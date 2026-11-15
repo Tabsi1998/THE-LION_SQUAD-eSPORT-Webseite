@@ -77,6 +77,54 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 
 ## 2. Einrichten Schritt für Schritt
 
+### 2.0 Bereich Ligen und Zuständige
+
+**Einmal nach dem Update (nur der Superadmin):** Die Rolle Turnierleitung und die Freigabe „Turnierleitung“ öffnen die Liga nicht
+mehr. Superadmin und Club-Admin haben den Bereich **Ligen** von selbst, alle anderen bekommen ihn einzeln. Nichts geschieht
+automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nur noch, was alle sehen.
+
+1. **Admin → Alle Benutzer** öffnen und die Person suchen.
+2. **Bearbeiten** tippen.
+3. Unter **Freigaben** den Haken bei **Ligen** setzen.
+4. **Speichern** und die Rückfrage bestätigen. Die Person bekommt eine Meldung, die Vergabe steht im Protokoll.
+5. Die Person braucht die Zwei-Faktor-Anmeldung. Hat sie noch keine, steht das in ihrer Meldung.
+
+**Zuständige je Liga:** Wer nur einen Teil machen soll, bekommt den Bereich nicht, sondern eine Zuständigkeit in einer Liga.
+
+1. **Admin → eSports → Liga** öffnen und bei der Liga **Zuständige** tippen.
+2. Unter **Person hinzufügen** den Namen tippen und die Person wählen.
+3. Anhaken, wofür sie zuständig ist, dann **Zuständig machen**.
+
+| Zuständigkeit | Was die Person darf |
+| --- | --- |
+| **Liga verwalten** | Liga bearbeiten, Seasons anlegen und löschen, Staffel starten, pausieren, beenden und sperren, Helfer der Staffel. Sieht auch, wer zuständig ist |
+| **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
+| **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
+| **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
+| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b), ins Veto eingreifen (3.1c) |
+| **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
+| **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
+| **Strafen** | Strafen verhängen, vorläufige Sperren bestätigen, widerrufen und über Einsprüche gegen Strafen entscheiden ([3.4a](#34a-strafen-regelwerk--13-anlage-c)) |
+| **Regeln veröffentlichen** | Regelwerk der Liga und der Season (2.11) |
+
+- Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
+- Zuständige finden ihre Ligen unter **Admin → Mein Dienst → Meine Ligen** und im Menü unter **Liga**. Sie sehen nur ihre Ligen und nur die Knöpfe ihrer Zuständigkeiten. Das gilt auch für Turnierleitung und Helfer, die zugleich zuständig sind.
+- **Bilder:** Zuständige ohne Admin-Medien laden Emblem, Banner und Gewinnbilder als eigene Bilder hoch (kein SVG), die Mediathek zeigt ihnen nur diese.
+- Vergeben und entfernen darf nur der Bereich **Ligen**. Liga anlegen und löschen auch.
+- **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
+- **Helfer** am Turnier (Organisation, Schiedsrichter, Ergebnisdienst, Station) lesen in einer Staffel nur noch. Ergebnisse tragen dort nur Zuständige und der Bereich Ligen ein.
+
+**Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
+keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen und setzt keinen Termin direkt. Die Matchseite und der Matchplan sagen es, der
+Knopf fehlt, und die Person meldet als eigene Seite wie alle anderen, den Termin über Vorschlag und Zustimmung. Es entscheidet eine zweite berechtigte Person. Nur der **Superadmin** darf als Notausnahme: Das Ergebnis-Fenster
+oder der Matchplan fragt dann nach dem Grund, er steht im Protokoll (`league.conflict.override`).
+
+**Ergebnis mit „Rückgängig“:** Verliert jemand in den 10 Sekunden die Zuständigkeit oder wird befangen, geht das Ergebnis nicht hinaus. Die Person bekommt eine
+Nachricht, der Vorgang steht im Protokoll.
+
+**Bekannte Grenze – Strafen-Eingang:** Admin → eSports → Strafen hängt bis #2208 am Bereich Turnierleitung. Kampflos-Wertungen einer Staffel und Strafen der Liga siehst du dort nur mit
+beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie. Am Spiel selbst bleibt die Wertung sichtbar, Strafen der Liga stehen immer im Reiter **Strafen** der Season.
+
 ### 2.1 Modi und Maps in der Bibliothek
 
 1. **Admin → eSports → Spiele → Zahnrad**, Reiter **Modi**, **Modus hinzufügen**: je Modus eine Zeile,
@@ -527,25 +575,28 @@ speichert.
 
 Wie es dann läuft, steht in 3.1b. Im Regelwerk nennt der Baustein `[[baustein:checkin]]` diese Werte (2.11).
 
-### 2.7f Erinnerungen
+### 2.7c Plattform und Eingabegerät
 
-Im Reiter **Termine** steht unter dem Check-in der Kasten **Erinnerungen** (Zuständigkeit „Season konfigurieren“) mit eigenem
-**Erinnerungen speichern**; er gilt sofort für alle Staffeln der Season. Je Art gibt es einen Schalter, die Zeiten haben Vorgaben. Ist für
-eine Season noch nichts gespeichert, steht „es gelten die Vorgaben unten“ – sie erinnert trotzdem schon.
+Eine Season kann nur für PC, nur für PlayStation, für mehrere oder alle Plattformen sein. Im Reiter **Anmeldung und Kader** steht dafür
+der Kasten **Plattform und Eingabegerät** (Zuständigkeit „Season konfigurieren“, Adresse `#plattform`) mit eigenem **Plattform
+speichern**. Er gilt sofort, ohne Übertragen, auch in laufenden Staffeln.
 
-| Art | Vorgabe | Wer bekommt sie |
-| --- | --- | --- |
-| **Spiel steht an** | 24 Stunden und 60 Minuten vor dem Termin | die Aufgestellten (ohne Aufstellung der Kader) und die Captains beider Seiten, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen (zum alten Termin) oder schon gestarteten Spielen und nicht, wenn das Spiel in einer Sperrzeit liegt. Vor dem ersten Spiel nach einer Pause kommt sie auch, wenn die Pause noch läuft |
-| **Termin noch offen** | bei 50 % der Spielwoche (Wochenmitte), spätestens 24 Stunden vor dem Standardtermin | Captain und Vertreter beider Seiten, solange kein Termin vereinbart ist – einmal je Spielwoche. Ohne Einigung gilt der Standardtermin; wird er nicht gemeldet, steht das Spiel bei euch als überfällig (2.7a) |
-| **Ergebnis fehlt** | Zeitpunkt aus „Termine und Verschiebungen“ (24 h nach dem Termin) | Captain und Vertreter beider Seiten. Kommt nicht, solange ein Vorfall oder ein Verfahren am Spiel offen ist |
-| **Map-Veto wartet** | nach 20 Sekunden ohne Zug, nie in den letzten 5 Sekunden | Captain und Vertreter der Seite am Zug, wenn sie die Matchseite nicht offen haben (3.1c) |
-| **Zusätzlich per Discord** | aus | Direktnachricht vom Vereins-Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben (Entscheidung Nr. 148). Gilt für alle Arten: Ist der Schalter aus, kommen auch „Ergebnis fehlt“ und „Map-Veto wartet“ nicht mehr per Discord – früher kamen sie bei eingeschaltetem Discord immer. Keine Funktion hängt an Discord |
+<img src="../assets/liga/liga-season-plattform-pc.png" alt="Kasten Plattform und Eingabegerät: Feld Plattform gewählt, nur PC angehakt, Crossplay aus, darunter was je Liga gilt" width="560">
 
-Jede Erinnerung kommt höchstens einmal, auch wenn der Job doppelt läuft. Spieler und Captains schalten „Match-Erinnerungen“ in ihren
-Benachrichtigungs-Einstellungen ab (Web und App). Die Nachricht „Spiel startet in 10 Minuten“ kommt in allen Turnieren und ist hier nicht
-einstellbar.
+1. **In welchem Feld steht die Plattform?** Wählt das Spiel-ID-Feld mit Auswahl, etwa „Plattform“. Fehlt es, legt es zuerst unter
+   **Admin → Spiele → Spiel → Spiel-IDs** an: Feld mit den Auswahlwerten (PC, PlayStation …). **Damit die Plattform je Season
+   festgehalten wird, das Plattform-Feld am Spiel als Pflicht führen.** Dann gilt sie wie die Spiel-ID die ganze Season; ein
+   freiwilliges Feld liest immer den aktuellen Wert im Profil.
+2. **Erlaubte Plattformen** anhaken. Nichts angehakt: alle erlaubt, keine Prüfung. Alle angehakt: jede erlaubt, die Angabe ist aber Pflicht.
+3. **Crossplay** (an, aus) und **Eingabegerät** (Controller, Maus und Tastatur, beides) sind nur Angaben für Regelwerk und
+   Ligaseite. Geprüft werden sie nicht.
 
-<img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche und spätestens 24 Stunden vor dem Standardtermin, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
+Darunter steht **So gilt es je Liga**. Eine Liga N weicht im Liga-N-Blatt ab (Reiter **Ligen und Staffeln**, Stift bei der Liga, Abschnitt
+**Plattform**): **Eigene Plattformen für diese Liga** anhaken und wählen. Mit Haken und ohne Auswahl sind in dieser Liga alle Plattformen
+erlaubt. Crossplay und Eingabegerät stehen dort auf „wie Season“, bis ihr etwas anderes wählt.
+
+Wer auf einer anderen Plattform spielt, ist nicht spielberechtigt und sieht den Grund, etwa „Diese Season ist nur für PC – angegeben
+ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Profil“. Wo das wirkt, steht in 3.9.
 
 ### 2.7d Veto: Maps vor dem Spiel sperren und wählen (Regelwerk § 6, Anlage B)
 
@@ -632,28 +683,25 @@ In beiden Fällen gilt: Solange ein Vorfall offen ist, wird **kein Ergebnis des 
 der 48-Stunden-Regel, und das Spiel steht nicht in der Tabelle. Wie ihr entscheidet, steht in 3.1d. Im Regeltext nennt
 `{{incident.answer_minutes}}` die Antwortzeit (2.11).
 
-### 2.7c Plattform und Eingabegerät
+### 2.7f Erinnerungen
 
-Eine Season kann nur für PC, nur für PlayStation, für mehrere oder alle Plattformen sein. Im Reiter **Anmeldung und Kader** steht dafür
-der Kasten **Plattform und Eingabegerät** (Zuständigkeit „Season konfigurieren“, Adresse `#plattform`) mit eigenem **Plattform
-speichern**. Er gilt sofort, ohne Übertragen, auch in laufenden Staffeln.
+Im Reiter **Termine** steht unter dem Check-in der Kasten **Erinnerungen** (Zuständigkeit „Season konfigurieren“) mit eigenem
+**Erinnerungen speichern**; er gilt sofort für alle Staffeln der Season. Je Art gibt es einen Schalter, die Zeiten haben Vorgaben. Ist für
+eine Season noch nichts gespeichert, steht „es gelten die Vorgaben unten“ – sie erinnert trotzdem schon.
 
-<img src="../assets/liga/liga-season-plattform-pc.png" alt="Kasten Plattform und Eingabegerät: Feld Plattform gewählt, nur PC angehakt, Crossplay aus, darunter was je Liga gilt" width="560">
+| Art | Vorgabe | Wer bekommt sie |
+| --- | --- | --- |
+| **Spiel steht an** | 24 Stunden und 60 Minuten vor dem Termin | die Aufgestellten (ohne Aufstellung der Kader) und die Captains beider Seiten, mit Gegner und Uhrzeit. Nicht bei abgesagten, verschobenen (zum alten Termin) oder schon gestarteten Spielen und nicht, wenn das Spiel in einer Sperrzeit liegt. Vor dem ersten Spiel nach einer Pause kommt sie auch, wenn die Pause noch läuft |
+| **Termin noch offen** | bei 50 % der Spielwoche (Wochenmitte), spätestens 24 Stunden vor dem Standardtermin | Captain und Vertreter beider Seiten, solange kein Termin vereinbart ist – einmal je Spielwoche. Ohne Einigung gilt der Standardtermin; wird er nicht gemeldet, steht das Spiel bei euch als überfällig (2.7a) |
+| **Ergebnis fehlt** | Zeitpunkt aus „Termine und Verschiebungen“ (24 h nach dem Termin) | Captain und Vertreter beider Seiten. Kommt nicht, solange ein Vorfall oder ein Verfahren am Spiel offen ist |
+| **Map-Veto wartet** | nach 20 Sekunden ohne Zug, nie in den letzten 5 Sekunden | Captain und Vertreter der Seite am Zug, wenn sie die Matchseite nicht offen haben (3.1c) |
+| **Zusätzlich per Discord** | aus | Direktnachricht vom Vereins-Bot an alle, die Discord in ihren Einstellungen eingeschaltet haben (Entscheidung Nr. 148). Gilt für alle Arten: Ist der Schalter aus, kommen auch „Ergebnis fehlt“ und „Map-Veto wartet“ nicht mehr per Discord – früher kamen sie bei eingeschaltetem Discord immer. Keine Funktion hängt an Discord |
 
-1. **In welchem Feld steht die Plattform?** Wählt das Spiel-ID-Feld mit Auswahl, etwa „Plattform“. Fehlt es, legt es zuerst unter
-   **Admin → Spiele → Spiel → Spiel-IDs** an: Feld mit den Auswahlwerten (PC, PlayStation …). **Damit die Plattform je Season
-   festgehalten wird, das Plattform-Feld am Spiel als Pflicht führen.** Dann gilt sie wie die Spiel-ID die ganze Season; ein
-   freiwilliges Feld liest immer den aktuellen Wert im Profil.
-2. **Erlaubte Plattformen** anhaken. Nichts angehakt: alle erlaubt, keine Prüfung. Alle angehakt: jede erlaubt, die Angabe ist aber Pflicht.
-3. **Crossplay** (an, aus) und **Eingabegerät** (Controller, Maus und Tastatur, beides) sind nur Angaben für Regelwerk und
-   Ligaseite. Geprüft werden sie nicht.
+Jede Erinnerung kommt höchstens einmal, auch wenn der Job doppelt läuft. Spieler und Captains schalten „Match-Erinnerungen“ in ihren
+Benachrichtigungs-Einstellungen ab (Web und App). Die Nachricht „Spiel startet in 10 Minuten“ kommt in allen Turnieren und ist hier nicht
+einstellbar.
 
-Darunter steht **So gilt es je Liga**. Eine Liga N weicht im Liga-N-Blatt ab (Reiter **Ligen und Staffeln**, Stift bei der Liga, Abschnitt
-**Plattform**): **Eigene Plattformen für diese Liga** anhaken und wählen. Mit Haken und ohne Auswahl sind in dieser Liga alle Plattformen
-erlaubt. Crossplay und Eingabegerät stehen dort auf „wie Season“, bis ihr etwas anderes wählt.
-
-Wer auf einer anderen Plattform spielt, ist nicht spielberechtigt und sieht den Grund, etwa „Diese Season ist nur für PC – angegeben
-ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Profil“. Wo das wirkt, steht in 3.9.
+<img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche und spätestens 24 Stunden vor dem Standardtermin, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
 
 ### 2.8 Sichtbarkeit
 
@@ -746,56 +794,6 @@ und bei den **Staffeln** – die App zeigt eine Staffel als Turnier mit ihrem Ba
 Turnierverwaltung ein eigenes Banner bekommen, bleibt das stehen.
 
 **Gewinne sind reine Anzeige:** Staffeln zählen weiter nicht für XP, Pokale oder die Jahreswertung.
-
-### 2.0 Bereich Ligen und Zuständige
-
-**Einmal nach dem Update (nur der Superadmin):** Die Rolle Turnierleitung und die Freigabe „Turnierleitung“ öffnen die Liga nicht
-mehr. Superadmin und Club-Admin haben den Bereich **Ligen** von selbst, alle anderen bekommen ihn einzeln. Nichts geschieht
-automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nur noch, was alle sehen.
-
-1. **Admin → Alle Benutzer** öffnen und die Person suchen.
-2. **Bearbeiten** tippen.
-3. Unter **Freigaben** den Haken bei **Ligen** setzen.
-4. **Speichern** und die Rückfrage bestätigen. Die Person bekommt eine Meldung, die Vergabe steht im Protokoll.
-5. Die Person braucht die Zwei-Faktor-Anmeldung. Hat sie noch keine, steht das in ihrer Meldung.
-
-**Zuständige je Liga:** Wer nur einen Teil machen soll, bekommt den Bereich nicht, sondern eine Zuständigkeit in einer Liga.
-
-1. **Admin → eSports → Liga** öffnen und bei der Liga **Zuständige** tippen.
-2. Unter **Person hinzufügen** den Namen tippen und die Person wählen.
-3. Anhaken, wofür sie zuständig ist, dann **Zuständig machen**.
-
-| Zuständigkeit | Was die Person darf |
-| --- | --- |
-| **Liga verwalten** | Liga bearbeiten, Seasons anlegen und löschen, Staffel starten, pausieren, beenden und sperren, Helfer der Staffel. Sieht auch, wer zuständig ist |
-| **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
-| **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
-| **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
-| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b), ins Veto eingreifen (3.1c) |
-| **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
-| **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
-| **Strafen** | Strafen verhängen, vorläufige Sperren bestätigen, widerrufen und über Einsprüche gegen Strafen entscheiden ([3.4a](#34a-strafen-regelwerk--13-anlage-c)) |
-| **Regeln veröffentlichen** | Regelwerk der Liga und der Season (2.11) |
-
-- Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
-- Zuständige finden ihre Ligen unter **Admin → Mein Dienst → Meine Ligen** und im Menü unter **Liga**. Sie sehen nur ihre Ligen und nur die Knöpfe ihrer Zuständigkeiten. Das gilt auch für Turnierleitung und Helfer, die zugleich zuständig sind.
-- **Bilder:** Zuständige ohne Admin-Medien laden Emblem, Banner und Gewinnbilder als eigene Bilder hoch (kein SVG), die Mediathek zeigt ihnen nur diese.
-- Vergeben und entfernen darf nur der Bereich **Ligen**. Liga anlegen und löschen auch.
-- **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
-- **Helfer** am Turnier (Organisation, Schiedsrichter, Ergebnisdienst, Station) lesen in einer Staffel nur noch. Ergebnisse tragen dort nur Zuständige und der Bereich Ligen ein.
-
-**Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
-keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen und setzt keinen Termin direkt. Die Matchseite und der Matchplan sagen es, der
-Knopf fehlt, und die Person meldet als eigene Seite wie alle anderen, den Termin über Vorschlag und Zustimmung. Es entscheidet eine zweite berechtigte Person. Nur der **Superadmin** darf als Notausnahme: Das Ergebnis-Fenster
-oder der Matchplan fragt dann nach dem Grund, er steht im Protokoll (`league.conflict.override`).
-
-**Ergebnis mit „Rückgängig“:** Verliert jemand in den 10 Sekunden die Zuständigkeit oder wird befangen, geht das Ergebnis nicht hinaus. Die Person bekommt eine
-Nachricht, der Vorgang steht im Protokoll.
-
-**Bekannte Grenze – Strafen-Eingang:** Admin → eSports → Strafen hängt bis #2208 am Bereich Turnierleitung. Kampflos-Wertungen einer Staffel und Strafen der Liga siehst du dort nur mit
-beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie. Am Spiel selbst bleibt die Wertung sichtbar, Strafen der Liga stehen immer im Reiter **Strafen** der Season.
-
----
 
 ### 2.11 Regelwerk: Versionen, PDF und Zustimmung
 
@@ -933,6 +931,8 @@ der Season sagt, was gespielt wird; Spieltage und Teams haben eine eigene Vorsch
 </tr>
 </table>
 
+---
+
 ## 3. Während der Season
 
 ### 3.0 Leitstand: alles Offene der Season an einem Ort
@@ -1029,6 +1029,14 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
   nach der zweiten Frist steht es unter **Mein Dienst → Braucht deine Entscheidung**, und ihr bekommt eine Nachricht.
   Entscheiden heißt: Ergebnis eintragen, kampflos werten oder einen neuen Termin festlegen. Ohne Entscheidung schließt
   die Season später nicht ab.
+
+### 3.1a Turnier nach dem Ende noch „Live“
+
+Gilt für alle Turniere: Steht ein Turnier nach seinem eingetragenen Ende noch auf **Live**, sagt es euch **Mein Dienst**
+(und die Startseite der Verwaltung) unter **Braucht deine Entscheidung**: „Läuft laut Stand noch, Ende war am … – beenden?“.
+Sind noch Spiele offen, zeigt die öffentliche Seite weiter **Läuft**; sind alle fertig, zeigt sie **Beendet**, und ihr stellt
+auf „Beendet“ bzw. „Ergebnisse veröffentlichen“ – erst dann gelten Gewinne und Saisonpunkte. Umgestellt wird nie von
+selbst. Die Turnierliste zeigt denselben Hinweis neben dem Stand.
 
 ### 3.1b Check-in und Start (Regelwerk § 8)
 
@@ -1181,14 +1189,6 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
 - **Zurückziehen** kann die meldende Seite nur, solange die Antwortzeit läuft. Danach liegt der Vorfall bei euch.
 
 <img src="../assets/liga/vorfall-entscheiden-1440.png" alt="Fläche Vorfälle im Spiel für die Liga-Leitung: der Vorfall in Klärung mit Stand und Vorschlag, darunter die Entscheidung mit sechs Möglichkeiten, der Seite für die zugesprochene Map, der Begründung und dem Haken Serie gleich feststellen" width="820">
-
-### 3.1a Turnier nach dem Ende noch „Live“
-
-Gilt für alle Turniere: Steht ein Turnier nach seinem eingetragenen Ende noch auf **Live**, sagt es euch **Mein Dienst**
-(und die Startseite der Verwaltung) unter **Braucht deine Entscheidung**: „Läuft laut Stand noch, Ende war am … – beenden?“.
-Sind noch Spiele offen, zeigt die öffentliche Seite weiter **Läuft**; sind alle fertig, zeigt sie **Beendet**, und ihr stellt
-auf „Beendet“ bzw. „Ergebnisse veröffentlichen“ – erst dann gelten Gewinne und Saisonpunkte. Umgestellt wird nie von
-selbst. Die Turnierliste zeigt denselben Hinweis neben dem Stand.
 
 ### 3.2 Ergebnisse
 
@@ -1613,7 +1613,6 @@ bekommt er unter **Gewinne** „nach Korrektur prüfen“; landet dieselbe Beloh
 solange der Gewinn nicht abgeholt ist.
 
 **Sichtbarkeit:** Öffentlich steht eine Belohnung nur, wenn Gäste die Season und die Staffel sehen dürfen.
-
 
 ### 3.13 Gesamtwertung über Seasons
 
