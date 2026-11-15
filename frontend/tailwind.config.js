@@ -1,8 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     darkMode: ["class"],
+    // Tests erzeugen keine Klassen (#936): Klassennamen, die nur in Asserts stehen, landeten sonst im Haupt-CSS.
     content: [
     "./src/**/*.{js,jsx,ts,tsx}",
+    "!./src/**/*.{test,spec}.{js,jsx,ts,tsx}",
     "./index.html"
   ],
   theme: {
