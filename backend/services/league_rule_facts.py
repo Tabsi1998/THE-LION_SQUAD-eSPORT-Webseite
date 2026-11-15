@@ -603,34 +603,95 @@ def veto_rules_of(season: dict) -> dict | None:
     return rules if rules["enabled"] and rules["steps"] else None
 
 
-def veto_data(season: dict, game: dict | None) -> dict:
-    """Die Daten des Bausteins: Team-A-Regel, Zeit je Schritt und die Schritte mit dem heutigen Namen des Modus - ``{enabled: false}``
-    ohne Veto."""
+def veto_divisions(season: dict, divisions: list[dict] | None) -> list[dict]:
+    """Die Ligen N mit eigenem Best of (Nr. 106): Die Vorlage belegt die Positionen der Season, dort läuft kein Veto
+    (``league_veto.outlook`` → ``skipped``, „Was fehlt noch?“ warnt) - ``[{label, best_of}]``, sonst leer."""
+    base = int(_effective(season, None).get("best_of") or 1)
+    rows = []
+    for division in divisions or []:
+        best_of = int(_effective(season, division).get("best_of") or 1)
+        if best_of != base:
+            rows.append({"label": _division_label(division), "best_of": best_of})
+    return rows
+
+
+def veto_data(season: dict, game: dict | None, divisions: list[dict] | None = None) -> dict:
+    """Die Daten des Bausteins: Team-A-Regel, Zeit je Schritt und die Schritte mit dem heutigen Namen des Modus, dazu die Ligen N ohne
+    Veto (#2426) - ``{enabled: false}`` ohne Veto."""
     rules = veto_rules_of(season)
     if not rules:
         return {"enabled": False}
     labels = game_mode_labels(game)
     return {"enabled": True, "team_a": rules["team_a"], "step_seconds": int(rules["step_seconds"]),
             "steps": [{"kind": step["kind"], "mode": step["mode"], "mode_label": labels.get(step["mode"], step["mode"]), "team": step["team"],
-                       "position": step["position"]} for step in rules["steps"]]}
+                       "position": step["position"]} for step in rules["steps"]],
+            "divisions": veto_divisions(season, divisions)}
+
+
+# Anlage B (#2426, Nr. 100): je Schrittart Aktion, wer handelt und was der Schritt bewirkt - die Sätze entstehen beim Darstellen.
+VETO_ACTIONS = {league_veto_rules.BAN: "Sperren (Ban)", league_veto_rules.PICK: "Wählen (Pick)", league_veto_rules.DECIDER: "Decider",
+                league_veto_rules.PRESET: "Vorgabe der Woche"}
+VETO_ACTORS = {league_veto_rules.DECIDER: "System", league_veto_rules.PRESET: "Liga-Leitung"}
+VETO_HEAD = ["| Schritt | Modus | Aktion | Am Zug | Wirkung | Zeit |", "| ---: | --- | --- | --- | --- | --- |"]
+
+
+def _veto_effect(step: dict) -> str:
+    position = step.get("position")
+    if step["kind"] == league_veto_rules.BAN:
+        return "eine Map dieses Modus fällt weg"
+    if step["kind"] == league_veto_rules.DECIDER:
+        return f"die übrige Map wird Map {position}"
+    if step["kind"] == league_veto_rules.PRESET:
+        return f"Map {position}, je Spielwoche festgelegt"
+    return f"Map {position} der Serie"
+
+
+def _veto_row(index: int, step: dict, seconds: int) -> str:
+    kind = step["kind"]
+    system = kind in league_veto_rules.SYSTEM_KINDS
+    actor = VETO_ACTORS.get(kind) or f"Team {step.get('team') or '?'}"
+    return (f"| {index} | {_cell(step.get('mode_label') or step.get('mode') or '')} | {VETO_ACTIONS.get(kind, kind)} | {actor} "
+            f"| {_veto_effect(step)} | {NOT_SET if system else f'{seconds} Sek.'} |")
 
 
 def render_veto(data: dict, variant: str = MARKDOWN) -> str:
-    """Liste: Team-A-Regel, Zeit je Schritt, Start nach dem Check-in; dann die Schritte nummeriert („1. Team A sperrt eine Map (Stellung)“)."""
+    """Anlage B (#2426): die Regeln zum Ablauf (Team A/B, Start, Zeit je Schritt, Zeitüberschreitung, keine Seitenwahl, Eingriffe der
+    Leitung, mit Vorgabe der Woche der Bereit-Start), dann die Schrittfolge als Tabelle und die Ligen N ohne Veto. Ohne Vorlage ein Satz -
+    steht der Baustein allein in einer Anlage, entfällt sie (``is_empty``)."""
     if not data.get("enabled") or not data.get("steps"):
         return NO_VETO
+    seconds = int(data.get("step_seconds") or 60)
+    kinds = {step.get("kind") for step in data["steps"]}
+    system = [VETO_ACTIONS[kind] for kind in (league_veto_rules.DECIDER, league_veto_rules.PRESET) if kind in kinds]
+    system_note = f" {' und '.join(system)} setzt das System ohne Wartezeit." if system else ""
     lines = [
-        f"- {TEAM_A_WORDS.get(data.get('team_a'), TEAM_A_WORDS['home'])}",
-        f"- Je Schritt {int(data.get('step_seconds') or 60)} Sekunden – nach Ablauf wählt das System zufällig aus den noch zulässigen Maps.",
-        "- Das Veto beginnt, sobald beide Teams eingecheckt sind; Map 1 folgt direkt danach.",
+        f"- Team A und B: {TEAM_A_WORDS.get(data.get('team_a'), TEAM_A_WORDS['home'])}",
+        "- Start: Das Veto beginnt, sobald beide Teams eingecheckt sind; Map 1 folgt direkt danach.",
+        f"- Zeit je Schritt: {seconds} Sekunden für das Team am Zug.{system_note}",
+        "- Zeitüberschreitung: Nach Ablauf wählt das System zufällig aus den noch zulässigen Maps - nur aus solchen, mit denen sich die "
+        "Serie noch vollständig bilden lässt.",
+        # Nr. 92: keine Schrittart für die Seite - die Seiten ergeben sich im Spiel.
+        "- Seitenwahl: keine - die Seiten ergeben sich im Spiel aus Heim und Gast.",
+        # Nr. 107: ``league_veto.LEAD_ACTIONS``.
+        "- Liga-Leitung: Sie wählt nie für ein Team; mit Grund kann sie das Veto pausieren, fortsetzen, einen Schritt zurücknehmen oder neu "
+        "starten.",
     ]
     if league_veto_rules.preset_steps(data["steps"]):
         # Vorgabe der Woche (#2326, Nr. 122): welche Map es je Woche ist, steht nicht hier - die Variable ``veto.presets`` nennt sie.
         lines.append(PRESET_RULE)
-    lines.append("")
-    lines += [f"{index}. {_cell(league_veto_rules.step_sentence(step, step.get('mode_label') or step.get('mode') or ''))}"
-              for index, step in enumerate(data["steps"], 1)]
+    lines += ["", *VETO_HEAD, *[_veto_row(index, step, seconds) for index, step in enumerate(data["steps"], 1)]]
+    # Ältere Fassungen tragen ``divisions`` nicht - dann keine Zeile (Nr. 106).
+    divisions = data.get("divisions") or []
+    if divisions:
+        lines.append("")
+    lines += [f"- Abweichend in {_cell(row.get('label'))}: Best of {row.get('best_of')} – dort gibt es kein Veto, die Maps werden beim "
+              "Ergebnis eingetragen." for row in divisions]
     return "\n".join(lines)
+
+
+def veto_is_empty(data: dict) -> bool:
+    """Ohne Vorlage keine Anlage B (#2426): steht der Baustein allein in einer Anlage, entfällt sie."""
+    return not data.get("enabled") or not data.get("steps")
 
 
 def veto_presets_text(season: dict, game: dict | None, pool: dict | None) -> str | None:
@@ -651,12 +712,6 @@ def veto_presets_text(season: dict, game: dict | None, pool: dict | None) -> str
     return "; ".join(parts) or NO_PRESETS_YET
 
 
-async def build_veto(db, league: dict, season: dict) -> dict:
-    data = veto_data(season, await game_of(db, league))
-    source = ({"team_a": data["team_a"], "step_seconds": data["step_seconds"],
-               "steps": [{key: step[key] for key in ("kind", "mode", "team", "position")} for step in data["steps"]]}
-              if data.get("enabled") else None)
-    return {"source": {"veto_rules": source}, "data": data}
 # ---------------------------------------------------------------- Wertung durch die Leitung (#2424, A7/A8)
 
 def _preset_of(season: dict, key: str) -> int:
@@ -693,3 +748,10 @@ async def build_lead_rulings(db, league: dict, season: dict) -> dict:
     return {"source": dict(data), "data": data}
 
 
+async def build_veto(db, league: dict, season: dict) -> dict:
+    data = veto_data(season, await game_of(db, league), await divisions_of(db, season))
+    source = ({"team_a": data["team_a"], "step_seconds": data["step_seconds"],
+               "steps": [{key: step[key] for key in ("kind", "mode", "team", "position")} for step in data["steps"]],
+               "divisions": data["divisions"]}
+              if data.get("enabled") else None)
+    return {"source": {"veto_rules": source}, "data": data}

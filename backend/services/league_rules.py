@@ -124,12 +124,19 @@ def _fill(body: str, values: dict[str, str], var_values: dict[str, dict] | None,
     return text.fill_blocks(filled, values, missing=blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT)
 
 
+def _empty_block(rows: dict[str, dict]):
+    """Schlüssel → ist der Baustein in ``rows`` für diese Seite leer (#2426)? Eine Anlage nur aus leeren Bausteinen entfällt."""
+    return lambda key: blocks.is_empty(key, rows.get(key))
+
+
 def _sections(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> list[dict]:
-    """Die Abschnitte einer Fassung auf dieser Seite - mit den eingefrorenen Bausteinen und Variablen."""
+    """Die Abschnitte einer Fassung auf dieser Seite - mit den eingefrorenen Bausteinen und Variablen. Web, PDF und Vergleich lesen
+    alle hier: Ohne Veto-Vorlage fehlt eine Anlage, die nur den Baustein trägt, überall gleich (#2426)."""
     values = _frozen_values(version, season, variant, plain)
     var_values = _frozen_vars(version, season)
+    rows = (version.get("frozen") or {}).get((season or {}).get("id") or "") or {}
     return text.sections_of(version.get("body_md"), version.get("annexes"),
-                            fill=lambda body: _fill(body, values, var_values, season, plain))
+                            fill=lambda body: _fill(body, values, var_values, season, plain), empty_block=_empty_block(rows))
 
 
 def _label(version: dict) -> str:
@@ -510,7 +517,8 @@ async def _rendered(db, scope: str, league: dict, season: dict | None, body_md: 
     values = {key: blocks.value(key, row) for key, row in snapshot.blocks.get(own, {}).items()}
     var_values = snapshot.vars.get(own, {})
     unknown_vars = variables.unknown(names, await facts.game_of(db, league))
-    sections = text.sections_of(body_md, annexes, fill=lambda value: _fill(value, values, var_values, season, keep=unknown_vars))
+    sections = text.sections_of(body_md, annexes, fill=lambda value: _fill(value, values, var_values, season, keep=unknown_vars),
+                                empty_block=_empty_block(snapshot.blocks.get(own, {})))
     result = await _compared(previous, season, sections)
     return {"sections": _served(sections, result), "blocks_used": [key for key in keys if key in blocks.BLOCKS],
             "unknown_blocks": blocks.unknown(keys), "vars_used": [name for name in names if name in var_values],

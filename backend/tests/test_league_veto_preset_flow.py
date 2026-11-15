@@ -828,7 +828,8 @@ async def test_the_rule_block_describes_the_preset_and_the_variable_lists_the_we
     season_doc = await flow.db.league_seasons.find_one({"id": sid}, {"_id": 0})
     rules_page = ok(await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{season_doc['slug']}"))
     body = league_rule_blocks.plain("\n".join(row["body_md"] for row in rules_page["sections"]))
-    assert "Die Liga-Leitung gibt Map 3 je Spielwoche vor" in body
+    # Anlage B (#2426): der Schritt als Zeile der Tabelle.
+    assert "| Kontrolle | Vorgabe der Woche | Liga-Leitung | Map 3, je Spielwoche festgelegt | – |" in body
     assert "Vorgabe der Woche: Wo die Schrittfolge es nennt, legt die Liga-Leitung die Map je Spielwoche fest." in body
     # Der Wert der Variable steht als Klartext im Satz - Klammern sind dort für Markdown maskiert.
     assert r"Vorgaben: Spielwoche 1: Kai \(Kontrolle\); Spielwoche 2: Hafen \(Kontrolle\)." in body

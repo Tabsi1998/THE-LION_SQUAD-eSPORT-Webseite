@@ -260,6 +260,8 @@ class Block:
     build: Callable[[object, dict, dict], Awaitable[dict]]
     render: Callable[[dict, str], str]
     images: Callable[[dict], list[str]] = lambda _data: []
+    # Leer für diese Seite (#2426): Steht der Baustein allein in einer Anlage, entfällt sie - etwa Anlage B ohne Veto-Vorlage.
+    is_empty: Callable[[dict], bool] = lambda _data: False
 
     @property
     def token(self) -> str:
@@ -271,8 +273,11 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("mode_order", "Modusfolge", "Die Modi je Map aus den Vorgaben der Season.", _mode_order, _mode_order_text, _mode_order_images),
     Block("checkin", "Check-in", "Fenster und Mindestzahl des Check-ins aus den Vorgaben der Season (D.2).", _checkin, _checkin_text),
     # Veto (D.3, #1618) - Daten und Darstellung in league_rule_facts, wie die Bausteine aus den Einstellungen.
-    Block("veto", "Veto", "Team-A-Regel, Zeit je Schritt und die Schrittfolge des Map-Vetos aus den Vorgaben der Season (D.3).",
-          facts.build_veto, facts.render_veto),
+    # Anlage B (#2426): Steht der Baustein allein in einer Anlage, entfällt sie ohne Vorlage.
+    Block("veto", "Veto", "Anlage B aus der Veto-Vorlage der Season (D.3): Team A und B, Start, Zeit je Schritt, Zeitüberschreitung, "
+          "Seitenwahl, Eingriffe der Leitung, Bereit-Start bei einer Vorgabe der Woche, die Schrittfolge als Tabelle und die Ligen N "
+          "ohne Veto. Steht er allein in einer Anlage, entfällt sie ohne Vorlage.",
+          facts.build_veto, facts.render_veto, is_empty=facts.veto_is_empty),
     Block("loadout_bans", "Erlaubte Ausrüstung", "Was gespielt werden darf: die aktive Bibliothek ohne die Sperrliste der Season, je "
           "Kategorie und Unterkategorie mit Bildern und Einschränkungen („nicht in …“ bzw. „nur in …“), Waffen als Tabelle mit den "
           "Aufsätzen nach Slot („nur erlaubt“, wenn das kürzer ist); ganz gesperrte Klassen als „nicht erlaubt“ (Anlage A).", _loadout_bans,
@@ -291,15 +296,15 @@ BLOCKS: dict[str, Block] = {block.key: block for block in (
     Block("eligibility", "Spielberechtigung", "Zulassung, Annahme der Anmeldung (automatisch oder durch die Leitung, #2348), Mindestalter, Spiel-IDs, Plattform, "
           "ein Co-Team je Season, Wartezeit, Stichtag und Transferfenster (B.3, #2270).",
           facts.build_eligibility, facts.render_eligibility),
+    # Was die Liga-Leitung von Hand wertet (#2424, A7/A8: Nr. 103, 109) - gedacht für Anlage C bzw. § 9a.
+    Block("lead_rulings", "Wertung durch die Leitung", "Was das System nicht selbst wertet: Abbruch in der frühen Phase (Einigung der Teams, "
+          "sonst die Leitung) und eine fehlende MOSS-Datei (nur ein Hinweis an die Leitung) - mit Antwortzeit und MOSS-Frist der Season.",
+          facts.build_lead_rulings, facts.render_lead_rulings),
 )}
 _IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
 
 
 def value(key: str, row: dict | None, variant: str = MARKDOWN) -> str:
-    # Was die Liga-Leitung von Hand wertet (#2424, A7/A8: Nr. 103, 109) - gedacht für Anlage C bzw. § 9a.
-    Block("lead_rulings", "Wertung durch die Leitung", "Was das System nicht selbst wertet: Abbruch in der frühen Phase (Einigung der Teams, "
-          "sonst die Leitung) und eine fehlende MOSS-Datei (nur ein Hinweis an die Leitung) - mit Antwortzeit und MOSS-Frist der Season.",
-          facts.build_lead_rulings, facts.render_lead_rulings),
     """Ein Baustein zum Darstellen (Markdown mit geschützten Namen). Neu eingefroren: aus ``data``; ältere Fassungen: das gespeicherte
     ``markdown`` bzw. ``text`` (``pdf`` liest dort ``text``, #2305)."""
     row = row or {}
@@ -309,6 +314,12 @@ def value(key: str, row: dict | None, variant: str = MARKDOWN) -> str:
     kept = TEXT if variant == PDF else variant
     stored = row.get(kept) if row.get(kept) is not None else row.get(MARKDOWN)
     return str(stored or "")
+
+
+def is_empty(key: str, row: dict | None) -> bool:
+    """Ist der eingefrorene Baustein für diese Seite leer (#2426)? Nur mit ``data`` - ältere Fassungen mit gespeichertem Markdown nie."""
+    block = BLOCKS.get(key)
+    return bool(block and isinstance(row, dict) and "data" in row and block.is_empty(row.get("data") or {}))
 
 
 def plain_value(key: str, row: dict | None, variant: str = TEXT) -> str:

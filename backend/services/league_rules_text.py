@@ -59,9 +59,17 @@ def _anchor(title: str | None, prefix: str, seen: dict[str, int]) -> str:
     return base if seen[base] == 1 else f"{base}-{seen[base]}"
 
 
-def sections_of(body_md: str | None, annexes: list[dict] | None = None, *, fill=None) -> list[dict]:
+def only_blocks(body: str | None) -> list[str]:
+    """Die Bausteine eines Textes, der nur aus ihnen besteht (Leerraum zählt nicht) - sonst leer."""
+    value = strip_protected(body or "")
+    return block_keys(value) if not _TOKEN.sub("", value).strip() else []
+
+
+def sections_of(body_md: str | None, annexes: list[dict] | None = None, *, fill=None, empty_block=None) -> list[dict]:
     """Haupttext und Anlagen als Abschnitte ``{anchor, title, level, kind, body_md}``. ``fill``: Text → Text, setzt die
-    Bausteine ein, bevor geschnitten wird. Ein eingegebenes Zeichen aus dem Bereich der Schutzzeichen fällt vorher weg (#2218)."""
+    Bausteine ein, bevor geschnitten wird. Ein eingegebenes Zeichen aus dem Bereich der Schutzzeichen fällt vorher weg (#2218).
+    ``empty_block``: Schlüssel → ist der Baustein für diese Seite leer? Eine Anlage nur aus solchen Bausteinen entfällt (#2426: ohne
+    Veto-Vorlage keine Anlage B); ihr Buchstabe bleibt, die nächste heißt weiter so wie in der Verwaltung."""
     given = fill or (lambda value: value)
 
     def filled(value: str) -> str:
@@ -73,6 +81,9 @@ def sections_of(body_md: str | None, annexes: list[dict] | None = None, *, fill=
         out.append({"anchor": _anchor(row["title"], "", seen), "title": row["title"], "level": row["level"],
                     "kind": "main", "body_md": row["body_md"]})
     for annex in annexes or []:
+        only = only_blocks(annex.get("body_md")) if empty_block else []
+        if only and all(empty_block(name) for name in only):
+            continue
         key = str(annex.get("key") or "").upper()
         prefix = f"anlage-{key.lower()}"
         parts = _split(filled(annex.get("body_md") or ""))

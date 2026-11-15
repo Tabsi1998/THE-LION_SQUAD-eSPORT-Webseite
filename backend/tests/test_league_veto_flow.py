@@ -751,11 +751,16 @@ async def test_the_rule_block_freezes_the_template_as_data_and_renders_german(fl
     assert on["veto"]["label"] == "Veto" and on["veto"]["source"]["veto_rules"]["step_seconds"] == 45
     assert on["veto"]["data"]["steps"][0] == {"kind": "ban", "mode": HP, "mode_label": "Stellung", "team": "A", "position": None}
     text = league_rule_blocks.plain_value("veto", on["veto"])
-    assert "Team A ist das Heimteam laut Spielplan" in text and "Je Schritt 45 Sekunden" in text
-    assert "1. Team A sperrt eine Map (Stellung)" in text and "3. Team A wählt Map 1 (Stellung)" in text
-    assert "11. Die übrige Map wird Map 3 (Kontrolle)" in text
+    assert "Team A ist das Heimteam laut Spielplan" in text and "- Zeit je Schritt: 45 Sekunden für das Team am Zug." in text
+    # Anlage B (#2426): die Schrittfolge als Tabelle in ihrer Reihenfolge, der Decider ohne Zeit.
+    assert "| 1 | Stellung | Sperren (Ban) | Team A | eine Map dieses Modus fällt weg | 45 Sek. |" in text
+    assert "| 3 | Stellung | Wählen (Pick) | Team A | Map 1 der Serie | 45 Sek. |" in text
+    assert "| 11 | Kontrolle | Decider | System | die übrige Map wird Map 3 | – |" in text
+    assert on["veto"]["data"]["divisions"] == [] and on["veto"]["source"]["veto_rules"]["divisions"] == []
     assert "" not in text, "Klartext ohne Schutzzeichen"
-    assert "" in league_rule_blocks.value("veto", on["veto"]), "beim Darstellen sind die Namen geschützt"
+    # Anlage B (#2426): Der Modus steht ohne Klammern in der Tabelle - der Name geht weiter durch ``text_cell`` (Unit-Test mit
+    # Sonderzeichen im Namen); hier entsteht der Wert beim Darstellen aus den eingefrorenen Daten.
+    assert league_rule_blocks.value("veto", on["veto"]) == league_rule_facts.render_veto(on["veto"]["data"])
     assert any(row["key"] == "veto" for row in league_rule_blocks.catalog())
     # Variablen (#2269): nur mit Veto einen Wert, sonst „(nicht festgelegt)“.
     with_veto = await league_rule_vars.context(flow.db, league, {"id": "s", "veto_rules": veto_rules(step_seconds=45, team_a="draw")})
@@ -782,7 +787,7 @@ async def test_a_changed_template_asks_for_a_new_rule_release(flow):
     assert await league_rules.data_changes(flow.db, league_doc, season_doc, version) is None, "nichts geändert"
     page = ok(await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{season_doc['slug']}"))
     body = league_rule_blocks.plain("\n".join(row["body_md"] for row in page["sections"]))
-    assert "Team A sperrt eine Map" in body and "60 Sekunden" in body and "das Heimteam laut Spielplan" in body
+    assert "| Sperren (Ban) | Team A |" in body and "60 Sekunden" in body and "das Heimteam laut Spielplan" in body
     ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(step_seconds=90, team_a="draw")))
     season_doc = await flow.db.league_seasons.find_one({"id": sid}, {"_id": 0})
     changes = await league_rules.data_changes(flow.db, league_doc, season_doc, version)
@@ -794,6 +799,60 @@ async def test_a_changed_template_asks_for_a_new_rule_release(flow):
     page = ok(await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{season_doc['slug']}"))
     body = league_rule_blocks.plain("\n".join(row["body_md"] for row in page["sections"]))
     assert "60 Sekunden" in body and "90 Sekunden" not in body
+
+
+def pdf_words(data: bytes) -> str:
+    import fitz
+
+    return " ".join("\n".join(page.get_text() for page in fitz.open(stream=data, filetype="pdf")).split())
+
+
+@pytest.mark.asyncio
+async def test_annex_b_comes_from_the_template_on_page_pdf_and_compare(flow):
+    """#2426 (Nr. 100): Anlage B mit ``[[baustein:veto]]`` zeigt die Schrittfolge der Season - auf der Seite, im PDF und im Vergleich
+    mit demselben Renderer. Die Sätze entstehen beim Anzeigen: Eine Fassung mit Daten von früher (ohne ``divisions``) zeigt die Tabelle
+    trotzdem. Ohne Vorlage gibt es keine Anlage B; Anlage C behält ihren Buchstaben."""
+    w = await season_world(flow)
+    sid = w["season"]["id"]
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules()))
+    annexes = [{"title": "Einstellungen", "body_md": "Siehe Map-Pool."}, {"title": "Veto", "body_md": "[[baustein:veto]]"},
+               {"title": "Strafen", "body_md": "Katalog"}]
+    first = await publish(flow, w, body="# § 6 Veto\n\nDie Schrittfolge steht in Anlage B.\n", annexes=annexes, reason="Anlage B")
+    ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"visibility": "admins"}))
+    season_doc = await flow.db.league_seasons.find_one({"id": sid}, {"_id": 0})
+    base = f"/api/league-rules/seasons/{w['league']['slug']}/{season_doc['slug']}"
+    # Früher eingefroren: ohne ``divisions`` - die Anlage entsteht trotzdem neu beim Anzeigen.
+    await flow.db.league_rules.update_one({"id": first["id"]}, {"$unset": {f"frozen.{sid}.veto.data.divisions": ""}})
+    stored = await flow.db.league_rules.find_one({"id": first["id"]}, {"_id": 0})
+    assert "divisions" not in stored["frozen"][sid]["veto"]["data"]
+    page = ok(await flow.get(base))
+    by_anchor = {row["anchor"]: row for row in page["sections"]}
+    assert [row["anchor"] for row in page["sections"] if row["anchor"].startswith("anlage")] == ["anlage-a", "anlage-b", "anlage-c"]
+    annex_b = league_rule_blocks.plain(by_anchor["anlage-b"]["body_md"])
+    assert by_anchor["anlage-b"]["title"] == "Anlage B: Veto"
+    assert "| 1 | Stellung | Sperren (Ban) | Team A | eine Map dieses Modus fällt weg | 60 Sek. |" in annex_b
+    assert "| 11 | Kontrolle | Decider | System | die übrige Map wird Map 3 | – |" in annex_b
+    assert "- Seitenwahl: keine" in annex_b and "- Zeitüberschreitung:" in annex_b
+    pdf = await flow.get(f"{base}/versions/{first['id']}/pdf")
+    assert pdf.status_code == 200
+    words = pdf_words(pdf.content)
+    assert "Anlage B: Veto" in words and "Sperren (Ban)" in words and "die übrige Map wird Map 3" in words
+    # Ohne Vorlage: keine Anlage B - auf der Seite, im PDF und im Vergleich.
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(enabled=False)))
+    second = await publish(flow, w, body="# § 6 Veto\n\nOhne Veto.\n", annexes=annexes, reason="ohne Veto")
+    page = ok(await flow.get(base))
+    assert [row["anchor"] for row in page["sections"] if row["anchor"].startswith("anlage")] == ["anlage-a", "anlage-c"]
+    assert "Anlage C: Strafen" in [row["title"] for row in page["sections"]]
+    pdf = await flow.get(f"{base}/versions/{second['id']}/pdf?marks=0")
+    words = pdf_words(pdf.content)
+    assert "Anlage B" not in words and "Sperren (Ban)" not in words and "Anlage C: Strafen" in words
+    # Mit Markierung nennt das PDF die entfernte Anlage nur noch in der Liste der entfernten Abschnitte.
+    marked = pdf_words((await flow.get(f"{base}/versions/{second['id']}/pdf")).content)
+    assert "Anlage B: Veto" in marked and "Sperren (Ban)" not in marked
+    compare = ok(await flow.get(f"{base}/compare?base={first['id']}&target={second['id']}"))
+    removed = [row for row in compare["sections"] if row["status"] == "removed"]
+    assert [row["anchor"] for row in removed] == ["anlage-b"]
+    assert "Sperren (Ban)" in "".join(op["text"] for op in removed[0]["ops"])
 
 
 # ---------------------------------------------------------------- Vorlage je Season (Verwaltung)

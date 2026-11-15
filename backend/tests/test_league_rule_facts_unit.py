@@ -203,6 +203,61 @@ def test_lead_rulings_say_the_lead_rules_by_hand():
     assert any(row["key"] == "lead_rulings" for row in blocks.catalog())
 
 
+# ---------------------------------------------------------------- Anlage B Veto-Folge (#2426)
+
+VETO_STEPS = [{"kind": "ban", "mode": "hp", "mode_label": "Stellung | Halten", "team": "A", "position": None},
+              {"kind": "pick", "mode": "hp", "mode_label": "Stellung | Halten", "team": "B", "position": 1},
+              {"kind": "ban", "mode": "snd", "mode_label": "Suchen", "team": "B", "position": None},
+              {"kind": "decider", "mode": "snd", "mode_label": "Suchen", "team": None, "position": 2},
+              {"kind": "preset", "mode": "ctl", "mode_label": "Kontrolle", "team": None, "position": 3}]
+
+
+def test_annex_b_lists_rules_and_steps_from_the_template():
+    """#2426 (Nr. 100): Anlage B aus der Veto-Vorlage - Team A/B, Start, Zeit je Schritt, Zeitüberschreitung, keine Seitenwahl (Nr. 92),
+    Eingriffe der Leitung (Nr. 107), Bereit-Start bei einer Vorgabe der Woche; die Schritte als Tabelle in ihrer Reihenfolge."""
+    data = {"enabled": True, "team_a": "draw", "step_seconds": 45, "steps": VETO_STEPS}
+    for variant in ("markdown", "text", "pdf"):
+        out = plain(blocks.value("veto", {"data": data}, variant))
+        assert "- Team A und B: Team A wird je Spiel vom System gelost." in out
+        assert "- Start: Das Veto beginnt, sobald beide Teams eingecheckt sind; Map 1 folgt direkt danach." in out
+        assert "- Zeit je Schritt: 45 Sekunden für das Team am Zug." in out
+        assert "- Zeitüberschreitung: Nach Ablauf wählt das System zufällig aus den noch zulässigen Maps" in out
+        assert "- Seitenwahl: keine - die Seiten ergeben sich im Spiel aus Heim und Gast." in out
+        assert "pausieren, fortsetzen, einen Schritt zurücknehmen oder neu starten" in out
+        assert "„Bereit zum Veto“" in out, "mit Vorgabe der Woche der Bereit-Start"
+        rows = [line for line in out.splitlines() if line.startswith("| ") and not line.startswith("| Schritt") and "---" not in line]
+        assert rows == ["| 1 | Stellung / Halten | Sperren (Ban) | Team A | eine Map dieses Modus fällt weg | 45 Sek. |",
+                        "| 2 | Stellung / Halten | Wählen (Pick) | Team B | Map 1 der Serie | 45 Sek. |",
+                        "| 3 | Suchen | Sperren (Ban) | Team B | eine Map dieses Modus fällt weg | 45 Sek. |",
+                        "| 4 | Suchen | Decider | System | die übrige Map wird Map 2 | – |",
+                        "| 5 | Kontrolle | Vorgabe der Woche | Liga-Leitung | Map 3, je Spielwoche festgelegt | – |"], variant
+    home = facts.render_veto({**data, "team_a": "home", "steps": VETO_STEPS[:4]})
+    assert "Team A ist das Heimteam laut Spielplan, Team B der Gast." in home and "Bereit zum Veto" not in home
+    assert no_protected(blocks.plain_value("veto", {"data": data}))
+    bold = blocks.value("veto", {"data": {**data, "steps": [{**VETO_STEPS[0], "mode_label": "Stellung **fett**"}]}})
+    assert not no_protected(bold) and "\\*\\*fett\\*\\*" in served(bold), "der Name des Modus ist Text, nie fett"
+
+
+def test_annex_b_names_divisions_without_veto_and_nothing_without_template():
+    """#2426 (Nr. 106): Eine Liga N mit eigenem Best of spielt ohne Veto - die Anlage sagt es je Liga N. Ohne Vorlage: der Satz ohne
+    Veto und ``is_empty`` - steht der Baustein allein in einer Anlage, entfällt sie. Ältere Fassungen ohne ``divisions`` bleiben."""
+    season = {**SEASON, "best_of": 5, "veto_rules": {"enabled": True, "team_a": "home", "step_seconds": 60, "steps": [
+        {"kind": "ban", "mode": "stellung", "team": "A", "position": None}, {"kind": "decider", "mode": "stellung", "team": None, "position": 1}]}}
+    divisions = [*DIVISIONS, {"id": "d3", "level": 3, "overrides": {"best_of": 3}}]
+    data = facts.veto_data(season, GAME, divisions)
+    assert data["divisions"] == [{"label": "Liga 3", "best_of": 3}], "Liga 1 und 2 spielen wie die Season Best of 5"
+    out = plain(facts.render_veto(data))
+    assert out.endswith("- Abweichend in Liga 3: Best of 3 – dort gibt es kein Veto, die Maps werden beim Ergebnis eingetragen.")
+    older = {key: value for key, value in data.items() if key != "divisions"}
+    assert "Abweichend" not in facts.render_veto(older)
+    assert facts.veto_data(season, GAME)["divisions"] == []
+    off = facts.veto_data({**season, "veto_rules": {**season["veto_rules"], "enabled": False}}, GAME, divisions)
+    assert off == {"enabled": False} and facts.render_veto(off) == facts.NO_VETO
+    assert blocks.is_empty("veto", {"data": off}) and not blocks.is_empty("veto", {"data": data})
+    assert not blocks.is_empty("veto", {"markdown": "Alt"}) and not blocks.is_empty("veto", None), "ohne Daten nie leer"
+    assert not blocks.is_empty("table", {"data": {}}), "andere Bausteine entfallen nie"
+
+
 # ---------------------------------------------------------------- Termine, Spielberechtigung
 
 def test_schedule_block_with_and_without_d1_rules():
