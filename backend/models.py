@@ -87,6 +87,28 @@ class AdminUserCreate(BaseModel):
     _username_rule = field_validator("username")(_new_username)
 
 
+class QuietHours(BaseModel):
+    """Ruhezeit (#1206): von–bis in Wiener Zeit („HH:MM“), Standard aus."""
+    enabled: bool = False
+    start: str = "22:00"
+    end: str = "07:00"
+
+    @field_validator("start", "end")
+    @classmethod
+    def _clock(cls, value: str) -> str:
+        from services.quiet_hours import parse_time
+
+        if parse_time(value) is None:
+            raise ValueError("Bitte eine Uhrzeit wie 22:00 angeben.")
+        return value.strip()
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if self.enabled and self.start == self.end:
+            raise ValueError("Beginn und Ende der Ruhezeit dürfen nicht gleich sein.")
+        return self
+
+
 class UserUpdate(BaseModel):
     """Profile update - all optional, both basic and extended fields."""
     # Basic
@@ -171,6 +193,7 @@ class UserUpdate(BaseModel):
     dm_privacy: Optional[DirectMessagePrivacy] = None
     newsletter_consent: Optional[bool] = None
     notification_preferences: Optional[Dict[str, bool]] = None
+    quiet_hours: Optional[QuietHours] = None
 
 
 AdminResettableField = Literal["display_name", "bio", "avatar_url", "banner_url"]
