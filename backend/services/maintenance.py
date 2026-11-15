@@ -173,16 +173,27 @@ async def renew(db, token: str, *, ttl_seconds: float = DEFAULT_TTL_SECONDS, now
     return getattr(result, "matched_count", 0) == 1
 
 
-async def release(db, token: str | None = None, *, force: bool = False, now: datetime | None = None) -> bool:
-    """Pause beenden. Ohne ``force`` nur mit dem eigenen Token; ``True``, wenn ein Dokument beendet wurde."""
+async def release_report(db, token: str | None = None, *, force: bool = False, now: datetime | None = None) -> dict:
+    """Pause beenden. Ohne ``force`` nur mit dem eigenen Token.
+
+    ``released``: ein Dokument wurde beendet. ``lease_held``: die Pause galt bis zum Beenden noch (bei eigenem Token:
+    nie abgelaufen) - ``False`` heißt, zwischendurch durfte jemand schreiben."""
     if not force and not token:
         raise ValueError("Ohne Token nur mit force beenden.")
     now = now or _now()
     query = {"_id": DOC_ID} if force else {"_id": DOC_ID, "token": str(token)}
-    result = await db.ops_maintenance.update_one(
-        query, {"$set": {"active": False, "lease_until": now, "ended_at": now, "updated_at": now}})
+    before = await db.ops_maintenance.find_one_and_update(
+        query, {"$set": {"active": False, "lease_until": now, "ended_at": now, "updated_at": now}},
+        return_document=ReturnDocument.BEFORE)
     reset_cache()
-    return getattr(result, "matched_count", 0) == 1
+    until = _aware((before or {}).get("lease_until"))
+    held = bool(before and before.get("active") and until is not None and until > now)
+    return {"released": before is not None, "lease_held": held}
+
+
+async def release(db, token: str | None = None, *, force: bool = False, now: datetime | None = None) -> bool:
+    """Pause beenden; ``True``, wenn ein Dokument beendet wurde (siehe ``release_report``)."""
+    return (await release_report(db, token, force=force, now=now))["released"]
 
 
 async def status(db, now: datetime | None = None) -> dict:
@@ -289,8 +300,10 @@ async def run_command(db, argv: list[str]) -> tuple[int, dict]:
         if args.command == "off":
             if not args.token and not args.force:
                 return 2, {"error": "Token fehlt (oder --force)."}
-            released = await release(db, args.token or None, force=args.force)
-            return (0 if released else 5), {"released": released}
+            report = await release_report(db, args.token or None, force=args.force)
+            # Mit --force ist "aus" das Ziel: auch ohne Dokument (frische oder alte Datenbank) ist das erreicht.
+            ok = report["released"] or args.force
+            return (0 if ok else 5), report
         return 0, await status(db)
     except WritePauseBusy as exc:
         return 3, {"error": str(exc), **(await status(db))}

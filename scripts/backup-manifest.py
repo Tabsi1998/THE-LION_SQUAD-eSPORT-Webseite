@@ -34,6 +34,9 @@ from pathlib import Path
 
 FORMAT = "tls-backup-manifest"
 FORMAT_VERSION = 2
+# Betriebsdaten ohne Fachinhalt: der Zustand der Schreibpause (#1009). Ein Backup von vor der Pause kennt sie nicht, ein
+# frisches Ziel vielleicht auch nicht - weder fehlend noch zusätzlich ist das ein Grund, den Restore aufzuhalten.
+OPERATIONAL_COLLECTIONS = frozenset({"ops_maintenance"})
 ROOT = Path(__file__).resolve().parents[1]
 # Fingerabdruck der Uploads: dieselbe Funktion wie im Backend (services/backup_inventory.py), damit Archiv und Ordner
 # nach dem Restore gleich gerechnet werden.
@@ -236,7 +239,8 @@ def compat(manifest: dict, target: dict, *, allow_version_mismatch: bool = False
 def extras(manifest: dict, target_collections: list[str]) -> list[str]:
     """Sammlungen im Ziel, die nicht im Backup stehen. ``mongorestore --drop`` lässt sie stehen."""
     known = set(manifest.get("collections") or {})
-    return sorted(name for name in target_collections if name not in known and not name.startswith("system."))
+    return sorted(name for name in target_collections
+                  if name not in known and not name.startswith("system.") and name not in OPERATIONAL_COLLECTIONS)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -248,8 +252,9 @@ def compare(manifest: dict, after: dict, *, kept_extras: list[str] | tuple[str, 
     errors, notes = [], []
     want, have = manifest.get("collections") or {}, dict(after.get("collections") or {})
     unstable = set(manifest.get("unstable_collections") or [])
-    for name in kept_extras:
+    for name in (*kept_extras, *OPERATIONAL_COLLECTIONS):
         have.pop(name, None)
+    want = {name: count for name, count in want.items() if name not in OPERATIONAL_COLLECTIONS}
     missing = sorted(set(want) - set(have))
     surplus = sorted(set(have) - set(want))
     if missing:

@@ -231,3 +231,21 @@ def test_command_line_on_status_renew_off():
         assert missing
 
     run(scenario())
+
+
+def test_off_force_is_idempotent_without_a_pause_document():
+    """Restore in ein frisches Ziel oder aus einem alten Backup: es gibt kein Pause-Dokument - "aus" ist trotzdem erreicht."""
+    async def scenario():
+        db = fresh_db()
+        code, out = await maintenance.run_command(db, ["off", "--force"])
+        assert code == 0 and out == {"released": False, "lease_held": False}
+        assert await db.ops_maintenance.count_documents({}) == 0
+        started = await maintenance.activate(db, ttl_seconds=60)
+        await maintenance.release(db, started["token"])
+        code, out = await maintenance.run_command(db, ["off", "--force"])
+        assert code == 0 and out["lease_held"] is False
+        # Ohne force und mit unbekanntem Token bleibt es ein Fehler.
+        code, _out = await maintenance.run_command(fresh_db(), ["off", "--token", "fremd"])
+        assert code == 5
+
+    run(scenario())

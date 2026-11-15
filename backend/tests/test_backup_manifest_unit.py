@@ -325,3 +325,15 @@ def test_the_scripts_find_the_manifest_next_to_the_pair(tmp_path):
     assert resolve((tmp_path / "fehlt.manifest.json").as_posix()).returncode != 0
     # Ein altes .txt allein reicht nicht: es nennt keine vollständigen Pfade.
     assert resolve((tmp_path / "tls_backup_20261116_031500.manifest.txt").as_posix()).returncode != 0
+
+
+def test_the_pause_document_never_blocks_a_restore(tmp_path):
+    """Altes Backup ohne ops_maintenance ins Ziel mit Pause-Dokument (auch mit RESTORE_EXTRA_COLLECTIONS=drop) und
+    umgekehrt: kein Abbruch, kein Fehler im Abgleich."""
+    manifest, *_ = make_pair(tmp_path)
+    assert "ops_maintenance" not in manifest["collections"]
+    assert manifest_tool.extras(manifest, [*manifest["collections"], "ops_maintenance"]) == []
+    with_pause_doc = snapshot(collections={**snapshot()["collections"], "ops_maintenance": 1})
+    assert manifest_tool.compare(manifest, with_pause_doc) == ([], [])
+    newer, *_ = make_pair(tmp_path, "20261117_031500", before=with_pause_doc)
+    assert manifest_tool.compare(newer, snapshot()) == ([], [])
