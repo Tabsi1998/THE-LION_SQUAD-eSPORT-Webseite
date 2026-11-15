@@ -1,16 +1,14 @@
 {
-  "version": "1.7.10",
-  "build": 104,
-  "date": "2026-11-15",
+  "version": "1.7.11",
+  "build": 105,
+  "date": "2026-11-16",
   "items": [
-    "Liga-Check-in zum Spiel: Anwesende anhaken, einchecken, Spiel starten.",
-    "Map-Veto live: Countdown nach der Serverzeit, sperren und wählen als Captain, „Bereit zum Veto“, Vorgabe der Woche.",
-    "Matchablauf als Schild im Kopf der Matchseite, vor dem Check-in ein Hinweis statt des Meldeformulars.",
-    "Liga-Anmeldung am Team: Stand je Co-Team, übernommene Anmeldung abmelden.",
-    "Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister.",
-    "Season-Historie, Belohnungen und Titel in Profil und Team.",
-    "Zeremonie bei neuer Liga-Belohnung.",
-    "Map-Veto sagt den eigenen Zug auch Vorleseprogrammen auf iOS an, größere Tippflächen.",
-    "„Vergangene anzeigen“ in der Turnierliste mit größerer Tippfläche."
+    "Gesamtwertung der Liga je Liga N mit Co-Teams, Spielern, Punkten je Season und Streichergebnis.",
+    "Platz in der Gesamtwertung an Profil und Team, Gesamtsieger erst beim vollständigen Endstand.",
+    "Reiter „Trophäen“ mit Karten und Filtern nach Art, Spiel, Season und Platz an Profil und Team.",
+    "Bis zu drei Embleme neben dem Namen an Profil und Team wählen.",
+    "Teamseite mit Reitern „Übersicht“ und „Trophäen“, Rankingbanner kopieren und teilen.",
+    "„Nachgemeldet ab Woche X“ in der Liga-Tabelle, Anmeldefenster der Season an der Staffel.",
+    "Freundlicher Hinweis „Kurze Wartung“ während der Backup-Pause statt einer Fehlermeldung."
   ]
 }

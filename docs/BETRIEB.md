@@ -75,6 +75,83 @@ in der Verwaltung, nicht auf der öffentlichen Seite.
 Zählt der Server alle Besucher als eine Adresse (Prüfung „Besucher-Adresse“ oben auf Gelb), gilt die
 Grenze für alle gemeinsam – dann zuerst den Proxy richtig einstellen, nicht die Grenze hochdrehen.
 
+## Migrationen beim Start (#1006)
+
+Beim Start legt das Backend zuerst die Indizes an und arbeitet dann die offenen Migrationen ab
+(`backend/services/migrations.py`, vermerkt in `schema_migrations`). Es migriert immer genau ein Start, auch wenn
+mehrere Backends gegen dieselbe Datenbank starten oder ein Container mitten im Lauf neu startet:
+
+1. **Sperre holen.** Wer zuerst kommt, bekommt `schema_migration_lock` (atomar, nur wenn sie frei oder abgelaufen
+   ist, mit eigenem Token) und migriert. Im Protokoll steht je Migration „beginnt“ und „fertig nach … s“, lange
+   Migrationen melden zwischendurch ihren Stand.
+2. **Verlängern.** Während des Laufs verlängert der Halter die Sperre im festen Takt. Stirbt er, wird sie nicht mehr
+   verlängert, läuft ab, und ein wartender Start übernimmt.
+3. **Warten.** Jeder andere Start wartet, bis der Halter fertig ist bzw. jede Migration vermerkt ist, und zieht
+   dann selbst nach, was noch offen ist. Bis dahin nimmt er keine Anfragen an. Im Protokoll steht alle 30 Sekunden
+   „Ein anderer Start (…) migriert gerade – dieser wartet“.
+4. **Bereit.** `/api/health/ready` (und damit der Docker-Healthcheck über `/api/health`) meldet erst bereit, wenn
+   der Migrationslauf dieses Prozesses abgeschlossen ist (`checks.migrations`, dazu `migrations.state`; die
+   Antwort ist öffentlich, welche Migrationen offen sind, steht nur im Protokoll). Eine Migration, die bewusst offen
+   bleibt (`MigrationIncomplete`, etwa eine Saison mit Fehler), hält den Start nicht auf. Sie steht als Fehler im
+   Protokoll und läuft beim nächsten Start erneut.
+
+**Sperre verloren.** Gelingt die Verlängerung bis einen Takt vor Ablauf nicht (Datenbank weg, Prozess hing) oder hat
+inzwischen ein anderer Start die Sperre, hört die laufende Migration auf. Migrationen mit Schritten hören am nächsten
+Schritt auf, die anderen werden abgebrochen – spätestens 5 Sekunden (mindestens einen halben Takt) vor Ablauf
+der Sperre, sofort, wenn schon ein anderer Start sie hat. Die Migration wird nicht vermerkt, und der Start bricht mit
+`MigrationLeaseLost` ab; Docker startet den Container neu (`restart: unless-stopped`). Weil jede Migration nur das
+Fehlende nachzieht, macht der nächste Halter dort weiter – ohne halben Stand.
+
+**Zeitlimits** (Umgebung des Backends; ohne Angabe gilt der Standard):
+
+| Variable | Standard | Bereich | Bedeutung |
+|---|---|---|---|
+| `MIGRATION_LEASE_SECONDS` | 180 | 30–3600 | So lange gilt die Sperre ab der letzten Verlängerung. So lange dauert die Übernahme nach einem Absturz höchstens. |
+| `MIGRATION_LEASE_RENEW_SECONDS` | ein Viertel der Sperre (45) | 1 bis ein Drittel der Sperre | Takt der Verlängerung. Bleibt sie bis einen Takt vor Ablauf aus, gibt der Halter auf. |
+| `MIGRATION_WAIT_SECONDS` | 1800 | 30–86400 | So lange wartet ein Start ohne Sperre. Danach bricht er mit `MigrationWaitTimeout` und dem Namen des Halters ab. Nach dem Neustart wartet er erneut oder übernimmt die inzwischen abgelaufene Sperre. |
+
+**Deploy mit langer Migration.** Auch der Halter meldet sich erst nach dem Migrieren bereit. Zwei Wartezeiten
+greifen nacheinander:
+
+- Zuerst `docker compose up` (auch in `update.sh`): Das Frontend hängt per `depends_on: service_healthy` am
+  Backend. Der Healthcheck hat `start_period: 600s` – Fehlversuche in den ersten zehn Minuten zählen nicht, der
+  erste Erfolg beendet die Anlaufzeit sofort. Danach braucht es noch fünf Fehlversuche im Abstand von 15 Sekunden.
+  Ist das Backend nach rund 11 Minuten (`start_period` + 5 × 15 s) nicht bereit, bricht schon `docker compose up`
+  mit „unhealthy“ ab – `update.sh` kommt dann gar nicht mehr zu seiner eigenen Wartezeit.
+- Danach wartet `update.sh` noch `BACKEND_READY_TIMEOUT` Sekunden auf `/api/health/ready` (Umgebung oder `.env`,
+  Standard 600, 30 bis 86400). Läuft die Zeit ab, nennt es den Befehl für das Protokoll und bricht ab. Das Backend
+  migriert dabei weiter.
+
+Für eine Migration, die länger als zehn Minuten dauern kann, vor dem Deploy beides erhöhen: `start_period` in der
+`docker-compose.override.yml` auf dem Server ergänzen (gibt es sie noch nicht, aus
+`docker-compose.override.example.yml` anlegen; vorhandene Einträge wie `extra_hosts` bleiben), etwa
+
+```yaml
+services:
+  backend:
+    healthcheck:
+      start_period: 1800s
+```
+
+und `BACKEND_READY_TIMEOUT=1800` in der `.env`. Nach dem Deploy beide Einträge wieder herausnehmen.
+
+Bricht `update.sh` ab oder meldet `docker compose up` „dependency failed to start: container tls-backend is
+unhealthy“, **nicht neu starten** – ein Neustart beginnt die abgebrochene Migration von vorn:
+
+1. `docker compose logs --tail=200 backend | grep -E 'migration|Startup complete'` ansehen. Steht dort
+   „… beginnt“ ohne „fertig“, läuft die Migration noch; lange Migrationen melden zwischendurch ihren Stand.
+2. Warten, bis „Startup complete“ steht und `curl -fsS http://localhost:8001/api/health/ready` antwortet.
+3. Danach das Frontend nachziehen: `docker compose up -d frontend`.
+
+Steht im Protokoll `MigrationLeaseLost` oder `MigrationWaitTimeout`, startet Docker das Backend von selbst neu; es
+wartet dann bzw. übernimmt.
+
+**Für Migrationsautoren** (`backend/services/migrations.py`): Jede Migration zieht beim zweiten Lauf nur Fehlendes
+nach (bedingte Updates, `$setOnInsert`). Lange Migrationen arbeiten in Schritten und prüfen zwischen den Schritten
+`migration_lease_ok()` oder `extend_migration_lease(db)` und werfen sonst `MigrationIncomplete`. Kein langer
+blockierender Sync-Code (Bilder, große Berechnungen) im Event-Loop – dafür `asyncio.to_thread`. Sonst kommt die
+Verlängerung im Hintergrund nicht dran, und der Halter verliert die Sperre.
+
 ## Eindeutige Indizes und Altdubletten (#930, #1043)
 
 Einige Sammlungen dürfen je Schlüssel nur eine Zeile haben (etwa XP je Konto, Discord-Aktivität je Person und
