@@ -36,9 +36,7 @@ export function WritePauseBar() {
     level.value = withTiming(0, { duration: motion.fast, easing: ease }, (finished) => {
       if (finished) runOnJS(setShown)(false);
     });
-    // `level` ist ein fester Wert von Reanimated.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, reduce]);
+  }, [active, level, reduce]);
 
   const style = useAnimatedStyle(() => ({ opacity: level.value, transform: [{ translateY: (1 - level.value) * -6 }] }));
   if (!shown && !active) return null;
