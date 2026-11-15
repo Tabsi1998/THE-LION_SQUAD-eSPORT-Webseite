@@ -314,3 +314,133 @@ async def test_after_the_deadline_the_lead_extends_with_a_reason(flow):
     assert removed["late_registration"]["extension"] is None
     flow.act_as(None)
     assert ok(await flow.get(base_url(world)))["application"]["state"] == "closed"
+
+
+async def disqualify(flow, world: dict, registration_id: str) -> dict:
+    """Disqualifikation über die Route; mit der 50-%-Regel werden die offenen Spiele abgesagt (annulliert)."""
+    tour = await flow.db.tournaments.find_one({"id": world["tid"]}, {"_id": 0, "scoring_rules": 1})
+    await flow.db.tournaments.update_one({"id": world["tid"]}, {"$set": {"scoring_rules": {**(tour.get("scoring_rules") or {}), "exit_rule": "half"}}})
+    flow.act_as(world["lead"])
+    return ok(await flow.post(f"{season_url(world)}/sanctions", json={"kind": "disqualification", "target_type": "squad",
+                                                                       "registration_id": registration_id, "rule_ref": "Anlage C.4",
+                                                                       "reason": "Die Leitung hat den Fall geprüft."}))
+
+
+@pytest.mark.asyncio
+async def test_a_disqualification_that_can_still_change_keeps_the_week_and_its_revoke_never_doubles_a_week(flow):
+    """Nr. 188: Solange die Disqualifikation angefochten werden kann, ist die Woche des abgesagten Spiels nicht frei. Endgültig ist
+    sie frei - und ein späterer Widerruf bricht mit 409 ab, statt die Woche doppelt zu belegen."""
+    world = await running_staffel(flow, teams=5, weeks=5)
+    week3 = next(match for match in await matches(flow, world) if match["round"] == 3)
+    banned, freed = (slot["registration_id"] for slot in week3["slots"])
+    sanction = await disqualify(flow, world, banned)
+    assert (await flow.db.matches_v2.find_one({"id": week3["id"]}, {"_id": 0}))["status"] == "cancelled"
+    _accepted, registration = await late_entry(flow, world)
+    flow.act_as(world["lead"])
+    held = ok(await flow.get(late_url(world, registration["id"])))
+    assert [row["matchday"] for row in held["pairings"]] == [4, 5] and len(held["missing"]) == 1
+    assert any("noch angefochten oder widerrufen" in note for note in held["notes"])
+
+    # Endgültig: Einspruchsfrist vorbei, kein Einspruch - jetzt ist die Woche frei.
+    await flow.db.competition_sanctions.update_one({"id": sanction["id"]}, {"$set": {"state": "final",
+                                                                                      "appeal_until": "2020-01-01T00:00:00+00:00"}})
+    final = ok(await flow.get(late_url(world, registration["id"])))
+    assert final["fingerprint"] != held["fingerprint"] and final["missing"] == []
+    assert next(row for row in final["pairings"] if row["matchday"] == 3)["opponent_id"] == freed
+    ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": final["fingerprint"]}))
+
+    before = await matches(flow, world)
+    revoked = await flow.post(f"{season_url(world)}/sanctions/{sanction['id']}/revoke", json={"reason": "Vorwurf hat sich nicht bestätigt."})
+    assert revoked.status_code == 409 and "Nachmeldespiel" in revoked.json()["detail"]
+    assert await matches(flow, world) == before
+    stored = await flow.db.tournament_registrations.find_one({"id": banned}, {"_id": 0})
+    assert stored["status"] == "disqualified"
+    assert (await flow.db.competition_sanctions.find_one({"id": sanction["id"]}, {"_id": 0})).get("revoked_at") is None
+
+
+@pytest.mark.asyncio
+async def test_the_own_team_needs_a_second_person_and_the_superadmin_a_reason(flow):
+    """Nr. 187: Befangenheit wie beim Annehmen - eine Person aus dem Team bestätigt nicht, der Superadmin nur mit Grund."""
+    world = await running_staffel(flow, teams=4, weeks=4)
+    _accepted, registration = await late_entry(flow, world)
+    side = world["teams"][-1]
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(late_url(world, registration["id"])))
+    assert preview["own_team"] is False
+    # Die Leitung (Superadmin) steht selbst im Kader des Co-Teams.
+    await flow.db.team_squads.update_one({"id": side["squad"]["id"]}, {"$push": {"member_ids": world["lead"]["id"]}})
+    await flow.db.teams.update_one({"id": side["team"]["id"]}, {"$push": {"member_ids": world["lead"]["id"]}})
+    own = ok(await flow.get(late_url(world, registration["id"])))
+    assert own["own_team"] is True and own["superadmin"] is True
+    refused = await flow.post(late_url(world, registration["id"]), json={"fingerprint": own["fingerprint"]})
+    assert refused.status_code == 403
+    assert await flow.db.matches_v2.count_documents({"tournament_id": world["tid"], "generation_mode": "late_entry"}) == 0
+    done = ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": own["fingerprint"],
+                                                                          "conflict_reason": "Niemand sonst erreichbar"}))
+    assert done["state"] == "done"
+    log = await flow.db.audit_logs.find_one({"action": "league.conflict.override"}, {"_id": 0})
+    assert log["data"]["action"] == "late_entry" and log["data"]["reason"] == "Niemand sonst erreichbar"
+
+
+@pytest.mark.asyncio
+async def test_a_failure_while_confirming_leaves_neither_games_nor_a_decision(flow, monkeypatch):
+    """Erst die Spiele, dann die Markierung: Scheitert eins von beiden, steht nichts halb da."""
+    from services import league_late_entry
+
+    world = await running_staffel(flow, teams=4, weeks=4)
+    _accepted, registration = await late_entry(flow, world)
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(late_url(world, registration["id"])))
+
+    async def broken_mark(*_args, **_kwargs):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(league_late_entry, "_mark_done", broken_mark)
+    first = await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]})
+    assert first.status_code == 409
+    assert await flow.db.matches_v2.count_documents({"tournament_id": world["tid"], "generation_mode": "late_entry"}) == 0
+    assert (await flow.db.tournament_registrations.find_one({"id": registration["id"]}, {"_id": 0}))["late_entry"]["state"] == "open"
+    monkeypatch.undo()
+
+    async def broken_insert(db, docs):
+        await db.matches_v2.insert_one(dict(docs[0]))
+        raise RuntimeError("Abbruch nach dem ersten Spiel")
+
+    monkeypatch.setattr(league_late_entry, "_insert", broken_insert)
+    with pytest.raises(RuntimeError):
+        await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]})
+    assert await flow.db.matches_v2.count_documents({"tournament_id": world["tid"], "generation_mode": "late_entry"}) == 0
+    assert (await flow.db.tournament_registrations.find_one({"id": registration["id"]}, {"_id": 0}))["late_entry"]["state"] == "open"
+    monkeypatch.undo()
+    done = ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]}))
+    assert len(done["match_ids"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_default_time_of_a_new_game_is_in_the_schedule_history(flow):
+    world = await running_staffel(flow, teams=4, weeks=4)
+    await flow.db.tournaments.update_one({"id": world["tid"]}, {"$set": {"schedule_rules": {"home_hours": 72}}})
+    _accepted, registration = await late_entry(flow, world)
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(late_url(world, registration["id"])))
+    done = ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]}))
+    created = await flow.db.matches_v2.find({"id": {"$in": done["match_ids"]}}, {"_id": 0}).to_list(5)
+    assert len(created) == 2
+    assert all([entry["kind"] for entry in match.get("schedule_history") or []] == ["default"] for match in created)
+    assert all(match["schedule_history"][0]["to"] == match["scheduled_at"] for match in created)
+
+
+@pytest.mark.asyncio
+async def test_the_closing_cockpit_names_an_undecided_late_entry_without_blocking(flow):
+    """Eine offene Nachmeldung steht im Abschluss-Cockpit als Hinweis mit Link - kein Sperrgrund. Nach der Entscheidung ist er weg."""
+    world = await running_staffel(flow, teams=4, weeks=4)
+    _accepted, registration = await late_entry(flow, world)
+    flow.act_as(world["lead"])
+    row = next(item for item in ok(await flow.get(f"{season_url(world)}/closing"))["staffeln"] if item["tournament_id"] == world["tid"])
+    hint = next(item for item in row["hints"] if item["code"] == "late_entry_open")
+    assert hint["label"] == "Nachmeldung nicht entschieden" and hint["items"][0]["url"].endswith("#nachmeldungen")
+    assert "late_entry_open" not in {item["code"] for item in row["blockers"]}
+    preview = ok(await flow.get(late_url(world, registration["id"])))
+    ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]}))
+    row = next(item for item in ok(await flow.get(f"{season_url(world)}/closing"))["staffeln"] if item["tournament_id"] == world["tid"])
+    assert row["hints"] == []

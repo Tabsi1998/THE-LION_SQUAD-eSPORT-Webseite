@@ -189,3 +189,34 @@ def test_an_old_extension_never_shortens_a_longer_deadline():
     assert league_late.effective_closes_iso(row) == "2026-12-01T00:00:00+00:00"
     short = season(application_closes_at="2026-11-25T00:00:00+00:00", application_late_extension={"until": "2026-12-10T00:00:00+00:00"})
     assert league_late.effective_closes_iso(short) == "2026-11-25T00:00:00+00:00"
+
+
+def dq_cancelled(day: int, home: str, away: str, removed: str) -> dict:
+    return duel(day, home, away, status="cancelled", result_meta={"source": "participant_removed", "reason": "disqualified",
+                                                                  "removed_registration_id": removed})
+
+
+def test_a_cancel_from_a_disqualification_that_can_still_change_keeps_the_week():
+    """Nr. 188: Abgesagt wegen einer noch anfechtbaren Disqualifikation - die Woche bleibt belegt. Endgültig: frei."""
+    teams = [reg("A"), reg("B", status="disqualified", removal={"mode": "annulled"}), reg("C"), reg("D"), reg("L")]
+    games = [duel(1, "A", "B"), duel(1, "C", "D"), duel(2, "A", "C"), duel(2, "B", "D"), duel(3, "A", "D"), dq_cancelled(3, "B", "C", "B")]
+    held = plan(staffel(weeks=3), reg("L"), teams, games, NOW, {"B"})
+    assert held["pairings"] == [] and len(held["missing"]) == 3
+    assert any("noch angefochten oder widerrufen" in note for note in held["notes"])
+    final = plan(staffel(weeks=3), reg("L"), teams, games, NOW)
+    assert [(row["opponent_id"], row["kind"]) for row in final["pairings"]] == [("C", "free")]
+    assert held["fingerprint"] != final["fingerprint"]
+
+
+def test_a_game_moved_into_an_open_week_occupies_it():
+    """Review #2422: Das Spiel von A aus Spieltag 1 liegt per Termin in Woche 3 - A ist dort belegt, die Vorschau sagt es."""
+    start = NOW - timedelta(days=10)
+    week3 = (start + timedelta(days=14, hours=20)).isoformat()
+    teams = [reg("A"), reg("B"), reg("C"), reg("L")]
+    games = [duel(1, "A", "B", scheduled_at=week3), duel(2, "C", "A"), duel(3, "B", "C")]
+    out = plan(staffel(weeks=3), reg("L"), teams, games, NOW)
+    # In Woche 3 hätte A sonst Freilos - durch das verschobene Spiel nicht mehr.
+    assert out["pairings"] == []
+    assert any("ist in Woche 3 verschoben" in note for note in out["notes"])
+    unmoved = plan(staffel(weeks=3), reg("L"), teams, [duel(1, "A", "B"), *games[1:]], NOW)
+    assert [row["opponent_id"] for row in unmoved["pairings"]] == ["A"]

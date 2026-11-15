@@ -87,3 +87,30 @@ test("eine erledigte Nachmeldung sagt, was angelegt wurde, und hat keinen Knopf"
   expect(screen.queryByTestId("late-entry-open-r9")).toBeNull();
   expect(lateEntryLine({ state: "done", created: 1, missing: 0 })).toBe("1 Spiel nachgetragen");
 });
+
+test("eigenes Team (Nr. 187): ohne Superadmin kein Knopf, der Superadmin braucht einen Grund", async () => {
+  route([ITEM], { ...PREVIEW, own_team: true, superadmin: false });
+  const { unmount } = render(<SeasonLateEntriesPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("late-entry-open-r9"));
+  expect(await screen.findByTestId("late-entry-own-team")).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
+  expect(screen.getByTestId("late-entry-confirm")).toBeDisabled();
+  unmount();
+
+  route([ITEM], { ...PREVIEW, own_team: true, superadmin: true });
+  apiMock.post.mockResolvedValue({ data: { state: "done", match_ids: ["m1"] } });
+  render(<SeasonLateEntriesPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("late-entry-open-r9"));
+  await screen.findByTestId("late-entry-conflict-reason");
+  expect(screen.getByTestId("late-entry-confirm")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("late-entry-conflict-reason"), { target: { value: "Niemand sonst erreichbar" } });
+  fireEvent.click(screen.getByTestId("late-entry-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/late-entries/r9",
+    { fingerprint: "abc123", conflict_reason: "Niemand sonst erreichbar" }));
+});
+
+test("Hinweise der Vorschau stehen da (verschobenes Spiel, anfechtbare Disqualifikation)", async () => {
+  route([ITEM], { ...PREVIEW, notes: ["Rudel Eins gegen Rudel Zwei (Spieltag 1) ist in Woche 3 verschoben - beide sind dort belegt."] });
+  render(<SeasonLateEntriesPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("late-entry-open-r9"));
+  expect(await screen.findByTestId("late-entry-notes")).toHaveTextContent("ist in Woche 3 verschoben");
+});

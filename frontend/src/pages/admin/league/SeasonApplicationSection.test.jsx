@@ -100,3 +100,21 @@ test("ohne Fenster über den Start gibt es nichts zu verlängern", () => {
   render(<SeasonApplicationSection form={form} set={vi.fn()} seasonId="s1" late={{ days: 14, extension: null }} />);
   expect(screen.queryByTestId("season-late-extension")).toBeNull();
 });
+
+test("Enter im Verlängern speichert nicht den Reiter (Review #2422), mit vollständiger Eingabe die Verlängerung", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: {} });
+  const onSubmit = vi.fn((event) => event.preventDefault());
+  const form = { ...applicationToForm(LONG), start_day: "2026-11-17" };
+  render(<form onSubmit={onSubmit}><SeasonApplicationSection form={form} set={vi.fn()} seasonId="s1" late={{ days: 14, extension: null }} /></form>);
+  fireEvent.click(screen.getByTestId("season-late-extension-open"));
+  const reason = screen.getByTestId("season-late-extension-reason");
+  expect(fireEvent.keyDown(reason, { key: "Enter" })).toBe(false);
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("season-late-extension-until"), { target: { value: "2026-12-10T18:00" } });
+  fireEvent.change(reason, { target: { value: "Nachrücker aus Liga 2" } });
+  expect(fireEvent.keyDown(reason, { key: "Enter" })).toBe(false);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/application-extension",
+    { until: "2026-12-10T17:00:00.000Z", reason: "Nachrücker aus Liga 2" }));
+  expect(onSubmit).not.toHaveBeenCalled();
+});
