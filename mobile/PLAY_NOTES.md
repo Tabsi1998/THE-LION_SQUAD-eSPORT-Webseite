@@ -12,6 +12,18 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.10
+
+Neu in 1.7.10:
+• Check-in zum Liga-Spiel direkt in der App
+• Map-Veto live: sperren, wählen, „Bereit zum Veto“
+• Matchablauf auf einen Blick, Spiel starten
+• Tabelle mit Auf- und Abstieg, Endstand und Meister
+• Liga-Anmeldung deines Co-Teams am Team
+• Seasons, Belohnungen und Titel im Profil
+• Zeremonie bei neuer Belohnung
+• Bessere Bedienung mit Vorleser
+
 ## 1.7.9
 
 Neu in 1.7.9:
