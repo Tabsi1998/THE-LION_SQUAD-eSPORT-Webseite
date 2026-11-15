@@ -164,6 +164,12 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
   (Status „Check-in“), die Anmeldung zu ist oder alle Plätze vergeben sind. Ob die Anmeldung offen ist, entscheidet
   dieselbe Regel wie auf der Turnierseite.
 - Ist das Turnier entschieden, bleibt die Siegerkarte stehen.
+- **Saisonabschluss einer Liga-Staffel mit Belohnungen:** Statt der Siegerkarte kommt das **Podest** – Platz 2, Meister,
+  Platz 3 mit Team, darüber Liga, Liga N und Season. Je Platz steht die Hauptbelohnung groß (Medaille vor Emblem, Banner und
+  Titel; erst die für genau diesen Platz, dann ein Platzbereich), bis zu zwei weitere klein daneben. Die Sockel steigen
+  nacheinander auf (3, 2, 1), die Belohnungen heben sich und glänzen, zuletzt kommt der Meister; danach parkt er wie sonst in
+  der Ecke. Am TV stehen nur Belohnungen, die Gäste sehen dürfen (Season und Staffel öffentlich) und die nicht ruhen. Ohne
+  Belohnung auf Platz 1 bis 3 bleibt die Siegerkarte wie bisher. Mit **Bewegung aus** steht das Podest sofort.
 
 **Pause bis:** Setzt ihr ein Turnier unter **Admin → eSports → Turniere → Turnier öffnen** auf **Pausiert**, erscheint
 darunter das Feld **Pause bis**. Uhrzeit wählen, **Speichern**, und der TV zeigt „Weiter um …“ mit Countdown. **Ohne

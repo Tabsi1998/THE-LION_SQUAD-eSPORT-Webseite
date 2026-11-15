@@ -1640,7 +1640,7 @@ vergeben ist.
 **3. Vergabe.** Vergeben wird beim **Abschluss** einer Staffel (3.10) aus dem Endstand – sofort. Wer etwas bekommt, sieht es
 im Profil bzw. an der Teamseite, bekommt eine Nachricht und beim nächsten Besuch eine kurze Zeremonie mit **Bild
 herunterladen** zum Teilen. Die Ligaseite zeigt das Podest mit den Belohnungen je Platz, das Ergebnis-PDF einen Abschnitt
-**Belohnungen**. Eine Änderung im Reiter wirkt erst beim nächsten Abschluss.
+**Belohnungen**, der Turnierbaum-TV beim Sieger-Moment das Podest mit der Hauptbelohnung je Platz ([TV & Beamer](tv.md)). Eine Änderung im Reiter wirkt erst beim nächsten Abschluss.
 
 **4. Wieder öffnen.** Solange eine Staffel wieder offen ist, ruhen ihre Belohnungen (unsichtbar). Beim neuen Abschluss wird
 neu zugeteilt – nie doppelt. Wer dabei etwas verliert oder neu bekommt, erhält eine Nachricht; Captain und Vertreter bekommen

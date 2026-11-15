@@ -6,6 +6,9 @@ import TVG from "../../e2e/fixtures/tvGenerated.json";
 describe("formatBracketSection", () => {
   it("nutzt die eingefuehrten eSports-Begriffe statt Uebersetzungen", () => {
     expect(formatBracketSection("WB")).toBe("Winner Bracket");
+    // Liga-Spiele (#2410): Bereich „LIGA“ bzw. „league“ heißt am TV und im Baum „Spieltage“.
+    expect(formatBracketSection("LIGA")).toBe("Spieltage");
+    expect(formatBracketSection("league")).toBe("Spieltage");
     expect(formatBracketSection("LB")).toBe("Loser Bracket");
     expect(formatBracketSection("GF")).toBe("Grand Final");
     expect(formatBracketSection("winner")).toBe("Winner Bracket");

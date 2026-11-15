@@ -165,6 +165,7 @@ export const BRACKET_SECTION_LABELS = {
   THIRD_PLACE: "Spiel um Platz 3",
   round_robin: "Spieltage",
   LIGA: "Spieltage",
+  league: "Spieltage",
   swiss: "Schweizer Runden",
 };
 

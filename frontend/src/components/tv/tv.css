@@ -929,6 +929,129 @@
 .tv-champion__avatar { width: calc(var(--tv-u) * 5); height: calc(var(--tv-u) * 5); box-shadow: 0 0 0 2px var(--tv-gold); }
 .tv-champion__text { display: flex; flex-direction: column; min-width: 0; }
 .tv-champion__name { font-weight: 700; color: var(--tv-gold); }
+/* ---------------------------------------------------------------- Podest beim Saisonabschluss (#2410)
+   Sieger-Moment einer Liga-Staffel mit Belohnungen (TvMoments.TvChampionPodium): Platz 2 links, der Meister in der Mitte, Platz 3
+   rechts, je Platz die Hauptbelohnung groß (RewardArt), Team und Name der Belohnung, darunter der Sockel mit der Ziffer.
+   Detail-Runde: die Bodenlinie zeichnet sich nach, die Sockel steigen nacheinander auf (3, 2, 1 über --tv-league-podium-at), je Platz hebt
+   sich die Belohnung an, ihr Glanz zieht nach und die Kante leuchtet kurz auf - zuletzt kommt der Meister, sein Sockel leuchtet.
+   Nur Verschieben und Deckkraft; „Bewegung aus“ (Regel für .tv-screen oben) zeigt sofort das Endbild. */
+/* Passt sich der Höhe an: Die Ebene des Moments ist der Bezug (cqh). Grafiken, Sockel und Abstände schrumpfen bei wenig Höhe
+   (1440x900, große Schrift), statt dass die Sockel unten abgeschnitten werden. */
+.tv-moment-layer:has(> .tv-league-podium) { container-type: size; }
+.tv-league-podium {
+  --tv-league-podium-gold: 255 215 0;
+  --tv-lp-u: min(var(--tv-u), 1.3cqh);
+  width: min(calc(var(--tv-u) * 132), 100%);
+  gap: calc(var(--tv-lp-u) * 0.7);
+  padding: calc(var(--tv-lp-u) * 2) calc(var(--tv-u) * 3) 0;
+}
+.tv-league-podium__line { color: var(--tv-muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; overflow-wrap: anywhere; hyphens: auto; }
+.tv-league-podium__winner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--tv-lp-u) * 1.6);
+  min-width: 0;
+  max-width: 100%;
+  animation: tv-league-podium-crown calc(var(--tls-motion-slow) * 1.6) var(--tls-ease) 1.9s both;
+}
+.tv-league-podium__photo { flex: none; width: calc(var(--tv-lp-u) * 7); height: calc(var(--tv-lp-u) * 7); font-size: var(--tv-fs-head); box-shadow: 0 0 0 3px var(--tv-gold), 0 0 30px rgb(var(--tv-league-podium-gold) / 0.45); }
+/* Der Meister höchstens in zwei Zeilen, lange Namen kleiner (data-fit) und mit Silbentrennung. */
+.tv-league-podium__winner .tv-champion__big {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tv-gold);
+  font-size: min(var(--tv-fs-hero), calc(var(--tv-lp-u) * 9));
+  hyphens: auto;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.tv-league-podium__winner .tv-champion__big[data-fit="small"] { font-size: min(calc(var(--tv-fs-hero) * 0.72), calc(var(--tv-lp-u) * 6.5)); }
+.tv-league-podium__winner .tv-champion__big[data-fit="tiny"] { font-size: min(calc(var(--tv-fs-hero) * 0.56), calc(var(--tv-lp-u) * 5)); }
+.tv-league-podium__stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: calc(var(--tv-u) * 1.4);
+  width: 100%;
+  margin-top: calc(var(--tv-lp-u) * 1.2);
+}
+.tv-league-podium__col { display: flex; flex-direction: column; align-items: center; gap: calc(var(--tv-lp-u) * 0.6); min-width: 0; }
+.tv-league-podium__arts { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: calc(var(--tv-u) * 0.8); }
+.tv-league-podium__main .tls-reward { width: calc(var(--tv-lp-u) * 13) !important; height: calc(var(--tv-lp-u) * 13) !important; }
+.tv-league-podium__col[data-place="1"] .tv-league-podium__main .tls-reward { width: calc(var(--tv-lp-u) * 17) !important; height: calc(var(--tv-lp-u) * 17) !important; }
+.tv-league-podium__extras { display: flex; flex-direction: column; gap: calc(var(--tv-lp-u) * 0.5); }
+.tv-league-podium__extras .tls-reward { width: calc(var(--tv-lp-u) * 7) !important; height: calc(var(--tv-lp-u) * 7) !important; }
+/* Team und Belohnungen höchstens zwei Zeilen, mit Silbentrennung - so bleibt der Sockel darunter immer im Bild. */
+.tv-league-podium__team, .tv-league-podium__rewards {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  hyphens: auto;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.tv-league-podium__team { font-weight: 800; }
+.tv-league-podium__col[data-place="1"] .tv-league-podium__team { color: var(--tv-gold); }
+.tv-league-podium__rewards { color: var(--tv-muted); overflow-wrap: anywhere; }
+.tv-league-podium__team, .tv-league-podium__rewards { animation: tv-rise var(--tls-motion-slow) var(--tls-ease) calc(var(--tv-league-podium-at, 0s) + 0.35s) both; }
+/* Der Sockel steigt aus dem Boden: der Rahmen schneidet ab, der Sockel fährt von unten herein. */
+.tv-league-podium__clip { flex: none; width: 100%; margin-top: calc(var(--tv-lp-u) * 0.4); overflow: hidden; }
+.tv-league-podium__block {
+  --tv-league-podium-rgb: 205 127 50;
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: calc(var(--tv-lp-u) * 6.5);
+  border-top: 3px solid rgb(var(--tv-league-podium-rgb));
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, rgb(var(--tv-league-podium-rgb) / 0.32), rgb(var(--tv-league-podium-rgb) / 0.06));
+  animation: tv-league-podium-up calc(var(--tls-motion-slow) * 1.4) var(--tls-ease) var(--tv-league-podium-at, 0s) both;
+}
+.tv-league-podium__col[data-place="2"] .tv-league-podium__block { --tv-league-podium-rgb: 217 222 229; height: calc(var(--tv-lp-u) * 9); }
+.tv-league-podium__col[data-place="1"] .tv-league-podium__block { --tv-league-podium-rgb: var(--tv-league-podium-gold); height: calc(var(--tv-lp-u) * 12); }
+.tv-league-podium__rank { font-size: min(calc(var(--tv-fs-hero) * 0.9), calc(var(--tv-lp-u) * 5)); line-height: 1; font-weight: 900; color: rgb(var(--tv-league-podium-rgb)); }
+/* Der Sockel des Meisters leuchtet auf, wenn der Meister kommt - und bleibt leise an. */
+.tv-league-podium__col[data-place="1"] .tv-league-podium__block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 calc(var(--tv-u) * 4) calc(var(--tv-u) * 0.4) rgb(var(--tv-league-podium-gold) / 0.35), inset 0 calc(var(--tv-u) * 1.2) calc(var(--tv-u) * 2) rgb(var(--tv-league-podium-gold) / 0.2);
+  opacity: 0.45;
+  animation: tv-league-podium-light var(--tls-motion-glow) var(--tls-ease) 2.05s both;
+}
+.tv-league-podium__floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgb(var(--tv-league-podium-gold) / 0.9) 20%, rgb(var(--tv-league-podium-gold) / 0.9) 80%, transparent);
+  transform-origin: center;
+  animation: tv-league-podium-draw calc(var(--tls-motion-slow) * 1.5) var(--tls-ease) 0.1s both;
+}
+/* Die Belohnung hebt sich an, wenn ihr Sockel steht - Glanz und Aufleuchten folgen (RewardArt, rewards.css). Das Aufleuchten hier
+   nur über die Deckkraft eines festen Scheins. */
+.tv-league-podium .tls-reward[data-play="run"] { animation-delay: calc(var(--tv-league-podium-at, 0s) + 0.3s + var(--tls-i, 0) * 90ms); }
+.tv-league-podium .tls-reward[data-play="run"] .tls-reward__shine { animation-delay: calc(var(--tv-league-podium-at, 0s) + 0.3s + var(--tls-motion-slow) + var(--tls-i, 0) * 90ms); }
+.tv-league-podium .tls-reward[data-play="run"]::after {
+  box-shadow: 0 0 calc(var(--tv-u) * 3) calc(var(--tv-u) * 0.6) rgb(var(--tls-reward-rgb) / 0.4);
+  opacity: 0;
+  animation: tv-league-podium-glow var(--tls-motion-glow) var(--tls-ease) calc(var(--tv-league-podium-at, 0s) + 0.3s + var(--tls-motion-slow) * 1.4) both;
+}
+.tv-screen[data-tv-contrast="1"] .tv-league-podium__block { background: #000000; }
+@keyframes tv-league-podium-up { from { transform: translateY(100%); } }
+@keyframes tv-league-podium-draw { from { opacity: 0; transform: scaleX(0.04); } }
+@keyframes tv-league-podium-crown { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.6)) scale(0.96); } }
+@keyframes tv-league-podium-light { 0% { opacity: 0; } 45% { opacity: 1; } 100% { opacity: 0.45; } }
+@keyframes tv-league-podium-glow { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }
 .tv-confetti { position: absolute; inset: 0; z-index: 7; width: 100%; height: 100%; pointer-events: none; }
 @keyframes tv-fade-in { from { opacity: 0; } }
 @keyframes tv-rise { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.6)); } }
