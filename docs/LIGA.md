@@ -3747,7 +3747,8 @@ Entscheidungen Nr. 163 bis 166. Kein zweites System: Die Belohnungen sind Eintr�
 aus F.1, die Grafik ist eine Vorlage im Stil von `TrophyCup`/`AwardBanner`, ein echter Gewinn läuft über `prize_pickups`
 (`prize_service`). Logik in `services/league_rewards.py`, Routen in `routes/league_reward_routes.py`, Teilen-Bild in
 `services/reward_share.py`. Oberfläche: Reiter **Belohnungen** der Season-Seite (`SeasonRewardsTab.jsx`, `lib/leagueRewards.js`),
-Grafik `components/tls/rewards/RewardArt.jsx`, Sammlung `RewardCollection.jsx`, Zeremonie `RewardMoment.jsx`.
+Grafik `components/tls/rewards/RewardArt.jsx`, Titel neben dem Namen `RewardChip.jsx` (die Sammlung je Season ist seit #2425 die Vitrine
+`TrophyCabinet.jsx`), Zeremonie `RewardMoment.jsx`.
 
 **Zusammenstellung** (Zuständigkeit `season`, ohne Migration - fehlt das Feld, gibt es keine Belohnungen und alles bleibt wie bisher):
 

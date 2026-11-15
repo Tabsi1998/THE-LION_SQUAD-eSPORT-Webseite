@@ -25,7 +25,7 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
-import { RewardChip } from "@/components/tls/rewards/RewardCollection";
+import { RewardChip } from "@/components/tls/rewards/RewardChip";
 import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
 import { TeamRankBanners } from "@/components/tls/league/RankBannerCopy";
 import { viennaDateTime } from "@/lib/vienna";

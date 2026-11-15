@@ -42,7 +42,7 @@ import { CountUp } from "@/components/tls/motion/CountUp";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
-import { RewardChip } from "@/components/tls/rewards/RewardCollection";
+import { RewardChip } from "@/components/tls/rewards/RewardChip";
 import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
