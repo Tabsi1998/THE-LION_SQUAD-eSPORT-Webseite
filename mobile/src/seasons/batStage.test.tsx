@@ -13,7 +13,10 @@ jest.mock("@react-navigation/native", () => ({ NavigationRouteContext: require("
 const mockSeasonState: Record<string, unknown> = { reducedMotion: false, showToast: jest.fn(), toast: null };
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
-const { HalloweenCorners } = require("./halloween");
+const { HalloweenCorners, setYearSalt } = require("./halloween");
+// Festes Jahres-Salz wie in den übrigen Halloween-Tests: sonst würfelt die Anordnung mit dem Jahr der Uhr und ab Jänner 2027
+// hingen andere Fledermäuse (2026 = die Anordnung, gegen die der Test geschrieben ist).
+setYearSalt("2026");
 const { Card } = require("../components/Card");
 const perches = require("./perches");
 const flights = require("./flights");
