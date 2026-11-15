@@ -137,9 +137,11 @@ curl -fsS http://localhost:8001/api/health/live
 curl -fsS http://localhost:8001/api/health/ready
 ```
 
-Antwortet das Backend noch nicht oder steht in `/api/health/ready` `"migrations": false`, läuft noch eine
-Migration. `update.sh` wartet darauf `BACKEND_READY_TIMEOUT` Sekunden (Standard 600). Bricht es trotzdem ab oder
-meldet `docker compose up`, `tls-backend` sei „unhealthy“: nicht neu starten, sondern im Protokoll nachsehen
+Antwortet das Backend noch nicht oder steht in `/api/health/ready` unter `checks` `"migrations": false`, läuft
+noch eine Migration. `docker compose up` wartet darauf rund 11 Minuten (Healthcheck mit `start_period: 600s`),
+danach `update.sh` noch `BACKEND_READY_TIMEOUT` Sekunden (Standard 600). Für längere Migrationen beides vorher
+erhöhen (siehe unten verlinkter Abschnitt). Meldet `docker compose up`, `tls-backend` sei „unhealthy“, oder bricht
+`update.sh` ab: nicht neu starten, sondern im Protokoll nachsehen
 (`docker compose logs --tail=200 backend | grep -E 'migration|Startup complete'`), bis „Startup complete“ steht, dann
 `docker compose up -d frontend`. Ablauf und Zeitlimits: [Migrationen beim Start](docs/BETRIEB.md#migrationen-beim-start-1006).
 

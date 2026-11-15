@@ -110,14 +110,30 @@ Fehlende nachzieht, macht der nächste Halter dort weiter – ohne halben Stand.
 | `MIGRATION_LEASE_RENEW_SECONDS` | ein Viertel der Sperre (45) | 1 bis ein Drittel der Sperre | Takt der Verlängerung. Bleibt sie bis einen Takt vor Ablauf aus, gibt der Halter auf. |
 | `MIGRATION_WAIT_SECONDS` | 1800 | 30–86400 | So lange wartet ein Start ohne Sperre. Danach bricht er mit `MigrationWaitTimeout` und dem Namen des Halters ab. Nach dem Neustart wartet er erneut oder übernimmt die inzwischen abgelaufene Sperre. |
 
-**Deploy mit langer Migration.** Auch der Halter meldet sich erst nach dem Migrieren bereit. Darauf sind beide
-Wartezeiten eingestellt:
+**Deploy mit langer Migration.** Auch der Halter meldet sich erst nach dem Migrieren bereit. Zwei Wartezeiten
+greifen nacheinander:
 
-- Der Healthcheck des Backends in `docker-compose.yml` hat `start_period: 600s`. Fehlversuche in den ersten zehn
-  Minuten zählen nicht, der erste Erfolg beendet die Anlaufzeit sofort. So lange wartet auch
-  `docker compose up`, bevor es das Frontend startet.
-- `update.sh` wartet `BACKEND_READY_TIMEOUT` Sekunden auf `/api/health/ready` (Umgebung oder `.env`, Standard 600).
-  Läuft die Zeit ab, nennt es den Befehl für das Protokoll und bricht ab. Das Backend migriert dabei weiter.
+- Zuerst `docker compose up` (auch in `update.sh`): Das Frontend hängt per `depends_on: service_healthy` am
+  Backend. Der Healthcheck hat `start_period: 600s` – Fehlversuche in den ersten zehn Minuten zählen nicht, der
+  erste Erfolg beendet die Anlaufzeit sofort. Danach braucht es noch fünf Fehlversuche im Abstand von 15 Sekunden.
+  Ist das Backend nach rund 11 Minuten (`start_period` + 5 × 15 s) nicht bereit, bricht schon `docker compose up`
+  mit „unhealthy“ ab – `update.sh` kommt dann gar nicht mehr zu seiner eigenen Wartezeit.
+- Danach wartet `update.sh` noch `BACKEND_READY_TIMEOUT` Sekunden auf `/api/health/ready` (Umgebung oder `.env`,
+  Standard 600, 30 bis 86400). Läuft die Zeit ab, nennt es den Befehl für das Protokoll und bricht ab. Das Backend
+  migriert dabei weiter.
+
+Für eine Migration, die länger als zehn Minuten dauern kann, vor dem Deploy beides erhöhen: `start_period` in der
+`docker-compose.override.yml` auf dem Server ergänzen (gibt es sie noch nicht, aus
+`docker-compose.override.example.yml` anlegen; vorhandene Einträge wie `extra_hosts` bleiben), etwa
+
+```yaml
+services:
+  backend:
+    healthcheck:
+      start_period: 1800s
+```
+
+und `BACKEND_READY_TIMEOUT=1800` in der `.env`. Nach dem Deploy beide Einträge wieder herausnehmen.
 
 Bricht `update.sh` ab oder meldet `docker compose up` „dependency failed to start: container tls-backend is
 unhealthy“, **nicht neu starten** – ein Neustart beginnt die abgebrochene Migration von vorn:
@@ -128,7 +144,7 @@ unhealthy“, **nicht neu starten** – ein Neustart beginnt die abgebrochene Mi
 3. Danach das Frontend nachziehen: `docker compose up -d frontend`.
 
 Steht im Protokoll `MigrationLeaseLost` oder `MigrationWaitTimeout`, startet Docker das Backend von selbst neu; es
-wartet dann bzw. übernimmt. Für eine bekannt lange Migration vorher `BACKEND_READY_TIMEOUT` erhöhen.
+wartet dann bzw. übernimmt.
 
 **Für Migrationsautoren** (`backend/services/migrations.py`): Jede Migration zieht beim zweiten Lauf nur Fehlendes
 nach (bedingte Updates, `$setOnInsert`). Lange Migrationen arbeiten in Schritten und prüfen zwischen den Schritten

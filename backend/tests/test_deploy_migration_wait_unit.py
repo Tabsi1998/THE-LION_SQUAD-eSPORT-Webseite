@@ -70,3 +70,13 @@ def test_update_sh_reads_its_ready_timeout(tmp_path, env_value, dotenv, expected
     result = subprocess.run([BASH, script.name], cwd=tmp_path, env=env, capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected
+
+
+def test_the_operations_guide_names_the_real_compose_limit():
+    """BETRIEB.md nennt, wann schon ``docker compose up`` aufgibt: start_period plus alle Fehlversuche."""
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    check = compose["services"]["backend"]["healthcheck"]
+    limit = _seconds(check["start_period"]) + check["retries"] * _seconds(check["interval"])
+    guide = (ROOT / "docs" / "BETRIEB.md").read_text(encoding="utf-8")
+    assert f"rund {round(limit / 60)} Minuten" in guide
+    assert "depends_on: service_healthy" in guide and "docker-compose.override.yml" in guide
