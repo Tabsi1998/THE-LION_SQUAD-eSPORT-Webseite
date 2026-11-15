@@ -1,28 +1,53 @@
 """Small, ordered MongoDB migration runner for idempotent schema/data changes.
 
+Startablauf (#1006, ``ensure_migrations``): Genau ein Start holt die Sperre ``schema_migration_lock`` (atomar, mit
+Bedingung und eigenem Token) und arbeitet die offenen Migrationen ab. Jeder andere Start wartet, bis der Halter fertig
+ist bzw. der Stand komplett ist - höchstens ``MIGRATION_WAIT_SECONDS``, dann bricht er mit klarer Meldung ab. Bis dahin
+bedient er nichts, und ``/api/health/ready`` meldet erst nach dem Lauf bereit (``migrations_ready``).
+
+Die Sperre gilt ``MIGRATION_LEASE_SECONDS`` und wird im Takt ``MIGRATION_LEASE_RENEW_SECONDS`` verlängert. Stirbt der
+Halter, läuft sie ab, und ein anderer Start übernimmt. Gelingt die Verlängerung nicht rechtzeitig oder gehört die Sperre
+inzwischen einem anderen, gilt sie als verloren: Die laufende Migration hört auf (Migrationen mit Schritten am nächsten
+Schritt über ``extend_migration_lease``, sonst wird sie abgebrochen), wird nicht vermerkt und läuft beim nächsten Halter
+von vorn - jede Migration ist darum so geschrieben, dass ein zweiter Lauf nur das Fehlende nachzieht.
+
 Eine Migration, die nur teilweise fertig wird, wirft ``MigrationIncomplete``: sie wird nicht als erledigt vermerkt und
-läuft beim nächsten Start erneut, der Start selbst geht weiter. Lange Migrationen verlängern die Sperre des Laufs
-zwischen ihren Schritten (``extend_migration_lease``)."""
+läuft beim nächsten Start erneut, der Start selbst geht weiter.
+
+Für Migrationsautoren: in Schritten arbeiten, zwischen den Schritten ``migration_lease_ok()`` bzw.
+``extend_migration_lease(db)`` prüfen; kein langer blockierender Sync-Code im Event-Loop (dafür ``asyncio.to_thread``),
+sonst kommt der Takt nicht dran und die Sperre geht verloren (docs/BETRIEB.md, Migrationen beim Start)."""
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import logging
 import os
 import socket
 from datetime import datetime, timedelta, timezone
+from time import monotonic
 
 from pymongo import ReturnDocument
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from models import new_id
+from services.log_safe import log_safe
 from services.secret_migration import migrate_plaintext_secrets
 from services.shop_motifs import migrate_motif_variants
 from services.shop_schema import migrate_shop_data_model
 
 logger = logging.getLogger("tls.migrations")
-# So lange gilt die Sperre eines Migrationslaufs ab dem Holen bzw. ab der letzten Verlängerung.
-LEASE_MINUTES = 10
-_LEASE_OWNER: contextvars.ContextVar[str | None] = contextvars.ContextVar("migration_lease_owner", default=None)
+LOCK_ID = "global"
+# So oft sieht ein wartender Start nach, ob die Sperre frei bzw. der Stand komplett ist.
+WAIT_POLL_SECONDS = 2.0
+# So oft meldet ein wartender Start höchstens, auf wen er wartet.
+WAIT_LOG_SECONDS = 30.0
+# In diesen Zuständen ist der Migrationslauf dieses Prozesses abgeschlossen und die Anwendung bereit.
+READY_STATES = frozenset({"done", "incomplete"})
+# So viel Abstand zum Ablauf der Sperre hält eine Migration mindestens, die nach dem Verlust noch ihren Schritt beendet.
+GRACE_MARGIN_SECONDS = 5.0
+# Lange Migrationen melden nach so vielen Einträgen ihren Stand ins Protokoll.
+PROGRESS_EVERY = 100
 
 
 class MigrationIncomplete(RuntimeError):
@@ -30,18 +55,155 @@ class MigrationIncomplete(RuntimeError):
     geht weiter - ``run_pending_migrations`` protokolliert sie und fährt mit den übrigen fort."""
 
 
+class MigrationLeaseLost(RuntimeError):
+    """Die Sperre gehört nicht mehr diesem Lauf: die laufende Migration ist abgebrochen und nicht vermerkt."""
+
+
+class MigrationWaitTimeout(RuntimeError):
+    """Ein anderer Start hielt die Sperre länger als ``MIGRATION_WAIT_SECONDS``."""
+
+
+def _seconds_env(name: str, default: float, low: float, high: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    try:
+        value = float(raw) if raw else float(default)
+    except ValueError:
+        value = float(default)
+    if value != value:  # NaN
+        value = float(default)
+    return min(max(value, low), high)
+
+
+def lease_seconds() -> float:
+    """Wie lange die Sperre ab dem Holen bzw. der letzten Verlängerung gilt (``MIGRATION_LEASE_SECONDS``, 30 bis 3600,
+    Standard 180). So lange dauert es nach einem abgestürzten Halter höchstens, bis ein anderer Start übernimmt."""
+    return _seconds_env("MIGRATION_LEASE_SECONDS", 180, 30, 3600)
+
+
+def renew_seconds() -> float:
+    """Takt der Verlängerung (``MIGRATION_LEASE_RENEW_SECONDS``, Standard ein Viertel der Sperre, höchstens ein Drittel).
+    Bleibt die Verlängerung bis einen Takt vor Ablauf aus, gibt der Halter selbst auf - darum höchstens ein Drittel:
+    bei der Hälfte stünde die erste Verlängerung schon genau einen Takt vor Ablauf, und die Sperre wäre sofort weg."""
+    lease = lease_seconds()
+    return _seconds_env("MIGRATION_LEASE_RENEW_SECONDS", lease / 4, 1, lease / 3)
+
+
+def wait_seconds() -> float:
+    """So lange wartet ein Start ohne Sperre auf den Halter (``MIGRATION_WAIT_SECONDS``, 30 bis 86400, Standard 1800),
+    dann bricht er ab; Docker startet ihn neu, und er wartet bzw. übernimmt von vorn."""
+    return _seconds_env("MIGRATION_WAIT_SECONDS", 1800, 30, 86400)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class _Lease:
+    """Die gehaltene Sperre eines Laufs. ``valid_until`` zählt auf der eigenen Uhr ab dem Absenden der letzten
+    erfolgreichen Verlängerung - also nie später als das, was in der Datenbank steht."""
+
+    def __init__(self, db, owner: str, ttl: float, renew_every: float, valid_until: float):
+        self.db = db
+        self.owner = owner
+        self.ttl = ttl
+        self.renew_every = renew_every
+        self.valid_until = valid_until
+        self.lost = asyncio.Event()
+        self.reason = ""
+        self.taken = False
+
+    def remaining(self) -> float:
+        return self.valid_until - monotonic()
+
+    def expiring(self) -> bool:
+        """Einen Takt vor Ablauf gibt der Halter auf - bevor ein anderer Start übernehmen darf."""
+        return self.remaining() <= self.renew_every
+
+    def mark_lost(self, reason: str, *, taken: bool = False) -> None:
+        if self.lost.is_set():
+            return
+        self.reason, self.taken = reason, taken
+        self.lost.set()
+        logger.error("[migration] Sperre verloren (%s): die laufende Migration hört auf und wird nicht vermerkt",
+                     reason)
+
+    def grace_seconds(self) -> float:
+        """So lange darf die laufende Migration nach dem Verlust noch bis zu ihrem nächsten Schritt laufen. Sie endet mit
+        echtem Abstand vor dem Ablauf (``GRACE_MARGIN_SECONDS``, mindestens ein halber Takt) - Uhrversatz zwischen
+        zwei Rechnern und die Laufzeit des Abbruchs haben darin Platz. Nie, wenn schon ein anderer die Sperre hat."""
+        if self.taken:
+            return 0.0
+        return max(0.0, self.remaining() - max(GRACE_MARGIN_SECONDS, self.renew_every / 2))
+
+    async def renew(self) -> bool:
+        """Verlängern - nur mit eigenem Token und nur, solange die Sperre noch gilt. ``False``: sie ist verloren."""
+        if self.lost.is_set():
+            return False
+        if self.expiring():
+            self.mark_lost("nicht rechtzeitig verlängert")
+            return False
+        sent = monotonic()
+        now = _utcnow()
+        try:
+            result = await asyncio.wait_for(self.db.schema_migration_lock.update_one(
+                {"_id": LOCK_ID, "owner": self.owner, "locked_until": {"$gt": now}},
+                {"$set": {"locked_until": now + timedelta(seconds=self.ttl), "updated_at": now}}),
+                timeout=max(0.05, self.remaining() - self.renew_every))
+        except (asyncio.TimeoutError, PyMongoError) as exc:
+            logger.warning("[migration] Sperre nicht verlängert (%s), nächster Versuch im Takt", type(exc).__name__)
+            if self.expiring():
+                self.mark_lost("nicht rechtzeitig verlängert")
+            return not self.lost.is_set()
+        if getattr(result, "matched_count", 0) == 1:
+            self.valid_until = sent + self.ttl
+            return True
+        self.mark_lost("abgelaufen oder von einem anderen Start übernommen", taken=True)
+        return False
+
+    async def keep_alive(self) -> None:
+        """Im Takt verlängern, bis der Lauf endet oder die Sperre verloren ist."""
+        while not self.lost.is_set():
+            await asyncio.sleep(max(0.0, min(self.renew_every, self.remaining() - self.renew_every)))
+            try:
+                await self.renew()
+            except Exception as exc:  # noqa: BLE001 - ein stiller Tod des Takts ließe die Migration ohne Sperre laufen
+                self.mark_lost(f"Fehler beim Verlängern ({type(exc).__name__})")
+
+
+_LEASE: contextvars.ContextVar[_Lease | None] = contextvars.ContextVar("migration_lease", default=None)
+_STATUS: dict = {"state": "not_started"}
+
+
+def _set_status(state: str, **extra) -> None:
+    _STATUS.clear()
+    _STATUS.update({"state": state, "since": _utcnow().isoformat(timespec="seconds"), **extra})
+
+
+def migration_status() -> dict:
+    """Zustand des Migrationslaufs dieses Prozesses: ``not_started``, ``waiting``, ``running``, ``done``,
+    ``incomplete`` (Lauf fertig, einzelne Migrationen bewusst offen), ``lost``, ``timeout`` oder ``error``."""
+    return dict(_STATUS)
+
+
+def migrations_ready() -> bool:
+    """Für ``/api/health/ready``: der Lauf dieses Prozesses ist abgeschlossen, keine Migration läuft mehr."""
+    return _STATUS.get("state") in READY_STATES
+
+
+def migration_lease_ok() -> bool:
+    """Ohne Datenbankzugriff: darf die laufende Migration weiterschreiben? Außerhalb eines Laufs immer ``True``."""
+    lease = _LEASE.get()
+    return lease is None or not lease.lost.is_set()
+
+
 async def extend_migration_lease(db) -> bool:
-    """Die Sperre des laufenden Migrationslaufs um ``LEASE_MINUTES`` verlängern - für lange Migrationen zwischen zwei
-    Schritten. Ohne laufenden Lauf (Tests, Aufruf von Hand) ``True``; gehört die Sperre nicht mehr diesem Lauf,
-    ``False`` - dann hört die Migration auf."""
-    owner = _LEASE_OWNER.get()
-    if owner is None:
+    """Die Sperre des laufenden Migrationslaufs sofort verlängern - für lange Migrationen zwischen zwei Schritten (der
+    Takt im Hintergrund verlängert ohnehin). Ohne laufenden Lauf (Tests, Aufruf von Hand) ``True``; gehört die Sperre
+    nicht mehr diesem Lauf, ``False`` - dann hört die Migration auf."""
+    lease = _LEASE.get()
+    if lease is None:
         return True
-    now = datetime.now(timezone.utc)
-    result = await db.schema_migration_lock.update_one(
-        {"_id": "global", "owner": owner},
-        {"$set": {"locked_until": now + timedelta(minutes=LEASE_MINUTES), "updated_at": now}})
-    return getattr(result, "matched_count", 0) == 1
+    return await lease.renew()
 
 
 async def migrate_team_leader_role(db) -> str:
@@ -86,10 +248,16 @@ async def migrate_deleted_account_leftovers(db) -> str:
     deleted = {"anonymized_at": {"$exists": True, "$ne": None}, "is_active": False, "display_name": "Gelöschter User",
                "email": {"$regex": r"^deleted_[^@]*@deleted\.(invalid|local)$"}}
     async for user in db.users.find(deleted, {"_id": 0, "id": 1, "anonymized_at": 1}):
+        # Lange Läufe (#1006): je Konto ein abgeschlossener Schritt; ohne Sperre hört die Migration davor auf, der
+        # nächste Lauf zieht dieselben Schritte noch einmal (sie finden nur, was noch übrig ist).
+        if not migration_lease_ok():
+            raise MigrationIncomplete(f"lease lost after {accounts} accounts - the next run continues")
         # Die Frist der Nachweise (drei Jahre) zählt ab der damaligen Löschung.
         result = await account_erasure.erase_related(db, user, now, erased_at=user["anonymized_at"])
         accounts += 1
         images += result["images"]
+        if accounts % PROGRESS_EVERY == 0:
+            logger.info("[migration] gelöschte Konten: %s bereinigt, %s Bilder entfernt", accounts, images)
     return f"{accounts} deleted accounts cleaned, {images} images removed"
 
 
@@ -548,53 +716,162 @@ MIGRATIONS = (
 )
 
 
-async def run_pending_migrations(db) -> list[dict]:
-    """Run each migration once. A short lease avoids startup-worker races. Eine Migration, die ``MigrationIncomplete``
-    wirft, wird nicht vermerkt und läuft beim nächsten Start erneut; die übrigen laufen weiter."""
-    now = datetime.now(timezone.utc)
+async def _acquire_lease(db) -> _Lease | None:
+    """Die Sperre holen - atomar: nur, wenn sie frei oder abgelaufen ist. ``None``: ein anderer Start hält sie."""
+    ttl = lease_seconds()
     owner = f"{socket.gethostname()}:{os.getpid()}:{new_id()}"
+    sent = monotonic()
+    now = _utcnow()
     try:
-        lease = await db.schema_migration_lock.find_one_and_update(
+        lock = await db.schema_migration_lock.find_one_and_update(
             {
-                "_id": "global",
+                "_id": LOCK_ID,
                 "$or": [
                     {"owner": owner},
                     {"locked_until": {"$lt": now}},
                     {"locked_until": {"$exists": False}},
                 ],
             },
-            {"$set": {"owner": owner, "locked_until": now + timedelta(minutes=LEASE_MINUTES), "updated_at": now}},
+            {"$set": {"owner": owner, "locked_until": now + timedelta(seconds=ttl), "acquired_at": now,
+                      "updated_at": now}},
             upsert=True,
             return_document=ReturnDocument.AFTER,
         )
     except DuplicateKeyError:
-        return []
-    if not lease or lease.get("owner") != owner:
-        return []
+        return None
+    if not lock or lock.get("owner") != owner:
+        return None
+    return _Lease(db, owner, ttl, renew_seconds(), sent + ttl)
 
+
+async def _guarded(db, migration, lease: _Lease):
+    """Eine Migration unter Aufsicht der Sperre: Geht sie verloren, darf die Migration bis kurz vor Ablauf noch zu ihrem
+    nächsten Schritt kommen (``extend_migration_lease`` liefert dann ``False``), danach wird sie abgebrochen. In beiden
+    Fällen ``MigrationLeaseLost`` - auch wenn sie trotzdem fertig wurde, wird sie nicht vermerkt."""
+    task = asyncio.ensure_future(migration(db))
+    lost = asyncio.ensure_future(lease.lost.wait())
+    try:
+        await asyncio.wait({task, lost}, return_when=asyncio.FIRST_COMPLETED)
+        if lease.lost.is_set() and not task.done():
+            await asyncio.wait({task}, timeout=lease.grace_seconds())
+    except BaseException:
+        task.cancel()
+        raise
+    finally:
+        lost.cancel()
+    if not task.done():
+        task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    if lease.lost.is_set():
+        raise MigrationLeaseLost(lease.reason)
+    return task.result()
+
+
+async def _run_once(db) -> list[dict] | None:
+    """Ein Versuch: Sperre holen und die offenen Migrationen abarbeiten. ``None``: ein anderer Start hält die Sperre."""
+    lease = await _acquire_lease(db)
+    if lease is None:
+        return None
+    _set_status("running")
     applied: list[dict] = []
-    token = _LEASE_OWNER.set(owner)
+    incomplete: list[int] = []
+    token = _LEASE.set(lease)
+    keeper = asyncio.ensure_future(lease.keep_alive())
     try:
         completed = set(await db.schema_migrations.distinct("version"))
         for version, name, migration in MIGRATIONS:
             if version in completed:
                 continue
+            if lease.lost.is_set():
+                raise MigrationLeaseLost(lease.reason)
+            logger.info("[migration] %s %s beginnt", version, name)
+            started = monotonic()
             try:
-                result = await migration(db)
+                result = await _guarded(db, migration, lease)
             except MigrationIncomplete as exc:
                 logger.error("[migration] %s %s ist noch nicht fertig und läuft beim nächsten Start erneut: %s",
                              version, name, exc)
+                incomplete.append(version)
                 continue
-            finished_at = datetime.now(timezone.utc)
+            finished_at = _utcnow()
             record = {"version": version, "name": name, "result": result, "applied_at": finished_at}
             await db.schema_migrations.update_one(
                 {"version": version}, {"$setOnInsert": record}, upsert=True,
             )
             applied.append(record)
+            logger.info("[migration] %s %s fertig nach %.1f s", version, name, monotonic() - started)
+        _set_status("incomplete" if incomplete else "done", open=incomplete)
         return applied
+    except MigrationLeaseLost:
+        _set_status("lost", reason=lease.reason)
+        logger.error("[migration] Lauf abgebrochen, die Sperre ist verloren (%s); %s Migrationen vermerkt",
+                     lease.reason, len(applied))
+        return applied
+    except BaseException:
+        _set_status("error")
+        raise
     finally:
-        _LEASE_OWNER.reset(token)
-        await db.schema_migration_lock.update_one(
-            {"_id": "global", "owner": owner},
-            {"$set": {"locked_until": datetime.now(timezone.utc)}, "$unset": {"owner": ""}},
-        )
+        keeper.cancel()
+        await asyncio.gather(keeper, return_exceptions=True)
+        _LEASE.reset(token)
+        try:
+            await db.schema_migration_lock.update_one(
+                {"_id": LOCK_ID, "owner": lease.owner},
+                {"$set": {"locked_until": _utcnow()}, "$unset": {"owner": ""}},
+            )
+        except PyMongoError as exc:
+            # Ohne Freigabe läuft die Sperre von selbst ab (``MIGRATION_LEASE_SECONDS``).
+            logger.warning("[migration] Sperre nicht freigegeben (%s), sie läuft von selbst ab", type(exc).__name__)
+
+
+async def run_pending_migrations(db) -> list[dict]:
+    """Ein Versuch ohne Warten: Run each migration once, under the lease. Eine Migration, die ``MigrationIncomplete``
+    wirft, wird nicht vermerkt und läuft beim nächsten Start erneut; die übrigen laufen weiter. Hält ein anderer Start
+    die Sperre oder geht sie verloren, kommt zurück, was bis dahin vermerkt wurde (``migration_status`` sagt, warum).
+    Für den Start: ``ensure_migrations``."""
+    return await _run_once(db) or []
+
+
+async def _all_recorded(db) -> bool:
+    done = set(await db.schema_migrations.distinct("version"))
+    return all(version in done for version, _, _ in MIGRATIONS)
+
+
+async def _holder(db) -> str:
+    lock = await db.schema_migration_lock.find_one({"_id": LOCK_ID}, {"_id": 0, "owner": 1}) or {}
+    return log_safe(str(lock.get("owner") or "-").split(":", 1)[0], 80)
+
+
+async def ensure_migrations(db) -> list[dict]:
+    """Startablauf (#1006): Sperre holen und migrieren - oder warten, bis der Halter fertig ist bzw. jede Migration
+    vermerkt ist. Wird die Sperre frei, holt dieser Start sie selbst und zieht nach, was offen ist. Erst danach geht
+    der Start weiter. Wartet er länger als ``MIGRATION_WAIT_SECONDS``: ``MigrationWaitTimeout``; verliert er die Sperre
+    mitten im Lauf: ``MigrationLeaseLost`` - der Start bricht ab, nach dem Neustart beginnt alles von vorn."""
+    limit = wait_seconds()
+    started = monotonic()
+    logged_at: float | None = None
+    while True:
+        applied = await _run_once(db)
+        if applied is not None:
+            if _STATUS.get("state") == "lost":
+                raise MigrationLeaseLost(
+                    f"Migrationen: die Sperre ging mitten im Lauf verloren ({_STATUS.get('reason')}). Der Start bricht "
+                    "ab; die abgebrochene Migration ist nicht vermerkt und läuft beim nächsten Halter erneut.")
+            return applied
+        if await _all_recorded(db):
+            _set_status("done", open=[])
+            return []
+        waited = monotonic() - started
+        if waited >= limit:
+            _set_status("timeout", waited_seconds=int(waited))
+            message = (f"Migrationen: ein anderer Start ({await _holder(db)}) hält die Sperre seit über {int(limit)} s "
+                       "(MIGRATION_WAIT_SECONDS). Dieser Start bricht ab und bedient nichts; nach dem Neustart wartet "
+                       "er erneut oder übernimmt die abgelaufene Sperre.")
+            logger.error("[migration] %s", message)
+            raise MigrationWaitTimeout(message)
+        _set_status("waiting", waited_seconds=int(waited))
+        if logged_at is None or monotonic() - logged_at >= WAIT_LOG_SECONDS:
+            logged_at = monotonic()
+            logger.warning("[migration] Ein anderer Start (%s) migriert gerade - dieser wartet (%s s von höchstens "
+                           "%s s) und meldet sich erst danach bereit", await _holder(db), int(waited), int(limit))
+        await asyncio.sleep(max(0.0, min(WAIT_POLL_SECONDS, limit - waited)))

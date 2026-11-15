@@ -153,9 +153,26 @@ docker compose up -d --force-recreate frontend backend
 
 # 4. Wait for backend
 BACKEND_PORT="$(grep -E '^BACKEND_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 8001)"
-info "Waiting for backend health…"
+# Eine lange Migration beim Start hält die Bereit-Meldung auf (#1006, docs/BETRIEB.md): so viele Sekunden warten,
+# aus der Umgebung oder .env, Standard 600.
+BACKEND_READY_TIMEOUT="${BACKEND_READY_TIMEOUT:-$(grep -E '^BACKEND_READY_TIMEOUT=' .env 2>/dev/null | cut -d= -f2 || true)}"
+# Nur Ziffern, dezimal gelesen (führende Nullen wie 0600 oder 090 sind kein Oktal), 30 bis 86400 Sekunden.
+case "${BACKEND_READY_TIMEOUT:-}" in
+  ''|*[!0-9]*) BACKEND_READY_TIMEOUT=600 ;;
+  *)
+    BACKEND_READY_TIMEOUT="${BACKEND_READY_TIMEOUT#"${BACKEND_READY_TIMEOUT%%[!0]*}"}"
+    if [ "${#BACKEND_READY_TIMEOUT}" -gt 5 ]; then
+      BACKEND_READY_TIMEOUT=86400
+    else
+      BACKEND_READY_TIMEOUT=$((10#${BACKEND_READY_TIMEOUT:-0}))
+    fi
+    ;;
+esac
+if [ "$BACKEND_READY_TIMEOUT" -lt 30 ]; then BACKEND_READY_TIMEOUT=30; fi
+if [ "$BACKEND_READY_TIMEOUT" -gt 86400 ]; then BACKEND_READY_TIMEOUT=86400; fi
+info "Waiting for backend health (up to ${BACKEND_READY_TIMEOUT}s)…"
 BACKEND_READY=false
-for i in $(seq 1 60); do
+for i in $(seq 1 $(( (BACKEND_READY_TIMEOUT + 1) / 2 ))); do
   if curl -fsS "http://localhost:${BACKEND_PORT:-8001}/api/health/ready" >/dev/null 2>&1; then
     ok "Backend up."
     BACKEND_READY=true
@@ -163,7 +180,11 @@ for i in $(seq 1 60); do
   fi
   sleep 2
 done
-[ "$BACKEND_READY" = "true" ] || fail "Backend did not become healthy within 120s."
+if [ "$BACKEND_READY" != "true" ]; then
+  warn "Backend not ready after ${BACKEND_READY_TIMEOUT}s. Migrations may still be running – check before restarting:"
+  warn "  docker compose logs --tail=200 backend | grep -E 'migration|Startup complete'"
+  fail "Backend did not become healthy within ${BACKEND_READY_TIMEOUT}s (BACKEND_READY_TIMEOUT)."
+fi
 
 # 5. Wait for frontend and verify SPA fallback routes
 FRONTEND_PORT="$(grep -E '^FRONTEND_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 3000)"
