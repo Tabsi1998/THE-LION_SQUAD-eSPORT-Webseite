@@ -234,3 +234,13 @@ test("Veto: ein überholter Zug (409) nennt den Satz des Servers und lädt frisc
   await waitFor(() => expect(pages()).toBeGreaterThan(before));
   expect(screen.queryByText("Glut gesperrt.")).toBeNull();
 });
+
+test("Tippflächen mindestens 44 Punkte: Regeln aufklappen und Verlauf", async () => {
+  const { StyleSheet } = jest.requireActual("react-native");
+  const sides = [{ ...OWN, checked_in: true, present_count: 2 }, { ...OTHER, checked_in: true, present_count: 3 }];
+  answer({ ...BASE, checkin: checkin({ state: "veto", sides, veto: vetoBlock() }) });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("veto-history-toggle")).toBeTruthy());
+  expect(StyleSheet.flatten(screen.getByTestId("veto-history-toggle").props.style).minHeight).toBeGreaterThanOrEqual(44);
+  expect(StyleSheet.flatten(screen.getByTestId("checkin-rules").props.style).minHeight).toBeGreaterThanOrEqual(44);
+});

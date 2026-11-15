@@ -143,3 +143,14 @@ test("Tabelle einer Liga-Staffel: Zonen je Zeile mit Legende, Endstand darüber"
   expect(screen.queryByTestId("standings-zones-all")).toBeNull();
   expect(screen.queryByTestId("standings-final")).toBeNull();
 });
+
+test("Tippflächen mindestens 44 Punkte: „Als Titel“ mit Namen der Belohnung für den Vorleser", async () => {
+  const { StyleSheet } = jest.requireActual("react-native");
+  await render(<RewardCollection awards={[reward("t", "title", "Meister Season 1")] as never} titleId={null} onTitle={jest.fn()} />);
+  const button = screen.getByTestId("reward-title-t");
+  expect(button.props.accessibilityLabel).toBe("Als Titel wählen: Meister Season 1");
+  expect(StyleSheet.flatten(button.props.style).minHeight).toBeGreaterThanOrEqual(44);
+  expect(StyleSheet.flatten(button.props.style).minWidth).toBeGreaterThanOrEqual(44);
+  await render(<RewardCollection awards={[reward("t", "title", "Meister Season 1")] as never} titleId="t" onTitle={jest.fn()} />);
+  expect(screen.getByTestId("reward-title-t").props.accessibilityLabel).toBe("Titel entfernen: Meister Season 1");
+});

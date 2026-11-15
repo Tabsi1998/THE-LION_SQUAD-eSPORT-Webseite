@@ -77,6 +77,7 @@ export function RewardCollection({ awards, titleId = null, onTitle = null, busy 
                       style={[styles.action, titled && styles.actionOn]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: titled }}
+                      accessibilityLabel={`${titled ? "Titel entfernen" : "Als Titel wählen"}: ${award.reward?.name || "Belohnung"}`}
                       testID={`reward-title-${award.id}`}
                     >
                       <Text style={[styles.actionText, titled && { color: roles.brand }]}>{titled ? "Titel ✓" : "Als Titel"}</Text>
@@ -106,7 +107,8 @@ const styles = StyleSheet.create({
   kind: { fontSize: 10, fontWeight: "900", letterSpacing: 1.4, textTransform: "uppercase" },
   name: { fontWeight: "900" },
   meta: { fontSize: 12 },
-  action: { borderColor: "rgba(255,255,255,0.2)", borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6 },
+  // Tippfläche mindestens 48 Punkte wie jeder Knopf der App (a11y/audit.ts).
+  action: { alignItems: "center", borderColor: "rgba(255,255,255,0.2)", borderRadius: radius.sm, borderWidth: 1, justifyContent: "center", minHeight: 48, minWidth: 48, paddingHorizontal: 10 },
   actionOn: { borderColor: "rgba(41,182,232,0.7)" },
   actionText: { color: roles.muted, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   chip: { alignItems: "center", alignSelf: "flex-start", borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, maxWidth: "100%", paddingLeft: 3, paddingRight: 10, paddingVertical: 3 },

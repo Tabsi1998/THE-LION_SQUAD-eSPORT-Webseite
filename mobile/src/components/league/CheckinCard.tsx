@@ -214,7 +214,7 @@ export function CheckinCard({ block, matchId, busy, run, onChanged }: { block: C
       ) : null}
       {block.lead?.can_enter ? <Muted style={styles.small} testID="checkin-lead-web">Für eine Seite eintragen (Liga-Leitung): auf der Matchseite im Web, mit Grund.</Muted> : null}
 
-      <Pressable onPress={() => setRulesOpen((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: rulesOpen }} hitSlop={8} testID="checkin-rules">
+      <Pressable onPress={() => setRulesOpen((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: rulesOpen }} style={styles.toggle} testID="checkin-rules">
         <Text style={styles.rulesToggle}>So läuft der Check-in in dieser Season {rulesOpen ? "▴" : "▾"}</Text>
       </Pressable>
       {rulesOpen ? (
@@ -257,5 +257,7 @@ const styles = StyleSheet.create({
   personBlocked: { borderColor: "rgba(255,255,255,0.05)" },
   blockedName: { color: roles.quiet },
   blockedText: { color: roles.warn, fontSize: 12 },
+  // Tippfläche mindestens 48 Punkte wie jeder Knopf der App (a11y/audit.ts) - auch für eine Textzeile.
+  toggle: { alignSelf: "flex-start", justifyContent: "center", minHeight: 48 },
   rulesToggle: { color: roles.muted, fontSize: 12, fontWeight: "800" },
 });

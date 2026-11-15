@@ -321,7 +321,7 @@ export function VetoCard({ block, matchId, busy = false, run, onChanged, readOnl
       ) : null}
       {block.history?.length ? (
         <View style={styles.stack}>
-          <Pressable onPress={() => setHistoryOpen((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: historyOpen || block.status !== "done" }} hitSlop={8} testID="veto-history-toggle">
+          <Pressable onPress={() => setHistoryOpen((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: historyOpen || block.status !== "done" }} style={styles.toggle} testID="veto-history-toggle">
             <Text style={styles.historyToggle}>Verlauf ({block.history.length} {block.history.length === 1 ? "Schritt" : "Schritte"})</Text>
           </Pressable>
           {historyOpen || block.status !== "done" ? (
@@ -382,5 +382,7 @@ const styles = StyleSheet.create({
   mapIcon: { marginRight: 4 },
   mapBadge: { borderRadius: radius.sm, color: "#04141B", fontSize: 11, fontWeight: "900", overflow: "hidden", paddingHorizontal: 6, paddingVertical: 3 },
   plannedRow: { alignItems: "center", backgroundColor: "rgba(31,208,142,0.05)", borderColor: "rgba(31,208,142,0.4)", borderRadius: radius.lg, borderWidth: 1, flexDirection: "row", gap: 10, padding: 8 },
+  // Tippfläche mindestens 48 Punkte wie jeder Knopf der App (a11y/audit.ts).
+  toggle: { alignSelf: "flex-start", justifyContent: "center", minHeight: 48 },
   historyToggle: { color: roles.muted, fontSize: 12, fontWeight: "800" },
 });
