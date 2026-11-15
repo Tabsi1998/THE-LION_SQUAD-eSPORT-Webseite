@@ -137,6 +137,9 @@ curl -fsS http://localhost:8001/api/health/live
 curl -fsS http://localhost:8001/api/health/ready
 ```
 
+Antwortet das Backend noch nicht oder steht in `/api/health/ready` `"migrations": false`, läuft noch eine
+Migration. Den Ablauf und die Zeitlimits beschreibt [Migrationen beim Start](docs/BETRIEB.md#migrationen-beim-start-1006).
+
 Oeffentlich pruefen:
 
 - `https://lionsquad.at`

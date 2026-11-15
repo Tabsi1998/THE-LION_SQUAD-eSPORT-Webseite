@@ -75,6 +75,44 @@ in der Verwaltung, nicht auf der öffentlichen Seite.
 Zählt der Server alle Besucher als eine Adresse (Prüfung „Besucher-Adresse“ oben auf Gelb), gilt die
 Grenze für alle gemeinsam – dann zuerst den Proxy richtig einstellen, nicht die Grenze hochdrehen.
 
+## Migrationen beim Start (#1006)
+
+Beim Start legt das Backend zuerst die Indizes an und arbeitet dann die offenen Migrationen ab
+(`backend/services/migrations.py`, vermerkt in `schema_migrations`). Es migriert immer genau ein Start, auch wenn
+mehrere Backends gegen dieselbe Datenbank starten oder ein Container mitten im Lauf neu startet:
+
+1. **Sperre holen.** Wer zuerst kommt, bekommt `schema_migration_lock` (atomar, nur wenn sie frei oder abgelaufen
+   ist, mit eigenem Token) und migriert. Im Protokoll steht je Migration „beginnt“ und „fertig nach … s“, lange
+   Migrationen melden zwischendurch ihren Stand.
+2. **Verlängern.** Während des Laufs verlängert der Halter die Sperre im festen Takt. Stirbt er, wird sie nicht mehr
+   verlängert, läuft ab, und ein wartender Start übernimmt.
+3. **Warten.** Jeder andere Start wartet, bis der Halter fertig ist bzw. jede Migration vermerkt ist, und zieht
+   dann selbst nach, was noch offen ist. Bis dahin nimmt er keine Anfragen an. Im Protokoll steht alle 30 Sekunden
+   „Ein anderer Start (…) migriert gerade – dieser wartet“.
+4. **Bereit.** `/api/health/ready` (und damit der Docker-Healthcheck über `/api/health`) meldet erst bereit, wenn
+   der Migrationslauf dieses Prozesses abgeschlossen ist (`checks.migrations`). Eine Migration, die bewusst offen
+   bleibt (`MigrationIncomplete`, etwa eine Saison mit Fehler), hält den Start nicht auf. Sie steht als Fehler im
+   Protokoll und läuft beim nächsten Start erneut.
+
+**Sperre verloren.** Gelingt die Verlängerung bis einen Takt vor Ablauf nicht (Datenbank weg, Prozess hing) oder hat
+inzwischen ein anderer Start die Sperre, hört die laufende Migration auf. Migrationen mit Schritten hören am nächsten
+Schritt auf, die anderen werden abgebrochen. Die Migration wird nicht vermerkt, und der Start bricht mit
+`MigrationLeaseLost` ab; Docker startet den Container neu (`restart: unless-stopped`). Weil jede Migration nur das
+Fehlende nachzieht, macht der nächste Halter dort weiter, ohne etwas doppelt zu schreiben.
+
+**Zeitlimits** (Umgebung des Backends; ohne Angabe gilt der Standard):
+
+| Variable | Standard | Bereich | Bedeutung |
+|---|---|---|---|
+| `MIGRATION_LEASE_SECONDS` | 180 | 30–3600 | So lange gilt die Sperre ab der letzten Verlängerung. So lange dauert die Übernahme nach einem Absturz höchstens. |
+| `MIGRATION_LEASE_RENEW_SECONDS` | ein Viertel der Sperre (45) | 1 bis halbe Sperre | Takt der Verlängerung. Bleibt sie bis einen Takt vor Ablauf aus, gibt der Halter auf. |
+| `MIGRATION_WAIT_SECONDS` | 1800 | 30–86400 | So lange wartet ein Start ohne Sperre. Danach bricht er mit `MigrationWaitTimeout` und dem Namen des Halters ab. Nach dem Neustart wartet er erneut oder übernimmt die inzwischen abgelaufene Sperre. |
+
+Gut zu wissen: Auch der Halter meldet sich erst nach dem Migrieren bereit. `update.sh` wartet 120 Sekunden auf
+`/api/health/ready`, der Healthcheck in `docker-compose.yml` rund 95 Sekunden. Dauert eine Migration länger, melden
+beide einen Fehler, obwohl das Backend weiter migriert. Dann das Protokoll ansehen
+(`docker compose logs -f backend`, Zeilen mit `[migration]`) und warten, bis „fertig“ steht, statt neu zu starten.
+
 ## Eindeutige Indizes und Altdubletten (#930, #1043)
 
 Einige Sammlungen dürfen je Schlüssel nur eine Zeile haben (etwa XP je Konto, Discord-Aktivität je Person und

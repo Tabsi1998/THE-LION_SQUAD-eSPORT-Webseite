@@ -67,6 +67,10 @@ services:
       OUTBOUND_DISABLED: "${OUTBOUND_DISABLED:-false}"
       # Wie lange gleichzeitige An- und Abmeldungen zu einem Turnier aufeinander warten (#1826), 2 bis 60 Sekunden.
       REGISTRATION_LOCK_WAIT_SECONDS: "${REGISTRATION_LOCK_WAIT_SECONDS:-20}"
+      # Migrationen beim Start (#1006, docs/BETRIEB.md): Sperre, Takt der Verlängerung, Wartezeit ohne Sperre.
+      MIGRATION_LEASE_SECONDS: "${MIGRATION_LEASE_SECONDS:-180}"
+      MIGRATION_LEASE_RENEW_SECONDS: "${MIGRATION_LEASE_RENEW_SECONDS:-}"
+      MIGRATION_WAIT_SECONDS: "${MIGRATION_WAIT_SECONDS:-1800}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
       MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
       MAX_VIDEO_UPLOAD_MB: "${MAX_VIDEO_UPLOAD_MB:-1536}"
