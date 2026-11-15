@@ -122,6 +122,16 @@ async def _ensure_prize_manager(user: dict, tournament_id: str | None) -> None:
         if needs_mfa(user):
             raise HTTPException(status_code=403, detail=MFA_MESSAGE)
         return
+    if tournament_id and str(tournament_id).startswith("overall:"):
+        # Gewinne einer Gesamtwertung (F.5, #2215): Bereich ``overall:<zeitraum>:<n>`` - es gelten die Rechte der Liga wie bei einer
+        # Staffel („Liga verwalten“).
+        from services import league_permissions
+
+        period_id = str(tournament_id).split(":")[1] if str(tournament_id).count(":") >= 2 else ""
+        league = await get_db().leagues.find_one({"overall.periods.id": period_id}, {"_id": 0, "id": 1}) if period_id else None
+        if league and await league_permissions.can(user, "manage", league["id"]):
+            return
+        raise HTTPException(status_code=403, detail="Gewinne dieser Gesamtwertung verwaltet die Liga-Leitung.")
     if tournament_id and await has_tournament_staff_permission(user, tournament_id, {"organizer"}, capability="manage"):
         return
     if tournament_id:

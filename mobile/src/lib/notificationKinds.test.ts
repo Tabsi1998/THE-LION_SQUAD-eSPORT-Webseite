@@ -23,3 +23,11 @@ test("Großbuchstaben im Text selbst, deutsch", () => {
   expect(upperDe("Straße")).toBe("STRASSE");
   expect(upperDe(null)).toBe("");
 });
+
+test("Liga-Spieltag und Belohnungen haben eigene Wörter (#2173)", () => {
+  expect(notificationKindLabel("match_call")).toBe("Aufruf");
+  expect(notificationKindLabel("match_schedule")).toBe("Termin");
+  expect(notificationKindLabel("league_reward")).toBe("Belohnung");
+  expect(notificationKindLabel("league_broadcast")).toBe("Liga-Leitung");
+  expect(notificationKindLabel("league_irgendwas")).toBe("Liga");
+});

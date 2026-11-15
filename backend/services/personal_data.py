@@ -267,6 +267,9 @@ CLUB_CONTENT = frozenset({
     # abgeschlossen bzw. wieder geöffnet hat. Seit F.2 (#1627) dazu je Anmeldung die eingesetzten Spieler (``sides``,
     # ``player_ids``) für die Season-Historie - wie ``player_ids`` am Meister-Eintrag in ``tournament_awards``.
     "league_final_tables",
+    # Gesamtwertung über Seasons (F.5, #2215): die abgeschlossene Fassung je Zeitraum und Liga N - Co-Teams und Spieler mit Punkten je
+    # Season (Kennungen wie ``player_ids`` am Endstand), dazu nur die Kennung, wer abgeschlossen bzw. wieder geöffnet hat.
+    "league_overall_finals",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",

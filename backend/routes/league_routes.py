@@ -761,8 +761,13 @@ async def public_season(league_slug: str, season_slug: str, user: dict | None = 
     view = await _call(leagues.public_season_view(db, league_slug, season_slug, user, staffel_hidden=tournament_hidden_reason))
     # Selbstanmeldung (#2205): Fenster-Stand und freie Plätze für alle, ``None`` ohne Fenster. Keine Personen.
     season = await db.league_seasons.find_one({"id": view["season"]["id"]}, {"_id": 0})
+    from services.league_overall import season_block as overall_block
+
+    league_doc = await db.leagues.find_one({"id": view["league"]["id"]}, {"_id": 0, "overall": 1})
     # Regelwerk (#1646): Link mit Version und Stand statt des Aufklappblocks; ``None`` - der Regeltext bleibt.
     return {**view, "rules": await rules_summary(db, view["league"]["id"], view["season"]["id"], user),
+            # Gesamtwertung (F.5, #2215): der Zeitraum dieser Season - nur dann zeigt die Navigation „Gesamtwertung“.
+            "overall": await overall_block(league_doc, season),
             "application": await league_applications.public_block(db, season),
             # Plattform je Season (#2270): erlaubte Plattformen, Crossplay, Eingabegerät, je Liga N; ``None`` ohne jede Angabe.
             "platform": await league_platform.season_block(db, season)}

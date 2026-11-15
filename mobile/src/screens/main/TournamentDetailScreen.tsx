@@ -20,6 +20,7 @@ import type { BracketMatch } from "../../lib/bracketGraph";
 import { motionPlan, wonJustNow, type MotionPlan } from "../../lib/bracketMotion";
 import { playMoment } from "../../lib/tournamentHaptics";
 import { checkInState, matchStatusText, standingsTables, treeKind } from "../../lib/tournamentView";
+import { finalNote, staffelApiPath, winnerLabel } from "../../lib/leagueTeam";
 import { BracketCanvas } from "../../components/tournament/bracket/BracketCanvas";
 import { RegistrationSheet, type RegistrationPayload } from "../../components/tournament/RegistrationSheet";
 import { ScheduleList } from "../../components/tournament/ScheduleList";
@@ -254,6 +255,20 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   );
   const recentCompletedMatches = useMemo(() => completedMatches.slice(-4).reverse(), [completedMatches]);
   const isFinished = FINISHED_TOURNAMENT_STATUSES.has(String(tournament?.status || ""));
+  // Liga-Staffel (#2173, docs/LIGA.md F.1): eingefrorener Endstand über der Tabelle, der Meister aus der Staffel der Ligaseite.
+  const isLeague = Boolean(tournament?.league_links);
+  const tableNote = tournament?.final_table ? finalNote(tournament.final_table) : "";
+  const staffelPath = tournament?.final_table ? staffelApiPath(tournament.league_links?.public_path, tournament.id) : null;
+  const [champion, setChampion] = useState<{ display_name?: string | null } | null>(null);
+  useEffect(() => {
+    setChampion(null);
+    if (!staffelPath) return undefined;
+    let active = true;
+    api.get<{ staffel?: { final?: { champion?: { display_name?: string | null } | null } | null } }>(staffelPath)
+      .then(({ data }) => { if (active) setChampion(data?.staffel?.final?.champion || null); })
+      .catch(() => { /* ohne Meister bleibt „Platz 1“ */ });
+    return () => { active = false; };
+  }, [staffelPath]);
   const completedAt = tournament?.results_published_at || tournament?.completed_at || tournament?.end_date || tournament?.updated_at;
 
   const register = useCallback(async (payload: RegistrationPayload = {}) => {
@@ -388,6 +403,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 playedMatches={completedMatches.length}
                 standings={finalStandings}
                 totalMatches={allMatches.length}
+                winnerTitle={winnerLabel(isLeague, champion)}
+                championName={champion?.display_name || null}
                 onOpenStandings={() => setTab("standings")}
               />
             ) : null}
@@ -551,7 +568,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             // Gruppen, Liga, Swiss (#1563): eine Tabelle statt Baum-Spalten, der Spielplan einen Tipp weiter.
             <Card style={styles.card}>
               <Heading>Tabelle</Heading>
-              <StandingsTables tables={tables} empty="Die Tabelle steht, sobald Ergebnisse da sind." />
+              <StandingsTables tables={tables} empty="Die Tabelle steht, sobald Ergebnisse da sind." finalNote={tableNote} />
               {allMatches.length ? <Button label="Zum Spielplan" variant="secondary" onPress={() => { tabRef.current = "matches"; setTab("matches"); }} /> : null}
             </Card>
           ) : (
@@ -587,7 +604,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         {tab === "standings" ? (
           <Card style={styles.card}>
             <Heading>{isFinished ? "Finale Rangliste" : "Rangliste"}</Heading>
-            {kind === "table" ? <StandingsTables tables={tables} empty="Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind." /> : finalStandings.length ? finalStandings.map((standing, index) => (
+            {kind === "table" ? <StandingsTables tables={tables} empty="Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind." finalNote={tableNote} /> : finalStandings.length ? finalStandings.map((standing, index) => (
               <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} />
             )) : <Muted>Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind.</Muted>}
           </Card>
@@ -662,6 +679,8 @@ function CompletedTournamentSummary({
   standings,
   totalMatches,
   onOpenStandings,
+  winnerTitle = "Champion",
+  championName = null,
 }: {
   completedAt?: string | null;
   participantCount: number;
@@ -669,6 +688,8 @@ function CompletedTournamentSummary({
   standings: any[];
   totalMatches: number;
   onOpenStandings: () => void;
+  winnerTitle?: string;
+  championName?: string | null;
 }) {
   const winner = standings[0];
   const podium = standings.slice(0, 3);
@@ -683,13 +704,13 @@ function CompletedTournamentSummary({
 
       {winner ? (
         <View style={styles.winnerBox}>
-          <Muted style={styles.winnerLabel}>Champion</Muted>
-          <Body style={styles.winnerName}>{standingName(winner)}</Body>
+          <Muted style={styles.winnerLabel} testID="tournament-winner-title">{winnerTitle}</Muted>
+          <Body style={styles.winnerName}>{championName || standingName(winner)}</Body>
           <Muted>{standingSummary(winner)}</Muted>
         </View>
       ) : (
         <View style={styles.winnerBox}>
-          <Muted style={styles.winnerLabel}>Champion</Muted>
+          <Muted style={styles.winnerLabel}>{winnerTitle}</Muted>
           <Body style={styles.winnerName}>Noch nicht veröffentlicht</Body>
           <Muted>Finale Platzierungen werden angezeigt, sobald sie im Backend vorhanden sind.</Muted>
         </View>

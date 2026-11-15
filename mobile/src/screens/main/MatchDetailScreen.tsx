@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Button } from "../../components/Button";
@@ -32,7 +32,7 @@ import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slo
 import { viennaWall, wallToIso } from "../../lib/dateChoice";
 import { DateTimeChooser } from "../../components/DateTimeChooser";
 import type { TournamentStackParamList } from "../../navigation/types";
-import { colors, radius } from "../../theme";
+import { colors, radius, roles } from "../../theme";
 import type { ChatMessage, Tournament } from "../../types";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "../../components/ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "../../components/ChatStickers";
@@ -46,6 +46,11 @@ import { asInstant, viennaTime } from "../../lib/vienna";
 import type { CatalogSticker } from "../../lib/stickers";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { playMoment } from "../../lib/tournamentHaptics";
+import { CheckinCard } from "../../components/league/CheckinCard";
+import { VetoCard } from "../../components/league/VetoCard";
+import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
+import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
+import { useVetoPolling } from "../../lib/useVetoPolling";
 
 const MATCH_LIVE_RESOURCES = ["matches", "matches-v2", "tournaments"];
 
@@ -74,6 +79,11 @@ type MatchPage = {
   allows_draw?: boolean;
   can_act?: boolean;
   call?: MatchCall;
+  // Liga-Spieltag (#2173, docs/LIGA.md D.2-D.4): Check-in mit Veto für Beteiligte und Leitung, das Veto lesend für Zuschauer und
+  // der Satz, warum Melden noch nicht geht. Ältere Server schicken die Felder nicht - dann bleibt alles wie vorher.
+  checkin?: CheckinBlock | null;
+  veto_view?: VetoBlock | null;
+  report_hint?: string | null;
   can_dispute?: boolean;
   dispute_until?: string | null;
   in_dispute?: boolean;
@@ -126,8 +136,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     ]);
     if (pageResult.status === "rejected") throw pageResult.reason;
     loadRound.current += 1;
+    const fresh = pageResult.value.data || null;
     return {
-      page: pageResult.value.data || null,
+      // Ein voller Stand mit älterem Veto-Block als dem des kurzen Abrufs behält den neueren Block (#2173, wie im Web).
+      page: fresh && previous?.page ? keepNewerVeto(previous.page, fresh) : fresh,
       chat: chatResult.status === "fulfilled" ? (Array.isArray(chatResult.value.data) ? chatResult.value.data : []) : previous?.chat || [],
       round: loadRound.current,
       partProblem: chatResult.status === "rejected" ? loadProblem(chatResult.reason) : null,
@@ -212,6 +224,37 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, [load]));
   useLiveRefresh(() => load(), MATCH_LIVE_RESOURCES, { enabled: isFocused, fallbackMs: 10000 });
 
+  // Map-Veto live (#2173, D.4): kurzer Abruf im Takt des Stands, nur sichtbar und im Vordergrund. Bleibt der Stand gleich, ersetzt
+  // die Antwort nur den Veto-Block; beginnt oder endet das Veto, lädt die Seite einmal ganz (Start-Knopf, Meldeformular).
+  const liveVeto = (page?.checkin ? page.checkin.veto : page?.veto_view) || null;
+  const vetoOffset = useMemo(() => vetoClockOffset(liveVeto?.server_now, Date.now()), [liveVeto?.server_now]);
+  const pollingVeto = useRef(false);
+  // Der gezeigte Stand für den Abruf: gerechnet wird vor dem Schreiben, nicht im Updater (der soll frei von Nebenwirkungen bleiben).
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const pollVeto = useCallback(async () => {
+    if (pollingVeto.current) return;
+    pollingVeto.current = true;
+    try {
+      const { data: live } = await api.get<{ veto?: VetoBlock | null; state?: string | null }>(`/matches/${idSegment(route.params.id)}/veto`);
+      const base = pageRef.current;
+      if (!base) return;
+      const merged = mergeLiveVeto(base, live);
+      if (merged === null) {
+        // Das Veto beginnt, endet oder der Stand wechselt: einmal ganz laden (Start-Knopf, Meldeformular).
+        await load();
+        return;
+      }
+      // Nur übernehmen, wenn inzwischen kein anderer Stand angekommen ist - sonst gilt der neuere.
+      if (merged !== base) mutate((current) => (current.page === base ? { ...current, page: merged } : current));
+    } catch {
+      // Der nächste Takt fragt wieder; das Live-Nachladen hält die Seite ohnehin frisch.
+    } finally {
+      pollingVeto.current = false;
+    }
+  }, [load, mutate, route.params.id]);
+  useVetoPolling(liveVeto, pollVeto, { bothIn: page?.checkin?.state === "veto", offset: vetoOffset, enabled: isFocused });
+
   const refreshAfterResult = useCallback(async () => {
     await Promise.all([
       invalidateCache("/mobile/dashboard"),
@@ -251,6 +294,10 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const canDispute = Boolean(page?.can_dispute);
   const hasResultActions = Boolean(canPlayerReportResult || showReportReadOnly || canSubmitV2Result || canDispute);
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
+  // Matchablauf (#2173): der Stand des Liga-Check-ins als Schild im Kopf - ohne Regeln an der Staffel nichts.
+  const flow = flowBadge(page?.checkin);
+  // Erst einchecken, dann melden (D.2): Der Server schickt den Satz, solange Melden noch nicht geht - er steht statt des Formulars.
+  const reportHint = canPlayerReportResult ? page?.report_hint || null : null;
 
   const propose = useCallback(async () => {
     // Datum und Uhrzeit zum Antippen (#1139) - als Wiener Uhr gewählt, als Zeitpunkt an den Server.
@@ -379,6 +426,28 @@ export function MatchDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, load, page?.can_dispute, route.params.id]);
 
+  // Liga-Spieltag (#2173): ein Weg für Einchecken, Start, Veto-Zug und „Bereit“ - Fehler und Erfolg stehen oben wie überall.
+  const runLeague = useCallback(async (task: () => Promise<string | void>, fallback: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const done = await task();
+      if (done) setSuccess(done);
+    } catch (err) {
+      setError(errorMessage(err, fallback));
+      // Ein veralteter Stand (409) ist meist der Grund - gleich frisch laden.
+      void load({ preserveDrafts: true });
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, load]);
+  const reloadLeague = useCallback(async () => {
+    await invalidateCache(`/matches/${route.params.id}`);
+    await load({ preserveDrafts: true });
+  }, [load, route.params.id]);
+
   if (!page && loading) {
     return (
       <Screen>
@@ -428,6 +497,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             </View>
           ) : (
             <View style={styles.pillRow}>
+              {flow ? <Pill label={flow.label} tone={flow.tone} testID="match-flow-state" /> : null}
               <Pill label={scheduleHeadline(match)} accent="gold" />
               {eventModeLabel ? <Pill label={eventModeLabel} accent="cyan" /> : null}
               {resultModeLabel ? <Pill label={resultModeLabel} /> : null}
@@ -448,6 +518,12 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             <Ionicons name="checkmark-circle-outline" color={colors.success} size={20} />
             <Body style={styles.successText}>{success}</Body>
           </View>
+        ) : null}
+
+        {page.checkin ? (
+          <CheckinCard block={page.checkin} matchId={idSegment(route.params.id)} busy={busy} run={runLeague} onChanged={reloadLeague} />
+        ) : page.veto_view ? (
+          <VetoCard block={page.veto_view} matchId={idSegment(route.params.id)} readOnly />
         ) : null}
 
         <Card style={styles.card}>
@@ -489,7 +565,12 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         {hasResultActions ? (
           <Card style={styles.card}>
             <Heading>{canPlayerReportResult ? "Ergebnis melden" : canSubmitV2Result ? "Ergebnis eintragen" : "Ergebnis"}</Heading>
-            {canPlayerReportResult || showReportReadOnly ? (
+            {reportHint ? (
+              <View style={styles.reportHint} testID="match-report-hint">
+                <Ionicons name="time-outline" color={colors.cyan} size={20} />
+                <Body style={styles.flex}>{reportHint}</Body>
+              </View>
+            ) : canPlayerReportResult || showReportReadOnly ? (
               <MatchReportCard
                 readOnly={!canPlayerReportResult}
                 onWrongResult={() => setProblemCategory("wrong_result")}
@@ -648,10 +729,13 @@ function ChatBubble({ message, own, grouped }: { message: ChatMessage; own: bool
   );
 }
 
-function Pill({ label, accent }: { label: string; accent?: "cyan" | "gold" }) {
+const FLOW_COLORS: Record<FlowTone, string> = { brand: roles.brand, ok: roles.ok, warn: roles.warn, live: roles.live, quiet: roles.quiet };
+
+function Pill({ label, accent, tone, testID }: { label: string; accent?: "cyan" | "gold"; tone?: FlowTone; testID?: string }) {
+  const color = tone ? FLOW_COLORS[tone] : null;
   return (
-    <View style={[styles.pill, accent === "cyan" && styles.pillCyan, accent === "gold" && styles.pillGold]}>
-      <Muted style={[styles.pillText, accent === "cyan" && styles.textCyan, accent === "gold" && styles.textGold]}>{label}</Muted>
+    <View style={[styles.pill, accent === "cyan" && styles.pillCyan, accent === "gold" && styles.pillGold, color ? { borderColor: color } : null]} testID={testID}>
+      <Muted style={[styles.pillText, accent === "cyan" && styles.textCyan, accent === "gold" && styles.textGold, color ? { color } : null]}>{label}</Muted>
     </View>
   );
 }
@@ -801,6 +885,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,59,48,0.1)",
     borderColor: "rgba(255,59,48,0.4)",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 9,
+    padding: 12,
+  },
+  reportHint: {
+    alignItems: "center",
+    backgroundColor: "rgba(41,182,232,0.06)",
+    borderColor: "rgba(41,182,232,0.32)",
     borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: "row",

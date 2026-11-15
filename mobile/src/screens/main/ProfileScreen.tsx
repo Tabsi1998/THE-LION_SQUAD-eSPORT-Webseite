@@ -17,6 +17,8 @@ import { Body, Muted, Title } from "../../components/Text";
 import { onAchievementUnlocked } from "../../lib/achievements";
 import { api } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
+import { RewardCollection } from "../../components/league/RewardCollection";
+import { withoutRewards, type RewardAward } from "../../lib/leagueRewards";
 import { formatDate } from "../../lib/format";
 import { formatMoney } from "../../lib/memberArea";
 import { documentsLine, type MemberDocument, type OwnDocuments } from "../../lib/memberDocuments";
@@ -80,7 +82,7 @@ function OwnProfile() {
   // Vereinsplatzierungen (#1945): die Referenzen des Vereins, in deren Aufstellung du stehst - über dein Vereinsprofil.
   const club = useMemberPlacements({ own: true, username: user?.username || "", enabled: Boolean(user?.is_club_member) });
   // Auszeichnungen (#230): eigene Banner und Trophäen, eine davon als Profilbanner - der Server prüft, dass sie die eigene ist.
-  const [awards, setAwards] = useState<{ awards: Award[]; featured_award_id?: string | null }>({ awards: [] });
+  const [awards, setAwards] = useState<{ awards: Award[]; featured_award_id?: string | null; featured_title_award_id?: string | null }>({ awards: [] });
   const [prizes, setPrizes] = useState<PrizePickup[]>([]);
   const [standing, setStanding] = useState<ModerationStanding | null>(null);
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
@@ -162,10 +164,12 @@ function OwnProfile() {
     }
   }, [load]);
 
-  const featureAward = useCallback(async (id: string | null) => {
+  const featureAward = useCallback(async (id: string | null, slot: "banner" | "title" = "banner") => {
     try {
-      if (id) await api.post(`/me/awards/${id}/feature`);
-      else await api.delete("/me/awards/feature");
+      // Titel neben dem Namen (#2173, F.4): derselbe Weg mit `slot=title`, nur für Belohnungen der Art „Titel“.
+      const options = slot === "title" ? { params: { slot } } : undefined;
+      if (id) await api.post(`/me/awards/${id}/feature`, undefined, options);
+      else await api.delete("/me/awards/feature", options);
       const { data } = await api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards");
       setAwards(data);
     } catch {
@@ -253,7 +257,10 @@ function OwnProfile() {
   const ownAwards = awards.awards.length ? (
     <View style={styles.list} testID="profile-awards">
       <Muted>Gewinnerbanner und Trophäen aus Turnieren des Vereins. Eine davon kannst du als Profilbanner wählen.</Muted>
-      {sortAwards(awards.awards).map((award) => (
+      {/* Belohnungen der Liga je Season (#2173, F.4): eine der Art „Titel“ steht als Titel neben deinem Namen. */}
+      <RewardCollection awards={awards.awards as RewardAward[]} testID="profile-reward-collection" titleId={awards.featured_title_award_id || null}
+        onTitle={(id) => { void featureAward(id, "title"); }} />
+      {sortAwards(withoutRewards(awards.awards as RewardAward[])).map((award) => (
         <AwardCard
           key={award.id}
           award={award}
