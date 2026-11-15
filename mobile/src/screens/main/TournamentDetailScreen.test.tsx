@@ -146,6 +146,8 @@ test("vor Ort: kein Check-in-Knopf, sondern „Check-in vor Ort bei der Turnierl
     check_in_from: "2026-11-14T17:00:00Z", check_in_until: "2026-11-14T17:45:00Z",
     my_registration: { id: "reg-1", status: "approved", user_id: "u-1" },
   };
+  // Die Uhr steht vor der eingestellten Öffnung (#2173): Der Test hing am echten Datum und wurde nach dem 14.11.2026 rot.
+  jest.useFakeTimers({ now: new Date("2026-11-14T16:30:00Z"), advanceTimers: true });
   answer({ ...checkIn, event_mode: "local" });
   const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("tournament-checkin-local")).toBeTruthy());
@@ -160,6 +162,7 @@ test("vor Ort: kein Check-in-Knopf, sondern „Check-in vor Ort bei der Turnierl
   await render(<TournamentDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("tournament-checkin")).toBeTruthy());
   expect(screen.queryByTestId("tournament-checkin-local")).toBeNull();
+  jest.useRealTimers();
 });
 
 // Kleinigkeiten (#1139): keine Kennzahl „Engine“, „Vom Turnier abmelden“ als leiser Link.
