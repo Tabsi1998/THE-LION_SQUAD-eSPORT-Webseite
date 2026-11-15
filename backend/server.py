@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -330,6 +331,22 @@ app.add_middleware(
     allowed_hosts=list(trusted_http_hosts()),
     www_redirect=False,
 )
+
+
+async def write_pause(request, call_next):
+    """Schreibpause fürs Backup (#1009, services/maintenance.py): schreibende Anfragen bekommen 503 „gleich wieder da“,
+    Lesen läuft weiter."""
+    if maintenance.blocks(request.method, request.url.path):
+        state = await maintenance.active_state(get_db())
+        if state:
+            status_code, body, headers = maintenance.response_parts(state)
+            return JSONResponse(status_code=status_code, content=body, headers=headers)
+    return await call_next(request)
+
+
+# Vor CORS angemeldet, also innerhalb davon: auch die 503 trägt die CORS-Kopfzeilen - sonst könnte eine andere erlaubte
+# Herkunft (etwa der Upload-Host) die Antwort nicht lesen und die Website keinen Hinweis zeigen.
+app.add_middleware(BaseHTTPMiddleware, dispatch=write_pause)
 
 # CORS: credentials require explicit trusted origins. Open wildcard CORS can be
 # enabled only for short-lived local debugging via ALLOW_INSECURE_CORS=true.
@@ -753,23 +770,12 @@ async def ops_monitoring(request, call_next):
         await ops_monitor.record_exception(app, request, exc)
         raise
     duration_ms = (time.perf_counter() - started) * 1000
-    if response.status_code >= 500:
+    # Die Schreibpause fürs Backup (#1009) ist gewollt und kein Serverfehler.
+    if response.status_code >= 500 and maintenance.MARKER_HEADER not in response.headers:
         await ops_monitor.record_http_error(app, request, response.status_code)
     if duration_ms >= ops_monitor.SLOW_REQUEST_MS:
         await ops_monitor.record_slow_request(app, request, duration_ms, response.status_code)
     return response
-
-
-# Schreibpause fürs Backup (#1009, services/maintenance.py): als letzte Middleware angemeldet, also die äußerste - eine
-# gesperrte Anfrage läuft durch nichts anderes und zählt nicht als Serverfehler in der Betriebssicht. Lesen läuft weiter.
-@app.middleware("http")
-async def write_pause(request, call_next):
-    if maintenance.blocks(request.method, request.url.path):
-        state = await maintenance.active_state(get_db())
-        if state:
-            status_code, body, headers = maintenance.response_parts(state)
-            return JSONResponse(status_code=status_code, content=body, headers=headers)
-    return await call_next(request)
 
 
 @app.get("/api/")

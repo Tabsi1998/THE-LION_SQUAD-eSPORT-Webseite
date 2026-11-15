@@ -81,3 +81,18 @@ def test_no_route_controls_the_pause():
     paths = [getattr(route, "path", "") for route in server.app.routes]
     assert paths
     assert not [path for path in paths if "maintenance" in path.lower() or "write-pause" in path or "write_pause" in path]
+
+
+@pytest.mark.asyncio
+async def test_the_503_carries_cors_headers_and_is_no_server_error(flow):
+    """Auch eine andere erlaubte Herkunft (etwa der Upload-Host) muss die Antwort lesen können, sonst erscheint kein Hinweis."""
+    tournament = await flow.create_tournament()
+    flow.act_as(await flow.add_user(name="Andere Herkunft"))
+    await maintenance.activate(flow.db, ttl_seconds=60)
+    blocked = await flow.post(f"/api/tournaments/{tournament['id']}/register", json=ACCEPT,
+                              headers={"Origin": "http://localhost:3000"})
+    assert blocked.status_code == 503
+    assert blocked.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert blocked.headers.get("access-control-allow-credentials") == "true"
+    assert blocked.json()["code"] == "write_pause"
+    assert await flow.db.ops_errors.count_documents({}) == 0

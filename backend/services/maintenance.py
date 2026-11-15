@@ -39,6 +39,8 @@ logger = logging.getLogger("tls.maintenance")
 
 DOC_ID = "write_pause"
 ERROR_CODE = "write_pause"
+# Kennzeichen der Antwort: die Betriebssicht zählt sie nicht als Serverfehler (server.py, ops_monitoring).
+MARKER_HEADER = "X-Write-Pause"
 # Grenzen der Lease: kurz genug, dass ein abgestürztes Backup die Website nicht lange sperrt.
 MIN_TTL_SECONDS = 5
 MAX_TTL_SECONDS = 1800
@@ -234,7 +236,7 @@ def response_parts(state: dict) -> tuple[int, dict, dict]:
     """Status, Inhalt und Kopfzeilen der Antwort in der Pause."""
     retry = max(1, min(retry_after_seconds(), int(state.get("remaining_seconds") or retry_after_seconds())))
     body = {"detail": MESSAGE, "code": ERROR_CODE, "retry_after": retry}
-    headers = {"Retry-After": str(retry), "Cache-Control": "no-store", "X-Write-Pause": "1"}
+    headers = {"Retry-After": str(retry), "Cache-Control": "no-store", MARKER_HEADER: "1"}
     return 503, body, headers
 
 
