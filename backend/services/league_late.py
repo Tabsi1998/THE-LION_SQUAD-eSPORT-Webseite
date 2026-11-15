@@ -11,6 +11,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+# Spiele einer Nachmeldung (#2422): gemeinsam für Nachmeldung (league_late_entry) und Strafen (league_sanctions), ohne Import-Kreis.
+GENERATION_MODE = "late_entry"
+# Ein Spiel, das entfallen ist, belegt die Woche nicht mehr - außer Nr. 188 (league_late_entry.held_cancel).
+GONE_STATUSES = frozenset({"cancelled", "archived"})
+
 FIELD = "late_registration_days"
 DEFAULT_DAYS = 14
 MAX_DAYS = 365
@@ -30,6 +35,12 @@ def aware(value) -> datetime | None:
         except ValueError:
             return None
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def registration_name(registration: dict | None) -> str:
+    """Der Name einer Anmeldung für Sätze: Anzeigename, sonst Team- oder Co-Team-Name."""
+    row = registration or {}
+    return row.get("display_name") or row.get("team_name") or row.get("squad_name") or "Team"
 
 
 def late_days(season: dict | None) -> int:

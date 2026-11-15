@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime, timezone
 
 from services.custom_bracket import league_legs
+from services.league_late import GENERATION_MODE, GONE_STATUSES, registration_name
 from services.matchday_schedule import (
     LOCAL_TZ,
     apply_schedule_writes,
@@ -40,10 +41,7 @@ logger = logging.getLogger("tls.league_late_entry")
 
 OPEN, DONE = "open", "done"
 ACTIVE_STATUSES = ("approved", "checked_in")
-# Ein Spiel, das entfallen ist, belegt die Woche nicht mehr - der Gegner ist dort frei.
-GONE_STATUSES = frozenset({"cancelled", "archived"})
 LEAGUE_STAGE_TYPES = frozenset({"league"})
-GENERATION_MODE = "late_entry"
 FINISHED_STATUSES = frozenset({"completed", "results_published", "archived", "cancelled"})
 
 BUSY = "An dieser Staffel wird gerade etwas geändert. Bitte gleich noch einmal versuchen."
@@ -66,8 +64,7 @@ def _now() -> datetime:
 
 
 def _name(registration: dict | None) -> str:
-    row = registration or {}
-    return row.get("display_name") or row.get("team_name") or row.get("squad_name") or "Team"
+    return registration_name(registration)
 
 
 def is_active(registration: dict | None) -> bool:
@@ -362,18 +359,14 @@ async def load(db, tournament_id: str) -> tuple[list[dict], list[dict]]:
 async def held_registrations(db, tournament_id: str, now: datetime | None = None) -> set[str]:
     """Nr. 188: Teams, deren Disqualifikation noch nicht endgültig ist - vorläufig, ein Einspruch offen oder die Einspruchsfrist
     läuft. Ihre abgesagten Spiele geben die Woche nicht frei."""
-    from services.league_sanction_bans import FINAL, OPEN as APPEAL_OPEN
+    from services.league_sanction_bans import FINAL, OPEN as APPEAL_OPEN, appeal_refusal
 
-    moment = now or _now()
     held = set()
     async for doc in db.competition_sanctions.find({"tournament_id": tournament_id, "kind": "disqualification", "revoked_at": None},
                                                    {"_id": 0}):
         if not doc.get("registration_id"):
             continue
-        # Wie league_sanctions.appeal_refusal (ohne Import, kein Import-Kreis): ohne Einspruch und mit laufender Frist geht er noch.
-        until = _moment(doc.get("appeal_until"))
-        appeal_possible = not doc.get("appeal") and until is not None and moment < until
-        if doc.get("state") != FINAL or (doc.get("appeal") or {}).get("state") == APPEAL_OPEN or appeal_possible:
+        if doc.get("state") != FINAL or (doc.get("appeal") or {}).get("state") == APPEAL_OPEN or appeal_refusal(doc, now) is None:
             held.add(doc["registration_id"])
     return held
 

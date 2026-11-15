@@ -220,3 +220,13 @@ def test_a_game_moved_into_an_open_week_occupies_it():
     assert any("ist in Woche 3 verschoben" in note for note in out["notes"])
     unmoved = plan(staffel(weeks=3), reg("L"), teams, [duel(1, "A", "B"), *games[1:]], NOW)
     assert [row["opponent_id"] for row in unmoved["pairings"]] == ["A"]
+
+
+def test_shared_values_live_in_leaf_modules_without_copies():
+    """Review #2422, Runde 2: Strafen und Nachmeldung teilen Einspruchsregel, Spielart und entfallene Status aus Blatt-Modulen."""
+    from services import league_late_entry, league_sanction_bans, league_sanctions
+
+    assert league_sanctions.appeal_refusal is league_sanction_bans.appeal_refusal
+    assert league_late_entry.GENERATION_MODE is league_late.GENERATION_MODE == "late_entry"
+    assert league_late_entry.GONE_STATUSES is league_late.GONE_STATUSES
+    assert league_sanctions.GENERATION_MODE is league_late.GENERATION_MODE

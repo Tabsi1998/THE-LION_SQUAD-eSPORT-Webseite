@@ -17,8 +17,9 @@ import logging
 from datetime import datetime, timedelta
 
 from models import new_id, now_utc
+from services.league_late import GENERATION_MODE, GONE_STATUSES, registration_name
 from services.league_sanction_bans import (BAN_KINDS, FINAL, GRANTED, KINDS, OPEN, PLAYER, PROVISIONAL, SQUAD, UPHELD, _local,
-                                          covered_matches, frame_for, parse, season_over, sync_proof_hold)
+                                          appeal_refusal, covered_matches, frame_for, parse, season_over, sync_proof_hold)
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_sanctions")
@@ -390,15 +391,14 @@ async def _refuse_late_entry_clash(db, tournament: dict, registration: dict) -> 
                                      "result_meta.removed_registration_id": rid}, {"_id": 0}).to_list(None)
     for match in back:
         sides = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
-        # Ohne Import aus league_late_entry (kein Import-Kreis): dieselben Werte wie dort (GENERATION_MODE, GONE_STATUSES).
-        clash = await db.matches_v2.find_one({"tournament_id": tournament["id"], "generation_mode": "late_entry", "round": match.get("round"),
-                                              "id": {"$ne": match["id"]}, "status": {"$nin": ["archived", "cancelled"]},
+        clash = await db.matches_v2.find_one({"tournament_id": tournament["id"], "generation_mode": GENERATION_MODE, "round": match.get("round"),
+                                              "id": {"$ne": match["id"]}, "status": {"$nin": sorted(GONE_STATUSES)},
                                               "slots.registration_id": {"$in": sides}}, {"_id": 0, "slots": 1})
         if clash:
             side = next(slot.get("registration_id") for slot in clash["slots"] if slot.get("registration_id") in sides)
             row = await db.tournament_registrations.find_one({"id": side}, {"_id": 0, "display_name": 1, "team_name": 1, "squad_name": 1})
-            name = (row or {}).get("display_name") or (row or {}).get("team_name") or (row or {}).get("squad_name") or "Team"
-            raise SanctionProblem(LATE_ENTRY_CLASH.format(week=calendar_week_of(tournament, int(match.get("round") or 0)), name=name), 409)
+            raise SanctionProblem(LATE_ENTRY_CLASH.format(week=calendar_week_of(tournament, int(match.get("round") or 0)),
+                                                          name=registration_name(row)), 409)
 
 
 async def undo_effect(db, doc: dict, actor_id: str | None) -> None:
@@ -534,20 +534,6 @@ async def revoke(db, doc: dict, reason, actor_id: str | None, *, via: str = "rev
     await sync_proof_hold(db, doc)
     await audit(db, "revoke", doc, actor_id, via=via, reason_length=len(reason), appeal_closed=bool(closed.modified_count))
     return doc
-
-
-def appeal_refusal(doc: dict, now: datetime | None = None) -> str | None:
-    """Warum gegen diese Strafe (jetzt) kein Einspruch geht - ``None``: Er geht."""
-    if doc.get("revoked_at"):
-        return "Die Strafe ist widerrufen."
-    if doc.get("state") != FINAL:
-        return "Eine vorläufige Sperre wird ohnehin geprüft. Der Einspruch ist ab der endgültigen Entscheidung möglich."
-    if doc.get("appeal"):
-        return "Gegen diese Strafe wurde schon Einspruch eingelegt. Er ist einmal je Entscheidung möglich."
-    until = parse(doc.get("appeal_until"))
-    if not until or (now or now_utc()) >= until:
-        return "Die Einspruchsfrist ist abgelaufen."
-    return None
 
 
 async def submit_appeal(db, doc: dict, user: dict, text) -> dict:
