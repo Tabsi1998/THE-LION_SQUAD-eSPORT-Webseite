@@ -257,8 +257,7 @@ Check-in, kein Start und keine erste Ergebnismeldung** – Bestätigen und Nacht
   Vertreter; ohne beide handelt die Teamleitung. Dieselbe Person spielt nie auf beiden Seiten eines Spiels.
 - **In der App** gibt es Captain und Vertreter noch nicht – meldet sie beim Kader-Ändern „… bitte erst die Rolle neu
   vergeben“, das auf der Website erledigen.
-- **Abmelden** einer laufenden Staffel geht nicht selbst („Austritt nur über die Turnierleitung“ – gemeint ist die
-  Liga-Leitung) – im Matchchat mit **@leitung** oder direkt bei der Liga-Leitung melden.
+- **Abmelden** einer laufenden Staffel geht nicht selbst („Austritt nur über die Liga-Leitung“) – im Matchchat mit **@leitung** oder direkt bei der Liga-Leitung melden.
 - **Angaben ändern** auf der Staffel geht nur für den Discord-Kontakt: Das dürfen Captain und Vertreter, ohne beide die
   Teamleitung. Name und Spiel-ID stehen je Season im Liga-Kader, ändern kann sie nur die Liga-Leitung.
 - **Konto löschen** geht erst, wenn die Rolle abgegeben ist; **Meine Daten** nennt den Weg.

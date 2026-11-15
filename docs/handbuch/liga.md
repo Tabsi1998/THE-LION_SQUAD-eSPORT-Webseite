@@ -1398,7 +1398,7 @@ Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga ·
 - **App:** Captain und Vertreter lassen sich in der App noch nicht vergeben. Scheitert dort eine Kader-Änderung an
   einer Rolle, nennt die Meldung den Weg auf der Website.
 - **Abmelden:** Ein zugeteiltes Co-Team meldet sich nicht selbst ab – auf der Staffel steht „Austritt nur über die
-  Turnierleitung“. Herausnehmen kann es nur die Turnierleitung.
+  Liga-Leitung“. Herausnehmen kann es nur die Liga-Leitung.
 
 ### 3.7 Spiel-IDs im Kader
 
