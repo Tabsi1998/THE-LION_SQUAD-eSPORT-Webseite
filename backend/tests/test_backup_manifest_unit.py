@@ -381,3 +381,30 @@ def test_the_lease_is_renewed_while_a_long_upload_archive_runs(tmp_path):
 def test_a_failed_renewal_is_reported(tmp_path):
     calls, state = run_renewer(tmp_path, 1, 5)
     assert state == "lapsed" and int(calls) == 2
+
+
+@pytest.mark.skipif(not BASH or not pathlib.Path(BASH).exists(), reason="Bash required")
+def test_restore_check_resolves_the_project_itself(tmp_path):
+    """Ein BACKUP_PROJECT aus der Umgebung darf die Prüfung nicht umgehen - maßgeblich ist das gewählte Compose-Projekt."""
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    config = {"name": "p-echt", "services": {"backend": {
+        "environment": {"DB_NAME": "tls_arena", "UPLOAD_DIR": "/app/backend/uploads"},
+        "volumes": [{"type": "volume", "source": "uploads_data", "target": "/app/backend/uploads"}]}},
+        "volumes": {"uploads_data": {"name": "p-echt_uploads_data"}}}
+    (tmp_path / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    (stubs / "docker").write_text(f'#!/usr/bin/env bash\ncat "{(tmp_path / "config.json").as_posix()}"\n', encoding="utf-8", newline="\n")
+    python = pathlib.Path(sys.executable).as_posix()
+    (stubs / "python3").write_text(f'#!/usr/bin/env bash\n"{python}" "$@" | tr -d \'\r\'\nexit "${{PIPESTATUS[0]}}"\n',
+                                   encoding="utf-8", newline="\n")
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+    _manifest, path, *_ = make_pair(tmp_path, project="fremd", db="tls_arena")
+    password = tmp_path / "password"
+    password.write_text("geheim", encoding="utf-8")
+    env = {**os.environ, "BACKUP_PROJECT": "fremd", "DB_NAME": "", "BACKUP_ENCRYPTION_PASSWORD_FILE": password.as_posix()}
+    script = 'export PATH="$(cd "$2" && pwd):$PATH"; exec bash scripts/restore-check.sh "$1"'
+    result = subprocess.run([BASH, "-c", script, "check", path.as_posix(), stubs.as_posix()], cwd=REPO, env=env, text=True,
+                            capture_output=True, timeout=60, stdin=subprocess.DEVNULL)
+    assert result.returncode == 1
+    assert "p-echt" in (result.stdout + result.stderr)

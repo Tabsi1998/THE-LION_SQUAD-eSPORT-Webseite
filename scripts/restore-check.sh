@@ -31,10 +31,9 @@ fi
 [ "$#" -ge 1 ] && [ "$#" -le 3 ] || { usage; exit 1; }
 
 source scripts/backup-target.sh
-if [ -z "${BACKUP_PROJECT:-}" ]; then
-  resolve_backup_target || fail "Cannot safely resolve this Compose project's restore targets."
-  resolve_backup_project || fail "Cannot resolve this Compose project's name."
-fi
+# Immer selbst auflösen: maßgeblich ist das gewählte Compose-Projekt, nie ein BACKUP_PROJECT aus der Umgebung.
+resolve_backup_target || fail "Cannot safely resolve this Compose project's restore targets."
+resolve_backup_project || fail "Cannot resolve this Compose project's name."
 resolve_backup_pair "$@" || fail "Backup pair or manifest not found (see above)."
 BACKUP_ENCRYPTION_PASSWORD_FILE="${BACKUP_ENCRYPTION_PASSWORD_FILE:-/etc/tls-arena/backup-password}"
 [ -r "$BACKUP_ENCRYPTION_PASSWORD_FILE" ] || fail "Password file not readable: ${BACKUP_ENCRYPTION_PASSWORD_FILE}"
