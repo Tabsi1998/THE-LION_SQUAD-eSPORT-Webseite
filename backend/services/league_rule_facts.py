@@ -426,8 +426,9 @@ def render_schedule(data: dict, variant: str = MARKDOWN) -> str:
     rules = data.get("rules")
     if rules:
         if rules.get("home_rule"):
+            # Nur ein Termin in der Spielwoche gilt von selbst (Nr. 17, ``league_schedule.home_rule_at``) - wie die Matchseite es sagt.
             lines.append(f"- {home_rule_name(rules.get('home_rule_hours'))}: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach "
-                         f"{hours(rules.get('home_rule_hours') or SCHEDULE_DEFAULTS['home_rule_hours'])}.")
+                         f"{hours(rules.get('home_rule_hours') or SCHEDULE_DEFAULTS['home_rule_hours'])}, wenn er in der Spielwoche liegt.")
         else:
             lines.append(f"- {home_rule_name(rules.get('home_rule_hours'))}: aus - ohne Einigung gilt der Standardtermin.")
         if int(rules.get("reschedule_max") or 0) > 0:

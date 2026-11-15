@@ -2003,7 +2003,7 @@ auf alle nicht gesperrten Staffeln der Season (eigene Gruppe `schedule` beim Üb
 
 | Feld | Typ | Vorgabe | Bedeutung |
 | --- | --- | --- | --- |
-| `home_rule` | bool | `true` | Nr. 17: unbeantworteter Vorschlag des Heimteams gilt nach der Frist |
+| `home_rule` | bool | `true` | Nr. 17: unbeantworteter Vorschlag des Heimteams gilt nach der Frist, wenn er in der Spielwoche liegt |
 | `home_rule_hours` | int 1–336 | 72 | Frist ab dem Vorschlag, Sperrzeiten zählen nicht (`response_deadline`) |
 | `reschedule_notice_hours` | int 0–336 | 24 | Nr. 18: Antrag spätestens so viele Stunden vor dem geltenden Termin |
 | `reschedule_max` | int 0–10 | 2 | Verschiebungen je Spiel durch beide Teams, 0 = nur die Leitung |

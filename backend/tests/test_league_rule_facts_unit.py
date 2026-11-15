@@ -173,14 +173,22 @@ def test_home_rule_line_is_named_after_the_set_deadline():
     def line(**changes):
         rules = {**SEASON["schedule_rules"], **changes}
         return [row for row in facts.render_schedule(facts.schedule_data({**SEASON, "schedule_rules": rules})).split("\n") if "-h-Regel" in row][0]
-    assert line(home_rule_hours=48) == "- 48-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 48 Stunden."
-    assert line(home_rule_hours=72) == "- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden."
+    assert line(home_rule_hours=48) == "- 48-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 48 Stunden, wenn er in der Spielwoche liegt."
+    assert line(home_rule_hours=72) == "- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden, wenn er in der Spielwoche liegt."
     assert line(home_rule=False, home_rule_hours=48) == "- 48-h-Regel: aus - ohne Einigung gilt der Standardtermin."
     without = {key: value for key, value in SEASON["schedule_rules"].items() if key != "home_rule_hours"}
-    assert "- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden." in facts.render_schedule(
+    assert "- 72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden, wenn er in der Spielwoche liegt." in facts.render_schedule(
         facts.schedule_data({**SEASON, "schedule_rules": without}))
     assert facts.home_rule_name(48) == "48-h-Regel" and facts.home_rule_name(None) == "72-h-Regel" and facts.home_rule_name(0) == "72-h-Regel"
     assert facts.home_rule_name("x") == "72-h-Regel" and facts.home_rule_name(1) == "1-h-Regel"
+
+
+def test_home_rule_line_names_the_week_condition():
+    """G.3 Regelwerksabgleich: Ein unbeantworteter Heimvorschlag gilt nur in der Spielwoche (Nr. 17, ``league_schedule.home_rule_at``).
+    Das Regelwerk sagt das wie die Matchseite - ohne den Zusatz verspräche es mehr, als der Server tut."""
+    out = facts.render_schedule(facts.schedule_data(SEASON))
+    line = [row for row in out.splitlines() if "-h-Regel" in row][0]
+    assert line.endswith("gilt nach 72 Stunden, wenn er in der Spielwoche liegt.")
 
 
 def test_schedule_block_names_the_result_reminder_only_when_it_is_on():
