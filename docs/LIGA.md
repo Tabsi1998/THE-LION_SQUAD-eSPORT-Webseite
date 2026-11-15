@@ -3881,8 +3881,8 @@ Liga N aktiv ist - sonst 404; eine Einzel-Liga hat keines. Auf dem Bild stehen k
 (nur in einer öffentlichen Season), die Unterseite „Teams“ zeigt denselben Knopf.
 
 **Gesamtpaket #2425:** Profil, Teamseite, Ligaseite (Teams), Handbuch Liga, Captains und Teams. Nicht erfasst: die Spielerlisten
-(Embleme dort bräuchten je Person die Auszeichnungen - offen), TV, Druck, Mail, Discord und die App (`mobile/` zeigt noch den Reiter
-„Auszeichnungen“ ohne Filter und keine Embleme - Liste in #2173).
+(Embleme dort bräuchten je Person die Auszeichnungen - offen), TV, Druck, Mail und Discord. Die App (`mobile/`, #2173) hat den Reiter „Trophäen“ mit denselben Filtern, die Embleme neben dem Namen und
+„Rankingbanner kopieren“ an der Teamseite (Logik `mobile/src/lib/trophies.ts`).
 
 ### F.5 Gesamtwertung über Seasons (#2215)
 
@@ -4019,7 +4019,8 @@ Zeiträume (`PROFILE_PERIODS`), weil jeder eine Rechnung über seine Endstände 
 Endstände von vor F.2 ohne `sides` lesen das Co-Team aus der Anmeldung. Keine Migration.
 
 **Nicht in F.5:** eigene Belohnungen je Liga N (eine Zusammenstellung gilt für alle Stufen), Nachricht an die Captains beim Abschluss der
-Gesamtwertung (Belohnungen schicken ihre eigene), TV und die App (`mobile/`, Liste in #2173).
+Gesamtwertung (Belohnungen schicken ihre eigene) und TV. Die App (`mobile/`, #2173) zeigt den Platz an Profil und Team und die
+Gesamtwertung je Liga N als eigene Seite (`/liga/<liga>/<season>/gesamtwertung`, `LeagueOverallScreen`), Gesamtsieger nur mit `complete`.
 
 ## 13. Feature-Matrix (Stand G.3, 15.11.2026)
 
@@ -4105,6 +4106,7 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Tests | Wackelige Frontend- und Browser-Tests unter Last | teilweise | – | #2390 |
 | App | Kompatibel mit allen neuen Feldern | getestet | laufend | – |
 | App | Check-in, Veto live, Anmeldestatus, Zonen, Historie, Belohnungen (LionsAPP 1.7.10) | getestet (App-Tests), nicht in G.1 | G.2 #2419 | #2173 (Rest offen) |
+| App | Gesamtwertung, Trophäen mit Filtern, Embleme, Rankingbanner, Nachmeldung, Schreibpause | getestet (App-Tests), nicht in G.1 | G.2 Teil 2 | #2173 |
 | App | Anmelden, Vorfälle, Verfahren, Ergebnis mit Maps, Strafen | fehlend (Web, die App nennt den Weg) | – | #2173 |
 
 **Funde der Systemanalyse (D-1 bis D-20):**
