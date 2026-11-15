@@ -33,7 +33,9 @@ AREA = re.compile(r"league|squad|match|map|flow_harness|result_confirm|result_au
                   # Unterkategorien (#2287): positionsgenaues Schreiben in den Kategorien des Spiels.
                   r"|equipment_subcategories"
                   # Einladung durch die Verwaltung (#932): zwei Protokollzeilen unter dem eindeutigen Index audit_logs.id.
-                  r"|admin_user_invite")
+                  r"|admin_user_invite"
+                  # Migrationen beim Start (#1006): Sperre, Verlängerung, Übernahme und Wartezeit zweier Starts.
+                  r"|migration_lease")
 USES_HARNESS = re.compile(r"\bmake_flow\b")
 
 
