@@ -25,6 +25,8 @@ import { BracketCanvas } from "../../components/tournament/bracket/BracketCanvas
 import { LeagueSeasonCard } from "../../components/league/LeagueSeasonCard";
 import { RegistrationSheet, type RegistrationPayload } from "../../components/tournament/RegistrationSheet";
 import { ScheduleList } from "../../components/tournament/ScheduleList";
+import { NoticeBanner } from "../../components/tournament/NoticeBanner";
+import type { NoticeItem } from "../../lib/tournamentNotices";
 import { StandingsTables } from "../../components/tournament/StandingsTables";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
@@ -70,10 +72,11 @@ const FINISHED_TOURNAMENT_STATUSES = new Set(["completed", "results_published", 
 const CLOSED_MATCH_STATUSES = new Set(["completed", "forfeit", "closed"]);
 
 /** Was die Turnierseite lädt; `partProblem`, wenn Bracket, Tabelle oder Anmeldungen nicht kamen (#1000). */
-type TournamentPage = { tournament: Tournament; bracket: BracketPayload; standings: any[]; myTeams: Team[]; partProblem: LoadProblem | null };
+type TournamentPage = { tournament: Tournament; bracket: BracketPayload; standings: any[]; myTeams: Team[]; notices: NoticeItem[]; partProblem: LoadProblem | null };
 const NO_BRACKET: BracketPayload = {};
 const NO_ROWS: any[] = [];
 const NO_TEAMS: Team[] = [];
+const NO_NOTICES: NoticeItem[] = [];
 
 export function TournamentDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
@@ -84,12 +87,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   // Tabelle und Anmeldungen sind Teile: kommt einer nicht, behält er seinen letzten Stand, und die Seite sagt es.
   const fetchTournament = useCallback(async (id: string, previous: TournamentPage | null): Promise<TournamentPage> => {
     const segment = idSegment(id);
-    const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult] = await Promise.allSettled([
+    const [detailResult, bracketResult, standingsResult, registrationsResult, teamsResult, noticesResult] = await Promise.allSettled([
       api.get<Tournament>(`/tournaments/${segment}`),
       api.get<BracketPayload>(`/tournaments/${segment}/bracket`),
       api.get<any[]>(`/tournaments/${segment}/standings`),
       api.get<any[]>(`/tournaments/${segment}/registrations`),
       signedInRef.current ? api.get<Team[]>("/teams/my") : Promise.resolve({ data: [] as Team[] }),
+      // Hinweis der Turnierleitung (#1166, #2393): lädt mit der Seite und mit jedem Live-Nachladen - kein eigenes Abo.
+      api.get<{ items?: NoticeItem[] }>(`/tournaments/${segment}/notices`),
     ]);
     if (detailResult.status === "rejected") throw detailResult.reason;
     // Auch die eigenen Teams sind ein Teil: kommen sie nicht, bleibt ihr letzter Stand, und die Seite sagt es.
@@ -100,7 +105,10 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       : previous?.bracket.registrations || bracketData.registrations || [];
     const standings = standingsResult.status === "fulfilled" ? (Array.isArray(standingsResult.value.data) ? standingsResult.value.data : []) : previous?.standings || [];
     const myTeams = teamsResult.status === "fulfilled" ? (Array.isArray(teamsResult.value.data) ? teamsResult.value.data : []) : previous?.myTeams || [];
-    return { tournament: detailResult.value.data, bracket: { ...bracketData, registrations }, standings, myTeams, partProblem: failed ? loadProblem(failed.reason) : null };
+    // Ein fehlendes Banner ist kein fehlender Teil der Seite: ohne Antwort bleibt der letzte Stand, ohne Hinweis nichts.
+    const noticeItems = noticesResult.status === "fulfilled" ? noticesResult.value.data?.items : previous?.notices;
+    const notices = Array.isArray(noticeItems) ? noticeItems : [];
+    return { tournament: detailResult.value.data, bracket: { ...bracketData, registrations }, standings, myTeams, notices, partProblem: failed ? loadProblem(failed.reason) : null };
   }, []);
   const { data: page, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(route.params.id, fetchTournament);
   const tournament = page?.tournament;
@@ -150,6 +158,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     };
   }, [load, navigation]);
   useLiveRefresh(load, TOURNAMENT_LIVE_RESOURCES, { enabled: focused, fallbackMs: 10000 });
+  // Hinweis der Turnierleitung (#1166, #2393): oben auf der Seite, bis er abläuft oder entfernt wird.
+  const notices = page?.notices ?? NO_NOTICES;
 
   const registrations = bracket.registrations || [];
   const myTeamIds = useMemo(() => new Set(myTeams.map((team) => team.id).filter(Boolean)), [myTeams]);
@@ -379,6 +389,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
         {notice ? <PartialLoadNotice problem={notice} onRetry={() => { void load(); }} testID="tournament-partial-load" /> : null}
+        <NoticeBanner items={notices} />
         <View style={styles.hero}>
           <Muted>{tournament.game?.display_name || tournament.game?.name || tournament.game_name || tournament.platform || "Turnier"}</Muted>
           <Title>{tournament.title}</Title>
