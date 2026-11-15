@@ -145,6 +145,12 @@ export function targetFromNotification(item: UserNotification): AppTarget | null
     const lead = targetFromUrl(item.url);
     if (lead) return lead;
   }
+  // Hinweis der Turnierleitung (#1166, #2393): die Adresse des Servers nennt die Seite mit dem Banner - beim Ziel „ganzes
+  // Event“ die Event-Seite, nicht das Turnier, aus dem er geschrieben wurde.
+  if (kind === "tournament_notice") {
+    const page = targetFromUrl(item.url);
+    if (page) return page;
+  }
   const matchId = stringMeta(meta, "match_id");
   if (matchId && (kind.includes("match") || kind.includes("station"))) return detail("MatchDetail", { id: matchId });
 

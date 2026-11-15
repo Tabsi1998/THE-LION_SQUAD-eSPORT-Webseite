@@ -191,6 +191,9 @@ test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst di
   expect(targetFromNotification(note("match_attention", { match_id: "m" }, "/tournaments/cup/leitung?fall=ds-m") as never)).toEqual(detail("TournamentLead", { id: "cup", fall: "ds-m" }));
   expect(targetFromNotification(note("match_attention", { match_id: "m" }, "/matches/m") as never)).toEqual(detail("MatchDetail", { id: "m" }));
   expect(targetFromNotification(note("prize_ready") as never)).toEqual(detail("MyPrizes"));
+  // Hinweis der Turnierleitung (#1166, #2393): öffnet die Seite, auf der das Banner steht - Turnier oder ganzes Event.
+  expect(targetFromNotification(note("tournament_notice", { tournament_id: "t-1", notice_id: "n1" }, "/tournaments/fc-cup") as never)).toEqual(detail("TournamentDetail", { id: "fc-cup" }));
+  expect(targetFromNotification(note("tournament_notice", { tournament_id: "t-1", event_id: "e-1" }, "/events/herbst-lan") as never)).toEqual(detail("EventDetail", { id: "herbst-lan" }));
   expect(targetFromNotification(note("friend_request", { requester_username: "kiwikomet" }) as never)).toEqual(detail("PublicProfile", { username: "kiwikomet" }));
   expect(targetFromNotification(note("friend_accepted") as never)).toEqual(tab("CommunityTab", "CommunityHub", { section: "players" }));
   expect(targetFromNotification(note("achievement", {}, "/profile?tab=achievements") as never)).toEqual(tab("ProfileTab", "Profile", { tab: "achievements" }));
