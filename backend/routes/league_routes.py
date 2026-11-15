@@ -805,7 +805,7 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"],
          "status": {"$in": [*league_page.PUBLIC_REGISTRATION_STATUSES, "withdrawn", "disqualified"]}},
-        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1, "status": 1}).to_list(REGISTRATION_LIMIT)
+        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1, "squad_id": 1, "status": 1}).to_list(REGISTRATION_LIMIT)
     names = {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
     active_ids = {row["id"] for row in registrations
                   if row.get("id") and row.get("status") in league_page.PUBLIC_REGISTRATION_STATUSES}
@@ -825,6 +825,9 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
     team_ids = sorted({row["team_id"] for key, row in names.items() if key in active_ids and row.get("team_id")})
     logos = {row["id"]: row.get("logo_url") or None for row in await db.teams.find(
         {"id": {"$in": team_ids}, "is_public": {"$ne": False}}, {"_id": 0, "id": 1, "logo_url": 1}).to_list(len(team_ids) or 1)} if team_ids else {}
+    # Rankingbanner (Nr. 60, #2425): der feste Bild-Link je Team - nur in einer öffentlichen Season, sonst gäbe es das Bild nicht.
+    from services.league_rank_banner import banner_path, banner_ref
+    refs = {row["id"]: banner_ref(row) for row in registrations if row.get("id")} if season.get("visibility") == "public" else {}
     return {
         "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"],
                     # Regeln der Tabelle (E.1, #1625): Remis, Reihenfolge bei Gleichstand - für Spalten und Legende.
@@ -834,7 +837,9 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
                     # Belohnungen (F.4, #2214): vor dem Abschluss die Zusammenstellung, danach mit Inhabern - ``None`` ohne Belohnungen.
                     "rewards": await reward_view(db, tournament, season, division, granted=bool(final))},
         "standings": table,
-        "teams": sorted(({**row, "logo_url": logos.get(row.get("team_id"))} for key, row in names.items() if key in active_ids),
+        "teams": sorted(({**row, "logo_url": logos.get(row.get("team_id")),
+                          "rank_banner_url": banner_path(league_slug, season_slug, refs[key]) if refs.get(key) else None}
+                         for key, row in names.items() if key in active_ids),
                         key=lambda row: str(row["display_name"]).casefold()),
         **league_page.staffel_weeks(tournament, matches, names, proposals),
     }
