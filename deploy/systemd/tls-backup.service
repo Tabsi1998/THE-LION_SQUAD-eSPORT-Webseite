@@ -10,3 +10,6 @@ ExecStart=/usr/bin/bash scripts/backup.sh
 User=root
 UMask=0077
 Nice=10
+# Obergrenze für den ganzen Lauf (#1009): hängt etwas, beendet systemd das Skript. Die Schreibpause endet trotzdem -
+# die Lease läuft ohne Verlängerung ab, ihr Verlängern hört spätestens nach BACKUP_WRITE_PAUSE_MAX_SECONDS auf.
+TimeoutStartSec=2h
