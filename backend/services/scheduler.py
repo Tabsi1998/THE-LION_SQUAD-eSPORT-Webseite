@@ -57,7 +57,19 @@ def _single_replica(job_id: str, runner, lease_seconds: float = 60.0):
     async def job():
         try:
             from database import get_db
+            from services import maintenance
             from services.mutation_lock import MutationLockBusy, MutationLockLost, mutation_lock
+            # Schreibpause fürs Backup (#1009), geprüft vor der Sperre - auch die Sperre wäre ein Schreibvorgang.
+            # Intervall-Jobs lassen den Takt aus, der nächste holt nach. Tägliche bzw. wöchentliche Jobs (CronTrigger,
+            # ``job.catch_up``) warten, bis die Pause vorbei ist - sonst fiele ihr Lauf bis zum nächsten Tag aus.
+            if await maintenance.active_state(get_db()):
+                if not job.catch_up:
+                    logger.info("[scheduler] %s skipped, write pause for backup", job_id)
+                    return
+                logger.info("[scheduler] %s waits for the end of the write pause", job_id)
+                if not await maintenance.wait_until_released(get_db()):
+                    logger.warning("[scheduler] %s skipped, write pause did not end in time", job_id)
+                    return
             try:
                 async with mutation_lock(
                     get_db(),
@@ -75,6 +87,7 @@ def _single_replica(job_id: str, runner, lease_seconds: float = 60.0):
             _log_task_failure(f"{job_id} lease", exc)
 
     job.__name__ = f"{job_id}_single_replica"
+    job.catch_up = False  # start_scheduler setzt es für CronTrigger-Jobs
     return job
 
 
@@ -1267,6 +1280,10 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="helper_reminders", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("year_review_notices", _safe_year_review_notices, lease_seconds=900.0), CronTrigger(hour=10, minute=15, timezone="Europe/Vienna"),
                   id="year_review_notices", max_instances=1, coalesce=True)
+    # Jobs zu festen Uhrzeiten holen einen Lauf in der Schreibpause nach, statt ihn bis morgen auszulassen (#1009).
+    for planned in sched.get_jobs():
+        if isinstance(planned.trigger, CronTrigger) and hasattr(planned.func, "catch_up"):
+            planned.func.catch_up = True
     allowed = allowed_jobs()
     if allowed is not None:
         known = {job.id for job in sched.get_jobs()}

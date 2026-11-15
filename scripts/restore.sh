@@ -21,19 +21,78 @@ WRITER_SERVICES="${RESTORE_WRITER_SERVICES:-backend}"
 # So lange warten wir nach der Freigabe, bis das Backend wieder "healthy" meldet.
 READY_TIMEOUT_SECONDS="${RESTORE_READY_TIMEOUT_SECONDS:-180}"
 
-[ "$#" -eq 2 ] || fail "Usage: RESTORE_CONFIRM=<db-name> scripts/restore.sh <mongo.archive.gz.enc> <uploads.tar.gz.enc>"
-MONGO_ARCHIVE="$(realpath "$1")"
-UPLOADS_ARCHIVE="$(realpath "$2")"
+# Sammlungen im Ziel, die nicht im Backup stehen (#1010): mongorestore --drop lässt sie stehen. Ohne Entscheidung bricht
+# der Restore ab und nennt sie. keep: bleiben stehen (mit Hinweis), drop: werden nach dem Restore entfernt (sie sind
+# im Sicherheitsbackup). Nie still.
+EXTRA_COLLECTIONS_MODE="${RESTORE_EXTRA_COLLECTIONS:-}"
+
+USAGE="Usage: RESTORE_CONFIRM=<db-name> scripts/restore.sh <tls_backup_*.manifest.json> | <mongo.archive.gz.enc> <uploads.tar.gz.enc> [manifest]"
+[ "$#" -ge 1 ] && [ "$#" -le 3 ] || fail "$USAGE"
 source scripts/backup-target.sh
 resolve_backup_target || fail "Cannot safely resolve this Compose project's restore targets."
+resolve_backup_project || fail "Cannot resolve this Compose project's name."
+resolve_backup_pair "$@" || fail "Backup pair or manifest not found. ${USAGE}"
 PASSWORD_FILE="${BACKUP_ENCRYPTION_PASSWORD_FILE:-/etc/tls-arena/backup-password}"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
 [ "${RESTORE_CONFIRM:-}" = "$DB_NAME" ] || fail "Set RESTORE_CONFIRM=${DB_NAME} to acknowledge destructive restore."
-[ -f "$MONGO_ARCHIVE" ] && [ -f "$UPLOADS_ARCHIVE" ] || fail "Both backup files must exist."
 [ -r "$PASSWORD_FILE" ] || fail "Password file not readable: ${PASSWORD_FILE}"
 docker volume inspect "$UPLOADS_VOLUME" >/dev/null || fail "Uploads volume not found: ${UPLOADS_VOLUME}"
+case "$EXTRA_COLLECTIONS_MODE" in ""|keep|drop) ;; *) fail "RESTORE_EXTRA_COLLECTIONS must be keep or drop." ;; esac
 
-BACKUP_ENCRYPTION_PASSWORD_FILE="$PASSWORD_FILE" bash scripts/restore-check.sh "$MONGO_ARCHIVE" "$UPLOADS_ARCHIVE"
+mongo_eval() {
+  # JavaScript über eine Umgebungsvariable - so braucht es kein Quoting im Befehl. Letzte Zeile der Ausgabe.
+  docker compose exec -T -e TLS_JS="$1" -e TLS_DROP="${TLS_DROP:-}" mongodb sh -ec 'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "$1" --eval "$TLS_JS"' sh "$DB_NAME" \
+    | tr -d '\r' | tail -1
+}
+
+# 1. Dasselbe Manifest wie die Vorprüfung: Prüfsummen, Paar, Projekt, Datenbank, Inhalt der Archive.
+BACKUP_ENCRYPTION_PASSWORD_FILE="$PASSWORD_FILE" bash scripts/restore-check.sh "$@" || fail "Backup pair rejected: nothing was changed."
+if [ "$MANIFEST_LEGACY" != true ]; then
+  CHECKED="$(python3 scripts/backup-manifest.py verify --manifest "$MANIFEST" --mongo "$MONGO_ARCHIVE" --uploads "$UPLOADS_ARCHIVE" \
+    --project "$BACKUP_PROJECT" --db "$DB_NAME" --allow-project "${RESTORE_ALLOW_FOREIGN_PROJECT:-}")" || fail "Backup pair rejected: nothing was changed."
+  MONGO_ARCHIVE="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["mongo"])' "$CHECKED")"
+  UPLOADS_ARCHIVE="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["uploads"])' "$CHECKED")"
+fi
+
+# 2. Versionen und Zielbestand - noch vor dem Stopp, ohne Änderung.
+DROP_EXTRAS=""
+KEPT_EXTRAS=""
+if [ "$MANIFEST_LEGACY" = true ]; then
+  warn "Old manifest: versions and the set of collections in the target cannot be checked."
+else
+  info "Checking versions against the target (code, MongoDB)"
+  CODE_INFO="$(backend_python -m services.backup_inventory code-info | tr -d '\r' | tail -1)" || fail "Cannot read the code version of the target; nothing was changed."
+  TARGET_MONGO="$(mongo_eval 'print(db.version())')" || fail "Cannot read the MongoDB version of the target; nothing was changed."
+  python3 - "$CODE_INFO" "$TARGET_MONGO" "$BACKUP_PROJECT" "$DB_NAME" >"${WORK}/target.json" <<'PY'
+import json, sys
+info = json.loads(sys.argv[1])
+print(json.dumps({"code_schema_version": info.get("code_schema_version"), "mongo_version": sys.argv[2],
+                  "project": sys.argv[3], "db_name": sys.argv[4]}))
+PY
+  COMPAT_ARGS=()
+  if [ "${RESTORE_ALLOW_VERSION_MISMATCH:-false}" = "true" ]; then COMPAT_ARGS+=(--allow-version-mismatch); fi
+  python3 scripts/backup-manifest.py compat --manifest "$MANIFEST" --target "${WORK}/target.json" "${COMPAT_ARGS[@]}" \
+    || fail "Versions do not fit: nothing was changed."
+
+  mongo_eval 'print(JSON.stringify(db.getCollectionNames()))' >"${WORK}/target-collections.json" \
+    || fail "Cannot list the collections of the target; nothing was changed."
+  EXTRAS="$(python3 scripts/backup-manifest.py extras --manifest "$MANIFEST" --target-collections "${WORK}/target-collections.json")" \
+    || fail "Cannot compare the collections of the target; nothing was changed."
+  if [ -n "$EXTRAS" ]; then
+    EXTRAS_LIST="$(printf '%s' "$EXTRAS" | tr '\n' ',' | sed 's/,$//')"
+    case "$EXTRA_COLLECTIONS_MODE" in
+      "") fail "Target has collections that are not in the backup: ${EXTRAS_LIST}. mongorestore --drop would leave them. Decide explicitly: RESTORE_EXTRA_COLLECTIONS=drop (removed after the restore, kept in the safety backup) or RESTORE_EXTRA_COLLECTIONS=keep. Nothing was changed." ;;
+      keep) KEPT_EXTRAS="$EXTRAS_LIST"; warn "Keeping collections that are not in the backup: ${EXTRAS_LIST}" ;;
+      drop) DROP_EXTRAS="$EXTRAS_LIST"; warn "Will drop collections that are not in the backup after the restore: ${EXTRAS_LIST}" ;;
+    esac
+  fi
+  # Entfernt wird nur, was vorher im Sicherheitsbackup steckt.
+  if [ -n "$DROP_EXTRAS" ] && [ "${SKIP_PRE_RESTORE_BACKUP:-false}" = "true" ]; then
+    fail "RESTORE_EXTRA_COLLECTIONS=drop needs the safety backup; it cannot be combined with SKIP_PRE_RESTORE_BACKUP=true. Nothing was changed."
+  fi
+fi
 
 # ---------------------------------------------------------------------------------------------------------------
 # Schreiber anhalten und den Stopp prüfen - vor der ersten Änderung. Bei unklarem Zustand: Abbruch, nichts verändert.
@@ -55,6 +114,7 @@ writers_running() {
 LOCKED=false
 on_exit() {
   local status=$?
+  rm -rf "$WORK"
   if [ "$status" -ne 0 ] && [ "$LOCKED" = true ]; then
     printf "\033[1;31m==> Restore abgebrochen (Exit %s). Das System bleibt GESPERRT: %s steht.\033[0m\n" "$status" "$WRITER_SERVICES"
     printf "\033[1;33m==> Wiederanlauf: Ursache beheben und das Skript erneut starten (es stoppt und prüft wieder).\033[0m\n"
@@ -82,6 +142,18 @@ info "Restoring MongoDB database '${DB_NAME}' with --drop"
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 -pass "file:${PASSWORD_FILE}" -in "$MONGO_ARCHIVE" \
   | docker compose exec -T mongodb sh -ec 'mongorestore --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db "$1" --archive --gzip --drop' sh "$DB_NAME"
 
+if [ -n "$DROP_EXTRAS" ]; then
+  info "Dropping collections that are not in the backup (RESTORE_EXTRA_COLLECTIONS=drop): ${DROP_EXTRAS}"
+  DROPPED="$(TLS_DROP="$DROP_EXTRAS" mongo_eval 'const names = process.env.TLS_DROP.split(","); names.forEach((n) => db.getCollection(n).drop()); print(names.length)')" \
+    || fail "Could not drop the extra collections; writers stay stopped."
+  ok "Dropped ${DROPPED} collection(s)"
+fi
+
+# Der Dump entstand in der Schreibpause (#1009): Ihr Dokument kommt mit zurück. Ist das Backup jünger als die Lease,
+# wäre die Website nach dem Restore noch kurz gesperrt - darum hier ausdrücklich beenden.
+backend_python -m services.maintenance off --force >/dev/null \
+  || fail "Could not end the write pause restored with the backup; writers stay stopped."
+
 info "Replacing files in uploads volume '${UPLOADS_VOLUME}'"
 docker run --rm -v "${UPLOADS_VOLUME}:/uploads" alpine sh -ec 'find /uploads -mindepth 1 -delete'
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 -pass "file:${PASSWORD_FILE}" -in "$UPLOADS_ARCHIVE" \
@@ -103,6 +175,19 @@ if [ "$UPLOAD_FILES" -eq 0 ]; then
   warn "Uploads volume is empty (allowed by RESTORE_ALLOW_EMPTY_UPLOADS)."
 fi
 ok "Restored: ${COLLECTION_COUNT} collections, ${USER_COUNT} user accounts, ${UPLOAD_FILES} upload files"
+
+# Fachlicher Abgleich (#1009/#1010): Sammlungen mit Anzahl, Summen (Anmeldungen, Rechnungen, Bestellungen,
+# Mitgliedschaften), Upload-Bestand und Datei-Verweise gegen das Manifest - der Bestand, den das Backup gesehen hat.
+if [ "$MANIFEST_LEGACY" != true ]; then
+  info "Comparing the restored data with the manifest (collections, totals, uploads, file references)"
+  SNAPSHOT_ARGS=(snapshot)
+  if python3 scripts/backup-manifest.py field --manifest "$MANIFEST" --name references >/dev/null 2>&1; then SNAPSHOT_ARGS+=(--references); fi
+  backend_python -m services.backup_inventory "${SNAPSHOT_ARGS[@]}" | tr -d '\r' | tail -1 >"${WORK}/after-restore.json" \
+    || fail "Could not count the restored data; writers stay stopped."
+  python3 scripts/backup-manifest.py compare --manifest "$MANIFEST" --after "${WORK}/after-restore.json" --kept-extras "$KEPT_EXTRAS" \
+    || fail "Restored data does not match the backup (see above); writers stay stopped."
+  ok "Restored data matches the manifest (pair $(python3 scripts/backup-manifest.py field --manifest "$MANIFEST" --name pair_id))"
+fi
 
 # ---------------------------------------------------------------------------------------------------------------
 # Freigabe: Schreiber wieder starten und warten, bis das Backend gesund ist.
