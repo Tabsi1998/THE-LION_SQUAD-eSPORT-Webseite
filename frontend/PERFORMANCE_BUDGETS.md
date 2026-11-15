@@ -21,6 +21,10 @@ Vite-Manifest (`dist/.vite/manifest.json`), damit die Zahl auf jedem Rechner gle
 Das Budget-Gate `yarn check:bundle` (`scripts/check-bundle-budget.mjs`) liest die Grenzwerte aus den Zeilen unten und
 schlägt fehl, wenn der Start darüber liegt oder Editor (`editor`), Diagramme (`charts`), PDF (`pdf`) oder QR (`jsQR`)
 vorab geladen werden. Es läuft in der CI im Job „Frontend“ direkt nach `yarn build` und in `scripts/local_check.py`.
+Außerdem darf keine öffentliche Seite (alle unter `src/pages/public/` sowie die Pflicht-Seiten Registrierung, Mitglied
+werden, Profil, Events und Turniere) diese Chunks statisch erreichen. Kleine Bibliotheken, die Editor bzw. Diagramme und
+anderer Code gemeinsam nutzen (clsx, use-sync-external-store), sammelt dafür die Gruppe `vendor-shared` in
+`vite.config.mjs` ein.
 
 - Start-JS: höchstens **300.000 Bytes** gzip (Ziel aus #936 erreicht).
   <!-- budget:startup-js-gzip 300000 -->

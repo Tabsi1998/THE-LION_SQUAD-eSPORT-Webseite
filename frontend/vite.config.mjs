@@ -7,6 +7,21 @@ import { defineConfig } from "vite";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
+const NODE_MODULES = /[\\/]node_modules[\\/]/;
+const EDITOR_MODULES = /[\\/]node_modules[\\/](@tiptap[\\/]|prosemirror-)/;
+const CHART_MODULES = /[\\/]node_modules[\\/](recharts[\\/]|d3-)/;
+const heavyGroup = (id) => (EDITOR_MODULES.test(id) ? "editor" : CHART_MODULES.test(id) ? "charts" : "");
+
+/**
+ * Eine Bibliothek, die Editor oder Diagramme UND anderer Code direkt importieren (auch Editor und Diagramme
+ * gemeinsam), bekommt einen eigenen Chunk (#936) - sonst zöge die schwere Gruppe sie mit und alle anderen hingen an ihr.
+ */
+export function sharedWithHeavy(id, ctx) {
+  if (!NODE_MODULES.test(id) || heavyGroup(id)) return null;
+  const groups = new Set((ctx.getModuleInfo(id)?.importers || []).map(heavyGroup));
+  return (groups.has("editor") || groups.has("charts")) && groups.size > 1 ? "vendor-shared" : null;
+}
+
 export default defineConfig({
   plugins: [react(), {
     name: "tls-release-version",
@@ -49,12 +64,16 @@ export default defineConfig({
         // Feste Gruppen mit Vorrang (#936): Eine Gruppe zieht ihre Abhängigkeiten mit. Mit dem früheren
         // manualChunks landete React in "charts" und jsx-runtime in "editor", dadurch lud jeder öffentliche
         // Start Editor und Diagramme vorab. React und Radix werden darum zuerst eingesammelt.
+        // Kleine Bibliotheken, die Editor bzw. Diagramme und der übrige Code gemeinsam nutzen (etwa clsx und
+        // use-sync-external-store), sammelt "vendor-shared" vorher ein - sonst hingen Registrierung, Mitglied werden
+        // und Profil über sie statisch an "editor" und "charts". Das Budget-Gate prüft das je öffentlicher Seite.
         codeSplitting: {
           groups: [
             { name: "react-core", test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 40 },
+            { name: sharedWithHeavy, debugName: "vendor-shared", priority: 35 },
             { name: "ui-radix", test: /[\\/]node_modules[\\/]@radix-ui[\\/]/, priority: 30 },
-            { name: "editor", test: /[\\/]node_modules[\\/](@tiptap[\\/]|prosemirror-)/, priority: 20 },
-            { name: "charts", test: /[\\/]node_modules[\\/](recharts[\\/]|d3-)/, priority: 10 },
+            { name: "editor", test: EDITOR_MODULES, priority: 20 },
+            { name: "charts", test: CHART_MODULES, priority: 10 },
           ],
         },
       },

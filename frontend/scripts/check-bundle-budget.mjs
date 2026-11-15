@@ -9,6 +9,7 @@
 // Grundlage ist das Vite-Manifest (dist/.vite/manifest.json, build.manifest in vite.config.mjs).
 // Gemessen wird gzip mit fester Stufe 9, damit die Zahl auf jedem Rechner gleich ist.
 // Die Grenzwerte stehen in PERFORMANCE_BUDGETS.md (Zeilen "<!-- budget:... -->").
+// Zusätzlich: Keine öffentliche Seite erreicht Editor, Diagramme, PDF oder QR statisch (heavyRouteProblems).
 //
 //   node scripts/check-bundle-budget.mjs          prüft und schlägt bei Überschreitung fehl
 //   node scripts/check-bundle-budget.mjs --json   gibt zusätzlich alle Dateien als JSON aus
@@ -25,6 +26,55 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 // Geprüft wird über die Chunk-Namen aus manualChunks bzw. die Paketnamen der Vite-Chunks.
 export const FORBIDDEN_STARTUP_CHUNKS = ["editor", "charts", "pdf", "jsQR"];
 
+// Öffentliche Seiten dürfen diese Chunks auch nicht statisch erreichen (#936): Hängt eine Seite über eine gemeinsam
+// genutzte Kleinigkeit (clsx, use-sync-external-store …) an "editor", lädt sie beim Öffnen den ganzen Editor mit.
+// Geprüft werden alle Seiten unter src/pages/public/ und diese Pflicht-Seiten - fehlt eine im Manifest, ist das ein
+// Fehler, damit eine Umbenennung die Prüfung nicht still abschaltet.
+export const LIGHT_ROUTE_PREFIX = "src/pages/public/";
+export const REQUIRED_LIGHT_ROUTES = [
+  "src/pages/public/RegisterPage.jsx",
+  "src/pages/public/MembershipApplyPage.jsx",
+  "src/pages/user/ProfilePage.jsx",
+  "src/pages/public/EventsPage.jsx",
+  "src/pages/public/TournamentsPage.jsx",
+];
+
+export function isForbiddenChunk(chunk) {
+  const file = path.basename(chunk.file || "");
+  return FORBIDDEN_STARTUP_CHUNKS.some((name) => chunk.name === name || file.startsWith(`${name}-`));
+}
+
+/** Alle Manifest-Einträge, die `key` statisch (transitiv) importiert, samt `key` selbst. */
+export function staticClosure(manifest, key) {
+  const seen = new Set();
+  const order = [];
+  const visit = (current) => {
+    if (seen.has(current)) return;
+    seen.add(current);
+    const chunk = manifest[current];
+    if (!chunk) throw new Error(`Manifest verweist auf unbekannten Eintrag "${current}".`);
+    order.push(current);
+    for (const child of chunk.imports || []) visit(child);
+  };
+  visit(key);
+  return order;
+}
+
+/** Öffentliche Seiten, die Editor, Diagramme, PDF oder QR statisch mitladen. */
+export function heavyRouteProblems(manifest, { prefix = LIGHT_ROUTE_PREFIX, required = REQUIRED_LIGHT_ROUTES } = {}) {
+  const problems = [];
+  for (const route of required) {
+    if (!manifest[route]) problems.push(`${route} fehlt im Manifest - Seite umbenannt? REQUIRED_LIGHT_ROUTES anpassen.`);
+  }
+  const routes = new Set([...Object.keys(manifest).filter((key) => key.startsWith(prefix) && manifest[key].isDynamicEntry), ...required]);
+  for (const route of [...routes].sort()) {
+    if (!manifest[route]) continue;
+    const heavy = staticClosure(manifest, route).map((key) => manifest[key]).filter(isForbiddenChunk);
+    if (heavy.length) problems.push(`${route} lädt ${heavy.map((chunk) => chunk.name || chunk.file).join(", ")} statisch mit.`);
+  }
+  return problems;
+}
+
 export function parseBudgets(markdown) {
   const budgets = {};
   for (const match of markdown.matchAll(/<!-- budget:([a-z0-9-]+) (\d+) -->/g)) {
@@ -38,17 +88,11 @@ export function collectStartup(manifest, entryKey = "index.html") {
   if (!entry) throw new Error(`Manifest enthält keinen Einstieg "${entryKey}".`);
   const js = [];
   const css = new Set();
-  const seen = new Set();
-  const visit = (key) => {
-    if (seen.has(key)) return;
-    seen.add(key);
+  for (const key of staticClosure(manifest, entryKey)) {
     const chunk = manifest[key];
-    if (!chunk) throw new Error(`Manifest verweist auf unbekannten Eintrag "${key}".`);
     js.push({ key, file: chunk.file, name: chunk.name || "" });
     for (const file of chunk.css || []) css.add(file);
-    for (const child of chunk.imports || []) visit(child);
-  };
-  visit(entryKey);
+  }
   return { js, css: [...css] };
 }
 
@@ -81,12 +125,12 @@ function main() {
   const cssGzip = cssFiles.reduce((sum, item) => sum + item.gzip, 0);
 
   const failures = [];
-  const forbidden = jsFiles.filter((item) =>
-    FORBIDDEN_STARTUP_CHUNKS.some((name) => item.name === name || path.basename(item.file).startsWith(`${name}-`)),
-  );
-  for (const item of forbidden) {
+  for (const item of jsFiles.filter(isForbiddenChunk)) {
     failures.push(`${item.file} gehört nicht in den anonymen Start (Editor, Diagramme, PDF und QR werden nur bei Bedarf geladen).`);
   }
+  const routeProblems = heavyRouteProblems(manifest);
+  for (const problem of routeProblems) failures.push(problem);
+  if (!routeProblems.length) console.log("Öffentliche Seiten: keine lädt Editor, Diagramme, PDF oder QR statisch mit – ok");
   const checks = [
     ["startup-js-gzip", "Start-JS", jsGzip],
     ["startup-css-gzip", "Start-CSS", cssGzip],
