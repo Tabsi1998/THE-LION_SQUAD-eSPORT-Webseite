@@ -39,7 +39,8 @@ test("die Leiste steht, solange die Pause läuft, und geht danach von selbst", a
   await act(async () => noteWritePause(10));
   expect(screen.getByTestId("write-pause-bar")).toBeTruthy();
   expect(screen.getByText(WRITE_PAUSE_LABEL)).toBeTruthy();
-  expect(WRITE_PAUSE_LABEL).toMatch(/^Kurze Wartung.*gleich wieder möglich\.$/);
+  // Derselbe Satz wie im Web (frontend/src/lib/writePause.js).
+  expect(WRITE_PAUSE_LABEL).toBe("Kurze Wartung: Wir sichern gerade die Daten. Lesen geht weiter, Speichern ist gleich wieder möglich.");
   // Eine kürzere Meldung verkürzt nichts.
   await act(async () => noteWritePause(2));
   await act(async () => { jest.advanceTimersByTime(5_000); });

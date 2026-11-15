@@ -42,8 +42,15 @@ function BannerActions({ row, testID }: { row: RankBannerRow; testID: string }) 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
-  const copy = () => {
-    Promise.resolve(Clipboard.setStringAsync(link)).catch(() => undefined);
+  const [failed, setFailed] = useState(false);
+  // Haken, Ansage und Aufleuchten nur, wenn der Link wirklich in der Zwischenablage liegt - sonst ein Satz mit dem Weg übers Teilen.
+  const copy = async () => {
+    const done = await Promise.resolve(Clipboard.setStringAsync(link)).then((result) => result !== false).catch(() => false);
+    setFailed(!done);
+    if (!done) {
+      AccessibilityInfo.announceForAccessibility?.("Kopieren ging nicht");
+      return;
+    }
     tapFeedback();
     AccessibilityInfo.announceForAccessibility?.("Link zum Rankingbanner kopiert");
     setCopied(true);
@@ -64,12 +71,13 @@ function BannerActions({ row, testID }: { row: RankBannerRow; testID: string }) 
           arrow={false}
           icon={copied ? "checkmark" : "link-outline"}
           accessibilityLabel={copied ? "Link zum Rankingbanner kopiert" : "Link zum Rankingbanner kopieren"}
-          onPress={copy}
+          onPress={() => { void copy(); }}
           testID={`${testID}-copy`}
         />
         {flash ? <Glow trigger={flash} tone="ok" radius={radius.sm} /> : null}
       </View>
       <Button label="Teilen" variant="secondary" arrow={false} icon="share-outline" accessibilityLabel="Link zum Rankingbanner teilen" onPress={share} testID={`${testID}-share`} />
+      {failed ? <Muted style={styles.failed} testID={`${testID}-copy-failed`}>Kopieren ging nicht – teile den Link stattdessen.</Muted> : null}
     </View>
   );
 }
@@ -111,4 +119,5 @@ const styles = StyleSheet.create({
   preview: { aspectRatio: 4, backgroundColor: colors.black, borderColor: colors.border, borderRadius: radius.sm, borderWidth: 1, overflow: "hidden", width: "100%" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   copy: { position: "relative" },
+  failed: { flexBasis: "100%", fontSize: 12 },
 });

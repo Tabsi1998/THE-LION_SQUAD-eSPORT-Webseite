@@ -286,8 +286,9 @@ export function errorMessage(error: unknown, fallback = "Das hat nicht geklappt.
       }
       return "Keine Internetverbindung. Bitte prüfe dein Netz.";
     }
-    // Schreibpause fürs Backup (#1009): ein eigener, freundlicher Satz statt der Meldung des Servers oder „status code 503“.
-    if (isWritePauseError(error)) return WRITE_PAUSE_MESSAGE;
+    // Schreibpause fürs Backup (#1009): ein eigener, freundlicher Satz statt der Meldung des Servers oder „status code 503“ - nur bei
+    // Antworten des eigenen Servers, wie die Leiste (eine andere Herkunft kann so eine Antwort nicht vortäuschen).
+    if ((error.config as CacheAwareConfig | undefined)?._ownServer && isWritePauseError(error)) return WRITE_PAUSE_MESSAGE;
     const detail = error.response?.data?.detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) return detail.map((item) => item?.msg || String(item)).join(" | ");

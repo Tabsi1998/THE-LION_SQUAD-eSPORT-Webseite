@@ -6,8 +6,8 @@ import { useSyncExternalStore } from "react";
 // eine Fehlermeldung steht (`errorMessage`), steht statt „Request failed with status code 503“ derselbe freundliche Satz.
 
 export const WRITE_PAUSE_CODE = "write_pause";
-/** Die Leiste oben im Screen - kurz, wie im Web. */
-export const WRITE_PAUSE_LABEL = "Kurze Wartung: Wir sichern gerade die Daten. Speichern ist gleich wieder möglich.";
+/** Die Leiste oben im Screen - derselbe Satz wie im Web (`WRITE_PAUSE_LABEL`, frontend/src/lib/writePause.js). */
+export const WRITE_PAUSE_LABEL = "Kurze Wartung: Wir sichern gerade die Daten. Lesen geht weiter, Speichern ist gleich wieder möglich.";
 /** Statt der Fehlermeldung: was los ist und was zu tun ist. */
 export const WRITE_PAUSE_MESSAGE = "Kurze Wartung: Wir sichern gerade die Daten. Speichern ist gleich wieder möglich – bitte versuch es in einer Minute noch einmal.";
 const DEFAULT_SECONDS = 30;

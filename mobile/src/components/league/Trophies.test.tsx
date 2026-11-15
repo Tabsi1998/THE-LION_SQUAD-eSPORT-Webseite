@@ -1,7 +1,7 @@
 import React from "react";
 import * as Clipboard from "expo-clipboard";
 import { Share } from "react-native";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { openLink } from "../../lib/openLink";
 import { LeagueOverallStanding } from "./LeagueOverallStanding";
 import { RankBanners } from "./RankBanners";
@@ -127,10 +127,21 @@ test("Rankingbanner: Vorschau, Link kopieren mit Haken, teilen - ohne Einträge 
   expect(screen.getByText("Löwen · Liga 1 · Staffel A")).toBeTruthy();
   await fireEvent.press(screen.getByTestId("team-rank-banners-s1-copy"));
   expect(Clipboard.setStringAsync).toHaveBeenCalledWith("https://api.example/api/leagues/cod/season-1/teams/q1/banner.png");
-  expect(screen.getByTestId("team-rank-banners-s1-copy")).toHaveTextContent("Kopiert");
+  await waitFor(() => expect(screen.getByTestId("team-rank-banners-s1-copy")).toHaveTextContent("Kopiert"));
+  expect(screen.queryByTestId("team-rank-banners-s1-copy-failed")).toBeNull();
   await fireEvent.press(screen.getByTestId("team-rank-banners-s1-share"));
   expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://api.example/api/leagues/cod/season-1/teams/q1/banner.png" }));
   share.mockRestore();
+  // Kopieren scheitert: kein Haken, stattdessen der Weg übers Teilen.
+  (Clipboard.setStringAsync as jest.Mock).mockResolvedValueOnce(false);
+  await render(<RankBanners rows={rows} />);
+  await fireEvent.press(screen.getByTestId("team-rank-banners-s1-copy"));
+  await waitFor(() => expect(screen.getByTestId("team-rank-banners-s1-copy-failed")).toHaveTextContent("Kopieren ging nicht – teile den Link stattdessen."));
+  expect(screen.getByTestId("team-rank-banners-s1-copy")).toHaveTextContent("Rankingbanner kopieren");
+  (Clipboard.setStringAsync as jest.Mock).mockRejectedValueOnce(new Error("kein Zugriff"));
+  await fireEvent.press(screen.getByTestId("team-rank-banners-s1-copy"));
+  await waitFor(() => expect(screen.getByTestId("team-rank-banners-s1-copy-failed")).toBeTruthy());
+  expect(screen.getByTestId("team-rank-banners-s1-copy")).toHaveTextContent("Rankingbanner kopieren");
   await render(<RankBanners rows={undefined} />);
   expect(screen.queryByTestId("team-rank-banners")).toBeNull();
 });

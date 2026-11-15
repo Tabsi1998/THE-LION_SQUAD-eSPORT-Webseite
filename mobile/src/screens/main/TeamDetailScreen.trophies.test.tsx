@@ -83,6 +83,14 @@ test("Teamleitung: Reiter Trophäen mit Vitrine; Embleme wählen geht über PUT 
   await waitFor(() => expect(mockDelete).toHaveBeenCalledWith("/teams/t1/awards/feature"));
 });
 
+test("Kennungen kommen kodiert in den Pfad (idSegment)", async () => {
+  serve({ ...FULL, id: "löwen team", awards: [{ ...cup, id: "c 1" }], featured_award: null });
+  await render(<TeamDetailScreen navigation={navigation} route={route({ id: "löwen team", tab: "trophies" })} />);
+  await waitFor(() => expect(screen.getByTestId("trophy-banner-c 1")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("trophy-banner-c 1"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/teams/l%C3%B6wen%20team/awards/c%201/feature"));
+});
+
 test("Doppeltipp schickt eine Wahl nur einmal", async () => {
   serve(FULL);
   let finish: (value: unknown) => void = () => undefined;

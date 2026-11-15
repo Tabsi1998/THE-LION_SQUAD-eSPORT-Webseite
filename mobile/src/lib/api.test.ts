@@ -605,9 +605,10 @@ describe("Schreibpause", () => {
     expect(errorMessage(failure)).toBe("Server überlastet");
   });
 
-  test("ein 503 einer anderen Herkunft schaltet die Leiste nicht ein", async () => {
+  test("ein 503 einer anderen Herkunft schaltet die Leiste nicht ein und ersetzt die Meldung nicht", async () => {
     handler = async (config) => { throw pauseError(config); };
-    await api.post("https://cdn.example/upload", {}).catch(() => null);
+    const failure = await api.post("https://cdn.example/upload", {}).catch((error: unknown) => error);
     expect(pause.writePauseSnapshot().active).toBe(false);
+    expect(errorMessage(failure)).toBe("Text des Servers");
   });
 });

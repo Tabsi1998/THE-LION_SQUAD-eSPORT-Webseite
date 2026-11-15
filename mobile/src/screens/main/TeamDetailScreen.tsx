@@ -457,18 +457,18 @@ export function TeamDetailScreen({ navigation, route }: Props) {
                 emblemHint: "Bis zu drei Embleme oder Medaillen stehen neben dem Teamnamen.",
                 onFeature: (id) => {
                   void choose(async () => {
-                    if (id) await api.post(`/teams/${team.id}/awards/${encodeURIComponent(id)}/feature`);
-                    else await api.delete(`/teams/${team.id}/awards/feature`);
+                    if (id) await api.post(`/teams/${idSegment(team.id)}/awards/${idSegment(id)}/feature`);
+                    else await api.delete(`/teams/${idSegment(team.id)}/awards/feature`);
                   }, id ? "Als Teambanner gesetzt." : "Teambanner entfernt.");
                 },
                 onTitle: (id) => {
                   void choose(async () => {
-                    if (id) await api.post(`/teams/${team.id}/awards/${encodeURIComponent(id)}/feature`, undefined, { params: { slot: "title" } });
-                    else await api.delete(`/teams/${team.id}/awards/feature`, { params: { slot: "title" } });
+                    if (id) await api.post(`/teams/${idSegment(team.id)}/awards/${idSegment(id)}/feature`, undefined, { params: { slot: "title" } });
+                    else await api.delete(`/teams/${idSegment(team.id)}/awards/feature`, { params: { slot: "title" } });
                   }, id ? "Als Titel gesetzt." : "Titel entfernt.");
                 },
                 onEmblems: (ids) => {
-                  void choose(() => api.put(`/teams/${team.id}/awards/emblems`, { award_ids: ids }), ids.length ? "Embleme gespeichert." : "Embleme entfernt.");
+                  void choose(() => api.put(`/teams/${idSegment(team.id)}/awards/emblems`, { award_ids: ids }), ids.length ? "Embleme gespeichert." : "Embleme entfernt.");
                 },
               } : null}
               empty="Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird."
