@@ -117,7 +117,8 @@ test("Dashboard: abgelehntes „gelesen“ wird zurückgenommen, „Nochmal vers
   await notice.getByRole("button", { name: /Nochmal versuchen/ }).click();
   await expect(notice).toHaveCount(0);
   await expect(row.locator(".rounded-full")).toHaveCount(0);
-  expect(readCalls).toEqual(["notification-0", "notification-0"]);
+  // „gelesen“ zeigt die Liste sofort (optimistisch), der zweite POST kann einen Takt später ankommen (#936).
+  await expect.poll(() => readCalls).toEqual(["notification-0", "notification-0"]);
 });
 
 test("Dashboard: ein Ladefehler zeigt den Fehler mit „Nochmal versuchen“, nicht „Keine Benachrichtigungen.“", async ({ page }) => {

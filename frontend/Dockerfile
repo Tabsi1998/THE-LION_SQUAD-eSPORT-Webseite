@@ -23,7 +23,8 @@ COPY package.json yarn.lock ./
 RUN corepack enable && yarn install --frozen-lockfile
 
 COPY . .
-RUN yarn build
+# Das Vite-Manifest (dist/.vite) braucht nur das Budget-Gate in der CI (#936) - nicht ausliefern.
+RUN yarn build && rm -rf dist/.vite
 
 FROM nginx:1.30.4-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
