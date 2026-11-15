@@ -118,3 +118,16 @@ test("Enter im Verlängern speichert nicht den Reiter (Review #2422), mit vollst
     { until: "2026-12-10T17:00:00.000Z", reason: "Nachrücker aus Liga 2" }));
   expect(onSubmit).not.toHaveBeenCalled();
 });
+
+test("Enter auf einem Knopf bleibt dessen eigene Aktion (Review #2422, Runde 2): Abbrechen und Speichern speichern nicht nebenbei", () => {
+  apiMock.post.mockReset();
+  const form = { ...applicationToForm(LONG), start_day: "2026-11-17" };
+  render(<SeasonApplicationSection form={form} set={vi.fn()} seasonId="s1" late={{ days: 14, extension: null }} />);
+  expect(fireEvent.keyDown(screen.getByTestId("season-late-extension-open"), { key: "Enter" })).toBe(true);
+  fireEvent.click(screen.getByTestId("season-late-extension-open"));
+  fireEvent.change(screen.getByTestId("season-late-extension-until"), { target: { value: "2026-12-10T18:00" } });
+  fireEvent.change(screen.getByTestId("season-late-extension-reason"), { target: { value: "Nachrücker aus Liga 2" } });
+  expect(fireEvent.keyDown(screen.getByTestId("season-late-extension-cancel"), { key: "Enter" })).toBe(true);
+  expect(fireEvent.keyDown(screen.getByTestId("season-late-extension-save"), { key: "Enter" })).toBe(true);
+  expect(apiMock.post).not.toHaveBeenCalled();
+});

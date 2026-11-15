@@ -34,8 +34,9 @@ export function SeasonLateExtension({ seasonId, extension, onSaved }) {
 
   const ready = Boolean(until) && reason.trim().length >= REASON_MIN;
   // Die Felder stehen im Formular des Reiters: Enter speichert hier nur die Verlängerung, nie den ganzen Reiter (Review #2422).
+  // Nur in den Eingabefeldern: Enter auf einem Knopf löst wie gewohnt dessen eigene Aktion aus (Review #2422, Runde 2).
   const onKeyDown = (event) => {
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || event.target?.tagName !== "INPUT") return;
     event.preventDefault();
     if (ready && !busy) send(fromViennaInput(until));
   };
@@ -62,7 +63,7 @@ export function SeasonLateExtension({ seasonId, extension, onSaved }) {
               <button type="button" disabled={busy || reason.trim().length < REASON_MIN} onClick={() => send(null)}
                 className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid="season-late-extension-remove">Verlängerung zurücknehmen</button>
             ) : null}
-            <button type="button" disabled={busy} onClick={() => setOpen(false)} className={`tls-btn tls-btn--quiet ${BUTTON}`}>Abbrechen</button>
+            <button type="button" disabled={busy} onClick={() => setOpen(false)} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid="season-late-extension-cancel">Abbrechen</button>
           </div>
         </div>
       )}
