@@ -89,6 +89,9 @@ npx jest src/pfad/Datei.test.tsx && npx tsc --noEmit
   Gitleaks und Code-Muster (`scripts/check-code-patterns.py`).
 - Bekannte Altbefunde stehen in `scripts/ci-baseline.json`; nur neue Befunde schlagen fehl.
 - Tests, die einen Kalendertag erwarten, mit `TZ=UTC` gegenprüfen – die CI läuft in UTC.
+- Termine in Testdaten relativ zu heute setzen oder die Uhr im Test feststellen; sonst kippt der Test von selbst.
+  Probe mit verstellter Uhr: `python scripts/local_check.py --only zeitreise [--zeit +6m]`, wöchentlich auf
+  GitHub ([Zeitreise-Probe](docs/entwicklung/zeitreise.md)).
 
 ## Pull Requests
 
