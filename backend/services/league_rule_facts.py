@@ -586,8 +586,10 @@ TEAM_A_SHORT = {"home": "das Heimteam laut Spielplan", "draw": "per Los je Spiel
 PRESET_RULE = ("- Vorgabe der Woche: Wo die Schrittfolge es nennt, legt die Liga-Leitung die Map je Spielwoche fest. Sie gilt für alle Spiele "
                # „Spielwoche“ wie Nr. 125 (#2424, A6): Spielwoche N ist Spieltag N, ein verschobenes Spiel bleibt in seiner Woche.
                "dieser Spielwoche – auch für ein verschobenes –, niemand kann sie sperren oder wählen. Solange sie für eine Woche fehlt, "
-               # Nr. 124, 127: Nach dem Nachtragen beginnt es erst, wenn beide Seiten bereit sind (``league_veto.set_ready``).
-               "beginnt das Veto nicht; wird sie nachgetragen, beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben.")
+               # Nr. 124, 127: Nach dem Nachtragen beginnt es erst, wenn beide Seiten bereit sind (``league_veto.set_ready``); im Notfall
+               # startet die Leitung mit Pflichtgrund (``league_veto.lead_start``, #2424).
+               "beginnt das Veto nicht; wird sie nachgetragen, beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben; im Notfall "
+               "kann die Liga-Leitung es mit Grund starten.")
 NO_PRESETS_YET = "noch keine eingetragen"
 
 

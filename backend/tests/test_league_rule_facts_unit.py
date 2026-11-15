@@ -304,7 +304,9 @@ def test_veto_block_with_preset_names_the_ready_start():
              {"kind": "preset", "mode": "ctl", "mode_label": "Kontrolle", "team": None, "position": 3}]
     out = facts.render_veto({"enabled": True, "team_a": "home", "step_seconds": 60, "steps": steps})
     preset_line = [row for row in out.splitlines() if row.startswith("- Vorgabe der Woche:")][0]
-    assert preset_line.endswith("beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben.")
+    assert "beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben;" in preset_line
+    # Nr. 127: Der Notfall-Start der Leitung (``league_veto.lead_start``) steht mit im Satz (#2424).
+    assert preset_line.endswith("; im Notfall kann die Liga-Leitung es mit Grund starten.")
     without = facts.render_veto({"enabled": True, "team_a": "home", "step_seconds": 60, "steps": steps[:1]})
     assert "Bereit zum Veto" not in without, "ohne Vorgabe der Woche kein Bereit-Satz"
 
