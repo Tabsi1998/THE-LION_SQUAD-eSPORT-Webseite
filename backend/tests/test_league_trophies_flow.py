@@ -168,8 +168,9 @@ async def test_the_rank_banner_is_public_cached_and_without_people(flow, monkeyp
     text = repr(data)
     assert not any(person in text for person in ("p-2-1", "captain-2", "P-2-1", "Captain-2", "example.test"))
 
-    # Nach den Spielen: Platz und Bilanz - und weil sich die Daten ändern, sofort ein neues Bild.
+    # Nach den Spielen: Platz und Bilanz - und weil sich die Daten ändern, ein neues Bild, sobald die gemerkten Daten (30 s) ablaufen.
     await play_all(flow, (await flow.db.tournaments.find_one({"league_context.staffel": "A"}, {"_id": 0})))
+    league_rank_banner.forget_payloads(flow.db)
     third = await flow.get(url)
     assert third.status_code == 200 and len(drawn) == 2
     assert (drawn[1]["rank"], drawn[1]["record"]["won"], drawn[1]["record"]["lost"], drawn[1]["record"]["points"]) == (2, 2, 1, 6)
@@ -188,6 +189,8 @@ async def test_the_rank_banner_is_public_cached_and_without_people(flow, monkeyp
 
 @pytest.mark.asyncio
 async def test_a_hidden_season_or_an_unknown_team_has_no_rank_banner(flow):
+    from services.league_rank_banner import forget_payloads
+
     _admin, _league, season, _division, staffel = await league_setup(flow, rewards=[GOLD])
     flow.act_as(None)
     assert (await flow.get(f"{PAGE}/teams/squad-1/banner.png")).status_code == 200
@@ -196,6 +199,7 @@ async def test_a_hidden_season_or_an_unknown_team_has_no_rank_banner(flow):
 
     for visibility in ("members", "admins", "off"):
         await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": visibility}})
+        forget_payloads(flow.db)
         hidden = await flow.get(f"{PAGE}/teams/squad-1/banner.png")
         assert hidden.status_code == 404, visibility
         assert hidden.headers.get("cache-control") != "public, max-age=300"
@@ -203,8 +207,47 @@ async def test_a_hidden_season_or_an_unknown_team_has_no_rank_banner(flow):
     await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": "public"}})
     # Eine Staffel im Entwurf sehen Gäste nicht - dann auch kein Bild.
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "draft"}})
+    forget_payloads(flow.db)
     assert (await flow.get(f"{PAGE}/teams/squad-1/banner.png")).status_code == 404
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})
     # Eine abgemeldete Anmeldung hat kein Bild mehr.
     await flow.db.tournament_registrations.update_one({"id": "reg-1"}, {"$set": {"status": "withdrawn"}})
+    forget_payloads(flow.db)
     assert (await flow.get(f"{PAGE}/teams/squad-1/banner.png")).status_code == 404
+
+
+
+@pytest.mark.asyncio
+async def test_the_rank_banner_remembers_its_data_and_limits_calls_per_ip(flow, monkeypatch):
+    """Review #2425: Ein Query-String geht am Zwischenspeicher vorbei - die Daten je Link werden trotzdem nur alle 30 Sekunden
+    gerechnet (auch ein „gibt es nicht“), und je IP gibt es eine Grenze."""
+    from services import league_rank_banner
+
+    await league_setup(flow, rewards=[GOLD])
+    flow.act_as(None)
+    computed = []
+    original = league_rank_banner.payload
+
+    async def counting(*args, **kwargs):
+        computed.append(args[3])
+        return await original(*args, **kwargs)
+
+    now = [1000.0]
+    monkeypatch.setattr(league_rank_banner, "payload", counting)
+    monkeypatch.setattr(league_rank_banner, "_clock", lambda: now[0])
+    for query in ("", "?a=1", "?a=2", "?zeit=123"):
+        answer = await flow.get(f"{PAGE}/teams/squad-1/banner.png{query}")
+        assert answer.status_code == 200
+    missing = [await flow.get(f"{PAGE}/teams/kein-team/banner.png?n={index}") for index in range(3)]
+    assert [answer.status_code for answer in missing] == [404, 404, 404]
+    assert computed == ["squad-1", "kein-team"]
+    now[0] += league_rank_banner.PAYLOAD_TTL_SECONDS + 1
+    again = await flow.get(f"{PAGE}/teams/squad-1/banner.png?a=3")
+    assert again.status_code == 200 and computed == ["squad-1", "kein-team", "squad-1"]
+
+    # Grenze je IP: danach 429 statt Rechnen und Zeichnen.
+    monkeypatch.setattr(league_rank_banner, "RATE_LIMIT", 1)
+    calls = [await flow.get(f"{PAGE}/teams/squad-1/banner.png?b={index}") for index in range(2)]
+    limited = calls[-1]
+    assert limited.status_code == 429
+    assert limited.headers.get("cache-control") != "public, max-age=300"

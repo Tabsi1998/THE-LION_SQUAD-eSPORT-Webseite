@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from contextlib import AsyncExitStack
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pymongo.errors import DuplicateKeyError
 
 from auth import get_optional_user, require_area
@@ -846,19 +846,23 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
 
 
 @router.get("/{league_slug}/{season_slug}/teams/{team_ref}/banner.png")
-async def public_rank_banner(league_slug: str, season_slug: str, team_ref: str):
+async def public_rank_banner(league_slug: str, season_slug: str, team_ref: str, request: Request):
     """Rankingbanner (Nr. 60, #2425): Platz und Bilanz eines Teams in dieser Season als Bild 1200×300 - für Discord und Streams.
-    ``team_ref``: Co-Team, sonst Hauptteam. Nur, was Gäste auf der Ligaseite sehen (sonst 404), ohne Personen. Sichtbarkeit wird bei
-    jedem Abruf geprüft, erst dann kommt das gemerkte Bild (``share_image_cache``, fünf Minuten); ``Cache-Control`` setzt server.py."""
+    ``team_ref``: Co-Team, sonst Hauptteam. Nur, was Gäste auf der Ligaseite sehen (sonst 404), ohne Personen. Die Daten je Link merkt
+    der Server 30 Sekunden (``league_rank_banner.cached_payload``), Abrufe je IP sind begrenzt; das Bild selbst kommt aus
+    ``share_image_cache`` (fünf Minuten), ``Cache-Control`` setzt server.py."""
     from fastapi.responses import Response
+
+    from services.rate_limit import enforce_rate_limit
 
     from routes.tournament_common import tournament_hidden_reason
     from routes.tournament_view_routes import standings as tournament_standings
     from services import league_rank_banner
     from services.share_image_cache import share_images
 
-    data = await league_rank_banner.payload(get_db(), league_slug, season_slug, team_ref, hidden=tournament_hidden_reason,
-                                            rows_of=lambda tournament: tournament_standings(tournament["id"], None, None))
+    await enforce_rate_limit(request, "league:rank-banner", league_rank_banner.RATE_LIMIT, league_rank_banner.RATE_WINDOW_SECONDS)
+    data = await league_rank_banner.cached_payload(get_db(), league_slug, season_slug, team_ref, hidden=tournament_hidden_reason,
+                                                   rows_of=lambda tournament: tournament_standings(tournament["id"], None, None))
     if not data:
         raise HTTPException(status_code=404, detail="Rankingbanner nicht gefunden")
     png = share_images.get_or_draw(("rank-banner", league_slug, season_slug, team_ref), data, lambda: league_rank_banner.render(data))

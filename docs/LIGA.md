@@ -3874,7 +3874,7 @@ nach Abschluss „Endstand“, Gold nur für Platz 1 einer abgeschlossenen Staff
 Co-Team das Hauptteam; mit der Hauptteam-Kennung gilt das Co-Team in der höchsten Liga N. Nur angenommene bzw. eingecheckte
 Team-Anmeldungen, nur wenn Gäste die Season (`visible_season` ohne Person) und die Staffel (`tournament_hidden_reason`) sehen und die
 Liga N aktiv ist - sonst 404; eine Einzel-Liga hat keines. Auf dem Bild stehen keine Personen. Zwischenspeicher wie das Teilen-Bild
-(`share_image_cache`, Fingerabdruck aus den Daten - ein neues Ergebnis zeichnet sofort neu, sonst fünf Minuten), `Cache-Control`
+(`share_image_cache`, Fingerabdruck aus den Daten - neue Daten zeichnen neu, sonst fünf Minuten). Die Daten je Link merkt der Server 30 Sekunden (`cached_payload`, auch ein 404 - ein angehängter Query-String erzeugt so keine Volllast), je IP höchstens 120 Abrufe je Minute (`enforce_rate_limit`). `Cache-Control`
 über `PUBLIC_IMAGE_PATH`. Die Teamseite trägt `rank_banners` (je öffentlicher Season Liga, Season, Liga N, Staffel, `image_url`,
 `page_url`) und zeigt sie mit Vorschau und **Rankingbanner kopieren**; die Staffel der Ligaseite trägt je Team `rank_banner_url`
 (nur in einer öffentlichen Season), die Unterseite „Teams“ zeigt denselben Knopf.

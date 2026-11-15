@@ -8,8 +8,15 @@ nur Team, Liga, Season, Liga N, Staffel, Platz und Bilanz - keine Personen, kein
 
 Zeichnen und Merken wie das Teilen-Bild der Belohnungen (``reward_share``): Pillow über ``share_image``, der Speicher
 ``share_image_cache.share_images`` (Fingerabdruck aus den Daten, fünf Minuten), ``Cache-Control`` über ``PUBLIC_IMAGE_PATH``.
+
+Schonung (Review #2425): Ein Link mit angehängtem Query-String geht an jedem Zwischenspeicher vorbei. Darum merkt sich der Server die
+Daten je Link 30 Sekunden (``PAYLOAD_TTL_SECONDS``, auch ein „gibt es nicht“), und die Route zählt Abrufe je IP
+(``RATE_LIMIT`` je ``RATE_WINDOW_SECONDS``). Eine Änderung an Tabelle oder Sichtbarkeit steht so spätestens nach 30 Sekunden im Bild.
 """
 from __future__ import annotations
+
+import time
+import weakref
 
 from PIL import ImageDraw
 
@@ -19,6 +26,35 @@ from services.league_scope import ONLY_LEAGUE
 
 WIDTH, HEIGHT = 1200, 300
 ENTRY_LIMIT = 12
+PAYLOAD_TTL_SECONDS = 30
+PAYLOAD_LIMIT = 500
+RATE_LIMIT = 120
+RATE_WINDOW_SECONDS = 60
+_PAYLOADS: dict[int, tuple[weakref.ref, dict]] = {}
+
+
+def _clock() -> float:
+    return time.monotonic()
+
+
+def _payload_cache(db) -> dict:
+    """Der Merkzettel dieser Datenbank - an das Objekt gebunden (wie ``awards._outcome_cache``; Tests bauen je Test eine neue)."""
+    entry = _PAYLOADS.get(id(db))
+    if entry and entry[0]() is db:
+        return entry[1]
+    for key in [key for key, (ref, _cache) in _PAYLOADS.items() if ref() is None]:
+        del _PAYLOADS[key]
+    cache: dict = {}
+    _PAYLOADS[id(db)] = (weakref.ref(db), cache)
+    return cache
+
+
+def forget_payloads(db=None) -> None:
+    """Gemerkte Daten verwerfen - für eine Datenbank oder alle."""
+    if db is None:
+        _PAYLOADS.clear()
+    else:
+        _payload_cache(db).clear()
 
 
 def banner_path(league_slug: str, season_slug: str, ref: str) -> str:
@@ -106,6 +142,21 @@ async def payload(db, league_slug: str, season_slug: str, ref: str, *, hidden, r
         "accent": entry["league"].get("accent_color") or share_image.CYAN,
         "club_name": branding.get("club_name") or "THE LION SQUAD",
     }
+
+
+async def cached_payload(db, league_slug: str, season_slug: str, ref: str, *, hidden, rows_of) -> dict | None:
+    """``payload`` je Link höchstens alle ``PAYLOAD_TTL_SECONDS`` neu gerechnet - auch ein ``None`` wird gemerkt."""
+    cache = _payload_cache(db)
+    key = (league_slug, season_slug, ref)
+    now = _clock()
+    hit = cache.get(key)
+    if hit and hit[0] > now:
+        return hit[1]
+    data = await payload(db, league_slug, season_slug, ref, hidden=hidden, rows_of=rows_of)
+    if len(cache) >= PAYLOAD_LIMIT:
+        cache.clear()
+    cache[key] = (now + PAYLOAD_TTL_SECONDS, data)
+    return data
 
 
 async def entries_for_team(db, team_id: str, *, hidden=None) -> list[dict]:
