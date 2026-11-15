@@ -182,9 +182,11 @@ test.describe("Liga-Gesamtabnahme: Grenzfälle gegen echte API und MongoDB", () 
     const games = seriesGames(winners, play.home, play.away, { planned: block.planned_games });
     const reporter = sides[play.winner][0];
     const lineup = await g1.presentOf(reporter, play.id, 3);
+    // Eine Map aus dem Stellung-Pool, die das Veto nicht für Map 1 vorsieht.
+    const otherMap = g1.POOL.stellung.map((name) => edge.maps[name].id).find((id) => id !== block.planned_games[0].map_id);
     const cases = [
       [{ results: resultsOf(play.winner, play.loser, "3:0"), games }, "laut Maps"],
-      [{ results: resultsOf(play.winner, play.loser, "3:1"), games: games.map((row, index) => (index === 0 ? { ...row, map_id: block.planned_games[1].map_id } : row)) }, "Veto"],
+      [{ results: resultsOf(play.winner, play.loser, "3:1"), games: games.map((row, index) => (index === 0 ? { ...row, map_id: otherMap } : row)) }, "Veto"],
       [{ results: resultsOf(play.winner, play.loser, "3:1"), games: games.map(({ scores, ...row }) => row) }, "Pflicht"],
       [{ results: resultsOf(play.winner, play.loser, "3:1"), games: games.map((row) => ({ ...row, scores: { [play.winner]: 5, [play.loser]: 2 } })) }, ""],
     ];
