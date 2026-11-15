@@ -300,6 +300,10 @@ Nicht vergebene Nummern gibt es keine; Nr. 33 ist durch 11c, Nr. 35 durch 68, Nr
 | 180 | Nachmeldung: Fenster über den Start, nur Hinweis | `league_readiness.py` (`application_after_start`), `league_applications.py` · `test_league_application_late_flow.py`, `test_league_pools_flow.py`, G.1 Nachmeldung | ja (Spiele für Nachrücker mit #2422) |
 | 183 | Nachmeldung: nur die restlichen Runden, keine Nachholspiele, „Nachgemeldet ab Woche X“ | `league_late_entry.py` (Vorschau, Bestätigung), `tournament_view_routes._standing_rows` (`late_from_week`) · `test_league_late_entry_flow.py`, `test_league_late_entry_unit.py`, G.1 `liga-nachmeldung.spec.js` | ja (#2422) |
 | 184 | Nachmeldefrist je Season, Vorgabe 14 Tage, Verlängern mit Grund | `league_late.py` (`late_registration_days`, `application_late_extension`), `league_late_routes.py` · `test_league_late_entry_flow.py`, G.1 `liga-nachmeldung.spec.js` | ja (#2422) |
+| 185 | Nachmeldung: Wertung nach absoluten Punkten, kein Quotient, der Hinweis reicht | `competition_standings` (E.1 unverändert), `late_from_week` · `test_league_late_entry_flow.py` | ja (#2422) |
+| 186 | Nachmeldung: die laufende Woche zählt als vorbei | `league_late_entry.open_matchdays` · `test_league_late_entry_unit.py` | ja (#2422) |
+| 187 | Nachmeldung: Befangenheit beim Bestätigen wie beim Annehmen, Superadmin mit Grund | `league_late_entry.apply` (`require_no_side_conflict`) · `test_league_late_entry_flow.py`, Rechte-Matrix | ja (#2422) |
+| 188 | Nachmeldung: abgesagte Spiele einer noch anfechtbaren Disqualifikation geben die Woche nicht frei; Widerruf belegt nie doppelt | `league_late_entry.held_registrations`, `league_sanctions._refuse_late_entry_clash` · `test_league_late_entry_flow.py`, `test_league_late_entry_unit.py` | ja (#2422) |
 
 ## 3. Abweichungen zwischen Regel und Funktion (Vorschläge für Issues)
 

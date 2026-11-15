@@ -683,7 +683,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | `POST squad-registrations` nur, wenn das Co-Team einen offenen Antrag hat | – |
 | `GET …/seasons/{id}/applications` | `applications` | – | – |
 | `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | ja, eigenes Team | – |
-| `GET …/seasons/{id}/late-entries`, `GET`, `POST …/staffeln/{tid}/late-entries/{rid}` (Nachmeldung, #2422) | `applications` | – | – |
+| `GET …/seasons/{id}/late-entries`, `GET …/staffeln/{tid}/late-entries/{rid}` (Nachmeldung, #2422) | `applications` | – | – |
+| `POST …/staffeln/{tid}/late-entries/{rid}` (Spiele einer Nachmeldung anlegen, #2422) | `applications` | ja, eigenes Team (Nr. 187) | – |
 | `POST …/seasons/{id}/application-extension` (Nachmeldefrist verlängern, #2422) | `season` | – | – |
 | Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
 | Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
@@ -1247,7 +1248,7 @@ Hinweis „… ist automatisch angenommen …“ bzw. „… steht automatisch a
 **Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist` sowie `league.season.auto_accept` (Umschalten, `before`/`after`)
 (`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung, `data.problem`, wenn die Staffel nicht ging); `.reject`, `.waitlist` und `.withdraw` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
 
-#### Nachmeldung nach dem Season-Start (#2422, Entscheidungen Nr. 180, 183, 184)
+#### Nachmeldung nach dem Season-Start (#2422, Entscheidungen Nr. 180, 183–188)
 
 Das Anmeldefenster darf über den Beginn der Season hinausgehen (Nr. 180). Ein Team, das danach in eine Staffel mit festem Spielplan kommt,
 spielt **nur die restlichen Runden** (Nr. 183): Paarungen gegen alle Teams der Staffel, aber nur in Spielwochen, die noch nicht begonnen
@@ -1262,7 +1263,8 @@ haben. Für vergangene Wochen gibt es keine Nachholspiele, die Tabelle hat dann 
 | `application_late_extension` | `{until, reason, at}` oder fehlt | – | keine Verlängerung | Verlängerung der Leitung mit Grund, nur über die Route unten. Wer verlängert hat, steht nur im Protokoll. Geht nicht in die Folge-Season |
 
 **Wirksames Ende** (`league_late.effective_closes`): `min(application_closes_at, start_date + late_registration_days)`; mit Verlängerung gilt
-`min(application_closes_at, until)`. Endet das Fenster vor dem Start, bleibt es beim Fenster. Dieses Ende gilt überall, wo bisher das Ende des
+`min(application_closes_at, max(start_date + late_registration_days, until))` - eine Verlängerung verlängert nur, sie verkürzt nie (wird die
+Frist später länger als eine alte Verlängerung, gilt die Frist). Endet das Fenster vor dem Start, bleibt es beim Fenster. Dieses Ende gilt überall, wo bisher das Ende des
 Fensters stand: Zustand des Fensters (`window_state`), Prüfung beim Einreichen („Die Anmeldung ist vorbei: Sie lief bis …“), `application.closes_at`
 der Ligaseite, Startseite (#2324), der Hinweis „Anmeldung läuft nach Season-Start weiter (bis …)“ in Vorab-Prüfung, Verwaltung und Ligaseite und die
 Regelwerk-Variable `{{application.closes}}`. Neu: `{{application.late_days}}` (Nachmeldefrist in Tagen). Das gespeicherte Fenster bleibt, wie es ist.
@@ -1288,9 +1290,12 @@ Ohne festen Spielplan (vor dem Start) gibt es keine Markierung: Das Team kommt b
 Spiele an** (keine stillen Änderungen).
 
 **Vorschau** (`league_late_entry.plan`, reine Rechnung): Offen ist ein Spieltag, dessen Woche noch nicht begonnen hat (Fensterbeginn nach jetzt;
-die laufende Woche zählt nicht, dort stehen Termine und Fristen schon). Spieltage gibt es bis zur letzten aktiven Woche der Season
+**Nr. 186:** die laufende Woche zählt als vorbei, dort stehen Termine und Fristen schon). Spieltage gibt es bis zur letzten aktiven Woche der Season
 (`matchday_weeks_total` ohne Sperrwochen), mindestens bis zum letzten Spieltag. Gegner sind alle aktiven Anmeldungen der Staffel (`approved`,
-`checked_in`, ohne `removal`). Eine Paarung braucht eine offene Woche, in der beide frei sind; ein abgesagtes Spiel (`cancelled`) belegt keine Woche.
+`checked_in`, ohne `removal`). Eine Paarung braucht eine offene Woche, in der beide frei sind. Belegt ist eine Woche durch den Spieltag eines Spiels und, ist es
+verschoben, auch durch die Woche seines Termins (`scheduled_at`); die Vorschau nennt solche Fälle unter `notes`. Ein abgesagtes Spiel
+(`cancelled`) belegt keine Woche - **außer (Nr. 188)** es wurde durch eine Disqualifikation abgesagt, die noch nicht endgültig ist
+(`held_registrations`: vorläufig, Einspruch offen oder Einspruchsfrist läuft). Dann bleibt die Woche belegt, und `notes` sagt es.
 Gerechnet wird eine größtmögliche Zuordnung Paarung → Woche (augmentierende Wege), frühe Wochen zuerst, je Woche höchstens ein Spiel des neuen
 Teams. Mit Hin- und Rückrunde braucht jeder Gegner zwei Spiele in verschiedenen Wochen, das spätere mit getauschten Seiten. Heimrecht nach dem
 Ausgleich des Gegners (mehr Heim- als Auswärtsspiele: auswärts), bei Gleichstand nach dem des neuen Teams. Je Paarung `kind`:
@@ -1304,15 +1309,20 @@ Ausgleich des Gegners (mehr Heim- als Auswärtsspiele: auswärts), bei Gleichsta
 Was nicht passt, entfällt: `missing[]` mit `{opponent_id, opponent_name, games, text}`, `text` „Gegen X kein Spiel mehr möglich.“ bzw. „Gegen X kein
 zweites Spiel mehr möglich.“. Bei gerader Teamzahl ohne Reservewoche spielt jedes Team jede Woche, dann passt kein Spiel. Die Vorschau zeigt je Paarung
 Woche, Spieltag, Heim- und Gastseite und den Standardtermin (`default_at`, nach `default_time_for` mit Sperrzeiten). `fingerprint` deckt Ergebnis und
-Ausgangslage (wer in welcher Woche frei ist).
+Ausgangslage (wer in welcher Woche frei ist). Steht schon ein Spiel der Paarung (Hin- und Rückrunde), bekommt das neue dessen getauschte
+Seiten. Für die Verwaltung dazu `own_team` und `superadmin` (Befangenheit, Nr. 187).
 
-**Bestätigen** (`league_late_entry.apply`): zuerst die Turnier-Sperre der Staffel, dann die Season-Sperre (wie beim Zuteilen). Dort wird die Vorschau
+**Bestätigen** (`league_late_entry.apply`): **Befangenheit (Nr. 187)** wie beim Annehmen und Zuteilen (`require_no_side_conflict`): Wer zum
+Team gehört, bekommt 403, der Superadmin geht als Notausnahme mit `conflict_reason` durch (Protokoll `league.conflict.override`,
+`action: "late_entry"`), geprüft vor allem anderen und unter der Sperre noch einmal. Dann zuerst die Turnier-Sperre der Staffel, dann die
+Season-Sperre (wie beim Zuteilen). Dort wird die Vorschau
 neu gerechnet; weicht der Fingerabdruck ab: 409 „Der Spielplan hat sich seit der Vorschau geändert …“, nichts wird angelegt. Nur `state: open` und
 eine aktive Anmeldung (sonst 409), Staffel nicht gesperrt (423), nicht abgeschlossen oder beendet (409). Die Markierung wechselt mit Bedingung
-auf `open` nach `done`, dann entstehen die Spiele (`matches_v2`) in derselben Form wie beim Start: Phase, Abschnitt und `settings` vom ersten
+auf `open` nach `done` erst, nachdem die Spiele (`matches_v2`) stehen - in derselben Form wie beim Start: Phase, Abschnitt und `settings` vom ersten
 Liga-Spiel, `round` und `round_name` „Spieltag N“, neuer `match_key`, `order` danach, `status: "ready"`, dazu `generation_mode: "late_entry"` und
-`late_entry: true`. Scheitert das Schreiben der Spiele, geht die Markierung zurück. Der Standardtermin wird nur für die neuen Spiele geschrieben
-(`schedule_writes` mit Quelle `default`); bestehende Spiele, Ergebnisse und Termine bleiben unberührt. Danach gelten Terminvorschläge,
+`late_entry: true`. Scheitert das Einfügen oder die Markierung, fallen die eingefügten Spiele wieder weg; halbe Zustände gibt es nicht.
+Der Standardtermin wird nur für die neuen Spiele geschrieben (`schedule_writes` mit Quelle `default`, in Staffeln mit Terminregeln mit
+Eintrag `default` in `schedule_history` wie `persist_matchday_schedule`); bestehende Spiele, Ergebnisse und Termine bleiben unberührt. Danach gelten Terminvorschläge,
 Verschiebungen, Check-in und Veto wie bei jedem Spiel. Auch null Spiele lassen sich bestätigen („nur Wertung ab jetzt“). Protokoll
 `league.staffel.late_entry` `{tournament_id, season_id, registration_id, from_week, match_ids, missing}`. Captain und Vertreter beider Seiten
 bekommen je neuem Spiel eine Nachricht (`match_attention`, „Neues Ligaspiel: …“, Schlüssel `late-entry:<match>:<user>`).
@@ -1323,15 +1333,21 @@ bekommen je neuem Spiel eine Nachricht (`match_attention`, „Neues Ligaspiel: �
 | --- | --- | --- |
 | `GET /api/admin/leagues/seasons/{id}/late-entries` | `applications` | Nachmeldungen aller Staffeln: `items[]` `{registration_id, tournament_id, name, staffel, staffel_title, state, from_week, created, missing, active}`, offene zuerst |
 | `GET /api/admin/leagues/staffeln/{tid}/late-entries/{rid}` | `applications` | Vorschau wie oben, dazu `late_entry`. Ohne Markierung 404 |
-| `POST /api/admin/leagues/staffeln/{tid}/late-entries/{rid}` `{fingerprint}` | `applications` | Bestätigen. Antwort: Vorschau mit `state: "done"`, `late_entry`, `match_ids` |
+| `POST /api/admin/leagues/staffeln/{tid}/late-entries/{rid}` `{fingerprint, conflict_reason?}` | `applications`, nicht befangen | Bestätigen. Antwort: Vorschau mit `state: "done"`, `late_entry`, `match_ids` |
 
 **Tabelle:** Jede Zeile einer Staffel trägt bei einer Nachmeldung `late_entry: true` und `late_from_week` (fehlt ohne offene Woche). Website,
 TV-Tabelle, Ergebnis-PDF und App lesen dieselbe Rechnung (`_standing_rows`), der Endstand (F.1) friert das Feld mit ein. Die Anzeige: „Nachgemeldet
 ab Woche X“ (ohne Woche „Nachgemeldet“). Gewertet wird wie immer nach E.1: Punkte, dann die Gleichstandsregeln der Season. Es gibt keinen
-Quotienten (Punkte je Spiel); ein Team mit weniger Spielen steht nach Punkten.
+Quotienten (Punkte je Spiel); ein Team mit weniger Spielen steht nach Punkten (**Nr. 185:** bewusst so, der Hinweis an der Zeile reicht).
 
 **Abschluss, Folge-Season, Gesamtwertung:** Ein nachgemeldetes Team zählt normal mit. Der Abschluss (F.1) prüft offene Spiele, nicht die Spielzahl je
-Team, ein nachgemeldetes Team mit weniger Spielen hält ihn nicht auf. Folge-Season (F.2) und Gesamtwertung (F.5) lesen den Endstand.
+Team, ein nachgemeldetes Team mit weniger Spielen hält ihn nicht auf. Eine noch offene Nachmeldung (`state: open`) steht im Cockpit
+(`GET …/seasons/{id}/closing`, je Staffel `hints[]`, Code `late_entry_open`) als Hinweis „Nachmeldung nicht entschieden“ mit Link auf
+`#nachmeldungen` - kein Sperrgrund.
+
+**Widerruf einer Disqualifikation (Nr. 188):** `league_sanctions.undo_effect` bricht mit 409 und Klartext ab („… In Woche X steht schon ein
+Nachmeldespiel von …“), wenn ein Spiel, das zurückkäme, in einer Woche liegt, in der eine der beiden Seiten schon ein Nachmeldespiel hat.
+Nichts wird still doppelt belegt; die Strafe gilt weiter, bis die Leitung das Nachmeldespiel absagt oder verlegt. Folge-Season (F.2) und Gesamtwertung (F.5) lesen den Endstand.
 
 ### C.1 Spielmodi (#2206)
 

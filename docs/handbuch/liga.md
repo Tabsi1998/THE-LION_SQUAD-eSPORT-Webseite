@@ -481,7 +481,15 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
   Eine Paarung braucht eine Woche, in der beide frei sind: Der Gegner hat spielfrei (ungerade Teamzahl), es ist eine Reservewoche nach
   dem letzten Spieltag, oder das Spiel des Gegners ist abgesagt. Bei gerader Teamzahl ohne Reservewoche passt kein Spiel. Dann
   bestätigst du **ohne Spiele**, das Team zählt ab jetzt. Gespielte Wochen, Ergebnisse und Termine bleiben unverändert. Hat sich der
-  Spielplan seit der Vorschau geändert, sagt es die Meldung, und die Vorschau lädt neu.
+  Spielplan seit der Vorschau geändert, sagt es die Meldung, und die Vorschau lädt neu. Ein verschobenes Spiel belegt auch die Woche
+  seines Termins. Eine Disqualifikation, gegen die noch Einspruch oder Widerruf möglich ist, gibt die Woche des abgesagten Spiels nicht
+  frei. Beides steht als Hinweis in der Vorschau.
+- **Eigenes Team:** Spielst du selbst im Co-Team, bestätigt eine andere Person. Als Superadmin geht es nur mit einem Grund für die
+  Notausnahme.
+- **Abschluss:** Eine noch offene Nachmeldung steht im Reiter **Abschluss** als Hinweis „Nachmeldung nicht entschieden“ mit Link. Sie hält
+  den Abschluss nicht auf.
+- **Strafe zurücknehmen:** Liegt ein Spiel, das durch den Widerruf einer Disqualifikation zurückkäme, in einer Woche mit einem
+  Nachmeldespiel einer der beiden Seiten, bricht der Widerruf mit einer Meldung ab. Sag zuerst das Nachmeldespiel ab oder verlege es.
 - **Tabelle:** Das Team steht mit „Nachgemeldet ab Woche X“ in Tabelle, Ligaseite, TV und PDF. Es hat weniger Spiele. Gewertet wird
   wie immer nach Punkten, es gibt keine Wertung nach Punkten je Spiel. Abschluss, Folge-Season und Gesamtwertung zählen das Team normal.
 
