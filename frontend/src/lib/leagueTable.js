@@ -118,6 +118,14 @@ export function deductionText(row) {
   return deducted ? `−${String(deducted).replace(".", ",")} ${deducted === 1 ? "Punkt" : "Punkte"} Abzug` : "";
 }
 
+/** Nachmeldung nach dem Season-Start (#2422, Nr. 183): „Nachgemeldet ab Woche 3“, ohne offene Woche nur „Nachgemeldet“ - leer sonst.
+ *  Für Web, TV, Druck und App derselbe Satz aus denselben Feldern (`late_entry`, `late_from_week`). */
+export function lateEntryText(row) {
+  if (!row?.late_entry) return "";
+  const week = Number(row.late_from_week) || 0;
+  return week ? `Nachgemeldet ab Woche ${week}` : "Nachgemeldet";
+}
+
 const DECISION_METHOD_NOTES = { playoff: "Platz durch Entscheidungsspiel", lot: "Platz durch Losentscheid", lead: "Platz durch Entscheid der Leitung" };
 
 /** Hinweise an einer Zeile der Staffel-Tabelle: was den Platz entschied, kampflos, Abzug, Ausscheiden. Leer bei
@@ -141,6 +149,8 @@ export function standingNotes(row) {
   const deducted = deductionText(row);
   if (deducted) notes.push({ key: "deducted", tone: "exit", text: deducted, title: "Punktabzug durch eine Strafe der Liga-Leitung" });
   // Angefochtene Ergebnisse (E.2, #1619): Sie zählen vorläufig mit - die Zeile sagt, wie viele Spiele noch „in Klärung“ sind.
+  const late = lateEntryText(row);
+  if (late) notes.push({ key: "late", tone: "tiebreak", text: late, title: "Nach dem Season-Start dazugekommen: Spiele nur in den noch offenen Spielwochen, daher weniger Spiele." });
   const contested = Number(row.contested) || 0;
   if (contested) {
     notes.push({ key: "contested", tone: "decision", text: contested === 1 ? "1 Spiel in Klärung" : `${contested} Spiele in Klärung`,

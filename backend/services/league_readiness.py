@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services import game_maps, game_modes, league_pool_check, league_veto_rules, map_pools
+from services import game_maps, game_modes, league_late, league_pool_check, league_veto_rules, map_pools
 from services.league_scope import ONLY_LEAGUE
 from services.log_safe import log_safe
 from services.permissions import is_superadmin
@@ -71,10 +71,16 @@ def _application_items(season: dict) -> list[tuple[str, dict]]:
                                                       "teilt sie zu."))]
     out = []
     start = _moment(season.get("start_date"))
+    # Nachmeldefrist (#2422, Nr. 184): wirksam ist min(Fenster, Start + Frist), außer die Leitung hat mit Grund verlängert.
+    closes = league_late.effective_closes(season) or closes
     if start and closes > start:
         # Nachmeldung (Entscheidung Nr. 180, #1632): erlaubt, etwa für nachrückende Teams - ein Hinweis, keine Sperre.
         out.append(("warning", _item("application_after_start", f"{after_start_text(closes)} Nachgemeldete Co-Teams teilt die "
-                                                                "Leitung einer Staffel zu.")))
+                                                                "Leitung einer Staffel zu; ihre Spiele trägt sie nach Vorschau nach.")))
+    if league_late.capped(season):
+        days = league_late.late_days(season)
+        out.append(("warning", _item("application_late_cap", f"Das Anmeldefenster reicht über die Nachmeldefrist hinaus ({days} Tage nach dem "
+                                                             "Start). Die Anmeldung schließt darum schon früher, das Fenster bleibt gespeichert.")))
     if closes <= datetime.now(timezone.utc):
         out.append(("warning", _item("application_closed", "Das Anmeldefenster ist schon vorbei.")))
     return out

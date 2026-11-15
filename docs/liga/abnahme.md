@@ -100,6 +100,7 @@ Weitere Prüfungen:
 | Abbrüche | Rückzug einer Anmeldung, Terminänderung macht den Check-in ungültig, Veto pausiert und fortgesetzt, Einwand zurückgezogen | Grenzfälle „Abbrüche und Sperren …“, „Gleichzeitig …“ |
 | Fristen-Job | Meldung ohne Antwort: nach 47 Stunden offen, nach 49 bestätigt (`auto_confirmed`), ein zweiter Lauf bestätigt nichts doppelt. Eine Seite checkt nicht ein: nach dem Fenster nur ein Vorschlag „nicht erschienen“ an die Leitung, keine Wertung, kein zweiter Vorschlag | Grenzfälle „Fristen-Job: …“ (zwei Tests) |
 | Nachmeldung | Erstes Veröffentlichen mit Fenster über den Season-Start: Hinweis `application_after_start`, keine Sperre | Grenzfälle „Anmeldung …“; Flow `test_league_pools_flow.py`, `test_league_application_late_flow.py` |
+| Nachmeldung nach dem Start (#2422, Nr. 183, 184) | Fenster 30 Tage über den Start, Season seit acht Tagen (Woche 2 läuft), drei Co-Teams spielen. Ligaseite (390 px) nennt das wirksame Ende (Start + 14 Tage), Vorab-Prüfung `application_late_cap`. Ein Captain meldet an, die Leitung nimmt mit Staffel an: noch kein Spiel, nichts an den drei Spielen geändert. Unter **Nachmeldungen** (1440 px) die Vorschau: Woche 3 gegen das Team mit Freilos, Woche 4 (Reserve) gegen ein zweites, gegen das dritte „kein Spiel mehr möglich“. Bestätigen legt genau diese zwei an, ein zweites Mal 409. Tabelle am Handy: „Nachgemeldet ab Woche 3“, 0 Spiele. Frist auf einen Tag: Anmeldung zu (409 „Die Anmeldung ist vorbei“), Verlängern ohne Grund 422, mit Grund wieder offen | Nachmeldung „Nachmeldung: …“ (`liga-nachmeldung.spec.js`); Flow `test_league_late_entry_flow.py` (ungerade und gerade Teamzahl, Vorschau veraltet, zwei Bestätigungen gleichzeitig, Tabelle und Abschluss, Frist und Verlängerung), Unit `test_league_late_entry_unit.py` |
 | Sperren | Gesperrtes Konto im Check-in blockiert (D-4), abgeschlossene Staffel nimmt nichts mehr an, Wiederöffnen nur durch eine zweite Person | Grenzfälle „Abbrüche und Sperren …“ |
 | Altdaten | Season ohne die Felder des Masterplans: melden ohne Check-in und Veto mit Aufstellung je Map, Tabelle, Protest-Vorgaben inaktiv, Seiten fehlerfrei | Grenzfälle „Altdaten …“ |
 
@@ -121,7 +122,6 @@ Diese Punkte aus der Testmatrix von #1632 betreffen Funktionen, die es noch nich
 
 ## Offene Punkte aus der Abnahme
 
-- **Nachmeldung nach dem Start (Entscheidung Nr. 180):** Die Leitung nimmt ein nachgemeldetes Co-Team an und teilt es einer
-  laufenden Staffel zu. Es steht dann mit 0 Spielen in der Tabelle. Spiele bekommt es nicht von selbst, der feste Spielplan
-  bleibt, wie er beim Start war (`backend/tests/test_league_application_late_flow.py`). Wie Nachrücker Spiele bekommen, ist noch
-  offen.
+- **Nachmeldung nach dem Start (Entscheidung Nr. 180):** erledigt mit #2422 (Nr. 183, 184): Spiele nur in den offenen Wochen nach
+  Vorschau und Bestätigung, Hinweis in der Tabelle, Nachmeldefrist je Season (Vorgabe 14 Tage) mit Verlängerung. Abgenommen im
+  Szenario „Nachmeldung nach dem Start“ oben.

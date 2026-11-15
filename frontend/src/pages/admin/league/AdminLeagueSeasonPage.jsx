@@ -369,7 +369,8 @@ export default function AdminLeagueSeasonPage() {
     termine: () => <SeasonDatesTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} formProps={formProps("termine")} />,
     anmeldung: () => (
       <SeasonEntryTab seasonId={seasonId} season={season} form={form} set={set} canSeason={canSeason} canApplications={can("applications")} canRoster={can("roster")}
-        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0} />
+        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0}
+        lateRegistration={data.late_registration || null} onReload={reload} />
     ),
     tabelle: () => (
       <div className="space-y-6">

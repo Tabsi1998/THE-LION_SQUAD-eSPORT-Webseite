@@ -202,3 +202,13 @@ test("Belohnungen (F.4): Anzahl und - ohne gemeldete Aufstellung - der Hinweis a
   expect(screen.getByTestId("close-rewards-fallback-t1")).toHaveTextContent("Kader statt Einsatz, weil keine Aufstellungen gemeldet: Probe 3.");
   expect(screen.queryByTestId("close-rewards-fallback-t2")).toBeNull();
 });
+
+test("Nachmeldung (#2422): eine offene Nachmeldung steht als Hinweis mit Link da, der Abschluss bleibt möglich", async () => {
+  renderTab(data([staffel({ hints: [{ code: "late_entry_open", label: "Nachmeldung nicht entschieden", text: "Kein Sperrgrund.", count: 1,
+    items: [{ text: "Probe 5", url: "/admin/leagues/seasons/s1#nachmeldungen" }] }] })]));
+  const hint = await screen.findByTestId("close-hint-t1-late_entry_open");
+  expect(hint).toHaveTextContent("Nachmeldung nicht entschieden");
+  expect(within(hint).getByRole("link", { name: "Probe 5" })).toHaveAttribute("href", "/admin/leagues/seasons/s1#nachmeldungen");
+  expect(screen.getByTestId("close-ready-t1")).toBeInTheDocument();
+  expect(screen.getByTestId("close-button-t1")).not.toBeDisabled();
+});

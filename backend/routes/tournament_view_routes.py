@@ -350,6 +350,8 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
     # Tabellenende der Liga-Staffel (E.1, Nr. 43): wann jemand ausschied - die Projektion gibt ``removal`` nicht mit.
     removed_at = {r.get("id"): (r.get("removal") or {}).get("at") for r in regs if r.get("removal")}
+    # Nachmeldung (#2422, Nr. 183): „Nachgemeldet ab Woche X“ - Website, TV, PDF und App lesen dasselbe Feld.
+    late_from = {r.get("id"): (r.get("late_entry") or {}).get("from_week") for r in regs if r.get("late_entry")}
     regs = [_public_registration(r, user, is_staff) for r in regs]
     for r in regs:
         if removed_at.get(r.get("id")):
@@ -378,6 +380,11 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
         from services.league_zones import mark_rows
 
         await mark_rows(db, t, rows)
+        for row in rows:
+            if row.get("registration_id") in late_from:
+                row["late_entry"] = True
+                if late_from[row["registration_id"]]:
+                    row["late_from_week"] = late_from[row["registration_id"]]
     # Die eigene Zeile ist markiert (#1179) - nur für den, der schaut.
     _mark_own_rows(rows, own_ids)
     return rows

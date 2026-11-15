@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  MAPS_TIEBREAKERS, byMaps, hidesDraws, mapPointsExample, pointsModeChange, pointsNote, pointsSummary, standingNotes, tableRulesPayload, tableRulesToForm, tiebreakOrder,
+  MAPS_TIEBREAKERS, byMaps, hidesDraws, lateEntryText, mapPointsExample, pointsModeChange, pointsNote, pointsSummary, standingNotes, tableRulesPayload, tableRulesToForm, tiebreakOrder,
 } from "./leagueTable";
 
 describe("Tabelle der Liga-Staffel (E.1, #1625)", () => {
@@ -71,5 +71,15 @@ describe("Punkte nach gewonnenen Maps (#2312)", () => {
     expect(pointsSummary({ match_points_mode: "maps", match_points: { win: 3, draw: 0, loss: 0 } })).toBe("Punkte je gewonnene Map");
     expect(pointsSummary({ match_points: { win: 3, draw: 1, loss: 0 } })).toBe("Sieg / Remis / Niederlage: 3 / 1 / 0");
     expect(pointsSummary({})).toBe("");
+  });
+});
+
+describe("Nachmeldung (#2422, Nr. 183)", () => {
+  it("sagt ab welcher Woche - ohne offene Woche nur nachgemeldet, sonst nichts", () => {
+    expect(lateEntryText({ late_entry: true, late_from_week: 3 })).toBe("Nachgemeldet ab Woche 3");
+    expect(lateEntryText({ late_entry: true })).toBe("Nachgemeldet");
+    expect(lateEntryText({ late_from_week: 3 })).toBe("");
+    expect(lateEntryText(null)).toBe("");
+    expect(standingNotes({ late_entry: true, late_from_week: 5 }).map((note) => note.text)).toEqual(["Nachgemeldet ab Woche 5"]);
   });
 });

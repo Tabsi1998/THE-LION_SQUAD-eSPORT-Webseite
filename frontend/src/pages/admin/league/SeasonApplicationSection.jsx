@@ -1,7 +1,8 @@
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { ENTRY_POLICY_OPTIONS, afterStartLine, waitingLine } from "@/lib/leagueApplications";
+import { ENTRY_POLICY_OPTIONS, LATE_DAYS_DEFAULT, afterStartLine, effectiveCloses, lateCapLine, waitingLine } from "@/lib/leagueApplications";
 import { fromViennaInput } from "@/lib/vienna";
+import { SeasonLateExtension } from "./SeasonLateExtension";
 
 // Selbstanmeldung je Season (docs/LIGA.md, B.4, #2205): Alles sind Vorgaben, nichts ist fest. Ohne Beginn und Ende gibt es keine Selbstanmeldung, und alles bleibt wie vorher.
 
@@ -18,10 +19,16 @@ function Toggle({ label, hint, checked, onChange, testId }) {
 }
 
 // ``waiting``: offene Anmeldungen (eingereicht, in Prüfung). Beim Einschalten von „automatisch annehmen“ (#2348) bleiben sie bei der Leitung.
-export function SeasonApplicationSection({ form, set, id, deadlineField = null, waiting = 0 }) {
+// ``late``: Nachmeldefrist vom Server (#2422, ``late_registration``), mit ``seasonId`` und ``onReload`` für „Mit Grund verlängern“.
+export function SeasonApplicationSection({ form, set, id, deadlineField = null, waiting = 0, late = null, seasonId = null, onReload = null }) {
   const waitingText = form.application_auto_accept ? waitingLine(waiting) : "";
-  // Nachmeldung (Entscheidung Nr. 180, #1632): erlaubt - der Satz sagt nur, dass die Anmeldung nach dem Start weiterläuft.
-  const afterStart = afterStartLine(fromViennaInput(form.application_closes), form.start_day ? fromViennaInput(`${form.start_day}T00:00`) : null);
+  // Nachmeldung (Entscheidung Nr. 180, #1632): erlaubt. Seit #2422 (Nr. 184) schließt sie spätestens nach der Frist - der Satz nennt das wirksame Ende.
+  const closes = fromViennaInput(form.application_closes);
+  const start = form.start_day ? fromViennaInput(`${form.start_day}T00:00`) : null;
+  const extension = late?.extension?.until || null;
+  const effective = effectiveCloses(closes, start, form.late_registration_days, extension);
+  const afterStart = afterStartLine(effective, start);
+  const capLine = lateCapLine(closes, start, form.late_registration_days, extension);
   return (
     <FormSection title="Selbstanmeldung" testId="season-application-settings" id={id} className="scroll-mt-24"
       hint="Captains und Vertreter melden ihr Co-Team auf der Ligaseite an, die Leitung entscheidet oder die Season nimmt automatisch an. Ohne Beginn und Ende gibt es das nicht: Dann teilst du wie bisher in der Turnierverwaltung zu. Für die Anmeldung braucht es ein gültiges Regelwerk.">
@@ -29,8 +36,15 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
         <TextField label="Anmeldung ab" type="datetime-local" value={form.application_opens} onChange={(value) => set("application_opens", value)} hint="Wiener Zeit" testId="season-form-application-opens" />
         <TextField label="Anmeldung bis" type="datetime-local" value={form.application_closes} onChange={(value) => set("application_closes", value)} hint="Wiener Zeit" testId="season-form-application-closes" />
       </FormGrid>
+      <TextField label="Nachmeldung bis (Tage nach dem Start)" type="number" min={0} max={365} value={form.late_registration_days}
+        onChange={(value) => set("late_registration_days", value)} placeholder={String(LATE_DAYS_DEFAULT)} className="max-w-xs"
+        hint={`Leer: ${LATE_DAYS_DEFAULT} Tage. Danach schließt die Anmeldung, auch wenn das Fenster länger läuft. 0: nur bis zum Start.`} testId="season-form-late-days" />
       {afterStart ? (
-        <p className="text-xs text-white/70" data-testid="season-form-application-after-start">{afterStart} Nachgemeldete Co-Teams teilst du im Eingang einer Staffel zu.</p>
+        <p className="text-xs text-white/70" data-testid="season-form-application-after-start">{afterStart} Nachgemeldete Co-Teams teilst du im Eingang einer Staffel zu, ihre Spiele trägst du unter „Nachmeldungen“ nach.</p>
+      ) : null}
+      {capLine ? <p className="text-xs text-warn" data-testid="season-form-late-cap">{capLine}</p> : null}
+      {seasonId && late && closes && start && new Date(closes) > new Date(start) ? (
+        <SeasonLateExtension seasonId={seasonId} extension={late.extension} onSaved={onReload} />
       ) : null}
       {deadlineField}
       <FormGrid cols={3}>
