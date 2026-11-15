@@ -120,13 +120,70 @@ def late_mark(tournament: dict, matches, now: datetime | None = None) -> dict | 
             "marked_at": moment.isoformat()}
 
 
-def _busy(matches, registration_id: str) -> set[int]:
+def held_cancel(match: dict, held: set[str] | frozenset = frozenset()) -> bool:
+    """Nr. 188: Ein Spiel, das eine noch anfechtbare Disqualifikation abgesagt hat (Einspruch oder Widerruf noch möglich), gibt die
+    Woche nicht frei - es kann wiederkommen."""
+    meta = match.get("result_meta") or {}
+    return (match.get("status") in GONE_STATUSES and meta.get("reason") == "disqualified"
+            and meta.get("removed_registration_id") in held)
+
+
+def occupies(match: dict, held: set[str] | frozenset = frozenset()) -> bool:
+    """Belegt das Spiel seine Woche? Abgesagte nur, wenn sie wiederkommen können (Nr. 188)."""
+    return match.get("status") not in GONE_STATUSES or held_cancel(match, held)
+
+
+def _moment(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def played_in(tournament: dict | None, match: dict, last: int) -> int | None:
+    """Die Spielwoche, in der das Spiel wirklich liegt: ein Termin in einer anderen Woche (verschoben) zählt dort (Review #2422)."""
+    moment = _moment(match.get("scheduled_at"))
+    if not tournament or moment is None:
+        return None
+    for number in range(1, last + 1):
+        if tournament_matchday_window(tournament, number).contains(moment):
+            return number
+    return None
+
+
+def _busy(matches, registration_id: str, *, tournament: dict | None = None, last: int = 0,
+          held: set[str] | frozenset = frozenset()) -> set[int]:
+    """Die Wochen, in denen das Team schon spielt: der Spieltag des Spiels und - ist es verschoben - die Woche seines Termins."""
     out = set()
     for match in matches:
-        if match.get("status") in GONE_STATUSES:
+        if not occupies(match, held) or registration_id not in duel_sides(match):
             continue
-        if registration_id in duel_sides(match):
-            out.add(matchday_number_of(match))
+        out.add(matchday_number_of(match))
+        moved = played_in(tournament, match, last)
+        if moved:
+            out.add(moved)
+    return out
+
+
+def _notes(tournament: dict, duels: list[dict], weeks: list[int], ids: set[str], names: dict, last: int,
+           held: set[str] | frozenset) -> list[str]:
+    """Hinweise in der Vorschau: was eine offene Woche belegt, ohne dass man es am Spieltag sieht."""
+    out = []
+    for match in sorted(duels, key=lambda row: (matchday_number_of(row) or 0, row.get("order") or 0)):
+        sides = [side for side in duel_sides(match) if side]
+        if not ids & set(sides):
+            continue
+        label = " gegen ".join(names.get(side, "Team") for side in sides)
+        moved = played_in(tournament, match, last) if occupies(match, held) else None
+        if moved and moved != matchday_number_of(match) and moved in weeks:
+            out.append(f"{label} (Spieltag {matchday_number_of(match)}) ist in Woche {calendar_week_of(tournament, moved)} verschoben - "
+                       "beide sind dort belegt.")
+        if held_cancel(match, held) and matchday_number_of(match) in weeks:
+            out.append(f"{label} in Woche {calendar_week_of(tournament, matchday_number_of(match))} ist wegen einer Disqualifikation "
+                       "abgesagt, die noch angefochten oder widerrufen werden kann - die Woche bleibt belegt, bis sie endgültig ist.")
     return out
 
 
@@ -162,12 +219,13 @@ def _assign(demands: list[tuple[str, int]], weeks: list[int], free: dict[str, se
     return {week: demands[index] for week, index in owner.items()}
 
 
-def _reason(tournament: dict, matches, opponent_id: str, matchday: int, last_regular: int, names: dict) -> tuple[str, str]:
+def _reason(tournament: dict, matches, opponent_id: str, matchday: int, last_regular: int, names: dict,
+            held: set[str] | frozenset = frozenset()) -> tuple[str, str]:
     opponent = names.get(opponent_id, "Team")
     if matchday > last_regular:
         return "reserve", "Reservewoche nach dem letzten Spieltag."
     if any(opponent_id in duel_sides(match) and matchday_number_of(match) == matchday and match.get("status") in GONE_STATUSES
-           for match in matches):
+           and not held_cancel(match, held) for match in matches):
         return "free", f"Das Spiel von {opponent} in dieser Woche ist abgesagt."
     return "bye", f"{opponent} hat in dieser Woche spielfrei."
 
@@ -176,8 +234,10 @@ def _local(moment: datetime | None) -> str | None:
     return moment.astimezone(LOCAL_TZ).isoformat() if moment else None
 
 
-def plan(tournament: dict, registration: dict, registrations: list[dict], matches: list[dict], now: datetime | None = None) -> dict:
-    """Die Vorschau: welche Paarungen das neue Team in welcher Woche bekommt und gegen wen kein Spiel mehr möglich ist."""
+def plan(tournament: dict, registration: dict, registrations: list[dict], matches: list[dict], now: datetime | None = None,
+         held: set[str] | frozenset = frozenset()) -> dict:
+    """Die Vorschau: welche Paarungen das neue Team in welcher Woche bekommt und gegen wen kein Spiel mehr möglich ist. ``held``: Teams
+    mit noch anfechtbarer Disqualifikation (Nr. 188, ``held_registrations``)."""
     moment = now or _now()
     duels = league_duels(matches)
     new_id = registration["id"]
@@ -187,9 +247,11 @@ def plan(tournament: dict, registration: dict, registrations: list[dict], matche
     legs = league_legs(tournament)
     weeks = open_matchdays(tournament, duels, moment)
     last_regular = max((matchday_number_of(match) or 0 for match in duels), default=0)
-    own_busy = _busy(duels, new_id)
+    last = active_matchdays(tournament, duels)
+    own_busy = _busy(duels, new_id, tournament=tournament, last=last, held=held)
     usable = [week for week in weeks if week not in own_busy]
-    free = {row["id"]: {week for week in usable if week not in _busy(duels, row["id"])} for row in opponents}
+    free = {row["id"]: {week for week in usable if week not in _busy(duels, row["id"], tournament=tournament, last=last, held=held)}
+            for row in opponents}
     already = {row["id"]: sum(1 for match in duels if match.get("status") not in GONE_STATUSES
                               and set(duel_sides(match)) == {new_id, row["id"]}) for row in opponents}
     demands = [(row["id"], leg) for leg in range(1, legs + 1) for row in opponents if already[row["id"]] < leg]
@@ -220,7 +282,7 @@ def plan(tournament: dict, registration: dict, registrations: list[dict], matche
         balance += 1 if new_home else -1
         window = tournament_matchday_window(tournament, week)
         default = default_time_for(tournament, window, weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"])
-        kind, text = _reason(tournament, matches, opponent_id, week, last_regular, names)
+        kind, text = _reason(tournament, matches, opponent_id, week, last_regular, names, held)
         home, away = (new_id, opponent_id) if new_home else (opponent_id, new_id)
         pairings.append({
             "opponent_id": opponent_id, "opponent_name": names[opponent_id], "matchday": week,
@@ -245,7 +307,8 @@ def plan(tournament: dict, registration: dict, registrations: list[dict], matche
     return {"registration_id": new_id, "name": names[new_id], "state": (registration.get("late_entry") or {}).get("state"),
             "legs": legs, "from_matchday": first, "from_week": calendar_week_of(tournament, first) if first else None,
             "open_weeks": [calendar_week_of(tournament, week) for week in weeks], "pairings": pairings, "missing": missing,
-            "existing": len(own_busy), "fingerprint": fingerprint, "now": _local(moment)}
+            "existing": len(own_busy), "fingerprint": fingerprint, "now": _local(moment),
+            "notes": _notes(tournament, duels, weeks, {new_id, *(row["id"] for row in opponents)}, names, last, held)}
 
 
 def _keys(matches) -> tuple[set[str], int]:
@@ -296,21 +359,47 @@ async def load(db, tournament_id: str) -> tuple[list[dict], list[dict]]:
     return registrations, matches
 
 
+async def held_registrations(db, tournament_id: str, now: datetime | None = None) -> set[str]:
+    """Nr. 188: Teams, deren Disqualifikation noch nicht endgültig ist - vorläufig, ein Einspruch offen oder die Einspruchsfrist
+    läuft. Ihre abgesagten Spiele geben die Woche nicht frei."""
+    from services.league_sanction_bans import FINAL, OPEN as APPEAL_OPEN
+    from services.league_sanctions import appeal_refusal
+
+    held = set()
+    async for doc in db.competition_sanctions.find({"tournament_id": tournament_id, "kind": "disqualification", "revoked_at": None},
+                                                   {"_id": 0}):
+        if not doc.get("registration_id"):
+            continue
+        if doc.get("state") != FINAL or (doc.get("appeal") or {}).get("state") == APPEAL_OPEN or appeal_refusal(doc, now) is None:
+            held.add(doc["registration_id"])
+    return held
+
+
 async def preview(db, tournament: dict, registration_id: str, now: datetime | None = None) -> dict:
     registrations, matches = await load(db, tournament["id"])
     registration = next((row for row in registrations if row["id"] == registration_id), None)
     if not registration or not registration.get("late_entry"):
         raise LateEntryProblem(GONE, 404)
-    out = plan(tournament, registration, registrations, matches, now)
+    out = plan(tournament, registration, registrations, matches, now, await held_registrations(db, tournament["id"], now))
     out["late_entry"] = registration.get("late_entry")
     return out
 
 
 async def write_schedule(db, tournament: dict, docs: list[dict]) -> int:
     """Der Standardtermin der neuen Spiele - nur sie, bestehende Termine bleiben, wie sie sind."""
+    from services.matchday_schedule import _home_rule_managed
+
     stages = await db.tournament_stages.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(200)
     fresh = await db.matches_v2.find({"id": {"$in": [doc["id"] for doc in docs]}}, {"_id": 0}).to_list(len(docs) + 1)
-    return await apply_schedule_writes(db, schedule_writes(tournament, fresh, [], stages))
+    writes = schedule_writes(tournament, fresh, [], stages)
+    if _home_rule_managed(tournament):
+        # Termin-Historie (#2194) wie in persist_matchday_schedule: der Standardtermin als eigene Art.
+        for write in writes:
+            if write["update"].get("schedule_source") == "default":
+                write["history"] = {"id": str(uuid.uuid4()), "at": _now().isoformat(), "kind": "default", "by": None,
+                                    "registration_id": None, "from": None, "to": write["update"].get("scheduled_at"),
+                                    "reason": None, "request_id": None}
+    return await apply_schedule_writes(db, writes)
 
 
 def done_mark(before: dict, preview_row: dict, docs: list[dict], actor_id: str | None, now: datetime) -> dict:
@@ -368,17 +457,45 @@ async def _notify(db, tournament: dict, registration: dict, docs: list[dict], re
                           "match_id": doc["id"], "tournament_id": tournament.get("id")})
 
 
-async def apply(db, tournament_id: str, registration_id: str, fingerprint: str | None, actor: dict) -> dict:
+async def _insert(db, docs: list[dict]) -> None:
+    await db.matches_v2.insert_many([dict(doc) for doc in docs])
+
+
+async def _mark_done(db, tournament_id: str, registration_id: str, mark: dict, now: datetime) -> bool:
+    written = await db.tournament_registrations.update_one(
+        {"id": registration_id, "tournament_id": tournament_id, "late_entry.state": OPEN},
+        {"$set": {"late_entry": mark, "updated_at": now.isoformat()}})
+    return bool(written.modified_count)
+
+
+async def conflict_view(db, user: dict, registration: dict) -> dict:
+    """Für die Vorschau (Nr. 187): gehört die Person zum Team? Dann bestätigt eine andere, der Superadmin nur mit Grund."""
+    from services.league_permissions import side_conflict
+
+    conflict = await side_conflict(db, user, registration)
+    return {"own_team": bool(conflict), "superadmin": bool(conflict and conflict.get("override"))}
+
+
+async def apply(db, tournament_id: str, registration_id: str, fingerprint: str | None, actor: dict,
+                conflict_reason: str | None = None) -> dict:
     """Die Spiele aus der Vorschau anlegen - unter der Turnier- und der Season-Sperre (wie beim Zuteilen) und nur, wenn die Vorschau
-    noch dieselbe ist. Wirft ``LateEntryProblem``."""
+    noch dieselbe ist. Befangenheit wie beim Annehmen (Nr. 187): Über das eigene Team entscheidet eine andere Person, der Superadmin
+    nur mit Grund. Erst die Spiele, dann die Markierung mit Bedingung; scheitert sie, fallen die Spiele wieder weg. Wirft
+    ``LateEntryProblem`` bzw. 403."""
     from routes.tournament_common import TOURNAMENT_MUTATION_LOCKED_DETAIL, _is_tournament_locked
     from services.league_final_read import CLOSED_LOCK, is_closed
+    from services.league_permissions import record_override, require_no_side_conflict
     from services.league_scope import ONLY_LEAGUE
     from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock, tournament_write_resource
 
     tournament = await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 0})
     if not tournament:
         raise LateEntryProblem("Staffel nicht gefunden.", 404)
+    first = await db.tournament_registrations.find_one({"id": registration_id, "tournament_id": tournament_id}, {"_id": 0})
+    if not first or not first.get("late_entry"):
+        raise LateEntryProblem(GONE, 404)
+    # Vor allem anderen: Die befangene Person erfährt schnell „nicht du“ (wie im Eingang).
+    await require_no_side_conflict(db, actor, first, conflict_reason=conflict_reason)
     season_id = (tournament.get("league_context") or {}).get("season_id")
     try:
         async with mutation_lock(db, tournament_write_resource(tournament_id)):
@@ -394,35 +511,44 @@ async def apply(db, tournament_id: str, registration_id: str, fingerprint: str |
                 registration = next((row for row in registrations if row["id"] == registration_id), None)
                 if not registration or not registration.get("late_entry"):
                     raise LateEntryProblem(GONE, 404)
+                override = await require_no_side_conflict(db, actor, registration, conflict_reason=conflict_reason)
                 if registration["late_entry"].get("state") != OPEN or not is_active(registration):
                     raise LateEntryProblem(NOT_OPEN, 409)
                 if not has_fixed_plan(matches):
                     raise LateEntryProblem(NO_PLAN, 409)
                 now = _now()
-                row = plan(tournament, registration, registrations, matches, now)
+                row = plan(tournament, registration, registrations, matches, now, await held_registrations(db, tournament_id, now))
                 if not fingerprint or fingerprint != row["fingerprint"]:
                     raise LateEntryProblem(CHANGED, 409)
                 docs = match_docs(tournament, row, matches, registrations, now)
                 mark = done_mark(registration["late_entry"], row, docs, actor.get("id"), now)
-                written = await db.tournament_registrations.update_one(
-                    {"id": registration_id, "tournament_id": tournament_id, "late_entry.state": OPEN},
-                    {"$set": {"late_entry": mark, "updated_at": now.isoformat()}})
-                if not written.modified_count:
-                    raise LateEntryProblem(NOT_OPEN, 409)
                 if docs:
                     try:
-                        await db.matches_v2.insert_many([dict(doc) for doc in docs])
+                        await _insert(db, docs)
                     except Exception:
-                        # Ohne Spiele keine Entscheidung: die Markierung geht zurück, die Leitung versucht es noch einmal.
-                        await db.tournament_registrations.update_one({"id": registration_id}, {"$set": {"late_entry": registration["late_entry"]}})
+                        # Ein Teil kann schon stehen: ohne Markierung keine halben Spiele.
+                        await db.matches_v2.delete_many({"id": {"$in": [doc["id"] for doc in docs]}})
                         raise
+                try:
+                    marked = await _mark_done(db, tournament_id, registration_id, mark, now)
+                except Exception:
+                    marked = None
+                if not marked:
+                    await db.matches_v2.delete_many({"id": {"$in": [doc["id"] for doc in docs]}})
+                    if marked is None:
+                        raise LateEntryProblem(BUSY, 409)
+                    raise LateEntryProblem(NOT_OPEN, 409)
+                if docs:
                     await write_schedule(db, tournament, docs)
     except MutationLockBusy:
         raise LateEntryProblem(BUSY, 409) from None
+    if override:
+        await record_override(db, actor, action="late_entry", target_id=tournament_id, reason=override, registration_id=registration_id)
     await db.audit_logs.insert_one({
         "id": str(uuid.uuid4()), "action": "league.staffel.late_entry", "actor_id": actor.get("id"), "target_id": tournament_id,
         "data": {"tournament_id": tournament_id, "season_id": season_id, "registration_id": registration_id, "from_week": row["from_week"],
-                 "match_ids": [doc["id"] for doc in docs], "missing": [item["opponent_id"] for item in row["missing"]]},
+                 "match_ids": [doc["id"] for doc in docs], "missing": [item["opponent_id"] for item in row["missing"]],
+                 **({"conflict_override": override} if override else {})},
         "created_at": now.isoformat()})
     try:
         await _notify(db, tournament, registration, docs, registrations)
