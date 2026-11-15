@@ -1,9 +1,10 @@
 # Liga leiten – Handbuch
 
 Für die **Liga-Leitung** (und den Obmann der Liga): eine Liga über Wochen aufsetzen, starten und durch die Season
-bringen – am Beispiel der CoD-Liga, Season 1 (Start Di 10.11.2026). Ohne Vorwissen lesbar; was technisch dahinter
-steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es einen eigenen
-[Spickzettel](liga-captains.md), zum Abhaken vor dem Start die [Checkliste für den Obmann](#6-checkliste-für-den-obmann-bis-911).
+bringen – am Beispiel einer CoD-Liga. Ohne Vorwissen lesbar; was technisch dahinter steckt, steht in [LIGA.md](../LIGA.md).
+Zahlen in Beispielen sind Vorgaben einer neuen Season, keine festen Werte: Kalender, Best of, Punkte und Fristen stellt jede
+Season selbst ein, den Starttermin legt der Obmann fest. Für die Captains der Co-Teams gibt es einen eigenen
+[Spickzettel](liga-captains.md), zum Abhaken vor dem Start die [Checkliste vor dem Season-Start](#6-checkliste-vor-dem-season-start).
 
 **Wo im Admin:**
 
@@ -17,7 +18,7 @@ steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es e
 
 Wer was darf: Liga, Season, Liga N, Staffel, Zuteilen, Start und Korrekturen macht nur die **Liga-Leitung mit
 bestätigter Zwei-Faktor-Anmeldung**: wer den Bereich **Ligen** hat oder in dieser Liga **zuständig** ist, siehe
-[2.11](#211-bereich-ligen-und-zuständige). Wo dieses Handbuch und die Oberfläche von „Turnierleitung“ schreiben, ist bei einer
+[2.0](#20-bereich-ligen-und-zuständige). Wo dieses Handbuch und die Oberfläche von „Turnierleitung“ schreiben, ist bei einer
 Liga genau diese Liga-Leitung gemeint. Der Bereich **Turnierleitung allein gibt in der Liga nichts mehr**. Co-Teams, Captain und
 Vertreter pflegt die **Teamleitung** (Leitung oder Co-Leitung des Hauptteams) im Profil. Termine, Melden, Bestätigen und Einspruch
 machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von beiden, die Teamleitung.
@@ -31,7 +32,7 @@ machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von bei
 3. [Während der Season](#3-während-der-season)
 4. [Wenn etwas nicht klappt](#4-wenn-etwas-nicht-klappt)
 5. [Häufige Fragen](#5-häufige-fragen)
-6. [Checkliste für den Obmann bis 9.11.](#6-checkliste-für-den-obmann-bis-911)
+6. [Checkliste vor dem Season-Start](#6-checkliste-vor-dem-season-start)
 
 ---
 
@@ -45,29 +46,26 @@ machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von bei
 | **Staffel** | Staffel A | ein gewöhnliches Turnier im Format Liga mit den Werten der Season – Spiele, Termine, Ergebnisse, Tabelle |
 | **Co-Team** | Nebelwölfe · Rudel | Teilnehmer der Staffel: ein Kader eines Hauptteams mit Captain und Vertreter |
 
-So läuft eine Spielwoche: Die Woche geht von **Dienstag bis Montag**. Die Captains vereinbaren einen Termin – ohne
-Einigung gilt der **Standardtermin** (Season 1: Sonntag 20:00). Nach dem Spiel meldet eine Seite das Ergebnis **im
-Web** mit Maps und hakt einmal an, wer bei ihr gespielt hat (**Teilnehmerliste**, siehe 3.3), die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach **48 Stunden**
-(spätestens am Ende der Spielwoche, mindestens 24 Stunden Zeit). Die Tabelle rechnet in neuen Seasons **3 Punkte für
-einen Sieg, 0 für eine Niederlage, ohne Remis**; bei Punktgleichheit entscheiden der **direkte Vergleich**, dann
-Map-Differenz und gewonnene Maps, zuletzt die Liga-Leitung (siehe 3.5). Alles stellt die Season ein.
+So läuft eine Spielwoche: Eine **Spielwoche** beginnt am Wochentag des Season-Beginns und dauert so viele Tage, wie die Season
+einstellt (Vorgabe 7, etwa Dienstag bis Montag); „Spielwoche 3“ ist dasselbe wie Spieltag 3. Die Captains vereinbaren einen
+Termin – ohne Einigung gilt der **Standardtermin** (Vorgabe Sonntag 20:00). Kurz vor dem Termin checken beide ein (3.1b), hat die
+Season ein Veto, folgt es gleich danach (3.1c). Nach dem Spiel meldet eine Seite das Ergebnis **im Web** mit Maps und hakt einmal
+an, wer bei ihr gespielt hat (**Teilnehmerliste**, siehe 3.3), die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach
+**48 Stunden** (Vorgabe). Die Tabelle rechnet je Season entweder **Sieg, Remis, Niederlage** (Vorgabe 3/0/0, ohne Remis) oder
+**Punkte nach gewonnenen Maps** (3:2 ergibt 3 und 2 Punkte); bei Punktgleichheit entscheidet die eingestellte Reihenfolge,
+etwa der **direkte Vergleich**, dann Map-Differenz und gewonnene Maps, zuletzt die Liga-Leitung (siehe 3.5).
 
-Season 1 im Kalender (10 Wochen, nur Hinrunde, acht Teams = sieben Spieltage):
-
-| Woche | Tage | Spieltag |
-| --- | --- | --- |
-| 1–6 | 10.11.–21.12.2026 | Spieltag 1 bis 6 |
-| 7–8 | 22.12.2026–4.1.2027 | **Weihnachtspause** – keine Spiele |
-| 9 | 5.1.–11.1.2027 | Spieltag 7 |
-| 10 | 12.1.–18.1.2027 | Reserve für Nachholspiele |
+Beispiel: Eine Season mit 10 Wochen, nur Hinrunde und acht Teams hat sieben Spieltage. Liegt eine Pause in Woche 7 und 8, spielen
+die Wochen 1 bis 6 die Spieltage 1 bis 6, Woche 9 den Spieltag 7, und Woche 10 bleibt Reserve für Nachholspiele. Der Reiter
+**Termine** zeigt nach dem Speichern, welche Wochen gesperrt sind und wie viele Teams eine Staffel höchstens fassen kann.
 
 Gesperrt ist eine Woche, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt. Gesperrt sind damit alle Tage
-der Sperrzeit **und** alle Tage einer gesperrten Woche: Am Montag 21.12. (letzter Tag von Woche 6) und am Montag 4.1.
-(letzter Tag von Woche 8) lässt sich kein Termin vorschlagen – Vorschläge wieder ab Di 5.1.
+der Sperrzeit **und** alle Tage einer gesperrten Woche: Auch am letzten Tag einer Woche, die mehrheitlich in der Pause liegt,
+lässt sich kein Termin vorschlagen.
 
-In der Pause **ruhen Termin-, Bestätigungs- und Nachtragsfristen**: Die 48 Stunden zum Bestätigen und zum Nachtragen
-der Aufstellung und die Antwortfrist auf einen Terminvorschlag laufen erst danach weiter. **Das Einspruchsfenster ruht
-nicht** – es bleibt bei 30 Minuten nach dem Ergebnis (nach der 48-Stunden-Regel bis zum Ende der Spielwoche).
+In Sperrzeiten **ruhen die Fristen** der Liga: Termin-Antwortfrist, Bestätigen und Nachtragen der Teilnehmerliste, dazu
+**Protest** (Vorgabe 48 Stunden ab der Bestätigung), **Stellungnahme** und **Einspruch** (je Vorgabe 48 Stunden). Sie laufen
+nach der Pause weiter. Die alte Turnier-Regel „Einspruch 30 Minuten nach dem Ergebnis“ gilt in der Liga nicht (3.4).
 
 Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für Teilnahme und Podest und die Team-Stufe;
 gespielte und gewonnene Spiele zählen weiter. Startseite, öffentlicher Kalender und Turnierliste zeigen die Staffeln nicht –
@@ -215,9 +213,9 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 ### 2.2 Liga und Season anlegen
 
 1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“) und Spiel.
-2. In der Liga **Season anlegen**: nur der **Beginn der ersten Spielwoche** (00:00 Uhr Wiener Zeit, Season 1:
-   10.11.2026). Die übrigen Vorgaben kommen als Startwerte mit.
-3. Die Season öffnen. Die Season-Seite hat sieben **Reiter**; jede Angabe steht an genau einer Stelle. Am Handy wischst du die
+2. In der Liga **Season anlegen**: nur der **Beginn der ersten Spielwoche** (00:00 Uhr Wiener Zeit). Die übrigen Vorgaben
+   kommen als Startwerte mit. Gibt es schon eine abgeschlossene Season, legst du die nächste besser aus ihr an (3.11).
+3. Die Season öffnen. Die Season-Seite hat zwölf **Reiter**; jede Angabe steht an genau einer Stelle. Am Handy wischst du die
    Reiterleiste seitlich. Jeder Reiter speichert für sich (**Termine speichern**, **Tabelle speichern** …) und schickt nur seine
    eigenen Felder. Was noch nicht gespeichert ist, trägt am Reiter einen **Punkt** und bleibt beim Wechsel erhalten; die Seite fragt
    dann einmal, ob du **jetzt speichern** willst. Verlässt du die Seite mit Ungespeichertem, fragt sie nach.
@@ -225,12 +223,17 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 | Reiter | Was dort steht | Adresse |
 | --- | --- | --- |
 | **Überblick** | Ablauf der Season, **Was fehlt noch?**, Name, Sichtbarkeit, Stand, Gestaltung und Gewinne | `…/seasons/<id>` |
-| **Spielbetrieb** | Modi der Season mit Maps, Mindestgröße, Ergebnisregeln, Serie (Best of, Teamgröße, Modus je Map, Map-Wiederholung), Fristen nach dem Spiel | `#spielbetrieb` |
-| **Termine** | Kalender, Standardtermin, Sperrzeiten, Antwortfrist, Terminregeln (2.7a) | `#termine` |
+| **Leitstand** | alles Offene der Season, Protokoll, Rundnachricht (3.0) | `#leitstand` |
+| **Spielbetrieb** | Modi der Season mit Maps, Mindestgröße, Ergebnisregeln, Serie (Best of, Teamgröße, Modus je Map, Map-Wiederholung), Fristen nach dem Spiel, Check-in (2.7b), Veto (2.7d), Vorfälle (2.7e) | `#spielbetrieb` |
+| **Termine** | Kalender, Standardtermin, Sperrzeiten, Antwortfrist, Terminregeln (2.7a), Erinnerungen (2.7f) | `#termine` |
 | **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7c), Eingang der Anmeldungen, Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#kader` |
 | **Tabelle** | Punkte, Gleichstand, Ausscheiden, Gleichstände der Staffeln (3.5) | `#tabelle` |
+| **Proteste** | Eingang der Verfahren und ihre Fristen (3.4) | `#proteste` |
+| **Strafen** | verhängen, bestätigen, widerrufen, Einsprüche (3.4a) | `#strafen` |
 | **Regelwerk und Sperrliste** | Stand des Regelwerks mit Weg dorthin (2.11), Sperrliste (2.1a) | `#regelwerk`, `#sperrliste` |
-| **Ligen und Staffeln** | Liga 1, 2 …, Staffeln, Staffelgröße, Vorgaben übertragen (2.3, 2.7) | `#ligen` |
+| **Ligen und Staffeln** | Liga 1, 2 …, Staffeln, Staffelgröße, Vorgaben übertragen, Auf- und Abstieg (2.3, 2.7, 3.11) | `#ligen` |
+| **Belohnungen** | Banner, Emblem, Medaille, Titel je Platz (3.12) | `#belohnungen` |
+| **Abschluss** | Checkliste je Staffel, Endstand, Wiederöffnen (3.10) | `#abschluss` |
 
 <table>
 <tr>
@@ -288,9 +291,9 @@ Mit **Verlängerung** dürfen Ziel und Rundenlimit überschritten werden. Ein Gl
 Map braucht trotzdem einen Sieger. Ohne Regel prüft die Meldung den Endstand nicht. Seasons von vor dieser Funktion haben
 keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier speicherst.
 
-**Die Werte für Season 1** in den übrigen Reitern:
+**Vorgaben einer neuen Season** in den übrigen Reitern – was die Tiroler Liga tatsächlich spielt (etwa Best of 5, Punkte nach gewonnenen Maps), trägt der Obmann laut Regelwerk ein:
 
-| Reiter | Feld | Season 1 |
+| Reiter | Feld | Vorgabe |
 | --- | --- | --- |
 | Spielbetrieb | **Best of** · **Teamgröße (je Map)** | Best of 3 · 4 |
 | | **Modus je Map** | nach Regelwerk |
@@ -299,15 +302,15 @@ keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier sp
 | Termine | **Wochen gesamt** (mit Sperrwochen) | 10 |
 | | **Spielwoche (Tage)**, **Standardtag**, **Standardzeit** | 7 · Sonntag · 20:00 |
 | | **Runden** | Nur Hinrunde |
-| | **Sperrzeiten** (Von, Bis, Bezeichnung) | 21.12.2026–3.1.2027 „Weihnachtspause“ |
+| | **Sperrzeiten** (Von, Bis, Bezeichnung) | keine; etwa „Weihnachtspause“ eintragen |
 | | **Antwort auf Terminvorschlag (Stunden)** – leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
-| Anmeldung und Kader | **Anmeldung ab / bis**, **Startplätze** … (2.5a) | nach Plan |
+| Anmeldung und Kader | **Anmeldung ab / bis**, **Startplätze** … (2.5a) | leer (ohne Selbstanmeldung) |
 | | **Meldeschluss** (nur Anzeige) – nur ohne Anmeldefenster, sonst gilt „Anmeldung bis“ | – |
 | | **Mindestkader** · **Höchstkader** · **Mindestalter (Jahre)** · **Wartezeit neuer Spieler (Tage)** | 3 · 50 · 18 · 7 |
 | | **Wer gespielt hat**, **Mindestens auf der Liste** | Teilnehmerliste einmal je Spiel, 3 |
 | | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
 | | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
-| | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7c) | nach Regelwerk |
+| | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7c) | keine Vorgabe |
 | Tabelle | **Punkteart**: *Sieg, Remis, Niederlage* oder *Punkte nach gewonnenen Maps* (3:2 ergibt 3 und 2) | Sieg, Remis, Niederlage |
 | | **Punkte Sieg / Remis / Niederlage** – nur bei *Sieg, Remis, Niederlage* | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
 | | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
@@ -333,7 +336,7 @@ Ausscheiden gelten wie in der Season.
 <img src="../assets/liga/liga-season-mappunkte-pc.png" alt="Reiter Tabelle mit Punkteart Punkte nach gewonnenen Maps, darunter die vorgeschlagene Reihenfolge Mehr Siege, Direkter Vergleich, Map-Differenz, Entscheid der Leitung und das gesperrte Feld Kampflos" width="560">
 
 Im Reiter **Termine** steht unter den Sperrzeiten nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel
-höchstens fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
+höchstens fassen kann** (etwa: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
 <table>
 <tr>
@@ -443,12 +446,12 @@ Teilst du ein Co-Team mit offener Anmeldung über 2.5 direkt zu, gilt die Anmeld
 
 ### 2.6 Spielplan und Start
 
-Oben in der Turnierverwaltung der Staffel: **Liga starten**. Damit wird der Spielplan fest (Season 1 mit acht Teams:
-sieben Spieltage zu je vier Spielen, Heimrecht ausgeglichen, Spieltag 7 nach der Weihnachtspause in Woche 9) und die
-Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen und melden. Mit der ersten Staffel springt
+Oben in der Turnierverwaltung der Staffel: **Liga starten**. Damit wird der Spielplan fest (etwa acht Teams: sieben Spieltage
+zu je vier Spielen, Heimrecht ausgeglichen, gesperrte Wochen werden übersprungen) und die Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen und melden. Mit der ersten Staffel springt
 die Season von *Entwurf* auf *Läuft*, ein von Hand gesetzter Stand bleibt.
 
-- Kein **Check-in** und keine Anmeldung – die Co-Teams sind zugeteilt, niemand checkt ein. Die Status-Auswahl oben
+- Kein **Turnier-Check-in** und keine Turnier-Anmeldung – die Co-Teams sind zugeteilt. Eingecheckt wird je Spiel auf der
+  Matchseite (2.7b, 3.1b), angemeldet über die Season (2.5a). Die Status-Auswahl oben
   bietet für eine Staffel nur Entwurf, Live, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt.
 - Den Spielplan vor dem Start ansehen: Reiter **Matchplan** (Vorschau mit Spielwochen) bzw. **Spiele**. Der Reiter
   **Tabelle** führt zur Tabelle und zum Spielplan auf der öffentlichen Seite. Neu mischen: **Werkzeuge → Vorschau neu
@@ -744,7 +747,7 @@ Turnierverwaltung ein eigenes Banner bekommen, bleibt das stehen.
 
 **Gewinne sind reine Anzeige:** Staffeln zählen weiter nicht für XP, Pokale oder die Jahreswertung.
 
-### 2.11 Bereich Ligen und Zuständige
+### 2.0 Bereich Ligen und Zuständige
 
 **Einmal nach dem Update (nur der Superadmin):** Die Rolle Turnierleitung und die Freigabe „Turnierleitung“ öffnen die Liga nicht
 mehr. Superadmin und Club-Admin haben den Bereich **Ligen** von selbst, alle anderen bekommen ihn einzeln. Nichts geschieht
@@ -1019,7 +1022,7 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
   den Hinweis auf @leitung im Matchchat.
 - **Termin festlegen:** Mit „Spiele betreuen“ steht auf der Matchseite **Termin festlegen (Liga-Leitung)** mit Pflichtgrund.
   Er gilt sofort, offene Anträge sind damit erledigt, beide Seiten bekommen eine Nachricht. Im eigenen Spiel legt ihn eine
-  zweite Person fest (Befangenheit, 2.11); der Superadmin nur als Notausnahme mit Grund im Matchplan.
+  zweite Person fest (Befangenheit, 2.0); der Superadmin nur als Notausnahme mit Grund im Matchplan.
 - **Verlauf:** Jede Änderung steht unter **Verlauf** – Einigung, 72-h-Regel, Standardtermin, Verschiebung, Liga-Leitung,
   mit Person und Grund. Sehen können ihn nur die beiden Seiten und die Leitung.
 - **Überfällig:** Ist ein Spiel nach dem Termin nie gemeldet, erinnert die Seite beide Seiten (Vorgabe nach 24 Stunden);
@@ -1056,7 +1059,7 @@ Mit dem Kasten aus 2.7b läuft jedes Spiel so, alles auf der **Matchseite** im B
   Leitungsansicht der Staffel. Dort entscheidet ihr: **<Team> nicht erschienen** (kampflos über den bekannten Weg, Teamstrafe wie in
   3.2), **+5 Min. verlängern** (das Fenster geht wieder auf) – oder ihr tragt die Seite auf der Matchseite unter **Für eine Seite
   eintragen (Liga-Leitung)** mit Grund nach, etwa wenn der Captain ohne Netz anruft; dann ist der Vorschlag erledigt. Im eigenen
-  Spiel macht das eine zweite Person (Befangenheit, 2.11).
+  Spiel macht das eine zweite Person (Befangenheit, 2.0).
 - **Ohne Check-in** (ältere Season oder Kasten nie gespeichert) bleibt alles wie vorher: kein Vorschlag, „Ergebnis fehlt“ meldet
   sich, ihr wertet von Hand.
 
@@ -1094,7 +1097,7 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
 - **Eingriff der Leitung** (Zuständigkeit „Spiele betreuen“, nur mit Grund, alles im Protokoll und für beide Seiten sichtbar):
   **Pausieren** (die Restzeit bleibt stehen), **Fortsetzen**, **Letzten Schritt zurück** (ein automatischer Decider geht mit dem Zug davor),
   **Neu starten** (Team A bleibt, ein Los wird nicht neu gezogen). Nach dem Start von Map 1 ändert sich am Veto nichts mehr. Im eigenen
-  Spiel macht das eine zweite Person (Befangenheit, 2.11).
+  Spiel macht das eine zweite Person (Befangenheit, 2.0).
 - **Neuer Termin:** Jeder neue Termin (auch zurück auf den alten, auch „Neu ansetzen“) setzt Check-in und Veto zurück – nach erneutem
   Check-in beider Seiten beginnt das Veto von vorn.
 - **Gesperrte Staffel:** Solange die Staffel gesperrt ist, läuft nichts weiter – kein Start, keine Zufallswahl, kein Zug; nach dem
@@ -1120,7 +1123,7 @@ Mit dem Kasten aus 2.7d läuft nach dem Check-in das Map-Veto – auf der **Matc
      eurem Speichern von selbst.
 - **Notfall: Veto starten (Liga-Leitung).** Kann eine Seite nicht selbst tippen (etwa Captain ohne Netz), startet ihr das wartende
   Veto im Kasten darunter: **Grund** eintragen (Pflicht), **Veto jetzt starten**. Das braucht „Spiele betreuen“, steht mit Grund im
-  Protokoll, und im eigenen Spiel macht es eine zweite Person (Befangenheit, 2.11).
+  Protokoll, und im eigenen Spiel macht es eine zweite Person (Befangenheit, 2.0).
 
 <img src="../assets/liga/veto-mit-vorgabe-390.png" alt="Matchseite am Handy im Veto: über dem Brett der Block Vorgabe der Woche mit der Map Kaimauer für Kontrolle als Map 3, im Brett steht sie als Vorgabe der Woche, bei der Auswahl zum Sperren ist sie ausgegraut" width="300"> <img src="../assets/liga/veto-vorgabe-fehlt-390.png" alt="Matchseite am Handy: Veto wartet auf die Vorgabe der Woche, darunter der Satz für welche Spielwoche und welchen Modus sie fehlt und der Hinweis, dass nichts von selbst gewertet wird" width="300"> <img src="../assets/liga/veto-bereit-wartet-390.png" alt="Matchseite am Handy nach dem Nachtragen: Vorgabe steht – bereit zum Veto?, die eigene Seite ist bereit und wartet auf die Gegenseite, darunter der Knopf Doch nicht bereit und der Hinweis, dass erst ab dem Start die Zeit läuft" width="300">
 
@@ -1169,7 +1172,7 @@ Fliegt jemand aus der Lobby, braucht es einen Rehost oder eine Pause, melden die
   erschienen“ und „Beide nicht erschienen“ ab und sagt, zu welcher Map der Vorfall offen ist. Entscheidet zuerst oder schließt
   ihn. Endet ein Spiel auf anderem Weg (abgesagt, archiviert), schließt die Seite offene Vorfälle von selbst und ohne Nachricht;
   „in Klärung“ verschwindet dann überall.
-- **Im eigenen Spiel** entscheidet eine zweite berechtigte Person (Befangenheit, 2.11); die Seite sagt das. Der Superadmin kann nur
+- **Im eigenen Spiel** entscheidet eine zweite berechtigte Person (Befangenheit, 2.0); die Seite sagt das. Der Superadmin kann nur
   als Notausnahme mit Grund.
 - **Ergebnis eintragen** geht, sobald kein Vorfall mehr offen ist (weder „wartet auf Antwort“ noch „in Klärung“) – die Seite nennt
   sonst den Grund. Ist entschieden, aber die Serie noch nicht festgestellt, stellt euer eingetragenes Ergebnis sie fest: Am
@@ -1231,7 +1234,7 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 - **Eingang**: Season → Reiter **Proteste** zeigt alle Verfahren der Season, offene zuerst, mit Zuständiger und
   Restzeit. **Zum Spiel** öffnet die Matchseite mit der Karte des Verfahrens. Dafür braucht es die Zuständigkeit
   **Proteste**; wer am Spiel beteiligt ist, sieht im Eingang nur, dass etwas läuft
-  ([2.11](#211-bereich-ligen-und-zuständige)).
+  ([2.0](#20-bereich-ligen-und-zuständige)).
 
   <img src="../assets/liga/protest-eingang-1440.png" alt="Reiter Proteste der Season am PC: Eingang der Verfahren mit Protest, Beanstandung und entschiedenem Einspruch, je mit Stand, Zuständiger und dem Link Zum Spiel; darunter die Einstellungen" width="760">
 
@@ -1267,7 +1270,7 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
   wie die Meldung der Captains. Passt ein Endstand wirklich nicht zur Regel (etwa nach einem Absturz), darf die
   **Liga-Leitung mit der Zuständigkeit „Ergebnisse“** sie übergehen: im Ergebnis-Fenster **Ergebnisregel übergehen
   (Liga-Leitung, mit Grund)** einen Grund eintragen (mindestens fünf Zeichen). Best of, Map-Pool und Aufstellung gelten
-  trotzdem; der Grund steht im Protokoll. Im eigenen Spiel entscheidet eine zweite Person (2.11), der Superadmin nur als
+  trotzdem; der Grund steht im Protokoll. Im eigenen Spiel entscheidet eine zweite Person (2.0), der Superadmin nur als
   Notausnahme mit Grund. Captains können eine Regel nie übergehen.
 - **Wiederholte und zugesprochene Maps**: Über die Schnittstelle kann eine Map als **wiederholt** (mit Grund) markiert
   oder von der Leitung **zugesprochen** werden (ohne Punkte, ohne Regel). Die Matchseite zeigt beides an der Map; nach
@@ -1276,7 +1279,7 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 ### 3.4a Strafen (Regelwerk § 13, Anlage C)
 
 Wettbewerbsstrafen stehen im Reiter **Strafen** der Season (Admin → Liga → Season). Dafür braucht es die Zuständigkeit
-**Strafen** ([2.11](#211-bereich-ligen-und-zuständige)). Nichts davon passiert von selbst: Jede Strafe wählt und
+**Strafen** ([2.0](#20-bereich-ligen-und-zuständige)). Nichts davon passiert von selbst: Jede Strafe wählt und
 begründet ihr von Hand. Verwarnungen der Community-Moderation (Chat, Verhalten) sind etwas anderes und stehen nicht hier.
 
 <img src="../assets/liga/strafen-reiter-1440.png" alt="Reiter Strafen der Season am PC: oben die Zahl der laufenden Strafen und der Knopf Strafe verhängen, darunter eine Spielsperre mit Stand Gilt, Regelverstoß, Begründung, Zeitraum 1 Liga-Spiel und dem Knopf Widerrufen sowie ein Punktabzug mit laufender Einspruchsfrist" width="760">
@@ -1683,8 +1686,8 @@ die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
 | „Das Spiel bleibt, sobald eine Season eine Staffel hat …“ | Spiel einer Liga mit Staffel ändern | Neue Liga anlegen, die alte archivieren |
 | „Die Adresse bleibt, seit eine Season der Liga sichtbar war …“ | Adresse nach der Veröffentlichung ändern | Adresse lassen; nur der Name ändert sich || „Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel …“ | Teamleitung will ihr Co-Team abmelden | Bei der Turnierleitung melden |
 | Ligaseite zeigt „Liga nicht gefunden“ | Sichtbarkeit *Aus* oder *Nur Liga-Leitung* | Sichtbarkeit der Season ändern und speichern |
-| „Dafür fehlt dir das Recht in dieser Liga …“ | Bereich Turnierleitung allein oder falsche Zuständigkeit | Superadmin vergibt den Bereich Ligen, der Bereich Ligen die Zuständigkeit – [2.11](#211-bereich-ligen-und-zuständige) |
-| „Du bist an diesem Spiel selbst beteiligt …“ | Eigenes Spiel | Eine zweite berechtigte Person entscheidet; Superadmin nur mit Grund – [2.11](#211-bereich-ligen-und-zuständige) |
+| „Dafür fehlt dir das Recht in dieser Liga …“ | Bereich Turnierleitung allein oder falsche Zuständigkeit | Superadmin vergibt den Bereich Ligen, der Bereich Ligen die Zuständigkeit – [2.0](#20-bereich-ligen-und-zuständige) |
+| „Du bist an diesem Spiel selbst beteiligt …“ | Eigenes Spiel | Eine zweite berechtigte Person entscheidet; Superadmin nur mit Grund – [2.0](#20-bereich-ligen-und-zuständige) |
 | „Bitte im Web mit Maps und Aufstellung melden.“ | Erstmeldung oder abweichende Meldung aus der App | Im Web auf der Matchseite melden |
 | „In dieser Zeit wird nicht gespielt (Weihnachtspause, 21.12.2026 bis 3.1.2027) …“ | Termin in einer Sperrzeit | Anderen Termin vorschlagen |
 | „Deine Maps, Modi oder Sieger weichen von der Meldung der Gegenseite ab …“ | Bestätigung passt nicht | Einspruch über **Problem melden**; die Turnierleitung entscheidet |
@@ -1719,7 +1722,8 @@ Nein. Mit sechs Teams gibt es fünf Spieltage, die übrigen Wochen sind Reserve.
 Team spielfrei.
 
 **Kann ein Spieler in zwei Co-Teams stehen?**
-Im Kader ja, aber nicht am selben Spieltag in zwei Aufstellungen derselben Season.
+In derselben Season nur, wenn **Ein Team je Season** aus ist (Vorgabe an, 3.9): Dann geht ein Wechsel nur als Transfer mit
+Wartezeit. In verschiedenen Ligen darf jemand für verschiedene Teams spielen. Am selben Spieltag spielt niemand für zwei Teams.
 
 **Was, wenn ein Team nicht antritt?**
 Mit Check-in (3.1b) kommt nach dem Fenster der Vorschlag „Nicht erschienen?“ an euch – ihr wertet kampflos, tragt die Seite
@@ -1727,7 +1731,8 @@ nach oder verlängert; von selbst wertet der Server nie. Ohne Check-in wertet ih
 der fehlenden Seite), ein Vorschlag entsteht dann nicht (3.2).
 
 **Zählt die Aufstellung für die Tabelle?**
-Nein, nur das Ergebnis. Die Aufstellung ist für Doppel-Einsatz und spätere Statistik da.
+Nein, nur das Ergebnis. Die Teilnehmerliste zählt für den Doppel-Einsatz, die Spieler-Belohnungen (3.12) und die
+Spielerwertung der Gesamtwertung (3.13): Wer nicht darauf steht, hatte keinen Einsatz.
 
 **Ein Spieler hat eine neue Activision-ID – darf er damit spielen?**
 Erst nach eurer Freigabe (3.7). Bis dahin spielt er mit der gemeldeten ID; aufstellbar bleibt er.
@@ -1737,28 +1742,29 @@ Erst nach eurer Freigabe (3.7). Bis dahin spielt er mit der gemeldeten ID; aufst
 
 ---
 
-## 6. Checkliste für den Obmann bis 9.11.
+## 6. Checkliste vor dem Season-Start
 
-Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
+Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Abschnitt von oben. Die Werte stehen im Regelwerk; die Season prüft
+vor der Veröffentlichung selbst, was fehlt (**Was fehlt noch?**, 2.8).
 
-- [ ] **Bereich Ligen** an alle vergeben, die die Liga leiten; Zuständige eingetragen – 2.11
-- [ ] **Modi** des Spiels angelegt (Stellung, Suchen & Zerstören, Kontrolle) – 2.1
-- [ ] **Maps** in der Bibliothek, je mit **Bild** und den richtigen **Modi** – 2.1
-- [ ] **Season 1**: Beginn 10.11.2026, 10 Wochen, **Weihnachtspause** 21.12.–3.1., nur Hinrunde, Meldeschluss 6.11. – 2.2
-- [ ] **Best of 3**, **Teamgröße 4**, Mindestkader, **Modus je Map** laut Regelwerk, Punkte 3/1/0 – 2.2
-- [ ] **Regelwerk** veröffentlicht, Bausteine für Map-Pool und Modusfolge gesetzt – 2.11
-- [ ] **Map-Pool der Season** gespeichert – 2.2
-- [ ] **Ausrüstung** in der Bibliothek, **Sperrliste der Season** gespeichert und als Baustein im Regelwerk – 2.1a
-- [ ] **Prüfung vor der Veröffentlichung** ohne Probleme – 2.8
-- [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
-- [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4
-- [ ] Jeder im Kader hat die **Activision-ID** im Profil; Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** zeigt niemanden „ohne ID“,
-      Stichtag für neue Spieler entschieden – 3.7
-- [ ] Je Co-Team **Captain** und **Vertreter** vergeben – 2.4
-- [ ] Alle Co-Teams **zugeteilt** (Teilnehmer: 8 von 8) – 2.5
-- [ ] Season gespeichert und, falls nach dem Anlegen der Staffel etwas geändert wurde, **Vorgaben übertragen** – 2.7
-- [ ] Ligaseite mit *Nur Liga-Leitung* geprüft: Teams, Wochen mit Weihnachtspause, Pool, Regeln – 2.8
-- [ ] **Liga starten** (Spielplan fest, sieben Spieltage) – 2.6
-- [ ] **Am 10.11.:** Sichtbarkeit auf **Öffentlich**, **Überblick speichern** – 2.8
-- [ ] **Discord-Ankündigung von Hand** (die Liga meldet sich noch nicht selbst): Link zur Ligaseite, Start, Ablauf,
+- [ ] **Bereich Ligen** an alle vergeben, die die Liga leiten; Zuständige je Liga eingetragen – 2.0
+- [ ] **Modi** des Spiels mit Ergebnisregel und Symbol, **Maps** mit Bild und Modi in der Bibliothek – 2.1
+- [ ] **Ausrüstung** in der Bibliothek, **Sperrliste der Season** gespeichert – 2.1a
+- [ ] **Season** angelegt (aus der Vorgängerin, falls es eine gibt – 3.11): Beginn, Wochen, Sperrzeiten, Runden – 2.2
+- [ ] **Spielbetrieb:** Best of, Teamgröße, **Modus je Map**, Map-Pool, Ergebnisregeln, Punkte je Map Pflicht – 2.2
+- [ ] **Check-in** (Fenster, Mindestzahl), **Veto-Vorlage** und, falls die Vorlage es verlangt, die **Vorgabe der Woche** – 2.7b, 2.7d
+- [ ] **Vorfälle und Pausen**, **Termine und Verschiebungen**, **Erinnerungen** (Discord-Direktnachricht an oder aus) – 2.7e, 2.7a, 2.7f
+- [ ] **Anmeldung und Kader:** Kadergrenzen, Mindestalter, Wartezeit, Plattform, Transferfenster – 3.9, 2.7c
+- [ ] **Tabelle:** Punkteart, Reihenfolge bei Punktgleichheit, Kampflos, Ausscheiden – 2.2, 3.5
+- [ ] **Proteste:** Fristen, Gründe, Zielfrist der Leitung; Strafkatalog im Regelwerk – 3.4, 3.4a
+- [ ] **Belohnungen** festgelegt, falls es welche gibt – 3.12
+- [ ] **Selbstanmeldung:** Fenster, Startplätze, Warteliste, automatisch annehmen ja oder nein, **Hinweis zum Datenschutz** mit dem
+      freigegebenen Wortlaut für externe Teilnehmer – 2.5a
+- [ ] **Regelwerk** mit allen Bausteinen veröffentlicht, Zustimmung verlangt – 2.11
+- [ ] **Liga 1** (und weitere) mit **Staffeln** angelegt – 2.3
+- [ ] **Prüfung vor der Veröffentlichung** ohne Probleme, Ligaseite mit *Nur Liga-Leitung* angesehen – 2.8
+- [ ] Sichtbarkeit auf **Öffentlich** oder **Nur Mitglieder**, damit die Anmeldung erreichbar ist – 2.8
+- [ ] Anmeldungen entschieden und **zugeteilt**; jeder im Kader hat Konto, Spiel-ID und Plattform (Kasten **Offene Punkte**) – 2.5a, 3.7
+- [ ] **Liga starten** je Staffel (Spielplan fest) – 2.6
+- [ ] **Ankündigung von Hand** auf Discord (die Liga postet nicht selbst in einen Kanal): Link zur Ligaseite, Start, Ablauf,
       [Spickzettel für Captains](liga-captains.md)
