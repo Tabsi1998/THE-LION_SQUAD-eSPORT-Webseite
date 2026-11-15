@@ -13,7 +13,7 @@ import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
 import { ViewTransitions } from "@/components/tls/ViewTransitions";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
-import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
+import { CeremonySlot } from "@/components/achievements/ceremony/CeremonySlot";
 import { RewardWatcher } from "@/components/tls/rewards/RewardWatcher";
 import { BallotPopup } from "@/components/tls/BallotPopup";
 import { CalendarHintHost } from "@/components/calendar/CalendarHintHost";
@@ -276,7 +276,7 @@ function App() {
             <OptionalBoundary quiet><AchievementCatchUp /></OptionalBoundary>
             {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
             <OptionalBoundary quiet><SignalSync /></OptionalBoundary>
-            <OptionalBoundary><CeremonyHost /></OptionalBoundary>
+            <OptionalBoundary><CeremonySlot /></OptionalBoundary>
             {/* Belohnungen der Liga (F.4, #2214): noch nicht gefeierte reiht sie still in die Zeremonie ein. */}
             <OptionalBoundary quiet><RewardWatcher /></OptionalBoundary>
             {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht als Popup auf jeder Seite, nie im Admin. */}
