@@ -15,8 +15,10 @@ jest.mock("../SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
 const { CLICKS_KEY, SNOW_KING_AT, SNOW_SIGNAL, SnowSky, SnowflakeWidget, skyBudget, snowShare } = require("./index");
 
+// Die Saison läuft im Test immer noch (Ende in 30 Tagen): mit festem Ende blendete der Schnee ab dem 6.1.2027 aus. Der Beginn bleibt
+// fest, er bestimmt das Saisonjahr der Würfel.
 function snowSeason(effective = "normal") {
-  return { key: "snow", label: "Schneefall", phase: "schnee", intensity: "normal", effective, channels: ["app"], texts: {}, data: {}, starts_at: "2026-11-29T00:00:00+01:00", ends_at: "2027-01-06T23:59:59+01:00", forced: false };
+  return { key: "snow", label: "Schneefall", phase: "schnee", intensity: "normal", effective, channels: ["app"], texts: {}, data: {}, starts_at: "2026-11-29T00:00:00+01:00", ends_at: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(), forced: false };
 }
 
 function visible() {

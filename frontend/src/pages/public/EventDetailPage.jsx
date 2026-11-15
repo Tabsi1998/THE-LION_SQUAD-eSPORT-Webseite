@@ -393,10 +393,11 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
             <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
             {!!e.tournaments?.length && (
-              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+              <div className="mt-1 flex flex-wrap gap-x-5">
+                {/* Tippfläche mindestens 44 px (#1155), auch wenn ein langer Name am Handy zweizeilig umbricht. */}
                 {e.tournaments.map((t) => (
-                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
-                    <Trophy className="w-3.5 h-3.5" /> {t.title}
+                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
+                    <Trophy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {t.title}
                   </Link>
                 ))}
               </div>
