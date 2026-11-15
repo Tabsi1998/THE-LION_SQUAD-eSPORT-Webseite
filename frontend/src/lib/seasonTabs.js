@@ -48,6 +48,8 @@ export const SEASON_SECTIONS = {
   spielberechtigung: "anmeldung",
   plattform: "anmeldung",
   anmeldungen: "anmeldung",
+  // Nachmeldungen (#2422): Spiele für Teams, die nach dem Start in eine Staffel kamen.
+  nachmeldungen: "anmeldung",
   kader: "anmeldung",
   punkte: "tabelle",
   gleichstand: "tabelle",
@@ -82,7 +84,7 @@ const READINESS_ANCHORS = {
   // Vorgabe der Woche (#2326): die Wochen ohne Map stehen im selben Kasten.
   veto_preset_missing: "veto",
   rules_missing: "regelwerk", rules_upcoming: "regelwerk",
-  application_none: "selbstanmeldung", application_after_start: "selbstanmeldung", application_closed: "selbstanmeldung",
+  application_none: "selbstanmeldung", application_after_start: "selbstanmeldung", application_late_cap: "selbstanmeldung", application_closed: "selbstanmeldung",
   divisions_missing: "staffeln", staffel_missing: "staffeln",
 };
 
@@ -105,7 +107,7 @@ export const TAB_FIELDS = {
   termine: ["start_day", "weeks_total", "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs", "blocked_periods",
     "match_schedule_response_hours"],
   anmeldung: ["application_opens", "application_closes", "application_slots", "application_waitlist", "application_waitlist_limit",
-    "application_waitlist_note", "application_privacy_text", "entry_policy", "sibling_squads_in_staffel", "application_auto_accept", "had_application", "registration_deadline",
+    "application_waitlist_note", "application_privacy_text", "entry_policy", "sibling_squads_in_staffel", "application_auto_accept", "late_registration_days", "had_application", "registration_deadline",
     "min_squad_size", "max_squad_size", "had_rules", "one_team_per_season", "new_player_wait_days", "min_age", "unique_game_ids", "lineup_mode",
     "lineup_min_players", "transfer_windows", "platform_field", "allowed_platforms", "crossplay", "input_device"],
   tabelle: ["match_points_mode", "points_win", "points_draw", "points_loss", "table_tiebreakers", "head_to_head_criteria", "allow_draws", "forfeit_score", "exit_rule",
@@ -122,7 +124,7 @@ export const TAB_PAYLOAD_KEYS = {
   termine: ["start_date", "weeks_total", "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs", "blocked_periods",
     "match_schedule_response_hours"],
   anmeldung: ["application_opens_at", "application_closes_at", "application_slots", "application_waitlist", "application_waitlist_limit",
-    "application_waitlist_note", "application_privacy_text", "entry_policy", "sibling_squads_in_staffel", "application_auto_accept", "registration_deadline",
+    "application_waitlist_note", "application_privacy_text", "entry_policy", "sibling_squads_in_staffel", "application_auto_accept", "late_registration_days", "registration_deadline",
     "min_squad_size", "max_squad_size", "one_team_per_season", "new_player_wait_days", "min_age", "unique_game_ids", "lineup_mode",
     "lineup_min_players", "transfer_windows", "platform_field", "allowed_platforms", "crossplay", "input_device"],
   tabelle: ["scoring_rules"],

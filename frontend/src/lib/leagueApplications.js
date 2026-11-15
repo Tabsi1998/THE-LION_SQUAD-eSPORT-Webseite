@@ -67,6 +67,34 @@ export function afterStartLine(closesAt, startAt) {
   return `Anmeldung läuft nach Season-Start weiter (bis ${when(closes)}).`;
 }
 
+/** Vorgabe der Nachmeldefrist (#2422, Nr. 184) - dieselbe wie auf dem Server (services/league_late.DEFAULT_DAYS). */
+export const LATE_DAYS_DEFAULT = 14;
+
+/**
+ * Das wirksame Ende der Anmeldung (#2422, Nr. 184): min(Ende des Fensters, Start + Frist), mit Verlängerung der Leitung deren Ende.
+ * Endet das Fenster vor dem Start, bleibt es beim Fenster. Gibt ein Date zurück oder null.
+ */
+export function effectiveCloses(closesAt, startAt, days, extensionUntil) {
+  if (!closesAt) return null;
+  const closes = asInstant(closesAt);
+  if (Number.isNaN(closes.getTime())) return null;
+  const start = startAt ? asInstant(startAt) : null;
+  if (!start || Number.isNaN(start.getTime()) || closes <= start) return closes;
+  const parsed = days === "" || days == null ? LATE_DAYS_DEFAULT : Number(days);
+  const span = Number.isFinite(parsed) && parsed >= 0 ? parsed : LATE_DAYS_DEFAULT;
+  const cap = extensionUntil ? asInstant(extensionUntil) : new Date(start.getTime() + span * 86400000);
+  return Number.isNaN(cap.getTime()) || closes <= cap ? closes : cap;
+}
+
+/** Hinweis in der Verwaltung, wenn die Frist die Anmeldung früher schließt als das Fenster. */
+export function lateCapLine(closesAt, startAt, days, extensionUntil) {
+  const effective = effectiveCloses(closesAt, startAt, days, extensionUntil);
+  if (!effective || !closesAt || effective >= asInstant(closesAt)) return "";
+  return extensionUntil
+    ? `Verlängert bis ${when(effective)}. Danach schließt die Anmeldung, auch wenn das Fenster länger eingestellt ist.`
+    : `Die Anmeldung schließt am ${when(effective)}, auch wenn das Fenster länger eingestellt ist.`;
+}
+
 /** Startplätze für die Ligaseite - ohne Grenze kein Satz. */
 export function seatsLine(block) {
   if (!block?.slots) return "";
@@ -113,6 +141,8 @@ export function applicationToForm(season = {}) {
     entry_policy: season.entry_policy || "all",
     sibling_squads_in_staffel: Boolean(season.sibling_squads_in_staffel),
     application_auto_accept: Boolean(season.application_auto_accept),
+    // Nachmeldefrist (#2422): leer heißt Vorgabe (14 Tage nach dem Start).
+    late_registration_days: text(season.late_registration_days),
     // Seasons von vor #2205 tragen die Felder nicht. Niemand hat sie angefasst: Dann geht auch nichts mit.
     had_application: season.entry_policy != null || season.application_opens_at != null,
   };
@@ -133,5 +163,6 @@ export function applicationPayload(form) {
     entry_policy: form.entry_policy || "all",
     sibling_squads_in_staffel: Boolean(form.sibling_squads_in_staffel),
     application_auto_accept: Boolean(form.application_auto_accept),
+    late_registration_days: number(form.late_registration_days),
   };
 }
