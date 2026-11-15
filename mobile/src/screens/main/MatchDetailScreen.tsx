@@ -229,21 +229,24 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const liveVeto = (page?.checkin ? page.checkin.veto : page?.veto_view) || null;
   const vetoOffset = useMemo(() => vetoClockOffset(liveVeto?.server_now, Date.now()), [liveVeto?.server_now]);
   const pollingVeto = useRef(false);
+  // Der gezeigte Stand für den Abruf: gerechnet wird vor dem Schreiben, nicht im Updater (der soll frei von Nebenwirkungen bleiben).
+  const pageRef = useRef(page);
+  pageRef.current = page;
   const pollVeto = useCallback(async () => {
     if (pollingVeto.current) return;
     pollingVeto.current = true;
     try {
       const { data: live } = await api.get<{ veto?: VetoBlock | null; state?: string | null }>(`/matches/${idSegment(route.params.id)}/veto`);
-      let reloadAll = false;
-      mutate((current) => {
-        const merged = mergeLiveVeto(current.page, live);
-        if (merged === null) {
-          reloadAll = true;
-          return current;
-        }
-        return merged === current.page ? current : { ...current, page: merged };
-      });
-      if (reloadAll) await load();
+      const base = pageRef.current;
+      if (!base) return;
+      const merged = mergeLiveVeto(base, live);
+      if (merged === null) {
+        // Das Veto beginnt, endet oder der Stand wechselt: einmal ganz laden (Start-Knopf, Meldeformular).
+        await load();
+        return;
+      }
+      // Nur übernehmen, wenn inzwischen kein anderer Stand angekommen ist - sonst gilt der neuere.
+      if (merged !== base) mutate((current) => (current.page === base ? { ...current, page: merged } : current));
     } catch {
       // Der nächste Takt fragt wieder; das Live-Nachladen hält die Seite ohnehin frisch.
     } finally {

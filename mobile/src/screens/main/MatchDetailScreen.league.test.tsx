@@ -206,3 +206,31 @@ test("ohne Liga-Felder (ältere Server, andere Formate) bleibt die Matchseite wi
   expect(screen.queryByTestId("veto-panel")).toBeNull();
   expect(screen.queryByTestId("match-flow-state")).toBeNull();
 });
+
+test("Veto live: endet das Veto (anderer Stand), lädt die Seite einmal ganz statt nur den Block zu tauschen", async () => {
+  const sides = [{ ...OWN, checked_in: true, present_count: 2 }, { ...OTHER, checked_in: true, present_count: 3 }];
+  answer({ ...BASE, checkin: checkin({ state: "veto", sides, veto: vetoBlock() }) }, () => ({
+    veto: vetoBlock({ status: "done", version: 9, server_now: new Date(Date.now() + 1000).toISOString(), current: null, own_turn: false, can_pick: false }),
+    state: "ready",
+  }));
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("veto-panel")).toBeTruthy());
+  const pages = () => mockGet.mock.calls.filter(([path]) => path === "/matches/m1/page").length;
+  const before = pages();
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/matches/m1/veto"), { timeout: 4000 });
+  await waitFor(() => expect(pages()).toBeGreaterThan(before), { timeout: 4000 });
+});
+
+test("Veto: ein überholter Zug (409) nennt den Satz des Servers und lädt frisch", async () => {
+  const sides = [{ ...OWN, checked_in: true, present_count: 2 }, { ...OTHER, checked_in: true, present_count: 3 }];
+  answer({ ...BASE, checkin: checkin({ state: "veto", sides, veto: vetoBlock() }) });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("veto-option-glut")).toBeTruthy());
+  const pages = () => mockGet.mock.calls.filter(([path]) => path === "/matches/m1/page").length;
+  const before = pages();
+  mockPost.mockRejectedValueOnce(new Error("Gerade hat sich am Veto etwas geändert – bitte die Seite neu laden."));
+  await fireEvent.press(screen.getByTestId("veto-option-glut"));
+  await waitFor(() => expect(screen.getByText("Gerade hat sich am Veto etwas geändert – bitte die Seite neu laden.")).toBeTruthy());
+  await waitFor(() => expect(pages()).toBeGreaterThan(before));
+  expect(screen.queryByText("Glut gesperrt.")).toBeNull();
+});
