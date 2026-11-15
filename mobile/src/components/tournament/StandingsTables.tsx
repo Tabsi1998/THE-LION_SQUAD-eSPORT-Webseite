@@ -11,6 +11,7 @@ import { colors, radius, roles, surfaces } from "../../theme";
 // Die Punkte zählen beim Öffnen hoch, je Zeile leicht versetzt (#1969); beim Live-Nachladen leuchtet nur ein neuer
 // Stand kurz auf. Liga-Staffeln (#2173, docs/LIGA.md F.1/F.2): Zonen für Auf- und Abstieg als farbige Kante je Zeile mit Legende
 // darunter (nur die vorkommenden, Wort statt nur Farbe), über der Tabelle „Endstand · abgeschlossen am …“, sobald sie eingefroren ist.
+// Nachmeldung (#2422): „Nachgemeldet ab Woche X“ klein unter dem Namen - erklärt die kleinere Spielzahl, wie im Web.
 
 const COLUMN_HINTS: Record<string, string> = { Sp: "Spiele", S: "Siege", U: "Unentschieden", N: "Niederlagen", Diff: "Differenz", BH: "Buchholz", Pkt: "Punkte" };
 
@@ -39,13 +40,14 @@ export function StandingsTables({ tables, empty, finalNote = "" }: { tables: Sta
               style={[styles.row, row.mine && styles.mineRow, row.zone ? { borderLeftColor: ZONE_COLORS[row.zone], borderLeftWidth: 3 } : null]}
               testID={`standings-row-${table.title || "all"}-${row.rank}`}
               accessible
-              accessibilityLabel={`Platz ${row.rank}: ${row.name}${row.mine ? " (du)" : ""}${row.out ? `, ${row.out}` : ""}${row.zone ? `, ${ZONE_LABELS[row.zone]}` : ""}. ${table.columns.map((column, index) => `${COLUMN_HINTS[column]} ${row.cells[index]}`).join(", ")}`}
+              accessibilityLabel={`Platz ${row.rank}: ${row.name}${row.mine ? " (du)" : ""}${row.out ? `, ${row.out}` : ""}${row.zone ? `, ${ZONE_LABELS[row.zone]}` : ""}${row.late ? `, ${row.late}` : ""}. ${table.columns.map((column, index) => `${COLUMN_HINTS[column]} ${row.cells[index]}`).join(", ")}`}
             >
               <Text style={[styles.rank, row.rank === 1 && styles.first]} maxFontSizeMultiplier={1.4}>{row.rank}</Text>
               <View style={styles.nameBox}>
                 <Text style={[styles.nameText, row.mine && styles.mineText, row.out && styles.out]} numberOfLines={2} maxFontSizeMultiplier={1.4}>{row.name}</Text>
                 {row.mine ? <Text style={styles.du}>Du</Text> : null}
                 {row.out ? <Text style={styles.outTag}>{row.out}</Text> : null}
+                {row.late ? <Text style={styles.lateTag} testID={`standings-late-${row.id}`} maxFontSizeMultiplier={1.4}>{row.late}</Text> : null}
               </View>
               {row.cells.map((cell, index) => (table.columns[index] === "Pkt" ? (
                 <CountUp key="Pkt" value={cell} delay={countDelay(rowIndex)} play={countsUp(rowIndex)} style={[styles.cell, styles.points]} containerStyle={styles.pointsBox} />
@@ -88,6 +90,7 @@ const styles = StyleSheet.create({
   du: { color: roles.brand, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
   out: { color: roles.quiet, textDecorationLine: "line-through" },
   outTag: { color: roles.warn, fontSize: 10, fontWeight: "900" },
+  lateTag: { color: roles.brand, fontSize: 10, fontWeight: "800" },
   cell: { color: roles.muted, fontSize: 12, fontVariant: ["tabular-nums"], textAlign: "right", width: 30 },
   points: { color: colors.white, fontWeight: "900", width: 34 },
   pointsBox: { width: 34 },

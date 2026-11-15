@@ -188,3 +188,22 @@ test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosse
   now.mockRestore();
   subscription.mockRestore();
 });
+
+test("Tabelle einer Liga-Staffel: Nachgemeldete tragen „Nachgemeldet ab Woche X“, ohne die Felder wie bisher", async () => {
+  const rows = [
+    { registration_id: "r1", display_name: "Löwen", rank: 1, points: 9 },
+    { registration_id: "r2", display_name: "Falken", rank: 2, points: 3, late_entry: true, late_from_week: 4 },
+    { registration_id: "r3", display_name: "Bären", rank: 3, points: 0, late_entry: true },
+  ];
+  const tables = standingsTables(rows, "round_robin", null);
+  expect(tables[0].rows.map((row) => row.late)).toEqual(["", "Nachgemeldet ab Woche 4", "Nachgemeldet"]);
+  await render(<StandingsTables tables={tables} empty="leer" />);
+  expect(screen.getByTestId("standings-late-r2")).toHaveTextContent("Nachgemeldet ab Woche 4");
+  expect(screen.getByTestId("standings-late-r3")).toHaveTextContent("Nachgemeldet");
+  expect(screen.queryByTestId("standings-late-r1")).toBeNull();
+  expect(screen.getByTestId("standings-row-all-2").props.accessibilityLabel).toContain("Nachgemeldet ab Woche 4");
+  // Kompatibilität: ein Server ohne die Felder - keine Zeile trägt den Hinweis.
+  await render(<StandingsTables tables={standingsTables(rows.map(({ late_entry: _late, late_from_week: _week, ...row }) => row), "round_robin", null)} empty="leer" />);
+  expect(screen.queryByTestId("standings-late-r2")).toBeNull();
+  expect(screen.queryByTestId("standings-late-r3")).toBeNull();
+});

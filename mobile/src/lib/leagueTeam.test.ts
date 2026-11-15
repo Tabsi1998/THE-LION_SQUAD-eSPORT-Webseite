@@ -1,5 +1,5 @@
 import {
-  applicationTone, applicationsForSquads, carryLine, finalNote, historyMovement, historyPlace, historyWhere, knownZone, staffelApiPath, teamStateLabel,
+  applicationTone, applicationsForSquads, carryLine, finalNote, historyMovement, historyPlace, historyWhere, knownZone, lateEntryText, staffelApiPath, teamStateLabel,
   winnerLabel, zoneLegend,
   ZONE_LABELS,
 } from "./leagueTeam";
@@ -70,4 +70,14 @@ test("Staffel auf der Ligaseite: Abrufpfad nur aus einem gültigen Pfad der Seas
   expect(winnerLabel(false)).toBe("Champion");
   expect(winnerLabel(true, { display_name: "Löwen" })).toBe("Meister");
   expect(winnerLabel(true, null)).toBe("Platz 1");
+});
+
+test("Nachmeldung (#2422): „Nachgemeldet ab Woche X“, ohne Woche nur „Nachgemeldet“, ohne Feld nichts", () => {
+  expect(lateEntryText({ late_entry: true, late_from_week: 3 })).toBe("Nachgemeldet ab Woche 3");
+  expect(lateEntryText({ late_entry: true })).toBe("Nachgemeldet");
+  expect(lateEntryText({ late_entry: true, late_from_week: 0 })).toBe("Nachgemeldet");
+  expect(lateEntryText({ late_entry: true, late_from_week: "x" })).toBe("Nachgemeldet");
+  expect(lateEntryText({ late_entry: false, late_from_week: 3 })).toBe("");
+  expect(lateEntryText({})).toBe("");
+  expect(lateEntryText(null)).toBe("");
 });

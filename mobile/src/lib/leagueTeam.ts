@@ -90,6 +90,16 @@ export function zoneLegend(rows: Array<{ zone?: string | null } | null | undefin
   return ZONE_ORDER.filter((zone) => used.has(zone)).map((zone) => ({ zone, label: ZONE_LABELS[zone] }));
 }
 
+/**
+ * Nachmeldung nach dem Season-Start (#2422, Nr. 183): „Nachgemeldet ab Woche 3“, ohne offene Woche nur „Nachgemeldet“ - leer sonst.
+ * Derselbe Satz aus denselben Feldern wie Web, TV und Druck (`late_entry`, `late_from_week`; frontend/src/lib/leagueTable.js).
+ */
+export function lateEntryText(row?: { late_entry?: unknown; late_from_week?: unknown } | null): string {
+  if (!row?.late_entry) return "";
+  const week = Number(row.late_from_week);
+  return Number.isInteger(week) && week > 0 ? `Nachgemeldet ab Woche ${week}` : "Nachgemeldet";
+}
+
 /** Die Zone einer Zeile, nur wenn sie eine der vier bekannten ist. */
 export function knownZone(zone?: string | null): string | null {
   return zone && ZONE_LABELS[zone] ? zone : null;
