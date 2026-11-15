@@ -307,6 +307,11 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: yarn build
+      - name: Check startup bundle budget
+        # Budget-Gate (#936): zählt die JS-Dateien des anonymen Starts aus dem Vite-Manifest (gzip Stufe 9) und
+        # vergleicht mit frontend/PERFORMANCE_BUDGETS.md. Editor, Diagramme, PDF und QR dürfen nicht vorab laden.
+        working-directory: frontend
+        run: yarn check:bundle
 
   frontend-unit:
     # Die Unit-Tests (Vitest, 650+ Dateien) brauchten im Frontend-Job knapp acht Minuten. Zwei Teile gleichzeitig

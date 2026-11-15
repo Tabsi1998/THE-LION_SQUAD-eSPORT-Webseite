@@ -42,6 +42,8 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: "es2022",
+    // Manifest für das Budget-Gate (scripts/check-bundle-budget.mjs, #936).
+    manifest: true,
     rolldownOptions: {
       output: {
         // Feste Gruppen mit Vorrang (#936): Eine Gruppe zieht ihre Abhängigkeiten mit. Mit dem früheren
