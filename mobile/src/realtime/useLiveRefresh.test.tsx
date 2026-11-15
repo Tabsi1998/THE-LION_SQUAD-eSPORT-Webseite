@@ -51,8 +51,8 @@ function fakeNavigation(focused = true) {
   };
 }
 
-function Probe({ onRefresh, fallbackMs, resources = ["/tournaments"] }: { onRefresh: () => void; fallbackMs?: number; resources?: string[] }) {
-  useLiveRefresh(onRefresh, resources, { fallbackMs, debounceMs: 100 });
+function Probe({ onRefresh, fallbackMs, pollMs, resources = ["/tournaments"] }: { onRefresh: () => void; fallbackMs?: number; pollMs?: number; resources?: string[] }) {
+  useLiveRefresh(onRefresh, resources, { fallbackMs, pollMs, debounceMs: 100 });
   return <Text>probe</Text>;
 }
 
@@ -204,4 +204,30 @@ test("verdeckt, während ein Neuladen noch entprellt wird: es lädt nicht verdec
   await act(() => nav.focus());
   await advance(100);
   expect(refresh).toHaveBeenCalledTimes(1);
+});
+
+// Turnier-Cockpit (#1653, #2393): fester Takt auch mit Live-Strom - nur sichtbar und mit der App im Vordergrund.
+test("pollMs: fragt auch mit Live-Strom im Takt nach, aber nicht verdeckt und nicht im Hintergrund", async () => {
+  const refresh = jest.fn();
+  const nav = fakeNavigation();
+  await mount(<Probe onRefresh={refresh} fallbackMs={15000} pollMs={20000} />, liveBus(true), nav);
+  await advance(60000);
+  expect(refresh).toHaveBeenCalledTimes(3);
+  await act(() => nav.blur());
+  await advance(60000);
+  expect(refresh).toHaveBeenCalledTimes(3);
+  await act(() => nav.focus());
+  // Zurück: der Takt beginnt von vorn (mit Strom meldet der Strom Verpasstes selbst).
+  await advance(20000);
+  expect(refresh).toHaveBeenCalledTimes(4);
+  await setAppState("background");
+  await advance(60000);
+  expect(refresh).toHaveBeenCalledTimes(4);
+});
+
+test("pollMs ohne Live-Strom: der schnellere Ersatz-Takt reicht, kein doppeltes Nachfragen", async () => {
+  const refresh = jest.fn();
+  await mount(<Probe onRefresh={refresh} fallbackMs={15000} pollMs={20000} />, liveBus(false), fakeNavigation());
+  await advance(60000);
+  expect(refresh).toHaveBeenCalledTimes(4);
 });
