@@ -952,6 +952,10 @@ Wiederholung sehen nur die beiden Teams und die Liga-Leitung auf der Matchseite,
 in der Adresse (`?staffel=…&woche=3`) – so lässt sich ein Spieltag in Discord verlinken.
 
 **Teams** (`…/teams`): je Liga und Staffel die Teams mit Logo (aus der Teamseite, sonst zwei Buchstaben), Platz und Punkten.
+In einer **öffentlichen** Season steht unter jeder Karte **Rankingbanner kopieren**: ein fester Link auf ein Bild mit Platz,
+Bilanz und Punkten des Teams (1200 × 300, ohne Spielernamen), das sich mit jedem Ergebnis selbst erneuert – höchstens fünf
+Minuten alt. Teams binden es in Discord oder im Stream ein; dieselben Links stehen an der Teamseite. Ist die Season nicht
+öffentlich, gibt es kein Bild (der Link antwortet „nicht gefunden“).
 
 Interne Dinge der Leitung – Grund eines Punktabzugs, Verfahren, Vorfälle – stehen nirgends auf diesen Seiten. Die Teilen-Vorschau
 der Season sagt, was gespielt wird; Spieltage und Teams haben eine eigene Vorschau.

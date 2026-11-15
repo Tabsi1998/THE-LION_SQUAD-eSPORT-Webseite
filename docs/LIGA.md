@@ -3846,6 +3846,43 @@ Kennungen (`player_ids`, `audience_ids`, `seen_by`); die Auswahl `featured_title
 Nachricht, Ergebnis-PDF, Handbuch Liga und Captains. Nicht in F.4: TV (der Sieger-Moment zeigt den Meister wie bisher) und die App
 (`mobile/`, Liste in #2173).
 
+#### F.4 Nachtrag: Embleme, Reiter „Trophäen“, Rankingbanner (#2425, Nr. 34c, 59, 60)
+
+Kein zweites System - alles liest `tournament_awards` über `awards_for_user`/`awards_for_team` wie Banner und Titel.
+
+**Drei Embleme neben dem Namen** (Nr. 34c): `featured_emblem_award_ids` an `users` und `teams`, höchstens drei, in der gewählten
+Reihenfolge; nur Belohnungen der Art `emblem` oder `medal` aus der eigenen Liste (`public_only=False`, ohne ruhende). Gesetzt mit
+`PUT /api/me/awards/emblems` bzw. `PUT /api/teams/{tid}/awards/emblems` (Teamleitung und Co-Leitung), Körper `{award_ids: [...]}`;
+`[]` löscht die Wahl. Mehr als drei: 400 „Höchstens 3 Embleme oder Medaillen neben dem Namen.“, fremd, ruhend oder andere Art: 404.
+Profil und Teamseite liefern `featured_emblems` aus derselben Liste wie `awards` - für Gäste also nur, was öffentlich sichtbar ist
+(`awards._visible`), nie Ruhendes; die gespeicherte Wahl bleibt, sie wird nur nicht gezeigt. `GET /api/me/awards` nennt
+`featured_emblem_award_ids`. Kontolöschung: das Feld steht in `account_erasure.EXTRA_PERSONAL_USER_FIELDS`. Anzeige klein neben dem
+Namen im Profilkopf und im Teamkopf (`EmblemRow`), daneben der Titel.
+
+**Reiter „Trophäen“** (Nr. 59): Der Reiter „Auszeichnungen“ des Profils heißt jetzt „Trophäen“ (Schlüssel `awards`, in der Adresse auch
+`?tab=trophaeen`); die Teamseite hat dafür eigene Reiter „Übersicht“ und „Trophäen“ (`?tab=trophaeen`, für Gäste nur mit Inhalt, für
+die Teamleitung immer). Turnier-Pokale, Turnier-Banner, Meister-Einträge und Liga-Belohnungen stehen in einer Vitrine
+(`components/tls/rewards/TrophyCabinet.jsx`, Logik `lib/trophies.js`): Karte mit Bild (Vorlage, Pokal oder hochgeladenes Bild),
+Art, Name, Wettbewerb, Platz, Datum und Link zum Wettbewerb; neueste zuerst. Filter nach Art (Pokal, Medaille, Banner, Emblem, Titel),
+Spiel, Season bzw. Jahr (Season der Liga bzw. Saison des Vereins, sonst das Jahr) und Platz (1, 2, 3, weitere) - angeboten wird nur, was
+vorkommt. Leerer Zustand und „Keine Trophäe passt zu diesem Filter“ mit Zurücksetzen. Wer besitzt, wählt an der Karte Banner, Titel und
+Embleme; der vierte Emblem-Knopf ist gesperrt und sagt warum.
+
+**Rankingbanner** (Nr. 60): `GET /api/leagues/{liga}/{season}/teams/{team}/banner.png` (`services/league_rank_banner.py`) - PNG
+1200×300 mit Team, Liga, Season, Liga N, Staffel, Platz („von N“), Bilanz (S/U/N; ohne Remis-Regel und ohne Remis nur S/N) und Punkten,
+nach Abschluss „Endstand“, Gold nur für Platz 1 einer abgeschlossenen Staffel. `{team}` ist das Co-Team der Anmeldung (`squad_id`), ohne
+Co-Team das Hauptteam; mit der Hauptteam-Kennung gilt das Co-Team in der höchsten Liga N. Nur angenommene bzw. eingecheckte
+Team-Anmeldungen, nur wenn Gäste die Season (`visible_season` ohne Person) und die Staffel (`tournament_hidden_reason`) sehen und die
+Liga N aktiv ist - sonst 404; eine Einzel-Liga hat keines. Auf dem Bild stehen keine Personen. Zwischenspeicher wie das Teilen-Bild
+(`share_image_cache`, Fingerabdruck aus den Daten - ein neues Ergebnis zeichnet sofort neu, sonst fünf Minuten), `Cache-Control`
+über `PUBLIC_IMAGE_PATH`. Die Teamseite trägt `rank_banners` (je öffentlicher Season Liga, Season, Liga N, Staffel, `image_url`,
+`page_url`) und zeigt sie mit Vorschau und **Rankingbanner kopieren**; die Staffel der Ligaseite trägt je Team `rank_banner_url`
+(nur in einer öffentlichen Season), die Unterseite „Teams“ zeigt denselben Knopf.
+
+**Gesamtpaket #2425:** Profil, Teamseite, Ligaseite (Teams), Handbuch Liga, Captains und Teams. Nicht erfasst: die Spielerlisten
+(Embleme dort bräuchten je Person die Auszeichnungen - offen), TV, Druck, Mail, Discord und die App (`mobile/` zeigt noch den Reiter
+„Auszeichnungen“ ohne Filter und keine Embleme - Liste in #2173).
+
 ### F.5 Gesamtwertung über Seasons (#2215)
 
 Entscheidungen Nr. 170 bis 173. Kein zweiter Endstand: Die Gesamtwertung rechnet allein aus den geltenden Endständen

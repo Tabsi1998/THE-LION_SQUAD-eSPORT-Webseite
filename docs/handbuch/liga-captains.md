@@ -177,12 +177,21 @@ Hat die Liga Belohnungen festgelegt (Medaille, Banner, Emblem oder Titel), stehe
 - Als Captain oder Vertreter bekommt ihr für Team-Belohnungen eine eigene Nachricht „Belohnung für euer Team“.
 - Ihr bekommt eine Nachricht und beim nächsten Besuch eine kurze Zeremonie. Dort lädt **Bild herunterladen** ein Bild zum
   Teilen herunter (am Handy: **Teilen**).
-- Im eigenen Profil unter **Auszeichnungen** wählt ihr **Als Banner** (oben im Profil) und bei einem Titel **Als Titel** (neben
-  dem Namen). Für das Team wählt das die Teamleitung.
+- Im eigenen Profil unter **Trophäen** wählt ihr **Als Banner** (oben im Profil), bei einem Titel **Als Titel** und bei bis zu
+  drei Emblemen oder Medaillen **Neben den Namen** – sie stehen dann klein neben eurem Namen. Für das Team wählt das die
+  Teamleitung im Reiter **Trophäen** der Teamseite.
+- Der Reiter **Trophäen** zeigt Turnier-Pokale und Liga-Belohnungen zusammen. Oben filtert ihr nach Art, Spiel, Season und Platz.
+- **Rankingbanner:** Läuft eure Season öffentlich, steht an der Teamseite (und auf der Ligaseite unter **Teams**) ein Bild mit
+  eurem Platz und eurer Bilanz. **Rankingbanner kopieren** kopiert den festen Link – in Discord oder im Streaming-Programm als
+  Bild eingefügt, zeigt er immer den aktuellen Stand (höchstens fünf Minuten alt). Namen von Spielern stehen nicht darauf.
 - Öffnet die Liga eine Staffel wieder, ruhen die Belohnungen. Nach dem neuen Abschluss gelten sie wieder; wer dabei etwas
   verliert oder neu bekommt, erhält eine Nachricht.
 
-<img src="../assets/liga/f4-profil-sammlung-390.png" alt="Sammlung im Profil am Handy: Season 1 mit Goldmedaille und Season-Banner, Season 0 mit dem Titel Kämpferherz" width="320">
+<img src="../assets/liga/profil-embleme-1440.png" alt="Profilkopf am PC: neben dem Namen der Titel Kämpferherz und drei kleine Embleme – Goldmedaille, Aufsteiger-Emblem und Podest-Emblem" width="760">
+
+<img src="../assets/liga/trophaeen-390.png" alt="Reiter Trophäen im Profil am Handy: Filter nach Art, Spiel, Season und Platz, darunter Karten mit Emblem, Medaille, Titel, Banner und Pokal" width="320">
+
+<img src="../assets/liga/rankingbanner.png" alt="Rankingbanner: Platz 2 von 8, Nordlicht A, Probe-Liga Season 1, Liga 1 Staffel A, 5 Siege, 2 Niederlagen, 15 Punkte" width="600">
 
 ### Gesamtwertung über Seasons
 
