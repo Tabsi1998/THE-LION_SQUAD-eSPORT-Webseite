@@ -96,3 +96,38 @@ async def test_the_503_carries_cors_headers_and_is_no_server_error(flow):
     assert blocked.headers.get("access-control-allow-credentials") == "true"
     assert blocked.json()["code"] == "write_pause"
     assert await flow.db.ops_errors.count_documents({}) == 0
+
+
+@pytest.fixture
+def google(monkeypatch):
+    from routes import auth_routes
+
+    real = auth_routes.load_auth_settings
+
+    async def settings(db=None):
+        data = await real(db)
+        return {**data, "google_login_enabled": True, "google_client_id": "test-client", "registration_enabled": True,
+                "google_registration_enabled": True}
+
+    async def identity(_credential, _client_id):
+        return {"email": "neu@abnahme.lionsquad.at", "id": "google-neu", "name": "Neu Hier"}
+
+    monkeypatch.setattr(auth_routes, "load_auth_settings", settings)
+    monkeypatch.setattr(auth_routes, "_resolve_google_identity", identity)
+    # Die Anmeldung stellt eine Sitzung aus - dafür braucht es den Schlüssel der Testumgebung (flow_harness.IMPORT_ENV).
+    monkeypatch.setenv("JWT_SECRET", "flow-tests-secret-with-at-least-32-characters")
+
+
+@pytest.mark.asyncio
+async def test_google_registration_waits_but_google_login_stays_free(flow, google):
+    await maintenance.activate(flow.db, ttl_seconds=60)
+    register = await flow.post("/api/auth/google/session", json={"credential": "x", "intent": "register",
+                                                                  "accept_privacy": True, "accept_terms": True})
+    assert register.status_code == 503
+    assert register.json()["code"] == "write_pause"
+    assert await flow.db.users.count_documents({"google_id": "google-neu"}) == 0
+    # Wer schon ein Google-Konto hat, kommt auch in der Pause hinein.
+    await flow.db.users.insert_one({"id": "u-google", "email": "neu@abnahme.lionsquad.at", "google_id": "google-neu",
+                                    "username": "neu", "display_name": "Neu Hier", "role": "user", "is_active": True})
+    login = await flow.post("/api/auth/google/session", json={"credential": "x", "intent": "login"})
+    assert login.status_code != 503, login.text
