@@ -58,7 +58,8 @@ async def test_a_player_picks_up_to_three_own_emblems_in_order_and_guests_see_th
     assert not_an_emblem.status_code == 404
     # Nur eigene: das Emblem von Team 2 gehört p-1-1 nicht.
     foreign = ids_of(docs, "Emblem 1", registration="reg-2")
-    assert (await flow.put("/api/me/awards/emblems", json={"award_ids": foreign})).status_code == 404
+    answer = await flow.put("/api/me/awards/emblems", json={"award_ids": foreign})
+    assert answer.status_code == 404
     stored = await flow.db.users.find_one({"id": "p-1-1"}, {"_id": 0, "featured_emblem_award_ids": 1})
     assert "featured_emblem_award_ids" not in stored
 
@@ -86,7 +87,8 @@ async def test_resting_emblems_are_neither_chosen_nor_shown(flow):
     _admin, league, _season, _division, staffel = await closed_season(flow, [GOLD, *EMBLEMS])
     gold, first = ids_of(await rewards_of(flow, staffel), "Goldmedaille", "Emblem 1")
     flow.act_as({"id": "p-1-1", "role": "user"})
-    assert (await flow.put("/api/me/awards/emblems", json={"award_ids": [gold, first]})).status_code == 200
+    answer = await flow.put("/api/me/awards/emblems", json={"award_ids": [gold, first]})
+    assert answer.status_code == 200
 
     flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
     await must_reopen(flow, staffel)
@@ -109,9 +111,11 @@ async def test_only_the_team_lead_picks_the_team_emblems(flow):
     refused = await flow.put("/api/teams/team-2/awards/emblems", json={"award_ids": [podium]})
     assert refused.status_code == 403
     flow.act_as({"id": "captain-1", "role": "user"})
-    assert (await flow.put("/api/teams/team-2/awards/emblems", json={"award_ids": [podium]})).status_code == 403
+    answer = await flow.put("/api/teams/team-2/awards/emblems", json={"award_ids": [podium]})
+    assert answer.status_code == 403
     # Ein Emblem eines anderen Teams geht auch für die eigene Teamleitung nicht.
-    assert (await flow.put("/api/teams/team-1/awards/emblems", json={"award_ids": [podium]})).status_code == 404
+    answer = await flow.put("/api/teams/team-1/awards/emblems", json={"award_ids": [podium]})
+    assert answer.status_code == 404
 
     flow.act_as({"id": "captain-2", "role": "user"})
     saved = await flow.put("/api/teams/team-2/awards/emblems", json={"award_ids": [first, podium]})
@@ -129,7 +133,8 @@ async def test_the_emblem_choice_disappears_with_the_account(flow):
     _admin, _league, _season, _division, staffel = await closed_season(flow, [GOLD])
     (gold,) = ids_of(await rewards_of(flow, staffel), "Goldmedaille")
     flow.act_as({"id": "p-1-1", "role": "user"})
-    assert (await flow.put("/api/me/awards/emblems", json={"award_ids": [gold]})).status_code == 200
+    answer = await flow.put("/api/me/awards/emblems", json={"award_ids": [gold]})
+    assert answer.status_code == 200
     await dsgvo_routes._anonymize_user_data(flow.db, "p-1-1", "p-1-1", "user.self_anonymize")
     stored = await flow.db.users.find_one({"id": "p-1-1"}, {"_id": 0})
     assert not stored.get("featured_emblem_award_ids")
@@ -154,7 +159,8 @@ async def test_the_rank_banner_is_public_cached_and_without_people(flow, monkeyp
     assert first.status_code == second.status_code == 200, first.text
     assert first.headers["content-type"] == "image/png" and first.headers.get("cache-control") == "public, max-age=300"
     assert first.content == second.content and len(drawn) == 1
-    assert Image.open(io.BytesIO(first.content)).size == (1200, 300)
+    picture = Image.open(io.BytesIO(first.content))
+    assert picture.size == (1200, 300)
     assert is_public_share_image(url) and not is_public_share_image(f"{PAGE}/teams/squad-2/banner.png/mehr")
     data = drawn[0]
     assert (data["team"], data["division"], data["staffel"], data["rank"], data["record"]["played"]) == ("Probe 2", "Liga 1", "A", None, 0)
@@ -174,6 +180,10 @@ async def test_the_rank_banner_is_public_cached_and_without_people(flow, monkeyp
     team = (await flow.get("/api/teams/team-2")).json()
     assert [row["image_url"] for row in team["rank_banners"]] == ["/api/leagues/probe-shooter/season-1/teams/squad-2/banner.png"]
     assert team["rank_banners"][0]["page_url"] == "/liga/probe-shooter/season-1"
+    # Die Ligaseite (Teams der Season) nennt denselben Link je Team.
+    staffel = await flow.db.tournaments.find_one({"league_context.staffel": "A"}, {"_id": 0})
+    teams = (await flow.get(f"{PAGE}/staffeln/{staffel['slug']}")).json()["teams"]
+    assert {row["display_name"]: row["rank_banner_url"] for row in teams}["Probe 2"] == team["rank_banners"][0]["image_url"]
 
 
 @pytest.mark.asyncio

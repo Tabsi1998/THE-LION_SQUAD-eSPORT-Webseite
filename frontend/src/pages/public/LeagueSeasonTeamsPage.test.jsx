@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Teams der Season (#2268): je Liga und Staffel die Teams mit Logo (sonst Initialen), Platz und Punkten, Link zur Teamseite.
@@ -20,7 +20,8 @@ const SEASON_VIEW = {
 };
 const STAFFEL = {
   standings: [{ registration_id: "r1", rank: 1, played: 2, points: 6 }, { registration_id: "r2", rank: 2, played: 0, points: 0 }],
-  teams: [{ id: "r1", display_name: "Probe · Probe B", team_id: "team-1", logo_url: "/api/static/uploads/probe.png" },
+  teams: [{ id: "r1", display_name: "Probe · Probe B", team_id: "team-1", logo_url: "/api/static/uploads/probe.png",
+      rank_banner_url: "/api/leagues/probe-liga/season-1/teams/sq-1/banner.png" },
     { id: "r2", display_name: LONG, team_id: null, logo_url: null }],
   weeks: [],
 };
@@ -52,4 +53,18 @@ test("Teams je Staffel mit Logo, Platz und Link - ohne Logo die Initialen, vor d
   // Kein Takt je Staffel (#2268): die Teams-Seite lädt einmal.
   expect(liveRefresh).toHaveBeenCalled();
   expect(liveRefresh.mock.calls.every(([, , options]) => options?.enabled === false)).toBe(true);
+});
+
+test("Rankingbanner (#2425): Knopf zum Kopieren nur, wo der Server einen Link nennt", async () => {
+  const writeText = vi.fn().mockResolvedValue();
+  Object.defineProperty(window.navigator, "clipboard", { value: { writeText }, configurable: true });
+  render(
+    <MemoryRouter initialEntries={["/liga/probe-liga/season-1/teams"]}>
+      <Routes><Route path="/liga/:league/:season/teams" element={<LeagueSeasonTeamsPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const first = await screen.findByTestId("season-team-r1");
+  expect(screen.queryByTestId("season-team-r2-banner")).toBeNull();
+  fireEvent.click(within(first).getByTestId("season-team-r1-banner-button"));
+  await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/api/leagues/probe-liga/season-1/teams/sq-1/banner.png`));
 });
