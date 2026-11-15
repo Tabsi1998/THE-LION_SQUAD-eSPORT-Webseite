@@ -241,8 +241,10 @@ async def lifespan(app: FastAPI):
     _start_variant_sweep()
     logger.info("[THE LION SQUAD] Initializing indexes...")
     await init_indexes()
-    from services.migrations import run_pending_migrations
-    applied_migrations = await run_pending_migrations(get_db())
+    # Migrationen (#1006): genau ein Start migriert, jeder andere wartet hier, bis der Stand komplett ist - vorher
+    # bedient der Prozess nichts. Zeitlimits und Ablauf: docs/BETRIEB.md, Abschnitt Migrationen beim Start.
+    from services.migrations import ensure_migrations
+    applied_migrations = await ensure_migrations(get_db())
     for migration in applied_migrations:
         logger.info("[migration] Applied %s: %s", migration["version"], migration["name"])
     # Auto-Checks je Zustand (#2080): einmaliger Nachtrag aus den gespeicherten Läufen, mit Merker.
@@ -779,7 +781,7 @@ async def liveness():
 
 @app.get("/api/health/ready")
 async def readiness():
-    checks = {"database": False, "storage": False, "scheduler": False}
+    checks = {"database": False, "storage": False, "scheduler": False, "migrations": False}
     try:
         checks["database"] = (await get_db().command("ping")).get("ok") == 1
     except Exception as exc:
@@ -797,6 +799,10 @@ async def readiness():
             checks["scheduler"] = bool(get_scheduler_status().get("running"))
         except Exception:
             checks["scheduler"] = False
+    # Bereit erst nach dem Migrationslauf dieses Prozesses (#1006); bewusst offene Migrationen (MigrationIncomplete)
+    # halten den Start nicht auf und zählen als abgeschlossen.
+    from services.migrations import migrations_ready
+    checks["migrations"] = migrations_ready()
     ready = all(checks.values())
     payload = {"status": "ok" if ready else "degraded", "checks": checks}
     return JSONResponse(payload, status_code=200 if ready else 503)
