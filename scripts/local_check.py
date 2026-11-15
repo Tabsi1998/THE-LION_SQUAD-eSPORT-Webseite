@@ -33,11 +33,18 @@ Groups:
                 data are never touched
     extra       what GitHub does not run: black, isort, the whole of flake8,
                 mypy, the contrast check, ShellCheck and OSV over the lockfiles
+    zeitreise   only on request (#775): the backend, web and app unit suites
+                with the clock moved ahead (TLS_TEST_NOW) by one month, six
+                months and one year - or only to --zeit. What turns red there
+                will turn red by itself once the calendar gets that far. The
+                weekly run on GitHub is .github/workflows/zeitreise-woche.yml.
 
 Usage:
     python scripts/local_check.py                  everything but extra
     python scripts/local_check.py --all            everything
     python scripts/local_check.py --only backend   some groups
+    python scripts/local_check.py --only zeitreise [--zeit +6m]
+                                                   the time-travel probe
     python scripts/local_check.py --list           the steps, without running
     python scripts/local_check.py --record         refresh the ratchet baseline
 
@@ -71,8 +78,10 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "backend", "frontend", "mobile", "container", "extra")
+GROUPS = ("repository", "backend", "frontend", "mobile", "container", "extra", "zeitreise")
 DEFAULT_GROUPS = ("repository", "backend", "frontend", "mobile", "container")
+# Groups that only run when named in --only, never with --all.
+ON_REQUEST_GROUPS = ("zeitreise",)
 
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
@@ -905,6 +914,7 @@ def main(argv: list | None = None) -> int:
     parser.add_argument("--list", action="store_true", help="show the steps without running them")
     parser.add_argument("--record", action="store_true", help="accept today's findings into the ratchet baseline")
     parser.add_argument("--keep-services", action="store_true", help="leave containers and servers running")
+    parser.add_argument("--zeit", help="zeitreise only: one jump instead of all (+1m, +6m, +1y, +2w, +10d or a date)")
     arguments = parser.parse_args(argv)
 
     if arguments.only:
@@ -913,9 +923,17 @@ def main(argv: list | None = None) -> int:
         if unknown:
             parser.error("unknown groups: " + ", ".join(sorted(unknown)))
     elif arguments.all or arguments.record:
-        groups = set(GROUPS)
+        groups = set(GROUPS) - set(ON_REQUEST_GROUPS)
     else:
         groups = set(DEFAULT_GROUPS)
+    if arguments.zeit:
+        if "zeitreise" not in groups:
+            parser.error("--zeit belongs to --only zeitreise")
+        try:
+            zeitreise_report().when(arguments.zeit)
+        except ValueError as error:
+            parser.error(str(error))
+        ZEITREISE_JUMPS[:] = [arguments.zeit]
 
     steps = plan(groups)
     if arguments.list:
@@ -1303,6 +1321,106 @@ def mobile_steps() -> list:
     ]
 
 
+# ----------------------------------------------------------------- zeitreise
+
+# The jumps of the weekly run on GitHub (zeitreise-woche.yml); --zeit replaces them with one.
+ZEITREISE_JUMPS = ["+1m", "+6m", "+1y"]
+_MODULES: dict = {}
+
+
+def zeitreise_report():
+    """scripts/zeitreise_report.py: the same jumps and the same report as the weekly run."""
+    if "zeitreise-report" not in _MODULES:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("zeitreise_report", ROOT / "scripts" / "zeitreise_report.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _MODULES["zeitreise-report"] = module
+    return _MODULES["zeitreise-report"]
+
+
+def zeitreise_moment(context: Context, jump: str) -> str:
+    """One moment per jump for the whole run, so every part travels to the same day."""
+    key = f"zeitreise-{jump}"
+    if key not in context.cache:
+        report = zeitreise_report()
+        context.cache[key] = report.iso(report.when(jump))
+    return context.cache[key]
+
+
+def zeitreise_result(context: Context, part: str, jump: str, completed: subprocess.CompletedProcess,
+                     source: Path, log: Path) -> str:
+    moment = zeitreise_moment(context, jump)
+    if completed.returncode == 0:
+        return f"green with the clock at {moment}"
+    root = str(MOBILE).replace("\\", "/")
+    failed = zeitreise_report().collect(part, jump, moment, "failure", source, root)["failed"]
+    names = "\n".join(f"  {name}" for name in failed[:30]) or "  (no test names - see the log)"
+    more = f"\n  ... and {len(failed) - 30} more" if len(failed) > 30 else ""
+    raise StepFailed(f"{len(failed)} tests turn red with the clock at {moment}. Full output: {log}\n{names}{more}")
+
+
+def zeitreise_backend(jump: str) -> Callable[[Context], str]:
+    def action(context: Context) -> str:
+        moment = zeitreise_moment(context, jump)
+        results = STATE / "zeitreise"
+        uploads = STATE / "uploads-zeitreise"
+        results.mkdir(parents=True, exist_ok=True)
+        uploads.mkdir(parents=True, exist_ok=True)
+        junit = results / f"backend{jump}.xml"
+        env = dict(BACKEND_TEST_ENV, UPLOAD_DIR=str(uploads), TLS_TEST_NOW=moment)
+        completed = context.run(venv_python(), "-m", "pytest", "-m", "not live", "-p", "no:cacheprovider", "-q",
+                                f"--numprocesses={min(8, os.cpu_count() or 2)}", f"--junitxml={junit}",
+                                env=env, check=False, timeout=5400)
+        log = context.log(f"zeitreise-backend{jump}", completed.stdout + completed.stderr)
+        return zeitreise_result(context, "backend", jump, completed, junit, log)
+    return action
+
+
+def zeitreise_web(jump: str) -> Callable[[Context], str]:
+    def action(context: Context) -> str:
+        if not (FRONTEND / "node_modules").is_dir():
+            raise StepSkipped("frontend/node_modules is missing; run --only frontend once")
+        moment = zeitreise_moment(context, jump)
+        junit = STATE / "zeitreise" / f"web{jump}.xml"
+        junit.parent.mkdir(parents=True, exist_ok=True)
+        completed = yarn(context, "vitest", "run", "--reporter=dot", "--reporter=junit", f"--outputFile.junit={junit}",
+                         check=False, extra_env={"TLS_TEST_NOW": moment})
+        log = context.log(f"zeitreise-web{jump}", completed.stdout + completed.stderr)
+        return zeitreise_result(context, "web", jump, completed, junit, log)
+    return action
+
+
+def zeitreise_app(jump: str) -> Callable[[Context], str]:
+    def action(context: Context) -> str:
+        if not (MOBILE / "node_modules").is_dir():
+            raise StepSkipped("mobile/node_modules is missing; run --only mobile once")
+        moment = zeitreise_moment(context, jump)
+        report = STATE / "zeitreise" / f"app{jump}.json"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        node = node_of(context, MOBILE_NODE_MAJOR)
+        env = dict(node_path_env(context, node), TLS_TEST_NOW=moment)
+        npx = Path(npm_of(node)).with_name("npx.cmd" if WINDOWS else "npx")
+        completed = context.run(str(npx) if npx.is_file() else "npx", "jest", "--json", f"--outputFile={report}",
+                                cwd=MOBILE, env=env, check=False, timeout=3600)
+        log = context.log(f"zeitreise-app{jump}", completed.stdout + completed.stderr)
+        return zeitreise_result(context, "app", jump, completed, report, log)
+    return action
+
+
+def zeitreise_steps() -> list:
+    steps = [Step("zeitreise", "venv", f"Python {BACKEND_PYTHON} with both requirement files (freezegun)",
+                  backend_environment)]
+    for jump in ZEITREISE_JUMPS:
+        steps += [
+            Step("zeitreise", f"backend{jump}", f"Backend suite with the clock at {jump}", zeitreise_backend(jump),
+                 ("venv",)),
+            Step("zeitreise", f"web{jump}", f"Web unit suite with the clock at {jump}", zeitreise_web(jump)),
+            Step("zeitreise", f"app{jump}", f"App unit suite with the clock at {jump}", zeitreise_app(jump)),
+        ]
+    return steps
+
+
 # ----------------------------------------------------------------- container
 
 def compose(context: Context, *arguments: str, project: bool = True, check: bool = True,
@@ -1493,7 +1611,8 @@ def extra_steps() -> list:
 
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "backend": backend_steps, "frontend": frontend_steps,
-                "mobile": mobile_steps, "container": container_steps, "extra": extra_steps}
+                "mobile": mobile_steps, "container": container_steps, "extra": extra_steps,
+                "zeitreise": zeitreise_steps}
     steps: list = []
     for group in GROUPS:
         if group in groups:

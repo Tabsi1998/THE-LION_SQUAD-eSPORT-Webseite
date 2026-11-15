@@ -143,7 +143,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     row(4, { points: 7, played: 4, won: 1, lost: 3, score_for: 7, score_against: 10, score_diff: -3, form: ["L", "L", "W", "L"] }),
     row(5, { points: 5, played: 4, won: 0, lost: 4, score_for: 5, score_against: 12, score_diff: -7, form: ["L", "L", "L", "L"] }),
   ];
-  const MAP_RULES = { allow_draws: false, match_points_mode: "maps", tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"] };
+  const MAP_RULES = { allow_draws: false, match_points_mode: "maps", best_of: 5, tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"] };
 
   test(`Punkte nach gewonnenen Maps (${width} px): Hinweis, Spalte S auch am Handy, Season-Seite nennt die Punkteart`, async ({ page }) => {
     await page.setViewportSize({ width, height });

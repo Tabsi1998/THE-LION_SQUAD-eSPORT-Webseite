@@ -56,7 +56,7 @@ async def context(db, league: dict, season: dict | None) -> Context:
         ctx.table = facts.table_data(season, ctx.divisions)
         ctx.schedule = facts.schedule_data(season)
         ctx.eligibility = facts.eligibility_data(season, ctx.id_fields, platform=await facts.platform_data(db, season))
-        ctx.veto = facts.veto_data(season, game)
+        ctx.veto = facts.veto_data(season, game, ctx.divisions)
     return ctx
 
 

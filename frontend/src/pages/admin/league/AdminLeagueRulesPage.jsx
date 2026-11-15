@@ -35,6 +35,18 @@ function formOf(draft) {
   return { title: draft?.title || "", body_md: draft?.body_md || "", annexes: (draft?.annexes || []).map(({ title, body_md }) => ({ title: title || "", body_md: body_md || "" })) };
 }
 
+/** Anlagen nur aus leeren Bausteinen entfallen (#2426) - etwa Anlage B ohne Veto-Vorlage. Die Vorschau sagt es, statt still zu fehlen. */
+function DroppedAnnexes({ annexes = [], testId }) {
+  if (!annexes.length) return null;
+  return (
+    <p role="status" className="mb-3 break-words text-sm text-white/70" data-testid={testId}>
+      {annexes.map((row) => `Anlage ${row.key}${row.title ? ` (${row.title})` : ""}`).join(", ")}{" "}
+      {annexes.length === 1 ? "entfällt" : "entfallen"} auf der Seite, im PDF und im Vergleich: Sie {annexes.length === 1 ? "besteht" : "bestehen"} nur
+      aus Bausteinen, die für diese Season leer sind – etwa ohne Veto-Vorlage. Mit einer Vorlage erscheint sie wieder.
+    </p>
+  );
+}
+
 function VarAlerts({ unknown = [], empty = [], leagueWide = false, testId }) {
   return (
     <>
@@ -98,6 +110,7 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, leagueWide, 
               Zum Anpassen des Texts vorher „Text vorher anpassen“.
             </p>
             <VarAlerts unknown={proposal.unknown_vars} empty={emptyVars} leagueWide={leagueWide} testId="rules-proposal" />
+          <DroppedAnnexes annexes={proposal.dropped_annexes} testId="rules-proposal-dropped" />
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <TextField label="Gültig ab" type="date" value={release.valid_from} min={today} onChange={(value) => setRelease((row) => ({ ...row, valid_from: value }))} testId="rules-approve-valid-from" />
               <TextAreaField label="Änderungsgrund" value={release.change_reason} onChange={(value) => setRelease((row) => ({ ...row, change_reason: value }))} rows={2}
@@ -477,6 +490,7 @@ export default function AdminLeagueRulesPage() {
                       <p role="alert" className="mb-4 text-sm text-warn">Unbekannter Baustein: {preview.unknown_blocks.join(", ")}. So lässt sich nichts veröffentlichen.</p>
                     ) : null}
                     <VarAlerts unknown={preview.unknown_vars} empty={preview.empty_vars} leagueWide={leagueWide} testId="rules-preview-vars" />
+                    <DroppedAnnexes annexes={preview.dropped_annexes} testId="rules-preview-dropped" />
                     {preview.foreign_images?.length ? (
                       <p role="alert" className="mb-4 break-words text-sm text-warn" data-testid="rules-preview-foreign">Fremde Bilder lassen sich nicht speichern: {preview.foreign_images.join(", ")}. Bitte über „Hochladen“ oder die Mediathek wählen.</p>
                     ) : null}
