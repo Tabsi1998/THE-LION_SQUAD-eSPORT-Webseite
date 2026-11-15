@@ -21,7 +21,7 @@ vi.mock("@/hooks/useTilt", () => ({ useTilt: () => null }));
 vi.mock("@/pages/user/profile/TeamsPanel", () => ({ TeamsPanel: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { default: TeamsPage } = await import("./TeamsPage");
+const { default: TeamsPage, teamTabFrom } = await import("./TeamsPage");
 
 const MEMBERS = [
   { id: "u-cap", username: "neonfalke", display_name: "NeonFalke" },
@@ -667,7 +667,8 @@ test("Trophäen: eigener Reiter, Embleme neben dem Namen, die Teamleitung wählt
   expect(screen.queryByTestId("team-trophies")).toBeNull();
   fireEvent.click(screen.getByTestId("team-tab-trophies"));
   expect(screen.getByTestId("team-trophies")).toHaveTextContent("Frühjahrs-Cup");
-  expect(screen.queryByTestId("team-upcoming")).toBeNull();
+  // Die Übersicht ist nur versteckt, nicht ausgehängt.
+  expect(screen.getByTestId("team-overview")).toHaveClass("hidden");
   expect(screen.getByTestId("trophy-emblem-aw-emb")).toHaveTextContent("Emblem 1 ✓");
   fireEvent.click(screen.getByTestId("trophy-emblem-aw-emb"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/teams/t-1/awards/emblems", { award_ids: [] }));
@@ -697,4 +698,31 @@ test("Rankingbanner: Vorschau und „Rankingbanner kopieren“ mit der vollen Ad
   fireEvent.click(screen.getByTestId("team-rank-banners-s1:sq-1-copy-button"));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/api/leagues/probe-liga/season-1/teams/sq-1/banner.png`));
   expect(await screen.findByText("Kopiert")).toBeInTheDocument();
+});
+
+test("Reiter aus der Adresse wie im Profil; #chat führt immer in die Übersicht", () => {
+  expect(["?tab=trophaeen", "?tab=trophies", "?tab=awards"].map((search) => teamTabFrom(search))).toEqual(["trophies", "trophies", "trophies"]);
+  expect(teamTabFrom("?tab=unbekannt")).toBe("overview");
+  expect(teamTabFrom("?tab=trophaeen", "#chat")).toBe("overview");
+  expect(teamTabFrom("", "")).toBe("overview");
+});
+
+test("Reiterwechsel: ein ungesendeter Entwurf im Team-Chat bleibt stehen", async () => {
+  serve({ ...TEAM, awards: [CUP] });
+  renderAt("/teams/t-1");
+  await screen.findByTestId("team-chat");
+  const box = screen.getByPlaceholderText("Nachricht schreiben, mit @username erwähnen...");
+  fireEvent.change(box, { target: { value: "Training heute um acht?" } });
+  fireEvent.click(screen.getByTestId("team-tab-trophies"));
+  expect(screen.getByTestId("team-overview")).toHaveClass("hidden");
+  fireEvent.click(screen.getByTestId("team-tab-overview"));
+  expect(screen.getByTestId("team-overview")).not.toHaveClass("hidden");
+  expect(screen.getByPlaceholderText("Nachricht schreiben, mit @username erwähnen...")).toHaveValue("Training heute um acht?");
+});
+
+test("Link zum Team-Chat (#chat) zeigt die Übersicht, auch mit ?tab=trophaeen", async () => {
+  serve({ ...TEAM, awards: [CUP] });
+  renderAt("/teams/t-1?tab=trophaeen#chat");
+  expect(await screen.findByTestId("team-chat")).toBeVisible();
+  expect(screen.queryByTestId("team-trophies")).toBeNull();
 });

@@ -49,6 +49,14 @@ import { ShareButton } from "@/components/tls/ShareButton";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 
+const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview", uebersicht: "overview" };
+
+/** Der Reiter der Teamseite aus der Adresse (#2425): dieselben Namen wie im Profil; #chat führt immer in die Übersicht. */
+export function teamTabFrom(search = "", hash = "") {
+  if (hash === "#chat") return "overview";
+  return TEAM_TAB_ALIASES[new URLSearchParams(search).get("tab") || ""] || "overview";
+}
+
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR };
 
 // Eigener Stand je Team und Konto (#1047): ein Teamwechsel oder ein echter Kontowechsel baut die Teamseite neu auf -
@@ -213,7 +221,11 @@ function TeamDetail({ id }) {
   const [actionError, setActionError] = useState("");
   const confirm = useConfirm();
   // Reiter (#2425): Übersicht und Trophäen - aus der Adresse (?tab=trophaeen), damit ein Link direkt in die Vitrine führt.
-  const [tab, setTab] = useState(() => (new URLSearchParams(location.search).get("tab") === "trophaeen" ? "trophies" : "overview"));
+  // Dieselben Namen wie im Profil (awards, trophies, trophaeen); ein Link zum Chat (#chat) führt immer in die Übersicht.
+  const [tab, setTab] = useState(() => teamTabFrom(location.search, location.hash));
+  useEffect(() => {
+    if (location.hash === "#chat") setTab("overview");
+  }, [location.hash]);
 
   // Laden (#983, #1152) über useLoad: 404/403 heißt „nicht gefunden“; ohne Netz oder bei einem Serverfehler bleibt ein
   // schon geladenes Team stehen (mit Hinweis), sonst steht der Fehler mit „Nochmal versuchen“ da - nie ein ewiges
@@ -437,10 +449,11 @@ function TeamDetail({ id }) {
         </div>
       )}
       {showTrophies ? (
+        // Reiter wie im Profil: schlichte Knöpfe ohne Tab-Rollen (einheitlich, Review #2425).
         <div className="border-b border-white/10 sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm z-20" data-testid="team-tabs">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe" role="tablist" aria-label="Teamseite">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe">
             {[["overview", "Übersicht"], ["trophies", `Trophäen${trophies.length ? ` (${trophies.length})` : ""}`]].map(([key, label]) => (
-              <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} data-testid={`team-tab-${key}`}
+              <button key={key} type="button" onClick={() => setTab(key)} data-testid={`team-tab-${key}`}
                 className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === key ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
                 {label}
               </button>
@@ -461,8 +474,11 @@ function TeamDetail({ id }) {
             } : null}
             empty="Noch keine Trophäen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel abgeschlossen wird." />
         </div>
-      ) : (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
+      ) : null}
+      {/* Die Übersicht bleibt eingehängt und wird im Reiter „Trophäen“ nur versteckt - so geht ein ungesendeter Entwurf im Team-Chat
+          beim Wechsel nicht verloren. */}
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 ${activeTab === "trophies" ? "hidden" : "grid"} lg:grid-cols-3 gap-8`}
+        data-testid="team-overview">
         <div className="lg:col-span-2 space-y-8">
           {inviteToken && !isMember ? <TeamJoinCard teamId={team.id} token={inviteToken} user={user} onJoined={joinedByLink} /> : null}
           {overviewLoad.status === "error" && overviewLoad.problem !== "notFound" && (
@@ -563,7 +579,6 @@ function TeamDetail({ id }) {
           <TeamRankBanners rows={team.rank_banners} />
         </aside>
       </div>
-      )}
       {editing && (
         <TeamModal
           team={editing}
