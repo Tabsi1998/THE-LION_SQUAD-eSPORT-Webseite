@@ -5,6 +5,8 @@ import {
   applicationPayload,
   applicationToForm,
   canStartApplication,
+  effectiveCloses,
+  lateCapLine,
   seatsLine,
   statsLine,
   submittedToast,
@@ -124,5 +126,28 @@ describe("Formular der Season", () => {
     const payload = applicationPayload({ ...applicationToForm({ entry_policy: "all", application_opens_at: "2026-07-01T16:00:00+00:00", application_closes_at: "2026-07-02T16:00:00+00:00" }), application_opens: "", application_closes: "" });
     expect(payload.application_opens_at).toBeNull();
     expect(payload.application_closes_at).toBeNull();
+  });
+});
+
+describe("Nachmeldefrist (#2422, Nr. 184)", () => {
+  const start = "2026-11-01T00:00:00+00:00";
+  test("min(Fenster, Start + Frist) - leer heißt 14 Tage, mit Verlängerung deren Ende", () => {
+    expect(effectiveCloses("2026-12-31T00:00:00+00:00", start, "", null).toISOString()).toBe("2026-11-15T00:00:00.000Z");
+    expect(effectiveCloses("2026-12-31T00:00:00+00:00", start, "30", null).toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    expect(effectiveCloses("2026-12-31T00:00:00+00:00", start, 0, null).toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(effectiveCloses("2026-12-31T00:00:00+00:00", start, "", "2026-12-10T00:00:00+00:00").toISOString()).toBe("2026-12-10T00:00:00.000Z");
+    // Endet das Fenster vor dem Start oder vor der Frist, bleibt es beim Fenster.
+    expect(effectiveCloses("2026-10-20T00:00:00+00:00", start, "", null).toISOString()).toBe("2026-10-20T00:00:00.000Z");
+    expect(effectiveCloses("2026-11-05T00:00:00+00:00", start, "", null).toISOString()).toBe("2026-11-05T00:00:00.000Z");
+    expect(effectiveCloses(null, start, "", null)).toBeNull();
+  });
+  test("der Hinweis nur, wenn die Frist früher schließt", () => {
+    expect(lateCapLine("2026-12-31T00:00:00+00:00", start, "", null)).toBe("Die Anmeldung schließt am 15.11.2026, 01:00 Uhr, auch wenn das Fenster länger eingestellt ist.");
+    expect(lateCapLine("2026-11-05T00:00:00+00:00", start, "", null)).toBe("");
+  });
+  test("das Formular trägt die Frist, leer heißt null", () => {
+    expect(applicationToForm({ late_registration_days: 21 }).late_registration_days).toBe("21");
+    expect(applicationPayload({ ...applicationToForm({ entry_policy: "all" }), late_registration_days: "" }).late_registration_days).toBeNull();
+    expect(applicationPayload({ ...applicationToForm({ entry_policy: "all" }), late_registration_days: "7" }).late_registration_days).toBe(7);
   });
 });
