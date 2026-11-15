@@ -226,6 +226,17 @@ def guard_environment(env) -> None:
         raise SystemExit("Abbruch, kein lokaler Abnahme-Stand: " + "; ".join(problems))
 
 
+# Dieselbe Umgebungsvariable und Vorgabe wie backend/auth.py (Zustimmung zu Datenschutz und Nutzungsbedingungen): Ändert sich die
+# Fassung, verlangt das Backend sonst von jedem Testkonto eine neue Zustimmung.
+POLICY_DEFAULT = "2026-08-26"
+
+
+def consent_versions(env=None) -> dict:
+    env = os.environ if env is None else env
+    return {"privacy_policy_version": env.get("PRIVACY_POLICY_VERSION", POLICY_DEFAULT),
+            "terms_version": env.get("TERMS_VERSION", POLICY_DEFAULT)}
+
+
 def credentials() -> tuple[str, str]:
     return os.environ["ABNAHME_SEED_PASSWORD"], os.environ["ABNAHME_SEED_TOTP"]
 
@@ -280,7 +291,7 @@ async def ensure_accounts(db) -> dict:
         doc = {
             "id": existing["id"] if existing else f"abnahme-liga-{key}", "email": email, "username": email.split("@")[0],
             "display_name": display_name, "role": role, "is_active": True, "email_verified": True,
-            "privacy_policy_version": "2026-08-26", "terms_version": "2026-08-26", "accepted_privacy": True,
+            **consent_versions(), "accepted_privacy": True,
             "accepted_terms": True, "consent_required": False, "consent_updated_at": stamp,
             "created_at": (existing or {}).get("created_at") or stamp, "updated_at": stamp, **password_fields(password),
             # Spielberechtigung (#2204): Neue Seasons verlangen ein Mindestalter - erfundenes Datum, wie alles hier.

@@ -402,6 +402,8 @@ Start. Bis dahin ist der Spielplan eine Vorschau und wird bei jeder Änderung ne
 
 Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entscheidest. Ohne Anmeldefenster gibt es das nicht, dann bleibt es beim Zuteilen aus 2.5. Das Zuteilen bleibt auch danach als Sonderweg.
 
+**Nachmeldung:** Das Fenster darf über den Beginn der Season hinausgehen. Dann steht unter „Anmeldung bis“ und auf der Ligaseite „Anmeldung läuft nach Season-Start weiter (bis …)“. Ein nachgemeldetes Co-Team nimmst du im Eingang an und teilst es einer Staffel zu; ist deren Spielplan schon fest, steht es mit 0 Spielen in der Tabelle, Spiele bekommt es nicht von selbst.
+
 **Einrichten** (Season-Seite, Reiter **Anmeldung und Kader** → **Selbstanmeldung**, Zuständigkeit „Season konfigurieren“):
 
 1. **Anmeldung ab** und **Anmeldung bis** in Wiener Zeit eintragen. Beides oder nichts.
@@ -665,8 +667,8 @@ Spiele, Termine und den Matchchat immer – auch bei *Aus*.
 **Prüfung vor der Veröffentlichung:** **Was fehlt noch?** im Reiter **Überblick** listet **Probleme** (rot) und **Warnungen**; jeder Punkt führt mit **Zu …** in den Reiter, wo du ihn erledigst. Probleme
 sind: kein oder ein fremder Map-Pool, zu wenige Maps für einen Modus, ein Modus aus **Modus je Map** fehlt im Pool, **Modus je Map**
 passt nicht zur längsten Serie, kein veröffentlichtes **Regelwerk** (ein Regeltext allein reicht nicht), keine Liga N oder eine Liga
-N ohne Staffel, ein Anmeldefenster, das erst nach dem Beginn der Season endet. Warnungen sind etwa ein abgelaufenes oder fehlendes
-Anmeldefenster oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine **Vorschau** und geht immer, auch mit Problemen.
+N ohne Staffel. Warnungen sind etwa ein abgelaufenes oder fehlendes Anmeldefenster, ein Anmeldefenster, das erst nach dem Beginn
+der Season endet (**Nachmeldung**, erlaubt – etwa für nachrückende Teams), oder inaktive Modi und Maps im Pool. *Nur Liga-Leitung* ist eine **Vorschau** und geht immer, auch mit Problemen.
 Solange es Probleme gibt, lässt sich die Sichtbarkeit aber nicht auf **Nur Mitglieder** oder **Öffentlich** stellen – weder von *Aus*
 noch von der Vorschau aus; das Speichern sagt dann, was fehlt. **Neu prüfen** liest den Stand nach Änderungen neu. Nur der Superadmin
 kann im Notfall trotzdem veröffentlichen: Er trägt im Abschnitt einen **Grund für die Notausnahme** ein (mindestens 5 Zeichen) und

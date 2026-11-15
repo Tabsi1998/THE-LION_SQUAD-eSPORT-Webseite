@@ -5,7 +5,8 @@ Länge von „Modus je Map“, Map in einem Schritt sperren und die Prüfung vor
 """
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
@@ -470,6 +471,27 @@ async def test_a_ready_season_has_no_problems_and_publishes(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_window_past_the_season_start_is_a_hint_and_the_season_publishes(flow):
+    """Nachmeldung (Entscheidung Nr. 180, #1632): Das Anmeldefenster darf über den Beginn hinausgehen - Hinweis, keine Sperre, auch
+    beim ersten Veröffentlichen. Die Ligaseite bekommt den Beginn mit, damit sie „läuft nach Season-Start weiter“ sagen kann."""
+    closes = (now_utc() + timedelta(days=20)).isoformat()
+    w = await build(flow, season={"application_opens_at": (now_utc() - timedelta(hours=1)).isoformat(), "application_closes_at": closes})
+    result = ok(await flow.get(f"{ADMIN}/seasons/{w['season']['id']}/readiness"))
+    assert result["ok"] and result["problems"] == []
+    hint = next(row for row in result["warnings"] if row["code"] == "application_after_start")
+    # Derselbe Satz wie in Verwaltung und Ligaseite (lib/leagueApplications.js): Wiener Zeit mit „Uhr“.
+    local = datetime.fromisoformat(closes).astimezone(ZoneInfo("Europe/Vienna"))
+    assert hint["text"].startswith(f"Anmeldung läuft nach Season-Start weiter (bis {local:%d.%m.%Y, %H:%M} Uhr). ")
+    published = ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "public"}))
+    assert published["visibility"] == "public"
+    assert not [row for row in await actions(flow) if row["action"] == "league.season.readiness_override"]
+    flow.act_as(None)
+    block = ok(await flow.get(f"/api/leagues/{w['league']['slug']}/{w['season']['slug']}"))["application"]
+    assert block["state"] == "open"
+    assert block["season_starts_at"] == w["season"]["start_date"]
+
+
+@pytest.mark.asyncio
 async def test_an_unready_season_lists_its_problems_and_does_not_publish(flow):
     w = await build(flow, staffel=False, rules=False,
                     season={"application_opens_at": "2020-01-01T10:00:00+00:00", "application_closes_at": "2099-01-01T10:00:00+00:00"})
@@ -479,8 +501,9 @@ async def test_an_unready_season_lists_its_problems_and_does_not_publish(flow):
     result = ok(await flow.get(f"{ADMIN}/seasons/{w['season']['id']}/readiness"))
     assert not result["ok"]
     # Seit D.3 (#1618) beginnt eine neue Season mit Veto an und vorbelegter Vorlage - mit diesem Pool geht sie nicht auf.
-    assert codes(result["problems"]) == {"pool_too_small", "mode_order_missing", "rules_missing", "staffel_missing",
-                                         "application_after_start", "veto_invalid"}
+    assert codes(result["problems"]) == {"pool_too_small", "mode_order_missing", "rules_missing", "staffel_missing", "veto_invalid"}
+    # Nachmeldung (Entscheidung Nr. 180): ein Fenster über den Season-Start hinaus ist ein Hinweis, keine Sperre.
+    assert "application_after_start" in codes(result["warnings"])
     club = await flow.add_user(role="club_admin", name="Vorstand")
     flow.act_as(club)
     blocked = await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"visibility": "members", "readiness_override_reason": "Bitte trotzdem"})
