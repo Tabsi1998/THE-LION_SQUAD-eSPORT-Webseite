@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { AppState, Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { ceremonyQueue, type CeremonyQueue } from "../../achievements/ceremony/queue";
 import { useAuth } from "../../auth/AuthContext";
@@ -34,6 +34,8 @@ function MomentCard({ rewards, onClose }: { rewards: RewardAward[]; onClose: () 
     <Animated.View style={[styles.card, rise]} accessibilityViewIsModal testID="reward-moment">
       <Text style={styles.eyebrow}>{momentSubtitle(rewards)}</Text>
       <Text style={styles.title} accessibilityRole="header" testID="reward-moment-title">{momentTitle(rewards)}</Text>
+      {/* Viele Belohnungen oder große Schrift: die Liste scrollt, Überschrift und „Weiter“ bleiben sichtbar. */}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} testID="reward-moment-scroll">
       <StaggerIn style={styles.list}>
         {rewards.map((award, index) => (
           <View key={award.id} style={[styles.row, { borderColor: metalColor(award.reward?.art?.metal) }]} testID={`reward-moment-${award.id}`}>
@@ -48,11 +50,15 @@ function MomentCard({ rewards, onClose }: { rewards: RewardAward[]; onClose: () 
           </View>
         ))}
       </StaggerIn>
+      </ScrollView>
       <Muted style={styles.meta}>Du findest sie in deinem Profil unter „Auszeichnungen“.</Muted>
       <Button label="Weiter" onPress={onClose} testID="reward-moment-close" />
     </Animated.View>
   );
 }
+
+/** Beim Zurückkommen in den Vordergrund höchstens so oft nach neuen Belohnungen fragen. */
+export const UNSEEN_THROTTLE_MS = 5 * 60 * 1000;
 
 export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQueue }) {
   const { user } = useAuth();
@@ -62,18 +68,35 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
   // Läuft eine Erfolgs-Zeremonie, wartet die Belohnung - nie zwei Momente übereinander.
   const busy = useSyncExternalStore(queue.subscribe, () => Boolean(queue.getCurrent()), () => false);
 
+  // Nachfragen beim Anmelden und beim Zurückkommen in den Vordergrund - dort höchstens alle UNSEEN_THROTTLE_MS, damit ein
+  // kurzes Wechseln der App keinen Abruf auslöst. Schon eingereihte Belohnungen kommen nie ein zweites Mal.
+  const lastFetch = useRef(0);
+  const fetchUnseen = useCallback((isCurrent: () => boolean) => {
+    lastFetch.current = Date.now();
+    api.get<{ rewards?: RewardAward[] }>("/me/rewards/unseen").then(({ data }) => {
+      if (!isCurrent()) return;
+      const fresh = (data?.rewards || []).filter((award) => award?.reward && !queued.current.has(award.id));
+      if (!fresh.length) return;
+      fresh.forEach((award) => queued.current.add(award.id));
+      setPackages((rest) => [...rest, ...rewardPackages(fresh)]);
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     setPackages([]);
+    queued.current = new Set();
     if (!userId) return undefined;
     let alive = true;
-    api.get<{ rewards?: RewardAward[] }>("/me/rewards/unseen").then(({ data }) => {
-      if (!alive) return;
-      const fresh = (data?.rewards || []).filter((award) => award?.reward && !queued.current.has(award.id));
-      fresh.forEach((award) => queued.current.add(award.id));
-      setPackages(rewardPackages(fresh));
-    }).catch(() => {});
-    return () => { alive = false; };
-  }, [userId]);
+    const isCurrent = () => alive;
+    fetchUnseen(isCurrent);
+    const subscription = AppState.addEventListener?.("change", (state) => {
+      if (state === "active" && Date.now() - lastFetch.current >= UNSEEN_THROTTLE_MS) fetchUnseen(isCurrent);
+    });
+    return () => {
+      alive = false;
+      subscription?.remove?.();
+    };
+  }, [fetchUnseen, userId]);
 
   const current = packages[0] || null;
   const close = useCallback(() => {
@@ -94,7 +117,9 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
 
 const styles = StyleSheet.create({
   backdrop: { alignItems: "center", backgroundColor: "rgba(0,0,0,0.78)", flex: 1, justifyContent: "center", padding: 18 },
-  card: { backgroundColor: surfaces.s2, borderColor: "rgba(255,215,0,0.45)", borderRadius: radius.lg, borderWidth: 1, gap: 12, maxWidth: 440, padding: 18, width: "100%" },
+  card: { backgroundColor: surfaces.s2, borderColor: "rgba(255,215,0,0.45)", borderRadius: radius.lg, borderWidth: 1, gap: 12, maxHeight: "90%", maxWidth: 440, padding: 18, width: "100%" },
+  scroll: { flexGrow: 0, flexShrink: 1, maxHeight: 420 },
+  scrollContent: { paddingBottom: 2 },
   eyebrow: { color: roles.honor, fontSize: 11, fontWeight: "900", letterSpacing: 1.6, textTransform: "uppercase" },
   title: { color: colors.white, fontSize: 24, fontWeight: "900", textTransform: "uppercase" },
   list: { gap: 8 },

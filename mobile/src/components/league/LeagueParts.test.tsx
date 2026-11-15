@@ -7,7 +7,7 @@ import { standingsTables } from "../../lib/tournamentView";
 import { LeagueApplicationsCard } from "./LeagueApplicationsCard";
 import { LeagueSeasonHistory } from "./LeagueSeasonHistory";
 import { RewardChip, RewardCollection } from "./RewardCollection";
-import { RewardMomentHost } from "./RewardMomentHost";
+import { RewardMomentHost, UNSEEN_THROTTLE_MS } from "./RewardMomentHost";
 
 // Liga an Team, Profil und Tabelle (#2173): Anmeldestatus mit „Abmelden“, Season-Historie, Belohnungen mit Titel, Zeremonie und
 // Zonen in der Tabelle - wie im Web (SquadApplicationStatus, LeagueSeasonHistory, RewardCollection, RewardWatcher, StaffelTable).
@@ -153,4 +153,38 @@ test("Tippflächen mindestens 44 Punkte: „Als Titel“ mit Namen der Belohnung
   expect(StyleSheet.flatten(button.props.style).minWidth).toBeGreaterThanOrEqual(44);
   await render(<RewardCollection awards={[reward("t", "title", "Meister Season 1")] as never} titleId="t" onTitle={jest.fn()} />);
   expect(screen.getByTestId("reward-title-t").props.accessibilityLabel).toBe("Titel entfernen: Meister Season 1");
+});
+
+test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosselt, nichts doppelt; die Liste scrollt", async () => {
+  const { AppState } = jest.requireActual("react-native");
+  let onChange: ((state: string) => void) | null = null;
+  const subscription = jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, handler: (state: string) => void) => {
+    onChange = handler;
+    return { remove: jest.fn() };
+  }) as never);
+  const now = jest.spyOn(Date, "now");
+  let clock = Date.parse("2026-11-15T19:00:00Z");
+  now.mockImplementation(() => clock);
+  mockGet.mockResolvedValue({ data: { rewards: [] } });
+  await render(<RewardMomentHost queue={createCeremonyQueue()} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(1));
+  // Kurz weg und wieder da: kein neuer Abruf.
+  clock += 60 * 1000;
+  onChange?.("active");
+  expect(mockGet).toHaveBeenCalledTimes(1);
+  // Nach der Drossel: neuer Abruf, die neue Belohnung wird gefeiert.
+  clock += UNSEEN_THROTTLE_MS;
+  mockGet.mockResolvedValue({ data: { rewards: [{ ...reward("n", "medal", "Neu"), tournament: { id: "t9" } }] } });
+  onChange?.("active");
+  await waitFor(() => expect(screen.getByTestId("reward-moment-title")).toHaveTextContent("Neue Belohnung"));
+  expect(mockGet).toHaveBeenCalledTimes(2);
+  expect(screen.getByTestId("reward-moment-scroll")).toBeTruthy();
+  // Dieselbe Belohnung beim nächsten Abruf: nicht noch einmal eingereiht.
+  clock += UNSEEN_THROTTLE_MS;
+  onChange?.("active");
+  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(3));
+  await fireEvent.press(screen.getByTestId("reward-moment-close"));
+  await waitFor(() => expect(screen.queryByTestId("reward-moment")).toBeNull());
+  now.mockRestore();
+  subscription.mockRestore();
 });
