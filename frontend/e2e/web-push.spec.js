@@ -3,7 +3,8 @@ const { test, expect } = require("@playwright/test");
 // Browser-Benachrichtigungen (#1163) bei 390 und 1440 px: die Frage kommt nie beim ersten Besuch, sondern nach einer
 // Anmeldung beim nächsten; „Benachrichtigen“ holt die Zustimmung des Browsers und meldet ihn beim Server an. In den
 // Einstellungen stehen Kanal „Browser“ und „Dieser Browser“. Zustimmung und Push-Dienst sind nachgestellt (headless gibt
-// es keinen echten Push-Dienst); was ein Tipp auf die Meldung öffnet, prüft src/lib/serviceWorker.test.js.
+// es keinen echten Push-Dienst); was ein Tipp auf die Meldung öffnet, prüft src/lib/serviceWorker.test.js. Seit #1204 gilt
+// „Push“ je Thema für App und Browser; den Kanal „Browser“ ganz abschalten geht unter „Weitere Wege“.
 
 const ME = { id: "u-push", username: "pushloewe", display_name: "PushLöwe", role: "player", email: "push@lionsquad-test.at", updated_at: "2026-11-01T10:00:00.000000+00:00" };
 const CONFIG = { enabled: true, public_key: `B${"Q".repeat(86)}`, subscriptions: 0 };
@@ -112,8 +113,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     test("Einstellungen: Kanal Browser und „Dieser Browser“ anmelden", async ({ page }) => {
       const seen = await mockServer(page, { storage: { "tls-web-push-ask": "declined" } });
       await page.goto("/profile?tab=notifications");
+      // Push je Thema gilt auch für den Browser (#1204); den Kanal „Browser“ ganz aus gibt es unter „Weitere Wege“.
+      await expect(page.getByTestId("notification-topic-match_reminders-push")).toBeVisible();
+      await page.getByTestId("notification-more-ways").click();
       await expect(page.getByTestId("profile-notification-channel-browser")).toBeVisible();
-      await expect(page.getByTestId("profile-notification-column-browser")).toBeVisible();
       const card = page.getByTestId("profile-browser-push");
       await expect(card).toHaveAttribute("data-status", "available");
       await page.getByTestId("profile-browser-push-enable").click();

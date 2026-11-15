@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useNavigationGuard } from "@/lib/navigationGuard";
 import { Crown, UserCircle } from "lucide-react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
-import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey, tabRedirect } from "./profile/constants";
+import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, tabRedirect } from "./profile/constants";
 import { applyGroupLevel } from "./profile/visibility";
 import { useProfileSave } from "./profile/useAutosave";
 import { ProfileNav } from "./profile/ProfileNav";
@@ -18,12 +18,15 @@ import { GamingTab } from "./profile/GamingTab";
 import { SocialsTab } from "./profile/SocialsTab";
 import { linkErrorText, linkedText } from "@/lib/platformLinks";
 import { PrivacyTab } from "./profile/PrivacyTab";
-import { NotificationsTab } from "./profile/NotificationsTab";
 import { SecurityTab } from "./profile/SecurityTab";
 import { AppearanceTab } from "./profile/AppearanceTab";
 import { AboutTab } from "./profile/AboutTab";
 import { CalendarTab } from "./profile/CalendarTab";
 import { AutosaveStatus } from "./profile/SwitchRow";
+import { channelTopicValue } from "@/lib/notificationLevels";
+
+// Benachrichtigungen (#1204) kommen erst beim Öffnen des Reiters - Stufen, Themen und Ruhezeit laden nicht mit jeder Einstellung.
+const NotificationsTab = lazy(() => import("./profile/NotificationsTab").then((module) => ({ default: module.NotificationsTab })));
 
 // Die Einstellungen (#1146): Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine eigene Datei unter ./profile
 // (#253, Regel aus #223). Dieselben Gruppen in derselben Reihenfolge wie in der App - Darstellung, Benachrichtigungen,
@@ -40,11 +43,12 @@ const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 // Regler speichern nach der Pause wie Text - jeder Zwischenwert beim Ziehen wäre sonst ein eigener Lauf.
 const SLIDER_SETTINGS = new Set(["ceremony_volume"]);
 // Beim Verlassen mit offener, ungültiger Eingabe (#1048, nach Codex-Prüfung): was fehlt und wo das Feld steht.
-const LEAVE_REASONS = { display_name: "Name ist leer oder zu lang.", bio: "Bio ist zu lang.", website: "Website ist keine gültige Adresse." };
+const LEAVE_REASONS = { display_name: "Name ist leer oder zu lang.", bio: "Bio ist zu lang.", website: "Website ist keine gültige Adresse.", quiet_hours: "Ruhezeit: Beginn und Ende sind gleich." };
 const FIELD_PLACES = {
   display_name: { tab: "basic", testId: "profile-display-name" },
   bio: { tab: "basic", testId: "profile-bio" },
   website: { tab: "socials", testId: "profile-website" },
+  quiet_hours: { tab: "notifications", testId: "notification-quiet-end" },
 };
 
 function leaveDescription(issue) {
@@ -238,6 +242,14 @@ export default function ProfilePage() {
     }));
     void saveNow();
   };
+  // Eine Stufe oder eine Stellung (#1204) setzt mehrere Schalter auf einmal - ein Speichern.
+  const setNotificationPreferences = (patch) => {
+    setForm((f) => ({
+      ...f,
+      notification_preferences: { ...(f.notification_preferences || {}), ...patch },
+    }));
+    void saveNow();
+  };
   const gameIdGroups = (() => {
     const groups = new Map();
     games.forEach((game) => {
@@ -266,15 +278,8 @@ export default function ProfilePage() {
     if (Object.prototype.hasOwnProperty.call(pref, field)) return !!pref[field];
     return !!meta?.defaultOn || (field === "news_events" && !!form.newsletter_consent);
   };
-  const notificationTopicEnabled = (channel, topic) => {
-    const pref = form.notification_preferences || {};
-    if (channel === "email" && topic.requiresNewsletter && !form.newsletter_consent) return false;
-    const key = notificationPreferenceKey(channel, topic.k);
-    if (Object.prototype.hasOwnProperty.call(pref, key)) return !!pref[key];
-    if (Object.prototype.hasOwnProperty.call(pref, topic.k)) return !!pref[topic.k];
-    if (topic.k === "news_events") return !!form.newsletter_consent;
-    return topic.defaultOn !== false;
-  };
+  // Wie am Server (#1204): Browser folgt dem Push, solange er nichts Eigenes hat.
+  const notificationTopicEnabled = (channel, topic) => channelTopicValue(form.notification_preferences || {}, channel, topic, !!form.newsletter_consent);
 
   if (!user) return null;
 
@@ -332,15 +337,19 @@ export default function ProfilePage() {
               />
             )}
             {tab === "notifications" && (
-              <NotificationsTab
-                form={form}
-                set={setSetting}
-                setNotificationPreference={setNotificationPreference}
-                notificationEnabled={notificationEnabled}
-                notificationTopicEnabled={notificationTopicEnabled}
-                autosave={autosave}
-                user={user}
-              />
+              <Suspense fallback={<div className="h-64 border border-white/10 rounded-sm bg-[#0A0A0A] animate-pulse" data-testid="profile-notifications-loading" />}>
+                <NotificationsTab
+                  form={form}
+                  set={setSetting}
+                  setLater={set}
+                  setNotificationPreference={setNotificationPreference}
+                  setNotificationPreferences={setNotificationPreferences}
+                  notificationEnabled={notificationEnabled}
+                  notificationTopicEnabled={notificationTopicEnabled}
+                  autosave={autosave}
+                  user={user}
+                />
+              </Suspense>
             )}
 
             {FORM_TABS.has(tab) && (

@@ -1,4 +1,5 @@
 import { friendsSharing } from "@/lib/eventRecap";
+import { quietHoursForm } from "@/lib/notificationLevels";
 
 
 export function dateInputValue(value) {
@@ -84,6 +85,8 @@ export function profileToForm(user) {
     ceremony_mode: user.ceremony_mode || "full",
     newsletter_consent: !!user.newsletter_consent,
     notification_preferences: user.notification_preferences || {},
+    // Ruhezeit (#1206): Standard aus, Vorschlag 22:00 bis 7:00 - ohne gespeicherten Wert genau dieser Stand.
+    quiet_hours: quietHoursForm(user.quiet_hours),
     profile_visibility: user.profile_visibility || {},
     dm_privacy: user.dm_privacy || "everyone",
   };
@@ -135,6 +138,9 @@ export function profileFieldErrors(form) {
   const website = typeof form.website === "string" ? form.website.trim() : "";
   if (website && !WEBSITE_PATTERN.test(website)) {
     errors.website = "Bitte gib eine Adresse wie https://lionsquad.at ein.";
+  }
+  if (form.quiet_hours?.enabled && form.quiet_hours.start === form.quiet_hours.end) {
+    errors.quiet_hours = "Beginn und Ende der Ruhezeit dürfen nicht gleich sein.";
   }
   return errors;
 }
