@@ -96,7 +96,7 @@ class QuietHours(BaseModel):
     @field_validator("start", "end")
     @classmethod
     def _clock(cls, value: str) -> str:
-        from services.quiet_hours import parse_time
+        from services.quiet_hours_rules import parse_time
 
         if parse_time(value) is None:
             raise ValueError("Bitte eine Uhrzeit wie 22:00 angeben.")

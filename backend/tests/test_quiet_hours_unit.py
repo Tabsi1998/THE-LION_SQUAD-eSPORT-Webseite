@@ -14,7 +14,7 @@ pytest.importorskip("email_validator")
 
 from pymongo.errors import DuplicateKeyError
 
-from services import quiet_hours
+from services import quiet_hours, quiet_hours_rules
 from services.user_notifications import create_user_notification
 
 NIGHT = {"enabled": True, "start": "22:00", "end": "07:00"}
@@ -165,7 +165,7 @@ def _at(monkeypatch, db, when):
 
 def test_off_by_default_and_suggested_from_22_to_7():
     assert quiet_hours.quiet_until({}, _utc("2026-11-16T02:00:00")) is None
-    assert quiet_hours.settings_payload({}) == {"enabled": False, "start": "22:00", "end": "07:00"}
+    assert quiet_hours_rules.settings_payload({}) == {"enabled": False, "start": "22:00", "end": "07:00"}
     assert quiet_hours.quiet_until({"quiet_hours": {**NIGHT, "enabled": False}}, _utc("2026-11-16T02:00:00")) is None
     # Gleiche Zeiten sind keine Ruhezeit.
     assert quiet_hours.quiet_until({"quiet_hours": {"enabled": True, "start": "07:00", "end": "07:00"}}, _utc("2026-11-16T06:00:00")) is None
@@ -202,13 +202,13 @@ def test_a_window_within_one_day():
     assert quiet_hours.quiet_until(user, _utc("2026-11-16T11:59:00")) is None
     assert quiet_hours.quiet_until(user, _utc("2026-11-16T12:00:00")) == _utc("2026-11-16T14:30:00")
     assert quiet_hours.quiet_until(user, _utc("2026-11-16T14:30:00")) is None
-    assert not quiet_hours.crosses_midnight(user) and quiet_hours.crosses_midnight({"quiet_hours": NIGHT})
+    assert not quiet_hours_rules.crosses_midnight(user) and quiet_hours_rules.crosses_midnight({"quiet_hours": NIGHT})
 
 
 def test_times_are_checked_without_regex():
-    assert quiet_hours.parse_time("07:05") == 425
+    assert quiet_hours_rules.parse_time("07:05") == 425
     for bad in ("7:00", "24:00", "12:60", "aa:bb", "", None, "12:000", "12-00"):
-        assert quiet_hours.parse_time(bad) is None
+        assert quiet_hours_rules.parse_time(bad) is None
 
 
 def test_the_profile_model_accepts_only_clock_times():

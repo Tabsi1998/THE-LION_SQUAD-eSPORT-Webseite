@@ -460,7 +460,7 @@ async def send_user_template(user: dict | None, template_key: str, category: str
 
 
 def public_preferences_payload(user: dict | None) -> dict[str, Any]:
-    from services.quiet_hours import EXEMPTION_TEXTS, SUGGESTED_END, SUGGESTED_START, settings_payload
+    from services.quiet_hours_rules import EXEMPTION_TEXTS, SUGGESTED_END, SUGGESTED_START, settings_payload
 
     prefs = normalized_preferences(user)
     return {
