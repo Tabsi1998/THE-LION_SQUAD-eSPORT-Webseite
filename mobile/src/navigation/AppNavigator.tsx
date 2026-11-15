@@ -247,6 +247,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   InfoCenter: { title: "Verein" },
   ReferenceSeason: { title: "Saison" },
   ReferenceRound: { title: "Runde" },
+  LeagueOverall: { title: "Gesamtwertung" },
   ClubAbout: { title: "Über uns" },
   YearReview: { title: "Dein Jahr", ...gold },
   Settings: { title: "Einstellungen" },
@@ -260,12 +261,14 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
  * keine zweite Seite. Gilt für jeden Detail-Screen, dessen Parameter eine Kennung tragen.
  */
 export function detailRouteId(_name: DetailScreenName, params?: object): string | undefined {
-  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown; lineage?: unknown; season?: unknown; round?: unknown };
+  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown; lineage?: unknown; season?: unknown; round?: unknown; league?: unknown };
   // Saison einer Serie (#1945): Spur und Saison zusammen; eine Runde (#1974) dazu mit ihrer Nummer - der Lauf bleibt
   // ein Reiter derselben Seite.
   const round = typeof values.round === "number" || typeof values.round === "string" ? `/${values.round}` : "";
   const season = typeof values.lineage === "string" && typeof values.season === "string" ? `${values.lineage}/${values.season}${round}` : undefined;
-  const id = values.id ?? values.username ?? values.userId ?? values.albumId ?? season;
+  // Gesamtwertung (#2173): Liga und Season zusammen - die Liga N bleibt ein Reiter derselben Seite.
+  const league = typeof values.league === "string" && typeof values.season === "string" ? `${values.league}/${values.season}` : undefined;
+  const id = values.id ?? values.username ?? values.userId ?? values.albumId ?? season ?? league;
   return typeof id === "string" || typeof id === "number" ? String(id) : undefined;
 }
 

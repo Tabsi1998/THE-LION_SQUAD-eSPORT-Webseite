@@ -1,5 +1,5 @@
 import {
-  applicationTone, applicationsForSquads, carryLine, finalNote, historyMovement, historyPlace, historyWhere, knownZone, lateEntryText, staffelApiPath, teamStateLabel,
+  applicationTone, applicationsForSquads, carryLine, finalNote, historyMovement, historyPlace, historyWhere, knownZone, lateEntryText, staffelApiPath, teamStateLabel, afterStartLine, seasonApiPath, windowLine,
   winnerLabel, zoneLegend,
   ZONE_LABELS,
 } from "./leagueTeam";
@@ -80,4 +80,21 @@ test("Nachmeldung (#2422): „Nachgemeldet ab Woche X“, ohne Woche nur „Nach
   expect(lateEntryText({ late_entry: false, late_from_week: 3 })).toBe("");
   expect(lateEntryText({})).toBe("");
   expect(lateEntryText(null)).toBe("");
+});
+
+test("Anmeldefenster der Season mit wirksamem Ende (#2422): offen, bald, vorbei, und „läuft nach Season-Start weiter“", () => {
+  expect(seasonApiPath("/liga/cod/season-2")).toBe("/leagues/cod/season-2");
+  expect(seasonApiPath("/liga/cod/..")).toBeNull();
+  expect(seasonApiPath("/liga/cod")).toBeNull();
+  // Wiener Zeit: 19.01.2027, 23:59 Uhr.
+  const open = { state: "open", closes_at: "2027-01-19T22:59:00Z", season_starts_at: "2027-01-05T17:00:00Z" };
+  expect(windowLine(open)).toBe("Anmeldung offen bis 19.01.2027, 23:59 Uhr");
+  expect(afterStartLine(open)).toBe("Anmeldung läuft nach Season-Start weiter (bis 19.01.2027, 23:59 Uhr).");
+  expect(windowLine({ state: "upcoming", opens_at: "2026-12-01T09:00:00Z" })).toBe("Anmeldung öffnet am 01.12.2026, 10:00 Uhr");
+  expect(windowLine({ state: "closed", closes_at: "2027-01-19T22:59:00Z" })).toBe("Anmeldung vorbei seit 19.01.2027, 23:59 Uhr");
+  // Endet vor dem Start, ist vorbei oder kennt keinen Start: kein Satz zur Nachmeldung.
+  expect(afterStartLine({ ...open, closes_at: "2027-01-04T10:00:00Z" })).toBe("");
+  expect(afterStartLine({ ...open, state: "closed" })).toBe("");
+  expect(afterStartLine({ state: "open", closes_at: open.closes_at })).toBe("");
+  expect(windowLine(null)).toBe("");
 });

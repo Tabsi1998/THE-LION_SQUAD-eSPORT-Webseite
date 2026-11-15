@@ -123,6 +123,14 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/references/series/prl/2026-liga-1/runde/3?lauf=sprint", detail("ReferenceRound", { lineage: "prl", season: "2026-liga-1", round: 3, session: "sprint" })],
   // Keine gültige Nummer: die Saison.
   ["/references/series/prl/2026-liga-1/runde/abc", detail("ReferenceSeason", { lineage: "prl", season: "2026-liga-1" })],
+  // Gesamtwertung über Seasons (F.5, #2173): hat einen Screen in der App; die übrigen Seiten der Liga bleiben im Web.
+  ["/liga/cod/season-2/gesamtwertung", detail("LeagueOverall", { league: "cod", season: "season-2" })],
+  ["/liga/cod/season-2", null],
+  ["/liga/cod/season-2/staffeln/t1", null],
+  // Trophäen (#2425): ?tab=trophaeen öffnet den Reiter an Team und eigenem Profil.
+  ["/teams/t-9?tab=trophaeen", detail("TeamDetail", { id: "t-9", tab: "trophies" })],
+  ["/teams/t-9?tab=chat", detail("TeamDetail", { id: "t-9" })],
+  ["/profile?tab=trophaeen", tab("ProfileTab", "Profile", { tab: "awards" })],
 ];
 
 test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles andere legt sich darüber", () => {

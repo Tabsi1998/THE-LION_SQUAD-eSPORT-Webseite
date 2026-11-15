@@ -252,6 +252,8 @@ test("jeder Detail-Screen mit Kennung hat eine eigene Seite je Kennung (#1000)",
   // Runde (#1974): Runde 3 und Runde 4 sind zwei Seiten - der Lauf ist nur ein Reiter derselben Seite.
   expect(detailRouteId("ReferenceRound", { lineage: "prl", season: "2026", round: 3 })).toBe("prl/2026/3");
   expect(detailRouteId("ReferenceRound", { lineage: "prl", season: "2026", round: 3, session: "sprint" })).toBe("prl/2026/3");
+  // Gesamtwertung (#2173): Liga und Season sind die Kennung, die Liga N ist ein Reiter derselben Seite.
+  expect(detailRouteId("LeagueOverall", { league: "cod", season: "season-2", level: 2 })).toBe("cod/season-2");
   expect(detailRouteId("Settings", undefined)).toBeUndefined();
   expect(detailRouteId("NewsDetail", undefined)).toBeUndefined();
 });

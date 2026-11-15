@@ -2,6 +2,7 @@ import { createNavigationContainerRef, type NavigationState, type PartialState }
 import type { AppStackParamList, DetailScreenName, LooseNavigation, MainTabName, TabRootParamList } from "./types";
 import type { UserNotification } from "../types";
 import { isLocalPath, ownPath } from "../lib/siteUrls";
+import { overallParams } from "../lib/leagueOverall";
 
 // Die Navigation von außen (#1144): Benachrichtigungen, Links von außen und Adressen aus Inhalten öffnen ihren Screen
 // über dem Tab, in dem man gerade ist - die Tab-Leiste springt nicht mit. Nur die Übersicht eines Tabs (Home, Events,
@@ -9,6 +10,9 @@ import { isLocalPath, ownPath } from "../lib/siteUrls";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const navigationRef = createNavigationContainerRef<any>();
+
+/** Der Reiter „Trophäen“ in Links (#2425): dieselben Namen wie im Web (`?tab=trophaeen`, `trophies`, `awards`). */
+const TROPHY_TABS = new Set(["trophaeen", "trophies", "awards"]);
 let pendingNotification: UserNotification | null = null;
 
 type TabRootName = keyof TabRootParamList;
@@ -198,8 +202,16 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if ((first === "fastlap" || first === "fastlaps") && second) return detail("FastLapDetail", { id: second });
   if (first === "f1" && second === "challenges" && third) return detail("FastLapDetail", { id: third });
   if (first === "f1" && second) return detail("FastLapDetail", { id: second });
-  // Einladungs-Link (#1191): der Schlüssel geht mit, die Team-Seite zeigt dann „Beitreten“.
-  if (first === "teams" && second) return detail("TeamDetail", query.get("einladung") ? { id: second, invite: query.get("einladung") } : { id: second });
+  // Einladungs-Link (#1191): der Schlüssel geht mit, die Team-Seite zeigt dann „Beitreten“. `?tab=trophaeen` (#2425) öffnet die Trophäen.
+  if (first === "teams" && second) {
+    const trophies = TROPHY_TABS.has(query.get("tab") || "") ? { tab: "trophies" as const } : {};
+    return detail("TeamDetail", query.get("einladung") ? { id: second, invite: query.get("einladung"), ...trophies } : { id: second, ...trophies });
+  }
+  // Gesamtwertung über Seasons (F.5, #2173): /liga/<liga>/<season>/gesamtwertung - die übrigen Seiten der Liga bleiben im Web.
+  if (first === "liga") {
+    const overall = overallParams(parsed.path);
+    if (overall) return detail("LeagueOverall", overall);
+  }
   if (first === "news" && second) return detail("NewsDetail", { id: second });
   // Saison einer Serie (#1945): /references/series/<spur>/<saison> öffnet die Saison in der App.
   if (first === "references" && second === "series" && third && parts[3]) {
@@ -300,6 +312,8 @@ function profileTarget(query: URLSearchParams): AppTarget {
   // „Erfolg freigeschaltet“ (#301, #218) führt zu den Erfolgen im eigenen Profil.
   if (wanted === "achievements") return tab("Profile", { tab: "achievements" });
   if (wanted === "honours") return tab("Profile", { tab: "honours" });
+  // Trophäen (#2425): der Reiter im eigenen Profil (früher „Auszeichnungen“).
+  if (TROPHY_TABS.has(wanted)) return tab("Profile", { tab: "awards" });
   // Einstellungen an einem Ort (#1146): was früher Reiter von /profile war, steht unter dem Zahnrad.
   if (["notifications", "privacy", "security", "sessions", "appearance", "about"].includes(wanted)) return detail("Settings");
   if (["basic", "gaming", "socials", "edit"].includes(wanted)) return detail("ProfileEdit");

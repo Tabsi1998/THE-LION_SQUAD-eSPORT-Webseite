@@ -129,6 +129,42 @@ export function staffelApiPath(publicPath?: string | null, tournamentId?: string
   return `/leagues/${encodeURIComponent(parts[2])}/${encodeURIComponent(parts[3])}/staffeln/${encodeURIComponent(tournamentId)}`;
 }
 
+/** Liga und Season aus dem öffentlichen Pfad der Season („/liga/<liga>/<season>“) - nur echte Namen, sonst null. */
+export function seasonParts(publicPath?: string | null): { league: string; season: string } | null {
+  const parts = String(publicPath || "").split("/");
+  const plain = (segment: string) => Boolean(segment) && segment !== "." && segment !== "..";
+  if (parts.length !== 4 || parts[0] !== "" || parts[1] !== "liga" || !plain(parts[2]) || !plain(parts[3])) return null;
+  return { league: parts[2], season: parts[3] };
+}
+
+/** Der Abruf der Season auf der Ligaseite (`GET /api/leagues/<liga>/<season>`): Anmeldefenster und Gesamtwertung. */
+export function seasonApiPath(publicPath?: string | null): string | null {
+  const parts = seasonParts(publicPath);
+  return parts ? `/leagues/${encodeURIComponent(parts.league)}/${encodeURIComponent(parts.season)}` : null;
+}
+
+/** Das Anmeldefenster der Season (`application`): `closes_at` ist das wirksame Ende mit Nachmeldefrist (#2422, Nr. 184). */
+export type ApplicationWindow = { state?: string | null; opens_at?: string | null; closes_at?: string | null; season_starts_at?: string | null };
+
+const when = (value?: string | null) => `${viennaDateTime(String(value), LONG)} Uhr`;
+
+/** Der Stand des Fensters als kurzer Satz - wie im Web (lib/leagueApplications.js `windowLine`). */
+export function windowLine(block?: ApplicationWindow | null): string {
+  if (block?.state === "open" && block.closes_at) return `Anmeldung offen bis ${when(block.closes_at)}`;
+  if (block?.state === "upcoming" && block.opens_at) return `Anmeldung öffnet am ${when(block.opens_at)}`;
+  if (block?.state === "closed" && block.closes_at) return `Anmeldung vorbei seit ${when(block.closes_at)}`;
+  return "";
+}
+
+/** Nachmeldung (Nr. 180): Endet die Anmeldung nach dem Beginn der Season, sagt es ein Satz - sonst leer (wie `afterStartLine` im Web). */
+export function afterStartLine(block?: ApplicationWindow | null): string {
+  if (!block?.state || block.state === "closed" || !block.closes_at || !block.season_starts_at) return "";
+  const closes = new Date(block.closes_at).getTime();
+  const start = new Date(block.season_starts_at).getTime();
+  if (!Number.isFinite(closes) || !Number.isFinite(start) || closes <= start) return "";
+  return `Anmeldung läuft nach Season-Start weiter (bis ${when(block.closes_at)}).`;
+}
+
 /** Die Überschrift über Platz 1 einer abgeschlossenen Staffel: „Meister“ nur, wenn der Endstand einen nennt, sonst „Platz 1“. */
 export function winnerLabel(isLeague: boolean, champion?: { display_name?: string | null } | null): string {
   if (!isLeague) return "Champion";
