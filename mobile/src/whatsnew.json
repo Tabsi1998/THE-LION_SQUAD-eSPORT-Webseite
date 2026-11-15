@@ -1,10 +1,16 @@
 {
-  "version": "1.7.9",
-  "build": 103,
-  "date": "2026-10-27",
+  "version": "1.7.10",
+  "build": 104,
+  "date": "2026-11-15",
   "items": [
-    "Wunschnummer unter „Meine Mitgliedschaft“: einmal frei von 0 bis 99 wählen, jede Nummer gibt es nur einmal.",
-    "Danach ändert sich die Nummer nur per Antrag an den Vorstand – mit Grund und optionaler Wunschnummer.",
-    "Die gewählte Nummer setzt sich mit ruhiger Bewegung und Vibration."
+    "Liga-Check-in zum Spiel: Anwesende anhaken, einchecken, Spiel starten.",
+    "Map-Veto live: Countdown nach der Serverzeit, sperren und wählen als Captain, „Bereit zum Veto“, Vorgabe der Woche.",
+    "Matchablauf als Schild im Kopf der Matchseite, vor dem Check-in ein Hinweis statt des Meldeformulars.",
+    "Liga-Anmeldung am Team: Stand je Co-Team, übernommene Anmeldung abmelden.",
+    "Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister.",
+    "Season-Historie, Belohnungen und Titel in Profil und Team.",
+    "Zeremonie bei neuer Liga-Belohnung.",
+    "Map-Veto sagt den eigenen Zug auch Vorleseprogrammen auf iOS an, größere Tippflächen.",
+    "„Vergangene anzeigen“ in der Turnierliste mit größerer Tippfläche."
   ]
 }

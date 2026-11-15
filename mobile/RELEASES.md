@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.10`: Build 104, Liga in der App: Check-in, Map-Veto live, Matchablauf, Anmeldestatus, Tabelle mit Zonen, Season-Historie, Belohnungen und Zeremonie (#2173)
 - `1.7.9`: Build 103, Wunschnummer in der Mitgliedschaft wählen bzw. per Antrag ändern (#2050)
 - `1.7.8`: Build 102, Turnierserien mit Turniertagen ohne Ort und Flagge, „Termin folgt“, Einsätze in den Wörtern der Serie (#2024); erste Store-Version nach 1.7.5 (1.7.6 und 1.7.7 nie gebaut)
 - `1.7.7`: Build 101, Original-Bilder im Vollbild (#1933), „Daten von …“ (#1964), Fahrer-Anpassungen in der Teamwertung (#2000), Mikro-Bewegung, Fast Lap mit Komma und wischbare Reiter (#1969)
