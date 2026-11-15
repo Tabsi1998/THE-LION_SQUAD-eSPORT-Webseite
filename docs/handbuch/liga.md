@@ -1609,6 +1609,43 @@ solange der Gewinn nicht abgeholt ist.
 
 **Sichtbarkeit:** Öffentlich steht eine Belohnung nur, wenn Gäste die Season und die Staffel sehen dürfen.
 
+
+### 3.13 Gesamtwertung über Seasons
+
+**Wo:** **Admin → Ligen → Gesamtwertung** (Knopf an der Liga). Lesen darf jede Zuständigkeit, ändern, abschließen und wieder
+öffnen, wer **Season konfigurieren** hat. Vier Reiter:
+
+<img src="../assets/liga/f5-verwaltung-1440.png" alt="Gesamtwertung verwalten am PC: Reiter Einstellungen mit Punkten nach Teamzahl, Zusatzpunkten für Platz 1, nur die besten zwei Seasons und der Reihenfolge bei Gleichstand" width="720">
+
+**1. Einstellungen.** **Punkte je Season-Platz**: **Nach Teamzahl** (Vorgabe – Platz 1 bekommt so viele Punkte, wie seine Staffel
+Teams in der Wertung hat, der Letzte 1; hat eine Liga mehrere Staffeln, zählt jede für sich) oder **Eigene Punkte je Platz**.
+**Zusatzpunkte für Platz 1 der Staffel** (Vorgabe 2): in der obersten Liga der Meister, sonst der Staffelsieger. Ausgetretene und
+Disqualifizierte bekommen 0, ein geteilter Platz dieselben Punkte. **Welche Seasons zählen**: alle oder **nur die besten X** – die
+übrigen stehen durchgestrichen als Streichergebnis da. **Gleichstand**: Reihenfolge aus Staffelsiegen, bester Platzierung und
+jüngster Season; steht Platz 1 danach noch gleich, entscheidest du im Reiter **Abschluss**.
+
+**2. Zeiträume.** Ein Zeitraum (etwa „2027“ oder „Seasons 1–4“) fasst Seasons zu einer Gesamtwertung zusammen. Eine Season gehört zu
+höchstens einem Zeitraum. Ohne Zeitraum zeigt die Ligaseite keine Gesamtwertung.
+
+**3. Abschluss.** Je Liga eine Karte mit der Vorschau (Co-Teams und Spieler), dem, was noch fehlt (eine Staffel einer Season ist nicht
+abgeschlossen, Gleichstand auf Platz 1), und dem Verlauf. **Entscheiden** legt bei Gleichstand die Reihenfolge fest – mit Art
+(Entscheidungsspiel, Los, Leitung) und Grund. **Gesamtwertung abschließen** hält den Stand fest und vergibt die Belohnungen.
+**Wieder öffnen** macht eine zweite Person, mit Grund; die Belohnungen ruhen bis zum neuen Abschluss. Wer zu einem Co-Team der
+Wertung gehört, schließt nicht ab.
+
+**4. Belohnungen.** Wie bei der Season (3.12): Medaille, Banner, Emblem oder Titel je Platz, Bereich oder für alle – etwa
+„Gesamtsieger 2027“ für Platz 1. Spieler-Belohnungen gehen an die Spieler, die für das Co-Team Punkte geholt haben (oder an den
+ganzen Kader).
+
+**Was zählt:** nur der feste Endstand jeder Season (3.10). Öffnest du eine Staffel wieder, fehlt sie in der laufenden Wertung,
+bis sie neu abgeschlossen ist. Steigt ein Team auf oder ab, zählen seine Punkte in der Liga, in der es die Season gespielt hat.
+**Spielerwertung:** Ein Spieler bekommt je Season die Punkte seines Co-Teams, wenn er mindestens ein gespieltes Spiel in der
+Aufstellung stand (ohne gemeldete Aufstellung zählt der Kader); wechselt er das Team, zählt je Season das jeweilige.
+**Sichtbarkeit:** Seasons mit Sichtbarkeit „Aus“ zählen auf der Ligaseite nicht mit – in der Verwaltung schon. Die Ligaseite zeigt
+die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
+
+<img src="../assets/liga/f5-gesamtwertung-390.png" alt="Gesamtwertung auf der Ligaseite am Handy: Liga 1 mit Co-Teams, Platz und Summe, Aufklappen je Zeile für die Punkte je Season" width="320">
+
 ---
 
 ## 4. Wenn etwas nicht klappt

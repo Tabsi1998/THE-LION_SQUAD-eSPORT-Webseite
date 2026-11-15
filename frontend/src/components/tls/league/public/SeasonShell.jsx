@@ -37,10 +37,11 @@ export function useLeagueSeason(leagueSlug, seasonSlug) {
 
 /**
  * Navigation zwischen Übersicht und Unterseiten. `hasRules`: ohne Regelwerk fehlt der Punkt (der Regeltext steht dann auf der
- * Übersicht). Am Handy wischbar; der aktive Punkt zeichnet seine Linie nach.
+ * Übersicht); `hasOverall`: „Gesamtwertung“ nur, wenn die Season zu einem Zeitraum gehört (F.5). Am Handy wischbar; der aktive Punkt
+ * zeichnet seine Linie nach.
  */
-export function SeasonNav({ leagueSlug, seasonSlug, hasRules = true, className = "" }) {
-  const sections = SEASON_SECTIONS.filter((row) => row.key !== "regeln" || hasRules);
+export function SeasonNav({ leagueSlug, seasonSlug, hasRules = true, hasOverall = false, className = "" }) {
+  const sections = SEASON_SECTIONS.filter((row) => (row.key !== "regeln" || hasRules) && (row.key !== "gesamtwertung" || hasOverall));
   // Steht rechts noch etwas über (Handy), blendet der Rand aus - der Hinweis, dass man wischen kann (#2268). Am Ende verschwindet er.
   const list = useRef(null);
   const [more, setMore] = useState(false);
@@ -103,6 +104,7 @@ export function SeasonShell({ section = "", head, children }) {
     "": `${name}: was gespielt wird, Map-Pool, Ablauf, Tabellen und der aktuelle Spieltag.`,
     spieltage: `${name}: Spielplan Woche für Woche mit Ergebnissen, Maps und Modi.`,
     teams: `${name}: alle Teams der Season nach Liga und Staffel.`,
+    gesamtwertung: `${name}: Gesamtwertung über mehrere Seasons mit Co-Teams und Spielern je Liga.`,
   }[section] || name;
   useDocumentTitle(title, description, {
     canonical: league && season ? `${window.location.origin}${sectionPath(league.slug, season.slug, section)}` : undefined,
@@ -153,7 +155,7 @@ export function SeasonShell({ section = "", head, children }) {
             {head ? head(data) : null}
           </LeagueHead>
         )}
-        <SeasonNav leagueSlug={league.slug} seasonSlug={season.slug} hasRules={Boolean(data.rules)} className="mt-8" />
+        <SeasonNav leagueSlug={league.slug} seasonSlug={season.slug} hasRules={Boolean(data.rules)} hasOverall={Boolean(data.overall)} className="mt-8" />
         {children(data)}
       </div>
     </PublicLayout>

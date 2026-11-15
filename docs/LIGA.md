@@ -3735,3 +3735,140 @@ Kennungen (`player_ids`, `audience_ids`, `seen_by`); die Auswahl `featured_title
 „Belohnungen“, Stand im Reiter „Abschluss“), Profil und Teamseite (Sammlung, Auswahl), Zeremonie beim nächsten Besuch, Teilen-Bild,
 Nachricht, Ergebnis-PDF, Handbuch Liga und Captains. Nicht in F.4: TV (der Sieger-Moment zeigt den Meister wie bisher) und die App
 (`mobile/`, Liste in #2173).
+
+### F.5 Gesamtwertung über Seasons (#2215)
+
+Entscheidungen Nr. 170 bis 173. Kein zweiter Endstand: Die Gesamtwertung rechnet allein aus den geltenden Endständen
+(`league_final_tables`, `active`, F.1), die Belohnungen sind Einträge in `tournament_awards` wie in F.4. Regeln in
+`services/league_overall_rules.py` (Blatt-Modul: Einstellungen, Punkte, Zählen, Reihenfolge), Rechnung, Abschluss und Belohnungen in
+`services/league_overall.py`, Routen in `routes/league_overall_routes.py`. Oberfläche: Verwaltung `/admin/leagues/<liga>/gesamtwertung`
+(`AdminLeagueOverallPage.jsx`, Reiter **Einstellungen · Zeiträume · Abschluss · Belohnungen**, `lib/leagueOverall.js`), Ligaseite
+`/liga/<liga>/<season>/gesamtwertung` (`LeagueSeasonOverallPage.jsx`), Profil und Teamseite (`league_overall`).
+
+**Einstellungen** `leagues.overall` (Zuständigkeit `season` an der Liga, ohne Migration - fehlt das Feld oder gibt es keinen Zeitraum,
+gibt es keine Gesamtwertung und alles bleibt wie bisher):
+
+| Feld | Inhalt | Vorgabe |
+| --- | --- | --- |
+| `points_mode` | `teams`: Platz 1 bekommt N Punkte, der Letzte 1 (N = Teams der Staffel in der Wertung); `table`: eigene Punkte je Platz | `teams` |
+| `points_table` | bei `table`: Punkte für Platz 1, 2, … (höchstens 32 Einträge, je 0–999); Plätze dahinter bekommen 0 | `[]` |
+| `champion_bonus` | Zusatzpunkte für Platz 1 der Staffel (0–99) | `2` |
+| `counting` | `all`: alle Seasons des Zeitraums; `best`: nur die besten X | `all` |
+| `best_count` | X bei `best` (1–50) | - |
+| `tiebreakers` | Reihenfolge bei gleicher Summe aus `wins` (mehr Siege in einer Staffel), `best_place` (bessere beste Platzierung), `latest` (mehr Punkte in der jüngsten Season des Zeitraums); danach Entscheid der Leitung | alle drei in dieser Reihenfolge |
+| `reward_players` | `fielded` (Spieler mit Einsatz) oder `roster` (ganzer Kader des Co-Teams) - wie F.4 | `fielded` |
+| `rewards` | Belohnungen der Gesamtwertung, dieselben Felder wie F.4 (höchstens 20, gelten für jede Liga N) | `[]` |
+| `periods` | Wertungszeiträume `[{id, name, season_ids}]` (höchstens 20, Name 1–60 Zeichen), z. B. „2027“ oder „Seasons 1–4“ | `[]` |
+
+- **Eine Season gehört zu höchstens einem Zeitraum** dieser Liga (422 „… steht schon im Zeitraum …“), nur Seasons dieser Liga.
+- Ist eine Liga N eines Zeitraums abgeschlossen, ändern sich dessen Seasons nicht mehr und der Zeitraum lässt sich nicht löschen (409 „Erst
+  im Reiter ‚Abschluss‘ wieder öffnen“). Punkte, Zählen und Reihenfolge darf die Leitung ändern - sie wirken auf laufende Wertungen, die
+  abgeschlossene Fassung bleibt fest.
+
+**Rechnung** (`league_overall.compute`, Nr. 170, 171):
+
+- **Quelle:** je Season des Zeitraums die geltenden Endstände ihrer Staffeln. Eine wieder geöffnete Staffel zählt erst nach dem neuen
+  Abschluss wieder; ein neuer Endstand rechnet die laufende Wertung sofort neu.
+- **Eigene Wertung je Liga N** (`level` der Liga N der Staffel), keine Verrechnung zwischen Stufen. Steigt ein Co-Team auf oder ab,
+  landen seine Punkte in der Wertung der Liga N, in der es die Season gespielt hat.
+- **Platz in der Staffel:** gezählt werden nur die Teams in der Wertung (ohne `exit`); ihr Platz ist 1 + die Zahl der Teams in der Wertung
+  mit besserem Platz - Ausgeschiedene schieben niemanden nach hinten, auch nicht unter der Regel `half`. **N gilt je Staffel**: Hat eine
+  Liga N mehrere Staffeln, bekommt Platz 1 jeder Staffel so viele Punkte, wie seine Staffel Teams in der Wertung hat.
+- **Punkte:** `teams` → N − Platz + 1; `table` → der Eintrag des Platzes, sonst 0. Platz 1 bekommt dazu `champion_bonus` - in der
+  obersten Liga N ist das der Meister aus F.1, in jeder anderen Liga N der Staffelsieger.
+- **Geteilter Platz:** dieselben Punkte für jeden, der ihn hält (auch den Bonus, wenn Platz 1 geteilt bleibt - das geht nur unterhalb der
+  obersten Liga N).
+- **Ausgeschiedene und Disqualifizierte:** 0 Punkte; die Season steht mit „ausgeschieden“ in ihrer Zeile.
+- **Co-Team** (`key`): `squad:<squad_id>` aus `sides` des Endstands (sonst aus der Anmeldung), ohne Co-Team `team:<team_id>`, in einer
+  Einzel-Liga `user:<user_id>` - dieselbe Identität, mit der F.2 Co-Teams in die nächste Season übernimmt. Der Name ist der aus der
+  jüngsten Season. Steht ein Co-Team in einer Season zweimal (Umzug zwischen Staffeln), zählt die Zeile mit mehr Punkten.
+- **Zählen** (Nr. 173): `all` alle Seasons; `best` die besten X Season-Punkte, die übrigen tragen `counted: false` und heißen
+  „Streichergebnis“. Bei gleichen Punkten zählt die frühere Season. Eine Season ohne Teilnahme zählt nicht und streicht nichts.
+- **Reihenfolge:** Summe, dann `tiebreakers`, dann ein **Entscheid der Leitung** (`leagues.overall_decisions`: `{id, period_id, level,
+  keys, reason, method, decided_at}` - `keys` in der entschiedenen Reihenfolge; er gilt nur, solange genau diese Co-Teams gleich stehen),
+  sonst ein geteilter Platz. `method` wie F.1: `playoff`, `lot`, `lead`.
+
+**Spielerwertung** (Nr. 172): Je Season bekommt eine Person die Punkte des Co-Teams, für das sie dort gilt - dieselbe Regel wie die
+Spieler-Belohnung in F.4 (`league_rewards.players_for`, Basis „Spieler mit Einsatz“): mindestens ein gespieltes Spiel (`completed`) in der
+Aufstellung, kampflose zählen nicht (Nr. 168); fehlen für ein Co-Team alle Aufstellungen, gilt sein Kader (Nr. 167) zum
+Abschluss der Season, wie der Endstand ihn festhielt (`sides[].player_ids`, seit F.2; ältere Endstände und
+Anmeldungen ohne Co-Team lesen wie F.4 den Kader des Hauptteams von heute). Ohne gesehene Fassung (Season nach dem Abschluss nicht
+öffentlich) gibt es keinen „Gesamtsieger“: Ligaseite, Profil und Teamseite tragen `complete` und nennen den Stand „Endstand ohne nicht
+öffentliche Seasons“. Bei einem Teamwechsel zählen je Season die Punkte des jeweiligen Co-Teams; spielte sie in einer
+Season für zwei, die höheren. Zählen und Reihenfolge wie bei den Co-Teams, ohne Entscheid der Leitung (gleich heißt geteilter Platz).
+Öffentlich steht der Name nur bei einem öffentlichen Profil (mit Link), sonst „Spieler mit privatem Profil“ - der Platz bleibt.
+
+**Sichtbarkeit:** Die Leitung (jede Zuständigkeit der Liga, Verwaltung) sieht alles. Die Ligaseite rechnet für die betrachtende Person:
+nur Seasons, die sie sieht (`can_see_season`, nicht archiviert), und nur Staffeln, die sie als Turnier sähe (`tournament_hidden_reason`) -
+Gäste sehen damit den öffentlichen Stand. Seasons mit Sichtbarkeit „Aus“ und versteckte Staffeln zählen dort nicht mit, die Reihenfolge
+wird ohne sie gerechnet. Bei einer abgeschlossenen Wertung rechnet die Ligaseite aus der Fassung (je Co-Team die Season-Einträge) ohne die
+unsichtbaren Seasons; sind alle sichtbar, steht die Fassung unverändert da. Die Inhaber der Belohnungen stehen nur, wenn die Person
+jede Season und Staffel der Fassung sieht (`rewards_granted`), sonst die Belohnungen ohne Inhaber. Jede Liga N trägt `settings`: bei einer
+abgeschlossenen die Rechnung ihrer Fassung (Ansicht und PDF), sonst die von heute. Die Season-Seite trägt `overall: {period_id, name} | null`
+- nur dann zeigt die Navigation „Gesamtwertung“.
+
+**Abschluss** (Nr. 173, wie F.1) je Zeitraum und Liga N - Sammlung `league_overall_finals` (neu, ohne Migration):
+
+| Feld | Inhalt |
+| --- | --- |
+| `id`, `league_id`, `period_id`, `level`, `version`, `active` | Zuordnung; höchstens eine aktive Fassung je Zeitraum und Liga N (Teilindex `league_overall_active`), `version` eindeutig je Zeitraum und Liga N |
+| `closed_at`, `closed_by`, `reopened_at`, `reopened_by`, `reopen_reason` | wie F.1 |
+| `title` | Namen von Liga, Zeitraum und Liga N zum Abschluss |
+| `settings` | Punkte, Zählen und Reihenfolge zum Abschluss |
+| `seasons` | `[{id, name, number}]` des Zeitraums |
+| `teams`, `players` | die Zeilen mit Platz, Summe und je Season `{points, place, of, counted, champion, exit, staffel, tournament_id}` |
+| `decisions`, `sources` | geltende Entscheide; Fingerabdruck der Endstände (`tournament_id`, `final_table_id`, `version`) |
+
+- **Sperrgründe** (`blockers`): `open_seasons` (eine Staffel dieser Liga N in einer Season des Zeitraums ist nicht abgeschlossen - Entwurf,
+  abgesagt und archiviert zählen nicht), `no_rows` (niemand in der Wertung), `leader_tie` (Gleichstand auf Platz 1 ohne Entscheid).
+- **Abschließen** (`POST /api/admin/leagues/{liga}/overall/{zeitraum}/levels/{n}/close`, `{confirm: true, conflict_reason?}`):
+  Zuständigkeit `season`. Wer zu einem Co-Team dieser Wertung gehört (Captain, Vertreter, Kader - `belongs_to_side`), schließt nicht ab
+  (403, Superadmin als Notausnahme mit Grund). Gleichzeitig: Den Abschluss gewinnt, wer die aktive Fassung zuerst schreibt (Teilindex) -
+  jeder zweite bekommt 409. Folgen: Belohnungen, Protokoll `league.overall.close`.
+- **Wieder öffnen** (`POST …/reopen`, `{reason, emergency_reason?, conflict_reason?}`): Pflichtgrund (mindestens fünf Zeichen), zweite
+  Person (wer abgeschlossen hat: 403, Superadmin nur mit `emergency_reason`), Befangenheit wie beim Abschluss. Die Fassung bleibt mit
+  `active: false` im Verlauf, die Belohnungen ruhen, die Wertung rechnet wieder. Protokoll `league.overall.reopen`.
+- **Entscheid** (`PUT …/levels/{n}/decision`, `{keys, reason, method}`): Zuständigkeit `season` wie der Abschluss,
+  Befangenheit ebenso; nur für Co-Teams, die gerade gleich stehen (sonst 422), nicht bei abgeschlossener Wertung (409).
+  `DELETE …/decision/{id}` nimmt ihn zurück.
+- **Cockpit** (`GET /api/admin/leagues/{liga}/overall/{zeitraum}`, jede Zuständigkeit): je Liga N `closed`, `final`, `blockers`, `teams`,
+  `players` (Vorschau bzw. Fassung), `ties`, `can_close`, `can_reopen`, `closed_by_me`, `own_team`, `history`, `rewards` (Stand der Vergabe).
+
+**Belohnungen auf Liga-Ebene** (wie F.4, dieselben Bausteine): beim Abschluss aus der Fassung - Platz aus `place`, „alle Teilnehmer“ sind
+alle Co-Teams mit mindestens einer Season in der Wertung. Team-Belohnung an das Hauptteam, Spieler-Belohnung nach `reward_players`: mit
+Einsatz (Nr. 177) wer für dieses Co-Team in mindestens einer Season eingesetzt war, die für das Co-Team zählt und mehr als 0 Punkte
+brachte - eine Season mit 0 Punkten (ausgeschieden) oder nur im Streichergebnis reicht nicht; sonst der Kader des Co-Teams. Je Belohnung und Co-Team
+ein Eintrag in `tournament_awards`:
+
+| Feld | Inhalt |
+| --- | --- |
+| `tournament_id` | `overall:<zeitraum>:<n>` - der Bereich der Gesamtwertung (keine Staffel); damit gilt der Teilindex `tournament_award_reward` je Wertung |
+| `reward_key` | `<belohnung>:<co-team>` |
+| `overall` | `{league_id, period_id, level, final_id, version, season_ids}` |
+| `league`, `season`, `reward` | wie F.4; `season` = `{id: <zeitraum>, name: "Gesamtwertung <Zeitraum>"}`, die Vorlage trägt „Gesamtwertung …“ statt der Season |
+
+Gleiches bleibt derselbe Eintrag, Neues kommt dazu, Weggefallenes verschwindet, ein echter Gewinn (`prize_pickups`, gleicher Bereich) wird
+nie entzogen (`needs_review`); Nachrichten wie F.4 (`dedupe_key` `league-reward:<fassung>:…`). Öffentlich in Profil, Teamseite und
+Teilen-Bild nur, wenn Gäste jede Season der Fassung sehen (`awards._visible`). Nachricht und Teilen-Link (`overall.url`, `award_view.url`)
+führen über die jüngste öffentliche Season zur Gesamtwertung, ohne öffentliche Season zu `/liga`. Echte Gewinne (Bereich `overall:…`) verwaltet
+unter **Gewinne**, wer in der Liga „Liga verwalten“ hat.
+
+**Lesen:**
+
+| Route | Recht |
+| --- | --- |
+| `GET /api/admin/leagues/{liga}/overall` - Einstellungen, Zeiträume mit Stand je Liga N, Seasons zur Auswahl | jede Zuständigkeit |
+| `PUT /api/admin/leagues/{liga}/overall` - `{points_mode, points_table, champion_bonus, counting, best_count, tiebreakers, reward_players, rewards, periods}` | `season` |
+| `GET /api/leagues/{liga}/{season}/overall` - der Zeitraum dieser Season: je Liga N `teams`, `players`, `seasons` (Spalten), `closed`, Belohnungen | öffentlich nach Sichtbarkeit |
+| `GET /api/leagues/{liga}/{season}/overall.pdf?level=n` - PDF der Gesamtwertung (Co-Teams und Spieler) über `pdf_service` | wie oben |
+
+Profil (`/api/users/public/{name}`) und Teamseite (`GET /api/teams/{id}`) tragen `league_overall`: `[{league_name, period_name,
+division_label, place, of, points, closed, url}]` - je Zeitraum und Liga N, in denen die Person bzw. ein Co-Team des Teams steht, nach
+derselben Sichtbarkeit wie die Ligaseite; der Link führt über die jüngste Season, die die Person sieht. Höchstens die sechs jüngsten
+Zeiträume (`PROFILE_PERIODS`), weil jeder eine Rechnung über seine Endstände kostet.
+
+**Altdaten:** Ligen ohne `overall` oder ohne Zeitraum zeigen keine Gesamtwertung; ein Zeitraum ohne Abschluss zeigt die laufende Wertung.
+Endstände von vor F.2 ohne `sides` lesen das Co-Team aus der Anmeldung. Keine Migration.
+
+**Nicht in F.5:** eigene Belohnungen je Liga N (eine Zusammenstellung gilt für alle Stufen), Nachricht an die Captains beim Abschluss der
+Gesamtwertung (Belohnungen schicken ihre eigene), TV und die App (`mobile/`, Liste in #2173).

@@ -171,6 +171,14 @@ Hat die Liga Belohnungen festgelegt (Medaille, Banner, Emblem oder Titel), stehe
 
 <img src="../assets/liga/f4-profil-sammlung-390.png" alt="Sammlung im Profil am Handy: Season 1 mit Goldmedaille und Season-Banner, Season 0 mit dem Titel Kämpferherz" width="320">
 
+### Gesamtwertung über Seasons
+
+Fasst die Liga mehrere Seasons zu einer Gesamtwertung zusammen, steht sie auf der Ligaseite unter **Gesamtwertung**: je Liga eure
+Punkte je Season (Platz 1 bekommt so viele Punkte, wie die Staffel Teams hat, dazu einen Bonus; Ausgeschiedene 0) und die Summe.
+Daneben gibt es eine **Spielerwertung**: Jeder Spieler bekommt die Punkte eures Co-Teams für jede Season, in der er mindestens ein
+Spiel gespielt hat. Euren Platz seht ihr auch an der Teamseite und im Profil. Nach der letzten Season schließt die Liga-Leitung die
+Gesamtwertung ab und vergibt die Belohnungen dafür.
+
 ## Neue Season: ihr seid automatisch dabei
 
 Legt die Liga-Leitung die nächste Season an, steht euer Co-Team **automatisch** in seiner neuen Liga – nach Auf- und Abstieg.

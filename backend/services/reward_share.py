@@ -21,10 +21,17 @@ async def share_payload(db, award_id: str) -> dict | None:
     doc = await db.tournament_awards.find_one({"id": award_id, "reward_key": {"$type": "string"}}, {"_id": 0})
     if not doc or doc.get("suspended") or not doc.get("reward"):
         return None
-    live = await db.tournaments.find_one({"id": doc["tournament_id"]}, {"_id": 0, "status": 1, "visibility": 1, "is_public": 1})
     season_id = (doc.get("league") or {}).get("season_id")
-    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) if season_id else None
-    if not live or not await _visible(doc, live, {season_id: season} if season else {}):
+    if doc.get("overall"):
+        # Gesamtwertung (F.5): kein Turnier dahinter - sichtbar nach den Seasons des Zeitraums.
+        live = {}
+        ids = list(doc["overall"].get("season_ids") or [])
+        seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": ids}}, {"_id": 0}).to_list(len(ids) + 1)}
+    else:
+        live = await db.tournaments.find_one({"id": doc["tournament_id"]}, {"_id": 0, "status": 1, "visibility": 1, "is_public": 1})
+        season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) if season_id else None
+        seasons = {season_id: season} if season else {}
+    if live is None or not await _visible(doc, live, seasons):
         return None
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "club_name": 1}) or {}
     reward = doc["reward"]
