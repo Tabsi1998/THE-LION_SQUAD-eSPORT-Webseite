@@ -4,8 +4,8 @@
   Verlängerung zurücknehmen (``until`` leer) - ``season``. Protokoll ``league.season.late_extension``.
 - ``GET /api/admin/leagues/seasons/{sid}/late-entries``: die Nachmeldungen aller Staffeln - ``applications``.
 - ``GET /api/admin/leagues/staffeln/{tid}/late-entries/{rid}``: Vorschau der Spiele - ``applications``.
-- ``POST /api/admin/leagues/staffeln/{tid}/late-entries/{rid}`` ``{fingerprint}``: Spiele aus der Vorschau anlegen - ``applications``,
-  unter Turnier- und Season-Sperre. Protokoll ``league.staffel.late_entry``.
+- ``POST /api/admin/leagues/staffeln/{tid}/late-entries/{rid}`` ``{fingerprint, conflict_reason?}``: Spiele aus der Vorschau anlegen -
+  ``applications``, nicht befangen (Nr. 187), unter Turnier- und Season-Sperre. Protokoll ``league.staffel.late_entry``.
 
 Logik in ``services/league_late.py`` (Frist) und ``services/league_late_entry.py`` (Spiele).
 """
@@ -38,6 +38,8 @@ class ExtensionBody(BaseModel):
 
 class LateEntryBody(BaseModel):
     fingerprint: str = Field(default="", max_length=64)
+    # Notausnahme des Superadmins beim eigenen Team (Nr. 187).
+    conflict_reason: str | None = Field(default=None, max_length=500)
 
 
 @admin_router.post("/seasons/{season_id}/application-extension")
@@ -80,15 +82,18 @@ async def admin_season_late_entries(season_id: str, _me: dict = Depends(require_
 
 @admin_router.get("/staffeln/{tournament_id}/late-entries/{registration_id}")
 async def admin_late_entry_preview(tournament_id: str, registration_id: str,
-                                   _me: dict = Depends(require_league("applications", via="tournament_id"))):
+                                   me: dict = Depends(require_league("applications", via="tournament_id"))):
     db = get_db()
     tournament = await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Staffel nicht gefunden.")
     try:
-        return await league_late_entry.preview(db, tournament, registration_id)
+        out = await league_late_entry.preview(db, tournament, registration_id)
     except league_late_entry.LateEntryProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    registration = await db.tournament_registrations.find_one({"id": registration_id}, {"_id": 0})
+    # Befangenheit (Nr. 187): Die Vorschau sagt es vorab, damit die Verwaltung den Knopf bzw. das Feld für die Notausnahme zeigt.
+    return {**out, **await league_late_entry.conflict_view(db, me, registration)}
 
 
 @admin_router.post("/staffeln/{tournament_id}/late-entries/{registration_id}")
@@ -96,7 +101,7 @@ async def admin_late_entry_apply(tournament_id: str, registration_id: str, body:
                                  me: dict = Depends(require_league("applications", via="tournament_id"))):
     db = get_db()
     try:
-        result = await league_late_entry.apply(db, tournament_id, registration_id, body.fingerprint, me)
+        result = await league_late_entry.apply(db, tournament_id, registration_id, body.fingerprint, me, body.conflict_reason)
     except league_late_entry.LateEntryProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
     await publish_api_change("POST", f"/api/tournaments/{tournament_id}/matches-v2", 200)

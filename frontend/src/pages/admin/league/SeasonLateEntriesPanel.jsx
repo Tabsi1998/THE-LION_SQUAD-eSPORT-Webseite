@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CircleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSheet } from "@/components/tls/AdminSheet";
+import { ConflictReasonField, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 import { FormSection } from "@/components/tls/AdminForm";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatApiError } from "@/lib/api";
@@ -26,6 +27,7 @@ export function LateEntrySheet({ item, onClose, onDone }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [conflictReason, setConflictReason] = useState("");
   const url = `/admin/leagues/staffeln/${item.tournament_id}/late-entries/${item.registration_id}`;
   const load = useCallback(async () => {
     try {
@@ -43,7 +45,7 @@ export function LateEntrySheet({ item, onClose, onDone }) {
     if (!data || saving) return;
     setSaving(true);
     try {
-      const { data: answer } = await api.post(url, { fingerprint: data.fingerprint });
+      const { data: answer } = await api.post(url, { fingerprint: data.fingerprint, ...overridePayload(data.own_team && data.superadmin, conflictReason) });
       const count = answer.match_ids?.length || 0;
       toast.success(count ? `${count === 1 ? "1 Spiel" : `${count} Spiele`} angelegt. Beide Seiten bekommen eine Nachricht.` : "Festgehalten: keine Spiele mehr, das Team zählt ab jetzt.");
       onDone();
@@ -57,9 +59,12 @@ export function LateEntrySheet({ item, onClose, onDone }) {
 
   const pairings = data?.pairings || [];
   const missing = data?.missing || [];
+  // Befangenheit (Nr. 187): Über das eigene Team entscheidet eine andere Person, der Superadmin nur mit Grund.
+  const blockedOwn = Boolean(data?.own_team && !data?.superadmin);
+  const needsReason = Boolean(data?.own_team && data?.superadmin);
   return (
     <AdminSheet title="Spiele nachtragen" eyebrow={`${item.name} · Staffel ${item.staffel || ""}`.trim()} size="lg" onClose={onClose} onSubmit={submit}
-      saving={saving} savingLabel="Lege an …" submitTestId="late-entry-confirm" submitDisabled={!data}
+      saving={saving} savingLabel="Lege an …" submitTestId="late-entry-confirm" submitDisabled={!data || blockedOwn || overrideMissing(needsReason, conflictReason)}
       submitLabel={pairings.length ? `${pairings.length === 1 ? "1 Spiel" : `${pairings.length} Spiele`} anlegen` : "Ohne Spiele bestätigen"}
       testId="late-entry-sheet">
       {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
@@ -89,6 +94,11 @@ export function LateEntrySheet({ item, onClose, onDone }) {
               <p className="text-xs text-white/55">Termin: der Standardtermin der Woche. Danach gehen Terminvorschläge und Verschiebung wie bei jedem Spiel.</p>
             </section>
           ) : null}
+          {data.notes?.length ? (
+            <ul className="space-y-1 text-xs text-white/70" data-testid="late-entry-notes">
+              {data.notes.map((note) => <li key={note} className="[overflow-wrap:anywhere]">{note}</li>)}
+            </ul>
+          ) : null}
           {missing.length ? (
             <section aria-labelledby="late-entry-missing" className="space-y-2">
               <h3 id="late-entry-missing" className="text-[11px] font-bold uppercase tracking-[0.2em] text-warn">Entfällt ({missing.length})</h3>
@@ -102,6 +112,8 @@ export function LateEntrySheet({ item, onClose, onDone }) {
               <p className="text-xs text-white/55">Keine offene Woche, in der beide frei sind. Nachholspiele für vergangene Wochen gibt es nicht – die Tabelle hat dann ungleiche Spielzahlen.</p>
             </section>
           ) : null}
+          {blockedOwn ? <OwnTeamNote testId="late-entry-own-team" /> : null}
+          {needsReason ? <ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="late-entry-conflict-reason" /> : null}
         </div>
       ) : null}
     </AdminSheet>
