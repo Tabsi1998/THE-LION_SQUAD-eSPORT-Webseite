@@ -469,3 +469,29 @@ async def test_a_mark_written_before_an_error_keeps_the_games(flow, monkeypatch)
     stored = (await flow.db.tournament_registrations.find_one({"id": registration["id"]}, {"_id": 0}))["late_entry"]
     assert stored["state"] == "done" and sorted(stored["match_ids"]) == sorted(done["match_ids"])
 
+
+@pytest.mark.asyncio
+async def test_a_failing_default_time_does_not_undo_the_decision(flow, monkeypatch):
+    """Review #2422, Runde 2: Scheitert der Standardtermin nach der Markierung, stehen Spiele, Protokoll und Nachricht trotzdem; den Termin
+    holt der Planer-Lauf nach."""
+    from services import league_late_entry
+    from services.matchday_schedule import persist_matchday_schedule
+
+    world = await running_staffel(flow, teams=4, weeks=4)
+    _accepted, registration = await late_entry(flow, world)
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(late_url(world, registration["id"])))
+
+    async def broken_schedule(*_args, **_kwargs):
+        raise RuntimeError("Termin nicht geschrieben")
+
+    monkeypatch.setattr(league_late_entry, "write_schedule", broken_schedule)
+    done = ok(await flow.post(late_url(world, registration["id"]), json={"fingerprint": preview["fingerprint"]}))
+    created = await flow.db.matches_v2.find({"id": {"$in": done["match_ids"]}}, {"_id": 0}).to_list(5)
+    assert len(created) == 2 and all(match["scheduled_at"] is None for match in created)
+    assert await flow.db.audit_logs.count_documents({"action": "league.staffel.late_entry"}) == 1
+    assert await flow.db.notifications.count_documents({"meta.dedupe_key": {"$regex": "^late-entry:"}}) > 0
+    tournament = await flow.db.tournaments.find_one({"id": world["tid"]}, {"_id": 0})
+    await persist_matchday_schedule(flow.db, tournament)
+    created = await flow.db.matches_v2.find({"id": {"$in": done["match_ids"]}}, {"_id": 0}).to_list(5)
+    assert all(match["scheduled_at"] and match["schedule_source"] == "default" for match in created)

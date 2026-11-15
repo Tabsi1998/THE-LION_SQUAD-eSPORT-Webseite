@@ -550,7 +550,10 @@ async def apply(db, tournament_id: str, registration_id: str, fingerprint: str |
                         raise LateEntryProblem(BUSY, 409)
                     raise LateEntryProblem(NOT_OPEN, 409)
                 if docs:
-                    await write_schedule(db, tournament, docs)
+                    try:
+                        await write_schedule(db, tournament, docs)
+                    except Exception:  # noqa: BLE001 - die Entscheidung steht; den Standardtermin holt der Planer-Lauf nach
+                        logger.warning("[liga] Standardtermin der Nachmeldung nicht geschrieben: %s", log_safe(registration_id), exc_info=True)
     except MutationLockBusy:
         raise LateEntryProblem(BUSY, 409) from None
     if override:
