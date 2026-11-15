@@ -65,3 +65,30 @@ resolve_backup_pair() {
   esac
   export MANIFEST MANIFEST_LEGACY MONGO_ARCHIVE UPLOADS_ARCHIVE
 }
+
+# Lease der Schreibpause im Hintergrund verlängern (#1009), alle TTL/3 Sekunden, solange Dump, Upload-Archiv und
+# Nachzählung laufen - ein langes tar darf die Pause nicht unbemerkt enden lassen. Scheitert ein Verlängern, legt der
+# Hintergrundprozess die Datei <flag> an und hört auf; das Backup gilt dann als unsicher.
+# Braucht PAUSE_TOKEN und backend_python. Aufruf: start_lease_renewer <ttl> <flag>, Ende: stop_lease_renewer.
+LEASE_RENEWER_PID=""
+start_lease_renewer() {
+  local ttl="$1" flag="$2" interval
+  interval=$(( ttl / 3 ))
+  [ "$interval" -ge 1 ] || interval=1
+  (
+    trap - EXIT INT TERM
+    while sleep "$interval"; do
+      if ! backend_python -m services.maintenance renew --token "$PAUSE_TOKEN" --ttl "$ttl" >/dev/null 2>&1; then
+        : >"$flag"
+        exit 0
+      fi
+    done
+  ) &
+  LEASE_RENEWER_PID=$!
+}
+stop_lease_renewer() {
+  [ -n "$LEASE_RENEWER_PID" ] || return 0
+  kill "$LEASE_RENEWER_PID" 2>/dev/null || true
+  wait "$LEASE_RENEWER_PID" 2>/dev/null || true
+  LEASE_RENEWER_PID=""
+}

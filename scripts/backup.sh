@@ -75,12 +75,16 @@ json_field() {
   python3 -c 'import json,sys; v=json.load(open(sys.argv[1])).get(sys.argv[2]); print("" if v is None else (json.dumps(v) if isinstance(v,(list,dict,bool)) else v))' "$1" "$2"
 }
 
+LEASE_LAPSED=false
 end_pause() {
+  stop_lease_renewer
   [ -n "$PAUSE_TOKEN" ] || return 0
   local token="$PAUSE_TOKEN"
   PAUSE_TOKEN=""
   if backend_python -m services.maintenance off --token "$token" >"${WORK}/pause-off.json" 2>/dev/null; then
     ok "Write pause ended after $(( $(date +%s) - PAUSE_STARTED ))s"
+    # Galt die Lease bis zum Freigeben? Sonst durfte zwischendurch jemand schreiben.
+    if [ "$(json_field "${WORK}/pause-off.json" lease_held)" != "true" ]; then LEASE_LAPSED=true; fi
   else
     warn "Write pause could not be ended explicitly; its lease expires on its own within ${BACKUP_WRITE_PAUSE_TTL}s."
   fi
@@ -120,6 +124,7 @@ elif [ "$BACKUP_WRITE_PAUSE" = "true" ]; then
   PAUSE_TOKEN="$(json_field "${WORK}/pause.json" token)"
   [ -n "$PAUSE_TOKEN" ] || fail "Write pause did not return a token; no backup written."
   PAUSE_MODE="pause"
+  start_lease_renewer "$BACKUP_WRITE_PAUSE_TTL" "${WORK}/lease-lapsed"
   if [ "$(json_field "${WORK}/pause.json" drained)" != "true" ]; then
     warn "Running writes did not finish within ${BACKUP_WRITE_PAUSE_DRAIN_SECONDS}s: $(json_field "${WORK}/pause.json" busy) - noted in the manifest."
   fi
@@ -135,14 +140,6 @@ info "Creating encrypted MongoDB backup for database '${DB_NAME}'"
 docker compose exec -T mongodb sh -ec 'mongodump --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db "$1" --archive --gzip' sh "$DB_NAME" \
   | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 250000 -pass "file:${BACKUP_ENCRYPTION_PASSWORD_FILE}" -out "${BACKUP_DIR}/${MONGO_FILE}"
 
-LEASE_LAPSED=false
-if [ -n "$PAUSE_TOKEN" ]; then
-  if ! backend_python -m services.maintenance renew --token "$PAUSE_TOKEN" --ttl "$BACKUP_WRITE_PAUSE_TTL" >"${WORK}/renew.json"; then
-    LEASE_LAPSED=true
-    warn "Write pause lease expired during the dump - writes may have happened; noted in the manifest. Consider a larger BACKUP_WRITE_PAUSE_TTL."
-  fi
-fi
-
 info "Creating uploads backup from Docker volume '${UPLOADS_VOLUME}'"
 docker volume inspect "$UPLOADS_VOLUME" >/dev/null || fail "Uploads volume not found: ${UPLOADS_VOLUME}. Check the selected Compose project."
 docker run --rm \
@@ -157,6 +154,10 @@ backend_python -m services.backup_inventory "${SNAPSHOT_ARGS[@]}" >"${WORK}/afte
 PAUSE_SECONDS=0
 if [ "$PAUSE_STARTED" -gt 0 ]; then PAUSE_SECONDS=$(( $(date +%s) - PAUSE_STARTED )); fi
 end_pause
+if [ -f "${WORK}/lease-lapsed" ]; then LEASE_LAPSED=true; fi
+if [ "$LEASE_LAPSED" = true ]; then
+  warn "Write pause lease did not hold until the end - writes may have happened; the backup is marked unsafe."
+fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Prüfen und Manifest - nach der Pause, damit sie so kurz wie möglich bleibt.
@@ -204,4 +205,9 @@ find "$BACKUP_DIR" -type f -name "tls_uploads_*.tar.gz.enc" -mtime +"$RETENTION_
 find "$BACKUP_DIR" -type f -name "tls_backup_*.manifest.txt" -mtime +"$RETENTION_DAYS" -delete
 find "$BACKUP_DIR" -type f -name "tls_backup_*.manifest.json" -mtime +"$RETENTION_DAYS" -delete
 
+if [ "$(python3 scripts/backup-manifest.py field --manifest "${BACKUP_DIR}/${MANIFEST_FILE}" --name consistent)" != "True" ]; then
+  # Die Dateien bleiben (besser als nichts), der Lauf meldet aber einen Fehler - der Timer zeigt ihn im Journal.
+  warn "Backup kept but marked unsafe (consistent=false in ${MANIFEST_FILE}): $(cat "${WORK}/pause-summary.json")"
+  exit 2
+fi
 ok "Backup complete."

@@ -337,3 +337,47 @@ def test_the_pause_document_never_blocks_a_restore(tmp_path):
     assert manifest_tool.compare(manifest, with_pause_doc) == ([], [])
     newer, *_ = make_pair(tmp_path, "20261117_031500", before=with_pause_doc)
     assert manifest_tool.compare(newer, snapshot()) == ([], [])
+
+
+def test_a_pause_that_did_not_hold_marks_the_backup_unsafe(tmp_path):
+    manifest, *_ = make_pair(tmp_path)
+    assert manifest["consistent"] is True
+    assert manifest_tool.consistent_pause({"mode": "writers_stopped", "drained": True}) is True
+    assert manifest_tool.consistent_pause({"mode": "pause", "drained": True, "lease_lapsed": True}) is False
+    assert manifest_tool.consistent_pause({"mode": "pause", "drained": False}) is False
+    assert manifest_tool.consistent_pause({"mode": "none", "drained": True}) is False
+
+
+RENEWER = """
+source scripts/backup-target.sh
+calls="$1/calls"; flag="$1/lapsed"; fail_after="$2"
+backend_python() { echo "$*" >>"$calls"; [ "$(wc -l <"$calls")" -le "$fail_after" ]; }
+PAUSE_TOKEN=t-1
+start_lease_renewer 3 "$flag"
+sleep "$3"   # ein langes Upload-Archiv
+stop_lease_renewer
+sleep 1.5
+printf '%s|%s\n' "$(wc -l <"$calls" | tr -d ' ')" "$([ -f "$flag" ] && echo lapsed || echo held)"
+"""
+
+
+def run_renewer(tmp_path, fail_after, seconds):
+    result = subprocess.run([BASH, "-c", RENEWER, "renewer", tmp_path.as_posix(), str(fail_after), str(seconds)], cwd=REPO,
+                            text=True, capture_output=True, timeout=60, stdin=subprocess.DEVNULL)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip().split("|")
+
+
+@pytest.mark.skipif(not BASH or not pathlib.Path(BASH).exists(), reason="Bash required")
+def test_the_lease_is_renewed_while_a_long_upload_archive_runs(tmp_path):
+    """TTL 3 s, das Archiv braucht 5 s: ohne Verlängerung im Hintergrund wäre die Pause mittendrin vorbei."""
+    calls, state = run_renewer(tmp_path, 100, 5)
+    assert int(calls) >= 3 and state == "held"
+    # Nach dem Stopp verlängert niemand mehr (kein verwaister Hintergrundprozess).
+    assert open(tmp_path / "calls").read().count("renew --token t-1 --ttl 3") == int(calls)
+
+
+@pytest.mark.skipif(not BASH or not pathlib.Path(BASH).exists(), reason="Bash required")
+def test_a_failed_renewal_is_reported(tmp_path):
+    calls, state = run_renewer(tmp_path, 1, 5)
+    assert state == "lapsed" and int(calls) == 2

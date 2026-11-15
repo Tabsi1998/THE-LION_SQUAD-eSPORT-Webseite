@@ -63,4 +63,7 @@ if [ "$MANIFEST_LEGACY" != true ]; then
   [ "$EXPECTED" = "$ACTUAL" ] || fail "Uploads archive content differs from the manifest; nothing was changed."
 fi
 
+if [ "$MANIFEST_LEGACY" != true ] && [ "$(python3 scripts/backup-manifest.py field --manifest "$MANIFEST" --name consistent 2>/dev/null)" != "True" ]; then
+  warn "This backup is marked unsafe: the write pause did not hold (see write_pause in the manifest). Database and uploads may not match exactly."
+fi
 ok "Backup pair checked: ${MANIFEST}"

@@ -251,6 +251,19 @@ def test_off_force_is_idempotent_without_a_pause_document():
     run(scenario())
 
 
+def test_off_reports_whether_the_lease_still_held():
+    async def scenario():
+        db = fresh_db()
+        started = await maintenance.activate(db, ttl_seconds=30, now=T0)
+        report = await maintenance.release_report(db, started["token"], now=T0 + timedelta(seconds=10))
+        assert report == {"released": True, "lease_held": True}
+        late = await maintenance.activate(db, ttl_seconds=30, now=T0 + timedelta(seconds=20))
+        report = await maintenance.release_report(db, late["token"], now=T0 + timedelta(seconds=60))
+        assert report == {"released": True, "lease_held": False}
+
+    run(scenario())
+
+
 def test_on_releases_its_own_pause_when_waiting_fails(monkeypatch):
     """Bricht das Warten nach dem Einschalten ab, ginge das Token verloren - die Pause wird gleich wieder frei."""
     async def broken_drain(*_args, **_kwargs):

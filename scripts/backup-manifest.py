@@ -87,6 +87,11 @@ def _unstable(before: dict, after: dict) -> list[str]:
     return sorted(name for name in names if before.get(name) != after.get(name))
 
 
+def consistent_pause(pause: dict) -> bool:
+    return (pause.get("mode") in ("pause", "writers_stopped") and bool(pause.get("drained"))
+            and not pause.get("lease_lapsed"))
+
+
 def build_manifest(*, project: str, db_name: str, timestamp: str, pair_id: str, mongo_path: Path, uploads_path: Path,
                    app_version: str, git_commit: str, before: dict, after: dict, uploads: dict, pause: dict,
                    retention_days: int, created_at: datetime | None = None) -> dict:
@@ -118,6 +123,9 @@ def build_manifest(*, project: str, db_name: str, timestamp: str, pair_id: str, 
         # Was im Archiv steht (aus dem Archiv gerechnet) - nicht, was im Ordner lag.
         "uploads": {key: uploads[key] for key in ("count", "bytes", "digest")},
         "write_pause": pause,
+        # Sicher nur mit Pause (oder stehendem Backend), fertig gewordenen Schreibvorgängen und einer Lease, die bis zum
+        # Ende gehalten hat. Sonst bleibt das Backup, gilt aber als unsicher (restore-check warnt).
+        "consistent": consistent_pause(pause),
         "retention_days": int(retention_days),
     }
     if "references" in after:
