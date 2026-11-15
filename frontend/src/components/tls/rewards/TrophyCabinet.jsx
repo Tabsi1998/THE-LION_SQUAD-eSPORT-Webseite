@@ -173,7 +173,7 @@ export function TrophyCabinet({ awards, owner = null, empty, testId = "trophy-ca
         </p>
       ) : null}
       {shown.length ? (
-        <ul className="tls-reward-collection__grid tls-trophy-cabinet__grid">
+        <ul className="tls-trophy-cabinet__grid">
           {shown.map((award, index) => <TrophyCard key={award.id} award={award} index={index} play={play} owner={owner} />)}
         </ul>
       ) : (

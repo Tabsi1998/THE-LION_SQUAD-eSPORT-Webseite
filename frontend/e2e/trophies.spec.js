@@ -81,6 +81,11 @@ test.describe("Trophäen, Embleme und Rankingbanner", () => {
       const cabinet = page.getByTestId("profile-trophies");
       await expect(cabinet).toBeVisible();
       await expect(cabinet.getByTestId("profile-trophies-count")).toHaveText("7 Trophäen");
+      // Der Zähler bleibt in der Vitrine - am Handy in einer eigenen Zeile (Review #2425).
+      const box = await cabinet.boundingBox();
+      const count = await cabinet.getByTestId("profile-trophies-count").boundingBox();
+      expect(count.x + count.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
+      if (width === 390) expect(count.x).toBeLessThanOrEqual(box.x + 0.5);
       await expect(cabinet.getByTestId("trophy-card-w-cup")).toContainText("Frühjahrs-Cup");
       await expect(cabinet.getByTestId("trophy-card-w-cup").getByRole("link")).toHaveAttribute("href", "/tournaments/fruehjahrs-cup");
       await expect(cabinet.getByTestId("trophy-name-w-gold")).toHaveText(LONG);

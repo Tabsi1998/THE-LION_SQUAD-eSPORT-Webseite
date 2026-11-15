@@ -45,10 +45,8 @@
   100% { box-shadow: 0 0 0 0 rgb(var(--tls-reward-rgb) / 0); }
 }
 
-/* Sammlung am Profil und am Team: je Season eine Gruppe, Karten im Raster. */
-.tls-reward-collection { display: grid; gap: 20px; }
-.tls-reward-collection__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
-.tls-reward-collection__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+/* Karten der Vitrine (Reiter „Trophäen“, #2425) im Raster. */
+.tls-trophy-cabinet__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .tls-reward-card {
   --tls-reward-rgb: 41 182 232;
   display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 14px 10px 12px; text-align: center; border-radius: 6px;
@@ -100,7 +98,7 @@
    die Grafik darin hebt sich nicht noch einmal - Glanz und Aufleuchten bleiben. */
 .tls-trophy-cabinet { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 .tls-trophy-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
-.tls-trophy-filters__kinds { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.tls-trophy-filters__kinds { display: flex; gap: 6px; overflow-x: auto; }
 .tls-trophy-filters__chip {
   flex: none; min-height: 36px; padding: 6px 12px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.15);
   font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.6);
@@ -108,7 +106,7 @@
 }
 .tls-trophy-filters__chip[aria-pressed="true"] { border-color: var(--tls-brand, #29B6E8); color: var(--tls-brand, #29B6E8); background: rgb(41 182 232 / 0.1); }
 @media (hover: hover) and (pointer: fine) { .tls-trophy-filters__chip:hover { color: #fff; } }
-.tls-trophy-filters__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
+.tls-trophy-filters__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; min-width: 0; }
 .tls-trophy-filters__select { display: grid; gap: 4px; min-width: 0; flex: 1 1 9rem; max-width: 16rem; }
 .tls-trophy-filters__select span { font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(255 255 255 / 0.5); }
 .tls-trophy-filters__select select {
@@ -116,6 +114,8 @@
   color: #fff; font-size: 13px;
 }
 .tls-trophy-filters__count { flex: none; white-space: nowrap; margin-left: auto; align-self: center; font-size: 11px; font-weight: 700; color: rgb(255 255 255 / 0.5); font-variant-numeric: tabular-nums; }
+/* Am Handy steht der Zähler in einer eigenen Zeile - neben dem Platz-Filter ragte er sonst rechts hinaus. */
+@media (max-width: 639px) { .tls-trophy-filters__count { flex-basis: 100%; margin-left: 0; } }
 .tls-trophy-filters__reset {
   display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 10px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.15);
   font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.7);
