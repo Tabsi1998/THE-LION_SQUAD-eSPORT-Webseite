@@ -156,9 +156,20 @@ BACKEND_PORT="$(grep -E '^BACKEND_PORT=' .env 2>/dev/null | cut -d= -f2 || echo 
 # Eine lange Migration beim Start hält die Bereit-Meldung auf (#1006, docs/BETRIEB.md): so viele Sekunden warten,
 # aus der Umgebung oder .env, Standard 600.
 BACKEND_READY_TIMEOUT="${BACKEND_READY_TIMEOUT:-$(grep -E '^BACKEND_READY_TIMEOUT=' .env 2>/dev/null | cut -d= -f2 || true)}"
+# Nur Ziffern, dezimal gelesen (führende Nullen wie 0600 oder 090 sind kein Oktal), 30 bis 86400 Sekunden.
 case "${BACKEND_READY_TIMEOUT:-}" in
   ''|*[!0-9]*) BACKEND_READY_TIMEOUT=600 ;;
+  *)
+    BACKEND_READY_TIMEOUT="${BACKEND_READY_TIMEOUT#"${BACKEND_READY_TIMEOUT%%[!0]*}"}"
+    if [ "${#BACKEND_READY_TIMEOUT}" -gt 5 ]; then
+      BACKEND_READY_TIMEOUT=86400
+    else
+      BACKEND_READY_TIMEOUT=$((10#${BACKEND_READY_TIMEOUT:-0}))
+    fi
+    ;;
 esac
+if [ "$BACKEND_READY_TIMEOUT" -lt 30 ]; then BACKEND_READY_TIMEOUT=30; fi
+if [ "$BACKEND_READY_TIMEOUT" -gt 86400 ]; then BACKEND_READY_TIMEOUT=86400; fi
 info "Waiting for backend health (up to ${BACKEND_READY_TIMEOUT}s)…"
 BACKEND_READY=false
 for i in $(seq 1 $(( (BACKEND_READY_TIMEOUT + 1) / 2 ))); do

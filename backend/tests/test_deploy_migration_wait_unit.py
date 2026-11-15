@@ -31,8 +31,8 @@ def _timeout_block() -> str:
     """Die Zeilen aus ``update.sh``, die die Wartezeit bestimmen - ausgeführt ohne den Rest des Skripts."""
     lines = (ROOT / "update.sh").read_text(encoding="utf-8").splitlines()
     start = next(i for i, line in enumerate(lines) if line.startswith("BACKEND_READY_TIMEOUT="))
-    end = next(i for i in range(start, len(lines)) if lines[i].strip() == "esac")
-    return "set -euo pipefail\n" + "\n".join(lines[start:end + 1]) + '\necho "$BACKEND_READY_TIMEOUT"\n'
+    end = next(i for i in range(start, len(lines)) if lines[i].startswith('info "Waiting for backend health'))
+    return "set -euo pipefail\n" + "\n".join(lines[start:end]) + '\necho "$BACKEND_READY_TIMEOUT"\n'
 
 
 def test_update_sh_has_no_fixed_120_second_limit_any_more():
@@ -47,6 +47,17 @@ def test_update_sh_has_no_fixed_120_second_limit_any_more():
     ("900", None, "900"),
     (None, "BACKEND_READY_TIMEOUT=1200\n", "1200"),
     ("kaputt", None, "600"),
+    # Dezimal, nicht oktal: führende Nullen, 08 und 09 sind gültige Zahlen.
+    ("0600", None, "600"),
+    ("090", None, "90"),
+    ("08", None, "30"),
+    ("09", None, "30"),
+    ("000", None, "30"),
+    (None, "BACKEND_READY_TIMEOUT=0900\n", "900"),
+    # Untergrenze 30 s, Obergrenze ein Tag.
+    ("5", None, "30"),
+    ("100000", None, "86400"),
+    ("99999999999999999999", None, "86400"),
 ])
 def test_update_sh_reads_its_ready_timeout(tmp_path, env_value, dotenv, expected):
     script = tmp_path / "probe.sh"
