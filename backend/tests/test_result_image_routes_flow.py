@@ -458,6 +458,7 @@ async def test_time_budget_leaves_the_rest_yellow_or_refuses(flow, fake_ocr, mon
 
 # ---------------------------------------------------------------- Ende-zu-Ende
 @needs_tesseract
+@pytest.mark.real_clock  # echtes Tesseract mit Zeitbudget (time.monotonic) - in der Zeitreise-Probe (#775) sonst „zu langsam“
 @pytest.mark.asyncio
 async def test_clean_screenshot_through_the_route(flow, monkeypatch):
     # Nur Tesseract - den zweiten Leser prüft test_result_image_second.py (ohne Modell gäbe es hier eine Warnung).
