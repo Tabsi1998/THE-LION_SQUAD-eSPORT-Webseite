@@ -75,7 +75,9 @@ das Skript für die Dauer der Sicherung eine **Schreibpause** im Backend ein:
    Rangstand um 03:35) warten, bis die Pause vorbei ist, und laufen dann - sie fallen nicht bis zum nächsten Tag aus.
 3. Zählen (Sammlungen, Summen, Uploads), `mongodump`, Upload-Archiv, noch einmal zählen. Solange das läuft,
    verlängert ein Hintergrundprozess die Lease alle TTL/3 Sekunden - auch ein langes Upload-Archiv lässt die Pause
-   nicht mittendrin enden.
+   nicht mittendrin enden. Das Verlängern hört auf, sobald `backup.sh` nicht mehr läuft (auch nach `kill -9` oder
+   OOM), und spätestens nach `BACKUP_WRITE_PAUSE_MAX_SECONDS`; die Lease läuft dann binnen TTL von selbst ab.
+   `deploy/systemd/tls-backup.service` begrenzt den ganzen Lauf mit `TimeoutStartSec=2h`.
 4. Pause beenden. Sie endet **immer**: am Ende, bei jedem Fehler oder Abbruch (trap) und spätestens nach Ablauf
    der Lease von selbst - auch wenn das Skript hart abgebrochen wird. Die Website kann also nie dauerhaft gesperrt
    bleiben. Fällt die Datenbank aus, gilt die Pause als aus. Beim Beenden meldet das Backend, ob die Lease bis
@@ -105,6 +107,7 @@ beiden Zählungen, steht sie in `unstable_collections`, und der Restore vergleic
 | `BACKUP_WRITE_PAUSE` | `true` | `false`: ohne Pause sichern (nicht empfohlen, das Paar kann dann abweichen) |
 | `BACKUP_WRITE_PAUSE_TTL` | `120` | Lease in Sekunden (5 bis 1800); wird im Hintergrund alle TTL/3 Sekunden verlängert |
 | `BACKUP_WRITE_PAUSE_SETTLE_SECONDS` | `3` | Wartezeit, bis alle Backend-Prozesse die Pause sehen |
+| `BACKUP_WRITE_PAUSE_MAX_SECONDS` | `900` | harte Höchstdauer der Pause: danach wird die Lease nicht mehr verlängert (Backup gilt dann als unsicher) |
 | `BACKUP_WRITE_PAUSE_DRAIN_SECONDS` | `60` | so lange höchstens auf laufende Schreibvorgänge warten; sonst Warnung und Vermerk im Manifest |
 | `BACKUP_REFERENCE_SCAN` | `true` | Datei-Verweise in der Pause mitzählen (für den fachlichen Vergleich beim Restore); `false` verkürzt die Pause |
 
@@ -286,6 +289,8 @@ Stack mit eigenem Projektnamen und leeren Volumes (wie unter „Zielauswahl“ b
 
 - **Timer und Cron bleiben unverändert** (`tls-backup.timer`, 03:15 mit bis zu 20 Minuten Versatz). Die
   Schreibpause steuert `scripts/backup.sh` selbst.
+- **Dienstdatei einmal neu kopieren:** `tls-backup.service` hat jetzt `TimeoutStartSec=2h`
+  (`sudo cp deploy/systemd/tls-backup.service /etc/systemd/system/ && sudo systemctl daemon-reload`).
 - **Reihenfolge beim Einspielen:** erst das Release mit dem neuen Backend deployen (es kennt
   `services.maintenance` und `services.backup_inventory`), dann läuft das nächste nächtliche Backup schon mit Pause
   und Manifest. Mit einem alten Backend-Image bricht `backup.sh` ab, bevor es ein Archiv schreibt.

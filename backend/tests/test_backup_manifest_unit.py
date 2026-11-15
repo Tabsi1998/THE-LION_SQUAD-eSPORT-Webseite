@@ -409,3 +409,51 @@ def test_restore_check_resolves_the_project_itself(tmp_path):
                             capture_output=True, timeout=60, stdin=subprocess.DEVNULL)
     assert result.returncode == 1
     assert "p-echt" in (result.stdout + result.stderr)
+
+
+ORPHAN = """
+calls="$1/calls"
+bash -c 'out="$1"; source scripts/backup-target.sh; backend_python() { echo renew >>"$out/calls"; }; PAUSE_TOKEN=t-1
+         start_lease_renewer 3 "$1/flag"; sleep 8' backup "$1" &
+child=$!
+sleep 3.5
+kill -9 "$child"   # backup.sh stirbt hart (kill -9, OOM) - kein Trap, kein stop_lease_renewer
+sleep 0.5
+before=$(wc -l <"$calls" | tr -d ' ')
+sleep 3.5
+after=$(wc -l <"$calls" | tr -d ' ')
+printf '%s|%s\n' "$before" "$after"
+"""
+
+CAPPED = """
+out="$1"
+source scripts/backup-target.sh
+backend_python() { echo renew >>"$out/calls"; }
+PAUSE_TOKEN=t-1
+start_lease_renewer 3 "$1/flag" 2   # Höchstdauer 2 s - ein Schritt hängt
+sleep 5
+stop_lease_renewer
+printf '%s|%s\n' "$(wc -l <"$1/calls" | tr -d ' ')" "$([ -f "$1/flag" ] && echo lapsed || echo held)"
+"""
+
+
+def run_bash(script, tmp_path):
+    result = subprocess.run([BASH, "-c", script, "test", tmp_path.as_posix()], cwd=REPO, text=True, capture_output=True,
+                            timeout=60, stdin=subprocess.DEVNULL)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip().split("|")
+
+
+@pytest.mark.skipif(not BASH or not pathlib.Path(BASH).exists(), reason="Bash required")
+def test_the_renewer_stops_when_the_backup_dies(tmp_path):
+    """Ohne diese Prüfung verlängerte der Hintergrundprozess ewig - die Website bliebe schreibgesperrt."""
+    before, after = run_bash(ORPHAN, tmp_path)
+    assert int(before) >= 2
+    assert after == before
+
+
+@pytest.mark.skipif(not BASH or not pathlib.Path(BASH).exists(), reason="Bash required")
+def test_the_renewer_stops_at_the_maximum_duration(tmp_path):
+    calls, state = run_bash(CAPPED, tmp_path)
+    assert state == "lapsed"
+    assert int(calls) <= 2

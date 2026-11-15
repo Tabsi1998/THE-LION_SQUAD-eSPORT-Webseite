@@ -42,6 +42,8 @@ BACKUP_WRITE_PAUSE="${BACKUP_WRITE_PAUSE:-true}"
 BACKUP_WRITE_PAUSE_TTL="${BACKUP_WRITE_PAUSE_TTL:-120}"
 BACKUP_WRITE_PAUSE_SETTLE_SECONDS="${BACKUP_WRITE_PAUSE_SETTLE_SECONDS:-3}"
 BACKUP_WRITE_PAUSE_DRAIN_SECONDS="${BACKUP_WRITE_PAUSE_DRAIN_SECONDS:-60}"
+# Harte Höchstdauer der Pause: danach wird die Lease nicht mehr verlängert, auch wenn ein Schritt hängt.
+BACKUP_WRITE_PAUSE_MAX_SECONDS="${BACKUP_WRITE_PAUSE_MAX_SECONDS:-900}"
 # Datei-Verweise in der Pause mitzählen (für den fachlichen Restore-Vergleich). false verkürzt die Pause.
 BACKUP_REFERENCE_SCAN="${BACKUP_REFERENCE_SCAN:-true}"
 RESOLVED_APP_ENV="$(resolve_app_env .env)"
@@ -124,7 +126,7 @@ elif [ "$BACKUP_WRITE_PAUSE" = "true" ]; then
   PAUSE_TOKEN="$(json_field "${WORK}/pause.json" token)"
   [ -n "$PAUSE_TOKEN" ] || fail "Write pause did not return a token; no backup written."
   PAUSE_MODE="pause"
-  start_lease_renewer "$BACKUP_WRITE_PAUSE_TTL" "${WORK}/lease-lapsed"
+  start_lease_renewer "$BACKUP_WRITE_PAUSE_TTL" "${WORK}/lease-lapsed" "$BACKUP_WRITE_PAUSE_MAX_SECONDS"
   if [ "$(json_field "${WORK}/pause.json" drained)" != "true" ]; then
     warn "Running writes did not finish within ${BACKUP_WRITE_PAUSE_DRAIN_SECONDS}s: $(json_field "${WORK}/pause.json" busy) - noted in the manifest."
   fi

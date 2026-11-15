@@ -69,15 +69,24 @@ resolve_backup_pair() {
 # Lease der Schreibpause im Hintergrund verlängern (#1009), alle TTL/3 Sekunden, solange Dump, Upload-Archiv und
 # Nachzählung laufen - ein langes tar darf die Pause nicht unbemerkt enden lassen. Scheitert ein Verlängern, legt der
 # Hintergrundprozess die Datei <flag> an und hört auf; das Backup gilt dann als unsicher.
-# Braucht PAUSE_TOKEN und backend_python. Aufruf: start_lease_renewer <ttl> <flag>, Ende: stop_lease_renewer.
+# Er verlängert nie länger als das Backup selbst lebt: Vor jedem Verlängern prüft er, ob der aufrufende Prozess noch
+# läuft (stirbt backup.sh per kill -9 oder OOM, endet die Schleife und die Lease läuft von selbst ab). Und nie länger
+# als <max> Sekunden (Standard 900): hängt ein Schritt, endet die Pause trotzdem - dann mit Flag, das Backup ist unsicher.
+# Braucht PAUSE_TOKEN und backend_python. Aufruf: start_lease_renewer <ttl> <flag> [<max>], Ende: stop_lease_renewer.
 LEASE_RENEWER_PID=""
 start_lease_renewer() {
-  local ttl="$1" flag="$2" interval
+  local ttl="$1" flag="$2" max="${3:-900}" interval parent=$$
   interval=$(( ttl / 3 ))
   [ "$interval" -ge 1 ] || interval=1
   (
     trap - EXIT INT TERM
+    deadline=$(( SECONDS + max ))
     while sleep "$interval"; do
+      kill -0 "$parent" 2>/dev/null || exit 0
+      if [ "$SECONDS" -ge "$deadline" ]; then
+        : >"$flag"
+        exit 0
+      fi
       if ! backend_python -m services.maintenance renew --token "$PAUSE_TOKEN" --ttl "$ttl" >/dev/null 2>&1; then
         : >"$flag"
         exit 0
