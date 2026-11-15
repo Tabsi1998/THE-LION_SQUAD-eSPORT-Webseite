@@ -9,6 +9,8 @@ import { matchName } from "@/lib/tvLive";
 import { advancementsOf, outcomeLabel, rankingOf } from "@/lib/tvTravel";
 import { isDuelMatch } from "@/lib/tvGrid";
 import { MOTION } from "@/lib/motion";
+import { RewardArt } from "@/components/tls/rewards/RewardArt";
+import { PODIUM_STAGE, podiumArt, podiumLine, podiumPlaces } from "@/lib/tvPodium";
 
 // Die Momente über dem Turnierbaum (#1116, #1118, #1119): „Jetzt live“, das Ergebnis groß (aus 5 Metern lesbar, etwa
 // 3 Sekunden), die Sammelkarte für mehr als drei Ergebnisse auf einmal und die Siegerkarte. Alle Größen hängen an der
@@ -164,11 +166,75 @@ function championSubline(champion, tournamentTitle) {
  * Die Siegerkarte: groß in der Mitte (Bild, Name, Turnier, Platz 2 und 3 klein dazu) oder geparkt - dann klein in einer
  * freien Ecke oder in der Kopfleiste, ohne einen Namen zu verdecken. Auch geparkt hält jede Schrift die Untergrenze.
  */
-export function TvChampionCard({ champion, registrations, tournamentTitle = "", parked = false, spot = "", testId = "tv-champion" }) {
+// Podest beim Saisonabschluss (#2410): Platz 3, 2 und 1 steigen nacheinander auf, je Platz hebt sich die Belohnung an, ihr Glanz zieht
+// nach und die Kante leuchtet kurz auf - zuletzt kommt der Meister. Wann was kommt, steht als `--tv-podium-at` am Platz (tv.css);
+// nur Verschieben und Deckkraft. Mit „Bewegung aus“ bzw. „Bewegung reduzieren“ steht sofort das Endbild.
+const PODIUM_AT = { 3: "0.3s", 2: "0.75s", 1: "1.2s" };
+
+function TvChampionPodium({ champion, places, podium, registrations, testId }) {
+  const { motionOn } = useTv();
+  const nameOf = nameOfRegistration(registrations);
+  const avatarOf = avatarOfRegistration(registrations);
+  const name = nameOf(champion.winnerId);
+  const play = motionOn ? "run" : undefined;
+  const line = podiumLine(podium);
+  const stage = PODIUM_STAGE.map((rank) => places.find((place) => place.rank === rank)).filter(Boolean);
+  return (
+    <div className="tv-moment tv-champion tv-podium" role="status" data-testid={testId} data-podium="1">
+      <div className="tv-champion__top tv-t-info">
+        <span className="tv-champion__cup-shine" aria-hidden="true"><Trophy className="tv-icon tv-champion__trophy" /></span> Meister
+      </div>
+      {line ? <div className="tv-podium__line tv-t-info" data-testid="tv-podium-line">{line}</div> : null}
+      <div className="tv-podium__winner" data-testid="tv-podium-winner">
+        <Avatar name={name} avatar={avatarOf(champion.winnerId)} className="tv-podium__photo" />
+        <div className="tv-champion__big font-heading" data-tv-name="1">{name}</div>
+      </div>
+      <div className="tv-podium__stage" aria-label="Podest">
+        {stage.map((place) => {
+          const rewards = [place.main, ...place.extras].filter(Boolean);
+          return (
+            <div key={place.rank} className="tv-podium__col" data-place={place.rank} style={{ "--tv-podium-at": PODIUM_AT[place.rank] }}
+              data-testid={`tv-podium-place-${place.rank}`}>
+              <div className="tv-podium__arts">
+                {place.main ? (
+                  <span className="tv-podium__main">
+                    <RewardArt reward={podiumArt(place.main, podium)} size="lg" play={play} testId={`tv-podium-art-${place.main.id}`} />
+                  </span>
+                ) : null}
+                {place.extras.length ? (
+                  <span className="tv-podium__extras">
+                    {place.extras.map((reward, index) => (
+                      <RewardArt key={reward.id} reward={podiumArt(reward, podium)} size="sm" play={play} index={index + 1} testId={`tv-podium-art-${reward.id}`} />
+                    ))}
+                  </span>
+                ) : null}
+              </div>
+              <div className="tv-podium__team tv-t-name" data-tv-name="1">{nameOf(place.registrationId)}</div>
+              {rewards.length ? (
+                <div className="tv-podium__rewards tv-t-meta">
+                  {rewards.map((reward) => reward.name).join(" · ")}{place.more ? ` · +${place.more}` : ""}
+                </div>
+              ) : null}
+              <div className="tv-podium__clip" aria-hidden="true">
+                <div className="tv-podium__block"><span className="tv-podium__rank font-display">{place.rank}</span></div>
+              </div>
+            </div>
+          );
+        })}
+        <span className="tv-podium__floor" aria-hidden="true" />
+      </div>
+    </div>
+  );
+}
+
+export function TvChampionCard({ champion, registrations, tournamentTitle = "", parked = false, spot = "", testId = "tv-champion", podium = null }) {
   const nameOf = nameOfRegistration(registrations);
   const avatarOf = avatarOfRegistration(registrations);
   const name = nameOf(champion.winnerId);
   const others = champion.podium.filter((entry) => entry.rank > 1);
+  // Saisonabschluss mit Belohnungen (#2410): das Podest. Ohne Belohnung auf Platz 1 bis 3 bleibt die Karte, wie sie war.
+  const places = parked ? null : podiumPlaces(champion, podium);
+  if (places) return <TvChampionPodium champion={champion} places={places} podium={podium} registrations={registrations} testId={testId} />;
   if (parked) {
     return (
       <div className={`tv-champion tv-champion--parked ${spot ? `tv-champion--${spot}` : ""}`} data-testid={testId} data-spot={spot || undefined}>
