@@ -35,6 +35,10 @@ import { RecordCard } from "./profile/TournamentPath";
 import { ProfileReferences } from "./profile/ProfileReferences";
 import { useMemberPlacements } from "../../lib/memberPlacements";
 import { Button } from "../../components/Button";
+import { LeagueSeasonHistory } from "../../components/league/LeagueSeasonHistory";
+import { RewardChip, RewardCollection } from "../../components/league/RewardCollection";
+import { withoutRewards, type RewardAward } from "../../lib/leagueRewards";
+import type { LeagueHistoryRow } from "../../lib/leagueTeam";
 
 type Props = NativeStackScreenProps<AppStackParamList, "PublicProfile">;
 
@@ -49,6 +53,9 @@ export type PublicProfilePayload = {
   // Ehrungen (#848): aus der Mitgliederakte - nur mit Freigabe des Vereins und dem Schalter der Person.
   honours?: Honour[];
   featured_award?: Award | null;
+  // Liga (#2173, docs/LIGA.md F.2/F.4): der Titel neben dem Namen und die Seasons der Person.
+  featured_title?: RewardAward | null;
+  league_history?: LeagueHistoryRow[];
   bio?: string | null;
   role?: string | null;
   created_at?: string | null;
@@ -417,6 +424,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
             <View style={styles.identityText}>
               <Muted>@{shown.username}{shown.created_at ? ` · dabei seit ${formatDate(shown.created_at)}` : ""}</Muted>
               <Title>{display}</Title>
+              {shown.featured_title ? <RewardChip award={shown.featured_title} testID="profile-featured-title" /> : null}
               <View style={styles.wrap}>
                 <Pill label={member ? "Vereinsmitglied" : "Community"} tone={member ? "success" : "cyan"} />
                 <Pill label={`${shown.achievement_level?.title || `Level ${shown.achievement_level?.level || stats.level || 1}`}${Number(shown.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(shown.achievement_level?.prestige)}` : ""}`} tone="gold" />
@@ -455,6 +463,9 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
               <Heading>Spielerprofil</Heading>
               {shown.bio ? <Body>{shown.bio}</Body> : <Muted>Keine Bio freigegeben.</Muted>}
             </Card>
+
+            {/* Season-Historie (#2173, F.2): je abgeschlossener Liga-Staffel Platz, Meister, Auf- oder Abstieg. */}
+            {hiddenForOthers ? null : <LeagueSeasonHistory rows={shown.league_history} showTeam testID="profile-league-history" />}
 
             {/* Bilanz gegen Gegner (#1193): die fünf häufigsten - für andere nur Gegner mit öffentlichem Profil. */}
             <RecordCard
@@ -503,7 +514,9 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         {activeTab === "awards" ? (ownMode ? own?.awards : (
           (shown.awards || []).length ? (
             <View style={styles.list} testID="public-profile-awards">
-              {sortAwards(shown.awards).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
+              {/* Belohnungen der Liga je Season (#2173, F.4) oben, darunter Pokale und Banner aus Turnieren wie bisher. */}
+              <RewardCollection awards={shown.awards as RewardAward[]} testID="profile-reward-collection" titleId={shown.featured_title?.id || null} />
+              {sortAwards(withoutRewards(shown.awards as RewardAward[])).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
             </View>
           ) : <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Auszeichnungen kommen aus öffentlichen Turnieren des Vereins." />
         )) : null}
