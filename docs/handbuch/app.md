@@ -41,7 +41,7 @@ Die technische Seite (Bauen, Signieren, Hochladen in die Play Console) steht in 
 | **App-Sperre** | Fingerabdruck, Gesicht oder Gerätesperre vor dem Öffnen, nur auf diesem Gerät | App → Profil → Zahnrad → Sicherheit |
 | **Push** | Benachrichtigungen aufs Handy in fünf Kanälen | App-Einstellungen, Admin → System → Push-Tests |
 | **Mitgliederbereich** | Mitgliedskarte, Versammlungen, Helfen, Dokumente, Rechnungen | Tab „Verein“ |
-| **Turnierleitung am Handy** | Ergebnisse eintragen, Streitfälle entscheiden | im Turnier, „Turnierleitung“ |
+| **Turnierleitung am Handy** | Cockpit vor Ort (Probleme und Stationen), Ergebnisse eintragen, Streitfälle entscheiden, Hinweis an alle | im Turnier, „Turnierleitung“ |
 | **Einlass** | Vorstand scannt die Mitgliedskarte bei der Versammlung | Tab Verein → Einlass |
 
 ---
@@ -94,6 +94,9 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Rankingbanner kopieren oder teilen (Platz und Bilanz als Bild mit festem Link) | Team → Übersicht |
 | Turnierbaum mit Weiterkommen-Modus (fester Baum, Auslosung nach der Runde, Show-Auslosung, sofort zufällig) und was gerade passiert („wartet auf Auslosung“, „Auslosung bereit · N Namen“, „das Los entscheidet“); Auslosung als Moment mit einer leichten Vibration, Namen wie im Web („Loser Runde 1“, „Grand Final“, „voraussichtlich“) | Turnier → Baum |
 | Turnierleitung: Ergebnisse eintragen, „Braucht Aufmerksamkeit“ | Turnier → Turnierleitung (für Leitung und Helfer) |
+| Turnier-Cockpit vor Ort: oben die Probleme (Einspruch, nicht erschienen, Defekt, Ergebnis fehlt, Verzug ab 5 Min., Auslosung), darunter bzw. am Tablet quer daneben die Stationen mit „Aufrufen“, „Starten“, „Freigeben“ und „Defekt“; lädt alle 20 Sekunden neu, solange es offen ist | Turnier → Turnierleitung → Cockpit (nur vor Ort mit Stationen) |
+| Spielzeit-Uhr „12:34 / 30 Min.“ mit Balken: ab 80 % orange („knapp“), ab 100 % orange gefüllt mit Warn-Symbol; ohne Dauer nur die Zeit, in der Turnierpause steht sie | Cockpit, Turnierleitung → Ergebnisse, Turnier → Baum |
+| Hinweis der Turnierleitung: Banner oben auf Turnier- und Event-Seite; die Leitung schreibt ihn im Reiter „Hinweis“ (Vorlagen, an wen, wie lange, auch am TV) | Turnier, Event; Turnier → Turnierleitung → Hinweis |
 | Mitgliedskarte (auch ohne Netz), Versammlungen und Abstimmung, Helfen, Vereinsdokumente, Vorteile, Meine Mitgliedschaft | Tab Verein |
 | Einlass bei der Generalversammlung (Vorstand) | Tab Verein → Einlass |
 | Profil, Rechnungen, Gewinne, „Deine Unterlagen“, Jahresrückblick | Tab Profil |
@@ -112,6 +115,8 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 - **In der Liga:** mit einem Co-Team anmelden, die Ligaseite, Vorfälle, Verfahren, Ergebnis mit Maps melden und alle Eingriffe der
   Liga-Leitung (für eine Seite eintragen, Veto pausieren oder neu starten) – die App zeigt dafür einen Satz mit dem Weg ins Web
   ([Liga für Captains](liga-captains.md)).
+- **In der Turnierleitung:** Check-in vor Ort, an den Stationen „Umlegen“, „Station räumen“, „Anderes Spiel aufrufen“ und
+  „Alle freien Stationen aufrufen“ sowie beim Hinweis „Turnier gleich pausieren“ – dafür die Turnierleitung im Web öffnen.
 - Lange Seiten wie Mitgliederverzeichnis, Server, Rechtliches und Kontaktformular bleiben auf der Website.
 
 Alles andere gibt es in beiden. Die Rechte sind dieselben wie im Web: Was dein Konto nicht darf, sieht es auch in der App nicht.
@@ -170,7 +175,7 @@ Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die P
   Vereinsintern, Helferdienste. Account- und Sicherheitsmails bleiben immer aktiv.
 - **Android-Kanäle** (in den Handy-Einstellungen einzeln stumm schaltbar):
   - **Aufrufe & Spielstart** – wichtig, mit Gong: „Du bist dran“, „Match startet jetzt“, Erinnerung vor dem Spiel; für die Turnierleitung „Braucht Aufmerksamkeit“.
-  - **Turniere & Events** – Check-in, Ergebnisse, Anmeldungen, Gewinne, Event-Hinweise.
+  - **Turniere & Events** – Check-in, Ergebnisse, Anmeldungen, Gewinne, Event-Hinweise, „Hinweis der Turnierleitung“ (ein Tipp öffnet die Turnier- bzw. Event-Seite mit dem Banner).
   - **Chats** – Direkt-, Team-, Turnier- und Match-Chat, Erwähnungen, Freundschafts- und Team-Einladungen.
   - **Verein** – Vereinsintern, News, Mitgliedschaft, Rechnungen.
   - **Erfolge** – Erfolge, Level, Kronen.
