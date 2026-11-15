@@ -561,7 +561,8 @@ TEAM_A_WORDS = {"home": "Team A ist das Heimteam laut Spielplan, Team B der Gast
 TEAM_A_SHORT = {"home": "das Heimteam laut Spielplan", "draw": "per Los je Spiel"}
 PRESET_RULE = ("- Vorgabe der Woche: Wo die Schrittfolge es nennt, legt die Liga-Leitung die Map je Spielwoche fest. Sie gilt für alle Spiele "
                "dieses Spieltags – auch für ein verschobenes –, niemand kann sie sperren oder wählen. Solange sie für eine Woche fehlt, "
-               "beginnt das Veto nicht.")
+               # Nr. 124, 127: Nach dem Nachtragen beginnt es erst, wenn beide Seiten bereit sind (``league_veto.set_ready``).
+               "beginnt das Veto nicht; wird sie nachgetragen, beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben.")
 NO_PRESETS_YET = "noch keine eingetragen"
 
 

@@ -191,6 +191,18 @@ def test_home_rule_line_names_the_week_condition():
     assert line.endswith("gilt nach 72 Stunden, wenn er in der Spielwoche liegt.")
 
 
+def test_veto_block_with_preset_names_the_ready_start():
+    """G.3 Regelwerksabgleich: Fehlt die Vorgabe der Woche beim Check-in, beginnt das Veto nach dem Nachtragen erst, wenn beide Teams
+    „Bereit zum Veto“ getippt haben (Nr. 124, 127). Ohne diesen Satz klänge der Baustein, als liefe es von selbst los."""
+    steps = [{"kind": "ban", "mode": "ctl", "mode_label": "Kontrolle", "team": "A", "position": None},
+             {"kind": "preset", "mode": "ctl", "mode_label": "Kontrolle", "team": None, "position": 3}]
+    out = facts.render_veto({"enabled": True, "team_a": "home", "step_seconds": 60, "steps": steps})
+    preset_line = [row for row in out.splitlines() if row.startswith("- Vorgabe der Woche:")][0]
+    assert preset_line.endswith("beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben.")
+    without = facts.render_veto({"enabled": True, "team_a": "home", "step_seconds": 60, "steps": steps[:1]})
+    assert "Bereit zum Veto" not in without, "ohne Vorgabe der Woche kein Bereit-Satz"
+
+
 def test_schedule_block_names_the_result_reminder_only_when_it_is_on():
     """E.5 (#1647, N9): Ist „Ergebnis fehlt“ für die Season aus, nennt der Regeltext keine Erinnerung - nur „überfällig“."""
     on = facts.render_schedule(facts.schedule_data(SEASON))
