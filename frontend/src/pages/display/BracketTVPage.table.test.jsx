@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { emitApiInvalidation, setStreamConnected } from "@/lib/apiInvalidation";
 
 // Turnierbaum-TV bei Liga & Co. (#2121): nach dem Spielplan kommt die Folie „Tabelle“, Kopf und QR-Code nennen die
 // Tabelle statt des Turnierbaums, und nach dem Ende kommt der Sieger aus Platz 1. Erfundene Namen.
@@ -103,4 +104,56 @@ test("Gruppen: je Gruppe eine Tabelle mit Namen, ohne Gold", async () => {
   expect(slide.querySelector("[data-place]")).toBeNull();
   expect(screen.queryByTestId("tv-champion-parked")).toBeNull();
   expect(screen.getByTestId("bracket-tv")).toHaveTextContent("Tabellen");
+});
+
+// Saisonabschluss nach „Beendet“ (#2410): Stand die Staffel schon auf „Beendet“, war der Sieger schon da (geparkt). Kommt beim
+// Abschluss das Podest mit Belohnungen dazu, läuft der Sieger-Moment einmal mit Podest - nicht noch einmal beim nächsten Stand und
+// nicht beim Wiederöffnen.
+test("Liga: das Podest kommt bei gleichem Sieger nach - der Moment läuft genau einmal", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  setStreamConnected(true);
+  const base = {
+    tournament: { id: "t1", slug: "liga", title: "Herbstliga", status: "completed", format: "league", team_mode: "team" },
+    registrations: REGS, stages: [{ id: "s1", name: "Liga", number: 1, stage_type: "league" }],
+    matches_v2: [match("a", "r1", "r2"), match("b", "r3", "r4")], standings: STANDINGS, league_podium: null,
+  };
+  const podium = { league: "Probe-Liga", season: "Season 3", division: "Liga 1", places: [
+    { rank: 1, registration_id: "r1", rewards: [{ id: "gold", kind: "medal", name: "Goldmedaille", image_url: null, art: { place: "1. Platz", metal: "gold" } }] }] };
+  let current = base;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (String(url || "").startsWith("/tournaments/t1/bracket/display")) return { data: structuredClone(current) };
+    return { data: [] };
+  });
+  const change = async (next) => {
+    current = next;
+    await act(async () => { emitApiInvalidation({ resource: "matches" }); });
+  };
+  try {
+    renderTv("/display/bracket/t1?key=tv&playlist=tree");
+    const main = await screen.findByTestId("tv-main");
+    await screen.findByTestId("tv-tree");
+    expect(main).not.toHaveAttribute("data-moment");
+    expect(screen.queryByTestId("tv-champion")).toBeNull();
+
+    // Abschluss: gleicher Sieger, jetzt mit Podest.
+    await change({ ...base, league_podium: podium });
+    await waitFor(() => expect(main).toHaveAttribute("data-moment", "champion"));
+    expect(await screen.findByTestId("tv-champion")).toHaveAttribute("data-podium", "1");
+    await act(async () => { vi.advanceTimersByTime(9000); });
+    await waitFor(() => expect(main).not.toHaveAttribute("data-moment"));
+
+    // Derselbe Stand noch einmal: kein zweiter Moment.
+    await change({ ...base, league_podium: structuredClone(podium) });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(main).not.toHaveAttribute("data-moment");
+
+    // Wieder geöffnet: läuft wieder, kein Podest - und kein Moment.
+    await change({ ...base, tournament: { ...base.tournament, status: "live" }, league_podium: null });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(main).not.toHaveAttribute("data-moment");
+    expect(screen.queryByTestId("tv-champion")).toBeNull();
+  } finally {
+    setStreamConnected(false);
+  }
 });

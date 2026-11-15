@@ -240,7 +240,7 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
         full = await _build_bracket_payload(db, t, None, False, with_table=table)
-        return await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full))
+        return await _with_league_podium(db, t, await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full)))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, capability=READ)
@@ -250,13 +250,21 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
     payload = await _build_bracket_payload(db, t, me, True, with_table=table)
     # Wie mit Schlüssel: die belegten Plätze für den Anmelde-Bildschirm (#1123).
     payload["seats"] = seat_summary(t, payload.get("registrations"))
-    return await _with_onsite_path(db, t, _with_table(payload, payload))
+    return await _with_league_podium(db, t, await _with_onsite_path(db, t, _with_table(payload, payload)))
 
 
 def _with_table(payload: dict, full: dict) -> dict:
     """Die Tabelle für die Folie „Tabelle“ am TV (#2121), nur mit den Feldern, die der TV zeigt."""
     if "standings" in full:
         payload["standings"] = display_standings(full["standings"])
+    return payload
+
+
+async def _with_league_podium(db, t: dict, payload: dict) -> dict:
+    """Saisonabschluss einer Liga-Staffel (#2410): das Podest mit den öffentlichen Belohnungen für den Sieger-Moment - sonst ``None``."""
+    from services.league_rewards import tv_podium
+
+    payload["league_podium"] = await tv_podium(db, t)
     return payload
 
 

@@ -13,6 +13,7 @@ import { isLiveMatch, liveZoomPlan, matchName } from "@/lib/tvLive";
 import { COLLECT_AFTER, MOMENT_MS, drawReadyText, readyDraws } from "@/lib/tvMoments";
 import { TRAVEL, advancementsOf, landFrame, planTravel, rideFrame, routeLength, routePath, travelRoute, travelTotal } from "@/lib/tvTravel";
 import { TV_STAGE_UNIT_PX, stageBase, treeBox, treeCssVars, treeMinZoom } from "@/lib/tvType";
+import { podiumPlaces } from "@/lib/tvPodium";
 import { TvChampionCard, TvCollectiveCard, TvLiveBanner, TvResultCard, avatarOfRegistration, nameOfRegistration } from "./TvMoments";
 import { TvTreeContext, TvTreeNode } from "./TvTreeNode";
 import { useTv } from "./TvScreen";
@@ -904,7 +905,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
           session.timers.push(window.setTimeout(() => { if (!session.cancelled) session.particles.push(runParticles(canvas, { kind: "confetti", budget: 60 })); }, 1100));
         }
       }
-      await sleep(MOMENT_MS.championCard);
+      // Mit Podest (#2410) etwas länger: drei Plätze steigen nacheinander auf, dann der Meister.
+      await sleep(podiumPlaces(winner, dataRef.current?.league_podium) ? MOMENT_MS.championPodium : MOMENT_MS.championCard);
       if (session.cancelled) return;
       setChampionCenter(false);
       setConfetti(false);
@@ -996,7 +998,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       ) : null}
       {champion && championCenter ? (
         <div className="tv-moment-layer">
-          <TvChampionCard champion={champion} registrations={registrations} tournamentTitle={data?.tournament?.title || ""} />
+          <TvChampionCard champion={champion} registrations={registrations} tournamentTitle={data?.tournament?.title || ""} podium={data?.league_podium || null} />
         </div>
       ) : null}
       {confetti ? <canvas ref={confettiRef} className="tv-confetti" aria-hidden="true" data-testid="tv-confetti" /> : null}

@@ -499,6 +499,77 @@ async def staffel_view(db, tournament: dict, season: dict | None, division: dict
     return {"granted": granted, "items": out}
 
 
+# ---------------------------------------------------------------- TV (#2410)
+# Der Sieger-Moment am TV zeigt beim Saisonabschluss das Podest mit den Belohnungen. Der TV läuft mit Anzeige-Schlüssel ohne Person -
+# also nur, was Gäste auch sehen (``awards._visible`` wie Profil, Teamseite und Teilen-Bild: Season öffentlich, Staffel als Turnier
+# sichtbar) und was nicht ruht. Je Belohnung nur Art, Name, Bild sowie Platz und Farbe der Vorlage, je Platz die Anmeldung - nie
+# Spieler, Konten, Preise oder Beschreibung. Ein Platzbereich (etwa Platz 2-3) zählt, „alle Teilnehmer“ nicht: das gehört nicht aufs
+# Podest.
+TV_PLACES = (1, 2, 3)
+TV_REWARD_FIELDS = ("id", "kind", "name", "image_url")
+TV_ART_FIELDS = ("place", "metal")
+TV_HEAD_FIELDS = ("league", "season", "division")
+# Die Hauptbelohnung je Platz: erst die für genau diesen Platz, dann ein Platzbereich - je Art Medaille vor Emblem, Banner und Titel.
+TV_KIND_ORDER = ("medal", "emblem", "banner", "title")
+# Was ``tv_places`` und ``awards._visible`` aus einem Eintrag brauchen - keine Spieler, Konten oder Empfänger.
+TV_AWARD_PROJECTION = {"_id": 0, "rank": 1, "registration_id": 1, "reward": 1, "suspended": 1, "league.season_id": 1, "overall": 1,
+                       "tournament.status": 1, "tournament.visibility": 1, "tournament.is_public": 1}
+
+
+def _tv_order(row: dict) -> tuple:
+    kind = row.get("kind")
+    return (0 if row["mode"] == "rank" else 1, TV_KIND_ORDER.index(kind) if kind in TV_KIND_ORDER else len(TV_KIND_ORDER),
+            str(row.get("name") or "").casefold())
+
+
+def tv_places(docs: list[dict]) -> list[dict]:
+    """Platz 1 bis 3 mit ihren Belohnungen aus den Einträgen der Staffel - ruhende und solche für andere Plätze fallen weg."""
+    places: dict[tuple, dict] = {}
+    for doc in docs:
+        rank, reward = doc.get("rank"), doc.get("reward") or {}
+        mode = (reward.get("places") or {}).get("mode")
+        if doc.get("suspended") or isinstance(rank, bool) or rank not in TV_PLACES or not reward.get("id") or mode not in ("rank", "range"):
+            continue
+        place = places.setdefault((rank, doc.get("registration_id")), {"rank": rank, "registration_id": doc.get("registration_id"), "rewards": []})
+        if any(row["id"] == reward["id"] for row in place["rewards"]):
+            continue
+        art = reward.get("art") or {}
+        place["rewards"].append({**{key: reward.get(key) for key in TV_REWARD_FIELDS},
+                                 "art": {key: art[key] for key in TV_ART_FIELDS if art.get(key)}, "mode": mode})
+    out = []
+    for place in sorted(places.values(), key=lambda row: (row["rank"], str(row["registration_id"] or ""))):
+        rewards = sorted(place["rewards"], key=_tv_order)
+        out.append({**place, "rewards": [{key: value for key, value in row.items() if key != "mode"} for row in rewards]})
+    return out
+
+
+async def tv_podium(db, tournament: dict | None) -> dict | None:
+    """Das Podest für den Sieger-Moment am TV - ``None``, solange die Staffel läuft oder ohne Belohnung auf Platz 1 bis 3 (dann bleibt
+    der Moment wie vorher)."""
+    from services.awards import _visible
+    from services.league_final_read import is_closed
+    from services.league_scope import is_league_staffel
+
+    # Erst die Marke am Turnier (ohne Abfrage), dann die geltende Fassung - nur ihre Kennung, nie die ganze Tabelle.
+    if not is_league_staffel(tournament) or not is_closed(tournament):
+        return None
+    if not await db.league_final_tables.find_one({"tournament_id": tournament["id"], "active": True}, {"_id": 0, "id": 1}):
+        return None
+    docs = await db.tournament_awards.find({"tournament_id": tournament["id"], "reward_key": {"$type": "string"}, "suspended": {"$ne": True},
+                                            "rank": {"$in": list(TV_PLACES)}}, TV_AWARD_PROJECTION).to_list(200)
+    season_id = (tournament.get("league_context") or {}).get("season_id")
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "id": 1, "name": 1, "status": 1, "visibility": 1}) if season_id else None
+    seasons = {season_id: season} if season else {}
+    visible = [doc for doc in docs if await _visible(doc, tournament, seasons)]
+    places = tv_places(visible)
+    if not places:
+        return None
+    art = next(((doc.get("reward") or {}).get("art") for doc in visible if (doc.get("reward") or {}).get("art")), None) or {}
+    head = {key: art.get(key) or None for key in TV_HEAD_FIELDS}
+    head["season"] = head["season"] or (season or {}).get("name") or None
+    return {**head, "places": places}
+
+
 async def pdf_rows(db, tournament: dict) -> list[list[str]]:
     """Für das Ergebnis-PDF einer abgeschlossenen Staffel: je Belohnung Platz, Name, Art und wer sie bekommen hat."""
     from services.league_final_read import active_final

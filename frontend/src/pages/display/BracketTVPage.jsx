@@ -23,6 +23,7 @@ import { bracketChanges, bracketSnapshot, isLiveMatch } from "@/lib/tvLive";
 import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
+import { podiumPlaces } from "@/lib/tvPodium";
 import { TABLE_SLIDE, isTreeless, tableChampionOf, tvTableSections, tvWords, withTableSlide } from "@/lib/tvTable";
 import { nameHead } from "@/lib/standingsTable";
 import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
@@ -299,6 +300,9 @@ function BracketTv() {
   const seenRef = useRef(new Set());
   const [resultTags, setResultTags] = useState(NO_TAGS);
   const championKeyRef = useRef(null);
+  // Podest beim Saisonabschluss (#2410): für welchen Sieger das Podest schon gezeigt (oder still übernommen) ist. Kommt es bei
+  // gleichem Sieger erst nachträglich (Staffel stand schon auf „Beendet“), läuft der Moment genau einmal - nie beim Wiederöffnen.
+  const podiumKeyRef = useRef("");
   // Ohne Finale (Liga, Jeder gegen jeden, Schweizer System) kommt der Sieger aus Platz 1 der Tabelle, sobald beendet.
   const champion = useMemo(() => (data ? championOf(matches, data.stages || []) || tableChampionOf(data.standings, data.tournament) : null), [data, matches]);
 
@@ -314,6 +318,9 @@ function BracketTv() {
       previousRef.current = baseMatches;
       snapshotRef.current = bracketSnapshot(baseMatches);
       const baseKey = championKey(championOf(baseMatches, base.stages || []));
+      // Auch das Podest (#2410) ist mit dem still übernommenen Stand gesehen.
+      const baseChampion = championOf(baseMatches, base.stages || []) || tableChampionOf(base.standings, base.tournament);
+      if (baseChampion && podiumPlaces(baseChampion, base.league_podium)) podiumKeyRef.current = championKey(baseChampion);
       if (baseKey !== championKeyRef.current) {
         championKeyRef.current = baseKey;
         setChampionState({ key: baseKey, parked: Boolean(baseKey) });
@@ -328,18 +335,25 @@ function BracketTv() {
     const change = momentsFromChange(previous, matches, { seen: seenRef.current });
     const hidden = typeof document !== "undefined" && document.hidden;
     const key = championKey(champion);
+    const podiumOn = Boolean(champion) && Boolean(podiumPlaces(champion, data.league_podium));
     // Beim ersten Laden ist nichts neu: steht der Sieger schon fest, gleich das Endbild - ohne Konfetti. Ebenso nach
     // einer Neuverbindung, bei verdecktem Bildschirm und bei Riesen-Sprüngen: nichts nachholen, nur den Stand merken.
     // Pause, Check-in, Anmeldung oder ein Bildschirm ohne Baum: genauso.
     if (first || hidden || !showMoments || change.count > MAX_EVENTS) {
       championKeyRef.current = key;
+      if (podiumOn) podiumKeyRef.current = key;
       setChampionState({ key, parked: Boolean(champion) });
       return;
     }
     if (key !== championKeyRef.current) {
       championKeyRef.current = key;
+      if (podiumOn) podiumKeyRef.current = key;
       setChampionState({ key, parked: false });
       if (champion) queue.enqueue({ type: "champion", key });
+    } else if (podiumOn && podiumKeyRef.current !== key) {
+      podiumKeyRef.current = key;
+      setChampionState({ key, parked: false });
+      queue.enqueue({ type: "champion", key });
     }
     // Das Finale bekommt den Champion-Moment statt einer Ergebnis-Karte. Korrigierte Ergebnisse kommen wie neue.
     const results = [...new Set([...decided, ...change.corrected])].filter((matchId) => !champion || matchId !== champion.finalMatchId);

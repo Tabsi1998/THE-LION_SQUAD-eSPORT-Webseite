@@ -20,8 +20,8 @@ export const YIELDING_MOMENTS = Object.freeze(new Set(["sponsor", "stats"]));
 export const MOMENT_MAX_WAIT_MS = Object.freeze({ live: 15000 });
 export const COLLECT_AFTER = 3;
 // Wie lange die Karten stehen: ein Ergebnis etwa 3 Sekunden, die Sammelkarte etwas länger, der Start-Zoom etwa 4, die
-// neue Bestzeit etwa 3. Sponsor und Zahlen bringen ihre Dauer selbst mit (aus der Wiedergabeliste).
-export const MOMENT_MS = Object.freeze({ result: 3000, collective: 4500, live: 4000, championCard: 4400, best: 3200, sponsor: 6000, stats: 8000, draw: 2400, merge: 3200, mark: 3200,
+// neue Bestzeit etwa 3, der Sieger mit Podest (#2410) etwa 7,6. Sponsor und Zahlen bringen ihre Dauer selbst mit (aus der Wiedergabeliste).
+export const MOMENT_MS = Object.freeze({ result: 3000, collective: 4500, live: 4000, championCard: 4400, championPodium: 7600, best: 3200, sponsor: 6000, stats: 8000, draw: 2400, merge: 3200, mark: 3200,
   // Show-Auslosung bereit: so lange steht der Baum mit den leuchtenden Zielspielen, danach bleibt der Hinweis stehen.
   // Ein sofort gezogener Platz: kurz - wie eine Zeile der Auslosung (#1634).
   draw_ready: 2800, draw_assigned: 1600 });
