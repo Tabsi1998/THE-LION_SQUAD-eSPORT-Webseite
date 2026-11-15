@@ -9,9 +9,6 @@ on:
   schedule:
     # 01:30 UTC = 02:30 Wiener Winterzeit, 03:30 Sommerzeit.
     - cron: "30 1 * * *"
-  # VORLAEUFIG zum Pruefen ohne Merge - vor der Uebergabe wieder entfernen.
-  push:
-    branches: [test/liga-g1-abnahme]
   workflow_dispatch:
     inputs:
       melden:
