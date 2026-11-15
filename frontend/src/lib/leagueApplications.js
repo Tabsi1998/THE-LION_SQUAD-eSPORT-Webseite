@@ -1,5 +1,5 @@
 // Selbstanmeldung mit Co-Team (docs/LIGA.md, B.4, #2205): Texte zu dem, was der Server schickt, und das Formular der Season. Geprüft wird auf dem Server.
-import { fromViennaInput, viennaDateTime, viennaInputValue } from "@/lib/vienna";
+import { asInstant, fromViennaInput, viennaDateTime, viennaInputValue } from "@/lib/vienna";
 
 const LONG = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
@@ -53,6 +53,18 @@ export function windowLine(block) {
   if (block?.state === "upcoming") return `Öffnet am ${when(block.opens_at)}`;
   if (block?.state === "closed") return `Vorbei seit ${when(block.closes_at)}`;
   return "";
+}
+
+/**
+ * Nachmeldung (Entscheidung Nr. 180, #1632): Endet die Anmeldung nach dem Beginn der Season, sagt es ein Satz - sonst leer.
+ * `closesAt` und `startAt` sind Zeitpunkte vom Server oder aus dem Formular (ohne Zone als Wiener Uhr).
+ */
+export function afterStartLine(closesAt, startAt) {
+  if (!closesAt || !startAt) return "";
+  const closes = asInstant(closesAt);
+  const start = asInstant(startAt);
+  if (Number.isNaN(closes.getTime()) || Number.isNaN(start.getTime()) || closes <= start) return "";
+  return `Anmeldung läuft nach Season-Start weiter (bis ${when(closes)}).`;
 }
 
 /** Startplätze für die Ligaseite - ohne Grenze kein Satz. */

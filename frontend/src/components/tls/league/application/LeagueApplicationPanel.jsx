@@ -8,7 +8,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
-import { APPLICATION_STATES, STATE_CLASS, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
+import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
 
 // ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
@@ -94,6 +94,8 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
 
   const current = view?.application || block || {};
   const seats = seatsLine(current);
+  // Nachmeldung (Entscheidung Nr. 180): Das Fenster geht über den Season-Start hinaus - solange es noch nicht vorbei ist, sagt es ein Satz.
+  const afterStart = current.state && current.state !== "closed" ? afterStartLine(current.closes_at, current.season_starts_at) : "";
   // Ohne Anmeldefenster (Season aus dem Vorgänger übernommen, F.2): nur die eigenen Co-Teams mit Antrag - sonst gibt es hier nichts zu tun.
   const rows = (view?.squads || []).filter((row) => current.state || row.application);
   if (!current.state && !rows.length) return null;
@@ -112,6 +114,7 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
           <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">
             {current.state ? windowLine(current) : "Aus der Vorgänger-Season übernommen: Eure Co-Teams sind automatisch dabei."}
           </p>
+          {afterStart ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-after-start">{afterStart}</p> : null}
           {seats ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-seats">{seats}</p> : null}
           {current.entry_policy === "members" ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}
           {current.waitlist && current.waitlist_note ? <p className="mt-0.5 text-sm text-white/60 [overflow-wrap:anywhere]" data-testid="league-application-waitlist-note">{current.waitlist_note}</p> : null}

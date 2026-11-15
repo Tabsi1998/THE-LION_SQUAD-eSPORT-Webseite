@@ -3,9 +3,9 @@ import { applicationToForm } from "@/lib/leagueApplications";
 import { SeasonApplicationSection } from "./SeasonApplicationSection";
 
 // Selbstanmeldung je Season (docs/LIGA.md, B.4): „Anmeldungen automatisch annehmen“ (#2348) mit dem Hinweis auf offene Anmeldungen von vorher.
-function renderSection(season, waiting) {
+function renderSection(season, waiting, extra = {}) {
   const set = vi.fn();
-  const form = applicationToForm(season);
+  const form = { ...applicationToForm(season), ...extra };
   render(<SeasonApplicationSection form={form} set={set} waiting={waiting} />);
   return set;
 }
@@ -32,4 +32,16 @@ test("ohne offene Anmeldungen steht kein Hinweis da", () => {
   renderSection({ application_auto_accept: true }, 0);
 
   expect(screen.queryByTestId("season-form-application-auto-waiting")).toBeNull();
+});
+
+test("Nachmeldung (Nr. 180): endet die Anmeldung nach dem Season-Start, steht ein Hinweis da - davor nicht", () => {
+  const season = { application_opens_at: "2026-11-01T17:00:00+00:00", application_closes_at: "2026-11-20T19:00:00+00:00" };
+  renderSection(season, 0, { start_day: "2026-11-17" });
+  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis 20.11.2026, 20:00 Uhr).");
+});
+
+test("ohne Nachmeldung kein Hinweis", () => {
+  const season = { application_opens_at: "2026-11-01T17:00:00+00:00", application_closes_at: "2026-11-15T19:00:00+00:00" };
+  renderSection(season, 0, { start_day: "2026-11-17" });
+  expect(screen.queryByTestId("season-form-application-after-start")).toBeNull();
 });

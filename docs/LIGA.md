@@ -1,6 +1,7 @@
 # Liga
 
-Abschnitte 1 bis 11 beschreiben die gebaute **Stufe 1**. Abschnitt 12 ist der Vertrag für den **Ausbau** (Epic #2211).
+Abschnitte 1 bis 11 beschreiben die gebaute **Stufe 1**. Abschnitt 12 ist der Vertrag für den **Ausbau** (Epic #2211),
+Abschnitt 13 die Feature-Matrix auf dem Stand nach Phase G.
 Beispielwerte in Stufe 1 (Start 10.11., zehn Wochen, Best of 3, acht Teams, 3/1/0) sind Vorgaben von damals, keine festen
 Regeln: Jede Season stellt sie selbst ein.
 
@@ -1451,7 +1452,7 @@ superadmin}`.
 | `rules_upcoming` | Warnung | es gibt nur eine Fassung, die erst später gilt (kein Problem, wenn eine schon gilt) |
 | `divisions_missing` | Problem | keine aktive Liga N |
 | `staffel_missing` | Problem | eine aktive Liga N ohne Staffel |
-| `application_after_start` | Problem | das Anmeldefenster (B.4) endet nach dem Beginn der Season |
+| `application_after_start` | Warnung | das Anmeldefenster (B.4) endet nach dem Beginn der Season: Nachmeldung erlaubt (Entscheidung Nr. 180, #1632), Text „Anmeldung läuft nach Season-Start weiter (bis …)“. Verwaltung und Ligaseite zeigen denselben Satz, der öffentliche Block trägt dafür `season_starts_at`. Eine Nachmeldung nach dem Start kommt per Annahme mit Staffel in die Staffel und steht mit 0 Spielen in der Tabelle; Spiele bekommt sie nicht von selbst (offen, siehe `docs/liga/abnahme.md`) |
 | `application_closed` | Warnung | das Anmeldefenster ist schon vorbei |
 | `application_none` | Warnung | kein Anmeldefenster: keine Selbstanmeldung |
 | `inactive_mode` | Warnung | ein inaktiver oder archivierter Modus im Pool oder in der Reihenfolge |
@@ -2003,7 +2004,7 @@ auf alle nicht gesperrten Staffeln der Season (eigene Gruppe `schedule` beim Üb
 
 | Feld | Typ | Vorgabe | Bedeutung |
 | --- | --- | --- | --- |
-| `home_rule` | bool | `true` | Nr. 17: unbeantworteter Vorschlag des Heimteams gilt nach der Frist |
+| `home_rule` | bool | `true` | Nr. 17: unbeantworteter Vorschlag des Heimteams gilt nach der Frist, wenn er in der Spielwoche liegt |
 | `home_rule_hours` | int 1–336 | 72 | Frist ab dem Vorschlag, Sperrzeiten zählen nicht (`response_deadline`) |
 | `reschedule_notice_hours` | int 0–336 | 24 | Nr. 18: Antrag spätestens so viele Stunden vor dem geltenden Termin |
 | `reschedule_max` | int 0–10 | 2 | Verschiebungen je Spiel durch beide Teams, 0 = nur die Leitung |
@@ -3872,3 +3873,114 @@ Endstände von vor F.2 ohne `sides` lesen das Co-Team aus der Anmeldung. Keine M
 
 **Nicht in F.5:** eigene Belohnungen je Liga N (eine Zusammenstellung gilt für alle Stufen), Nachricht an die Captains beim Abschluss der
 Gesamtwertung (Belohnungen schicken ihre eigene), TV und die App (`mobile/`, Liste in #2173).
+
+## 13. Feature-Matrix (Stand G.3, 15.11.2026)
+
+Abschnitt 26 B des Auftrags vom 02.11., zuerst geführt in der privaten Projektnotiz (Stand 02.11., `main` 385beb0b3), hier auf dem
+Stand nach Phase G. Regel gegen Funktion im Einzelnen: [liga/regelwerksabgleich.md](liga/regelwerksabgleich.md); Abnahme:
+[liga/abnahme.md](liga/abnahme.md); Abschluss: [liga/abschlussbericht.md](liga/abschlussbericht.md).
+
+**Status:** *vorhanden* (gab es vor dem Ausbau) · *teilweise* (ein benannter Teil fehlt) · *fehlend* · *implementiert* (gebaut, ohne
+eigenen automatischen Test) · *getestet* (gebaut, automatische Tests in Backend, Vitest oder Playwright) · *abgenommen* (zusätzlich
+in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440 px; die Spalte nennt das Szenario).
+
+| Bereich | Funktion | Status | Paket · PR | Issue |
+| --- | --- | --- | --- | --- |
+| Rahmen | Liga, Season, Liga N, Staffel | abgenommen (Sz. 1) | Stufe 1 | – |
+| Rahmen | Spielplan einfach und doppelt, spielfrei | abgenommen (Sz. 5: 16 Teams, 120 Spiele) | A.2 #2217 | – |
+| Rahmen | Sperrwochen, Standardtermin | getestet | Stufe 1, A.3 #2220 | – |
+| Rahmen | Season-Prüfung vor Veröffentlichung („Was fehlt noch?“) | abgenommen (Sz. 1) | C.2 #2257 | – |
+| Rahmen | Season-Seite mit Reitern, geführte Einrichtung | getestet | #2279 | #2267 |
+| Rahmen | Neue Season aus der Vorgängerin, Auf- und Abstieg, Zonen | abgenommen (Sz. 18) | F.2 #2397 | #1627 |
+| Rahmen | Sportlicher Auf- und Abstieg als Regel je Spiel, Solo-Ligen | fehlend | – | #1627 |
+| Rahmen | Unterbesetzte Divisionen zusammenlegen | fehlend | – | #1628 |
+| Rahmen | Eigene Staffel-Seite in der Liga-Verwaltung | fehlend (Staffeln laufen über die Turnierverwaltung) | – | #2262 |
+| Rahmen | Erweiterbarkeit: Edition je Season, Partien ohne Maps, Playoffs, freier Name je Liga N | fehlend (Prüfbericht vorhanden: [liga/erweiterbarkeit.md](liga/erweiterbarkeit.md)) | F.3 #2399 | #2400, #2401, #2404, #2405 |
+| Anmeldung | Selbstanmeldung mit Co-Team | abgenommen (Sz. 3) | B.4 #2244 | #1623 |
+| Anmeldung | Anmeldefenster, Startplätze, Warteliste | abgenommen (Sz. 3, 4: letzter Platz bei gleichzeitiger Annahme); Warteliste getestet | B.4 #2244 | #1623 |
+| Anmeldung | Genehmigung, Ablehnung, Zuteilung, Eingang | abgenommen (Sz. 4) | B.4 #2244 | – |
+| Anmeldung | Zulassung je Season, zwei Co-Teams eines Hauptteams | getestet | B.4 #2244 | #1665 |
+| Anmeldung | Eigenes Team: zweite Person entscheidet | getestet | #2248 | #2245 |
+| Anmeldung | Anmeldung trotz fehlender Angaben, Sperre erst beim Check-in | getestet | #2320 | #2313 |
+| Anmeldung | Automatisch annehmen | getestet | #2355 | #2348 |
+| Anmeldung | Nachmeldung nach dem Season-Start | teilweise: Anmeldung und Hinweis abgenommen (G.1 Nachmeldung), Spiele für Nachrücker fehlen | G.1 #2423 | #2422 |
+| Anmeldung | Datenschutztext für externe Teilnehmer | teilweise: Feld und Zustimmung getestet, freigegebener Wortlaut fehlt | B.4 | Entscheidung Nr. 1 |
+| Regeln | Versioniertes Regelwerk, eigene Seite, PDF, Änderungen, Zustimmung | abgenommen (Sz. 1, 3) | B.2 #2231 | #1646 |
+| Regeln | Regelwerk aus den Einstellungen: Bausteine, Variablen, Freigabe | getestet | #2286, #2291 | #2269 |
+| Berechtigung | Eine Prüfung für Anmeldung, Aufstellung, Check-in | abgenommen (Sz. 14, Grenzfälle „Sperren“) | B.3 #2234 | #2204 |
+| Berechtigung | Spiel-ID Format, Eindeutigkeit je Season | getestet | B.3 #2234 | #2204 |
+| Berechtigung | Kadergrenzen, Stichtag, Wartezeit, Transfers, Protokoll | getestet | B.3 #2234 | #2204 |
+| Berechtigung | Plattform, Crossplay, Eingabegerät je Season | getestet | #2282 | #2270 |
+| Berechtigung | Sperre wirkt, nie beide Seiten, Mindestkader | abgenommen (Sperre, Grenzfälle); beide Seiten und Mindestkader getestet | A.4 #2222 | #2202 |
+| Rechte | Bereich Ligen, Zuständige je Liga | abgenommen (Grenzfälle „Rechte“, auch negativ) | B.1 #2227, #2241 | #2203 |
+| Rechte | Befangenheit (Ergebnis, Protest, Strafe, Termin, Anmeldung) | abgenommen (Grenzfälle „Rechte“) | B.1 #2227 | #2203 |
+| Modi | Anlegen, umbenennen | vorhanden | – | – |
+| Modi | Status, Ergebnisregel, Schutz bei Verwendung, Symbol | getestet | C.1 #2247, #2280 | #2206 |
+| Spiele | Eigene Spielseite mit Reitern | getestet | #2263, #2277 | #2249 |
+| Maps | Bibliothek, Map × Modus, Import | vorhanden | – | – |
+| Maps | Inaktiv, Warnung beim Archivieren | getestet | C.2 #2257 | #2207 |
+| Pools | Versionen, Season-Pool, Festhalten am Spiel | abgenommen (Sz. 2) | Stufe 1, C.2 | – |
+| Pools | Vergleich, Mindestgröße je Modus, Map in einem Schritt sperren | getestet | C.2 #2257 | #2207 |
+| Ausrüstung | Bibliothek je Spiel, Sperrliste je Season, Unterkategorien, Aufsätze je Waffe, im Regelwerk | getestet (mit Browser-Specs `ausruestung-*.spec.js`) | C.4 #2272, #2292, #2300, #2303, #2314, #2315 | #2218 |
+| BO | BO1 bis BO7, 3:0 bis 3:2, Modus je Map | abgenommen (Sz. 9) | A.2 #2217 | – |
+| BO | Länge der Modusfolge gegen Best of | getestet | C.2 #2257 | – |
+| Ergebnis | Melden, Bestätigen, 48 h, Korrektur | abgenommen (Sz. 9, 10, 13, Fristen-Job) | Stufe 1, A.2 | – |
+| Ergebnis | Regel je Modus, Endstand gegen Sieger, Punkte Pflicht | abgenommen (Fehleingaben) | C.3 #2258 | #1617 |
+| Ergebnis | Seite, Status, Nachweis, Wiederholung je Map | getestet | C.3 #2258, D.5 #2364 | #1617 |
+| Termine | Vorschlag, Annahme, Standardtermin, mehrere Termine | abgenommen (Sz. 6) | Stufe 1, A.3 | – |
+| Termine | Verschiebungsantrag, Historie, überfällig, 72-h-Regel | getestet (Grenzfälle: Terminänderung macht den Check-in ungültig) | D.1 #2255, #2407 | #2194 |
+| Ablauf | Check-in, Bereit, Start | abgenommen (Sz. 7, Fristen-Job) | D.2 #2283, #2323 | #1652 |
+| Veto | Ablauf, Timer, Zeitüberschreitung, Historie, Plan | abgenommen (Sz. 8) | D.3 #2293 | #1618 |
+| Veto | Vorgabe der Woche, Bereit-Start | getestet | #2353 | #2326 |
+| Veto | Oberfläche live, Zuschauer, TV | abgenommen (Sz. 8 im Browser); TV getestet | D.4 #2359 | #1651 |
+| Veto | Seitenwahl, Aufstellungsgröße je Modus | fehlend (bewusst ohne Seitenwahl, Nr. 92) | – | #2402 |
+| Technik | Vorfälle: Disconnect, Pause, Rehost, Wiederholung, MOSS | getestet | D.5 #2362, #2364 | #1619 |
+| Technik | Vorfallarten und MOSS je Season schaltbar | fehlend | – | #2403 |
+| Tabelle | Punkte, Maps, Differenz, Korrektur | abgenommen (Sz. 11, 13) | Stufe 1, A.2 | – |
+| Tabelle | Direkter Vergleich, Mini-Tabelle, Entscheid der Leitung | abgenommen (Sz. 16) | E.1 #2259 | #1625, #1559 |
+| Tabelle | Default-Win, Punktabzug | abgenommen (Sz. 14, 15) | E.1 #2259, E.3 #2370 | #1625 |
+| Tabelle | Remis-Schalter, Tabellenende, Punkte nach gewonnenen Maps | getestet | E.1 #2259, #2319 | #1625, #2312 |
+| Proteste | Beanstandung, Protest, Stellungnahme, Entscheidung, Korrektur | abgenommen (Sz. 12, 13) | E.2 #2366 | #1619 |
+| Proteste | Mehrere Beweise, Video-Links, MOSS-Datei, Fristen, Aufbewahrung | getestet | #2362, E.2 #2366 | #1619, #2360 |
+| Proteste | Einspruch, zweite Person entscheidet | abgenommen (Sz. 13) | E.2 #2366 | #1619 |
+| Strafen | Wettbewerbsstrafen mit Wirkung, Einspruch, Widerruf | abgenommen (Sz. 14) | E.3 #2370 | – |
+| Verwaltung | Liga-Leitstand, Protokoll, Rundnachricht | getestet (mit `league-desk.spec.js`) | E.4 #2385 | #2209 |
+| Nachrichten | Terminaktionen | vorhanden | – | – |
+| Nachrichten | Erinnerungen 24 h, 1 h, Termin offen, Ergebnis fehlt, Veto, Discord-Direktnachricht | getestet (Versand an echte Dienste außerhalb der Abnahme) | E.5 #2381 | #1647 |
+| Abschluss | Cockpit, Endstand, Meister, Wiederöffnen, Archiv | abgenommen (Sz. 17) | F.1 #2389 | #1645 |
+| Belohnungen | Banner, Emblem, Medaille, Titel je Platz, Platzbereich und alle; Sammlung, Zeremonie, Teilen-Bild | abgenommen (Hauptweg „Belohnungen“) | F.4 #2411 | #2214 |
+| Belohnungen | Rankingbanner, drei Embleme neben dem Namen, Filter der Sammlung | fehlend | – | – (Vorschlag A4 im Regelwerksabgleich) |
+| Belohnungen | Sieger-Moment am TV mit Podest | fehlend | – | #2410 |
+| Gesamtwertung | Punkte je Season-Platz, Spielerwertung, Abschluss, Belohnungen je Liga | abgenommen (Hauptweg „Gesamtwertung“) | F.5 #2415 | #2215 |
+| Historie | Season-Historie an Team und Spieler | getestet | F.2 #2397 | #1627 |
+| Öffentlich | Season-Seite mit Spieltagen und Teams, Startseite | abgenommen (Sz. 5, 11: Ligaseite 390/1440); Startseite getestet | #2378, #2327 | #2268, #2324 |
+| Tests | Echtes MongoDB, Browser mit echter API, nächtlich | abgenommen (G.1 nächtlich in GitHub Actions) | A.2 #2217, #2373, G.1 #2423 | #1632 |
+| Tests | Wackelige Frontend- und Browser-Tests unter Last | teilweise | – | #2390 |
+| App | Kompatibel mit allen neuen Feldern | getestet | laufend | – |
+| App | Check-in, Veto live, Anmeldestatus, Zonen, Historie, Belohnungen (LionsAPP 1.7.10) | getestet (App-Tests), nicht in G.1 | G.2 #2419 | #2173 (Rest offen) |
+| App | Anmelden, Vorfälle, Verfahren, Ergebnis mit Maps, Strafen | fehlend (Web, die App nennt den Weg) | – | #2173 |
+
+**Funde der Systemanalyse (D-1 bis D-20):**
+
+| Fund | Paket · PR | Stand |
+| --- | --- | --- |
+| D-1 falscher Nichtantritt | A.3 #2220 (Zwischenlösung), D.2 #2283 (`started_at` beim Start) | erledigt |
+| D-2 Liga-Kampflos unsichtbar | A.3 #2220 | erledigt |
+| D-3 Einspruchsfenster nach Pause | A.3 #2220, in der Liga abgelöst durch E.2 (`protest_hours`, ruht in Sperrzeiten) | erledigt |
+| D-4 gesperrtes Konto aufstellbar | A.4 #2222 | erledigt, abgenommen |
+| D-5 Kader unter Teamgröße | A.4 #2222 | erledigt |
+| D-6 beide Seiten | A.4 #2222 | erledigt |
+| D-7 vorgetäuschte Regel-Zustimmung | B.2 #2231, B.4 #2244 | erledigt |
+| D-8 alte Antwortfrist | A.3 #2220 | erledigt |
+| D-9 Ablehnung eskaliert | A.3 #2220 | erledigt |
+| D-10 Einspruch nimmt Sieg | E.2 #2366 (Wirkung offener Proteste je Season, Vorgabe „zählt vorläufig“) | erledigt, abgenommen (Sz. 12) |
+| D-11 Terminänderung spurlos | A.3 #2220, D.1 #2255 (Historie) | erledigt |
+| D-12 Maps bei `/forfeit` | A.3 #2220 | erledigt |
+| D-13 Karte nach Meldung | A.3 #2220 | erledigt |
+| D-14 Spielplan per API löschbar | A.3 #2220 | erledigt |
+| D-15 Season-Stand | A.3 #2220 | erledigt |
+| D-16 Kaderaufnahme ohne Hinweis | A.4 #2222 | erledigt |
+| D-17 Freigabe Teamverwaltung | A.4 #2222 | erledigt |
+| D-18 Start ab 17 Teams | A.3 #2220 | erledigt |
+| D-19 Standardtermin in Sperrzeit | A.3 #2220 | erledigt |
+| D-20 veraltete Doku (10.11., zehn Wochen, BO3, acht Teams, 3/1/0) | je Paket, Rest G.3 | erledigt: Hinweis oben in diesem Papier, Handbuch Liga leiten und Spickzettel ohne feste Season-1-Werte |

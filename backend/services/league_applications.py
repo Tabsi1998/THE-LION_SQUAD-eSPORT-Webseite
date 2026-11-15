@@ -174,7 +174,9 @@ async def public_block(db, season: dict) -> dict | None:
             "slots": stats["slots"], "slots_free": _free_for_newcomers(season, stats), "waitlist": bool(season.get("application_waitlist")),
             "waitlist_full": bool(season.get("application_waitlist")) and not _waitlist_has_room(season, stats),
             "waitlist_note": season.get("application_waitlist_note"), "entry_policy": season.get("entry_policy") or "all",
-            "auto_accept": bool(season.get(AUTO_ACCEPT))}
+            "auto_accept": bool(season.get(AUTO_ACCEPT)),
+            # Nachmeldung (Entscheidung Nr. 180): Beginn der Season, damit die Seite „läuft nach Season-Start weiter“ sagen kann.
+            "season_starts_at": season.get("start_date")}
 
 
 # ---------------------------------------------------------------- Prüfung

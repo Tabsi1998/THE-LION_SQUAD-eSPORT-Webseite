@@ -78,3 +78,19 @@ def test_the_backend_of_the_acceptance_stack_has_no_public_backend_url():
 def test_anything_else_stops_before_writing(change):
     with pytest.raises(SystemExit):
         load().guard_environment({**GOOD, **change})
+
+
+def test_consent_versions_follow_the_backend():
+    """Dieselbe Variable und Vorgabe wie backend/auth.py - sonst müssten alle Testkonten nach einer neuen Fassung erneut zustimmen."""
+    import re
+
+    auth = (pathlib.Path(__file__).resolve().parents[1] / "auth.py").read_text(encoding="utf-8")
+    defaults = dict(re.findall(r'os\.environ\.get\("(PRIVACY_POLICY_VERSION|TERMS_VERSION)", "([0-9-]+)"\)', auth))
+    module = load()
+    assert module.consent_versions({}) == {"privacy_policy_version": defaults["PRIVACY_POLICY_VERSION"],
+                                          "terms_version": defaults["TERMS_VERSION"]}
+    assert module.consent_versions({"PRIVACY_POLICY_VERSION": "2027-01-01", "TERMS_VERSION": "2027-02-02"}) == {
+        "privacy_policy_version": "2027-01-01", "terms_version": "2027-02-02"}
+    for name in ("seed_abnahme_liga.py", "seed_liga_g1.py"):
+        source = (SCRIPT.parent / name).read_text(encoding="utf-8")
+        assert '"privacy_policy_version": "' not in source, name
