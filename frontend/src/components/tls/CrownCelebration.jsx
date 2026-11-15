@@ -5,7 +5,7 @@ import { OptionalBoundary } from "@/components/tls/OptionalBoundary";
 // Kronen-Feier: Die Glocke meldet eine eroberte Krone über das Ereignis "tls-crown-celebration". Der Hörer bleibt
 // klein und sofort da, damit kein Ereignis verloren geht; die Feier selbst (CrownCelebrationCard.jsx mit Kronen-Grafik
 // und Konfetti) lädt erst mit dem ersten Ereignis (#936).
-const CrownCelebrationCard = lazyPage(() => import("./CrownCelebrationCard"));
+const CrownCelebrationCard = lazyPage(() => import("./CrownCelebrationCard"), { optional: true });
 
 export function CrownCelebration() {
   const [event, setEvent] = useState(null);

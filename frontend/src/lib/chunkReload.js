@@ -78,7 +78,20 @@ export function importWithReload(factory, options) {
   });
 }
 
-/** `lazy()` für Seiten: wie React.lazy, aber mit einmaligem Neuladen nach einem Deploy. */
-export function lazyPage(factory) {
-  return lazy(() => importWithReload(factory));
+const Nothing = () => null;
+
+/** Ein dynamischer Import für Hintergrund-Bausteine (#936): Lädt die Datei nicht (veraltet nach einem Deploy, Netz
+ *  weg), steht an ihrer Stelle still nichts - ohne Neuladen der Seite und ohne Fehler. Andere Fehler gehen weiter. */
+export function importOptional(factory) {
+  return factory().catch((error) => {
+    if (isChunkLoadError(error)) return { default: Nothing };
+    throw error;
+  });
+}
+
+/** `lazy()` für Seiten: wie React.lazy, aber mit einmaligem Neuladen nach einem Deploy.
+ *  `{ optional: true }` für Bausteine im Hintergrund (Zeremonie, Glocke, Kronen-Feier, Karten „Heute im Einsatz“):
+ *  für sie wird keine Seite neu geladen, auf der jemand gerade etwas tippt - sie fallen nur still weg. */
+export function lazyPage(factory, { optional = false } = {}) {
+  return lazy(() => (optional ? importOptional(factory) : importWithReload(factory)));
 }

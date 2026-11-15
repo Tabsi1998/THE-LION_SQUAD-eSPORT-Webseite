@@ -11,7 +11,7 @@ import { todayItems } from "@/lib/homeToday";
 // .tls-run-*). Steht heute nichts an oder scheitert der Abruf, gibt es den Streifen nicht - die Seite bleibt wie sie ist.
 // Runde mit Läufen (#1930): statt „Rennen R3“ der heutige Lauf („R3 · Qualifying“), darunter die Lauf-Chips der Runde.
 // Start-Bundle (#936): Hier steht nur der Abruf; die Karten (HomeTodayCards.jsx) laden erst, wenn heute etwas ansteht.
-const HomeTodayCards = lazyPage(() => import("@/components/tls/HomeTodayCards"));
+const HomeTodayCards = lazyPage(() => import("@/components/tls/HomeTodayCards"), { optional: true });
 
 export function HomeTodayStrip() {
   const [items, setItems] = useState([]);

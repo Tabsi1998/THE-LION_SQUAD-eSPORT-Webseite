@@ -6,7 +6,7 @@ import { ceremonyQueue } from "./queue";
 // Belohnungs-Moment ist rund 25 KB gzip groß, gebraucht wird er nur, wenn wirklich etwas in der Warteschlange steht -
 // beim anonymen Besuch praktisch nie. Die Hülle liest nur die Warteschlange; sobald dort etwas steht, lädt sie den Host
 // und behält ihn. Er entscheidet wie bisher, ob und wann gezeigt wird (still im Adminbereich, „dezent“ usw.).
-const CeremonyHost = lazyPage(() => import("./CeremonyHost").then((module) => ({ default: module.CeremonyHost })));
+const CeremonyHost = lazyPage(() => import("./CeremonyHost").then((module) => ({ default: module.CeremonyHost })), { optional: true });
 
 export function CeremonySlot({ queue = ceremonyQueue }) {
   const current = useSyncExternalStore(queue.subscribe, queue.getCurrent, () => null);

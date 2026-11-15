@@ -38,7 +38,7 @@ import { OptionalBoundary } from "@/components/tls/OptionalBoundary";
 
 // Die Glocke gibt es nur angemeldet (#936): samt Liste, Abzeichen und Kronen-Abgleich lädt sie erst dann und hält bis
 // dahin ihren Platz frei (gleich groß wie der Knopf), damit die Kopfzeile nicht springt.
-const NotificationBell = lazyPage(() => import("@/components/tls/NotificationBell").then((module) => ({ default: module.NotificationBell })));
+const NotificationBell = lazyPage(() => import("@/components/tls/NotificationBell").then((module) => ({ default: module.NotificationBell })), { optional: true });
 const BELL_PLACEHOLDER = <span className="w-10 h-10 shrink-0" aria-hidden="true" data-testid="notification-bell-placeholder" />;
 
 export function PublicLayout({ children }) {
