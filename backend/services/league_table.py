@@ -62,7 +62,9 @@ def public_rules(tournament: dict | None) -> dict | None:
     return {"allow_draws": rules["allow_draws"], "tiebreakers": list(rules["table_tiebreakers"]),
             "head_to_head_criteria": list(rules["head_to_head_criteria"]), "forfeit_score": rules["forfeit_score"],
             "exit_rule": rules["exit_rule"], "match_points": dict(rules["match_points"]),
-            "match_points_mode": rules["match_points_mode"]}
+            "match_points_mode": rules["match_points_mode"],
+            # Das Best of der Staffel (#2424): Daraus entsteht das Beispiel unter der Tabelle („3:2 ergibt 3 und 2“ bei Best of 5).
+            **({"best_of": int(tournament["best_of"])} if (tournament or {}).get("best_of") else {})}
 
 
 def ties(rows: list[dict]) -> list[dict]:

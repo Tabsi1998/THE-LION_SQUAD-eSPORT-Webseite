@@ -131,7 +131,8 @@ def test_table_block_speaks_map_points_and_marks_the_change():
     data = facts.table_data(MAPS_SEASON, [])
     assert data["points_mode"] == "maps"
     out = facts.render_table(data)
-    assert "- Punkte: je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)." in out
+    # Das Beispiel kommt aus dem Best of der Season (#2424, A5) - hier Best of 3.
+    assert "- Punkte: je gewonnene Map ein Punkt (2:1 ergibt 2 und 1 Punkte, 2:0 ergibt 2 und 0)." in out
     assert "Sieg 3" not in out
     assert "- Bei Punktgleichheit entscheidet der Reihe nach: mehr Siege, direkter Vergleich (Punkte, Map-Differenz, gewonnene Maps), " \
            "Map-Differenz, Entscheid der Liga-Leitung." in out
@@ -144,12 +145,35 @@ def test_table_block_speaks_map_points_and_marks_the_change():
     assert blocks.value("table", {"data": frozen}) == blocks.value("table", {"data": before}), "ältere Fassung bleibt gleich"
     ctx = context()
     ctx.table = data
-    assert variables.value_of("table.points", ctx) == "je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)"
+    assert variables.value_of("table.points", ctx) == "je gewonnene Map ein Punkt (2:1 ergibt 2 und 1 Punkte, 2:0 ergibt 2 und 0)"
     assert variables.value_of("table.points", context()) == "Sieg 3, Niederlage 0 Punkte"
     # Punkte je Sieg/Remis/Niederlage gibt es mit Map-Punkten nicht - ein eigener Wert, damit ein Text damit als geändert gilt.
     for name in ("table.points_win", "table.points_draw", "table.points_loss"):
         assert variables.value_of(name, ctx) == "– (Punkte je gewonnene Map)", name
     assert variables.value_of("table.points_win", context()) == "3"
+
+
+def test_map_points_example_follows_the_best_of_of_season_and_division():
+    """#2424 (A5): Das Beispiel zu „je gewonnene Map ein Punkt“ entsteht aus dem Best of - der Season bzw. einer Liga N mit eigenem
+    Best of. Nach Spielen gibt es kein Beispiel, und eine früher eingefrorene Fassung ohne Best of nennt keine Zahlen."""
+    def points(best_of, scoring=MAPS_SEASON["scoring_rules"]):
+        return facts.points_sentence(facts.table_data({**MAPS_SEASON, "best_of": best_of, "scoring_rules": scoring}, []))
+    assert points(3) == "je gewonnene Map ein Punkt (2:1 ergibt 2 und 1 Punkte, 2:0 ergibt 2 und 0)"
+    assert points(5) == "je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)"
+    assert points(7) == "je gewonnene Map ein Punkt (4:3 ergibt 4 und 3 Punkte, 4:0 ergibt 4 und 0)"
+    assert points(1) == "je gewonnene Map ein Punkt (1:0 ergibt 1 und 0 Punkte)"
+    for best_of in (3, 5, 7):
+        assert points(best_of, SEASON["scoring_rules"]) == "Sieg 3, Niederlage 0 Punkte", "nach Spielen kein Map-Beispiel"
+    # Liga N mit eigenem Best of: eigene Zeilen mit ihrem Beispiel; nach Spielen ändert das Best of nichts am Text.
+    division = [{"id": "d1", "level": 1, "nickname": "Elite", "overrides": {"best_of": 7}}]
+    out = plain(facts.render_table(facts.table_data(MAPS_SEASON, division)))
+    assert "(2:1 ergibt 2 und 1 Punkte, 2:0 ergibt 2 und 0)" in out
+    assert "**Abweichend in Liga 1 · Elite**" in out and "(4:3 ergibt 4 und 3 Punkte, 4:0 ergibt 4 und 0)" in out
+    assert facts.table_data(SEASON, division)["divisions"] == [], "nach Spielen keine Abweichung nur wegen des Best of"
+    frozen = {key: value for key, value in facts.table_data(MAPS_SEASON, []).items() if key != "best_of"}
+    old = blocks.value("table", {"data": frozen})
+    assert "- Punkte: je gewonnene Map ein Punkt - jedes Team bekommt so viele Punkte, wie es Maps gewonnen hat." in old
+    assert "3:2" not in old and "2:1" not in old, "ohne Best of kein falsches Beispiel"
 
 
 # ---------------------------------------------------------------- Termine, Spielberechtigung

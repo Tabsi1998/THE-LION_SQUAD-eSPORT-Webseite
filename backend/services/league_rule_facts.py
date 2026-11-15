@@ -268,25 +268,31 @@ async def build_format(db, league: dict, season: dict) -> dict:
 
 # ---------------------------------------------------------------- Tabelle und Wertung
 
-TABLE_KEYS = ("points", "points_mode", "allow_draws", "tiebreakers", "head_to_head", "forfeit_score", "exit_rule")
+TABLE_KEYS = ("points", "points_mode", "allow_draws", "tiebreakers", "head_to_head", "forfeit_score", "exit_rule", "best_of")
 
 
-def _table_rules(raw) -> dict:
+def _table_rules(raw, best_of=None) -> dict:
     rules = normalize_rules(raw if isinstance(raw, dict) else {})
     return {"points": {key: rules["match_points"].get(key) for key in ("win", "draw", "loss")},
             "points_mode": rules.get("match_points_mode") or "result", "allow_draws": bool(rules.get("allow_draws")),
             "tiebreakers": list(rules.get("table_tiebreakers") or []), "head_to_head": list(rules.get("head_to_head_criteria") or []),
-            "forfeit_score": rules.get("forfeit_score") or "recorded", "exit_rule": rules.get("exit_rule") or "half"}
+            "forfeit_score": rules.get("forfeit_score") or "recorded", "exit_rule": rules.get("exit_rule") or "half",
+            # Das Best of der Season bzw. Liga N (#2424, A5): Daraus entsteht das Beispiel zu den Map-Punkten.
+            "best_of": int(best_of or 1)}
 
 
 def table_data(season: dict, divisions: list[dict]) -> dict:
-    base = _table_rules(season.get("scoring_rules"))
+    base = _table_rules(season.get("scoring_rules"), _effective(season, None).get("best_of"))
     data = {**base, "divisions": []}
     for division in divisions:
-        own = (division.get("overrides") or {}).get("scoring_rules")
-        if isinstance(own, dict):
-            # Nur die eigenen Punkte legen sich über die Season (#2318); mit Map-Punkten gelten keine eigenen.
-            merged = _table_rules(division_rules(season.get("scoring_rules"), own))
+        overrides = division.get("overrides") or {}
+        own = overrides.get("scoring_rules")
+        best_of = _effective(season, division).get("best_of")
+        if isinstance(own, dict) or int(best_of or 1) != base["best_of"]:
+            # Nur die eigenen Punkte legen sich über die Season (#2318); mit Map-Punkten gelten keine eigenen. Ein eigenes Best of
+            # ändert das Beispiel zu den Map-Punkten (#2424).
+            merged = _table_rules(division_rules(season.get("scoring_rules"), own) if isinstance(own, dict) else season.get("scoring_rules"),
+                                  best_of)
             # Nur, was sich im Text unterscheidet: Remis-Punkte einer Liga N ohne Remis ändern nichts am Satz.
             if _table_lines(merged) != _table_lines(base):
                 data["divisions"].append({"label": _division_label(division), **merged})
@@ -309,10 +315,28 @@ def _by_maps(rules: dict) -> bool:
     return rules.get("points_mode") == "maps"
 
 
+def map_points_example(best_of) -> str | None:
+    """Das Beispiel zu „je gewonnene Map ein Punkt“ aus dem Best of (#2424, A5): Best of 5 „3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0“,
+    Best of 3 „2:1 …, 2:0 …“, Best of 7 „4:3 …, 4:0 …“; ohne knappen Ausgang (Best of 1) nur „1:0 ergibt 1 und 0 Punkte“. ``None``
+    ohne Best of - früher eingefrorene Fassungen tragen es nicht."""
+    if best_of in (None, ""):
+        return None
+    win = maps_to_win(best_of)
+    close = int(best_of) - win
+    clear = f"{win}:0 ergibt {win} und 0"
+    if close <= 0:
+        return f"{clear} Punkte"
+    return f"{win}:{close} ergibt {win} und {close} Punkte, {clear}"
+
+
 def points_sentence(rules: dict) -> str:
-    """Die Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder je gewonnene Map ein Punkt (#2312)."""
+    """Die Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder je gewonnene Map ein Punkt (#2312) - mit dem Beispiel aus dem
+    Best of (#2424), in einer Fassung ohne Best of ohne Zahlen."""
     if _by_maps(rules):
-        return "je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)"
+        example = map_points_example(rules.get("best_of"))
+        if example is None:
+            return "je gewonnene Map ein Punkt - jedes Team bekommt so viele Punkte, wie es Maps gewonnen hat"
+        return f"je gewonnene Map ein Punkt ({example})"
     points = rules.get("points") or {}
     if rules.get("allow_draws"):
         return f"Sieg {number(points.get('win'))}, Remis {number(points.get('draw'))}, Niederlage {number(points.get('loss'))} Punkte"
