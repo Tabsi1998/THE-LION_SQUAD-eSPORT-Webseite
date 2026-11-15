@@ -1228,6 +1228,8 @@ def frontend_steps() -> list:
         yarn_step("lint", "ESLint against the recorded suppressions", "lint",
                   failure="ESLint found new problems; known ones live in eslint-suppressions.json"),
         Step("frontend", "build", "The production build, and it is not empty", frontend_build, ("install",)),
+        yarn_step("bundle", "The startup bundle against PERFORMANCE_BUDGETS.md", "check:bundle",
+                  failure="the anonymous startup bundle is over its budget", needs=("build",)),
         Step("frontend", "unit", "The unit suite with coverage", frontend_unit, ("install",)),
         yarn_step("browser", "Chromium for the smoke tests", "playwright", "install", "chromium",
                   failure="Playwright could not install Chromium"),

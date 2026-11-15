@@ -14,6 +14,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
+import { GALLERY_ALBUM_GRID_SIZES } from "@/lib/gallerySizes";
 import {
   galleryEmbedSrc,
   galleryMediaUrl,
@@ -232,7 +233,8 @@ export default function GalleryAlbumPage() {
 
 // Was eine Kachel tatsaechlich breit ist. Ohne diese Angabe nimmt der Browser
 // die volle Fensterbreite an und laedt eine groessere Fassung als noetig.
-const GRID_SIZES = "(min-width: 1280px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw";
+// Die Werte passen zum Raster oben (#936), siehe lib/gallerySizes.js.
+const GRID_SIZES = GALLERY_ALBUM_GRID_SIZES;
 
 
 function GalleryTile({ item, onDimensions }) {

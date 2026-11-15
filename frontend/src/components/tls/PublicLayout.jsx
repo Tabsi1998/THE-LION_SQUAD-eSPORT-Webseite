@@ -9,7 +9,6 @@ import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants"
 import { useUnreadChats } from "@/hooks/useChats";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
-import { NotificationBell } from "@/components/tls/NotificationBell";
 import { InvitationBanner } from "@/components/tls/InvitationBanner";
 import { CrownCelebration } from "@/components/tls/CrownCelebration";
 import { LevelUpCelebration } from "@/components/tls/LevelUpCelebration";
@@ -30,10 +29,24 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone, ClipboardList, UserRound } from "lucide-react";
 import { mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
 import { UserMenu } from "@/components/tls/UserMenu";
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
 import { RouteProgress } from "@/components/tls/RouteProgress";
 import { useMobileMenu } from "@/lib/mobileMenu";
+import { lazyPage } from "@/lib/chunkReload";
+import { OptionalBoundary } from "@/components/tls/OptionalBoundary";
+
+// Die Glocke gibt es nur angemeldet (#936): samt Liste, Abzeichen und Kronen-Abgleich lädt sie erst dann und hält bis
+// dahin ihren Platz frei (gleich groß wie der Knopf), damit die Kopfzeile nicht springt. Derselbe Platzhalter bleibt
+// stehen, wenn sie nicht lädt (Ladefehler oder Absturz).
+function BellPlaceholder() {
+  return <span className="w-10 h-10 shrink-0" aria-hidden="true" data-testid="notification-bell-placeholder" />;
+}
+const BELL_PLACEHOLDER = <BellPlaceholder />;
+const NotificationBell = lazyPage(
+  () => import("@/components/tls/NotificationBell").then((module) => ({ default: module.NotificationBell })),
+  { optional: true, fallback: BellPlaceholder },
+);
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, adminNeedsSecondFactor, isClubMember } = useAuth();
@@ -123,7 +136,12 @@ export function PublicLayout({ children }) {
             <GlobalSearch />
             {user ? (
               <>
-                <NotificationBell />
+                {/* Lädt die Glocke nicht, bleibt still ihr Platz frei - die Kopfzeile kippt nicht (#936). */}
+                <OptionalBoundary quiet placeholder={BELL_PLACEHOLDER}>
+                  <Suspense fallback={BELL_PLACEHOLDER}>
+                    <NotificationBell />
+                  </Suspense>
+                </OptionalBoundary>
                 {/* Benutzermenü statt sechs Knöpfen (#282): Dashboard, Profil, Einstellungen, Mitgliederbereich, Admin,
                     Abmelden. Die Chats stehen seit #1148 unter Community - kein zweiter Knopf dafür im Kopf. */}
                 <UserMenu />
