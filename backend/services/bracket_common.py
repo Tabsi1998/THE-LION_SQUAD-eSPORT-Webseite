@@ -29,6 +29,15 @@ def in_clarification(match: dict) -> bool:
     return bool(match.get("contested")) if done else bool(match.get("in_clarification"))
 
 
+def late_entry_note(late_entry, from_week=None) -> str:
+    """Nachmeldung (#2422): „nachgemeldet ab Woche 3“ bzw. „nachgemeldet“ - wie die Zeile der Ligatabelle (Web, TV, PDF); leer ohne.
+    ``late_entry``: ``True`` (Tabellenzeile) oder die Markierung an der Anmeldung (``{from_week, ...}``)."""
+    if not late_entry:
+        return ""
+    week = from_week if from_week is not None else (late_entry.get("from_week") if isinstance(late_entry, dict) else None)
+    return f"nachgemeldet ab Woche {week}" if isinstance(week, int) and not isinstance(week, bool) and week > 0 else "nachgemeldet"
+
+
 def clarification_count(count) -> str:
     """„1 Spiel in Klärung“ / „2 Spiele in Klärung“ - wie die Zeile der Ligatabelle (Web, PDF); leer ohne."""
     count = count if isinstance(count, int) and not isinstance(count, bool) else 0

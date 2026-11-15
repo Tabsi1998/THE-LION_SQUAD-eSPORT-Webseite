@@ -797,6 +797,11 @@ def _standing_name(row: dict) -> str:
     contested = row.get("contested") if isinstance(row.get("contested"), int) and not isinstance(row.get("contested"), bool) else 0
     if contested > 0:
         notes.append("1 Spiel in Klärung" if contested == 1 else f"{contested} Spiele in Klärung")
+    # Nachmeldung (#2422): wie in Webtabelle und TV - erklärt die kleinere Spielzahl.
+    if row.get("late_entry") is True:
+        from services.bracket_common import late_entry_note
+
+        notes.append(late_entry_note(True, row.get("late_from_week")))
     if _ZONE_TEXT.get(row.get("zone") or ""):
         notes.append(_ZONE_TEXT[row["zone"]])
     return f"{name} ({', '.join(notes)})" if notes else name

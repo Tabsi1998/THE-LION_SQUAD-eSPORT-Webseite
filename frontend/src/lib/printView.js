@@ -7,7 +7,7 @@
 import { displayRoundLabels, roundName, treeSlotLabel } from "@/lib/bracketNames";
 import { isTableFormat, sectionKind } from "@/lib/bracketSections";
 import { STANDING_COLUMNS, standingCell, standingSections, tableKind } from "@/lib/standingsTable";
-import { deductionText } from "@/lib/leagueTable";
+import { deductionText, lateEntryText } from "@/lib/leagueTable";
 import { isCancelled, isDone, markedNoShow } from "@/lib/bracketGraph";
 import { describeSlot, finderFor } from "@/lib/slotSource";
 import { formatBracketSection, stationText } from "@/lib/tournamentLabels";
@@ -472,7 +472,8 @@ export function standingsSections(standings, { heats = false } = {}) {
           rank: row.rank ?? "",
           // Tabellenende der Liga-Staffel (E.1, #1625): wer ausschied, steht mit dem Grund da.
           // Punktabzug (E.3): steht wie auf der Website an der Zeile - die Höhe, nicht der Grund.
-          name: `${row.display_name || "Teilnehmer"}${EXIT_SUFFIX[row.exit?.kind] ? ` (${EXIT_SUFFIX[row.exit.kind]})` : ""}${deductionText(row) ? ` (${deductionText(row)})` : ""}`,
+          // Nachmeldung (#2422): „Nachgemeldet ab Woche X“ wie auf der Website - erklärt die kleinere Spielzahl.
+          name: `${row.display_name || "Teilnehmer"}${EXIT_SUFFIX[row.exit?.kind] ? ` (${EXIT_SUFFIX[row.exit.kind]})` : ""}${deductionText(row) ? ` (${deductionText(row)})` : ""}${lateEntryText(row) ? ` (${lateEntryText(row)})` : ""}`,
           cells: columns.map((column) => String(standingCell(column, row))),
         })),
       };
