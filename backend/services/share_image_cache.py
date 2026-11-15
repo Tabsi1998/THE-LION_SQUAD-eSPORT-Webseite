@@ -29,8 +29,10 @@ MAX_ENTRIES = 200
 MAX_BYTES = 32 * 1024 * 1024
 
 # Genau die öffentlichen Teilen-Bilder - ganzer Pfad, von Anfang bis Ende.
-# Belohnungen der Liga (F.4, #2214): /api/rewards/<id>/share.png.
-PUBLIC_IMAGE_PATH = re.compile(r"^/api/(?:share/result/[^/]+/[^/]+/(?:story|wide)|achievements/share/[^/]+|rewards/[^/]+/share)\.png$")
+# Belohnungen der Liga (F.4, #2214): /api/rewards/<id>/share.png. Rankingbanner (Nr. 60, #2425):
+# /api/leagues/<liga>/<season>/teams/<team>/banner.png.
+PUBLIC_IMAGE_PATH = re.compile(r"^/api/(?:share/result/[^/]+/[^/]+/(?:story|wide)|achievements/share/[^/]+|rewards/[^/]+/share"
+                               r"|leagues/[^/]+/[^/]+/teams/[^/]+/banner)\.png$")
 CACHE_CONTROL = f"public, max-age={MAX_AGE_SECONDS}"
 
 

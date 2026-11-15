@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { RewardArt, placeMark } from "./RewardArt";
-import { RewardChip, RewardCollection } from "./RewardCollection";
+import { RewardChip } from "./RewardChip";
 
 // Lionsquad-Vorlagen und Sammlung der Belohnungen (F.4, #2214, Nr. 164). Erfundene Namen.
 
@@ -47,32 +46,11 @@ test("die Bewegung spielt nur auf Wunsch und staffelt über den Index", () => {
 const award = (id, kind, season, extra = {}) => ({ id, rank: 1, kind, updated_at: `2026-0${season}-01`, league: { season_id: `s${season}`, division_label: "Liga 2", staffel: "A" },
   team: { name: "Nordlicht" }, tournament: { slug: `probe-${season}` }, reward: { ...reward(kind), name: `${kind} ${season}`, art: { ...reward(kind).art, season: `Season ${season}` } }, ...extra });
 
-test("die Sammlung zeigt je Season eine Gruppe; Auswahl nur mit Rechten, Titel nur für Titel", () => {
-  const onFeature = vi.fn();
-  const onTitle = vi.fn();
-  const awards = [award("a", "medal", 1), award("b", "title", 2), { id: "pokal", rank: 1, kind: "trophy", reward: null }];
-  const { rerender } = render(<MemoryRouter><RewardCollection awards={awards} featuredId="a" onFeature={onFeature} onTitle={onTitle} /></MemoryRouter>);
-  const groups = screen.getAllByTestId("reward-collection-season");
-  expect(groups.map((group) => group.querySelector("h3").textContent)).toEqual(["Season 2", "Season 1"]);
-  expect(screen.queryByTestId("reward-card-pokal")).toBeNull();
-  expect(screen.getByTestId("reward-card-a")).toHaveAttribute("data-featured", "true");
-  expect(screen.getByTestId("reward-card-a")).toHaveTextContent("1. Platz · Liga 2 · Staffel A");
-  expect(screen.getByTestId("reward-feature-a")).toHaveTextContent("Banner ✓");
-  expect(screen.queryByTestId("reward-title-a")).toBeNull();
-  screen.getByTestId("reward-title-b").click();
-  expect(onTitle).toHaveBeenCalledWith("b");
-  screen.getByTestId("reward-feature-a").click();
-  expect(onFeature).toHaveBeenCalledWith(null);
-
-  rerender(<MemoryRouter><RewardCollection awards={awards} /></MemoryRouter>);
-  expect(screen.queryByTestId("reward-feature-a")).toBeNull();
-  rerender(<MemoryRouter><RewardCollection awards={[{ id: "pokal", reward: null }]} /></MemoryRouter>);
-  expect(screen.queryByTestId("reward-collection")).toBeNull();
-});
-
+// Die Sammlung je Season (RewardCollection) ist seit #2425 die Vitrine „Trophäen“ - Auswahl und Rechte prüft TrophyCabinet.test.jsx.
 test("der Titel neben dem Namen zeigt Grafik und Namen - ohne Belohnung nichts", () => {
   const { rerender } = render(<RewardChip award={award("b", "title", 2)} testId="chip" />);
   expect(screen.getByTestId("chip")).toHaveTextContent("title 2");
+  expect(screen.getByTestId("chip").querySelector(".tls-reward")).toHaveClass("tls-reward--xs");
   rerender(<RewardChip award={null} testId="chip" />);
   expect(screen.queryByTestId("chip")).toBeNull();
 });

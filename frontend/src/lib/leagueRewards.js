@@ -83,30 +83,6 @@ export function listProblem(items) {
   return (items || []).map(rewardProblem).find(Boolean) || "";
 }
 
-/** Die Belohnungen einer Sammlung - Auszeichnungen mit `reward`. */
-export function rewardsOf(awards) {
-  return (Array.isArray(awards) ? awards : []).filter((award) => award?.reward);
-}
-
-/** Nach Season gruppiert, die neueste zuerst; je Season Platz 1 vorn. */
-export function groupBySeason(awards) {
-  const groups = new Map();
-  for (const award of rewardsOf(awards)) {
-    const key = award.league?.season_id || award.season?.id || award.reward?.art?.season || "season";
-    if (!groups.has(key)) {
-      groups.set(key, { key, season: award.reward?.art?.season || award.season?.name || "Season", league: award.reward?.art?.league || "", items: [], latest: "" });
-    }
-    const group = groups.get(key);
-    group.items.push(award);
-    const stamp = String(award.updated_at || award.date || "");
-    if (stamp > group.latest) group.latest = stamp;
-  }
-  const rank = (award) => (Number.isInteger(award.rank) ? award.rank : 999);
-  return [...groups.values()]
-    .map((group) => ({ ...group, items: group.items.sort((a, b) => rank(a) - rank(b) || String(a.reward.name).localeCompare(String(b.reward.name), "de")) }))
-    .sort((a, b) => b.latest.localeCompare(a.latest));
-}
-
 /** Beschriftung der Vorlage: Season, Liga N, Platz (Nr. 164). */
 export function artLines(art) {
   return [art?.season, art?.division, art?.place].filter(Boolean);

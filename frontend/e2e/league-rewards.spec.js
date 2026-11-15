@@ -152,22 +152,25 @@ test.describe("Liga: Belohnungen", () => {
       expect(sent.divisions).toEqual({ d1: null, d2: [expect.objectContaining({ id: "aufstieg", name: "Aufsteiger-Emblem" })] });
     });
 
-    test(`Profil bei ${width} px: Sammlung nach Season, Titel neben dem Namen, Banner im Kopf`, async ({ page }) => {
+    test(`Profil bei ${width} px: Vitrine „Trophäen“ mit Season-Filter, Titel neben dem Namen, Banner im Kopf`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.setViewportSize({ width, height });
       await mockServer(page);
       await page.goto("/u/neonfalke?tab=awards");
-      const collection = page.getByTestId("profile-reward-collection");
+      // Seit #2425 eine Vitrine mit Filtern statt Gruppen je Season (Nr. 59).
+      const collection = page.getByTestId("profile-trophies");
       await expect(collection).toBeVisible();
-      await expect(collection.getByTestId("profile-reward-collection-season").first()).toContainText("Season 1");
-      await expect(collection.getByTestId("profile-reward-collection-season").nth(1)).toContainText("Season 0");
-      await expect(collection.getByTestId("reward-card-w-gold")).toContainText("1. Platz · Liga 1 · Staffel A");
-      await expect(collection.getByTestId("reward-art-w-gold")).toHaveAttribute("data-metal", "gold");
+      await expect(collection.getByTestId("trophy-card-w-gold")).toContainText("1. Platz");
+      await expect(collection.getByTestId("trophy-competition-w-gold")).toHaveText("Probe-Liga · Season 1 · Liga 1 · Staffel A");
+      await expect(collection.getByTestId("trophy-art-w-gold")).toHaveAttribute("data-metal", "gold");
+      await collection.getByTestId("profile-trophies-period").selectOption("Season 0");
+      await expect(collection.getByTestId("profile-trophies-count")).toHaveText("1 von 3");
+      await expect(collection.getByTestId("trophy-card-w-title")).toBeVisible();
+      await collection.getByTestId("profile-trophies-reset").click();
       await expect(page.getByTestId("profile-featured-title")).toContainText("Kämpferherz");
       await expect(page.getByTestId("profile-featured-award")).toContainText("Goldmedaille");
-      // Nur Belohnungen: kein leeres Raster für Turnier-Auszeichnungen und kein „Noch keine Auszeichnungen“.
-      await expect(page.getByTestId("profile-award-banners")).toHaveCount(0);
-      await expect(page.getByTestId("public-profile-awards")).not.toContainText("Noch keine Auszeichnungen");
+      // Nur Belohnungen: kein „Noch keine Trophäen“.
+      await expect(page.getByTestId("public-profile-awards")).not.toContainText("Noch keine");
       await noSideScroll(page);
       if (width === 390) await shot(collection, "f4-profil-sammlung-390");
     });

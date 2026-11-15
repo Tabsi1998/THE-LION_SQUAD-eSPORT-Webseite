@@ -433,6 +433,10 @@
 .tls-season-team:active { transform: scale(0.98); }
 .tls-season-team__name { max-width: 100%; font-size: 0.9375rem; font-weight: 700; line-height: 1.2; color: #fff; overflow-wrap: anywhere; hyphens: auto; }
 .tls-season-team__meta { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(255 255 255 / 0.5); }
+/* Rankingbanner (#2425): der Knopf unter der Karte, so breit wie sie - die Karte füllt den Rest der Zeile. */
+.tls-season-team__slot { display: flex; flex-direction: column; gap: 0.375rem; }
+.tls-season-team__slot > .tls-season-team { flex: 1 1 auto; height: auto; }
+.tls-season-team__banner > span, .tls-season-team__banner button { display: flex; width: 100%; justify-content: center; }
 
 
 @media (hover: hover) and (pointer: fine) {

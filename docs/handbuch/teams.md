@@ -18,6 +18,8 @@ wer was darf, wie man Teams verwaltet und was beim Auflösen passiert. Wie Co-Te
 | Aufgelöstes Team zurückholen | **Admin → eSports → Teams** oder **Teams → Deine Teams** | Club-Admin, Superadmin; die frühere Teamleitung nur, wenn sie selbst aufgelöst hat |
 | Alle Teams, verwaiste Teams | **Admin → eSports → Teams** | Turnierleitung, Vereinsverwaltung |
 | Alle Beitrittscodes erneuern | **Admin → eSports → Teams** | Club-Admin, Superadmin |
+| Teambanner, Titel, Embleme wählen | Teamseite → Reiter **Trophäen** | Teamleitung, Co-Leitung |
+| Rankingbanner kopieren | Teamseite → Kasten **Rankingbanner** | alle |
 
 ### Die Begriffe
 
@@ -78,7 +80,30 @@ ihr Konto gelöscht oder ist es abgeschaltet, übernimmt die Co-Leitung, sonst e
 Nach den 30 Tagen räumt der tägliche Job auf: Chat samt Anhängen, Einladungen, Kader und Mitgliederlisten sind weg, Logo und
 Banner auch, wenn sie sonst nirgends stehen (Bilder aus der Mediathek bleiben). Nur Name und Kürzel bleiben für alte Turniere. Löscht jemand sein Konto, ist die Person sofort auch aus aufgelösten Teams heraus.
 
-### 3.5 Teamverwaltung im Admin
+### 3.5 Trophäen, Embleme und Rankingbanner
+
+Die Teamseite hat zwei Reiter: **Übersicht** und **Trophäen**. Unter **Trophäen** stehen alle Pokale und Banner aus Turnieren und
+alle Belohnungen aus der Liga zusammen – je Karte Bild, Name, Wettbewerb, Platz und Datum; ein Klick führt zum Wettbewerb. Oben
+filtert ihr nach Art (Pokal, Medaille, Banner, Emblem, Titel), Spiel, Season bzw. Jahr und Platz. Gäste sehen den Reiter nur, wenn
+das Team schon etwas gewonnen hat, und nur, was aus öffentlichen Wettbewerben stammt.
+
+Die Teamleitung wählt an der Karte:
+
+- **Als Banner** – steht groß im Teamkopf.
+- **Als Titel** – bei einer Belohnung der Art Titel, neben dem Teamnamen.
+- **Neben den Namen** – bis zu **drei** Embleme oder Medaillen, klein neben dem Teamnamen, in der gewählten Reihenfolge. Sind drei
+  gewählt, ist der Knopf an den übrigen gesperrt; erst eines abwählen.
+
+Belohnungen einer wieder geöffneten Staffel ruhen und stehen nirgends, auch nicht neben dem Namen.
+
+**Rankingbanner:** Spielt ein Co-Team in einer öffentlichen Liga-Season, steht rechts der Kasten **Rankingbanner** mit Vorschau:
+Platz, Bilanz und Punkte als Bild. **Rankingbanner kopieren** kopiert den festen Link, **Bild öffnen** zeigt es. In Discord oder im
+Streaming-Programm (als Bild- bzw. Browser-Quelle) zeigt der Link immer den aktuellen Stand, höchstens fünf Minuten alt. Spieler
+stehen nicht darauf. Ist die Season nicht öffentlich, gibt es kein Rankingbanner.
+
+<img src="../assets/liga/rankingbanner.png" alt="Rankingbanner: Platz 2 von 8, Nordlicht A, Probe-Liga Season 1, Liga 1 Staffel A, 5 Siege, 2 Niederlagen, 15 Punkte" width="600">
+
+### 3.6 Teamverwaltung im Admin
 
 **Admin → eSports → Teams** (auch über die Kachel **Teams** auf dem Dashboard): alle Teams mit Suche, auch private. **Ohne aktive
 Teamleitung** steht rot in der Zeile – die Teamleitung hat ihr Konto gelöscht. Ein Klick führt zur Teamseite; dort übergeben

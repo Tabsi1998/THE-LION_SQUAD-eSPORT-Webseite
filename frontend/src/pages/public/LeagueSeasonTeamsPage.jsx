@@ -7,6 +7,7 @@ import { SeasonShell } from "@/components/tls/league/public/SeasonShell";
 import { SeasonPlaceholder } from "@/components/tls/league/public/SeasonParts";
 import { TeamMark, useStaffel } from "@/components/tls/league/public/StaffelPanel";
 import { staffelList } from "@/lib/leagueSeasonPage";
+import { RankBannerCopy } from "@/components/tls/league/RankBannerCopy";
 
 function TeamCard({ team, standing }) {
   const meta = standing && Number(standing.played) > 0 ? `Platz ${standing.rank} · ${standing.points ?? 0} ${Number(standing.points) === 1 ? "Punkt" : "Punkte"}` : "noch ohne Spiel";
@@ -18,10 +19,16 @@ function TeamCard({ team, standing }) {
     </>
   );
   return (
-    <li className="min-w-0" data-testid={`season-team-${team.id}`}>
+    <li className="min-w-0 tls-season-team__slot" data-testid={`season-team-${team.id}`}>
       {team.team_id
         ? <Link to={`/teams/${team.team_id}`} className="tls-season-team">{body}</Link>
         : <div className="tls-season-team">{body}</div>}
+      {/* Rankingbanner (Nr. 60, #2425): fester Bild-Link mit Platz und Bilanz - nur in einer öffentlichen Season. */}
+      {team.rank_banner_url ? (
+        <div className="tls-season-team__banner">
+          <RankBannerCopy path={team.rank_banner_url} compact testId={`season-team-${team.id}-banner`} />
+        </div>
+      ) : null}
     </li>
   );
 }

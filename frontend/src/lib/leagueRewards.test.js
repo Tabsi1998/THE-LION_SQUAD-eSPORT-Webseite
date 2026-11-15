@@ -1,6 +1,6 @@
 import {
-  artLines, emptyReward, everyoneLine, groupBySeason, listProblem, metalOf, placeLabel, recipientsLabel, rewardPayload, rewardProblem,
-  rewardToForm, rewardsByPlace, rewardsOf, rosterFallbackText,
+  artLines, emptyReward, everyoneLine, listProblem, metalOf, placeLabel, recipientsLabel, rewardPayload, rewardProblem,
+  rewardToForm, rewardsByPlace, rosterFallbackText,
 } from "./leagueRewards";
 
 // Belohnungen der Liga (F.4, #2214): dieselben Texte und Regeln wie der Server. Erfundene Namen.
@@ -34,16 +34,8 @@ test("an den Server geht nur, was er kennt - Zahlen als Zahlen, leere Texte als 
   expect(rewardPayload({ ...emptyReward(), name: "Neu" })).not.toHaveProperty("id");
 });
 
-const award = (id, season, rank, name, updated) => ({ id, rank, updated_at: updated, league: { season_id: season }, reward: { name, art: { season: `Season ${season}`, league: "Probe-Liga" } } });
-
-test("die Sammlung gruppiert nach Season, die neueste oben, darin Platz 1 zuerst", () => {
-  const awards = [award("a", "1", 3, "Bronze", "2026-01-01"), award("b", "2", 2, "Silber", "2026-06-01"), award("c", "1", 1, "Gold", "2026-01-01"),
-    { id: "pokal", rank: 1, reward: null }];
-  expect(rewardsOf(awards).map((row) => row.id)).toEqual(["a", "b", "c"]);
-  const groups = groupBySeason(awards);
-  expect(groups.map((group) => group.season)).toEqual(["Season 2", "Season 1"]);
-  expect(groups[1].items.map((row) => row.reward.name)).toEqual(["Gold", "Bronze"]);
-  expect(groups[1].league).toBe("Probe-Liga");
+// Die Sammlung je Season (groupBySeason) ist seit #2425 die Vitrine „Trophäen“ - Gruppen und Filter prüft lib/trophies.test.js.
+test("die Beschriftung der Vorlage: Season, Liga N, Platz", () => {
   expect(artLines({ season: "Season 1", division: "Liga 2", place: "1. Platz" })).toEqual(["Season 1", "Liga 2", "1. Platz"]);
 });
 
