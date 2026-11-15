@@ -37,7 +37,7 @@ Jeder Satz eines Bausteins gegen die Funktion, die ihn trägt.
 | Modusfolge: Map 1, 2, 3 …, „bei mehr Maps beginnt die Folge von vorn“ | `league_games.py:394`, `league_veto_rules.py:322` (Modulo) | `test_league_mode_order_flow.py` | umgesetzt, getestet |
 | Map-Pool: Maps je Modus | `map_pools.py` (Versionen, festgehalten am Spiel) | `test_map_pools_flow.py`, `test_league_pools_flow.py` | umgesetzt, getestet |
 | Tabelle: Punkte Sieg/Remis/Niederlage oder je gewonnene Map | `scoring_rules.py`, `competition_standings.py` | `test_league_map_points_unit.py`, `test_league_table_e1_flow.py`, G.1 Szenario 11 | umgesetzt, getestet |
-| Tabelle: Beispiel „3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0“ | fester Text in `points_sentence` | `test_league_rule_facts_unit.py` | teilweise: Beispiel passt nur zu Best of 5 (Abweichung A5) |
+| Tabelle: Beispiel zu den Map-Punkten („3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0“ bei Best of 5) | `league_rule_facts.map_points_example` aus dem Best of der Season bzw. Liga N (#2424) | `test_league_rule_facts_unit.py::test_map_points_example_follows_the_best_of_of_season_and_division` | umgesetzt, getestet (A5) |
 | Tabelle: Reihenfolge bei Punktgleichheit, direkter Vergleich mit Kriterien | `competition_standings.py` (Mini-Tabelle, Nr. 42, 78) | `test_league_tiebreak_unit.py`, G.1 Szenario 16 | umgesetzt, getestet |
 | Tabelle: Kampflos – Sieger bekommt die zum Sieg nötigen Maps | `scoring_rules.forfeit_score`, `league_table_routes.py` | `test_league_forfeit_maps_flow.py`, G.1 Szenario 15 | umgesetzt, getestet |
 | Tabelle: Beide nicht erschienen – beide verlieren, keine Maps | `league_table_routes.py` (Doppel-Nichtantritt), `competition_standings.py` | `test_league_table_e1_flow.py` (`double_no_show`) | umgesetzt, getestet |
@@ -62,7 +62,7 @@ Jeder Satz eines Bausteins gegen die Funktion, die ihn trägt.
 | Spielberechtigung: Spiel-IDs, „jede Spiel-ID nur einmal je Season“ | `league_roster.py`, `league_eligibility.py` | `test_league_roster_flow.py`, `test_league_eligibility_race_flow.py` | umgesetzt, getestet |
 | Spielberechtigung: Plattform, Crossplay, Eingabegerät je Season und Liga N | `league_platform.py` | `test_league_platform_flow.py`, `league-platform.spec.js` | umgesetzt, getestet |
 | Spielberechtigung: ein Co-Team je Season, Wechsel nur als Transfer | `league_eligibility.py`, `league_transfers.py` | `test_league_transfers_flow.py` | umgesetzt, getestet |
-| Spielberechtigung: Wartezeit nach Spieltag 1, nach Transfer immer | `league_eligibility.py` (`wait_until`) | `test_league_wait_until_unit.py`, `test_league_eligibility_flow.py` | umgesetzt, getestet (Wort „Spieltag“, siehe A6) |
+| Spielberechtigung: Wartezeit nach Spielwoche 1, nach Transfer immer | `league_eligibility.py` (`wait_until`) | `test_league_wait_until_unit.py`, `test_league_eligibility_flow.py`, `test_league_rule_facts_unit.py::test_rule_blocks_say_matchweek_not_matchday` | umgesetzt, getestet (A6, #2424) |
 | Spielberechtigung: Stichtag – danach Freigabe der Leitung | `league_roster.py:90, 878` (`late_squad_ids`) | `test_league_roster_rules_flow.py` | umgesetzt, getestet |
 | Spielberechtigung: Transferfenster | `league_transfers.py` | `test_league_transfers_flow.py` | umgesetzt, getestet |
 | Regelwerk: Versionen, PDF, Änderungsmarkierung, Vergleich, Zustimmung | `league_rules.py`, `league_rules_store.py`, `league_rules_text.py` | `test_league_rules_flow.py`, `test_league_rules_pdf_unit.py`, `test_league_rules_consent_flow.py`, `test_league_rules_review_flow.py` | umgesetzt, getestet |
@@ -217,16 +217,16 @@ Nicht vergebene Nummern gibt es keine; Nr. 33 ist durch 11c, Nr. 35 durch 68, Nr
 | 97 | Aufsätze passen zu Unterkategorien und Waffen | `loadout_bans.py` · `test_loadout_allowed_by_weapon_unit.py` | umgesetzt, getestet |
 | 98 | Sperrliste gruppiert (Web), Tabelle (PDF) | `loadout_bans.py` · `test_loadout_bans_grouped_unit.py` | umgesetzt, getestet |
 | 99 | Regelwerk zeigt, was erlaubt ist | `loadout_bans.allowed_data` · `test_loadout_allowed_table_unit.py` | umgesetzt, getestet |
-| 100 | Veto-Folge Anlage B | – | **offen:** Fabian prüft gegen die CDL (Daten der Vorlage) |
+| 100 | Veto-Folge Anlage B | `league_rule_facts.render_veto` (Anlage B aus der Vorlage, #2426), `league_rules_text.sections_of(empty_block=…)` · `test_league_rule_facts_unit.py`, `test_league_veto_flow.py::test_annex_b_comes_from_the_template_on_page_pdf_and_compare` | teilweise: Anlage B entsteht aus der Veto-Vorlage; **offen:** Fabian prüft die Folge gegen die CDL und trägt die Vorlage ein |
 | 101 | Spielsperre mindestens ein Spiel, höchstens bis Season-Ende | `league_sanctions.py`, `league_sanction_bans.py` · `test_league_sanctions_flow.py` | umgesetzt, getestet |
 | 102 | Lobby-Details in den Modus-Einstellungen | `league_rule_blocks._mode_settings` · `test_league_rules_dynamic_flow.py` | umgesetzt, getestet |
-| 103 | Frühe Abbrüche: S&D ab erster Runde, Respawn ab erstem Punkt | `league_incident_rules.py` (Vorschlag „Neustart frühe Phase“) · `test_league_incidents_unit.py` | teilweise: Schwelle steht im Regeltext, das System prüft sie nicht (die Teams wählen den Vorschlag) |
+| 103 | Frühe Abbrüche: S&D ab erster Runde, Respawn ab erstem Punkt | `league_incident_rules.py` (Vorschlag „Neustart frühe Phase“) · `test_league_incidents_unit.py` | umgesetzt, getestet: Das System prüft die Schwelle bewusst nicht (die Teams wählen den Vorschlag); der Baustein `[[baustein:lead_rulings]]` sagt, dass sonst die Leitung von Hand wertet (#2424, A7) |
 | 104 | Externe Sperren wegen Cheating: nicht spielberechtigt, Leitung prüft | `league_sanctions.py` (Art externe Sperre) · `test_league_sanctions_flow.py` | umgesetzt, getestet |
 | 105 | Veto bei neuen Seasons an, Vorlage per Vorschlag | `league_service.py` · `test_league_veto_flow.py` | umgesetzt, getestet |
 | 106 | Liga N mit anderem Best of: kein Veto, Warnung | `league_veto.outlook` (`skipped`), `league_readiness.py` · `test_league_veto_flow.py` | umgesetzt, getestet |
 | 107 | Leitung wählt nie für eine Seite | `league_veto_routes.py` · `test_league_veto_flow.py`, G.1 Rechte | umgesetzt, getestet |
 | 108 | Unberührte Veto-Vorlage folgt dem Pool | `league_veto_rules.py` · `test_league_veto_flow.py`, `test_league_admin_flow.py` | umgesetzt, getestet |
-| 109 | MOSS-Pflicht am PC, Upload binnen 24 h | `league_procedures.py` (MOSS anfordern) · `test_league_procedures_flow.py` | umgesetzt, getestet; die Wertung bei fehlender Datei entscheidet die Leitung von Hand |
+| 109 | MOSS-Pflicht am PC, Upload binnen 24 h | `league_procedures.py` (MOSS anfordern) · `test_league_procedures_flow.py` | umgesetzt, getestet; die Wertung bei fehlender Datei entscheidet die Leitung von Hand – so steht es im Baustein `[[baustein:lead_rulings]]` (#2424, A8) |
 | 110 | Aufsätze je Waffe aufklappbar, „für Klasse übernehmen“ | `loadout_bans.py`, `SeasonLoadoutBansPanel.jsx` · `test_loadout_by_weapon_flow.py`, `ausruestung-je-waffe.spec.js` | umgesetzt, getestet |
 | 111 | Modus-Hinweis „nur in …“ / „nicht in …“ | `loadout_bans.py` · `test_loadout_bans_rules_flow.py` | umgesetzt, getestet |
 | 112 | „An keiner Waffe erlaubt: …“ als eigene Zeile | `loadout_bans.py` · `test_loadout_allowed_by_weapon_unit.py` | umgesetzt, getestet |
@@ -242,7 +242,7 @@ Nicht vergebene Nummern gibt es keine; Nr. 33 ist durch 11c, Nr. 35 durch 68, Nr
 | 122 | Veto-Schrittart „Vorgabe je Spielwoche“ | `league_veto_rules.py` · `test_league_veto_preset_unit.py` | umgesetzt, getestet |
 | 123 | Keine Wechsel-Grenze, keine Strafe je Runde | – | bewusst nicht |
 | 124 | Nach nachgetragener Vorgabe: „Vorgabe da – Veto kann starten“ | `league_veto.announce_ready` · `test_league_veto_preset_flow.py` | umgesetzt, getestet |
-| 125 | „Spielwoche N“ mit Datum | Oberfläche (`leagueVeto.js`, Ligaseite) · `test_league_veto_preset_flow.py` | umgesetzt, getestet (Restwort „Spieltag“ im Regelwerk, A6) |
+| 125 | „Spielwoche N“ mit Datum | Oberfläche (`leagueVeto.js`, Ligaseite) · `test_league_veto_preset_flow.py` | umgesetzt, getestet (Regelwerk sagt „Spielwoche“, A6, #2424) |
 | 126 | Anmeldung automatisch annehmen je Season | `league_applications.py` · `test_league_application_auto_flow.py` | umgesetzt, getestet |
 | 127 | Beide Seiten „Bereit zum Veto“, Leitung im Notfall mit Grund | `league_veto.set_ready`, `lead_start` · `test_league_veto_preset_flow.py`, `test_league_rights_matrix_flow.py` | umgesetzt, getestet (Regelwerk-Satz in G.3 ergänzt) |
 | 128 | Wer zuerst kommt, wird zuerst bedient; Rückzug vor festem Spielplan | `league_applications.py` · `test_league_application_auto_flow.py`, `test_league_application_race_flow.py` | umgesetzt, getestet |
@@ -309,13 +309,13 @@ Nicht still behoben. Je Punkt der Vorschlag; Fabian legt die Issues an.
 | A2 | **Nr. 180:** Ein nachgemeldetes Co-Team steht mit 0 Spielen in der Tabelle, der feste Spielplan bekommt keine Spiele dazu. | In #2422 entscheiden: Nachrücker-Spiele anhängen (Nachholwochen) oder Nachmeldung nur bis zum Start der Staffel. |
 | A3 | **Nr. 66:** Entschieden war „eine Season zählt in der Gesamtwertung nur, wenn die Stufe genau eine Staffel hat“. Gebaut ist „N je Staffel“: Jede Staffel zählt, Platz 1 jeder Staffel bekommt so viele Punkte, wie seine Staffel Teams hat. | Entweder Nr. 66 als abgelöst vermerken (F.5-Rechnung bestätigen) oder eine Prüfung „nur bei genau einer Staffel“ als Schalter je Liga nachrüsten. |
 | A4 | **Nr. 60:** Rankingbanner (Live-Bild mit Platz und Bilanz, fester Link zum Einbinden) fehlt. Nr. 34c: drei Embleme neben dem Namen fehlen, nur Banner und Titel sind wählbar. Nr. 59: Sammlung ohne Filter. | Ein Issue „Belohnungen: Rankingbanner, Embleme neben dem Namen, Filter der Sammlung (Rest aus F.4)“. |
-| A5 | **Regelwerk, Baustein Tabelle:** Das Beispiel „3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0“ steht fest im Satz, auch bei Best of 3 oder 7. | Beispiel aus dem Best of der Season bilden (BO3: „2:1 ergibt 2 und 1“) oder ohne Zahlen formulieren. Ändert den Text veröffentlichter Fassungen beim Anzeigen – mit Fabian abstimmen. |
-| A6 | **Regelwerk, Baustein Spielberechtigung und Veto:** „nach dem Ende von Spieltag 1“ und „alle Spiele dieses Spieltags“ – Nr. 125 nennt die Woche „Spielwoche“. Inhaltlich gleich (Spielwoche = Spieltag), nur das Wort weicht ab. | Bei der nächsten Regelwerk-Änderung „Spielwoche 1“ schreiben, zusammen mit dem Fließtext. |
-| A7 | **Nr. 103:** Die Schwelle für frühe Abbrüche (S&D ab erster Runde, Respawn ab erstem Punkt) prüft das System nicht; die Teams wählen „Neustart in der frühen Phase“ selbst, die Leitung entscheidet bei Streit. | So lassen (Nr. 24: Einigung, sonst Leitung) und im Regeltext klarstellen, dass die Schwelle nicht automatisch geprüft wird. |
-| A8 | **Nr. 109:** Fehlt eine MOSS-Datei, gelten laut Regel die Maps des Spielers als verloren. Das System meldet nur den Hinweis an die Leitung, gewertet wird von Hand. | So lassen (keine Automatik, Nr. 32) und im Regeltext „die Liga-Leitung wertet“ schreiben. |
+| A5 | **Regelwerk, Baustein Tabelle:** Das Beispiel „3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0“ steht fest im Satz, auch bei Best of 3 oder 7. | **Erledigt (#2424):** Das Beispiel entsteht aus dem Best of der Season bzw. Liga N (BO3 „2:1 ergibt 2 und 1“, BO7 „4:3 ergibt 4 und 3“); Fassungen ohne eingefrorenes Best of nennen keine Zahlen. Auch der Hinweis unter der Tabelle der Staffel und die Hilfe in der Verwaltung folgen dem Best of. |
+| A6 | **Regelwerk, Baustein Spielberechtigung und Veto:** „nach dem Ende von Spieltag 1“ und „alle Spiele dieses Spieltags“ – Nr. 125 nennt die Woche „Spielwoche“. Inhaltlich gleich (Spielwoche = Spieltag), nur das Wort weicht ab. | **Erledigt (#2424):** Bausteine, Spielberechtigung auf der Ligaseite, Hilfen der Verwaltung und Handbuch sagen „Spielwoche“. Im Fließtext (Verwaltung) passt Fabian „Ende des ersten Spieltags“ selbst an. |
+| A7 | **Nr. 103:** Die Schwelle für frühe Abbrüche (S&D ab erster Runde, Respawn ab erstem Punkt) prüft das System nicht; die Teams wählen „Neustart in der frühen Phase“ selbst, die Leitung entscheidet bei Streit. | **Erledigt (#2424):** Neuer Baustein `[[baustein:lead_rulings]]` „Wertung durch die Leitung“: Die frühe Phase prüft das System nicht, die Teams einigen sich, sonst wertet die Liga-Leitung von Hand. Fabian setzt ihn in Anlage C ein. |
+| A8 | **Nr. 109:** Fehlt eine MOSS-Datei, gelten laut Regel die Maps des Spielers als verloren. Das System meldet nur den Hinweis an die Leitung, gewertet wird von Hand. | **Erledigt (#2424):** Derselbe Baustein sagt: Fehlt die Datei nach der Frist, bekommt nur die Leitung einen Hinweis, gewertet wird von Hand. Fabian setzt ihn bei § 9a ein. |
 | A9 | **Nr. 11:** Entschieden war „ohne Zustimmung Aufgabe und Hinweis, das Spiel läuft weiter“. Seit D.2 sperrt die fehlende Zustimmung Check-in, Start und erste Meldung (Nr. 86 setzt das voraus). | Nr. 11 in der Entscheidungsliste als geändert durch D.2 vermerken. |
 | A10 | **Nr. 1, 72, 141:** Der Datenschutztext für externe Teilnehmer fehlt; er muss Bilder im Regelwerk nach Kontolöschung und MOSS-Aufbewahrung nennen. Ohne Text steht bei der Anmeldung ein Platzhalter-Satz. | Vor Season 1: Wortlaut freigeben und rechtlich prüfen lassen, in der Season eintragen (Reiter Anmeldung und Kader → Selbstanmeldung). |
-| A11 | **Nr. 100:** Veto-Folge Anlage B ist offen, bis Fabian sie gegen die CDL geprüft hat. | Vor Season 1 die Vorlage eintragen; das System prüft die Folge gegen Pool und Best of. |
+| A11 | **Nr. 100:** Veto-Folge Anlage B ist offen, bis Fabian sie gegen die CDL geprüft hat. | **Teilweise (#2426):** `[[baustein:veto]]` erzeugt die ganze Anlage B aus der Vorlage (Regeln, Schritte als Tabelle, Ligen N ohne Veto); steht er allein in der Anlage, entfällt sie ohne Vorlage. **Offen:** Fabian prüft die Folge gegen die CDL und trägt die Vorlage vor Season 1 ein. |
 
 ## 4. In G.3 korrigierte Regelwerk-Sätze
 
@@ -326,3 +326,15 @@ einfrieren und den Satz beim Anzeigen bilden.
 | --- | --- | --- | --- |
 | Termine | „72-h-Regel: Ein unbeantworteter Terminvorschlag des Heimteams gilt nach 72 Stunden.“ | „… gilt nach 72 Stunden, wenn er in der Spielwoche liegt.“ – wie die Matchseite und `home_rule_at` | `test_league_rule_facts_unit.py::test_home_rule_line_names_the_week_condition` |
 | Veto | „… Solange sie für eine Woche fehlt, beginnt das Veto nicht.“ | „… beginnt das Veto nicht; wird sie nachgetragen, beginnt es, sobald beide Teams „Bereit zum Veto“ getippt haben.“ (Nr. 124, 127) | `test_league_rule_facts_unit.py::test_veto_block_with_preset_names_the_ready_start` |
+
+## 5. Nach G.3 korrigiert (#2424, #2426)
+
+Wie in Abschnitt 4: Die Sätze entstehen beim Anzeigen, darum zeigen auch schon veröffentlichte Fassungen die neue Formulierung (mit
+ihren eingefrorenen Werten). Variablen sind als Wert eingefroren und bleiben in alten Fassungen, wie sie waren.
+
+| Baustein | Vorher | Nachher | Test |
+| --- | --- | --- | --- |
+| Tabelle (A5) | „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)“ bei jedem Best of | Beispiel aus dem Best of der Season bzw. Liga N; ohne eingefrorenes Best of „… – jedes Team bekommt so viele Punkte, wie es Maps gewonnen hat“ | `test_league_rule_facts_unit.py::test_map_points_example_follows_the_best_of_of_season_and_division` |
+| Spielberechtigung, Veto (A6) | „nach dem Ende von Spieltag 1“, „alle Spiele dieses Spieltags“ | „nach dem Ende von Spielwoche 1“, „alle Spiele dieser Spielwoche“ | `test_league_rule_facts_unit.py::test_rule_blocks_say_matchweek_not_matchday` |
+| neu: Wertung durch die Leitung (A7, A8) | – | frühe Phase und fehlende MOSS-Datei wertet die Liga-Leitung von Hand | `test_league_rule_facts_unit.py::test_lead_rulings_say_the_lead_rules_by_hand` |
+| Veto = Anlage B (A11) | Liste mit nummerierten Sätzen | Regeln (Team A/B, Start, Zeit, Zeitüberschreitung, Seitenwahl, Eingriffe, Bereit-Start) und Tabelle der Schritte, je Liga N „kein Veto“; allein in einer Anlage entfällt sie ohne Vorlage | `test_league_rule_facts_unit.py::test_annex_b_*`, `test_league_rules_text_unit.py::test_an_annex_of_only_empty_blocks_is_left_out`, `test_league_veto_flow.py::test_annex_b_comes_from_the_template_on_page_pdf_and_compare` |

@@ -52,7 +52,7 @@ Termin – ohne Einigung gilt der **Standardtermin** (Vorgabe Sonntag 20:00). Ku
 Season ein Veto, folgt es gleich danach (3.1c). Nach dem Spiel meldet eine Seite das Ergebnis **im Web** mit Maps und hakt einmal
 an, wer bei ihr gespielt hat (**Teilnehmerliste**, siehe 3.3), die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach
 **48 Stunden** (Vorgabe). Die Tabelle rechnet je Season entweder **Sieg, Remis, Niederlage** (Vorgabe 3/0/0, ohne Remis) oder
-**Punkte nach gewonnenen Maps** (3:2 ergibt 3 und 2 Punkte); bei Punktgleichheit entscheidet die eingestellte Reihenfolge,
+**Punkte nach gewonnenen Maps** (bei Best of 5 ergibt 3:2 3 und 2 Punkte, bei Best of 3 ergibt 2:1 2 und 1); bei Punktgleichheit entscheidet die eingestellte Reihenfolge,
 etwa der **direkte Vergleich**, dann Map-Differenz und gewonnene Maps, zuletzt die Liga-Leitung (siehe 3.5).
 
 Beispiel: Eine Season mit 10 Wochen, nur Hinrunde und acht Teams hat sieben Spieltage. Liegt eine Pause in Woche 7 und 8, spielen
@@ -359,7 +359,7 @@ keine Kopie und keine Punktepflicht – sie prüfen nichts Neues, bis du hier sp
 | | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
 | | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
 | | **Plattform und Eingabegerät**: Feld, erlaubte Plattformen, Crossplay, Eingabegerät (2.7c) | keine Vorgabe |
-| Tabelle | **Punkteart**: *Sieg, Remis, Niederlage* oder *Punkte nach gewonnenen Maps* (3:2 ergibt 3 und 2) | Sieg, Remis, Niederlage |
+| Tabelle | **Punkteart**: *Sieg, Remis, Niederlage* oder *Punkte nach gewonnenen Maps* (jede Seite bekommt so viele Punkte, wie sie Maps gewonnen hat; das Beispiel im Hinweis folgt dem Best of der Season) | Sieg, Remis, Niederlage |
 | | **Punkte Sieg / Remis / Niederlage** – nur bei *Sieg, Remis, Niederlage* | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
 | | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
 | | **Direkter Vergleich (Mini-Tabelle)** – erscheint mit dem direkten Vergleich | Punkte, Map-Differenz, Gewonnene Maps |
@@ -646,7 +646,7 @@ speichern** steht im selben Kasten der Block **Vorgabe der Woche**:
 Was gilt:
 
 - **Spielwoche heißt Spieltag.** Der Block schreibt „Spielwoche 3“ mit den Tagen dieser Woche. Gemeint ist der dritte Spieltag, also
-  die dritte Woche, in der gespielt wird (Sperrwochen zählen nicht mit). Die Vorgabe gilt für alle Spiele dieses Spieltags.
+  die dritte Woche, in der gespielt wird (Sperrwochen zählen nicht mit). Die Vorgabe gilt für alle Spiele dieser Spielwoche.
 - **Ein verschobenes Spiel bleibt in seiner Spielwoche.** Es spielt die Vorgabe seines Spieltags, auch wenn es erst in einer späteren
   Woche stattfindet – nicht die Vorgabe der Woche, in die der neue Termin fällt.
 - **Ohne Vorgabe beginnt das Veto nicht.** Sind beide Seiten eingecheckt und für die Woche fehlt die Map, sagt die Matchseite das, und
@@ -814,13 +814,14 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | Map-Pool | `[[baustein:map_pool]]` | Tabelle Modus · Maps | Season → Spielbetrieb → Map-Pool |
    | Modusfolge | `[[baustein:mode_order]]` | Modus je Map | Season → Spielbetrieb → Serie |
    | Check-in | `[[baustein:checkin]]` | Fenster (öffnet und schließt, Minuten um den Termin), Mindestens Anwesende je Seite, Start sobald beide eingecheckt, Entscheidung der Leitung bei Fehlen (2.7b); ohne Check-in ein Satz | Season → Termine → Check-in vor dem Spiel |
-   | Veto | `[[baustein:veto]]` | Team A (Heim oder Los), Zeit je Schritt, Start nach dem Check-in und die Schrittfolge nummeriert („1. Team A sperrt eine Map (Stellung)“, 2.7d); mit einer Vorgabe der Woche dazu die Regel (gilt für alle Spiele des Spieltags, nicht sperrbar, nicht wählbar) und der Schritt „Die Liga-Leitung gibt Map 3 je Spielwoche vor“; ohne Veto ein Satz | Season → Spielbetrieb → Veto |
+   | Veto (Anlage B) | `[[baustein:veto]]` | Die Anlage B aus der Veto-Vorlage (2.7d): Team A und B (Heim oder Los), Start nach dem Check-in, Zeit je Schritt, Zeitüberschreitung (Zufallswahl unter den zulässigen Maps), keine Seitenwahl, Eingriffe der Leitung; mit einer Vorgabe der Woche dazu die Regel (gilt für alle Spiele der Spielwoche, nicht sperrbar, nicht wählbar) und der Bereit-Start. Darunter die Schrittfolge als Tabelle: Schritt · Modus · Aktion (Ban, Pick, Decider, Vorgabe der Woche) · Am Zug (Team A, Team B, System, Liga-Leitung) · Wirkung · Zeit. Spielt eine Liga N ein anderes Best of, steht dort „kein Veto“. Ohne Veto ein Satz; steht der Baustein allein in einer Anlage, **entfällt die Anlage** ohne Vorlage (auf der Seite, im PDF und im Vergleich) | Season → Spielbetrieb → Veto |
    | Erlaubte Ausrüstung | `[[baustein:loadout_bans]]` | was erlaubt ist: aktive Bibliothek ohne die Sperrliste, je Kategorie und Unterkategorie mit Bild, Hinweise „nicht in …“ bzw. „nur in …“, Waffen als Tabelle je Kategorie mit Bild und den Ausnahmen nach Slot („gesperrt: …“, „nur erlaubt: …“, wenn das kürzer ist), ganz gesperrte Klasse als Zeile „nicht erlaubt“ (im PDF genauso, übrige Ausrüstung als Tabelle; gedacht für Anlage A, 2.1a) | Spiel → Ausrüstung, Season → Regelwerk und Sperrliste |
    | Einstellungen je Modus | `[[baustein:mode_settings]]` | je Modus Zeitlimit, Zeit je Runde, Einstellungen (Tabelle), Regeltext | Spiel → Modi, Season → Ergebnisregeln |
    | Modi der Season | `[[baustein:modes]]` | Tabelle Modus (mit Symbol) · Ergebnisregel in Klartext (Ziel, Runden, Verlängerung, Remis) · Zeit · Spieler je Seite | Season → Spielbetrieb → Modi, Ergebnisregeln |
    | Spielformat | `[[baustein:format]]` | Best of, Teamgröße, Mindest- und Höchstkader, Map-Wiederholung, Teilnehmerliste; Abweichungen je Liga N | Season → Spielbetrieb → Serie, Anmeldung und Kader, Ligen |
    | Tabelle und Wertung | `[[baustein:table]]` | Punkte, Remis, Reihenfolge bei Punktgleichheit, kampflos, beide nicht erschienen, Ausscheiden | Season → Tabelle |
    | Termine | `[[baustein:schedule]]` | Spielwochen, Standardtermin, Sperrzeiten, Antwortfrist, 72-h-Regel, Verschiebungen, Erinnerung und überfällig | Season → Termine |
+   | Wertung durch die Leitung | `[[baustein:lead_rulings]]` | Zwei Sätze, gedacht für Anlage C und § 9a: Ob ein Abbruch noch in der frühen Phase lag, prüft das System nicht – die Teams einigen sich über den Vorfall, sonst wertet die Liga-Leitung von Hand (mit der Antwortzeit der Season). Fehlt eine angeforderte MOSS-Datei nach der Frist, bekommt nur die Leitung einen Hinweis; gewertet wird von Hand | Season → Spielbetrieb → Vorfälle und Pausen, Season → Proteste |
    | Spielberechtigung | `[[baustein:eligibility]]` | Zulassung, Annahme der Anmeldung („automatisch angenommen“ oder „die Liga-Leitung prüft“, nur mit Anmeldefenster, 2.5a), Mindestalter, Spiel-IDs, Plattform (erlaubte Plattformen, Crossplay, Eingabegerät, Abweichungen je Liga N, 2.7c), ein Co-Team je Season, Wartezeit, Stichtag, Transferfenster | Season → Anmeldung und Kader, Spiel → Spiel-IDs |
 
 4. **Variablen** stehen mitten im Satz, etwa „Gespielt wird Best of `{{best_of}}`“, und werden beim Lesen durch den Wert der Season
@@ -841,7 +842,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
    | `{{veto.presets}}` | Vorgabe der Woche (2.7d): „Spielwoche 1: Hafen (Kontrolle); Spielwoche 2: Kai (Kontrolle)“; ohne Einträge „noch keine eingetragen“. Steht die Variable im Regelwerk, schlägt jede neue Vorgabe eine Freigabe vor – wer das nicht will, lässt sie weg (die Matchseite nennt die Map ohnehin) |
    | `{{schedule.matchday_days}}`, `{{schedule.default_weekday}}`, `{{schedule.default_time}}`, `{{schedule.default_slot}}`, `{{schedule.response_hours}}`, `{{schedule.blocked_periods}}` | Spielwoche, Standardtermin („Sonntag, 20:00 Uhr“), Antwortfrist, Sperrzeiten |
    | `{{schedule.home_rule_hours}}`, `{{schedule.reschedule_max}}`, `{{schedule.reschedule_notice_hours}}`, `{{schedule.result_reminder_hours}}`, `{{schedule.result_overdue_hours}}` | Terminregeln (2.7a) |
-   | `{{table.points}}` | Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)“ |
+   | `{{table.points}}` | Punktevergabe in Worten: „Sieg 3, Niederlage 0 Punkte“ oder „je gewonnene Map ein Punkt (3:2 ergibt 3 und 2 Punkte, 3:0 ergibt 3 und 0)“ – das Beispiel folgt dem Best of (Best of 3: „2:1 ergibt 2 und 1 Punkte, 2:0 ergibt 2 und 0“) |
    | `{{table.points_win}}`, `{{table.points_draw}}`, `{{table.points_loss}}`, `{{table.draws}}`, `{{table.tiebreakers}}`, `{{table.head_to_head}}`, `{{table.forfeit_score}}`, `{{table.exit_rule}}` | Punkte, Remis, Reihenfolge bei Punktgleichheit, direkter Vergleich, kampflos, Ausscheiden |
    | `{{eligibility.min_age}}`, `{{eligibility.wait_days}}`, `{{eligibility.roster_deadline}}`, `{{eligibility.transfer_windows}}`, `{{eligibility.entry_policy}}`, `{{eligibility.id_fields}}` | Spielberechtigung (3.9) |
    | `{{eligibility.platform}}`, `{{eligibility.crossplay}}`, `{{eligibility.input_device}}` | Plattform je Season (2.7c): „PC und PlayStation“ oder „alle Plattformen“, Crossplay „an“/„aus“, Eingabegerät; ohne Plattform-Feld „(nicht festgelegt)“ |
@@ -854,7 +855,7 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
 
 5. **Vorschau** zeigt die Seite mit den Werten von heute und den Änderungen zur letzten Version.
 6. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
-   die Version nicht mehr ändern. Bausteine und Variablen werden eingefroren: alte Versionen zeigen ihre Werte von damals, im Web und im PDF.
+   die Version nicht mehr ändern. Bausteine und Variablen werden eingefroren: alte Versionen zeigen ihre Werte von damals, im Web und im PDF. Die Sätze eines Bausteins entstehen aber erst beim Anzeigen aus diesen Werten – wird ein Satz verbessert (etwa die Anlage B als Tabelle), zeigen auch schon veröffentlichte Versionen die neue Formulierung mit den alten Werten.
 
 **Was die Seite selbst macht:** Sie vergleicht jede Version mit der vorigen. Geänderte Paragrafen tragen einen Strich am Rand und das Wort
 „Geändert“, oben steht „Neu in Version X“ mit Links zu den Stellen. Leser können die Markierung ausblenden und Wort für Wort mit jeder alten Version
@@ -1358,7 +1359,7 @@ Unter dem Namen steht klein, was den Platz entschied („Direkter Vergleich“, 
 die Reihenfolge der Kriterien.
 
 **Punkte nach gewonnenen Maps:** Rechnet die Season so (2.2), steht unter der Tabelle „Punkte = gewonnene Maps (3:2 ergibt 3 und 2,
-kampflos 3:0)“, und die Spalte **S** (Siege) bleibt auch am Handy sichtbar, weil mehr Siege bei Punktgleichheit zuerst zählen. Die
+kampflos 3:0)“ – das Beispiel folgt dem Best of der Staffel, bei Best of 3 also „2:1 ergibt 2 und 1, kampflos 2:0“, und die Spalte **S** (Siege) bleibt auch am Handy sichtbar, weil mehr Siege bei Punktgleichheit zuerst zählen. Die
 Spalte **Maps** (gewonnen:verloren) gibt es am PC. App und TV zeigen dieselben Punkte, weil sie vom Server kommen.
 
 <table>
@@ -1456,7 +1457,7 @@ Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an e
 | --- | --- |
 | **Mindest- und Höchstkader** | Über den Höchstkader lässt sich niemand aufnehmen. Unter den Mindestkader führt nur ein Abgang: Der bleibt möglich, es gibt Warnung und Aufgabe (3.8) |
 | **Ein Team je Season** | Wer in der Season in einem anderen Co-Team steht oder stand, kommt nur per Transfer. In anderen Seasons und Ligen ist das frei |
-| **Wartezeit** | Bis zum Ende von Spieltag 1 spielen Neue sofort. Danach warten sie ab der Aufnahme so viele Tage, auch wenn der Kader dadurch zu klein ist. Wer ins selbe Co-Team zurückkommt, startet keine neue Wartezeit. Das Zuteilen eines Co-Teams durch euch startet keine. **Ein Transfer wartet immer**, auch vor dem Ende von Spieltag 1 |
+| **Wartezeit** | Bis zum Ende von Spielwoche 1 spielen Neue sofort. Danach warten sie ab der Aufnahme so viele Tage, auch wenn der Kader dadurch zu klein ist. Wer ins selbe Co-Team zurückkommt, startet keine neue Wartezeit. Das Zuteilen eines Co-Teams durch euch startet keine. **Ein Transfer wartet immer**, auch vor dem Ende von Spielwoche 1 |
 | **Stichtag** | Optional in der Kaderübersicht: Neue warten auf eure Freigabe, Abgänge bleiben frei (3.7) |
 | **Transferfenster** | Die Teamleitung beantragt im Fenster, ihr entscheidet. Nach der Genehmigung wartet die Person ab der Kaderaufnahme die volle Wartezeit, immer und auch wenn sie das alte Co-Team schon verlassen hatte |
 | **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum oder zu jung: Anmeldung, Zuteilen, Aufnahme in den Kader und Transfer gehen, aber kein Check-in und keine Aufstellung. Auf der Team-Seite steht so jemand unter „Aufnehmbar, spielen erst mit der fehlenden Angabe“. Ihr seht nur „Alter erfüllt“, „Geburtsdatum fehlt“ oder „Altersvorgabe nicht erfüllt“, die Liga nennt nie ein Datum oder Alter |
