@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable
 
-from services import league_rule_facts as facts, map_pools
+from services import league_late, league_rule_facts as facts, map_pools
 from services.league_presets import PRESETS
 from services.markdown_text import plain as plain_text, text_cell
 from services.matchday_schedule import LOCAL_TZ
@@ -226,7 +226,11 @@ def _static() -> list[Variable]:
         Variable("eligibility.input_device", "Eingabegerät", "„Controller“, „Maus und Tastatur“ oder „Controller oder Maus und Tastatur“.",
                  "Spielberechtigung", lambda ctx: (ctx.eligibility.get("platform") or {}).get("input_device") if ctx.eligibility else None),
         Variable("application.opens", "Anmeldung ab", "Beginn des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_opens_at"))),
-        Variable("application.closes", "Anmeldung bis", "Ende des Anmeldefensters (Wiener Zeit).", "Anmeldung", lambda ctx: _local(_season(ctx, "application_closes_at"))),
+        # Wirksames Ende mit Nachmeldefrist (#2422, Nr. 184): min(Fenster, Start + Frist), mit Verlängerung der Leitung deren Ende.
+        Variable("application.closes", "Anmeldung bis", "Wirksames Ende der Anmeldung (Wiener Zeit): Fenster, höchstens bis zum Ende der Nachmeldefrist.",
+                 "Anmeldung", lambda ctx: _local(league_late.effective_closes_iso(ctx.season)) if _season(ctx, "application_closes_at") else None),
+        Variable("application.late_days", "Nachmeldefrist", "Tage nach dem Season-Start, bis zu denen eine Nachmeldung geht (Vorgabe 14).", "Anmeldung",
+                 lambda ctx: _count(league_late.late_days(ctx.season)) if _season(ctx, "application_closes_at") else None),
         Variable("application.slots", "Startplätze", "Zahl der Startplätze der Season.", "Anmeldung", lambda ctx: _count(_season(ctx, "application_slots"))),
         # Anmeldungen automatisch annehmen (#2348): ein ganzer Satz ohne Punkt, ohne Anmeldefenster „(nicht festgelegt)“.
         Variable("application.acceptance", "Annahme der Anmeldung", "„Anmeldungen werden automatisch angenommen, solange ein Startplatz frei ist; … zurückstufen“ "

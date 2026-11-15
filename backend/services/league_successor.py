@@ -37,6 +37,8 @@ NOT_COPIED = frozenset({
     "_id", "id", "league_id", "number", "name", "slug", "status", "visibility", "created_at", "created_by", "updated_at",
     "start_date", "blocked_periods", "registration_deadline", "application_opens_at", "application_closes_at", "transfer_windows",
     "roster_deadline", "final_closed_at", "predecessor_id", "predecessor", "successor_ready",
+    # Verlängerte Nachmeldung (#2422, Nr. 184): gilt nur dieser Season, die Frist selbst (``late_registration_days``) geht mit.
+    "application_late_extension",
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (

@@ -35,6 +35,7 @@ from models import (
 )
 from services import game_maps
 from services import league_applications
+from services import league_late
 from services import league_look
 from services import league_platform
 from services import league_pool_check
@@ -152,6 +153,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         "league": league, "season": season, "game": map_pools.game_summary(game),
         # Gestaltung (#2107): was die Ligaseite zeigt - für die Vorschau mit dem Erbe der Liga.
         "look": league_look.effective(league, season),
+        # Nachmeldefrist (#2422, Nr. 184): Frist, ihr Ende, die Verlängerung der Leitung und das wirksame Ende der Anmeldung.
+        "late_registration": league_late.view(season),
         "calendar": leagues.calendar_summary(season),
         "library": await map_pools.library(db, game),
         "default_pool": await map_pools.default_pool(db, game),

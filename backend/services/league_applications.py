@@ -21,7 +21,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import checkin_rules, league_eligibility, league_platform, league_roster, league_rules, league_service, squad_registration
+from services import checkin_rules, league_eligibility, league_late, league_platform, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
 from services.league_permissions import CAPABILITIES, belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
@@ -119,7 +119,8 @@ def carry_open(application: dict | None, season: dict | None, now: datetime | No
 
 def window_state(season: dict, now: datetime | None = None) -> str | None:
     """``None``: Die Season hat kein Fenster, also keine Selbstanmeldung."""
-    opens, closes = _moment(season.get("application_opens_at")), _moment(season.get("application_closes_at"))
+    # Nachmeldefrist (#2422, Nr. 184): Das wirksame Ende ist min(Fenster, Start + Frist), außer die Leitung hat mit Grund verlängert.
+    opens, closes = _moment(season.get("application_opens_at")), league_late.effective_closes(season)
     if not opens or not closes:
         return None
     moment = now or now_utc()
@@ -170,7 +171,7 @@ async def public_block(db, season: dict) -> dict | None:
     if not state:
         return None
     stats = await seat_stats(db, season)
-    return {"state": state, "opens_at": season.get("application_opens_at"), "closes_at": season.get("application_closes_at"),
+    return {"state": state, "opens_at": season.get("application_opens_at"), "closes_at": league_late.effective_closes_iso(season),
             "slots": stats["slots"], "slots_free": _free_for_newcomers(season, stats), "waitlist": bool(season.get("application_waitlist")),
             "waitlist_full": bool(season.get("application_waitlist")) and not _waitlist_has_room(season, stats),
             "waitlist_note": season.get("application_waitlist_note"), "entry_policy": season.get("entry_policy") or "all",
@@ -205,7 +206,7 @@ async def season_problems(db, league: dict, season: dict, stats: dict | None = N
     if state == UPCOMING:
         problems.append(f"Die Anmeldung öffnet am {_when(season.get('application_opens_at'))} Uhr.")
     if state == CLOSED:
-        problems.append(f"Die Anmeldung ist vorbei: Sie lief bis {_when(season.get('application_closes_at'))} Uhr.")
+        problems.append(f"Die Anmeldung ist vorbei: Sie lief bis {_when(league_late.effective_closes_iso(season))} Uhr.")
     if not await league_rules.current_version(db, league, season):
         problems.append(NO_RULES)
     stats = stats or await seat_stats(db, season)
