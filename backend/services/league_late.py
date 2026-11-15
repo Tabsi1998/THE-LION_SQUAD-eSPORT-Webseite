@@ -47,12 +47,14 @@ def extension_until(season: dict | None) -> datetime | None:
 
 
 def late_deadline(season: dict | None) -> datetime | None:
-    """Bis wann eine Nachmeldung höchstens geht: Start plus Frist, mit einer Verlängerung deren Ende. ``None``: kein Start."""
+    """Bis wann eine Nachmeldung höchstens geht: Start plus Frist; eine Verlängerung verlängert nur, sie verkürzt nie (Review
+    #2422: wird die Frist später länger als eine alte Verlängerung, gilt die Frist). ``None``: kein Start."""
     extended = extension_until(season)
-    if extended:
-        return extended
     start = aware((season or {}).get("start_date"))
-    return start + timedelta(days=late_days(season)) if start else None
+    regular = start + timedelta(days=late_days(season)) if start else None
+    if extended and regular:
+        return max(extended, regular)
+    return extended or regular
 
 
 def effective_closes(season: dict | None) -> datetime | None:

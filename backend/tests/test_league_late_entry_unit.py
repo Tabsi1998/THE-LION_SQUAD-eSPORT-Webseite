@@ -181,3 +181,11 @@ def test_the_second_leg_swaps_the_sides_of_the_existing_game():
     out = plan(staffel(weeks=6, legs=2), reg("L"), teams, games, NOW)
     against_x = [row for row in out["pairings"] if row["opponent_id"] == "X"]
     assert len(against_x) == 1 and against_x[0]["home_registration_id"] == "L"
+
+
+def test_an_old_extension_never_shortens_a_longer_deadline():
+    """Review #2422: Frist später auf 30 Tage, die alte Verlängerung lag davor - es gilt die Frist, begrenzt aufs Fensterende."""
+    row = season(late_registration_days=30, application_late_extension={"until": "2026-11-20T00:00:00+00:00", "reason": "Nachrücker"})
+    assert league_late.effective_closes_iso(row) == "2026-12-01T00:00:00+00:00"
+    short = season(application_closes_at="2026-11-25T00:00:00+00:00", application_late_extension={"until": "2026-12-10T00:00:00+00:00"})
+    assert league_late.effective_closes_iso(short) == "2026-11-25T00:00:00+00:00"

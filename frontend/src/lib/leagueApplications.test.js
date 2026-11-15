@@ -141,6 +141,10 @@ describe("Nachmeldefrist (#2422, Nr. 184)", () => {
     expect(effectiveCloses("2026-11-05T00:00:00+00:00", start, "", null).toISOString()).toBe("2026-11-05T00:00:00.000Z");
     expect(effectiveCloses(null, start, "", null)).toBeNull();
   });
+  test("eine alte Verlängerung verkürzt eine später verlängerte Frist nicht (Review #2422)", () => {
+    expect(effectiveCloses("2026-12-31T00:00:00+00:00", start, "30", "2026-11-20T00:00:00+00:00").toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    expect(effectiveCloses("2026-11-25T00:00:00+00:00", start, "", "2026-12-10T00:00:00+00:00").toISOString()).toBe("2026-11-25T00:00:00.000Z");
+  });
   test("der Hinweis nur, wenn die Frist früher schließt", () => {
     expect(lateCapLine("2026-12-31T00:00:00+00:00", start, "", null)).toBe("Die Anmeldung schließt am 15.11.2026, 01:00 Uhr, auch wenn das Fenster länger eingestellt ist.");
     expect(lateCapLine("2026-11-05T00:00:00+00:00", start, "", null)).toBe("");

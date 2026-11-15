@@ -71,7 +71,8 @@ export function afterStartLine(closesAt, startAt) {
 export const LATE_DAYS_DEFAULT = 14;
 
 /**
- * Das wirksame Ende der Anmeldung (#2422, Nr. 184): min(Ende des Fensters, Start + Frist), mit Verlängerung der Leitung deren Ende.
+ * Das wirksame Ende der Anmeldung (#2422, Nr. 184): min(Ende des Fensters, Start + Frist), mit Verlängerung der Leitung
+ * min(Fenster, max(Start + Frist, Verlängerung)).
  * Endet das Fenster vor dem Start, bleibt es beim Fenster. Gibt ein Date zurück oder null.
  */
 export function effectiveCloses(closesAt, startAt, days, extensionUntil) {
@@ -82,15 +83,20 @@ export function effectiveCloses(closesAt, startAt, days, extensionUntil) {
   if (!start || Number.isNaN(start.getTime()) || closes <= start) return closes;
   const parsed = days === "" || days == null ? LATE_DAYS_DEFAULT : Number(days);
   const span = Number.isFinite(parsed) && parsed >= 0 ? parsed : LATE_DAYS_DEFAULT;
-  const cap = extensionUntil ? asInstant(extensionUntil) : new Date(start.getTime() + span * 86400000);
-  return Number.isNaN(cap.getTime()) || closes <= cap ? closes : cap;
+  const regular = new Date(start.getTime() + span * 86400000);
+  // Eine Verlängerung verlängert nur, sie verkürzt nie (Review #2422): max(regulär, Verlängerung), begrenzt aufs Fensterende.
+  const extended = extensionUntil ? asInstant(extensionUntil) : null;
+  const cap = extended && !Number.isNaN(extended.getTime()) && extended > regular ? extended : regular;
+  return closes <= cap ? closes : cap;
 }
 
 /** Hinweis in der Verwaltung, wenn die Frist die Anmeldung früher schließt als das Fenster. */
 export function lateCapLine(closesAt, startAt, days, extensionUntil) {
   const effective = effectiveCloses(closesAt, startAt, days, extensionUntil);
   if (!effective || !closesAt || effective >= asInstant(closesAt)) return "";
-  return extensionUntil
+  // Nur wenn die Verlängerung wirklich das Ende setzt - sonst gilt die (längere) Frist.
+  const viaExtension = extensionUntil && asInstant(extensionUntil).getTime() === effective.getTime();
+  return viaExtension
     ? `Verlängert bis ${when(effective)}. Danach schließt die Anmeldung, auch wenn das Fenster länger eingestellt ist.`
     : `Die Anmeldung schließt am ${when(effective)}, auch wenn das Fenster länger eingestellt ist.`;
 }
