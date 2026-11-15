@@ -277,9 +277,9 @@ async def test_a_deliberately_open_migration_does_not_block_readiness(flow, fast
     assert await migrations.ensure_migrations(db) == []
     assert migrations.migration_status() | {"since": None} == {"state": "incomplete", "open": [1], "since": None}
     assert await _ready(flow) is True
-    # Die Bereit-Meldung nennt Zustand und Nummer der offenen Migration, sonst nichts dazu.
+    # Die Bereit-Meldung ist öffentlich: nur der Zustand, keine Nummern offener Migrationen.
     res = await flow.get("/api/health/ready")
-    assert res.json()["migrations"] == {"state": "incomplete", "open": [1]}
+    assert res.json()["migrations"] == {"state": "incomplete"}
 
 
 @pytest.mark.asyncio

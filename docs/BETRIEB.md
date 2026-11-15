@@ -90,8 +90,8 @@ mehrere Backends gegen dieselbe Datenbank starten oder ein Container mitten im L
    dann selbst nach, was noch offen ist. Bis dahin nimmt er keine Anfragen an. Im Protokoll steht alle 30 Sekunden
    „Ein anderer Start (…) migriert gerade – dieser wartet“.
 4. **Bereit.** `/api/health/ready` (und damit der Docker-Healthcheck über `/api/health`) meldet erst bereit, wenn
-   der Migrationslauf dieses Prozesses abgeschlossen ist (`checks.migrations`; unter `migrations` stehen Zustand
-   und Nummern bewusst offener Migrationen). Eine Migration, die bewusst offen
+   der Migrationslauf dieses Prozesses abgeschlossen ist (`checks.migrations`, dazu `migrations.state`; die
+   Antwort ist öffentlich, welche Migrationen offen sind, steht nur im Protokoll). Eine Migration, die bewusst offen
    bleibt (`MigrationIncomplete`, etwa eine Saison mit Fehler), hält den Start nicht auf. Sie steht als Fehler im
    Protokoll und läuft beim nächsten Start erneut.
 
