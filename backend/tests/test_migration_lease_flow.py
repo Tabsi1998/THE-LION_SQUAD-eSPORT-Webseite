@@ -373,8 +373,8 @@ async def test_after_a_missed_renewal_the_step_may_finish_within_the_grace(flow,
 
 
 @pytest.mark.asyncio
-async def test_a_migration_that_ignores_the_loss_is_cancelled_with_margin_before_expiry(flow, fast, monkeypatch,
-                                                                                         lost_at):
+async def test_a_migration_that_ignores_the_loss_is_cancelled_with_margin_before_expiry(
+        flow, fast, monkeypatch, lost_at):
     db = flow.db
     await _clean(db)
     monkeypatch.setattr(migrations, "GRACE_MARGIN_SECONDS", 0.05)
