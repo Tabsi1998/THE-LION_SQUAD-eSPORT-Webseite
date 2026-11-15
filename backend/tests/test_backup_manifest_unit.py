@@ -395,7 +395,7 @@ def test_restore_check_resolves_the_project_itself(tmp_path):
     (tmp_path / "config.json").write_text(json.dumps(config), encoding="utf-8")
     (stubs / "docker").write_text(f'#!/usr/bin/env bash\ncat "{(tmp_path / "config.json").as_posix()}"\n', encoding="utf-8", newline="\n")
     python = pathlib.Path(sys.executable).as_posix()
-    (stubs / "python3").write_text(f'#!/usr/bin/env bash\n"{python}" "$@" | tr -d \'\r\'\nexit "${{PIPESTATUS[0]}}"\n',
+    (stubs / "python3").write_text(f'#!/usr/bin/env bash\n"{python}" "$@" | tr -d \'\\r\'\nexit "${{PIPESTATUS[0]}}"\n',
                                    encoding="utf-8", newline="\n")
     for stub in stubs.iterdir():
         stub.chmod(0o755)
