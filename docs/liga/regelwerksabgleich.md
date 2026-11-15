@@ -140,7 +140,7 @@ Nicht vergebene Nummern gibt es keine; Nr. 33 ist durch 11c, Nr. 35 durch 68, Nr
 | --- | --- | --- | --- |
 | 34a | Empfänger je Belohnung einstellbar, Vorgabe Team und Spieler mit Einsatz | `league_rewards.py` (`recipients`, `reward_players`) · `test_league_rewards_flow.py` | umgesetzt, getestet |
 | 34b | „Alle Teilnehmer“ = regulär beendet, ohne Ausgeschiedene | `league_rewards.grant` (Zeilen ohne `exit`) · `test_league_rewards_flow.py` | umgesetzt, getestet |
-| 34c | 1 Banner, bis zu 3 Embleme/Medaillen neben dem Namen, Rest in der Vitrine | Banner (`featured_award_id`) und Titel (`featured_title_award_id`) · `test_awards_flow.py`, `test_league_rewards_flow.py` | teilweise: Banner und ein Titel wählbar, **drei Embleme neben dem Namen fehlen** |
+| 34c | 1 Banner, bis zu 3 Embleme/Medaillen neben dem Namen, Rest in der Vitrine | Banner (`featured_award_id`), Titel (`featured_title_award_id`) und bis zu drei Embleme (`featured_emblem_award_ids`, #2425) · `test_awards_flow.py`, `test_league_rewards_flow.py`, `test_league_trophies_flow.py`, `trophies.spec.js` | umgesetzt, getestet |
 | 34d | Keine XP, keine Erfolge | `kind: reward` zählt nirgends · `test_league_rewards_flow.py` | umgesetzt, getestet |
 
 ### Einrichtung
@@ -176,8 +176,8 @@ Nicht vergebene Nummern gibt es keine; Nr. 33 ist durch 11c, Nr. 35 durch 68, Nr
 | 56 | Ausrüstungs-Bibliothek je Spiel, Sperrliste je Season, je Modus und Aufsatz | `loadout_bans.py`, `game_equipment` · `test_game_equipment_flow.py`, `test_loadout_bans_flow.py` | umgesetzt, getestet |
 | 57 | Waffen in Phase C, vor dem Start | C.4 (#2218, PR #2272) | umgesetzt, getestet |
 | 58 | Belohnungsbild: Design hochladen, Textfelder, System beschriftet | `RewardArt.jsx` (Vorlage mit Beschriftung), `image_url` | teilweise: abgelöst durch 164 (Lionsquad-Vorlage plus eigenes Bild); frei gestaltete Textfelder fehlen |
-| 59 | Reiter „Trophäen“ an Team und Profil mit Karten, Links, Filtern | Reiter **Auszeichnungen** (`PublicProfilePage.jsx`), `RewardCollection` | teilweise: Sammlung je Season ohne Filter |
-| 60 | Rankingbanner: Live-Bild mit Platz und Bilanz, fester Link zum Einbinden | – | **fehlt** |
+| 59 | Reiter „Trophäen“ an Team und Profil mit Karten, Links, Filtern | Reiter **Trophäen** an Profil und Team (`TrophyCabinet.jsx`, `lib/trophies.js`, #2425) · `trophies.test.js`, `TrophyCabinet.test.jsx`, `trophies.spec.js` | umgesetzt, getestet |
+| 60 | Rankingbanner: Live-Bild mit Platz und Bilanz, fester Link zum Einbinden | `GET /api/leagues/{liga}/{season}/teams/{team}/banner.png` (`league_rank_banner.py`, #2425) · `test_league_trophies_flow.py`, `trophies.spec.js` | umgesetzt, getestet |
 | 61 | Co-Teams in laufenden Staffeln: nur eigenes Team und Zuständigkeit Kader | `team_routes.py`, `league_permissions.py` · `test_league_squad_rights_flow.py` | umgesetzt, getestet |
 | 62 | Termin im eigenen Spiel: zweite Person setzt | `league_schedule.py` · `test_league_own_match_schedule_flow.py` | umgesetzt, getestet |
 | 63 | Protestfrist 48 h ab Bestätigung, vorher Beanstandung | `league_procedures.kind_now` · `test_league_procedures_flow.py` | umgesetzt, getestet |

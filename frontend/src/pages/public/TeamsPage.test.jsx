@@ -1,10 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 
 // Team-Seite: Termine und letzte Spiele (#1191), „Einladen“ mit Link und QR-Code, Beitreten über den Link.
 // Erfundene Daten, keine echten Personen.
 
-const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback, resolveMediaUrl: (v) => v || "" }));
 const authState = { user: null, isAdmin: false };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
@@ -21,7 +21,7 @@ vi.mock("@/hooks/useTilt", () => ({ useTilt: () => null }));
 vi.mock("@/pages/user/profile/TeamsPanel", () => ({ TeamsPanel: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { default: TeamsPage } = await import("./TeamsPage");
+const { default: TeamsPage, teamTabFrom } = await import("./TeamsPage");
 
 const MEMBERS = [
   { id: "u-cap", username: "neonfalke", display_name: "NeonFalke" },
@@ -645,4 +645,99 @@ test("Team-Seite: das Team steht sofort, Level und Übersicht laden unabhängig;
   expect(await screen.findByTestId("team-level-panel")).toBeInTheDocument();
   expect(screen.queryByTestId("team-level-error")).toBeNull();
   expect(screen.queryByTestId("public-error-state")).toBeNull();
+});
+
+// Trophäen (#2425): eigener Reiter mit Vitrine und Filtern, bis zu drei Embleme neben dem Teamnamen, Rankingbanner zum Kopieren.
+const EMBLEM = {
+  id: "aw-emb", kind: "emblem", rank: 1, rank_label: "1. Platz", date: "2026-11-09", game: { name: "Probe Shooter" },
+  tournament: { id: "s-1", slug: "probe-a", title: "Probe-Liga · Season 1" }, league: { division_label: "Liga 1", staffel: "A" },
+  reward: { id: "aw-emb", kind: "emblem", kind_label: "Emblem", name: "Meister-Emblem", art: { season: "Season 1", place: "1. Platz", metal: "gold" } },
+};
+const CUP = { id: "aw-cup", kind: "trophy", rank: 2, rank_label: "2. Platz", date: "2025-05-03", game: { name: "Rennspiel" },
+  tournament: { id: "tt-9", slug: "fruehjahrs-cup", title: "Frühjahrs-Cup" }, reward: null };
+const BANNERS = [{ key: "s1:sq-1", league: "Probe-Liga", season: "Season 1", division: "Liga 1", staffel: "A", name: "Lions Rocket · A",
+  image_url: "/api/leagues/probe-liga/season-1/teams/sq-1/banner.png", page_url: "/liga/probe-liga/season-1" }];
+
+test("Trophäen: eigener Reiter, Embleme neben dem Namen, die Teamleitung wählt bis zu drei", async () => {
+  serve({ ...TEAM, awards: [EMBLEM, CUP], featured_emblems: [EMBLEM] });
+  apiMock.put.mockResolvedValue({ data: { ok: true, featured_emblems: [] } });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-featured-emblems")).toHaveAttribute("aria-label", "Embleme: Meister-Emblem");
+  expect(screen.getByTestId("team-tab-trophies")).toHaveTextContent("Trophäen (2)");
+  expect(screen.queryByTestId("team-trophies")).toBeNull();
+  fireEvent.click(screen.getByTestId("team-tab-trophies"));
+  expect(screen.getByTestId("team-trophies")).toHaveTextContent("Frühjahrs-Cup");
+  // Die Übersicht ist nur versteckt, nicht ausgehängt.
+  expect(screen.getByTestId("team-overview")).toHaveClass("hidden");
+  expect(screen.getByTestId("trophy-emblem-aw-emb")).toHaveTextContent("Emblem 1 ✓");
+  fireEvent.click(screen.getByTestId("trophy-emblem-aw-emb"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/teams/t-1/awards/emblems", { award_ids: [] }));
+});
+
+test("Trophäen für Gäste: Reiter nur mit Inhalt, ohne Auswahl; über ?tab=trophaeen direkt", async () => {
+  authState.user = null;
+  serve({ ...TEAM, can_manage: false, is_member: false, awards: [CUP] });
+  const { unmount } = renderAt("/teams/t-1?tab=trophaeen");
+  expect(await screen.findByTestId("team-trophies")).toHaveTextContent("2. Platz");
+  expect(screen.queryByTestId("trophy-banner-aw-cup")).toBeNull();
+  unmount();
+  serve({ ...TEAM, can_manage: false, is_member: false, awards: [] });
+  renderAt("/teams/t-1?tab=trophaeen");
+  expect(await screen.findByTestId("team-upcoming")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-tabs")).toBeNull();
+});
+
+test("Rankingbanner: Vorschau und „Rankingbanner kopieren“ mit der vollen Adresse", async () => {
+  const writeText = vi.fn().mockResolvedValue();
+  Object.defineProperty(window.navigator, "clipboard", { value: { writeText }, configurable: true });
+  serve({ ...TEAM, rank_banners: BANNERS });
+  renderAt("/teams/t-1");
+  const box = await screen.findByTestId("team-rank-banners");
+  expect(box).toHaveTextContent("Probe-Liga · Season 1");
+  expect(within(box).getByRole("img")).toHaveAttribute("src", `${window.location.origin}/api/leagues/probe-liga/season-1/teams/sq-1/banner.png`);
+  fireEvent.click(screen.getByTestId("team-rank-banners-s1:sq-1-copy-button"));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/api/leagues/probe-liga/season-1/teams/sq-1/banner.png`));
+  expect(await screen.findByText("Kopiert")).toBeInTheDocument();
+});
+
+test("Reiter aus der Adresse wie im Profil; #chat führt immer in die Übersicht", () => {
+  expect(["?tab=trophaeen", "?tab=trophies", "?tab=awards"].map((search) => teamTabFrom(search))).toEqual(["trophies", "trophies", "trophies"]);
+  expect(teamTabFrom("?tab=unbekannt")).toBe("overview");
+  expect(teamTabFrom("?tab=trophaeen", "#chat")).toBe("overview");
+  expect(teamTabFrom("", "")).toBe("overview");
+});
+
+test("Reiterwechsel: ein ungesendeter Entwurf im Team-Chat bleibt stehen", async () => {
+  serve({ ...TEAM, awards: [CUP] });
+  renderAt("/teams/t-1");
+  await screen.findByTestId("team-chat");
+  const box = screen.getByPlaceholderText("Nachricht schreiben, mit @username erwähnen...");
+  fireEvent.change(box, { target: { value: "Training heute um acht?" } });
+  fireEvent.click(screen.getByTestId("team-tab-trophies"));
+  expect(screen.getByTestId("team-overview")).toHaveClass("hidden");
+  fireEvent.click(screen.getByTestId("team-tab-overview"));
+  expect(screen.getByTestId("team-overview")).not.toHaveClass("hidden");
+  expect(screen.getByPlaceholderText("Nachricht schreiben, mit @username erwähnen...")).toHaveValue("Training heute um acht?");
+});
+
+test("Link zum Team-Chat (#chat) zeigt die Übersicht, auch mit ?tab=trophaeen", async () => {
+  serve({ ...TEAM, awards: [CUP] });
+  renderAt("/teams/t-1?tab=trophaeen#chat");
+  expect(await screen.findByTestId("team-chat")).toBeVisible();
+  expect(screen.queryByTestId("team-trophies")).toBeNull();
+});
+
+test("Embleme: ein Doppelklick speichert nur einmal", async () => {
+  serve({ ...TEAM, awards: [EMBLEM, CUP], featured_emblems: [] });
+  let finish;
+  apiMock.put.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  renderAt("/teams/t-1?tab=trophaeen");
+  const button = await screen.findByTestId("trophy-emblem-aw-emb");
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(apiMock.put).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(screen.getByTestId("trophy-emblem-aw-emb")).toBeDisabled());
+  await act(async () => finish({ data: { ok: true, featured_emblems: [EMBLEM] } }));
+  await waitFor(() => expect(screen.getByTestId("trophy-emblem-aw-emb")).not.toBeDisabled());
+  expect(apiMock.put).toHaveBeenCalledTimes(1);
 });

@@ -755,6 +755,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         })
     total_points = sum(b.get("points", 0) for b in badges if not b.get("is_negative"))
     achievement_level = await xp.view(user_id)
+    from services.awards import EMBLEM_FIELD, featured_emblems
     # Tournament participation (only if public)
     tournaments = []
     f1_bests = []
@@ -893,6 +894,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
         # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Person gewählt hat.
         "featured_title": next((award for award in awards if award["id"] == u.get("featured_title_award_id")), None),
+        # Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur aus den öffentlichen Auszeichnungen oben - nie Ruhendes.
+        "featured_emblems": featured_emblems(awards, u.get(EMBLEM_FIELD)),
     }
 
 

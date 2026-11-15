@@ -264,7 +264,7 @@ test("dieselben Reiter in derselben Reihenfolge wie in der App; „Erfolge“ st
   const tabs = screen.getAllByTestId(/^profile-tab-/).map((node) => node.textContent.replace(/ \(\d+\)$/, ""));
   // Andere sehen nur Reiter mit Inhalt (#1268): Paula hat keine Auszeichnungen und keine Ehrungen.
   expect(tabs).toEqual(["Übersicht", "Erfolge", "Referenzen", "Teams"]);
-  expect(profileTabs({ own: true, clubMember: true }).map(([, label]) => label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  expect(profileTabs({ own: true, clubMember: true }).map(([, label]) => label)).toEqual(["Übersicht", "Erfolge", "Trophäen", "Referenzen", "Teams", "Ehrungen"]);
   expect(screen.getByTestId("profile-stat-badges")).toHaveTextContent("Erfolge");
   expect(screen.queryByTestId("profile-private-box")).toBeNull();
   expect(screen.queryByTestId("profile-as-others")).toBeNull();
@@ -368,7 +368,7 @@ test("eigenes Profil: leere Reiter bleiben, ohne „(0)“, mit einem Satz und L
     renderPage();
     await screen.findByTestId("profile-private-box");
     expect(screen.getByTestId("profile-tab-teams")).toHaveTextContent(/^Teams$/);
-    expect(screen.getByTestId("profile-tab-awards")).toHaveTextContent(/^Auszeichnungen$/);
+    expect(screen.getByTestId("profile-tab-awards")).toHaveTextContent(/^Trophäen$/);
     fireEvent.click(screen.getByTestId("profile-tab-teams"));
     const empty = screen.getByTestId("profile-teams-empty");
     expect(empty).toHaveTextContent("Noch kein Team – Teams entdecken");

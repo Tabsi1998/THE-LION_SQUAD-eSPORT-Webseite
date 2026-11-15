@@ -89,8 +89,8 @@ async def test_teams_of_a_staffel_carry_the_logo_of_their_team_page(flow):
     logos = {row["team_id"]: row["logo_url"] for row in body["teams"]}
     assert logos == {"team-1": "/api/static/uploads/probe-1.png", "team-2": "/api/static/uploads/probe-2.png",
                      "team-3": "/api/static/uploads/probe-3.png", "team-4": None}
-    # Mehr als Name, Teamseite und Bild steht dort nicht.
-    assert set(body["teams"][0]) == {"id", "display_name", "team_id", "squad_name", "logo_url"}
+    # Mehr als Name, Teamseite, Bild und der Link zum Rankingbanner (#2425, ohne Personen) steht dort nicht.
+    assert set(body["teams"][0]) == {"id", "display_name", "team_id", "squad_name", "logo_url", "rank_banner_url"}
 
 
 @pytest.mark.asyncio
