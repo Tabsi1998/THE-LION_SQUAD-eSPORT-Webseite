@@ -17,7 +17,7 @@
           "id": "anmeldung-starten",
           "titel": "Anmeldung starten",
           "text": "Öffne die Ligaseite. Ist die Anmeldung offen, tippe auf Mit Co-Team anmelden.",
-          "hinweis": "Anmelden dürfen nur Captain und Vertreter eines Co-Teams. Fehlen beide, trägt die Teamleitung zuerst einen Captain ein.",
+          "hinweis": "Anmelden dürfen nur Captain und Vertreter eines Co-Teams. Fehlen beide, trägt die Teamleitung zuerst einen Captain ein. Läuft die Anmeldung nach dem Season-Start weiter, geht es genauso.",
           "bild": true,
           "link": { "to": "/liga", "label": "Zu den Ligen" }
         },
@@ -212,6 +212,48 @@
           "text": "Stimmt etwas nicht? Tippe auf Stimmt nicht oder Problem melden. Wähle den Grund, schreib kurz dazu und häng bei Bedarf ein Foto an. Die Leitung entscheidet.",
           "hinweis": "Einen eigenen Knopf „Protest“ gibt es nicht. Bis wann es geht, steht im Formular.",
           "bild": true
+        },
+        {
+          "id": "einspruch",
+          "titel": "Einspruch einlegen",
+          "text": "Passt euch eine Entscheidung der Liga-Leitung nicht? Tippe am Verfahren auf Einspruch einlegen und begründe ihn.",
+          "hinweis": "Einspruch geht einmal, innerhalb der Frist. Es entscheidet eine andere Person. Bis dahin gilt die Entscheidung weiter.",
+          "bild": false
+        },
+        {
+          "id": "strafen",
+          "titel": "Strafen im Blick",
+          "text": "Verhängt die Liga-Leitung eine Strafe, bekommst du eine Nachricht. Unter Meine Strafen steht sie mit Grund und Frist.",
+          "hinweis": "Eine gesperrte Person ist beim Check-in grau. Die Sperre gilt auch während eines Einspruchs.",
+          "link": { "to": "/my/penalties", "label": "Meine Strafen" },
+          "bild": false
+        }
+      ]
+    },
+    {
+      "id": "saisonende",
+      "titel": "Am Ende der Season",
+      "schritte": [
+        {
+          "id": "abschluss",
+          "titel": "Endstand",
+          "text": "Sind alle Spiele entschieden, schließt die Liga-Leitung die Staffel ab. Dann steht der Endstand fest.",
+          "hinweis": "Protest und Einspruch gehören vor den Abschluss. Danach ändern sich Plätze und Punkte nicht mehr.",
+          "bild": false
+        },
+        {
+          "id": "belohnungen",
+          "titel": "Belohnungen",
+          "text": "Mit dem Abschluss vergibt die Liga ihre Belohnungen nach eurem Platz. Ihr seht sie an der Teamseite und im Profil.",
+          "hinweis": "Spieler-Belohnungen bekommt, wer mindestens ein Spiel gespielt hat. Kampflose Spiele zählen nicht.",
+          "bild": false
+        },
+        {
+          "id": "neue-season",
+          "titel": "Neue Season",
+          "text": "Legt die Liga-Leitung die nächste Season an, ist euer Co-Team automatisch dabei. Wollt ihr nicht, tippt auf Abmelden.",
+          "hinweis": "Abmelden geht bis zum Start der Season. Gibt es eine neue Fassung des Regelwerks, stimmt ihr vor dem ersten Spiel zu.",
+          "bild": false
         }
       ]
     }

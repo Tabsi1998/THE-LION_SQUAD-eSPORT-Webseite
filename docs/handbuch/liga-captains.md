@@ -1,10 +1,11 @@
 # Liga: Spickzettel für Captains
 
-Eine Seite für **Captain und Vertreter** eines Co-Teams in der CoD-Liga (Season 1 ab Di 10.11.2026). Alles läuft
+Eine Seite für **Captain und Vertreter** eines Co-Teams in einer Liga, etwa der CoD-Liga. Fristen und Zahlen hier sind die
+Vorgaben – was in eurer Season gilt, steht im **Regelwerk** auf der Ligaseite und auf der Matchseite. Alles läuft
 auf der **Matchseite** eures Spiels: Ligaseite → **Spieltage** → euer Spiel, oder über die Benachrichtigung. Ohne Captain und
 Vertreter macht das die Teamleitung. Melden, Bestätigen und Nachtragen ausführlich:
 [Turniere, 3.16 Ergebnis je Map melden](turniere.md#316-liga-ergebnis-je-map-melden-für-captains); für die
-Turnierleitung: [Liga leiten](liga.md). Zum Verschicken an Captains gibt es dieselben Schritte kürzer und mit Bildern
+Liga-Leitung: [Liga leiten](liga.md). Zum Verschicken an Captains gibt es dieselben Schritte kürzer und mit Bildern
 auf der Website unter `/hilfe/liga-captains` ([Hilfe für Spieler und Captains](hilfe.md)).
 
 ## Anmelden
@@ -36,15 +37,21 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 
 <img src="../assets/liga/liga-angemeldet-390.png" alt="Anmeldung auf der Ligaseite am Handy: ein Co-Team Angemeldet mit Staffel, eines Angemeldet – Zuteilung folgt, eines Eingereicht mit dem Satz, dass die Liga-Leitung prüft" width="300">
 
+**Nach dem Season-Start anmelden:** Läuft das Anmeldefenster über den Beginn der Season hinaus, steht auf der Ligaseite
+„Anmeldung läuft nach Season-Start weiter (bis …)“, und ihr könnt wie oben einreichen. Teilt euch die Liga-Leitung einer
+laufenden Staffel zu, steht ihr mit 0 Spielen in der Tabelle: Der Spielplan bleibt, wie er beim Start war, Spiele bekommt ihr
+nicht von selbst. Wie und wann ihr spielt, sagt euch die Liga-Leitung.
+
 **Zurückziehen** geht, bis die Liga-Leitung das Co-Team einer Staffel zugeteilt hat. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange der Spielplan der Staffel noch nicht steht. Danach klärt ihr den Austritt mit der Liga-Leitung.
 
 ## Die Woche
 
-- Eine **Spielwoche** geht von **Dienstag bis Montag**, je Woche ein Spiel.
-- **Weihnachtspause 21.12.–3.1.:** keine Spiele und keine Termine. Spieltag 6 endet am So 20.12., Spieltag 7 ist in
-  der Woche ab Di 5.1. Der **Mo 4.1.** gehört noch zur gesperrten Woche – Terminvorschläge erst ab **Di 5.1.**
-- In der Pause **ruhen Termin-, Bestätigungs- und Nachtragsfristen**, das **Einspruchsfenster nicht**: Einspruch
-  also gleich einlegen, auch kurz vor oder in der Pause.
+- Eine **Spielwoche** beginnt am Wochentag des Season-Starts, je Woche ein Spiel (Vorgabe 7 Tage, etwa Dienstag bis
+  Montag). Spielwoche 3 ist der dritte Spieltag. Kalender und Pausen stehen auf der Ligaseite unter **Spieltage**.
+- **Sperrzeiten** (etwa eine Weihnachtspause): keine Spiele und keine Termine. Auch der letzte Tag einer Woche, die
+  größtenteils in der Pause liegt, ist gesperrt – Terminvorschläge wieder ab der ersten freien Spielwoche.
+- In Sperrzeiten **ruhen die Fristen**: Termin-Antwort, Bestätigen, Teilnehmerliste nachtragen, Protest, Stellungnahme
+  und Einspruch laufen nach der Pause weiter.
 
 ## Was ihr tut
 
@@ -64,7 +71,7 @@ Den Stand siehst du auf der Ligaseite und unter **Teams → Deine Teams**:
 | **Melden:** erst, wenn **beide Seiten eingecheckt** sind – sonst sagt die Matchseite, wer fehlt (auch in der App steht der Satz statt des Formulars). Hat niemand auf **Spiel starten** getippt, gilt das Spiel mit eurer Meldung als begonnen. Dann je Map Modus, **Map aus dem Pool** und den **Endstand** der Map – den **Sieger** ergeben die Punkte, antippen müsst ihr ihn nur bei Gleichstand (Endstand Pflicht; an jeder Map steht, wie sie gewertet wird, z. B. „bis 250 Punkte“ oder „6 Runden, höchstens 11“ – ein unpassender Endstand wird gleich angezeigt) – bis die Serie entschieden ist. Beim Bestätigen gelten die Punkte der ersten Meldung. Dieselbe Map im selben Modus gibt es je Serie nur einmal. Am Schluss einmal ankreuzen, **wer bei euch gespielt hat**: mindestens 3, bei Wechseln auch 6 und mehr, nur aus eurem Kader. Wer nicht spielen darf, steht grau mit Grund da. | Matchseite, **nur im Web** (die App lehnt eine erste Meldung ab) | nach dem Spiel |
 | **Bestätigen:** im Web ankreuzen, wer bei euch gespielt hat, und **Stimmt**; in der App nur bestätigen. | Web oder App | sonst gilt die Meldung nach **48 Stunden** |
 | **Teilnehmerliste nachtragen**, wenn „Teilnehmerliste fehlt noch“ dasteht (nach App-Bestätigung oder 48-Stunden-Regel). Das Ergebnis gilt schon. Wer nicht auf der Liste steht, zählt nicht als Einsatz. Niemand spielt am selben Spieltag für zwei Teams. | Matchseite, Web; Startseite → **Offene Aktionen** | bis **48 Stunden ab der Bestätigung**, danach entscheidet die Liga-Leitung: Die Matchseite sagt das und hat den Knopf **@leitung im Matchchat** |
-| **Spielberechtigung im Blick:** Unter eurem Co-Team steht, wer spielen darf und was fehlt (Geburtsdatum, Spiel-ID, Plattform, Wartezeit). Neue Spieler warten nach Spieltag 1 sieben Tage. Wechsel aus einem anderen Co-Team der Season gehen nur per Transfer, den die Teamleitung beantragt; danach wartet die Person immer sieben Tage, auch vor Spieltag 1. | **Teams → Deine Teams** | vor dem Spiel |
+| **Spielberechtigung im Blick:** Unter eurem Co-Team steht, wer spielen darf und was fehlt (Geburtsdatum, Spiel-ID, Plattform, Wartezeit). Neue Spieler warten nach Spieltag 1 eine Wartezeit (Vorgabe sieben Tage). Wechsel aus einem anderen Co-Team der Season gehen nur per Transfer, den die Teamleitung beantragt; danach wartet die Person immer, auch vor Spieltag 1. | **Teams → Deine Teams** | vor dem Spiel |
 | **Beanstandung oder Protest:** **Stimmt nicht** bzw. **Problem melden**. Die Art ergibt sich von selbst: vor der Bestätigung eine **Beanstandung** (das Spiel ruht), danach ein **Protest**. Grund antippen, begründen (mindestens zehn Zeichen), dann Nachweise hinzufügen. Nicht einfach mit anderen Maps bestätigen. Je Seite läuft ein Verfahren; ihr ergänzt es, statt ein zweites zu eröffnen. | Matchseite, Web | Beanstandung bis zur Bestätigung, Protest **48 Stunden ab der Bestätigung** (ruht in Sperrzeiten); später Matchchat mit **@leitung** |
 | **Stellung nehmen**, wenn die Gegenseite ein Verfahren eröffnet hat: Ihr seht Grund und Begründung und schreibt eure Sicht, auf Wunsch mit Nachweisen. | Matchseite, Karte des Verfahrens | **48 Stunden** ab der Benachrichtigung (ruht in Sperrzeiten); die Leitung kann verlängern |
 | **Einspruch** gegen die Entscheidung, eine Wertung kampflos oder eine Korrektur: Knopf **Einspruch einlegen**, einmal, mit Begründung. Es entscheidet eine andere Person, endgültig. | Matchseite, Karte des Verfahrens | **48 Stunden** ab der Entscheidung |
@@ -100,13 +107,13 @@ Gegenvorschlag gilt ebenfalls für alle. **Lehnst du in der App nur einen Termin
 72-h-Regel kann dann noch greifen.** Alle auf einmal ablehnen geht im Web mit **Alle ablehnen**. Mehrere Termine auf
 einmal vorschlagen geht nur im Web.
 
-Die Turnierleitung entscheidet einen Einspruch und korrigiert das Ergebnis; beide Seiten bekommen Bescheid. Ändert sie
+Die Liga-Leitung entscheidet einen Einspruch und korrigiert das Ergebnis; beide Seiten bekommen Bescheid. Ändert sie
 Termin oder Best of eures Spiels, bekommt ihr ebenfalls eine Nachricht.
 
 **Gegner nicht da?** Checkt selbst ein – fehlt die Gegenseite nach dem Fenster, bekommt die Liga-Leitung von selbst den
 Vorschlag „Nicht erschienen?“ und entscheidet; gewertet wird nie automatisch. Dazu gern im Matchchat mit **@leitung**.
 Eine kampflose Niederlage steht als Teamstrafe bei Captain, Vertreter und der Leitung des Hauptteams unter **Meine
-Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und die Turnierleitung.
+Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und die Liga-Leitung.
 
 ## Erinnerungen
 
@@ -125,12 +132,14 @@ das Thema **Match-Erinnerungen** ab: auf der Website **Benutzermenü → Einstel
 
 ## Tabelle
 
-- **Punkte:** Sieg 3, Niederlage 0, kein Remis. Ein **kampfloser Sieg** zählt die Maps des Best of (BO3 2:0) und steht
-  in der Tabelle als „kampflos“. Sind **beide nicht erschienen**, verlieren beide ohne Punkte und Maps; die Leitung kann
-  das Spiel neu ansetzen.
+- **Punkte:** Je Season entweder **Sieg, Remis, Niederlage** (Vorgabe Sieg 3, Niederlage 0, kein Remis) oder **Punkte nach
+  gewonnenen Maps** (3:2 ergibt 3 und 2 Punkte). Ein **kampfloser Sieg** zählt die Maps, die zum Sieg nötig sind (BO5 3:0),
+  und steht in der Tabelle als „kampflos“. Sind **beide nicht erschienen**, verlieren beide ohne Punkte und Maps; die Leitung
+  kann das Spiel neu ansetzen.
 - **Punktgleich?** Zuerst der **direkte Vergleich** (bei drei und mehr Teams eine Mini-Tabelle nur aus euren Spielen
-  untereinander – nur, wenn die alle gespielt sind), dann Map-Differenz und gewonnene Maps. Stehen Teams danach in allem gleich, teilen sie sich den Platz,
-  bis die Liga-Leitung mit Grund entscheidet. Unter eurem Namen steht klein, was entschied.
+  untereinander – nur, wenn die alle gespielt sind), dann Map-Differenz und gewonnene Maps; mit Punkten nach Maps zählen
+  vorher die **Siege**. Stehen Teams danach in allem gleich, teilen sie sich den Platz, bis die Liga-Leitung mit Grund
+  entscheidet. Unter eurem Namen steht klein, was entschied.
 - **Steigt ein Team aus** (Austritt, Auflösung, Disqualifikation), zählen **alle** seine Spiele für die Gegner, auch schon
   gespielte. Das echte Ergebnis bleibt sichtbar, das Team steht am Tabellenende.
 
@@ -232,7 +241,7 @@ Check-in, kein Start und keine erste Ergebnismeldung** – Bestätigen und Nacht
   der Liga-Leitung – auch wer aus einem anderen Co-Team wechselt. Wer nur kurz draußen war und zurückkommt, nicht.
   Fehlt die ID oder wartet jemand auf die Freigabe, bekommen er und ihr eine Nachricht.
 - **Lobby:** Auf der Matchseite steht unter **Activision-ID für die Lobby** die ID jedes Spielers beider Seiten – nur
-  für euch, den Gegner und die Turnierleitung.
+  für euch, den Gegner und die Liga-Leitung.
 
 ## Euer Co-Team und eure Rolle
 
@@ -242,14 +251,14 @@ Check-in, kein Start und keine erste Ergebnismeldung** – Bestätigen und Nacht
   abgeben**. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu; bis dahin handelt der
   andere (Captain oder Vertreter), ohne beide die Teamleitung. Erst ohne Rolle lässt sich das Team verlassen.
 - **Kader zu klein:** Geht jemand und der Kader fällt unter den Mindestkader der Staffel, bekommen ihr und die
-  Turnierleitung eine Warnung. Auf der Startseite steht **Kader auffüllen**, bis er wieder reicht. Auffüllen kann nur die
+  Liga-Leitung eine Warnung. Auf der Startseite steht **Kader auffüllen**, bis er wieder reicht. Auffüllen kann nur die
   Teamleitung – sagt ihr Bescheid.
 - **Wer nicht aufstellbar ist:** Ein gesperrtes Konto lässt sich nicht aufstellen und zählt nicht als Captain oder
   Vertreter; ohne beide handelt die Teamleitung. Dieselbe Person spielt nie auf beiden Seiten eines Spiels.
 - **In der App** gibt es Captain und Vertreter noch nicht – meldet sie beim Kader-Ändern „… bitte erst die Rolle neu
   vergeben“, das auf der Website erledigen.
-- **Abmelden** einer Staffel geht nicht selbst („Austritt nur über die Turnierleitung“) – im Matchchat oder direkt bei
-  der Turnierleitung melden.
+- **Abmelden** einer laufenden Staffel geht nicht selbst („Austritt nur über die Turnierleitung“ – gemeint ist die
+  Liga-Leitung) – im Matchchat mit **@leitung** oder direkt bei der Liga-Leitung melden.
 - **Angaben ändern** auf der Staffel geht nur für den Discord-Kontakt: Das dürfen Captain und Vertreter, ohne beide die
   Teamleitung. Name und Spiel-ID stehen je Season im Liga-Kader, ändern kann sie nur die Liga-Leitung.
 - **Konto löschen** geht erst, wenn die Rolle abgegeben ist; **Meine Daten** nennt den Weg.
