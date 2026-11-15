@@ -37,7 +37,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from seed_abnahme_liga import guard_environment  # noqa: E402
+from seed_abnahme_liga import consent_versions, guard_environment  # noqa: E402
 
 G1_DB_PREFIX = "tls_abnahme_g1"
 DOMAIN = "abnahme.lionsquad.at"
@@ -107,8 +107,8 @@ async def upsert_user(db, run: str, key: str, display_name: str, role: str, pass
     email = f"g1-{run}-{key}@{DOMAIN}"
     doc = {
         "id": f"g1-{run}-{key}", "email": email, "username": f"g1{run}{key}".replace("-", ""), "display_name": display_name,
-        "role": role, "is_active": True, "email_verified": True, "privacy_policy_version": "2026-08-26",
-        "terms_version": "2026-08-26", "accepted_privacy": True, "accepted_terms": True, "consent_required": False,
+        "role": role, "is_active": True, "email_verified": True, **consent_versions(),
+        "accepted_privacy": True, "accepted_terms": True, "consent_required": False,
         "consent_updated_at": stamp, "created_at": stamp, "updated_at": stamp, **password_fields(password),
         # Mindestalter neuer Seasons (#2204) - erfundenes Datum. Öffentliches Profil für die Profil-Prüfung (F.4).
         "birth_date": "1990-03-03", "privacy_public_profile": True,
