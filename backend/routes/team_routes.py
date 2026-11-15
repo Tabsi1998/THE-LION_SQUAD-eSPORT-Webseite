@@ -671,8 +671,11 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     from services.awards import EMBLEM_FIELD, featured_emblems
     out["featured_emblems"] = featured_emblems(out["awards"], team.get(EMBLEM_FIELD))
     out.pop(EMBLEM_FIELD, None)
-    # Season-Historie (F.2, #1627): je abgeschlossener Liga-Staffel Liga N, Platz, Meister - nur Seasons, die die Person sieht.
+    # Rankingbanner (Nr. 60, #2425): je öffentlicher Season, in der das Team spielt, der feste Bild-Link - ohne Personen.
     from routes.tournament_common import tournament_hidden_reason
+    from services.league_rank_banner import entries_for_team
+    out["rank_banners"] = await entries_for_team(db, team_id, hidden=tournament_hidden_reason)
+    # Season-Historie (F.2, #1627): je abgeschlossener Liga-Staffel Liga N, Platz, Meister - nur Seasons, die die Person sieht.
     from services.league_history import for_team
     out["league_history"] = await for_team(db, team_id, user, hidden=tournament_hidden_reason)
     # Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N - nach derselben Sichtbarkeit wie die Ligaseite.
