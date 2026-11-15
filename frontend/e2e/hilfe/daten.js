@@ -51,6 +51,25 @@ const PLAYER = {
   city: "Probehausen", country: "AT", privacy_public_profile: true, consent_required: false, birth_date: "", main_platforms: ["PC"],
   game_ids: { "probe-hauptspiel": { activision_id: "NeonFalke#1234567", platform: "PC" } }, updated_at: "2026-10-01T10:00:00.000000+00:00",
 };
+// Benachrichtigungen (#1204): Stufen wie in backend/services/notification_preferences.py.
+const NOTIFY_TOPICS = ["match_reminders", "tournament_updates", "prize_updates", "achievements", "billing_updates",
+  "membership_updates", "community_messages", "news_events", "club_internal", "helper_shifts"];
+const notifyModes = (pushed) => Object.fromEntries(NOTIFY_TOPICS.map((topic) => [topic, pushed.includes(topic) ? "push" : "app"]));
+const NOTIFICATION_SETTINGS = {
+  discord: { linked: false },
+  topics: NOTIFY_TOPICS,
+  levels: [
+    { key: "all", label: "Alles", description: "Jedes Thema per Push – nichts verpasst.", modes: notifyModes(NOTIFY_TOPICS) },
+    { key: "important", label: "Wichtiges", description: "Spiele, Turniere, Rechnungen, Mitgliedschaft, Nachrichten an dich und Helferdienste per Push. Der Rest liegt in der Glocke.",
+      modes: notifyModes(["match_reminders", "tournament_updates", "billing_updates", "membership_updates", "community_messages", "helper_shifts"]) },
+    { key: "few", label: "Wenig", description: "Nur Spiele und Aufrufe sowie Rechnungen per Push. Alles andere liegt in der Glocke.", modes: notifyModes(["match_reminders", "billing_updates"]) },
+  ],
+  quiet_hours_exceptions: [
+    "Aufruf zu deinem Spiel und „Match startet jetzt“",
+    "Liga: Check-in offen und Veto – ihr seid am Zug, für dein eigenes Spiel",
+    "Für die Turnierleitung: „Braucht Aufmerksamkeit“, solange dein Turnier läuft",
+  ],
+};
 const GAMES = [{
   id: "g1", slug: "probe-shooter", name: "Probe Shooter", identity_game_slug: "probe-hauptspiel", identity_game_name: "Probe Shooter",
   effective_player_id_fields: [
@@ -263,5 +282,5 @@ const BRACKET_CUP = { id: "t9", slug: "probe-cup", title: "Probe Cup", status: "
 module.exports = {
   BLOCK, BRACKET, BRACKET_CUP, CAPTAIN, CONFIRM_PAGE, CUP, CUP_CHECKIN, DUEL_CONFIRM, DUEL_REPORT, ELIGIBILITY, GAMES, INCIDENT_HOLD, INCIDENT_INFO, LEAD, LEAGUE, MATCH_BASE,
   MATCH_FIXED, MATCH_PROPOSALS, PROOFS, SIDES, incidentPage, incidentRow,
-  MATE, MATE2, MEMBERS, MINE, MINE_SUBMITTED, MY_REG, PLAYER, REPORT_PAGE, SEASON_VIEW, SPIELER, SQUAD, TEAM, TEAM_GAMES, checkinPage, readyPage, serve,
+  MATE, MATE2, MEMBERS, MINE, MINE_SUBMITTED, MY_REG, NOTIFICATION_SETTINGS, PLAYER, REPORT_PAGE, SEASON_VIEW, SPIELER, SQUAD, TEAM, TEAM_GAMES, checkinPage, readyPage, serve,
 };

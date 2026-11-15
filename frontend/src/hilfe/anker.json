@@ -8,7 +8,11 @@
     "geburtsdatum": "Geburtsdatum eintragen",
     "plattform": "Plattform wählen",
     "spiel-ids": "Spiel-IDs eintragen",
-    "liga-hinweis": "Fehlt noch etwas für die Liga?"
+    "liga-hinweis": "Fehlt noch etwas für die Liga?",
+    "stufe": "Stufe wählen",
+    "themen": "Themen einzeln stellen",
+    "ruhezeit": "Ruhezeit einschalten",
+    "weitere-wege": "E-Mail und Discord"
   },
   "liga-captains": {
     "anmeldung-starten": "Anmeldung starten",

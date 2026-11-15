@@ -3,7 +3,7 @@
   "titel": "Konto und Profil",
   "kurz": "Konto anlegen, Profil einrichten, Geburtsdatum, Plattform und Spiel-IDs wie die Activision-ID eintragen.",
   "zielgruppe": "Für alle Spieler",
-  "suchbegriffe": ["registrieren", "anmelden", "account", "einstellungen", "activision", "id", "gamertag", "alter", "playstation", "xbox", "pc"],
+  "suchbegriffe": ["registrieren", "anmelden", "account", "einstellungen", "activision", "id", "gamertag", "alter", "playstation", "xbox", "pc", "benachrichtigungen", "push", "ruhezeit", "nachts"],
   "abschnitte": [
     {
       "id": "konto-anlegen",
@@ -81,6 +81,40 @@
           "hinweis": "Für die Liga gilt die ID, die bei der Anmeldung festgehalten wurde. Änderst du sie später, gibt die Liga-Leitung die neue frei.",
           "bild": true,
           "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+        }
+      ]
+    },
+    {
+      "id": "benachrichtigungen",
+      "titel": "Benachrichtigungen",
+      "schritte": [
+        {
+          "id": "stufe",
+          "titel": "Stufe wählen",
+          "text": "Öffne Benachrichtigungen. Tippe oben eine Stufe an: Alles, Wichtiges oder Wenig. Die Stufe stellt alle Themen auf einmal.",
+          "hinweis": "Neue Konten starten mit Alles.",
+          "bild": true,
+          "link": { "to": "/profile?tab=notifications", "label": "Benachrichtigungen öffnen" }
+        },
+        {
+          "id": "themen",
+          "titel": "Themen einzeln stellen",
+          "text": "Unter Themen wählst du je Thema Push, Nur App oder Aus. Push kommt aufs Handy und in den Browser. Nur App legt es still in die Glocke.",
+          "hinweis": "Stellst du ein Thema selbst um, steht oben Eigene Auswahl.",
+          "bild": true
+        },
+        {
+          "id": "ruhezeit",
+          "titel": "Ruhezeit einschalten",
+          "text": "Schalte Ruhezeit ein. Vorgeschlagen ist 22:00 bis 7:00 Uhr. In dieser Zeit kommt kein Push, alles wartet in der Glocke. Danach kommt eine Sammelmeldung.",
+          "hinweis": "Der Aufruf zu deinem Spiel und „Match startet jetzt“ kommen trotzdem sofort. E-Mails kommen wie bisher.",
+          "bild": true
+        },
+        {
+          "id": "weitere-wege",
+          "titel": "E-Mail und Discord",
+          "text": "Tippe auf Weitere Wege. Dort stellst du E-Mail und Discord je Thema ein oder schaltest einen Weg ganz ab.",
+          "bild": true
         }
       ]
     }
