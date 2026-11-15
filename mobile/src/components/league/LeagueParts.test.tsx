@@ -157,9 +157,9 @@ test("Tippflächen mindestens 44 Punkte: „Als Titel“ mit Namen der Belohnung
 
 test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosselt, nichts doppelt; die Liste scrollt", async () => {
   const { AppState } = jest.requireActual("react-native");
-  let onChange: ((state: string) => void) | null = null;
+  const listener: { current: ((state: string) => void) | null } = { current: null };
   const subscription = jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, handler: (state: string) => void) => {
-    onChange = handler;
+    listener.current = handler;
     return { remove: jest.fn() };
   }) as never);
   const now = jest.spyOn(Date, "now");
@@ -170,18 +170,18 @@ test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosse
   await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(1));
   // Kurz weg und wieder da: kein neuer Abruf.
   clock += 60 * 1000;
-  onChange?.("active");
+  listener.current?.("active");
   expect(mockGet).toHaveBeenCalledTimes(1);
   // Nach der Drossel: neuer Abruf, die neue Belohnung wird gefeiert.
   clock += UNSEEN_THROTTLE_MS;
   mockGet.mockResolvedValue({ data: { rewards: [{ ...reward("n", "medal", "Neu"), tournament: { id: "t9" } }] } });
-  onChange?.("active");
+  listener.current?.("active");
   await waitFor(() => expect(screen.getByTestId("reward-moment-title")).toHaveTextContent("Neue Belohnung"));
   expect(mockGet).toHaveBeenCalledTimes(2);
   expect(screen.getByTestId("reward-moment-scroll")).toBeTruthy();
   // Dieselbe Belohnung beim nächsten Abruf: nicht noch einmal eingereiht.
   clock += UNSEEN_THROTTLE_MS;
-  onChange?.("active");
+  listener.current?.("active");
   await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(3));
   await fireEvent.press(screen.getByTestId("reward-moment-close"));
   await waitFor(() => expect(screen.queryByTestId("reward-moment")).toBeNull());
