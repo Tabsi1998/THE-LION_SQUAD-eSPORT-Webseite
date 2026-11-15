@@ -88,6 +88,10 @@ PY
       drop) DROP_EXTRAS="$EXTRAS_LIST"; warn "Will drop collections that are not in the backup after the restore: ${EXTRAS_LIST}" ;;
     esac
   fi
+  # Entfernt wird nur, was vorher im Sicherheitsbackup steckt.
+  if [ -n "$DROP_EXTRAS" ] && [ "${SKIP_PRE_RESTORE_BACKUP:-false}" = "true" ]; then
+    fail "RESTORE_EXTRA_COLLECTIONS=drop needs the safety backup; it cannot be combined with SKIP_PRE_RESTORE_BACKUP=true. Nothing was changed."
+  fi
 fi
 
 # ---------------------------------------------------------------------------------------------------------------
