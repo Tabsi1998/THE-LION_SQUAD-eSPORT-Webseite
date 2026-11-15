@@ -446,7 +446,7 @@ journalctl -u tls-backup.service --since '7 days ago'
 ```
 
 Während des nächtlichen Backups gibt es eine **kurze Schreibpause** (#1009, meist 10 bis 60 Sekunden): Lesen geht
-weiter, Speichern bekommt 503 „gleich wieder da“, Hintergrundjobs lassen ihren Takt aus. Die Health-Prüfungen per GET
+weiter, Speichern bekommt 503 „gleich wieder da“, Hintergrundjobs im Takt lassen ihn aus, Jobs zu festen Uhrzeiten laufen danach. Die Health-Prüfungen per GET
 bleiben grün. Ablauf, Schalter und wie man eine Pause von Hand beendet: [`BACKUP_RESTORE.md`](../BACKUP_RESTORE.md).
 
 ## Wenn etwas passiert ist

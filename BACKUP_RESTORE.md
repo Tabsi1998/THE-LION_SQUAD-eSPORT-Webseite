@@ -68,19 +68,42 @@ das Skript für die Dauer der Sicherung eine **Schreibpause** im Backend ein:
    „Kurze Wartung: Wir sichern gerade die Daten. Lesen geht weiter, Speichern ist gleich wieder möglich.“
    Anmelden, Abmelden und Sitzung verlängern bleiben erlaubt. Die Website zeigt unter dem Kopf eine Leiste
    „gleich wieder da“, die nach `Retry-After` von selbst verschwindet; die App zeigt den Text der Antwort als
-   Fehlermeldung. Hintergrundjobs lassen ihren Takt aus.
-3. Zählen (Sammlungen, Summen, Uploads), `mongodump`, Upload-Archiv, noch einmal zählen.
+   Fehlermeldung. Die Antwort trägt die CORS-Kopfzeilen, damit auch der Upload-Host sie lesen kann, und zählt in
+   der Betriebssicht nicht als Serverfehler. Eine Registrierung mit Google bekommt dieselbe Antwort, das Anmelden
+   mit Google bleibt frei.
+   Hintergrundjobs im Takt (Intervall) lassen ihn aus, der nächste holt nach. Jobs zu festen Uhrzeiten (etwa der
+   Rangstand um 03:35) warten, bis die Pause vorbei ist, und laufen dann - sie fallen nicht bis zum nächsten Tag aus.
+3. Zählen (Sammlungen, Summen, Uploads), `mongodump`, Upload-Archiv, noch einmal zählen. Solange das läuft,
+   verlängert ein Hintergrundprozess die Lease alle TTL/3 Sekunden - auch ein langes Upload-Archiv lässt die Pause
+   nicht mittendrin enden.
 4. Pause beenden. Sie endet **immer**: am Ende, bei jedem Fehler oder Abbruch (trap) und spätestens nach Ablauf
    der Lease von selbst - auch wenn das Skript hart abgebrochen wird. Die Website kann also nie dauerhaft gesperrt
-   bleiben. Fällt die Datenbank aus, gilt die Pause als aus.
+   bleiben. Fällt die Datenbank aus, gilt die Pause als aus. Beim Beenden meldet das Backend, ob die Lease bis
+   zuletzt gehalten hat. Scheitert eine Verlängerung oder hielt die Lease nicht, bleiben die Dateien, das Manifest
+   vermerkt `consistent: false`, `restore-check.sh` warnt, und `backup.sh` endet mit Rückgabewert 2 (der Timer zeigt
+   den Fehler im Journal).
 
 Üblich sind 10 bis 60 Sekunden. Steht das Backend (etwa beim Sicherheitsbackup im Restore), braucht es keine
 Pause; das Manifest vermerkt `writers_stopped`.
 
+**Was in der Pause trotzdem schreibt** - bewusst, und warum das Paar trotzdem stimmig bleibt:
+
+- **Anmelden, Abmelden, Sitzung verlängern** (auch per App und Passkey) legen Sitzungen, Refresh-Tokens,
+  Anmeldeversuche und Zähler gegen Missbrauch an.
+- **Nebenwirkungen von Leseanfragen:** etwa Zähler und Bildfassungen (Vorschaubilder), die beim
+  ersten Abruf eines Bildes entstehen.
+- **Der Discord-Bot** schreibt Ereignisse aus dem Gateway (etwa Mitglieder-Zähler) und die Prozess-Überwachung des
+  Bots gegebenenfalls einen Alarm.
+
+Nichts davon legt Uploads an oder verweist neu auf Dateien: Anmeldungen, Rechnungen, Bestellungen, Medien und alle
+Texte mit Bildern ändern sich nur über schreibende API-Anfragen, und die stehen still. Vorschaubilder sind aus dem
+Original ableitbar und entstehen nach einem Restore von selbst neu. Ändert sich trotzdem eine Sammlung zwischen den
+beiden Zählungen, steht sie in `unstable_collections`, und der Restore vergleicht sie nur als Hinweis.
+
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `BACKUP_WRITE_PAUSE` | `true` | `false`: ohne Pause sichern (nicht empfohlen, das Paar kann dann abweichen) |
-| `BACKUP_WRITE_PAUSE_TTL` | `120` | Lease in Sekunden (5 bis 1800); wird nach dem Dump einmal verlängert |
+| `BACKUP_WRITE_PAUSE_TTL` | `120` | Lease in Sekunden (5 bis 1800); wird im Hintergrund alle TTL/3 Sekunden verlängert |
 | `BACKUP_WRITE_PAUSE_SETTLE_SECONDS` | `3` | Wartezeit, bis alle Backend-Prozesse die Pause sehen |
 | `BACKUP_WRITE_PAUSE_DRAIN_SECONDS` | `60` | so lange höchstens auf laufende Schreibvorgänge warten; sonst Warnung und Vermerk im Manifest |
 | `BACKUP_REFERENCE_SCAN` | `true` | Datei-Verweise in der Pause mitzählen (für den fachlichen Vergleich beim Restore); `false` verkürzt die Pause |
@@ -95,6 +118,10 @@ Von Hand, etwa zum Prüfen oder wenn eine Pause nach einem abgebrochenen Lauf so
 docker compose exec -T backend python -m services.maintenance status
 docker compose exec -T backend python -m services.maintenance off --force
 ```
+
+`off --force` ist auch ohne Pause-Dokument erfolgreich (frische oder alte Datenbank). Der Restore ruft es nach dem
+Einspielen der Datenbank auf; `ops_maintenance` gilt im Manifest-Vertrag als Betriebsdaten - fehlt es im Backup oder
+im Ziel, hält das den Restore nicht auf.
 
 Eine Route dafür gibt es absichtlich nicht.
 
@@ -111,7 +138,8 @@ Zu jedem Paar entsteht `tls_backup_<zeit>.manifest.json` (früher `.manifest.txt
   (wie viele Dateien die Datenbank nennt und wie viele fehlen),
 - `unstable_collections`/`unstable_figures`: was sich zwischen den beiden Zählungen in der Pause geändert hat
   (sollte leer sein), `ttl_collections` (Sammlungen, aus denen MongoDB Abgelaufenes selbst löscht),
-- `write_pause`: Art, Dauer, ob laufende Schreibvorgänge fertig wurden und ob die Lease gehalten hat.
+- `write_pause`: Art, Dauer, ob laufende Schreibvorgänge fertig wurden und ob die Lease gehalten hat;
+  `consistent`: `true` nur mit Pause (oder stehendem Backend), fertig gewordenen Schreibvorgängen und gehaltener Lease.
 
 Ein Lauf, der abbricht, entfernt seine halb geschriebenen Dateien - ein halbes Paar ist kein Backup.
 
