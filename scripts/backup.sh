@@ -88,6 +88,8 @@ end_pause() {
     # Galt die Lease bis zum Freigeben? Sonst durfte zwischendurch jemand schreiben.
     if [ "$(json_field "${WORK}/pause-off.json" lease_held)" != "true" ]; then LEASE_LAPSED=true; fi
   else
+    # Ohne Antwort ist nicht belegt, dass die Lease gehalten hat - das Backup gilt dann als unsicher.
+    LEASE_LAPSED=true
     warn "Write pause could not be ended explicitly; its lease expires on its own within ${BACKUP_WRITE_PAUSE_TTL}s."
   fi
 }
