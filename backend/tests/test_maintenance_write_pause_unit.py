@@ -249,3 +249,19 @@ def test_off_force_is_idempotent_without_a_pause_document():
         assert code == 5
 
     run(scenario())
+
+
+def test_on_releases_its_own_pause_when_waiting_fails(monkeypatch):
+    """Bricht das Warten nach dem Einschalten ab, ginge das Token verloren - die Pause wird gleich wieder frei."""
+    async def broken_drain(*_args, **_kwargs):
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(maintenance, "wait_for_drain", broken_drain)
+
+    async def scenario():
+        db = fresh_db()
+        with pytest.raises(RuntimeError):
+            await maintenance.run_command(db, ["on", "--ttl", "120", "--settle", "0"])
+        assert (await maintenance.status(db))["active"] is False
+
+    run(scenario())

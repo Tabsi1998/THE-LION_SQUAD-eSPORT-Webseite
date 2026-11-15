@@ -291,7 +291,12 @@ async def run_command(db, argv: list[str]) -> tuple[int, dict]:
     try:
         if args.command == "on":
             started = await activate(db, ttl_seconds=args.ttl, reason=args.reason)
-            busy = await wait_for_drain(db, timeout_seconds=args.drain_timeout, settle_seconds=args.settle)
+            try:
+                busy = await wait_for_drain(db, timeout_seconds=args.drain_timeout, settle_seconds=args.settle)
+            except BaseException:
+                # Das Token ginge mit der Ausnahme verloren - die Pause selbst freigeben, statt die Lease abzuwarten.
+                await release(db, started["token"])
+                raise
             return 0, {**started, "drained": not busy, "busy": busy}
         if args.command == "renew":
             if await renew(db, args.token, ttl_seconds=args.ttl):
