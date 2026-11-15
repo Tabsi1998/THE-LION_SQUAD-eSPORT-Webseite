@@ -1,5 +1,10 @@
+// Zeitreise-Probe (#775): Mit TLS_TEST_NOW (ISO-Datum) laufen die Tests so, als wäre heute dieser Tag. Ohne die
+// Variable bleibt alles beim Alten.
+const zeitreise = (process.env.TLS_TEST_NOW || "").trim();
+
 module.exports = {
   preset: "jest-expo",
+  ...(zeitreise ? { testEnvironment: "<rootDir>/jest.zeitreise-env.js" } : {}),
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testMatch: ["<rootDir>/src/**/*.test.{ts,tsx}"],
   // Der erste Test einer Datei trägt auf dem GitHub-Runner den Kaltstart der

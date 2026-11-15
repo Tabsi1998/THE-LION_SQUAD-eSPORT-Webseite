@@ -147,6 +147,8 @@ async def track(flow, name: str, scope: str = "admin", **extra) -> None:
     await flow.db.media_uploads.insert_one({"id": name, "filename": name, "url": UPLOADS + name, "media_type": "image", "media_scope": scope, "owner_role": "admin", **extra})
 
 
+# Das Alter der Dateien kommt vom Dateisystem, das die echte Uhr hat: nicht in der Zeitreise-Probe (#775).
+@pytest.mark.real_clock
 @pytest.mark.asyncio
 async def test_cleanup_offers_only_what_is_safe_to_remove(flow, public):
     await admin(flow)

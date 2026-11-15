@@ -8,6 +8,7 @@ import mongomock_to_list
 import pytest
 import requests
 import shard_plan
+import zeitreise
 
 # Parallel mit pytest-xdist (#2054): Jeder Worker ist ein eigener Prozess mit eigener Datenbank im Speicher
 # (mongomock, siehe flow_harness), teilt sich aber das Dateisystem. Darum bekommt jeder Worker einen eigenen
@@ -44,6 +45,9 @@ DEMO_PASSWORD = os.environ.get("TEST_DEMO_PASSWORD", "")
 
 
 def pytest_configure(config):
+    # Zeitreise-Probe (#775): mit TLS_TEST_NOW läuft die Uhr ab diesem Tag - vor dem Sammeln, damit auch Werte zählen,
+    # die eine Testdatei beim Import ausrechnet. Ohne die Variable ändert sich nichts.
+    config._zeitreise = zeitreise.start()
     # CI in Teilen (TEST_SHARD=n/gesamt, #2054); ohne die Variable läuft die ganze Suite.
     shard_plan.configure(config)
     # Test-Mongo: ``to_list(n)`` liefert wie Motor höchstens n Einträge (#2357), in jedem Prozess.
@@ -60,6 +64,12 @@ def pytest_sessionfinish(session, exitstatus):
     flow_mongo.drop_process_database()
 
 
+def pytest_unconfigure(config):
+    freezer = getattr(config, "_zeitreise", None)
+    if freezer is not None:
+        freezer.stop()
+
+
 def pytest_collection_modifyitems(config, items):
     live_enabled = bool(
         os.environ.get("REACT_APP_BACKEND_URL")
@@ -74,6 +84,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.live)
             if not live_enabled:
                 item.add_marker(skip_live)
+    # Tests mit echter Uhr (Marker real_clock) laufen in der Zeitreise-Probe nicht mit (#775).
+    zeitreise.deselect_real_clock(config, items)
 
 
 @pytest.fixture(autouse=True, scope="session")

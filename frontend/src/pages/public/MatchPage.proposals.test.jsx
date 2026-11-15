@@ -45,6 +45,16 @@ function renderMatch(page) {
   );
 }
 
+// Die Termine liegen im März 2027, die Seite lehnt vergangene ab: Die Uhr beginnt in jedem Test am Tag, an dem die
+// Gegenseite vorschlug, und läuft von dort weiter - sonst kippen die Tests von selbst, sobald der März vorbei ist (#775).
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+  vi.setSystemTime(new Date("2027-03-01T12:00:00Z"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(() => {
   apiMock.get.mockReset();
   apiMock.post.mockReset();
