@@ -1,6 +1,7 @@
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { ENTRY_POLICY_OPTIONS, waitingLine } from "@/lib/leagueApplications";
+import { ENTRY_POLICY_OPTIONS, afterStartLine, waitingLine } from "@/lib/leagueApplications";
+import { fromViennaInput } from "@/lib/vienna";
 
 // Selbstanmeldung je Season (docs/LIGA.md, B.4, #2205): Alles sind Vorgaben, nichts ist fest. Ohne Beginn und Ende gibt es keine Selbstanmeldung, und alles bleibt wie vorher.
 
@@ -19,6 +20,8 @@ function Toggle({ label, hint, checked, onChange, testId }) {
 // ``waiting``: offene Anmeldungen (eingereicht, in Prüfung). Beim Einschalten von „automatisch annehmen“ (#2348) bleiben sie bei der Leitung.
 export function SeasonApplicationSection({ form, set, id, deadlineField = null, waiting = 0 }) {
   const waitingText = form.application_auto_accept ? waitingLine(waiting) : "";
+  // Nachmeldung (Entscheidung Nr. 180, #1632): erlaubt - der Satz sagt nur, dass die Anmeldung nach dem Start weiterläuft.
+  const afterStart = afterStartLine(fromViennaInput(form.application_closes), form.start_day ? fromViennaInput(`${form.start_day}T00:00`) : null);
   return (
     <FormSection title="Selbstanmeldung" testId="season-application-settings" id={id} className="scroll-mt-24"
       hint="Captains und Vertreter melden ihr Co-Team auf der Ligaseite an, die Leitung entscheidet oder die Season nimmt automatisch an. Ohne Beginn und Ende gibt es das nicht: Dann teilst du wie bisher in der Turnierverwaltung zu. Für die Anmeldung braucht es ein gültiges Regelwerk.">
@@ -26,6 +29,9 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
         <TextField label="Anmeldung ab" type="datetime-local" value={form.application_opens} onChange={(value) => set("application_opens", value)} hint="Wiener Zeit" testId="season-form-application-opens" />
         <TextField label="Anmeldung bis" type="datetime-local" value={form.application_closes} onChange={(value) => set("application_closes", value)} hint="Wiener Zeit" testId="season-form-application-closes" />
       </FormGrid>
+      {afterStart ? (
+        <p className="text-xs text-white/70" data-testid="season-form-application-after-start">{afterStart} Nachgemeldete Co-Teams teilst du im Eingang einer Staffel zu.</p>
+      ) : null}
       {deadlineField}
       <FormGrid cols={3}>
         <TextField label="Startplätze" type="number" min={1} max={500} value={form.application_slots} onChange={(value) => set("application_slots", value)} hint="leer: keine Grenze außer der Staffelgröße" testId="season-form-application-slots" />

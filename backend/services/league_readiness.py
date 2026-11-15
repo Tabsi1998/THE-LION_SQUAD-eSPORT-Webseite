@@ -56,6 +56,14 @@ async def _rules_items(db, league: dict, season: dict) -> list[tuple[str, dict]]
                                                "allein reicht nicht – ohne Regelwerk geht auch keine Selbstanmeldung."))]
 
 
+def after_start_text(closes: datetime) -> str:
+    """„Anmeldung läuft nach Season-Start weiter (bis 20.03.2027, 18:00).“ - Ende in Wiener Zeit."""
+    from zoneinfo import ZoneInfo
+
+    local = closes.astimezone(ZoneInfo("Europe/Vienna"))
+    return f"Anmeldung läuft nach Season-Start weiter (bis {local:%d.%m.%Y, %H:%M})."
+
+
 def _application_items(season: dict) -> list[tuple[str, dict]]:
     opens, closes = _moment(season.get("application_opens_at")), _moment(season.get("application_closes_at"))
     if not opens or not closes:
@@ -64,8 +72,9 @@ def _application_items(season: dict) -> list[tuple[str, dict]]:
     out = []
     start = _moment(season.get("start_date"))
     if start and closes > start:
-        out.append(("problem", _item("application_after_start", "Das Anmeldefenster endet nach dem Beginn der Season – bitte "
-                                                                "spätestens zum Beginn schließen.")))
+        # Nachmeldung (Entscheidung Nr. 180, #1632): erlaubt, etwa für nachrückende Teams - ein Hinweis, keine Sperre.
+        out.append(("warning", _item("application_after_start", f"{after_start_text(closes)} Nachgemeldete Co-Teams teilt die "
+                                                                "Leitung einer Staffel zu.")))
     if closes <= datetime.now(timezone.utc):
         out.append(("warning", _item("application_closed", "Das Anmeldefenster ist schon vorbei.")))
     return out

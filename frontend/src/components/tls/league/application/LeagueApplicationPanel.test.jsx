@@ -174,3 +174,12 @@ test("Season aus dem Vorgänger ohne Fenster (F.2, #1627): nur Co-Teams mit Antr
   const { container } = renderPanel(null);
   expect(container.querySelector("[data-testid='league-application']")).toBeNull();
 });
+
+test("Nachmeldung (Nr. 180): läuft das Fenster über den Season-Start, sagt die Ligaseite es - geschlossen nicht mehr", () => {
+  authMock.current = null;
+  const { unmount } = renderPanel({ ...BLOCK, season_starts_at: "2026-11-17T00:00:00" });
+  expect(screen.getByTestId("league-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis 20.11.2026, 20:00 Uhr).");
+  unmount();
+  renderPanel({ ...BLOCK, season_starts_at: "2026-11-17T00:00:00", state: "closed" });
+  expect(screen.queryByTestId("league-application-after-start")).toBeNull();
+});

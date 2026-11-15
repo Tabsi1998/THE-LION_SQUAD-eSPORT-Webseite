@@ -1451,7 +1451,7 @@ superadmin}`.
 | `rules_upcoming` | Warnung | es gibt nur eine Fassung, die erst später gilt (kein Problem, wenn eine schon gilt) |
 | `divisions_missing` | Problem | keine aktive Liga N |
 | `staffel_missing` | Problem | eine aktive Liga N ohne Staffel |
-| `application_after_start` | Problem | das Anmeldefenster (B.4) endet nach dem Beginn der Season |
+| `application_after_start` | Warnung | das Anmeldefenster (B.4) endet nach dem Beginn der Season: Nachmeldung erlaubt (Entscheidung Nr. 180, #1632), Text „Anmeldung läuft nach Season-Start weiter (bis …)“. Verwaltung und Ligaseite zeigen denselben Satz, der öffentliche Block trägt dafür `season_starts_at`. Eine Nachmeldung nach dem Start kommt per Annahme mit Staffel in die Staffel und steht mit 0 Spielen in der Tabelle; Spiele bekommt sie nicht von selbst (offen, siehe `docs/liga/abnahme.md`) |
 | `application_closed` | Warnung | das Anmeldefenster ist schon vorbei |
 | `application_none` | Warnung | kein Anmeldefenster: keine Selbstanmeldung |
 | `inactive_mode` | Warnung | ein inaktiver oder archivierter Modus im Pool oder in der Reihenfolge |

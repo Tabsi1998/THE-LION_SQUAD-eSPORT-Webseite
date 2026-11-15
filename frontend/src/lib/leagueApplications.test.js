@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   APPLICATION_STATES,
+  afterStartLine,
   applicationPayload,
   applicationToForm,
   canStartApplication,
@@ -16,6 +17,14 @@ import {
 
 describe("Fenster und Plätze", () => {
   const block = { opens_at: "2026-11-01T17:00:00+00:00", closes_at: "2026-11-20T19:00:00+00:00" };
+
+  test("Nachmeldung (Nr. 180): endet die Anmeldung nach dem Season-Start, sagt es ein Satz - sonst nichts", () => {
+    expect(afterStartLine(block.closes_at, "2026-11-17T00:00:00")).toBe("Anmeldung läuft nach Season-Start weiter (bis 20.11.2026, 20:00 Uhr).");
+    expect(afterStartLine(block.closes_at, "2026-11-24T00:00:00")).toBe("");
+    expect(afterStartLine(block.closes_at, "2026-11-20T20:00:00")).toBe("");
+    expect(afterStartLine(null, "2026-11-17T00:00:00")).toBe("");
+    expect(afterStartLine(block.closes_at, null)).toBe("");
+  });
 
   test("das Fenster nennt die Wiener Uhrzeit je Stand", () => {
     expect(windowLine({ ...block, state: "open" })).toBe("Offen bis 20.11.2026, 20:00 Uhr");
