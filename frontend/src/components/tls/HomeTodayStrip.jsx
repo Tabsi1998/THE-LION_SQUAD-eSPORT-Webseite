@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { lazyPage } from "@/lib/chunkReload";
+import { OptionalBoundary } from "@/components/tls/OptionalBoundary";
 import { todayItems } from "@/lib/homeToday";
 
 // „Heute im Einsatz“ (#1753): an Renn- und Spieltagen ein schmaler Streifen über dem Kopf der Startseite - je Saison
@@ -23,8 +24,11 @@ export function HomeTodayStrip() {
   }, []);
   if (!items.length) return null;
   return (
-    <Suspense fallback={null}>
-      <HomeTodayCards items={items} />
-    </Suspense>
+    // Laden die Karten nicht, bleibt es wie an Tagen ohne Termin: kein Streifen (#936).
+    <OptionalBoundary quiet>
+      <Suspense fallback={null}>
+        <HomeTodayCards items={items} />
+      </Suspense>
+    </OptionalBoundary>
   );
 }

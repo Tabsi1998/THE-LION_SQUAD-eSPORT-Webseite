@@ -34,10 +34,12 @@ import { OfflineBar } from "@/components/tls/OfflineBar";
 import { RouteProgress } from "@/components/tls/RouteProgress";
 import { useMobileMenu } from "@/lib/mobileMenu";
 import { lazyPage } from "@/lib/chunkReload";
+import { OptionalBoundary } from "@/components/tls/OptionalBoundary";
 
 // Die Glocke gibt es nur angemeldet (#936): samt Liste, Abzeichen und Kronen-Abgleich lädt sie erst dann und hält bis
 // dahin ihren Platz frei (gleich groß wie der Knopf), damit die Kopfzeile nicht springt.
 const NotificationBell = lazyPage(() => import("@/components/tls/NotificationBell").then((module) => ({ default: module.NotificationBell })));
+const BELL_PLACEHOLDER = <span className="w-10 h-10 shrink-0" aria-hidden="true" data-testid="notification-bell-placeholder" />;
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, adminNeedsSecondFactor, isClubMember } = useAuth();
@@ -127,9 +129,12 @@ export function PublicLayout({ children }) {
             <GlobalSearch />
             {user ? (
               <>
-                <Suspense fallback={<span className="w-10 h-10 shrink-0" aria-hidden="true" data-testid="notification-bell-placeholder" />}>
-                  <NotificationBell />
-                </Suspense>
+                {/* Lädt die Glocke nicht, bleibt still ihr Platz frei - die Kopfzeile kippt nicht (#936). */}
+                <OptionalBoundary quiet placeholder={BELL_PLACEHOLDER}>
+                  <Suspense fallback={BELL_PLACEHOLDER}>
+                    <NotificationBell />
+                  </Suspense>
+                </OptionalBoundary>
                 {/* Benutzermenü statt sechs Knöpfen (#282): Dashboard, Profil, Einstellungen, Mitgliederbereich, Admin,
                     Abmelden. Die Chats stehen seit #1148 unter Community - kein zweiter Knopf dafür im Kopf. */}
                 <UserMenu />

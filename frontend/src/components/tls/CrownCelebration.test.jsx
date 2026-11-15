@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 // Kronen-Feier (#936): Der Hörer ist sofort da, die Feier mit Kronen-Grafik lädt erst mit dem ersten Ereignis.
 
@@ -19,7 +20,7 @@ const celebrate = (detail) => act(() => { window.dispatchEvent(new CustomEvent("
 
 test("lädt die Feier erst mit dem Ereignis und zeigt Krone und Text", async () => {
   const user = userEvent.setup();
-  render(<CrownCelebration />);
+  render(<MemoryRouter><CrownCelebration /></MemoryRouter>);
   await act(async () => { await new Promise((done) => setTimeout(done, 0)); });
   expect(crowns.loaded).toBe(0);
   expect(screen.queryByTestId("crown-celebration-overlay")).toBeNull();
@@ -38,7 +39,7 @@ test("lädt die Feier erst mit dem Ereignis und zeigt Krone und Text", async () 
 
 test("Escape schließt, ohne Text steht die Beschreibung der Krone", async () => {
   const user = userEvent.setup();
-  render(<CrownCelebration />);
+  render(<MemoryRouter><CrownCelebration /></MemoryRouter>);
   celebrate({ id: "n2" });
   expect(await screen.findByTestId("crown-celebration-body")).toHaveTextContent("Platz 1 der Punktewertung");
   expect(screen.getByTestId("crown-celebration-title")).toHaveTextContent("GOLD-KRONE EROBERT!");

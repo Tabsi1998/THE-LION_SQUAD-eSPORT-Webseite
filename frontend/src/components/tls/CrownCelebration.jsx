@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { lazyPage } from "@/lib/chunkReload";
+import { OptionalBoundary } from "@/components/tls/OptionalBoundary";
 
 // Kronen-Feier: Die Glocke meldet eine eroberte Krone über das Ereignis "tls-crown-celebration". Der Hörer bleibt
 // klein und sofort da, damit kein Ereignis verloren geht; die Feier selbst (CrownCelebrationCard.jsx mit Kronen-Grafik
@@ -24,8 +25,11 @@ export function CrownCelebration() {
 
   if (!event) return null;
   return (
-    <Suspense fallback={null}>
-      <CrownCelebrationCard event={event} onClose={close} />
-    </Suspense>
+    // Lädt die Feier nicht, fehlt nur sie (#936).
+    <OptionalBoundary quiet>
+      <Suspense fallback={null}>
+        <CrownCelebrationCard event={event} onClose={close} />
+      </Suspense>
+    </OptionalBoundary>
   );
 }
