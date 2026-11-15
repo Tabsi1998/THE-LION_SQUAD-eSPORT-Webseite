@@ -334,3 +334,24 @@ def test_start_scheduler_marks_exactly_the_cron_jobs(monkeypatch):
             scheduler.stop_scheduler()
 
     run(scenario())
+
+
+def test_on_returns_a_full_lease_after_waiting():
+    """Das Warten (settle, laufende Schreibvorgänge) verbraucht Lease - ab der Rückgabe gilt wieder die volle Dauer."""
+    async def scenario():
+        db = fresh_db()
+        code, out = await maintenance.run_command(db, ["on", "--ttl", "5", "--settle", "1.5", "--drain-timeout", "0"])
+        assert code == 0
+        assert (await maintenance.status(db))["remaining_seconds"] >= 4
+
+    run(scenario())
+
+
+def test_on_gives_up_when_the_lease_ran_out_while_waiting():
+    async def scenario():
+        db = fresh_db()
+        code, out = await maintenance.run_command(db, ["on", "--ttl", "5", "--settle", "5.3", "--drain-timeout", "0"])
+        assert code == 4 and "--ttl" in out["error"]
+        assert (await maintenance.status(db))["active"] is False
+
+    run(scenario())

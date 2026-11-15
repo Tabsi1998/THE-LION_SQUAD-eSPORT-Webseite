@@ -312,7 +312,13 @@ async def run_command(db, argv: list[str]) -> tuple[int, dict]:
                 # Das Token ginge mit der Ausnahme verloren - die Pause selbst freigeben, statt die Lease abzuwarten.
                 await release(db, started["token"])
                 raise
-            return 0, {**started, "drained": not busy, "busy": busy}
+            # Das Warten hat Zeit der Lease verbraucht: ab jetzt wieder die volle Dauer. Lief sie schon ab, durfte
+            # zwischendurch jemand schreiben - dann lieber gleich abbrechen.
+            if not await renew(db, started["token"], ttl_seconds=args.ttl):
+                await release(db, started["token"])
+                return 4, {"error": "Die Pause lief schon während des Wartens ab - eine längere Dauer (--ttl) wählen."}
+            return 0, {**started, **{k: v for k, v in (await status(db)).items() if k == "lease_until"},
+                       "drained": not busy, "busy": busy}
         if args.command == "renew":
             if await renew(db, args.token, ttl_seconds=args.ttl):
                 return 0, {"renewed": True, **(await status(db))}
