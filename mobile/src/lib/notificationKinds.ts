@@ -24,6 +24,11 @@ const KIND_LABELS: Record<string, string> = {
   team_leader_transferred: "Team-Leitung",
   team_presence_nudge: "Spieltag",
   match_reminder: "Match-Erinnerung",
+  // Liga-Spieltag und Belohnungen (#2173, docs/LIGA.md D.2-D.4, E.4, F.4).
+  match_call: "Aufruf",
+  match_schedule: "Termin",
+  league_reward: "Belohnung",
+  league_broadcast: "Liga-Leitung",
   match_result: "Ergebnis",
   match_station: "Station",
   score_reported: "Ergebnis gemeldet",
@@ -95,6 +100,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const PREFIX_LABELS: Array<[string, string]> = [
   ["tournament", "Turnier"],
+  ["league", "Liga"],
   ["match", "Match"],
   ["team", "Team"],
   ["news", "News"],
