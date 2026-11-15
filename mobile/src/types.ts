@@ -148,6 +148,12 @@ export type Team = {
   awards?: import("./lib/leagueRewards").RewardAward[];
   featured_title?: import("./lib/leagueRewards").RewardAward | null;
   league_history?: import("./lib/leagueTeam").LeagueHistoryRow[];
+  // Trophäen (#2425): Teambanner, bis zu drei Embleme neben dem Namen und die Rankingbanner je öffentlicher Season; dazu der Platz in der
+  // Gesamtwertung (F.5, #2215). Alle optional - ältere Server liefern sie nicht.
+  featured_award?: import("./lib/awards").Award | null;
+  featured_emblems?: import("./lib/trophies").TrophyAward[];
+  rank_banners?: import("./components/league/RankBanners").RankBannerRow[];
+  league_overall?: import("./lib/leagueOverall").OverallStandingRow[];
   tag?: string;
   description?: string | null;
   logo_url?: string | null;

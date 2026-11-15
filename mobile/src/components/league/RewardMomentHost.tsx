@@ -10,7 +10,7 @@ import { colors, motion, radius, roles, surfaces } from "../../theme";
 import { Button } from "../Button";
 import { Glow, StaggerIn, useReduceMotion } from "../motion";
 import { Body, Muted } from "../Text";
-import { RewardArt } from "./RewardCollection";
+import { RewardArt } from "./RewardArt";
 
 // Zeremonie bei neuer Belohnung (#2173, Web: components/tls/rewards/RewardWatcher.jsx und RewardMoment.jsx, docs/LIGA.md F.4, Nr. 165):
 // Nach dem Anmelden fragt die App einmal, welche Belohnungen noch nicht gefeiert wurden, und zeigt je Staffel ein Paket - nie zugleich
