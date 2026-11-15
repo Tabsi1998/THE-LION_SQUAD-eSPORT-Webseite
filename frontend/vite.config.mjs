@@ -42,16 +42,18 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: "es2022",
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          const modulePath = id.replaceAll("\\", "/");
-          if (!modulePath.includes("/node_modules/")) return undefined;
-          if (modulePath.includes("/@tiptap/") || modulePath.includes("/prosemirror-")) return "editor";
-          if (modulePath.includes("/recharts/") || modulePath.includes("/d3-")) return "charts";
-          if (modulePath.includes("/@radix-ui/")) return "ui-radix";
-          if (/\/node_modules\/(react|react-dom|scheduler)\//.test(modulePath)) return "react-core";
-          return undefined;
+        // Feste Gruppen mit Vorrang (#936): Eine Gruppe zieht ihre Abhängigkeiten mit. Mit dem früheren
+        // manualChunks landete React in "charts" und jsx-runtime in "editor", dadurch lud jeder öffentliche
+        // Start Editor und Diagramme vorab. React und Radix werden darum zuerst eingesammelt.
+        codeSplitting: {
+          groups: [
+            { name: "react-core", test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 40 },
+            { name: "ui-radix", test: /[\\/]node_modules[\\/]@radix-ui[\\/]/, priority: 30 },
+            { name: "editor", test: /[\\/]node_modules[\\/](@tiptap[\\/]|prosemirror-)/, priority: 20 },
+            { name: "charts", test: /[\\/]node_modules[\\/](recharts[\\/]|d3-)/, priority: 10 },
+          ],
         },
       },
     },
