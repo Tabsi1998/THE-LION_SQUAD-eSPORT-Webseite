@@ -32,8 +32,16 @@ export function SeasonLateExtension({ seasonId, extension, onSaved }) {
     }
   };
 
+  const ready = Boolean(until) && reason.trim().length >= REASON_MIN;
+  // Die Felder stehen im Formular des Reiters: Enter speichert hier nur die Verlängerung, nie den ganzen Reiter (Review #2422).
+  const onKeyDown = (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (ready && !busy) send(fromViennaInput(until));
+  };
+
   return (
-    <div className="space-y-2 border-l-2 border-[#29B6E8]/40 pl-3" data-testid="season-late-extension">
+    <div className="space-y-2 border-l-2 border-[#29B6E8]/40 pl-3" data-testid="season-late-extension" role="presentation" onKeyDown={onKeyDown}>
       {extension?.until ? (
         <p className="text-xs text-white/70" data-testid="season-late-extension-current">
           Verlängert bis {viennaDateTime(extension.until, WHEN)} Uhr. Grund: {extension.reason}
@@ -48,7 +56,7 @@ export function SeasonLateExtension({ seasonId, extension, onSaved }) {
           <TextField label="Nachmeldung bis" type="datetime-local" value={until} onChange={setUntil} hint="Wiener Zeit, höchstens bis zum Ende des Fensters" testId="season-late-extension-until" />
           <TextField label="Grund" value={reason} onChange={setReason} hint="Steht im Protokoll, mindestens fünf Zeichen" testId="season-late-extension-reason" />
           <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <button type="button" disabled={busy || !until || reason.trim().length < REASON_MIN} onClick={() => send(fromViennaInput(until))}
+            <button type="button" disabled={busy || !ready} onClick={() => send(fromViennaInput(until))}
               className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid="season-late-extension-save">Verlängern</button>
             {extension?.until ? (
               <button type="button" disabled={busy || reason.trim().length < REASON_MIN} onClick={() => send(null)}
