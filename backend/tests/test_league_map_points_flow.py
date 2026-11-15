@@ -72,6 +72,9 @@ async def test_switch_running_season_to_map_points(flow):
         assert (points[winner], points[loser]) == (3, 2)
     assert data["staffel"]["table_rules"]["match_points_mode"] == "maps"
     assert data["staffel"]["table_rules"]["tiebreakers"] == MAPS_ORDER
+    # Das Best of der Staffel (#2424): Daraus bildet die Ligaseite das Beispiel unter der Tabelle.
+    best_of = (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "best_of": 1}))["best_of"]
+    assert best_of and data["staffel"]["table_rules"]["best_of"] == int(best_of)
     turnier = (await flow.get(f"/api/tournaments/{staffel['id']}/standings")).json()
     assert {row["registration_id"]: row["points"] for row in turnier} == points
 

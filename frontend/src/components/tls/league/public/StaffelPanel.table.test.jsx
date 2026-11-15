@@ -42,7 +42,7 @@ test("die Tabelle sagt, was entschied, und zeigt das Tabellenende", async () => 
 
 test("Punkte nach gewonnenen Maps (#2312): Hinweis unter der Tabelle, „S“ auch am Handy, Pkt sagt, was zählt", async () => {
   apiMock.get.mockResolvedValue({ data: { ...DATA, staffel: { tournament_id: "t1", staffel: "A",
-    table_rules: { allow_draws: false, match_points_mode: "maps", tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"] } },
+    table_rules: { allow_draws: false, match_points_mode: "maps", best_of: 5, tiebreakers: ["wins", "head_to_head", "score_diff", "lead_decision"] } },
   standings: [row("a", 1, { points: 5, score_for: 5, score_against: 3 }), row("b", 2, { points: 4, won: 0 })] } });
   render(<MemoryRouter><StaffelPanel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
   const table = await screen.findByRole("table", { name: "Tabelle Staffel A" });

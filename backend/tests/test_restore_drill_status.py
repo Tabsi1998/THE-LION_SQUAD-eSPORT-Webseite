@@ -11,7 +11,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "restore-drill-status.sh"
 BASH = shutil.which("bash") if os.name != "nt" else r"C:\Program Files\Git\bin\bash.exe"
-pytestmark = pytest.mark.skipif(not BASH or not Path(BASH).exists(), reason="Bash required")
+# Das Skript rechnet mit der echten Uhr des Systems: in der Zeitreise-Probe (#775) läuft die Datei nicht mit.
+pytestmark = [pytest.mark.skipif(not BASH or not Path(BASH).exists(), reason="Bash required"), pytest.mark.real_clock]
 
 
 def run_status(log_path, max_age_days=None):

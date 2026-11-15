@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  MAPS_TIEBREAKERS, byMaps, hidesDraws, pointsModeChange, pointsNote, pointsSummary, standingNotes, tableRulesPayload, tableRulesToForm, tiebreakOrder,
+  MAPS_TIEBREAKERS, byMaps, hidesDraws, mapPointsExample, pointsModeChange, pointsNote, pointsSummary, standingNotes, tableRulesPayload, tableRulesToForm, tiebreakOrder,
 } from "./leagueTable";
 
 describe("Tabelle der Liga-Staffel (E.1, #1625)", () => {
@@ -60,7 +60,13 @@ describe("Punkte nach gewonnenen Maps (#2312)", () => {
   it("sagt öffentlich, was die Punkte zählen", () => {
     expect(byMaps({ match_points_mode: "maps" })).toBe(true);
     expect(byMaps(null)).toBe(false);
-    expect(pointsNote({ match_points_mode: "maps" })).toBe("Punkte = gewonnene Maps (3:2 ergibt 3 und 2, kampflos 3:0)");
+    // Das Beispiel kommt aus dem Best of der Staffel (#2424) - ohne Best of keine Zahlen.
+    expect(pointsNote({ match_points_mode: "maps", best_of: 5 })).toBe("Punkte = gewonnene Maps (3:2 ergibt 3 und 2, kampflos 3:0)");
+    expect(pointsNote({ match_points_mode: "maps", best_of: 3 })).toBe("Punkte = gewonnene Maps (2:1 ergibt 2 und 1, kampflos 2:0)");
+    expect(pointsNote({ match_points_mode: "maps", best_of: 7 })).toBe("Punkte = gewonnene Maps (4:3 ergibt 4 und 3, kampflos 4:0)");
+    expect(pointsNote({ match_points_mode: "maps" })).toBe("Punkte = gewonnene Maps");
+    expect(mapPointsExample(1)).toBe("kampflos 1:0");
+    expect(mapPointsExample("")).toBe("");
     expect(pointsNote({ match_points_mode: "result" })).toBe("");
     expect(pointsSummary({ match_points_mode: "maps", match_points: { win: 3, draw: 0, loss: 0 } })).toBe("Punkte je gewonnene Map");
     expect(pointsSummary({ match_points: { win: 3, draw: 1, loss: 0 } })).toBe("Sieg / Remis / Niederlage: 3 / 1 / 0");

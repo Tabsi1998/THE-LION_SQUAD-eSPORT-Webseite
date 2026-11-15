@@ -185,6 +185,8 @@ def test_any_other_error_while_writing_leaves_no_temp_file(bild, monkeypatch):
     assert list(ordner.iterdir()) == [], "keine Zwischendatei, keine Fassung"
 
 
+# Das Alter der Zwischendateien kommt vom Dateisystem, das die echte Uhr hat: nicht in der Zeitreise-Probe (#775).
+@pytest.mark.real_clock
 def test_the_start_sweep_clears_empty_variants_and_stale_temps(bild, tmp_path):
     """nginx liefert, was auf der Platte liegt - darum räumt der Start leere Fassungen und alte Zwischendateien weg."""
     import os

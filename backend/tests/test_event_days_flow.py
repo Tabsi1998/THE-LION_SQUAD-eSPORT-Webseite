@@ -28,14 +28,19 @@ def freeze_clock(monkeypatch, moment: datetime) -> None:
     in den geladenen Backend-Modulen bekommt dieselbe stehende Uhr, damit ein Lauf über Mitternacht (Wien) nicht
     zwischen Aufbau und Prüfung den Tag wechselt."""
 
-    class _Same(type):
-        def __instancecheck__(cls, obj):
-            return isinstance(obj, cls.__bases__[0])
+    def same_as(base):
+        # Die Metaklasse erbt von der der Basis: In der Zeitreise-Probe (#775) sind datetime und date die Ersatzklassen
+        # von freezegun mit eigener Metaklasse - eine Klasse mit bloß `type` darüber ließe sich sonst nicht bauen.
+        class _Same(type(base)):
+            def __instancecheck__(cls, obj):
+                return isinstance(obj, cls.__bases__[0])
 
-        def __subclasscheck__(cls, sub):
-            return issubclass(sub, cls.__bases__[0])
+            def __subclasscheck__(cls, sub):
+                return issubclass(sub, cls.__bases__[0])
 
-    class FrozenDatetime(REAL_DATETIME, metaclass=_Same):
+        return _Same
+
+    class FrozenDatetime(REAL_DATETIME, metaclass=same_as(REAL_DATETIME)):
         @classmethod
         def now(cls, tz=None):
             return moment.astimezone(tz) if tz else moment.astimezone().replace(tzinfo=None)
@@ -44,7 +49,7 @@ def freeze_clock(monkeypatch, moment: datetime) -> None:
         def utcnow(cls):
             return moment.astimezone(timezone.utc).replace(tzinfo=None)
 
-    class FrozenDate(REAL_DATE, metaclass=_Same):
+    class FrozenDate(REAL_DATE, metaclass=same_as(REAL_DATE)):
         @classmethod
         def today(cls):
             return moment.astimezone().date()

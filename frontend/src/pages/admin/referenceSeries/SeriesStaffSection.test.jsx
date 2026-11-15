@@ -22,6 +22,16 @@ const SERIES = { id: "serie-1", publish_mode: "review" };
 const ACTIVE = { id: "st-1", user_id: "u-1", name: "Captain Carla", valid_until: "2026-12-31", is_valid: true, can_publish: false, publishes_directly: false, mfa_enabled: true, account_active: true, is_member: true };
 const EXPIRED = { id: "st-2", user_id: "u-3", name: "Alter Albert", valid_until: "2026-01-31", is_valid: false, can_publish: true, publishes_directly: true, mfa_enabled: false, account_active: true, is_member: false };
 
+// Der Ablauf „31.12.2026“ muss in der Zukunft liegen: Die Uhr beginnt in jedem Test am 15.11.2026 und läuft von dort
+// weiter - sonst kippt das Hinzufügen von selbst, sobald das Jahr vorbei ist (#775).
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+  vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(() => {
   for (const fn of Object.values(apiMock)) fn.mockReset();
   apiMock.get.mockResolvedValue({ data: { staff: [ACTIVE, EXPIRED], publish_mode: "review" } });

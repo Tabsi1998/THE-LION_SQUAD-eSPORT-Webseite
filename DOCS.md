@@ -43,6 +43,7 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [Frontend](frontend/README.md) | Lokale Entwicklung und Build |
 | [Abnahme lokal](docs/entwicklung/abnahme-lokal.md) | Echter Server in Docker mit Testdaten, Browser-Abnahme ohne Nachstellen |
 | [Probelauf](docs/entwicklung/probelauf.md) | Drehbuch für die Generalprobe eines Event-Abends auf dem Abnahme-Stand |
+| [Zeitreise-Probe](docs/entwicklung/zeitreise.md) | Tests mit verstellter Uhr: Regel für Termine in Testdaten, wöchentliche Frühwarnung, lokal auf Knopfdruck |
 | [GitHub-Automatik](docs/entwicklung/github.md) | Workflows, PR-Titel, Website-Releases, README-Bilder, Vorlagen und Einstellungen |
 | [Serien: Ergebnisse eintragen](docs/entwicklung/serien-ergebnisse.md) | API zum Eintragen: Vorschau, Übernehmen mit Version, Entwurf daneben, Freigabe |
 | [CHANGELOG](CHANGELOG.md) | Versionen der Website |
