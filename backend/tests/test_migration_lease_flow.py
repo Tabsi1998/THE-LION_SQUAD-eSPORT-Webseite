@@ -319,6 +319,92 @@ async def test_deleted_account_cleanup_stops_before_the_next_account_without_lea
         migrations._LEASE.reset(token)
 
 
+def _cut_off_renewal(record: dict) -> None:
+    """Ab jetzt erreicht keine Verlängerung der laufenden Sperre mehr die Datenbank; ``record`` bekommt die Sperre."""
+    async def unreachable(*_args, **_kwargs):
+        raise AutoReconnect("Datenbank weg")
+
+    lease = migrations._LEASE.get()
+    lease.db = SimpleNamespace(schema_migration_lock=SimpleNamespace(update_one=unreachable))
+    record["lease"] = lease
+
+
+@pytest.fixture
+def lost_at(monkeypatch):
+    """Wann die Sperre als verloren galt (eigene Uhr)."""
+    seen = {}
+    original = migrations._Lease.mark_lost
+
+    def mark_lost(self, reason, *, taken=False):
+        seen.setdefault("at", monotonic())
+        original(self, reason, taken=taken)
+
+    monkeypatch.setattr(migrations._Lease, "mark_lost", mark_lost)
+    return seen
+
+
+@pytest.mark.asyncio
+async def test_after_a_missed_renewal_the_step_may_finish_within_the_grace(flow, fast, monkeypatch, lost_at):
+    db = flow.db
+    await _clean(db)
+    monkeypatch.setattr(migrations, "GRACE_MARGIN_SECONDS", 0.05)
+    state = {}
+
+    async def stepwise(_database):
+        _cut_off_renewal(state)
+        while migrations.migration_lease_ok():
+            await asyncio.sleep(0.01)
+        # Der angefangene Schritt läuft noch zu Ende - innerhalb der Nachfrist -, dann hört die Migration auf.
+        await asyncio.sleep(0.05)
+        state["step_done"] = monotonic()
+        raise migrations.MigrationIncomplete("lease lost")
+
+    monkeypatch.setattr(migrations, "MIGRATIONS", ((1, "nachfrist", stepwise),))
+    with pytest.raises(migrations.MigrationLeaseLost):
+        await migrations.ensure_migrations(db)
+    lease = state["lease"]
+    assert "step_done" in state, "der Schritt wurde nicht abgebrochen, er durfte zu Ende laufen"
+    # Mit echtem Abstand vor dem Ablauf: mindestens ein halber Takt (hier mehr als die 0,05 s Mindestabstand).
+    assert lease.valid_until - state["step_done"] >= RENEW / 2 - 0.05
+    assert await db.schema_migrations.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_migration_that_ignores_the_loss_is_cancelled_with_margin_before_expiry(flow, fast, monkeypatch,
+                                                                                         lost_at):
+    db = flow.db
+    await _clean(db)
+    monkeypatch.setattr(migrations, "GRACE_MARGIN_SECONDS", 0.05)
+    state = {}
+
+    async def stubborn(_database):
+        _cut_off_renewal(state)
+        try:
+            await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            state["cancelled"] = monotonic()
+            raise
+        return "nie"
+
+    monkeypatch.setattr(migrations, "MIGRATIONS", ((1, "stur", stubborn),))
+    with pytest.raises(migrations.MigrationLeaseLost):
+        await migrations.ensure_migrations(db)
+    lease = state["lease"]
+    # Abgebrochen erst nach der Nachfrist, aber mit Abstand vor dem Ablauf auf der eigenen Uhr.
+    assert state["cancelled"] - lost_at["at"] >= 0.05
+    assert lease.valid_until - state["cancelled"] >= RENEW / 2 - 0.05
+
+
+def test_the_grace_keeps_at_least_the_safety_margin():
+    lease = migrations._Lease(None, "x", 180, 45, monotonic() + 40)
+    # 40 s Rest, Abstand mindestens ein halber Takt (22,5 s): 17,5 s Nachfrist.
+    assert lease.grace_seconds() == pytest.approx(17.5, abs=0.2)
+    short = migrations._Lease(None, "x", 30, 2, monotonic() + 4)
+    assert short.grace_seconds() == 0.0, "unter fünf Sekunden Rest gibt es keine Nachfrist"
+    short.taken = True
+    assert short.grace_seconds() == 0.0
+
+
 def test_lease_settings_have_bounds(monkeypatch):
     for name in ("MIGRATION_LEASE_SECONDS", "MIGRATION_LEASE_RENEW_SECONDS", "MIGRATION_WAIT_SECONDS"):
         monkeypatch.delenv(name, raising=False)

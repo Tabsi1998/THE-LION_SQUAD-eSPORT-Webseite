@@ -40,6 +40,8 @@ WAIT_POLL_SECONDS = 2.0
 WAIT_LOG_SECONDS = 30.0
 # In diesen Zuständen ist der Migrationslauf dieses Prozesses abgeschlossen und die Anwendung bereit.
 READY_STATES = frozenset({"done", "incomplete"})
+# So viel Abstand zum Ablauf der Sperre hält eine Migration mindestens, die nach dem Verlust noch ihren Schritt beendet.
+GRACE_MARGIN_SECONDS = 5.0
 # Lange Migrationen melden nach so vielen Einträgen ihren Stand ins Protokoll.
 PROGRESS_EVERY = 100
 
@@ -122,11 +124,12 @@ class _Lease:
                      reason)
 
     def grace_seconds(self) -> float:
-        """So lange darf die laufende Migration nach dem Verlust noch bis zu ihrem nächsten Schritt laufen: bis kurz vor
-        dem Ablauf, nie, wenn schon ein anderer die Sperre hat."""
+        """So lange darf die laufende Migration nach dem Verlust noch bis zu ihrem nächsten Schritt laufen. Sie endet mit
+        echtem Abstand vor dem Ablauf (``GRACE_MARGIN_SECONDS``, mindestens ein halber Takt) - Uhrversatz zwischen
+        zwei Rechnern und die Laufzeit des Abbruchs haben darin Platz. Nie, wenn schon ein anderer die Sperre hat."""
         if self.taken:
             return 0.0
-        return max(0.0, self.remaining() - 1.0)
+        return max(0.0, self.remaining() - max(GRACE_MARGIN_SECONDS, self.renew_every / 2))
 
     async def renew(self) -> bool:
         """Verlängern - nur mit eigenem Token und nur, solange die Sperre noch gilt. ``False``: sie ist verloren."""
