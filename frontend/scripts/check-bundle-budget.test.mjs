@@ -100,6 +100,10 @@ test("vite.config: gemeinsam genutzte Bibliotheken kommen nach vendor-shared, ni
   // nur vom Editor genutzt: bleibt beim Editor; nur vom übrigen Code: kein eigener Chunk
   assert.equal(sharedWithHeavy(nm("linkifyjs/dist/linkify.mjs"), ctx([nm("@tiptap/extension-link/dist/index.js")])), null);
   assert.equal(sharedWithHeavy(nm("axios/index.js"), ctx(["C:/app/src/lib/api.js"])), null);
+  // immer und reselect brauchen nur die Diagramme (über @reduxjs/toolkit): sie bleiben bei "charts"
+  for (const lib of ["immer/dist/immer.mjs", "reselect/dist/reselect.mjs"]) {
+    assert.equal(sharedWithHeavy(nm(lib), ctx([nm("recharts/es6/state/store.js"), nm("@reduxjs/toolkit/dist/redux-toolkit.modern.mjs")])), null, lib);
+  }
   assert.equal(sharedWithHeavy(nm("@tiptap/core/dist/index.js"), ctx(["C:/app/src/x.jsx", nm("@tiptap/react/dist/index.js")])), null);
   assert.equal(sharedWithHeavy("C:/app/src/lib/utils.js", ctx([nm("recharts/es6/util.js"), "C:/app/src/a.jsx"])), null);
 });

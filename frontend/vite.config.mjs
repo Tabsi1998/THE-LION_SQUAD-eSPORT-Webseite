@@ -10,6 +10,9 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const NODE_MODULES = /[\\/]node_modules[\\/]/;
 const EDITOR_MODULES = /[\\/]node_modules[\\/](@tiptap[\\/]|prosemirror-)/;
 const CHART_MODULES = /[\\/]node_modules[\\/](recharts[\\/]|d3-)/;
+// Nur die Diagramme brauchen sie (recharts und @reduxjs/toolkit): ohne Ausnahme landeten sie in "vendor-shared",
+// weil @reduxjs/toolkit nicht zu "charts" zählt - und Registrierung, Mitglied werden und Profil luden rund 4 KB mit.
+const CHARTS_ONLY = /[\\/]node_modules[\\/](immer|reselect)[\\/]/;
 const heavyGroup = (id) => (EDITOR_MODULES.test(id) ? "editor" : CHART_MODULES.test(id) ? "charts" : "");
 
 /**
@@ -17,7 +20,7 @@ const heavyGroup = (id) => (EDITOR_MODULES.test(id) ? "editor" : CHART_MODULES.t
  * gemeinsam), bekommt einen eigenen Chunk (#936) - sonst zöge die schwere Gruppe sie mit und alle anderen hingen an ihr.
  */
 export function sharedWithHeavy(id, ctx) {
-  if (!NODE_MODULES.test(id) || heavyGroup(id)) return null;
+  if (!NODE_MODULES.test(id) || heavyGroup(id) || CHARTS_ONLY.test(id)) return null;
   const groups = new Set((ctx.getModuleInfo(id)?.importers || []).map(heavyGroup));
   return (groups.has("editor") || groups.has("charts")) && groups.size > 1 ? "vendor-shared" : null;
 }
