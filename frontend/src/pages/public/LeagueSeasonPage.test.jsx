@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Ligaseite (docs/LIGA.md, P5, #1625): Kopf mit Pausen, Liga N mit Staffel-Reitern, Tabelle, Spielwochen mit Pause,
@@ -253,13 +253,24 @@ test("Navigation (#2268): Übersicht, Spieltage, Teams - Regelwerk nur mit Regel
 
 test("Navigation am Handy (#2268): steht rechts noch etwas über, blendet der Rand aus - am Ende nicht mehr", async () => {
   renderPage();
-  const nav = await screen.findByTestId("season-nav");
-  const list = nav.querySelector("ul");
-  Object.defineProperty(list, "scrollWidth", { configurable: true, value: 420 });
-  Object.defineProperty(list, "clientWidth", { configurable: true, value: 358 });
-  list.scrollLeft = 0;
-  fireEvent(window, new Event("resize"));
-  expect(nav).toHaveAttribute("data-more", "true");
+  await screen.findByTestId("season-nav");
+  // Robust gegen langsame CI (#2173-Hotfix): Die Seite lädt Season und Staffeln nacheinander; bis alles steht, kann die Leiste neu
+  // aufgebaut werden oder ihr Lauscher noch fehlen. Darum je Versuch die aktuelle Leiste nehmen und das Ereignis neu auslösen - die
+  // Erwartung selbst bleibt dieselbe.
+  const shown = () => {
+    const nav = screen.getByTestId("season-nav");
+    const list = nav.querySelector("ul");
+    Object.defineProperty(list, "scrollWidth", { configurable: true, value: 420 });
+    Object.defineProperty(list, "clientWidth", { configurable: true, value: 358 });
+    return { nav, list };
+  };
+  await waitFor(() => {
+    const { nav, list } = shown();
+    list.scrollLeft = 0;
+    fireEvent(window, new Event("resize"));
+    expect(nav).toHaveAttribute("data-more", "true");
+  });
+  const { nav, list } = shown();
   list.scrollLeft = 62;
   fireEvent.scroll(list);
   expect(nav).not.toHaveAttribute("data-more");

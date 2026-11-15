@@ -666,7 +666,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     borderWidth: 1,
-    minHeight: 42,
+    // Tippfläche mindestens 48 Punkte wie jeder Knopf der App (a11y/audit.ts, #1155) - der Knopf erscheint erst, wenn es Vergangenes gibt.
+    minHeight: 48,
     justifyContent: "center",
   },
   pastToggleText: {

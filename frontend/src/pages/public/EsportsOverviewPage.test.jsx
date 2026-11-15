@@ -25,7 +25,9 @@ test("mit sichtbarer Season: Kachel „Liga“ mit Starttermin und Knopf oben", 
   // Starttermin immer in der Zukunft - ein festes Datum läuft ab (rot ab dem 11.11.2026).
   const start = new Date(Date.now() + 30 * 24 * 3600 * 1000);
   const iso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-  const shown = `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+  // Die Seite schreibt Tag und Monat ohne führende Null („4.1.2027“) - mit fester Null wurde der Test an jedem Tag rot, an dem der
+  // Start auf einen Tag oder Monat unter 10 fällt.
+  const shown = `${start.getDate()}.${start.getMonth() + 1}.${start.getFullYear()}`;
   state.leagues = [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [{ ...SEASON, start_date: iso }] }];
   render(<MemoryRouter><EsportsOverviewPage /></MemoryRouter>);
   const tile = await screen.findByTestId("esports-hub-league");

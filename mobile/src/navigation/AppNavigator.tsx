@@ -10,6 +10,7 @@ import { HeaderBell } from "../components/TabHeader";
 import { BootScreen } from "../screens/BootScreen";
 import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
+import { RewardMomentHost } from "../components/league/RewardMomentHost";
 import { BallotPopupOverlay } from "../components/BallotPopupOverlay";
 import { CalendarHintHost } from "../components/calendar/CalendarHintHost";
 import { PasskeyInvite } from "../components/PasskeyInvite";
@@ -78,6 +79,8 @@ export function AppNavigator() {
     <NavigationContainer ref={navigationRef} theme={theme} onReady={() => { flushPendingNotification(); flushPendingLink(); }}>
       {signedIn && user?.consent_required ? <ConsentScreen /> : <RootScreens />}
       {signedIn && !user?.consent_required ? <AchievementCatchUpOverlay /> : null}
+      {/* Neue Belohnung der Liga (#2173, F.4): je Staffel eine Zeremonie, nach den Erfolgen. */}
+      {signedIn && !user?.consent_required ? <RewardMomentHost /> : null}
       {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht über jedem Screen. */}
       {signedIn && !user?.consent_required ? <BallotPopupOverlay /> : null}
       {/* Passkey (#919): direkt nach einer Anmeldung mit Passwort einmal die Einladung zum Fingerabdruck. */}

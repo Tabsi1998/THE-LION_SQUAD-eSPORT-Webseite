@@ -72,6 +72,9 @@ export type Tournament = {
   // Darf diese Person hier Ergebnisse eintragen (Turnierleitung oder Helfer mit Ergebnis-Recht)? Der Server sagt es.
   can_manage_results?: boolean;
   status?: string;
+  // Liga-Staffel (#2173, docs/LIGA.md F.1): eingefrorener Endstand und die Namen von Liga, Season, Liga N und Staffel.
+  final_table?: { id?: string; version?: number; closed_at?: string | null } | null;
+  league_links?: { league_name?: string | null; season_name?: string | null; division_label?: string | null; staffel?: string | null; public_path?: string | null } | null;
   game_name?: string;
   // Spiel des Turniers - mit ihm gibt es einen Map-Pool (#1616).
   game_id?: string | null;
@@ -141,6 +144,10 @@ export type Tournament = {
 export type Team = {
   id: string;
   name: string;
+  // Liga (#2173, docs/LIGA.md F.2/F.4): Auszeichnungen mit Belohnungen, der gewählte Titel und die Season-Historie.
+  awards?: import("./lib/leagueRewards").RewardAward[];
+  featured_title?: import("./lib/leagueRewards").RewardAward | null;
+  league_history?: import("./lib/leagueTeam").LeagueHistoryRow[];
   tag?: string;
   description?: string | null;
   logo_url?: string | null;
