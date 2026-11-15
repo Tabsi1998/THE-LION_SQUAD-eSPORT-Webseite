@@ -198,7 +198,8 @@ def week_marker(now: datetime) -> str:
 
 
 def open_issue(gh: Gh) -> dict | None:
-    listed = gh(["issue", "list", "--state", "open", "--label", "testing", "--search", f'in:title "{TITLE_PREFIX}"',
+    # Nur über den Titel: Wer das Label von Hand ändert, bekommt sonst ein zweites Issue.
+    listed = gh(["issue", "list", "--state", "open", "--search", f'in:title "{TITLE_PREFIX}"',
                  "--json", "number,title"])
     for issue in json.loads(listed or "[]"):
         if str(issue.get("title", "")).startswith(TITLE_PREFIX):
@@ -218,6 +219,15 @@ def milestone_exists(gh: Gh) -> bool:
     except subprocess.CalledProcessError:
         return False
     return MILESTONE in json.loads(listed or "[]")
+
+
+def earlier_than_title(moment: str, title: str) -> bool:
+    """Liegt ``moment`` vor dem Tag im Titel? Ein Titel ohne lesbaren Tag gilt als später."""
+    try:
+        shown = datetime.strptime(title[len(TITLE_PREFIX):].strip()[:10], "%d.%m.%Y").date()
+    except ValueError:
+        return True
+    return datetime.fromisoformat(moment.replace("Z", "+00:00")).date() < shown
 
 
 def notify(results: list[dict], expected: int, run_url: str, ref: str, gh: Gh = run_gh,
@@ -245,7 +255,8 @@ def notify(results: list[dict], expected: int, run_url: str, ref: str, gh: Gh = 
         if reported_this_week(gh, issue["number"], marker):
             return "diese Woche schon gemeldet"
         gh(["issue", "comment", number, "--body-file", "-"], stdin=report + footer)
-        if first and issue.get("title") != title:
+        # Der Titel nennt den frühesten Tag, an dem etwas kippt: nur ein früherer Tag ersetzt ihn.
+        if first and earlier_than_title(first, str(issue.get("title", ""))):
             gh(["issue", "edit", number, "--title", title])
         return "ergänzt"
     intro = ("Die wöchentliche Zeitreise-Probe (#775, docs/entwicklung/zeitreise.md) ist rot: Mit verstellter Uhr "

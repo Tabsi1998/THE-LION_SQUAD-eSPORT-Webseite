@@ -171,6 +171,28 @@ def test_red_again_adds_one_comment_per_week_and_moves_the_title():
     assert again.made("comment") == [] and again.made("edit") == []
 
 
+def test_the_title_only_moves_to_an_earlier_day():
+    issue = {"number": 7, "title": "Zeitreise: Test kippt ab 16.12.2026"}
+    later = FakeGh([issue])
+    assert report.notify(week([("web", "+6m", "w::spaeter")]), 9, "https://run", "refs/heads/main", later, NOW) == (
+        "ergänzt"
+    )
+    assert len(later.made("comment")) == 1 and later.made("edit") == []
+
+    unreadable = FakeGh([{"number": 7, "title": "Zeitreise: Test kippt ab ? (Lauf unvollständig)"}])
+    report.notify(week([("web", "+6m", "w::spaeter")]), 9, "https://run", "refs/heads/main", unreadable, NOW)
+    (args, _), = unreadable.made("edit")
+    assert args[args.index("--title") + 1] == "Zeitreise: Test kippt ab 16.05.2027"
+
+
+def test_the_open_issue_is_found_by_its_title_alone():
+    gh = FakeGh([{"number": 7, "title": "Zeitreise: Test kippt ab 16.05.2027"}])
+    report.notify(week([("app", "+1y", "x")]), 9, "https://run", "refs/heads/main", gh, NOW)
+    (args, _), = gh.made("list")
+    assert "--label" not in args
+    assert gh.made("create") == [] and len(gh.made("comment")) == 1
+
+
 def test_only_a_full_green_week_closes_the_issue():
     issue = {"number": 7, "title": "Zeitreise: Test kippt ab 16.05.2027"}
     partial = FakeGh([issue])

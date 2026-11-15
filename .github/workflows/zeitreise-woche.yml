@@ -62,6 +62,16 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
+      - name: Tesseract installieren (Texterkennung, wie in ci.yml und backend/Dockerfile)
+        if: matrix.teil == 'backend'
+        # Kurze Zeitlimits für apt wie in ci.yml - ein hängender Paketspiegel bricht hier ab.
+        timeout-minutes: 8
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Languages "none";\n' \
+            | sudo tee /etc/apt/apt.conf.d/99-tls-timeouts > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-deu
+          tesseract --list-langs
       - name: Backend-Pakete installieren
         if: matrix.teil == 'backend'
         run: |
@@ -78,6 +88,9 @@ jobs:
           DB_NAME: tls_ci
           DISABLE_SCHEDULER: "true"
           UPLOAD_DIR: /tmp/tls-uploads
+          # Ergebnis-Bilder (#1756): ohne Tesseract schlagen die Lese-Tests fehl, statt still zu überspringen - auch
+          # die Texterkennung liest Datum und Uhrzeit aus Bildern und gehört in die Probe.
+          REQUIRE_TESSERACT: "1"
         # Tests mit echter Uhr (Marker real_clock) wählt backend/tests/zeitreise.py mit TLS_TEST_NOW selbst ab.
         run: python -m pytest -m "not live" --numprocesses=auto -p no:cacheprovider -q --junitxml="$ERGEBNIS/junit.xml"
 
