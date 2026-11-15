@@ -244,3 +244,20 @@ test("Tippflächen mindestens 44 Punkte: Regeln aufklappen und Verlauf", async (
   expect(StyleSheet.flatten(screen.getByTestId("veto-history-toggle").props.style).minHeight).toBeGreaterThanOrEqual(44);
   expect(StyleSheet.flatten(screen.getByTestId("checkin-rules").props.style).minHeight).toBeGreaterThanOrEqual(44);
 });
+
+test("Vorleser (iOS): der eigene Zug und jeder neue Schritt werden angesagt - nicht beim Öffnen", async () => {
+  const { AccessibilityInfo } = jest.requireActual("react-native");
+  const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  const sides = [{ ...OWN, checked_in: true, present_count: 2 }, { ...OTHER, checked_in: true, present_count: 3 }];
+  const history = [{ index: 0, kind: "ban", name: "Falken", map_name: "Hafen", mode_label: "Stellung", via: "side" }];
+  let live = vetoBlock({ own_turn: false, can_pick: false, pick_hint: "Falken ist am Zug.", history });
+  answer({ ...BASE, checkin: checkin({ state: "veto", sides, veto: live }) }, () => ({ veto: live, state: "veto" }));
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("veto-wait")).toBeTruthy());
+  expect(announce).not.toHaveBeenCalled();
+  // Die Gegenseite sperrt, jetzt seid ihr am Zug.
+  live = vetoBlock({ version: 4, server_now: new Date(Date.now() + 5000).toISOString(), own_turn: true, can_pick: true,
+    history: [...history, { index: 1, kind: "ban", name: "Falken", map_name: "Glut", mode_label: "Stellung", via: "side" }] });
+  await waitFor(() => expect(announce).toHaveBeenCalledWith("Ihr seid am Zug: sperrt eine Map (Stellung). Nach 60 Sekunden wählt das System."), { timeout: 4000 });
+  announce.mockRestore();
+});

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { api } from "../../lib/api";
 import { remainingText } from "../../lib/leagueCheckin";
 import { playMoment } from "../../lib/tournamentHaptics";
@@ -28,6 +28,16 @@ export const SIDE_COLORS = { a: roles.brand, b: "#FF7020", system: roles.honor }
 const PRESET_COLOR = roles.ok;
 
 export type VetoRun = (task: () => Promise<string | void>, fallback: string) => Promise<void>;
+
+/** Für den Vorleser ansagen - scheitert es (kein Vorleser, Test), passiert nichts. */
+function announce(text: string) {
+  if (!text) return;
+  try {
+    AccessibilityInfo.announceForAccessibility?.(text);
+  } catch {
+    // ohne Ansage weiter
+  }
+}
 
 function useServerOffset(serverNow?: string | null) {
   return useMemo(() => vetoClockOffset(serverNow, Date.now()), [serverNow]);
@@ -248,9 +258,27 @@ export function VetoCard({ block, matchId, busy = false, run, onChanged, readOnl
   useEffect(() => {
     const before = turnBefore.current;
     turnBefore.current = ownTurn;
-    if (before === false && ownTurn) return playMoment("advance");
+    if (before === false && ownTurn) {
+      // iOS liest Live-Regionen nicht vor - darum zusätzlich ansagen, dass ihr jetzt am Zug seid.
+      announce(vetoText(block));
+      return playMoment("advance");
+    }
     return undefined;
+    // Nur der Wechsel „am Zug“ zählt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownTurn]);
+  // Neuer Schritt (nicht beim Öffnen): der letzte Zug für den Vorleser - auf Android über die Live-Region, auf iOS über die Ansage.
+  const steps = block?.history?.length ?? null;
+  const stepsBefore = useRef<number | null>(null);
+  useEffect(() => {
+    const before = stepsBefore.current;
+    stepsBefore.current = steps;
+    if (before === null || steps === null || steps <= before || ownTurn) return;
+    const last = block?.history?.[steps - 1];
+    if (last) announce(historyLine(last));
+    // Nur die Zahl der Schritte zählt; beim eigenen Zug sagt der Effekt darüber schon an.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps]);
   if (!block || !vetoVisible(block)) return null;
   const live = block.status === "running" || block.status === "paused";
   const blocked = Boolean(block.status === "waiting" && block.blocked);
