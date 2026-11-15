@@ -64,6 +64,9 @@ test("Staffel auf der Ligaseite: Abrufpfad nur aus einem gültigen Pfad der Seas
   expect(staffelApiPath("https://x.test/liga/a/b", "t1")).toBeNull();
   expect(staffelApiPath(null, "t1")).toBeNull();
   expect(staffelApiPath("/liga/a/b", null)).toBeNull();
+  expect(staffelApiPath("/liga/../admin", "t1")).toBeNull();
+  expect(staffelApiPath("/liga/cod/.", "t1")).toBeNull();
+  expect(staffelApiPath("/liga/cod/season-1", "..")).toBeNull();
   expect(winnerLabel(false)).toBe("Champion");
   expect(winnerLabel(true, { display_name: "Löwen" })).toBe("Meister");
   expect(winnerLabel(true, null)).toBe("Platz 1");

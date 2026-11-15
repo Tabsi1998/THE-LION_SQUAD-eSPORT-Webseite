@@ -113,7 +113,9 @@ export function finalNote(final?: { closed_at?: string | null } | null): string 
  */
 export function staffelApiPath(publicPath?: string | null, tournamentId?: string | null): string | null {
   const parts = String(publicPath || "").split("/");
-  if (parts.length !== 4 || parts[0] !== "" || parts[1] !== "liga" || !parts[2] || !parts[3] || !tournamentId) return null;
+  // „.“ und „..“ wären nach dem Auflösen ein anderer Pfad auf dem Server - nur echte Namen zählen.
+  const plain = (segment: string) => Boolean(segment) && segment !== "." && segment !== "..";
+  if (parts.length !== 4 || parts[0] !== "" || parts[1] !== "liga" || !plain(parts[2]) || !plain(parts[3]) || !tournamentId || !plain(String(tournamentId))) return null;
   return `/leagues/${encodeURIComponent(parts[2])}/${encodeURIComponent(parts[3])}/staffeln/${encodeURIComponent(tournamentId)}`;
 }
 
