@@ -15,7 +15,7 @@ import { ViewTransitions } from "@/components/tls/ViewTransitions";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CeremonySlot } from "@/components/achievements/ceremony/CeremonySlot";
 import { RewardWatcher } from "@/components/tls/rewards/RewardWatcher";
-import { BallotPopup } from "@/components/tls/BallotPopup";
+import { BallotSlot } from "@/components/tls/BallotSlot";
 import { CalendarHintHost } from "@/components/calendar/CalendarHintHost";
 import { WebPushHost } from "@/components/notifications/WebPushHost";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
@@ -280,7 +280,7 @@ function App() {
             {/* Belohnungen der Liga (F.4, #2214): noch nicht gefeierte reiht sie still in die Zeremonie ein. */}
             <OptionalBoundary quiet><RewardWatcher /></OptionalBoundary>
             {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht als Popup auf jeder Seite, nie im Admin. */}
-            <OptionalBoundary><BallotPopup /></OptionalBoundary>
+            <OptionalBoundary><BallotSlot /></OptionalBoundary>
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. Still (#986): reine
                 Deko - der Adventkalender darin hat eine eigene Grenze mit Hinweis (seasons/adventCalendar). */}
             <OptionalBoundary quiet><SeasonStage /></OptionalBoundary>
