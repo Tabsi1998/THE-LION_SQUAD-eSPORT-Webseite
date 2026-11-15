@@ -56,7 +56,8 @@ export type DetailParamList = {
   TournamentLead: { id: string; spiel?: string; fall?: string };
   TournamentChat: { id: string; title?: string };
   // `invite` (#1191): der Schlüssel aus einem Einladungs-Link (/teams/<id>?einladung=…) - oben steht dann „Beitreten“.
-  TeamDetail: { id: string; invite?: string };
+  // `tab` (#2425): „trophies“ öffnet gleich den Reiter Trophäen (aus /teams/<id>?tab=trophaeen).
+  TeamDetail: { id: string; invite?: string; tab?: "trophies" };
   TeamChat: { id: string; title?: string };
   PublicProfile: { username: string };
   DirectThread: { userId: string; title?: string };
@@ -98,6 +99,8 @@ export type DetailParamList = {
   // Saison einer Serie (#1945, nur lesen): Rennliga, Team-Liga oder Turnierserie - aus Verein › Erfolge und dem Profil.
   // `view` (#1974): „statistik“ öffnet den Reiter Statistik (aus /references/series/…?ansicht=statistik).
   ReferenceSeason: { lineage: string; season: string; view?: string };
+  // Gesamtwertung über Seasons (F.5, #2215; App: #2173): /liga/<liga>/<season>/gesamtwertung, je Liga N Co-Teams und Spieler.
+  LeagueOverall: { league: string; season: string; level?: number };
   // Ergebnis einer Runde (#1950, #1974): Rennliga, Runde nach Nummer, optional mit Lauf (`session`, wie ?lauf= im Web).
   ReferenceRound: { lineage: string; season: string; round: number; session?: string };
   // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.

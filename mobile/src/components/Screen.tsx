@@ -3,6 +3,7 @@ import { StyleSheet, View, type ViewStyle } from "react-native";
 import { type Edge, SafeAreaView } from "react-native-safe-area-context";
 import { SeasonBackdropSlot } from "../seasons/SeasonStage";
 import { OfflineBar } from "./ListState";
+import { WritePauseBar } from "./WritePauseBar";
 import { colors } from "../theme";
 
 /**
@@ -33,6 +34,8 @@ export function Screen({
     <SafeAreaView style={styles.safe} edges={screenEdges(underHeader, bottomSafe)}>
       {/* Ohne Netz (#1152): „Offline · Stand 14:05“ oben in jedem Screen - der zuletzt geladene Stand bleibt darunter stehen. */}
       <OfflineBar />
+      {/* Schreibpause fürs Backup (#1009): „Kurze Wartung … Speichern ist gleich wieder möglich“, bis der Server wieder speichert. */}
+      <WritePauseBar />
       <View style={[styles.container, padded && styles.padded, style]}>
         {/* Jahreszeiten (#642): was hinter dem Inhalt liegt (Weihnachten: warme Lichtinseln) - unter allem, nie klickbar. */}
         <SeasonBackdropSlot />

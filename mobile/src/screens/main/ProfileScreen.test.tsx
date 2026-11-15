@@ -91,10 +91,10 @@ beforeEach(() => {
 });
 
 test("dieselben Reiter in derselben Reihenfolge - Mitglieder zusätzlich Ehrungen", () => {
-  expect(profileTabs({ own: true }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams"]);
-  expect(profileTabs({ own: true, clubMember: true }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  expect(profileTabs({ own: true }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Trophäen", "Referenzen", "Teams"]);
+  expect(profileTabs({ own: true, clubMember: true }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Trophäen", "Referenzen", "Teams", "Ehrungen"]);
   const full = { achievements: 3, awards: 1, references: 2, teams: 1, honours: 1 };
-  expect(profileTabs({ own: false, ...full }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  expect(profileTabs({ own: false, ...full }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Trophäen", "Referenzen", "Teams", "Ehrungen"]);
 });
 
 // Profile ohne Nullen (#1916, App-Teil von #1268): Kennzahlen nur über null, leere Reiter sehen andere nicht.
@@ -175,8 +175,8 @@ test("fremdes Profil: nur Reiter mit Inhalt und Zahlen über null, kein Kasten, 
   await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
   await waitFor(() => expect(screen.getByText("KiwiKomet")).toBeTruthy());
   expect(screen.getByText("Übersicht")).toBeTruthy();
-  // Kiwi hat nichts in Erfolgen, Auszeichnungen, Referenzen, Teams und Ehrungen (#1916): diese Reiter fehlen.
-  for (const label of ["Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]) expect(screen.queryByText(label)).toBeNull();
+  // Kiwi hat nichts in Erfolgen, Trophäen, Referenzen, Teams und Ehrungen (#1916): diese Reiter fehlen.
+  for (const label of ["Erfolge", "Trophäen", "Referenzen", "Teams", "Ehrungen"]) expect(screen.queryByText(label)).toBeNull();
   // Zahlenleiste ohne Nullen: nur die zwei Siege.
   expect(screen.getByTestId("profile-stat-wins")).toHaveTextContent(/^2\s*Siege$/);
   for (const key of ["points", "top3", "tournaments", "fastlaps"]) expect(screen.queryByTestId(`profile-stat-${key}`)).toBeNull();
@@ -221,7 +221,7 @@ test("erst auswerten, dann die Erfolge laden - einmal je Öffnen, die anderen Ab
   expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
 });
 
-test("eigenes Profil ohne Netz: Teams, Referenzen und Auszeichnungen sagen „nicht geladen“, nicht „noch keine“ (#1001)", async () => {
+test("eigenes Profil ohne Netz: Teams, Referenzen und Trophäen sagen „nicht geladen“, nicht „noch keine“ (#1001)", async () => {
   const offline = () => Object.assign(new Error("Network Error"), { isAxiosError: true });
   mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => (
     ["/teams/my", "/mobile/profile/references", "/me/awards"].includes(path) ? Promise.reject(offline()) : answer(path, config)
@@ -234,13 +234,13 @@ test("eigenes Profil ohne Netz: Teams, Referenzen und Auszeichnungen sagen „ni
   await fireEvent.press(screen.getByText("Referenzen"));
   await waitFor(() => expect(screen.getByTestId("profile-references-error")).toBeTruthy());
   expect(screen.queryByText("Noch keine Referenzen")).toBeNull();
-  await fireEvent.press(screen.getByText("Auszeichnungen"));
+  await fireEvent.press(screen.getByText("Trophäen"));
   await waitFor(() => expect(screen.getByTestId("profile-awards-error")).toBeTruthy());
-  expect(screen.queryByText("Noch keine Auszeichnungen")).toBeNull();
+  expect(screen.queryByTestId("profile-trophies-empty")).toBeNull();
   // Nochmal versuchen: jetzt klappt es - und leer ist wirklich leer.
   mockGet.mockImplementation(answer);
   await fireEvent.press(screen.getByTestId("profile-awards-error-retry"));
-  await waitFor(() => expect(screen.getByText("Noch keine Auszeichnungen")).toBeTruthy());
+  await waitFor(() => expect(screen.getByTestId("profile-trophies-empty")).toBeTruthy());
   expect(screen.queryByTestId("profile-partial-load")).toBeNull();
 });
 

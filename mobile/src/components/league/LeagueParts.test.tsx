@@ -5,12 +5,14 @@ import { createCeremonyQueue } from "../../achievements/ceremony/queue";
 import { StandingsTables } from "../tournament/StandingsTables";
 import { standingsTables } from "../../lib/tournamentView";
 import { LeagueApplicationsCard } from "./LeagueApplicationsCard";
+import { LeagueSeasonCard } from "./LeagueSeasonCard";
 import { LeagueSeasonHistory } from "./LeagueSeasonHistory";
-import { RewardChip, RewardCollection } from "./RewardCollection";
+import { RewardChip } from "./RewardArt";
+import { TrophyCabinet } from "./TrophyCabinet";
 import { RewardMomentHost, UNSEEN_THROTTLE_MS } from "./RewardMomentHost";
 
 // Liga an Team, Profil und Tabelle (#2173): Anmeldestatus mit „Abmelden“, Season-Historie, Belohnungen mit Titel, Zeremonie und
-// Zonen in der Tabelle - wie im Web (SquadApplicationStatus, LeagueSeasonHistory, RewardCollection, RewardWatcher, StaffelTable).
+// Zonen in der Tabelle - wie im Web (SquadApplicationStatus, LeagueSeasonHistory, TrophyCabinet, RewardWatcher, StaffelTable).
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
@@ -80,22 +82,21 @@ const reward = (id: string, kind: string, name: string, extra: Record<string, un
   reward: { kind, kind_label: kind === "title" ? "Titel" : "Medaille", name, art: { season: "Season 1", league: "CoD-Liga", place: "1. Platz", metal: "gold" } }, ...extra,
 });
 
-test("Belohnungen je Season, Titel wählen nur bei der Art „Titel“ und nur für Besitzer", async () => {
+test("Belohnungen in der Vitrine, Titel wählen nur bei der Art „Titel“ und nur für Besitzer", async () => {
   const onTitle = jest.fn();
   const awards = [reward("m", "medal", "Goldmedaille"), reward("t", "title", "Meister Season 1")] as never;
-  await render(<RewardCollection awards={awards} titleId={null} onTitle={onTitle} />);
-  expect(screen.getByText("Season 1")).toBeTruthy();
+  await render(<TrophyCabinet awards={awards} empty="leer" owner={{ titleId: null, onTitle }} />);
   expect(screen.getByText("Goldmedaille")).toBeTruthy();
-  expect(screen.queryByTestId("reward-title-m")).toBeNull();
-  await fireEvent.press(screen.getByTestId("reward-title-t"));
+  expect(screen.queryByTestId("trophy-title-m")).toBeNull();
+  await fireEvent.press(screen.getByTestId("trophy-title-t"));
   expect(onTitle).toHaveBeenCalledWith("t");
-  await render(<RewardCollection awards={awards} titleId="t" onTitle={onTitle} />);
-  expect(screen.getByTestId("reward-title-t")).toHaveTextContent("Titel ✓");
-  await fireEvent.press(screen.getByTestId("reward-title-t"));
+  await render(<TrophyCabinet awards={awards} empty="leer" owner={{ titleId: "t", onTitle }} />);
+  expect(screen.getByTestId("trophy-title-t")).toHaveTextContent("Titel ✓");
+  await fireEvent.press(screen.getByTestId("trophy-title-t"));
   expect(onTitle).toHaveBeenLastCalledWith(null);
   // Fremdes Profil: ohne Auswahl.
-  await render(<RewardCollection awards={awards} />);
-  expect(screen.queryByTestId("reward-title-t")).toBeNull();
+  await render(<TrophyCabinet awards={awards} empty="leer" />);
+  expect(screen.queryByTestId("trophy-title-t")).toBeNull();
   await render(<RewardChip award={reward("t", "title", "Meister Season 1") as never} />);
   expect(screen.getByTestId("featured-title")).toHaveTextContent("Meister Season 1");
 });
@@ -144,15 +145,15 @@ test("Tabelle einer Liga-Staffel: Zonen je Zeile mit Legende, Endstand darüber"
   expect(screen.queryByTestId("standings-final")).toBeNull();
 });
 
-test("Tippflächen mindestens 44 Punkte: „Als Titel“ mit Namen der Belohnung für den Vorleser", async () => {
+test("Tippflächen mindestens 48 Punkte: „Als Titel“ mit Namen der Belohnung für den Vorleser", async () => {
   const { StyleSheet } = jest.requireActual("react-native");
-  await render(<RewardCollection awards={[reward("t", "title", "Meister Season 1")] as never} titleId={null} onTitle={jest.fn()} />);
-  const button = screen.getByTestId("reward-title-t");
+  await render(<TrophyCabinet awards={[reward("t", "title", "Meister Season 1")] as never} empty="leer" owner={{ titleId: null, onTitle: jest.fn() }} />);
+  const button = screen.getByTestId("trophy-title-t");
   expect(button.props.accessibilityLabel).toBe("Als Titel wählen: Meister Season 1");
-  expect(StyleSheet.flatten(button.props.style).minHeight).toBeGreaterThanOrEqual(44);
-  expect(StyleSheet.flatten(button.props.style).minWidth).toBeGreaterThanOrEqual(44);
-  await render(<RewardCollection awards={[reward("t", "title", "Meister Season 1")] as never} titleId="t" onTitle={jest.fn()} />);
-  expect(screen.getByTestId("reward-title-t").props.accessibilityLabel).toBe("Titel entfernen: Meister Season 1");
+  expect(StyleSheet.flatten(button.props.style).minHeight).toBeGreaterThanOrEqual(48);
+  expect(StyleSheet.flatten(button.props.style).minWidth).toBeGreaterThanOrEqual(48);
+  await render(<TrophyCabinet awards={[reward("t", "title", "Meister Season 1")] as never} empty="leer" owner={{ titleId: "t", onTitle: jest.fn() }} />);
+  expect(screen.getByTestId("trophy-title-t").props.accessibilityLabel).toBe("Titel entfernen: Meister Season 1");
 });
 
 test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosselt, nichts doppelt; die Liste scrollt", async () => {
@@ -187,4 +188,46 @@ test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosse
   await waitFor(() => expect(screen.queryByTestId("reward-moment")).toBeNull());
   now.mockRestore();
   subscription.mockRestore();
+});
+
+test("Tabelle einer Liga-Staffel: Nachgemeldete tragen „Nachgemeldet ab Woche X“, ohne die Felder wie bisher", async () => {
+  const rows = [
+    { registration_id: "r1", display_name: "Löwen", rank: 1, points: 9 },
+    { registration_id: "r2", display_name: "Falken", rank: 2, points: 3, late_entry: true, late_from_week: 4 },
+    { registration_id: "r3", display_name: "Bären", rank: 3, points: 0, late_entry: true },
+  ];
+  const tables = standingsTables(rows, "round_robin", null);
+  expect(tables[0].rows.map((row) => row.late)).toEqual(["", "Nachgemeldet ab Woche 4", "Nachgemeldet"]);
+  await render(<StandingsTables tables={tables} empty="leer" />);
+  expect(screen.getByTestId("standings-late-r2")).toHaveTextContent("Nachgemeldet ab Woche 4");
+  expect(screen.getByTestId("standings-late-r3")).toHaveTextContent("Nachgemeldet");
+  expect(screen.queryByTestId("standings-late-r1")).toBeNull();
+  expect(screen.getByTestId("standings-row-all-2").props.accessibilityLabel).toContain("Nachgemeldet ab Woche 4");
+  // Kompatibilität: ein Server ohne die Felder - keine Zeile trägt den Hinweis.
+  await render(<StandingsTables tables={standingsTables(rows.map(({ late_entry: _late, late_from_week: _week, ...row }) => row), "round_robin", null)} empty="leer" />);
+  expect(screen.queryByTestId("standings-late-r2")).toBeNull();
+  expect(screen.queryByTestId("standings-late-r3")).toBeNull();
+});
+
+test("Season der Staffel: Anmeldefenster mit wirksamem Ende und Weg zur Gesamtwertung - ohne Angaben nichts", async () => {
+  const onOpenOverall = jest.fn();
+  mockGet.mockResolvedValue({ data: {
+    application: { state: "open", opens_at: "2026-12-01T09:00:00Z", closes_at: "2027-01-19T22:59:00Z", season_starts_at: "2027-01-05T17:00:00Z" },
+    overall: { period_id: "p1", name: "2027" },
+  } });
+  await render(<LeagueSeasonCard publicPath="/liga/cod/season-2" title="CoD-Liga · Season 2" onOpenOverall={onOpenOverall} />);
+  await waitFor(() => expect(screen.getByTestId("league-season-card-window")).toHaveTextContent("Anmeldung offen bis 19.01.2027, 23:59 Uhr"));
+  expect(mockGet).toHaveBeenCalledWith("/leagues/cod/season-2");
+  expect(screen.getByTestId("league-season-card-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis 19.01.2027, 23:59 Uhr).");
+  await fireEvent.press(screen.getByTestId("league-season-card-overall"));
+  expect(onOpenOverall).toHaveBeenCalledWith({ league: "cod", season: "season-2" });
+  // Ältere Server ohne Fenster und Zeitraum: nichts.
+  mockGet.mockResolvedValue({ data: { season: { id: "s" } } });
+  await render(<LeagueSeasonCard publicPath="/liga/cod/season-3" onOpenOverall={onOpenOverall} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/leagues/cod/season-3"));
+  expect(screen.queryByTestId("league-season-card")).toBeNull();
+  // Kein sauberer Pfad: kein Abruf.
+  mockGet.mockClear();
+  await render(<LeagueSeasonCard publicPath="/liga/../x" onOpenOverall={onOpenOverall} />);
+  expect(mockGet).not.toHaveBeenCalled();
 });

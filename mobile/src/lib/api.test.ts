@@ -567,3 +567,48 @@ test("eine Antwort der vorigen Sitzung wird nicht mehr zwischengespeichert", asy
   await api.get("/news");
   expect(mockSetCached).toHaveBeenCalledTimes(1);
 });
+
+// Schreibpause fürs Backup (#1009, #2173): ein 503 mit Code „write_pause“ zeigt die Leiste „Kurze Wartung“ und einen eigenen Satz statt
+// der Meldung „status code 503“. Ein anderer 503 bleibt ein gewöhnlicher Fehler.
+describe("Schreibpause", () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const pause = require("./writePause");
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { errorMessage } = require("./api");
+
+  function pauseError(config: AxiosRequestConfig, headers: Record<string, string> = { "retry-after": "45" }) {
+    const error = httpError(503, config) as Error & { response: { data: unknown; headers: unknown } };
+    error.response.data = { detail: "Text des Servers", code: "write_pause", retry_after: 45 };
+    error.response.headers = headers;
+    return error;
+  }
+
+  afterEach(() => pause.resetWritePause());
+
+  test("ein 503 der Schreibpause schaltet die Leiste für die genannte Zeit ein", async () => {
+    handler = async (config) => { throw pauseError(config); };
+    const failure = await api.post("/teams/t1/awards/emblems", {}).catch((error: unknown) => error);
+    expect(pause.writePauseSnapshot().active).toBe(true);
+    expect(pause.writePauseSnapshot().until - Date.now()).toBeGreaterThan(40_000);
+    expect(errorMessage(failure)).toBe(pause.WRITE_PAUSE_MESSAGE);
+    expect(errorMessage(failure)).toMatch(/^Kurze Wartung.*gleich wieder möglich/);
+  });
+
+  test("ein gewöhnlicher 503 bleibt ein Fehler ohne Leiste", async () => {
+    handler = async (config) => {
+      const error = httpError(503, config) as Error & { response: { data: unknown } };
+      error.response.data = { detail: "Server überlastet" };
+      throw error;
+    };
+    const failure = await api.post("/teams/t1/join", {}).catch((error: unknown) => error);
+    expect(pause.writePauseSnapshot().active).toBe(false);
+    expect(errorMessage(failure)).toBe("Server überlastet");
+  });
+
+  test("ein 503 einer anderen Herkunft schaltet die Leiste nicht ein und ersetzt die Meldung nicht", async () => {
+    handler = async (config) => { throw pauseError(config); };
+    const failure = await api.post("https://cdn.example/upload", {}).catch((error: unknown) => error);
+    expect(pause.writePauseSnapshot().active).toBe(false);
+    expect(errorMessage(failure)).toBe("Text des Servers");
+  });
+});
