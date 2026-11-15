@@ -4,6 +4,7 @@ ohne Doppel, Nachricht je Fassung, Sichtbarkeit für Gäste, Rechte und gleichze
 Nur erfundene Namen.
 """
 import asyncio
+import json
 import pathlib
 import sys
 from datetime import timedelta
@@ -710,3 +711,80 @@ async def test_a_new_season_takes_over_the_rewards_and_says_so(flow):
     assert [row["name"] for row in copied["rewards"]] == ["Goldmedaille"] and copied["reward_players"] == "roster"
     new_division = await flow.db.league_divisions.find_one({"season_id": new_id_}, {"_id": 0})
     assert [row["name"] for row in new_division["rewards"]] == ["Liga-Emblem"]
+
+
+# ---------------------------------------------------------------- TV (#2410)
+
+async def tv_key(flow, staffel) -> str:
+    """Ein Anzeige-Schlüssel für die Staffel - sie endet heute, damit der Schlüssel noch gilt (eine Woche nach dem Ende)."""
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"end_date": now_utc().isoformat()}})
+    response = await flow.post("/api/tv/keys", json={"tournament_id": staffel["id"], "label": "Beamer Halle"})
+    assert response.status_code == 200, response.text
+    return response.json()["token"]
+
+
+async def tv_of(flow, staffel, key: str) -> dict:
+    flow.act_as(None)
+    response = await flow.get(f"/api/tournaments/{staffel['id']}/bracket/display", params={"key": key, "table": "1"})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.asyncio
+async def test_the_tv_shows_the_podium_with_public_rewards_only_after_the_close_and_never_a_person(flow):
+    banner = {"kind": "banner", "name": "Meister-Banner", "places": {"mode": "rank", "rank": 1}, "recipients": ["team"]}
+    admin, league, season, _division, staffel = await setup(flow, rewards=[banner, GOLD, PODIUM, EVERYONE, LAST])
+    key = await tv_key(flow, staffel)
+    await play_all(flow, staffel)
+    # Vor dem Abschluss: kein Podest - der Sieger-Moment bleibt, wie er war.
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+
+    flow.act_as(admin)
+    await must_close(flow, staffel)
+    podium = (await tv_of(flow, staffel, key))["league_podium"]
+    assert set(podium) == {"league", "season", "division", "places"}
+    assert podium["league"] == "Probe-Liga" and podium["season"] == season["name"] and podium["division"]
+    assert [(row["rank"], row["registration_id"]) for row in podium["places"]] == [(1, "reg-1"), (2, "reg-2"), (3, "reg-3")]
+    # Hauptbelohnung zuerst: Medaille vor Banner; „alle Teilnehmer“ und Platz 4 stehen nicht auf dem Podest.
+    assert [row["name"] for row in podium["places"][0]["rewards"]] == ["Goldmedaille", "Meister-Banner"]
+    assert [row["name"] for row in podium["places"][1]["rewards"]] == ["Podest-Emblem"]
+    assert podium["places"][0]["rewards"][0]["art"] == {"place": "1. Platz", "metal": "gold"}
+    assert podium["places"][2]["rewards"][0]["art"] == {"place": "3. Platz", "metal": "bronze"}
+    # Nur die Felder der Liste - keine Spieler, Konten, Preise, Beschreibung oder Teamkennung.
+    for place in podium["places"]:
+        assert set(place) == {"rank", "registration_id", "rewards"}
+        for reward in place["rewards"]:
+            assert set(reward) == {"id", "kind", "name", "image_url", "art"}
+    text = json.dumps(podium)
+    assert not any(person in text for person in ("p-1-1", "captain-1", "team-1", "example.test"))
+
+    # Season nur für Mitglieder bzw. Staffel nicht öffentlich: am TV kein Podest (wie Profil und Teilen-Bild).
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": "members"}})
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": "public"}})
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"is_public": False}})
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"is_public": True}})
+    assert (await tv_of(flow, staffel, key))["league_podium"]["places"]
+
+    # Ohne Abschluss-Marke am Turnier fragt der TV gar nicht erst nach - kein Podest.
+    mark = (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "final_table": 1}))["final_table"]
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"final_table": None}})
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"final_table": mark}})
+    assert (await tv_of(flow, staffel, key))["league_podium"]["places"]
+
+    # Wieder geöffnet: die Belohnungen ruhen - kein Podest mehr.
+    flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
+    await must_reopen(flow, staffel)
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_without_rewards_keeps_the_tv_moment_as_before(flow):
+    admin, _league, _season, _division, staffel = await setup(flow)
+    key = await tv_key(flow, staffel)
+    await play_all(flow, staffel)
+    flow.act_as(admin)
+    await must_close(flow, staffel)
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None

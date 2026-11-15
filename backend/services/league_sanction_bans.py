@@ -52,6 +52,21 @@ def parse(value) -> datetime | None:
     return _parse(value)
 
 
+# Einspruch (E.3): hier im Blatt-Modul, damit Nachmeldung (league_late_entry) und Strafen es ohne Import-Kreis teilen (#2422).
+def appeal_refusal(doc: dict, now: datetime | None = None) -> str | None:
+    """Warum gegen diese Strafe (jetzt) kein Einspruch geht - ``None``: Er geht."""
+    if doc.get("revoked_at"):
+        return "Die Strafe ist widerrufen."
+    if doc.get("state") != FINAL:
+        return "Eine vorläufige Sperre wird ohnehin geprüft. Der Einspruch ist ab der endgültigen Entscheidung möglich."
+    if doc.get("appeal"):
+        return "Gegen diese Strafe wurde schon Einspruch eingelegt. Er ist einmal je Entscheidung möglich."
+    until = parse(doc.get("appeal_until"))
+    if not until or (now or now_utc()) >= until:
+        return "Die Einspruchsfrist ist abgelaufen."
+    return None
+
+
 def _local(moment: datetime) -> str:
     from services.matchday_schedule import LOCAL_TZ
 

@@ -277,7 +277,9 @@ STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "
                    # Angefochtene Ergebnisse (E.2, #1619): wie viele Spiele der Zeile „in Klärung“ sind - nur die Zahl.
                    "contested",
                    # Zone für Auf- und Abstieg (F.2, #1627): Strich am Platz wie auf der Website.
-                   "zone")
+                   "zone",
+                   # Nachmeldung (#2422): „Nachgemeldet ab Woche X“ wie auf der Website.
+                   "late_entry", "late_from_week")
 STANDING_GROUP_FIELDS = ("id", "group_key", "name")
 
 

@@ -240,7 +240,7 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
         full = await _build_bracket_payload(db, t, None, False, with_table=table)
-        return await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full))
+        return await _with_league_podium(db, t, await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full)))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, capability=READ)
@@ -250,13 +250,21 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
     payload = await _build_bracket_payload(db, t, me, True, with_table=table)
     # Wie mit Schlüssel: die belegten Plätze für den Anmelde-Bildschirm (#1123).
     payload["seats"] = seat_summary(t, payload.get("registrations"))
-    return await _with_onsite_path(db, t, _with_table(payload, payload))
+    return await _with_league_podium(db, t, await _with_onsite_path(db, t, _with_table(payload, payload)))
 
 
 def _with_table(payload: dict, full: dict) -> dict:
     """Die Tabelle für die Folie „Tabelle“ am TV (#2121), nur mit den Feldern, die der TV zeigt."""
     if "standings" in full:
         payload["standings"] = display_standings(full["standings"])
+    return payload
+
+
+async def _with_league_podium(db, t: dict, payload: dict) -> dict:
+    """Saisonabschluss einer Liga-Staffel (#2410): das Podest mit den öffentlichen Belohnungen für den Sieger-Moment - sonst ``None``."""
+    from services.league_rewards import tv_podium
+
+    payload["league_podium"] = await tv_podium(db, t)
     return payload
 
 
@@ -350,6 +358,8 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
     # Tabellenende der Liga-Staffel (E.1, Nr. 43): wann jemand ausschied - die Projektion gibt ``removal`` nicht mit.
     removed_at = {r.get("id"): (r.get("removal") or {}).get("at") for r in regs if r.get("removal")}
+    # Nachmeldung (#2422, Nr. 183): „Nachgemeldet ab Woche X“ - Website, TV, PDF und App lesen dasselbe Feld.
+    late_from = {r.get("id"): (r.get("late_entry") or {}).get("from_week") for r in regs if r.get("late_entry")}
     regs = [_public_registration(r, user, is_staff) for r in regs]
     for r in regs:
         if removed_at.get(r.get("id")):
@@ -378,6 +388,11 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
         from services.league_zones import mark_rows
 
         await mark_rows(db, t, rows)
+        for row in rows:
+            if row.get("registration_id") in late_from:
+                row["late_entry"] = True
+                if late_from[row["registration_id"]]:
+                    row["late_from_week"] = late_from[row["registration_id"]]
     # Die eigene Zeile ist markiert (#1179) - nur für den, der schaut.
     _mark_own_rows(rows, own_ids)
     return rows

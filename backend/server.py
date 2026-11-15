@@ -49,6 +49,7 @@ from routes.league_roster_routes import admin_router as league_roster_admin_rout
 from routes.league_application_routes import admin_router as league_application_admin_router, me_router as league_application_me_router, router as league_application_router
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.league_table_routes import admin_router as league_table_admin_router
+from routes.league_late_routes import admin_router as league_late_admin_router
 from routes.league_sanction_routes import admin_router as league_sanction_admin_router
 from routes.league_final_routes import admin_router as league_final_admin_router
 from routes.league_successor_routes import admin_router as league_successor_admin_router
@@ -437,6 +438,7 @@ app.include_router(league_application_router)  # Selbstanmeldung: einreichen, zu
 app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md, #1646)
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)
+app.include_router(league_late_admin_router)  # Nachmeldung: Frist verlängern, Spiele nachtragen (#2422)
 app.include_router(league_sanction_admin_router)  # Strafen im Wettbewerb: verhängen, bestätigen, widerrufen, Einspruch (E.3)
 app.include_router(league_final_admin_router)  # Saisonabschluss: Cockpit, abschließen, wieder öffnen (F.1, #1645)
 app.include_router(league_successor_admin_router)  # Neue Season aus dem Vorgänger mit Auf- und Abstieg (F.2, #1627)

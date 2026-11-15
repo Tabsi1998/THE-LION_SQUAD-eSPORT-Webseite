@@ -2787,6 +2787,8 @@ class LeagueSeasonFields(LeagueLookFields):
     sibling_squads_in_staffel: Optional[bool] = None
     # Anmeldungen automatisch annehmen (#2348): Vorgabe aus, dann prüft die Leitung jede Anmeldung.
     application_auto_accept: Optional[bool] = None
+    # Nachmeldefrist (#2422, Nr. 184): Tage nach dem Season-Start, leer = Vorgabe 14.
+    late_registration_days: Optional[int] = Field(default=None, ge=0, le=365)
     # Plattform je Season (#2270, docs/LIGA.md B.3): Feld mit der Plattform, erlaubte Plattformen (leer = alle), Crossplay und
     # Eingabegerät als Angabe. Geprüft wird in ``league_platform.clean_season``; ``null`` heißt: keine Angabe.
     platform_field: Optional[str] = Field(default=None, max_length=80)

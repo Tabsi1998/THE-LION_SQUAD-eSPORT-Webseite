@@ -44,6 +44,31 @@ function Table({ rows, rules, championId, label }) {
 // Gleichstände, die einen Entscheid brauchen (Nr. 156): um den Meistertitel und - seit F.2 (#1627) - an einer Grenze zu Auf- oder Abstieg.
 const TIE_BLOCKERS = { champion_tie: { kind: "champion", label: "Meister entscheiden" }, zone_tie: { kind: "zone", label: "Platz entscheiden" } };
 
+/** Hinweise ohne Sperre (#2422: Nachmeldung nicht entschieden) - mit Link dorthin, wo es zu entscheiden ist. */
+function Hints({ row }) {
+  if (!row.hints?.length) return null;
+  return (
+    <ul className="mt-3 space-y-2" aria-label="Hinweise" data-testid={`close-hints-${row.tournament_id}`}>
+      {row.hints.map((hint) => (
+        <li key={hint.code} className="rounded-sm border border-white/10 p-3" data-testid={`close-hint-${row.tournament_id}-${hint.code}`}>
+          <p className="flex items-start gap-2 text-sm font-semibold text-white">
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
+            <span>{hint.label}</span>
+          </p>
+          <p className="mt-1 text-xs text-white/65">{hint.text}</p>
+          <ul className="mt-2 space-y-1">
+            {hint.items.map((item, index) => (
+              <li key={`${item.url}-${index}`} className="text-sm">
+                <Link to={item.url} className="inline-flex min-h-11 min-w-0 items-center break-words text-[#29B6E8] hover:underline">{item.text}</Link>
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Die Checkliste: jeder Sperrgrund mit seinen Fällen und dem Weg dorthin. */
 function Checklist({ row, canResults, superadmin, onDecide }) {
   if (!row.blockers.length) {
@@ -269,6 +294,7 @@ function StaffelCard({ row, data, canResults, onSheet }) {
       ) : (
         <div className="mt-3">
           <Checklist row={row} canResults={canResults} superadmin={data.superadmin} onDecide={(tie) => onSheet({ kind: "decide", row, tie })} />
+          <Hints row={row} />
         </div>
       )}
 
