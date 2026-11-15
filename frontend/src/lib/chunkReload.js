@@ -81,17 +81,21 @@ export function importWithReload(factory, options) {
 const Nothing = () => null;
 
 /** Ein dynamischer Import für Hintergrund-Bausteine (#936): Lädt die Datei nicht (veraltet nach einem Deploy, Netz
- *  weg), steht an ihrer Stelle still nichts - ohne Neuladen der Seite und ohne Fehler. Andere Fehler gehen weiter. */
-export function importOptional(factory) {
+ *  weg), steht an ihrer Stelle `fallback` (sonst nichts) - die Seite lädt nicht neu und zeigt keine Fehlerkarte.
+ *  Ganz still ist es nicht immer: Scheitert dabei das Vorladen einer Abhängigkeit, meldet Vite `vite:preloadError`,
+ *  und index.jsx zeigt den Hinweis „Eine neue Website-Version ist verfügbar …“ mit „Neu laden“ - die Person
+ *  entscheidet. Andere Fehler (ein Absturz im Baustein) gehen unverändert an die Fehlergrenze weiter. */
+export function importOptional(factory, fallback = Nothing) {
   return factory().catch((error) => {
-    if (isChunkLoadError(error)) return { default: Nothing };
+    if (isChunkLoadError(error)) return { default: fallback };
     throw error;
   });
 }
 
 /** `lazy()` für Seiten: wie React.lazy, aber mit einmaligem Neuladen nach einem Deploy.
  *  `{ optional: true }` für Bausteine im Hintergrund (Zeremonie, Glocke, Kronen-Feier, Karten „Heute im Einsatz“):
- *  für sie wird keine Seite neu geladen, auf der jemand gerade etwas tippt - sie fallen nur still weg. */
-export function lazyPage(factory, { optional = false } = {}) {
-  return lazy(() => (optional ? importOptional(factory) : importWithReload(factory)));
+ *  für sie wird keine Seite neu geladen, auf der jemand gerade etwas tippt - sie fallen weg (siehe importOptional).
+ *  `fallback` ist dann die Komponente an ihrer Stelle, etwa der gleich große Platzhalter der Glocke. */
+export function lazyPage(factory, { optional = false, fallback = Nothing } = {}) {
+  return lazy(() => (optional ? importOptional(factory, fallback) : importWithReload(factory)));
 }

@@ -27,8 +27,15 @@ for (const [path, name] of [
 }
 vi.mock("@/components/tls/UserMenu", () => ({ UserMenu: () => <button type="button" data-testid="nav-user">NeonFalke</button> }));
 
-// Die nachgeladenen Teile selbst sind kaputt.
-vi.mock("@/components/tls/NotificationBell", () => { throw new Error("Glocke kaputt"); });
+// Die nachgeladenen Teile selbst sind kaputt. Die Glocke mit einem echten Ladefehler (Datei nach einem Deploy weg),
+// Kronen-Feier und Karten mit einem Absturz beim Laden.
+// Ein Fehler in der vi.mock-Fabrik käme verpackt an ("[vitest] There was an error when mocking a module"); darum wirft
+// erst der Zugriff auf den Export - genau dort, wo lazyPage den Baustein aus dem geladenen Modul nimmt.
+vi.mock("@/components/tls/NotificationBell", () => ({
+  get NotificationBell() {
+    throw new TypeError("Failed to fetch dynamically imported module: https://lionsquad.at/assets/NotificationBell-abc123.js");
+  },
+}));
 vi.mock("./CrownCelebrationCard", () => { throw new Error("Feier kaputt"); });
 vi.mock("@/components/tls/HomeTodayCards", () => { throw new Error("Karten kaputt"); });
 
@@ -41,7 +48,9 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-test("Glocke lädt nicht: Kopfzeile und Seite bleiben, an ihrer Stelle der gleich große Platzhalter", async () => {
+test("Glocke mit echtem Ladefehler: der gleich große Platzhalter bleibt, keine Fehlergrenze, kein Neuladen", async () => {
+  const { reportCaughtError } = await import("@/lib/clientLog");
+  const { chunkReloadPending } = await import("@/lib/chunkReload");
   authState.user = { id: "u1", username: "neonfalke" };
   render(<MemoryRouter><PublicLayout><p>Inhalt</p></PublicLayout></MemoryRouter>);
   await settle();
@@ -49,7 +58,20 @@ test("Glocke lädt nicht: Kopfzeile und Seite bleiben, an ihrer Stelle der gleic
   expect(screen.getByTestId("nav-user")).toBeInTheDocument();
   expect(screen.getByTestId("notification-bell-placeholder").className).toMatch(/w-10 h-10/);
   expect(screen.queryByTestId("optional-error")).toBeNull();
+  // Der Ladefehler endet im Platzhalter von lazyPage, nicht in der Fehlergrenze - und lädt die Seite nicht neu.
+  expect(reportCaughtError).not.toHaveBeenCalled();
+  expect(chunkReloadPending()).toBe(false);
   authState.user = null;
+});
+
+test("stürzt ein Teil ab, zeigt die stille Grenze ihren Platzhalter", async () => {
+  const { OptionalBoundary } = await import("./OptionalBoundary");
+  const Broken = () => { throw new Error("kaputt"); };
+  render(<MemoryRouter><OptionalBoundary quiet placeholder={<span data-testid="platz" />}><Broken /></OptionalBoundary><p>Seite</p></MemoryRouter>);
+  await settle();
+  expect(screen.getByTestId("platz")).toBeInTheDocument();
+  expect(screen.getByText("Seite")).toBeInTheDocument();
+  expect(screen.queryByTestId("optional-error")).toBeNull();
 });
 
 test("Kronen-Feier lädt nicht: kein Absturz, kein Hinweis, die Seite bleibt", async () => {

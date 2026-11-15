@@ -128,7 +128,7 @@ test("lazyPage mit optional: Ladefehler zeichnet nichts und lädt nicht neu", as
 test("Zeremonie, Glocke, Kronen-Feier und Heute-Karten laden als optionale Hintergrund-Bausteine", () => {
   const read = (file) => readFileSync(path.resolve(__dirname, "..", file), "utf8");
   for (const file of ["components/achievements/ceremony/CeremonySlot.jsx", "components/tls/PublicLayout.jsx", "components/tls/CrownCelebration.jsx", "components/tls/HomeTodayStrip.jsx"]) {
-    expect(read(file), file).toMatch(/lazyPage\([\s\S]*?\{ optional: true \}\)/);
+    expect(read(file), file).toMatch(/lazyPage\([\s\S]*?\{ optional: true[ ,}]/);
   }
 });
 
