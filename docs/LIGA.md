@@ -3864,7 +3864,7 @@ Namen im Profilkopf und im Teamkopf (`EmblemRow`), daneben der Titel.
 die Teamleitung immer). Turnier-Pokale, Turnier-Banner, Meister-Einträge und Liga-Belohnungen stehen in einer Vitrine
 (`components/tls/rewards/TrophyCabinet.jsx`, Logik `lib/trophies.js`): Karte mit Bild (Vorlage, Pokal oder hochgeladenes Bild),
 Art, Name, Wettbewerb, Platz, Datum und Link zum Wettbewerb; neueste zuerst. Filter nach Art (Pokal, Medaille, Banner, Emblem, Titel),
-Spiel, Season bzw. Jahr (Season der Liga bzw. Saison des Vereins, sonst das Jahr) und Platz (1, 2, 3, weitere) - angeboten wird nur, was
+Spiel, Season bzw. Jahr (Season der Liga bzw. Saison des Vereins, sonst das Jahr) und Platz (1, 2, 3, weitere, „Alle Teilnehmer“ als eigener Wert) - angeboten wird nur, was
 vorkommt. Leerer Zustand und „Keine Trophäe passt zu diesem Filter“ mit Zurücksetzen. Wer besitzt, wählt an der Karte Banner, Titel und
 Embleme; der vierte Emblem-Knopf ist gesperrt und sagt warum.
 

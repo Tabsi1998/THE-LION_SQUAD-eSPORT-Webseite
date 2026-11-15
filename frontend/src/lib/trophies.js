@@ -18,7 +18,9 @@ export const TROPHY_KINDS = [
   ["title", "Titel"],
 ];
 const KIND_LABELS = Object.fromEntries(TROPHY_KINDS);
-export const PLACE_FILTERS = [["1", "1. Platz"], ["2", "2. Platz"], ["3", "3. Platz"], ["other", "Weitere Plätze"]];
+export const PLACE_FILTERS = [["1", "1. Platz"], ["2", "2. Platz"], ["3", "3. Platz"], ["other", "Weitere Plätze"], ["all", "Alle Teilnehmer"]];
+// Belohnung für alle Teilnehmer (Liga): derselbe Text wie ``league_reward_rules.place_label`` - sie zählt nie als Platz 1 bis 3.
+export const ALL_PLACES_LABEL = "Alle Teilnehmer";
 
 // Embleme neben dem Namen: Belohnungen der Art „Emblem“ oder „Medaille“, höchstens drei (der Server prüft dasselbe).
 export const EMBLEM_LIMIT = 3;
@@ -57,6 +59,7 @@ export function gameOf(award) {
 }
 
 export function placeOf(award) {
+  if (award?.reward && (award.reward.place_label === ALL_PLACES_LABEL || award.reward.art?.place === ALL_PLACES_LABEL)) return "all";
   const rank = Number(award?.rank);
   return rank >= 1 && rank <= 3 ? String(rank) : "other";
 }

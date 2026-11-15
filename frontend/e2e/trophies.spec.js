@@ -104,7 +104,9 @@ test.describe("Trophäen, Embleme und Rankingbanner", () => {
       await expect(cabinet.getByTestId("profile-trophies-no-match")).toBeVisible();
       await cabinet.getByTestId("profile-trophies-reset").click();
       await cabinet.getByTestId("profile-trophies-place").selectOption("other");
-      await expect(cabinet.getByTestId("profile-trophies-count")).toHaveText("3 von 7");
+      await expect(cabinet.getByTestId("profile-trophies-count")).toHaveText("2 von 7");
+      await cabinet.getByTestId("profile-trophies-place").selectOption("all");
+      await expect(cabinet.getByTestId("profile-trophies-count")).toHaveText("1 von 7");
       await noSideScroll(page);
     });
 

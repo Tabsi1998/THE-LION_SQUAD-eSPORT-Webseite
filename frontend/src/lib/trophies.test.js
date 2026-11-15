@@ -67,3 +67,13 @@ test("Embleme: nur Emblem und Medaille einer Liga-Belohnung, höchstens drei, in
   expect(toggleEmblem(["a", "b", "c"], "d")).toBeNull();
   expect(EMBLEM_LIMIT).toBe(3);
 });
+
+test("Belohnung für alle Teilnehmer: eigener Platz-Filter, nie unter „1. Platz“", () => {
+  const everyone = reward("all", "banner", "Season-Banner", { rank: 1, rank_label: "Alle Teilnehmer" });
+  everyone.reward = { ...everyone.reward, place_label: "Alle Teilnehmer", art: { ...everyone.reward.art, place: "Alle Teilnehmer", metal: "lion" } };
+  expect(placeOf(everyone)).toBe("all");
+  const list = [GOLD, everyone];
+  expect(trophyFacets(list).places).toEqual([["1", "1. Platz"], ["all", "Alle Teilnehmer"]]);
+  expect(filterTrophies(list, { ...NO_FILTER, place: "1" }).map((row) => row.id)).toEqual(["gold"]);
+  expect(filterTrophies(list, { ...NO_FILTER, place: "all" }).map((row) => row.id)).toEqual(["all"]);
+});
