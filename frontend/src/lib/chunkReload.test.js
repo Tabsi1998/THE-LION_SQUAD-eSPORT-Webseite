@@ -101,6 +101,37 @@ test("App.jsx lädt jede Seite über lazyPage, keine über das blanke lazy", () 
   expect((app.match(/= lazyPage\(\(\) => import\(/g) || []).length).toBeGreaterThan(100);
 });
 
+test("Hintergrund-Bausteine (#936): ein Ladefehler lädt die Seite nicht neu, an ihrer Stelle steht still nichts", async () => {
+  const { importOptional, chunkReloadPending } = await freshModule();
+  const module = await importOptional(() => Promise.reject(STALE));
+  expect(module.default()).toBeNull();
+  expect(chunkReloadPending()).toBe(false);
+  expect(window.sessionStorage.getItem("tls-chunk-reload-at")).toBeNull();
+  // Ein echter Fehler im Baustein geht weiter an die Fehlergrenze.
+  const broken = new TypeError("liste.map is not a function");
+  await expect(importOptional(() => Promise.reject(broken))).rejects.toBe(broken);
+  const loaded = { default: () => "da" };
+  await expect(importOptional(() => Promise.resolve(loaded))).resolves.toBe(loaded);
+});
+
+test("lazyPage mit optional: Ladefehler zeichnet nichts und lädt nicht neu", async () => {
+  const { render, screen, act } = await import("@testing-library/react");
+  const { Suspense, createElement: h } = await import("react");
+  const { lazyPage, chunkReloadPending } = await freshModule();
+  const Part = lazyPage(() => Promise.reject(STALE), { optional: true });
+  render(h("div", { "data-testid": "seite" }, h(Suspense, { fallback: h("span", { "data-testid": "laedt" }) }, h(Part))));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(screen.getByTestId("seite")).toBeEmptyDOMElement();
+  expect(chunkReloadPending()).toBe(false);
+});
+
+test("Zeremonie, Glocke, Kronen-Feier und Heute-Karten laden als optionale Hintergrund-Bausteine", () => {
+  const read = (file) => readFileSync(path.resolve(__dirname, "..", file), "utf8");
+  for (const file of ["components/achievements/ceremony/CeremonySlot.jsx", "components/tls/PublicLayout.jsx", "components/tls/CrownCelebration.jsx", "components/tls/HomeTodayStrip.jsx"]) {
+    expect(read(file), file).toMatch(/lazyPage\([\s\S]*?\{ optional: true[ ,}]/);
+  }
+});
+
 test("ein geladener Baustein kommt unverändert durch", async () => {
   const { importWithReload } = await freshModule();
   const module = { default: () => null };
