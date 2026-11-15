@@ -12,7 +12,11 @@ Schritt über ``extend_migration_lease``, sonst wird sie abgebrochen), wird nich
 von vorn - jede Migration ist darum so geschrieben, dass ein zweiter Lauf nur das Fehlende nachzieht.
 
 Eine Migration, die nur teilweise fertig wird, wirft ``MigrationIncomplete``: sie wird nicht als erledigt vermerkt und
-läuft beim nächsten Start erneut, der Start selbst geht weiter."""
+läuft beim nächsten Start erneut, der Start selbst geht weiter.
+
+Für Migrationsautoren: in Schritten arbeiten, zwischen den Schritten ``migration_lease_ok()`` bzw.
+``extend_migration_lease(db)`` prüfen; kein langer blockierender Sync-Code im Event-Loop (dafür ``asyncio.to_thread``),
+sonst kommt der Takt nicht dran und die Sperre geht verloren (docs/BETRIEB.md, Migrationen beim Start)."""
 from __future__ import annotations
 
 import asyncio

@@ -97,9 +97,10 @@ mehrere Backends gegen dieselbe Datenbank starten oder ein Container mitten im L
 
 **Sperre verloren.** Gelingt die Verlängerung bis einen Takt vor Ablauf nicht (Datenbank weg, Prozess hing) oder hat
 inzwischen ein anderer Start die Sperre, hört die laufende Migration auf. Migrationen mit Schritten hören am nächsten
-Schritt auf, die anderen werden abgebrochen. Die Migration wird nicht vermerkt, und der Start bricht mit
+Schritt auf, die anderen werden abgebrochen – spätestens 5 Sekunden (mindestens einen halben Takt) vor Ablauf
+der Sperre, sofort, wenn schon ein anderer Start sie hat. Die Migration wird nicht vermerkt, und der Start bricht mit
 `MigrationLeaseLost` ab; Docker startet den Container neu (`restart: unless-stopped`). Weil jede Migration nur das
-Fehlende nachzieht, macht der nächste Halter dort weiter, ohne etwas doppelt zu schreiben.
+Fehlende nachzieht, macht der nächste Halter dort weiter – ohne halben Stand.
 
 **Zeitlimits** (Umgebung des Backends; ohne Angabe gilt der Standard):
 
