@@ -22,6 +22,7 @@ from services.achievement_visibility import sees_hidden_achievements
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
     OPTIONAL_EMAIL_PREFERENCES,
+    new_account_preferences,
     preference_key,
     public_preferences_payload,
 )
@@ -469,6 +470,7 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         "accepted_terms": False,
         "consent_required": True,
         "newsletter_consent": False,
+        "notification_preferences": new_account_preferences(),  # Stufe „Alles“ (#1204)
         "dm_privacy": "everyone",
         "favorite_games": [],
         "created_at": now_utc().isoformat(),
