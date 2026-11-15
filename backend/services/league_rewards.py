@@ -511,6 +511,9 @@ TV_ART_FIELDS = ("place", "metal")
 TV_HEAD_FIELDS = ("league", "season", "division")
 # Die Hauptbelohnung je Platz: erst die für genau diesen Platz, dann ein Platzbereich - je Art Medaille vor Emblem, Banner und Titel.
 TV_KIND_ORDER = ("medal", "emblem", "banner", "title")
+# Was ``tv_places`` und ``awards._visible`` aus einem Eintrag brauchen - keine Spieler, Konten oder Empfänger.
+TV_AWARD_PROJECTION = {"_id": 0, "rank": 1, "registration_id": 1, "reward": 1, "suspended": 1, "league.season_id": 1, "overall": 1,
+                       "tournament.status": 1, "tournament.visibility": 1, "tournament.is_public": 1}
 
 
 def _tv_order(row: dict) -> tuple:
@@ -544,15 +547,18 @@ async def tv_podium(db, tournament: dict | None) -> dict | None:
     """Das Podest für den Sieger-Moment am TV - ``None``, solange die Staffel läuft oder ohne Belohnung auf Platz 1 bis 3 (dann bleibt
     der Moment wie vorher)."""
     from services.awards import _visible
-    from services.league_final_read import active_final
+    from services.league_final_read import is_closed
     from services.league_scope import is_league_staffel
 
-    if not is_league_staffel(tournament) or not await active_final(db, tournament["id"]):
+    # Erst die Marke am Turnier (ohne Abfrage), dann die geltende Fassung - nur ihre Kennung, nie die ganze Tabelle.
+    if not is_league_staffel(tournament) or not is_closed(tournament):
+        return None
+    if not await db.league_final_tables.find_one({"tournament_id": tournament["id"], "active": True}, {"_id": 0, "id": 1}):
         return None
     docs = await db.tournament_awards.find({"tournament_id": tournament["id"], "reward_key": {"$type": "string"}, "suspended": {"$ne": True},
-                                            "rank": {"$in": list(TV_PLACES)}}, {"_id": 0}).to_list(200)
+                                            "rank": {"$in": list(TV_PLACES)}}, TV_AWARD_PROJECTION).to_list(200)
     season_id = (tournament.get("league_context") or {}).get("season_id")
-    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) if season_id else None
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "id": 1, "name": 1, "status": 1, "visibility": 1}) if season_id else None
     seasons = {season_id: season} if season else {}
     visible = [doc for doc in docs if await _visible(doc, tournament, seasons)]
     places = tv_places(visible)

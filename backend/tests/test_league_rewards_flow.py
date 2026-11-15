@@ -767,6 +767,13 @@ async def test_the_tv_shows_the_podium_with_public_rewards_only_after_the_close_
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"is_public": True}})
     assert (await tv_of(flow, staffel, key))["league_podium"]["places"]
 
+    # Ohne Abschluss-Marke am Turnier fragt der TV gar nicht erst nach - kein Podest.
+    mark = (await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "final_table": 1}))["final_table"]
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"final_table": None}})
+    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"final_table": mark}})
+    assert (await tv_of(flow, staffel, key))["league_podium"]["places"]
+
     # Wieder geöffnet: die Belohnungen ruhen - kein Podest mehr.
     flow.act_as(await lead(flow, league, "Zweite Leitung", "season"))
     await must_reopen(flow, staffel)
