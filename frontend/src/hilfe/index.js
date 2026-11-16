@@ -140,6 +140,16 @@ export function bereichInhalt(bereichId, { fragen = FRAGEN, themen = THEMEN, rol
   return { anleitungen, fragen: passende, leer: !anleitungen.length && !passende.length };
 }
 
+/**
+ * Die Bereichsliste der Seite: sichtbare Bereiche samt Inhalt. Ohne Rollen-Filter steht ein leerer Bereich als „Kommt
+ * bald“ da; mit Filter fällt er weg - leer nur wegen des Filters ist kein „bald“ (#2448, Review F4).
+ */
+export function faqBereichsliste({ fragen = FRAGEN, themen = THEMEN, rolle = "", darf = {}, bereiche = BEREICHE } = {}) {
+  return sichtbareBereiche({ darf, rolle, bereiche })
+    .map((bereich) => ({ bereich, inhalt: bereichInhalt(bereich.id, { fragen, themen, rolle, darf }) }))
+    .filter(({ inhalt }) => !rolle || !inhalt.leer);
+}
+
 /** „Häufige Fragen“: markierte Fragen, die jemand sehen darf und die zur Rolle passen. */
 export function haeufigeFragen({ fragen = FRAGEN, rolle = "", darf = {} } = {}) {
   return fragen.filter((frage) => frage.haeufig && darfSehen(frage.sichtbar_fuer, darf) && passtZuRolle(frage, rolle));

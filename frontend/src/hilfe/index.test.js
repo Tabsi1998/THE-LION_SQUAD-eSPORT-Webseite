@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import masse from "./bilder/masse.json";
 import anker from "./anker.json";
 import {
-  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, bereichInhalt, darfSehen, fragePfad, haeufigeFragen, hilfeBild, hilfeNormal,
+  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, faqBereichsliste, bereichInhalt, darfSehen, fragePfad, haeufigeFragen, hilfeBild, hilfeNormal,
   hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo, passtZuRolle, sichtbareBereiche, sichtbareRollen, sucheFaq, sucheHilfe,
 } from "./index";
 
@@ -240,4 +240,27 @@ test("F2: Leitungs-Fragen mit Weg über die Verwaltung brauchen die eigene Stufe
   expect(SICHTBARKEITEN).toContain("turnierleitung_verwaltung");
   expect(darfSehen("turnierleitung_verwaltung", { turnierleitung: true })).toBe(false);
   expect(darfSehen("turnierleitung_verwaltung", { turnierleitung: true, turnierleitung_verwaltung: true })).toBe(true);
+});
+
+test("F4: Rollen von Bereich und Inhalt passen zusammen, jede Rolle gegen jeden Bereich", () => {
+  const alleRechte = { angemeldet: true, mitglied: true, turnierleitung: true, turnierleitung_verwaltung: true };
+  for (const bereich of BEREICHE) {
+    const inhalt = bereichInhalt(bereich.id, { darf: alleRechte });
+    if (inhalt.leer) continue; // Inhalt folgt (Paket 3) oder kommt nur vom Server
+    const inhaltsRollen = new Set([...inhalt.fragen, ...inhalt.anleitungen.map(({ thema }) => thema)].flatMap((eintrag) => eintrag.rollen));
+    expect([...inhaltsRollen].sort(), bereich.id).toEqual([...bereich.rollen].sort());
+  }
+  for (const { id: rolle } of ROLLEN) {
+    const liste = faqBereichsliste({ rolle, darf: alleRechte });
+    for (const { bereich, inhalt } of liste) {
+      expect(inhalt.leer, `${rolle} · ${bereich.id}`).toBe(false);
+      expect(bereich.rollen, `${rolle} · ${bereich.id}`).toContain(rolle);
+    }
+    for (const bereich of BEREICHE.filter((row) => row.rollen.includes(rolle))) {
+      const leer = bereichInhalt(bereich.id, { rolle, darf: alleRechte }).leer;
+      expect(liste.some((row) => row.bereich.id === bereich.id), `${rolle} · ${bereich.id}`).toBe(!leer);
+    }
+  }
+  // Ohne Filter bleibt „Kommt bald“: leere Bereiche stehen in der Liste.
+  expect(faqBereichsliste({ darf: { mitglied: true } }).find((row) => row.bereich.id === "helferdienste")?.inhalt.leer).toBe(true);
 });

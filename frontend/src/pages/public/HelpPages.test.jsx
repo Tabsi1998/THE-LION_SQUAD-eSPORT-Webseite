@@ -254,3 +254,16 @@ test("F1: zugeklappte Panels sind auch per Stil zu - kein später geladenes Styl
   fireEvent.click(screen.getByTestId("faq-frage-knopf-team-beitreten"));
   expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("");
 });
+
+test("F4: mit Rollen-Filter kein „Kommt bald“ - leere Bereiche fallen weg, ohne Filter stehen sie da", async () => {
+  await show("/faq", { darf: { angemeldet: true, mitglied: true, turnierleitung: false }, fragen: [], anleitungen: [] });
+  expect(screen.getByTestId("faq-bereich-helferdienste")).toHaveAttribute("data-leer", "true");
+  expect(screen.getByTestId("faq-bereich-bald-helferdienste")).toHaveTextContent("Kommt bald");
+  fireEvent.click(screen.getByTestId("faq-rolle-mitglied"));
+  expect(screen.queryByTestId("faq-bereich-helferdienste")).toBeNull();
+  expect(screen.queryAllByTestId(/^faq-bereich-bald-/)).toEqual([]);
+  for (const rolle of ["spieler", "captain"]) {
+    fireEvent.click(screen.getByTestId(`faq-rolle-${rolle}`));
+    expect(screen.queryAllByTestId(/^faq-bereich-bald-/), rolle).toEqual([]);
+  }
+});

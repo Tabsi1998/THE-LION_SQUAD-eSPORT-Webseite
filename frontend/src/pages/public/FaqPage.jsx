@@ -8,8 +8,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
-  FRAGEN, HILFE_BESCHREIBUNG, bereichInhalt, faqBereich, haeufigeFragen, hilfePfad, hilfeSchritte, sichtbareBereiche,
-  sichtbareRollen, sucheFaq,
+  FRAGEN, HILFE_BESCHREIBUNG, faqBereich, faqBereichsliste, haeufigeFragen, hilfePfad, hilfeSchritte, sichtbareRollen, sucheFaq,
 } from "@/hilfe";
 import { useFaqZugang } from "@/hilfe/useFaqZugang";
 
@@ -173,8 +172,7 @@ export default function FaqPage() {
   const fragen = useMemo(() => [...FRAGEN, ...zugang.fragen.filter((frage) => !FRAGEN.some((row) => row.id === frage.id))], [zugang.fragen]);
   const results = useMemo(() => sucheFaq(query, { fragen, darf: zugang.darf }), [query, fragen, zugang.darf]);
   const haeufig = useMemo(() => haeufigeFragen({ fragen, darf: zugang.darf }), [fragen, zugang.darf]);
-  const bereiche = useMemo(() => sichtbareBereiche({ darf: zugang.darf, rolle })
-    .map((bereich) => ({ bereich, inhalt: bereichInhalt(bereich.id, { fragen, rolle, darf: zugang.darf }) })), [fragen, rolle, zugang.darf]);
+  const bereiche = useMemo(() => faqBereichsliste({ fragen, rolle, darf: zugang.darf }), [fragen, rolle, zugang.darf]);
   const [offeneFragen, setOffeneFragen] = useState(() => new Set());
   const [offeneBereiche, setOffeneBereiche] = useState(() => new Set());
   const [ziel, setZiel] = useState("");
