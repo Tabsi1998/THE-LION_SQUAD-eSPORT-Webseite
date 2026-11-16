@@ -713,6 +713,27 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true");
   });
 
+  test("Turnierwechsel: das neue Turnier startet mit seiner Vorgabe, nicht mit dem Reiter des vorigen", async () => {
+    const LEAD_B = { ...LEAD, tournament: { ...LEAD.tournament, id: "t2", slug: "b-cup", title: "B-Cup Winter" } };
+    apiMock.get.mockImplementation((url) => {
+      const path = String(url);
+      if (path.endsWith("/live-queue")) return Promise.resolve({ data: QUEUE });
+      return Promise.resolve({ data: path.startsWith("/tournaments/b-cup") ? LEAD_B : LEAD });
+    });
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/b-cup/leitung" data-testid="go-b">B</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("lead-tab-results"));
+    expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByTestId("go-b"));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("B-Cup Winter"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+  });
+
   test("Takt nur mit Warteschlange: online (`applies: false`) kein Takt - nur der Rückfall-Takt, solange der Strom fehlt", async () => {
     apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? { applies: false, reason: "online", stations: [] } : { ...LEAD, tournament: { ...LEAD.tournament, event_mode: "online" } } }));
     liveCalls.length = 0;

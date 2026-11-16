@@ -126,7 +126,12 @@ export default function TournamentLeadPage() {
   }, [queueFailures, loadQueue]);
 
   useEffect(() => {
-    // Neues Turnier: nichts vom vorigen stehen lassen - weder seine Ansicht noch „letzter Stand vor X s“.
+    // Neues Turnier: nichts vom vorigen stehen lassen - weder seine Ansicht noch „letzter Stand vor X s“ noch der Reiter
+    // (es startet mit seiner Vorgabe; ein ?reiter= im Link setzt ihn danach).
+    if (slugRef.current !== slug) {
+      setTab(null);
+      setAutoTab("");
+    }
     slugRef.current = slug;
     hasView.current = false;
     setData(null);
