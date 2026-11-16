@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.87.0 (16.11.2026)
+
+### Neu
+
+* Benachrichtigungen in drei Stufen (Alles, Wichtiges, Wenig) mit Push, Nur App oder Aus je Thema (#1204)
+* E-Mail, Discord und Kanal-Hauptschalter eingeklappt unter „Weitere Wege“ (#1204)
+* Neue Konten starten mit der Stufe „Alles“, News & Events ohne Newsletter-Zustimmung nur in der Glocke (#1204)
+* Ruhezeit hält Push, Browser und Discord bis zum Ende zurück, danach genau eine Sammelmeldung (#1206)
+* Ruhezeit von–bis in Wiener Zeit in den Einstellungen, Vorschlag 22:00 bis 7:00, mindestens 15 Minuten Lücke (#1206)
+* Schalter in den Einstellungen geben beim Drücken kurz nach (#1204)
+* Themen per Pfeiltasten wählbar, beim Ladefehler ein Hinweis mit „Erneut versuchen“ (#1204)
+
+### Dokumentation
+
+* Hilfe und Handbuch zu Stufen, Themen und Ruhezeit mit Bildern (#1204)
+
 ## 1.86.0 (16.11.2026)
 
 ### Neu
