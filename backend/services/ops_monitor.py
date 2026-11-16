@@ -230,8 +230,10 @@ def is_client_abort(exc: BaseException, *, client_gone: bool) -> bool:
 class OpsMonitorMiddleware:
     """Die Betriebssicht als äußerste Middleware (server.py), als reine ASGI-Middleware (#2446).
 
-    Zählt wie bisher unbehandelte Ausnahmen vor der Antwort und 5xx-Antworten als Gruppe (außer der Schreibpause,
-    ``maintenance.MARKER_HEADER``) und Anfragen über ``SLOW_REQUEST_MS`` - gemessen bis zum Beginn der Antwort.
+    Zählt unbehandelte Ausnahmen - auch solche, die erst nach Beginn der Antwort im Körper auftreten - und 5xx-Antworten
+    als Gruppe (außer der Schreibpause, ``maintenance.MARKER_HEADER``; eine schon gezählte 5xx nicht doppelt) und
+    Anfragen über ``SLOW_REQUEST_MS`` - gemessen bis zum Beginn der Antwort. Andere Scopes (WebSocket, lifespan) gehen
+    unverändert durch.
     Neu: Sie sieht, ob der Client die Verbindung getrennt hat (``http.disconnect`` beim Lesen, ``OSError`` beim Senden).
     Ein solcher Abbruch wird nicht gezählt und nicht weitergeworfen - es gibt niemanden mehr, dem man antworten könnte."""
 
@@ -253,6 +255,7 @@ class OpsMonitorMiddleware:
         started = time.perf_counter()
         client_gone = False
         response_started = False
+        recorded_5xx = False
 
         async def watched_receive():
             nonlocal client_gone
@@ -262,10 +265,10 @@ class OpsMonitorMiddleware:
             return message
 
         async def watched_send(message):
-            nonlocal client_gone, response_started
+            nonlocal client_gone, response_started, recorded_5xx
             if message.get("type") == "http.response.start" and not response_started:
                 response_started = True
-                await _observe_response(app, request, message, (time.perf_counter() - started) * 1000)
+                recorded_5xx = await _observe_response(app, request, message, (time.perf_counter() - started) * 1000)
             try:
                 await send(message)
             except OSError as exc:  # uvicorn: Verbindung beim Senden schon zu
@@ -277,26 +280,32 @@ class OpsMonitorMiddleware:
         except Exception as exc:
             if is_client_abort(exc, client_gone=client_gone):
                 if client_gone:
-                    logger.debug("[ops] client left before the answer route=%s", log_safe(route_template(app, scope)))
+                    logger.debug("[ops] client left during the request route=%s", log_safe(route_template(app, scope)))
                     return
                 raise
             # Aufzeichnung darf nie die Antwort verhindern - die Ausnahme geht nach dem Festhalten unverändert weiter.
-            if not response_started:
+            # Auch nach Beginn der Antwort (ein Streaming- oder Datei-Körper bricht ab): Dann kann Starlette keine 500
+            # mehr senden, der Fehler wäre sonst unsichtbar. Wurde die Antwort schon als 5xx gezählt, nicht doppelt.
+            if not recorded_5xx:
                 await record_exception(app, request, exc)
             raise
 
 
-async def _observe_response(app: Any, request: Any, message: dict, duration_ms: float) -> None:
+async def _observe_response(app: Any, request: Any, message: dict, duration_ms: float) -> bool:
+    """Beginn der Antwort: 5xx (außer Schreibpause) als Gruppe, langsame Anfragen. ``True``, wenn eine 5xx gezählt wurde."""
     from starlette.datastructures import Headers
 
     from services import maintenance
 
     status_code = int(message.get("status") or 0)
+    recorded = False
     # Die Schreibpause fürs Backup (#1009) ist gewollt und kein Serverfehler.
     if status_code >= 500 and maintenance.MARKER_HEADER not in Headers(raw=message.get("headers") or []):
         await record_http_error(app, request, status_code)
+        recorded = True
     if duration_ms >= SLOW_REQUEST_MS:
         await record_slow_request(app, request, duration_ms, status_code)
+    return recorded
 
 
 # ---------------------------------------------------------------- Lesen
