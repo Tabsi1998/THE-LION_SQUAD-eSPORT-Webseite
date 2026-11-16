@@ -1,0 +1,65 @@
+{
+  "slug": "gewinne-und-trophaeen",
+  "titel": "Gewinne und Trophäen",
+  "kurz": "Preise und Urkunden, Trophäen und Medaillen im Profil, Erfolge und die Karte zum Teilen.",
+  "zielgruppe": "Für alle Spieler",
+  "bereich": "gewinne",
+  "rollen": ["spieler", "captain"],
+  "sichtbar_fuer": "alle",
+  "suchbegriffe": ["gewinn", "preis", "abholen", "urkunde", "trophaee", "pokal", "medaille", "emblem", "titel", "banner", "erfolg", "achievement", "teilen", "vitrine"],
+  "abschnitte": [
+    {
+      "id": "gewinne",
+      "titel": "Gewinne",
+      "schritte": [
+        {
+          "id": "meine-gewinne",
+          "titel": "Meine Gewinne",
+          "text": "Unter Meine Gewinne stehen deine Preise und Urkunden. Bei jedem Preis steht, ob er noch vorbereitet wird oder abholbereit ist.",
+          "hinweis": "Einen abholbereiten Preis holst du beim nächsten Vereinsabend ab. Ab dann hast du 90 Tage Zeit.",
+          "bild": true,
+          "link": { "to": "/my/prizes", "label": "Zu Meine Gewinne" }
+        }
+      ]
+    },
+    {
+      "id": "trophaeen-medaillen",
+      "titel": "Trophäen und Medaillen",
+      "schritte": [
+        {
+          "id": "trophaeen",
+          "titel": "Deine Trophäen",
+          "text": "In deinem Profil stehen unter Trophäen deine Pokale, Medaillen, Banner und Titel. Mit den Knöpfen oben filterst du nach Art.",
+          "hinweis": "Eine Trophäe kommt dazu, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel endet.",
+          "bild": true
+        },
+        {
+          "id": "neben-den-namen",
+          "titel": "Neben deinen Namen",
+          "text": "In deinem Profil wählst du eine Trophäe als Banner, als Titel oder neben deinem Namen. Dort stehen bis zu drei Embleme oder Medaillen.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "erfolge-und-teilen",
+      "titel": "Erfolge",
+      "schritte": [
+        {
+          "id": "erfolge",
+          "titel": "Deine Erfolge",
+          "text": "Unter Erfolge stehen deine Erfolge nach Gruppen. Tippe auf eine Gruppe, dann siehst du ihre Stufen.",
+          "hinweis": "Erfolge kommen von selbst dazu, wenn du etwas geschafft hast.",
+          "bild": true
+        },
+        {
+          "id": "erfolg-teilen",
+          "titel": "Erfolg teilen",
+          "text": "Tippe bei einer erreichten Stufe auf Teilen. So schickst oder kopierst du den Link zu einer Karte mit Bild. Dort speicherst du sie mit Bild speichern.",
+          "hinweis": "Teilen geht nur, wenn deine Erfolge öffentlich sind.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}

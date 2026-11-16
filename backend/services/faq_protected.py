@@ -11,6 +11,10 @@ Stufen „turnierleitung“ und „turnierleitung_verwaltung“ (Review #2448, F
 Fragen zu Check-in, Aufruf und Ergebnissen. Fragen, deren Weg über die Verwaltung führt, sehen nur Personen mit dem
 Bereich Turnierleitung.
 
+Stufe „helfer“ (Fabian 16.11., #2448 Paket 3): Fragen zu „Mein Dienst“ und zur Nachricht beim Eintragen sehen
+Mitglieder und alle mit einem aktiven Helfer-Einsatz in einem Turnier - auch ohne Mitgliedschaft. Ein beendeter Einsatz
+zählt nicht.
+
 Achtung, das Repository ist öffentlich: Diese Datei liest jeder auf GitHub. Hier steht nur Bedienung, nichts
 Vertrauliches (keine Zugänge, keine internen Abläufe, keine Namen). Die Prüfung am Server regelt nur, wem die Seite
 eine Frage zeigt - geheim ist sie dadurch nicht.
@@ -26,7 +30,7 @@ from services.tournament_permissions import READ_STAFF_ROLES, RESULT_STAFF_ROLES
 from services.visibility import sees_member_content
 
 # Stufen der Sichtbarkeit, von offen nach eng. „alle“ liefert das Frontend selbst aus.
-VISIBILITIES = ("alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung")
+VISIBILITIES = ("alle", "angemeldet", "mitglied", "helfer", "turnierleitung", "turnierleitung_verwaltung")
 ROLES = ("spieler", "captain", "mitglied", "turnierleitung")
 
 PROTECTED_QUESTIONS: tuple[dict, ...] = (
@@ -58,6 +62,33 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "sichtbar_fuer": "mitglied",
         "link": {"to": "/members/documents", "label": "Zu den Vereinsdokumenten"},
     },
+    {
+        "id": "mitgliedsnummer",
+        "frage": "Wo finde ich Mitgliedsnummer und Mitgliedskarte?",
+        "antwort": "Unter Meine Mitgliedschaft. Oben steht deine Nummer, darunter die Karte mit Prüfcode. Ob die Nummer öffentlich steht, entscheidest nur du.",
+        "bereich": "verein-mitgliedschaft",
+        "rollen": ["mitglied"],
+        "sichtbar_fuer": "mitglied",
+        "link": {"to": "/members/membership", "label": "Zu Meine Mitgliedschaft"},
+    },
+    {
+        "id": "mitgliederverzeichnis",
+        "frage": "Wie komme ich ins Mitgliederverzeichnis?",
+        "antwort": "Unter Meine Mitgliedschaft schaltest du Im Mitgliederverzeichnis zeigen ein. Gamertag, Spiele und Plattformen trägst du dort selbst ein.",
+        "bereich": "verein-mitgliedschaft",
+        "rollen": ["mitglied"],
+        "sichtbar_fuer": "mitglied",
+        "link": {"to": "/members/membership", "label": "Zu Meine Mitgliedschaft"},
+    },
+    {
+        "id": "austritt",
+        "frage": "Wie trete ich aus dem Verein aus?",
+        "antwort": "Unter Meine Mitgliedschaft tippst du auf Austritt erklären, auf Wunsch mit Wunschtermin. Wann die Mitgliedschaft endet, ergibt sich aus der Regel des Vereins. Zurücknehmen geht nur, solange der Austritt nicht fest eingetragen ist.",
+        "bereich": "verein-mitgliedschaft",
+        "rollen": ["mitglied"],
+        "sichtbar_fuer": "mitglied",
+        "link": {"to": "/members/membership", "label": "Zu Meine Mitgliedschaft"},
+    },
     # Helferdienste - nur für Mitglieder.
     {
         "id": "helferdienst-eintragen",
@@ -77,6 +108,31 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "rollen": ["mitglied"],
         "sichtbar_fuer": "mitglied",
         "link": {"to": "/members/helfen", "label": "Zu den Helferdiensten"},
+    },
+    {
+        "id": "helferdienst-stand",
+        "frage": "Was heißt angefragt, bestätigt und geleistet?",
+        "antwort": "Ich helfe ist eine Anfrage. Bestätigt der Vorstand, steht bestätigt dabei. Gezählt wird, was der Verein danach als geleistet bestätigt.",
+        "bereich": "helferdienste",
+        "rollen": ["mitglied"],
+        "sichtbar_fuer": "mitglied",
+        "link": {"to": "/members/helfen", "label": "Zu den Helferdiensten"},
+    },
+    {
+        "id": "mein-dienst",
+        "frage": "Wo sehe ich meine Einsätze bei Turnieren?",
+        "antwort": "Oben rechts im Menü unter Mein Dienst. Bei Deine Einsätze steht jedes Turnier, bei dem du hilfst, mit deiner Rolle.",
+        "bereich": "helferdienste",
+        "rollen": ["mitglied"],
+        "sichtbar_fuer": "helfer",
+    },
+    {
+        "id": "helfer-nachricht",
+        "frage": "Woher weiß ich, dass ich als Helfer eingetragen bin?",
+        "antwort": "Trägt dich die Turnierleitung ein, kommt eine Nachricht in die Glocke. Sie nennt deine Rolle und was du darfst. Ein Tipp führt zu Mein Dienst.",
+        "bereich": "helferdienste",
+        "rollen": ["mitglied"],
+        "sichtbar_fuer": "helfer",
     },
     # Turnierleitung - nur mit dem Bereich Turnierleitung.
     {
@@ -122,10 +178,43 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "sichtbar_fuer": "turnierleitung_verwaltung",
         "link": {"to": "/admin/events", "label": "Zu den Events in der Verwaltung"},
     },
+    {
+        "id": "leitung-cockpit",
+        "frage": "Was zeigt das Cockpit?",
+        "antwort": "Links stehen die Probleme, Dringendes zuerst. Rechts stehen die Stationen mit dem, was läuft und als Nächstes kommt. Ein Tipp auf ein Problem führt zum Fall.",
+        "bereich": "turnierleitung",
+        "rollen": ["turnierleitung"],
+        "sichtbar_fuer": "turnierleitung",
+    },
+    {
+        "id": "leitung-aufmerksamkeit",
+        "frage": "Was landet in Braucht Aufmerksamkeit?",
+        "antwort": "Streitfälle, nicht erschienene Spieler, defekte Stationen sowie fehlende oder abweichende Ergebnisse. Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.",
+        "bereich": "turnierleitung",
+        "rollen": ["turnierleitung"],
+        "sichtbar_fuer": "turnierleitung",
+    },
+    {
+        "id": "leitung-alle-aufrufen",
+        "frage": "Kann ich alle freien Stationen auf einmal aufrufen?",
+        "antwort": "Ja. Im Reiter Stationen tippst du auf Alle freien Stationen aufrufen und bestätigst. Gestartet wird dabei nichts.",
+        "bereich": "turnierleitung",
+        "rollen": ["turnierleitung"],
+        "sichtbar_fuer": "turnierleitung",
+    },
+    {
+        "id": "leitung-abschluss",
+        "frage": "Wie hole ich den Abschluss eines Turniers nach?",
+        "antwort": "In der Verwaltung tippst du beim Turnier unter Werkzeuge auf Abschluss nachholen. Das prüft Auszeichnungen, Erfolge, Jahreswertung und Gewinne und vergibt, was fehlt.",
+        "bereich": "turnierleitung",
+        "rollen": ["turnierleitung"],
+        "sichtbar_fuer": "turnierleitung_verwaltung",
+        "link": {"to": "/admin/tournaments", "label": "Zu den Turnieren in der Verwaltung"},
+    },
 )
 
 
-NO_ACCESS = {"angemeldet": False, "mitglied": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
+NO_ACCESS = {"angemeldet": False, "mitglied": False, "helfer": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
 
 
 async def _helps_in_a_tournament(user: dict) -> bool:
@@ -136,6 +225,14 @@ async def _helps_in_a_tournament(user: dict) -> bool:
         {"user_id": user["id"], "is_active": {"$ne": False}, "role": {"$in": sorted(READ_STAFF_ROLES | RESULT_STAFF_ROLES)}},
         {"_id": 1},
     )
+    return row is not None
+
+
+async def _has_helper_assignment(user: dict) -> bool:
+    """Irgendein aktiver Helfer-Einsatz in einem Turnier, gleich mit welcher Rolle (Stufe „helfer“)."""
+    if not user.get("id"):
+        return False
+    row = await get_db().tournament_staff_assignments.find_one({"user_id": user["id"], "is_active": {"$ne": False}}, {"_id": 1})
     return row is not None
 
 
@@ -150,13 +247,16 @@ async def _leads_a_league(user: dict) -> bool:
 async def viewer_access(user: dict | None) -> dict[str, bool]:
     """Was die Person einer Anfrage sehen darf. Mitglied wie bei allen Mitglieder-Inhalten (``sees_member_content``).
     Turnierleitung (Verwaltung) wie ``require_area("tournaments")`` samt Zwei-Faktor; die Stufe „turnierleitung“ hat
-    zusätzlich, wer die Leitungsansicht eines Turniers öffnen darf - aktiver Helfer-Einsatz oder Liga-Leitung."""
+    zusätzlich, wer die Leitungsansicht eines Turniers öffnen darf - aktiver Helfer-Einsatz oder Liga-Leitung. „helfer“:
+    Mitglied oder irgendein aktiver Helfer-Einsatz."""
     if not user:
         return dict(NO_ACCESS)
     area = await can_use_area(user, "tournaments")
+    member = await sees_member_content(user)
     return {
         "angemeldet": True,
-        "mitglied": await sees_member_content(user),
+        "mitglied": member,
+        "helfer": member or await _has_helper_assignment(user),
         "turnierleitung": area or await _helps_in_a_tournament(user) or await _leads_a_league(user),
         "turnierleitung_verwaltung": area,
     }

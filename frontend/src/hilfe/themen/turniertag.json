@@ -1,0 +1,72 @@
+{
+  "slug": "turniertag",
+  "titel": "Turniertag vor Ort",
+  "kurz": "Wann du dran bist, an welcher Station, wie lange gespielt wird und wer das Ergebnis einträgt.",
+  "zielgruppe": "Für alle Spieler bei Turnieren vor Ort",
+  "bereich": "turniertag",
+  "rollen": ["spieler", "captain"],
+  "sichtbar_fuer": "alle",
+  "suchbegriffe": ["vor ort", "lan", "aufruf", "dran", "station", "warteschlange", "spielzeit", "uhr", "zeit", "hinweis", "durchsage", "turnierleitung", "ergebnis"],
+  "abschnitte": [
+    {
+      "id": "dein-spiel",
+      "titel": "Dein Spiel",
+      "schritte": [
+        {
+          "id": "naechstes-spiel",
+          "titel": "Wann du spielst",
+          "text": "Auf der Turnierseite zeigt Dein Stand, wann und wo du als Nächstes spielst. Die Zeit ist geschätzt und geht mit dem Turnier mit.",
+          "hinweis": "Läuft das Turnier hinter dem Plan, steht dabei, um wie viele Minuten.",
+          "bild": true
+        },
+        {
+          "id": "aufruf",
+          "titel": "Du bist dran",
+          "text": "Ruft die Turnierleitung dein Spiel auf, steht oben Du bist dran mit deiner Station. Auf der Matchseite läuft die Zeit bis zum Antreten.",
+          "hinweis": "Dazu kommt eine Benachrichtigung, auch während der Ruhezeit. Bist du nach der Frist nicht da, kann die Turnierleitung dich als nicht erschienen werten.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "stationen",
+      "titel": "Stationen und Spielzeit",
+      "schritte": [
+        {
+          "id": "nach-stationen",
+          "titel": "Spielplan nach Stationen",
+          "text": "Öffne im Turnier den Spielplan und tippe auf Nach Stationen. Je Station steht, was gerade läuft und was als Nächstes kommt.",
+          "bild": true,
+          "clip": true
+        },
+        {
+          "id": "spielzeit",
+          "titel": "Die Spielzeit-Uhr",
+          "text": "Die Uhr zeigt, wie lange ein Spiel schon läuft und wie lange es dauern darf. Wird es knapp, färbt sie sich.",
+          "hinweis": "Ist die Zeit um, kommt ein Warnzeichen mit den Minuten darüber dazu.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "ergebnis-hinweise",
+      "titel": "Ergebnis und Hinweise",
+      "schritte": [
+        {
+          "id": "ergebnis-vor-ort",
+          "titel": "Ergebnis vor Ort",
+          "text": "Vor Ort trägt meist die Turnierleitung das Ergebnis ein. Auf der Matchseite steht dann, dass du nichts melden musst.",
+          "hinweis": "Sobald das Ergebnis drin ist, bekommst du eine Benachrichtigung. Wer meldet, legt die Turnierleitung je Turnier fest.",
+          "bild": true
+        },
+        {
+          "id": "hinweis-leitung",
+          "titel": "Hinweis der Turnierleitung",
+          "text": "Schreibt die Turnierleitung einen Hinweis, steht er oben auf der Turnierseite. Er bleibt stehen, bis seine Zeit abläuft.",
+          "hinweis": "Alle Angemeldeten bekommen den Hinweis auch als Benachrichtigung.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}

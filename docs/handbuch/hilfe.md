@@ -21,16 +21,24 @@ automatisch zur FAQ, auch Links auf einzelne Schritte und Suchen (#2448).
 | Team und Co-Team | Teamleitung und Spieler | `/faq/team-und-co-team` |
 | Liga für Captains | Captain und Vertreter | `/faq/liga-captains` |
 | Turniere (Check-in auch unter „Turniertag vor Ort“) | alle Spieler | `/faq/turniere` |
+| Verein und Mitgliedschaft (Mitglied werden, Antrag) | alle, die Mitglied werden wollen | `/faq/verein-und-mitgliedschaft` |
+| Events und Kalender (Begleitung, Warteliste, Tagesplan, Kalender-Abo) | alle | `/faq/events-und-kalender` |
+| Turniertag vor Ort (Aufruf, Station, Spielzeit-Uhr, Ergebnis, Hinweise) | alle Spieler vor Ort | `/faq/turniertag` |
+| Gewinne und Trophäen (Preise, Medaillen, Erfolge teilen) | alle Spieler | `/faq/gewinne-und-trophaeen` |
+| Datenschutz und Konto (Daten herunterladen, anonymisieren) | alle mit Konto | `/faq/datenschutz-und-konto` |
 
 ## Wer was sieht
 
 - **Alle** sehen die öffentlichen Fragen und Anleitungen.
-- **Vereinsmitglieder** sehen zusätzlich Fragen zur Mitgliedschaft (Beitrag, Versammlungen, Dokumente) und den Bereich
-  **Helferdienste**.
-- **Turnierleitung** sieht zusätzlich den Bereich **Turnierleitung** mit Fragen zu Check-in, Aufruf, Stationen und
-  Ergebnissen. Dazu zählt jeder, der die Leitungsansicht eines Turniers öffnen darf: der Bereich Turnierleitung (Rolle
+- **Vereinsmitglieder** sehen zusätzlich Fragen zur Mitgliedschaft (Beitrag, Mitgliedsnummer und Karte,
+  Mitgliederverzeichnis, Austritt, Versammlungen, Dokumente) und den Bereich **Helferdienste** (Dienst eintragen und
+  absagen, Stand der Anfrage, „Mein Dienst“ und die Nachricht beim Eintragen).
+- **Helfer bei Turnieren** mit einem aktiven Einsatz sehen den Bereich **Helferdienste** auch ohne Mitgliedschaft, dort
+  aber nur die Fragen zu „Mein Dienst“ und zur Nachricht beim Eintragen. Ein beendeter Einsatz zählt nicht.
+- **Turnierleitung** sieht zusätzlich den Bereich **Turnierleitung** mit Fragen zu Check-in, Aufruf, Stationen,
+  Cockpit, „Braucht Aufmerksamkeit“ und Ergebnissen. Dazu zählt jeder, der die Leitungsansicht eines Turniers öffnen darf: der Bereich Turnierleitung (Rolle
   oder Freigabe, mit Zwei-Faktor-Anmeldung), Helfer mit einem aktiven Einsatz in einem Turnier und die Liga-Leitung.
-- Fragen, deren Weg über die **Verwaltung** führt (Turnierleitung öffnen, Einlass beim Event), sehen nur Personen mit
+- Fragen, deren Weg über die **Verwaltung** führt (Turnierleitung öffnen, Einlass beim Event, Abschluss nachholen), sehen nur Personen mit
   dem Bereich Turnierleitung. Helfer und Liga-Leitung sehen sie nicht.
 
 Das prüft der Server. Wer kein Recht hat, bekommt diese Fragen gar nicht erst geschickt. Geheim sind sie trotzdem
