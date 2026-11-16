@@ -73,6 +73,7 @@ export function QrScanner({ onCode, paused = false }) {
         return;
       }
       video.srcObject = stream;
+      // Bewusst still: play() scheitert nur, wenn das Bild schon wieder weg ist; Kamerafehler meldet getUserMedia.
       await video.play().catch(() => {});
       const decode = await makeDecoder();
       if (stopped) return;

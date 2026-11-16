@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { X } from "lucide-react";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 // Seitenblatt (#435): kleine Formulare (Sponsor, Partner, Vorstand, Referenz …) öffnen sich von
 // rechts über der Liste statt als Fenster in der Bildschirmmitte. Am PC 36–56 rem breit, die Liste
@@ -16,21 +17,17 @@ const WIDTHS = {
 };
 
 export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", onClose, onSubmit, saving = false, submitLabel = "Speichern", savingLabel = "Speichere …", submitTestId, cancelLabel = "Abbrechen", footer, testId = "admin-sheet", noValidate = false, submitDisabled = false, children }) {
-  const panelRef = useRef(null);
+  // Tastatur (#2412): Fokus aufs Blatt, Tab bleibt darin, Escape schließt, der Rest der Seite ist solange gesperrt
+  // (`inert`), danach steht der Fokus wieder dort, wo er vorher war.
+  const panelRef = useModalBehavior(true, () => onClose?.(), { focusContainer: true });
 
   useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [onClose]);
+  }, []);
 
   const Panel = onSubmit ? "form" : "div";
   return (

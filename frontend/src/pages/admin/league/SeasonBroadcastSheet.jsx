@@ -13,6 +13,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import {
   AUDIENCES, BROADCAST_LIMITS, broadcastProblem, broadcastResultText, forgetBroadcast, newRequestId, peopleText, recallBroadcast,
   rememberBroadcast, scopeOptions, splitScope,
@@ -60,7 +61,7 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
         setTitle("");
         setText("");
       }
-    }).catch(() => {});
+    }).catch(toastLoadFailed("Der Stand des letzten Versands konnte nicht geladen werden."));
     return () => { alive = false; };
   }, [saved, statusUrl, seasonId]);
 

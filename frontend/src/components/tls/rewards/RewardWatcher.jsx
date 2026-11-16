@@ -32,9 +32,11 @@ export function RewardWatcher({ queue = ceremonyQueue, client = api }) {
         rewards.forEach((award) => queued.current.add(award.id));
         queue.enqueue({
           rewards,
+          // Bewusst still: nur die Gesehen-Marke - schlimmstenfalls kommt die Feier noch einmal.
           onDone: () => { client.post("/me/rewards/seen", { ids: rewards.map((award) => award.id) }).catch(() => {}); },
         });
       }
+    // Bewusst still: Feiern sind eine Zugabe - die nächste Anmeldung fragt wieder.
     }).catch(() => {});
     return () => { alive = false; };
   }, [userId, queue, client]);

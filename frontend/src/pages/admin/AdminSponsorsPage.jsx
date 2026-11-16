@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
@@ -72,7 +73,7 @@ export default function AdminSponsorsPage() {
   const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
     setList(data);
-    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => {});
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(toastLoadFailed("Die Events für die Auswahl konnten nicht geladen werden."));
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["sponsors", "uploads"]);

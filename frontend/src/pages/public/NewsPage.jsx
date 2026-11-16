@@ -4,7 +4,8 @@ import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
-import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicEmptyState, PublicErrorState } from "@/components/tls/PublicEmptyState";
+import { problemKind } from "@/lib/loadProblem";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -27,8 +28,11 @@ export default function NewsPage() {
   const [activeCat, setActiveCat] = useState(searchParams.get("category") || "");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
 
   useEffect(() => {
+    // Bewusst still: nur die Kategorie-Leiste; die Liste selbst meldet ihren Ladefehler.
     api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
   }, []);
 
@@ -37,7 +41,7 @@ export default function NewsPage() {
     const params = new URLSearchParams({ compact: "true", limit: "90" });
     if (activeCat) params.set("category", activeCat);
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    api.get(`/news?${params.toString()}`).then(({ data }) => setList(Array.isArray(data) ? data : data?.items || [])).catch(() => {}).finally(() => setLoading(false));
+    api.get(`/news?${params.toString()}`).then(({ data }) => { setList(Array.isArray(data) ? data : data?.items || []); setProblem(null); }).catch((error) => setProblem(problemKind(error))).finally(() => setLoading(false));
   }, [activeCat, searchQuery]);
 
   useEffect(() => {
@@ -94,6 +98,8 @@ export default function NewsPage() {
 
         {loading ? (
           <PublicLoadingState cards={6} className="mt-10" />
+        ) : problem && list.length === 0 ? (
+          <PublicErrorState kind={problem} onRetry={load} className="mt-10" />
         ) : list.length === 0 ? (
           <PublicEmptyState
             art={hasSearch ? "search" : "sleep"}

@@ -9,6 +9,126 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
+// Was auch hinter einem offenen Overlay hörbar und bedienbar bleibt - nur ausdrücklich Ausgenommenes (#2412): die
+// Toasts, die Offline- und die Rückgängig-Leiste, der Cookie-Hinweis. Ein beliebiges role="alert" oder aria-live im
+// Hintergrund (Ladefehler mit Knopf, Trefferlisten) ist gesperrt wie der Rest.
+const KEEP_OPEN = "[data-modal-exempt], [data-sonner-toaster]";
+const NEVER_INERT = new Set(["SCRIPT", "STYLE", "TEMPLATE", "LINK", "META", "NOSCRIPT"]);
+
+/**
+ * Sperrt alles außerhalb von `root` mit `inert` (#2412) - wie `aria-modal` es verspricht: kein Klick, kein Tab und
+ * kein Vorleseprogramm erreicht den Hintergrund. Gesperrt wird nur, was nicht schon gesperrt war; die Rückgabe gibt
+ * genau das wieder frei.
+ */
+function inertOutside(root) {
+  const keep = new Set([root, ...Array.from(document.querySelectorAll(KEEP_OPEN)).filter((node) => !root.contains(node))]);
+  const path = new Set();
+  keep.forEach((node) => {
+    for (let parent = node.parentElement; parent && !path.has(parent); parent = parent.parentElement) path.add(parent);
+  });
+  const locked = [];
+  const visit = (parent) => {
+    Array.from(parent.children).forEach((child) => {
+      // Erst der Weg: liegt das Overlay in einem ausgenommenen Bereich, wird dessen übriger Inhalt trotzdem gesperrt.
+      if (path.has(child)) {
+        visit(child);
+        return;
+      }
+      if (keep.has(child)) return;
+      if (NEVER_INERT.has(child.tagName) || child.hasAttribute("inert")) return;
+      child.setAttribute("inert", "");
+      locked.push(child);
+    });
+  };
+  visit(document.body);
+  // Setzt jemand anders (React mit `inert={…}`) das Attribut, solange wir sperren, gehört es ab dann ihm: beim Freigeben
+  // bleibt es stehen. Der Beobachter sieht jedes setAttribute, auch mit gleichem Wert.
+  const owned = new Set(locked);
+  const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver((records) => {
+    records.forEach((record) => owned.delete(record.target));
+  });
+  locked.forEach((node) => observer?.observe(node, { attributes: true, attributeFilter: ["inert"] }));
+  return () => {
+    // Noch nicht zugestellte Änderungen zählen mit.
+    observer?.takeRecords().forEach((record) => owned.delete(record.target));
+    observer?.disconnect();
+    owned.forEach((node) => node.removeAttribute("inert"));
+  };
+}
+
+// Optionsfelder einer Gruppe sind ein einziger Tab-Halt: am Rand zählt die ganze Gruppe als erstes bzw. letztes Element.
+function sameStop(a, b) {
+  if (a === b) return true;
+  return Boolean(a && b && a.type === "radio" && b.type === "radio" && a.name && a.name === b.name && a.form === b.form);
+}
+
+// Offene Overlays von unten nach oben. Nur das oberste nimmt Escape und Tab an und sperrt den Rest der Seite; schließt
+// es, gilt wieder das darunter (ein Bild-Dialog im Seitenblatt schließt allein, das Blatt bleibt offen).
+const stack = [];
+
+// Taucht ein ausgenommener Bereich erst auf, während gesperrt ist (Offline-Leiste, Meldung), liegt er in einem gesperrten
+// Vorfahren - dann wird die Sperre neu gezogen, mit ihm als Ausnahme.
+function lockedExemptAppeared(records) {
+  return records.some((record) => Array.from(record.addedNodes).some((node) => {
+    if (node.nodeType !== 1) return false;
+    const exempt = node.matches(KEEP_OPEN) ? [node] : Array.from(node.querySelectorAll(KEEP_OPEN));
+    return exempt.some((element) => element.closest("[inert]"));
+  }));
+}
+
+function lockTop() {
+  const top = stack[stack.length - 1];
+  if (!top?.modalRoot?.isConnected || top.release) return;
+  const release = inertOutside(top.modalRoot);
+  const watcher = typeof MutationObserver === "undefined" ? null : new MutationObserver((records) => {
+    if (stack[stack.length - 1] !== top || !lockedExemptAppeared(records)) return;
+    unlockTop();
+    lockTop();
+  });
+  watcher?.observe(document.body, { childList: true, subtree: true });
+  top.release = () => {
+    watcher?.disconnect();
+    release();
+  };
+}
+
+function unlockTop() {
+  const top = stack[stack.length - 1];
+  top?.release?.();
+  if (top) top.release = null;
+}
+
+function pushOverlay(entry) {
+  unlockTop();
+  // Gehen zwei verschachtelte Overlays gleichzeitig auf, laufen die Effekte von innen nach außen - das innere bleibt oben.
+  let index = stack.length;
+  while (index > 0 && entry.container && entry.container.contains(stack[index - 1].container)) index -= 1;
+  stack.splice(index, 0, entry);
+  lockTop();
+}
+
+/**
+ * Nimmt `entry` vom Stapel. Gibt `true` zurück, wenn ein Overlay darüber noch offen ist: dann gibt nicht dieses den Fokus
+ * zurück (der Hintergrund ist noch gesperrt), sondern es reicht sein Ziel an die Overlays darüber weiter, deren eigenes
+ * Ziel mit ihm verschwindet - schließen Dialog und Blatt im selben Durchgang, landet der Fokus beim Auslöser des Blatts.
+ */
+function popOverlay(entry) {
+  const index = stack.indexOf(entry);
+  if (index < 0) return false;
+  const wasTop = index === stack.length - 1;
+  if (wasTop) unlockTop();
+  stack.splice(index, 1);
+  if (wasTop) {
+    lockTop();
+    return false;
+  }
+  stack.slice(index).forEach((above) => {
+    const target = above.returnTo;
+    if (!target || !target.isConnected || entry.container?.contains(target)) above.returnTo = entry.returnTo;
+  });
+  return true;
+}
+
 /**
  * Keyboard behaviour every one of our own overlays needs: Escape closes it, Tab
  * stays inside it, and focus returns where it came from afterwards.
@@ -19,11 +139,24 @@ const FOCUSABLE = [
  * whole screen: without it a keyboard user cannot reach their close button.
  *
  * Focus only goes back when it is still inside the overlay (or was lost with it): an action that already moved it on
- * on purpose - inserting a picture puts it back into the text editor - keeps it there (#937).
+ * on purpose - inserting a picture puts it back into the text editor - keeps it there (#937). Because the rest of the
+ * page is `inert` while a modal overlay is open, such an action has to move the focus after closing (the text editor
+ * focuses in the next frame, when the lock is already lifted).
+ *
+ * An overlay marked `aria-modal="true"` (on the container or around it) locks everything else on the page with
+ * `inert` while it is open (#2412). Only the topmost open overlay reacts to Escape and Tab, so a dialog inside a
+ * sheet closes on its own. Escape pressed in a list that lives outside the overlay (a Radix select hangs off the
+ * body) belongs to that list.
+ *
+ * No `autoFocus` inside: it fires before this hook remembers where the focus came from. Focus a field in an effect
+ * declared after the hook instead.
+ *
+ * `focusContainer`: focus goes to the overlay itself instead of its first control (sheets: the screen reader reads
+ * the title first, Tab leads to the first field).
  *
  * Returns the ref to put on the element that holds the focusable content.
  */
-export function useModalBehavior(active, onDismiss) {
+export function useModalBehavior(active, onDismiss, { focusContainer = false } = {}) {
   const containerRef = useRef(null);
   const dismissRef = useRef(onDismiss);
   dismissRef.current = onDismiss;
@@ -34,14 +167,27 @@ export function useModalBehavior(active, onDismiss) {
     const previouslyFocused = document.activeElement;
 
     const focusableItems = () => Array.from(container?.querySelectorAll(FOCUSABLE) || []);
+    const entry = { container, modalRoot: container?.closest?.('[aria-modal="true"]') || null, release: null, returnTo: previouslyFocused };
+    pushOverlay(entry);
+    const isTop = () => stack[stack.length - 1] === entry;
 
     if (container && !container.contains(document.activeElement)) {
-      const [first] = focusableItems();
+      const [first] = focusContainer ? [] : focusableItems();
       (first || container).focus?.();
     }
 
+    // Ein Modal sperrt den Rest der Seite. Steht der Fokus trotzdem außerhalb, ist es eine Ebene, die erst danach
+    // aufging (ein Radix-Popover am body, etwa der Kalender im Datumsfeld): Tab und Escape gehören dann ihr.
+    const inForeignLayer = (current) => Boolean(
+      entry.modalRoot && current && current !== document.body && !entry.modalRoot.contains(current) && !current.closest("[inert]"),
+    );
+
     const onKeyDown = (event) => {
+      if (!isTop()) return;
+      const current = document.activeElement;
+      if (inForeignLayer(current)) return;
       if (event.key === "Escape") {
+        if (container && current && current !== document.body && !container.contains(current)) return;
         event.stopPropagation();
         dismissRef.current?.();
         return;
@@ -54,11 +200,10 @@ export function useModalBehavior(active, onDismiss) {
       }
       const first = items[0];
       const last = items[items.length - 1];
-      const current = document.activeElement;
-      if (event.shiftKey && (current === first || !container.contains(current))) {
+      if (event.shiftKey && (sameStop(current, first) || current === container || !container.contains(current))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (current === last || !container.contains(current))) {
+      } else if (!event.shiftKey && (sameStop(current, last) || !container.contains(current))) {
         event.preventDefault();
         first.focus();
       }
@@ -67,11 +212,12 @@ export function useModalBehavior(active, onDismiss) {
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
+      if (popOverlay(entry)) return;
       const current = document.activeElement;
       const movedOnPurpose = current && current !== document.body && !container?.contains(current);
-      if (!movedOnPurpose) previouslyFocused?.focus?.();
+      if (!movedOnPurpose) entry.returnTo?.focus?.();
     };
-  }, [active]);
+  }, [active, focusContainer]);
 
   return containerRef;
 }
