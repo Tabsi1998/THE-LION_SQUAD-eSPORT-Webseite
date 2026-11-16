@@ -71,6 +71,20 @@ test("nach fünf Minuten meldet sich eine anhaltende Störung noch einmal", () =
   }
 });
 
+test("wird die Uhr zurückgestellt, meldet sich die Störung wieder statt still zu bleiben", () => {
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(new Date("2026-11-16T12:00:00Z"));
+    const fail = toastLoadFailed("Die Kategorien konnten nicht geladen werden.");
+    fail({ response: { status: 500 } });
+    vi.setSystemTime(new Date("2026-11-16T11:00:00Z"));
+    fail({ response: { status: 500 } });
+    expect(toast.error).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test("teilen sich Abrufe eine Meldung, schaltet nur der eigene Erfolg den Hinweis wieder scharf", () => {
   const message = "Teile der Übersicht konnten nicht geladen werden.";
   const failA = toastLoadFailed(message, "/a");

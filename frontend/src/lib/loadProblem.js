@@ -43,8 +43,10 @@ export function toastLoadFailed(message, key = message) {
     if (canceled(error)) return;
     if (!error?.response && typeof navigator !== "undefined" && navigator.onLine === false) return;
     const last = reported.get(key);
-    if (last !== undefined && Date.now() - last < REPEAT_AFTER_MS) return;
-    reported.set(key, Date.now());
+    const now = Date.now();
+    // Uhr zurückgestellt (now < last): lieber neu melden als bis zum alten Zeitpunkt still bleiben.
+    if (last !== undefined && now >= last && now - last < REPEAT_AFTER_MS) return;
+    reported.set(key, now);
     toast.error(message, { id: `load-failed:${message}` });
   };
 }
