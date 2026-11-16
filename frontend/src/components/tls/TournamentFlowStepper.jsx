@@ -61,7 +61,9 @@ function staffelSteps({ r, approved, matches, published }) {
   ];
 }
 
-export function TournamentFlowStepper({ tournament, registrations = [], matchesV2 = [], onNavigate }) {
+// ``stack``: am Handy (unter 640 px) als Liste untereinander statt als Wischleiste - die Staffel-Seite der Liga-Verwaltung (#2262)
+// zeigt so alle Schritte auf einen Blick. Ohne Angabe bleibt die Leiste, wie sie ist.
+export function TournamentFlowStepper({ tournament, registrations = [], matchesV2 = [], onNavigate, stack = false }) {
   const status = tournament?.status || "draft";
   const r = rank(status);
   const staffel = Boolean(tournament?.league_context);
@@ -96,7 +98,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
         <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{staffel ? "Liga-Ablauf" : "Turnier-Ablauf"}</span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
-      <div className="flex items-stretch gap-1 tls-swipe tls-swipe--room pb-1">
+      <div className={stack ? "flex flex-col gap-1 sm:flex-row sm:items-stretch tls-swipe tls-swipe--room pb-1" : "flex items-stretch gap-1 tls-swipe tls-swipe--room pb-1"}>
         {steps.map((step, i) => {
           const isDone = step.done;
           const isCurrent = i === current;
@@ -109,13 +111,13 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
               ? "border-[#29B6E8] bg-[#29B6E8] text-black"
               : "border-white/15 text-white/40";
           return (
-            <div key={step.id} className="flex items-center flex-1 min-w-[120px]">
+            <div key={step.id} className={stack ? "flex items-center flex-1 min-w-0 sm:min-w-[120px]" : "flex items-center flex-1 min-w-[120px]"}>
               <button
                 type="button"
                 data-testid={`flow-step-${step.id}`}
                 aria-current={isCurrent ? "step" : undefined}
                 onClick={() => onNavigate?.(step.key)}
-                className="group flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                className={stack ? "group flex min-h-[44px] flex-1 items-center gap-3 text-left focus:outline-none sm:flex-col sm:gap-1.5 sm:text-center" : "group flex flex-col items-center gap-1.5 flex-1 focus:outline-none"}
               >
                 <span
                   className={`relative w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${ring} ${
@@ -125,7 +127,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
                   {state === "done" ? <Check className="w-5 h-5" /> : <Icon className="w-4 h-4" />}
                 </span>
                 <span
-                  className={`text-[11px] font-bold uppercase tracking-wider text-center transition-colors ${
+                  className={`text-[11px] font-bold uppercase tracking-wider ${stack ? "flex-1 sm:flex-none sm:text-center" : "text-center"} transition-colors ${
                     state === "current" ? "text-[#FFD700]" : state === "done" ? "text-white" : "text-white/45"
                   }`}
                 >
@@ -135,7 +137,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
               </button>
               {i < steps.length - 1 && (
                 <span
-                  className={`h-0.5 w-full max-w-[40px] -mt-6 rounded transition-colors duration-300 ${
+                  className={`h-0.5 w-full max-w-[40px] -mt-6 rounded transition-colors duration-300 ${stack ? "hidden sm:block" : ""} ${
                     isDone ? "bg-[#29B6E8]" : "bg-white/10"
                   }`}
                 />

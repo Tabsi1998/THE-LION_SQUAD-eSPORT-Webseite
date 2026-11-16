@@ -2,7 +2,7 @@
 // die Staffelgröße und „Vorgaben auf Staffeln übertragen“. Was beim Übertragen nicht mehr darf, meldet der Server je Staffel mit Grund.
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightLeft, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
@@ -11,6 +11,7 @@ import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
 import { nicknameRepeatsLevel, seasonWithEnd } from "@/lib/seasonTabs";
 import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable";
+import { staffelAdminUrl } from "@/lib/staffelTabs";
 import { PrizeEditor } from "./LeagueLookFields";
 import { DivisionPlatformFields } from "./DivisionPlatformFields";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -212,7 +213,12 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                     {/* Stand aus der Season statt „Entwurf“ (#2453), dazu was fehlt - dieselbe Ableitung wie die Ablaufleiste im Überblick. */}
                     <StaffelStandBadge tournament={asStaffel(staffel, season)} season={season} now={now} testId={`staffel-stand-${division.level}-${staffel.staffel}`} />
                     <StaffelNeedsHint tournament={asStaffel(staffel, season)} season={season} now={now} testId={`staffel-needs-${division.level}-${staffel.staffel}`} />
-                    <span className="ml-auto inline-flex items-center gap-2">
+                    <span className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {/* Staffel-Seite der Liga-Verwaltung (#2262): zusätzlich - der Weg in die Turnierverwaltung bleibt bis Paket D. */}
+                      <Link to={staffelAdminUrl(staffel.tournament_id)} data-testid={`staffel-open-${division.level}-${staffel.staffel}`}
+                        className="inline-flex min-h-[44px] items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+                        Staffel öffnen <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                      </Link>
                       <Link to={`/admin/tournaments/${staffel.tournament_id}`} data-testid={`staffel-manage-${division.level}-${staffel.staffel}`}
                         className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">
                         Turnierverwaltung · Co-Teams zuteilen <ExternalLink className="w-3 h-3" aria-hidden="true" />

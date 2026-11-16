@@ -50,7 +50,9 @@ function SquadIds({ players = [], label, squadId }) {
   );
 }
 
-export function SquadAssignDialog({ tournament, onAssigned }) {
+// ``triggerClassName``: Aussehen des Knopfs „Co-Team zuteilen“ - die Staffel-Seite der Liga-Verwaltung (#2262) stellt ihn breit
+// und mit 44 px Tippfläche hin.
+export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "" }) {
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
@@ -125,7 +127,7 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
 
   return (
     <>
-      <button type="button" onClick={start} data-testid="squad-assign-open" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+      <button type="button" onClick={start} data-testid="squad-assign-open" className={triggerClassName || "tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider"}>
         <Users className="h-4 w-4" /> Co-Team zuteilen
       </button>
       {open ? (
@@ -151,7 +153,7 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
               {loadError ? (
                 <div className="space-y-3">
                   <p role="alert" className="text-warn">{loadError}</p>
-                  <button type="button" onClick={load} data-testid="squad-assign-reload" className="tls-btn tls-btn--secondary rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                  <button type="button" onClick={load} data-testid="squad-assign-reload" className="tls-btn tls-btn--secondary min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
                     Erneut laden
                   </button>
                 </div>
@@ -226,14 +228,14 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
 
             <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-white/10 p-4">
               {team ? (
-                <button type="button" onClick={() => pickTeam("")} disabled={busy} className="tls-btn tls-btn--quiet mr-auto rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => pickTeam("")} disabled={busy} className="tls-btn tls-btn--quiet mr-auto min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
                   Anderes Team
                 </button>
               ) : null}
-              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="tls-btn tls-btn--quiet rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="tls-btn tls-btn--quiet min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
                 Abbrechen
               </button>
-              <button type="button" onClick={submit} disabled={busy || !squad} data-testid="squad-assign-confirm" className="tls-btn tls-btn--primary rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              <button type="button" onClick={submit} disabled={busy || !squad} data-testid="squad-assign-confirm" className="tls-btn tls-btn--primary min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                 {busy ? "Teile zu …" : "Zuteilen"}
               </button>
             </div>

@@ -198,6 +198,18 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
     expect(staffelNeeds({ id: "x", status: "draft", participant_count: 0 })).toEqual([]);
   });
 
+  it("was fehlt auf der Staffel-Seite (#2262): die Seite nennt mit manageUrl ihre eigenen Ziele", () => {
+    const manageUrl = (tab) => `/staffel${tab ? `?alt=${tab}` : ""}`;
+    const needs = (staffel, now, season) => staffelNeeds({ ...STAFFEL, ...staffel }, { season, now: new Date(now), manageUrl });
+    const noWindow = { ...OPEN, application_opens_at: null, application_closes_at: null };
+    expect(needs({ participant_count: 0 }, "2026-11-02T10:00:00Z", noWindow)[0].to).toBe("/staffel?alt=participants");
+    expect(needs({ participant_count: 4 }, "2026-11-08T10:00:00Z", OPEN)[0].to).toBe("/staffel");
+    expect(needs({ status: "live", participant_count: 4, league_plan: { fixed_matches: 0 } }, "2026-11-12T10:00:00Z", { ...OPEN, status: "active" })[0].to)
+      .toBe("/staffel?alt=matchplan");
+    // Der Eingang der Season bleibt der Eingang der Season.
+    expect(needs({}, "2026-11-02T10:00:00Z", OPEN)[0].to).toBe("/admin/leagues/seasons/s1#anmeldungen");
+  });
+
   it("Filter: nur der Entwurf weicht dem Liga-Stand, Live, Pausiert und Beendet passen weiter auf ihren Status (Review #2453, 1)", () => {
     const active = { ...OPEN, status: "active" };
     expect(statusFilterKeys({ ...STAFFEL, status: "live", league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["live", "league:spielbetrieb"]);

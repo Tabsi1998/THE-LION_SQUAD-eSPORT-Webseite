@@ -373,6 +373,18 @@ export function statusChangeNotice(status, tournament, { activeRegistrations = 0
   }
   if (status === "cancelled") {
     const count = Number(activeRegistrations) || 0;
+    // Liga-Staffel (#2262): Teilnehmer sind Co-Teams, abgesagt wird eine Staffel - die Nachricht geht wie im Turnier an die Angemeldeten.
+    if (tournament.league_context) {
+      const teams = count === 1 ? "Das 1 Co-Team bekommt" : count ? `Alle ${count} Co-Teams bekommen` : "Zugeteilte Co-Teams bekommen";
+      return {
+        title: "Staffel absagen?",
+        description: `${teams} eine Nachricht (Postfach und Push). Ein Grund ist freiwillig und steht in dieser Nachricht.`,
+        confirmLabel: "Absagen",
+        tone: "danger",
+        askReason: true,
+        placeholder: "z. B. zu wenige Teams",
+      };
+    }
     const who = count === 1 ? "Die 1 Anmeldung bekommt" : count ? `Alle ${count} Anmeldungen bekommen` : "Angemeldete bekommen";
     return {
       title: "Turnier absagen?",
