@@ -387,6 +387,25 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, locked ? "Turnier konnte nicht gesperrt werden." : "Turnier konnte nicht entsperrt werden."));
     }
   };
+  // Abschluss nachholen (#2452): ein veröffentlichtes Turnier noch einmal auswerten - Auszeichnungen, Erfolge, Punkte und
+  // Gewinne, die beim Veröffentlichen ausblieben, kommen genau einmal dazu. Kein Statuswechsel, keine Nachricht.
+  const recheckResults = async () => {
+    const ok = await confirm({
+      title: "Abschluss nachholen?",
+      description: "Das System prüft Auszeichnungen, Erfolge, Jahreswertung und Gewinne dieses Turniers noch einmal und vergibt, was fehlt – genau einmal. Ergebnisse und Status bleiben, niemand bekommt eine Nachricht; wer jetzt einen Erfolg bekommt, sieht ihn beim nächsten Öffnen.",
+      confirmLabel: "Nachholen",
+      tone: "info",
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.post(`/tournaments/${id}/status`, { status: t.status, recheck: true });
+      toast.success(`Abschluss nachgeholt – ${data?.awards ?? 0} Auszeichnungen geprüft.`);
+      if (data?.season_points_note) toast.info(data.season_points_note, { duration: 10000 });
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Der Abschluss konnte nicht nachgeholt werden."));
+    }
+  };
   const generateGroups = async () => {
     const gc = await prompt({
       title: "Gruppen generieren",
@@ -530,6 +549,11 @@ export default function AdminTournamentEditPage() {
     canLockTournament && (
       <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border font-bold uppercase tracking-wider rounded-sm text-xs ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
         {t.locked_at ? "Entsperren" : "Sperren"}
+      </button>
+    ),
+    isTournamentLead && !staffel && ["results_published", "archived"].includes(t.status) && (
+      <button key="recheck" type="button" onClick={recheckResults} data-testid="admin-tr-recheck-results" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+        <RefreshCw className="w-3.5 h-3.5" /> Abschluss nachholen
       </button>
     ),
     // Nach dem Ende bleibt der Baum (#2120): daran hängen Platzierungen, Punkte und Gewinne.

@@ -1057,6 +1057,27 @@ test("nach dem Ende gibt es kein Zurücksetzen mehr", async () => {
   expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
 });
 
+// Abschluss nachholen (#2452): nur bei veröffentlichten Turnieren, mit Rückfrage, ohne Statuswechsel.
+test("Abschluss nachholen: Rückfrage, dann derselbe Status mit recheck", async () => {
+  const user = userEvent.setup();
+  serveFixed({ status: "results_published" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+  apiMock.post.mockImplementation(() => Promise.resolve({ data: { ok: true, rechecked: true, awards: 8 } }));
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+  await user.click(screen.getByTestId("admin-tr-recheck-results"));
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("genau einmal");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/status", { status: "results_published", recheck: true }));
+});
+
+test("Abschluss nachholen gibt es erst nach dem Veröffentlichen", async () => {
+  serveFixed({ status: "completed" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.queryByTestId("admin-tr-recheck-results")).toBeNull();
+});
+
 test("im festen Baum: kein Entfernen und kein Ablehnen - wer nicht spielt, bleibt entfernbar", async () => {
   serveFixed();
   await screen.findAllByText("Max Muster");
