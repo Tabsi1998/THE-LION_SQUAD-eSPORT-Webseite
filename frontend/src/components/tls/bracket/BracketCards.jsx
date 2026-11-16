@@ -8,7 +8,7 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
 import { InlineMatchClock } from "@/components/tls/live/MatchClock";
 import { MOTION, motionAllowed } from "@/lib/motion";
-import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
+import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, slotDraw, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
   DurationContext, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
@@ -361,7 +361,9 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
   const freeCount = freeSlots.length;
   // Kommt auf diese Plätze niemand mehr (#2452: die Quelle wurde zusammengelegt oder schickt weniger weiter), heißt es
   // „bleiben leer“ statt „frei“ - „frei“ klang, als könnte noch jemand dazukommen.
-  const stayEmpty = freeCount > 0 && freeSlots.every((slot) => slot.source_result?.skipped);
+  // Gemischte Runden (#1548, #1590): ein gestrichener Platz ohne Los-Kennung wartet weiter aufs Los (wie slotDrawn) -
+  // dort kann noch jemand hinkommen, also nicht „bleibt leer“.
+  const stayEmpty = freeCount > 0 && freeSlots.every((slot) => slot.source_result?.skipped && !(slotDraw(slot) && !slot.source_result.draw_id));
   const taken = slots.filter((slot) => slot.registration_id || !isByeSlot(slot));
   const rows = played
     ? [...taken].sort((a, b) => (resultMap.get(a.registration_id)?.rank || 99) - (resultMap.get(b.registration_id)?.rank || 99))

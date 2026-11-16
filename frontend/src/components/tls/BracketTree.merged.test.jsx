@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import MERGED from "../../../e2e/fixtures/mergedHeatsGenerated.json";
+import FFA from "../../../e2e/fixtures/ffaGenerated.json";
 import { BracketTree } from "./BracketTree";
 import { TournamentFlowStepper } from "./TournamentFlowStepper";
 
@@ -51,5 +52,17 @@ describe("Läufe-Cup mit zusammengelegten Läufen", () => {
     expect(screen.queryByText("2 Plätze frei")).toBeNull();
     // Lauf G ist schon gefahren: dort steht keine Zeile mehr.
     expect(screen.queryByTestId(`bracket-heat-free-${byKey(data, "G").id}`)).toBeNull();
+  });
+});
+
+// Gemischte Runde (draw_round, #1548): ein gestrichener Platz ohne Los-Kennung wartet weiter aufs Los - dort kann noch
+// jemand hinkommen. Der Baum aus dem echten Umbau: 8 von 16 gemischt und zusammengelegt (ffa8_shuffle_merged).
+describe("Gemischte Runde nach dem Zusammenlegen", () => {
+  it("die Plätze heißen weiter „frei“, nicht „bleiben leer“", () => {
+    const data = structuredClone(FFA.ffa8_shuffle_merged);
+    const heat = byKey(data, "E");
+    expect(heat.slots.some((slot) => slot.source_result?.skipped && slot.source?.draw && !slot.source_result.draw_id)).toBe(true);
+    render(<BracketTree data={data} layout="tree" />);
+    expect(screen.getByTestId(`bracket-heat-free-${heat.id}`)).toHaveTextContent("2 Plätze frei");
   });
 });
