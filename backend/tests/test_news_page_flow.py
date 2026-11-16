@@ -172,15 +172,11 @@ async def test_home_lead_is_the_pinned_news_like_on_the_news_page(flow):
 
 
 @pytest.mark.asyncio
-async def test_home_without_pinned_news_has_no_news_lead(flow):
-    """Seit #1263 wie die News-Seite: ohne angehefteten Beitrag kein News-Aufmacher - oben steht das nächste Event, die
-    neueste News führt das Raster an."""
+async def test_home_lead_without_pinned_news_is_the_newest(flow):
     await news(flow, "gestern", days_ago=1)
     await news(flow, "vorgestern", days_ago=2)
     flow.act_as(None)
-    state = (await flow.get("/api/home/state")).json()
-    assert state["featured_news"] == []
-    assert [n["slug"] for n in state["news"]] == ["gestern", "vorgestern"]
+    assert [n["slug"] for n in (await flow.get("/api/home/state")).json()["featured_news"]] == ["gestern"]
 
 
 # ---------------------------------------------------------------- #1266 Weg zur Anmeldung
