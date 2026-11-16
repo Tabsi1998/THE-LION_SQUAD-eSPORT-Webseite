@@ -30,7 +30,6 @@ LIVE_TEST_FILES = {
     "test_iter11_refresh_race.py",
     "test_iter12_sessions_growth.py",
     "test_iter13_crowns.py",
-    "test_iter14_logout_regression.py",
     "test_iter14_team_levels_crowns.py",
     "test_live_preview_validation.py",
     "test_phase1_unified_match.py",
