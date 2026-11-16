@@ -134,3 +134,123 @@ test("Hat eine Aktion den Fokus schon hinausgesetzt, bleibt er dort", async () =
 
   expect(screen.getByLabelText("Text")).toHaveFocus();
 });
+
+// #2412: hinter einem offenen modalen Overlay ist der Rest der Seite gesperrt (`inert`) - für Maus, Tastatur und
+// Vorleseprogramm. Meldungen (Toasts, aria-live) bleiben erreichbar, nach dem Schließen ist alles wieder frei.
+function ModalOverlay({ onDismiss = () => {}, children = null }) {
+  const ref = useModalBehavior(true, onDismiss);
+  return (
+    <div role="presentation" data-testid="backdrop">
+      <div ref={ref} role="dialog" aria-modal="true" aria-label="Fenster" data-testid="modal">
+        <button type="button">Im Fenster</button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Page({ initiallyOpen = false, overlay = null }) {
+  const [open, setOpen] = useState(initiallyOpen);
+  return (
+    <div>
+      <main data-testid="page"><button type="button" onClick={() => setOpen(true)}>Öffnen</button></main>
+      <section aria-live="polite" data-testid="live" />
+      {open ? (overlay ? overlay(() => setOpen(false)) : <ModalOverlay onDismiss={() => setOpen(false)} />) : null}
+    </div>
+  );
+}
+
+test("Ein modales Overlay sperrt den Hintergrund und gibt ihn beim Schließen frei", async () => {
+  const user = userEvent.setup();
+  render(<Page />);
+
+  await user.click(screen.getByRole("button", { name: "Öffnen" }));
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
+  expect(screen.getByTestId("modal")).not.toHaveAttribute("inert");
+  expect(screen.getByTestId("backdrop")).not.toHaveAttribute("inert");
+
+  await user.keyboard("{Escape}");
+  expect(screen.getByTestId("page")).not.toHaveAttribute("inert");
+});
+
+test("Meldungsbereiche (aria-live) bleiben hinter dem Overlay erreichbar", async () => {
+  const user = userEvent.setup();
+  render(<Page />);
+
+  await user.click(screen.getByRole("button", { name: "Öffnen" }));
+
+  expect(screen.getByTestId("live")).not.toHaveAttribute("inert");
+});
+
+test("Was schon vorher gesperrt war, bleibt nach dem Schließen gesperrt", async () => {
+  const user = userEvent.setup();
+  render(
+    <>
+      <div data-testid="already" inert />
+      <Page />
+    </>,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Öffnen" }));
+  await user.keyboard("{Escape}");
+
+  expect(screen.getByTestId("already")).toHaveAttribute("inert");
+});
+
+test("Ein nicht modales Overlay (ohne aria-modal) sperrt nichts", async () => {
+  function Drawer() {
+    const ref = useModalBehavior(true, () => {});
+    return <aside ref={ref}><button type="button">Menü</button></aside>;
+  }
+  render(<><main data-testid="page" /><Drawer /></>);
+
+  expect(screen.getByTestId("page")).not.toHaveAttribute("inert");
+});
+
+test("Verschachtelt: Escape schließt nur das obere Overlay, der Hintergrund des unteren bleibt gesperrt", async () => {
+  const user = userEvent.setup();
+  const outerDismiss = vi.fn();
+
+  function Inner({ onDismiss }) {
+    const ref = useModalBehavior(true, onDismiss);
+    return <div ref={ref} role="dialog" aria-modal="true" aria-label="Innen" data-testid="inner"><button type="button">Innen</button></div>;
+  }
+  function Outer() {
+    const [inner, setInner] = useState(false);
+    const ref = useModalBehavior(true, outerDismiss);
+    return (
+      <div ref={ref} role="dialog" aria-modal="true" aria-label="Außen" data-testid="outer">
+        <button type="button" onClick={() => setInner(true)}>Innen öffnen</button>
+        <p data-testid="outer-text">Text</p>
+        {inner ? <Inner onDismiss={() => setInner(false)} /> : null}
+      </div>
+    );
+  }
+  render(<><main data-testid="page" /><Outer /></>);
+
+  await user.click(screen.getByRole("button", { name: "Innen öffnen" }));
+  expect(screen.getByTestId("outer-text")).toHaveAttribute("inert");
+
+  await user.keyboard("{Escape}");
+  expect(screen.queryByTestId("inner")).not.toBeInTheDocument();
+  expect(outerDismiss).not.toHaveBeenCalled();
+  expect(screen.getByTestId("outer-text")).not.toHaveAttribute("inert");
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
+  expect(screen.getByRole("button", { name: "Innen öffnen" })).toHaveFocus();
+});
+
+test("Escape gehört einer aufgeklappten Auswahl außerhalb des Overlays, nicht dem Overlay", async () => {
+  const user = userEvent.setup();
+  const onDismiss = vi.fn();
+  render(<ModalOverlay onDismiss={onDismiss} />);
+  // Eine Auswahlliste (z. B. Radix) hängt sich nach dem Öffnen an den body und bekommt den Fokus, solange sie offen ist.
+  const popover = document.createElement("div");
+  popover.innerHTML = '<button type="button">Wahl</button>';
+  document.body.appendChild(popover);
+  popover.querySelector("button").focus();
+
+  await user.keyboard("{Escape}");
+
+  expect(onDismiss).not.toHaveBeenCalled();
+  popover.remove();
+});
