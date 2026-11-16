@@ -575,7 +575,16 @@ test.describe("Liga-Gesamtabnahme: die 18 Szenarien gegen echte API und MongoDB"
       await openPage(person, `${leagueUrl()}/gesamtwertung`);
       await shot(person.page, `g1-gesamtwertung-${viewport.width}.png`);
       await openPage(person, `/teams/${state.teams[0].team_id}`);
-      await expect(person.page.getByText("Goldmedaille").first()).toBeVisible();
+      // Seit #2425 (PR #2436) stehen Turnier-Pokale und Liga-Belohnungen im Reiter „Trophäen“, nicht mehr in der Übersicht.
+      // Die Medaille des Meisters liegt dort genau einmal, als Gold.
+      await person.page.getByTestId("team-tab-trophies").click();
+      const cabinet = person.page.getByTestId("team-trophies");
+      await expect(cabinet).toBeVisible();
+      const gold = cabinet.locator('[data-testid^="trophy-card-"]').filter({ hasText: "Goldmedaille" });
+      await expect(gold).toHaveCount(1);
+      await expect(gold).toBeVisible();
+      await expect(gold).toHaveAttribute("data-metal", "gold");
+      await noSideScroll(person.page);
       await shot(person.page, `g1-teamprofil-${viewport.width}.png`);
       await done(person);
     }
