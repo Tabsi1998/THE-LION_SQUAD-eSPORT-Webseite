@@ -317,3 +317,51 @@ test("Tab in einer aufgeklappten Auswahl außerhalb des modalen Overlays bleibt 
   expect(june).toHaveFocus();
   popover.remove();
 });
+
+// Fix-Runde #2412: schließt eine Aktion im inneren Dialog auch das Blatt darunter (beide im selben Durchgang), geht der
+// Fokus an den Knopf zurück, der das Blatt geöffnet hat - nicht verloren an einen verschwundenen oder gesperrten Knopf.
+test("Dialog im Blatt, beide schließen zugleich: der Fokus kehrt zum Auslöser des Blatts zurück", async () => {
+  const user = userEvent.setup();
+  function Inner({ onDone }) {
+    const ref = useModalBehavior(true, () => {});
+    return <div ref={ref} role="dialog" aria-modal="true" aria-label="Innen"><button type="button" onClick={onDone}>Fertig</button></div>;
+  }
+  function Sheet({ onClose }) {
+    const [inner, setInner] = useState(false);
+    const ref = useModalBehavior(true, onClose);
+    return (
+      <div ref={ref} role="dialog" aria-modal="true" aria-label="Blatt">
+        <button type="button" onClick={() => setInner(true)}>Bild wählen</button>
+        {inner ? <Inner onDone={onClose} /> : null}
+      </div>
+    );
+  }
+  function App() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <main data-testid="page"><button type="button" onClick={() => setOpen(true)}>Bearbeiten</button></main>
+        {open ? <Sheet onClose={() => setOpen(false)} /> : null}
+      </>
+    );
+  }
+  // Wie im Browser: ein Element unter `inert` (oder nicht mehr im Dokument) nimmt keinen Fokus an.
+  const realFocus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function focusUnlessInert(...args) {
+    if (!this.isConnected || this.closest("[inert]")) return;
+    realFocus.apply(this, args);
+  };
+  try {
+    render(<App />);
+    const opener = screen.getByRole("button", { name: "Bearbeiten" });
+    await user.click(opener);
+    await user.click(screen.getByRole("button", { name: "Bild wählen" }));
+    await user.click(screen.getByRole("button", { name: "Fertig" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("page")).not.toHaveAttribute("inert");
+    expect(opener).toHaveFocus();
+  } finally {
+    HTMLElement.prototype.focus = realFocus;
+  }
+});

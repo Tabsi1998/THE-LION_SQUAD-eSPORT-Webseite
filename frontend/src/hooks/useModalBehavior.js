@@ -71,13 +71,26 @@ function pushOverlay(entry) {
   lockTop();
 }
 
+/**
+ * Nimmt `entry` vom Stapel. Gibt `true` zurück, wenn ein Overlay darüber noch offen ist: dann gibt nicht dieses den Fokus
+ * zurück (der Hintergrund ist noch gesperrt), sondern es reicht sein Ziel an die Overlays darüber weiter, deren eigenes
+ * Ziel mit ihm verschwindet - schließen Dialog und Blatt im selben Durchgang, landet der Fokus beim Auslöser des Blatts.
+ */
 function popOverlay(entry) {
   const index = stack.indexOf(entry);
-  if (index < 0) return;
+  if (index < 0) return false;
   const wasTop = index === stack.length - 1;
   if (wasTop) unlockTop();
   stack.splice(index, 1);
-  if (wasTop) lockTop();
+  if (wasTop) {
+    lockTop();
+    return false;
+  }
+  stack.slice(index).forEach((above) => {
+    const target = above.returnTo;
+    if (!target || !target.isConnected || entry.container?.contains(target)) above.returnTo = entry.returnTo;
+  });
+  return true;
 }
 
 /**
@@ -118,7 +131,7 @@ export function useModalBehavior(active, onDismiss, { focusContainer = false } =
     const previouslyFocused = document.activeElement;
 
     const focusableItems = () => Array.from(container?.querySelectorAll(FOCUSABLE) || []);
-    const entry = { container, modalRoot: container?.closest?.('[aria-modal="true"]') || null, release: null };
+    const entry = { container, modalRoot: container?.closest?.('[aria-modal="true"]') || null, release: null, returnTo: previouslyFocused };
     pushOverlay(entry);
     const isTop = () => stack[stack.length - 1] === entry;
 
@@ -163,10 +176,10 @@ export function useModalBehavior(active, onDismiss, { focusContainer = false } =
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      popOverlay(entry);
+      if (popOverlay(entry)) return;
       const current = document.activeElement;
       const movedOnPurpose = current && current !== document.body && !container?.contains(current);
-      if (!movedOnPurpose) previouslyFocused?.focus?.();
+      if (!movedOnPurpose) entry.returnTo?.focus?.();
     };
   }, [active, focusContainer]);
 
