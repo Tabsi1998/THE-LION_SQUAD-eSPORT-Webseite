@@ -5,8 +5,8 @@ Vereinsfunktionen. Die Website übernimmt den Stand – für Konten, deren
 Zuordnung zu einem Mitglied **bestätigt** ist. Dieses Dokument ist die
 Anleitung für den Betrieb: einrichten, umstellen, Fehler lesen, zurückdrehen.
 
-Stand: Dolibarr I (#316 Teil 1, #295, #297, #330 Teil 1). Rechnungen und PDF
-folgen mit „Dolibarr II“, Abrechnung mit „Abrechnung I/II“.
+Stand: Dolibarr I (#316 Teil 1, #295, #297, #330 Teil 1). Rechnungen, Vereinsakte, Versammlungen
+und Teilnahmen kamen später dazu und haben eigene Abschnitte weiter unten.
 
 ## Grundsätze
 
@@ -34,6 +34,46 @@ folgen mit „Dolibarr II“, Abrechnung mit „Abrechnung I/II“.
 | **Superadmin** | Freigabe „Vorstand → Bereiche“, weil sie Rechte vergibt |
 | Redaktion, Turnierleitung, Moderation | nichts davon |
 | Das Mitglied selbst | eigener Beitragsstand und eigene Funktionen unter „Meine Mitgliedschaft“ |
+
+## Datenfluss: was die Website liest und was sie schreibt (#1542)
+
+Die Anbindung ist **nicht nur lesend**. Der Abgleich holt den Stand aus Dolibarr; daneben schreibt die
+Website an genau den Stellen, die unten stehen, und nur auf einen Auftrag hin: eine Person schickt etwas ab,
+die Verwaltung klickt, oder ein Job trägt einen schon erteilten Auftrag nach. Einen stillen Rückweg, der Daten
+aus der Website über Dolibarr schreibt, gibt es nicht.
+
+**Lesen (Dolibarr → Website):** Status, Mitgliedsart, Nummer, Beginn, Austritt, Beitragsstand und Funktionen,
+Vereinsdaten und Vorstand, Ehrungen, Sponsoren, Dokumente und Statuten, Belege, Versammlungen und
+Abstimmungen. Der Abgleich läuft alle 10 Minuten für das Geänderte und einmal am Tag für alles; ein
+signierter Webhook stößt ihn sofort an, offene Einträge arbeitet ein Job alle 30 Sekunden ab. Vereinsdaten
+und Sponsoren holt ein eigener Job stündlich.
+
+**Schreiben (Website → Dolibarr):** Jeder schreibende Aufruf geht mit dem Schreib-Schlüssel (sonst dem
+Lese-Schlüssel des Website-Benutzers) und **ohne automatische Wiederholung im Aufruf selbst**. Wo
+nachgetragen wird, macht das ein Job, der vorher prüft, ob es den Eintrag schon gibt (feste Kennung je
+Auftrag). Nichts davon läuft im Modus „Aus“ oder „Vorschau“.
+
+| Was | Aufruf | Auslöser | Führend | Wenn Dolibarr nicht antwortet | Nachtrag |
+| --- | --- | --- | --- | --- | --- |
+| Beitrittsantrag (Schalter „Anträge nach Dolibarr senden“) | `POST /vereine/applications`, Rücknahme `…/{id}/withdraw` | Person schickt „Mitglied werden“ ab bzw. zieht zurück | Dolibarr entscheidet; die Website zeigt den Stand | Antrag bleibt „wird übermittelt“, nie „abgelehnt“; ein fachliches Nein (400) wird „fehlgeschlagen“ | mit dem Abgleich alle 10 Minuten, gleiche Kennung `web-<Antrag>` |
+| Einwilligungen | `POST /vereine/members/{id}/consents` | Person stimmt unter „Meine Mitgliedschaft“ zu oder widerruft | Dolibarr; die Website hebt einen Nachweis auf (`consent_decisions`) | Meldung „noch nicht bestätigt“, der Nachweis bleibt offen; ein späterer Widerruf in Dolibarr gewinnt | nein: die Person schickt erneut, dieselbe Entscheidung ist derselbe Auftrag |
+| Vereinsakte verbinden | `POST /vereine/identities/claim` | Person löst einen Einladungscode ein | Dolibarr (Bindung je Person) | Fehlermeldung, nichts gebunden | nein |
+| Eigene Kontaktdaten | `POST /vereine/me/profile/changes` | Person reicht eine Änderung ein | Dolibarr; Änderungen sind Anträge, außer das Modul übernimmt ein Feld sofort | Fehlermeldung; hat sich der Stand inzwischen geändert (409), überschreibt die Website nichts | nein |
+| Austritt | `POST /vereine/me/exit` | Person erklärt den Austritt | Dolibarr (letzter Tag nach der Kündigungsregel) | Fehlermeldung, kein Austritt vermerkt | nein |
+| Website-Profil (Gamertag, Kurztext, Spiele, Plattformen) | `PUT /vereine/me/website-profile` | Person speichert unter „Meine Mitgliedschaft“ | Dolibarr; das Verzeichnis übernimmt es beim nächsten Abgleich | Fehlermeldung, nichts geändert | nein |
+| Konten in der Akte (Discord, Twitch, Steam) | `PUT`/`DELETE /vereine/me/accounts/{netzwerk}` | Schalter je Konto; Trennen auf der Website nimmt es mit heraus | Website (nur geprüfte Verknüpfungen) | Fehlermeldung, Schalter bleibt, wie er war | nein |
+| Zu- und Absage, Anträge, Stimmen | `PUT …/meetings/{id}/response`, `POST …/motions`, `POST …/ballots/{id}/votes` | Person, Stimme nach Rückfrage | Dolibarr (Stimmrecht, Ergebnis) | Die Website behauptet nie, es sei abgestimmt, wenn sie es nicht weiß | nein; eine Stimme hat eine feste Kennung, ein zweites Senden ist dieselbe Stimme |
+| Einlass bei der Generalversammlung | `PUT`/`DELETE /vereine/meetings/{id}/attendance/{mitglied}` | Vorstand scannt die Karte bzw. nimmt zurück | Dolibarr (prüft die Vorstandsfunktion) | Fehlermeldung am Eingang | nein |
+| Helferdienste | `PUT`/`DELETE /vereine/me/events/{id}/shifts/{dienst}` | Person fragt einen Dienst an bzw. zieht zurück | Dolibarr; erst ein bestätigter Dienst zählt | Fehlermeldung | nein |
+| Teilnahmen (Schalter „Teilnahmen melden“) | `POST`/`DELETE /vereine/members/{id}/participations` | Check-in, Turnierabschluss, Widerruf | Website für die Teilnahme | wird beim nächsten Lauf gemeldet | Job alle 10 Minuten über die letzten 30 Tage, Kennung `ev.…`/`tn.…` |
+| Wunschnummer | `PUT /members/{id}` (ergänzendes Attribut) | Mitglied wählt eine Nummer; Austritt und Kontolöschung leeren sie | Website (das Mitglied hat sie gewählt) | Nummer bleibt auf der Website gesichert | Job `jersey_numbers` alle 10 Minuten |
+| Geschäftspartner | `POST /thirdparties` | Rechnungsauftrag ohne passenden Partner; Finanzverwaltung legt bewusst einen neuen an | Dolibarr | Auftrag wartet; bei gleicher E-Mail entscheidet die Finanzverwaltung | mit dem Rechnungs-Job |
+| Rechnungen und Gutschriften (Schalter „Schreiben erlaubt“) | `POST /invoices`, `…/validate`, `PUT /documents/builddoc` | Anmeldung mit Preis bei Event oder Turnier; Gutschrift nur als Entwurf | Dolibarr für den Beleg, Website für die Buchung | Auftrag bleibt offen; fehlt nur das PDF, bleibt der Beleg gültig | Rechnungs-Job alle 2 Minuten, Abgleich alle 10 Minuten, prüft vorher `ref_ext` |
+
+Was die Website nie schreibt: Mitgliedsstatus, Mitgliedsart, Mitgliedsnummer, Beitragsstand, Funktionen,
+Zahlungen. Gelöscht wird in Dolibarr nur, was die Website selbst eingetragen hat und ausdrücklich zurücknimmt
+(Teilnahme, Einlass, Helferdienst, Konto in der Akte, Wunschnummer). Die Einzelheiten stehen in den
+Abschnitten weiter unten; was davon Personendaten betrifft, fasst [DATA_PROTECTION.md](../DATA_PROTECTION.md) zusammen.
 
 ## Einrichten (einmalig)
 
@@ -265,8 +305,9 @@ Grund. Es steht nie ein Schlüssel oder ein Antworttext darin.
 | gelb: „steht seit … min“ | der letzte gelungene Lauf ist über eine Stunde her | Ursache oben suchen |
 | rot | Live und seit über einem Tag kein gelungener Lauf | **nach 48 Stunden ruhen die Rechte aus Funktionen**; Mitgliedschaften bleiben |
 
-Niemals bei einer unklaren Lage blind etwas doppelt anlegen: Die Anbindung
-schreibt in dieser Ausbaustufe **nichts** nach Dolibarr.
+Niemals bei einer unklaren Lage blind etwas doppelt anlegen: Der Abgleich selbst
+schreibt **nichts** nach Dolibarr. Was die Website sonst schreibt, steht unter „Datenfluss“ oben;
+wo ein Job nachträgt, prüft er vorher die feste Kennung des Auftrags.
 
 ## Zurückdrehen
 
