@@ -111,3 +111,25 @@ async def test_without_tournament_mails_only_bell_and_push(flow):
     await flow.db.users.update_one({"id": helper["id"]}, {"$set": {"notification_preferences": {"email:tournament_updates": False}}})
     await flow.post(f"/api/tournaments/{tournament['id']}/staff", json={"user_id": helper["id"], "role": "station_manager"})
     assert await mails(flow, helper) == []
+
+
+@pytest.mark.asyncio
+async def test_fast_lap_helpers_get_the_same_message(flow):
+    """Fast Lap (#1384, Review): Eintragen schickt dieselbe Nachricht; pausiert eingetragen kommt sie beim Aktivieren."""
+    flow.act_as(await flow.add_user(role="superadmin", name="leitung"))
+    await flow.db.f1_challenges.insert_one({"id": "fl-1", "slug": "monza", "title": "Monza Fast Lap", "status": "registration_open"})
+    helper = await flow.add_user(name="Hanna Helfer")
+    later = await flow.add_user(name="Paul Pause")
+    created = await flow.post("/api/f1/challenges/fl-1/staff", json={"user_id": helper["id"], "role": "scorekeeper"})
+    assert created.status_code == 200, created.text
+    rows = await notes(flow, helper)
+    assert len(rows) == 1 and "Monza Fast Lap" in rows[0]["title"] and "Zeiten eintragen" in rows[0]["body"]
+    assert rows[0]["url"] == "/admin/dienst" and len(await mails(flow, helper)) == 1
+
+    paused = await flow.post("/api/f1/challenges/fl-1/staff", json={"user_id": later["id"], "role": "referee", "is_active": False})
+    assert paused.status_code == 200 and await notes(flow, later) == []
+    for active in (True, False, True):
+        toggled = await flow.patch(f"/api/f1/challenges/fl-1/staff/{paused.json()['id']}", json={"is_active": active})
+        assert toggled.status_code == 200, toggled.text
+    rows = await notes(flow, later)
+    assert len(rows) == 1 and "als Schiedsrichter" in rows[0]["body"]

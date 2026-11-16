@@ -30,7 +30,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
     setSaving(true);
     try {
       await api.post(`/f1/challenges/${challengeId}/staff`, { user_id: person.id, ...form });
-      toast.success(`${person.name} hilft jetzt beim Fast Lap.`);
+      toast.success(`${person.name} hilft jetzt beim Fast Lap und bekommt Bescheid.`);
       setPerson(null);
       setForm({ role: "scorekeeper", notes: "" });
       onChanged();
