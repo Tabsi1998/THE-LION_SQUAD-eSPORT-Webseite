@@ -13,6 +13,7 @@ from typing import Iterable
 
 from models import new_id, now_utc
 from services.competition_versions import competition_version_fields_for_write
+from services.station_runtime import free_stations_of_deleted_matches
 
 
 class StructureApplyError(RuntimeError):
@@ -211,6 +212,8 @@ async def activate_structure_plan(
             ) from exc
         raise
 
+    # Die ersetzte Vorschau ist weg: eine Station, die eines ihrer Spiele hielt, wird frei (#2386).
+    await free_stations_of_deleted_matches(db, old_v2_ids)
     return {
         "ok": True,
         "idempotent_replay": False,

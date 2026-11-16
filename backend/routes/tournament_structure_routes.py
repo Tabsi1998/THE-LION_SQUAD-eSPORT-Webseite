@@ -12,6 +12,7 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.staffel_guard import staffel_rebuild_problem
+from services.station_runtime import free_stations_of_deleted_matches
 from services import tournament_guard
 from services.draw_records import record_build_draws
 from services.heat_rebuild import evaluate_after_write
@@ -479,6 +480,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
         if v2_match_ids:
             await db.matches_v2.delete_many({"id": {"$in": v2_match_ids}})
             await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+            await free_stations_of_deleted_matches(db, v2_match_ids)
         await db.tournament_stages.delete_many({
             "tournament_id": tid,
             "id": {"$ne": stage["id"]},
@@ -550,6 +552,7 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+    await free_stations_of_deleted_matches(db, v2_match_ids)
     # Der Status bleibt (#2120, TA16): früher fiel jedes Turnier auf „Entwurf“, und die öffentliche Seite war weg.
     await db.tournaments.update_one({"id": tid}, {"$set": {"updated_at": now_utc().isoformat()}})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen

@@ -35,6 +35,7 @@ from services.competition_versions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.mutation_lock import MutationLockBusy, mutation_lock
+from services.station_runtime import free_stations_of_deleted_matches
 from services.slug_utils import (
     apply_slug_history,
     find_by_slug_or_history,
@@ -676,6 +677,7 @@ async def _drop_matches(db, match_ids: list[str]) -> None:
     if match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
         await db.matches_v2.delete_many({"id": {"$in": match_ids}})
+        await free_stations_of_deleted_matches(db, match_ids)
 
 
 @router.delete("/{tid}")

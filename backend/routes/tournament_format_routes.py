@@ -15,6 +15,7 @@ from services.graph_swiss import (
 )
 from services.competition_versions import persist_competition_versions
 from services import tournament_guard
+from services.station_runtime import free_stations_of_deleted_matches
 from models import REGISTRATION_LIMIT, GROUP_LIMIT, now_utc, new_id
 from routes.tournament_common import (
     require_lead_of,
@@ -216,6 +217,7 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
     if old_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": old_match_ids}})
     await db.matches_v2.delete_many({"stage_id": stage["id"]})
+    await free_stations_of_deleted_matches(db, old_match_ids)
     await db.tournament_groups.delete_many({"tournament_id": tid})
     await db.tournament_groups.insert_many([
         {**group, "tournament_id": tid, "created_at": now_utc().isoformat()}

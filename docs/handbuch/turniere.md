@@ -629,9 +629,12 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
 - **Anderes Turnier**: An einer geteilten Station des Events spielt gerade ein anderes Turnier. Aufrufen, Freigeben und
   Räumen macht dessen Leitung. **Defekt** geht nach einer Rückfrage – dessen Leitung bekommt sofort Bescheid, sieht den
   Fall unter **Braucht Aufmerksamkeit** und legt das Spiel um; beide Protokolle halten es fest.
-- **Hängt**: Die Station ist als belegt gespeichert, hält aber kein offenes Spiel (etwa nach dem Löschen einer Phase).
-  **Station räumen** macht sie wieder frei – nie, solange ein offenes Spiel daran steht. Beim Löschen oder Neubauen
-  einer Phase werden die Stationen ihrer Spiele ohnehin frei; wer dort aufgerufen war, bekommt „Aufruf zurückgenommen“.
+- **Hängt**: Die Station ist als belegt gespeichert, hält aber kein offenes Spiel (etwa nach einer Störung beim
+  Speichern). **Station räumen** macht sie wieder frei – nie, solange ein offenes Spiel daran steht. Wo Spiele gelöscht
+  werden, werden ihre Stationen ohnehin frei: Phase löschen oder neu bauen, Turnierbaum zurücksetzen oder neu bauen,
+  Gruppen neu bilden, Vorschau neu bauen (Format, Anmeldung, Check-in-Ende) und Turnier löschen. Eine defekte Station
+  bleibt dabei defekt. Beim Löschen oder Neubauen einer Phase bekommt, wer dort aufgerufen war, „Aufruf
+  zurückgenommen“.
 - Tippen zwei Leute zugleich, gilt genau ein Tipp; der andere bekommt eine Meldung und sieht den neuen Stand. Jede
   Aktion steht im Protokoll.
 

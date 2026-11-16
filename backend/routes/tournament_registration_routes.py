@@ -12,6 +12,7 @@ from database import get_db
 from services import billing_orders, league_applications, squad_registration
 from services.league_scope import is_league_staffel
 from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
+from services.station_runtime import free_stations_of_deleted_matches
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
@@ -323,6 +324,7 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
             if match_ids:
                 await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
             await db.matches_v2.delete_many({"stage_id": stage["id"]})
+            await free_stations_of_deleted_matches(db, match_ids)
         await db.matches_v2.insert_many(matches)
         await db.tournament_stages.update_one(
             {"id": stage["id"]},

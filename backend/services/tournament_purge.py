@@ -10,6 +10,7 @@ mit; Stationen bleiben (sie sind Geräte in der Halle) und verlieren nur die Zuo
 from __future__ import annotations
 
 from services.chat_attachments import delete_tournament_attachments
+from services.station_runtime import free_stations_of_deleted_matches
 
 
 async def purge_tournament(db, tid: str) -> None:
@@ -33,6 +34,8 @@ async def purge_tournament(db, tid: str) -> None:
         pool_scopes.append({"scope": "stage", "scope_id": {"$in": stage_ids}})
     await db.map_pools.delete_many({"$or": pool_scopes})
     await db.loadout_bans.delete_many({"scope": "tournament", "scope_id": tid})
+    # Eine Station, die ein Spiel des Turniers hielt, wird frei (#2386) - eine geteilte Event-Station auch.
+    await free_stations_of_deleted_matches(db, v2_match_ids)
     await db.stations.update_many({"tournament_id": tid}, {"$set": {"tournament_id": None}})
     # Fotos vom Ergebnis (#1157): persönlich - sie gehen mit dem Turnier.
     from services.match_proofs import delete_for_tournament
