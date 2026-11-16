@@ -244,16 +244,8 @@ test("unbekannte Anleitung: Hinweis und Weg zur FAQ, nicht in Suchmaschinen", as
   expect(useDocumentTitle).toHaveBeenLastCalledWith("FAQ", undefined, { robots: "noindex, follow" });
 });
 
-// Review-Runde 1 (#2448).
-
-test("F1: zugeklappte Panels sind auch per Stil zu - kein später geladenes Stylesheet kann sie öffnen", async () => {
-  await show("/faq");
-  // Als Stil am Element selbst - das schlägt jede Klasse, auch aus einem später nachgeladenen Stylesheet.
-  expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("none");
-  expect(screen.getByTestId("faq-bereich-inhalt-teams").style.display).toBe("none");
-  fireEvent.click(screen.getByTestId("faq-frage-knopf-team-beitreten"));
-  expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("");
-});
+// Review-Runde 1 (#2448): F4 Rollen-Filter ohne „Kommt bald“, F6 kaputter Anker, F7 Anker einmal, Suche mit Anker,
+// Fragen im Bereich als h4, Ansage nur der Trefferzahl.
 
 test("F4: mit Rollen-Filter kein „Kommt bald“ - leere Bereiche fallen weg, ohne Filter stehen sie da", async () => {
   await show("/faq", { darf: { angemeldet: true, mitglied: true, turnierleitung: false }, fragen: [], anleitungen: [] });
@@ -273,4 +265,53 @@ test("F6: ein kaputter Anker (#%E0%A4) bricht weder die FAQ noch eine Anleitung"
   expect(screen.getByTestId("faq-haeufig")).toBeInTheDocument();
   await show("/faq/turniere#%E0%A4");
   expect(screen.getAllByTestId("help-topic").length).toBeGreaterThan(0);
+});
+
+test("F7: der Anker springt einmal je Aufruf - nicht noch einmal nach der Antwort des Servers oder einer Invalidierung", async () => {
+  const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
+  const scroll = vi.fn();
+  window.HTMLElement.prototype.scrollIntoView = scroll;
+  await show("/faq#frage-team-beitreten", { darf: { angemeldet: true, mitglied: true, turnierleitung: false }, fragen: [MITGLIED_FRAGE], anleitungen: [] });
+  await waitFor(() => expect(within(screen.getByTestId("faq-haeufig")).getByTestId("faq-frage-helferdienst-eintragen")).toBeInTheDocument());
+  expect(scroll).toHaveBeenCalledTimes(1);
+  const knopf = screen.getByTestId("faq-frage-knopf-team-beitreten");
+  fireEvent.click(knopf);
+  expect(knopf).toHaveAttribute("aria-expanded", "false");
+  await act(async () => { emitApiInvalidation({ resource: "auth" }); });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 200)); });
+  expect(api.get).toHaveBeenCalledTimes(2);
+  expect(knopf).toHaveAttribute("aria-expanded", "false");
+  expect(scroll).toHaveBeenCalledTimes(1);
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+});
+
+test("F7: Anker auf eine häufige Frage bei laufender Suche - die Frage steht offen in ihrem Bereich", async () => {
+  await show("/faq?q=team#frage-team-beitreten");
+  expect(screen.getByTestId("faq-results")).toBeInTheDocument();
+  expect(screen.getByTestId("faq-bereich-knopf-teams")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("faq-frage-knopf-team-beitreten-bereich")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("faq-antwort-team-beitreten-bereich")).toBeVisible();
+});
+
+test("F7: Fragen im Bereich sind h4 unter dem h3 des Bereichs, nur die Trefferzahl wird angesagt", async () => {
+  await show("/faq");
+  fireEvent.click(screen.getByTestId("faq-bereich-knopf-teams"));
+  const frage = screen.getByTestId("faq-frage-knopf-team-beitreten-bereich");
+  expect(frage.closest("h4")).not.toBeNull();
+  expect(screen.getByTestId("faq-bereich-knopf-teams").closest("h3")).not.toBeNull();
+  expect(screen.getByTestId("faq-frage-knopf-team-beitreten").closest("h3")).not.toBeNull();
+  expect(screen.getByTestId("faq-results-ansage")).toHaveAttribute("aria-live", "polite");
+  fireEvent.change(screen.getByTestId("faq-search"), { target: { value: "beitrittscode" } });
+  expect(screen.getByTestId("faq-results-ansage")).toHaveTextContent(/^\d+ Treffer$/);
+  expect(screen.getByTestId("faq-results")).not.toHaveAttribute("aria-live");
+  expect(document.querySelectorAll("[aria-live]").length).toBe(1);
+});
+
+test("F1: zugeklappte Panels sind auch per Stil zu - kein später geladenes Stylesheet kann sie öffnen", async () => {
+  await show("/faq");
+  // Als Stil am Element selbst - das schlägt jede Klasse, auch aus einem später nachgeladenen Stylesheet.
+  expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("none");
+  expect(screen.getByTestId("faq-bereich-inhalt-teams").style.display).toBe("none");
+  fireEvent.click(screen.getByTestId("faq-frage-knopf-team-beitreten"));
+  expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("");
 });

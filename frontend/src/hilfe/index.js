@@ -63,7 +63,9 @@ export function hilfeVideo(id, videos = VIDEOS) {
 
 /** Klein, ohne Akzente, Umlaute ausgeschrieben - so findet ein Wort mit Umlaut auch die Schreibweise mit ae, oe, ue. */
 export function hilfeNormal(text) {
+  // Zuerst NFC (#2448): Ein zerlegtes „ä“ (a + Trema, etwa vom Mac oder aus kopiertem Text) wird so zu „ä“ und damit zu „ae“.
   return String(text || "")
+    .normalize("NFC")
     .toLowerCase()
     .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")

@@ -3,8 +3,9 @@ import { resolve } from "node:path";
 import masse from "./bilder/masse.json";
 import anker from "./anker.json";
 import {
-  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, ankerAus, faqBereichsliste, bereichInhalt, darfSehen, fragePfad, haeufigeFragen, hilfeBild, hilfeNormal,
-  hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo, passtZuRolle, sichtbareBereiche, sichtbareRollen, sucheFaq, sucheHilfe,
+  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, ankerAus, bereichInhalt, darfSehen, faqBereichsliste, fragePfad,
+  haeufigeFragen, hilfeBild, hilfeNormal, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo, passtZuRolle, sichtbareBereiche,
+  sichtbareRollen, sucheFaq, sucheHilfe,
 } from "./index";
 
 // Hilfe-Daten (#2295): eindeutige Anker, jedes Bild für Handy und PC vorhanden, Verweise zeigen auf echte Schritte,
@@ -270,4 +271,13 @@ test("F6: ein kaputter Anker zählt als keiner", () => {
   expect(ankerAus("#check-in")).toBe("check-in");
   expect(ankerAus("#frage-%C3%BC")).toBe("frage-ü");
   expect(ankerAus("")).toBe("");
+});
+
+test("F7: Suche zuerst NFC - ein zerlegtes „ä“ findet dasselbe wie das fertige", () => {
+  const zerlegt = "Gründe".normalize("NFD");
+  expect(zerlegt).not.toBe("Gründe");
+  expect(hilfeNormal(zerlegt)).toBe("gruende");
+  expect(hilfeNormal("Bestätigen".normalize("NFD"))).toBe("bestaetigen");
+  expect(sucheFaq(`Team ${zerlegt}`).map((row) => row.id)).toEqual(sucheFaq("Team gründe").map((row) => row.id));
+  expect(sucheFaq("gruende Team").map((row) => row.id)).toContain("team-gruenden");
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   ArrowRight, BadgeCheck, Bell, CalendarDays, ChevronDown, ClipboardList, Gift, HandHelping, ListOrdered, MapPin, Search,
@@ -39,18 +39,19 @@ function toggleIn(set, id, auf) {
 }
 
 /** Eine Frage zum Aufklappen (Disclosure): Knopf mit aria-expanded, darunter die kurze Antwort samt Link. */
-function FrageEintrag({ frage, offen, onToggle, anker = true, bereich = "" }) {
+function FrageEintrag({ frage, offen, onToggle, anker = true, bereich = "", ebene = 3 }) {
+  const Kopf = ebene === 4 ? "h4" : "h3";
   const suffix = anker ? "" : "-bereich";
   const panelId = `faq-antwort-${frage.id}${suffix}`;
   return (
     <li id={anker ? `frage-${frage.id}` : undefined} className="scroll-mt-24 border-b border-white/10 last:border-b-0" data-testid={`faq-frage-${frage.id}${suffix}`}>
-      <h3 className="m-0">
+      <Kopf className="m-0">
         <button type="button" aria-expanded={offen} aria-controls={panelId} onClick={onToggle} data-testid={`faq-frage-knopf-${frage.id}${suffix}`}
           className="group flex w-full min-h-[52px] items-center justify-between gap-3 py-3 text-left text-base font-semibold text-white hover:text-[#29B6E8] focus-visible:text-[#29B6E8]">
           <span className="min-w-0 [overflow-wrap:anywhere]">{frage.frage}</span>
           <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-white/45 transition-transform duration-200 motion-reduce:transition-none group-hover:text-[#29B6E8] ${offen ? "rotate-180" : ""}`} />
         </button>
-      </h3>
+      </Kopf>
       <div id={panelId} hidden={!offen} style={zuStil(offen)} className="tls-reveal pb-4 pr-8" data-testid={panelId}>
         <p className="text-base leading-relaxed text-white/80">{frage.antwort}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-4">
@@ -153,7 +154,7 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
         {inhalt.fragen.length ? (
           <ul className="mt-2">
             {inhalt.fragen.map((frage) => (
-              <FrageEintrag key={frage.id} frage={frage} anker={!frage.haeufig} offen={offeneFragen.has(frage.id)} onToggle={() => onFrage(frage.id)} />
+              <FrageEintrag key={frage.id} frage={frage} ebene={4} anker={!frage.haeufig} offen={offeneFragen.has(frage.id)} onToggle={() => onFrage(frage.id)} />
             ))}
           </ul>
         ) : null}
@@ -164,7 +165,7 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
 
 export default function FaqPage() {
   const [params, setParams] = useSearchParams();
-  const { hash } = useLocation();
+  const { hash, key: besuch } = useLocation();
   const zugang = useFaqZugang();
   const query = params.get("q") || "";
   const rollen = sichtbareRollen(zugang.darf);
@@ -187,21 +188,29 @@ export default function FaqPage() {
   };
   const searching = query.trim().length > 1;
 
-  // Ein Link auf eine Frage (#frage-<id>) oder einen Bereich (#bereich-<id>) klappt ihn auf und springt hin. Geschützte
-  // Fragen stehen erst nach der Antwort des Servers da - deshalb hängt das auch an `fragen`.
+  // Ein Link auf eine Frage (#frage-<id>) oder einen Bereich (#bereich-<id>) klappt ihn auf und springt hin - einmal je
+  // Aufruf der Adresse (location.key), nicht noch einmal nach der Antwort des Servers oder einer Invalidierung.
+  // Geschützte Fragen stehen erst nach der Antwort da; bis dahin bleibt der Anker offen. Läuft eine Suche, sind die
+  // Häufigen ausgeblendet - dann steht die Frage in ihrem Bereich.
+  const erledigt = useRef("");
   useEffect(() => {
     const anker = ankerAus(hash);
+    const schluessel = `${besuch}#${anker}`;
+    if (!anker || erledigt.current === schluessel) return;
     if (anker.startsWith("frage-")) {
       const frage = fragen.find((row) => row.id === anker.slice(6));
       if (!frage) return;
+      const imBereich = !frage.haeufig || searching;
       setOffeneFragen((set) => toggleIn(set, frage.id, true));
-      if (!frage.haeufig) setOffeneBereiche((set) => toggleIn(set, frage.bereich, true));
-      setZiel(frage.haeufig ? anker : `bereich-${frage.bereich}`);
+      if (imBereich) setOffeneBereiche((set) => toggleIn(set, frage.bereich, true));
+      setZiel(imBereich ? `bereich-${frage.bereich}` : anker);
+      erledigt.current = schluessel;
     } else if (anker.startsWith("bereich-")) {
       setOffeneBereiche((set) => toggleIn(set, anker.slice(8), true));
       setZiel(anker);
+      erledigt.current = schluessel;
     }
-  }, [hash, fragen]);
+  }, [hash, besuch, fragen, searching]);
   useEffect(() => {
     if (!ziel) return;
     const target = document.getElementById(ziel);
@@ -235,8 +244,12 @@ export default function FaqPage() {
           </div>
         </div>
 
+        {/* Vorgelesen wird nur die Zahl der Treffer - die Zeile steht immer da, damit die Ansage auch beim ersten Tippen kommt. */}
+        <p className="sr-only" aria-live="polite" data-testid="faq-results-ansage">
+          {searching ? (results.length ? mehrzahl(results.length, "Treffer", "Treffer") : "Nichts gefunden") : ""}
+        </p>
         {searching ? (
-          <section className="mt-6" aria-live="polite" data-testid="faq-results">
+          <section className="mt-6" data-testid="faq-results">
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/50">
               {results.length ? mehrzahl(results.length, "Treffer", "Treffer") : "Nichts gefunden"}
             </h2>
