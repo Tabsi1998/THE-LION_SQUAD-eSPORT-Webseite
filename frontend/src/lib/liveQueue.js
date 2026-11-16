@@ -48,3 +48,31 @@ export function queueSummaryLine(summary) {
   const delay = delayText(summary.delay_minutes);
   return delay ? `${delay} · ${last.label} jetzt ca. ${clock(last.forecast_at)}` : `Im Plan · ${last.label} ca. ${clock(last.forecast_at)}`;
 }
+
+// Ein gescheiterter Abruf der Warteschlange (#2440): Netz, Server (5xx) oder Zeitüberschreitung lassen den letzten Stand
+// stehen - nur „gibt es nicht“ nimmt sie weg. Das sagt der Server mit `applies: false` (online, keine Station) oder,
+// wenn es das Turnier nicht (mehr) gibt oder es nicht sichtbar ist, mit 404 bzw. 403 (routes/tournament_live_routes.py).
+export const QUEUE_GONE_STATUSES = Object.freeze([403, 404]);
+// Hängt ein Abruf, gilt er nach so vielen ms als gescheitert - sonst stünde der nächste für immer hinten an.
+export const QUEUE_TIMEOUT_MS = 15000;
+// Nach einem Fehler kein Dauerfeuer: der nächste Versuch von selbst frühestens nach 5 s, dann 10, 20, 40, höchstens 60 s.
+export const QUEUE_RETRY_MIN_MS = 5000;
+export const QUEUE_RETRY_MAX_MS = 60000;
+
+/** Ob ein Fehler beim Abruf heißt „diese Warteschlange gibt es nicht“ (403/404) - sonst ist er vorübergehend. */
+export function queueGoneError(error) {
+  return QUEUE_GONE_STATUSES.includes(error?.response?.status);
+}
+
+/** Wartezeit bis zum nächsten Versuch von selbst nach `failures` Fehlschlägen in Folge (0: sofort). */
+export function queueRetryDelay(failures) {
+  const count = Math.max(0, Math.floor(Number(failures) || 0));
+  if (!count) return 0;
+  return Math.min(QUEUE_RETRY_MAX_MS, QUEUE_RETRY_MIN_MS * 2 ** (count - 1));
+}
+
+/** „Letzter Stand vor 25 s“, ab einer Minute „vor 3 Min.“ - solange das Nachladen scheitert. */
+export function staleText(ms) {
+  const seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+  return `Letzter Stand vor ${seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} Min.`} – es wird weiter nachgeladen.`;
+}

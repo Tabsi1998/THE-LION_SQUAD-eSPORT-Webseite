@@ -9,6 +9,7 @@ import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useLiveQueue } from "@/hooks/useLiveQueue";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatWhen } from "@/lib/datetime";
 import { motionAllowed } from "@/lib/motion";
@@ -18,6 +19,7 @@ import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
+import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
 import { serverNow, serverOffset } from "@/seasons/clock";
 import { MatchClock } from "@/components/tls/live/MatchClock";
 import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
@@ -62,8 +64,6 @@ export default function TournamentLeadPage() {
   const [deciding, setDeciding] = useState(false);
   const [tab, setTab] = useState(() => ({ cockpit: "cockpit", checkin: "checkin", stationen: "stations", hinweis: "notice" })[searchParams.get("reiter")] || null);
   const [movingId, setMovingId] = useState("");
-  const [queue, setQueue] = useState(null);
-  const [queueLoaded, setQueueLoaded] = useState(false);
   const [busyStation, setBusyStation] = useState("");
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
@@ -77,6 +77,10 @@ export default function TournamentLeadPage() {
 
   // Die Restzeit der Auslosung zählt nach der Serveruhr (#2440): der Abstand zur Geräteuhr aus `now` der Antwort.
   const [clockOffset, setClockOffset] = useState(0);
+  // Scheitert das Nachladen der Ansicht vorübergehend (Netz, Server), bleibt der letzte Stand stehen (#2440).
+  const [leadOkAt, setLeadOkAt] = useState(0);
+  const [leadStale, setLeadStale] = useState(false);
+  const hasView = useRef(false);
 
   const load = useCallback(async () => {
     const requestedAt = Date.now();
@@ -86,25 +90,29 @@ export default function TournamentLeadPage() {
       setData(view);
       setError(null);
       setClockOffset(serverOffset(view?.now, requestedAt, receivedAt));
+      hasView.current = true;
+      setLeadOkAt(receivedAt);
+      setLeadStale(false);
     } catch (err) {
-      setError({ status: err.response?.status || 0, detail: formatApiError(err.response?.data?.detail) });
+      const status = err.response?.status || 0;
+      // Ein Stand ist schon da und der Fehler vorübergehend: stehen lassen, mit „letzter Stand vor X s“. Kein Recht
+      // (401/403) oder kein Turnier (404) gilt sofort.
+      if (hasView.current && (!status || status >= 500 || status === 408 || status === 429)) {
+        setLeadStale(true);
+        return;
+      }
+      setError({ status, detail: formatApiError(err.response?.data?.detail) });
     }
   }, [slug]);
 
-  // Die Warteschlange vor Ort (#1556) - online gibt es sie nicht (`applies: false`), dann fehlt der Reiter.
-  const loadQueue = useCallback(async () => {
-    try {
-      const { data: view } = await api.get(`/tournaments/${encodeURIComponent(slug)}/live-queue`);
-      setQueue(view?.applies ? view : null);
-    } catch {
-      setQueue(null);
-    } finally {
-      setQueueLoaded(true);
-    }
-  }, [slug]);
+  // Die Warteschlange vor Ort (#1556) - online gibt es sie nicht (`applies: false`), dann fehlt der Reiter. Scheitert
+  // ein Abruf, bleibt ihr letzter Stand samt Reiter und offener Rückfragen stehen (#2440, hooks/useLiveQueue).
+  const { queue, status: queueStatus, loaded: queueLoaded, staleSince: queueStaleSince, reload: loadQueue, autoReload: autoLoadQueue } = useLiveQueue(slug ? `/tournaments/${encodeURIComponent(slug)}/live-queue` : "");
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { loadQueue(); }, [loadQueue]);
+  useEffect(() => {
+    hasView.current = false;
+    load();
+  }, [load]);
   // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801). Bis
   // das Turnier geladen ist, jede; ohne sichtbares Event jede eines Turniers mit Event.
   const tournamentId = data?.tournament?.id;
@@ -137,13 +145,19 @@ export default function TournamentLeadPage() {
   // Reiter) - sonst wie bisher nur bei Änderungen.
   const cockpitOpen = activeTab === "cockpit";
   useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0, tournamentId, eventId });
-  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter.
-  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 60000, tournamentId, eventId });
+  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter. Im Takt nur
+  // mit Warteschlange (#2440): online meldet der Strom Änderungen; scheiterte schon der erste Abruf, versucht es die
+  // Seite im Cockpit-Takt weiter (nach Fehlern mit wachsendem Abstand, useLiveQueue).
+  const queuePollMs = queue ? (cockpitOpen ? COCKPIT_POLL_MS : 60000) : queueStatus === "unknown" ? COCKPIT_POLL_MS : 0;
+  useLiveRefresh(autoLoadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: queue ? 15000 : 0, pollMs: queuePollMs, tournamentId, eventId });
   // Die Probleme des Cockpits (#1653) - aus denselben Daten wie „Braucht Aufmerksamkeit“ und die Stationen.
   const problems = useMemo(() => cockpitProblems({ attention, draws, queue }), [attention, draws, queue]);
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.
   const compactTabs = Boolean(queue) || canCheckIn || canNotice;
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
+  // „Letzter Stand vor X s“ (#2440): im Cockpit und bei den Stationen zählen Ansicht und Warteschlange, sonst die Ansicht.
+  const queueShown = (activeTab === "cockpit" || activeTab === "stations") && Boolean(queue);
+  const staleSince = Math.min(...[leadStale ? leadOkAt : 0, queueShown ? queueStaleSince : 0].filter(Boolean), Infinity);
 
   const drawNow = async (card) => {
     setDeciding(true);
@@ -327,6 +341,8 @@ export default function TournamentLeadPage() {
             </button>
           ))}
         </div>
+
+        {Number.isFinite(staleSince) ? <LiveStaleNote since={staleSince} className="mt-3" testId="lead-stale" /> : null}
 
         {activeTab === "cockpit" && queue ? (
           <TournamentCockpit

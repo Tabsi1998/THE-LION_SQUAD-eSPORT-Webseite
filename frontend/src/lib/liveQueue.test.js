@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DELAY_SHOWN_FROM, delayText, myQueueLine, queueSummaryLine } from "./liveQueue";
+import { DELAY_SHOWN_FROM, delayText, myQueueLine, queueGoneError, queueRetryDelay, queueSummaryLine, staleText } from "./liveQueue";
 
 // Live vor Ort (#1556): Verzug und die Zeile für Spieler - reine Rechnung. Die Spielzeit-Uhr prüft matchClock.test.js.
 
@@ -49,5 +49,29 @@ describe("queueSummaryLine", () => {
     expect(queueSummaryLine(summary)).toBe("+11 Min. · Finale jetzt ca. 20:51");
     expect(queueSummaryLine({ ...summary, delay_minutes: 2 })).toBe("Im Plan · Finale ca. 20:51");
     expect(queueSummaryLine(null)).toBe("");
+  });
+});
+
+// #2440: Nur „gibt es nicht“ (403/404) nimmt die Warteschlange weg - Netz, Server und Zeitüberschreitung nicht.
+describe("gescheiterter Abruf (#2440)", () => {
+  it("403 und 404 heißen „gibt es nicht“, alles andere ist vorübergehend", () => {
+    expect(queueGoneError({ response: { status: 404 } })).toBe(true);
+    expect(queueGoneError({ response: { status: 403 } })).toBe(true);
+    expect(queueGoneError({ response: { status: 503 } })).toBe(false);
+    expect(queueGoneError({ response: { status: 500 } })).toBe(false);
+    expect(queueGoneError({ code: "ECONNABORTED" })).toBe(false);
+    expect(queueGoneError(new Error("Network Error"))).toBe(false);
+    expect(queueGoneError(null)).toBe(false);
+  });
+
+  it("nach Fehlern wächst der Abstand: 5, 10, 20, 40, dann höchstens 60 s", () => {
+    expect([0, 1, 2, 3, 4, 5, 9].map(queueRetryDelay)).toEqual([0, 5000, 10000, 20000, 40000, 60000, 60000]);
+  });
+
+  it("„Letzter Stand vor 25 s“, ab einer Minute in Minuten", () => {
+    expect(staleText(25400)).toBe("Letzter Stand vor 25 s – es wird weiter nachgeladen.");
+    expect(staleText(0)).toBe("Letzter Stand vor 0 s – es wird weiter nachgeladen.");
+    expect(staleText(185000)).toBe("Letzter Stand vor 3 Min. – es wird weiter nachgeladen.");
+    expect(staleText(-5)).toBe("Letzter Stand vor 0 s – es wird weiter nachgeladen.");
   });
 });
