@@ -301,5 +301,57 @@ async def main_lines():
     LINES_OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
 
 
+MERGED_OUT = ROOT / "frontend" / "e2e" / "fixtures" / "mergedHeatsGenerated.json"
+MERGED_INFO = ("Erzeugt von scripts/make_ffa_bracket_fixture.py --merged (#2452): der Läufe-Cup vom 31.10. - 16 Plätze, Winner "
+               "und Loser Bracket mit Grand Final (14 Läufe), 8 Fahrer. Der Umbau legt B in A, D in C, F in E, LB in LA und LD "
+               "in LC zusammen; alle übrigen neun Läufe sind gefahren, die Ergebnisse veröffentlicht (lb8_merged_done). Dazu "
+               "der Stand vor dem Grand Final (lb8_merged_live). Nicht von Hand ändern - neu erzeugen.")
+
+
+async def play_ready(flow, tournament, staff, *, stop_before: str | None = None):
+    """Jeden Lauf eintragen, sobald er steht - die früher Gesetzten fahren vorne. ``stop_before``: diesen Lauf offen lassen."""
+    flow.act_as(staff)
+    regs = await flow.db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)
+    order = [reg["id"] for reg in sorted(regs, key=lambda reg: reg.get("seed") or 0)]
+    for _ in range(40):
+        ready = sorted((m for m in await flow.matches(tournament)
+                        if m.get("status") in {"pending", "ready", "scheduled"} and m["match_key"] != stop_before
+                        and not any(s.get("status") == "pending" for s in m["slots"])
+                        and sum(1 for s in m["slots"] if s.get("registration_id")) >= 2),
+                       key=lambda m: (m.get("round") or 0, m["match_key"]))
+        if not ready:
+            return
+        seated = sorted((s["registration_id"] for s in ready[0]["slots"] if s.get("registration_id")), key=order.index)
+        response = await flow.post(f"/api/matches/{ready[0]['id']}/result", json={
+            "results": [{"registration_id": reg, "rank": index + 1, "score": 15 - 3 * index} for index, reg in enumerate(seated)]})
+        assert response.status_code == 200, response.text
+
+
+async def main_merged():
+    data = {}
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _schema = await build(flow, 8, "auto", 16, custom=FFA16_DE)
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"slug": "kart-cup-31-10", "title": "Kart-Cup 31.10."}})
+        await flow.start(tournament)
+        await play_ready(flow, tournament, staff, stop_before="FINAL")
+        data["lb8_merged_live"] = await bracket(flow, tournament)
+        await play_ready(flow, tournament, staff)
+        flow.act_as(staff)
+        for status in ("completed", "results_published"):
+            response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": status})
+            assert response.status_code == 200, response.text
+        data["lb8_merged_done"] = await bracket(flow, tournament)
+    finally:
+        await shutdown()
+    out = {"_info": MERGED_INFO}
+    for key, value in data.items():
+        out[key] = {name: item for name, item in value.items() if name not in {"structure", "matches"}}
+        rows = [(m["match_key"], m.get("section"), m["round"], m.get("status"), m.get("merged_into_key"))
+                for m in sorted(value["matches_v2"], key=lambda m: (m["round"], m.get("order") or 0))]
+        print(key, rows)
+    MERGED_OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
+
+
 if __name__ == "__main__":
-    asyncio.run(main_lines() if "--lines" in sys.argv else main())
+    asyncio.run(main_lines() if "--lines" in sys.argv else main_merged() if "--merged" in sys.argv else main())

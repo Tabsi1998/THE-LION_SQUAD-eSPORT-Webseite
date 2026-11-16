@@ -16,6 +16,9 @@ const statusOf = (match) => String(match?.status || "").toLowerCase();
 export const isDone = (match) => DONE.has(statusOf(match));
 export const isLive = (match) => LIVE.has(statusOf(match));
 export const isCancelled = (match) => statusOf(match) === "cancelled";
+/** Zählt als Spiel (#2452): weder Vorschau noch entfallen - ein zusammengelegter Lauf, ein nicht nötiger Reset oder eine
+ * abgekürzte Runde ist kein offenes Spiel. Für Zählungen wie „Ergebnisse 9/9“. */
+export const countsAsMatch = (match) => Boolean(match) && !match.is_preview && statusOf(match) !== "preview" && !isCancelled(match);
 
 /** Grobe Lage eines Abschnitts: main, loser, final oder bronze - wie `section_kind` am Server (Gruppen zählen als main).
  * Ältere Bäume nennen das Spiel um Platz 3 auch „TP“ oder „Third Place“; das bleibt zusätzlich erkannt. */

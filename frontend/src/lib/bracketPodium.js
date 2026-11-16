@@ -74,13 +74,16 @@ export function buildPodiumMap(allMatches = [], stages = []) {
     if (!current || rank < current) podium.set(id, rank);
   };
 
+  // Entfallene Spiele (#2452) sind keine letzte Runde: Nach dem Abkürzen ist der Sammellauf das Finale, ein entfallenes
+  // Grand Final entscheidet nichts - sonst stand nach dem Ende kein Sieger mit Medaille im Baum.
+  const played = matchesV2.filter((match) => !isCancelled(match));
   const maxRoundBySection = new Map();
-  for (const match of matchesV2) {
+  for (const match of played) {
     const section = normalizeSection(match.section);
     const round = Number(match.round || 1);
     maxRoundBySection.set(section, Math.max(maxRoundBySection.get(section) || 0, round));
   }
-  const hasGrandFinal = matchesV2.some((match) => FINAL_SECTIONS.has(normalizeSection(match.section)));
+  const hasGrandFinal = played.some((match) => FINAL_SECTIONS.has(normalizeSection(match.section)));
   // Mit Reset-Spiel (#1549) entscheidet das letzte Grand Final, das nicht entfallen ist - nie beide zugleich.
   const decidingGrandFinal = hasGrandFinal ? finalMatchOf(matchesV2, stages) : null;
   const isFinal = (match) => {
