@@ -103,6 +103,8 @@ PUSH_CHANNELS = {
     "moderation": "lion_club",
     "rights_change": "lion_club",   # Rolle, Freigabe oder Vorstandsposten geändert (#2125)
     "admin_push_test": "lion_club",
+    # Sammelmeldung nach der Ruhezeit (#1206): „In der Nacht: 4 Meldungen“.
+    "quiet_digest": "lion_club",
     "helper_call": "lion_club",
     "helper_reminder": "lion_club",
     # Erfolge, Level, Kronen, Jahresrückblick.

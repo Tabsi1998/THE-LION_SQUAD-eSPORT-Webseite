@@ -22,6 +22,7 @@ from services.achievement_visibility import sees_hidden_achievements
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
     OPTIONAL_EMAIL_PREFERENCES,
+    new_account_preferences,
     preference_key,
     public_preferences_payload,
 )
@@ -232,6 +233,19 @@ def _normalize_notification_preferences(value) -> dict:
         for topic in OPTIONAL_EMAIL_PREFERENCES
     }
     return {key: bool(value[key]) for key in allowed if key in value}
+
+
+async def _merged_quiet_hours(db, user_id: str, sent: dict | None) -> dict:
+    """Ruhezeit (#1206): nur die gesendeten Felder ändern sich, der Rest bleibt wie gespeichert (ohne Speicherstand der
+    Vorschlag 22:00 bis 7:00). Geprüft wird das Ganze - auch eine ausgeschaltete Ruhezeit behält gültige Zeiten."""
+    from services.quiet_hours_rules import effective, gap_problem
+
+    stored = await db.users.find_one({"id": user_id}, {"_id": 0, "quiet_hours": 1}) or {}
+    merged = {**effective(stored), **{key: value for key, value in (sent or {}).items() if value is not None}}
+    problem = gap_problem(merged["start"], merged["end"])
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    return {"enabled": bool(merged["enabled"]), "start": merged["start"], "end": merged["end"]}
 
 
 async def _is_public_tournament(tournament: dict | None) -> bool:
@@ -469,6 +483,8 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         "accepted_terms": False,
         "consent_required": True,
         "newsletter_consent": False,
+        # Stufe „Alles“ (#1204); eine Einladung hat keine Newsletter-Zustimmung - News & Events nur in der Glocke.
+        "notification_preferences": new_account_preferences(False),
         "dm_privacy": "everyone",
         "favorite_games": [],
         "created_at": now_utc().isoformat(),
@@ -969,6 +985,8 @@ async def update_me(
     updates = _normalize_social_updates(updates)
     if "notification_preferences" in updates:
         updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
+    if "quiet_hours" in updates:
+        updates["quiet_hours"] = await _merged_quiet_hours(db, me["id"], updates["quiet_hours"])
     if not updates:
         await _attach_membership(me)
         return me

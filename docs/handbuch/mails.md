@@ -176,21 +176,53 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   keine Push-Erlaubnis.
   In der Kommandozentrale steht die Zahl der aktiven Tokens und Fehler unter **Push-Monitoring**.
 
-### 3.6 Was Mitglieder selbst abschalten können
+### 3.6 Was Mitglieder selbst einstellen können
 
-**Benutzermenü → Einstellungen → Benachrichtigungen** (Seite „Benachrichtigungen einstellen“):
+**Benutzermenü → Einstellungen → Benachrichtigungen** (`/profile?tab=notifications`). Die Schritte mit Bildern für Mitglieder
+stehen auch in der Hilfe unter [Konto und Profil → Benachrichtigungen](../../frontend/src/hilfe/themen/konto-und-profil.json)
+(`/hilfe/konto-und-profil#stufe`).
 
-- Oben die **Kanäle**: **E-Mail**, **Push**, **Browser** (nur, wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat), **In-App**,
-  **Discord** (nur mit verknüpftem Konto). Ein ausgeschalteter Kanal blendet seine Spalte aus, die Einstellungen darin bleiben erhalten.
-- Darunter **Dieser Browser**: ob der Browser, in dem die Seite gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw.
-  **Browser abmelden**. Blockiert der Browser die Benachrichtigungen, steht dort, wo man sie wieder erlaubt. Mit **Inhalt verbergen**
-  zeigt dieser Browser nur „Neue Benachrichtigung“. Chat-Texte und Beträge (Rechnungen, Kostenbeiträge) stehen nie in einer
-  Browser-Meldung – dort steht nur „Neue Nachricht von …“ bzw. „Deine Rechnung liegt in deinem Konto“.
-- Darunter die Tabelle **Jede Benachrichtigung pro Kanal**: je Thema ein Schalter je Kanal. Ein Strich heißt: Dieses Thema gibt es auf dem Kanal nicht.
-- **News & Events** per E-Mail geht nur mit der Einwilligung unten: „Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu
-  erhalten. Jederzeit widerrufbar.“
+<img src="../../frontend/src/hilfe/bilder/konto-und-profil/stufe-handy.webp" alt="Stufe am Handy: drei Karten Alles, Wichtiges und Wenig, Wichtiges ist gewählt" width="300"> <img src="../../frontend/src/hilfe/bilder/konto-und-profil/themen-handy.webp" alt="Themen am Handy: je Thema die Wahl Push, Nur App oder Aus, bei Erfolge ist Aus gewählt" width="300">
+
+- **Stufe** (#1204): oben drei Karten zum Antippen.
+  - **Alles:** jedes Thema per Push.
+  - **Wichtiges:** Spiele & Aufrufe, Turnier-Updates, Rechnungen, Mitgliedschaft, Nachrichten & Erwähnungen und
+    Helferdienste per Push, der Rest nur in der App.
+  - **Wenig:** nur Spiele & Aufrufe und Rechnungen per Push, der Rest nur in der App.
+  - Eine Stufe stellt alle Themen auf einmal. Stellt jemand ein Thema selbst um, steht dort **Eigene Auswahl**.
+  - Neue Konten starten mit **Alles** – nur **News & Events** liegt ohne Newsletter-Haken bei der Registrierung still in der
+    Glocke („Nur App“); diese Konten zeigen deshalb „Eigene Auswahl“. Wer von der Verwaltung eingeladen wird, hat keinen
+    Haken. Bestehende Konten behalten ihre bisherigen Schalter und sehen meist „Eigene Auswahl“.
+- **Themen:** je Thema **Push**, **Nur App** oder **Aus**.
+  - **Push** heißt: aufs Handy (LionsAPP) und in angemeldete Browser.
+  - **Nur App** legt die Meldung still in die Glocke.
+  - **Aus** heißt: auch keine Glocke.
+  - Liga-Rundnachrichten und Belohnungen der Liga gehören zu **Turnier-Updates**; Veto, Check-in und Aufrufe des eigenen Spiels zu
+    **Spiele & Aufrufe**.
+- **Ruhezeit** (#1206): von–bis in Wiener Zeit, Standard **aus**; beim Einschalten 22:00 bis 7:00 Uhr.
+  - In der Ruhezeit kommt kein Push, keine Browser-Meldung und keine Discord-Direktnachricht. Alles liegt sofort in der Glocke.
+  - Danach kommt genau eine **Sammelmeldung** („In der Nacht: 4 Meldungen“), wenn etwas Ungelesenes kam. Der Server sieht dafür alle fünf
+    Minuten nach (Job `quiet_digest`). Auch wer die Ruhezeit mitten in der Nacht verlängert, bekommt nur eine.
+  - Ausschalten oder Verkürzen wirkt sofort: Was gewartet hat, kommt beim nächsten Lauf (spätestens nach fünf Minuten).
+  - Zwischen Ende und Beginn müssen mindestens 15 Minuten liegen; sonst zeigt das Feld einen Hinweis und speichert nicht.
+  - Trotzdem sofort kommen: der **Aufruf zum eigenen Spiel**, **Match startet jetzt**, in der Liga **Check-in offen** und **Veto – ihr seid am
+    Zug** fürs eigene Spiel, und für die Turnierleitung **Braucht Aufmerksamkeit**, solange ihr Turnier läuft. Leitungs-Meldungen einer
+    Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung. Der **Push-Test** der Verwaltung kommt ebenfalls sofort.
+  - E-Mails sind davon nicht betroffen.
+- **Dieser Browser** (unter den Themen, nur wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat): ob der Browser, in dem die Seite
+  gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw. **Browser abmelden**. Blockiert der Browser die Benachrichtigungen,
+  steht dort, wo man sie wieder erlaubt. Mit **Inhalt verbergen** zeigt dieser Browser nur „Neue Benachrichtigung“. Chat-Texte und Beträge
+  (Rechnungen, Kostenbeiträge) stehen nie in einer Browser-Meldung.
+- **Weitere Wege** (eingeklappt):
+  - die Kanäle **E-Mail**, **Push**, **Browser**, **In-App** und **Discord** (nur mit verknüpftem Konto) ganz an oder aus;
+  - je Thema **E-Mail** und **Discord**. Ein Strich heißt: Dieses Thema gibt es auf dem Weg nicht;
+  - der **Newsletter**. **News & Events** per E-Mail geht nur mit dieser Einwilligung: „Ich willige separat ein, Newsletter, Event-Hinweise
+    und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar.“
+  - Ist Push ganz aus, zeigen die Themen einen Hinweis mit **Push einschalten**.
 - Account- und Sicherheitsmails bleiben immer aktiv.
 - Dieselbe Seite regelt, wie Erfolge gefeiert werden (mit Klang oder dezent).
+
+<img src="../../frontend/src/hilfe/bilder/konto-und-profil/ruhezeit-pc.webp" alt="Ruhezeit am PC: Schalter an, von 22:00 bis 07:00, darunter was trotzdem sofort kommt" width="600">
 
 ---
 

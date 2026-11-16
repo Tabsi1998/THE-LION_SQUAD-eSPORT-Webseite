@@ -1,0 +1,118 @@
+/* Benachrichtigungen (#1204, #1206): drei Stufen, Themen mit Push / Nur App / Aus, Ruhezeit und „Weitere Wege“.
+   Bewegung nur, wo sie etwas zeigt: Der Rahmen der Stufe gleitet zur neuen Stufe, der Daumen einer Stellung gleitet mit,
+   Themen, die eine Stufe umstellt, leuchten kurz nacheinander auf. Alles über transform und opacity; bei reduzierter
+   Bewegung bleiben nur Farbe und Deckkraft. */
+
+.tls-notify {
+  --tls-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --tls-ease-glide: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.tls-notify-card { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 2px; background: #0a0a0a; padding: 1.25rem; }
+.tls-notify-card__title { font-family: var(--font-heading, inherit); font-weight: 900; text-transform: uppercase; letter-spacing: 0.02em; }
+.tls-notify-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 2px; color: rgba(255, 255, 255, 0.85); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; animation: tls-notify-chip-in 200ms var(--tls-ease-out) both; }
+
+/* ---- Stufen ---- */
+.tls-level { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.tls-level__glide {
+  position: absolute; z-index: 0; top: 0; left: 0; bottom: 0;
+  width: calc((100% - 1rem) / 3);
+  border: 1px solid rgba(41, 182, 232, 0.85); border-radius: 2px;
+  background: linear-gradient(180deg, rgba(41, 182, 232, 0.16), rgba(41, 182, 232, 0.05));
+  box-shadow: 0 0 22px rgba(41, 182, 232, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateX(calc(var(--level-i, 0) * (100% + 0.5rem)));
+  transition: transform 280ms var(--tls-ease-glide), opacity 180ms ease;
+  pointer-events: none;
+}
+.tls-level__glide[data-hidden="true"] { opacity: 0; }
+.tls-level__card {
+  position: relative; z-index: 1; display: flex; min-height: 5.5rem; flex-direction: column; align-items: flex-start; gap: 0.3rem;
+  padding: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 2px; background: transparent; text-align: left;
+  color: rgba(255, 255, 255, 0.72);
+  transition: transform 160ms var(--tls-ease-out), color 200ms ease, border-color 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tls-level__card:active { transform: scale(0.97); }
+.tls-level__card:focus-visible { outline: 2px solid #29b6e8; outline-offset: 2px; }
+.tls-level__card[aria-checked="true"] { color: #fff; border-color: transparent; }
+.tls-level__icon { width: 1.15rem; height: 1.15rem; color: rgba(255, 255, 255, 0.45); transition: color 200ms ease, transform 280ms var(--tls-ease-out); }
+.tls-level__card[aria-checked="true"] .tls-level__icon { color: #29b6e8; transform: translateY(-1px); }
+.tls-level__label { font-family: var(--font-heading, inherit); font-size: 0.95rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.02em; }
+@media (max-width: 400px) {
+  .tls-level__card { padding: 0.65rem 0.55rem; }
+  .tls-level__label { font-size: 0.85rem; }
+}
+.tls-level__hint { font-size: 11px; line-height: 1.3; color: rgba(255, 255, 255, 0.5); overflow-wrap: anywhere; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-level__card[aria-checked="false"]:hover { border-color: rgba(41, 182, 232, 0.35); color: #fff; }
+}
+
+/* ---- Themen ---- */
+.tls-topics { list-style: none; margin: 0; padding: 0; }
+.tls-topic {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.6rem; align-items: center;
+  padding: 0.85rem 0.75rem; margin: 0 -0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.07); border-radius: 2px;
+}
+.tls-topic:first-child { border-top: 0; }
+@media (min-width: 768px) {
+  .tls-topic { grid-template-columns: minmax(0, 1fr) 17rem; gap: 1.5rem; }
+}
+/* Von einer Stufe umgestellt: kurz aufleuchten, gestaffelt. Zwei Namen, damit ein zweiter Wechsel neu beginnt. */
+.tls-topic[data-lit="a"] { animation: tls-topic-lit-a 900ms ease-out var(--lit-delay, 0ms) both; }
+.tls-topic[data-lit="b"] { animation: tls-topic-lit-b 900ms ease-out var(--lit-delay, 0ms) both; }
+
+.tls-seg {
+  position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 2px; background: rgba(255, 255, 255, 0.03);
+}
+.tls-seg__thumb {
+  position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 1px;
+  background: #29b6e8; box-shadow: 0 0 14px rgba(41, 182, 232, 0.3);
+  transform: translateX(calc(var(--seg-i, 0) * 100%));
+  transition: transform 220ms var(--tls-ease-out), background-color 200ms ease, box-shadow 200ms ease;
+}
+.tls-seg[data-mode="app"] .tls-seg__thumb { background: rgba(255, 255, 255, 0.16); box-shadow: none; }
+.tls-seg[data-mode="off"] .tls-seg__thumb { background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.tls-seg__option {
+  position: relative; z-index: 1; min-height: 2.75rem; padding: 0 0.4rem; border-radius: 1px; background: transparent;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55); transition: color 200ms ease, transform 140ms var(--tls-ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.tls-seg__option:active { transform: scale(0.95); }
+.tls-seg__option:focus-visible { outline: 2px solid #29b6e8; outline-offset: 1px; }
+.tls-seg__option[aria-checked="true"] { color: #fff; }
+.tls-seg[data-mode="push"] .tls-seg__option[aria-checked="true"] { color: #050505; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-seg__option[aria-checked="false"]:hover { color: #fff; }
+}
+
+/* ---- Aufklappen (Ruhezeit, Weitere Wege): Höhe über grid-template-rows, Inhalt blendet mit ---- */
+.tls-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--tls-ease-out); }
+.tls-reveal[data-open="true"] { grid-template-rows: 1fr; }
+/* Zu heißt auch unsichtbar (visibility nach dem Zuklappen) - dann springt die Tab-Taste nicht in verborgene Felder. */
+.tls-reveal__inner { min-height: 0; overflow: hidden; opacity: 0; transform: translateY(-4px); visibility: hidden; transition: opacity 180ms ease, transform 260ms var(--tls-ease-out), visibility 0s linear 260ms; }
+.tls-reveal[data-open="true"] > .tls-reveal__inner { opacity: 1; transform: none; visibility: visible; transition: opacity 180ms ease 40ms, transform 260ms var(--tls-ease-out) 40ms, visibility 0s linear 0s; }
+
+.tls-more__toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; text-align: left; -webkit-tap-highlight-color: transparent; }
+.tls-more__toggle:focus-visible { outline: 2px solid #29b6e8; outline-offset: -2px; }
+.tls-more__chevron { flex: none; width: 1.25rem; height: 1.25rem; color: rgba(255, 255, 255, 0.55); transition: transform 220ms var(--tls-ease-out), color 200ms ease; }
+.tls-more__toggle[aria-expanded="true"] .tls-more__chevron { transform: rotate(180deg); color: #29b6e8; }
+
+.tls-quiet__time { width: 100%; min-height: 2.75rem; padding: 0 0.75rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 2px; background: #050505; color: #fff; font-variant-numeric: tabular-nums; color-scheme: dark; transition: border-color 200ms ease; }
+.tls-quiet__time:focus { outline: none; border-color: #29b6e8; }
+.tls-quiet__moon { transition: color 240ms ease, transform 320ms var(--tls-ease-out); }
+.tls-notify-card[data-enabled="true"] .tls-quiet__moon { color: var(--tls-honor); transform: rotate(-12deg); }
+
+@keyframes tls-topic-lit-a { 0% { background-color: rgba(41, 182, 232, 0.16); } 100% { background-color: rgba(41, 182, 232, 0); } }
+@keyframes tls-topic-lit-b { 0% { background-color: rgba(41, 182, 232, 0.16); } 100% { background-color: rgba(41, 182, 232, 0); } }
+@keyframes tls-notify-chip-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-level__glide, .tls-seg__thumb { transition: opacity 120ms ease, background-color 120ms ease; }
+  .tls-level__card, .tls-seg__option, .tls-level__icon, .tls-more__chevron, .tls-quiet__moon { transition: color 120ms ease, border-color 120ms ease; }
+  .tls-level__card:active, .tls-seg__option:active { transform: none; }
+  .tls-level__card[aria-checked="true"] .tls-level__icon, .tls-notify-card[data-enabled="true"] .tls-quiet__moon { transform: none; }
+  .tls-reveal, .tls-reveal__inner { transition: none; transform: none; }
+  .tls-notify-chip { animation: none; }
+}
