@@ -137,7 +137,10 @@ test("Status: Abgesagt fragt nach dem Grund wie in der Turnierverwaltung", async
 test("ohne „Liga verwalten“ weder „Liga starten“ noch Statusauswahl - auch mit „Season konfigurieren“", async () => {
   serve({ tournament: { can_edit_staffel: false, can_manage_structure: true, league_capabilities: ["season", "applications"] } });
   renderPage();
-  expect(await screen.findByTestId("staffel-status-readonly")).toHaveTextContent("Vor dem Start");
+  // Der Stand steht nur einmal - im Abzeichen oben; die Kachel sagt nur, wer ihn ändert (Kann-Punkt aus Paket A).
+  const readonly = await screen.findByTestId("staffel-status-readonly");
+  expect(readonly).toHaveTextContent("Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.");
+  expect(readonly).not.toHaveTextContent("Vor dem Start");
   expect(screen.getByTestId("staffel-stand")).toHaveTextContent("Vor dem Start");
   expect(screen.queryByTestId("staffel-primary-action")).toBeNull();
   expect(screen.queryByTestId("staffel-status-select")).toBeNull();

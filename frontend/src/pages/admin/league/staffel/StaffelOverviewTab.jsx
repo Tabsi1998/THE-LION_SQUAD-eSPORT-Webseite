@@ -101,9 +101,8 @@ function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
           <PauseUntilControl tournament={tournament} onSaved={onReload} />
         </div>
       ) : (
-        <p className="mt-3 text-sm text-white/75" data-testid="staffel-status-readonly">
-          {staffelStandText(tournament)}. <span className="text-white/60">Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.</span>
-        </p>
+        // Der Stand steht schon im Abzeichen oben - hier nur, wer ihn ändert.
+        <p className="mt-3 text-sm text-white/70" data-testid="staffel-status-readonly">Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.</p>
       )}
     </section>
   );
