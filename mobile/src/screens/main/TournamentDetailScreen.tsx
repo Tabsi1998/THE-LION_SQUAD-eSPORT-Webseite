@@ -16,7 +16,7 @@ import { checkInLine } from "../../lib/checkInTimes";
 import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, formatWhen } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
-import type { BracketMatch } from "../../lib/bracketGraph";
+import { countsAsMatch, type BracketMatch } from "../../lib/bracketGraph";
 import { motionPlan, wonJustNow, type MotionPlan } from "../../lib/bracketMotion";
 import { playMoment } from "../../lib/tournamentHaptics";
 import { checkInState, matchStatusText, standingsTables, treeKind } from "../../lib/tournamentView";
@@ -264,6 +264,9 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     () => allMatches.filter((match) => CLOSED_MATCH_STATUSES.has(String(match.status || ""))),
     [allMatches],
   );
+  // Gezählt wird wie im Web (#2459, countsAsMatch): entfallene Spiele (zusammengelegt, Reset nicht nötig) zählen nicht.
+  const countedMatches = useMemo(() => allMatches.filter(countsAsMatch), [allMatches]);
+  const playedMatchCount = useMemo(() => completedMatches.filter(countsAsMatch).length, [completedMatches]);
   const recentCompletedMatches = useMemo(() => completedMatches.slice(-4).reverse(), [completedMatches]);
   const isFinished = FINISHED_TOURNAMENT_STATUSES.has(String(tournament?.status || ""));
   // Liga-Staffel (#2173, docs/LIGA.md F.1): eingefrorener Endstand über der Tabelle, der Meister aus der Staffel der Ligaseite.
@@ -412,9 +415,9 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               <CompletedTournamentSummary
                 completedAt={completedAt}
                 participantCount={registrations.length || tournament.participant_count || 0}
-                playedMatches={completedMatches.length}
+                playedMatches={playedMatchCount}
                 standings={finalStandings}
-                totalMatches={allMatches.length}
+                totalMatches={countedMatches.length}
                 winnerTitle={winnerLabel(isLeague, champion)}
                 championName={champion?.display_name || null}
                 onOpenStandings={() => setTab("standings")}
@@ -511,7 +514,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 )}
               </View>
               <View style={styles.statGrid}>
-                <Stat label="Matches" value={String(allMatches.length)} />
+                <Stat label="Matches" value={String(countedMatches.length)} />
                 <Stat label="Spieler" value={String(registrations.length || tournament.participant_count || 0)} tone="gold" />
               </View>
               <Info label="Event" value={tournament.event?.name || "-"} />
@@ -873,7 +876,7 @@ function formatTeamMode(value?: string | null) {
 
 function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
   return (
-    <View style={styles.stat}>
+    <View style={styles.stat} testID={`tournament-stat-${label}`}>
       <Body style={[styles.statValue, tone === "gold" && styles.gold]}>{value}</Body>
       <Muted>{label}</Muted>
     </View>

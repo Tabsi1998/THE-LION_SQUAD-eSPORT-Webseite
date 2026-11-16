@@ -12,6 +12,8 @@ import { TournamentDetailScreen } from "./TournamentDetailScreen";
 const TREES = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../../docs/bracket-trees.json"), "utf8"));
 // Vier Modi (#1590, App #1633): Bäume aus dem echten Generator mit Show-Auslosung und „sofort zufällig“.
 const FFA = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../../frontend/e2e/fixtures/ffaGenerated.json"), "utf8"));
+// Zusammengelegte Läufe (#2452, App #2459): der Läufe-Cup aus dem echten Generator, 14 Läufe, fünf zusammengelegt.
+const MERGED = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../../frontend/e2e/fixtures/mergedHeatsGenerated.json"), "utf8"));
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
@@ -450,4 +452,16 @@ describe("neue Namen im Baum (#1633)", () => {
       expect(head.props.adjustsFontSizeToFit).toBe(true);
     }
   });
+});
+
+describe("zusammengelegte Läufe (#2459)", () => {
+  test("beendet: gezählt wie im Web - Gespielt 9 · Matches 9 statt 14", async () => {
+    serve("lb8_merged_done", { status: "completed", public_phase: { state: "finished", label: "Beendet" } }, undefined, MERGED);
+    await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByText("Lions Cup")).toBeTruthy());
+    expect(await screen.findByTestId("tournament-stat-Gespielt")).toHaveTextContent(/^9\s*Gespielt$/);
+    // Beide Karten (Abschluss und Übersicht) zählen gleich.
+    for (const stat of screen.getAllByTestId("tournament-stat-Matches")) expect(stat).toHaveTextContent(/^9\s*Matches$/);
+  });
+
 });

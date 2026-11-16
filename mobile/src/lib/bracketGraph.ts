@@ -100,6 +100,10 @@ const statusOf = (match: Pick<BracketMatch, "status"> | null | undefined) => Str
 export const isDone = (match: Pick<BracketMatch, "status"> | null | undefined) => DONE.has(statusOf(match));
 export const isLive = (match: Pick<BracketMatch, "status"> | null | undefined) => LIVE.has(statusOf(match));
 export const isCancelled = (match: Pick<BracketMatch, "status"> | null | undefined) => statusOf(match) === "cancelled";
+/** Zählt als Spiel (#2459, wie `countsAsMatch` im Web, #2452): weder Vorschau noch entfallen - ein zusammengelegter Lauf,
+ * ein nicht nötiger Reset oder eine abgekürzte Runde ist kein offenes Spiel. Für Zählungen wie „Gespielt 9 · Matches 9“. */
+export const countsAsMatch = (match: Pick<BracketMatch, "status" | "is_preview"> | null | undefined) =>
+  Boolean(match) && !match?.is_preview && statusOf(match) !== "preview" && !isCancelled(match);
 
 /** Grobe Lage eines Abschnitts: main, loser, final oder bronze - wie `section_kind` am Server (Gruppen zählen als main).
  * Ältere Bäume nennen das Spiel um Platz 3 auch „TP“ oder „Third Place“; das bleibt zusätzlich erkannt. Wie im Web. */
@@ -345,6 +349,7 @@ export function heatText(match: BracketMatch, edges: BracketEdge[], matches: Bra
     free: free ? `${free} ${free === 1 ? "Platz" : "Plätze"} frei` : "",
   };
 }
+
 
 const playersOf = (match: BracketMatch | null | undefined) => new Set((match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean) as string[]);
 
