@@ -23,6 +23,7 @@ AREAS = ("backend", "frontend", "mobile", "container")
 BADGE_ART = "frontend/src/components/achievements/motifs/"
 BADGE_ART_FILES = {"frontend/src/components/achievements/badgeArt.jsx", "frontend/src/components/achievements/materials.js"}
 SHARED_CASES = "frontend/src/lib/"
+WEB_FAQ = "frontend/src/hilfe/"
 # Gemeinsamer Auswerter der Paket-Audits (#1055): Website- und App-Job rufen ihn samt Selbsttest auf.
 AUDIT_GATE = {"scripts/dependency-audit-gate.cjs", "scripts/dependency-audit-gate.test.mjs"}
 
@@ -59,6 +60,10 @@ def areas_for(path: str) -> set[str]:
     # Gemeinsame Testfälle von Website und App (*.cases.json in frontend/src/lib, etwa #1132, #1140): beide Jobs lesen
     # sie, eine Änderung prüft deshalb auch die App.
     if path.startswith(SHARED_CASES) and path.endswith(".cases.json"):
+        hits.add("mobile")
+    # Die App bündelt die öffentliche FAQ als Kopie und übernimmt die Sichtbarkeitsregeln aus index.js (#2449):
+    # ändert sich das im Web, prüft der App-Job den Abgleich. Danach im Ordner mobile: node scripts/sync-faq.js
+    if path.startswith(WEB_FAQ) and (path.endswith(".json") or path == WEB_FAQ + "index.js"):
         hits.add("mobile")
     if (path.startswith(("backend/", "frontend/")) or compose or env_example
             or name.startswith("Dockerfile") or name == ".dockerignore"
