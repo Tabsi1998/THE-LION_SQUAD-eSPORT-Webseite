@@ -80,3 +80,19 @@ async def test_a_version_may_not_mark_a_second_field_when_its_id_source_has_one(
     own = await flow.patch("/api/games/version", json={"inherit_player_ids": False, "player_id_fields": [
         {"key": "konsole", "label": "Konsole", "options": ["PS5", "PC"], "platform": True}]})
     assert own.status_code == 200, "ohne Erben ist das eigene Feld die Plattform"
+
+
+@pytest.mark.asyncio
+async def test_a_main_game_may_not_mark_a_field_when_an_inheriting_version_has_its_own(flow):
+    """Review #2281: auch andersherum - kennzeichnet das Hauptspiel, darf keine erbende Version schon ein eigenes haben."""
+    await flow.db.games.insert_one({"id": "haupt", "slug": "haupt", "name": "Hauptspiel", "kind": "game",
+                                    "player_id_fields": [ACTIVISION, PLATFORM]})
+    await flow.db.games.insert_one({"id": "version", "slug": "version", "name": "Version Eins", "kind": "edition", "parent_game_id": "haupt",
+                                    "player_id_fields": [{"key": "konsole", "label": "Konsole", "options": ["PS5", "PC"], "platform": True}]})
+    flow.act_as(await flow.add_user(role="superadmin", name="admin"))
+    refused = await flow.patch("/api/games/haupt", json={"player_id_fields": [ACTIVISION, {**PLATFORM, "platform": True}]})
+    assert refused.status_code == 422, refused.text
+    assert "Version Eins" in refused.json()["detail"] and "Konsole" in refused.json()["detail"]
+    await flow.db.games.update_one({"id": "version"}, {"$set": {"inherit_player_ids": False}})
+    allowed = await flow.patch("/api/games/haupt", json={"player_id_fields": [ACTIVISION, {**PLATFORM, "platform": True}]})
+    assert allowed.status_code == 200, "eine Version, die nicht erbt, stört nicht"

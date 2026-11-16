@@ -187,22 +187,36 @@ def _check_id_fields(fields: list | None, current: list | None = None) -> None:
         raise HTTPException(status_code=422, detail=problem)
 
 
+def _platform_field(game: dict | None) -> dict | None:
+    return next((item for item in (game or {}).get("player_id_fields") or [] if isinstance(item, dict) and item.get("platform") is True), None)
+
+
+async def _game_name(db, game: dict) -> str:
+    named = await db.games.find_one({"id": game.get("id")}, {"_id": 0, "name": 1}) or {}
+    return named.get("name") or game.get("slug") or "Spiel"
+
+
 async def _check_platform_source(db, game: dict) -> None:
-    """Plattform-Feld (#2281): höchstens eines je Spiel, auch über die ID-Quelle geerbt. Kennzeichnet die ID-Quelle schon ein
-    Feld, darf das Spiel kein zweites eigenes kennzeichnen - sonst wüsste die Season nicht, welches gilt."""
-    if not any(isinstance(item, dict) and item.get("platform") is True for item in game.get("player_id_fields") or []):
+    """Plattform-Feld (#2281): höchstens eines je Spiel, auch über die ID-Quelle geerbt - in beide Richtungen. Kennzeichnet die
+    ID-Quelle schon ein Feld, darf das Spiel kein zweites eigenes kennzeichnen; kennzeichnet ein Hauptspiel eines, darf keine
+    erbende Version schon ein eigenes haben (Review). Sonst wüsste die Season nicht, welches gilt."""
+    if not _platform_field(game):
         return
     by_id = await game_id_keys.games_by_id(db)
+    if game.get("id"):
+        by_id = {**by_id, game["id"]: {**by_id.get(game["id"], {}), **game}}
     source = game_id_keys.source_of(game, by_id)
-    if not source or source.get("id") == game.get("id"):
-        return
-    inherited = next((item for item in source.get("player_id_fields") or []
-                      if isinstance(item, dict) and item.get("platform") is True), None)
+    inherited = _platform_field(source) if source and source.get("id") != game.get("id") else None
     if inherited:
-        named = await db.games.find_one({"id": source.get("id")}, {"_id": 0, "name": 1}) or {}
         raise HTTPException(status_code=422, detail=(
             f"Die Plattform steht schon im Feld „{inherited.get('label') or inherited.get('key')}“ der ID-Quelle "
-            f"„{named.get('name') or source.get('slug')}“ – hier geht kein zweites Plattform-Feld."))
+            f"„{await _game_name(db, source)}“ – hier geht kein zweites Plattform-Feld."))
+    for reader in game_id_keys.readers(game, by_id) if game.get("id") else []:
+        own = _platform_field(reader)
+        if own:
+            raise HTTPException(status_code=422, detail=(
+                f"Die Version „{await _game_name(db, reader)}“ nimmt ihre IDs von diesem Spiel und kennzeichnet schon ein eigenes "
+                f"Plattform-Feld („{own.get('label') or own.get('key')}“). Bitte dort zuerst den Haken „Plattform“ entfernen."))
 
 
 @router.post("")
