@@ -23,9 +23,11 @@ async def flow():
         await shutdown()
 
 
-async def player(flow, name, *, public=True):
+async def player(flow, name, *, public=True, member="active"):
     user = await flow.add_user(name=name)
     await flow.db.users.update_one({"id": user["id"]}, {"$set": {"privacy_public_profile": public}})
+    if member:
+        await flow.db.memberships.insert_one({"id": f"m-{name}", "user_id": user["id"], "member_status": member, "membership_type": "ordinary"})
     return user
 
 
@@ -71,6 +73,19 @@ async def test_no_hint_without_link_or_with_an_inactive_club_profile(flow):
     for name in ("lea", "tom"):
         body = (await flow.get(f"/api/users/public/{name}")).json()
         assert body.get("club_profile_slug") is None and body.get("club_role_title") is None
+
+
+@pytest.mark.asyncio
+async def test_no_hint_after_the_membership_ended(flow):
+    """Review #1267: Das redaktionelle Profil ist noch aktiv, die Mitgliedschaft aber zu Ende - kein „Vereinsmitglied“."""
+    ex = await player(flow, "ex", member="former")
+    await club_profile(flow, ex, "ex-e", role_title="Kassier")
+    never = await player(flow, "nie", member=None)
+    await club_profile(flow, never, "nie-n")
+    flow.act_as(None)
+    for name in ("ex", "nie"):
+        body = (await flow.get(f"/api/users/public/{name}")).json()
+        assert body["club_profile_slug"] is None and body["club_role_title"] is None, name
 
 
 @pytest.mark.asyncio

@@ -735,7 +735,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     base["linked_accounts"] = await linked_accounts(db, u["id"], base["verified_platforms"])
     # Vereinsprofil (#1267): nur ein Hinweis „Vereinsmitglied · Funktion“ mit Link - Adresse und öffentliche Funktion des
     # verbundenen, aktiven Vereinsprofils. Kein Zusammenführen, nichts Privates aus der Vereinsakte.
-    base.update(await _club_profile_hint(db, u["id"]))
+    # Nur bei aktiver Mitgliedschaft (Review #1267): ein noch aktives redaktionelles Profil nach dem Austritt zeigt nichts.
+    base.update(await _club_profile_hint(db, u["id"]) if is_member else {"club_profile_slug": None, "club_role_title": None})
     # Ehrungen (#848): nur mit Freigabe des Vereins und dem Schalter der Person - aus dem Zwischenstand, nie live aus Dolibarr.
     from services.dolibarr_honours import public_honours
     base["honours"] = await public_honours(db, u["id"])

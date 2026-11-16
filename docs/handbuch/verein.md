@@ -207,7 +207,7 @@ Website-Konto verknüpft ihr im Profil im Kasten **Konto** (optional). Funktione
 dem Vorstand. Mit Dolibarr kommen Mitglieder mit Einwilligung von selbst ins Verzeichnis (`/members`).
 
 **Vereinsprofil und Spielerprofil** bleiben zwei Seiten: Das Vereinsprofil (`/members/…`) ist die offizielle Vertretung im
-Verein und verlinkt auf das Spielerprofil. Ist ein aktives Vereinsprofil mit einem öffentlichen Konto verknüpft, zeigt das
+Verein und verlinkt auf das Spielerprofil. Ist ein aktives Vereinsprofil mit dem öffentlichen Konto eines aktiven Mitglieds verknüpft, zeigt das
 Spielerprofil (`/u/…`) im Kopf einen kleinen Hinweis **Vereinsmitglied · Funktion** (etwa „Vereinsmitglied · Kassierin“),
 der zum Vereinsprofil führt. Mehr geht nicht hinüber – Geburtstag, Zusatzfelder und alles andere aus der Vereinsakte bleiben
 im Vereinsprofil bzw. in der Verwaltung. Ein ausgeblendetes Vereinsprofil oder ein privates Konto zeigt keinen Hinweis.
