@@ -44,7 +44,8 @@ ALERT_KINDS = {
 
 DEFAULT_RULES = {kind: {"discord": True, "email": False} for kind in ALERT_KINDS}
 # Kontaktanfragen (#2131): erledigt 12 Monate, Spam 30 Tage - siehe services/contact_retention.py.
-DEFAULT_RETENTION = {"email_logs": 90, "audit_logs": 730, "contact_done": 365, "contact_spam": 30}
+# Abgemeldete Push-Geräte (#2467): 30 Tage ab dem Abmelden, dann ist der Eintrag weg.
+DEFAULT_RETENTION = {"email_logs": 90, "audit_logs": 730, "contact_done": 365, "contact_spam": 30, "push_devices": 30}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -468,6 +469,21 @@ async def purge_old_logs(db, *, now: datetime | None = None) -> dict:
     from services.contact_retention import purge_expired
 
     removed["contact_messages"] = await purge_expired(db, done_days=settings["retention_days"]["contact_done"], spam_days=settings["retention_days"]["contact_spam"], now=current)
+    removed["push_devices"] = await purge_disabled_push_devices(db, days=settings["retention_days"]["push_devices"], now=current)
     old_alerts = (current - timedelta(days=365)).isoformat()
     await db.ops_alert_log.delete_many({"at": {"$lt": old_alerts}})
     return removed
+
+
+async def purge_disabled_push_devices(db, *, days: int, now: datetime | None = None) -> int:
+    """Abgeschaltete Push-Geräte (#2467) nach ``days`` Tagen löschen. Die Frist läuft ab ``disabled_at``; Einträge, die vor
+    dem Feld abgemeldet wurden, zählen ab ihrer letzten Änderung. Aktive Geräte bleiben, wie alt sie auch sind."""
+    cutoff = ((now or now_utc()) - timedelta(days=days)).isoformat()
+    result = await db.mobile_push_tokens.delete_many({
+        "enabled": False,
+        "$or": [
+            {"disabled_at": {"$lt": cutoff}},
+            {"disabled_at": None, "updated_at": {"$lt": cutoff}},
+        ],
+    })
+    return int(getattr(result, "deleted_count", 0) or 0)
