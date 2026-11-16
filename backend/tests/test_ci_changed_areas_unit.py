@@ -29,6 +29,11 @@ ALL = set(areas.AREAS)
         # Gemeinsame Testfälle von Website und App (#1132, #1140) prüft auch der App-Job.
         ("frontend/src/lib/matchReport.cases.json", {"frontend", "mobile", "container"}),
         ("frontend/src/lib/matchReport.js", {"frontend", "container"}),
+        # Die App bündelt die öffentliche FAQ samt Regeln (#2449) - der App-Job prüft den Abgleich.
+        ("frontend/src/hilfe/fragen.json", {"frontend", "mobile", "container"}),
+        ("frontend/src/hilfe/themen/turniere.json", {"frontend", "mobile", "container"}),
+        ("frontend/src/hilfe/index.js", {"frontend", "mobile", "container"}),
+        ("frontend/src/hilfe/FaqClip.jsx", {"frontend", "container"}),
         ("scripts/check-secrets.py", {"backend"}),
         # Beide Skripte ruft der Frontend-Job auf.
         ("scripts/check-public-routes.sh", {"backend", "frontend"}),
