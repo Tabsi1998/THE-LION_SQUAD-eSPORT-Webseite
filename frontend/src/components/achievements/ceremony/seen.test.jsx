@@ -218,3 +218,22 @@ describe("Warteschlange: Level-up neben Belohnung und Sieger-Moment", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("Prüfung mit Zeitgrenze", () => {
+  it("hängt die Anfrage, kommt nach der Zeitgrenze null - die Bühne zeigt das Paket wie bisher", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    localStorage.setItem(seen.importedKey("anna"), "x");
+    apiMock.get.mockReturnValue(new Promise(() => {}));
+    const queue = createCeremonyQueue({ now: () => 1 });
+    renderHost(queue);
+    enqueueSeen(queue, ["a"]);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(seen.STATE_TIMEOUT_MS); });
+    for (let step = 0; step < 5 && !screen.queryByTestId("achievement-unlock-overlay"); step += 1) await act(async () => { await Promise.resolve(); });
+    expect(screen.getByTestId("achievement-unlock-overlay")).toBeInTheDocument();
+    // Die hängende Anfrage blockiert die nächste nicht.
+    apiMock.get.mockResolvedValue({ data: serverState({ unseen: ["b"] }) });
+    expect(await seen.ceremonyState("anna")).toMatchObject({ unseen: ["b"] });
+  });
+});

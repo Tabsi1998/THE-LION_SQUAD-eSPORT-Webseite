@@ -91,14 +91,17 @@ function notSupported(error) {
   return [404, 405].includes(Number(error?.response?.status));
 }
 
+/** Länger wartet die Bühne nicht auf den Server - danach gilt das bisherige Verhalten (die Zeremonie kommt). */
+export const STATE_TIMEOUT_MS = 4500;
+
 /**
- * Der Stand am Server - oder null (älterer Server, nicht erreichbar): dann gilt das bisherige Verhalten im Browser.
- * Gleichzeitige Aufrufe teilen sich eine Anfrage; jeder spätere fragt neu.
+ * Der Stand am Server - oder null (älterer Server, nicht erreichbar, keine Antwort binnen STATE_TIMEOUT_MS): dann gilt
+ * das bisherige Verhalten im Browser. Gleichzeitige Aufrufe teilen sich eine Anfrage; jeder spätere fragt neu.
  */
 export function ceremonyState(userId) {
   if (!userId || unsupported.has(userId)) return Promise.resolve(null);
   if (inflight.has(userId)) return inflight.get(userId);
-  const request = (async () => {
+  const work = (async () => {
     try {
       // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
       const { data } = await api.get("/achievements/me/ceremony");
@@ -111,10 +114,14 @@ export function ceremonyState(userId) {
     } catch (error) {
       if (notSupported(error)) unsupported.add(userId);
       return null;
-    } finally {
-      inflight.delete(userId);
     }
   })();
+  let timer = null;
+  const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), STATE_TIMEOUT_MS); });
+  const request = Promise.race([work, timeout]).finally(() => {
+    clearTimeout(timer);
+    if (inflight.get(userId) === request) inflight.delete(userId);
+  });
   inflight.set(userId, request);
   return request;
 }
