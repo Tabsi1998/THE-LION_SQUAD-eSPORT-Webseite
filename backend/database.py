@@ -683,6 +683,8 @@ REPLACED_INDEXES = (
 # „einmal je …“ war bisher nur im Code geprüft, zwei gleichzeitige Anfragen konnten zwei Zeilen anlegen.
 AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("user_xp", "user_id", "user", {}),
+    # Zeremonie einmal je Konto (#2450): je Person eine Zeile - bei jedem Seitenaufruf gelesen.
+    ("ceremony_seen", "user_id", "user", {}),
     # Stand der Zähler und Signale der Erfolge: je Konto eine Zeile bzw. eine je Signal - bei jeder Auswertung und
     # seit #615 bei jedem Abruf der Abstimmungen gelesen.
     ("user_achievement_stats", "user_id", "user", {}),
