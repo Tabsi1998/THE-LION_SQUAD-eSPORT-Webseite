@@ -37,9 +37,9 @@ export function StaffelStandBadge({ tournament, season, now, testId }) {
   );
 }
 
-/** Was der Staffel noch fehlt („Teams zuteilen · 1 von 8“), jeweils mit dem Weg an die Stelle. */
-export function StaffelNeedsHint({ tournament, season, now, testId, className = "" }) {
-  const needs = staffelNeeds(tournament, { season: season || undefined, now });
+/** Was der Staffel noch fehlt („Teams zuteilen · 1 von 8“), jeweils mit dem Weg an die Stelle. ``manageUrl``: wie bei `staffelNeeds`. */
+export function StaffelNeedsHint({ tournament, season, now, testId, className = "", manageUrl }) {
+  const needs = staffelNeeds(tournament, { season: season || undefined, now, manageUrl });
   if (!needs.length) return null;
   return (
     <ul data-testid={testId} className={`space-y-0.5 ${className}`}>
