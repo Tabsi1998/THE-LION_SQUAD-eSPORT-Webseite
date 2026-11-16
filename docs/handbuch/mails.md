@@ -200,10 +200,12 @@ stehen auch in der Hilfe unter [Konto und Profil → Benachrichtigungen](../../f
 - **Ruhezeit** (#1206): von–bis in Wiener Zeit, Standard **aus**; beim Einschalten 22:00 bis 7:00 Uhr.
   - In der Ruhezeit kommt kein Push, keine Browser-Meldung und keine Discord-Direktnachricht. Alles liegt sofort in der Glocke.
   - Danach kommt genau eine **Sammelmeldung** („In der Nacht: 4 Meldungen“), wenn etwas Ungelesenes kam. Der Server sieht dafür alle fünf
-    Minuten nach (Job `quiet_digest`).
+    Minuten nach (Job `quiet_digest`). Auch wer die Ruhezeit mitten in der Nacht verlängert, bekommt nur eine.
+  - Ausschalten oder Verkürzen wirkt sofort: Was gewartet hat, kommt beim nächsten Lauf (spätestens nach fünf Minuten).
+  - Zwischen Ende und Beginn müssen mindestens 15 Minuten liegen; sonst zeigt das Feld einen Hinweis und speichert nicht.
   - Trotzdem sofort kommen: der **Aufruf zum eigenen Spiel**, **Match startet jetzt**, in der Liga **Check-in offen** und **Veto – ihr seid am
     Zug** fürs eigene Spiel, und für die Turnierleitung **Braucht Aufmerksamkeit**, solange ihr Turnier läuft. Leitungs-Meldungen einer
-    Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung.
+    Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung. Der **Push-Test** der Verwaltung kommt ebenfalls sofort.
   - E-Mails sind davon nicht betroffen.
 - **Dieser Browser** (unter den Themen, nur wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat): ob der Browser, in dem die Seite
   gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw. **Browser abmelden**. Blockiert der Browser die Benachrichtigungen,
