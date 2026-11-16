@@ -83,9 +83,13 @@ export default function HomePage() {
   // Ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182) - aus drei Karten wird eine.
   const timeline = useMemo(() => (state ? nestUnderEvents(buildHomeTimeline(state)).slice(0, 5) : []), [state]);
   const hero = homeHero(state?.home_hero);
-  const leadNews = state?.featured_news?.[0] || state?.news?.[0] || null;
+  // Der Aufmacher ist die angepinnte News (#1342) - nur solange sie angeheftet ist (#1263). Ohne sie steht oben das
+  // nächste Event (Nächste Termine), die neueste News führt das Raster an.
+  const leadNews = state?.featured_news?.[0] || null;
   // Dasselbe Bild nie zweimal nebeneinander (#1343): die Wiederholung bekommt die Text-Karte.
-  const [primaryNews = null, ...newsItems] = withoutRepeatedBanners(leadNews ? [leadNews, ...homeNews(state, leadNews.id).slice(0, 3)] : []);
+  const shownNews = withoutRepeatedBanners(leadNews ? [leadNews, ...homeNews(state, leadNews.id).slice(0, 3)] : homeNews(state).slice(0, 3));
+  const primaryNews = leadNews ? shownNews[0] : null;
+  const newsItems = leadNews ? shownNews.slice(1) : shownNews;
   const isEmptyHome = state && !state.has_live && !timeline.length && !primaryNews && !newsItems.length;
 
   return (
@@ -167,7 +171,7 @@ export default function HomePage() {
       {state && (primaryNews || timeline.length > 0) && (
         <Reveal as="section" className="border-b border-white/10 bg-[#080808]/35" data-testid="home-current">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
-            {/* Derselbe Aufmacher wie auf der News-Seite (#1342): die angepinnte News, sonst die neueste. */}
+            {/* Derselbe Aufmacher wie auf der News-Seite (#1342): die angepinnte News; ohne sie oben das nächste Event (#1263). */}
             {primaryNews && <NewsLead news={primaryNews} testId={`home-featured-news-${primaryNews.slug}`} />}
             <div className={`${primaryNews ? "mt-8 md:mt-10 border-t border-white/10 pt-8 md:pt-10" : ""}`}>
               <NextUp items={timeline} />

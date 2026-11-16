@@ -292,3 +292,26 @@ test("schon öffentlicher Beitrag: „Zurückziehen“ statt „Zurück zum Entw
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", expect.objectContaining({ published: false })));
   expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Beitrag zurückziehen?" }));
 });
+
+// Angeheftete News laufen ab (#1263): Anheften schlägt 14 Tage vor, das Ende geht mit; eine abgelaufene Anheftung gilt
+// nicht mehr.
+test("Anpinnen schlägt ein Ende in 14 Tagen vor und schickt es mit", async () => {
+  const { defaultPinUntil } = await import("@/lib/newsPin");
+  apiMock.patch.mockResolvedValue({ data: POSTS[0] });
+  renderAt("/admin/news/n1");
+  await screen.findByTestId("news-pinned");
+  expect(screen.queryByTestId("news-pinned-until")).toBeNull();
+  fireEvent.click(screen.getByTestId("news-pinned"));
+  expect(screen.getByTestId("news-pinned-until")).toHaveValue(defaultPinUntil());
+  fireEvent.change(screen.getByTestId("news-pinned-until"), { target: { value: "2099-01-31" } });
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", { pinned: true, pinned_until: "2099-01-31" }));
+});
+
+test("eine abgelaufene Anheftung steht nicht mehr als angepinnt im Editor", async () => {
+  const posts = [{ ...POSTS[0], pinned: true, pinned_until: "2020-01-01", pin_active: false }];
+  apiMock.get.mockImplementation(async (url) => (url === "/news-meta" ? { data: META } : url.startsWith("/admin/news/") ? adminPost(url, posts) : { data: [] }));
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-pinned")).not.toBeChecked();
+  expect(screen.queryByTestId("news-pinned-until")).toBeNull();
+});

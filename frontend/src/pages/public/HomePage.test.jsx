@@ -178,6 +178,18 @@ test("News ohne Bild und doppelte Bilder bekommen die Text-Karte", async () => {
   expect(screen.getByTestId("home-news-c").querySelector("[data-testid='news-text-card']")).toHaveTextContent("1. NeonFalke");
 });
 
+// Angeheftete News laufen ab (#1263): ohne angehefteten Beitrag steht oben das nächste Event, die neueste News führt
+// das Raster an - keine News als Aufmacher.
+test("ohne angehefteten Beitrag: oben das nächste Event, die News im Raster", async () => {
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/board") ? { data: [] } : { data: { ...stateWith(3), news: NEWS, featured_news: [] } }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-up");
+  expect(screen.queryByTestId("home-featured-news-cup-abgesagt")).toBeNull();
+  expect(screen.getByTestId("home-current")).toHaveTextContent("Herbst-Cup");
+  expect(screen.getByTestId("home-news-cup-abgesagt")).toBeInTheDocument();
+  expect(screen.getByTestId("home-news-smash-anmeldung")).toBeInTheDocument();
+});
+
 // Startseite I (#832): wie die große News im Raster steht, und wie weit das Licht dem Zeiger folgt.
 test("News-Raster: allein ganze Breite, zu zweit 2:1, zu dritt links über zwei Zeilen", () => {
   expect(newsCardSpan(true, 1)).toBe("lg:col-span-3");

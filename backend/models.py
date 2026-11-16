@@ -1735,6 +1735,8 @@ class NewsCreate(BaseModel):
     # Link-Vorschau beim Teilen (#347)
     share_preview: bool = False
     pinned: bool = False
+    # Ende der Anheftung (#1263): Wiener Kalendertag „JJJJ-MM-TT“; ohne Angabe beim Anheften heute + 14 Tage.
+    pinned_until: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     linked_event_ids: List[str] = []
     linked_tournament_ids: List[str] = []
     linked_f1_challenge_ids: List[str] = []
@@ -1757,6 +1759,7 @@ class NewsUpdate(BaseModel):
     discord_skip: Optional[bool] = None
     share_preview: Optional[bool] = None
     pinned: Optional[bool] = None
+    pinned_until: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     linked_event_ids: Optional[List[str]] = None
     linked_tournament_ids: Optional[List[str]] = None
     linked_f1_challenge_ids: Optional[List[str]] = None

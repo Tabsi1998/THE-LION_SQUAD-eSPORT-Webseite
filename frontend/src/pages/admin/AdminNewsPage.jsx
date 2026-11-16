@@ -9,6 +9,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Download, Plus, Pin, RotateCcw, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { pinState } from "@/lib/newsPin";
 
 function csvCell(value) {
   const text = String(value ?? "").replace(/\r?\n/g, " ");
@@ -204,14 +205,21 @@ export default function AdminNewsPage() {
               <tbody className="divide-y divide-white/5">
                 {filteredList.map((n) => {
                   const state = publicationState(n);
+                  const pin = pinState(n);
                   return (
                   <tr key={n.id}>
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
-                        {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+                        {pin?.active && <Pin className="w-3 h-3 text-[#FFD700]" aria-label="Angepinnt" />}
                         {n.title}
                       </div>
                       <div className="text-[11px] text-white/50">/{n.slug}</div>
+                      {/* Ende der Anheftung (#1263): die Redaktion sieht, wie lange der Beitrag noch oben steht. */}
+                      {pin && (pin.active ? pin.text : pin.until) && (
+                        <div className={`mt-0.5 text-[11px] ${pin.active ? "text-[#FFD700]/80" : "text-white/40"}`} data-testid={`news-pin-${n.id}`}>
+                          {pin.active ? `Angepinnt ${pin.text}` : `Anpinnen abgelaufen (${pin.text})`}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{newsCategoryLabel(n.category)}</td>
                     <td className="px-4 py-3 text-xs text-white/65" data-testid={`news-visibility-${n.id}`}>{newsVisibilityLabel(n.visibility)}</td>

@@ -301,8 +301,9 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         key=lambda n: (_parse_dt(n.get("published_at") or n.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc), bool(n.get("pinned"))),
         reverse=True,
     )
-    # Der Aufmacher (#1342): dieselbe News wie oben auf der News-Seite - die neueste angepinnte, sonst die neueste.
-    lead_news = next((n for n in visible_news if n.get("pinned")), None) or (visible_news[0] if visible_news else None)
+    # Der Aufmacher (#1342): dieselbe News wie oben auf der News-Seite - die neueste angepinnte. Ohne angehefteten Beitrag
+    # (oder nach dem Ende der Anheftung, #1263) zeigt die Startseite oben das nächste Event statt einer News.
+    lead_news = next((n for n in visible_news if n.get("pinned")), None)
     visible_news = visible_news[:8]
     if lead_news and lead_news not in visible_news:
         visible_news = [lead_news, *visible_news[:7]]

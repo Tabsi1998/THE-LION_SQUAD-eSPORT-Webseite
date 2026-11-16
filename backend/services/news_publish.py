@@ -1,5 +1,6 @@
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
@@ -25,8 +26,43 @@ INTERNAL_NEWS_FIELDS = frozenset({
 
 
 def public_news(post: dict) -> dict:
-    """Ein Beitrag ohne die internen Felder der Redaktion - für jede öffentliche Antwort."""
-    return {key: value for key, value in (post or {}).items() if key not in INTERNAL_NEWS_FIELDS}
+    """Ein Beitrag ohne die internen Felder der Redaktion - für jede öffentliche Antwort. ``pinned`` gilt nur bis zum
+    Ende der Anheftung (#1263)."""
+    row = {key: value for key, value in (post or {}).items() if key not in INTERNAL_NEWS_FIELDS}
+    if "pinned" in row:
+        row["pinned"] = pin_active(post)
+    return row
+
+
+# Angeheftete News laufen ab (#1263): ``pinned_until`` ist ein Wiener Kalendertag („JJJJ-MM-TT“), angeheftet bleibt der
+# Beitrag bis zum Ende dieses Tages. Beim Anheften ohne Ende schlägt der Editor (und notfalls der Server) 14 Tage vor.
+VIENNA = ZoneInfo("Europe/Vienna")
+PIN_DEFAULT_DAYS = 14
+
+
+def vienna_today(now: datetime | None = None) -> date:
+    return (now or now_utc()).astimezone(VIENNA).date()
+
+
+def default_pinned_until(now: datetime | None = None) -> str:
+    return (vienna_today(now) + timedelta(days=PIN_DEFAULT_DAYS)).isoformat()
+
+
+def parse_pin_day(value) -> date | None:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10]) if value else None
+    except ValueError:
+        return None
+
+
+def pin_active(post: dict | None, now: datetime | None = None) -> bool:
+    """Ist der Beitrag gerade angeheftet? Ohne Ende (Altbestand vor der Umstellung) gilt der Schalter allein."""
+    if not (post or {}).get("pinned"):
+        return False
+    until = parse_pin_day(post.get("pinned_until"))
+    return until is None or vienna_today(now) <= until
 
 
 def parse_dt(value):

@@ -18,6 +18,7 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toDateTimeLocalInput } from "@/lib/datetime";
 import { viennaDateTime } from "@/lib/vienna";
+import { PIN_DEFAULT_DAYS, defaultPinUntil, viennaToday } from "@/lib/newsPin";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
@@ -93,7 +94,9 @@ function NewsForm({ post, meta, onDone, onReload }) {
     visibility: source.visibility || "public",
     // Neu ist ein Entwurf (#2122 NW1) - veröffentlicht wird bewusst über „Wann erscheint der Beitrag?“.
     published: source.published ?? false,
-    pinned: source.pinned ?? false,
+    // Eine abgelaufene Anheftung (#1263) gilt nicht mehr - der Haken ist dann aus, neues Anheften schlägt 14 Tage vor.
+    pinned: Boolean(source.pinned) && source.pin_active !== false,
+    pinned_until: source.pinned && source.pin_active !== false ? source.pinned_until || "" : "",
     published_at: toDateTimeLocalInput(source.published_at),
     discord_skip: source.discord_skip ?? false,
     share_preview: source.share_preview ?? false,
@@ -149,6 +152,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
   }, [userQuery]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Anheften schlägt das Ende vor (#1263): heute + 14 Tage, solange noch keines gewählt ist.
+  const togglePinned = (on) => setForm((f) => ({ ...f, pinned: on, pinned_until: on ? f.pinned_until || defaultPinUntil() : "" }));
   const insertEmbed = (kind, item) => {
     setForm((f) => ({ ...f, content: appendEmbedToken(f.content, kind, item) }));
     if (kind === "event") setLinkedE((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
@@ -179,6 +184,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
 
   const normalizePayload = (payload) => {
     const next = { ...payload };
+    // Das Ende der Anheftung (#1263) nur mit Haken - Lösen nimmt es am Server mit.
+    if (!next.pinned || !next.pinned_until) delete next.pinned_until;
     if (next.published_at) {
       const d = new Date(next.published_at);
       if (!isNaN(d.getTime())) next.published_at = d.toISOString();
@@ -324,7 +331,10 @@ function NewsForm({ post, meta, onDone, onReload }) {
             {mode === "scheduled" && (
               <TextField label="Termin" type="datetime-local" value={scheduleAt} onChange={setScheduleAt} testId="news-published-at" required hint={plannedDetail} />
             )}
-            <CheckField label="Anpinnen" hint="Bleibt oben in der News-Liste und auf der Startseite." checked={form.pinned} onChange={(v) => set("pinned", v)} testId="news-pinned" accent="#FFD700" />
+            <CheckField label="Anpinnen" hint="Bleibt bis zum gewählten Tag oben in der News-Liste und auf der Startseite, danach rutscht der Beitrag normal in die Liste." checked={form.pinned} onChange={togglePinned} testId="news-pinned" accent="#FFD700" />
+            {form.pinned && (
+              <TextField label="Angepinnt bis" type="date" value={form.pinned_until} onChange={(v) => set("pinned_until", v)} min={viennaToday()} required testId="news-pinned-until" hint={`Einschließlich dieses Tages. Vorschlag: ${PIN_DEFAULT_DAYS} Tage.`} />
+            )}
           </FormSection>
           <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility}>
             <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
