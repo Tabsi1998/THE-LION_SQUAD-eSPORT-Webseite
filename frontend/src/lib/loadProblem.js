@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { AREA_LABELS as AREA_NAMES } from "@/lib/permissions";
 
 // Was beim Laden schiefging (#1152, wie loadProblem in der App): ohne Netz, nicht gefunden (404), nicht freigegeben
@@ -19,4 +20,22 @@ export function deniedText(error, areas = []) {
   if (typeof detail === "string" && detail.trim()) return detail.trim();
   const names = areas.map((area) => `„${AREA_NAMES[area] || area}“`).join(" oder ");
   return names ? `Dafür fehlt dir der Bereich ${names}.` : "Dafür fehlt dir das Recht.";
+}
+
+function canceled(error) {
+  return error?.code === "ERR_CANCELED" || error?.name === "CanceledError" || error?.name === "AbortError";
+}
+
+/**
+ * Ein Teil der Seite kam nicht (#2412) - eine Auswahlliste, eine Kachel, ein Zusatz: statt still zu fehlen, meldet ein
+ * Hinweis den Ladefehler. Gibt den Fänger für `.catch(...)` zurück. Dieselbe Meldung steht nur einmal da (sonner `id`),
+ * auch wenn mehrere Abrufe scheitern. Abgebrochene Abrufe bleiben still, ebenso „kein Netz“ - dafür gibt es die
+ * Offline-Leiste. Fehlt die ganze Seite, gehört der Fehler in die Seite (PublicErrorState, LoadState), nicht hierher.
+ */
+export function toastLoadFailed(message) {
+  return (error) => {
+    if (canceled(error)) return;
+    if (!error?.response && typeof navigator !== "undefined" && navigator.onLine === false) return;
+    toast.error(message, { id: `load-failed:${message}` });
+  };
 }
