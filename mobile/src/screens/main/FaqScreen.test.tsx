@@ -1,6 +1,6 @@
 import React from "react";
 import { AccessibilityInfo, Linking } from "react-native";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { WEBSITE_BASE_URL } from "../../config";
 import { FaqScreen } from "./FaqScreen";
 
@@ -85,6 +85,41 @@ test("ein Link ohne Ziel vom Server: die Frage klappt auf, nur der Link fehlt", 
   await fireEvent.press(screen.getByTestId("faq-frage-helferdienst-eintragen-knopf"));
   expect(screen.getByText(/tippe bei einer Schicht auf Ich helfe/)).toBeTruthy();
   expect(screen.queryByTestId("faq-frage-link-helferdienst-eintragen")).toBeNull();
+});
+
+test("Link auf eine Frage: eine häufige klappt oben auf, eine andere in ihrem Bereich", async () => {
+  antwort({ darf: ALLES_ZU, fragen: [] });
+  const view = await render(<FaqScreen route={{ key: "faq-1", params: { frage: "app-aufruf-ton" } }} />);
+  await waitFor(() => expect(screen.getByTestId("faq-frage-app-aufruf-ton-knopf").props.accessibilityState).toEqual({ expanded: true }));
+  expect(screen.getByTestId("faq-bereich-lionsapp-knopf").props.accessibilityState).toEqual({ expanded: false });
+  await view.unmount();
+
+  await render(<FaqScreen route={{ key: "faq-2", params: { frage: "app-ruhezeit" } }} />);
+  await waitFor(() => expect(screen.getByTestId("faq-bereich-lionsapp-knopf").props.accessibilityState).toEqual({ expanded: true }));
+  expect(screen.getByTestId("faq-frage-app-ruhezeit-bereich-knopf").props.accessibilityState).toEqual({ expanded: true });
+});
+
+test("Link mit Suche und auf einen Bereich; eine geschützte Frage wartet auf den Server", async () => {
+  mockAuth.user = { id: "u-1" };
+  let freigeben: (value: unknown) => void = () => undefined;
+  mockGet.mockImplementation(() => new Promise((resolve) => { freigeben = resolve; }));
+  await render(<FaqScreen route={{ key: "faq-3", params: { frage: HELFER.id, q: "Helferdienst" } }} />);
+  expect(screen.getByTestId("faq-search").props.value).toBe("Helferdienst");
+  await act(async () => freigeben({ data: { darf: { ...ALLES_ZU, angemeldet: true, mitglied: true }, fragen: [HELFER] } }));
+  // Während einer Suche stehen die Häufigen nicht da - die Frage klappt in ihrem Bereich auf.
+  await waitFor(() => expect(screen.getByTestId("faq-bereich-helferdienste-knopf").props.accessibilityState).toEqual({ expanded: true }));
+  expect(screen.getByTestId("faq-frage-helferdienst-eintragen-bereich-knopf").props.accessibilityState).toEqual({ expanded: true });
+});
+
+test("Link auf einen Bereich setzt den Rollen-Filter zurück und klappt ihn auf", async () => {
+  antwort({ darf: ALLES_ZU, fragen: [] });
+  const view = await renderFaq();
+  // Mit „Mitglied“ steht die Liga nicht in der Liste.
+  await fireEvent.press(screen.getByTestId("faq-rolle-mitglied"));
+  expect(screen.queryByTestId("faq-bereich-liga")).toBeNull();
+  await view.rerender(<FaqScreen route={{ key: "faq-4", params: { bereich: "liga" } }} />);
+  await waitFor(() => expect(screen.getByTestId("faq-bereich-liga-knopf").props.accessibilityState).toEqual({ expanded: true }));
+  expect(screen.getByTestId("faq-rolle-alle").props.accessibilityState).toMatchObject({ selected: true });
 });
 
 test("Turnierleitung: eigener Bereich und Rollen-Chip", async () => {

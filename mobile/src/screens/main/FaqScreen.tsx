@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useReduceMotion } from "../../components/motion";
@@ -12,6 +12,7 @@ import {
 } from "../../faq";
 import { useFaqZugang } from "../../faq/useFaqZugang";
 import { navigateToUrl } from "../../navigation/rootNavigation";
+import type { AppStackParamList } from "../../navigation/types";
 import { colors, motion, radius, surfaces } from "../../theme";
 
 // FAQ in der App (#2449, Aufbau wie /faq im Web #2448): oben die Suche über Fragen und Schritte, darunter „Häufige
@@ -77,7 +78,9 @@ function useAufklappen(offen: boolean) {
   return { pfeil, inhalt };
 }
 
-function Aufklapp({ offen, onToggle, label, kopf, children, testID, kopfStyle }: {
+type AnkerRef = (node: View | null) => void;
+
+function Aufklapp({ offen, onToggle, label, kopf, children, testID, kopfStyle, ankerRef }: {
   offen: boolean;
   onToggle: () => void;
   label: string;
@@ -85,10 +88,11 @@ function Aufklapp({ offen, onToggle, label, kopf, children, testID, kopfStyle }:
   children: React.ReactNode;
   testID: string;
   kopfStyle?: object;
+  ankerRef?: AnkerRef;
 }) {
   const { pfeil, inhalt } = useAufklappen(offen);
   return (
-    <View style={styles.aufklapp} testID={testID}>
+    <View style={styles.aufklapp} testID={testID} ref={ankerRef}>
       <Pressable
         onPress={onToggle}
         accessibilityRole="button"
@@ -111,9 +115,17 @@ function Aufklapp({ offen, onToggle, label, kopf, children, testID, kopfStyle }:
   );
 }
 
-function FrageZeile({ frage, offen, onToggle, bereich, suffix = "" }: { frage: FaqFrage; offen: boolean; onToggle: () => void; bereich?: string; suffix?: string }) {
+function FrageZeile({ frage, offen, onToggle, bereich, suffix = "", ankerRef }: {
+  frage: FaqFrage;
+  offen: boolean;
+  onToggle: () => void;
+  bereich?: string;
+  suffix?: string;
+  ankerRef?: AnkerRef;
+}) {
   return (
     <Aufklapp
+      ankerRef={ankerRef}
       offen={offen}
       onToggle={onToggle}
       label={frage.frage}
@@ -184,13 +196,14 @@ function AnleitungZeile({ bereichId, anleitung }: { bereichId: string; anleitung
   );
 }
 
-function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage }: {
+function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage, ankerRef }: {
   bereich: FaqBereich;
   inhalt: FaqBereichInhalt;
   offen: boolean;
   onToggle: () => void;
   offeneFragen: Set<string>;
   onFrage: (id: string) => void;
+  ankerRef?: AnkerRef;
 }) {
   const icon = (
     <View style={[styles.bereichIcon, inhalt.leer && styles.bereichIconLeer]}>
@@ -205,7 +218,7 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
   );
   if (inhalt.leer) {
     return (
-      <View style={[styles.kopf, styles.bereichKopf]} testID={`faq-bereich-${bereich.id}`} accessible accessibilityLabel={`${bereich.titel}, kommt bald`}>
+      <View ref={ankerRef} style={[styles.kopf, styles.bereichKopf]} testID={`faq-bereich-${bereich.id}`} accessible accessibilityLabel={`${bereich.titel}, kommt bald`}>
         {icon}
         {text}
         <Muted style={styles.bald} testID={`faq-bereich-bald-${bereich.id}`}>Kommt bald</Muted>
@@ -218,6 +231,7 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
   ].filter(Boolean).join(" · ");
   return (
     <Aufklapp
+      ankerRef={ankerRef}
       offen={offen}
       onToggle={onToggle}
       label={`${bereich.titel}, ${zaehler}`}
@@ -236,12 +250,25 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
   );
 }
 
-export function FaqScreen() {
+type Props = { route?: { key?: string; params?: AppStackParamList["Faq"] } };
+
+export function FaqScreen({ route }: Props = {}) {
   const zugang = useFaqZugang();
-  const [query, setQuery] = useState("");
+  const reduce = useReduceMotion();
+  const ziel = route?.params;
+  const [query, setQuery] = useState(() => ziel?.q || "");
   const [rolleWahl, setRolleWahl] = useState("");
   const [offeneFragen, setOffeneFragen] = useState<Set<string>>(() => new Set());
   const [offeneBereiche, setOffeneBereiche] = useState<Set<string>>(() => new Set());
+  const scrollRef = useRef<ScrollView>(null);
+  const inhaltRef = useRef<View>(null);
+  const anker = useRef(new Map<string, View>());
+  const ankerFuer = useCallback((key: string): AnkerRef => (node) => {
+    if (node) anker.current.set(key, node);
+    else anker.current.delete(key);
+  }, []);
+  const [scrollZiel, setScrollZiel] = useState("");
+  const erledigt = useRef("");
 
   const rollen = sichtbareRollen(zugang.darf);
   // Eine Rolle, die nicht (mehr) angeboten wird - etwa Turnierleitung nach dem Abmelden - zählt als „Alle“.
@@ -253,9 +280,59 @@ export function FaqScreen() {
   const searching = query.trim().length > 1;
   const frageUmschalten = (id: string) => setOffeneFragen((set) => umschalten(set, id));
 
+  // Ein Link auf eine Frage (/faq#frage-<id>) oder einen Bereich (#bereich-<id>) klappt auf und scrollt hin - einmal je
+  // Aufruf (wie FaqPage im Web). Geschützte Fragen stehen erst nach der Antwort des Servers da; bis dahin wartet der Anker.
+  // Läuft eine Suche (?q=), sind die Häufigen ausgeblendet - dann steht die Frage in ihrem Bereich.
+  useEffect(() => {
+    const frageId = ziel?.frage || "";
+    const bereichId = ziel?.bereich || "";
+    const q = ziel?.q || "";
+    const schluessel = `${route?.key || ""}|${frageId}|${bereichId}|${q}`;
+    if (erledigt.current === schluessel || (!frageId && !bereichId && !q)) return;
+    if (frageId) {
+      const frage = fragen.find((row) => row.id === frageId);
+      if (!frage && !zugang.geladen) return;
+      erledigt.current = schluessel;
+      setQuery(q);
+      if (!frage) return;
+      const imBereich = !frage.haeufig || q.trim().length > 1;
+      setRolleWahl("");
+      if (imBereich) {
+        setOffeneBereiche((set) => new Set(set).add(frage.bereich));
+        setOffeneFragen((set) => new Set(set).add(`${frage.id}-bereich`));
+        setScrollZiel(`bereich-${frage.bereich}`);
+      } else {
+        setOffeneFragen((set) => new Set(set).add(frage.id));
+        setScrollZiel(`frage-${frage.id}`);
+      }
+      return;
+    }
+    erledigt.current = schluessel;
+    setQuery(q);
+    if (bereichId) {
+      setRolleWahl("");
+      setOffeneBereiche((set) => new Set(set).add(bereichId));
+      setScrollZiel(`bereich-${bereichId}`);
+    }
+  }, [fragen, route?.key, ziel?.bereich, ziel?.frage, ziel?.q, zugang.geladen]);
+
+  useEffect(() => {
+    if (!scrollZiel) return undefined;
+    // Nach dem Zeichnen messen: erst dann steht die aufgeklappte Zeile an ihrem Platz.
+    const timer = setTimeout(() => {
+      const knoten = anker.current.get(scrollZiel);
+      const basis = inhaltRef.current;
+      setScrollZiel("");
+      if (!knoten || !basis || typeof knoten.measureLayout !== "function") return;
+      knoten.measureLayout(basis, (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: !reduce }), () => undefined);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [reduce, scrollZiel]);
+
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" testID="faq-screen">
+      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" testID="faq-screen">
+        <View ref={inhaltRef} style={styles.content}>
         <View style={styles.hero}>
           <Muted style={styles.eyebrow}>FAQ</Muted>
           <Title>So geht&apos;s</Title>
@@ -314,6 +391,7 @@ export function FaqScreen() {
               {haeufig.map((frage) => (
                 <FrageZeile
                   key={frage.id}
+                  ankerRef={ankerFuer(`frage-${frage.id}`)}
                   frage={frage}
                   bereich={faqBereich(frage.bereich)?.titel}
                   offen={offeneFragen.has(frage.id)}
@@ -348,6 +426,7 @@ export function FaqScreen() {
               {bereiche.map(({ bereich, inhalt }) => (
                 <BereichZeile
                   key={bereich.id}
+                  ankerRef={ankerFuer(`bereich-${bereich.id}`)}
                   bereich={bereich}
                   inhalt={inhalt}
                   offen={offeneBereiche.has(bereich.id)}
@@ -366,6 +445,7 @@ export function FaqScreen() {
           <Muted style={styles.flex}>Nicht gefunden, was du suchst? Schreib uns.</Muted>
           <Ionicons name="open-outline" size={16} color={colors.cyan} />
         </Pressable>
+        </View>
       </ScrollView>
     </Screen>
   );

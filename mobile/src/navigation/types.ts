@@ -113,7 +113,8 @@ export type DetailParamList = {
   // Mein Kalender-Abo (#1788): der persönliche Link - aus den Einstellungen und dem Hinweis nach einer Anmeldung.
   CalendarSubscription: undefined;
   // FAQ (#2449): Suche, Häufige Fragen und Bereiche wie /faq im Web - aus den Einstellungen unter „Über die App“.
-  Faq: undefined;
+  // `frage`/`bereich` aus /faq#frage-<id> bzw. #bereich-<id> klappen auf und scrollen hin, `q` aus ?q= sucht.
+  Faq: { frage?: string; bereich?: string; q?: string } | undefined;
 };
 
 export type AppStackParamList = TabRootParamList & DetailParamList;
