@@ -178,3 +178,16 @@ test("hängt die Anfrage, kommt nach der Zeitgrenze null - die App zeigt das Pak
   mockGet.mockResolvedValue({ data: serverState({ unseen: ["b"] }) });
   await expect(ceremonyState("anna")).resolves.toMatchObject({ unseen: ["b"] });
 });
+
+test("Stand am Server fehlt trotz Merker (z. B. nach einer Rücksicherung): die App meldet neu", async () => {
+  mockStore[importedKey("anna")] = "2026-11-01T00:00:00.000Z";
+  mockStore.tls_ach_seen_anna = "2026-11-10T10:00:00.000Z";
+  mockGet.mockResolvedValue({ data: serverState({ since: null }) });
+  mockPost.mockResolvedValue({ data: serverState({ unseen: ["a"] }) });
+  await expect(ceremonyState("anna")).resolves.toMatchObject({ unseen: ["a"] });
+  expect(mockPost).toHaveBeenCalledWith("/achievements/me/ceremony/import", { seen_until: "2026-11-10T10:00:00.000Z" });
+  mockGet.mockResolvedValue({ data: serverState() });
+  await ceremonyState("anna");
+  expect(mockPost).toHaveBeenCalledTimes(1);
+});
+

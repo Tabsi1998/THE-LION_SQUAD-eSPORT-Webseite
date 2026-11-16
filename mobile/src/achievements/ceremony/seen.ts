@@ -19,7 +19,7 @@ export const levelSeenKey = (id: string) => `tls_level_seen_${safe(id)}`;
 export const importedKey = (id: string) => `tls_ceremony_imported_${safe(id)}`;
 
 export type CeremonyState = { unseen: string[]; level: LevelState | null; recountSeen: string[] };
-type ServerState = { unseen?: unknown; level?: Partial<LevelState> | null; recount_seen?: string[] };
+type ServerState = { since?: string | null; unseen?: unknown; level?: Partial<LevelState> | null; recount_seen?: string[] };
 type LegacyReport = { seen_until?: string; level?: LevelState };
 type CheckEntry = { tiers?: CeremonyTier[]; levelUp?: LevelUp | null };
 
@@ -97,8 +97,9 @@ export function ceremonyState(userId: string | null | undefined): Promise<Ceremo
       // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
       const { data } = await api.get<ServerState>("/achievements/me/ceremony");
       const state = normalise(userId, data);
-      if (!state || (await read(importedKey(userId)))) return state;
-      // Einmal je Gerät und Konto: den Altbestand melden - erst damit legt der Server den Stand an.
+      // Einmal je Gerät und Konto den Altbestand melden - erst damit legt der Server den Stand an. Kennt der Server keinen
+      // Beginn (Zeile fehlt, etwa nach einer Rücksicherung), meldet die App neu, auch mit Merker.
+      if (!state || ((await read(importedKey(userId))) && data?.since)) return state;
       const { data: imported } = await api.post<ServerState>("/achievements/me/ceremony/import", await legacyReport(userId));
       await SecureStore.setItemAsync(importedKey(userId), new Date().toISOString()).catch(() => {});
       return normalise(userId, imported);
