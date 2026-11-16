@@ -1,5 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const D = require("./hilfe/daten");
+const B = require("./hilfe/daten-bereiche");
 const { CLIPS, SHOTS, camera, saveSizes } = require("./hilfe/kamera");
 
 // Hilfe-Bereich (#2295): Jeder Ablauf aus src/hilfe/themen/*.json einmal durchgespielt, bei 390 px (Handy) und
@@ -20,6 +21,7 @@ async function noSideScroll(page) {
 /** Der sichtbare von mehreren gleichen Knöpfen (Einstellungen haben am PC und am Handy je eine Leiste). */
 const shown = (page, testId) => page.locator(`[data-testid="${testId}"]:visible`).first();
 const labelOf = (locator) => locator.locator("xpath=ancestor::label[1]");
+const ERFOLG_KARTE = require("node:fs").readFileSync(require("node:path").join(__dirname, "fixtures", "hilfe-erfolg-karte.jpg"));
 
 async function konto(page, cam, state) {
   state.routes = { "POST /auth/register": ({ body }) => ({ verification_required: true, email: body?.email }) };
@@ -341,7 +343,237 @@ async function turniere(page, cam, state) {
   }
 }
 
-const FLOWS = { "konto-und-profil": konto, "team-und-co-team": team, "liga-captains": liga, turniere };
+// ---------------------------------------------------------------- Paket 3 (#2448): die übrigen Bereiche
+
+async function verein(page, cam, state) {
+  let application = null;
+  state.user = { ...B.NEON };
+  state.routes = {
+    "/membership/fees": B.JOIN_FEES,
+    "/membership/join-page": { benefits: [], fee_purpose: "" },
+    "/membership/apply/form": B.APPLY_FORM,
+    "/membership/apply/me": () => application,
+    "POST /membership/apply": () => { application = { ...B.APPLICATION }; return application; },
+    "/board/statutes": {},
+  };
+  await page.goto("/membership/join");
+  await noSideScroll(page);
+  await cam.shot("mitglied-werden", page.getByTestId("join-apply-btn"), { area: [page.getByTestId("join-apply-btn"), page.locator("h1").first()] });
+
+  await page.goto("/membership/apply");
+  await expect(page.getByTestId("apply-form")).toBeVisible();
+  await noSideScroll(page);
+  // Die Schleife zeigt die Wahl der Mitgliedsart; das Geburtsdatum (ein Fenster mit Kalender) kommt danach ohne Aufnahme.
+  await cam.clip("antrag-ausfuellen", page.getByTestId("apply-fee-3"), (act) => act.check(page.getByTestId("apply-fee-3")),
+    { area: page.getByTestId("apply-fees"), start: page.getByTestId("apply-fees") });
+  await page.getByTestId("apply-birth").click();
+  await page.getByTestId("apply-birth-year").selectOption("2001");
+  await page.getByTestId("apply-birth-day-15").click();
+  await noSideScroll(page);
+  await cam.clip("antrag-einreichen", [labelOf(page.getByTestId("apply-statutes")), labelOf(page.getByTestId("apply-privacy")), page.getByTestId("apply-submit")], async (act) => {
+    await act.check(page.getByTestId("apply-statutes"));
+    await act.check(page.getByTestId("apply-privacy"));
+  }, { area: [page.getByTestId("apply-consents"), page.getByTestId("apply-submit")] });
+  await page.getByTestId("apply-submit").click();
+  await expect(page.getByTestId("apply-pending")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("antrag-stand", page.getByTestId("apply-withdraw"), { area: page.getByTestId("apply-pending") });
+}
+
+async function events(page, cam, state) {
+  let event = B.EVENT_BASE;
+  state.user = { ...B.NEON };
+  state.routes = {
+    "/events/meta": B.EVENTS_META,
+    "/events": B.EVENT_LIST,
+    "/tournaments": [],
+    "/f1/challenges": [],
+    "/calendar/mine": { events: [], tournaments: [], fastlaps: [] },
+    "/events/probe-lan": () => event,
+    "/events/probe-lan/notices": { items: [] },
+    "/events/probe-lan/friends": { sharing: true, hint: false, friends: [] },
+    "POST /events/e1/registrations": () => ({ id: "r-neon", status: "registered", seat_count: 2, companion_count: 1 }),
+  };
+  await page.goto("/events");
+  await expect(page.getByTestId("events-list")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("events-liste", [page.getByTestId("events-filter"), page.getByTestId("events-only-mine")], { area: [page.locator("h1").first(), page.getByTestId("events-filter")] });
+
+  await page.goto("/events/probe-lan?anmelden=1");
+  const form = page.getByTestId("event-register-form");
+  await expect(form).toBeVisible();
+  await page.waitForTimeout(500);
+  await noSideScroll(page);
+  const companions = form.locator("input[type='number']");
+  await cam.clip("event-anmelden", [companions, page.getByTestId("event-register-submit")], (act) => act.type(companions, "1", { delay: 120 }),
+    { area: [form, page.getByTestId("event-register-submit")], start: companions });
+  await expect(page.getByTestId("event-quote")).toContainText("2 Personen");
+
+  event = B.EVENT_FULL;
+  await page.reload();
+  await expect(page.getByTestId("event-register-form")).toBeVisible();
+  await expect(page.getByTestId("event-waitlist-note")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("warteliste", [page.getByTestId("event-waitlist-note"), page.getByTestId("event-register-submit")], { area: page.getByTestId("event-register-form") });
+
+  event = B.EVENT_MINE;
+  await page.goto("/events/probe-lan");
+  await expect(page.getByTestId("event-own-registration")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("anmeldung-aendern", [page.getByTestId("event-edit-link"), page.getByTestId("event-cancel-link")], { area: page.getByTestId("event-own-registration") });
+
+  event = B.EVENT_PROGRAM;
+  await page.reload();
+  await expect(page.getByTestId("event-whatson")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("tagesplan", page.getByTestId("event-whatson"));
+
+  let personal = { active: false, created_at: null, last_used_at: null };
+  state.routes = {
+    "/calendar/me": () => ({ items: B.CAL_ITEMS, subscription: personal, hint_due: false }),
+    "/calendar": { items: B.CAL_ITEMS, signed_in: true, feed_path: "/api/calendar/feed.ics" },
+    "/calendar/personal": () => personal,
+    "POST /calendar/personal": () => { personal = { ...B.PERSONAL_FEED }; return personal; },
+  };
+  await page.goto("/calendar/mine");
+  await expect(page.getByTestId("calendar-scope-mine")).toBeVisible();
+  const asList = page.getByTestId("calendar-view-list");
+  if (await asList.isVisible()) await asList.click();
+  await expect(page.getByTestId("calendar-list")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("mein-kalender", page.getByTestId("calendar-badge-tournament-t-duo"),
+    { area: [page.getByTestId("calendar-scope"), page.getByTestId("calendar-list")] });
+  // Die Adresse beginnt im Bild mit der Adresse der Website statt mit dem Testserver (nur die Anzeige im Feld).
+  const feedUrl = page.getByTestId("calendar-personal-feed-url");
+  await cam.clip("kalender-abo", feedUrl, async (act) => {
+    await act.click(page.getByTestId("calendar-personal-create"));
+    await feedUrl.waitFor({ state: "visible" });
+    await feedUrl.evaluate((input) => { input.value = input.value.replace(window.location.origin, "https://lionsquad.at"); });
+  }, { area: page.getByTestId("calendar-personal"), start: page.getByTestId("calendar-personal-create") });
+  await expect(page.getByTestId("calendar-personal-webcal")).toBeVisible();
+  await noSideScroll(page);
+}
+
+async function turniertag(page, cam, state) {
+  const cup = B.ONSITE_CUP;
+  state.user = { ...B.NEON };
+  state.routes = {
+    [`/tournaments/${cup.slug}`]: cup,
+    [`/tournaments/${cup.id}/registrations`]: [B.ONSITE_REG],
+    [`/tournaments/${cup.id}/live-queue/me`]: B.MY_QUEUE,
+    [`/tournaments/${cup.id}/notices`]: B.NOTICES,
+    "/teams/my": [],
+    "/matches/m-vor-ort/page": B.CALLED_MATCH,
+    "/matches/m-vor-ort/chat": [],
+  };
+  await page.goto(`/tournaments/${cup.slug}`);
+  await expect(page.getByTestId("live-queue-status")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("naechstes-spiel", page.getByTestId("live-queue-status"), { area: page.getByTestId("tournament-my-stand") });
+  await cam.shot("hinweis-leitung", page.getByTestId("notice-banner"));
+
+  await page.goto("/matches/m-vor-ort");
+  await expect(page.getByTestId("match-call")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("aufruf", page.getByTestId("match-call-station"), { area: page.getByTestId("match-call") });
+  await cam.shot("ergebnis-vor-ort", page.getByTestId("match-staff-enters"));
+
+  // Spielplan vor Ort: echte Daten aus dem Planer (fixtures/tableScheduleGenerated.json), die Warteschlange dazu.
+  const t = B.ONSITE;
+  state.user = { ...B.NEON };
+  state.routes = {
+    [`/tournaments/${t.slug}`]: t,
+    [`/tournaments/${t.id}`]: t,
+    [`/tournaments/${t.id}/bracket`]: B.onsite.bracket,
+    [`/tournaments/${t.id}/registrations`]: B.onsite.bracket.registrations,
+    [`/tournaments/${t.id}/matchdays`]: { applies: false, matchdays: [] },
+    [`/tournaments/${t.id}/live-queue`]: () => B.onsiteQueue(),
+  };
+  await page.goto(`/tournaments/${t.slug}/matches`);
+  await expect(page.getByTestId("schedule-view-stations")).toBeVisible();
+  await noSideScroll(page);
+  const running = page.getByTestId(`schedule-now-${B.RUNNING.station_id}`);
+  await cam.clip("nach-stationen", running, (act) => act.click(page.getByTestId("schedule-view-stations")),
+    { area: [page.getByTestId("schedule-view-stations"), running], start: page.getByTestId("schedule-view-stations"), block: "start" });
+  await noSideScroll(page);
+  await cam.shot("spielzeit", page.getByTestId(`schedule-clock-${B.RUNNING.id}`), { area: running });
+}
+
+async function gewinne(page, cam, state) {
+  state.user = { ...B.NEON };
+  state.routes = {
+    "/prizes/me": B.PRIZES,
+    "/prizes/me/certificates": B.CERTIFICATES,
+    "/users/public/neonfalke": B.PROFILE,
+    "/me/rewards/unseen": { rewards: [] },
+    "/achievements/me": B.ME_ACHIEVEMENTS,
+    "/achievements/user/u-neon": { groups: B.ME_ACHIEVEMENTS.groups, awards: B.ME_ACHIEVEMENTS.awards },
+    "POST /achievements/evaluate": { newly_awarded: 0 },
+    "/users/me/profile-completeness": { score: 80, missing: [] },
+    "/users/me/level": { level: 9, title: "Jäger", prestige: 0 },
+    "/achievements/award/a2": B.SHARE_AWARD,
+  };
+  await page.goto("/my/prizes");
+  await expect(page.getByTestId("my-prize-p-ready")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("meine-gewinne", page.getByTestId("my-prize-p-ready"));
+
+  await page.goto("/u/neonfalke?tab=trophaeen");
+  await expect(page.getByTestId("profile-trophies")).toBeVisible();
+  await noSideScroll(page);
+  await page.getByTestId("profile-trophies-kind-medal").click();
+  await expect(page.getByTestId("profile-trophies-count")).toContainText("1 von 6");
+  await cam.shot("trophaeen", page.getByTestId("trophy-card-w-gold"),
+    { area: [page.getByTestId("profile-trophies-filters"), page.getByTestId("trophy-card-w-gold")] });
+  await page.getByTestId("profile-trophies-kind-all").click();
+  await cam.shot("neben-den-namen", [page.getByTestId("trophy-emblem-w-emblem"), page.getByTestId("trophy-banner-w-emblem")],
+    { area: page.getByTestId("trophy-card-w-emblem") });
+
+  await page.goto("/u/neonfalke?tab=erfolge");
+  await expect(page.getByTestId("profile-own-achievements")).toBeVisible();
+  await noSideScroll(page);
+  const group = page.getByTestId("achievement-group-sieg");
+  await group.locator("button").first().click();
+  await expect(page.getByTestId("achievement-share-sieg-2")).toBeVisible();
+  await page.waitForTimeout(300);
+  await cam.shot("erfolge", [page.getByTestId("achievement-group-sieg-tiers"), page.getByTestId("achievement-share-sieg-2")], { area: group });
+
+  // Die Teilen-Karte selbst zeichnet der Server (services/achievement_share.py) - hier ein damit erzeugtes Bild.
+  await page.route("**/api/static/achievements/**", (route) => route.fulfill({ contentType: "image/jpeg", body: ERFOLG_KARTE }));
+  await page.goto("/achievements/a/a2");
+  await expect(page.getByTestId("share-card")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("erfolg-teilen", [page.getByTestId("share-button"), page.getByTestId("share-download")], { area: page.getByTestId("share-card") });
+}
+
+async function datenschutz(page, cam, state) {
+  let check = B.ERASE_OK;
+  state.user = { ...B.NEON };
+  state.routes = { "/dsgvo/anonymize-me/check": () => check, "/moderation/blocks": [] };
+  await page.goto("/privacy-account");
+  await expect(page.getByTestId("dsgvo-export-btn")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("daten-herunterladen", page.getByTestId("dsgvo-export-btn"));
+  await page.getByTestId("dsgvo-anonymize-btn").click();
+  const dialog = page.getByTestId("confirm-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("textbox").fill("LÖSCHEN");
+  await cam.shot("konto-anonymisieren", [dialog.getByRole("textbox"), page.getByTestId("confirm-dialog-confirm")], { area: dialog });
+  await page.getByTestId("confirm-dialog-cancel").click();
+  await expect(dialog).toHaveCount(0);
+
+  check = B.ERASE_BLOCKED;
+  await page.reload();
+  await expect(page.getByTestId("dsgvo-erasure-blockers")).toBeVisible();
+  await noSideScroll(page);
+  await cam.shot("rollen-abgeben", page.getByTestId("dsgvo-erasure-blockers"),
+    { area: [page.getByTestId("dsgvo-erasure-blockers"), page.getByTestId("dsgvo-anonymize-btn")] });
+}
+
+const FLOWS = {
+  "konto-und-profil": konto, "team-und-co-team": team, "liga-captains": liga, turniere,
+  "verein-und-mitgliedschaft": verein, "events-und-kalender": events, turniertag, "gewinne-und-trophaeen": gewinne, "datenschutz-und-konto": datenschutz,
+};
 
 test.describe.configure({ mode: "serial" });
 test.afterAll(() => saveSizes());

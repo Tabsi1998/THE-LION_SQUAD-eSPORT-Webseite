@@ -2,6 +2,11 @@ import konto from "./themen/konto-und-profil.json";
 import team from "./themen/team-und-co-team.json";
 import liga from "./themen/liga-captains.json";
 import turniere from "./themen/turniere.json";
+import verein from "./themen/verein-und-mitgliedschaft.json";
+import events from "./themen/events-und-kalender.json";
+import turniertag from "./themen/turniertag.json";
+import gewinne from "./themen/gewinne-und-trophaeen.json";
+import datenschutz from "./themen/datenschutz-und-konto.json";
 import masse from "./bilder/masse.json";
 import bereiche from "./bereiche.json";
 import fragen from "./fragen.json";
@@ -21,7 +26,7 @@ export { FAQ_PFAD, ankerAus, fragePfad, hilfePfad, hilfeUmleitung } from "./pfad
 // Hier im öffentlichen Bundle steht nur `alle`; Geschütztes liefert der Server nach Rechteprüfung (GET /api/faq,
 // backend/services/faq_protected.py). Ein Abschnitt kann mit eigenem `bereich` zusätzlich in einem zweiten Bereich stehen.
 
-export const THEMEN = [konto, team, liga, turniere];
+export const THEMEN = [konto, team, liga, turniere, verein, events, turniertag, gewinne, datenschutz];
 // Gleich lautend in backend/services/help_topics.py (Teilen-Karte für Discord und WhatsApp).
 export const HILFE_BESCHREIBUNG = "Häufige Fragen und kurze Anleitungen mit Bildern: Konto und Profil, Teams, Liga, Turniere und mehr.";
 export const BEREICHE = bereiche;
