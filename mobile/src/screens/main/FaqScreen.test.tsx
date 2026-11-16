@@ -77,6 +77,16 @@ test("Mitglied: der Server liefert Mitgliederfragen, die Leitungsfrage ohne Rech
   expect(screen.queryByTestId("faq-rolle-turnierleitung")).toBeNull();
 });
 
+test("ein Link ohne Ziel vom Server: die Frage klappt auf, nur der Link fehlt", async () => {
+  mockAuth.user = { id: "u-1" };
+  antwort({ darf: { ...ALLES_ZU, angemeldet: true, mitglied: true }, fragen: [{ ...HELFER, link: { label: "Zu den Helferdiensten" } }] });
+  await renderFaq();
+  await waitFor(() => expect(screen.getByTestId("faq-frage-helferdienst-eintragen")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("faq-frage-helferdienst-eintragen-knopf"));
+  expect(screen.getByText(/tippe bei einer Schicht auf Ich helfe/)).toBeTruthy();
+  expect(screen.queryByTestId("faq-frage-link-helferdienst-eintragen")).toBeNull();
+});
+
 test("Turnierleitung: eigener Bereich und Rollen-Chip", async () => {
   mockAuth.user = { id: "u-2" };
   antwort({ darf: { ...ALLES_ZU, angemeldet: true, turnierleitung: true }, fragen: [LEITUNG] });

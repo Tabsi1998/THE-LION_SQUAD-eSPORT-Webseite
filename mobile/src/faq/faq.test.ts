@@ -174,6 +174,25 @@ describe("Sichtbarkeit", () => {
     expect(faqZugangAus(undefined)).toEqual({ darf: OHNE_ZUGANG, fragen: [] });
   });
 
+  test("kaputte Links vom Server fallen weg, die Frage bleibt; Pflichtfelder nur als Text", () => {
+    const zugang = faqZugangAus({
+      darf: { mitglied: true },
+      fragen: [
+        { ...MITGLIED_FRAGE, id: "ohne-ziel", link: { label: "Weiter" } },
+        { ...MITGLIED_FRAGE, id: "zahl-als-ziel", link: { to: 5, label: "Weiter" } },
+        { ...MITGLIED_FRAGE, id: "fremdes-ziel", link: { to: "https://example.test/x", label: "Weiter" } },
+        { ...MITGLIED_FRAGE, id: "gut", link: { to: "/members/helfen", label: "Zu den Helferdiensten" }, rollen: ["mitglied", 3] },
+        { ...MITGLIED_FRAGE, id: 7 },
+        { ...MITGLIED_FRAGE, id: "antwort-zahl", antwort: 42 },
+      ],
+    });
+    expect(zugang.fragen.map((row) => [row.id, row.link?.to ?? null])).toEqual([
+      ["ohne-ziel", null], ["zahl-als-ziel", null], ["fremdes-ziel", null], ["gut", "/members/helfen"],
+    ]);
+    expect(zugang.fragen[3].rollen).toEqual(["mitglied"]);
+    expect("link" in zugang.fragen[0]).toBe(false);
+  });
+
   test("eine Kennung zählt einmal - die öffentliche Frage gewinnt", () => {
     const doppelt = { ...FRAGEN[0], antwort: "Andere Antwort vom Server" };
     const fragen = alleFragen([doppelt]);

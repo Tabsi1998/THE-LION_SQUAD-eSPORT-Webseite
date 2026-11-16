@@ -1,5 +1,5 @@
 import { APP_BEREICH, APP_FRAGEN } from "./appFragen";
-import type { FaqBereich, FaqDarf, FaqFrage, FaqSchritt, FaqAbschnitt, FaqThema } from "./types";
+import type { FaqBereich, FaqDarf, FaqFrage, FaqLink, FaqSchritt, FaqAbschnitt, FaqThema } from "./types";
 import WEB from "./webFaq.generated.json";
 
 export type * from "./types";
@@ -171,9 +171,27 @@ export function sucheFaq(anfrage: string, { fragen = FRAGEN, themen = THEMEN, da
     .slice(0, limit);
 }
 
+const PFLICHT = ["id", "frage", "antwort", "bereich", "sichtbar_fuer"] as const;
+
 function gueltigeFrage(frage: unknown): frage is FaqFrage {
-  const row = frage as Partial<FaqFrage> | null;
-  return Boolean(row && typeof row === "object" && row.id && row.frage && row.antwort && row.bereich && row.sichtbar_fuer);
+  const row = frage as Record<string, unknown> | null;
+  return Boolean(row && typeof row === "object" && PFLICHT.every((feld) => typeof row[feld] === "string" && row[feld]));
+}
+
+/** Ein Link braucht Ziel und Text als Zeichenfolge, das Ziel als Pfad der Website - sonst fällt nur der Link weg. */
+function gueltigerLink(link: unknown): FaqLink | undefined {
+  const row = link as Record<string, unknown> | null;
+  if (!row || typeof row !== "object" || typeof row.to !== "string" || typeof row.label !== "string") return undefined;
+  if (!row.to.startsWith("/") || !row.label.trim()) return undefined;
+  return { to: row.to, label: row.label };
+}
+
+/** Eine Frage vom Server in die Form der App: Rollen nur als Zeichenfolgen, ein kaputter Link fällt weg. */
+function frageVomServer(frage: FaqFrage): FaqFrage {
+  const { link, rollen, ...rest } = frage;
+  const sauber: FaqFrage = { ...rest, rollen: Array.isArray(rollen) ? rollen.filter((rolle) => typeof rolle === "string") : [] };
+  const ziel = gueltigerLink(link);
+  return ziel ? { ...sauber, link: ziel } : sauber;
 }
 
 /** Antwort des Servers in die Form der App bringen: nur bekannte Rechte, nur vollständige Fragen (wie faqZugangAus im Web). */
@@ -188,7 +206,7 @@ export function faqZugangAus(data: unknown): { darf: FaqDarf; fragen: FaqFrage[]
       turnierleitung: darf.turnierleitung === true,
       turnierleitung_verwaltung: darf.turnierleitung_verwaltung === true,
     },
-    fragen: Array.isArray(body.fragen) ? body.fragen.filter(gueltigeFrage).map((frage) => ({ ...frage, rollen: Array.isArray(frage.rollen) ? frage.rollen : [] })) : [],
+    fragen: Array.isArray(body.fragen) ? body.fragen.filter(gueltigeFrage).map(frageVomServer) : [],
   };
 }
 
