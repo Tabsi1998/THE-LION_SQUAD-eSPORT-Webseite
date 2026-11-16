@@ -62,9 +62,12 @@ describe("Zeitpunkt der Frage", () => {
     expect(askDecision({ config: CONFIG, env, state: "pending", firstVisit: false })).toBe("ask");
   });
 
-  test("nur einmal, und ein Nein bleibt ein Nein", () => {
-    expect(askDecision({ config: CONFIG, env, state: "asked", firstVisit: false })).toBeNull();
-    expect(askDecision({ config: CONFIG, env, state: "declined", firstVisit: false })).toBeNull();
+  // #1208: „Später“ fragt bei der nächsten Anmeldung wieder - nur die Antwort des Browsers ist endgültig.
+  test("„Später“ hält die nächste Anmeldung nicht auf; ein Nein des Browsers bleibt ein Nein", () => {
+    expect(askDecision({ config: CONFIG, env, state: "later", firstVisit: false })).toBe("ask");
+    // Ein „Nicht jetzt“ von früher (#1163) zählt wie „Später“.
+    expect(askDecision({ config: CONFIG, env, state: "declined", firstVisit: false })).toBe("ask");
+    expect(askDecision({ config: CONFIG, env, state: "asked", firstVisit: false })).toBe("ask");
     expect(askDecision({ config: CONFIG, env: { ...env, permission: "denied" }, state: "", firstVisit: false })).toBeNull();
     expect(askDecision({ config: CONFIG, env: { ...env, permission: "granted" }, state: "", firstVisit: false })).toBeNull();
   });
@@ -77,6 +80,9 @@ describe("Zeitpunkt der Frage", () => {
     const iphone = { supported: false, ios: true, standalone: false, permission: "unsupported" };
     expect(needsHomeScreen(iphone)).toBe(true);
     expect(askDecision({ config: CONFIG, env: iphone, state: "", firstVisit: false })).toBe("ios-hint");
+    // Den Hinweis fürs iPhone gibt es nur einmal.
+    expect(askDecision({ config: CONFIG, env: iphone, state: "ios-seen", firstVisit: false })).toBeNull();
+    expect(askDecision({ config: CONFIG, env: iphone, state: "asked", firstVisit: false })).toBeNull();
     // Vom Home-Bildschirm aus kann das iPhone Web-Push - dann die echte Frage.
     expect(askDecision({ config: CONFIG, env: { supported: true, ios: true, standalone: true, permission: "default" }, state: "", firstVisit: false })).toBe("ask");
     // Ein Browser ohne Web-Push und kein iPhone: nichts.
@@ -201,5 +207,33 @@ describe("Inhalt verbergen (#1163)", () => {
     const { win } = fakeWindow({ permission: "granted" });
     expect(await webPush.setWebPushPrivate(true, win)).toBe(false);
     expect(apiMock.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("Erlaubnis im richtigen Moment (#1208)", () => {
+  function laterVisit() {
+    const made = fakeWindow();
+    markVisit(made.win);
+    made.win.sessionStorage = storage();
+    return made;
+  }
+
+  test("„Später“ - die nächste Anmeldung fragt wieder", async () => {
+    const { win } = laterVisit();
+    const asked = vi.fn();
+    win.addEventListener(WEB_PUSH_EVENT, asked);
+    win.localStorage.setItem("tls-web-push-ask", "later");
+    expect(await offerWebPush(win)).toBe("ask");
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  test("abgelehnt oder erlaubt: keine Frage, nicht einmal die Einstellungen vom Server", async () => {
+    for (const permission of ["denied", "granted"]) {
+      const { win } = fakeWindow({ permission });
+      markVisit(win);
+      win.sessionStorage = storage();
+      expect(await offerWebPush(win)).toBeNull();
+    }
+    expect(apiMock.get).not.toHaveBeenCalled();
   });
 });

@@ -2,9 +2,12 @@
 // iPhone nur mit der Website auf dem Home-Bildschirm. Der Server schaltet es frei (GET /web-push/config: ohne Schlüssel
 // aus - dann kein Knopf und keine Frage).
 //
-// Gefragt wird nie beim ersten Besuch und erst im richtigen Moment: nach einer Turnier- oder Event-Anmeldung, und nur
-// einmal je Browser. „Nicht jetzt“ merkt sich die Seite. Fällt die erste Anmeldung in den ersten Besuch, kommt die Frage
-// beim nächsten Besuch. Am iPhone ohne Home-Bildschirm erscheint statt der Frage ein Hinweis, wie es geht.
+// Gefragt wird nie beim ersten Besuch und erst im richtigen Moment (#1208): nach einer Turnier- oder Event-Anmeldung -
+// erst die eigene Erklärung, bei „Ja, rufen“ dann der Browser. „Später“ fragt frühestens bei der nächsten Anmeldung wieder.
+// Wurde das Team angemeldet, kommt die Frage beim nächsten Öffnen der Übersicht (neue Anmeldung, die dieser Browser noch
+// nicht kannte - gemerkt je Konto im Browser, nicht am Server). Fällt die Anmeldung in den ersten Besuch, kommt die Frage
+// beim nächsten Besuch. Am iPhone ohne Home-Bildschirm erscheint statt der Frage einmal ein Hinweis, wie es geht. Hat der
+// Browser abgelehnt, fragt die Seite nie wieder; Turnier- und Event-Seiten zeigen dann leise „Aufrufe sind aus“.
 //
 // Die Anmeldung gehört dem Konto, das sie im Browser angelegt hat (OWNER_KEY). Meldet sich jemand anderes im selben Browser
 // an, endet sie; Abmelden vom Konto beendet sie auch (forgetWebPush, der Server löscht seine Seite mit der Sitzung).
@@ -88,13 +91,17 @@ export function markVisit(win = currentWindow()) {
 export const askState = (win = currentWindow()) => read(local(win), ASK_KEY);
 export const rememberAsk = (state, win = currentWindow()) => write(local(win), ASK_KEY, state);
 
-/** Was nach einer Anmeldung passiert: "ask" (fragen), "ios-hint" (Hinweis), "pending" (beim nächsten Besuch) oder null. */
+/**
+ * Was nach einer Anmeldung passiert: "ask" (fragen), "ios-hint" (Hinweis), "pending" (beim nächsten Besuch) oder null.
+ * Entscheidet der Browser (erlaubt oder abgelehnt), fragt die Seite nicht mehr. „Später“ (later) und ein früheres „Nicht
+ * jetzt“ (declined) halten die nächste Anmeldung nicht auf (#1208). Den Hinweis fürs iPhone gibt es nur einmal.
+ */
 export function askDecision({ config, env, state, firstVisit }) {
   if (!config?.enabled || !config?.public_key) return null;
-  if (state === "asked" || state === "declined") return null;
   if (env?.permission === "granted" || env?.permission === "denied") return null;
   const hint = needsHomeScreen(env);
   if (!env?.supported && !hint) return null;
+  if (hint && (state === "asked" || state === "ios-seen")) return null;
   if (firstVisit) return "pending";
   return hint ? "ios-hint" : "ask";
 }
@@ -112,8 +119,8 @@ export async function loadWebPushConfig() {
 export async function offerWebPush(win = currentWindow(), { firstVisit } = {}) {
   if (!win) return null;
   const state = askState(win);
-  if (state === "asked" || state === "declined") return null;
   const env = pushEnvironment(win);
+  if (env.permission === "granted" || env.permission === "denied") return null;
   if (!env.supported && !needsHomeScreen(env)) return null;
   const config = await loadWebPushConfig();
   const decision = askDecision({ config, env, state, firstVisit: firstVisit ?? markVisit(win) });

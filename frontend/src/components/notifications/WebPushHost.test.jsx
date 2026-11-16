@@ -1,8 +1,9 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// Die Frage nach Browser-Benachrichtigungen (#1163): erscheint auf Zuruf (nach einer Anmeldung), wartet, solange der
-// Abo-Hinweis offen ist, und merkt sich ein „Nicht jetzt“. „Benachrichtigen“ holt erst dann die Frage des Browsers.
+// Die Frage nach Browser-Benachrichtigungen (#1163, #1208): erscheint auf Zuruf (nach einer Anmeldung), erst mit der eigenen
+// Erklärung (Aufruf, Check-in, Ergebnis), wartet, solange der Abo-Hinweis offen ist. „Ja, rufen“ holt erst dann die Frage
+// des Browsers; „Später“ fragt bei der nächsten Anmeldung wieder.
 
 const authState = { user: { id: "u1" } };
 vi.mock("@/context/AuthContext", () => ({ useOptionalAuth: () => authState }));
@@ -14,7 +15,7 @@ vi.mock("@/lib/webPush", async (importOriginal) => {
 });
 vi.mock("@/lib/api", () => ({ api: { get: vi.fn(async () => ({ data: { enabled: false } })), post: vi.fn() } }));
 
-const { WebPushHost } = await import("./WebPushHost");
+const { WEB_PUSH_TITLE, WebPushHost } = await import("./WebPushHost");
 const { WEB_PUSH_EVENT } = await import("@/lib/webPush");
 const { CALENDAR_HINT_CLOSED_EVENT, CALENDAR_HINT_EVENT } = await import("@/lib/calendarHint");
 
@@ -34,7 +35,11 @@ test("erscheint erst auf Zuruf und ruft den Browser nur nach einem Klick", async
   expect(screen.queryByTestId("web-push-hint")).toBeNull();
   ask();
   const hint = screen.getByTestId("web-push-hint");
-  expect(hint).toHaveTextContent("Bescheid sagen, wenn es losgeht?");
+  expect(hint).toHaveTextContent(WEB_PUSH_TITLE);
+  expect(WEB_PUSH_TITLE).toBe("Sollen wir dich rufen, wenn du dran bist?");
+  for (const title of ["Aufruf", "Check-in", "Ergebnis"]) expect(screen.getByTestId(`web-push-hint-line-${title}`)).toBeInTheDocument();
+  expect(screen.getByTestId("web-push-hint-allow")).toHaveTextContent("Ja, rufen");
+  expect(screen.getByTestId("web-push-hint-later")).toHaveTextContent("Später");
   expect(hint.className).toContain("tls-push-hint");
   expect(enableMock).not.toHaveBeenCalled();
   await userEvent.click(screen.getByTestId("web-push-hint-allow"));
@@ -42,12 +47,22 @@ test("erscheint erst auf Zuruf und ruft den Browser nur nach einem Klick", async
   expect(screen.queryByTestId("web-push-hint")).toBeNull();
 });
 
-test("„Nicht jetzt“ merkt sich die Seite", async () => {
+test("„Später“ schließt ohne Frage des Browsers - bei der nächsten Anmeldung kommt die Erklärung wieder", async () => {
   render(<WebPushHost />);
   ask();
   await userEvent.click(screen.getByTestId("web-push-hint-later"));
   expect(screen.queryByTestId("web-push-hint")).toBeNull();
-  expect(window.localStorage.getItem("tls-web-push-ask")).toBe("declined");
+  expect(enableMock).not.toHaveBeenCalled();
+  expect(window.localStorage.getItem("tls-web-push-ask")).toBe("later");
+  ask();
+  expect(screen.getByTestId("web-push-hint")).toBeInTheDocument();
+});
+
+test("Tippflächen mindestens 44 Pixel", () => {
+  render(<WebPushHost />);
+  ask();
+  for (const id of ["web-push-hint-allow", "web-push-hint-later"]) expect(screen.getByTestId(id).className).toContain("min-h-[44px]");
+  expect(screen.getByTestId("web-push-hint-close").className).toContain("w-11 h-11");
 });
 
 test("wartet, solange der Abo-Hinweis offen ist", () => {
@@ -65,7 +80,7 @@ test("am iPhone ohne Home-Bildschirm steht, wie es geht - ohne Frage des Browser
   expect(screen.getByTestId("web-push-hint")).toHaveTextContent("Zum Home-Bildschirm");
   expect(screen.queryByTestId("web-push-hint-allow")).toBeNull();
   await userEvent.click(screen.getByTestId("web-push-hint-ok"));
-  expect(window.localStorage.getItem("tls-web-push-ask")).toBe("asked");
+  expect(window.localStorage.getItem("tls-web-push-ask")).toBe("ios-seen");
 });
 
 test("ohne Konto keine Frage", () => {

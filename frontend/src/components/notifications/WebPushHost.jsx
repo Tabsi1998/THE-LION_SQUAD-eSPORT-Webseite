@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BellRing, Share, X } from "lucide-react";
+import { BellRing, CheckCircle2, Megaphone, Share, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
 import { useOptionalAuth } from "@/context/AuthContext";
+import { StaggerIn } from "@/components/tls/motion";
 import { CALENDAR_HINT_CLOSED_EVENT, CALENDAR_HINT_EVENT } from "@/lib/calendarHint";
 import { WEB_PUSH_EVENT, askState, enableWebPush, markVisit, offerWebPush, rememberAsk, syncWebPush } from "@/lib/webPush";
 
-// Die Frage nach Browser-Benachrichtigungen (#1163): ein ruhiger Kasten unten wie der Abo-Hinweis (am Handy über der Leiste),
-// erst nach einer Turnier- oder Event-Anmeldung und nie beim ersten Besuch (lib/webPush). Erst „Benachrichtigen“ ruft die
-// Frage des Browsers auf - nie ohne Klick. Steht gerade der Abo-Hinweis da, wartet die Frage, bis er zu ist. Am iPhone ohne
-// Home-Bildschirm steht statt der Frage, wie es geht. Mit „Bewegung reduzieren“ ohne Bewegung (index.css, .tls-push-hint).
+// Die Frage nach Browser-Benachrichtigungen (#1163, #1208): ein ruhiger Kasten unten wie der Abo-Hinweis (am Handy über der
+// Leiste), erst nach einer Turnier- oder Event-Anmeldung und nie beim ersten Besuch (lib/webPush). Zuerst die eigene
+// Erklärung „Sollen wir dich rufen, wenn du dran bist?“ mit Aufruf, Check-in und Ergebnis; erst „Ja, rufen“ ruft die Frage
+// des Browsers auf - nie ohne Klick. „Später“ fragt frühestens bei der nächsten Anmeldung wieder. Steht gerade der
+// Abo-Hinweis da, wartet die Frage, bis er zu ist. Am iPhone ohne Home-Bildschirm steht statt der Frage einmal, wie es geht.
+// Bewegung: der Kasten steigt auf, die Glocke schwingt einmal, die drei Zeilen staffeln - mit „Bewegung reduzieren“ nichts
+// davon (index.css, .tls-push-hint; StaggerIn).
+export const WEB_PUSH_TITLE = "Sollen wir dich rufen, wenn du dran bist?";
+export const WEB_PUSH_LINES = [
+  { icon: Megaphone, title: "Aufruf", text: "Du bist dran, dein Match geht los." },
+  { icon: CheckCircle2, title: "Check-in", text: "Der Check-in ist offen." },
+  { icon: Trophy, title: "Ergebnis", text: "Dein Ergebnis steht fest." },
+];
+
 export function WebPushHost() {
   const auth = useOptionalAuth();
   const user = auth?.user || null;
@@ -44,9 +55,9 @@ export function WebPushHost() {
   const open = Boolean(request && user && !calendarOpen);
   const mode = request?.mode;
 
-  // Schließen ohne Zustimmung merkt sich die Seite - die Frage kommt nicht wieder (Einstellungen bleiben offen).
+  // „Später“ (oder Schließen): erst die nächste Anmeldung fragt wieder (#1208). Den Hinweis fürs iPhone gibt es nur einmal.
   const decline = useCallback(() => {
-    rememberAsk(mode === "ios-hint" ? "asked" : "declined");
+    rememberAsk(mode === "ios-hint" ? "ios-seen" : "later");
     setRequest(null);
   }, [mode]);
 
@@ -79,14 +90,14 @@ export function WebPushHost() {
       data-testid="web-push-hint"
       className="tls-push-hint fixed z-[70] left-4 right-4 bottom-20 lg:bottom-6 lg:left-auto lg:right-6 lg:w-[380px] border border-[#29B6E8]/40 bg-[#121212]/95 backdrop-blur rounded-sm p-4 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.8)]"
     >
-      <button type="button" onClick={decline} aria-label="Hinweis schließen" data-testid="web-push-hint-close" className="absolute top-2 right-2 w-9 h-9 inline-flex items-center justify-center text-white/45 hover:text-white rounded-sm">
+      <button type="button" onClick={decline} aria-label={ios ? "Hinweis schließen" : "Später"} data-testid="web-push-hint-close" className="absolute top-1 right-1 w-11 h-11 inline-flex items-center justify-center text-white/45 hover:text-white rounded-sm">
         <X className="w-4 h-4" />
       </button>
-      <div className="flex items-start gap-3 pr-8">
+      <div className="flex items-start gap-3 pr-9">
         <span className="tls-push-hint__icon mt-0.5 shrink-0 text-[#29B6E8]" aria-hidden="true">
           {ios ? <Share className="w-5 h-5" /> : <BellRing className="w-5 h-5" />}
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {ios ? (
             <>
               <h2 id="web-push-hint-title" className="text-sm font-bold">Aufrufe auch aufs iPhone?</h2>
@@ -95,24 +106,32 @@ export function WebPushHost() {
                 Öffne die Website von dort – dann kann sie dir Aufrufe, Check-in und Turnier-Meldungen schicken.
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <button type="button" onClick={decline} data-testid="web-push-hint-ok" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">
+                <button type="button" onClick={decline} data-testid="web-push-hint-ok" className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm font-bold uppercase tracking-wider">
                   Verstanden
                 </button>
               </div>
             </>
           ) : (
             <>
-              <h2 id="web-push-hint-title" className="text-sm font-bold">Bescheid sagen, wenn es losgeht?</h2>
-              <p className="mt-1 text-xs text-white/60">
-                Check-in offen, du bist dran, Ergebnis bestätigt – wir melden uns im Browser, auch wenn die Website zu ist.
-                Was genau kommt, stellst du unter Einstellungen → Benachrichtigungen ein.
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FFD700]">Nach deiner Anmeldung</p>
+              <h2 id="web-push-hint-title" className="mt-0.5 text-sm font-bold">{WEB_PUSH_TITLE}</h2>
+              <StaggerIn as="ul" className="mt-2 space-y-1.5 text-xs" data-testid="web-push-hint-lines">
+                {WEB_PUSH_LINES.map(({ icon: Icon, title, text }) => (
+                  <li key={title} className="flex items-center gap-2 text-white/70" data-testid={`web-push-hint-line-${title}`}>
+                    <Icon className="w-4 h-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
+                    <span><strong className="text-white">{title}:</strong> {text}</span>
+                  </li>
+                ))}
+              </StaggerIn>
+              <p className="mt-2 text-[11px] text-white/50">
+                Bei „Ja“ fragt dein Browser einmal nach der Erlaubnis. Was genau kommt, stellst du unter Einstellungen → Benachrichtigungen ein.
               </p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <button type="button" onClick={allow} disabled={busy} data-testid="web-push-hint-allow" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm font-bold uppercase tracking-wider disabled:opacity-60">
-                  {busy ? "Einen Moment …" : "Benachrichtigen"}
+                <button type="button" onClick={allow} disabled={busy} data-testid="web-push-hint-allow" className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm font-bold uppercase tracking-wider disabled:opacity-60">
+                  {busy ? "Einen Moment …" : "Ja, rufen"}
                 </button>
-                <button type="button" onClick={decline} disabled={busy} data-testid="web-push-hint-later" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">
-                  Nicht jetzt
+                <button type="button" onClick={decline} disabled={busy} data-testid="web-push-hint-later" className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm font-bold uppercase tracking-wider">
+                  Später
                 </button>
               </div>
             </>
