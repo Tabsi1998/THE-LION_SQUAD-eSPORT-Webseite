@@ -27,6 +27,7 @@ from services.match_pause import settle_pause
 from services.league_scope import is_league_staffel
 from services.league_service import season_follows_first_staffel
 from services.staffel_guard import staffel_status_problem
+from services.station_runtime import free_stations_of_deleted_matches
 from services.change_events import reset_scope_cache
 from services.public_phase import parse_dt
 from routes.tournament_common import (
@@ -112,6 +113,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
             if match_ids:
                 await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
             await db.matches_v2.delete_many({"stage_id": stage["id"]})
+            await free_stations_of_deleted_matches(db, match_ids)
         await db.matches_v2.insert_many(matches)
         # Gemischt (#1548): schon beim Bau entschiedene Auslosungen (Liga, kampflose Runde) ins Protokoll.
         await record_build_draws(db, matches, actor_id=actor_id)
@@ -173,10 +175,12 @@ async def _finalize_bracket_for_checkin(
     if v2_matches and not all(_v2_match_can_be_rebuilt(match) for match in v2_matches):
         return None
     if v2_matches:
-        match_ids = [match["id"] for match in v2_matches if match.get("id")]
+        # Alle Kennungen, die gleich gelöscht werden - nicht nur die gelesenen (#2386, Review).
+        match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
         if match_ids:
             await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
         await db.matches_v2.delete_many({"tournament_id": tid})
+        await free_stations_of_deleted_matches(db, match_ids)
 
     return None
 

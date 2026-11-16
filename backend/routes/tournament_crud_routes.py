@@ -3,7 +3,7 @@
 import hashlib
 import json
 from typing import Literal
-from fastapi import HTTPException, Depends, Request
+from fastapi import HTTPException, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
@@ -23,6 +23,7 @@ from services.access_links import (
 from services.event_public import public_event
 from services.public_phase import derive_public_phase
 from services.league_scope import is_league_staffel, league_filter, league_label
+from services.tournament_rules import EVENT_MODES
 from services.tournament_permissions import (
     assigned_tournament_ids,
     leads_tournament,
@@ -35,6 +36,7 @@ from services.competition_versions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.mutation_lock import MutationLockBusy, mutation_lock
+from services.station_runtime import free_stations_of_deleted_matches
 from services.slug_utils import (
     apply_slug_history,
     find_by_slug_or_history,
@@ -198,15 +200,59 @@ async def _enrich_tournaments(tournaments: list[dict], user: dict | None = None)
         t["participant_count"] = participants.get(t["id"], 0)
 
 
+def _mode_query(mode: str) -> dict:
+    """Online oder vor Ort (#1276) als Mongo-Filter - dieselbe Regel wie ``tournament_rules.tournament_event_mode``:
+    hybrid zählt zu beiden; ohne gültigen Modus entscheiden die alten Schalter, sonst gilt online."""
+    unset = {"event_mode": {"$nin": sorted(EVENT_MODES)}}
+    if mode == "local":
+        return {"$or": [{"event_mode": {"$in": ["local", "hybrid"]}}, {**unset, "is_hybrid": True}]}
+    return {"event_mode": {"$ne": "local"}}
+
+
+async def _games_with_tournaments(db, user, league: str, *, is_admin: bool, own_ids) -> list[dict]:
+    """Die Spiele für die Chips der Turnierliste (#1276): nur Spiele mit Turnieren, die diese Person in der Liste sehen
+    kann - dieselbe Sichtbarkeit wie die Liste (Review): ohne Entwürfe, ohne versteckte, ohne fremde Mitglieder-Turniere.
+    Eigene (angemeldet oder als Helfer eingesetzt) zählen immer."""
+    rows = await db.tournaments.find(
+        {"status": {"$ne": "draft"}, "game_id": {"$nin": [None, ""]}, **league_filter(league)},
+        {"_id": 0, "id": 1, "game_id": 1, "visibility": 1, "is_public": 1, "league_context": 1},
+    ).to_list(5000)
+    check = user_can_see if is_admin else lead_can_see
+    allowed: dict[str, bool] = {}
+    game_ids: set[str] = set()
+    for row in rows:
+        if row["game_id"] in game_ids:
+            continue
+        if row.get("id") in own_ids or (is_admin and not is_league_staffel(row)):
+            game_ids.add(row["game_id"])
+            continue
+        if row.get("is_public") is False:
+            continue
+        visibility = row.get("visibility") or "public"
+        if visibility not in allowed:
+            allowed[visibility] = bool(await check(user, visibility))
+        if allowed[visibility]:
+            game_ids.add(row["game_id"])
+    games = await db.games.find({"id": {"$in": sorted(game_ids)}}, {"_id": 0, "id": 1, "slug": 1, "name": 1}).to_list(200)
+    return sorted(({"id": game["id"], "slug": game.get("slug"), "name": game.get("name")} for game in games),
+                  key=lambda game: str(game.get("name") or "").lower())
+
+
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100,
                            offset: int = 0, paged: bool = False, compact: bool = False,
                            include_drafts: bool = False, managed: bool = False,
                            league: Literal["include", "exclude", "only"] = "include",
+                           game: str | None = Query(default=None, max_length=120),
+                           mode: Literal["online", "local"] | None = None,
+                           mine: bool = False,
                            user=Depends(get_optional_user)):
     """``league`` (docs/LIGA.md): ``include`` (Vorgabe - die App ohne neuen Build sieht Staffeln als Turniere),
-    ``exclude`` (Web-Listen) oder ``only``."""
+    ``exclude`` (Web-Listen) oder ``only``.
+
+    Filter der Turnierliste (#1276): ``game`` (Kurzname des Spiels, wie ``?game=`` in der Adresse), ``mode`` (online
+    oder vor Ort) und ``mine`` (eigene Anmeldungen und die des Teams; ein Gast bekommt nichts)."""
     db = get_db()
     is_admin = is_confirmed_tournament_lead(user)
     assigned_ids = await assigned_tournament_ids(user)
@@ -240,6 +286,17 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if event_id:
         q["event_id"] = event_id
     q.update(league_filter(league))
+    narrowing = []
+    if game:
+        # Auch ein alter Kurzname aus einem geteilten Link findet das Spiel (Review #1276).
+        found, _renamed = await find_by_slug_or_history(db.games, game, {"_id": 0, "id": 1})
+        narrowing.append({"game_id": found["id"]} if found else {"id": {"$in": []}})
+    if mode:
+        narrowing.append(_mode_query(mode))
+    if mine:
+        narrowing.append({"id": {"$in": sorted(participant_visible_ids)}})
+    if narrowing:
+        q["$and"] = [*q.get("$and", []), *narrowing]
     safe_limit = max(1, min(int(limit or 100), 500))
     projection = {"_id": 0}
     if compact:
@@ -302,7 +359,13 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         items = [_compact_tournament(t) for t in tournaments]
         if not paged:
             return items
-        return {"items": items, "total": total, "limit": page_limit, "offset": page_offset}
+        page = {"items": items, "total": total, "limit": page_limit, "offset": page_offset}
+        if page_offset == 0:
+            # Die Chips braucht nur die erste Seite (Review #1276) - „Mehr laden“ fragt ab 0 mit größerem limit.
+            page["games"] = await _games_with_tournaments(
+                db, user, league, is_admin=is_admin,
+                own_ids={*participant_visible_ids, *assigned_visible_ids, *(assigned_ids if is_admin else [])})
+        return page
     return tournaments
 
 
@@ -684,6 +747,7 @@ async def _drop_matches(db, match_ids: list[str]) -> None:
     if match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
         await db.matches_v2.delete_many({"id": {"$in": match_ids}})
+        await free_stations_of_deleted_matches(db, match_ids)
 
 
 @router.delete("/{tid}")
