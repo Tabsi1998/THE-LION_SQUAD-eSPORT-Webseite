@@ -67,6 +67,42 @@ test("Staffeln tragen ihr Kennzeichen und lassen sich filtern", async () => {
   expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
 });
 
+// Liga-Stand (#2453): Eine Staffel im Entwurf bei offener Anmeldung der Season zeigt „Anmeldung offen bis …“ statt „Entwurf“, dazu was ihr
+// fehlt mit Weg in den Eingang. Der Status-Filter kennt die Liga-Stände, „Entwurf“ meint nur noch Turniere.
+test("Staffeln zeigen den Stand ihrer Season, was fehlt, und der Status-Filter passt dazu", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const at = (offset) => new Date(Date.now() + offset).toISOString();
+  const open = { ...STAFFEL, participant_count: 1, max_participants: 8, league_plan: { fixed_matches: 0 },
+    league_season: { id: "s1", status: "draft", visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) } };
+  const running = { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live", participant_count: 8, league_plan: { fixed_matches: 28 },
+    league_season: { id: "s0", status: "active", visibility: "public", start_date: at(-20 * day) } };
+  const plain = { ...OWN, id: "t-draft", slug: "entwurf", title: "Entwurfs-Turnier", status: "draft" };
+  apiMock.get.mockResolvedValue({ data: [open, running, plain] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Laufende Staffel");
+  expect(screen.getByTestId("admin-tr-stand-liga-a")).toHaveTextContent(/^Anmeldung offen bis /);
+  expect(within(screen.getByTestId("admin-tr-liga-a")).queryByText("ENTWURF")).toBeNull();
+  expect(screen.getByTestId("admin-tr-stand-liga-b")).toHaveTextContent("Spielbetrieb");
+  expect(within(screen.getByTestId("admin-tr-entwurf")).getByText("ENTWURF")).toBeInTheDocument();
+  const needs = screen.getByTestId("admin-tr-needs-liga-a");
+  expect(needs).toHaveTextContent("Teams zuteilen · 1 von 8");
+  expect(within(needs).getByRole("link")).toHaveAttribute("href", "/admin/leagues/seasons/s1#anmeldungen");
+  expect(screen.queryByTestId("admin-tr-needs-liga-b")).toBeNull();
+
+  const filter = screen.getByTestId("admin-tournament-status-filter");
+  expect(filter.querySelector("option[value='draft']")).toHaveTextContent("Entwurf (1)");
+  expect(filter.querySelector("option[value='league:anmeldung']")).toHaveTextContent("Liga: Anmeldung offen (1)");
+  expect(filter.querySelector("option[value='league:spielbetrieb']")).toHaveTextContent("Liga: Spielbetrieb (1)");
+  fireEvent.change(filter, { target: { value: "league:anmeldung" } });
+  expect(screen.getByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeInTheDocument();
+  expect(screen.queryByText("Entwurfs-Turnier")).toBeNull();
+  expect(screen.queryByText("Laufende Staffel")).toBeNull();
+  fireEvent.change(filter, { target: { value: "draft" } });
+  expect(screen.getByText("Entwurfs-Turnier")).toBeInTheDocument();
+  expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
+});
+
 // Löschen nur für Entwürfe (#2111, TA18) - alles andere sagt man ab oder archiviert.
 test("ein Turnier lässt sich nur als Entwurf löschen", async () => {
   apiMock.get.mockResolvedValue({ data: [{ ...OWN, status: "draft" }, { ...OWN, id: "t-open", slug: "offen", title: "Offenes Turnier", status: "registration_open" }] });

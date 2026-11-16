@@ -17,7 +17,7 @@ import { effectiveRuleModes } from "@/lib/tournamentRulePresets";
 import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { StaffelNeedsHint, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
 import { STAFFEL_STAND_FILTERS, staffelStand, statusFilterKey } from "@/lib/seasonTabs";
 import { endText, liveAfterEnd } from "@/lib/endedLive";
 
@@ -288,6 +288,7 @@ export default function AdminTournamentsPage() {
                   {isStaffel(t) ? (
                     <>
                       <StaffelStandBadge tournament={t} now={now} testId={`admin-tr-stand-${t.slug}`} />
+                      {leadsRow(t) ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className="mt-1 max-w-[14rem]" /> : null}
                     </>
                   ) : <StatusBadge status={t.status} />}
                   {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
