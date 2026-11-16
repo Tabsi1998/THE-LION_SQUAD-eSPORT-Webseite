@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Spielplan (#225): Ein frisch eingetragenes Ergebnis trägt kurz „gerade eingetragen“, und
 // unten steht ein Hinweis mit dem Ergebnis - auch für Zuschauer. Beim ersten Laden nichts davon.
@@ -228,6 +228,40 @@ test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“
   } finally {
     vi.useRealTimers();
   }
+});
+
+// #2440 (Review): Nach einem Turnierwechsel zeigt der Spielplan nicht die Stationen des vorigen Turniers - auch nicht,
+// wenn der erste Abruf der Warteschlange des neuen scheitert.
+test("Turnierwechsel: scheitert der erste Abruf des neuen Turniers, bleibt nichts vom vorigen stehen", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const set = generated.onsite;
+  const live = set.bracket.matches_v2.find((match) => match.status === "in_progress");
+  const queue = {
+    applies: true, summary: null, matches: {},
+    stations: [{ id: live.station_id, name: "PC 1", station_text: "PC 1", status: "busy", waiting: 0,
+      running: { match_id: live.id, state: "running", names: ["NeonFalke", "PixelPaula"], label: "Viertelfinale", started_at: "2026-10-31T16:00:00Z", duration_minutes: 30 }, next: null, after: null }],
+  };
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === "/tournaments/cup2") return Promise.resolve({ data: { ...set.tournament, id: "t-second", slug: "cup2" } });
+    if (path === `/tournaments/${set.tournament.id}/bracket` || path === "/tournaments/t-second/bracket") return Promise.resolve({ data: set.bracket });
+    if (String(path).endsWith("/matchdays")) return Promise.resolve({ data: { applies: false, matchdays: [] } });
+    if (path === `/tournaments/${set.tournament.id}/live-queue`) return Promise.resolve({ data: queue });
+    if (path === "/tournaments/t-second/live-queue") return Promise.reject(Object.assign(new Error("503"), { response: { status: 503, data: {} } }));
+    return Promise.reject(new Error(path));
+  });
+  render(
+    <MemoryRouter initialEntries={["/tournaments/cup/matches"]}>
+      <Link to="/tournaments/cup2/matches" data-testid="go-second">Zweites</Link>
+      <Routes><Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByTestId("schedule-view-stations"));
+  expect(await screen.findByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+  await user.click(screen.getByTestId("go-second"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t-second/live-queue", expect.anything()));
+  await waitFor(() => expect(screen.queryByTestId(`schedule-now-${live.station_id}`)).toBeNull());
+  expect(screen.queryByTestId("schedule-live-stale")).toBeNull();
 });
 
 // #1801: Der Spielplan lädt nur bei Änderungen seines Turniers nach - und, weil sich die Turniere eines Events Stationen

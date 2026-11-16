@@ -69,39 +69,47 @@ export default function TournamentSchedulePage() {
   const [mineOnly, setMineOnly] = useState(false);
   // Die Live-Warteschlange (#1556) mit dem Zeitpunkt des letzten guten Stands und ob das Nachladen gerade scheitert
   // (#2440): dann „Letzter Stand vor X s“; nach 3 Minuten ohne Erfolg fällt der alte Stand weg.
-  const [queueState, setQueueState] = useState({ view: null, okAt: 0, failing: false });
+  // Je Turnier (`slug`, #2440): Nach einem Wechsel gilt der Stand des vorigen nicht - auch nicht, wenn der erste Abruf
+  // des neuen scheitert. Eine späte Antwort zum vorigen Turnier wird verworfen.
+  const [queueState, setQueueState] = useState({ slug: "", view: null, okAt: 0, failing: false });
+  const slugRef = useRef(slug);
+  useEffect(() => { slugRef.current = slug; }, [slug]);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
+    const current = () => slugRef.current === slug;
     const { data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig);
     const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig);
+    if (!current()) return;
     setData(bracket);
     // Spielwochen gibt es nur bei Liga, Round Robin und Gruppen. Schlägt der
     // Aufruf fehl, bleibt die bisherige Gruppierung stehen statt einer leeren Seite.
     try {
       const { data: matchdayPlan } = await api.get(`/tournaments/${tournament.id}/matchdays`, accessConfig);
-      setPlan(matchdayPlan);
+      if (current()) setPlan(matchdayPlan);
     } catch {
-      setPlan({ applies: false, matchdays: [] });
+      if (current()) setPlan({ applies: false, matchdays: [] });
     }
     // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan. Scheitert
     // ein Abruf (Netz, Server), bleibt ihr letzter Stand - nur 404/403 heißt „gibt es nicht“ (#2440).
-    if (tournament.event_mode === "online") return setQueueState({ view: null, okAt: 0, failing: false });
+    if (tournament.event_mode === "online") return setQueueState({ slug, view: null, okAt: 0, failing: false });
     try {
       const { data: live } = await api.get(`/tournaments/${tournament.id}/live-queue`, accessConfig);
-      setQueueState({ view: live?.applies ? live : null, okAt: Date.now(), failing: false });
+      if (current()) setQueueState({ slug, view: live?.applies ? live : null, okAt: Date.now(), failing: false });
     } catch (err) {
-      if (queueGoneError(err)) setQueueState({ view: null, okAt: Date.now(), failing: false });
-      else setQueueState((prev) => ({ ...prev, failing: true }));
+      if (!current()) return;
+      if (queueGoneError(err)) setQueueState({ slug, view: null, okAt: Date.now(), failing: false });
+      else setQueueState((prev) => (prev.slug === slug ? { ...prev, failing: true } : { slug, view: null, okAt: 0, failing: true }));
     }
   }, [slug, accessToken]);
 
   useEffect(() => {
     load();
   }, [load]);
-  const queueStaleSince = queueState.failing && queueState.view ? queueState.okAt : 0;
+  const ownQueue = queueState.slug === slug ? queueState : null;
+  const queueStaleSince = ownQueue?.failing && ownQueue.view ? ownQueue.okAt : 0;
   const queueExpired = useStaleExpired(queueStaleSince);
-  const queue = queueExpired ? null : queueState.view;
+  const queue = queueExpired || !ownQueue ? null : ownQueue.view;
   // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801).
   useLiveRefresh(load, ["tournaments", "matches", "matches-v2", "stations"], {
     fallbackMs: 7000, tournamentId: data?.tournament?.id, eventId: data?.tournament?.event_id,

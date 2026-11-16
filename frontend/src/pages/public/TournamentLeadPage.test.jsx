@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Turnierleitung (#1156, #1160): erster Reiter „Braucht Aufmerksamkeit“ mit dem passenden Knopf je Fall, zweiter
 // „Ergebnisse“. Namen sind erfunden.
@@ -589,6 +589,52 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     await waitFor(() => expect(queueCalls()).toBe(before + 1));
     await waitFor(() => expect(screen.queryByTestId("lead-stale")).toBeNull());
     expect(queueTakt()).toEqual([COCKPIT_POLL_MS, 15000]);
+  });
+
+  test("Turnierwechsel: kein „letzter Stand“ und keine späte Antwort vom vorigen Turnier; abgebaut fragt nichts nach", async () => {
+    let finishLeadA = null;
+    let finishQueue = null;
+    const LEAD_B = { ...LEAD, tournament: { ...LEAD.tournament, id: "t2", slug: "b-cup", title: "B-Cup Winter" } };
+    apiMock.get.mockImplementation((url) => {
+      const path = String(url);
+      if (path === "/tournaments/fc-cup/lead" && finishLeadA === "hold") return new Promise((resolve) => { finishLeadA = () => resolve({ data: LEAD }); });
+      if (path === "/tournaments/fc-cup/lead") return Promise.resolve({ data: LEAD });
+      if (path === "/tournaments/fc-cup/live-queue") return Promise.resolve({ data: QUEUE });
+      if (path === "/tournaments/b-cup/lead") return Promise.resolve({ data: LEAD_B });
+      if (path === "/tournaments/b-cup/live-queue") return finishQueue === "hold" ? new Promise((resolve) => { finishQueue = () => resolve({ data: QUEUE }); }) : Promise.reject(offline());
+      return Promise.reject(new Error(path));
+    });
+    const view = render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/b-cup/leitung" data-testid="go-b">B</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    // A: die Ansicht scheitert einmal - „letzter Stand“ steht. Dann hängt die nächste Abfrage von A.
+    apiMock.get.mockImplementationOnce(() => Promise.reject(offline()));
+    await act(async () => { await liveLoads.at(-2)(); });
+    expect(screen.getByTestId("lead-stale")).toBeInTheDocument();
+    finishLeadA = "hold";
+    act(() => { liveLoads.at(-2)(); });
+    // Wechsel zu B: kein Hinweis von A, B lädt seinen Stand; die späte Antwort von A ändert nichts.
+    fireEvent.click(screen.getByTestId("go-b"));
+    expect(screen.queryByTestId("lead-stale")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("B-Cup Winter"));
+    await act(async () => { finishLeadA(); });
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("B-Cup Winter");
+    // B: der erste Abruf der Warteschlange scheiterte - die Stationen von A erscheinen nicht.
+    expect(screen.queryByTestId("lead-tab-cockpit")).toBeNull();
+    expect(screen.queryByTestId("live-station-st1")).toBeNull();
+
+    // Abgebaut während einer Abfrage: keine weitere hinterher, auch wenn eine angehängt war.
+    finishQueue = "hold";
+    const queueLoad = liveLoads.at(-1);
+    act(() => { queueLoad(); queueLoad(); });
+    const asked = queueCalls();
+    view.unmount();
+    await act(async () => { finishQueue(); });
+    expect(queueCalls()).toBe(asked);
   });
 
   test("Takt nur mit Warteschlange: online (`applies: false`) kein Takt - nur der Rückfall-Takt, solange der Strom fehlt", async () => {

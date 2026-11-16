@@ -85,11 +85,14 @@ export default function TournamentLeadPage() {
   // Kommt die Ansicht wieder durch, während die Warteschlange noch scheitert: sofort nachfragen (#2440) - ein Erfolg
   // setzt ihren gebremsten Takt zurück.
   const queueRecover = useRef(null);
+  // Turnier gewechselt (#2440): eine Antwort zum vorigen Turnier gilt nicht mehr.
+  const slugRef = useRef(slug);
 
   const load = useCallback(async () => {
     const requestedAt = Date.now();
     try {
       const { data: view } = await api.get(`/tournaments/${encodeURIComponent(slug)}/lead`);
+      if (slugRef.current !== slug) return;
       const receivedAt = Date.now();
       setData(view);
       setError(null);
@@ -99,6 +102,7 @@ export default function TournamentLeadPage() {
       setLeadStale(false);
       queueRecover.current?.();
     } catch (err) {
+      if (slugRef.current !== slug) return;
       const status = err.response?.status || 0;
       // Ein Stand ist schon da und der Fehler vorübergehend: stehen lassen, mit „letzter Stand vor X s“. Kein Recht
       // (401/403) oder kein Turnier (404) gilt sofort.
@@ -119,9 +123,16 @@ export default function TournamentLeadPage() {
   }, [queueFailures, loadQueue]);
 
   useEffect(() => {
+    // Neues Turnier: nichts vom vorigen stehen lassen - weder seine Ansicht noch „letzter Stand vor X s“.
+    slugRef.current = slug;
     hasView.current = false;
+    setData(null);
+    setError(null);
+    setLeadStale(false);
+    setLeadOkAt(0);
+    setClockOffset(0);
     load();
-  }, [load]);
+  }, [slug, load]);
   // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801). Bis
   // das Turnier geladen ist, jede; ohne sichtbares Event jede eines Turniers mit Event.
   const tournamentId = data?.tournament?.id;
