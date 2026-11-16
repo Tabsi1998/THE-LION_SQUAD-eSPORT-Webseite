@@ -353,6 +353,28 @@ async def test_nachholen_ohne_platzierungen_kein_500_auszeichnungen_kommen_trotz
         "ohne Platzierungen bleibt die Jahreswertung, wie sie ist"
 
 
+@pytest.mark.asyncio
+async def test_rang_korrigiert_dann_nachholen_eine_aktuelle_auszeichnung(flow):
+    """Nach dem Veröffentlichen wurde das Grand Final korrigiert: Nachholen schreibt die Auszeichnungen neu - je
+    Anmeldung genau eine, mit dem neuen Rang, nichts doppelt."""
+    tournament, _staff, users, regs = await published_cup(flow)
+    final = next(m for m in await flow.matches(tournament) if m["match_key"] == "FINAL")
+    ranking = [row["registration_id"] for row in sorted(final["results"], key=lambda row: row["rank"])]
+    assert ranking[0] == regs[0]["id"]
+    swapped = [{**row, "rank": 2 if row["registration_id"] == ranking[0] else 1 if row["registration_id"] == ranking[1] else row["rank"]}
+               for row in final["results"]]
+    await flow.db.matches_v2.update_one({"id": final["id"]}, {"$set": {"results": swapped}})
+    response = await recheck(flow, tournament)
+    assert response.status_code == 200, response.text
+    for _ in range(2):
+        again = await recheck(flow, tournament)
+        assert again.status_code == 200, again.text
+    awards = await flow.db.tournament_awards.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)
+    assert len(awards) == 8 and len({row["registration_id"] for row in awards}) == 8, "je Anmeldung genau eine"
+    by_reg = {row["registration_id"]: row["rank"] for row in awards}
+    assert by_reg[ranking[1]] == 1 and by_reg[ranking[0]] == 2, "der neue Rang gilt"
+
+
 async def badges_queue(flow, users: list[dict]) -> None:
     """Die vorgemerkten Auswertungen abarbeiten - was der Server-Job sonst nach ein paar Sekunden tut -, dann so lange
     nachwerten, bis nichts Neues mehr kommt (Meta-Erfolge wie „Sammler“ zählen erst die frisch vergebenen; das tut sonst
