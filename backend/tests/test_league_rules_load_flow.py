@@ -223,6 +223,9 @@ async def test_comparison_and_marks_are_remembered_the_preview_is_not(flow, monk
 @pytest.mark.parametrize("kind", ["pdf", "compare"])
 async def test_pdf_and_comparison_are_limited_per_visitor(flow, monkeypatch, kind):
     monkeypatch.setattr(league_rules_routes, "HEAVY_LIMIT", 2)
+    # Festes Zeitfenster (rate_limit zählt je Fenster ab Epoche): ein riesiges Fenster, damit die drei Aufrufe nie über
+    # eine Fenstergrenze fallen - sonst wird der Test an der Minutengrenze zufällig rot (#2458).
+    monkeypatch.setattr(league_rules_routes, "HEAVY_WINDOW_SECONDS", 10**9)
     w = await make_bare_world(flow, visibility="public")
     version = await publish(flow, w, body="# A\nText", annexes=[])
     flow.act_as(None)
