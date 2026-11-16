@@ -39,7 +39,7 @@ logger = logging.getLogger("tls.maintenance")
 
 DOC_ID = "write_pause"
 ERROR_CODE = "write_pause"
-# Kennzeichen der Antwort: die Betriebssicht zählt sie nicht als Serverfehler (server.py, ops_monitoring).
+# Kennzeichen der Antwort: die Betriebssicht zählt sie nicht als Serverfehler (services/ops_monitor.py, OpsMonitorMiddleware).
 MARKER_HEADER = "X-Write-Pause"
 # Grenzen der Lease: kurz genug, dass ein abgestürztes Backup die Website nicht lange sperrt.
 MIN_TTL_SECONDS = 5
