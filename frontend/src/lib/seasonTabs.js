@@ -298,11 +298,14 @@ export function statusFilterKeys(tournament, now = new Date()) {
  * Was der Staffel noch fehlt, mit dem Weg dorthin: `[{code, text, to}]`. Zuteilen läuft mit Anmeldefenster über den Eingang der Season,
  * sonst über „Co-Team zuteilen“ in der Turnierverwaltung; den Spielplan macht „Liga starten“ in der Staffel fest. Ohne ``league_plan``
  * (Season-Seite) fragt niemand nach festen Spielen. Eine beendete oder archivierte Season braucht nichts mehr.
+ * ``manageUrl(tab)``: wohin ein Ziel in der Bedienung der Staffel führt (Reiter der Turnierverwaltung, leer = Kopf) - die Staffel-Seite
+ * der Liga-Verwaltung (#2262) nennt ihre eigenen Reiter. Ohne Angabe wie bisher die Turnierverwaltung.
  */
-export function staffelNeeds(staffel, { season = staffel?.league_season, now = new Date() } = {}) {
+export function staffelNeeds(staffel, { season = staffel?.league_season, now = new Date(), manageUrl = null } = {}) {
   const status = staffel?.status || "draft";
   if (!staffel?.league_context || OWN_STAFFEL_STATUS.has(status) || CLOSED_SEASON.has(season?.status)) return [];
   const manage = `/admin/tournaments/${encodeURIComponent(staffel.id || staffel.tournament_id || "")}`;
+  const toManage = manageUrl || ((tab) => (tab ? `${manage}?tab=${tab}` : manage));
   const seasonId = staffel.league_context.season_id;
   const stand = staffelStand(staffel, { season, now });
   const needs = [];
@@ -314,16 +317,16 @@ export function staffelNeeds(staffel, { season = staffel?.league_season, now = n
       // Vor dem Fensterbeginn meldet sich noch niemand an - zuteilen ist erst ab der Anmeldung dran.
       if (!(window && stand?.key === "vorbereitung")) {
         const of = staffel.max_participants ? ` · ${count} von ${staffel.max_participants}` : "";
-        needs.push({ code: "assign", text: `Teams zuteilen${of}`, to: window && seasonId ? seasonAnchorUrl(seasonId, "anmeldungen") : `${manage}?tab=participants` });
+        needs.push({ code: "assign", text: `Teams zuteilen${of}`, to: window && seasonId ? seasonAnchorUrl(seasonId, "anmeldungen") : toManage("participants") });
       }
     } else if (!stand || stand.key === "einteilung") {
       // Während der Anmeldung kommen noch Teams dazu - „Liga starten“ ist erst danach dran.
-      needs.push({ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: manage });
+      needs.push({ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: toManage("") });
     }
     return needs;
   }
   if (["live", "paused"].includes(status) && staffel.league_plan && !(staffel.league_plan.fixed_matches > 0)) {
-    needs.push({ code: "plan", text: "Spielplan noch nicht erzeugt", to: `${manage}?tab=matchplan` });
+    needs.push({ code: "plan", text: "Spielplan noch nicht erzeugt", to: toManage("matchplan") });
   }
   return needs;
 }

@@ -553,6 +553,8 @@ async def test_the_season_admin_path_goes_only_to_the_management(flow):
     assert view.status_code == 200, view.text
     links = view.json()["league_links"]
     assert "season_admin_path" not in links
+    # Die Staffel-Seite der Verwaltung (#2262) ebenso nur für die, die verwalten.
+    assert "staffel_admin_path" not in links
     assert links["division_label"] == "Liga 1" and links["public_path"].startswith("/liga/")
 
 
@@ -597,5 +599,6 @@ async def test_the_staffel_page_links_back_to_its_season(flow):
     assert view["league_links"] == {
         "league_name": "Probe-Liga", "season_name": "Season 1", "division_label": "Liga 1", "staffel": "A",
         "season_admin_path": f"/admin/leagues/seasons/{season['id']}",
+        "staffel_admin_path": f"/admin/leagues/staffeln/{staffel['id']}",
         "public_path": f"/liga/{league['slug']}/{season['slug']}",
     }

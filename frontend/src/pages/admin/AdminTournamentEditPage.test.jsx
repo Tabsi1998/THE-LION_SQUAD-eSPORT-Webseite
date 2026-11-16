@@ -869,7 +869,8 @@ test("Check-in nur in der Turnierleitung: kein Abhaken hier, ein Link zum Reiter
 
 // Liga-Staffel (#2096): keine Vor-Ort-Anmeldung über QR, der Startknopf heißt „Liga starten“.
 test("eine Liga-Staffel zeigt keine Vor-Ort-Anmeldung und startet mit „Liga starten“", async () => {
-  const staffel = { ...TOURNAMENT, status: "draft", format: "league", team_mode: "team",
+  // „Liga starten“ verlangt in der Staffel „Liga verwalten“ (#2262) - der Server schickt es als ``can_edit_staffel``.
+  const staffel = { ...TOURNAMENT, status: "draft", format: "league", team_mode: "team", can_edit_staffel: true,
     league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" } };
   apiMock.get.mockImplementation((url) => Promise.resolve(String(url).includes("/onsite-access") ? { data: {} }
     : String(url).match(/\/tournaments\/t-1(\?|$)/) ? { data: staffel } : routeFor(String(url))));
@@ -1330,4 +1331,47 @@ test("Staffel: die Turnierleitung allein bekommt weder Bearbeiten noch Team noch
   expect(screen.queryByTestId("admin-tr-tab-edit")).toBeNull();
   expect(screen.queryByTestId("admin-tr-tab-staff")).toBeNull();
   expect(screen.queryByTestId("admin-tr-status-select")).toBeNull();
+});
+
+// Rechte wie der Server (#2262, Entwurf 1.4 Nr. 1–2): Status und „Liga starten“ nur mit „Liga verwalten“, Austritt und
+// Disqualifizieren nur mit „Teams freigeben“ - „Season konfigurieren“ allein zeigt keinen Knopf, der mit 403 endet.
+test("Staffel: „Season konfigurieren“ allein zeigt weder Status noch „Liga starten“", async () => {
+  serveStaffel({ can_edit_staffel: false, can_manage_structure: true });
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect(screen.queryByTestId("admin-tr-status-select")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-primary-action")).toBeNull();
+});
+
+test("Staffel: mit „Liga verwalten“ stehen Status und „Liga starten“ da", async () => {
+  serveStaffel({ can_edit_staffel: true, can_manage_structure: false });
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect(screen.getByTestId("admin-tr-status-select")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-tr-primary-action")).toHaveTextContent("Liga starten");
+});
+
+test("Staffel live: Austritt und Disqualifizieren nach „Teams freigeben“, nicht nach „Season konfigurieren“", async () => {
+  const squad = [{ id: "r-1", status: "approved", display_name: "Probeteam · Rudel", team_id: "tm-1", squad_id: "sq-1" }];
+  serveStaffel({ status: "live", can_manage_structure: true, can_manage_participants: false }, squad);
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  await screen.findAllByText("Probeteam · Rudel");
+  expect(screen.queryByTestId("admin-reg-withdraw-r-1")).toBeNull();
+  cleanup();
+  serveStaffel({ status: "live", can_manage_structure: false, can_manage_participants: true }, squad);
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect((await screen.findAllByTestId("admin-reg-withdraw-r-1")).length).toBeGreaterThan(0);
+  expect(screen.getAllByTestId("admin-reg-disqualify-r-1").length).toBeGreaterThan(0);
+});
+
+test("Turnier unverändert: die Strukturrolle zeigt Status und Austritt", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "approved", display_name: "Max Muster" }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, status: "live", can_manage_participants: false } });
+    return Promise.resolve(routeFor(path));
+  });
+  authState.lead = false;
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.getByTestId("admin-tr-status-select")).toBeInTheDocument();
+  expect((await screen.findAllByTestId("admin-reg-withdraw-r-1")).length).toBeGreaterThan(0);
 });
