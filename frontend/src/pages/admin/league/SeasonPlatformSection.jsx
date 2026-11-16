@@ -52,6 +52,9 @@ export function SeasonPlatformSection({ seasonId, form, set, id, version }) {
     set("allowed_platforms", key && key === state.settings.platform_field ? state.settings.allowed_platforms : []);
   };
   const missing = state.field_missing && form.platform_field === state.settings.platform_field;
+  // Vorschlag (#2281): das am Spiel als „Plattform“ gekennzeichnete Feld - nur solange die Season noch keines gewählt hat.
+  const suggested = fields.find((row) => row.key === state.suggested_field) || null;
+  const offerSuggestion = suggested && !form.platform_field;
 
   return (
     <FormSection title="Plattform und Eingabegerät" testId="season-platform" className="scroll-mt-24" id={id}
@@ -68,9 +71,16 @@ export function SeasonPlatformSection({ seasonId, form, set, id, version }) {
         </p>
       ) : (
         <SelectField label="In welchem Feld steht die Plattform?" value={form.platform_field} onChange={chooseField}
-          options={[["", "kein Feld – keine Prüfung"], ...fields.map((row) => [row.key, row.label])]}
+          options={[["", "kein Feld – keine Prüfung"], ...fields.map((row) => [row.key, row.platform ? `${row.label} (am Spiel als Plattform gekennzeichnet)` : row.label])]}
           hint="Ein Spiel-ID-Feld mit Auswahl. Die Spieler tragen den Wert im Profil ein." testId="season-platform-field" />
       )}
+      {offerSuggestion ? (
+        <div className={`${BOX} border-[#29B6E8]/30 bg-[#29B6E8]/5 text-white/80 flex flex-wrap items-center gap-x-3 gap-y-2`} data-testid="season-platform-suggestion">
+          <span className="min-w-0 flex-1">Vorschlag: „{suggested.label}“ – am Spiel als Plattform gekennzeichnet.</span>
+          <button type="button" onClick={() => chooseField(suggested.key)} data-testid="season-platform-suggestion-take"
+            className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Übernehmen</button>
+        </div>
+      ) : null}
       {field ? (
         <fieldset className="min-w-0 space-y-1">
           <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Erlaubte Plattformen</legend>

@@ -615,6 +615,7 @@ export default function PublicProfilePage() {
                 <RewardChip award={profile.featured_title} testId="profile-featured-title" />
                 <EmblemRow emblems={profile.featured_emblems} testId="profile-featured-emblems" />
                 <AccountLevelPill level={level.level} />
+                <ClubProfileHint profile={profile} />
                 {liveStream && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
                     <Radio className="w-3 h-3 animate-live" /> Live
@@ -1150,6 +1151,26 @@ function AccountRow({ entry }) {
     return <a href={entry.url} target="_blank" rel="noopener noreferrer" title={`${entry.label} öffnen`} data-testid={`profile-account-${entry.key}`} className={className} style={style}>{inner}</a>;
   }
   return <button type="button" onClick={() => copyText(entry.value, `${entry.label} kopiert.`)} title={`${entry.label} kopieren`} data-testid={`profile-account-${entry.key}`} className={className} style={style}>{inner}</button>;
+}
+
+// Vereinsprofil (#1267, kein Zusammenführen): ein kleiner Hinweis „Vereinsmitglied · Funktion“ mit Link zur offiziellen
+// Vereinsseite. Der Server liefert Adresse und Funktion nur, wenn ein aktives Vereinsprofil mit dem Konto verbunden ist.
+export function ClubProfileHint({ profile }) {
+  const slug = profile?.club_profile_slug;
+  if (!slug) return null;
+  const role = String(profile.club_role_title || "").trim();
+  const label = role && role !== "Mitglied" ? `Vereinsmitglied · ${role}` : "Vereinsmitglied";
+  return (
+    <Link
+      to={`/members/${encodeURIComponent(slug)}`}
+      data-testid="profile-club-hint"
+      title="Zum Vereinsprofil"
+      className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 border border-honor/40 text-honor text-[10px] uppercase tracking-widest rounded-sm font-bold hover:bg-honor/10 focus-visible:bg-honor/10 transition"
+    >
+      <Crown className="w-3 h-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">{label}</span>
+    </Link>
+  );
 }
 
 function AboutCard({ profile, joinedDate }) {

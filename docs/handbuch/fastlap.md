@@ -8,15 +8,15 @@ Team von Helfern einsetzt und wie die Bestenliste und der Bestzeit-Moment entste
 
 - **Admin → eSports → Fast Lap** (`/admin/f1`) – die Liste aller Challenges, mit Suche, Status-Filter und CSV-Export
 - **Admin → eSports → Fast Lap → Neue Challenge** (`/admin/f1/new`) – eine Challenge anlegen
-- **Admin → eSports → Fast Lap → Challenge öffnen** (`/admin/f1/<Challenge>`) – Einstellungen, Fast-Lap-Team,
+- **Admin → eSports → Fast Lap → Challenge öffnen** (`/admin/f1/<Challenge>`) – Einstellungen, Fast-Lap-Helfer,
   Strecken, Zeiten eintragen
 - **Admin → eSports → TV & Beamer** – die Rangliste auf den Fernseher, siehe [TV und Beamer](tv.md)
 - **Admin → Verbindungen → Discord → Reiter „Meldungen“** – die Bestzeit-Meldung, siehe [Discord](discord.md)
 
 Öffentlich ist die Challenge unter **/fastlap** (Liste) und **/fastlap/<Name der Challenge>**.
 
-Wer was darf: Die **Turnierleitung** (Bereich „Turnierleitung“) darf alles. Wen ihr zum **Fast-Lap-Team** einer
-Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challenge, Strecken oder das Team bearbeiten.
+Wer was darf: Die **Turnierleitung** (Bereich „Turnierleitung“) darf alles. Wen ihr zu den **Fast-Lap-Helfern** einer
+Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challenge, Strecken oder die Helfer bearbeiten.
 
 ---
 
@@ -42,7 +42,7 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 | **Zeiten** | Zeit, Strafsekunden, Beleg, ungültig markieren | Challenge öffnen, Kasten „Zeiten eintragen“ |
 | **Vor Ort** | Schnelleingabe mit Ziffernblock, Gäste ohne Konto, Liste „Am Start / Als Nächstes“ | Challenge öffnen, ganz oben (siehe 3.12) |
 | **Vereins-Referenzzeiten** | Zeiten von Vereinsmitgliedern außer Wertung als „Zielzeit zum Schlagen“ | Formular, Kasten „Teilnahme und Vereins-Referenzzeiten“ |
-| **Fast-Lap-Team** | Helfer, die Zeiten eintragen dürfen | Challenge öffnen, Kasten „Fast-Lap-Team“ |
+| **Fast-Lap-Helfer** | Helfer, die Zeiten eintragen dürfen | Challenge öffnen, Kasten „Fast-Lap-Helfer“ |
 | **Preise** | Preise je Platz, daraus entstehen Gewinn-Einträge | Formular, Kasten „Preise“ |
 | **Jahreswertung** | Punkte für die Jahreswertung, mit einstellbarem Gewicht | Formular, Kasten „Jahreswertung“ |
 | **Bestenliste** | Strecken-Rangliste und Gesamtwertung auf der Website, PDF und Urkunden | öffentliche Seite der Challenge |
@@ -85,16 +85,20 @@ Auf der Seite der Challenge (**Admin → eSports → Fast Lap → Challenge öff
 
 Die **Zielzeit** ist eine Marke zum Knacken: Wer sie unterbietet, sammelt den Erfolg „Zielzeit geknackt“.
 
-### 2.3 Das Fast-Lap-Team einsetzen
+### 2.3 Fast-Lap-Helfer einsetzen
 
 Wer Zeiten eintragen soll, ohne sonst etwas verwalten zu dürfen:
 
-1. Challenge öffnen, Kasten **Fast-Lap-Team**.
+1. Challenge öffnen, Kasten **Fast-Lap-Helfer**.
 2. Bei **Person** den Namen suchen und wählen.
 3. **Rolle** wählen: **Ergebnisdienst**, **Schiedsrichter** oder **Organisation**. Alle drei dürfen Zeiten eintragen.
 4. Optional eine **Notiz** (zum Beispiel „Station am Samstag“), dann **Hinzufügen**.
 5. In der Tabelle könnt ihr jemanden **Pausieren** (und wieder **Aktivieren**) oder **Entfernen**. Ohne Zuweisung darf die
    Person keine Zeiten mehr eintragen.
+
+Wer eingetragen wird, bekommt genau eine Nachricht mit Rolle, „Darf hier: Zeiten eintragen und ändern.“ und dem Link zu
+**Mein Dienst** – in der Glocke, per Push und per Mail (wenn die Person „Turnier-Updates“ per Mail bekommt). Wer pausiert
+eingetragen ist, bekommt sie, sobald ihr ihn **Aktiviert**.
 
 ### 2.4 Freigeben
 
@@ -166,7 +170,7 @@ sieht, wer die Challenge sehen darf; bei **Nur intern** läuft keiner. Unter dem
 ### 3.3 Online-Einreichung
 
 Online einreichen können Fahrer noch nicht (kommt mit #1278). Bis dahin gibt es dafür keinen Haken, und die Website
-verspricht auch kein Formular. Zeiten tragen Turnierleitung und Fast-Lap-Team ein (3.4). Bei alten Challenges bleibt, was
+verspricht auch kein Formular. Zeiten tragen Turnierleitung und Fast-Lap-Helfer ein (3.4). Bei alten Challenges bleibt, was
 gespeichert ist; die App zeigt dort noch den alten Hinweis, bis sie nachgezogen ist.
 
 ### 3.4 Zeiten eintragen
@@ -272,7 +276,7 @@ Zeiten von Gästen zählen dafür nicht.
 ### 3.11 Nach „Ergebnisse veröffentlicht“
 
 Mit **Ergebnisse veröffentlicht** stehen Gewinne und Jahreswertungs-Punkte fest – die Zeiten sind dann gesperrt
-(ebenso im Status **Archiviert**). Das Fast-Lap-Team kann nichts mehr eintragen, ändern oder löschen; die App zeigt statt
+(ebenso im Status **Archiviert**). Die Fast-Lap-Helfer können nichts mehr eintragen, ändern oder löschen; die App zeigt statt
 des Formulars einen Hinweis. Die **Turnierleitung** kann noch korrigieren, aber nur mit **Begründung** (mindestens
 10 Zeichen), die im **Protokoll** steht. Nach jeder solchen Korrektur gleicht die Website Gewinne und
 Jahreswertungs-Punkte an die neue Rangfolge an: Wer neu auf einem Preisplatz steht, bekommt seinen Gewinn; ein Gewinn,
@@ -339,7 +343,7 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 - **Als Nächstes:** Pfeil hoch schiebt nach vorn, ▶ startet sofort, ✕ nimmt aus der Liste.
 - **Am Start:** **Nächster** – die Person ist fertig, die nächste kommt an dieselbe Station. ✓ – fertig ohne Nachfolger.
 - **Ersten starten** holt die erste wartende Person an den Start.
-- Das TV zeigt die Liste mit Station und Versuch. Ändern dürfen Turnierleitung und Fast-Lap-Team.
+- Das TV zeigt die Liste mit Station und Versuch. Ändern dürfen Turnierleitung und Fast-Lap-Helfer.
 
 ---
 
@@ -362,8 +366,8 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 | „Der Gast ist schon mit einem anderen Konto verknüpft.“ | Verknüpfen geht nur einmal | Bei einem Irrtum die Zeiten von Hand korrigieren |
 | „Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.“ | Der Haken **Vereinsmitglieder aus offizieller Wertung ausschließen** ist an | Als **Vereins-Referenz** eintragen, oder den Haken ausschalten |
 | „Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.“ | **Vereins-Referenzzeiten erlauben** ist aus | Haken einschalten |
-| „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch im Fast-Lap-Team (oder pausiert) | Im Kasten **Fast-Lap-Team** hinzufügen oder **Aktivieren** |
-| Der Menüpunkt „Fast Lap“ fehlt | Die Person hat keinen Zugang zur Turnierleitung und keinen Einsatz | Zum Fast-Lap-Team machen lassen (siehe 2.3) |
+| „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch bei den Fast-Lap-Helfern (oder pausiert) | Im Kasten **Fast-Lap-Helfer** hinzufügen oder **Aktivieren** |
+| Der Menüpunkt „Fast Lap“ fehlt | Die Person hat keinen Zugang zur Turnierleitung und keinen Einsatz | Als Fast-Lap-Helfer eintragen lassen (siehe 2.3) |
 | Die Challenge ist öffentlich nicht zu sehen | Status **Entwurf** oder Sichtbarkeit zu eng | Status auf **Angekündigt** stellen, **Sichtbarkeit** prüfen |
 | Keine Jahreswertungs-Punkte | Der Status steht noch nicht auf **Ergebnisse veröffentlicht**, oder der Faktor ist 0. Alte Challenges, die von **Beendet** direkt ins Archiv gingen, haben auch keine | Status setzen, Faktor im Kasten **Jahreswertung** prüfen. Bei alten Archiv-Einträgen landen die Punkte in der gerade aktiven Saison, also nur bewusst nachholen |
 | Keine Gewinn-Einträge | Der Status ist vor **Beendet**, oder es sind keine Preise eingetragen | Status prüfen, im Kasten **Preise** Preise eintragen |
@@ -375,7 +379,7 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 ## 5. Häufige Fragen
 
 **Können Fahrer ihre Zeit selbst eintragen?**
-Nein. Zeiten tragen die Turnierleitung und das Fast-Lap-Team ein. Der Beleg (Bild oder Video) kommt als Link in
+Nein. Zeiten tragen die Turnierleitung und die Fast-Lap-Helfer ein. Der Beleg (Bild oder Video) kommt als Link in
 den **Nachweis-Link**.
 
 **Was ist der Unterschied zwischen ungültig, Strafe und Löschen?**

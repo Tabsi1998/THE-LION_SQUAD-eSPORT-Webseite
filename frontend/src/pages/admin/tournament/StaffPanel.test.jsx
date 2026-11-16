@@ -38,3 +38,30 @@ test("kein Freitext für die Kennung, die Liste nennt den Bereich beim Namen", (
   expect(screen.getAllByText("Turnierbaum").length).toBeGreaterThan(1);
   expect(screen.getByText("Alle Stationen")).toBeInTheDocument();
 });
+
+// Helfer (#1384): je Rolle ein Satz - beim Eintragen unter der Auswahl, in der Liste unter der Rolle; am Handy Karten.
+test("der Satz zur Rolle steht unter der Auswahl und in der Liste", () => {
+  const staff = [{ id: "a-1", role: "scorekeeper", scope: "tournament", is_active: true, user: { display_name: "Hanna" } }];
+  render(<TournamentStaffPanel tournamentId="t-1" staff={staff} onChanged={() => {}} />);
+  expect(screen.getByTestId("tournament-staff-role-sentence")).toHaveTextContent("Darf hier: Teilnehmer, Ergebnisse und Check-in.");
+  fireEvent.change(screen.getByTestId("tournament-staff-role"), { target: { value: "stream_operator" } });
+  expect(screen.getByTestId("tournament-staff-role-sentence")).toHaveTextContent("Darf hier nur ansehen");
+  expect(screen.getByTestId("tournament-staff-sentence-a-1")).toHaveTextContent("Teilnehmer, Ergebnisse und Check-in");
+  expect(screen.getByText("Helfer eintragen")).toBeInTheDocument();
+  expect(screen.queryByTestId("tournament-staff-cards")).toBeNull();
+});
+
+test("am Handy: Karten mit Rolle und Satz statt der Tabelle", () => {
+  const original = window.matchMedia;
+  window.matchMedia = (query) => ({ matches: query.includes("max-width"), media: query, addEventListener: () => {}, removeEventListener: () => {} });
+  try {
+    const staff = [{ id: "a-1", role: "referee", scope: "tournament", is_active: true, user: { display_name: "Paul", username: "paul" } }];
+    render(<TournamentStaffPanel tournamentId="t-1" staff={staff} onChanged={() => {}} />);
+    const card = screen.getByTestId("tournament-staff-card-a-1");
+    expect(card).toHaveTextContent("Schiedsrichter");
+    expect(card).toHaveTextContent("Darf hier: Ablauf und Baum");
+    expect(screen.queryByRole("table")).toBeNull();
+  } finally {
+    window.matchMedia = original;
+  }
+});

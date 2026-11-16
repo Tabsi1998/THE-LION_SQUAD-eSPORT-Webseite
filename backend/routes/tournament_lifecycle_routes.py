@@ -430,6 +430,26 @@ async def _settle_published_results(db, t: dict, tid: str, me: dict) -> tuple[st
     return season_points_note, failed
 
 
+async def _report_settle_failure(db, t: dict, tid: str, me: dict, failed: list[str]) -> None:
+    """Ein Abschluss-Schritt beim Veröffentlichen gescheitert (#2460): ins Protokoll und als Alarm in den Betrieb - damit
+    es auffällt, auch wenn die Leitung das Fenster mit der Warnung schon geschlossen hat. Hält nie etwas auf."""
+    labels = [SETTLE_STEP_LABELS[step] for step in failed]
+    await _audit_tournament_action(db, "tournament.results.settle_failed", me.get("id"), tid, {"failed": failed})
+    # Der Alarm läuft neben der Antwort (Discord, Mail) - die Leitung wartet nicht darauf. Die Sperrfrist je Turnier hält
+    # mehrfaches Veröffentlichen bei einem Alarm.
+    try:
+        from services.ops_alerts import schedule_notify
+        schedule_notify(
+            db, "tournament_settle_failed", "Turnierabschluss unvollständig",
+            f"Beim Veröffentlichen von „{t.get('title') or tid}“ ist gescheitert: {', '.join(labels)}. "
+            "In der Verwaltung beim Turnier unter Werkzeuge „Abschluss nachholen“ tippen.",
+            [{"name": "Turnier", "value": str(t.get("title") or tid)[:200]}],
+            key=f"tournament_settle_failed:{tid}",
+        )
+    except Exception:  # noqa: BLE001 - ein Alarm hält keinen Statuswechsel auf
+        logger.warning("Alarm zum Turnierabschluss nicht gemeldet tournament=%s", log_safe(tid), exc_info=True)
+
+
 async def _settle_season_points(db, t: dict, tid: str, me: dict, regs: list[dict], placements: list[dict],
                                 placed_reg_ids: set, season_weight_of, sync_tournament_points, failed: list[str]) -> str | None:
     """Die Jahreswertung des Turniers angleichen - scheitert sie, steht ``season_points`` in ``failed``."""
@@ -616,8 +636,11 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
 
     # ---------- Season Points + Badges on results_published ----------
     season_points_note = None
+    settle_failed: list[str] | None = None
     if prev != status and status == "results_published":
-        season_points_note, _failed = await _settle_published_results(db, t, tid, me)
+        season_points_note, settle_failed = await _settle_published_results(db, t, tid, me)
+        if settle_failed:
+            await _report_settle_failure(db, t, tid, me, settle_failed)
 
     # „Turnier beendet“ (#1133): einmal je Turnier und Person, beim ersten der beiden Abschluss-Status.
     if prev != status and status in ("completed", "results_published") and prev not in ("completed", "results_published"):
@@ -659,4 +682,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         "idempotent_replay": prev == status,
         **({"notified": notified} if notified is not None else {}),
         **({"season_points_note": season_points_note} if season_points_note else {}),
+        # Veröffentlichen (#2460): welche Abschluss-Schritte gescheitert sind - die Seite warnt und bietet „Abschluss
+        # nachholen“ an. Der Statuswechsel gilt trotzdem.
+        **({"failed": settle_failed, "failed_labels": [SETTLE_STEP_LABELS[step] for step in settle_failed]}
+           if settle_failed is not None else {}),
     }

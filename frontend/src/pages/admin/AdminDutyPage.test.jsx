@@ -36,6 +36,9 @@ test("Helfer: eigene Einsätze in der Reihenfolge des Servers, mit Rolle und Kno
   expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual(["duty-row-t-1", "duty-row-f-1"]);
   expect(screen.getByTestId("duty-when-t-1")).toHaveTextContent(/^Heute · \d\d:\d\d$/);
   expect(screen.getByTestId("duty-roles-t-1")).toHaveTextContent("Deine Rolle: Schiedsrichter, Ergebnisdienst");
+  // Was die Rollen dürfen (#1384): derselbe Satz wie in der Verwaltung - für Fast Laps keiner.
+  expect(screen.getByTestId("duty-rights-t-1")).toHaveTextContent("Darf hier: Ablauf und Baum, Teilnehmer, Ergebnisse, Check-in und Stationen.");
+  expect(screen.queryByTestId("duty-rights-f-1")).toBeNull();
   expect(screen.getByTestId("duty-open-t-1")).toHaveAttribute("href", "/tournaments/herbst-cup/leitung");
   expect(screen.getByTestId("duty-open-t-1")).toHaveTextContent("Turnierleitung öffnen");
   expect(screen.getByTestId("duty-admin-t-1")).toHaveAttribute("href", "/admin/tournaments/t-1");

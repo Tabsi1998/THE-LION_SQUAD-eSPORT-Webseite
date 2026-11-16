@@ -208,7 +208,7 @@ def record_text(record: dict) -> str:
     if record.get("draws"):
         parts.append(f"{record.get('drawn', 0)} U")
     parts.append(f"{record.get('lost', 0)} N")
-    return " · ".join(parts)
+    return share_image.joined(parts)
 
 
 def points_text(record: dict) -> str:
@@ -243,15 +243,15 @@ def render(data: dict) -> bytes:
 
     left, right = 296, WIDTH - 60
     max_width = right - left
-    kicker = " · ".join(part for part in (data.get("league"), data.get("season")) if part).upper()
+    kicker = share_image.joined((data.get("league"), data.get("season"))).upper()
     kicker_font = share_image.font(22)
     draw.text((left, 50), share_image.ellipsis(draw, kicker, kicker_font, max_width), font=kicker_font, fill=accent)
-    team = str(data.get("team") or "Team")
+    team = str(data.get("team") or "Team")  # groß reicht der normale Abstand
     team_font = share_image.fit(draw, team, 64, max_width, min_size=34)
     draw.text((left, 84), share_image.ellipsis(draw, team, team_font, max_width), font=team_font, fill=(255, 255, 255, 255))
-    where = " · ".join(part for part in (data.get("division"), f"Staffel {data['staffel']}" if data.get("staffel") else "") if part)
+    where = share_image.joined((data.get("division"), f"Staffel {data['staffel']}" if data.get("staffel") else ""))
     if data.get("final"):
-        where = f"{where} · Endstand" if where else "Endstand"
+        where = share_image.joined((where, "Endstand"))
     where_font = share_image.font(26, bold=False)
     draw.text((left, 170), share_image.ellipsis(draw, where, where_font, max_width), font=where_font, fill=(255, 255, 255, 190))
 

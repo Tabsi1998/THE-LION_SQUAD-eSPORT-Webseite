@@ -33,7 +33,7 @@ Kapitel ist der Einstieg: Alle anderen Kapitel setzen voraus, dass ihr hier einm
 | **Kommandozentrale** | Offene Aufgaben, Termine heute, Zahlen, Schnellzugriff | Admin |
 | **Zwei-Faktor** | Pflicht für jeden Bereich außer Moderation; ohne sie öffnet sich die Verwaltung nicht | Benutzermenü → Einstellungen → Sicherheit |
 | **Freigaben** | Einzelne Bereiche an eine Person geben, ohne die Rolle zu ändern | Admin → Mitglieder → Alle Benutzer → Bearbeiten |
-| **Helfer-Einsatz** | Eine Person hilft bei einem Turnier oder einer Fast Lap und sieht nur das | Turnier bzw. Fast Lap öffnen, Reiter „Team“ |
+| **Helfer-Einsatz** | Eine Person hilft bei einem Turnier oder einer Fast Lap und sieht nur das | Turnier bzw. Fast Lap öffnen, Reiter „Helfer“ bzw. Kasten „Fast-Lap-Helfer“ |
 | **Einrichtung & FAQ** | Fragen und Antworten zur Einrichtung, mit Weg zur richtigen Seite | Admin → System → Einrichtung & FAQ |
 
 ---
@@ -231,9 +231,21 @@ Wichtig:
 Es gibt zwei Wege zu einer Rolle ohne Verwaltungsbereich:
 
 - **Helfer in einem Turnier oder einer Fast Lap:** Die Turnierleitung trägt die Person im Turnier unter **Admin →
-  eSports → Turniere → Turnier öffnen → Reiter „Team“** ein (Rollen: Organisation, Schiedsrichter, Ergebnisdienst,
-  Stationsleitung, Stream-Betreuung). Bei der Fast Lap geht das im Kasten „Fast-Lap-Team“, siehe
-  [Fast Lap](fastlap.md). Helfer sehen in der Verwaltung **nur ihr Turnier** bzw. **ihre Fast Laps**; im Menü stehen
+  eSports → Turniere → Turnier öffnen → Reiter „Helfer“** ein: Person suchen, Rolle wählen, **Eintragen** (Rollen:
+  Organisation, Schiedsrichter, Ergebnisdienst, Stationsleitung, Stream-Betreuung). Unter der Rolle steht in einem Satz,
+  was sie darf – aus denselben Regeln, die der Server prüft:
+
+  | Rolle | Darf hier |
+  | --- | --- |
+  | Organisation, Schiedsrichter | Ablauf und Baum, Teilnehmer, Ergebnisse, Check-in und Stationen |
+  | Ergebnisdienst | Teilnehmer, Ergebnisse und Check-in – den Baum nicht |
+  | Stationsleitung | Ergebnisse, Check-in und Stationen |
+  | Stream-Betreuung | nur ansehen |
+
+  Wer eingetragen wird oder eine neue Rolle bekommt, erhält genau eine Nachricht mit Rolle, diesem Satz und dem Link zu
+  **Mein Dienst** – in der Glocke, per Push und per Mail (wenn die Person „Turnier-Updates“ per Mail bekommt). Speichern
+  ohne neue Rolle und ein pausierter Einsatz schicken nichts. Am Handy steht jeder Helfer als Karte mit Rolle und Satz.
+  Bei der Fast Lap geht das im Kasten „Fast-Lap-Helfer“, siehe [Fast Lap](fastlap.md). Helfer sehen in der Verwaltung **nur ihr Turnier** bzw. **ihre Fast Laps**; im Menü stehen
   ihnen **Turniere**, **Fast Lap** und **Stationen**. Sie brauchen dafür keinen Bereich und keine Zwei-Faktor-Anmeldung.
 - **Moderator** (nur Bereich Moderation): sieht im Menü **Mein Dienst** und **System → Moderation**.
 
@@ -241,7 +253,7 @@ Für beide steht im **Benutzermenü** (am Handy im ausklappenden Menü) der Eint
 führt nach `/admin`, und das öffnet die eigene Arbeit statt „Kein Zugriff“:
 
 - **Helfer** landen auf **Mein Dienst** (`/admin/dienst`): ihre Turniere und Fast Laps, **heute zuerst**, je mit
-  Uhrzeit, ihrer **Rolle** und dem Knopf **Turnierleitung öffnen** (die Ansicht `/tournaments/<Name>/leitung`, siehe
+  Uhrzeit, ihrer **Rolle** samt dem Satz, was sie darf, und dem Knopf **Turnierleitung öffnen** (die Ansicht `/tournaments/<Name>/leitung`, siehe
   [Turniere](turniere.md)) bzw. **Fast Lap öffnen**. **Vorbereiten** führt in die Turnierverwaltung. Abgeschaltete
   Einsätze und Turniere, die vorbei sind, stehen nicht mehr da.
 - **Moderatoren** landen direkt bei den **Meldungen** (`/admin/moderation`). Unter „Mein Dienst“ steht die Zahl der
@@ -252,7 +264,7 @@ führt nach `/admin`, und das öffnet die eigene Arbeit statt „Kein Zugriff“
   „2FA einrichten“.
 
 Die Knöpfe in Turnier, Fast Lap und Stationen richten sich nach der **Rolle im Turnier**: Eine Stream-Betreuung sieht
-zum Beispiel keinen Check-in und kein „Entfernen“, der Ergebnisdienst kein „Zurücksetzen“. Den Reiter „Team“, „Neues
+zum Beispiel keinen Check-in und kein „Entfernen“, der Ergebnisdienst kein „Zurücksetzen“. Den Reiter „Helfer“, „Neues
 Turnier“, „Löschen“ und den Reiter „Bearbeiten“ hat nur die Turnierleitung. Wer nur für einzelne Spiele oder eine Station
 eingetragen ist, sieht „Ergebnis eintragen“ und Termin nur bei diesen Spielen.
 

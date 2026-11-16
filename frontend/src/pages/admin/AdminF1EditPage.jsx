@@ -85,8 +85,8 @@ export default function AdminF1EditPage() {
     } catch (failure) {
       setStaff([]);
       setStaffError(failure?.response?.status === 403
-        ? formatRequestError(failure, "Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.")
-        : "Das Fast-Lap-Team lässt sich gerade nicht laden.");
+        ? formatRequestError(failure, "Dafür fehlt dir das Recht, die Fast-Lap-Helfer zu sehen.")
+        : "Die Fast-Lap-Helfer lassen sich gerade nicht laden.");
     }
   }, [id, isTournamentLead, wantedTrack]);
 

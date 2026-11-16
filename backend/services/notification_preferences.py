@@ -130,6 +130,7 @@ TEMPLATE_CATEGORY = {
     "registration_received": "tournament_updates",
     "registration_approved": "tournament_updates",
     "registration_rejected": "tournament_updates",
+    "tournament_staff": "tournament_updates",
     "checkin_closes_soon": "tournament_updates",
     "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",

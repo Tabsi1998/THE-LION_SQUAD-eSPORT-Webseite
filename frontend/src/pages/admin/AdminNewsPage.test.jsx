@@ -81,3 +81,19 @@ test("Knöpfe je Stand: Zurückziehen, Löschen nur für Entwürfe, Wiederherste
   expect(screen.getByTestId("news-view-n2")).toHaveTextContent("Vorschau");
   expect(screen.getByTestId("news-view-n1")).toHaveTextContent("Ansehen");
 });
+// Angeheftete News laufen ab (#1263): die Redaktion sieht das Ende - und wenn es vorbei ist.
+test("die Liste nennt das Ende der Anheftung", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/admin/news") return { data: [
+      { ...POSTS[0], pinned: true, pinned_until: "2099-10-21", pin_active: true },
+      { id: "n2", title: "Alt", slug: "alt", category: "club", visibility: "public", published: true, pinned: true, pinned_until: "2020-01-05", pin_active: false },
+      { id: "n3", title: "Normal", slug: "normal", category: "club", visibility: "public", published: true },
+    ] };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminNewsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("news-pin-n1")).toHaveTextContent("Angepinnt bis 21.10.2099");
+  expect(screen.getByTestId("news-pin-n2")).toHaveTextContent("Anpinnen abgelaufen (bis 05.01.2020)");
+  expect(screen.queryByTestId("news-pin-n3")).toBeNull();
+});
