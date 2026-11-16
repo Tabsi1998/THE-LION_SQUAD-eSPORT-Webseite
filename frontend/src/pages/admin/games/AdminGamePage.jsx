@@ -214,7 +214,8 @@ export default function AdminGamePage() {
 
   const PANELS = game ? {
     allgemein: () => <GameGeneralTab gameId={game.id} form={formOf("allgemein")} onChange={setForm("allgemein")} games={games} servers={servers} />,
-    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} usage={usage} />,
+    ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} usage={usage}
+      parentGameId={formOf("allgemein")?.parent_game_id} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
     // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps. Ist ein Blatt mit Änderungen offen, meldet es das: Punkt am

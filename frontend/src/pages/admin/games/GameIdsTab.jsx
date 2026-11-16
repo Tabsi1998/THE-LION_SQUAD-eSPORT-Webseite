@@ -27,10 +27,12 @@ function hasOptions(field) {
 }
 
 /** Das Plattform-Feld der ID-Quelle (#2281), das eine Spielversion erbt - sonst ``null``. Wie am Server: eigene ID-Quelle, sonst
- *  beim Erben das Hauptspiel. */
-export function inheritedPlatform(games = [], gameId, form = {}) {
+ *  beim Erben das Hauptspiel. ``parentGameId``: das Hauptspiel aus dem Formular (Reiter Allgemein, auch ungespeichert) - ohne
+ *  Angabe das gespeicherte. */
+export function inheritedPlatform(games = [], gameId, form = {}, parentGameId = undefined) {
   const current = games.find((game) => game.id === gameId);
-  const sourceId = form.identity_source_game_id || (form.inherit_player_ids !== false ? current?.parent_game_id : "");
+  const parent = parentGameId !== undefined ? parentGameId : current?.parent_game_id;
+  const sourceId = form.identity_source_game_id || (form.inherit_player_ids !== false ? parent : "");
   const source = sourceId && sourceId !== gameId ? games.find((game) => game.id === sourceId) : null;
   const field = (source?.player_id_fields || []).find((item) => item?.platform === true);
   return field ? { game: source.display_name || source.name || source.slug, label: field.label || field.key } : null;
@@ -87,12 +89,12 @@ function IdFieldCard({ field, index, onChange, onLabel, onRemove, onPlatform, in
 }
 
 // `usage`: Antwort von GET /games/{id}/usage (`id_fields`: Personen je Schlüssel); undefined = lädt, null = unbekannt.
-export function GameIdsTab({ gameId, kind, form, onChange, games, usage }) {
+export function GameIdsTab({ gameId, kind, form, onChange, games, usage, parentGameId }) {
   const confirm = useConfirm();
   const fields = form.player_id_fields || [];
   const setFields = (next) => onChange({ ...form, player_id_fields: next });
   const isEdition = kind === "edition";
-  const inherited = isEdition ? inheritedPlatform(games, gameId, form) : null;
+  const inherited = isEdition ? inheritedPlatform(games, gameId, form, parentGameId) : null;
   const identityOptions = selectableGames(games, form.identity_source_game_id).filter((game) => game.id !== gameId)
     .map((game) => [game.id, `ID von ${gameOptionLabel(game)}`]);
 
