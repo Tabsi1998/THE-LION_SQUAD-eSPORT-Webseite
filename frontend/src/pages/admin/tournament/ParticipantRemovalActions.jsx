@@ -1,8 +1,8 @@
 // Disqualifikation und Austritt (#1553): zwei Knöpfe in der Teilnehmerliste der Turnierverwaltung. Der erste Klick
 // holt den Umbauplan vom Server (`POST /registrations/{id}/removal` ohne Kennung) und zeigt ihn in Worten - „E: Lena
 // kommt kampflos weiter.“ -, der zweite bestätigt ihn mit der Kennung des Vorschlags. Abbrechen lehnt den Vorschlag ab,
-// damit er nicht am Turnier liegen bleibt. Nur für Strukturrollen (`can_manage_structure`), nur während das Turnier
-// läuft, nur für Personen, die noch dabei sind.
+// damit er nicht am Turnier liegen bleibt. Nur mit dem Recht, das auch der Server verlangt (`canRemoveParticipants`), nur
+// während das Turnier läuft, nur für Personen, die noch dabei sind.
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
@@ -39,7 +39,17 @@ export function headline(kind, name) {
   return kind === "withdrawn" ? `Austritt von ${name} eintragen?` : `${name} disqualifizieren?`;
 }
 
-export function ParticipantRemovalActions({ tournament, registration, onDone, compact = false }) {
+/**
+ * Darf diese Person Austritt und Disqualifikation eintragen? Wie der Server (`tournament_removal_routes.py`): im Turnier die
+ * Strukturrollen, in einer Liga-Staffel das Liga-Recht „Teams freigeben“ (`can_manage_participants`, #2262) - nicht
+ * „Season konfigurieren“, das sonst Knöpfe zeigte, die mit 403 endeten.
+ */
+export function canRemoveParticipants(tournament) {
+  return Boolean(tournament?.league_context ? tournament?.can_manage_participants : tournament?.can_manage_structure);
+}
+
+// ``allowed``: das Recht von außen (Staffel-Seite der Liga-Verwaltung); ohne Angabe gilt `canRemoveParticipants`.
+export function ParticipantRemovalActions({ tournament, registration, onDone, compact = false, allowed }) {
   const [plan, setPlan] = useState(null);
   const [kind, setKind] = useState("");
   const [reason, setReason] = useState("");
@@ -59,7 +69,8 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
     return () => document.removeEventListener("keydown", onKey);
   }, [plan]);
 
-  if (!tournament?.can_manage_structure || !ACTIVE_TOURNAMENT_STATUSES.has(String(tournament?.status || ""))) return null;
+  const permitted = allowed ?? canRemoveParticipants(tournament);
+  if (!permitted || !ACTIVE_TOURNAMENT_STATUSES.has(String(tournament?.status || ""))) return null;
   if (!REMOVABLE_REGISTRATION_STATUSES.has(String(registration?.status || ""))) return null;
 
   const url = `/tournaments/${tournament.id}/registrations/${registration.id}/removal`;

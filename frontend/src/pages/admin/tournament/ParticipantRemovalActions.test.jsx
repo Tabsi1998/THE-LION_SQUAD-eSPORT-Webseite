@@ -9,7 +9,7 @@ const toastMock = { success: vi.fn(), error: vi.fn(), message: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_error, fallback) => fallback }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { ParticipantRemovalActions } = await import("./ParticipantRemovalActions");
+const { ParticipantRemovalActions, canRemoveParticipants } = await import("./ParticipantRemovalActions");
 
 const TOURNAMENT = { id: "t1", status: "live", can_manage_structure: true };
 const REGISTRATION = { id: "r1", status: "approved", display_name: "Max Muster" };
@@ -43,6 +43,32 @@ test("ohne Struktur-Recht, bei Entwurf oder bei schon Ausgeschiedenen steht nich
   rerender(<ParticipantRemovalActions tournament={TOURNAMENT} registration={REGISTRATION} />);
   expect(screen.getByTestId("admin-reg-disqualify-r1")).toHaveTextContent("Disqualifizieren");
   expect(screen.getByTestId("admin-reg-withdraw-r1")).toHaveTextContent("Austritt");
+});
+
+// Liga-Staffel (#2262, Entwurf 1.4 Nr. 1): Der Server verlangt dort „Teams freigeben“ (applications), nicht „Season konfigurieren“.
+const STAFFEL = { id: "t1", status: "live", league_context: { league_id: "l1", season_id: "s1", staffel: "A" } };
+
+test("Staffel: Austritt und Disqualifizieren mit „Teams freigeben“ - ohne es keine Knöpfe, auch mit „Season konfigurieren“", () => {
+  const { rerender } = render(<ParticipantRemovalActions tournament={{ ...STAFFEL, can_manage_participants: true, can_manage_structure: false }} registration={REGISTRATION} />);
+  expect(screen.getByTestId("admin-reg-withdraw-r1")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-reg-disqualify-r1")).toBeInTheDocument();
+  rerender(<ParticipantRemovalActions tournament={{ ...STAFFEL, can_manage_participants: false, can_manage_structure: true }} registration={REGISTRATION} />);
+  expect(screen.queryByTestId("admin-reg-withdraw-r1")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("admin-reg-disqualify-r1")).not.toBeInTheDocument();
+});
+
+test("Turnier unverändert: die Strukturrolle zählt, „Teilnehmer verwalten“ allein reicht nicht", () => {
+  expect(canRemoveParticipants({ can_manage_structure: true })).toBe(true);
+  expect(canRemoveParticipants({ can_manage_participants: true, can_manage_structure: false })).toBe(false);
+  expect(canRemoveParticipants({ ...STAFFEL, can_manage_participants: true })).toBe(true);
+  expect(canRemoveParticipants({ ...STAFFEL, can_manage_structure: true })).toBe(false);
+});
+
+test("das Recht als Prop geht vor", () => {
+  const { rerender } = render(<ParticipantRemovalActions tournament={{ ...STAFFEL, can_manage_participants: true }} registration={REGISTRATION} allowed={false} />);
+  expect(screen.queryByTestId("admin-reg-withdraw-r1")).not.toBeInTheDocument();
+  rerender(<ParticipantRemovalActions tournament={STAFFEL} registration={REGISTRATION} allowed />);
+  expect(screen.getByTestId("admin-reg-withdraw-r1")).toBeInTheDocument();
 });
 
 test("Disqualifizieren holt den Plan, zeigt ihn in Worten und bestätigt mit Kennung und Grund", async () => {

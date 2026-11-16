@@ -546,7 +546,9 @@ export default function AdminTournamentEditPage() {
   const checkInTools = Boolean(t.can_check_in) && !staffel;
   // Setzplatz (#2111, TA15): bei „Manuell“ ordnet er die Vorschau - änderbar, bis der Baum steht (Ende des Check-ins).
   const seedEditable = Boolean(t.can_manage_participants) && !staffel && !structureFixed && ["manual", "ranking"].includes(t.seeding_mode);
-  const canOperateTournament = isTournamentLead || !!t.can_manage_structure;
+  // Status und „Liga starten“ verlangt der Server in einer Staffel mit „Liga verwalten“ (#2262, Entwurf 1.4 Nr. 2) - „Season
+  // konfigurieren“ allein zeigte sonst Knöpfe, die mit 403 endeten. Im Turnier zählt die Strukturrolle wie bisher.
+  const canOperateTournament = staffel ? isTournamentLead : isTournamentLead || !!t.can_manage_structure;
   const visibleStatusOptions = (isTournamentLead
     ? TOURNAMENT_STATUS_OPTIONS
     : TOURNAMENT_STATUS_OPTIONS.filter(([value]) => OPERATIONAL_STATUS_VALUES.has(value)))
