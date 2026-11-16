@@ -13,7 +13,6 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -341,20 +340,11 @@ app.add_middleware(
 )
 
 
-async def write_pause(request, call_next):
-    """Schreibpause fürs Backup (#1009, services/maintenance.py): schreibende Anfragen bekommen 503 „gleich wieder da“,
-    Lesen läuft weiter."""
-    if maintenance.blocks(request.method, request.url.path):
-        state = await maintenance.active_state(get_db())
-        if state:
-            status_code, body, headers = maintenance.response_parts(state)
-            return JSONResponse(status_code=status_code, content=body, headers=headers)
-    return await call_next(request)
-
-
-# Vor CORS angemeldet, also innerhalb davon: auch die 503 trägt die CORS-Kopfzeilen - sonst könnte eine andere erlaubte
-# Herkunft (etwa der Upload-Host) die Antwort nicht lesen und die Website keinen Hinweis zeigen.
-app.add_middleware(BaseHTTPMiddleware, dispatch=write_pause)
+# Schreibpause fürs Backup (#1009, services/maintenance.py): schreibende Anfragen bekommen 503 „gleich wieder da“,
+# Lesen läuft weiter. Reine ASGI-Middleware (#2446). Vor CORS angemeldet, also innerhalb davon: auch die 503 trägt die
+# CORS-Kopfzeilen - sonst könnte eine andere erlaubte Herkunft (etwa der Upload-Host) die Antwort nicht lesen und die
+# Website keinen Hinweis zeigen.
+app.add_middleware(maintenance.WritePauseMiddleware)
 
 # CORS: credentials require explicit trusted origins. Open wildcard CORS can be
 # enabled only for short-lived local debugging via ALLOW_INSECURE_CORS=true.

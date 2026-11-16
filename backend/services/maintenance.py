@@ -253,6 +253,34 @@ def response_parts(state: dict) -> tuple[int, dict, dict]:
     return 503, body, headers
 
 
+class WritePauseMiddleware:
+    """Die Schreibpause am Eingang (server.py), als reine ASGI-Middleware (#2446).
+
+    Früher eine ``BaseHTTPMiddleware``: Kam von innen keine Antwort, weil der Browser die Verbindung schon getrennt hatte
+    (``sendBeacon`` beim Seitenwechsel), warf sie „No response returned.“ - die Betriebssicht zählte das als 500.
+    Hier wird nichts umgepackt: gesperrt heißt 503 mit ``Retry-After``, sonst geht die Anfrage unverändert weiter."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            from starlette.requests import Request
+
+            request = Request(scope)
+            if blocks(request.method, request.url.path):
+                from database import get_db
+
+                state = await active_state(get_db())
+                if state:
+                    from starlette.responses import JSONResponse
+
+                    status_code, body, headers = response_parts(state)
+                    await JSONResponse(status_code=status_code, content=body, headers=headers)(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # Warten, bis laufende Schreibvorgänge fertig sind
 # ---------------------------------------------------------------------------------------------------------------------
