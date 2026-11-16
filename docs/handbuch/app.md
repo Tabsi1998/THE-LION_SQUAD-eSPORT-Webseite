@@ -169,15 +169,22 @@ Was mit eingeschalteter Sperre zusätzlich gilt (Stand #1461, kommt mit dem näc
 
 Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die Person eingestellt hat (E-Mail, Push, In-App, Discord). Im Detail:
 
-- **Themen und Kanäle einstellen:** in der App **Profil → Zahnrad → Benachrichtigungen** („Jede Benachrichtigung pro Kanal“), auf der Website
-  **Benutzermenü → Einstellungen → Benachrichtigungen einstellen**. Die Einstellungen sind für Web und App dieselben. Themen: Spiel-Erinnerungen, Turnier-Updates,
-  Gewinne & Abholung, Erfolge, Wochenrückblick, Rechnungen, Vereinsmitgliedschaft, Geburtstagsgruß, Nachrichten & Erwähnungen, News & Events (nur mit Newsletter-Zustimmung),
-  Vereinsintern, Helferdienste. Account- und Sicherheitsmails bleiben immer aktiv.
+- **Themen und Kanäle einstellen:** in der App **Profil → Zahnrad → Benachrichtigungen**, auf der Website
+  **Benutzermenü → Einstellungen → Benachrichtigungen einstellen**. Die Einstellungen sind für Web und App dieselben, mit denselben Wörtern (ab LionsAPP 1.7.13):
+  - **Stufe:** Alles, Wichtiges oder Wenig. Eine Stufe stellt alle Themen auf einmal; wer danach ein Thema selbst stellt, sieht „Eigene Auswahl“.
+  - **Themen:** je Thema **Push**, **Nur App** (still in die Glocke) oder **Aus** – Spiele & Aufrufe, Turnier-Updates, Gewinne & Abholung, Erfolge, Rechnungen,
+    Vereinsmitgliedschaft, Nachrichten & Erwähnungen, News & Events (per Mail nur mit Newsletter-Zustimmung), Vereinsintern, Helferdienste. Ist Push ganz aus,
+    steht oben „Push einschalten“.
+  - **Ruhezeit:** von–bis in Wiener Zeit (Vorschlag 22:00 bis 7:00), tippen oder mit − und + in Viertelstunden. Zwischen Ende und Beginn müssen mindestens
+    15 Minuten liegen. In der Ruhezeit kommt kein Push, alles wartet in der Glocke; danach kommt **eine Sammelmeldung** („In der Nacht: 4 Meldungen“), ein Tipp
+    darauf öffnet die Glocke. Der Aufruf zum eigenen Spiel, „Match startet jetzt“, Check-in und Veto der Liga und „Braucht Aufmerksamkeit“ kommen trotzdem sofort.
+  - **Weitere Wege** (eingeklappt): E-Mail und Discord je Thema, die Kanäle ganz aus, Wochenrückblick, Geburtstagsgruß und der Newsletter.
+  Account- und Sicherheitsmails bleiben immer aktiv. Mit einem älteren Server zeigt die App die bisherige Ansicht (Kanäle und „Jede Benachrichtigung pro Kanal“).
 - **Android-Kanäle** (in den Handy-Einstellungen einzeln stumm schaltbar):
   - **Aufrufe & Spielstart** – wichtig, mit Gong: „Du bist dran“, „Match startet jetzt“, Erinnerung vor dem Spiel; für die Turnierleitung „Braucht Aufmerksamkeit“.
   - **Turniere & Events** – Check-in, Ergebnisse, Anmeldungen, Gewinne, Event-Hinweise, „Hinweis der Turnierleitung“ (ein Tipp öffnet die Turnier- bzw. Event-Seite mit dem Banner).
   - **Chats** – Direkt-, Team-, Turnier- und Match-Chat, Erwähnungen, Freundschafts- und Team-Einladungen.
-  - **Verein** – Vereinsintern, News, Mitgliedschaft, Rechnungen.
+  - **Verein** – Vereinsintern, News, Mitgliedschaft, Rechnungen und die Sammelmeldung nach der Ruhezeit.
   - **Erfolge** – Erfolge, Level, Kronen.
   Wer die Chats stumm stellt, verpasst den Spielaufruf nicht.
 - **Push testen:** **Admin → System → Push-Tests**: Konto suchen, Titel und Text prüfen, senden. Die Seite zeigt die angemeldeten Handys und den letzten Versand;
@@ -187,8 +194,9 @@ Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die P
   aktiven Handys; die abgemeldeten liegen grau und eingeklappt unter **Alte Geräte (n)** mit „abgemeldet – App gelöscht oder neu installiert“. Das ist
   kein Fehler. Rot erscheint nur, wenn ein **aktives** Handy einen Fehler meldet. **Alte Geräte entfernen** löscht nach einer Rückfrage nur die
   abgemeldeten Einträge der Person und steht im Adminprotokoll. Ohne Knopf verschwinden sie nach 30 Tagen von selbst (einstellbar unter
-  **Betrieb → Alarme → Aufbewahrung**). Eine App, die ihre Installations-Kennung mitschickt, legt beim Neuinstallieren oder neuen Token keinen
-  zweiten Eintrag mehr an.
+  **Betrieb → Alarme → Aufbewahrung**). Eine App, die ihre Installations-Kennung mitschickt, legt beim neuen Token keinen zweiten Eintrag mehr an.
+  Die LionsAPP tut das ab 1.7.13: Die Kennung ist reiner Zufall, bleibt nur auf diesem Handy (nicht in Sicherungen) und überlebt Abmelden und Kontowechsel.
+  Unter Android entsteht nach dem Löschen und Neuinstallieren eine neue Kennung – der alte Eintrag zählt dann als altes Gerät.
 - **Monitoring:** In der Kommandozentrale zeigt die Kachel **Push-Monitoring** aktive Tokens und Fehler; Fehler zählen nur an aktiven Geräten. Pushes gehen nur an echte Geräte, nie an Emulatoren.
 - Mehr zu Mails, Vorlagen und Discord-Nachrichten im Kapitel **Mails und Benachrichtigungen**.
 
