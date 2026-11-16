@@ -3347,6 +3347,8 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .mp-btn:disabled { opacity: 0.45; cursor: default; }
 .mp-btn--small { padding: 4px 8px; font-size: 11px; gap: 4px; }
+/* Staffel-Seite (#2262): dieselben Knöpfe mit Tippfläche ab 44 px. */
+.mp-btn--touch { min-height: 44px; padding: 8px 12px; font-size: 11px; gap: 4px; }
 .mp-link { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tls-brand); text-underline-offset: 3px; }
 .mp-link:hover { text-decoration: underline; }
 .mp-desktop-only { display: none; }
@@ -3536,6 +3538,8 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-remote[data-tone="open"] .mp-remote__state { color: var(--tls-brand); }
 .mp-remote[data-tone="accepted"] .mp-remote__state { color: var(--tls-ok); }
 .mp-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; }
+/* Staffel-Seite (#2262): Wochen brechen um, statt seitlich zu wischen - am Handy untereinander. */
+.mp-weeks--stack { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
 .mp-week { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; background: var(--tls-surface-0); min-width: 0; }
 .mp-week[data-current="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }
 .mp-week__deadline { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }

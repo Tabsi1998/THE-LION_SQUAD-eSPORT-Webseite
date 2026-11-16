@@ -34,12 +34,12 @@ function onlineState(match, deadline) {
 
 /** Online: Runden untereinander, je Spiel der Stand und die nächste Frist. */
 /** „ändern“ an einer Partie (Start und Dauer) - nur mit Recht auf Termine und nicht für Vorschau oder Gespieltes. */
-function EditToggle({ match, canEdit, editor, open, setOpen }) {
+function EditToggle({ match, canEdit, editor, open, setOpen, touch = false }) {
   if (!editor || !canEdit?.(match) || DONE.has(String(match.status || ""))) return null;
   const key = match.match_key || "Spiel";
   return (
     <>
-      <button type="button" className="tls-btn tls-btn--quiet mp-btn mp-btn--small mp-remote__action" aria-label={`${key} ändern`}
+      <button type="button" className={`tls-btn tls-btn--quiet mp-btn mp-remote__action ${touch ? "mp-btn--touch" : "mp-btn--small"}`} aria-label={`${key} ändern`}
         aria-expanded={open === match.id} onClick={() => setOpen(open === match.id ? null : match.id)}>ändern</button>
       {open === match.id ? editor(match, () => setOpen(null)) : null}
     </>
@@ -97,10 +97,15 @@ const SOURCE_TEXT = {
   default: "Standardzeit",
   manual: "von der Turnierleitung",
 };
+// Staffel-Seite der Liga-Verwaltung (#2262): dort setzt die Liga-Leitung den Termin.
+const STAFFEL_SOURCE_TEXT = { ...SOURCE_TEXT, manual: "von der Liga-Leitung" };
 
-/** Liga: Spielwochen nebeneinander - Fenster, Frist, je Partie der geltende Termin und woher er kommt. */
-export function LeagueWeeks({ tournament, matches, registrations, matchdays, error = "", canEdit = null, editor = null }) {
+/** Liga: Spielwochen nebeneinander - Fenster, Frist, je Partie der geltende Termin und woher er kommt. ``variant="staffel"`` (Staffel-Seite
+ * der Liga-Verwaltung, #2262): Wochen umbrechen statt seitlich zu wischen, Tippflächen ab 44 px, Liga-Wörter. */
+export function LeagueWeeks({ tournament, matches, registrations, matchdays, error = "", canEdit = null, editor = null, variant = "" }) {
   const [open, setOpen] = useState(null);
+  const staffel = variant === "staffel";
+  const sources = staffel ? STAFFEL_SOURCE_TEXT : SOURCE_TEXT;
   const byId = new Map((matches || []).map((match) => [match.id, match]));
   const findIn = finderFor(matches || []);
   const weeks = matchdays?.matchdays || [];
@@ -111,8 +116,8 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays, err
         <span className="mp-card__note">Ohne Einigung gilt die Standardzeit. „Ergebnis fehlt“ meldet sich erst nach der Frist der Woche. Der Planer überschreibt vereinbarte Termine nie.</span>
       </div>
       {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Spielwochen konnten nicht geladen werden: {error}</p>}
-      <div className="mp-weeks-scroll tls-swipe">
-        <ol className="mp-weeks">
+      <div className={staffel ? "" : "mp-weeks-scroll tls-swipe"}>
+        <ol className={staffel ? "mp-weeks mp-weeks--stack" : "mp-weeks"}>
           {weeks.map((week) => (
             <li key={week.number} className="mp-week" data-testid={`mp-week-${week.number}`} data-current={matchdays?.current === week.number ? "true" : undefined}>
               <h4 className="mp-week__title">
@@ -128,9 +133,9 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays, err
                     <li key={entry.match_id} className="mp-remote" data-tone={done ? "done" : entry.schedule_source || "open"}>
                       <span className="mp-remote__names">{namesOf(match, registrations, findIn).join(" – ")}</span>
                       <span className="mp-remote__state">
-                        {done ? "gespielt" : entry.scheduled_at ? `${SOURCE_TEXT[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : entry.schedule_hint || "noch kein Termin"}
+                        {done ? "gespielt" : entry.scheduled_at ? `${sources[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : entry.schedule_hint || "noch kein Termin"}
                       </span>
-                      {match.id ? <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} /> : null}
+                      {match.id ? <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} touch={staffel} /> : null}
                     </li>
                   );
                 })}
