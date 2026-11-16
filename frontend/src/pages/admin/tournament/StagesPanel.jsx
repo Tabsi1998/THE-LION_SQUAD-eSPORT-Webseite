@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { formatBracketSection, formatMatchStatus, formatMatchType, formatStageType } from "@/lib/tournamentLabels";
+import { displayRoundLabels, sectionRoundLabel } from "@/lib/bracketNames";
 import { Fld } from "./PrizeEditor";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
@@ -284,7 +285,8 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
     acc[m.status || "pending"] = (acc[m.status || "pending"] || 0) + 1;
     return acc;
   }, {});
-  const sortedMatches = [...matches].sort(sortMatchesForPlan);
+  // Rundennamen wie im Baum (#1947): fortlaufend je Abschnitt, wie der Server sie nennt.
+  const sortedMatches = displayRoundLabels(matches).sort(sortMatchesForPlan);
   const sectionGroups = sortedMatches.reduce((acc, match) => {
     const key = matchSectionKey(match);
     if (!acc[key]) acc[key] = [];
@@ -391,7 +393,7 @@ function MatchV2Card({ match, regById, stations = [], canRecordResults = false, 
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-white/40">{formatBracketSection(match.section)} · {match.round_name}</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/40">{sectionRoundLabel(match)}</div>
           <div className="font-heading font-bold uppercase">{match.match_key}</div>
           <div className="mt-1 text-[10px] uppercase tracking-wider text-white/45">
             {match.scheduled_at ? formatDateTime(match.scheduled_at) : "Termin offen"}

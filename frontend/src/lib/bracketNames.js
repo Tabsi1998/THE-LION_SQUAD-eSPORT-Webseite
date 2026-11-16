@@ -4,7 +4,7 @@
 // „Weiter aus Runde 1“ (Lauf), „Sieger aus Viertelfinale“ (Duell) bzw. „Verlierer aus Runde 2“ - kurz, in einer Zeile.
 import { sectionKind } from "@/lib/bracketSections";
 import { describeSlot, normalizeSource } from "@/lib/slotSource";
-import { formatRoundName, matchRoundLabel } from "@/lib/tournamentLabels";
+import { formatBracketSection, formatRoundName, matchRoundLabel } from "@/lib/tournamentLabels";
 
 const GENERIC_ROUND = /^((?:Loser|Winner) )?Runde (\d+)$/i;
 
@@ -46,6 +46,16 @@ export function displayRoundLabels(matches = []) {
  * fortlaufend), sonst aus `round_name` bzw. der Nummer („Runde 2“). */
 export function roundName(match, number = match?.round) {
   return match?.round_label || formatRoundName(match?.round_name, number);
+}
+
+/** Abschnitt und Rundenname in einer Zeile - Listen der Verwaltung (#1947: Rundensponsoren, Ablaufplan). Der Name ist
+ * der aus dem Baum (`roundName`, das Spiel vorher durch `displayRoundLabels`); der Abschnitt steht davor wie die
+ * Überschrift im Baum, außer der Name nennt ihn schon („Loser Runde 1“, „Grand Final“). */
+export function sectionRoundLabel(match) {
+  const name = roundName(match);
+  const section = match?.section ? formatBracketSection(match.section) : "";
+  const side = section.toLowerCase().split(" ")[0];
+  return [section && !name.toLowerCase().includes(side) ? section : "", name].filter(Boolean).join(" · ");
 }
 
 /** Wie ein Spiel in Texten heißt: das Kürzel („A“, „LC“). Das Grand Final heißt wie seine Runde („Grand Final“,

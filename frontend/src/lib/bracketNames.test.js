@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, test } from "vitest";
 import LINES from "../../e2e/fixtures/bracketLines.json";
 import { bracketEdges, heatText } from "./bracketGraph";
-import { displayRoundLabels, matchName, roundsText, sideRoundLabel, treeSlotLabel } from "./bracketNames";
+import { displayRoundLabels, matchName, roundsText, sectionRoundLabel, sideRoundLabel, treeSlotLabel } from "./bracketNames";
 import { finderFor } from "./slotSource";
 
 // Namen im Turnierbaum (#1591): fortlaufende Runden je Abschnitt, „Grand Final“ statt „Lauf FINAL“, klare Plätze.
@@ -87,4 +87,12 @@ describe("roundsText (#1829)", () => {
     expect(sideRoundLabel(keys.get("E"), single)).toBe("Runde 2");
     expect(sideRoundLabel(keys.get("G"), matches)).toBe("Finale");
   });
+});
+
+test("sectionRoundLabel: Abschnitt wie die Überschrift im Baum, außer der Name nennt ihn schon (#1947)", () => {
+  expect(sectionRoundLabel({ section: "LB", round: 2, round_label: "Loser Runde 1" })).toBe("Loser Runde 1");
+  expect(sectionRoundLabel({ section: "GF", round: 4, round_label: "Grand Final" })).toBe("Grand Final");
+  expect(sectionRoundLabel({ section: "WB", round: 2, round_label: "Halbfinale" })).toBe("Winner Bracket · Halbfinale");
+  expect(sectionRoundLabel({ section: "LB", round: 3, round_name: "Runde 2" })).toBe("Loser Bracket · Runde 2");
+  expect(sectionRoundLabel({ round: 1 })).toBe("Runde 1");
 });
