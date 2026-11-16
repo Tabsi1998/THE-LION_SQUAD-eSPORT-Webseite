@@ -565,24 +565,30 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     expect(queueCalls()).toBe(3);
   });
 
-  test("nach einem Fehler kein Dauerfeuer: von selbst erst nach der Wartezeit wieder", async () => {
+  test("nach Fehlern wird nur der Takt langsamer: jeder Anstoß (Takt, Strom, Wiederverbinden) fragt sofort, /lead wieder da lädt sofort", async () => {
+    const { COCKPIT_POLL_MS } = await import("@/lib/tournamentCockpit");
     renderCockpit();
     await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
     await waitFor(() => expect(queueCalls()).toBe(1));
+    const queueTakt = () => [liveCalls.at(-1).pollMs, liveCalls.at(-1).fallbackMs];
+    expect(queueTakt()).toEqual([COCKPIT_POLL_MS, 15000]);
     queueAnswer = () => Promise.reject(offline());
+    // Kein Anstoß geht verloren - auch nicht einer, der genau nach der Wartezeit kommt (Takt = Wartezeit).
+    for (const calls of [2, 3, 4, 5]) {
+      await tick();
+      expect(queueCalls()).toBe(calls);
+    }
+    // Vier Fehler in Folge: der Takt ist auf 40 s gebremst, nie schneller als der Grundtakt; der Rückfall-Takt ebenso.
+    expect(queueTakt()).toEqual([40000, 40000]);
     await tick();
-    expect(queueCalls()).toBe(2);
-    // Gleich danach (Strom-Meldungen, Takt): keine weitere Abfrage.
-    await tick();
-    await tick();
-    expect(queueCalls()).toBe(2);
-    vi.setSystemTime(new Date(T0 + 5000));
-    await tick();
-    expect(queueCalls()).toBe(3);
-    // Zweiter Fehler in Folge: jetzt 10 s Abstand.
-    vi.setSystemTime(new Date(T0 + 9000));
-    await tick();
-    expect(queueCalls()).toBe(3);
+    expect(queueTakt()).toEqual([60000, 60000]);
+    // Die Ansicht kommt wieder durch: die Warteschlange fragt sofort nach, ihr Takt ist wieder der Grundtakt.
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    const before = queueCalls();
+    await act(async () => { await liveLoads.at(-2)(); });
+    await waitFor(() => expect(queueCalls()).toBe(before + 1));
+    await waitFor(() => expect(screen.queryByTestId("lead-stale")).toBeNull());
+    expect(queueTakt()).toEqual([COCKPIT_POLL_MS, 15000]);
   });
 
   test("Takt nur mit Warteschlange: online (`applies: false`) fragt nichts im Takt nach", async () => {

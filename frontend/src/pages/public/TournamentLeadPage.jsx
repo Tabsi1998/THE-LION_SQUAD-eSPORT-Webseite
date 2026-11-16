@@ -15,6 +15,7 @@ import { formatWhen } from "@/lib/datetime";
 import { motionAllowed } from "@/lib/motion";
 import { leadFilter, leadLine, leadNames } from "@/lib/tournamentLead";
 import { COCKPIT_POLL_MS, cockpitProblems } from "@/lib/tournamentCockpit";
+import { queuePollMs } from "@/lib/liveQueue";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
@@ -81,6 +82,9 @@ export default function TournamentLeadPage() {
   const [leadOkAt, setLeadOkAt] = useState(0);
   const [leadStale, setLeadStale] = useState(false);
   const hasView = useRef(false);
+  // Kommt die Ansicht wieder durch, während die Warteschlange noch scheitert: sofort nachfragen (#2440) - ein Erfolg
+  // setzt ihren gebremsten Takt zurück.
+  const queueRecover = useRef(null);
 
   const load = useCallback(async () => {
     const requestedAt = Date.now();
@@ -93,6 +97,7 @@ export default function TournamentLeadPage() {
       hasView.current = true;
       setLeadOkAt(receivedAt);
       setLeadStale(false);
+      queueRecover.current?.();
     } catch (err) {
       const status = err.response?.status || 0;
       // Ein Stand ist schon da und der Fehler vorübergehend: stehen lassen, mit „letzter Stand vor X s“. Kein Recht
@@ -107,7 +112,11 @@ export default function TournamentLeadPage() {
 
   // Die Warteschlange vor Ort (#1556) - online gibt es sie nicht (`applies: false`), dann fehlt der Reiter. Scheitert
   // ein Abruf, bleibt ihr letzter Stand samt Reiter und offener Rückfragen stehen (#2440, hooks/useLiveQueue).
-  const { queue, status: queueStatus, loaded: queueLoaded, staleSince: queueStaleSince, reload: loadQueue, autoReload: autoLoadQueue } = useLiveQueue(slug ? `/tournaments/${encodeURIComponent(slug)}/live-queue` : "");
+  const { queue, status: queueStatus, loaded: queueLoaded, staleSince: queueStaleSince, reload: loadQueue, failures: queueFailures } = useLiveQueue(slug ? `/tournaments/${encodeURIComponent(slug)}/live-queue` : "");
+
+  useEffect(() => {
+    queueRecover.current = queueFailures ? loadQueue : null;
+  }, [queueFailures, loadQueue]);
 
   useEffect(() => {
     hasView.current = false;
@@ -147,9 +156,10 @@ export default function TournamentLeadPage() {
   useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0, tournamentId, eventId });
   // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter. Im Takt nur
   // mit Warteschlange (#2440): online meldet der Strom Änderungen; scheiterte schon der erste Abruf, versucht es die
-  // Seite im Cockpit-Takt weiter (nach Fehlern mit wachsendem Abstand, useLiveQueue).
-  const queuePollMs = queue ? (cockpitOpen ? COCKPIT_POLL_MS : 60000) : queueStatus === "unknown" ? COCKPIT_POLL_MS : 0;
-  useLiveRefresh(autoLoadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: queue ? 15000 : 0, pollMs: queuePollMs, tournamentId, eventId });
+  // Seite im Cockpit-Takt weiter. Nach Fehlern wird nur der Takt langsamer (queuePollMs, höchstens 60 s) - Meldungen aus
+  // dem Strom und das Wiederverbinden laden sofort, nie überlappend (useLiveQueue).
+  const queueBaseMs = queue ? (cockpitOpen ? COCKPIT_POLL_MS : 60000) : queueStatus === "unknown" ? COCKPIT_POLL_MS : 0;
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: queue ? queuePollMs(15000, queueFailures) : 0, pollMs: queuePollMs(queueBaseMs, queueFailures), tournamentId, eventId });
   // Die Probleme des Cockpits (#1653) - aus denselben Daten wie „Braucht Aufmerksamkeit“ und die Stationen.
   const problems = useMemo(() => cockpitProblems({ attention, draws, queue }), [attention, draws, queue]);
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.

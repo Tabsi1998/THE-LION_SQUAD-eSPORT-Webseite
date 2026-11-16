@@ -55,7 +55,8 @@ export function queueSummaryLine(summary) {
 export const QUEUE_GONE_STATUSES = Object.freeze([403, 404]);
 // Hängt ein Abruf, gilt er nach so vielen ms als gescheitert - sonst stünde der nächste für immer hinten an.
 export const QUEUE_TIMEOUT_MS = 15000;
-// Nach einem Fehler kein Dauerfeuer: der nächste Versuch von selbst frühestens nach 5 s, dann 10, 20, 40, höchstens 60 s.
+// Nach einem Fehler kein Dauerfeuer: der Takt wird langsamer - 5 s, 10, 20, 40, höchstens 60 s, aber nie schneller als
+// der Grundtakt der Seite. Meldungen aus dem Strom und das Wiederverbinden laden sofort (nur nie überlappend).
 export const QUEUE_RETRY_MIN_MS = 5000;
 export const QUEUE_RETRY_MAX_MS = 60000;
 
@@ -69,6 +70,12 @@ export function queueRetryDelay(failures) {
   const count = Math.max(0, Math.floor(Number(failures) || 0));
   if (!count) return 0;
   return Math.min(QUEUE_RETRY_MAX_MS, QUEUE_RETRY_MIN_MS * 2 ** (count - 1));
+}
+
+/** Der Takt nach `failures` Fehlschlägen in Folge: der Grundtakt, nach Fehlern mindestens die Wartezeit. 0 bleibt 0. */
+export function queuePollMs(baseMs, failures) {
+  const base = Math.max(0, Number(baseMs) || 0);
+  return base ? Math.max(base, queueRetryDelay(failures)) : 0;
 }
 
 /** „Letzter Stand vor 25 s“, ab einer Minute „vor 3 Min.“ - solange das Nachladen scheitert. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DELAY_SHOWN_FROM, delayText, myQueueLine, queueGoneError, queueRetryDelay, queueSummaryLine, staleText } from "./liveQueue";
+import { DELAY_SHOWN_FROM, delayText, myQueueLine, queueGoneError, queuePollMs, queueRetryDelay, queueSummaryLine, staleText } from "./liveQueue";
 
 // Live vor Ort (#1556): Verzug und die Zeile für Spieler - reine Rechnung. Die Spielzeit-Uhr prüft matchClock.test.js.
 
@@ -66,6 +66,12 @@ describe("gescheiterter Abruf (#2440)", () => {
 
   it("nach Fehlern wächst der Abstand: 5, 10, 20, 40, dann höchstens 60 s", () => {
     expect([0, 1, 2, 3, 4, 5, 9].map(queueRetryDelay)).toEqual([0, 5000, 10000, 20000, 40000, 60000, 60000]);
+  });
+
+  it("der Takt nach Fehlern: nie schneller als der Grundtakt, höchstens 60 s; ohne Takt bleibt es 0", () => {
+    expect([0, 1, 3, 4, 5].map((failures) => queuePollMs(20000, failures))).toEqual([20000, 20000, 20000, 40000, 60000]);
+    expect([0, 5].map((failures) => queuePollMs(60000, failures))).toEqual([60000, 60000]);
+    expect(queuePollMs(0, 4)).toBe(0);
   });
 
   it("„Letzter Stand vor 25 s“, ab einer Minute in Minuten", () => {

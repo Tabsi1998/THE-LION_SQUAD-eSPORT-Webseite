@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useLiveQueue } from "@/hooks/useLiveQueue";
+import { queuePollMs } from "@/lib/liveQueue";
 import { buildTimeline, knownStations, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
@@ -112,10 +113,10 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const liveLocal = live && mode === "local";
   // Scheitert ein Abruf (Netz, Server), bleibt der letzte Stand mit „Letzter Stand vor X s“ stehen; nur `applies: false`
   // oder 404/403 nimmt die Warteschlange weg (#2440, hooks/useLiveQueue). Im Takt nur mit Warteschlange.
-  const { queue, staleSince: queueStaleSince, reload: refreshQueue, autoReload: autoRefreshQueue } = useLiveQueue(liveLocal && tid ? `/tournaments/${encodeURIComponent(tid)}/live-queue` : "");
+  const { queue, staleSince: queueStaleSince, reload: refreshQueue, failures: queueFailures } = useLiveQueue(liveLocal && tid ? `/tournaments/${encodeURIComponent(tid)}/live-queue` : "");
 
   useEffect(() => { refreshPlan(); }, [refreshPlan]);
-  useLiveRefresh(autoRefreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, pollMs: queue ? 60_000 : 0 });
+  useLiveRefresh(refreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, pollMs: queuePollMs(queue ? 60_000 : 0, queueFailures) });
   useEffect(() => { refreshRemote(); }, [refreshRemote]);
   useLiveRefresh(refreshPlan, ["matches", "stations", "tournaments"], { enabled: canPlan, pollMs: live ? 60_000 : 0 });
   useLiveRefresh(refreshRemote, ["matches", "tournaments"], { enabled: mode !== "local", pollMs: live ? 60_000 : 0 });
