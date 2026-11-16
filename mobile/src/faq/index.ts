@@ -171,11 +171,15 @@ export function sucheFaq(anfrage: string, { fragen = FRAGEN, themen = THEMEN, da
     .slice(0, limit);
 }
 
-const PFLICHT = ["id", "frage", "antwort", "bereich", "sichtbar_fuer"] as const;
+function text(wert: unknown): boolean {
+  return typeof wert === "string" && wert.length > 0;
+}
 
+/** Pflichtfelder einer Frage - Kennung, Frage, Antwort, Bereich und Sichtbarkeit - nur als Text. */
 function gueltigeFrage(frage: unknown): frage is FaqFrage {
-  const row = frage as Record<string, unknown> | null;
-  return Boolean(row && typeof row === "object" && PFLICHT.every((feld) => typeof row[feld] === "string" && row[feld]));
+  if (!frage || typeof frage !== "object") return false;
+  const row = frage as Partial<Record<keyof FaqFrage, unknown>>;
+  return text(row.id) && text(row.frage) && text(row.antwort) && text(row.bereich) && text(row.sichtbar_fuer);
 }
 
 /** Ein Link braucht Ziel und Text als Zeichenfolge, das Ziel als Pfad der Website - sonst fällt nur der Link weg. */
