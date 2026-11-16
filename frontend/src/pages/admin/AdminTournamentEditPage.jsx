@@ -400,7 +400,10 @@ export default function AdminTournamentEditPage() {
     if (!ok) return;
     try {
       const { data } = await api.post(`/tournaments/${id}/status`, { status: t.status, recheck: true });
-      toast.success(`Abschluss nachgeholt – ${data?.awards ?? 0} Auszeichnungen geprüft.`);
+      // Ist ein Schritt gescheitert, sagt der Server welcher - dann eine Warnung statt „nachgeholt“ (#2452).
+      const failed = Array.isArray(data?.failed_labels) ? data.failed_labels : [];
+      if (failed.length) toast.warning(`Nicht alles nachgeholt – gescheitert: ${failed.join(", ")}. Die übrigen Schritte sind gelaufen; bitte später noch einmal versuchen.`, { duration: 12000 });
+      else toast.success(`Abschluss nachgeholt – ${data?.awards ?? 0} Auszeichnungen geprüft.`);
       if (data?.season_points_note) toast.info(data.season_points_note, { duration: 10000 });
       load();
     } catch (e) {
