@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from services import league_late
 from services.league_scope import is_league_staffel
 
 FROM_SEASON = "Kommt aus der Season – dort ändern und übertragen."
@@ -195,8 +196,11 @@ async def staffel_rebuild_problem(db, tournament: dict) -> str | None:
 
 # Liga-Stand in der Verwaltung (#2453): Eine Staffel steht bis „Liga starten“ im Status ``draft``. Die Verwaltung zeigt darum den Stand
 # der Season - abgeleitet an genau einer Stelle, der Ablaufleiste im Web (``lib/seasonTabs.js``, ``seasonPhases``). Der Server liefert nur,
-# woraus sie rechnet, und ob der Spielplan fest ist.
+# woraus sie rechnet, und ob der Spielplan fest ist. Dazu das wirksame Ende der Anmeldung (Nachmeldefrist #2422,
+# ``application_effective_closes_at``) - es kann vor dem Fensterende liegen.
 SEASON_STAND_FIELDS = ("id", "status", "visibility", "application_opens_at", "application_closes_at", "start_date")
+# Was ``league_late.effective_closes`` dafür liest - gelesen, nicht mitgeschickt.
+LATE_FIELDS = (league_late.FIELD, league_late.EXTENSION)
 
 
 async def attach_season_stand(db, tournaments: list[dict]) -> None:
@@ -207,14 +211,15 @@ async def attach_season_stand(db, tournaments: list[dict]) -> None:
         return
     season_ids = sorted({row["league_context"].get("season_id") for row in staffeln if row["league_context"].get("season_id")})
     seasons = {row["id"]: row async for row in db.league_seasons.find(
-        {"id": {"$in": season_ids}}, {"_id": 0, **{field: 1 for field in SEASON_STAND_FIELDS}})} if season_ids else {}
+        {"id": {"$in": season_ids}}, {"_id": 0, **{field: 1 for field in (*SEASON_STAND_FIELDS, *LATE_FIELDS)}})} if season_ids else {}
     fixed = {row["_id"]: row["count"] async for row in db.matches_v2.aggregate([
         {"$match": {"tournament_id": {"$in": [row["id"] for row in staffeln]}, "is_preview": {"$ne": True}}},
         {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},
     ])}
     for row in staffeln:
         season = seasons.get(row["league_context"].get("season_id"))
-        row["league_season"] = {field: season.get(field) for field in SEASON_STAND_FIELDS} if season else None
+        row["league_season"] = {**{field: season.get(field) for field in SEASON_STAND_FIELDS},
+                                "application_effective_closes_at": league_late.effective_closes_iso(season)} if season else None
         row["league_plan"] = {"fixed_matches": int(fixed.get(row["id"], 0))}
 
 

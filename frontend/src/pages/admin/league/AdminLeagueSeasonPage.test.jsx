@@ -370,6 +370,21 @@ test("Ligen und Staffeln: Staffel mit Stand der Season statt „Entwurf“ und w
   expect(within(needs).getByRole("link")).toHaveAttribute("href", "/admin/leagues/seasons/s1#anmeldungen");
 });
 
+// Review #2453 (2): Schließt die Nachmeldefrist die Anmeldung vor dem Fensterende, nennt der Stand das wirksame Ende vom Server.
+test("Ligen und Staffeln: der Stand nennt das wirksame Ende der Anmeldung (Nachmeldefrist)", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const at = (offset) => new Date(Date.now() + offset).toISOString();
+  const effective = new Date(Date.now() + 2 * day);
+  effective.setUTCHours(11, 0, 0, 0);
+  body = { ...BODY, season: { ...SEASON, visibility: "public", application_opens_at: at(-day), application_closes_at: at(30 * day), start_date: at(-day) },
+    late_registration: { effective_closes_at: effective.toISOString() },
+    divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 1, max_participants: 8 }] }] };
+  renderPage("#ligen");
+  const stand = await screen.findByTestId("staffel-stand-1-A");
+  const expected = effective.toLocaleString("de-AT", { timeZone: "Europe/Vienna", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  expect(stand).toHaveTextContent(`Anmeldung offen bis ${expected}`);
+});
+
 test("Ligen und Staffeln: Staffel mit Weg zur Turnierverwaltung, Vorgaben übertragen", async () => {
   apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"],
     skipped: [{ group: "before_start", label: "Termine und Kalender", reason: "Die Staffel hat schon begonnen." }] }] } });

@@ -9,7 +9,7 @@ import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
-import { nicknameRepeatsLevel } from "@/lib/seasonTabs";
+import { nicknameRepeatsLevel, seasonWithEnd } from "@/lib/seasonTabs";
 import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable";
 import { PrizeEditor } from "./LeagueLookFields";
 import { DivisionPlatformFields } from "./DivisionPlatformFields";
@@ -152,6 +152,8 @@ export function SyncResults({ rows }) {
 export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staffelCount, syncing, syncRows, onSync, onAddDivision, onEditDivision, onDelete,
   onCreateStaffel }) {
   const now = new Date();
+  // Mit dem wirksamen Ende der Anmeldung (Nachmeldefrist #2422) vom Server.
+  const season = seasonWithEnd(data);
   return (
     <div className="space-y-6">
       <section id="staffeln" className="scroll-mt-24 space-y-4 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-label="Ligen und Staffeln" data-testid="season-divisions">
@@ -208,8 +210,8 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                     <span className="font-semibold text-white">Staffel {staffel.staffel}</span>
                     <span className="text-xs text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams</span>
                     {/* Stand aus der Season statt „Entwurf“ (#2453), dazu was fehlt - dieselbe Ableitung wie die Ablaufleiste im Überblick. */}
-                    <StaffelStandBadge tournament={asStaffel(staffel, data.season)} season={data.season} now={now} testId={`staffel-stand-${division.level}-${staffel.staffel}`} />
-                    <StaffelNeedsHint tournament={asStaffel(staffel, data.season)} season={data.season} now={now} testId={`staffel-needs-${division.level}-${staffel.staffel}`} />
+                    <StaffelStandBadge tournament={asStaffel(staffel, season)} season={season} now={now} testId={`staffel-stand-${division.level}-${staffel.staffel}`} />
+                    <StaffelNeedsHint tournament={asStaffel(staffel, season)} season={season} now={now} testId={`staffel-needs-${division.level}-${staffel.staffel}`} />
                     <span className="ml-auto inline-flex items-center gap-2">
                       <Link to={`/admin/tournaments/${staffel.tournament_id}`} data-testid={`staffel-manage-${division.level}-${staffel.staffel}`}
                         className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">
