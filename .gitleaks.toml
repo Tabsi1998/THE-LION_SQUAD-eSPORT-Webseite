@@ -30,13 +30,6 @@ regexTarget = "secret"
 regexes = ['''^GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ$''']
 
 [[allowlists]]
-description = "A deliberately wrong password in the login test."
-condition = "AND"
-paths = ['''^backend/tests/test_live_preview_validation\.py$''']
-regexTarget = "secret"
-regexes = ['''^definitely-wrong-1$''']
-
-[[allowlists]]
 description = "The made-up new password the profile test types into the password panel (#258); the request body is asserted, nothing is real."
 condition = "AND"
 paths = ['''^frontend/src/pages/user/ProfilePage\.test\.jsx$''']
@@ -49,6 +42,13 @@ condition = "AND"
 paths = ['''^backend/tests/test_login_comfort_flow\.py$''']
 regexTarget = "secret"
 regexes = ['''^Ein-langes-Testpasswort-42$''']
+
+[[allowlists]]
+description = "The made-up passwords of the logout and login switch tests (#2395); the accounts live only in the in-memory test database."
+condition = "AND"
+paths = ['''^backend/tests/(test_auth_switches_flow|test_logout_ends_session_flow)\.py$''']
+regexTarget = "secret"
+regexes = ['''^(Schalter|Loewen)-Testpasswort-7$''']
 
 [[allowlists]]
 description = "The made-up Discord server id of the partner tests (#469): eighteen digits in a row look like a Discord client id to the scanner; the value is only asserted, nothing is real."

@@ -35,7 +35,9 @@ AREA = re.compile(r"league|squad|match|map|flow_harness|result_confirm|result_au
                   # Einladung durch die Verwaltung (#932): zwei Protokollzeilen unter dem eindeutigen Index audit_logs.id.
                   r"|admin_user_invite"
                   # Migrationen beim Start (#1006): Sperre, Verlängerung, Übernahme und Wartezeit zweier Starts.
-                  r"|migration_lease")
+                  r"|migration_lease"
+                  # Übernommene Fälle der alten Live-Tests (#2395): Anmeldungen, Vergabe unter eindeutigem Index, Aggregationen.
+                  r"|session_devices|auth_switches|achievement_ranking_legacy|admin_legacy_cases")
 USES_HARNESS = re.compile(r"\bmake_flow\b")
 
 
