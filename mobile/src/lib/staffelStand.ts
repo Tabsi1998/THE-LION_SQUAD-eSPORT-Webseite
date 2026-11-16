@@ -48,11 +48,15 @@ const at = (value?: string | null) => {
   return Number.isNaN(time) ? null : time;
 };
 
-/** Das wirksame Ende der Anmeldung: vom Server, sonst das Fensterende. */
+/** Das wirksame Ende der Anmeldung: vom Server, sonst das Fensterende. `staffel_guard.attach_season_stand` schickt
+ * `application_effective_closes_at` immer mit; der Rückfall auf das rohe Fensterende (ohne Nachmeldefrist, anders als
+ * `effectiveCloses` im Web) greift nur bei einem älteren Server. */
 function applicationEnd(season: LeagueSeasonStand) {
   return at(season.application_effective_closes_at) ?? at(season.application_closes_at);
 }
 
+/** Bewusst etwas weiter als im Web (`league_context`): auch `league_links` genügt - die App-Antwort kann je nach
+ * Endpunkt nur eines von beiden tragen. */
 export function isLeagueStaffel(tournament: StaffelLike | null | undefined): boolean {
   return Boolean(tournament?.league_context || tournament?.league_links);
 }

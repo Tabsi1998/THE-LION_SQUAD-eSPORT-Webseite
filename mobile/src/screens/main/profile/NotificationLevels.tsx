@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Switch, TextInput, View, type LayoutChangeEvent } from "react-native";
+import { Platform, Pressable, StyleSheet, Switch, TextInput, View, type LayoutChangeEvent } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { Card } from "../../../components/Card";
 import { Glow, Press, useReduceMotion } from "../../../components/motion";
@@ -315,7 +315,8 @@ function ClockField({ label, value, invalid, onChange, onStep, onBlur, testID }:
           onChangeText={onChange}
           onBlur={onBlur}
           accessibilityLabel={`Ruhezeit ${label}`}
-          keyboardType="numbers-and-punctuation"
+          // „numbers-and-punctuation“ gibt es nur unter iOS - Android bekäme sonst die volle Texttastatur.
+          keyboardType={Platform.select({ ios: "numbers-and-punctuation", default: "decimal-pad" })}
           maxLength={5}
           placeholder="22:00"
           placeholderTextColor={colors.muted}
