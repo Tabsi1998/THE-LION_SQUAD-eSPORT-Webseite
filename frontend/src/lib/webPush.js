@@ -19,6 +19,9 @@ const FIRST_VISIT_KEY = "tls-web-push-first-visit";
 const VISIT_KEY = "tls-web-push-visit";
 const OWNER_KEY = "tls-web-push-owner";
 const PRIVATE_KEY = "tls-web-push-private";
+const SEEN_PREFIX = "tls-web-push-seen:";
+/** Höchstens so viele Anmeldungen merkt sich der Browser je Konto (die neuesten). */
+export const SEEN_MAX = 300;
 const READY_TIMEOUT_MS = 5000;
 
 function local(win) {
@@ -104,6 +107,68 @@ export function askDecision({ config, env, state, firstVisit }) {
   if (hint && (state === "asked" || state === "ios-seen")) return null;
   if (firstVisit) return "pending";
   return hint ? "ios-hint" : "ask";
+}
+
+/** Die Kennung einer Anmeldung: Turnier oder Event. */
+export function registrationKey(kind, id) {
+  return id ? `${kind === "tournament" ? "t" : "e"}:${id}` : null;
+}
+
+/** Die Anmeldungen der Übersicht (eigene und die des Teams, so wie der Server sie unter „Meine“ führt). */
+export function dashboardRegistrationKeys(me) {
+  const keys = [
+    ...(Array.isArray(me?.tournaments) ? me.tournaments : []).map((row) => registrationKey("tournament", row?.id)),
+    ...(Array.isArray(me?.events) ? me.events : []).map((row) => registrationKey("event", row?.id)),
+  ];
+  return [...new Set(keys.filter(Boolean))];
+}
+
+function seenKey(userId) {
+  return `${SEEN_PREFIX}${String(userId)}`;
+}
+
+function readSeen(win, userId) {
+  try {
+    const parsed = JSON.parse(read(local(win), seenKey(userId)) || "null");
+    if (parsed && Array.isArray(parsed.seen)) return { seen: parsed.seen.filter((key) => typeof key === "string"), fresh: parsed.fresh === true };
+  } catch {
+    // kaputter Merker: wie neu
+  }
+  return null;
+}
+
+function writeSeen(win, userId, { seen, fresh = false }) {
+  const kept = seen.slice(-SEEN_MAX);
+  write(local(win), seenKey(userId), JSON.stringify(fresh ? { seen: kept, fresh: true } : { seen: kept }));
+}
+
+const mergeKeys = (seen, keys) => [...seen.filter((key) => !keys.includes(key)), ...keys];
+
+/**
+ * Eigene Anmeldung: merken, damit die Übersicht sie nicht noch einmal als neu zählt. Gab es noch keinen Ausgangsstand,
+ * wird die nächste Übersicht zum Ausgangsstand - ältere Anmeldungen sind kein neuer Anlass.
+ */
+export function rememberWebPushRegistration(userId, key, win = currentWindow()) {
+  if (!userId || !key || !win) return;
+  const stored = readSeen(win, userId);
+  writeSeen(win, userId, stored ? { ...stored, seen: mergeKeys(stored.seen, [key]) } : { seen: [key], fresh: true });
+}
+
+/**
+ * Die Übersicht meldet die aktuellen Anmeldungen. Zurück kommt, ob eine neue dabei ist (Team angemeldet oder in der App
+ * angemeldet). Die erste Übersicht nach dem Login ist nur der Ausgangsstand - keine Frage direkt nach dem Anmelden.
+ */
+export function noteWebPushRegistrations(userId, keys, win = currentWindow()) {
+  if (!userId || !win) return false;
+  const stored = readSeen(win, userId);
+  if (!stored) {
+    writeSeen(win, userId, { seen: keys });
+    return false;
+  }
+  const fresh = keys.filter((key) => !stored.seen.includes(key));
+  if (!fresh.length && !stored.fresh) return false;
+  writeSeen(win, userId, { seen: mergeKeys(stored.seen, fresh) });
+  return fresh.length > 0 && !stored.fresh;
 }
 
 export async function loadWebPushConfig() {

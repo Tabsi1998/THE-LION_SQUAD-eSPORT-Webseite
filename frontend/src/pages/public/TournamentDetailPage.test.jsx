@@ -707,3 +707,17 @@ test("disqualifiert: „Dein Stand“ ohne Abmelden - das nimmt nur die Turnierl
   expect(await screen.findByTestId("tournament-my-stand")).toBeInTheDocument();
   expect(screen.queryByTestId("tournament-unregister-btn")).toBeNull();
 });
+
+// Erlaubnis im richtigen Moment (#1208): nach der Anmeldung merkt sich der Browser das Turnier - die Übersicht zählt es
+// dann nicht noch einmal als neu. Hat der Browser Benachrichtigungen abgelehnt, steht leise „Aufrufe sind aus“.
+test("nach der Anmeldung merkt sich der Browser das Turnier für die Frage nach Benachrichtigungen", async () => {
+  window.localStorage.removeItem("tls-web-push-seen:u1");
+  const user = userEvent.setup();
+  mockApi(base);
+  renderPage();
+  await user.click(await screen.findByTestId("tournament-register-btn"));
+  await screen.findByRole("dialog");
+  await user.click(screen.getByTestId("tournament-register-submit"));
+  await waitFor(() => expect(JSON.parse(window.localStorage.getItem("tls-web-push-seen:u1") || "null")?.seen).toEqual(["t:t1"]));
+});
+

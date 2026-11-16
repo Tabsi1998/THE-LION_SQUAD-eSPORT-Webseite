@@ -15,7 +15,7 @@ import { FactsBox } from "@/components/tls/FactsBox";
 import { EventRecap } from "@/components/tls/EventRecap";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
-import { offerWebPush } from "@/lib/webPush";
+import { offerWebPush, registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { NoticeBanner, useNotices } from "@/components/tls/tournament/NoticeBanner";
@@ -261,7 +261,7 @@ export default function EventDetailPage() {
           )}
         </div>
       </div>
-      {playAlong && <PlayAlongSheet event={e} from={returnFrom} onClose={finishPlayAlong} />}
+      {playAlong && <PlayAlongSheet event={e} from={returnFrom} userId={user?.id || null} onClose={finishPlayAlong} />}
     </PublicLayout>
   );
 }
@@ -693,7 +693,9 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
       void offerFriendsHint();
       // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet. Danach (#1163) die Frage nach
-      // Browser-Benachrichtigungen.
+      // Browser-Benachrichtigungen. Die Anmeldung merkt sich der Browser (#1208), damit die Übersicht sie nicht noch einmal
+      // als neu zählt.
+      rememberWebPushRegistration(user?.id, registrationKey("event", event.id));
       void offerCalendarHint().then(() => offerWebPush());
     });
     if (attempt.started && attempt.error) {

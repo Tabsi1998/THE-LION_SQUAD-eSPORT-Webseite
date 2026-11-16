@@ -4,6 +4,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock }));
 
 const webPush = await import("./webPush");
 const { askDecision, markVisit, offerWebPush, enableWebPush, syncWebPush, forgetWebPush, browserPushStatus, keyBytes, needsHomeScreen, WEB_PUSH_EVENT } = webPush;
+const { dashboardRegistrationKeys, noteWebPushRegistrations, registrationKey, rememberWebPushRegistration } = webPush;
 
 const CONFIG = { enabled: true, public_key: `B${"Q".repeat(86)}`, subscriptions: 0 };
 
@@ -235,5 +236,45 @@ describe("Erlaubnis im richtigen Moment (#1208)", () => {
       expect(await offerWebPush(win)).toBeNull();
     }
     expect(apiMock.get).not.toHaveBeenCalled();
+  });
+
+  test("die Anmeldungen der Übersicht: Turniere und Events, jede einmal", () => {
+    expect(dashboardRegistrationKeys({ tournaments: [{ id: "t1" }, { id: "t1" }, {}], events: [{ id: "e1" }] })).toEqual(["t:t1", "e:e1"]);
+    expect(dashboardRegistrationKeys(null)).toEqual([]);
+    expect(registrationKey("event", null)).toBeNull();
+  });
+
+  test("kein Dialog nach dem Login: die erste Übersicht ist nur der Ausgangsstand", () => {
+    const { win } = fakeWindow();
+    expect(noteWebPushRegistrations("u1", ["t:alt", "e:alt"], win)).toBe(false);
+    expect(JSON.parse(win.localStorage.getItem("tls-web-push-seen:u1"))).toEqual({ seen: ["t:alt", "e:alt"] });
+  });
+
+  test("Teammitglied: das Team wurde angemeldet - beim nächsten Öffnen ist das der Anlass, danach nicht noch einmal", () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], win);
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:team"], win)).toBe(true);
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:team"], win)).toBe(false);
+  });
+
+  test("eigene Anmeldung zählt auf der Übersicht nicht noch einmal als neu", () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], win);
+    rememberWebPushRegistration("u1", "t:neu", win);
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:neu"], win)).toBe(false);
+  });
+
+  test("eigene Anmeldung ohne Ausgangsstand: die nächste Übersicht gilt als Ausgangsstand", () => {
+    const { win } = fakeWindow();
+    rememberWebPushRegistration("u1", "t:neu", win);
+    expect(noteWebPushRegistrations("u1", ["t:neu", "t:alt"], win)).toBe(false);
+    expect(noteWebPushRegistrations("u1", ["t:neu", "t:alt", "t:team"], win)).toBe(true);
+  });
+
+  test("der Merker gehört dem Konto in diesem Browser", () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], win);
+    expect(noteWebPushRegistrations("u2", ["t:alt", "t:x"], win)).toBe(false);
+    expect(noteWebPushRegistrations(null, ["t:y"], win)).toBe(false);
   });
 });
