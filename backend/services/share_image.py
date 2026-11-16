@@ -1,7 +1,8 @@
 """Der gemeinsame Bild-Baustein für Teilen-Bilder (#1194): Erfolge (#619), Turnier-Ergebnisse (#1194), der
 Jahresrückblick (#1195) und das Vorschaubild mit Datum und Ort (#1281) zeichnen mit denselben Werkzeugen.
 
-Serverseitig mit Pillow, ohne Browser: Schriften (DejaVu im Container, sonst die des Rechners), Farben, Umbruch,
+Serverseitig mit Pillow, ohne Browser: Schriften (die Lionsquad-Schriften aus ``static/fonts``, #2435 - Saira Condensed
+für Überschriften und Zahlen, Outfit für Text; fehlt eine Datei oder ein Zeichen, DejaVu bzw. die des Rechners), Farben, Umbruch,
 Kürzen mit „…“, Sterne als Polygon (nicht jede Schrift hat ein ★), dunkler Grund mit Schein in der Akzentfarbe,
 doppelter Rahmen und die Ausgabe als PNG. Zwei Formate: breit (1200×630, Link-Vorschau) und hoch (1080×1920,
 WhatsApp-Status und Instagram-Story).
@@ -40,12 +41,102 @@ FONT_REGULAR_CANDIDATES = (
     "C:/Windows/Fonts/arial.ttf",
     "/System/Library/Fonts/Supplemental/Arial.ttf",
 )
+# Die Lionsquad-Schriften (#2435) - dieselben Dateien wie die Website und die Shop-Bilder (services/shop_gamertag.py), SIL Open
+# Font License. ``bold``: Überschriften, Namen, Zahlen und Kennzeichen in Saira Condensed Black (schmal, sportlich - Unbounded
+# wäre für Namen und Kacheln zu breit); sonst Text in Outfit (Mittel). Lokal und in Produktion dieselbe Schrift.
+BRAND_FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts")
+BRAND_FONTS = {
+    True: {"file": "saira-condensed-latin-900.woff2", "weight": None},
+    False: {"file": "outfit-latin-wght.woff2", "weight": 500},
+}
+# Ein Zeichen, das keine der Schriften hat - sein Bild ist das „fehlt“-Kästchen, mit dem jedes andere Zeichen verglichen wird.
+_MISSING_PROBE = "\ue000"
+_PROBE_SIZE = 64
 # Platz 1–3 in den Farben der Medaillen, alles darunter weiß.
 RANK_COLORS = {1: GOLD, 2: "#D9DEE5", 3: "#E0A06A"}
 
 
+@lru_cache(maxsize=4)
+def _brand_bytes(file_name: str) -> bytes | None:
+    try:
+        with open(os.path.join(BRAND_FONT_DIR, file_name), "rb") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+def _glyph_print(probe: ImageFont.FreeTypeFont, char: str) -> tuple:
+    box = ImageFont.FreeTypeFont.getbbox(probe, char)
+    image = Image.new("L", (max(1, box[2]) + 2, max(1, box[3]) + 2))
+    ImageDraw.Draw(image).text((0, 0), char, font=probe, fill=255)
+    return box, ImageFont.FreeTypeFont.getlength(probe, char), image.tobytes()
+
+
+@lru_cache(maxsize=4)
+def _probe(bold: bool) -> tuple[ImageFont.FreeTypeFont, tuple] | None:
+    data = _brand_bytes(BRAND_FONTS[bold]["file"])
+    if data is None:
+        return None
+    try:
+        probe = ImageFont.FreeTypeFont(io.BytesIO(data), _PROBE_SIZE)
+    except OSError:
+        return None
+    return probe, _glyph_print(probe, _MISSING_PROBE)
+
+
+@lru_cache(maxsize=2048)
+def has_glyph(bold: bool, char: str) -> bool:
+    """Hat die Lionsquad-Schrift dieses Zeichen? Die Dateien tragen nur den lateinischen Zeichensatz (mit Umlauten und ß) - ein
+    Zeichen aus Osteuropa, Kyrillisch oder ein Symbol fehlt. Erkannt am Bild: Ein fehlendes Zeichen sieht aus wie das
+    „fehlt“-Kästchen."""
+    if char.isspace():
+        return True
+    found = _probe(bold)
+    if found is None:
+        return False
+    probe, missing = found
+    return _glyph_print(probe, char) != missing
+
+
+class BrandFont(ImageFont.FreeTypeFont):
+    """Eine Lionsquad-Schrift mit sauberem Ersatz (#2435): Enthält ein Text ein Zeichen, das sie nicht hat, misst und zeichnet ihn
+    die Ersatzschrift (DejaVu bzw. die des Rechners) - ganz, nie gemischt, und nie als Kästchen. Messen (``textlength``,
+    ``textbbox``) und Zeichnen gehen über dieselbe Wahl, darum passen Umbruch und Kürzen weiter."""
+
+    def __init__(self, data: bytes, size: int, *, bold: bool, weight: int | None, fallback: ImageFont.ImageFont):
+        super().__init__(io.BytesIO(data), size)
+        if weight:
+            self.set_variation_by_axes([weight])
+        self.bold = bold
+        self.fallback = fallback
+
+    def covers(self, text) -> bool:
+        return all(has_glyph(self.bold, char) for char in set(str(text or "")))
+
+    def getbbox(self, text, *args, **kwargs):
+        if self.covers(text):
+            return super().getbbox(text, *args, **kwargs)
+        return self.fallback.getbbox(text, *args, **kwargs)
+
+    def getlength(self, text, *args, **kwargs):
+        if self.covers(text):
+            return super().getlength(text, *args, **kwargs)
+        return self.fallback.getlength(text, *args, **kwargs)
+
+    def getmask(self, text, *args, **kwargs):
+        if self.covers(text):
+            return super().getmask(text, *args, **kwargs)
+        return self.fallback.getmask(text, *args, **kwargs)
+
+    def getmask2(self, text, *args, **kwargs):
+        if self.covers(text):
+            return super().getmask2(text, *args, **kwargs)
+        return self.fallback.getmask2(text, *args, **kwargs)
+
+
 @lru_cache(maxsize=48)
-def font(size: int, bold: bool = True) -> ImageFont.ImageFont:
+def system_font(size: int, bold: bool = True) -> ImageFont.ImageFont:
+    """Die Ersatzschrift: DejaVu im Container, sonst die des Rechners, zuletzt die eingebaute von Pillow."""
     for path in (FONT_CANDIDATES if bold else FONT_REGULAR_CANDIDATES):
         if os.path.exists(path):
             try:
@@ -56,6 +147,21 @@ def font(size: int, bold: bool = True) -> ImageFont.ImageFont:
         return ImageFont.load_default(size=size)
     except TypeError:  # sehr altes Pillow
         return ImageFont.load_default()
+
+
+@lru_cache(maxsize=48)
+def font(size: int, bold: bool = True) -> ImageFont.ImageFont:
+    """Die Schrift aller Teilen-Bilder und des Rankingbanners (#2435): die Lionsquad-Schrift, mit Ersatz je Text. Fehlt die
+    Datei oder lässt sie sich nicht laden, gilt die Ersatzschrift allein - das Bild entsteht trotzdem."""
+    fallback = system_font(size, bold)
+    spec = BRAND_FONTS[bool(bold)]
+    data = _brand_bytes(spec["file"])
+    if data is None:
+        return fallback
+    try:
+        return BrandFont(data, size, bold=bool(bold), weight=spec["weight"], fallback=fallback)
+    except OSError:
+        return fallback
 
 
 def hex_color(color: str | None, alpha: int = 255, fallback: str = "FFD700") -> tuple:
