@@ -358,7 +358,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
           <PlanPreview plan={preview} stale={stale} busy={busy} onApply={apply} onDiscard={() => { setPreview(null); setStale(""); }} forecastOnly={liveLocal} />
           {queue && (
             <Section title="Warteschlange je Station" note="Live: läuft, als Nächstes, danach - aus dem Server" testId="mp-live-queue">
-              {queueStaleSince ? <LiveStaleNote since={queueStaleSince} className="mb-3" testId="mp-live-queue-stale" /> : null}
+              <LiveStaleNote since={queueStaleSince} className="mb-3" testId="mp-live-queue-stale" />
               <StationQueueBoard queue={{ ...queue, summary: null }} busyKey={busyStation} onCall={(station, entry) => operateStation("call", station, entry)}
                 onStart={(station, entry) => operateStation("start", station, entry)} />
             </Section>

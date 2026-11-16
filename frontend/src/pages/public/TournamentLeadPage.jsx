@@ -352,7 +352,7 @@ export default function TournamentLeadPage() {
           ))}
         </div>
 
-        {Number.isFinite(staleSince) ? <LiveStaleNote since={staleSince} className="mt-3" testId="lead-stale" /> : null}
+        <LiveStaleNote since={Number.isFinite(staleSince) ? staleSince : 0} className="mt-3" testId="lead-stale" />
 
         {activeTab === "cockpit" && queue ? (
           <TournamentCockpit
