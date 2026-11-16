@@ -12,9 +12,19 @@ const mockGet = jest.fn();
 jest.mock("../../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...args) } }));
 const mockAuth: { user: Record<string, unknown> | null } = { user: null };
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
-jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+// Symbole mit Kennung zeigen ihren Namen - so prüft der Test Pfeil gegen „öffnet im Browser“.
+jest.mock("@expo/vector-icons", () => ({
+  Ionicons: ({ name, testID }: { name: string; testID?: string }) => {
+    const { createElement } = jest.requireActual("react");
+    const { Text: RNText } = jest.requireActual("react-native");
+    return testID ? createElement(RNText, { testID }, name) : null;
+  },
+}));
 const mockNavigateToUrl = jest.fn((_url: string) => false);
-jest.mock("../../navigation/rootNavigation", () => ({ navigateToUrl: (url: string) => mockNavigateToUrl(url) }));
+jest.mock("../../navigation/rootNavigation", () => ({
+  ...jest.requireActual("../../navigation/rootNavigation"),
+  navigateToUrl: (url: string) => mockNavigateToUrl(url),
+}));
 
 const reanimated = jest.requireMock("react-native-reanimated");
 
@@ -155,6 +165,20 @@ test("Aufklappen sagt den Zustand an; Links öffnen den Screen der App oder die 
   expect(open).toHaveBeenLastCalledWith(`${WEBSITE_BASE_URL}/faq/konto-und-profil#registrieren`);
   await fireEvent.press(screen.getByTestId("faq-frage-konto-anlegen-knopf"));
   expect(screen.queryByTestId("faq-frage-konto-anlegen-inhalt")).toBeNull();
+});
+
+test("das Symbol am Link sagt, ob die App den Screen hat oder die Website aufgeht", async () => {
+  antwort({ darf: ALLES_ZU, fragen: [] });
+  await renderFaq();
+  await fireEvent.press(screen.getByTestId("faq-bereich-lionsapp-knopf"));
+  await fireEvent.press(screen.getByTestId("faq-frage-app-push-stufen-bereich-knopf"));
+  expect(screen.getByTestId("faq-frage-link-symbol-app-push-stufen-bereich")).toHaveTextContent("arrow-forward");
+  // Anleitung im Web und eine Seite ohne Screen in der App (Beitrag unter Mitglied werden): beide öffnen den Browser.
+  await fireEvent.press(screen.getByTestId("faq-frage-konto-anlegen-knopf"));
+  expect(screen.getByTestId("faq-frage-link-symbol-konto-anlegen")).toHaveTextContent("open-outline");
+  await fireEvent.press(screen.getByTestId("faq-bereich-verein-mitgliedschaft-knopf"));
+  await fireEvent.press(screen.getByTestId("faq-frage-was-kostet-mitgliedschaft-bereich-knopf"));
+  expect(screen.getByTestId("faq-frage-link-symbol-was-kostet-mitgliedschaft-bereich")).toHaveTextContent("open-outline");
 });
 
 test("Suche: Fragen zum Aufklappen und Schritte mit Link auf die Website; Rollen-Filter blendet Bereiche aus", async () => {

@@ -11,7 +11,7 @@ import {
   type FaqAnleitung, type FaqBereich, type FaqBereichInhalt, type FaqFrage, type FaqTreffer,
 } from "../../faq";
 import { useFaqZugang } from "../../faq/useFaqZugang";
-import { navigateToUrl } from "../../navigation/rootNavigation";
+import { navigateToUrl, targetFromUrl } from "../../navigation/rootNavigation";
 import type { AppStackParamList } from "../../navigation/types";
 import { colors, motion, radius, surfaces } from "../../theme";
 
@@ -142,7 +142,8 @@ function FrageZeile({ frage, offen, onToggle, bereich, suffix = "", ankerRef }: 
             testID={`faq-frage-link-${frage.id}${suffix}`}
           >
             <Body style={styles.linkText}>{frage.link.label}</Body>
-            <Ionicons name={frage.link.to.startsWith("/faq/") ? "open-outline" : "arrow-forward"} size={16} color={colors.cyan} />
+            {/* Pfeil nur, wenn die App den Screen selbst hat - sonst das Zeichen für „öffnet im Browser“. */}
+            <Ionicons name={targetFromUrl(frage.link.to) ? "arrow-forward" : "open-outline"} size={16} color={colors.cyan} testID={`faq-frage-link-symbol-${frage.id}${suffix}`} />
           </Pressable>
         ) : null}
         {bereich ? <Muted style={styles.bereichMarke}>{bereich}</Muted> : null}
