@@ -7,7 +7,7 @@ import { hasPlayer, matchStatusText, roundLabels, scheduleSections } from "../..
 import { colors, radius, roles, surfaces } from "../../theme";
 import { useReduceMotion } from "../FadeIn";
 import { SegmentedTabs } from "../SegmentedTabs";
-import { LiveClock } from "./bracket/LiveClock";
+import { LiveClock, clockDuration } from "./bracket/LiveClock";
 import { playersText } from "./bracket/LiveNow";
 import { breatheStyle } from "./bracket/motion";
 
@@ -94,7 +94,7 @@ const ScheduleRow = React.memo(function ScheduleRow({ match, round, nameOf, mine
           <View style={styles.liveRow}>
             <Animated.View style={[styles.liveDot, breatheStyle(reduce)]} />
             <Text style={styles.liveText} numberOfLines={1}>{match.station_text || "läuft"}</Text>
-            <LiveClock startedAt={match.started_at} style={styles.liveText} />
+            <LiveClock startedAt={match.started_at} durationMinutes={clockDuration(match)} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} style={styles.liveText} />
           </View>
         ) : (
           <Text style={[styles.status, cancelled && styles.statusQuiet]} numberOfLines={2}>{matchStatusText(match)}</Text>

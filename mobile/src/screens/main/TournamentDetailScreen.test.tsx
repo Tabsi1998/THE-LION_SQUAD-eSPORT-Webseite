@@ -353,3 +353,31 @@ describe("Bestätigungs-Blatt", () => {
     await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
   });
 });
+
+// Hinweis der Turnierleitung (#1166, #2393): das Banner steht oben, lädt mit der Seite - und fehlt es, bleibt die Seite.
+test("Hinweis der Turnierleitung oben auf der Turnierseite", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...TOURNAMENT, event_gate: null } });
+    if (path === "/tournaments/cup/notices") {
+      return Promise.resolve({ data: { items: [{ id: "n1", text: "Finale an PC 1", created_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 3600000).toISOString(), target: "tournament" }] } });
+    }
+    if (path.endsWith("/bracket")) return Promise.resolve({ data: {} });
+    return Promise.resolve({ data: [] });
+  });
+  const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("notice-n1")).toBeTruthy());
+  expect(screen.getByTestId("notice-text")).toHaveTextContent("Finale an PC 1");
+  expect(screen.queryByTestId("tournament-partial-load")).toBeNull();
+  await view.unmount();
+
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...TOURNAMENT, event_gate: null } });
+    if (path.endsWith("/notices")) return Promise.reject(new Error("weg"));
+    if (path.endsWith("/bracket")) return Promise.resolve({ data: {} });
+    return Promise.resolve({ data: [] });
+  });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("LAN-Cup")).toBeTruthy());
+  expect(screen.queryByTestId("notice-banner")).toBeNull();
+  expect(screen.queryByTestId("tournament-partial-load")).toBeNull();
+});

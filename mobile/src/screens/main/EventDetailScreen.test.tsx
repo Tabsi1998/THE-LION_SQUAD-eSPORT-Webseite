@@ -296,7 +296,8 @@ test("Spielst du auch mit? nach der Anmeldung - „Nein danke“ schließt, ohne
   await render(<EventDetailScreen navigation={navigation} route={route} />);
   await fireEvent.press(await screen.findByTestId("event-register-submit"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/events/e1/registrations", expect.anything()));
-  await waitFor(() => expect(mockGet.mock.calls.filter(([url]) => !String(url).includes("friends"))).toHaveLength(2));
+  // Ohne Freunde und ohne das Banner der Turnierleitung (#1166, lädt einmal mit der Seite): genau zwei Abfragen des Events.
+  await waitFor(() => expect(mockGet.mock.calls.filter(([url]) => !String(url).includes("friends") && !String(url).endsWith("/notices"))).toHaveLength(2));
   expect(mockGet.mock.calls.some(([url]) => String(url).endsWith("/play-along"))).toBe(false);
   expect(screen.queryByTestId("play-along-sheet")).toBeNull();
 });
@@ -337,4 +338,17 @@ test("Nachladen gescheitert: das Event bleibt, ausdrücklich als letzter Stand (
   });
   await waitFor(() => expect(screen.getByTestId("event-stale")).toBeTruthy());
   expect(screen.getAllByText("Vereinsabend").length).toBeGreaterThan(0);
+});
+
+// Hinweis der Turnierleitung an das ganze Event (#1166, #2393): oben auf der Event-Seite.
+test("Hinweis der Turnierleitung oben auf der Event-Seite", async () => {
+  mockGet.mockImplementation(async (url: string) => {
+    if (url === "/events/vereinsabend/notices") {
+      return { data: { items: [{ id: "n2", text: "Pause bis 14:30", created_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 3600000).toISOString(), target: "event" }] } };
+    }
+    return { data: { ...EVENT, visibility: "public" } };
+  });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("notice-n2")).toBeTruthy());
+  expect(screen.getByTestId("notice-text")).toHaveTextContent("Pause bis 14:30");
 });
