@@ -44,8 +44,9 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     const alone = (item) => Boolean(item?.placement || item?.rewards || item?.context?.recount);
     if (last && !alone(last) && !alone(pkg) && stamp - state.lastEnqueueAt <= bundleMs) {
       entry = mergeInto(last, pkg);
-    } else if (!last && state.current && pkg.levelUp && !(pkg.tiers || []).length) {
-      // Ein Level-up während einer laufenden Zeremonie wird Teil davon (am Ende gezeigt).
+    } else if (!last && state.current && !state.current.placement && !state.current.rewards && pkg.levelUp && !(pkg.tiers || []).length) {
+      // Ein Level-up während einer laufenden Zeremonie wird Teil davon (am Ende gezeigt). Sieger-Moment und Liga-Belohnung
+      // zeigen kein Level - dort käme es nie auf die Bühne und gälte trotzdem als gesehen (#2450); es wartet als eigenes Paket.
       state.current = { ...state.current, levelUp: pkg.levelUp, onDone: chain(state.current.onDone, pkg.onDone) };
       state.lastEnqueueAt = stamp;
       emit();

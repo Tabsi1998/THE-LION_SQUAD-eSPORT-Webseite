@@ -187,3 +187,25 @@ describe("Warteschlange", () => {
     expect([first, second, level].map((fn) => fn.mock.calls.length)).toEqual([1, 1, 1]);
   });
 });
+
+describe("Warteschlange: Level-up neben Belohnung und Sieger-Moment", () => {
+  for (const [name, pkg] of [
+    ["Liga-Belohnung", { id: "lohn", rewards: [{ id: "r1", reward: { name: "Gold" } }] }],
+    ["Sieger-Moment", { id: "platz", placement: { key: "t1:r1", rank: 1 } }],
+  ]) {
+    it(`${name} läuft: das Level-up wird danach gezeigt und erst dann als gesehen gemeldet`, () => {
+      const queue = createCeremonyQueue({ now: () => 1 });
+      const levelDone = vi.fn();
+      queue.enqueue(pkg);
+      queue.enqueue({ tiers: [], levelUp: { level: 7, previous: 6 }, onDone: levelDone });
+      // Der laufende Moment bekommt kein Level-up angehängt - er könnte es nie zeigen.
+      expect(queue.getCurrent().levelUp).toBeNull();
+      queue.advance();
+      expect(levelDone).not.toHaveBeenCalled();
+      expect(queue.getCurrent()).toMatchObject({ levelUp: { level: 7 } });
+      queue.advance();
+      expect(levelDone).toHaveBeenCalledTimes(1);
+    });
+  }
+
+});
