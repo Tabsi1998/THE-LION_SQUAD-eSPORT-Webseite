@@ -10,6 +10,10 @@ Stufen „turnierleitung“ und „turnierleitung_verwaltung“ (Review #2448, F
 (``routes/tournament_lead_routes.py``) öffnen auch Helfer mit aktivem Einsatz und die Liga-Leitung. Sie sehen die
 Fragen zu Check-in, Aufruf und Ergebnissen. Fragen, deren Weg über die Verwaltung führt, sehen nur Personen mit dem
 Bereich Turnierleitung.
+
+Achtung, das Repository ist öffentlich: Diese Datei liest jeder auf GitHub. Hier steht nur Bedienung, nichts
+Vertrauliches (keine Zugänge, keine internen Abläufe, keine Namen). Die Prüfung am Server regelt nur, wem die Seite
+eine Frage zeigt - geheim ist sie dadurch nicht.
 """
 from __future__ import annotations
 

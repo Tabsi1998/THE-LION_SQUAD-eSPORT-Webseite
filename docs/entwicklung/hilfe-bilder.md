@@ -24,16 +24,23 @@ dem Cloudflare-Cache.
 ## Inhaltsmodell und Sichtbarkeit (#2448)
 
 Jede Frage und jede Anleitung trägt einen `bereich` (aus `bereiche.json`), `rollen` für den Filter (`spieler`,
-`captain`, `mitglied`, `turnierleitung`) und `sichtbar_fuer` (`alle`, `angemeldet`, `mitglied`, `turnierleitung`). Ein
-Abschnitt einer Anleitung kann mit eigenem `bereich` zusätzlich in einem zweiten Bereich stehen (Benachrichtigungen,
-Turniertag vor Ort).
+`captain`, `mitglied`, `turnierleitung`) und `sichtbar_fuer` (`alle`, `angemeldet`, `mitglied`, `turnierleitung`,
+`turnierleitung_verwaltung`). Ein Abschnitt einer Anleitung kann mit eigenem `bereich` zusätzlich in einem zweiten
+Bereich stehen (Benachrichtigungen, Turniertag vor Ort). Die `rollen` eines Bereichs entsprechen denen seines Inhalts
+(Test in `index.test.js` und `test_faq_visibility_flow.py`).
 
 - **Öffentlich (`alle`)** steht im Frontend-Bundle. Ein Test (`src/hilfe/index.test.js`) lässt dort nichts anderes zu.
 - **Alles andere** steht nur in `backend/services/faq_protected.py`. `GET /api/faq` gibt Mitglieder-Fragen nur an
-  Vereinsmitglieder (`sees_member_content`) und Fragen der Turnierleitung nur mit dem Bereich Turnierleitung samt
-  Zwei-Faktor (`can_use_area(…, "tournaments")`). Gäste bekommen eine leere Liste. Tests:
-  `backend/tests/test_faq_visibility_flow.py`.
-- Bereiche ohne Inhalt stehen als „Kommt bald“ in der Liste; geschützte Bereiche sieht nur, wer sie sehen darf.
+  Vereinsmitglieder (`sees_member_content`). `turnierleitung` sieht, wer die Leitungsansicht eines Turniers öffnen darf:
+  Bereich Turnierleitung samt Zwei-Faktor (`can_use_area(…, "tournaments")`), ein aktiver Helfer-Einsatz
+  (`tournament_staff_assignments`) oder die Liga-Leitung (Bereich Ligen oder eine Zuständigkeit, mit Zwei-Faktor).
+  `turnierleitung_verwaltung` – Fragen mit Weg über die Verwaltung – nur der Bereich Turnierleitung. Gäste bekommen eine
+  leere Liste. Tests: `backend/tests/test_faq_visibility_flow.py`.
+- **Das Repository ist öffentlich.** Auch `faq_protected.py` liest jeder auf GitHub. Dort gehört nur Bedienung hinein,
+  nichts Vertrauliches (keine Zugänge, keine internen Abläufe, keine Namen). Die Prüfung am Server regelt nur, wem die
+  Seite eine Frage zeigt.
+- Bereiche ohne Inhalt stehen als „Kommt bald“ in der Liste; mit Rollen-Filter fallen leere Bereiche weg. Geschützte
+  Bereiche sieht nur, wer sie sehen darf.
 - „Häufige Fragen“ sind Fragen mit `"haeufig": true` – öffentlich höchstens zehn, dazu je eine für Mitglieder und Leitung.
 
 ## Neu erzeugen
