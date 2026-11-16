@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 // Tabelle der Liga-Staffel in der Verwaltung (E.1, #1625): Gleichstand sehen, Reihenfolge mit Grund festlegen,
 // Entscheid zurücknehmen; dazu die Tabellenregeln der Season als Formular.
@@ -9,7 +10,7 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { SeasonTablePanel } = await import("./SeasonTablePanel");
+const { SeasonTableLinks, StaffelTablePanel } = await import("./SeasonTablePanel");
 const { SeasonTableRules } = await import("./SeasonTableRules");
 const { tableRulesToForm } = await import("@/lib/leagueTable");
 
@@ -29,7 +30,7 @@ beforeEach(() => {
 });
 
 test("zeigt nur gestartete Staffeln mit Gleichstand und legt die Reihenfolge mit Grund fest", async () => {
-  render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
   const tie = await screen.findByTestId("season-tie-t1-1");
   expect(apiMock.get).toHaveBeenCalledTimes(1);
   expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/table");
@@ -52,7 +53,7 @@ test("zeigt nur gestartete Staffeln mit Gleichstand und legt die Reihenfolge mit
 });
 
 test("nimmt einen Entscheid mit Grund zurück - ohne Recht gibt es keine Knöpfe", async () => {
-  const { unmount } = render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  const { unmount } = render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
   fireEvent.click(await screen.findByTestId("season-decision-remove-d0"));
   const sheet = await screen.findByTestId("table-decision-remove-sheet");
   fireEvent.change(within(sheet).getByTestId("table-decision-remove-reason"), { target: { value: "Ergebnis korrigiert" } });
@@ -60,7 +61,7 @@ test("nimmt einen Entscheid mit Grund zurück - ohne Recht gibt es keine Knöpfe
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/table-decision/d0", { data: { reason: "Ergebnis korrigiert" } }));
   unmount();
 
-  render(<SeasonTablePanel divisions={DIVISIONS} canDecide={false} />);
+  render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide={false} />);
   await screen.findByTestId("season-tie-t1-1");
   expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
   expect(screen.queryByTestId("season-decision-remove-d0")).toBeNull();
@@ -69,7 +70,7 @@ test("nimmt einen Entscheid mit Grund zurück - ohne Recht gibt es keine Knöpfe
 test("befangen (eigenes Team): der Satz statt der Knöpfe - der Superadmin nur mit Grund für die Notausnahme", async () => {
   const own = { ...TABLE, superadmin: false, ties: [{ ...TABLE.ties[0], own_team: true }], decisions: [{ ...TABLE.decisions[0], own_team: true }] };
   apiMock.get.mockResolvedValue({ data: own });
-  const { unmount } = render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  const { unmount } = render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
   expect(await screen.findByTestId("season-tie-own-1")).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
   expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
   expect(screen.getByTestId("season-decision-own-d0")).toBeInTheDocument();
@@ -77,7 +78,7 @@ test("befangen (eigenes Team): der Satz statt der Knöpfe - der Superadmin nur m
   unmount();
 
   apiMock.get.mockResolvedValue({ data: { ...own, superadmin: true } });
-  render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
   fireEvent.click(await screen.findByTestId("season-tie-decide-1"));
   const sheet = await screen.findByTestId("table-decision-sheet");
   fireEvent.change(within(sheet).getByTestId("table-decision-reason"), { target: { value: "Losentscheid vor Zeugen" } });
@@ -97,10 +98,34 @@ test("befangen (eigenes Team): der Satz statt der Knöpfe - der Superadmin nur m
     { data: { reason: "Ergebnis korrigiert", conflict_reason: "Keine zweite Person erreichbar" } }));
 });
 
-test("ohne gestartete Staffel bleibt das Feld weg", () => {
-  const { container } = render(<SeasonTablePanel divisions={[{ label: "Liga 1", staffeln: [{ tournament_id: "t2", staffel: "B", status: "draft" }] }]} canDecide />);
-  expect(container).toBeEmptyDOMElement();
+test("der Season-Reiter Tabelle führt je Staffel zur Staffel-Seite - ohne eigenen Entscheid (#2262, Nr. 190)", () => {
+  render(<MemoryRouter><SeasonTableLinks divisions={DIVISIONS} /></MemoryRouter>);
+  expect(screen.getByTestId("season-table-open-t1")).toHaveAttribute("href", "/admin/leagues/staffeln/t1#tabelle");
+  expect(screen.getByTestId("season-table-open-t1")).toHaveTextContent("Liga 1 · Staffel A");
+  expect(screen.getByTestId("season-table-open-t2")).toHaveAttribute("href", "/admin/leagues/staffeln/t2#tabelle");
+  expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
   expect(apiMock.get).not.toHaveBeenCalled();
+});
+
+test("Tabelle der Staffel mit Zonen und PDF; ein Ladefehler zeigt sich mit „Nochmal versuchen“", async () => {
+  const standings = [
+    { registration_id: "r1", rank: 1, display_name: "Nordlicht", points: 9, played: 3, won: 3, lost: 0, zone: "promotion" },
+    { registration_id: "r2", rank: 2, display_name: "Sturmfalke", points: 3, played: 3, won: 1, lost: 2, zone: "relegation" },
+  ];
+  apiMock.get.mockResolvedValue({ data: { ...TABLE, standings } });
+  const { unmount } = render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" pdfHref="/api/exports/tournaments/t1/standings.pdf" />);
+  expect(await screen.findByTestId("standing-row-r1")).toHaveTextContent("Nordlicht");
+  expect(screen.getByTestId("standing-zone-r1")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-table-zones")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", "/api/exports/tournaments/t1/standings.pdf");
+  unmount();
+
+  apiMock.get.mockRejectedValueOnce({ response: { data: { detail: "Server weg" } } });
+  render(<StaffelTablePanel tournamentId="t1" />);
+  expect(await screen.findByTestId("staffel-table-error")).toHaveTextContent("Server weg");
+  apiMock.get.mockResolvedValue({ data: TABLE });
+  fireEvent.click(screen.getByRole("button", { name: "Nochmal versuchen" }));
+  expect(await screen.findByTestId("season-ties-t1")).toBeInTheDocument();
 });
 
 function RulesHarness({ initial }) {
@@ -131,7 +156,7 @@ test("die Tabellenregeln der Season: Reihenfolge, Mini-Tabelle, Remis, Default-W
 });
 
 test("Art der Entscheidung (F.1): im Reiter Tabelle freiwillig - gewählt geht sie mit", async () => {
-  render(<SeasonTablePanel divisions={DIVISIONS} canDecide />);
+  render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
   fireEvent.click(await screen.findByTestId("season-tie-decide-1"));
   const sheet = await screen.findByTestId("table-decision-sheet");
   expect(within(sheet).getByTestId("table-decision-method")).toHaveValue("");

@@ -106,7 +106,7 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
               {!row.can_decide ? (
                 <p className="text-xs text-white/65">
                   In dieser Season entscheidet die Leitung keinen Gleichstand. Nimm im Reiter{" "}
-                  <Link to="#gleichstand" className="text-[#29B6E8] hover:underline">Tabelle</Link> „Entscheid der Leitung“ als letztes Kriterium auf und übertrage die Vorgaben.
+                  <Link to="#punkte" className="text-[#29B6E8] hover:underline">Tabelle</Link> „Entscheid der Leitung“ als letztes Kriterium auf und übertrage die Vorgaben.
                 </p>
               ) : !canResults ? (
                 <p className="text-xs text-white/65">Den Entscheid trifft, wer in dieser Liga „Ergebnisse korrigieren“ darf.</p>
