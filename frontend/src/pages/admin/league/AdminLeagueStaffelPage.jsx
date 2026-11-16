@@ -59,8 +59,13 @@ function Breadcrumbs({ tournament }) {
   );
 }
 
+/** Beim Wechsel auf eine andere Staffel (neue Kennung) beginnt die Seite frisch - nie Co-Teams, Spiele oder Tabelle der vorigen. */
 export default function AdminLeagueStaffelPage() {
   const { tournamentId } = useParams();
+  return <StaffelPage key={tournamentId} tournamentId={tournamentId} />;
+}
+
+function StaffelPage({ tournamentId }) {
   const location = useLocation();
   const navigate = useNavigate();
   const confirm = useConfirm();

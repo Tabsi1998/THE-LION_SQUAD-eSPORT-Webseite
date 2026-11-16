@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Staffel-Seite der Liga-Verwaltung (#2262, Paket A): Kopf mit Brotkrumen, nur die fertigen Reiter Überblick und Teilnehmer, die
@@ -333,4 +333,41 @@ test("Entfernen in einer laufenden Staffel (Nachmeldung ohne festes Spiel) versp
   const dialog = await screen.findByRole("dialog");
   expect(dialog).toHaveTextContent("Es hat noch kein festes Spiel");
   expect(dialog).not.toHaveTextContent("neu gemischt");
+});
+
+function Jump({ to }) {
+  const navigate = useNavigate();
+  return <button type="button" data-testid="jump" onClick={() => navigate(to)}>weiter</button>;
+}
+
+test("Wechsel auf eine andere Staffel zeigt nichts von der vorigen, bis die neue geladen ist", async () => {
+  // Kann-Punkt aus Paket A: neue `tournamentId`, frischer Zustand - nie die Co-Teams von Staffel A unter dem Kopf von Staffel B.
+  const user = userEvent.setup();
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  serve();
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.match(/\/tournaments\/t2(\?|$)/)) return Promise.resolve({ data: { ...STAFFEL, id: "t2", league_context: { ...STAFFEL.league_context, staffel: "B" }, league_links: { ...STAFFEL.league_links, staffel: "B" } } });
+    if (path.includes("/tournaments/t2/registrations")) return pending;
+    if (path.includes("/tournaments/t2/")) return Promise.resolve({ data: [] });
+    return base(url);
+  });
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/leagues/staffeln/t1#teilnehmer"]}>
+        <Routes>
+          <Route path="/admin/leagues/staffeln/:tournamentId" element={<><AdminLeagueStaffelPage /><Jump to="/admin/leagues/staffeln/t2#teilnehmer" /></>} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>,
+  );
+  expect((await screen.findAllByText("Nebelwölfe · Rudel")).length).toBeGreaterThan(0);
+  await user.click(screen.getByTestId("jump"));
+  expect(await screen.findByTestId("staffel-title")).toHaveTextContent("Staffel B");
+  expect(screen.getByTestId("staffel-lists-loading")).toBeInTheDocument();
+  expect(screen.queryByText("Nebelwölfe · Rudel")).toBeNull();
+  release({ data: [] });
+  expect(await screen.findByTestId("staffel-teams-count")).toHaveTextContent("0");
 });
