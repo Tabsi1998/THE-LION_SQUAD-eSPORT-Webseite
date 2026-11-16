@@ -66,9 +66,18 @@ export function EmptyState({
 }
 
 /** Was beim Laden schiefging - entscheidet, was der Fehlerzustand sagt. */
-export type LoadProblem = { kind: "offline" | "notFound" | "denied" | "error"; message: string };
+export type LoadProblem = {
+  kind: "offline" | "notFound" | "denied" | "error";
+  message: string;
+  /** Der Server hat 410 gesagt (#2164): das gab es, ist aber zurückgezogen - `message` ist sein Hinweistext. */
+  gone?: boolean;
+};
 
-/** Aus einem Fehler des API-Clients: kein Netz, nicht gefunden (404), nicht erlaubt (401/403) oder etwas anderes. */
+/** Wenn der Server bei 410 keinen Text mitschickt: ruhig, ohne Fehler. */
+const GONE_TITLE = "Zurückgezogen";
+const GONE_DETAIL = "Das wurde zurückgezogen und ist nicht mehr zu sehen.";
+
+/** Aus einem Fehler des API-Clients: kein Netz, nicht gefunden (404) oder zurückgezogen (410), nicht erlaubt (401/403) oder etwas anderes. */
 export function loadProblem(error: unknown): LoadProblem {
   // Eine Kennung, die nicht in einen API-Pfad taugt (#1000), gibt es nicht - kein Abruf, sondern „nicht gefunden“.
   if (error instanceof InvalidIdError) return { kind: "notFound", message: "" };
@@ -78,6 +87,8 @@ export function loadProblem(error: unknown): LoadProblem {
     const message = typeof detail === "string" ? detail : "";
     if (!error.response) return { kind: "offline", message };
     if (status === 404) return { kind: "notFound", message };
+    // Zurückgezogen (#2164): wie „nicht gefunden“ ohne Nochmal versuchen, aber mit dem Hinweis des Servers.
+    if (status === 410) return { kind: "notFound", message: message.trim(), gone: true };
     if (status === 401 || status === 403) return { kind: "denied", message };
     return { kind: "error", message };
   }
@@ -93,12 +104,15 @@ const PROBLEM_TEXT: Record<LoadProblem["kind"], { title: string; detail: string;
 
 /**
  * Ein Ladefehler - nie „nichts da“. Mit `problem` (aus `loadProblem`) sagt er, was los ist: ohne Netz und bei
- * anderen Fehlern mit „Nochmal versuchen“, bei „nicht gefunden“ der Text der Seite (`title`/`detail`). Ohne `problem`
+ * anderen Fehlern mit „Nochmal versuchen“, bei „nicht gefunden“ der Text der Seite (`title`/`detail`), bei „zurückgezogen“
+ * (410) der Hinweis des Servers (sonst `goneDetail` oder ein ruhiger Rückfalltext), nie mit „Nochmal versuchen“. Ohne `problem`
  * zeigt er `title` und `detail` wie bisher.
  */
 export function ErrorState({
   title,
   detail,
+  goneTitle,
+  goneDetail,
   problem = null,
   onRetry,
   action,
@@ -106,6 +120,9 @@ export function ErrorState({
 }: {
   title?: string;
   detail?: string;
+  /** Titel und Rückfalltext, wenn die Sache zurückgezogen ist (410) - etwa „Beitrag zurückgezogen“. */
+  goneTitle?: string;
+  goneDetail?: string;
   problem?: LoadProblem | null;
   onRetry?: (() => void) | null;
   /** Statt „Nochmal versuchen“ ein anderer Weg (etwa bei „nicht gefunden“ zur Übersicht). */
@@ -115,8 +132,9 @@ export function ErrorState({
   const kind = problem?.kind || "error";
   const known = PROBLEM_TEXT[kind];
   const pageText = !problem || kind === "notFound" || kind === "denied";
-  const shownTitle = (pageText && title) || known.title;
-  const shownDetail = (pageText && detail) || (kind === "denied" && problem?.message) || known.detail;
+  const gone = Boolean(problem?.gone);
+  const shownTitle = gone ? goneTitle || GONE_TITLE : (pageText && title) || known.title;
+  const shownDetail = gone ? problem?.message || goneDetail || GONE_DETAIL : (pageText && detail) || (kind === "denied" && problem?.message) || known.detail;
   const retry = onRetry && (kind === "offline" || kind === "error") ? onRetry : null;
   return (
     <View style={styles.center} testID={testID} data-kind={problem ? kind : undefined} accessibilityLiveRegion="polite">
