@@ -260,8 +260,12 @@ test.describe("Turnier-Cockpit", () => {
 
       // „Gibt es nicht“ (404): erst dann fällt das Cockpit weg.
       world.queueStatus = 404;
-      await page.getByTestId("live-release-yes-pc1").click();
-      await expect(page.getByTestId("lead-tab-cockpit")).toHaveCount(0);
+      // Die Abfrage im Takt (20 s) kann vor dem Klick kommen - dann ist das Cockpit schon weg und es gibt nichts zu klicken.
+      await expect(async () => {
+        const yes = page.getByTestId("live-release-yes-pc1");
+        if (await yes.count()) await yes.click({ timeout: 2000 }).catch(() => {});
+        await expect(page.getByTestId("lead-tab-cockpit")).toHaveCount(0, { timeout: 2000 });
+      }).toPass({ timeout: 20_000 });
       await expect(page.getByTestId("lead-stale")).toHaveCount(0);
     });
   }

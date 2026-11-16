@@ -96,6 +96,7 @@ let optionsQueue = Promise.resolve();
 
 function loginOptions() {
   const request = optionsQueue.then(() => api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true }));
+  // Bewusst still: nur die Warteschlange - den Fehler bekommt der Aufrufer von `request`.
   optionsQueue = request.catch(() => {});
   return request.then(({ data }) => data);
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatApiError, formatMemberSince } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -700,7 +701,7 @@ function DirectoryCard() {
   const load = useCallback(() => {
     api.get("/membership/me/directory").then(({ data }) => {
       if (data && typeof data.eligible === "boolean") { setEntry(data); setForm(toDirectoryForm(data.entry)); }
-    }).catch(() => {});
+    }).catch(toastLoadFailed("Dein Eintrag im Mitgliederverzeichnis konnte nicht geladen werden."));
   }, []);
   useEffect(() => { load(); }, [load]);
   if (!entry?.eligible) return null;

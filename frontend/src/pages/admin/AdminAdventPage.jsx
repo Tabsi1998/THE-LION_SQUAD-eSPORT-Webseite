@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertTriangle, CalendarHeart, Copy, ExternalLink, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SeasonSwitch } from "@/components/tls/SeasonSwitch";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -116,7 +117,7 @@ export default function AdminAdventPage() {
     load(year);
   }, [year, load]);
   useEffect(() => {
-    api.get("/seasonal/advent/admin/options", { skipInvalidation: true }).then(({ data: result }) => setOptions(result)).catch(() => {});
+    api.get("/seasonal/advent/admin/options", { skipInvalidation: true }).then(({ data: result }) => setOptions(result)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden."));
   }, []);
 
   const run = async (action, success, fallback) => {

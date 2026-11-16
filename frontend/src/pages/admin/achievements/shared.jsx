@@ -102,6 +102,7 @@ export function useBoardRights() {
   const [board, setBoard] = useState(false);
   useEffect(() => {
     let alive = true;
+    // Bewusst still: ohne Antwort gilt der sichere Standard (keine Vorstandsrechte); der Server prüft ohnehin selbst.
     api.get("/admin/achievements/me").then(({ data }) => { if (alive) setBoard(Boolean(data?.board)); }).catch(() => {});
     return () => { alive = false; };
   }, []);

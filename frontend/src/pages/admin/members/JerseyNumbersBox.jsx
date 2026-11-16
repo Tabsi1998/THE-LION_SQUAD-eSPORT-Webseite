@@ -118,6 +118,7 @@ function MemberRow({ row, range, onChanged }) {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       api.post("/admin/jersey-numbers/check", { number: local.value, user_id: row.user_id }, { signal: controller.signal })
+        // Bewusst still: nur die Vorab-Prüfung beim Tippen (auch abgebrochene); Speichern prüft auf dem Server und meldet.
         .then(({ data }) => setCheck(data)).catch(() => {});
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };

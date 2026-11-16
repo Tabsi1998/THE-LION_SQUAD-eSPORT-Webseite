@@ -66,7 +66,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
         {bundle.body ? (
           <div className="mt-0.5 text-xs text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
         ) : null}
-        <div className="mt-1 text-[10px] uppercase tracking-widest text-white/30">
+        <div className="mt-1 text-[10px] uppercase tracking-widest text-quiet">
           {notificationDate(bundle.created_at)}
           {bundle.count > 1 ? ` · ${bundle.count} gebündelt` : ""}
         </div>
@@ -92,7 +92,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
         <button
           type="button"
           onClick={() => onDelete(bundle)}
-          className="w-11 shrink-0 inline-flex items-center justify-center text-white/25 hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 border-l border-white/5"
+          className="w-11 shrink-0 inline-flex items-center justify-center text-quiet hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 border-l border-white/5"
           title="Benachrichtigung löschen"
           aria-label="Benachrichtigung löschen"
         >

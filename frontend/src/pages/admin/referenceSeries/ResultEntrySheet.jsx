@@ -448,6 +448,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       if (Object.keys(result.team_colors || {}).length) {
         Promise.resolve()
           .then(() => api.post(`/reference-series/admin/series/${series.id}/team-colors/suggestions`, { colors: result.team_colors }))
+          // Bewusst still: nur ein Vorschlag für die Teamfarben, übernommen wird er erst bei der Saison.
           .catch(() => {});
       }
     },

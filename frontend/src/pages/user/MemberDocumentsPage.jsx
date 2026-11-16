@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { loadOk, problemKind, toastLoadFailed } from "@/lib/loadProblem";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { FileText, ArrowLeft, Search } from "lucide-react";
@@ -17,6 +19,8 @@ export default function MemberDocumentsPage() {
   const [activeCat, setActiveCat] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
   // PDFs öffnen im gemeinsamen Betrachter (#325) statt in einem neuen Tab; alles andere wie bisher.
   const [viewing, setViewing] = useState(null);
   // Vereinsakte (#324 Teil 1): ohne Bindung ein Hinweis, wie die eigenen Unterlagen ins Profil kommen.
@@ -25,13 +29,13 @@ export default function MemberDocumentsPage() {
     api.get("/membership/me/identity").then(({ data }) => setIdentity(data && data.available === true ? data : null)).catch(() => setIdentity(null));
   }, []);
 
-  const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}), []);
+  const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => { setMeta(data); loadOk("Die Kategorien konnten nicht geladen werden."); }).catch(toastLoadFailed("Die Kategorien konnten nicht geladen werden.")), []);
   useEffect(() => { loadMeta(); }, [loadMeta]);
   const load = useCallback(() => {
     setLoading(true);
     api.get("/documents", { params: activeCat ? { scope: "club", category: activeCat } : { scope: "club" } })
-      .then(({ data }) => setList(Array.isArray(data) ? data : []))
-      .catch(() => {})
+      .then(({ data }) => { setList(Array.isArray(data) ? data : []); setProblem(null); })
+      .catch((error) => setProblem(problemKind(error)))
       .finally(() => setLoading(false));
   }, [activeCat]);
   useEffect(() => { load(); }, [load]);
@@ -94,6 +98,8 @@ export default function MemberDocumentsPage() {
 
         {loading ? (
           <SkeletonList rows={5} className="mt-10" label="Lade Dokumente" />
+        ) : problem && list.length === 0 ? (
+          <PublicErrorState kind={problem} title="Die Dokumente konnten nicht laden" onRetry={load} className="mt-10" />
         ) : filtered.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <FileText className="w-10 h-10 mx-auto opacity-40 mb-3" />

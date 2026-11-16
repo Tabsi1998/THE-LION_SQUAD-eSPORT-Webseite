@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -60,7 +61,7 @@ export default function SetupWizardPage() {
         toast.error("Setup-Wizard ist nur für Admins.");
         nav("/login");
       }
-    }).catch(() => {});
+    }).catch(toastLoadFailed("Der Stand der Einrichtung konnte nicht geladen werden."));
   }, [isAdmin, nav]);
   useEffect(() => { loadStatus(); }, [loadStatus]);
   useEffect(() => {
@@ -73,6 +74,7 @@ export default function SetupWizardPage() {
         smtp_pass: "",
         resend_api_key: "",
       }));
+    // Bewusst still: nur die Vorbelegung - die Felder bleiben leer und lassen sich von Hand ausfüllen.
     }).catch(() => {});
   }, [isAdmin]);
   useApiInvalidation(loadStatus, ["setup", "settings"]);

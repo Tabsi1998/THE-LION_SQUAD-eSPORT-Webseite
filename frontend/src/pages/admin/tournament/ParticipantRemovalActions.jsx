@@ -6,6 +6,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 const ACTIVE_TOURNAMENT_STATUSES = new Set(["check_in", "live", "paused"]);
 const REMOVABLE_REGISTRATION_STATUSES = new Set(["approved", "checked_in"]);
@@ -48,15 +49,11 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
   const confirmRef = useRef(null);
   const cancelRef = useRef(null);
 
+  // Escape schließt und lehnt ab - wie „Abbrechen“. Tab bleibt im Dialog, die Liste dahinter ist gesperrt (#2412).
+  const dialogRef = useModalBehavior(Boolean(plan), () => cancelRef.current?.());
+
   useEffect(() => {
-    if (!plan) return undefined;
-    confirmRef.current?.focus();
-    // Escape schließt und lehnt ab - wie „Abbrechen“.
-    const onKey = (event) => {
-      if (event.key === "Escape") cancelRef.current?.();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    if (plan) confirmRef.current?.focus();
   }, [plan]);
 
   if (!tournament?.can_manage_structure || !ACTIVE_TOURNAMENT_STATUSES.has(String(tournament?.status || ""))) return null;
@@ -131,6 +128,7 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
       {plan ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${reasonId}-title`}

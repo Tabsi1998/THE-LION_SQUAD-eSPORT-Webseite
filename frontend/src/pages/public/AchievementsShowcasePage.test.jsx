@@ -334,3 +334,20 @@ describe("AchievementsShowcasePage (#619, #1229)", () => {
     expect(screen.queryByTestId("unlock-ticker")).toBeNull();
   });
 });
+
+// #2412: kommt die Übersicht nicht, steht bei den Kategorien ein Ladefehler mit „Nochmal versuchen“ - keine leere Fläche.
+test("Erfolge: Ladefehler der Übersicht mit „Nochmal versuchen“, danach die Kategorien", async () => {
+  mockApi();
+  const ok = apiMock.get.getMockImplementation();
+  let fail = true;
+  apiMock.get.mockImplementation(async (url, options) => {
+    if (url === "/achievements/overview" && fail) throw { response: { status: 500 } };
+    return ok(url, options);
+  });
+  renderPage();
+  expect(await screen.findByTestId("public-error-state")).toBeInTheDocument();
+  fail = false;
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  await waitFor(() => expect(screen.queryByTestId("public-error-state")).toBeNull());
+  expect(screen.getAllByText("Spielen").length).toBeGreaterThan(0);
+});

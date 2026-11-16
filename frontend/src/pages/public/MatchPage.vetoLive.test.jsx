@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Map-Veto live auf der Matchseite (#1651): Der kurze Abruf bringt einen neueren Veto-Stand, danach kommt eine langsamere volle Antwort
@@ -79,8 +79,12 @@ test("eine langsame volle Antwort mit älterem Veto-Block: der übrige Stand kom
   );
   expect(await screen.findByTestId("veto-step")).toHaveTextContent("Schritt 2 von 11");
   // Tab wieder sichtbar: die Seite lädt ganz (langsam), der Veto-Block fragt kurz nach (schnell, Schritt 4).
-  act(() => { document.dispatchEvent(new Event("visibilitychange")); });
-  await waitFor(() => expect(screen.getByTestId("veto-step")).toHaveTextContent("Schritt 4 von 11"));
+  // Das Element steht schon, bevor der Listener des Veto-Abrufs hängt (Effekte laufen nach dem Zeichnen) - auf einer
+  // langsamen CI ginge ein einzelnes Ereignis ins Leere. Deshalb so lange melden, bis der kurze Abruf angekommen ist.
+  await waitFor(() => {
+    fireEvent(document, new Event("visibilitychange"));
+    expect(screen.getByTestId("veto-step")).toHaveTextContent("Schritt 4 von 11");
+  });
   await act(async () => { release({ data: page(veto(3, at(-5)), 3) }); await slow; });
   await waitFor(() => expect(screen.getByTestId("checkin-slim")).toHaveTextContent("(3 Spieler)"));
   expect(screen.getByTestId("veto-step")).toHaveTextContent("Schritt 4 von 11");
