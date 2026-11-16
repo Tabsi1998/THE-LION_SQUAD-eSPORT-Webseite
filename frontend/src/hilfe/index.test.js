@@ -254,7 +254,12 @@ test("Bereiche: bestehende Anleitungen eingeordnet, Abschnitte auch im zweiten B
   expect(slugs("teams")).toEqual(["team-und-co-team"]);
   expect(slugs("liga")).toEqual(["liga-captains"]);
   expect(slugs("turniere")).toEqual(["turniere"]);
-  expect(slugs("turniertag")).toEqual(["turniere#check-in-turnier"]);
+  // Paket 3: Der Check-in bleibt bei den Turnieren und steht zusätzlich hier - neben der eigenen Anleitung.
+  expect(slugs("turniertag")).toEqual(["turniere#check-in-turnier", "turniertag"]);
+  expect(slugs("verein-mitgliedschaft")).toEqual(["verein-und-mitgliedschaft"]);
+  expect(slugs("events-kalender")).toEqual(["events-und-kalender"]);
+  expect(slugs("gewinne")).toEqual(["gewinne-und-trophaeen"]);
+  expect(slugs("datenschutz")).toEqual(["datenschutz-und-konto"]);
   // Jede Anleitung steht in genau einem Hauptbereich.
   for (const thema of THEMEN) expect(BEREICHE.filter((bereich) => slugs(bereich.id).includes(thema.slug)).length, thema.slug).toBe(1);
   // Liga ist nichts für den Filter Mitglied; Helferdienste ohne Fragen vom Server sind leer.
@@ -329,4 +334,40 @@ test("F7: Suche zuerst NFC - ein zerlegtes „ä“ findet dasselbe wie das fert
   expect(hilfeNormal("Bestätigen".normalize("NFD"))).toBe("bestaetigen");
   expect(sucheFaq(`Team ${zerlegt}`).map((row) => row.id)).toEqual(sucheFaq("Team gründe").map((row) => row.id));
   expect(sucheFaq("gruende Team").map((row) => row.id)).toContain("team-gruenden");
+});
+
+// Paket 3 (#2448): die Bereiche, die „Kommt bald“ zeigten, haben jetzt Inhalt - und die Suche findet ihn.
+
+test("Paket 3: öffentliche Bereiche ohne „Kommt bald“, jeder mit Fragen und einer Anleitung", () => {
+  const oeffentlich = BEREICHE.filter((bereich) => bereich.sichtbar_fuer === "alle");
+  for (const bereich of oeffentlich) expect(bereichInhalt(bereich.id).leer, bereich.id).toBe(false);
+  for (const id of ["verein-mitgliedschaft", "events-kalender", "turniertag", "gewinne", "datenschutz"]) {
+    const inhalt = bereichInhalt(id);
+    expect(inhalt.fragen.length, id).toBeGreaterThanOrEqual(2);
+    expect(inhalt.anleitungen.some(({ abschnitt }) => !abschnitt), id).toBe(true);
+  }
+  // Geschützte Bereiche haben öffentlich nichts - ihr Inhalt kommt nur vom Server.
+  expect(bereichInhalt("helferdienste").leer).toBe(true);
+  expect(bereichInhalt("turnierleitung").leer).toBe(true);
+});
+
+test("Paket 3: die Suche findet die neuen Fragen und Schritte", () => {
+  const ids = (anfrage) => sucheFaq(anfrage, { limit: 50 }).map((row) => row.id);
+  expect(ids("Begleitperson")).toEqual(expect.arrayContaining(["event-begleitung", "events-und-kalender-event-anmelden"]));
+  expect(ids("Warteliste Event")).toContain("event-warteliste");
+  expect(ids("Kalender abonnieren")).toEqual(expect.arrayContaining(["kalender-abo", "events-und-kalender-kalender-abo"]));
+  expect(ids("Station dran")).toContain("wann-bin-ich-dran");
+  expect(ids("Spielzeit")).toEqual(expect.arrayContaining(["spielzeit-uhr", "turniertag-spielzeit"]));
+  expect(ids("Medaille")).toContain("trophaeen-medaillen");
+  expect(ids("Erfolg teilen")).toEqual(expect.arrayContaining(["erfolg-teilen", "gewinne-und-trophaeen-erfolg-teilen"]));
+  expect(ids("Vereinsmitglied 18")).toEqual(expect.arrayContaining(["ab-welchem-alter", "verein-und-mitgliedschaft-mitglied-werden"]));
+  expect(ids("Ab welchem Alter")).toContain("ab-welchem-alter");
+  expect(ids("anonymisiere")).toEqual(expect.arrayContaining(["anonymisieren-was-passiert", "datenschutz-und-konto-konto-anonymisieren"]));
+  expect(sucheFaq("Spielzeit", { limit: 50 }).find((row) => row.id === "turniertag-spielzeit")).toMatchObject({ bereich: "turniertag", to: "/faq/turniertag#spielzeit" });
+});
+
+test("Paket 3: Benachrichtigungen stehen nur einmal - Datenschutz verweist auf die Anleitung", () => {
+  const verweis = FRAGEN.find((frage) => frage.id === "was-bekomme-ich-zugeschickt");
+  expect(verweis.link.to).toBe("/faq/konto-und-profil#stufe");
+  expect(hilfeSchritte(hilfeThema("datenschutz-und-konto")).some((schritt) => /Ruhezeit|Benachrichtigung/.test(`${schritt.text} ${schritt.hinweis || ""}`))).toBe(false);
 });
