@@ -718,6 +718,20 @@ describe("live: Warteschlange je Station", () => {
       { station_id: state.stations[1].id, match_id: state.matches.find((match) => match.match_key === "D").id }));
   });
 
+  // #2440: Scheitert das Nachladen (Netz, Server), bleibt die Warteschlange mit „Letzter Stand vor X s“ stehen.
+  it("scheitert das Nachladen der Warteschlange, bleibt ihr letzter Stand mit Hinweis", async () => {
+    const { state } = setupLive();
+    await screen.findByTestId("mp-live-queue");
+    const previous = apiMock.get.getMockImplementation();
+    apiMock.get.mockImplementation((url, ...rest) => (String(url).endsWith("/live-queue")
+      ? Promise.reject(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" }))
+      : previous(url, ...rest)));
+    fireEvent.click(await screen.findByTestId(`live-start-${state.stations[1].id}`));
+    expect(await screen.findByTestId("mp-live-queue-stale")).toHaveTextContent("Letzter Stand vor");
+    expect(screen.getByTestId("mp-live-queue")).toBeInTheDocument();
+    expect(screen.getByTestId(`live-next-${state.stations[1].id}`)).toBeInTheDocument();
+  });
+
   it("„Nachrücken planen“ schreibt im laufenden Turnier nichts: nur die Prognose, ohne „Übernehmen“", async () => {
     setupLive();
     const banner = await screen.findByTestId("mp-delay");
