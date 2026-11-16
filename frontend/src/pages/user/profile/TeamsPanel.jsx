@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
-import { toastLoadFailed } from "@/lib/loadProblem";
+import { loadOk, toastLoadFailed } from "@/lib/loadProblem";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { shortageAfter, shortageWarning } from "@/lib/squadShortage";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -62,7 +62,7 @@ export function TeamsPanel() {
 
   // Aufgelöste Teams (#2128, TM8): nur für die frühere Teamleitung, bis die Frist vorbei ist.
   const loadDissolved = useCallback(() => {
-    api.get("/teams/dissolved/mine").then(({ data }) => setDissolved(Array.isArray(data) ? data : [])).catch(toastLoadFailed("Aufgelöste Teams konnten nicht geladen werden."));
+    api.get("/teams/dissolved/mine").then(({ data }) => { setDissolved(Array.isArray(data) ? data : []); loadOk("Aufgelöste Teams konnten nicht geladen werden."); }).catch(toastLoadFailed("Aufgelöste Teams konnten nicht geladen werden."));
   }, []);
 
   // Stand der Liga-Anmeldungen (#2205): nur die eigenen Co-Teams, kein Fehler, wenn er nicht kommt.
@@ -72,12 +72,12 @@ export function TeamsPanel() {
   }, []);
 
   const loadMeta = useCallback(() => {
-    api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(toastLoadFailed("Die Spiele für die Auswahl konnten nicht geladen werden."));
+    api.get("/games").then(({ data }) => { setGames(Array.isArray(data) ? data : []); loadOk("Die Spiele für die Auswahl konnten nicht geladen werden."); }).catch(toastLoadFailed("Die Spiele für die Auswahl konnten nicht geladen werden."));
   }, []);
 
   useEffect(() => {
     loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
-    loadInvites().catch(toastLoadFailed("Deine Team-Einladungen konnten nicht geladen werden."));
+    loadInvites().then(() => loadOk("Deine Team-Einladungen konnten nicht geladen werden.")).catch(toastLoadFailed("Deine Team-Einladungen konnten nicht geladen werden."));
     loadDissolved();
     loadMeta();
     loadApplications();

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { problemKind, toastLoadFailed } from "@/lib/loadProblem";
+import { loadOk, problemKind, toastLoadFailed } from "@/lib/loadProblem";
 import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -29,7 +29,7 @@ export default function MemberDocumentsPage() {
     api.get("/membership/me/identity").then(({ data }) => setIdentity(data && data.available === true ? data : null)).catch(() => setIdentity(null));
   }, []);
 
-  const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Kategorien konnten nicht geladen werden.")), []);
+  const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => { setMeta(data); loadOk("Die Kategorien konnten nicht geladen werden."); }).catch(toastLoadFailed("Die Kategorien konnten nicht geladen werden.")), []);
   useEffect(() => { loadMeta(); }, [loadMeta]);
   const load = useCallback(() => {
     setLoading(true);
