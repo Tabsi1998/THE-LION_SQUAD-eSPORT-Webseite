@@ -63,7 +63,7 @@ async def test_board_function_wins_over_the_editorial_role(flow):
 
 @pytest.mark.asyncio
 async def test_no_hint_without_link_or_with_an_inactive_club_profile(flow):
-    lea = await player(flow, "lea")
+    await player(flow, "lea")
     await club_profile(flow, None, "lea-ohne-konto")
     tom = await player(flow, "tom")
     await club_profile(flow, tom, "tom-alt", is_active=False)

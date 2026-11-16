@@ -62,7 +62,8 @@ def test_a_missing_font_file_falls_back_and_the_images_still_render(monkeypatch,
     assert not isinstance(fallback, share_image.BrandFont)
     assert fallback is share_image.system_font(40, True)
     png = league_rank_banner.render({"rank": 2, "teams": 8, "team": "Nordlicht A", "record": {"played": 3, "won": 2, "lost": 1, "points": 6}})
-    assert Image.open(io.BytesIO(png)).size == (league_rank_banner.WIDTH, league_rank_banner.HEIGHT)
+    size = _size(png)
+    assert size == (league_rank_banner.WIDTH, league_rank_banner.HEIGHT)
 
 
 def test_a_broken_font_file_falls_back(monkeypatch, tmp_path):

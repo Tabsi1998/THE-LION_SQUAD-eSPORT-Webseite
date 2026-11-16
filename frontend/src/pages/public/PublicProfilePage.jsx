@@ -1165,7 +1165,7 @@ export function ClubProfileHint({ profile }) {
       to={`/members/${encodeURIComponent(slug)}`}
       data-testid="profile-club-hint"
       title="Zum Vereinsprofil"
-      className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm font-bold hover:bg-[#FFD700]/10 focus-visible:bg-[#FFD700]/10 transition"
+      className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 border border-honor/40 text-honor text-[10px] uppercase tracking-widest rounded-sm font-bold hover:bg-honor/10 focus-visible:bg-honor/10 transition"
     >
       <Crown className="w-3 h-3 shrink-0" aria-hidden="true" />
       <span className="truncate">{label}</span>

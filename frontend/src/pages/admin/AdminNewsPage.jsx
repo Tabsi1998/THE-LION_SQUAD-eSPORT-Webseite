@@ -210,13 +210,13 @@ export default function AdminNewsPage() {
                   <tr key={n.id}>
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
-                        {pin?.active && <Pin className="w-3 h-3 text-[#FFD700]" aria-label="Angepinnt" />}
+                        {pin?.active && <Pin className="w-3 h-3 text-honor" aria-label="Angepinnt" />}
                         {n.title}
                       </div>
                       <div className="text-[11px] text-white/50">/{n.slug}</div>
                       {/* Ende der Anheftung (#1263): die Redaktion sieht, wie lange der Beitrag noch oben steht. */}
                       {pin && (pin.active ? pin.text : pin.until) && (
-                        <div className={`mt-0.5 text-[11px] ${pin.active ? "text-[#FFD700]/80" : "text-white/40"}`} data-testid={`news-pin-${n.id}`}>
+                        <div className={`mt-0.5 text-[11px] ${pin.active ? "text-honor/80" : "text-white/40"}`} data-testid={`news-pin-${n.id}`}>
                           {pin.active ? `Angepinnt ${pin.text}` : `Anpinnen abgelaufen (${pin.text})`}
                         </div>
                       )}

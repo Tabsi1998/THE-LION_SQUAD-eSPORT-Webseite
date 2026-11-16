@@ -48,7 +48,7 @@ const EXCEPTIONS = {
   "pages/public/EventDetailPage.jsx": 1, // Zeile eines Turniers am Event
   "pages/public/NewsDetailPage.jsx": 1, // verwandter Beitrag
   "pages/public/PartnerDetailPage.jsx": 1, // Werkzeug-Zeile in der Partnerfarbe
-  "pages/public/PublicProfilePage.jsx": 2, // Zeilen (Team, Referenz)
+  "pages/public/PublicProfilePage.jsx": 3, // Zeilen (Team, Referenz); Schild „Vereinsmitglied · Funktion“ mit Link zum Vereinsprofil (#1267)
   "pages/public/ServersPage.jsx": 2, // Serverzeile, Kopierfeld
   "pages/public/TournamentDetailPage.jsx": 1, // Partner-Schild „mit …“
   "pages/public/VereinPage.jsx": 1, // Kacheln des Mitgliederbereichs (#1147), wie in der App
