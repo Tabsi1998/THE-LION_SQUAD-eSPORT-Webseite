@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowRight, Check, Minus } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { SEASON_STATUS_OPTIONS, VISIBILITY_OPTIONS, VISIBILITY_SHORT } from "@/lib/league";
-import { STATUS_EFFECT, VISIBILITY_EFFECT, seasonPhases } from "@/lib/seasonTabs";
+import { STATUS_EFFECT, VISIBILITY_EFFECT, seasonPhases, seasonWithEnd } from "@/lib/seasonTabs";
 import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { SeasonReadinessPanel } from "./SeasonReadinessPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -99,7 +99,7 @@ export function SeasonOverviewTab({ data, form, set, setForm, saved, canSeason, 
   );
   return (
     <div className="space-y-6">
-      <SeasonPhaseBar season={season} calendar={data.calendar} divisions={data.divisions} now={now} />
+      <SeasonPhaseBar season={seasonWithEnd(data)} calendar={data.calendar} divisions={data.divisions} now={now} />
       <RulesNotice notice={rulesNotice} rulesLink={rulesLink} onJump={onJump} />
       {canSeason ? (
         <SeasonTabForm {...formProps}>

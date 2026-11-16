@@ -17,7 +17,8 @@ import { effectiveRuleModes } from "@/lib/tournamentRulePresets";
 import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { StaffelNeedsHint, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { STAFFEL_STAND_FILTERS, staffelStand, statusFilterKeys } from "@/lib/seasonTabs";
 import { endText, liveAfterEnd } from "@/lib/endedLive";
 
 const EVENT_MODE_LABELS = {
@@ -37,8 +38,11 @@ const SCHEDULE_MODE_LABELS = {
 };
 // Dieselben Statuswörter wie im Kopf der Turnierseite (#2111, TA21) - mit „Check-in offen“. „Alle“ heißt ohne Archiv;
 // archivierte Turniere zeigt der Filter „Archiviert“.
-const TOURNAMENT_STATUS_FILTERS = [["", "Alle außer Archiv"], ...TOURNAMENT_STATUS_OPTIONS];
+// Liga-Staffeln (#2453) filtern nach dem Stand ihrer Season („Liga: Anmeldung offen“) - so wie sie in der Liste stehen. „Entwurf“
+// meint damit nur noch Turniere; abgesagte und archivierte Staffeln behalten ihren Status.
+const TOURNAMENT_STATUS_GROUPS = [["Turniere", TOURNAMENT_STATUS_OPTIONS], ["Liga-Staffeln", STAFFEL_STAND_FILTERS]];
 const statusLabel = (status) => TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status || "—";
+const rowStatusLabel = (tournament, now) => staffelStand(tournament, { now })?.label || statusLabel(tournament.status);
 // Die Verwaltungsliste fragt bis zu so viele Turniere ab (der Server liefert höchstens 500) - steht die Liste voll, sagt
 // die Seite es, statt still abzuschneiden.
 const LIST_LIMIT = 500;
@@ -60,6 +64,8 @@ export default function AdminTournamentsPage() {
   const leadsRow = (t) => isTournamentLead && (!isStaffel(t) || canUseArea(user, "leagues"));
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
+  // Ein Zeitpunkt je geladener Liste (#2453): Liga-Stand, Zähler und Filter rechnen mit demselben „jetzt“.
+  const [now, setNow] = useState(() => new Date());
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [kindFilter, setKindFilter] = useState("");
@@ -70,6 +76,7 @@ export default function AdminTournamentsPage() {
     try {
       const { data } = await api.get(`/tournaments?include_drafts=true&managed=true&limit=${LIST_LIMIT}`);
       setList(data);
+      setNow(new Date());
       setDenied("");
     } catch (error) {
       // Verweigert der Server die Liste, steht der Grund da - nicht „Keine Turniere“ (#1353).
@@ -135,15 +142,15 @@ export default function AdminTournamentsPage() {
     }
   };
   const statusCounts = useMemo(() => list.reduce((acc, tournament) => {
-    const key = tournament.status || "unknown";
-    acc[key] = (acc[key] || 0) + 1;
+    // Eine laufende Staffel zählt bei „Live“ und bei „Liga: Spielbetrieb“ (#2453).
+    for (const key of statusFilterKeys(tournament, now)) acc[key] = (acc[key] || 0) + 1;
     return acc;
-  }, {}), [list]);
+  }, {}), [list, now]);
   const sortedList = useMemo(() => sortByNearestDate(list), [list]);
   const filteredList = useMemo(() => {
     const q = normalizeSearch(query);
     return sortedList.filter((tournament) => {
-      if (statusFilter && tournament.status !== statusFilter) return false;
+      if (statusFilter && !statusFilterKeys(tournament, now).includes(statusFilter)) return false;
       if (!statusFilter && tournament.status === "archived") return false;
       if (kindFilter === "league" && !isStaffel(tournament)) return false;
       if (kindFilter === "tournament" && isStaffel(tournament)) return false;
@@ -163,7 +170,7 @@ export default function AdminTournamentsPage() {
       ].filter(Boolean).join(" "));
       return haystack.includes(q);
     });
-  }, [kindFilter, query, sortedList, statusFilter]);
+  }, [kindFilter, now, query, sortedList, statusFilter]);
 
   const exportCsv = () => {
     downloadCsv(
@@ -174,7 +181,7 @@ export default function AdminTournamentsPage() {
         tournament.slug,
         gameLabel(tournament.game),
         formatTournamentDisplay(tournament),
-        statusLabel(tournament.status),
+        rowStatusLabel(tournament, now),
         formatAdminDate(tournament.start_date),
         tournament.participant_count,
         tournament.max_participants,
@@ -212,10 +219,11 @@ export default function AdminTournamentsPage() {
           data-testid="admin-tournament-status-filter"
           className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
         >
-          {TOURNAMENT_STATUS_FILTERS.map(([value, label]) => (
-            <option key={value || "all"} value={value}>
-              {label} ({value ? statusCounts[value] || 0 : list.length - (statusCounts.archived || 0)})
-            </option>
+          <option value="">Alle außer Archiv ({list.length - (statusCounts.archived || 0)})</option>
+          {TOURNAMENT_STATUS_GROUPS.map(([group, options]) => (
+            <optgroup key={group} label={group}>
+              {options.map(([value, label]) => <option key={value} value={value}>{label} ({statusCounts[value] || 0})</option>)}
+            </optgroup>
           ))}
         </select>
         <select
@@ -276,7 +284,14 @@ export default function AdminTournamentsPage() {
                   <RulePills tournament={t} />
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={t.status} />
+                  {/* Liga-Staffel (#2453): der Stand der Season statt „Entwurf“, darunter was ihr noch fehlt - mit Weg dorthin. */}
+                  {isStaffel(t) ? (
+                    <>
+                      <StaffelStandBadge tournament={t} now={now} testId={`admin-tr-stand-${t.slug}`} />
+                      {/* Was fehlt, sieht, wer die Staffel als Liga leitet - der Server schickt dann die Season-Angaben mit. */}
+                      {"league_season" in t ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className="mt-1 max-w-[14rem]" /> : null}
+                    </>
+                  ) : <StatusBadge status={t.status} />}
                   {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
                   {leadsRow(t) && liveAfterEnd(t) ? (
                     <Link to={`/admin/tournaments/${t.id}`} data-testid={`admin-tr-ended-live-${t.slug}`} title={`Ende war am ${endText(t.end_date)}`}
