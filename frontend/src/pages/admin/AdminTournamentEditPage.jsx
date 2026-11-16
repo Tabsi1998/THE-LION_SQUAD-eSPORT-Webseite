@@ -240,7 +240,12 @@ export default function AdminTournamentEditPage() {
       if (force || confirmed) params.set("force", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
       return (await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, keepStage ? undefined : (structure || {}))).data;
-    }, { title: "Turnierbaum aus dem Format neu bauen?", confirmLabel: "Neu bauen", failure: "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden." });
+    }, {
+      title: "Turnierbaum aus dem Format neu bauen?",
+      // Ein eigenes Schema geht nie still verloren (#2046): der Server fragt, der Knopf sagt, was verloren geht.
+      confirmLabel: (detail) => (detail.own_schema ? "Schema verwerfen" : "Neu bauen"),
+      failure: "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden.",
+    });
     if (!data) return;
     toast.success(keepStage
       ? `Spielplan-Vorschau mit ${data.match_count} Spielen neu gemischt.`

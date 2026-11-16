@@ -197,6 +197,10 @@ Terminplanung, Spieldauer, Weiterkommen) stellt die Turnierleitung je Phase unte
   **Spieler pro Team** bleibt die Phase, wie sie ist (Name, Best of, Schema), samt geplanter Zeiten und Stationen.
   Eine eigene Phase (anderer Name, eigene Einstellungen oder mehrere Phasen) baut ein Formatwechsel nicht still um –
   die baust du mit **Speichern & Struktur anwenden** neu.
+- Hat die Phase ein eigenes Schema (etwa ein Cup mit eigenem Loser Bracket) und das Formular bringt keines mit, fragt
+  **Speichern & Struktur anwenden** erst nach: **Schema verwerfen** baut den Baum aus dem Format, **Abbrechen** lässt
+  alles stehen. Mit dem Schema baust du die Phase bei den Phasen über **Vorschau** bzw. **Mit Teilnehmern
+  generieren** neu.
 - Ab dem Ende des Check-ins (oder sobald es feste Spiele gibt, etwa generierte Gruppen) stehen **Turnierstruktur**,
   **Teilnahme**, **Spieler pro Team** und **Spiel** nur noch lesend da, und **Speichern & Struktur anwenden** fehlt.
   Beim Schweizer System, bei Zeitfahren und Rennserie gibt es den Knopf nie – dort gibt es keinen Baum zum Vorausbauen.
@@ -394,7 +398,8 @@ oder **Stationsleitung** in diesem Turnier; im Status **Check-in offen** öffnet
   eingetragen wird, übernimmt genau einen freien Platz – zuerst den einer Person mit **Nicht erschienen**, sonst einen
   leeren Platz neben einem **Freilos** (das Freilos-Spiel wird dann normal gespielt). Das geht, solange das erste Spiel
   dieses Platzes nicht begonnen hat; in Liga und Gruppen, solange höchstens ein Spieltag gespielt ist. Ist kein Platz
-  frei, sagt die Seite es. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
+  frei, sagt die Seite es und auch, was noch geht: Solange kein Spiel begonnen hat, holen **Zurücksetzen** und neu
+  bauen die Person in den Baum; danach kommt sie nicht mehr hinein. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
   Person mit Freilos.
 - Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
 - **Weiterkommen (Gegner der nächsten Runde)** (Spieloptionen, auch je Phase; nur bei K.-o., Doppel-K.-o. und freien

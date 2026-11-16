@@ -29,7 +29,8 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.bracket_fill_in import (
-    NO_PLACE_DETAIL,
+    NO_PLACE_BEFORE_START,
+    NO_PLACE_STARTED,
     FillInRefused,
     free_bye_place,
     reopened_bye,
@@ -502,7 +503,8 @@ async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict 
         return None
     spot = await _open_place(db, tid, matches)
     if not spot:
-        return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_DETAIL}
+        begun = any(tournament_guard.match_begun(match) for match in fixed)
+        return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_STARTED if begun else NO_PLACE_BEFORE_START}
     if spot["kind"] == "no_show":
         absent_id, targets = spot["registration_id"], spot["targets"]
         await _replace_registration_in_open_matches(db, tid, absent_id, reg, actor_id, targets)

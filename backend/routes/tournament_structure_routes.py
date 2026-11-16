@@ -375,6 +375,24 @@ async def apply_tournament_structure_plan(
     }
 
 
+SCHEMA_SETTING_KEYS = ("schema", "custom_schema", "bracket_schema")
+
+
+def _has_schema(settings: dict | None) -> bool:
+    return any(str((settings or {}).get(key) or "").strip() for key in SCHEMA_SETTING_KEYS)
+
+
+def _dropped_schema_note(stage: dict | None, body: TournamentBracketStructurePayload | None) -> str | None:
+    """Der Satz für die Rückfrage, wenn Neu bauen das eigene Schema der Phase verwerfen würde (#2046) - sonst ``None``.
+    Ohne Struktur im Aufruf baut der Server mit der vorhandenen Phase, das Schema bleibt."""
+    if not stage or body is None or not _has_schema(stage.get("settings")) or _has_schema(body.settings):
+        return None
+    name = stage.get("name") or "Turnierbaum"
+    return (f"Neu bauen aus dem Format verwirft das eigene Schema der Phase „{name}“ – danach steht der Format-Baum, "
+            "etwa ohne dein eigenes Loser Bracket. Mit dem Schema baust du die Phase bei den Phasen über „Vorschau“ "
+            "bzw. „Mit Teilnehmern generieren“ neu.")
+
+
 @router.post("/{tid}/bracket/from-format")
 async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBracketStructurePayload | None = None,
                                                  preview: bool = True, force: bool = False,
@@ -399,6 +417,9 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
 
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     impact = tournament_guard.match_impact(v2_matches)
+    existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
+    # Ein eigenes Schema geht nie still verloren (#2046): Bringt der Aufruf keines mit, fragt der Server erst nach.
+    schema_note = _dropped_schema_note(existing_stage, body)
     if impact["match_count"] and preview:
         # Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17) - „Speichern & Struktur anwenden“ löschte so im
         # laufenden Turnier alle Spiele samt Ergebnissen.
@@ -414,9 +435,12 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
                    if impact["match_count"] else
                    "Das Turnier läuft schon – der Turnierbaum wird aus dem Format neu aufgebaut.")
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
-            "confirm_destruction", message, impact))
+            "confirm_destruction", f"{message} {schema_note}" if schema_note else message,
+            {**impact, "own_schema": bool(schema_note)}))
+    if schema_note and not force:
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction", schema_note, {**impact, "own_schema": True}))
     match_plan = _collect_match_plan(v2_matches)
-    existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
     if body is None and existing_stage:
         body = TournamentBracketStructurePayload(
             name=existing_stage.get("name") or "Turnierbaum",
