@@ -59,11 +59,13 @@ describe("Stand vom Server", () => {
     expect(mockGet).toHaveBeenCalledWith("/achievements/me/ceremony");
   });
 
-  test("älterer Server: null, kein Melden mehr", async () => {
-    mockPost.mockRejectedValue({ response: { status: 404 } });
+  test("älterer Server: null, kein Melden mehr - auch nicht der Altbestand", async () => {
+    mockStore.tls_ach_seen_anna = "2026-11-01T10:00:00.000Z";
+    mockGet.mockRejectedValue({ response: { status: 404 } });
     expect(await ceremonyState("anna")).toBeNull();
     expect(await ceremonyState("anna")).toBeNull();
-    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    expect(mockPost).not.toHaveBeenCalled();
     markSeen("anna", { codes: ["a"] });
     expect(seenBodies()).toEqual([]);
   });
@@ -142,7 +144,7 @@ describe("Prüfung vor dem Anzeigen", () => {
   });
 
   test("ohne Server-Stand zeigt die App das Paket wie bisher", async () => {
-    mockPost.mockRejectedValue({ response: { status: 404 } });
+    mockGet.mockRejectedValue({ response: { status: 404 } });
     await showSeen(["a"]);
     expect(screen.getByTestId("achievement-unlock-overlay")).toBeTruthy();
   });

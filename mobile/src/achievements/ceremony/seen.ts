@@ -88,13 +88,14 @@ export function ceremonyState(userId: string | null | undefined): Promise<Ceremo
   if (running) return running;
   const request = (async () => {
     try {
-      if (!(await read(importedKey(userId)))) {
-        const { data } = await api.post<ServerState>("/achievements/me/ceremony/import", await legacyReport(userId));
-        await SecureStore.setItemAsync(importedKey(userId), new Date().toISOString()).catch(() => {});
-        return normalise(userId, data);
-      }
+      // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
       const { data } = await api.get<ServerState>("/achievements/me/ceremony");
-      return normalise(userId, data);
+      const state = normalise(userId, data);
+      if (!state || (await read(importedKey(userId)))) return state;
+      // Einmal je Gerät und Konto: den Altbestand melden - erst damit legt der Server den Stand an.
+      const { data: imported } = await api.post<ServerState>("/achievements/me/ceremony/import", await legacyReport(userId));
+      await SecureStore.setItemAsync(importedKey(userId), new Date().toISOString()).catch(() => {});
+      return normalise(userId, imported);
     } catch (error) {
       if (notSupported(error)) unsupported.add(userId);
       return null;
