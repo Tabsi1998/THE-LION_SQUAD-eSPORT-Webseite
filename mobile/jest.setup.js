@@ -19,6 +19,15 @@ jest.mock("expo-secure-store", () => ({
   deleteItemAsync: jest.fn(async (key) => {
     mockSecureStore.delete(key);
   }),
+  AFTER_FIRST_UNLOCK: 0,
+  AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 1,
+  WHEN_UNLOCKED: 5,
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 6,
+}));
+
+// Zufall für Kennungen (#2470): im Test aus dem Krypto-Modul von Node, wie am Gerät eine UUID v4.
+jest.mock("expo-crypto", () => ({
+  randomUUID: jest.fn(() => require("crypto").randomUUID()),
 }));
 
 jest.mock("expo-constants", () => ({
