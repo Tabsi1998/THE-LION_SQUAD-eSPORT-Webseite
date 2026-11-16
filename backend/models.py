@@ -88,25 +88,22 @@ class AdminUserCreate(BaseModel):
 
 
 class QuietHours(BaseModel):
-    """Ruhezeit (#1206): von–bis in Wiener Zeit („HH:MM“), Standard aus."""
-    enabled: bool = False
-    start: str = "22:00"
-    end: str = "07:00"
+    """Ruhezeit (#1206): von–bis in Wiener Zeit („HH:MM“), Standard aus. Ein Teil-PATCH schickt nur, was sich ändert - die
+    Route führt es mit dem gespeicherten Stand zusammen und prüft dann das Ganze (Lücke zwischen Ende und Beginn)."""
+    enabled: Optional[bool] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
 
     @field_validator("start", "end")
     @classmethod
-    def _clock(cls, value: str) -> str:
+    def _clock(cls, value: Optional[str]) -> Optional[str]:
         from services.quiet_hours_rules import parse_time
 
+        if value is None:
+            return None
         if parse_time(value) is None:
             raise ValueError("Bitte eine Uhrzeit wie 22:00 angeben.")
         return value.strip()
-
-    @model_validator(mode="after")
-    def _not_empty(self):
-        if self.enabled and self.start == self.end:
-            raise ValueError("Beginn und Ende der Ruhezeit dürfen nicht gleich sein.")
-        return self
 
 
 class UserUpdate(BaseModel):

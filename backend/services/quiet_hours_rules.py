@@ -12,8 +12,11 @@ from zoneinfo import ZoneInfo
 VIENNA = ZoneInfo("Europe/Vienna")
 SUGGESTED_START = "22:00"
 SUGGESTED_END = "07:00"
+# So lange muss zwischen Ende und nächstem Beginn mindestens Zeit sein (07:05–07:00 wäre fast immer still).
+MIN_GAP_MINUTES = 15
 
-EXEMPT_KINDS = frozenset({"match_call", "match_station"})
+# ``admin_push_test``: der Push-Test der Verwaltung (Admin → System → Push-Tests) soll auch nachts zeigen, ob Push ankommt.
+EXEMPT_KINDS = frozenset({"match_call", "match_station", "admin_push_test"})
 ACTIVE_TOURNAMENT_STATUSES = frozenset({"check_in", "live", "paused"})
 EXEMPTION_TEXTS = (
     "Aufruf zu deinem Spiel und „Match startet jetzt“",
@@ -26,7 +29,7 @@ def parse_time(value: Any) -> int | None:
     """``"HH:MM"`` als Minuten nach Mitternacht - sonst ``None``. Ohne Regex: zwei Zahlen und ein Doppelpunkt."""
     text = str(value or "").strip()
     hours, sep, minutes = text.partition(":")
-    if not sep or len(hours) != 2 or len(minutes) != 2 or not hours.isdigit() or not minutes.isdigit():
+    if not sep or len(hours) != 2 or len(minutes) != 2 or not text.isascii() or not hours.isdigit() or not minutes.isdigit():
         return None
     h, m = int(hours), int(minutes)
     if h > 23 or m > 59:
@@ -39,23 +42,41 @@ def _raw(user: dict | None) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def settings_payload(user: dict | None) -> dict[str, Any]:
-    """Für die Einstellungen: an oder aus, von, bis - ohne gespeicherten Wert der Vorschlag 22:00 bis 7:00."""
+def effective(user: dict | None) -> dict[str, Any]:
+    """Der Stand, der gilt - für Anzeige und Wirkung gleich: an oder aus, von, bis; fehlt eine Zeit oder ist sie ungültig, gilt
+    der Vorschlag 22:00 bis 7:00."""
     raw = _raw(user)
     start = raw.get("start") if parse_time(raw.get("start")) is not None else SUGGESTED_START
     end = raw.get("end") if parse_time(raw.get("end")) is not None else SUGGESTED_END
     return {"enabled": bool(raw.get("enabled")), "start": start, "end": end}
 
 
+def settings_payload(user: dict | None) -> dict[str, Any]:
+    """Für die Einstellungen - derselbe Stand wie ``effective``."""
+    return effective(user)
+
+
+def gap_minutes(start: int, end: int) -> int:
+    """Wie lange zwischen Ende und nächstem Beginn keine Ruhezeit ist."""
+    return (start - end) % (24 * 60)
+
+
+def gap_problem(start: Any, end: Any) -> str | None:
+    """Warum ``start``–``end`` keine Ruhezeit sein kann - ``None``: passt. Ohne Lücke von ``MIN_GAP_MINUTES`` käme nie etwas."""
+    first, last = parse_time(start), parse_time(end)
+    if first is None or last is None:
+        return "Bitte eine Uhrzeit wie 22:00 angeben."
+    if gap_minutes(first, last) < MIN_GAP_MINUTES:
+        return f"Zwischen Ende und Beginn der Ruhezeit müssen mindestens {MIN_GAP_MINUTES} Minuten liegen."
+    return None
+
+
 def window(user: dict | None) -> tuple[int, int] | None:
-    """Beginn und Ende in Minuten, wenn die Ruhezeit an ist - gleiche Zeiten heißen: keine Ruhezeit."""
-    raw = _raw(user)
-    if not raw.get("enabled"):
+    """Beginn und Ende in Minuten, wenn die Ruhezeit an ist - mit derselben Rückfallregel wie die Anzeige."""
+    current = effective(user)
+    if not current["enabled"] or gap_problem(current["start"], current["end"]):
         return None
-    start, end = parse_time(raw.get("start")), parse_time(raw.get("end"))
-    if start is None or end is None or start == end:
-        return None
-    return start, end
+    return parse_time(current["start"]), parse_time(current["end"])
 
 
 def crosses_midnight(user: dict | None) -> bool:
@@ -82,5 +103,10 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
             return None
         if minute >= start:
             day = day + timedelta(days=1)
-    end_local = datetime(day.year, day.month, day.day, end // 60, end % 60, tzinfo=VIENNA)
-    return end_local.astimezone(timezone.utc)
+    # In der Nacht der Rückstellung gibt es 02:00–02:59 zweimal: das erste Ende, das noch vor uns liegt (fold 0, dann 1).
+    moment = local.astimezone(timezone.utc)
+    for fold in (0, 1):
+        until = datetime(day.year, day.month, day.day, end // 60, end % 60, tzinfo=VIENNA, fold=fold).astimezone(timezone.utc)
+        if until > moment:
+            return until
+    return None

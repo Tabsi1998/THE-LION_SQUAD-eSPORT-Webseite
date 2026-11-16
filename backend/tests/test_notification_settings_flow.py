@@ -54,6 +54,36 @@ async def test_level_custom_choice_and_quiet_hours_round_trip(flow):
 
 
 @pytest.mark.asyncio
+async def test_partial_quiet_hours_patch_changes_only_what_is_sent(flow):
+    """Ein Teil-PATCH (#1206): nur die gesendeten Felder ändern sich - Anzeige und Wirkung bleiben gleich."""
+    anna = await flow.add_user(name="anna")
+    flow.act_as(anna)
+
+    async def stored():
+        return await flow.db.users.find_one({"id": anna["id"]}, {"_id": 0, "quiet_hours": 1})
+
+    # Nur einschalten: der Vorschlag wird mitgespeichert - gezeigt wird, was auch wirkt.
+    res = await flow.patch("/api/users/me", json={"quiet_hours": {"enabled": True}})
+    assert res.status_code == 200, res.text
+    assert (await stored())["quiet_hours"] == {"enabled": True, "start": "22:00", "end": "07:00"}
+    # Eigene Zeiten, dann nur ausschalten: die Zeiten bleiben.
+    await flow.patch("/api/users/me", json={"quiet_hours": {"start": "23:00", "end": "06:30"}})
+    res = await flow.patch("/api/users/me", json={"quiet_hours": {"enabled": False}})
+    assert res.status_code == 200, res.text
+    assert (await stored())["quiet_hours"] == {"enabled": False, "start": "23:00", "end": "06:30"}
+    # Nur den Beginn ändern: das gespeicherte Ende gilt weiter (früher fiel es auf 07:00 zurück und scheiterte).
+    res = await flow.patch("/api/users/me", json={"quiet_hours": {"enabled": True, "start": "07:00"}})
+    assert res.status_code == 200, res.text
+    assert (await stored())["quiet_hours"] == {"enabled": True, "start": "07:00", "end": "06:30"}
+    # Weniger als 15 Minuten Lücke: abgelehnt, mit Grund - und nichts geändert.
+    res = await flow.patch("/api/users/me", json={"quiet_hours": {"start": "06:40"}})
+    assert res.status_code == 422 and "15 Minuten" in res.json()["detail"]
+    assert (await stored())["quiet_hours"] == {"enabled": True, "start": "07:00", "end": "06:30"}
+    payload = (await flow.get("/api/users/me/notification-preferences")).json()
+    assert payload["quiet_hours"] == {"enabled": True, "start": "07:00", "end": "06:30"}
+
+
+@pytest.mark.asyncio
 async def test_only_own_settings(flow):
     """Die Verwaltung setzt fremde Profile nur zurück (#2118) - Stufe, Themen und Ruhezeit ändert nur die Person selbst."""
     anna = await flow.add_user(name="anna")
