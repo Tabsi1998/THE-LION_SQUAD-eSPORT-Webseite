@@ -66,3 +66,24 @@ describe("Gemischte Runde nach dem Zusammenlegen", () => {
     expect(screen.getByTestId(`bracket-heat-free-${heat.id}`)).toHaveTextContent("2 Plätze frei");
   });
 });
+
+// Ein Name aus einem Wort bricht nie mitten im Wort um (#2452, „KartKönigi / n“ im Grand Final): er endet mit „…“, der
+// ganze Name steht im Hinweis. Namen mit Leerzeichen dürfen weiter umbrechen.
+describe("Namen in der Karte", () => {
+  it("ein Wort: gekürzt mit vollem Namen im Hinweis; mehrere Wörter: Umbruch wie bisher", () => {
+    const data = state("lb8_merged_done");
+    const final = byKey(data, "FINAL");
+    const second = final.slots.find((slot) => slot.registration_id && slot.registration_id !== final.results[0].registration_id).registration_id;
+    const reg = data.registrations.find((row) => row.id === second);
+    const long = "Der sehr lange Name";
+    data.registrations = data.registrations.map((row) => (row.id === final.results[0].registration_id ? { ...row, display_name: long, ingame_name: long } : row));
+    render(<BracketTree data={data} layout="tree" />);
+    const card = screen.getByTestId(`bracket-heat-${final.id}`);
+    const single = within(card).getByText(reg.display_name);
+    expect(single.className).toMatch(/truncate/);
+    expect(single).toHaveAttribute("title", reg.display_name);
+    const words = within(card).getByText(long);
+    expect(words.className).not.toMatch(/truncate/);
+    expect(words).not.toHaveAttribute("title");
+  });
+});

@@ -194,6 +194,9 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const label = slotLabel(slot, regMap);
   const bye = !reg && isByeSlot(slot);
   const pending = reg || bye ? "" : pendingLabel(slot, findMatch, match);
+  // Ein Name aus einem Wort bricht nie mitten im Wort um („KartKönigi / n“, #2452): passt er nicht, endet er mit „…“, der
+  // ganze Name steht im Hinweis (und im Namen des Knopfs). Namen mit Leerzeichen dürfen weiter umbrechen.
+  const singleWord = Boolean(label) && !bye && !/\s/.test(String(label).trim());
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
   useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);
@@ -233,7 +236,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
     >
       <span className="w-4 shrink-0 text-right font-display text-[11px] tabular-nums text-quiet">{seed || ""}</span>
       <SlotAvatar avatar={reg?.user?.avatar_url || reg?.avatar_url} label={label} empty={!reg} />
-      <span className={`min-w-0 flex-1 leading-tight ${!label && pending ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : undefined}>
+      <span className={`min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
       {isMine ? <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand">Du</span> : null}
