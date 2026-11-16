@@ -363,7 +363,7 @@ export default function LoginPage() {
         )}
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
           {settings.registration_enabled !== false && (
-            <div>Kein Account? <Link to={`/register${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="login-register-link">Registrieren</Link></div>
+            <div>Kein Konto? <Link to={`/register${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="login-register-link">Registrieren</Link></div>
           )}
           <div><Link to="/forgot-password" className="text-white/45 hover:text-[#29B6E8]">Passwort vergessen?</Link></div>
           <div><Link to="/verify-email" state={{ email: email.trim() }} className="text-white/60 hover:text-[#29B6E8]">Keine Bestätigungs-E-Mail erhalten?</Link></div>

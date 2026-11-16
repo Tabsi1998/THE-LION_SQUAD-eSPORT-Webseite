@@ -7,9 +7,6 @@
   "rollen": ["spieler", "captain"],
   "sichtbar_fuer": "alle",
   "suchbegriffe": ["clan", "squad", "kader", "einladung", "beitrittscode", "qr", "link", "captain", "vertreter", "teamleitung", "co-leitung"],
-  "videos": [
-    { "id": "team-und-co-team", "titel": "Team und Co-Team anlegen im Video", "abschnitt": "neues-team" }
-  ],
   "abschnitte": [
     {
       "id": "neues-team",
@@ -27,7 +24,8 @@
           "titel": "Name und Kürzel",
           "text": "Gib den Namen und ein Kürzel mit 2 bis 8 Zeichen ein. Tippe auf Speichern. Du bist dann die Teamleitung.",
           "hinweis": "Logo, Banner und Discord-Link kannst du auch später ergänzen.",
-          "bild": true
+          "bild": true,
+          "clip": true
         }
       ]
     },
@@ -40,7 +38,8 @@
           "titel": "Einladungs-Link teilen",
           "text": "Öffne eure Teamseite und tippe auf Einladen. Teile den Link oder zeig den QR-Code. Wer ihn öffnet, kann sofort beitreten.",
           "hinweis": "Einladen dürfen Teamleitung und Co-Leitung. Mit Neuen Link erzeugen wird der alte Link ungültig.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "beitrittscode",
@@ -52,7 +51,8 @@
           "id": "persoenlich-einladen",
           "titel": "Gezielt einladen",
           "text": "Such unter Persönlich einladen nach dem Benutzernamen und tippe auf Einladen. Die Person sieht die Einladung bei den Benachrichtigungen und unter Teams.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "beitreten",
@@ -78,14 +78,16 @@
           "id": "co-team-kader",
           "titel": "Name, Spiel und Kader",
           "text": "Gib dem Co-Team einen Namen und wähle das Spiel. Hake alle Spieler an, die zum Kader gehören.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "captain-vertreter",
           "titel": "Captain und Vertreter",
           "text": "Wähle Captain und Vertreter aus dem Kader. Die beiden machen in der Liga Termine aus und melden und bestätigen Ergebnisse. Tippe auf Speichern.",
           "hinweis": "Gibt es keinen Captain und keinen Vertreter, macht das die Teamleitung.",
-          "bild": true
+          "bild": true,
+          "clip": true
         }
       ]
     },

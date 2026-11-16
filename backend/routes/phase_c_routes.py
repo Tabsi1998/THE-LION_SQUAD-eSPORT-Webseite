@@ -16,7 +16,7 @@ from database import get_db
 from auth import get_current_user, require_area
 from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_membership_badges, evaluate_user_progress
-from services import dolibarr_applications, membership_fees, membership_invitations, membership_notices
+from services import dolibarr_applications, membership_age, membership_fees, membership_invitations, membership_notices
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 from services.dolibarr_links import verified_link
 from services.log_safe import log_safe
@@ -206,6 +206,10 @@ async def membership_apply_form(me: dict = Depends(get_current_user)):
 async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)):
     if not body.accept_statutes or not body.accept_privacy:
         raise HTTPException(400, "Statuten und Datenschutz müssen akzeptiert werden.")
+    # Mindestalter (#1698): Vereinsmitglied ab 18 am Wiener Tag des Antrags - auf beiden Wegen, vor jedem Speichern.
+    age_problem = membership_age.membership_birth_problem(body.birth)
+    if age_problem:
+        raise HTTPException(422, age_problem)
     db = get_db()
     # Reject if already an active member
     existing_member = await db.memberships.find_one(
@@ -239,6 +243,7 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
         "type_id": chosen["id"] if chosen else None,
         "type_label": chosen["label"] if chosen else None,
         "notes": body.notes,
+        "birth": body.birth,
         "status": "pending",
         "created_at": now_utc().isoformat(),
         "decided_at": None,

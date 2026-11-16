@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  FORBIDDEN_STARTUP_CHUNKS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, judge, parseBudgets, parseGoals,
+  FORBIDDEN_STARTUP_CHUNKS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, judge, parseBudgets, parseGoals, startupVideoProblems,
 } from "./check-bundle-budget.mjs";
 
 const manifest = {
@@ -116,4 +116,19 @@ test("die Pflicht-Seiten aus #936 stehen in der Liste", () => {
 
 test("Editor, Diagramme, PDF und QR stehen auf der Sperrliste für den Start", () => {
   for (const name of ["editor", "charts", "pdf", "jsQR"]) assert.ok(FORBIDDEN_STARTUP_CHUNKS.includes(name));
+});
+
+// FAQ-Schleifen (#2448): Videos nie im Start und nie vorab geladen.
+test("Videos an nachgeladenen Seiten sind erlaubt, keine Meldung", () => {
+  const withClips = { ...manifest, "src/pages/Admin.jsx": { ...manifest["src/pages/Admin.jsx"], assets: ["assets/schritt-pc-1.webm", "assets/schritt-pc-2.mp4"] } };
+  assert.deepEqual(startupVideoProblems(withClips, "<script type=\"module\" src=\"/assets/index-a.js\"></script>"), []);
+});
+
+test("ein Video am Start oder im index.html fällt auf", () => {
+  const atStart = { ...manifest, "_api.js": { ...manifest["_api.js"], assets: ["assets/schritt-handy-3.webm"] } };
+  assert.equal(startupVideoProblems(atStart).length, 1);
+  assert.match(startupVideoProblems(atStart)[0], /schritt-handy-3\.webm/);
+  assert.equal(startupVideoProblems(manifest, "<link rel=\"preload\" href=\"/assets/a.MP4\" as=\"video\">").length, 1);
+  // Das Web-App-Manifest ist kein Video.
+  assert.deepEqual(startupVideoProblems(manifest, "<link rel=\"manifest\" href=\"/api/manifest.webmanifest\" />"), []);
 });

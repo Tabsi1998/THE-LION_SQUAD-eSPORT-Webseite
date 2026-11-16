@@ -63,9 +63,9 @@ async def test_without_the_switch_the_website_keeps_its_own_application(flow, fa
     flow.act_as(await person(flow, "amelie"))
     form = (await flow.get("/api/membership/apply/form")).json()
     assert form["coupled"] is False and [o["value"] for o in form["contribution_options"]][:2] == ["full", "supporter"]
-    short = await flow.post("/api/membership/apply", json={"motivation": "zu kurz", "accept_statutes": True, "accept_privacy": True})
+    short = await flow.post("/api/membership/apply", json={"motivation": "zu kurz", "accept_statutes": True, "accept_privacy": True, "birth": "1990-04-12"})
     assert short.status_code == 422
-    sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte mitspielen und mich einbringen.", "contribution_pref": "youth", "accept_statutes": True, "accept_privacy": True})
+    sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte mitspielen und mich einbringen.", "contribution_pref": "youth", "accept_statutes": True, "accept_privacy": True, "birth": "1990-04-12"})
     assert sent.status_code == 200 and sent.json()["status"] == "pending" and "external_id" not in sent.json()
     assert fake.applications == {}, "ohne Schalter geht nichts nach Dolibarr"
     assert (await flow.get("/api/membership/apply/me")).json()["status"] == "pending"
@@ -324,7 +324,7 @@ async def test_the_admin_decision_without_dolibarr_still_mails_the_person(flow, 
         user = await person(flow, name)
         await flow.db.users.update_one({"id": user["id"]}, {"$set": {"notification_preferences": prefs}})
         flow.act_as(user)
-        sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte mitspielen und mich einbringen.", "contribution_pref": "full", "accept_statutes": True, "accept_privacy": True})
+        sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte mitspielen und mich einbringen.", "contribution_pref": "full", "accept_statutes": True, "accept_privacy": True, "birth": "1990-04-12"})
         assert sent.status_code == 200, sent.text
         flow.act_as(admin)
         decided = await flow.patch(f"/api/membership/applications/{sent.json()['id']}", json={"decision": "reject", "note": "Bitte im Frühjahr nochmal."})

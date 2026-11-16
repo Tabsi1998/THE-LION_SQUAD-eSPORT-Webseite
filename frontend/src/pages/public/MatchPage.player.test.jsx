@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Matchseite für Spieler (#2124): Läufe nach Platz, Termin nur in der Zukunft, Entscheidung zur eigenen Meldung,
-// kein „Login zum Ergebnis melden“, wo Spieler nichts melden, und die Teilnehmer nur einmal. Erfundene Namen.
+// kein „Zum Ergebnis-Melden anmelden“, wo Spieler nichts melden, und die Teilnehmer nur einmal. Erfundene Namen.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
 const authState = { user: null };
@@ -122,7 +122,7 @@ test("Teilnehmer stehen nur einmal - in den Ergebnis-Kacheln, kein eigener Kaste
   expect(screen.queryByText(/^Slot/)).toBeNull();
 });
 
-describe("„Login zum Ergebnis melden“ nur, wo Spieler selbst melden (TP6)", () => {
+describe("„Zum Ergebnis-Melden anmelden“ nur, wo Spieler selbst melden (TP6)", () => {
   const open = { id: "m1", match_key: "A", status: "ready", slots: DUEL.map(({ slot, registration_id }) => ({ slot, registration_id })) };
 
   test("online mit Spieler-Meldung: Gäste sehen den Weg zum Login", async () => {

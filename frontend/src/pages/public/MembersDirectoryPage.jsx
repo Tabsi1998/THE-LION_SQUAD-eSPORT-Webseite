@@ -137,7 +137,7 @@ export default function MembersDirectoryPage() {
                     <div className="flex items-center justify-between gap-2 pt-1">
                       {m.linked_account?.achievement_level && (
                         <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest font-bold">
-                          Account-Level {m.linked_account.achievement_level.level}
+                          Konto-Level {m.linked_account.achievement_level.level}
                         </div>
                       )}
                     </div>

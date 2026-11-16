@@ -420,9 +420,9 @@ test("Was läuft: Zeilen mit Uhrzeit, Spielart und eigenem Stand - „Anmelden�
   expect(team.querySelector("a")).toHaveAttribute("href", "/tournaments/rl");
 });
 
-test("Gäste: „Einloggen zum Anmelden“; angemeldet: der eigene Stand statt „Anmelden“", async () => {
+test("Gäste: „Zum Teilnehmen anmelden“; angemeldet: der eigene Stand statt „Anmelden“", async () => {
   const { unmount } = renderPage(LAN);
-  expect(await screen.findByTestId("event-facts-register")).toHaveTextContent("Einloggen zum Anmelden");
+  expect(await screen.findByTestId("event-facts-register")).toHaveTextContent("Zum Teilnehmen anmelden");
   unmount();
   authState.user = { id: "u1", role: "player", areas: [] };
   renderPage({ ...LAN, own_registration: { id: "r1", status: "registered", seat_count: 1 } });

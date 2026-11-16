@@ -203,7 +203,7 @@ async def test_membership_mails_show_names_and_notes_as_text(flow):
     flow.act_as(paula)
     applied = await flow.post("/api/membership/apply", json={
         "motivation": "Ich möchte mitspielen und mich beim Verein einbringen.", "contribution_pref": "full",
-        "accept_statutes": True, "accept_privacy": True,
+        "accept_statutes": True, "accept_privacy": True, "birth": "1990-04-12",
     })
     assert applied.status_code == 200, applied.text
     notice = await flow.db.mail_jobs.find_one({"to": board["email"]}, {"_id": 0})

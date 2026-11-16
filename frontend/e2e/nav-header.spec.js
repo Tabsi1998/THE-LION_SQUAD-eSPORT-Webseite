@@ -161,7 +161,7 @@ test.describe("Kopfzeile 1024-1439 px (#1234)", () => {
           expect(facts.logoVariant).toBe("mascot");
           if (who === "Gast") {
             expect(await page.getByTestId("nav-register").innerText()).toBe("BEITRETEN");
-            await expect(page.getByTestId("nav-login")).toHaveAccessibleName("Login");
+            await expect(page.getByTestId("nav-login")).toHaveAccessibleName("Anmelden");
           }
         } else {
           expect(facts.logoVariant).toBe("wordmark");

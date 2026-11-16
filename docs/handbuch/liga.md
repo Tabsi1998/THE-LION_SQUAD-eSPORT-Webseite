@@ -1618,8 +1618,10 @@ Der Vorgänger bleibt unverändert: Endstand, Spiele und Regeln der alten Season
 
 <img src="../assets/liga/f2-zonen-tabelle-390.png" alt="Staffel-Tabelle am Handy: Platz 1 mit grünem Strich, der Letzte mit orangem Strich, darunter die Legende Aufstieg und Abstieg" width="300">
 
-**Zonen in der Tabelle:** Ein Strich links am Platz – grün für Aufstieg, orange für Abstieg, heller für Relegation – darunter
-die Legende. Dieselben Farben am TV und im Ergebnis-PDF (dort zusätzlich als Wort hinter dem Namen). Vor dem ersten Ergebnis
+**Zonen in der Tabelle:** Ein Strich links am Platz – grün für Aufstieg, orange für Abstieg, heller für Relegation – und
+daneben ein Pfeil, damit die Zone auch ohne Farbe lesbar ist (#1648): ↑ Aufstieg, ↓ Abstieg, schräg für die Relegation. Darunter
+die Legende mit denselben Pfeilen. Dasselbe am TV; im Ergebnis-PDF steht die Zone als Wort hinter dem Namen („Relegation um den
+Aufstieg“ bzw. „gegen den Abstieg“). Vor dem ersten Ergebnis
 gibt es keine Zonen. Stehen zwei Teams an einer Zonengrenze in allem gleich, verlangt der Abschluss **Platz entscheiden** (3.10).
 
 **Season-Historie:** Team- und Spielerprofil zeigen unter **Seasons** je abgeschlossene Staffel Liga, Platz, Meister und Auf-

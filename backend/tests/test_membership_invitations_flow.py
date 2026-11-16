@@ -23,7 +23,7 @@ async def flow():
         await shutdown()
 
 
-APPLICATION = {"motivation": "Ich möchte mitspielen und mich beim Verein einbringen.", "contribution_pref": "full", "accept_statutes": True, "accept_privacy": True}
+APPLICATION = {"motivation": "Ich möchte mitspielen und mich beim Verein einbringen.", "contribution_pref": "full", "accept_statutes": True, "accept_privacy": True, "birth": "1990-04-12"}
 
 
 @pytest.mark.asyncio

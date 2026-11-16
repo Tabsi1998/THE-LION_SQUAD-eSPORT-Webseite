@@ -7,6 +7,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
 import { MEMBERSHIP_STEPS, StepBar } from "@/components/tls/StepBar";
 import { BENEFIT_ICONS, DEFAULT_JOIN_BENEFITS, feeAmount, feesStandLine, formatMoney } from "@/lib/membershipFees";
+import { ACCOUNT_AGE_TEXT } from "@/lib/minimumAge";
 import { Crown, Mail, Star } from "lucide-react";
 
 // Mitglied werden (#1251, #1335): auf der Bühne die Mitgliedskarte (Muster „Dein Name“, leicht schräg; am Handy gerade),
@@ -91,6 +92,8 @@ export default function JoinMembershipPage() {
             <Step n="3" title="Prüfung">Der Vorstand prüft jeden Antrag persönlich und meldet sich per E-Mail.</Step>
             <Step n="4" title="Mitglied">Nach der Aufnahme bekommst du deine Mitgliedsnummer und die Mitgliedskarte.</Step>
           </ol>
+          {/* Mindestalter (#1698): ein Satz für beides - Konto ab 14, Vereinsmitglied ab 18 (lib/minimumAge.js). */}
+          <p className="mt-4 text-sm text-white/60" data-testid="join-age">{ACCOUNT_AGE_TEXT}</p>
           <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
             {user ? null : (
               <Link to="/register" data-testid="join-register-btn" className="tls-btn tls-btn--primary inline-flex justify-center items-center gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">

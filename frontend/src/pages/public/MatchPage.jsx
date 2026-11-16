@@ -694,7 +694,7 @@ function MatchPageView() {
             </div>
           ) : !user && !isCompleted && guestsCouldReport ? (
             <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
-              Login zum Ergebnis melden
+              Zum Ergebnis-Melden anmelden
             </Link>
           ) : showStaffEnters || reportHint ? null : (
             <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>

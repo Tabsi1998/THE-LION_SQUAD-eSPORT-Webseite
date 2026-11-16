@@ -48,6 +48,8 @@ PURGED = (
     "chat_reads", "document_opens", "team_invites", "user_achievements", "achievement_outbox", "user_stickers", "season_rank_snapshots",
     "year_review_notices", "feedback_receipts", "tournament_stream_announcements", "f1_staff_assignments", "dolibarr_identities",
     "dolibarr_honours",
+    # Seit #2450: was die Person von den Zeremonien schon gesehen hat.
+    "ceremony_seen",
     # Seit #1585: der Platz in der Liste „Am Start / Als Nächstes“ einer Fast Lap.
     "f1_queue",
     # Seit #1741: Captain einer externen Serie.
@@ -162,7 +164,7 @@ async def _series_links(db, profile_ids: list[str], now: str) -> None:
 async def _applications(db, user_id: str, now: str) -> None:
     await db.membership_applications.update_many({"user_id": user_id}, {
         "$set": {"motivation": None, "notes": None, "decision_note": None, "anonymized_at": now, "updated_at": now},
-        "$unset": {"person": "", "fields": "", "consents": ""},
+        "$unset": {"person": "", "birth": "", "fields": "", "consents": ""},
     })
     await db.membership_applications.update_many(
         {"user_id": user_id, "status": {"$in": list(OPEN_APPLICATIONS)}}, {"$set": {"status": "withdrawn", "withdrawn_at": now}},

@@ -83,7 +83,7 @@ export function GoogleAuthButton({
             if (isLinking) {
               toast.success(`Google verknüpft${result.data?.google_email ? `: ${result.data.google_email}` : ""}.`);
             } else {
-              toast.success(result.data?._created ? "Willkommen im Rudel! Account erstellt." : "Erfolgreich angemeldet.");
+              toast.success(result.data?._created ? "Willkommen im Rudel! Konto erstellt." : "Erfolgreich angemeldet.");
               // Dieselbe Prüfregel wie Login, Registrieren und Mail-Link (#1225).
               navigate(safeNextPath(returnPath));
             }

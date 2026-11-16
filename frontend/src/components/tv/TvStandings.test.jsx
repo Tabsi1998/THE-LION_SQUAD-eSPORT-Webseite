@@ -60,6 +60,18 @@ test("Punktabzug (E.3): am TV steht die Höhe an der Zeile, ohne Abzug nichts", 
   expect(screen.queryByTestId("tv-deducted-r1")).not.toBeInTheDocument();
 });
 
+test("Zonen (#1648): am TV dasselbe Symbol wie im Web - hinauf, hinunter, ohne Zone keines", async () => {
+  const zoned = [{ ...groups[0], standings: groups[0].standings.map((row, index) => (index === 0 ? { ...row, zone: "promotion" } : index === 7 ? { ...row, zone: "relegation" } : row)) }];
+  render(
+    <MemoryRouter initialEntries={["/display/bracket/t1"]}>
+      <TvScreen><TvStandingsSlide standings={zoned} turn={0} /></TvScreen>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("tv-zone-r-0-0")).toHaveAttribute("data-zone", "promotion");
+  expect(screen.getByTestId("tv-zone-r-0-7")).toHaveAttribute("data-zone", "relegation");
+  expect(screen.queryByTestId("tv-zone-r-0-3")).toBeNull();
+});
+
 test("Nachmeldung (#2422): die Zeile sagt, ab welcher Woche das Team dabei ist", async () => {
   const late = [{ ...groups[0], standings: groups[0].standings.map((row, index) => (index === 7 ? { ...row, late_entry: true, late_from_week: 3 } : row)) }];
   render(

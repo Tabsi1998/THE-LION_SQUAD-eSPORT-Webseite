@@ -48,6 +48,9 @@ async def test_without_services_the_privacy_page_says_so_and_the_imprint_shows_t
     ids = [sec["id"] for sec in privacy["sections"]]
     assert "account-deletion" in ids and "google" not in ids and "discord" not in ids and "dolibarr" not in ids
     assert block(privacy, "privacy-no-google-login")
+    # Mindestalter (#1698): Konto ab 14 nach österreichischem Recht, Vereinsmitglied ab 18 mit Prüfung beim Antrag.
+    age = block(privacy, "privacy-age")["text"]
+    assert "ab 14 Jahren" in age and "Art. 8 DSGVO" in age and "ab 18 Jahren" in age and "Geburtsdatum" in age
     assert "keinen Statistik- oder Tracking-Dienst" in block(privacy, "privacy-analytics")["text"]
     assert "kein E-Mail-Versand" in block(privacy, "privacy-email")["text"]
     assert "Crashlytics" in block(privacy, "privacy-app")["text"]
@@ -55,6 +58,8 @@ async def test_without_services_the_privacy_page_says_so_and_the_imprint_shows_t
     counted = block(privacy, "privacy-achievement-counters")["text"]
     assert "Fundstücke der Jahreszeiten" in counted and "nicht öffentlich" in counted and "Datenexport" in counted and "gelöscht" in counted
     assert "Zählerstände hinter den Erfolgen" in blocks(privacy, "account-deletion")[1]["text"]
+    # Der Weg nennt den Knopf so, wie er auf der Seite heißt (#1238).
+    assert "„Konto anonymisieren“" in blocks(privacy, "account-deletion")[0]["text"]
     assert any("eigener Infrastruktur des Vereins" in item for item in block(privacy, "privacy-recipients")["items"])
     # Steam braucht keine App - es ist die einzige Plattform, die ohne Einrichtung verknüpfbar ist.
     # Steam, Lichess, Mastodon und Bluesky brauchen keine App - die vier sind ohne Einrichtung verknüpfbar.
