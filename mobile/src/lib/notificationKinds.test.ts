@@ -31,3 +31,8 @@ test("Liga-Spieltag und Belohnungen haben eigene Wörter (#2173)", () => {
   expect(notificationKindLabel("league_broadcast")).toBe("Liga-Leitung");
   expect(notificationKindLabel("league_irgendwas")).toBe("Liga");
 });
+
+test("Hinweis der Turnierleitung heißt wie im Web (#1166, #2393)", () => {
+  expect(notificationKindLabel("tournament_notice")).toBe("Hinweis der Turnierleitung");
+  expect(notificationKindLabel("tournament_notice", { category: "tournament_updates" })).toBe("Hinweis der Turnierleitung");
+});

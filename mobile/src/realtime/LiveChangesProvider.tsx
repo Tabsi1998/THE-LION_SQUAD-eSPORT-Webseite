@@ -117,7 +117,7 @@ function useVisible() {
 export function useLiveRefresh(
   callback: () => unknown,
   resources: readonly string[],
-  options: { fallbackMs?: number; debounceMs?: number; enabled?: boolean } = {},
+  options: { fallbackMs?: number; debounceMs?: number; enabled?: boolean; pollMs?: number } = {},
 ) {
   const { connected, subscribe } = useContext(LiveChangesContext);
   const visible = useVisible();
@@ -129,6 +129,9 @@ export function useLiveRefresh(
   const enabled = options.enabled ?? true;
   const debounceMs = options.debounceMs ?? 250;
   const fallbackMs = options.fallbackMs ?? 0;
+  // Fester Takt auch mit Live-Strom (#1653, #2393): für Ansichten, deren Stand mit der Zeit wandert, ohne dass der Strom
+  // etwas meldet (Turnier-Cockpit: „Ergebnis fehlt“, Verzug). Wie der Ersatz-Takt nur, solange die Ansicht zu sehen ist.
+  const pollMs = options.pollMs ?? 0;
   const resourceKey = resources.join("|");
   const scheduleRef = useRef(() => {});
   visibleRef.current = visible;
@@ -190,6 +193,16 @@ export function useLiveRefresh(
     }, fallbackMs);
     return () => clearInterval(timer);
   }, [connected, enabled, fallbackMs, visible]);
+
+  useEffect(() => {
+    // Ohne Strom fragt schon der Ersatz-Takt nach - ist er mindestens so schnell, reicht er.
+    if (!enabled || !pollMs || !visible || (!connected && fallbackMs > 0 && fallbackMs <= pollMs)) return undefined;
+    const timer = setInterval(() => {
+      lastRunRef.current = Date.now();
+      runSafely(callbackRef.current);
+    }, pollMs);
+    return () => clearInterval(timer);
+  }, [connected, enabled, fallbackMs, pollMs, visible]);
 }
 
 function runSafely(callback: () => unknown) {

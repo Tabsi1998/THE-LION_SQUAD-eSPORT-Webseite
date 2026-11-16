@@ -40,6 +40,10 @@ export type BracketMatch = {
   called_at?: string | null;
   scheduled_at?: string | null;
   duration_minutes?: number | null;
+  /** Spielzeit-Uhr (#1167, #2393): die wirksame Dauer, die Pause des Turniers und frühere Pausen - alle freiwillig. */
+  effective_duration_minutes?: number | null;
+  paused_at?: string | null;
+  paused_seconds?: number | null;
   station_text?: string | null;
   group_id?: string | null;
   merged_into?: string | null;

@@ -15,6 +15,7 @@ import { colors, radius, roles, surfaces } from "../../../theme";
 import { Button } from "../../Button";
 import { BracketCard, TrophyCard } from "./BracketCard";
 import { DrawNotice } from "./DrawNotice";
+import { clockDuration } from "./LiveClock";
 import { LiveNow } from "./LiveNow";
 
 // Der Turnierbaum der App (#1563): eine Leinwand je Phase mit Linien (react-native-svg - liegt schon im Projekt und
@@ -236,7 +237,7 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
         {[...layout.nodes.values()].filter((node) => node.id !== TROPHY_ID).map((node) => {
           const model = models.get(node.id) as CardModel;
           const match = byId.get(node.id) as BracketMatch;
-          const live = isLive(match) ? { station: String(match.station_text || ""), startedAt: match.started_at || null } : null;
+          const live = isLive(match) ? { station: String(match.station_text || ""), startedAt: match.started_at || null, durationMinutes: clockDuration(match), pausedAt: match.paused_at || null, pausedSeconds: match.paused_seconds || 0 } : null;
           const rows = plan?.rows.get(node.id);
           const lift = plan?.lifts.get(node.id);
           const motion = plan && (rows || lift || plan.results.has(node.id) || plan.walkovers.has(node.id) || plan.fates.has(node.id))

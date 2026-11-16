@@ -40,6 +40,7 @@ import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } 
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { idSegment } from "../../lib/apiIds";
+import { NoticeBanner, useNotices } from "../../components/tournament/NoticeBanner";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 
 // Einzahl und Mehrzahl (#1223): „1 Platz“, „2 Plätze“, „1 Begleitperson“, „2 Begleitpersonen“.
@@ -78,6 +79,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   // gescheitertes Nachladen lässt den letzten Stand gekennzeichnet stehen.
   const fetchEvent = useCallback(async (id: string) => (await api.get<EventDetail>(`/events/${idSegment(id)}`)).data || null, []);
   const { data: event, loading, error: loadError, problem, stale, reload: load } = useKeyedLoad(route.params.id, fetchEvent);
+  // Hinweis der Turnierleitung (#1166, #2393): die an das ganze Event und die seiner Turniere - oben auf der Seite.
+  const notices = useNotices(route.params.id ? `/events/${idSegment(route.params.id)}/notices` : null);
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (event ? () => { void sharePage({ kind: "event", id: String(event.slug || event.id), title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date }); } : null), [event]);
   useShareHeader(navigation, share);
@@ -257,6 +260,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
       >
         {/* Nachladen gescheitert (#1000): das Event ist ausdrücklich der letzte Stand. */}
         {stale && problem ? <PartialLoadNotice problem={problem} onRetry={() => { void load(); }} testID="event-stale" /> : null}
+        <NoticeBanner items={notices} />
         {/* Kopfbild (#1273): ein Foto füllt das Banner, ein Logo steht klein auf einer Fläche in Event-Violett. */}
         {banner?.kind === "logo" ? (
           <View style={styles.logoStage} testID="event-banner-logo">
