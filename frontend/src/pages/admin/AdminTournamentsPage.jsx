@@ -18,7 +18,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { StaffelNeedsHint, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
-import { STAFFEL_STAND_FILTERS, staffelStand, statusFilterKey } from "@/lib/seasonTabs";
+import { STAFFEL_STAND_FILTERS, staffelStand, statusFilterKeys } from "@/lib/seasonTabs";
 import { endText, liveAfterEnd } from "@/lib/endedLive";
 
 const EVENT_MODE_LABELS = {
@@ -142,15 +142,15 @@ export default function AdminTournamentsPage() {
     }
   };
   const statusCounts = useMemo(() => list.reduce((acc, tournament) => {
-    const key = statusFilterKey(tournament, now);
-    acc[key] = (acc[key] || 0) + 1;
+    // Eine laufende Staffel zählt bei „Live“ und bei „Liga: Spielbetrieb“ (#2453).
+    for (const key of statusFilterKeys(tournament, now)) acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {}), [list, now]);
   const sortedList = useMemo(() => sortByNearestDate(list), [list]);
   const filteredList = useMemo(() => {
     const q = normalizeSearch(query);
     return sortedList.filter((tournament) => {
-      if (statusFilter && statusFilterKey(tournament, now) !== statusFilter) return false;
+      if (statusFilter && !statusFilterKeys(tournament, now).includes(statusFilter)) return false;
       if (!statusFilter && tournament.status === "archived") return false;
       if (kindFilter === "league" && !isStaffel(tournament)) return false;
       if (kindFilter === "tournament" && isStaffel(tournament)) return false;
