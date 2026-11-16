@@ -67,7 +67,12 @@ async function mockCockpit(page, world) {
     if (url === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "example.test" }));
     if (url === "/api/seasonal/active") return route.fulfill(json({ seasons: [], now: at(0) }));
     if (url === `/api/tournaments/${SLUG}/lead`) return route.fulfill(json(leadOf(world)));
-    if (url === `/api/tournaments/${SLUG}/live-queue`) return route.fulfill(json(queueOf(world)));
+    // Kein Netz vor Ort (#2440): `queueDown` lässt die Abfrage der Warteschlange scheitern, `queueStatus` antwortet mit dem Status.
+    if (url === `/api/tournaments/${SLUG}/live-queue`) {
+      if (world.queueDown) return route.abort("internetdisconnected");
+      if (world.queueStatus) return route.fulfill(json({ detail: "Fehler" }, world.queueStatus));
+      return route.fulfill(json(queueOf(world)));
+    }
     const action = /\/live-queue\/(call|start|release|broken)$/.exec(url);
     if (action && request.method() === "POST") {
       const body = request.postDataJSON();
@@ -163,6 +168,8 @@ test.describe("Turnier-Cockpit", () => {
       }
       // Zwei Kacheln nebeneinander (768): die kurze bleibt so hoch wie ihr Inhalt, sie wird nicht auf die lange gestreckt.
       if (width === 768) {
+        // Erst messen, wenn die Kacheln eingeblendet sind (#2390): mitten im Einblenden liegen sie Bruchteile versetzt.
+        await settled(page);
         const short = await page.getByTestId("live-station-pc1").boundingBox();
         const tall = await page.getByTestId("live-station-pc2").boundingBox();
         expect(Math.abs(short.y - tall.y)).toBeLessThan(2);
@@ -209,6 +216,53 @@ test.describe("Turnier-Cockpit", () => {
       await expect(page).toHaveURL(/\?fall=ns-g3$/);
       await expect(page.getByTestId("lead-no-show-r-st")).toBeVisible();
       await expect(page.getByTestId("lead-no-show-r-st")).toBeInViewport();
+    });
+  }
+
+  // #2440: Scheitert eine Abfrage der Warteschlange (WLAN vor Ort), bleiben Cockpit und offene Rückfrage stehen - mit
+  // „Letzter Stand vor X s“. Die nächste gelungene Abfrage nimmt den Hinweis weg; erst ein 404 nimmt das Cockpit weg.
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`${width} px: gescheiterte Abfrage - letzter Stand bleibt mit Hinweis, Rückfrage bleibt offen`, async ({ page }, testInfo) => {
+      test.setTimeout(60_000);
+      const world = newWorld();
+      await page.setViewportSize({ width, height });
+      await mockCockpit(page, world);
+      await page.goto(`/tournaments/${SLUG}/leitung`);
+      await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByTestId("lead-stale")).toHaveCount(0);
+
+      // Rückfrage „Freigeben“ an PC 1 offen lassen, dann fällt das Netz für die Warteschlange aus.
+      await page.getByTestId("live-release-pc1").click();
+      await expect(page.getByTestId("live-release-confirm-pc1")).toBeVisible();
+      world.queueDown = true;
+      await page.clock.setFixedTime(new Date(NOW + 25_000));
+      // Aufrufen an PC 2 geht durch - das Nachladen danach scheitert.
+      await page.getByTestId("live-call-pc2").click();
+      await expect(page.getByTestId("lead-stale")).toContainText("Letzter Stand vor 25 s");
+      await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByTestId("live-release-confirm-pc1")).toBeVisible();
+      await expect(page.getByTestId("cockpit-stations")).toBeVisible();
+      expect(world.posts.map(([kind, body]) => `${kind}:${body.station_id}`)).toEqual(["call:pc2"]);
+      // Der Hinweis zählt mit.
+      await page.clock.setFixedTime(new Date(NOW + 40_000));
+      await expect(page.getByTestId("lead-stale")).toContainText("Letzter Stand vor 40 s");
+      await settled(page);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await shot(page, testInfo, `2440-cockpit-letzter-stand-${width}.png`);
+
+      // Wieder Netz: die nächste Abfrage (nach dem nächsten Tipp) nimmt den Hinweis weg - PC 2 steht jetzt aufgerufen.
+      world.queueDown = false;
+      await page.getByTestId("live-call-pc2").click();
+      await expect(page.getByTestId("lead-stale")).toHaveCount(0);
+      await expect(page.getByTestId("live-chip-pc2")).toHaveAttribute("data-tone", "called");
+      await expect(page.getByTestId("live-release-confirm-pc1")).toBeVisible();
+
+      // „Gibt es nicht“ (404): erst dann fällt das Cockpit weg.
+      world.queueStatus = 404;
+      await page.getByTestId("live-release-yes-pc1").click();
+      await expect(page.getByTestId("lead-tab-cockpit")).toHaveCount(0);
+      await expect(page.getByTestId("lead-stale")).toHaveCount(0);
     });
   }
 

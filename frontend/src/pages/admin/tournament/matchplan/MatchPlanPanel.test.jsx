@@ -16,7 +16,9 @@ vi.mock("@/lib/api", () => ({
   api: apiMock,
   formatRequestError: (error, fallback) => error?.response?.data?.detail || fallback,
 }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => true }));
+// Je Zeichnen drei Abfragen im Takt: Warteschlange, Plan, Online/Liga (#2440: die erste prüfen).
+const refreshCalls = [];
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { refreshCalls.push(options); return true; } }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() } }));
 
 const { MatchPlanPanel } = await import("./MatchPlanPanel");
@@ -29,8 +31,9 @@ function conflict(detail) {
   return Object.assign(new Error("409"), { response: { status: 409, data: { detail } } });
 }
 
-function setup(state, { plan = state.plan, now = fixture.generated_at, extra = {}, lead = true, queue = null } = {}) {
+function setup(state, { plan = state.plan, now = fixture.generated_at, extra = {}, lead = true, queue = null, queueError = null } = {}) {
   apiMock.get.mockImplementation((url) => {
+    if (queueError && String(url).endsWith("/live-queue")) return Promise.reject(queueError);
     if (queue && String(url).endsWith("/live-queue")) return Promise.resolve({ data: queue });
     if (String(url).includes("/schedule/deadlines")) return Promise.resolve({ data: state.deadlines || { matches: [] } });
     if (String(url).includes("/matchdays")) return Promise.resolve({ data: state.matchdays || { applies: false, matchdays: [] } });
@@ -716,6 +719,36 @@ describe("live: Warteschlange je Station", () => {
     fireEvent.click(await screen.findByTestId(`live-start-${state.stations[1].id}`));
     await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/tournaments/${state.tournament.id}/live-queue/start`,
       { station_id: state.stations[1].id, match_id: state.matches.find((match) => match.match_key === "D").id }));
+  });
+
+  // #2440 (Review): Scheitert schon der erste Abruf, fragt die Seite im Takt weiter; ohne Warteschlange bleibt der
+  // Rückfall-Takt, solange der Strom fehlt.
+  it("scheitert der erste Abruf, fragt die Seite im Takt weiter; ohne Warteschlange nur der Rückfall-Takt", async () => {
+    const state = fixture.live;
+    setup(state, { now: state.now, queueError: Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" }) });
+    await waitFor(() => expect(refreshCalls.at(-3)).toMatchObject({ pollMs: 60_000, fallbackMs: 60_000 }));
+    expect(screen.queryByTestId("mp-live-queue")).toBeNull();
+  });
+
+  it("ohne Warteschlange (`applies: false`) kein Takt, aber der Rückfall-Takt ohne Strom", async () => {
+    const state = fixture.live;
+    setup(state, { now: state.now, queue: { applies: false, reason: "keine Station", stations: [] } });
+    await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => String(url).endsWith("/live-queue"))).toBe(true));
+    await waitFor(() => expect(refreshCalls.at(-3)).toMatchObject({ pollMs: 0, fallbackMs: 60_000 }));
+  });
+
+  // #2440: Scheitert das Nachladen (Netz, Server), bleibt die Warteschlange mit „Letzter Stand vor X s“ stehen.
+  it("scheitert das Nachladen der Warteschlange, bleibt ihr letzter Stand mit Hinweis", async () => {
+    const { state } = setupLive();
+    await screen.findByTestId("mp-live-queue");
+    const previous = apiMock.get.getMockImplementation();
+    apiMock.get.mockImplementation((url, ...rest) => (String(url).endsWith("/live-queue")
+      ? Promise.reject(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" }))
+      : previous(url, ...rest)));
+    fireEvent.click(await screen.findByTestId(`live-start-${state.stations[1].id}`));
+    expect(await screen.findByTestId("mp-live-queue-stale")).toHaveTextContent("Letzter Stand vor");
+    expect(screen.getByTestId("mp-live-queue")).toBeInTheDocument();
+    expect(screen.getByTestId(`live-next-${state.stations[1].id}`)).toBeInTheDocument();
   });
 
   it("„Nachrücken planen“ schreibt im laufenden Turnier nichts: nur die Prognose, ohne „Übernehmen“", async () => {

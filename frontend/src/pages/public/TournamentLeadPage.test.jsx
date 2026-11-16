@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Turnierleitung (#1156, #1160): erster Reiter „Braucht Aufmerksamkeit“ mit dem passenden Knopf je Fall, zweiter
 // „Ergebnisse“. Namen sind erfunden.
@@ -10,7 +10,9 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "s1" } }
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
 const liveCalls = [];
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { liveCalls.push(options); } }));
+// Die Ladefunktionen, die die Seite dem Takt gibt (#2440): je Zeichnen zuerst die Ansicht, dann die Warteschlange.
+const liveLoads = [];
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { liveCalls.push(options); liveLoads.push(load); } }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const TournamentLeadPage = (await import("./TournamentLeadPage")).default;
@@ -189,7 +191,8 @@ test("„Alle freien Stationen aufrufen“ (#1162): nacheinander über den Aufru
 
 // Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit Topf, Restzeit bis zum automatischen Los und „Jetzt auslosen“.
 test("Auslosung bereit: Topf mit Namen, Restzeit, „Jetzt auslosen“ nur mit Aufbau-Recht", async () => {
-  // Die Browser-Uhr steht drei Minuten nach der Server-Uhr der Antwort - die Restzeit zählt von dort weiter.
+  // Die Browser-Uhr geht drei Minuten vor (10:06:30, der Server sagt 10:03:30): die Restzeit zählt nach der Serveruhr
+  // (#2440) - bis 10:20 sind es 16,5 Minuten, also „17 Min.“ (nach der Geräteuhr wären es 14).
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-14T10:06:30+00:00"));
   apiMock.post.mockResolvedValue({ data: { ok: true } });
@@ -207,7 +210,7 @@ test("Auslosung bereit: Topf mit Namen, Restzeit, „Jetzt auslosen“ nur mit A
   expect(shown).toHaveTextContent("Auslosung bereit · 4 Namen");
   expect(shown).toHaveTextContent("nach Runde 1 → E, F");
   expect(screen.getByTestId("lead-draw-pot-WB:2").querySelectorAll("li")).toHaveLength(4);
-  expect(screen.getByTestId("lead-draw-countdown-WB:2")).toHaveTextContent("automatisch in 14 Min.");
+  expect(screen.getByTestId("lead-draw-countdown-WB:2")).toHaveTextContent("automatisch in 17 Min.");
   fireEvent.click(screen.getByTestId("lead-draw-now-WB:2"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/stages/s1/draw", { group: "WB:2" }));
   // Nach dem Auslosen lädt die Ansicht neu (die Warteschlange vor Ort fragt die Seite getrennt, #1556).
@@ -231,8 +234,8 @@ test("Auslosung bereit ohne Aufbau-Recht: Karte ohne Knopf; nach der Frist steht
   expect(await screen.findByTestId("lead-draw-LB:3")).toHaveTextContent("Auslosung bereit · 1 Name");
   expect(screen.queryByTestId("lead-draw-now-LB:3")).toBeNull();
   expect(screen.getByTestId("lead-draw-countdown-LB:3")).toHaveTextContent("jeden Moment");
-  expect(drawCountdown(card, "2026-10-14T10:09:30+00:00", new Date("2026-10-14T10:09:30+00:00").getTime())).toBe("automatisch in 11 Min.");
-  expect(drawCountdown({ due_at: null }, "2026-10-14T10:09:30+00:00")).toBe("");
+  expect(drawCountdown(card, Date.parse("2026-10-14T10:09:30+00:00"))).toBe("automatisch in 11 Min.");
+  expect(drawCountdown({ due_at: null }, Date.parse("2026-10-14T10:09:30+00:00"))).toBe("");
   vi.useRealTimers();
 });
 
@@ -386,6 +389,19 @@ test("Cockpit (#1653): Probleme oben, ein Tipp öffnet den Fall mit seinen Knöp
   expect(liveCalls.slice(-2).map((options) => options.pollMs)).toEqual([0, 60000]);
 });
 
+test("von selbst gezeigter Reiter (#2440): bleibt, solange sein Grund gilt - „Ergebnisse“ immer", async () => {
+  const { autoTabHolds } = await import("./TournamentLeadPage");
+  const queue = { applies: true, stations: [] };
+  expect(autoTabHolds("results", {})).toBe(true);
+  expect(autoTabHolds("checkin", { checkinPhase: true })).toBe(true);
+  expect(autoTabHolds("checkin", { checkinPhase: false })).toBe(false);
+  expect(autoTabHolds("attention", { cases: 1 })).toBe(true);
+  expect(autoTabHolds("attention", { fall: "rm-1" })).toBe(true);
+  expect(autoTabHolds("attention", { cases: 0 })).toBe(false);
+  expect(autoTabHolds("cockpit", { queue })).toBe(true);
+  expect(autoTabHolds("cockpit", { queue: null })).toBe(false);
+});
+
 test("Einstieg (#1653): Fall-Link → Aufmerksamkeit; vor Ort das Cockpit (im Check-in nur mit Fällen); sonst wie bisher", async () => {
   const { defaultLeadTab } = await import("./TournamentLeadPage");
   const queue = { applies: true, stations: [] };
@@ -469,4 +485,324 @@ test("Cockpit: der Tipp auf ein Problem setzt den Fokus auf die Fallkarte", asyn
   );
   fireEvent.click(await screen.findByTestId("cockpit-problem-rm-m8"));
   await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("lead-case-rm-m8")));
+});
+
+// #2440: Am Turniertag vor Ort (WLAN) scheitert auch einmal eine Abfrage. Dann bleibt der letzte Stand stehen - der
+// Reiter „Cockpit“, die offene Rückfrage in der Stationskachel - mit „Letzter Stand vor X s“. Nur der Server nimmt die
+// Warteschlange weg (`applies: false`). Nie zwei Abfragen zugleich, nach einem Fehler kein Dauerfeuer.
+describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
+  const T0 = Date.parse("2026-11-14T15:30:00Z");
+  const running = { match_id: "QF1", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "running", position: 0, started_at: "2026-11-14T15:10:00Z", duration_minutes: 30 };
+  const QUEUE = {
+    applies: true, summary: null, operate: { all: true, station_ids: [] }, matches: {}, now: "2026-11-14T15:30:00Z",
+    stations: [{ id: "st1", name: "1", station_text: "Station 1", status: "busy", waiting: 0, running, next: null, after: null }],
+  };
+  const LEAD = { tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_mode: "local" }, now: "2026-11-14T15:30:00Z", matches: [], recent: [], attention: [], stations: [], counts: { open: 0 } };
+  const offline = () => Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" });
+  const status = (code) => Object.assign(new Error(`Status ${code}`), { response: { status: code, data: {} } });
+  const queueCalls = () => apiMock.get.mock.calls.filter(([url]) => String(url).endsWith("/live-queue")).length;
+  // Die Warteschlangen-Abfrage, wie sie der Takt (useLiveRefresh) aufruft: die zweite der Seite.
+  const tick = async () => { await act(async () => { await liveLoads.at(-1)?.(); }); };
+  let queueAnswer;
+
+  function renderCockpit() {
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/live-queue") ? queueAnswer() : Promise.resolve({ data: LEAD })));
+    return render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    apiMock.get.mockReset();
+    liveLoads.length = 0;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(T0));
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  test("Netzfehler: Cockpit und offene Rückfrage bleiben, „Letzter Stand vor 25 s“ - die nächste gelungene Abfrage nimmt den Hinweis weg", async () => {
+    renderCockpit();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(await screen.findByTestId("live-release-st1"));
+    expect(screen.getByTestId("live-release-confirm-st1")).toBeInTheDocument();
+    expect(screen.queryByTestId("lead-stale")).toBeNull();
+
+    vi.setSystemTime(new Date(T0 + 25000));
+    queueAnswer = () => Promise.reject(offline());
+    await tick();
+    expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("live-release-confirm-st1")).toBeInTheDocument();
+    expect(screen.getByTestId("lead-stale")).toHaveTextContent("Letzter Stand vor 25 s");
+
+    // Wieder Netz (nach der Wartezeit): der Hinweis geht, die Rückfrage bleibt offen.
+    vi.setSystemTime(new Date(T0 + 31000));
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    await tick();
+    await waitFor(() => expect(screen.queryByTestId("lead-stale")).toBeNull());
+    expect(screen.getByTestId("live-release-confirm-st1")).toBeInTheDocument();
+  });
+
+  test("Serverfehler (503) lässt den Stand stehen; erst `applies: false` nimmt das Cockpit weg", async () => {
+    renderCockpit();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    queueAnswer = () => Promise.reject(status(503));
+    await tick();
+    expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("live-station-st1")).toBeInTheDocument();
+    expect(screen.getByTestId("lead-stale")).toHaveTextContent("Letzter Stand vor 0 s");
+
+    vi.setSystemTime(new Date(T0 + 6000));
+    queueAnswer = () => Promise.resolve({ data: { applies: false, reason: "online", stations: [] } });
+    await tick();
+    await waitFor(() => expect(screen.queryByTestId("lead-tab-cockpit")).toBeNull());
+    expect(screen.queryByTestId("lead-tab-stations")).toBeNull();
+    expect(screen.queryByTestId("lead-stale")).toBeNull();
+  });
+
+  test("nie zwei Abfragen zugleich: was während einer laufenden kommt, folgt genau einmal danach", async () => {
+    renderCockpit();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(queueCalls()).toBe(1));
+    let finish;
+    queueAnswer = () => new Promise((resolve) => { finish = () => resolve({ data: QUEUE }); });
+    const load = liveLoads.at(-1);
+    let pending;
+    act(() => { pending = Promise.all([load(), load(), load()]); });
+    expect(queueCalls()).toBe(2);
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    await act(async () => { finish(); await pending; });
+    // Die drei Anstöße während der laufenden Abfrage: genau eine weitere danach.
+    expect(queueCalls()).toBe(3);
+  });
+
+  test("nach Fehlern wird nur der Takt langsamer: jeder Anstoß (Takt, Strom, Wiederverbinden) fragt sofort, /lead wieder da lädt sofort", async () => {
+    const { COCKPIT_POLL_MS } = await import("@/lib/tournamentCockpit");
+    renderCockpit();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(queueCalls()).toBe(1));
+    const queueTakt = () => [liveCalls.at(-1).pollMs, liveCalls.at(-1).fallbackMs];
+    expect(queueTakt()).toEqual([COCKPIT_POLL_MS, 15000]);
+    queueAnswer = () => Promise.reject(offline());
+    // Kein Anstoß geht verloren - auch nicht einer, der genau nach der Wartezeit kommt (Takt = Wartezeit).
+    for (const calls of [2, 3, 4, 5]) {
+      await tick();
+      expect(queueCalls()).toBe(calls);
+    }
+    // Vier Fehler in Folge: der Takt ist auf 40 s gebremst, nie schneller als der Grundtakt; der Rückfall-Takt ebenso.
+    expect(queueTakt()).toEqual([40000, 40000]);
+    await tick();
+    expect(queueTakt()).toEqual([60000, 60000]);
+    // Die Ansicht kommt wieder durch: die Warteschlange fragt sofort nach, ihr Takt ist wieder der Grundtakt.
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    const before = queueCalls();
+    await act(async () => { await liveLoads.at(-2)(); });
+    await waitFor(() => expect(queueCalls()).toBe(before + 1));
+    await waitFor(() => expect(screen.queryByTestId("lead-stale")).toBeNull());
+    expect(queueTakt()).toEqual([COCKPIT_POLL_MS, 15000]);
+  });
+
+  test("Turnierwechsel: kein „letzter Stand“ und keine späte Antwort vom vorigen Turnier; abgebaut fragt nichts nach", async () => {
+    let finishLeadA = null;
+    let finishQueue = null;
+    const LEAD_B = { ...LEAD, tournament: { ...LEAD.tournament, id: "t2", slug: "b-cup", title: "B-Cup Winter" } };
+    apiMock.get.mockImplementation((url) => {
+      const path = String(url);
+      if (path === "/tournaments/fc-cup/lead" && finishLeadA === "hold") return new Promise((resolve) => { finishLeadA = () => resolve({ data: LEAD }); });
+      if (path === "/tournaments/fc-cup/lead") return Promise.resolve({ data: LEAD });
+      if (path === "/tournaments/fc-cup/live-queue") return Promise.resolve({ data: QUEUE });
+      if (path === "/tournaments/b-cup/lead") return Promise.resolve({ data: LEAD_B });
+      if (path === "/tournaments/b-cup/live-queue") return finishQueue === "hold" ? new Promise((resolve) => { finishQueue = () => resolve({ data: QUEUE }); }) : Promise.reject(offline());
+      return Promise.reject(new Error(path));
+    });
+    const view = render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/b-cup/leitung" data-testid="go-b">B</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    // A: die Ansicht scheitert einmal - „letzter Stand“ steht. Dann hängt die nächste Abfrage von A.
+    apiMock.get.mockImplementationOnce(() => Promise.reject(offline()));
+    await act(async () => { await liveLoads.at(-2)(); });
+    expect(screen.getByTestId("lead-stale")).toBeInTheDocument();
+    finishLeadA = "hold";
+    act(() => { liveLoads.at(-2)(); });
+    // Wechsel zu B: kein Hinweis von A, B lädt seinen Stand; die späte Antwort von A ändert nichts.
+    fireEvent.click(screen.getByTestId("go-b"));
+    expect(screen.queryByTestId("lead-stale")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("B-Cup Winter"));
+    await act(async () => { finishLeadA(); });
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("B-Cup Winter");
+    // B: der erste Abruf der Warteschlange scheiterte - die Stationen von A erscheinen nicht.
+    expect(screen.queryByTestId("lead-tab-cockpit")).toBeNull();
+    expect(screen.queryByTestId("live-station-st1")).toBeNull();
+
+    // Abgebaut während einer Abfrage: keine weitere hinterher, auch wenn eine angehängt war.
+    finishQueue = "hold";
+    const queueLoad = liveLoads.at(-1);
+    act(() => { queueLoad(); queueLoad(); });
+    const asked = queueCalls();
+    view.unmount();
+    await act(async () => { finishQueue(); });
+    expect(queueCalls()).toBe(asked);
+  });
+
+  test("scheitert der erste Abruf, springt die Ansicht später nicht von selbst ins Cockpit - der Reiter erscheint nur", async () => {
+    queueAnswer = () => Promise.reject(offline());
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/live-queue") ? queueAnswer() : Promise.resolve({ data: LEAD })));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true"));
+    expect(screen.queryByTestId("lead-tab-cockpit")).toBeNull();
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    await tick();
+    expect(await screen.findByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
+  });
+
+  // Fix-Runde 2: Benachrichtigungen verlinken ?fall=<id> (match_attention, Fristen, Auslosung) bzw. ?reiter=stationen.
+  test("neuer ?fall= bei offener Seite öffnet den Fall; ?reiter=stationen den Reiter", async () => {
+    const CASE = { id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 };
+    apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? QUEUE : { ...LEAD, matches: [ENTRY], attention: [CASE] } }));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/fc-cup/leitung?fall=rm-m8" data-testid="note-fall">Fall</Link>
+        <Link to="/tournaments/fc-cup/leitung?reiter=stationen" data-testid="note-stations">Stationen</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("note-fall"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("lead-case-rm-m8")));
+    fireEvent.click(screen.getByTestId("note-stations"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
+  });
+
+  test("derselbe ?fall= ein zweites Mal öffnet den Fall wieder; derselbe ?reiter= in einem anderen Turnier ebenso", async () => {
+    const CASE = { id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 };
+    apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? QUEUE : { ...LEAD, matches: [ENTRY], attention: [CASE] } }));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/fc-cup/leitung?fall=rm-m8" data-testid="note-fall">Fall</Link>
+        <Link to="/tournaments/fc-cup/leitung?reiter=stationen" data-testid="note-a">A</Link>
+        <Link to="/tournaments/b-cup/leitung?reiter=stationen" data-testid="note-b">B</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("note-fall"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
+    expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    // Dieselbe Benachrichtigung noch einmal: wieder der Fall.
+    fireEvent.click(screen.getByTestId("note-fall"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("lead-case-rm-m8")));
+    // ?reiter=stationen in A, Cockpit getippt, dann derselbe ?reiter= in B: B öffnet die Stationen.
+    fireEvent.click(screen.getByTestId("note-a"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
+    fireEvent.click(screen.getByTestId("note-b"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
+  });
+
+  test("von selbst gezeigter Check-in folgt nach dem Check-in wieder der Vorgabe - ein getippter Reiter bleibt", async () => {
+    let status = "check_in";
+    const lead = () => ({ ...LEAD, matches: [ENTRY], tournament: { ...LEAD.tournament, status, can_check_in: true } });
+    apiMock.get.mockImplementation((url) => {
+      if (String(url).endsWith("/lead/checkin")) return Promise.resolve({ data: { applies: true, team_mode: false, tournament: { id: "t1", slug: "fc-cup" }, rows: [] } });
+      return Promise.resolve({ data: String(url).endsWith("/live-queue") ? QUEUE : lead() });
+    });
+    // Alles nachladen, was die Seite im Takt lädt (Ansicht, Warteschlange, Check-in-Liste).
+    const reloadAll = async () => { await act(async () => { await Promise.all([...new Set(liveLoads.slice(-6))].map((load) => load())); }); };
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true"));
+    // Der Check-in endet: die Ansicht folgt der Vorgabe (Cockpit).
+    status = "live";
+    await reloadAll();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    // Getippt bleibt getippt - auch wenn sich der Grund ändert.
+    fireEvent.click(screen.getByTestId("lead-tab-checkin"));
+    status = "check_in";
+    await reloadAll();
+    status = "live";
+    await reloadAll();
+    expect(screen.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("Turnierwechsel: das neue Turnier startet mit seiner Vorgabe, nicht mit dem Reiter des vorigen", async () => {
+    const LEAD_B = { ...LEAD, tournament: { ...LEAD.tournament, id: "t2", slug: "b-cup", title: "B-Cup Winter" } };
+    apiMock.get.mockImplementation((url) => {
+      const path = String(url);
+      if (path.endsWith("/live-queue")) return Promise.resolve({ data: QUEUE });
+      return Promise.resolve({ data: path.startsWith("/tournaments/b-cup") ? LEAD_B : LEAD });
+    });
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/b-cup/leitung" data-testid="go-b">B</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("lead-tab-results"));
+    expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByTestId("go-b"));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("B-Cup Winter"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+  });
+
+  test("Takt nur mit Warteschlange: online (`applies: false`) kein Takt - nur der Rückfall-Takt, solange der Strom fehlt", async () => {
+    apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? { applies: false, reason: "online", stations: [] } : { ...LEAD, tournament: { ...LEAD.tournament, event_mode: "online" } } }));
+    liveCalls.length = 0;
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true"));
+    const [, queueOptions] = liveCalls.slice(-2);
+    // Rückfall-Takt (#2440, Review): fehlt der Strom, erscheint eine neu angelegte Station trotzdem.
+    expect([queueOptions.pollMs, queueOptions.fallbackMs]).toEqual([0, 15000]);
+  });
+
+  test("Zeitüberschreitung lässt den Stand stehen; 404 heißt „gibt es nicht“ - das Cockpit fällt weg, ohne Hinweis", async () => {
+    renderCockpit();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    queueAnswer = () => Promise.reject(Object.assign(new Error("timeout of 15000ms exceeded"), { code: "ECONNABORTED" }));
+    await tick();
+    expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("lead-stale")).toBeInTheDocument();
+    vi.setSystemTime(new Date(T0 + 6000));
+    queueAnswer = () => Promise.reject(status(404));
+    await tick();
+    await waitFor(() => expect(screen.queryByTestId("lead-tab-cockpit")).toBeNull());
+    expect(screen.queryByTestId("lead-stale")).toBeNull();
+  });
+
+  test("scheitert das Nachladen der Ansicht, bleibt die Seite mit „letzter Stand“ - kein Recht (403) gilt sofort", async () => {
+    renderCockpit();
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(await screen.findByTestId("live-release-st1"));
+    const loadLead = liveLoads.at(-2);
+    vi.setSystemTime(new Date(T0 + 12000));
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/live-queue") ? queueAnswer() : Promise.reject(offline())));
+    await act(async () => { await loadLead(); });
+    expect(screen.queryByTestId("lead-denied")).toBeNull();
+    expect(screen.getByTestId("live-release-confirm-st1")).toBeInTheDocument();
+    expect(screen.getByTestId("lead-stale")).toHaveTextContent("Letzter Stand vor 12 s");
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/live-queue") ? queueAnswer() : Promise.reject(status(403))));
+    await act(async () => { await loadLead(); });
+    expect(screen.getByTestId("lead-denied")).toBeInTheDocument();
+  });
 });

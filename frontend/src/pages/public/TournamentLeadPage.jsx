@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ClipboardCheck, Clock, Gauge, Megaphone, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -9,15 +9,19 @@ import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useLiveQueue } from "@/hooks/useLiveQueue";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatWhen } from "@/lib/datetime";
 import { motionAllowed } from "@/lib/motion";
 import { leadFilter, leadLine, leadNames } from "@/lib/tournamentLead";
 import { COCKPIT_POLL_MS, cockpitProblems } from "@/lib/tournamentCockpit";
+import { queuePollMs } from "@/lib/liveQueue";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
+import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
+import { serverNow, serverOffset } from "@/seasons/clock";
 import { MatchClock } from "@/components/tls/live/MatchClock";
 import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
 import { NoticeComposer } from "@/components/tls/tournament/NoticeComposer";
@@ -59,10 +63,11 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  const [tab, setTab] = useState(() => ({ cockpit: "cockpit", checkin: "checkin", stationen: "stations", hinweis: "notice" })[searchParams.get("reiter")] || null);
+  // `tab`: was jemand gewählt hat (Tipp, ?reiter=, ?fall=) - sonst null, dann gilt die Vorgabe (`autoTab`, unten).
+  const reiterParam = searchParams.get("reiter") || "";
+  const [tab, setTab] = useState(() => REITER_TABS[reiterParam] || null);
+  const [autoTab, setAutoTab] = useState("");
   const [movingId, setMovingId] = useState("");
-  const [queue, setQueue] = useState(null);
-  const [queueLoaded, setQueueLoaded] = useState(false);
   const [busyStation, setBusyStation] = useState("");
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
@@ -74,30 +79,68 @@ export default function TournamentLeadPage() {
   const stationScrolled = useRef("");
   const [stationJump, setStationJump] = useState(0);
 
+  // Die Restzeit der Auslosung zählt nach der Serveruhr (#2440): der Abstand zur Geräteuhr aus `now` der Antwort.
+  const [clockOffset, setClockOffset] = useState(0);
+  // Scheitert das Nachladen der Ansicht vorübergehend (Netz, Server), bleibt der letzte Stand stehen (#2440).
+  const [leadOkAt, setLeadOkAt] = useState(0);
+  const [leadStale, setLeadStale] = useState(false);
+  const hasView = useRef(false);
+  // Kommt die Ansicht wieder durch, während die Warteschlange noch scheitert: sofort nachfragen (#2440) - ein Erfolg
+  // setzt ihren gebremsten Takt zurück.
+  const queueRecover = useRef(null);
+  // Turnier gewechselt (#2440): eine Antwort zum vorigen Turnier gilt nicht mehr.
+  const slugRef = useRef(slug);
+
   const load = useCallback(async () => {
+    const requestedAt = Date.now();
     try {
       const { data: view } = await api.get(`/tournaments/${encodeURIComponent(slug)}/lead`);
+      if (slugRef.current !== slug) return;
+      const receivedAt = Date.now();
       setData(view);
       setError(null);
+      setClockOffset(serverOffset(view?.now, requestedAt, receivedAt));
+      hasView.current = true;
+      setLeadOkAt(receivedAt);
+      setLeadStale(false);
+      queueRecover.current?.();
     } catch (err) {
-      setError({ status: err.response?.status || 0, detail: formatApiError(err.response?.data?.detail) });
+      if (slugRef.current !== slug) return;
+      const status = err.response?.status || 0;
+      // Ein Stand ist schon da und der Fehler vorübergehend: stehen lassen, mit „letzter Stand vor X s“. Kein Recht
+      // (401/403) oder kein Turnier (404) gilt sofort.
+      if (hasView.current && (!status || status >= 500 || status === 408 || status === 429)) {
+        setLeadStale(true);
+        return;
+      }
+      setError({ status, detail: formatApiError(err.response?.data?.detail) });
     }
   }, [slug]);
 
-  // Die Warteschlange vor Ort (#1556) - online gibt es sie nicht (`applies: false`), dann fehlt der Reiter.
-  const loadQueue = useCallback(async () => {
-    try {
-      const { data: view } = await api.get(`/tournaments/${encodeURIComponent(slug)}/live-queue`);
-      setQueue(view?.applies ? view : null);
-    } catch {
-      setQueue(null);
-    } finally {
-      setQueueLoaded(true);
-    }
-  }, [slug]);
+  // Die Warteschlange vor Ort (#1556) - online gibt es sie nicht (`applies: false`), dann fehlt der Reiter. Scheitert
+  // ein Abruf, bleibt ihr letzter Stand samt Reiter und offener Rückfragen stehen (#2440, hooks/useLiveQueue).
+  const { queue, status: queueStatus, loaded: queueLoaded, staleSince: queueStaleSince, reload: loadQueue, failures: queueFailures } = useLiveQueue(slug ? `/tournaments/${encodeURIComponent(slug)}/live-queue` : "");
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { loadQueue(); }, [loadQueue]);
+  useEffect(() => {
+    queueRecover.current = queueFailures ? loadQueue : null;
+  }, [queueFailures, loadQueue]);
+
+  useEffect(() => {
+    // Neues Turnier: nichts vom vorigen stehen lassen - weder seine Ansicht noch „letzter Stand vor X s“ noch der Reiter
+    // (es startet mit seiner Vorgabe; ein ?reiter= im Link setzt ihn danach).
+    if (slugRef.current !== slug) {
+      setTab(null);
+      setAutoTab("");
+    }
+    slugRef.current = slug;
+    hasView.current = false;
+    setData(null);
+    setError(null);
+    setLeadStale(false);
+    setLeadOkAt(0);
+    setClockOffset(0);
+    load();
+  }, [slug, load]);
   // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801). Bis
   // das Turnier geladen ist, jede; ohne sichtbares Event jede eines Turniers mit Event.
   const tournamentId = data?.tournament?.id;
@@ -125,18 +168,56 @@ export default function TournamentLeadPage() {
   const chosenTab = tab === "checkin" && !canCheckIn ? null
     : (tab === "stations" || tab === "cockpit") && !queue ? (queueLoaded ? null : "")
       : tab === "notice" && !canNotice ? (data ? null : "") : tab;
-  const activeTab = chosenTab === "" ? "" : chosenTab || defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded });
+  const keepAuto = autoTab && autoTabHolds(autoTab, { fall, cases, checkinPhase, queue });
+  const activeTab = chosenTab === "" ? "" : chosenTab || (keepAuto ? autoTab : defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded }));
+  // Der von selbst gezeigte Reiter bleibt stehen, solange sein Grund gilt (#2440): kommt die Warteschlange erst nach einem
+  // gescheiterten ersten Abruf, erscheint der Reiter „Cockpit“, die Ansicht springt aber nicht dorthin. Endet der Grund
+  // (Check-in vorbei, keine Fälle mehr, keine Warteschlange), folgt die Ansicht wieder der Vorgabe. Was jemand getippt
+  // hat (`tab`), bleibt ohnehin.
+  useEffect(() => {
+    if (activeTab && !chosenTab && activeTab !== autoTab) setAutoTab(activeTab);
+  }, [activeTab, chosenTab, autoTab]);
+  // Neue Ziele per Link bei offener Seite (Benachrichtigungen, #2440): ?fall= öffnet „Braucht Aufmerksamkeit“ an genau
+  // diesem Fall, ?reiter= den Reiter. Ausgelöst je Aufruf der Adresse (`location.key`): auch derselbe Link ein zweites
+  // Mal und derselbe ?reiter= in einem anderen Turnier. Ändert die Seite nur selbst die Adresse (?spiel=), bleibt alles.
+  // Die Adresse behält ?fall= - sie bleibt teilbar, und die Karte bleibt markiert. Beim ersten Laden gilt das schon über
+  // die Vorgabe bzw. den Startwert.
+  const location = useLocation();
+  const seenNav = useRef({ key: location.key, search: location.search, slug });
+  useEffect(() => {
+    const prev = seenNav.current;
+    if (prev.key === location.key) return;
+    seenNav.current = { key: location.key, search: location.search, slug };
+    const before = new URLSearchParams(prev.search);
+    // Dieselbe Adresse erneut geöffnet oder ein anderes Turnier: das Ziel gilt wieder.
+    const again = prev.search === location.search || prev.slug !== slug;
+    if (fall && (again || before.get("fall") !== fall)) {
+      scrolledTo.current = "";
+      setCaseJump((value) => value + 1);
+      setTab("attention");
+      return;
+    }
+    if (REITER_TABS[reiterParam] && (again || before.get("reiter") !== reiterParam)) setTab(REITER_TABS[reiterParam]);
+  }, [location.key, location.search, slug, fall, reiterParam]);
   // Das Cockpit (#1653) fragt kurz im Takt nach, solange es wirklich zu sehen ist (nicht im Check-in oder einem anderen
   // Reiter) - sonst wie bisher nur bei Änderungen.
   const cockpitOpen = activeTab === "cockpit";
   useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 0, tournamentId, eventId });
-  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter.
-  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: cockpitOpen ? COCKPIT_POLL_MS : 60000, tournamentId, eventId });
+  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter. Im Takt nur
+  // mit Warteschlange (#2440): online meldet der Strom Änderungen; scheiterte schon der erste Abruf, versucht es die
+  // Seite im Cockpit-Takt weiter. Nach Fehlern wird nur der Takt langsamer (queuePollMs, höchstens 60 s) - Meldungen aus
+  // dem Strom und das Wiederverbinden laden sofort, nie überlappend (useLiveQueue). Fehlt der Strom, fragt die Seite auch
+  // ohne Warteschlange im Rückfall-Takt - eine neu angelegte Station erscheint so trotzdem.
+  const queueBaseMs = queue ? (cockpitOpen ? COCKPIT_POLL_MS : 60000) : queueStatus === "unknown" ? COCKPIT_POLL_MS : 0;
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: queuePollMs(15000, queueFailures), pollMs: queuePollMs(queueBaseMs, queueFailures), tournamentId, eventId });
   // Die Probleme des Cockpits (#1653) - aus denselben Daten wie „Braucht Aufmerksamkeit“ und die Stationen.
   const problems = useMemo(() => cockpitProblems({ attention, draws, queue }), [attention, draws, queue]);
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.
   const compactTabs = Boolean(queue) || canCheckIn || canNotice;
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
+  // „Letzter Stand vor X s“ (#2440): im Cockpit und bei den Stationen zählen Ansicht und Warteschlange, sonst die Ansicht.
+  const queueShown = (activeTab === "cockpit" || activeTab === "stations") && Boolean(queue);
+  const staleSince = Math.min(...[leadStale ? leadOkAt : 0, queueShown ? queueStaleSince : 0].filter(Boolean), Infinity);
 
   const drawNow = async (card) => {
     setDeciding(true);
@@ -183,8 +264,7 @@ export default function TournamentLeadPage() {
       setStationJump((value) => value + 1);
       return;
     }
-    scrolledTo.current = "";
-    setCaseJump((value) => value + 1);
+    // Hinspringen übernimmt der Link selbst (?fall=, #2440: je Aufruf der Adresse) - hier nur sofort der Reiter.
     setTab("attention");
   };
 
@@ -321,6 +401,8 @@ export default function TournamentLeadPage() {
           ))}
         </div>
 
+        <LiveStaleNote since={Number.isFinite(staleSince) ? staleSince : 0} className="mt-3" testId="lead-stale" />
+
         {activeTab === "cockpit" && queue ? (
           <TournamentCockpit
             problems={problems}
@@ -353,7 +435,7 @@ export default function TournamentLeadPage() {
         {activeTab === "attention" ? (
           <div className="mt-5 space-y-3" data-testid="lead-attention">
             {data && cases === 0 ? <div className="rounded-sm border border-white/10 bg-[#121212] p-6 text-center text-white/50" data-testid="lead-attention-empty">Gerade hängt nichts.</div> : null}
-            {draws.map((card) => <DrawCard key={card.id} card={card} now={data?.now} highlighted={fall === card.id} busy={deciding} onDraw={() => drawNow(card)} />)}
+            {draws.map((card) => <DrawCard key={card.id} card={card} offset={clockOffset} highlighted={fall === card.id} busy={deciding} onDraw={() => drawNow(card)} />)}
             {attention.map((item) => (item.kind === "dispute" && byId[item.match_id]?.dispute ? (
               <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note, conflictReason) => keepResult(byId[item.match_id], note, conflictReason)} onChange={() => openEntry(item.match_id)} />
             ) : (
@@ -420,6 +502,21 @@ export default function TournamentLeadPage() {
   );
 }
 
+// ?reiter= aus Links (Verwaltung, Benachrichtigungen) → Reiter.
+const REITER_TABS = Object.freeze({ cockpit: "cockpit", checkin: "checkin", stationen: "stations", hinweis: "notice" });
+
+/**
+ * Ob ein von selbst gezeigter Reiter stehen bleibt (#2440): solange sein Grund gilt - Check-in im Check-in, „Braucht
+ * Aufmerksamkeit“ mit Fall oder Link, Cockpit mit Warteschlange; „Ergebnisse“ immer. Sonst folgt die Ansicht der Vorgabe.
+ */
+export function autoTabHolds(key, { fall = "", cases = 0, checkinPhase = false, queue = null } = {}) {
+  if (key === "results") return true;
+  if (key === "checkin") return Boolean(checkinPhase);
+  if (key === "attention") return Boolean(fall) || cases > 0;
+  if (key === "cockpit") return Boolean(queue);
+  return false;
+}
+
 /**
  * Womit die Turnierleitung startet, wenn kein Reiter gewählt ist: ein Fall aus einem Link (?fall=) öffnet „Braucht
  * Aufmerksamkeit“. Vor Ort mit Warteschlange ist das Cockpit der Einstieg (#1653) - es zeigt die Fälle mit; nur im
@@ -435,14 +532,14 @@ export function defaultLeadTab({ fall = "", cases = 0, checkinPhase = false, que
   return "results";
 }
 
-/** Restzeit bis zum automatischen Los: ganze Minuten, aus der Server-Uhr (`now`) weitergezählt. */
-export function drawCountdown(card, serverNow, clientNow = Date.now()) {
+/**
+ * Restzeit bis zum automatischen Los in ganzen Minuten. `now` ist die Serverzeit (ms) - seasons/clock.serverNow mit dem
+ * Abstand aus der Antwort (#2440), damit eine falsch gehende Geräteuhr nichts verschiebt.
+ */
+export function drawCountdown(card, now = Date.now()) {
   const due = card?.due_at ? new Date(card.due_at).getTime() : NaN;
-  const base = serverNow ? new Date(serverNow).getTime() : NaN;
   if (Number.isNaN(due)) return "";
-  // Die Server-Uhr gilt; was seit dem Laden vergangen ist, zählt der Browser dazu.
-  const elapsed = Number.isNaN(base) ? 0 : Math.max(0, clientNow - Math.min(base, clientNow));
-  const left = Math.ceil((due - (Number.isNaN(base) ? clientNow : base + elapsed)) / 60000);
+  const left = Math.ceil((due - now) / 60000);
   if (left <= 0) return "der Server lost jeden Moment selbst";
   return `automatisch in ${left} Min.`;
 }
@@ -454,7 +551,7 @@ export function drawTargetText(card) {
 }
 
 /** Show-Auslosung (#1590): der Topf steht - die Leitung lost mit einem Tipp, sonst der Server nach der Frist. */
-function DrawCard({ card, now, highlighted, busy, onDraw }) {
+function DrawCard({ card, offset = 0, highlighted, busy, onDraw }) {
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setTick(Date.now()), 30000);
@@ -470,7 +567,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold text-white">Auslosung bereit · {card.pot_size} {card.pot_size === 1 ? "Name" : "Namen"}</div>
           <div className="text-xs text-white/55 [overflow-wrap:anywhere]">{card.stage_name ? `${card.stage_name} · ` : ""}{drawTargetText(card)}</div>
-          <div className="text-[11px] text-brand" data-testid={`lead-draw-countdown-${card.group}`}>{drawCountdown(card, now, tick)}</div>
+          <div className="text-[11px] text-brand" data-testid={`lead-draw-countdown-${card.group}`}>{drawCountdown(card, serverNow(offset, tick))}</div>
         </div>
         {card.can_draw ? (
           <button type="button" disabled={busy} onClick={onDraw} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-draw-now-${card.group}`}>Jetzt auslosen</button>
