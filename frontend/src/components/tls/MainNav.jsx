@@ -57,10 +57,11 @@ export const NAV_STRUCTURE = [
       { to: "/teams", label: "Teams" },
       { to: "/seasons/current", label: "Jahreswertung" },
       { to: "/achievements", label: "Erfolge" },
-      { to: "/hilfe", label: "Hilfe" },
     ],
   },
   { key: "contact", to: "/contact", label: "Kontakt" },
+  // FAQ (#2448, Fabian 16.11.): letzter Eintrag rechts, am Handy im Menü - nicht mehr unter „Community“.
+  { key: "faq", to: "/faq", label: "FAQ" },
 ];
 
 function navTestId(label) {
@@ -68,7 +69,8 @@ function navTestId(label) {
 }
 
 // v4 (#2122 NW7): „Liga“ kommt aus dem Menü-Editor, „Home“ heißt „Start“ - ein altes Menü aus dem Browser zählt nicht mehr.
-const NAV_CACHE_KEY = "tls-public-nav-v4";
+// v5 (#2448): „FAQ“ steht oben statt „Hilfe“ unter „Community“.
+const NAV_CACHE_KEY = "tls-public-nav-v5";
 
 const GERMAN_NAV_LABELS = {
   ["Ue" + "bersicht"]: "Übersicht",

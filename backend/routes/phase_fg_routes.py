@@ -760,10 +760,11 @@ DEFAULT_NAV = {
             {"key": "community_teams", "to": "/teams", "label": "Teams", "visible": True},
             {"key": "season", "to": "/seasons/current", "label": "Jahreswertung", "visible": True},
             {"key": "achievements", "to": "/achievements", "label": "Erfolge", "visible": True},
-            # Hilfe (#2295, Fabian 09.11.): Anleitungen für Spieler und Captains; gespeicherte Menüs bekommen den Punkt dazu.
-            {"key": "help", "to": "/hilfe", "label": "Hilfe", "visible": True},
         ]},
         {"key": "contact", "to": "/contact", "label": "Kontakt", "visible": True, "order": 6},
+        # FAQ (#2448, Fabian 16.11.): letzter Eintrag rechts in der Hauptleiste, am Handy im Menü. Ersetzt „Hilfe“ unter
+        # „Community“ (#2295); gespeicherte Menüs bekommen den Punkt von selbst dazu.
+        {"key": "faq", "to": "/faq", "label": "FAQ", "visible": True, "order": 7},
     ],
 }
 
@@ -772,7 +773,8 @@ RETIRED_NAV_CHILD_KEYS = {
     "esports": {"teams", "references", "achievements", "season"},
     # „Werte & Ziele“ ist seit #1253 ein Abschnitt von „Über uns“ (/values leitet auf /about#werte weiter).
     "club": {"values"},
-    "community": {"members", "join"},
+    # „Hilfe“ (#2295) steht seit #2448 als „FAQ“ in der Hauptleiste.
+    "community": {"members", "join", "help"},
 }
 
 # Alte Beschriftungen, die es nicht mehr gibt: ein Name für die Erfolge (#1143).
