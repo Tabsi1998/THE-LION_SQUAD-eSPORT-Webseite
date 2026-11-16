@@ -294,6 +294,10 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
     await hide_unseen_event_links(db, user, tournaments)
     await attach_has_bracket_tree(db, tournaments)
+    if managed:
+        # Liga-Stand (#2453): Die Verwaltungsliste zeigt bei Staffeln den Stand der Season statt „Entwurf“ - für die, die sie verwalten.
+        await staffel_guard.attach_season_stand(
+            db, [t for t in tournaments if is_admin or staffeln.covers(t) or t.get("id") in assigned_ids])
     if compact:
         items = [_compact_tournament(t) for t in tournaments]
         if not paged:
@@ -337,6 +341,9 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         # Der Admin-Pfad der Season nur für die Verwaltung (Turnierleitung oder Strukturrechte).
         t["league_links"] = await staffel_guard.staffel_links(
             db, t, with_admin_path=is_admin or bool(t.get("can_manage_structure")))
+        if is_admin or t.get("can_manage_structure"):
+            # Liga-Stand (#2453): der Kopf der Staffel-Verwaltung zeigt den Stand der Season statt „Entwurf“.
+            await staffel_guard.attach_season_stand(db, [t])
     if not t.get("can_manage_structure") and "applications" not in (t.get("league_capabilities") or []):
         # Der Umbau-Vorschlag für die Läufe (#1550) und der für Austritt/Disqualifikation (#1553) sieht nur, wer ihn
         # auch bestätigen darf (Strukturrollen).

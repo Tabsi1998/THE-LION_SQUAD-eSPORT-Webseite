@@ -193,6 +193,31 @@ async def staffel_rebuild_problem(db, tournament: dict) -> str | None:
     return STAFFEL_REBUILD_REFUSED if await _staffel_started(db, tournament) else None
 
 
+# Liga-Stand in der Verwaltung (#2453): Eine Staffel steht bis „Liga starten“ im Status ``draft``. Die Verwaltung zeigt darum den Stand
+# der Season - abgeleitet an genau einer Stelle, der Ablaufleiste im Web (``lib/seasonTabs.js``, ``seasonPhases``). Der Server liefert nur,
+# woraus sie rechnet, und ob der Spielplan fest ist.
+SEASON_STAND_FIELDS = ("id", "status", "visibility", "application_opens_at", "application_closes_at", "start_date")
+
+
+async def attach_season_stand(db, tournaments: list[dict]) -> None:
+    """Setzt an jede Staffel ``league_season`` (die Felder oben, ``None`` ohne Season) und ``league_plan: {fixed_matches}`` (Spiele
+    außer der Vorschau). Zwei Abfragen für die ganze Liste. Nur für die Verwaltung - eine Season auf „aus“ ist sonst nirgends lesbar."""
+    staffeln = [row for row in tournaments if is_league_staffel(row) and row.get("id")]
+    if not staffeln:
+        return
+    season_ids = sorted({row["league_context"].get("season_id") for row in staffeln if row["league_context"].get("season_id")})
+    seasons = {row["id"]: row async for row in db.league_seasons.find(
+        {"id": {"$in": season_ids}}, {"_id": 0, **{field: 1 for field in SEASON_STAND_FIELDS}})} if season_ids else {}
+    fixed = {row["_id"]: row["count"] async for row in db.matches_v2.aggregate([
+        {"$match": {"tournament_id": {"$in": [row["id"] for row in staffeln]}, "is_preview": {"$ne": True}}},
+        {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},
+    ])}
+    for row in staffeln:
+        season = seasons.get(row["league_context"].get("season_id"))
+        row["league_season"] = {field: season.get(field) for field in SEASON_STAND_FIELDS} if season else None
+        row["league_plan"] = {"fixed_matches": int(fixed.get(row["id"], 0))}
+
+
 async def staffel_links(db, tournament: dict, *, with_admin_path: bool = True) -> dict | None:
     """Für den Kopf der Staffel-Verwaltung (S24, L-C1): „Liga 1 · Staffel A – Season öffnen · Ligaseite“."""
     if not is_league_staffel(tournament):
