@@ -22,6 +22,7 @@ PERSON_FIELDS = ("user_id", "owner_id", "sender_id", "recipient_id", "requester_
 MATCHES = "Match-Sammlung (matches_v2 bzw. die alte matches) je nach Turnierformat"
 CHATS = "die Chat-Sammlungen aus chat_attachments.MESSAGE_COLLECTIONS bzw. word_filter.CHAT_COLLECTIONS"
 MEDIA = "die Verwendungsstellen von Bildern aus media_audit (TARGETS, TEXT_TARGETS, USAGE_*)"
+OPS_ACKS = "die Quellen im Betrieb aus ops_acks.SPECS (Quittieren, #2447) - jede Sammlung wird auch direkt angesprochen"
 DYNAMIC = {
     "database.py:init_audit_indexes:getattr(db, collection)": "Indexliste in database.py; jede Sammlung steht dort als Text",
     "database.py:blocked_unique_indexes:getattr(db, collection)": "Indexliste in database.py; jede Sammlung steht dort als Text",
@@ -41,6 +42,12 @@ DYNAMIC = {
     "routes/station_routes.py:_assign_match_to_station:db[collection_name]": MATCHES,
     "routes/station_routes.py:clear_station:db[collection_name]": MATCHES,
     "services/account_erasure.py:_clean:getattr(db, collection)": MEDIA,
+    # Quittieren im Betrieb (#2447): die Quellen aus ops_acks.SPECS, jede Sammlung steht dort als Text.
+    "routes/admin_routes.py:_rows:getattr(db, ops_acks.SPECS[source].collection)": OPS_ACKS,
+    "services/ops_acks.py:_count_open_rows:getattr(db, spec.collection)": OPS_ACKS,
+    "services/ops_acks.py:acknowledge:getattr(db, spec.collection)": OPS_ACKS,
+    "services/ops_acks.py:_ack_source:getattr(db, spec.collection)": OPS_ACKS,
+    "services/ops_acks.py:problem_rows:getattr(db, spec.collection)": OPS_ACKS,
     # Bestand fürs Backup-Manifest (#1009/#1010): zählt nur, liest keine Inhalte und schreibt nichts.
     "services/backup_inventory.py:collection_counts:db[name]": "alle Sammlungen, nur gezählt (Backup-Manifest)",
     "services/backup_inventory.py:figures:db[collection]": "backup_inventory.FIGURES (Anmeldungen, Rechnungen, Bestellungen, Mitgliedschaften)",

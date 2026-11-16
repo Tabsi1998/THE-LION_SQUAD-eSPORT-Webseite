@@ -333,7 +333,11 @@ async def wanted_roles_by_user(db, user_ids: list[str]) -> dict[str, set[str]]:
 
 
 async def record_state(db, **fields) -> None:
-    await db.settings.update_one({"id": "discord_bot_state"}, {"$set": {**fields, "updated_at": now_utc().isoformat()}, "$setOnInsert": {"id": "discord_bot_state"}}, upsert=True)
+    update = {"$set": {**fields, "updated_at": now_utc().isoformat()}, "$setOnInsert": {"id": "discord_bot_state"}}
+    if "last_error" in fields and not fields["last_error"]:
+        # Wieder ohne Fehler (#2447): eine Quittierung unter Betrieb gilt nur für den Fehler, der damals anstand.
+        update["$unset"] = {"ack": ""}
+    await db.settings.update_one({"id": "discord_bot_state"}, update, upsert=True)
 
 
 async def read_state(db) -> dict:

@@ -44,6 +44,10 @@ PROOF_PHOTO = ("id", "match_id", "tournament_id", "registration_id", "type", "li
                "status", "created_at", "updated_at")
 
 
+# Betrieb (#2447): Kennung der Person, die einen Eintrag quittiert bzw. gelöst hat - nicht die der Auskunft.
+OPS_ACTOR_FIELDS = ("acknowledged_by", "resolved_by")
+
+
 def _clean(row: dict, *drop: str) -> dict:
     return {key: value for key, value in row.items() if key not in HIDDEN_KEYS and key not in drop}
 
@@ -251,12 +255,13 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("blocks", _rows(db.user_blocks, {"blocker_id": user_id})),
         ("moderation_reports", _rows(db.user_reports, {"$or": [{"reporter_id": user_id}, {"target_user_id": user_id}]},
                                      _report(user_id))),
-        ("email_logs", _rows(db.email_logs, {"to": email})),
+        # Wer im Betrieb quittiert bzw. gelöst hat (#2447), ist eine andere Person - wie die übrigen fremden ``*_by``.
+        ("email_logs", _rows(db.email_logs, {"to": email}, lambda row: _clean(row, *OPS_ACTOR_FIELDS))),
         ("mobile_devices", _rows(db.mobile_push_tokens, me, lambda row: _clean(row, "token"))),
         # Browser-Benachrichtigungen (#1163): welcher Browser, seit wann - ohne Adresse und Schlüssel beim Push-Dienst.
         ("web_push_browsers", _rows(db.web_push_subscriptions, me,
                                     _pick("browser", "private_content", "created_at", "updated_at", "last_sent_at"))),
-        ("mobile_client_logs", _rows(db.mobile_client_logs, me)),
+        ("mobile_client_logs", _rows(db.mobile_client_logs, me, lambda row: _clean(row, *OPS_ACTOR_FIELDS))),
         ("audit_trail", _rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}, _audit_entry(user_id))),
         # Nachrichten an alle Angemeldeten eines Events (#1372), die die Person als Turnierleitung geschickt hat.
         ("event_messages_sent", _rows(db.event_messages, {"actor_id": user_id}, _pick("id", "event_id", "text", "recipient_count", "created_at"))),

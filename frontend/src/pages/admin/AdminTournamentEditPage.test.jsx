@@ -41,7 +41,7 @@ vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: () => <div d
 vi.mock("@/components/tls/AccessLinksPanel", () => ({ AccessLinksPanel: () => <div data-testid="access-links" /> }));
 vi.mock("@/components/tls/TournamentFlowStepper", () => ({ TournamentFlowStepper: () => <div data-testid="flow-stepper" /> }));
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn(), info: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 
 const { AdminTournamentEditPage } = await import("./AdminTournamentEditPage").then((module) => ({
   AdminTournamentEditPage: module.default || module.AdminTournamentEditPage,
@@ -1055,6 +1055,44 @@ test("nach dem Ende gibt es kein Zurücksetzen mehr", async () => {
   serveFixed({ status: "results_published" });
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
   expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
+});
+
+// Abschluss nachholen (#2452): nur bei veröffentlichten Turnieren, mit Rückfrage, ohne Statuswechsel.
+test("Abschluss nachholen: Rückfrage, dann derselbe Status mit recheck", async () => {
+  const user = userEvent.setup();
+  serveFixed({ status: "results_published" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+  apiMock.post.mockImplementation(() => Promise.resolve({ data: { ok: true, rechecked: true, awards: 8 } }));
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+  await user.click(screen.getByTestId("admin-tr-recheck-results"));
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("genau einmal");
+  // Ehrlich: Neues wird wie sonst gemeldet - nur kein „Turnier beendet“ und nichts im Discord-Kanal.
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("erhält die übliche Meldung zu Erfolg bzw. Gewinn");
+  expect(screen.getByTestId("confirm-dialog")).not.toHaveTextContent("niemand bekommt eine Nachricht");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/status", { status: "results_published", recheck: true }));
+});
+
+test("Abschluss nachholen mit gescheitertem Schritt: Warnung mit dem Schritt statt „nachgeholt“", async () => {
+  const user = userEvent.setup();
+  const { toast } = await import("sonner");
+  serveFixed({ status: "results_published" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  toast.success.mockClear();
+  apiMock.post.mockImplementation(() => Promise.resolve({ data: { ok: false, rechecked: true, awards: 8, failed: ["season_points"], failed_labels: ["Jahreswertung"] } }));
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+  await user.click(screen.getByTestId("admin-tr-recheck-results"));
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("gescheitert: Jahreswertung"), { duration: 12000 }));
+  expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("Abschluss nachgeholt"));
+});
+
+test("Abschluss nachholen gibt es erst nach dem Veröffentlichen", async () => {
+  serveFixed({ status: "completed" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.queryByTestId("admin-tr-recheck-results")).toBeNull();
 });
 
 test("im festen Baum: kein Entfernen und kein Ablehnen - wer nicht spielt, bleibt entfernbar", async () => {

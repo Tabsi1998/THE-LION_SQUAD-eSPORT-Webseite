@@ -14,6 +14,7 @@ import { SelectField, modeLabel } from "./TournamentEditForm";
 import { DrawControls } from "./DrawControls";
 import { NO_MATCH_FORMATS } from "@/lib/tournamentFormFields";
 import { sourceLabel } from "@/lib/slotSource";
+import { isCancelled } from "@/lib/bracketGraph";
 import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, drawShowMinutesPayload, guardDetail, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
 
@@ -315,7 +316,8 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
             <span>·</span>
             <span>{formatStageType(stage.stage_type)}</span>
             <span>·</span>
-            <span>{matches.length} Spiele</span>
+            {/* Entfallene Spiele (zusammengelegt, Reset nicht nötig) zählen nicht mit (#2452) - sie stehen als „Entfällt“ daneben. */}
+            <span data-testid={`stage-match-count-${stage.id}`}>{matches.filter((match) => !isCancelled(match)).length} Spiele</span>
             {settings.event_mode && <span>· {modeLabel(EVENT_MODE_OPTIONS, settings.event_mode)}</span>}
             {settings.result_entry_mode && <span>· {modeLabel(RESULT_ENTRY_MODE_OPTIONS, settings.result_entry_mode)}</span>}
             {settings.schedule_mode && <span>· {modeLabel(SCHEDULE_MODE_OPTIONS, settings.schedule_mode)}</span>}

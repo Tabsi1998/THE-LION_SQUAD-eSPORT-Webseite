@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 STATUS_ORDER = {"ok": 0, "warn": 1, "crit": 2}
 HISTORY_DAYS = 7
 CHECK_INTERVAL_MINUTES = 5
+# „Jetzt neu prüfen“ (#2447): höchstens so oft je Minute und Person - ein Lauf prüft Platte, Uploads und Bilder.
+RUN_NOW_LIMIT_PER_MINUTE = 3
 
 DB_WARN_MS = 250
 DB_CRIT_MS = 1000
@@ -677,9 +679,10 @@ async def record_episode(db, run: dict) -> dict | None:
         )
         if extended:
             return {**extended, "changed": False}
-        # Ein anderer Stand war offen: zu - nur, solange er noch offen ist und nicht dieser Stand ist.
+        # Ein anderer Stand war offen: zu - nur, solange er noch offen ist und nicht dieser Stand ist. ``closed_by_status``
+        # (#2447): wurde es danach grün, ist eine Warnung „behoben“, sonst von einem anderen Stand „abgelöst“.
         await db.ops_check_episodes.update_many({"open": True, "signature": {"$ne": signature}},
-                                                {"$unset": {"open": ""}, "$set": {"closed_at": at}})
+                                                {"$unset": {"open": ""}, "$set": {"closed_at": at, "closed_by_status": status}})
         episode = {"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": status, "signature": signature, "open": True,
                    "failing": list(run.get("failing") or []), "counts": counts, "expires_at": expires_at}
         try:

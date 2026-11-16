@@ -422,6 +422,8 @@ async def init_indexes():
     await db.site_banner_stats.create_index("id", unique=True)
     await db.email_logs.create_index("created_at")
     await db.email_logs.create_index("contact_id", sparse=True)
+    # Betrieb (#2447): „auffällig“ zählt fehlgeschlagene/übersprungene Sendungen in der Datenbank.
+    await db.email_logs.create_index([("status", 1), ("created_at", -1)])
     await db.seasons.create_index("id", unique=True)
     await db.seasons.create_index("slug", unique=True)
     await db.seasons.create_index("slug_history")
