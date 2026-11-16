@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.12`: Build 106, Turniertag: Cockpit, Spielzeit-Uhr, Hinweis der Turnierleitung (#2393)
 - `1.7.11`: Build 105, Liga Teil 2: Gesamtwertung, Trophäen mit Filtern, Embleme, Rankingbanner, Nachmeldung, Hinweis zur Backup-Pause (#2173)
 - `1.7.10`: Build 104, Liga in der App: Check-in, Map-Veto live, Matchablauf, Anmeldestatus, Tabelle mit Zonen, Season-Historie, Belohnungen und Zeremonie (#2173)
 - `1.7.9`: Build 103, Wunschnummer in der Mitgliedschaft wählen bzw. per Antrag ändern (#2050)

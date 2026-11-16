@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.12 - 2026-11-16
+
+- Mobile: Turnier-Cockpit für die Turnierleitung vor Ort: Probleme nach Dringlichkeit, Stationen aufrufen, starten, freigeben und Defekt melden. (#2393)
+- Mobile: Spielzeit-Uhr mit Balken in Cockpit, Ergebnissen, Baum und Spielplan, orange ab 80 %, steht in der Turnierpause. (#2393)
+- Mobile: Auslosung mit „Jetzt auslosen“ und Restzeit nach der Serverzeit. (#2393)
+- Mobile: Hinweis der Turnierleitung als Banner auf Turnier- und Event-Seite, Reiter „Hinweis“ zum Schreiben mit Protokoll. (#2393)
+- Mobile: Ein Hinweis an das ganze Event öffnet die Event-Seite. (#2393)
+- Mobile: Cockpit behält ohne Verbindung den letzten Stand, ein Doppeltipp schickt nichts doppelt. (#2393)
+
 ## 1.7.11 - 2026-11-16
 
 - Mobile: Gesamtwertung der Liga je Liga N mit Co-Teams, Spielern, Punkten je Season und Streichergebnis. (#2173)
