@@ -80,7 +80,7 @@ async def test_a_role_change_sends_one_message_unchanged_saving_none(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_paused_assignment_hears_nothing_about_a_role_change(flow):
+async def test_a_paused_assignment_hears_once_when_it_becomes_active(flow):
     staff = await flow.add_staff()
     flow.act_as(staff)
     tournament = await flow.create_tournament(title="Mario Kart Cup")
@@ -88,7 +88,18 @@ async def test_a_paused_assignment_hears_nothing_about_a_role_change(flow):
     url = f"/api/tournaments/{tournament['id']}/staff"
     assignment = (await flow.post(url, json={"user_id": helper["id"], "role": "scorekeeper", "is_active": False})).json()
     await flow.patch(f"{url}/{assignment['id']}", json={"role": "referee"})
-    assert await notes(flow, helper) == []
+    assert await notes(flow, helper) == [], "Rollenwechsel während der Pause schicken nichts"
+
+    # Aktiv geschaltet: genau eine Nachricht - mit der Rolle, die jetzt gilt; erneutes Pausieren und Aktivieren schickt keine.
+    activated = await flow.patch(f"{url}/{assignment['id']}", json={"is_active": True})
+    assert activated.status_code == 200, activated.text
+    rows = await notes(flow, helper)
+    assert len(rows) == 1 and "als Schiedsrichter" in rows[0]["body"]
+    for active in (False, True):
+        toggled = await flow.patch(f"{url}/{assignment['id']}", json={"is_active": active})
+        assert toggled.status_code == 200
+    assert len(await notes(flow, helper)) == 1
+    assert len(await mails(flow, helper)) == 1
 
 
 @pytest.mark.asyncio

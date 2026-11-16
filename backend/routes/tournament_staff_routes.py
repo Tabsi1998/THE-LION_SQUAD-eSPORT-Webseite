@@ -201,8 +201,13 @@ async def update_tournament_staff(tid: str, assignment_id: str, body: Tournament
         {"assignment_id": assignment_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
     )
     updated = await db.tournament_staff_assignments.find_one({"id": assignment_id}, {"_id": 0})
-    # Neue Rolle (#1384): genau eine Nachricht - nicht bei unverändertem Speichern, nicht für einen pausierten Einsatz.
-    if updated and updated.get("role") != current.get("role") and updated.get("is_active", True) is not False:
+    # Nachricht (#1384): Wer pausiert eingetragen war und jetzt aktiv wird, bekommt die Nachricht zum Eintragen - je Einsatz
+    # einmal (derselbe Schlüssel wie beim Eintragen). Eine neue Rolle bei aktivem Einsatz: genau eine Nachricht. Während der
+    # Pause und bei unverändertem Speichern: keine.
+    active_now = bool(updated) and updated.get("is_active", True) is not False
+    if active_now and current.get("is_active") is False:
+        await _notify_helper(db, tid, updated)
+    elif active_now and updated.get("role") != current.get("role"):
         await _notify_helper(db, tid, updated, role_changed=True)
     return (await _enrich_staff_assignments([updated]))[0]
 
