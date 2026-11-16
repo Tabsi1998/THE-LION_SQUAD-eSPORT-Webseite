@@ -130,7 +130,8 @@ describe("Check-in", () => {
 describe("Kleinigkeiten", () => {
   test("Live-Uhr ab dem Start", () => {
     expect(liveClockText("2026-10-31T13:00:00Z", new Date("2026-10-31T13:07:41Z").getTime())).toBe("07:41");
-    expect(liveClockText("2026-10-31T13:00:00Z", new Date("2026-10-31T14:02:05Z").getTime())).toBe("62:05");
+    // Über eine Stunde mit Stunden wie im Web (#1167, #2393) - vorher liefen die Minuten über 59 weiter („62:05“).
+    expect(liveClockText("2026-10-31T13:00:00Z", new Date("2026-10-31T14:02:05Z").getTime())).toBe("1:02:05");
     expect(liveClockText(null, Date.now())).toBe("");
     expect(liveClockText("2026-10-31T13:00:00Z", new Date("2026-10-31T12:59:00Z").getTime())).toBe("00:00");
   });

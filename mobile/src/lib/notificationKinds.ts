@@ -44,6 +44,8 @@ const KIND_LABELS: Record<string, string> = {
   tournament_update: "Turnier geändert",
   tournament_updates: "Turnier geändert",
   tournament_finished: "Turnier beendet",
+  // Hinweis der Turnierleitung (#1166, #2393): ein Satz an alle im Turnier oder Event - wie die Überschrift im Web.
+  tournament_notice: "Hinweis der Turnierleitung",
   feedback_request: "Rückmeldung",
   prize_pending: "Gewinn",
   prize_ready: "Gewinn abholbereit",

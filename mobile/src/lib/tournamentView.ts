@@ -4,6 +4,7 @@ import { DRAW_STATE_TEXT, drawStateOf } from "./advancement";
 import { isByeSlot, isCancelled, isDone, isLive, isWalkover, matchFate, sectionGroup, soloAdvance, type BracketMatch } from "./bracketGraph";
 import { sectionKind } from "./bracketSections";
 import { formatStatus } from "./format";
+import { clockText, elapsedSeconds } from "./matchClock";
 import { knownZone, lateEntryText } from "./leagueTeam";
 
 // ---------------------------------------------------------------------------------------------------- Rundennamen
@@ -188,12 +189,9 @@ export function checkInState(tournament: CheckInFields | null | undefined, now: 
 }
 
 // ------------------------------------------------------------------------------------------------------ Kleinigkeiten
-/** Spielzeit seit dem Start: „07:41“ (Minuten laufen über 59 weiter). */
+/** Spielzeit seit dem Start: „07:41“, ab einer Stunde mit Stunden („1:02:05“) - dieselbe Rechnung wie die Spielzeit-Uhr (#1167, lib/matchClock). */
 export function liveClockText(startedAt: string | null | undefined, now: number) {
-  const start = startedAt ? Date.parse(startedAt) : NaN;
-  if (!Number.isFinite(start)) return "";
-  const seconds = Math.max(0, Math.floor((now - start) / 1000));
-  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  return clockText(elapsedSeconds(startedAt, now));
 }
 
 const REMOVED = new Set(["disqualified", "withdrawn"]);

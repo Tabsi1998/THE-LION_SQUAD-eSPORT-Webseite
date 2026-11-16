@@ -35,7 +35,10 @@ export type ResultEntry = {
   station_text?: string | null;
   scheduled_at?: string | null;
   started_at?: string | null;
-  timing?: { running_minutes?: number | null; overdue_minutes?: number | null; missing?: boolean } | null;
+  // Spielzeit-Uhr (#1167, #2393): Turnierpause und frühere Pausen - freiwillig, ältere Server lassen sie weg.
+  paused_at?: string | null;
+  paused_seconds?: number | null;
+  timing?: { running_minutes?: number | null; overdue_minutes?: number | null; missing?: boolean; duration_minutes?: number | null } | null;
   can_enter?: boolean;
   // Streitfall (#1158): nur in der Ansicht der Turnierleitung.
   dispute?: {

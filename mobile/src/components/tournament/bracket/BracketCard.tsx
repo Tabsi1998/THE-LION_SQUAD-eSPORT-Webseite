@@ -31,7 +31,7 @@ type Props = {
   y: number;
   w: number;
   status: string;
-  live: { station: string; startedAt: string | null } | null;
+  live: { station: string; startedAt: string | null; durationMinutes?: number | null; pausedAt?: string | null; pausedSeconds?: number | null } | null;
   dim: boolean;
   selected: string | null;
   motion: { rows?: Map<string, RowMotion>; result?: boolean; walkover?: boolean; fate?: boolean; lift?: CardLift; key: string } | null;
@@ -93,7 +93,7 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
           <View style={styles.liveHead}>
             <Animated.View style={[styles.liveDot, breatheStyle(reduce)]} />
             <Text style={styles.liveText} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{live.station || "läuft"}</Text>
-            {live.startedAt ? <><Text style={styles.liveText}> · </Text><LiveClock startedAt={live.startedAt} style={styles.liveText} /></> : null}
+            {live.startedAt ? <><Text style={styles.liveText}> · </Text><LiveClock startedAt={live.startedAt} durationMinutes={live.durationMinutes} pausedAt={live.pausedAt} pausedSeconds={live.pausedSeconds} style={styles.liveText} /></> : null}
           </View>
         ) : (
           <Text style={[styles.status, model.walkover && styles.walkover, model.drawState === "ready" && styles.statusReady]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{status}</Text>
