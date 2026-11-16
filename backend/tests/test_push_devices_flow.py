@@ -248,3 +248,118 @@ async def test_kachel_zaehlt_nur_fehler_aktiver_geraete(flow):
     summary = await mobile_push_health_summary()
     assert summary["receipt_errors"] == 1
     assert summary["latest_problem"]["last_receipt_error"] == "MessageRateExceeded"
+
+
+class _Collection:
+    """Reicht alles an die echte Collection weiter; vor dem ersten Aufräumen der Installation läuft ``before_cleanup``."""
+
+    def __init__(self, real, before_cleanup):
+        self._real = real
+        self._before_cleanup = before_cleanup
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    async def delete_many(self, query, *args, **kwargs):
+        if "installation_id" in query and self._before_cleanup:
+            hook, self._before_cleanup = self._before_cleanup, None
+            await hook()
+        return await self._real.delete_many(query, *args, **kwargs)
+
+
+class _Db:
+    def __init__(self, real, collection):
+        self._real = real
+        self.mobile_push_tokens = collection
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+@pytest.mark.asyncio
+async def test_gleichzeitige_anmeldungen_derselben_installation_lassen_den_spaeteren_stehen(flow, monkeypatch):
+    from routes import mobile_routes
+
+    user = await flow.add_user(name="doppelt")
+    # Ein früherer Token derselben Installation: beide Anmeldungen finden etwas zum Ersetzen.
+    await _token(flow, "ExponentPushToken[gleichzeitig-alt-01]", user["id"], updated_days=10, installation_id=INSTALLATION)
+    clock = iter([now_utc() - timedelta(seconds=2), now_utc() - timedelta(seconds=1)])
+    monkeypatch.setattr(mobile_routes, "now_utc", lambda: next(clock))
+    first = mobile_routes.MobilePushTokenCreate(token="ExponentPushToken[gleichzeitig-a-0001]", platform="android", installation_id=INSTALLATION)
+    second = mobile_routes.MobilePushTokenCreate(token="ExponentPushToken[gleichzeitig-b-0001]", platform="android", installation_id=INSTALLATION)
+
+    # A hat seinen Eintrag geschrieben; bevor A die alten Einträge der Installation löscht, läuft B ganz durch.
+    async def second_runs_in_between():
+        monkeypatch.setattr(mobile_routes, "get_db", lambda: flow.db)
+        await mobile_routes.register_mobile_push_token(second, user)
+
+    monkeypatch.setattr(mobile_routes, "get_db", lambda: _Db(flow.db, _Collection(flow.db.mobile_push_tokens, second_runs_in_between)))
+    await mobile_routes.register_mobile_push_token(first, user)
+
+    rows = await flow.db.mobile_push_tokens.find({"installation_id": INSTALLATION}, {"_id": 0, "token": 1}).to_list(10)
+    assert [row["token"] for row in rows] == ["ExponentPushToken[gleichzeitig-b-0001]"]
+
+
+@pytest.mark.asyncio
+async def test_verwaltung_bekommt_die_installations_kennung_nicht(flow):
+    admin = await flow.add_user(role="club_admin", name="sysadmin3")
+    target = await flow.add_user(name="kennung-geheim")
+    flow.act_as(target)
+    await _register(flow, "ExponentPushToken[kennung-geheim-0001]", installation_id=INSTALLATION)
+
+    flow.act_as(admin)
+    for url in (f"/api/admin/mobile-push/status/{target['id']}", "/api/admin/mobile-push/users"):
+        answer = await flow.get(url)
+        assert answer.status_code == 200
+        assert INSTALLATION not in answer.text
+        assert "installation_id" not in answer.text
+
+
+@pytest.mark.asyncio
+async def test_erneutes_abmelden_verlaengert_die_frist_nicht(flow):
+    user = await flow.add_user(name="doppelt-ab")
+    flow.act_as(user)
+    token = "ExponentPushToken[doppelt-abmelden-001]"
+    await _register(flow, token)
+    first = await flow.client.request("DELETE", "/api/mobile/push-token", json={"token": token})
+    assert first.status_code == 200
+    stamp = "2026-10-01T10:00:00+00:00"
+    await flow.db.mobile_push_tokens.update_one({"token": token}, {"$set": {"disabled_at": stamp}})
+
+    again = await flow.client.request("DELETE", "/api/mobile/push-token", json={"token": token})
+    assert again.status_code == 200
+    row = await flow.db.mobile_push_tokens.find_one({"token": token}, {"_id": 0})
+    assert row["enabled"] is False
+    assert row["disabled_at"] == stamp
+
+
+@pytest.mark.asyncio
+async def test_erneute_anmeldung_beendet_die_frist(flow):
+    user = await flow.add_user(name="zurueck")
+    flow.act_as(user)
+    token = "ExponentPushToken[wieder-angemeldet-01]"
+    await _token(flow, token, user["id"], enabled=False, disabled_days=40, updated_days=40)
+
+    answer = await _register(flow, token)
+    assert answer.status_code == 200
+    row = await flow.db.mobile_push_tokens.find_one({"token": token}, {"_id": 0})
+    assert row["enabled"] is True
+    assert "disabled_at" not in row
+
+    assert (await ops_alerts.purge_old_logs(flow.db))["push_devices"] == 0
+    assert await flow.db.mobile_push_tokens.count_documents({"token": token}) == 1
+
+
+@pytest.mark.asyncio
+async def test_frist_unter_sieben_tagen_wird_abgelehnt(flow):
+    with pytest.raises(ValueError):
+        await ops_alerts.save_alert_settings(flow.db, {"retention_days": {"push_devices": 6}})
+    assert (await ops_alerts.load_alert_settings(flow.db))["retention_days"]["push_devices"] == 30
+
+    admin = await flow.add_user(role="club_admin", name="sysadmin4")
+    flow.act_as(admin)
+    refused = await flow.put("/api/admin/ops/alerts", json={"retention_days": {"push_devices": 3}})
+    assert refused.status_code == 400
+    accepted = await flow.put("/api/admin/ops/alerts", json={"retention_days": {"push_devices": 7}})
+    assert accepted.status_code == 200
+    assert (await ops_alerts.load_alert_settings(flow.db))["retention_days"]["push_devices"] == 7
