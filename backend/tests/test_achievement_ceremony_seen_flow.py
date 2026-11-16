@@ -239,3 +239,17 @@ async def test_a_catalog_migration_does_not_flood(flow):
     moved = await flow.db.user_achievements.find_one({"user_id": person["id"], "tier_code": "mentor_1"})
     assert moved and moved.get("migrated_at")
     assert (await state(flow, person))["unseen"] == []
+
+
+@pytest.mark.asyncio
+async def test_recount_markers_keep_the_newest(flow):
+    person = await flow.add_user()
+    await start(flow, person, recount_markers=[f"alt-{n}" for n in range(20)])
+    for n in range(5):
+        await seen(flow, person, recount_marker=f"neu-{n}")
+    markers = (await state(flow, person))["recount_seen"]
+    # Die neuesten zählen - die jüngste Kennung muss dabei sein, gespeichert wird höchstens die Grenze.
+    assert len(markers) == achievement_ceremony.MAX_MARKERS
+    assert markers[-5:] == [f"neu-{n}" for n in range(5)]
+    stored = await flow.db.ceremony_seen.find_one({"user_id": person["id"]})
+    assert len(stored["recount_seen"]) == achievement_ceremony.MAX_MARKERS

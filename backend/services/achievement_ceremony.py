@@ -128,7 +128,8 @@ async def state(db, user_id: str) -> dict:
         "since": row.get("since"),
         "unseen": await _unseen_codes(db, user_id, row),
         "level": seen_level,
-        "recount_seen": [str(marker) for marker in row.get("recount_seen") or []][:MAX_MARKERS],
+        # Die neuesten Kennungen zählen - sie stehen hinten.
+        "recount_seen": [str(marker) for marker in row.get("recount_seen") or []][-MAX_MARKERS:],
     }
 
 
@@ -155,9 +156,11 @@ async def _raise_level(db, user_id: str, row: dict, level: dict | None) -> None:
 
 
 async def _add_markers(db, user_id: str, markers) -> None:
-    markers = [str(marker)[:MAX_TEXT] for marker in markers or [] if isinstance(marker, str) and marker][:MAX_MARKERS]
+    markers = [str(marker)[:MAX_TEXT] for marker in markers or [] if isinstance(marker, str) and marker][-MAX_MARKERS:]
     if markers:
         await db.ceremony_seen.update_one({"user_id": user_id}, {"$addToSet": {"recount_seen": {"$each": markers}}})
+        # Gekappt wird beim Schreiben: nur die neuesten MAX_MARKERS bleiben.
+        await db.ceremony_seen.update_one({"user_id": user_id}, {"$push": {"recount_seen": {"$each": [], "$slice": -MAX_MARKERS}}})
 
 
 async def mark_seen(db, user_id: str, *, codes: list[str] | None = None, level: dict | None = None,
