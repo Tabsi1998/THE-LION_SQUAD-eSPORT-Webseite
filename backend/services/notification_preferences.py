@@ -412,9 +412,14 @@ def level_preferences(level: str) -> dict[str, bool]:
     return prefs
 
 
-def new_account_preferences() -> dict[str, bool]:
-    """Die Schalter eines neuen Kontos: die Stufe ``NEW_ACCOUNT_LEVEL``."""
-    return level_preferences(NEW_ACCOUNT_LEVEL)
+def new_account_preferences(newsletter_consent: bool = False) -> dict[str, bool]:
+    """Die Schalter eines neuen Kontos: die Stufe ``NEW_ACCOUNT_LEVEL`` - nur News & Events richtet sich nach dem Haken beim
+    Newsletter (Fabians Entscheidung M5): ohne Zustimmung still in der Glocke („Nur App“), mit Zustimmung per Push. Ohne
+    Haken zeigt das Konto deshalb „Eigene Auswahl“ - so gewollt. Eine Einladung durch die Verwaltung hat keine Zustimmung."""
+    prefs = level_preferences(NEW_ACCOUNT_LEVEL)
+    if not newsletter_consent:
+        prefs.update(mode_preferences("news_events", "app"))
+    return prefs
 
 
 def _topic_state(prefs: dict[str, bool], topic: str) -> tuple[bool, bool, bool]:

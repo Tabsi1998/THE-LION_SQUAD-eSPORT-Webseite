@@ -80,12 +80,21 @@ def test_an_own_change_shows_custom_and_the_three_modes_are_exact():
     assert notification_level(_user(prefs)) == "important"
 
 
-def test_new_accounts_start_with_all():
-    user = _user(new_account_preferences())
-    assert notification_level(user) == "all"
-    # News per Push ja, per Mail nur mit Newsletter-Zustimmung - wie bisher.
-    assert push_allowed(user, "news_mention", "news_events") is True
-    assert email_allowed(user, "newsletter_news", "news_events") is False
+def test_new_accounts_start_with_all_news_only_with_consent():
+    """M5 (Fabians Entscheidung): „Alles“, aber News & Events ohne Newsletter-Haken nur in der Glocke."""
+    with_consent = _user(new_account_preferences(True), newsletter=True)
+    assert notification_level(with_consent) == "all"
+    assert push_allowed(with_consent, "news_mention", "news_events") is True
+    without = _user(new_account_preferences(False))
+    assert notification_level(without) == "custom"
+    assert topic_modes(without)["news_events"] == "app"
+    assert notification_allowed(without, "news_mention", "news_events") is True
+    assert push_allowed(without, "news_mention", "news_events") is False
+    assert browser_allowed(without, "news_mention", "news_events") is False
+    assert email_allowed(without, "newsletter_news", "news_events") is False
+    # Alle anderen Themen wie „Alles“ - und ohne Angabe heißt: kein Haken.
+    assert {k: v for k, v in topic_modes(without).items() if k != "news_events"} == {k: "push" for k in LEVEL_TOPICS if k != "news_events"}
+    assert new_account_preferences() == new_account_preferences(False)
 
 
 def test_old_accounts_keep_their_switches_and_see_custom():

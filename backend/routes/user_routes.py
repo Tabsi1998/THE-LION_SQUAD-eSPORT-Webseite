@@ -483,7 +483,8 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         "accepted_terms": False,
         "consent_required": True,
         "newsletter_consent": False,
-        "notification_preferences": new_account_preferences(),  # Stufe „Alles“ (#1204)
+        # Stufe „Alles“ (#1204); eine Einladung hat keine Newsletter-Zustimmung - News & Events nur in der Glocke.
+        "notification_preferences": new_account_preferences(False),
         "dm_privacy": "everyone",
         "favorite_games": [],
         "created_at": now_utc().isoformat(),

@@ -103,23 +103,83 @@ async def test_only_own_settings(flow):
     assert (await flow.get("/api/users/me/notification-preferences")).status_code == 401
 
 
-@pytest.mark.asyncio
-async def test_a_new_account_starts_with_all(flow, monkeypatch):
-    """Website, App, Google und Einladung legen Konten an - geprüft über die Registrierung der App (ohne Formular-Token)."""
-    from services.notification_preferences import notification_level
+def _expected(newsletter: bool) -> dict:
+    """Neue Konten (#1204, M5): Stufe „Alles“ - News & Events ohne Newsletter-Haken nur in der Glocke."""
+    prefs = level_preferences("all")
+    if not newsletter:
+        prefs.update(mode_preferences("news_events", "app"))
+    return prefs
+
+
+async def _check_new_account(flow, query: dict, newsletter: bool):
+    from services.notification_preferences import notification_level, topic_modes
+
+    stored = await flow.db.users.find_one(query, {"_id": 0})
+    assert stored is not None, query
+    assert stored["notification_preferences"] == _expected(newsletter)
+    assert bool(stored.get("newsletter_consent")) is newsletter
+    assert topic_modes(stored)["news_events"] == ("push" if newsletter else "app")
+    assert topic_modes(stored)["achievements"] == "push"
+    # Ohne Haken zeigt das Konto „Eigene Auswahl“ - so gewollt.
+    assert notification_level(stored) == ("all" if newsletter else "custom")
+
+
+@pytest.fixture
+def secrets_and_google(monkeypatch):
+    from routes import auth_routes
 
     monkeypatch.setenv("JWT_SECRET", "notification-settings-tests-secret-with-32-characters")
-    res = await flow.post("/api/auth/mobile/register", json={
-        "username": "neuerloewe", "email": "neu-1204@lionsquad-test.at", "password": "Passwort-123!",
-        "accept_privacy": True, "accept_terms": True,
+    real = auth_routes.load_auth_settings
+
+    async def settings(db=None):
+        data = await real(db)
+        return {**data, "google_login_enabled": True, "google_client_id": "test-client", "registration_enabled": True,
+                "google_registration_enabled": True}
+
+    who = {"email": "", "id": ""}
+
+    async def identity(_credential, _client_id):
+        return {"email": who["email"], "id": who["id"], "name": "Neu Hier"}
+
+    monkeypatch.setattr(auth_routes, "load_auth_settings", settings)
+    monkeypatch.setattr(auth_routes, "_resolve_google_identity", identity)
+    return who
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("newsletter", [True, False])
+async def test_a_new_account_starts_with_all_news_only_with_consent(flow, secrets_and_google, newsletter):
+    """Alle vier Wege: Website, App, Google und Einladung durch die Verwaltung - je mit und ohne Newsletter-Haken."""
+    from spam_forms import form_fields
+
+    tag = "mit" if newsletter else "ohne"
+    # Website
+    res = await flow.post("/api/auth/register", json={
+        "username": f"web{tag}", "email": f"web-{tag}@lionsquad-test.at", "password": "Passwort-123!",
+        "accept_privacy": True, "accept_terms": True, "newsletter_consent": newsletter, **form_fields("register"),
     })
     assert res.status_code == 200, res.text
-    stored = await flow.db.users.find_one({"username": "neuerloewe"}, {"_id": 0})
-    assert stored["notification_preferences"] == level_preferences("all")
-    assert notification_level(stored) == "all"
-    # Die Verwaltung legt ein Konto per Einladung an - auch das startet mit „Alles“.
+    await _check_new_account(flow, {"username": f"web{tag}"}, newsletter)
+    # App
+    res = await flow.post("/api/auth/mobile/register", json={
+        "username": f"app{tag}", "email": f"app-{tag}@lionsquad-test.at", "password": "Passwort-123!",
+        "accept_privacy": True, "accept_terms": True, "newsletter_consent": newsletter,
+    })
+    assert res.status_code == 200, res.text
+    await _check_new_account(flow, {"username": f"app{tag}"}, newsletter)
+    # Google
+    secrets_and_google.update(email=f"google-{tag}@lionsquad-test.at", id=f"google-{tag}")
+    res = await flow.post("/api/auth/google/session", json={
+        "credential": "x", "intent": "register", "accept_privacy": True, "accept_terms": True, "newsletter_consent": newsletter,
+    })
+    assert res.status_code == 200, res.text
+    await _check_new_account(flow, {"google_id": f"google-{tag}"}, newsletter)
+
+
+@pytest.mark.asyncio
+async def test_an_invited_account_has_news_only_in_the_bell(flow):
+    """Die Einladung durch die Verwaltung hat keine Newsletter-Zustimmung - News & Events nur in der Glocke."""
     flow.act_as(await flow.add_user(role="superadmin", name="root"))
     res = await flow.post("/api/users", json={"username": "eingeladen", "email": "eingeladen@lionsquad-test.at", "role": "player"})
     assert res.status_code in (200, 201), res.text
-    invited = await flow.db.users.find_one({"username": "eingeladen"}, {"_id": 0, "notification_preferences": 1})
-    assert invited["notification_preferences"] == level_preferences("all")
+    await _check_new_account(flow, {"username": "eingeladen"}, False)
