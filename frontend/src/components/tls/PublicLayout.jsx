@@ -422,6 +422,7 @@ function SiteBannerSlot({ banners, pathname, slot }) {
       const key = `tls-banner-seen:${banner.id}`;
       if (!banner.id || sessionStorage.getItem(key)) return;
       sessionStorage.setItem(key, "1");
+      // Bewusst still: nur die Zählung der Anzeige.
       api.post("/settings/site-banners/impression", { banner_id: banner.id }).catch(() => {});
     });
   }, [visible]);
@@ -446,6 +447,7 @@ function SiteBanner({ banner }) {
   const linkUrl = String(banner.link_url || "");
   const linkLabel = banner.link_label || "Mehr";
   const trackClick = () => {
+    // Bewusst still: nur die Zählung des Klicks.
     if (banner.id) api.post("/settings/site-banners/click", { banner_id: banner.id }).catch(() => {});
   };
   const link = linkUrl

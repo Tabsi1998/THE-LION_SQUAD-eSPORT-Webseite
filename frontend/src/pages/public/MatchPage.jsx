@@ -224,6 +224,7 @@ function MatchPageView() {
 
   useEffect(() => {
     const refreshVisible = () => {
+      // Bewusst still: Nachladen im Takt - der letzte Stand bleibt, der nächste Takt fragt wieder.
       if (typeof document === "undefined" || !document.hidden) load().catch(() => {});
     };
     load({ preserveDrafts: false }).catch(() => setData(null));
@@ -354,6 +355,7 @@ function MatchPageView() {
     await load({ preserveDrafts: false });
   }, "Problem konnte nicht gemeldet werden.");
 
+  // Bewusst still: nach „Rückgängig“ - der Takt der Seite lädt ohnehin nach.
   const resultUndo = useResultUndo({ onDone: () => load({ preserveDrafts: false }).catch(() => {}) });
   const chatAttachments = useChatAttachmentDrafts();
   const [stickersOpen, setStickersOpen] = useState(false);

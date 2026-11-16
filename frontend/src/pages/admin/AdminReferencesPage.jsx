@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
@@ -531,7 +532,7 @@ function ShowcaseAdmin({ items }) {
     let alive = true;
     api.get("/references/admin/showcase").then(({ data }) => {
       if (alive) setChoice(data?.mode === "pinned" && data.reference_id ? data.reference_id : "auto");
-    }).catch(() => {});
+    }).catch(toastLoadFailed("Die Auswahl fürs Schaufenster konnte nicht geladen werden."));
     return () => { alive = false; };
   }, []);
   const podium = podiumItems(items);

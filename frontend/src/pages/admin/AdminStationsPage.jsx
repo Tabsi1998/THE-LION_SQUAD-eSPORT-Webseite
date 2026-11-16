@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -475,7 +476,7 @@ function StationEditSheet({ station, onClose, onSaved }) {
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   useEffect(() => {
     let live = true;
-    api.get("/games").then(({ data }) => { if (live) setGames(safeArray(data)); }).catch(() => {});
+    api.get("/games").then(({ data }) => { if (live) setGames(safeArray(data)); }).catch(toastLoadFailed("Die Spiele für die Auswahl konnten nicht geladen werden."));
     return () => { live = false; };
   }, []);
   const devices = DEVICES.some(([key]) => key === form.device_type) ? DEVICES : [...DEVICES, [form.device_type, formatDeviceType(form.device_type)]];

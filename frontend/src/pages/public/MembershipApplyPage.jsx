@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { MEMBERSHIP_STEPS, StepBar, membershipStep } from "@/components/tls/StepBar";
 import { GermanDateField } from "@/components/tls/GermanDateField";
@@ -88,7 +89,7 @@ export default function MembershipApplyPage() {
           setForm((current) => ({ ...current, type_id: current.type_id || data.fees[0].id }));
         }
       }
-    }).catch(() => {});
+    }).catch(toastLoadFailed("Die Mitgliedsarten konnten nicht geladen werden."));
     return api.get("/membership/apply/me").then(({ data }) => { setExisting(data); setLoading(false); }).catch(() => setLoading(false));
   }, [user, nav]);
   useEffect(() => { loadExisting(); }, [loadExisting]);

@@ -4,6 +4,7 @@ import { countWord } from "@/lib/adminWords";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout, canOpenAdminLink } from "@/components/tls/AdminLayout";
 import { canUseArea, hasHelperAssignment, hasLeagueStaff } from "@/lib/permissions";
@@ -46,17 +47,17 @@ export default function AdminDashboardPage() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const load = useCallback(() => {
     api.get("/admin/dashboard").then(({ data }) => { setData(data); setRefreshedAt(new Date()); });
-    if (canGrowth) api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
+    if (canGrowth) api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
     // Systemstand, Setup und Einstellungen nur für System - die Login-Schalter nur für den Superadmin, wie im Server.
     if (canSystem) {
-      api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
-      api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(() => {});
-      api.get("/me/platform-links").then(({ data }) => setLinkAvail(data?.available || null)).catch(() => {});
-      api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(() => {});
+      api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
+      api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
+      api.get("/me/platform-links").then(({ data }) => setLinkAvail(data?.available || null)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
+      api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
     }
-    if (isSuperAdmin) api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
+    if (isSuperAdmin) api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
     // Eigene Helfer-Einsätze stehen oben (#1352) - aus demselben Dienst wie „Mein Dienst“.
-    if (helper || leads) api.get("/users/me/duty").then(({ data }) => setDuty(data)).catch(() => {});
+    if (helper || leads) api.get("/users/me/duty").then(({ data }) => setDuty(data)).catch(toastLoadFailed("Teile der Übersicht konnten nicht geladen werden."));
   }, [canSystem, canGrowth, isSuperAdmin, helper, leads]);
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, [], { fallbackMs: 30000 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useAuth } from "@/context/AuthContext";
@@ -59,7 +60,7 @@ export default function ContactPage() {
   const isBugReport = form.topic === "report_bug";
 
   const loadTopics = useCallback(() => {
-    api.get("/contact/topics").then(({ data }) => setTopics(data)).catch(() => {});
+    api.get("/contact/topics").then(({ data }) => setTopics(data)).catch(toastLoadFailed("Die Themen konnten nicht geladen werden - bitte die Seite neu laden."));
   }, []);
   useEffect(() => { loadTopics(); }, [loadTopics]);
   useApiInvalidation(loadTopics, ["contact"]);

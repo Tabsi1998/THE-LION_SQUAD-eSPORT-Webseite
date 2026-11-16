@@ -63,6 +63,7 @@ export function keepScreenAwake({ nav = typeof navigator === "undefined" ? null 
     sentinel = null;
     if (current) {
       current.removeEventListener?.("release", onRelease);
+      // Bewusst still: die Sperre kann der Browser schon selbst gelöst haben.
       Promise.resolve(current.release?.()).catch(() => {});
     }
   };

@@ -34,6 +34,7 @@ function registerValidSW(swUrl, config) {
     .then((registration) => {
       if (registration.waiting) config?.onUpdate?.(registration);
       const checkUpdate = () => {
+        // Bewusst still: Hintergrund-Update - das nächste Sichtbarwerden der Seite versucht es wieder.
         if (!document.hidden && navigator.onLine) registration.update().catch(() => {});
       };
       window.addEventListener("online", checkUpdate);

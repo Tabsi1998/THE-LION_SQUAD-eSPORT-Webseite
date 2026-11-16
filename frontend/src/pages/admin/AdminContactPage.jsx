@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -149,14 +150,14 @@ export default function AdminContactPage() {
     } catch (e) {
       if (ticket === latest.current) setLoadError(formatApiError(e.response?.data?.detail) || "Die Inbox ließ sich nicht laden.");
     }
-    api.get("/spam-guard/stats").then(({ data: stats }) => setSpamStats(stats)).catch(() => {});
+    api.get("/spam-guard/stats").then(({ data: stats }) => setSpamStats(stats)).catch(toastLoadFailed("Die Zahlen des Spam-Schutzes konnten nicht geladen werden."));
   }, [view, page, query, assigned]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["contact"]);
   // Bezeichnungen vom Server (#2131): dieselben Themen wie im Formular, und wer zuständig sein kann.
   useEffect(() => {
-    api.get("/contact/topics").then(({ data }) => setTopics(Object.fromEntries((Array.isArray(data) ? data : []).map((row) => [row.value, row.label])))).catch(() => {});
-    api.get("/contact/assignees").then(({ data }) => setAssignees(Array.isArray(data) ? data : [])).catch(() => {});
+    api.get("/contact/topics").then(({ data }) => setTopics(Object.fromEntries((Array.isArray(data) ? data : []).map((row) => [row.value, row.label])))).catch(toastLoadFailed("Themen und Zuständige konnten nicht geladen werden."));
+    api.get("/contact/assignees").then(({ data }) => setAssignees(Array.isArray(data) ? data : [])).catch(toastLoadFailed("Themen und Zuständige konnten nicht geladen werden."));
   }, []);
 
   const pick = (next) => {

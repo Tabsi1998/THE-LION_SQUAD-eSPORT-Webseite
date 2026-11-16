@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { eventTypeLabel } from "@/lib/eventTypes";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -62,7 +63,7 @@ export default function AdminEventsPage() {
   };
   useEffect(() => {
     load();
-    api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
+    api.get("/events/meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden."));
   }, [load]);
   useApiInvalidation(load, ["events"]);
 

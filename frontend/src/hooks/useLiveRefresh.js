@@ -76,6 +76,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   // Ansichten, die das brauchen, ordnen Antworten selbst (TV-Baum: seqRef) und nutzen `overlap: true`.
   const run = useCallback(function runOnce() {
     if (overlap) {
+      // Bewusst still: Nachladen im Takt; den Ladefehler zeigt die Seite selbst, der nächste Takt fragt wieder.
       Promise.resolve(callbackRef.current?.()).catch(() => {});
       return;
     }
@@ -108,6 +109,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
       done();
       return;
     }
+    // Bewusst still: Nachladen im Takt; den Ladefehler zeigt die Seite selbst, `done` gibt den Takt wieder frei.
     if (result && typeof result.then === "function") Promise.resolve(result).catch(() => {}).finally(done);
     else done();
   }, [overlap]);

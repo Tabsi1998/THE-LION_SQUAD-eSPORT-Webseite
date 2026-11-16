@@ -55,6 +55,7 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
       const task = pdfPage.render({ canvasContext: canvas.getContext("2d"), viewport });
       renderTaskRef.current = task;
       task.promise?.catch?.(() => {});
+    // Bewusst still: eine Seite, deren Zeichnen das Blättern oder Zoomen abbricht; ein Ladefehler zeigt sich schon beim Öffnen.
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [page, zoom, state.loading, state.error]);
