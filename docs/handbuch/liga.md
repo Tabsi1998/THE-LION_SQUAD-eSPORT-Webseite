@@ -416,6 +416,16 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
    Staffel.
 
+**Stand einer Staffel:** Bis **Liga starten** (2.6) ist eine Staffel technisch ein Entwurf – das hält nichts auf, Anmeldung und
+Zuteilen laufen trotzdem. Unter **Turniere**, im Kopf der Staffel und im Reiter **Ligen und Staffeln** steht darum der Stand der
+Season, wie in der Ablaufleiste: **Vorbereitung**, **Anmeldung offen bis …**, **Einteilung**, **Spielbetrieb**, **Abgeschlossen**.
+Darunter steht in Orange, was der Staffel noch fehlt, mit Link an die richtige Stelle: **Teams zuteilen · 1 von 8** (mit
+Anmeldefenster in den Eingang, sonst in die Teilnehmerliste) oder nach der Anmeldung **Spielplan noch nicht erzeugt – Liga
+starten**. Der Status-Filter der Turnierliste hat dafür eigene Einträge unter **Liga-Staffeln** („Liga: Anmeldung offen“ …);
+„Entwurf“ meint dort nur gewöhnliche Turniere.
+
+<img src="../assets/liga/turnierliste-liga-stand-pc.png" alt="Turnierliste am PC: Staffel A mit Stand Anmeldung offen bis 21.11. und darunter Teams zuteilen 1 von 8, eine laufende Staffel mit Spielbetrieb, ein Turnier im Entwurf" width="720">
+
 <table>
 <tr>
 <td><img src="../assets/liga/liga-season-ligen-pc.png" alt="Reiter Ligen und Staffeln: Liga 1 mit Hinweis zum Beinamen, Staffelgröße und Vorgaben übertragen" width="560"></td>

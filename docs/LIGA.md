@@ -483,6 +483,17 @@ gemeinsam, damit das Heimrecht fair bleibt.
   und `GET /api/leagues/{liga}/{season}` – auch die Turnierleitung bekommt dort bei `off` ein 404 (sie sieht die Season
   in der Verwaltung). Gelesene Turniere tragen bei Staffeln `league_label` („Liga · Staffel A“, Turnierliste, Profil,
   Teamseite).
+- **Liga-Stand in der Verwaltung (#2453):** Eine Staffel steht bis „Liga starten“ im Turnier-Status `draft` – auch während die
+  Season zur Anmeldung offen ist. Das blockiert nichts (Anmeldung, Zuteilung, Kader, Start; `test_league_staffel_stand_flow.py`).
+  Die Verwaltungsliste (`GET /api/tournaments?managed=true`, für wer die Staffel verwaltet) und `GET /api/tournaments/{id}` für die
+  Leitung tragen darum je Staffel `league_season` (`id`, `status`, `visibility`, `application_opens_at`, `application_closes_at`,
+  `start_date`) und `league_plan: {fixed_matches}` (`staffel_guard.attach_season_stand`). Den Stand leitet das Web an einer Stelle
+  ab: `lib/seasonTabs.js` `staffelStand` ruft die Ablaufleiste `seasonPhases` mit dieser einen Staffel auf („Vorbereitung“,
+  „Anmeldung offen bis …“, „Einteilung“, „Spielbetrieb“, „Abgeschlossen“; abgesagt und archiviert bleiben Status). `staffelNeeds`
+  nennt, was fehlt („Teams zuteilen“ → Eingang `#anmeldungen` bzw. ohne Fenster die Teilnehmerliste, „Spielplan noch nicht erzeugt –
+  Liga starten“ nach der Anmeldung, „Spielplan noch nicht erzeugt“ gestartet ohne feste Spiele). Der Status-Filter der Turnierliste
+  filtert Staffeln nach `league:<phase>`. Turnierliste, Kopf der Staffel-Verwaltung und Reiter „Ligen und Staffeln“ zeigen den Stand;
+  öffentlich erscheint eine Staffel im Entwurf ohnehin nicht, die App zeigt Turnierleitungen weiter den rohen Status.
 
 | `league_seasons.visibility` | Ligaseite | Staffel-Turniere (`visibility`, `is_public`) |
 | --- | --- | --- |
