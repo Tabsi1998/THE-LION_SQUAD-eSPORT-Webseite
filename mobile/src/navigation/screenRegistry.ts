@@ -9,6 +9,7 @@ import { DashboardScreen } from "../screens/main/DashboardScreen";
 import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
 import { EasterHuntScreen } from "../screens/main/EasterHuntScreen";
 import { EventDetailScreen } from "../screens/main/EventDetailScreen";
+import { FaqScreen } from "../screens/main/FaqScreen";
 import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { GalleryAlbumScreen } from "../screens/main/GalleryAlbumScreen";
 import { GalleryScreen } from "../screens/main/GalleryScreen";
@@ -99,4 +100,5 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   Settings: SettingsScreen,
   ProfileEdit: ProfileEditScreen,
   CalendarSubscription: CalendarSubscriptionScreen,
+  Faq: FaqScreen,
 };

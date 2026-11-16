@@ -101,6 +101,7 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Einlass bei der Generalversammlung (Vorstand) | Tab Verein → Einlass |
 | Profil, Rechnungen, Gewinne, „Deine Unterlagen“, Jahresrückblick | Tab Profil |
 | App-Sperre, Passkeys, angemeldete Geräte, Benachrichtigungen, Konto löschen | Profil → Zahnrad |
+| FAQ mit Suche, Häufigen Fragen, Bereichen und dem Bereich LionsAPP (siehe 3.6) | Profil → Zahnrad → Über die App → FAQ |
 
 **Nur auf der Website** (heute):
 
@@ -204,6 +205,28 @@ Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die P
 
 **Admin → System → Betrieb & Logs → Reiter „App-Logs“**: Meldungen aus der App mit Gerät, Version und Text, mit Status und Notiz je Eintrag. Abstürze gehen anonym (ohne Nutzerkennung) zusätzlich an Firebase
 Crashlytics. Die Datenschutzerklärung der Website bekommt den App-Abschnitt (Push, Absturzberichte, App-Sperre, Konto löschen) von selbst.
+
+### 3.6 FAQ in der App
+
+**Profil → Zahnrad → Über die App → FAQ** (auch für Gäste). Aufbau wie die [FAQ der Website](hilfe.md):
+
+- Oben die **Suche** über Fragen und Schritte der Anleitungen. Eine Frage klappt in der Liste auf, ein Schritt öffnet die Anleitung
+  auf der Website an genau dieser Stelle.
+- **Häufige Fragen** zum Aufklappen, darunter **Alle Bereiche** mit dem Filter **Für: Alle, Spieler, Captain, Mitglied** und
+  **Turnierleitung** (nur mit Leitungsrecht).
+- Vorne steht der Bereich **LionsAPP** mit Fragen, die nur die App betreffen: Push-Stufen, Ruhezeit, Kanäle am Handy, der Gong beim
+  Aufruf, Anmelden mit Passkey, App-Sperre, ohne Netz und Updates. Ein Link wie „Zu den Einstellungen“ öffnet den Screen der App.
+- **Anleitungen mit Bildern** zeigt nur die Website. In der App steht die Anleitung mit Zahl der Schritte, ein Tipp öffnet sie im Browser.
+- **Fragen für Mitglieder, Helfer und die Turnierleitung** kommen wie im Web erst nach der Prüfung am Server dazu. Ein älterer Server ohne
+  FAQ-Schnittstelle zeigt nur die öffentlichen Fragen, ohne Fehlermeldung. Kommt die FAQ wieder nach vorn, fragt sie die Rechte
+  neu, etwa nach einer neuen Mitgliedschaft; nach einem Kontowechsel gilt sofort nur das Öffentliche, bis der Server antwortet.
+- Links auf `/faq` (etwa in News oder Benachrichtigungen) öffnen die FAQ der App, ebenso die alte Adresse `/hilfe`. Wie im Web
+  klappt `/faq#frage-<id>` die Frage auf, `#bereich-<id>` den Bereich, und `?q=` startet die Suche.
+- Ein Pfeil am Link heißt: die App zeigt die Seite selbst. Das Zeichen mit dem Kasten heißt: es öffnet sich der Browser.
+
+Die öffentlichen Fragen und Anleitungen bringt die App als Kopie der Website mit. Ändert sich die FAQ der Website, muss die App
+neu erzeugt werden (`node scripts/sync-faq.js` im Ordner `mobile`); ein Test der App meldet, wenn die Kopie nicht mehr passt. Die Fragen
+des Bereichs LionsAPP stehen in `mobile/src/faq/appFragen.ts`.
 
 ---
 

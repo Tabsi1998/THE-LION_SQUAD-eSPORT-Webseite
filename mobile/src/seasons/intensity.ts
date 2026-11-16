@@ -61,6 +61,8 @@ const CALM = new Set([
   "MemberCard", "MemberDocuments", "MyDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
   // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
   "AdventCalendar",
+  // FAQ (#2449): Lesen und Suchen - die Deko hält sich zurück wie bei den Konto-Seiten.
+  "Faq",
 ]);
 const QUIET = new Set(["Consent", "Lock", "Boot", "Settings", "Admin"]);
 

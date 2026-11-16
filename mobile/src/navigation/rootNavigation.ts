@@ -303,9 +303,29 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
       return detail("InfoCenter", { section: "partners" });
     case "references":
       return detail("InfoCenter", { section: "references" });
+    // FAQ (#2449): /faq und die alte Hilfe (/hilfe) öffnen die FAQ der App. Eine Anleitung (/faq/<thema>) bleibt im Web -
+    // dort stehen die Bilder. Wie im Web: #frage-<id> und #bereich-<id> klappen auf, ?q= sucht.
+    case "faq":
+    case "hilfe":
+      return detail("Faq", faqParams(parsed.hash, query));
     default:
       return null;
   }
+}
+
+/** Anker und Suche der FAQ (#2449) - ein kaputter Anker (etwa #%E0%A4) zählt als keiner, wie ankerAus im Web. */
+function faqParams(hash: string, query: URLSearchParams): AppStackParamList["Faq"] {
+  let anker = "";
+  try {
+    anker = decodeURIComponent(hash.replace(/^#/, ""));
+  } catch {
+    anker = "";
+  }
+  const params: { frage?: string; bereich?: string; q?: string } = {};
+  if (anker.startsWith("frage-") && anker.length > 6) params.frage = anker.slice(6);
+  if (anker.startsWith("bereich-") && anker.length > 8) params.bereich = anker.slice(8);
+  if (query.get("q")) params.q = query.get("q") || "";
+  return Object.keys(params).length ? params : undefined;
 }
 
 function profileTarget(query: URLSearchParams): AppTarget {
@@ -361,15 +381,25 @@ function parsePath(value?: string | null) {
   // sonst nur Adressen der eigenen Website.
   const text = String(value || "").trim();
   const raw = isLocalPath(text) ? text : ownPath(text) || "";
-  if (!raw) return { path: "", query: "", root: false };
+  if (!raw) return { path: "", query: "", hash: "", root: false };
   try {
     const url = new URL(raw, "https://lionsquad.local");
     const path = url.pathname.replace(/^\/+|\/+$/g, "");
-    return { path, query: url.search.replace(/^\?/, ""), root: !path && raw.startsWith("/") };
+    // Der Anker (#2449, FAQ): ownPath lässt ihn bei vollen Adressen weg - dann aus der Adresse selbst.
+    return { path, query: url.search.replace(/^\?/, ""), hash: url.hash || hashOf(text), root: !path && raw.startsWith("/") };
   } catch {
-    const [path, query = ""] = raw.split("?");
+    const [vorAnker, hash = ""] = raw.split("#");
+    const [path, query = ""] = vorAnker.split("?");
     const clean = path.replace(/^\/+|\/+$/g, "");
-    return { path: clean, query, root: !clean && raw.startsWith("/") };
+    return { path: clean, query, hash: hash ? `#${hash}` : "", root: !clean && raw.startsWith("/") };
+  }
+}
+
+function hashOf(text: string): string {
+  try {
+    return /^https?:\/\//i.test(text) ? new URL(text).hash : "";
+  } catch {
+    return "";
   }
 }
 

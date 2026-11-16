@@ -410,8 +410,9 @@ function SessionsCard() {
   );
 }
 
-/** Über die App: Version, „Was ist neu“, Datenschutz und Impressum - auch für Gäste. */
+/** Über die App: Version, „Was ist neu“, FAQ, Datenschutz und Impressum - auch für Gäste. */
 function AboutGroup() {
+  const navigation = useContext(NavigationContext);
   const openWhatsNew = useOptionalAppUpdate()?.openWhatsNew;
   const version = Constants.expoConfig?.version ?? "?";
   const build = Constants.expoConfig?.android?.versionCode;
@@ -420,6 +421,8 @@ function AboutGroup() {
       <Card style={styles.list}>
         <Row icon="information-circle-outline" label="Version" detail={`LionsAPP v${version}${build ? ` · Build ${build}` : ""}`} testID="settings-version" />
         {openWhatsNew ? <Row icon="sparkles-outline" label="Was ist neu" onPress={openWhatsNew} testID="more-whats-new" border /> : null}
+        {/* FAQ (#2449): Fragen zu App und Website - wie /faq im Web, dazu der Bereich LionsAPP. */}
+        <Row icon="help-circle-outline" label="FAQ" detail="Häufige Fragen zu App und Website" onPress={() => navigation?.navigate("Faq" as never)} testID="settings-faq" border />
         <Row icon="shield-outline" label="Datenschutz" onPress={() => openLink(`${WEB_BASE_URL}/privacy`)} testID="settings-privacy-policy" border />
         <Row icon="document-text-outline" label="Impressum" onPress={() => openLink(`${WEB_BASE_URL}/imprint`)} testID="settings-imprint" border />
       </Card>
