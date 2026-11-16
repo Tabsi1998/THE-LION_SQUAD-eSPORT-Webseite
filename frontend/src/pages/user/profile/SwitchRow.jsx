@@ -30,11 +30,12 @@ export function ProfileSwitch({ label, checked, onCheckedChange, disabled = fals
       onClick={() => onCheckedChange(!on)}
       data-testid={testId}
       data-state={on ? "checked" : "unchecked"}
-      className={`tls-hit relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] disabled:cursor-not-allowed ${on ? "bg-[#29B6E8]" : "bg-white/20"} ${className}`}
+      className={`group tls-hit relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] disabled:cursor-not-allowed ${on ? "bg-[#29B6E8]" : "bg-white/20"} ${className}`}
     >
+      {/* Kurzes Nachgeben beim Drücken (#1204): der Knopf dehnt sich zur Gegenseite, wie ein Finger, der ihn schiebt. */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`}
+        className={`pointer-events-none block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] group-active:scale-x-[1.22] motion-reduce:transition-none ${on ? "translate-x-5 origin-right" : "translate-x-0 origin-left"}`}
       />
     </button>
   );

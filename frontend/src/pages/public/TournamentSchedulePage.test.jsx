@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Spielplan (#225): Ein frisch eingetragenes Ergebnis trägt kurz „gerade eingetragen“, und
 // unten steht ein Hinweis mit dem Ergebnis - auch für Zuschauer. Beim ersten Laden nichts davon.
@@ -10,7 +10,9 @@ let refresh = null;
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("sonner", () => ({ toast: (...args) => toastMock(...args) }));
 let liveOptions = null;
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { refresh = callback; liveOptions = options; } }));
+// Alle Ladefunktionen (#2440): die Seite und die Spieler-Zeile (LiveQueueStatus) fragen je selbst.
+const refreshes = new Set();
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { refresh = callback; liveOptions = options; refreshes.add(callback); } }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -204,6 +206,98 @@ test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“
   expect(now).toHaveTextContent("NeonFalke gegen PixelPaula");
   expect(now).toHaveTextContent("Als Nächstes");
   expect(now).toHaveTextContent("Aufgerufen · antreten bis 17:30");
+
+  // #2440: Scheitert das Nachladen der Warteschlange (Server 503), bleiben „Jetzt“/„Als Nächstes“ und die eigene Zeile -
+  // mit „Letzter Stand vor X s“. Nach 3 Minuten ohne Erfolg fällt der alte Stand weg (kein falsches „Du bist dran“).
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+  try {
+    const answer = apiMock.get.getMockImplementation();
+    apiMock.get.mockImplementation((path, ...rest) => (String(path).includes("/live-queue")
+      ? Promise.reject(Object.assign(new Error("503"), { response: { status: 503, data: {} } }))
+      : answer(path, ...rest)));
+    await act(async () => { await Promise.all([...refreshes].map((load) => load())); });
+    expect(screen.getByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+    expect(screen.getByTestId("live-queue-status")).toHaveTextContent("Du bist als Nächstes an PC 2");
+    expect(screen.getByTestId("schedule-live-stale")).toHaveTextContent("Letzter Stand vor");
+    expect(screen.getByTestId("live-queue-status-stale")).toHaveTextContent("Letzter Stand vor");
+    act(() => { vi.advanceTimersByTime(3 * 60 * 1000 + 1000); });
+    expect(screen.queryByTestId("schedule-live-summary")).toBeNull();
+    expect(screen.queryByTestId("schedule-live-stale")).toBeNull();
+    expect(screen.queryByTestId("live-queue-status")).toBeNull();
+    expect(screen.queryByTestId(`schedule-now-${live.station_id}`)).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+// #2440 (Nachprüfung): Scheitert schon der Baum (WLAN ohne Internet), gilt der Stand der Warteschlange als alt - mit
+// Hinweis und nach 3 Minuten weg.
+test("scheitert schon /bracket, zeigt der Spielplan „Letzter Stand“ und blendet die Warteschlange nach 3 Minuten aus", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const set = generated.onsite;
+  const live = set.bracket.matches_v2.find((match) => match.status === "in_progress");
+  const queue = {
+    applies: true, summary: null, matches: {},
+    stations: [{ id: live.station_id, name: "PC 1", station_text: "PC 1", status: "busy", waiting: 0,
+      running: { match_id: live.id, state: "running", names: ["NeonFalke", "PixelPaula"], label: "Viertelfinale", started_at: "2026-10-31T16:00:00Z", duration_minutes: 30 }, next: null, after: null }],
+  };
+  let bracketDown = false;
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === `/tournaments/${set.tournament.id}/bracket`) return bracketDown ? Promise.reject(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" })) : Promise.resolve({ data: set.bracket });
+    if (String(path).endsWith("/matchdays")) return Promise.resolve({ data: { applies: false, matchdays: [] } });
+    if (path === `/tournaments/${set.tournament.id}/live-queue`) return Promise.resolve({ data: queue });
+    return Promise.reject(new Error(path));
+  });
+  const earlier = new Set(refreshes);
+  renderSchedule();
+  await user.click(await screen.findByTestId("schedule-view-stations"));
+  expect(await screen.findByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+  try {
+    bracketDown = true;
+    // Alles, was diese Seite im Takt lädt.
+    await act(async () => { await Promise.all([...refreshes].filter((load) => !earlier.has(load)).map((load) => Promise.resolve(load()).catch(() => {}))); });
+    expect(screen.getByTestId("schedule-live-stale")).toHaveTextContent("Letzter Stand vor");
+    act(() => { vi.advanceTimersByTime(3 * 60 * 1000 + 1000); });
+    expect(screen.queryByTestId(`schedule-now-${live.station_id}`)).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+// #2440 (Review): Nach einem Turnierwechsel zeigt der Spielplan nicht die Stationen des vorigen Turniers - auch nicht,
+// wenn der erste Abruf der Warteschlange des neuen scheitert.
+test("Turnierwechsel: scheitert der erste Abruf des neuen Turniers, bleibt nichts vom vorigen stehen", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const set = generated.onsite;
+  const live = set.bracket.matches_v2.find((match) => match.status === "in_progress");
+  const queue = {
+    applies: true, summary: null, matches: {},
+    stations: [{ id: live.station_id, name: "PC 1", station_text: "PC 1", status: "busy", waiting: 0,
+      running: { match_id: live.id, state: "running", names: ["NeonFalke", "PixelPaula"], label: "Viertelfinale", started_at: "2026-10-31T16:00:00Z", duration_minutes: 30 }, next: null, after: null }],
+  };
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === "/tournaments/cup2") return Promise.resolve({ data: { ...set.tournament, id: "t-second", slug: "cup2" } });
+    if (path === `/tournaments/${set.tournament.id}/bracket` || path === "/tournaments/t-second/bracket") return Promise.resolve({ data: set.bracket });
+    if (String(path).endsWith("/matchdays")) return Promise.resolve({ data: { applies: false, matchdays: [] } });
+    if (path === `/tournaments/${set.tournament.id}/live-queue`) return Promise.resolve({ data: queue });
+    if (path === "/tournaments/t-second/live-queue") return Promise.reject(Object.assign(new Error("503"), { response: { status: 503, data: {} } }));
+    return Promise.reject(new Error(path));
+  });
+  render(
+    <MemoryRouter initialEntries={["/tournaments/cup/matches"]}>
+      <Link to="/tournaments/cup2/matches" data-testid="go-second">Zweites</Link>
+      <Routes><Route path="/tournaments/:slug/matches" element={<TournamentSchedulePage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await user.click(await screen.findByTestId("schedule-view-stations"));
+  expect(await screen.findByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+  await user.click(screen.getByTestId("go-second"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t-second/live-queue", expect.anything()));
+  await waitFor(() => expect(screen.queryByTestId(`schedule-now-${live.station_id}`)).toBeNull());
+  expect(screen.queryByTestId("schedule-live-stale")).toBeNull();
 });
 
 // #1801: Der Spielplan lädt nur bei Änderungen seines Turniers nach - und, weil sich die Turniere eines Events Stationen

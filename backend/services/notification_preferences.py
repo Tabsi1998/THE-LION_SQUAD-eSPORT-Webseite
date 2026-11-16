@@ -11,14 +11,16 @@ from zoneinfo import ZoneInfo
 
 
 OPTIONAL_EMAIL_PREFERENCES = {
+    # Spiele & Aufrufe (#1204): der Name der Stufen-Seite - Aufruf, Spielstart, Erinnerung, Check-in und Veto des eigenen Spiels.
     "match_reminders": {
-        "label": "Match-Erinnerungen",
-        "description": "Startzeiten, Match-Hub und Check-in-nahe Hinweise.",
+        "label": "Spiele & Aufrufe",
+        "description": "Aufruf zum Spiel, Spielstart, Erinnerungen, Check-in, Veto und Ergebnisse deiner Spiele.",
         "default": True,
     },
     "tournament_updates": {
         "label": "Turnier-Updates",
-        "description": "Anmeldung, Status, Ergebnisse und wichtige Turnierinfos.",
+        # Liga-Meldungen und Belohnungen der Liga (E.4, F.4) laufen unter diesem Thema (#1204).
+        "description": "Anmeldung, Status, Hinweise der Turnierleitung, Liga-Rundnachrichten und Belohnungen der Liga.",
         "default": True,
     },
     "prize_updates": {
@@ -353,6 +355,104 @@ def discord_allowed(user: dict | None, kind: str, category: str | None = None) -
     return channel_topic_allowed(user, "discord", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
 
 
+# Drei Stufen und Themen (#1204, Fabians Wahl A): je Thema „Push“ (App und Browser, #1163), „Nur in der App“ (Glocke) oder
+# „Aus“. Das ist nur eine Sicht auf die bestehenden Schalter ``in_app:<thema>``, ``push:<thema>`` und ``browser:<thema>`` -
+# gespeichert wird wie bisher, eine Migration gibt es nicht. E-Mail und Discord bleiben eigene Wege („Weitere Wege“).
+TOPIC_MODE_CHANNELS = ("in_app", "push", "browser")
+TOPIC_MODES: dict[str, dict[str, bool]] = {
+    "push": {"in_app": True, "push": True, "browser": True},
+    "app": {"in_app": True, "push": False, "browser": False},
+    "off": {"in_app": False, "push": False, "browser": False},
+}
+# Die Themen der Liste in dieser Reihenfolge; Wochenrückblick und Geburtstagsgruß sind reine Mails („Weitere Wege“).
+# Neue Themen späterer Pakete reihen sich hier ein - Liga-Meldungen und Belohnungen der Liga laufen unter Turnier-Updates.
+LEVEL_TOPICS: tuple[str, ...] = (
+    "match_reminders", "tournament_updates", "prize_updates", "achievements", "billing_updates",
+    "membership_updates", "community_messages", "news_events", "club_internal", "helper_shifts",
+)
+# Je Stufe die Themen per Push; alle anderen „Nur in der App“. Helferdienste sind ein Aufruf an dich - bei „Wichtiges“ per Push.
+NOTIFICATION_LEVELS: dict[str, dict[str, Any]] = {
+    "all": {
+        "label": "Alles",
+        "description": "Jedes Thema per Push – nichts verpasst.",
+        "push": frozenset(LEVEL_TOPICS),
+    },
+    "important": {
+        "label": "Wichtiges",
+        "description": "Spiele, Turniere, Rechnungen, Mitgliedschaft, Nachrichten an dich und Helferdienste per Push. Der Rest liegt in der Glocke.",
+        "push": frozenset({"match_reminders", "tournament_updates", "billing_updates", "membership_updates", "community_messages", "helper_shifts"}),
+    },
+    "few": {
+        "label": "Wenig",
+        "description": "Nur Spiele und Aufrufe sowie Rechnungen per Push. Alles andere liegt in der Glocke.",
+        "push": frozenset({"match_reminders", "billing_updates"}),
+    },
+}
+CUSTOM_LEVEL = "custom"
+# Neue Konten starten mit „Alles“ (#1204); bestehende behalten ihre Schalter.
+NEW_ACCOUNT_LEVEL = "all"
+
+
+def level_modes(level: str) -> dict[str, str]:
+    """Die Themen einer Stufe: ``{thema: "push" | "app"}``."""
+    pushed = NOTIFICATION_LEVELS[level]["push"]
+    return {topic: "push" if topic in pushed else "app" for topic in LEVEL_TOPICS}
+
+
+def mode_preferences(topic: str, mode: str) -> dict[str, bool]:
+    """Die Schalter eines Themas für eine Stellung - genau die drei Kanäle der Liste."""
+    return {preference_key(channel, topic): value for channel, value in TOPIC_MODES[mode].items()}
+
+
+def level_preferences(level: str) -> dict[str, bool]:
+    """Die Schalter einer Stufe. E-Mail, Discord und die Kanal-Hauptschalter bleiben, wie sie sind."""
+    prefs: dict[str, bool] = {}
+    for topic, mode in level_modes(level).items():
+        prefs.update(mode_preferences(topic, mode))
+    return prefs
+
+
+def new_account_preferences(newsletter_consent: bool = False) -> dict[str, bool]:
+    """Die Schalter eines neuen Kontos: die Stufe ``NEW_ACCOUNT_LEVEL`` - nur News & Events richtet sich nach dem Haken beim
+    Newsletter (Fabians Entscheidung M5): ohne Zustimmung still in der Glocke („Nur App“), mit Zustimmung per Push. Ohne
+    Haken zeigt das Konto deshalb „Eigene Auswahl“ - so gewollt. Eine Einladung durch die Verwaltung hat keine Zustimmung."""
+    prefs = level_preferences(NEW_ACCOUNT_LEVEL)
+    if not newsletter_consent:
+        prefs.update(mode_preferences("news_events", "app"))
+    return prefs
+
+
+def _topic_state(prefs: dict[str, bool], topic: str) -> tuple[bool, bool, bool]:
+    in_app, push, browser = (bool(prefs.get(preference_key(channel, topic))) for channel in TOPIC_MODE_CHANNELS)
+    return in_app, push, browser
+
+
+def topic_modes(user: dict | None, prefs: dict[str, bool] | None = None) -> dict[str, str]:
+    """Die Stellung je Thema aus den gespeicherten Schaltern. Alte Mischstände (Push an, Glocke aus) zeigen „Push“."""
+    prefs = prefs if prefs is not None else normalized_preferences(user)
+    modes: dict[str, str] = {}
+    for topic in LEVEL_TOPICS:
+        in_app, push, browser = _topic_state(prefs, topic)
+        modes[topic] = "push" if (push or browser) else "app" if in_app else "off"
+    return modes
+
+
+def notification_level(user: dict | None, prefs: dict[str, bool] | None = None) -> str:
+    """Die Stufe, die genau zu den Schaltern passt - sonst ``custom`` („Eigene Auswahl“)."""
+    prefs = prefs if prefs is not None else normalized_preferences(user)
+    exact = all(
+        dict(zip(TOPIC_MODE_CHANNELS, _topic_state(prefs, topic))) in TOPIC_MODES.values()
+        for topic in LEVEL_TOPICS
+    )
+    if not exact:
+        return CUSTOM_LEVEL
+    modes = topic_modes(user, prefs)
+    for level in NOTIFICATION_LEVELS:
+        if modes == level_modes(level):
+            return level
+    return CUSTOM_LEVEL
+
+
 async def send_user_template(user: dict | None, template_key: str, category: str | None = None, **kwargs) -> dict:
     """Send a named template to a user if their preferences allow it."""
     if not user or not user.get("email"):
@@ -365,9 +465,24 @@ async def send_user_template(user: dict | None, template_key: str, category: str
 
 
 def public_preferences_payload(user: dict | None) -> dict[str, Any]:
+    from services.quiet_hours_rules import EXEMPTION_TEXTS, SUGGESTED_END, SUGGESTED_START, settings_payload
+
+    prefs = normalized_preferences(user)
     return {
         "newsletter_consent": bool((user or {}).get("newsletter_consent")),
-        "preferences": normalized_preferences(user),
+        "preferences": prefs,
+        # Stufen und Themen (#1204): die Stufe, die Stellung je Thema und was jede Stufe setzt.
+        "level": notification_level(user, prefs),
+        "topic_modes": topic_modes(user, prefs),
+        "topics": list(LEVEL_TOPICS),
+        "levels": [
+            {"key": key, "label": meta["label"], "description": meta["description"], "modes": level_modes(key)}
+            for key, meta in NOTIFICATION_LEVELS.items()
+        ],
+        # Ruhezeit (#1206): Wiener Zeit, Standard aus; beim Einschalten 22:00 bis 7:00.
+        "quiet_hours": settings_payload(user),
+        "quiet_hours_suggestion": {"start": SUGGESTED_START, "end": SUGGESTED_END},
+        "quiet_hours_exceptions": list(EXEMPTION_TEXTS),
         "channels": [
             {"key": key, **meta} for key, meta in DELIVERY_CHANNEL_PREFERENCES.items()
         ],

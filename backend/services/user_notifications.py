@@ -91,7 +91,7 @@ async def create_user_notification(
     db = get_db()
     user = await db.users.find_one(
         {"id": user_id},
-        {"_id": 0, "id": 1, "newsletter_consent": 1, "notification_preferences": 1},
+        {"_id": 0, "id": 1, "newsletter_consent": 1, "notification_preferences": 1, "quiet_hours": 1},
     )
     category = (meta or {}).get("category")
     in_app_allowed = (not user) or notification_allowed(user, kind, category)
@@ -110,6 +110,20 @@ async def create_user_notification(
     if not in_app_allowed and not push_channel_allowed and not browser_channel_allowed and not discord_channel_allowed:
         return None
     meta = meta or {}
+    # Ruhezeit (#1206): Push, Browser und Discord warten bis zum Ende der Ruhezeit, die Meldung liegt sofort in der Glocke.
+    # Danach geht genau eine Sammelmeldung über die zurückgehaltenen Wege (services/quiet_hours.py) - Ausnahmen kommen sofort.
+    held_until = None
+    held_channels: list[str] = []
+    if user and (push_channel_allowed or browser_channel_allowed or discord_channel_allowed):
+        from services.quiet_hours import hold_until
+        held_until = await hold_until(db, user, kind, meta)
+    if held_until:
+        # Discord nur, wenn diese Art überhaupt als Direktnachricht ginge (nie: Moderation, Rechnungen).
+        from services.discord_dm import EXCLUDED_KINDS as NO_DM_KINDS
+        held_channels = [name for name, allowed in (("push", push_channel_allowed), ("browser", browser_channel_allowed),
+                                                    ("discord", discord_channel_allowed and kind not in NO_DM_KINDS)) if allowed]
+        push_channel_allowed = browser_channel_allowed = discord_channel_allowed = False
+        in_app_allowed = True
     dedupe_key = meta.get("dedupe_key")
     unique = bool(dedupe_key and meta.get("unique_dedupe"))
     if dedupe_key:
@@ -157,6 +171,9 @@ async def create_user_notification(
         "meta": meta,
         "created_at": now_utc().isoformat(),
     }
+    if held_until:
+        doc["quiet_hold_until"] = held_until
+        doc["quiet_held_channels"] = held_channels
     if unique:
         # Liga-Erinnerungen (#1647): der Teilindex ``user_unique_dedupe`` lässt je Person und Schlüssel nur eine Zeile zu - laufen
         # zwei Jobs gleichzeitig, verliert der zweite hier und schickt weder Push noch Discord.

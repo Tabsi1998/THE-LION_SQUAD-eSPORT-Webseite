@@ -3,6 +3,8 @@ import { Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useLiveQueue } from "@/hooks/useLiveQueue";
+import { queuePollMs } from "@/lib/liveQueue";
 import { buildTimeline, knownStations, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
@@ -17,6 +19,7 @@ import { FlowGraph } from "./FlowGraph";
 import { DelayBanner, MatchEditor, OrderList, PlanNotice, PlanPreview, PlanSettings, PlanWarnings, StationAgenda } from "./MatchPlanParts";
 import { LeagueWeeks, OnlineRounds } from "./MatchPlanRemote";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
+import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
 
 // Matchplan-Seite (#1557) - das Werkzeug der Turnierleitung am Turniertag. Oben die Einstellungen, darunter „Wer wartet
 // auf wen“, die Zeitleiste je Station und die Reihenfolge. Gerechnet wird nur im Planer (services/match_scheduler.py):
@@ -63,7 +66,6 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const confirm = useConfirm();
   const askReason = usePrompt();
   const [remoteError, setRemoteError] = useState("");
-  const [queue, setQueue] = useState(null);
   const [busyStation, setBusyStation] = useState("");
   const request = useRef(0);
 
@@ -109,19 +111,15 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   }, [mode, tid]);
 
   const liveLocal = live && mode === "local";
-  const refreshQueue = useCallback(async () => {
-    if (!liveLocal) return setQueue(null);
-    try {
-      const { data } = await api.get(`/tournaments/${encodeURIComponent(tid)}/live-queue`);
-      setQueue(data?.applies ? data : null);
-    } catch {
-      setQueue(null);
-    }
-  }, [liveLocal, tid]);
+  // Scheitert ein Abruf (Netz, Server), bleibt der letzte Stand mit „Letzter Stand vor X s“ stehen; nur `applies: false`
+  // oder 404/403 nimmt die Warteschlange weg (#2440, hooks/useLiveQueue). Im Takt nur mit Warteschlange.
+  const { queue, status: queueStatus, staleSince: queueStaleSince, reload: refreshQueue, failures: queueFailures } = useLiveQueue(liveLocal && tid ? `/tournaments/${encodeURIComponent(tid)}/live-queue` : "");
 
   useEffect(() => { refreshPlan(); }, [refreshPlan]);
-  useEffect(() => { refreshQueue(); }, [refreshQueue]);
-  useLiveRefresh(refreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, pollMs: 60_000 });
+  // Im Takt mit Warteschlange - und wenn schon der erste Abruf scheiterte (dann weiter versuchen). Ohne Warteschlange
+  // nur, solange der Strom fehlt: eine neu angelegte Station taucht so auch ohne Strom auf (#2440).
+  useLiveRefresh(refreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, fallbackMs: queuePollMs(60_000, queueFailures),
+    pollMs: queuePollMs(queue || queueStatus === "unknown" ? 60_000 : 0, queueFailures) });
   useEffect(() => { refreshRemote(); }, [refreshRemote]);
   useLiveRefresh(refreshPlan, ["matches", "stations", "tournaments"], { enabled: canPlan, pollMs: live ? 60_000 : 0 });
   useLiveRefresh(refreshRemote, ["matches", "tournaments"], { enabled: mode !== "local", pollMs: live ? 60_000 : 0 });
@@ -363,6 +361,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
           <PlanPreview plan={preview} stale={stale} busy={busy} onApply={apply} onDiscard={() => { setPreview(null); setStale(""); }} forecastOnly={liveLocal} />
           {queue && (
             <Section title="Warteschlange je Station" note="Live: läuft, als Nächstes, danach - aus dem Server" testId="mp-live-queue">
+              <LiveStaleNote since={queueStaleSince} className="mb-3" testId="mp-live-queue-stale" />
               <StationQueueBoard queue={{ ...queue, summary: null }} busyKey={busyStation} onCall={(station, entry) => operateStation("call", station, entry)}
                 onStart={(station, entry) => operateStation("start", station, entry)} />
             </Section>

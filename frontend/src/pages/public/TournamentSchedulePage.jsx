@@ -1,7 +1,9 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { StationNowNext } from "@/components/tls/live/StationNowNext";
-import { queueSummaryLine } from "@/lib/liveQueue";
+import { queueGoneError, queueSummaryLine } from "@/lib/liveQueue";
+import { useStaleExpired } from "@/hooks/useLiveQueue";
+import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
@@ -65,34 +67,62 @@ export default function TournamentSchedulePage() {
   const [activeMatchday, setActiveMatchday] = useState(null);
   const [view, setView] = useState("rounds");
   const [mineOnly, setMineOnly] = useState(false);
-  const [queue, setQueue] = useState(null);
+  // Die Live-Warteschlange (#1556) mit dem Zeitpunkt des letzten guten Stands und ob das Nachladen gerade scheitert
+  // (#2440): dann „Letzter Stand vor X s“; nach 3 Minuten ohne Erfolg fällt der alte Stand weg.
+  // Je Turnier (`slug`, #2440): Nach einem Wechsel gilt der Stand des vorigen nicht - auch nicht, wenn der erste Abruf
+  // des neuen scheitert. Eine späte Antwort zum vorigen Turnier wird verworfen.
+  const [queueState, setQueueState] = useState({ slug: "", view: null, okAt: 0, failing: false });
+  const slugRef = useRef(slug);
+  useEffect(() => { slugRef.current = slug; }, [slug]);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
-    const { data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig);
-    const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig);
+    const current = () => slugRef.current === slug;
+    // Scheitert schon das Turnier oder der Baum (WLAN ohne Internet, Server), gilt der Stand der Warteschlange als alt:
+    // „Letzter Stand vor X s“ und nach 3 Minuten weg - wie bei einem gescheiterten Abruf der Warteschlange (#2440).
+    const markFailing = (err) => {
+      if (!current() || queueGoneError(err)) return;
+      setQueueState((prev) => (prev.slug === slug ? { ...prev, failing: true } : { slug, view: null, okAt: 0, failing: true }));
+    };
+    let tournament;
+    let bracket;
+    try {
+      ({ data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig));
+      ({ data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig));
+    } catch (err) {
+      markFailing(err);
+      return;
+    }
+    if (!current()) return;
     setData(bracket);
     // Spielwochen gibt es nur bei Liga, Round Robin und Gruppen. Schlägt der
     // Aufruf fehl, bleibt die bisherige Gruppierung stehen statt einer leeren Seite.
     try {
       const { data: matchdayPlan } = await api.get(`/tournaments/${tournament.id}/matchdays`, accessConfig);
-      setPlan(matchdayPlan);
+      if (current()) setPlan(matchdayPlan);
     } catch {
-      setPlan({ applies: false, matchdays: [] });
+      if (current()) setPlan({ applies: false, matchdays: [] });
     }
-    // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan.
-    if (tournament.event_mode === "online") return setQueue(null);
+    // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan. Scheitert
+    // ein Abruf (Netz, Server), bleibt ihr letzter Stand - nur 404/403 heißt „gibt es nicht“ (#2440).
+    if (tournament.event_mode === "online") return setQueueState({ slug, view: null, okAt: 0, failing: false });
     try {
       const { data: live } = await api.get(`/tournaments/${tournament.id}/live-queue`, accessConfig);
-      setQueue(live?.applies ? live : null);
-    } catch {
-      setQueue(null);
+      if (current()) setQueueState({ slug, view: live?.applies ? live : null, okAt: Date.now(), failing: false });
+    } catch (err) {
+      if (!current()) return;
+      if (queueGoneError(err)) setQueueState({ slug, view: null, okAt: Date.now(), failing: false });
+      else markFailing(err);
     }
   }, [slug, accessToken]);
 
   useEffect(() => {
     load();
   }, [load]);
+  const ownQueue = queueState.slug === slug ? queueState : null;
+  const queueStaleSince = ownQueue?.failing && ownQueue.view ? ownQueue.okAt : 0;
+  const queueExpired = useStaleExpired(queueStaleSince);
+  const queue = queueExpired || !ownQueue ? null : ownQueue.view;
   // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801).
   useLiveRefresh(load, ["tournaments", "matches", "matches-v2", "stations"], {
     fallbackMs: 7000, tournamentId: data?.tournament?.id, eventId: data?.tournament?.event_id,
@@ -266,7 +296,7 @@ export default function TournamentSchedulePage() {
             </div>
           </div>
         ) : activeView === "stations" ? (
-          <StationView entries={filtered} changedMatches={changedMatches} queue={queue} />
+          <StationView entries={filtered} changedMatches={changedMatches} queue={queue} staleSince={queue ? queueStaleSince : 0} />
         ) : (
           <div className="mt-8 space-y-10">
             {groupByRound(filtered).map((group) => (
@@ -368,13 +398,14 @@ function ScheduleCard({ entry, resolved, changed = false }) {
 }
 
 /** Je Station eine einfache Liste nach Zeit - keine Zeitleiste der Verwaltung. */
-function StationView({ entries, changedMatches, queue = null }) {
+function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) {
   const stations = groupByStation(entries);
   const live = Object.fromEntries((queue?.stations || []).map((row) => [row.id, row]));
   const summary = queueSummaryLine(queue?.summary);
   return (
     <>
     {summary ? <p className="mt-8 text-sm font-bold text-white" data-testid="schedule-live-summary">{summary}</p> : null}
+    <LiveStaleNote since={staleSince} className="mt-3" testId="schedule-live-stale" />
     <div className="mt-8 grid gap-8 lg:grid-cols-2" data-testid="schedule-stations">
       {stations.map((station) => (
         <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>

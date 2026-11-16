@@ -118,8 +118,10 @@ export const GENDER_OPTIONS = [
 ];
 
 export const EMAIL_PREFERENCES = [
-  { k: "match_reminders", l: "Spiel-Erinnerungen", d: "Startzeiten, Spiel-Hub und Check-in-nahe Hinweise.", defaultOn: true },
-  { k: "tournament_updates", l: "Turnier-Updates", d: "Anmeldung, Status, Ergebnisse und wichtige Turnierinfos.", defaultOn: true },
+  // Spiele & Aufrufe (#1204): gleicher Name wie am Server und in der Stufen-Liste.
+  { k: "match_reminders", l: "Spiele & Aufrufe", d: "Aufruf zum Spiel, Spielstart, Erinnerungen, Check-in, Veto und Ergebnisse deiner Spiele.", defaultOn: true },
+  // Liga-Meldungen und Belohnungen der Liga laufen unter Turnier-Updates (#1204).
+  { k: "tournament_updates", l: "Turnier-Updates", d: "Anmeldung, Status, Hinweise der Turnierleitung, Liga-Rundnachrichten und Belohnungen der Liga.", defaultOn: true },
   { k: "prize_updates", l: "Gewinne & Abholung", d: "Gewinn bereit, übergeben oder Frist abgelaufen.", defaultOn: true },
   // Erfolge (#568): In-App, Push und Discord - eine Mail dafür gibt es nicht, die Spalte zeigt einen Strich.
   { k: "achievements", l: "Erfolge", d: "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.", defaultOn: true, channels: ["in_app", "push", "browser", "discord"] },
