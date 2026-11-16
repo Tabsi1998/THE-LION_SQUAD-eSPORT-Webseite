@@ -697,7 +697,9 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
 (nur bei Turnieren vor Ort mit Stationen):
 
 - Je Station: was **läuft** (mit Spielzeit-Uhr „12:34 / 30 Min.“, orange ab 80 %, ab der vollen Dauer orange hinterlegt mit Warn-Symbol), was **als
-  Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“.
+  Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“. Eine
+  Turnierpause rechnet die Prognose heraus wie die Uhr: Nach zehn Minuten Pause rücken „als Nächstes“ und das Finale um
+  zehn Minuten nach hinten.
 - Wird eine Station frei, rückt das nächste bereite Spiel nach – an die Station, die zuerst frei ist. Ein Spiel wartet
   nur auf seine eigenen Vorspiele (die Linien im Baum), nicht auf die ganze Runde. Steht ein Platz noch nicht fest,
   heißt es „wartet auf die Vorspiele“, bei der Show-Auslosung „wartet auf die Auslosung“, und die Zeit „voraussichtlich“.
