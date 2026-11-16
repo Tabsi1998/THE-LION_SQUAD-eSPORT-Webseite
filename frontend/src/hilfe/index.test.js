@@ -59,8 +59,10 @@ test("jeder Schritt mit Bild hat Handy und PC samt Größe; keine verwaisten Bil
   }
 });
 
-// Schleifen wie ein GIF (#2448): Grenze je Datei - gleich lautend in e2e/hilfe/clips.js (MAX_BYTES).
+// Schleifen wie ein GIF (#2448): Grenze je Datei - gleich lautend in e2e/hilfe/clips.js (MAX_BYTES) - und für alle
+// zusammen (das Repository ist öffentlich und wächst mit jeder Neuaufnahme).
 const CLIP_MAX_BYTES = 300 * 1024;
+const CLIPS_TOTAL_MAX_BYTES = 8 * 1024 * 1024;
 
 test("jeder Schritt mit Schleife hat Handy und PC als WebM und MP4 samt Poster; keine verwaisten Schleifen", () => {
   const expected = new Set();
@@ -85,13 +87,17 @@ test("jeder Schritt mit Schleife hat Handy und PC als WebM und MP4 samt Poster; 
   expect(files.sort()).toEqual([...expected].sort());
 });
 
-test(`Schleifen: jede Datei höchstens ${CLIP_MAX_BYTES / 1024} KB`, () => {
+test(`Schleifen: jede Datei höchstens ${CLIP_MAX_BYTES / 1024} KB, alle zusammen höchstens ${CLIPS_TOTAL_MAX_BYTES / 1024 / 1024} MB`, () => {
   const dir = resolve(ROOT, "clips");
+  let total = 0;
   for (const slug of readdirSync(dir)) {
     for (const file of readdirSync(resolve(dir, slug))) {
-      expect(statSync(resolve(dir, slug, file)).size, `${slug}/${file}`).toBeLessThanOrEqual(CLIP_MAX_BYTES);
+      const size = statSync(resolve(dir, slug, file)).size;
+      total += size;
+      expect(size, `${slug}/${file}`).toBeLessThanOrEqual(CLIP_MAX_BYTES);
     }
   }
+  expect(total, "alle Schleifen zusammen").toBeLessThanOrEqual(CLIPS_TOTAL_MAX_BYTES);
 });
 
 test("Schleife eines Schritts: WebM und MP4, eine Art darf fehlen, ohne beide null", () => {
