@@ -19,6 +19,7 @@ import hashlib
 import logging
 import os
 import re
+import time
 import traceback
 from datetime import timedelta
 from typing import Any
@@ -27,6 +28,7 @@ from starlette.routing import Match
 
 from database import get_db
 from models import new_id, now_utc
+from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.ops")
 
@@ -205,6 +207,96 @@ async def record_slow_request(app: Any, request: Any, duration_ms: float, status
 
 def should_watch(path: str) -> bool:
     return not any(path.startswith(prefix) for prefix in IGNORED_PATH_PREFIXES)
+
+
+# Starlettes ``BaseHTTPMiddleware`` wirft das, wenn von innen keine Antwort kam - etwa weil die Verbindung schon weg war.
+NO_RESPONSE_MESSAGE = "No response returned."
+
+
+def is_client_abort(exc: BaseException, *, client_gone: bool) -> bool:
+    """Ein Abbruch durch den Client (#2446) ist kein Serverfehler.
+
+    ``ClientDisconnect`` sagt das selbst. „No response returned.“ zählt nur als Abbruch, wenn die Verbindung wirklich
+    getrennt war (``client_gone``) - ohne Trennung ist es ein echter Fehler im Code und bleibt eine Gruppe. Jede andere
+    Ausnahme bleibt ein Serverfehler, auch wenn der Client inzwischen weg ist."""
+    from starlette.requests import ClientDisconnect
+
+    exc = unwrap_exception(exc)
+    if isinstance(exc, ClientDisconnect):
+        return True
+    return client_gone and isinstance(exc, RuntimeError) and str(exc) == NO_RESPONSE_MESSAGE
+
+
+class OpsMonitorMiddleware:
+    """Die Betriebssicht als äußerste Middleware (server.py), als reine ASGI-Middleware (#2446).
+
+    Zählt wie bisher unbehandelte Ausnahmen vor der Antwort und 5xx-Antworten als Gruppe (außer der Schreibpause,
+    ``maintenance.MARKER_HEADER``) und Anfragen über ``SLOW_REQUEST_MS`` - gemessen bis zum Beginn der Antwort.
+    Neu: Sie sieht, ob der Client die Verbindung getrennt hat (``http.disconnect`` beim Lesen, ``OSError`` beim Senden).
+    Ein solcher Abbruch wird nicht gezählt und nicht weitergeworfen - es gibt niemanden mehr, dem man antworten könnte."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        from starlette.requests import ClientDisconnect, Request
+
+        request = Request(scope)
+        path = request.url.path
+        if not path.startswith("/api/") or not should_watch(path):
+            await self.app(scope, receive, send)
+            return
+        app = scope.get("app")
+        started = time.perf_counter()
+        client_gone = False
+        response_started = False
+
+        async def watched_receive():
+            nonlocal client_gone
+            message = await receive()
+            if message.get("type") == "http.disconnect":
+                client_gone = True
+            return message
+
+        async def watched_send(message):
+            nonlocal client_gone, response_started
+            if message.get("type") == "http.response.start" and not response_started:
+                response_started = True
+                await _observe_response(app, request, message, (time.perf_counter() - started) * 1000)
+            try:
+                await send(message)
+            except OSError as exc:  # uvicorn: Verbindung beim Senden schon zu
+                client_gone = True
+                raise ClientDisconnect() from exc
+
+        try:
+            await self.app(scope, watched_receive, watched_send)
+        except Exception as exc:
+            if is_client_abort(exc, client_gone=client_gone):
+                if client_gone:
+                    logger.debug("[ops] client left before the answer route=%s", log_safe(route_template(app, scope)))
+                    return
+                raise
+            # Aufzeichnung darf nie die Antwort verhindern - die Ausnahme geht nach dem Festhalten unverändert weiter.
+            if not response_started:
+                await record_exception(app, request, exc)
+            raise
+
+
+async def _observe_response(app: Any, request: Any, message: dict, duration_ms: float) -> None:
+    from starlette.datastructures import Headers
+
+    from services import maintenance
+
+    status_code = int(message.get("status") or 0)
+    # Die Schreibpause fürs Backup (#1009) ist gewollt und kein Serverfehler.
+    if status_code >= 500 and maintenance.MARKER_HEADER not in Headers(raw=message.get("headers") or []):
+        await record_http_error(app, request, status_code)
+    if duration_ms >= SLOW_REQUEST_MS:
+        await record_slow_request(app, request, duration_ms, status_code)
 
 
 # ---------------------------------------------------------------- Lesen
