@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.90.0 (16.11.2026)
+
+### Neu
+
+* angeheftete News laufen zum gewählten Tag ab, Vorschlag 14 Tage ab dem Erscheinen (#1263)
+* Antrag, „Mitglied werden“ und Registrierung nennen das Mindestalter (#1698)
+* **app:** App schickt bei der Push-Anmeldung eine Installations-Kennung mit – kein zweiter Geräte-Eintrag mehr (#2470)
+* **app:** Benachrichtigungen in der App in drei Stufen mit „Eigene Auswahl“ und je Thema Push, Nur App oder Aus (#2444)
+* **app:** E-Mail, Discord und Kanal-Hauptschalter in der App eingeklappt unter „Weitere Wege“ (#2444)
+* **app:** Profil in der App zeigt „Vereinsmitglied · Funktion“ mit Weg zum Vereinsprofil (#1267)
+* **app:** Ruhezeit von–bis in der App, mit Ausnahmen und mindestens 15 Minuten Lücke (#2444)
+* **app:** Sammelmeldung nach der Ruhezeit öffnet in der App die Glocke (#2444)
+* Beitrittsantrag erst ab 18 – Geburtsdatum Pflicht, Prüfung am Wiener Tag (#1698)
+* die drei langen FAQ-Videos sind durch die Animationen je Schritt ersetzt (#2448)
+* FAQ-Animationen bei „Bewegung reduzieren“ nur als Standbild mit Abspielen-Knopf (#2448)
+* FAQ-Animationen laden erst im Bild, halten außerhalb an und lassen sich per Knopf anhalten (#2448)
+* FAQ-Anleitungen zeigen kurze Animationen wie ein GIF, am Handy die Handy-, am PC die PC-Fassung (#2448)
+* Fast-Lap-Helfer bekommen beim Eintragen dieselbe Nachricht (#1384)
+* Liga-Tabelle zeigt Auf- und Abstieg auch als Pfeil, am TV und in der Legende (#1648)
+* Reiter „Helfer“ mit einem Satz je Rolle und Nachricht beim Eintragen, Aktivieren und Rollenwechsel (#1384)
+* Sammel-PR C – Begriffe, Mindestalter, Rundung, Liga-Pfeile, Dolibarr-Doku ([#1238](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1238), [#1698](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1698), [#1908](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1908), [#1648](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1648), [#1542](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1542)) (#2479)
+* Spiel-ID-Feld als Plattform kennzeichnen, Season schlägt es vor (#2281)
+* Spielerprofil zeigt „Vereinsmitglied · Funktion“ mit Link zum Vereinsprofil (#1267)
+* Teilen-Bilder und Rankingbanner mit den Lionsquad-Schriften (#2435)
+* Turnierliste der Verwaltung am Handy als Karten mit Stand, Teilnehmern, Regeln und Aktionen (#2463)
+* Turnierliste für Liga-Zuständige und Bereich Ligen mit nur den eigenen Staffeln, Menüeintrag „Turniere“ (#2463)
+
+### Fehlerbehebungen
+
+* Aktions-Symbole der Turnierliste mit fester Größe, 44-px-Tippfläche und Turniernamen zum Vorlesen (#2463)
+* **app:** App zählt zusammengelegte und entfallene Spiele nicht mehr mit (#2459)
+* **app:** Benachrichtigungs-Themen in der App heißen wie im Web („Spiele & Aufrufe“, neuer Text bei Turnier-Updates) (#2444)
+* **app:** Lange Namen aus einem Wort brechen in der Läufe-Karte nicht mehr mitten im Wort um (#2459)
+* **app:** Läufe-Karte der App sagt „Plätze frei“ nur vor dem Lauf, sonst „bleiben leer“ oder nichts (#2459)
+* **app:** Liga-Staffeln zeigen in der App den Liga-Stand statt „Entwurf“ (#2453)
+* Beträge in Cent überall kaufmännisch gerundet (#1908)
+* Datenschutzerklärung nennt den Knopf „Konto anonymisieren“ (#1238)
+* Erfolgs- und Level-Zeremonien kommen nur noch einmal je Konto statt auf jedem Gerät (#2450)
+* Ergebnis-PDF unterscheidet „Relegation um den Aufstieg“ und „gegen den Abstieg“ (#1648)
+* FAQ-Animation fällt bei einem Ladefehler auf MP4 und erst dann auf das Standbild zurück (#2448)
+* FAQ-Animation startet per Klick, auch wenn der Browser das automatische Abspielen ablehnt (#2448)
+* install.sh und update.sh ohne ShellCheck-Funde (#1908)
+* Kontaktseite zeigt den Vereinsnamen ohne doppelten Untertitel (#1238)
+* Level-up neben einem Sieger-Moment oder einer Liga-Belohnung wird nicht mehr verschluckt (#2450)
+* Registrierung schreibt „Männlich“ statt „Maennlich“ (#1238)
+* Service Worker schreibt nur noch mit Schalter in die Browser-Konsole (#1908)
+* Turnierliste am Tablet ohne seitliches Wischen, Regeln unter dem Titel, Filterzeile zweispaltig (#2463)
+* Überschrift „Turniere“ bricht am Handy nicht mehr mitten im Wort um (#2463)
+* Veröffentlichen warnt, wenn ein Abschluss-Schritt scheitert, mit „Abschluss nachholen“ und Betriebs-Alarm (#2460)
+* Website sagt einheitlich „Anmelden“ und „Konto“ statt „Login“, „Einloggen“ und „Account“ (#1238)
+* Zeremonie lässt sich mit der Zurück-Taste schließen (#2450)
+
+### Dokumentation
+
+* Datenschutzerklärung erklärt das Mindestalter (#1698)
+* Dolibarr-Anbindung beschreibt alle Schreibwege und den Datenfluss (#1542)
+
 ## 1.89.0 (16.11.2026)
 
 ### Neu
