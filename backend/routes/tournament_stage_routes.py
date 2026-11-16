@@ -255,9 +255,13 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
         # Staffel (#2203): Der Plan sagt je Spiel, ob die Person dort beteiligt ist - der Server entscheidet trotzdem.
         if is_league_staffel(tournament):
             own = await involved_match_ids(db, user, tournament, matches)
+            # Staffel-Seite (#2262, Paket B): Check-in, Veto, Vorfall und Verfahren je Spiel - nur gelesen, vor dem Kürzen der Verfahren.
+            from services.league_match_marks import match_marks
+            moment = now_utc()
             for match in matches:
                 match["viewer_involved"] = match["id"] in own
                 match["viewer_override"] = match["id"] in own and is_superadmin(user)
+                match["league_marks"] = match_marks(match, tournament, now=moment)
             # Verfahren (E.2, #1619): im eigenen Spiel sieht auch die Leitung nur, was ihre Seite sehen darf.
             from services.league_procedures import for_viewer_list
             matches = await for_viewer_list(db, user, matches, own)
