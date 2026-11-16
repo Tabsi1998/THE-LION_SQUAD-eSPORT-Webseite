@@ -127,7 +127,7 @@ export function CookieConsentProvider({ children }) {
         // Cookie-Hinweis als schmales Blatt am unteren Rand (#1226, Variante A): keine Unschärfe, kein Fenster über der
         // Seite - der Inhalt dahinter bleibt lesbar, scrollbar und klickbar. Am Handy liegt das Blatt über der unteren
         // Leiste (.tls-cookie-sheet in index.css), ab 640 px mittig und höchstens 720 px breit.
-        <div className="tls-cookie-sheet fixed inset-x-0 bottom-0 z-[80] flex justify-center p-2 sm:p-4 pointer-events-none" data-testid="cookie-sheet">
+        <div className="tls-cookie-sheet fixed inset-x-0 bottom-0 z-[80] flex justify-center p-2 sm:p-4 pointer-events-none" data-modal-exempt="" data-testid="cookie-sheet">
           <section
             role="dialog"
             aria-modal="false"

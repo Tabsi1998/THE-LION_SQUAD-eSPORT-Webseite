@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { useModalBehavior } from "./useModalBehavior";
@@ -154,7 +154,7 @@ function Page({ initiallyOpen = false, overlay = null }) {
   return (
     <div>
       <main data-testid="page"><button type="button" onClick={() => setOpen(true)}>Öffnen</button></main>
-      <section aria-live="polite" data-testid="live" />
+      <section aria-live="polite" data-modal-exempt="" data-testid="live" />
       {open ? (overlay ? overlay(() => setOpen(false)) : <ModalOverlay onDismiss={() => setOpen(false)} />) : null}
     </div>
   );
@@ -173,7 +173,7 @@ test("Ein modales Overlay sperrt den Hintergrund und gibt ihn beim Schließen fr
   expect(screen.getByTestId("page")).not.toHaveAttribute("inert");
 });
 
-test("Meldungsbereiche (aria-live) bleiben hinter dem Overlay erreichbar", async () => {
+test("Ausgenommene Meldungsbereiche (data-modal-exempt) bleiben hinter dem Overlay erreichbar", async () => {
   const user = userEvent.setup();
   render(<Page />);
 
@@ -393,4 +393,56 @@ test("Was React während des Overlays selbst sperrt, bleibt nach dem Schließen 
   await user.keyboard("{Escape}");
 
   expect(screen.getByTestId("drawer")).toHaveAttribute("inert");
+});
+
+// Fix-Runde #2412: frei bleibt nur, was ausdrücklich ausgenommen ist (Toasts, Offline-Leiste, Rückgängig-Leiste,
+// Cookie-Hinweis - `data-modal-exempt`). Ein beliebiges role="alert" oder aria-live im Hintergrund, etwa ein
+// Ladefehler mit Knopf, ist gesperrt wie der Rest.
+test("Ein Hinweis mit role=alert im Hintergrund ist gesperrt, ein ausgenommener Bereich nicht", async () => {
+  render(
+    <>
+      <div role="alert" data-testid="alert"><button type="button">Nochmal versuchen</button></div>
+      <ul aria-live="polite" data-testid="list"><li><button type="button">Treffer</button></li></ul>
+      <div data-modal-exempt="" data-testid="cookie"><button type="button">Alle annehmen</button></div>
+      <ModalOverlay />
+    </>,
+  );
+
+  expect(screen.getByTestId("alert")).toHaveAttribute("inert");
+  expect(screen.getByTestId("list")).toHaveAttribute("inert");
+  expect(screen.getByTestId("cookie")).not.toHaveAttribute("inert");
+});
+
+test("Liegt das Overlay selbst in einem ausgenommenen Bereich, ist dessen übriger Inhalt trotzdem gesperrt", async () => {
+  render(
+    <div data-modal-exempt="" data-testid="exempt">
+      <p data-testid="beside">Daneben</p>
+      <ModalOverlay />
+    </div>,
+  );
+
+  expect(screen.getByTestId("exempt")).not.toHaveAttribute("inert");
+  expect(screen.getByTestId("beside")).toHaveAttribute("inert");
+});
+
+test("Ein ausgenommener Bereich, der erst bei offenem Overlay erscheint (Offline-Leiste), ist nicht gesperrt", async () => {
+  function Layout() {
+    const [offline, setOffline] = useState(false);
+    return (
+      <>
+        <div data-testid="layout">
+          <main><button type="button">Seite</button></main>
+          {offline ? <div role="status" data-modal-exempt="" data-testid="offline">Offline</div> : null}
+        </div>
+        <ModalOverlay><button type="button" onClick={() => setOffline(true)}>Netz weg</button></ModalOverlay>
+      </>
+    );
+  }
+  const user = userEvent.setup();
+  render(<Layout />);
+  expect(screen.getByTestId("layout")).toHaveAttribute("inert");
+  await user.click(screen.getByRole("button", { name: "Netz weg" }));
+
+  await waitFor(() => expect(screen.getByTestId("offline").closest("[inert]")).toBeNull());
+  expect(screen.getByRole("button", { name: "Seite" }).closest("[inert]")).not.toBeNull();
 });

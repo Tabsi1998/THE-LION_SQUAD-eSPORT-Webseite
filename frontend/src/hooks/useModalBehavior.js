@@ -9,8 +9,10 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
-// Meldungen (Toasts, aria-live, Status) bleiben auch hinter einem offenen Overlay hörbar und bedienbar.
-const LIVE_REGIONS = '[aria-live], [role="status"], [role="alert"]';
+// Was auch hinter einem offenen Overlay hörbar und bedienbar bleibt - nur ausdrücklich Ausgenommenes (#2412): die
+// Toasts, die Offline- und die Rückgängig-Leiste, der Cookie-Hinweis. Ein beliebiges role="alert" oder aria-live im
+// Hintergrund (Ladefehler mit Knopf, Trefferlisten) ist gesperrt wie der Rest.
+const KEEP_OPEN = "[data-modal-exempt], [data-sonner-toaster]";
 const NEVER_INERT = new Set(["SCRIPT", "STYLE", "TEMPLATE", "LINK", "META", "NOSCRIPT"]);
 
 /**
@@ -19,7 +21,7 @@ const NEVER_INERT = new Set(["SCRIPT", "STYLE", "TEMPLATE", "LINK", "META", "NOS
  * genau das wieder frei.
  */
 function inertOutside(root) {
-  const keep = new Set([root, ...Array.from(document.querySelectorAll(LIVE_REGIONS)).filter((node) => !root.contains(node))]);
+  const keep = new Set([root, ...Array.from(document.querySelectorAll(KEEP_OPEN)).filter((node) => !root.contains(node))]);
   const path = new Set();
   keep.forEach((node) => {
     for (let parent = node.parentElement; parent && !path.has(parent); parent = parent.parentElement) path.add(parent);
@@ -27,11 +29,12 @@ function inertOutside(root) {
   const locked = [];
   const visit = (parent) => {
     Array.from(parent.children).forEach((child) => {
-      if (keep.has(child)) return;
+      // Erst der Weg: liegt das Overlay in einem ausgenommenen Bereich, wird dessen übriger Inhalt trotzdem gesperrt.
       if (path.has(child)) {
         visit(child);
         return;
       }
+      if (keep.has(child)) return;
       if (NEVER_INERT.has(child.tagName) || child.hasAttribute("inert")) return;
       child.setAttribute("inert", "");
       locked.push(child);
@@ -63,9 +66,30 @@ function sameStop(a, b) {
 // es, gilt wieder das darunter (ein Bild-Dialog im Seitenblatt schließt allein, das Blatt bleibt offen).
 const stack = [];
 
+// Taucht ein ausgenommener Bereich erst auf, während gesperrt ist (Offline-Leiste, Meldung), liegt er in einem gesperrten
+// Vorfahren - dann wird die Sperre neu gezogen, mit ihm als Ausnahme.
+function lockedExemptAppeared(records) {
+  return records.some((record) => Array.from(record.addedNodes).some((node) => {
+    if (node.nodeType !== 1) return false;
+    const exempt = node.matches(KEEP_OPEN) ? [node] : Array.from(node.querySelectorAll(KEEP_OPEN));
+    return exempt.some((element) => element.closest("[inert]"));
+  }));
+}
+
 function lockTop() {
   const top = stack[stack.length - 1];
-  if (top?.modalRoot?.isConnected && !top.release) top.release = inertOutside(top.modalRoot);
+  if (!top?.modalRoot?.isConnected || top.release) return;
+  const release = inertOutside(top.modalRoot);
+  const watcher = typeof MutationObserver === "undefined" ? null : new MutationObserver((records) => {
+    if (stack[stack.length - 1] !== top || !lockedExemptAppeared(records)) return;
+    unlockTop();
+    lockTop();
+  });
+  watcher?.observe(document.body, { childList: true, subtree: true });
+  top.release = () => {
+    watcher?.disconnect();
+    release();
+  };
 }
 
 function unlockTop() {
