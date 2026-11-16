@@ -1,0 +1,45 @@
+{
+  "slug": "datenschutz-und-konto",
+  "titel": "Datenschutz und Konto",
+  "kurz": "Deine Daten herunterladen und das Konto anonymisieren.",
+  "zielgruppe": "Für alle mit Konto",
+  "bereich": "datenschutz",
+  "rollen": ["spieler", "captain", "mitglied"],
+  "sichtbar_fuer": "alle",
+  "suchbegriffe": ["datenschutz", "dsgvo", "daten", "export", "herunterladen", "json", "konto loeschen", "loeschen", "anonymisieren", "abmelden"],
+  "abschnitte": [
+    {
+      "id": "deine-daten",
+      "titel": "Deine Daten",
+      "schritte": [
+        {
+          "id": "daten-herunterladen",
+          "titel": "Daten herunterladen",
+          "text": "Öffne in den Einstellungen Meine Daten und tippe auf Als JSON herunterladen. Die Datei enthält alles, was wir über dich gespeichert haben.",
+          "bild": true,
+          "link": { "to": "/privacy-account", "label": "Zu Meine Daten" }
+        }
+      ]
+    },
+    {
+      "id": "konto-loeschen",
+      "titel": "Konto löschen",
+      "schritte": [
+        {
+          "id": "konto-anonymisieren",
+          "titel": "Konto anonymisieren",
+          "text": "Unter Meine Daten tippst du auf Konto anonymisieren. Zur Sicherheit tippst du danach LÖSCHEN ein.",
+          "hinweis": "Das gilt sofort und lässt sich nicht rückgängig machen. Deine Turnier-Ergebnisse bleiben ohne Namen stehen.",
+          "bild": true
+        },
+        {
+          "id": "rollen-abgeben",
+          "titel": "Erst die Rollen abgeben",
+          "text": "Bist du Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Die Seite zeigt dir je Rolle den Weg dorthin.",
+          "hinweis": "Solange eine Rolle offen ist, bleibt der Knopf gesperrt.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}

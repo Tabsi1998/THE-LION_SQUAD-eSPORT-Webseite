@@ -2,6 +2,11 @@ import konto from "./themen/konto-und-profil.json";
 import team from "./themen/team-und-co-team.json";
 import liga from "./themen/liga-captains.json";
 import turniere from "./themen/turniere.json";
+import verein from "./themen/verein-und-mitgliedschaft.json";
+import events from "./themen/events-und-kalender.json";
+import turniertag from "./themen/turniertag.json";
+import gewinne from "./themen/gewinne-und-trophaeen.json";
+import datenschutz from "./themen/datenschutz-und-konto.json";
 import masse from "./bilder/masse.json";
 import bereiche from "./bereiche.json";
 import fragen from "./fragen.json";
@@ -17,11 +22,11 @@ export { FAQ_PFAD, ankerAus, fragePfad, hilfePfad, hilfeUmleitung } from "./pfad
 // nutzen - deshalb Daten statt fest geschriebener Seiten.
 //
 // Inhaltsmodell (#2448): Jede Frage (fragen.json) und jedes Thema trägt `bereich` (bereiche.json), `rollen` für den
-// Filter (spieler, captain, mitglied, turnierleitung) und `sichtbar_fuer` (alle, angemeldet, mitglied, turnierleitung).
+// Filter (spieler, captain, mitglied, turnierleitung) und `sichtbar_fuer` (alle, angemeldet, mitglied, helfer, turnierleitung).
 // Hier im öffentlichen Bundle steht nur `alle`; Geschütztes liefert der Server nach Rechteprüfung (GET /api/faq,
 // backend/services/faq_protected.py). Ein Abschnitt kann mit eigenem `bereich` zusätzlich in einem zweiten Bereich stehen.
 
-export const THEMEN = [konto, team, liga, turniere];
+export const THEMEN = [konto, team, liga, turniere, verein, events, turniertag, gewinne, datenschutz];
 // Gleich lautend in backend/services/help_topics.py (Teilen-Karte für Discord und WhatsApp).
 export const HILFE_BESCHREIBUNG = "Häufige Fragen und kurze Anleitungen mit Bildern: Konto und Profil, Teams, Liga, Turniere und mehr.";
 export const BEREICHE = bereiche;
@@ -33,7 +38,7 @@ export const ROLLEN = [
   { id: "mitglied", label: "Mitglied" },
   { id: "turnierleitung", label: "Turnierleitung" },
 ];
-export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung"];
+export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "helfer", "turnierleitung", "turnierleitung_verwaltung"];
 
 const BILDER = import.meta.glob("./bilder/**/*.webp", { eager: true, query: "?url", import: "default" });
 // Nur Adressen (?url), keine Inhalte: Die Schleifen lädt erst FaqClip, wenn ein Schritt sichtbar wird (#2448).
@@ -112,6 +117,8 @@ export function sucheHilfe(anfrage, { themen = THEMEN, limit = 12 } = {}) {
 /** Darf jemand eine Stufe sehen? `darf` kommt vom Server (GET /api/faq). Unbekannte Stufen bleiben zu. */
 export function darfSehen(sichtbar, darf = {}) {
   if (!sichtbar || sichtbar === "alle") return true;
+  // „helfer“ (Fabian 16.11.): Mitglied oder aktiver Helfer-Einsatz - ein Mitglied gilt immer auch als Helfer, wie am Server.
+  if (sichtbar === "helfer") return Boolean(darf?.helfer || darf?.mitglied);
   return SICHTBARKEITEN.includes(sichtbar) && Boolean(darf?.[sichtbar]);
 }
 

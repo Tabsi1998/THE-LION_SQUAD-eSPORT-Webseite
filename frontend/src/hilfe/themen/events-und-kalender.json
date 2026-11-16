@@ -1,0 +1,88 @@
+{
+  "slug": "events-und-kalender",
+  "titel": "Events und Kalender",
+  "kurz": "Events finden und anmelden, mit Begleitung oder auf der Warteliste, den Tagesplan lesen und den Kalender abonnieren.",
+  "zielgruppe": "Für alle, die zu Events kommen",
+  "bereich": "events-kalender",
+  "rollen": ["spieler", "mitglied"],
+  "sichtbar_fuer": "alle",
+  "suchbegriffe": ["event", "veranstaltung", "lan", "termin", "kalender", "abo", "abonnieren", "ics", "begleitung", "begleitperson", "warteliste", "stornieren", "absagen", "tagesplan", "programm"],
+  "abschnitte": [
+    {
+      "id": "finden",
+      "titel": "Events finden",
+      "schritte": [
+        {
+          "id": "events-liste",
+          "titel": "Alle Events",
+          "text": "Unter Events stehen alle kommenden Termine. Oben filterst du nach Events, Turnieren oder Fast Laps.",
+          "hinweis": "Bist du angemeldet, zeigt Nur meine nur das, wobei du dabei bist.",
+          "bild": true,
+          "link": { "to": "/events", "label": "Zu den Events" }
+        }
+      ]
+    },
+    {
+      "id": "anmeldung",
+      "titel": "Anmelden",
+      "schritte": [
+        {
+          "id": "event-anmelden",
+          "titel": "Zum Event anmelden",
+          "text": "Öffne das Event und tippe auf Anmelden. Nimmst du jemanden mit, stellst du bei Begleitpersonen die Zahl ein.",
+          "hinweis": "Jede Begleitperson belegt einen eigenen Platz. Wie viele mitdürfen, legt der Verein je Event fest.",
+          "bild": true,
+          "clip": true
+        },
+        {
+          "id": "warteliste",
+          "titel": "Warteliste",
+          "text": "Ist das Event voll, heißt der Knopf Auf die Warteliste. Wird ein Platz frei, bekommst du Bescheid.",
+          "hinweis": "Kostet das Event etwas, zahlst du erst, wenn du nachrückst.",
+          "bild": true
+        },
+        {
+          "id": "anmeldung-aendern",
+          "titel": "Ändern oder stornieren",
+          "text": "Unter Dein Event steht dein Stand. Mit Anmeldung ändern passt du Begleitpersonen und Hinweis an. Mit Stornieren wird dein Platz frei.",
+          "hinweis": "Beides geht bis zum Beginn des Events und nicht mehr nach dem Check-in. Ist deine Rechnung schon erstellt, ändert die Begleitpersonen nur die Turnierleitung.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "ablauf",
+      "titel": "Tagesplan",
+      "schritte": [
+        {
+          "id": "tagesplan",
+          "titel": "Was wann läuft",
+          "text": "Unter Was läuft beim Event stehen alle Turniere und Fast Laps mit Tag und Uhrzeit. Du siehst auch, wo du schon dabei bist.",
+          "hinweis": "Bei mehrtägigen Events zeigt Die Tage jeden Tag mit Einlass. Mit Drucken bekommst du den Plan als Blatt.",
+          "bild": true
+        }
+      ]
+    },
+    {
+      "id": "kalender",
+      "titel": "Kalender",
+      "schritte": [
+        {
+          "id": "mein-kalender",
+          "titel": "Mein Kalender",
+          "text": "Unter Kalender zeigt Mein Kalender nur deine Termine. Bei jedem Termin steht dein Stand.",
+          "bild": true,
+          "link": { "to": "/calendar/mine", "label": "Zu Mein Kalender" }
+        },
+        {
+          "id": "kalender-abo",
+          "titel": "Termine automatisch im Kalender",
+          "text": "Tippe bei Automatisch in deinen Kalender auf Abo einrichten. Danach landet jede Anmeldung von selbst in deinem Kalender.",
+          "hinweis": "Die Adresse ist privat und steht nur einmal da. Kopier sie gleich oder tippe auf Im Kalender öffnen.",
+          "bild": true,
+          "clip": true
+        }
+      ]
+    }
+  ]
+}

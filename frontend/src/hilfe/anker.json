@@ -1,4 +1,25 @@
 {
+  "datenschutz-und-konto": {
+    "daten-herunterladen": "Daten herunterladen",
+    "konto-anonymisieren": "Konto anonymisieren",
+    "rollen-abgeben": "Erst die Rollen abgeben"
+  },
+  "events-und-kalender": {
+    "events-liste": "Alle Events",
+    "event-anmelden": "Zum Event anmelden",
+    "warteliste": "Warteliste",
+    "anmeldung-aendern": "Ändern oder stornieren",
+    "tagesplan": "Was wann läuft",
+    "mein-kalender": "Mein Kalender",
+    "kalender-abo": "Termine automatisch im Kalender"
+  },
+  "gewinne-und-trophaeen": {
+    "meine-gewinne": "Meine Gewinne",
+    "trophaeen": "Deine Trophäen",
+    "neben-den-namen": "Neben deinen Namen",
+    "erfolge": "Deine Erfolge",
+    "erfolg-teilen": "Erfolg teilen"
+  },
   "konto-und-profil": {
     "registrieren": "Registrieren",
     "zustimmen": "Zustimmen und Konto erstellen",
@@ -68,5 +89,19 @@
     "ergebnis-bestaetigen": "Ergebnis bestätigen",
     "turnierbaum": "Dein Spiel im Turnierbaum",
     "weg-zeigen": "Weg durch den Baum"
+  },
+  "turniertag": {
+    "naechstes-spiel": "Wann du spielst",
+    "aufruf": "Du bist dran",
+    "nach-stationen": "Spielplan nach Stationen",
+    "spielzeit": "Die Spielzeit-Uhr",
+    "ergebnis-vor-ort": "Ergebnis vor Ort",
+    "hinweis-leitung": "Hinweis der Turnierleitung"
+  },
+  "verein-und-mitgliedschaft": {
+    "mitglied-werden": "Mitglied werden öffnen",
+    "antrag-ausfuellen": "Antrag ausfüllen",
+    "antrag-einreichen": "Zustimmen und einreichen",
+    "antrag-stand": "Stand des Antrags"
   }
 }

@@ -74,14 +74,14 @@
     "frage": "Wie werde ich Vereinsmitglied?",
     "antwort": "Du brauchst ein Konto. Öffne Mitglied werden und tippe auf Antrag stellen. Der Vorstand prüft jeden Antrag und meldet sich per E-Mail.",
     "bereich": "verein-mitgliedschaft", "rollen": ["mitglied", "spieler"], "sichtbar_fuer": "alle", "haeufig": true,
-    "link": { "to": "/membership/join", "label": "Zu Mitglied werden" }
+    "link": { "to": "/faq/verein-und-mitgliedschaft#mitglied-werden", "label": "Zur Anleitung" }
   },
   {
     "id": "daten-und-konto",
     "frage": "Wie lade ich meine Daten herunter oder lösche mein Konto?",
     "antwort": "Unter Meine Daten lädst du alles als JSON herunter. Dort kannst du dein Konto auch anonymisieren. Das lässt sich nicht rückgängig machen.",
     "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
-    "link": { "to": "/privacy-account", "label": "Zu Meine Daten" }
+    "link": { "to": "/faq/datenschutz-und-konto#daten-herunterladen", "label": "Zur Anleitung" }
   },
   {
     "id": "kalender-abo",
@@ -102,6 +102,111 @@
     "frage": "Ich habe etwas gewonnen. Wie bekomme ich den Preis?",
     "antwort": "Unter Meine Gewinne stehen deine Preise und Urkunden. Ist ein Preis abholbereit, holst du ihn beim nächsten Vereinsabend ab. Dafür hast du 90 Tage Zeit.",
     "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
-    "link": { "to": "/my/prizes", "label": "Zu Meine Gewinne" }
+    "link": { "to": "/faq/gewinne-und-trophaeen#meine-gewinne", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "ab-welchem-alter",
+    "frage": "Ab welchem Alter kann ich mitmachen?",
+    "antwort": "Ein Konto kannst du ab 14 Jahren anlegen. Vereinsmitglied wirst du ab 18 Jahren. Der Antrag fragt dafür nach deinem Geburtsdatum.",
+    "bereich": "verein-mitgliedschaft", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/verein-und-mitgliedschaft#mitglied-werden", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "was-kostet-mitgliedschaft",
+    "frage": "Was kostet die Mitgliedschaft?",
+    "antwort": "Auf Mitglied werden steht unter Beitrag jede Mitgliedsart mit Betrag und Aufnahmegebühr. Die Art wählst du im Antrag.",
+    "bereich": "verein-mitgliedschaft", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/membership/join#beitrag", "label": "Zum Beitrag" }
+  },
+  {
+    "id": "meine-rechnungen",
+    "frage": "Wo finde ich meine Rechnungen?",
+    "antwort": "Unter Meine Rechnungen stehen deine Belege, etwa für den Mitgliedsbeitrag oder ein Event. Offene stehen oben, bezahlte im Archiv.",
+    "bereich": "verein-mitgliedschaft", "rollen": ["mitglied", "spieler"], "sichtbar_fuer": "alle",
+    "link": { "to": "/account/invoices", "label": "Zu Meine Rechnungen" }
+  },
+  {
+    "id": "event-begleitung",
+    "frage": "Kann ich jemanden zum Event mitnehmen?",
+    "antwort": "Ja, wenn das Event Begleitpersonen erlaubt. Bei der Anmeldung stellst du die Zahl ein. Jede Begleitperson belegt einen eigenen Platz.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/events-und-kalender#event-anmelden", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "event-warteliste",
+    "frage": "Was heißt Warteliste bei einem Event?",
+    "antwort": "Ist das Event voll, kommst du auf die Warteliste. Wird ein Platz frei, bekommst du Bescheid. Kosten zahlst du erst dann.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/events-und-kalender#warteliste", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "event-absagen",
+    "frage": "Wie sage ich ein Event wieder ab?",
+    "antwort": "Öffne das Event und tippe unter Dein Event auf Stornieren. Das geht bis zum Beginn, aber nicht mehr nach dem Check-in.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/events-und-kalender#anmeldung-aendern", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "wann-bin-ich-dran",
+    "frage": "Woher weiß ich vor Ort, wann ich dran bin?",
+    "antwort": "Dein Stand auf der Turnierseite zeigt dein nächstes Spiel mit Station und Zeit. Bist du dran, kommt eine Benachrichtigung.",
+    "bereich": "turniertag", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/turniertag#aufruf", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "spielzeit-uhr",
+    "frage": "Wie lange dauert ein Spiel vor Ort?",
+    "antwort": "Die Spielzeit-Uhr im Spielplan zeigt, wie lange ein Spiel schon läuft und wie lange es dauern darf.",
+    "bereich": "turniertag", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/turniertag#spielzeit", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "ergebnis-vor-ort",
+    "frage": "Muss ich vor Ort das Ergebnis melden?",
+    "antwort": "Meist nicht: Vor Ort trägt die Turnierleitung das Ergebnis ein. Die Matchseite sagt dir, ob du selbst melden musst.",
+    "bereich": "turniertag", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/turniertag#ergebnis-vor-ort", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "hinweis-turnierleitung",
+    "frage": "Wo sehe ich Hinweise der Turnierleitung?",
+    "antwort": "Oben auf der Turnierseite, solange der Hinweis gilt. Angemeldete bekommen ihn auch als Benachrichtigung.",
+    "bereich": "turniertag", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/turniertag#hinweis-leitung", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "trophaeen-medaillen",
+    "frage": "Wo sehe ich meine Trophäen und Medaillen?",
+    "antwort": "In deinem Profil im Reiter Trophäen. Dort wählst du auch, was neben deinem Namen steht.",
+    "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/gewinne-und-trophaeen#trophaeen", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "erfolg-teilen",
+    "frage": "Wie teile ich einen Erfolg?",
+    "antwort": "Im Profil unter Erfolge tippst du beim Erfolg auf Teilen. Deine Erfolge müssen dafür öffentlich sein.",
+    "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/gewinne-und-trophaeen#erfolg-teilen", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "anonymisieren-was-passiert",
+    "frage": "Was passiert, wenn ich mein Konto anonymisiere?",
+    "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben. Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen.",
+    "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/datenschutz-und-konto#konto-anonymisieren", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "konto-loeschen-gesperrt",
+    "frage": "Warum kann ich mein Konto nicht löschen?",
+    "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Meine Daten steht je Rolle, wo das geht.",
+    "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/datenschutz-und-konto#rollen-abgeben", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "was-bekomme-ich-zugeschickt",
+    "frage": "Wo stelle ich ein, was ich zugeschickt bekomme?",
+    "antwort": "In den Einstellungen unter Benachrichtigungen. Wie das geht, steht in der Anleitung zu Konto und Profil.",
+    "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/konto-und-profil#stufe", "label": "Zur Anleitung" }
   }
 ]

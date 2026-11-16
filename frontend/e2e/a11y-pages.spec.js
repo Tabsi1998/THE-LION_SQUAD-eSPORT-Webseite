@@ -71,6 +71,8 @@ const PAGES = [
   // FAQ (#2448): Übersicht mit Suche, Häufigen Fragen und Bereichen; eine Anleitung.
   { name: "FAQ", path: "/faq", ready: "faq-haeufig", user: null },
   { name: "FAQ-Anleitung", path: "/faq/team-und-co-team", ready: "help-topic", user: null },
+  // Paket 3: eine Anleitung mit vielen Schleifen (Events und Kalender).
+  { name: "FAQ-Anleitung Events", path: "/faq/events-und-kalender", ready: "help-topic", user: null },
 ];
 
 async function mockServer(page, user) {
