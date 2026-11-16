@@ -35,7 +35,7 @@
         {
           "id": "rollen-abgeben",
           "titel": "Erst die Rollen abgeben",
-          "text": "Bist du Teamleitung oder Captain, gib die Rolle zuerst ab. Die Seite zeigt dir je Rolle den Weg dorthin.",
+          "text": "Bist du Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Die Seite zeigt dir je Rolle den Weg dorthin.",
           "hinweis": "Solange eine Rolle offen ist, bleibt der Knopf gesperrt.",
           "bild": true
         }

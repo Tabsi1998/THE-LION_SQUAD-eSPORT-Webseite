@@ -198,7 +198,7 @@
   {
     "id": "konto-loeschen-gesperrt",
     "frage": "Warum kann ich mein Konto nicht löschen?",
-    "antwort": "Bist du noch Teamleitung oder Captain, gib die Rolle zuerst ab. Unter Meine Daten steht je Rolle, wo das geht.",
+    "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Meine Daten steht je Rolle, wo das geht.",
     "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
     "link": { "to": "/faq/datenschutz-und-konto#rollen-abgeben", "label": "Zur Anleitung" }
   },
