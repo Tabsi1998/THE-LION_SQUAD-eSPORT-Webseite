@@ -211,7 +211,7 @@ export default function AdminTournamentsPage() {
           </Link>
         )}
       </div>
-      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_16rem_auto_auto]">
+      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_14rem_14rem_auto_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
             <input
@@ -273,7 +273,7 @@ export default function AdminTournamentsPage() {
                 </div>
                 <div className="shrink-0 text-right" data-testid={`admin-tr-participants-${t.slug}`}>
                   <div className="text-sm font-bold tabular-nums">{t.participant_count}/{t.max_participants}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-white/40">Teilnehmer</div>
+                  <div className="text-[10px] uppercase tracking-wider text-white/55">Teilnehmer</div>
                 </div>
               </div>
               <div className="mt-3">
@@ -289,7 +289,7 @@ export default function AdminTournamentsPage() {
           ))}
           {filteredList.length === 0 && (
             <li className={denied ? "" : "rounded-sm border border-white/10 bg-[#121212] py-10 text-center text-white/40"}>
-              {denied ? <AdminDenied text={denied} /> : list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}
+              {denied ? <AdminDenied text={denied} /> : list.length === 0 ? (leagueScope ? "Keine Staffeln" : "Keine Turniere") : (leagueScope ? "Keine Staffeln für diesen Filter" : "Keine Turniere für diesen Filter")}
             </li>
           )}
         </ul>
@@ -313,7 +313,7 @@ export default function AdminTournamentsPage() {
             {filteredList.map((t) => (
               <tr key={t.id} data-testid={`admin-tr-${t.slug}`}>
                 <td className="px-4 py-3">
-                  <Link to={`/admin/tournaments/${t.id}`} className="font-semibold hover:text-[#29B6E8]">{t.title}</Link>
+                  <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
                   <LeagueLabel tournament={t} className="ml-2 inline-flex align-middle" />
                   <div className="mt-1 xl:hidden"><RulePills tournament={t} compact /></div>
                 </td>
@@ -336,7 +336,7 @@ export default function AdminTournamentsPage() {
             {filteredList.length === 0 && (
               <tr>
                 <td colSpan="7" className={denied ? "p-4" : "text-center py-10 text-white/40"}>
-                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}
+                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? (leagueScope ? "Keine Staffeln" : "Keine Turniere") : (leagueScope ? "Keine Staffeln für diesen Filter" : "Keine Turniere für diesen Filter")}
                 </td>
               </tr>
             )}
@@ -388,22 +388,22 @@ const ACTION_ICON = "h-4 w-4 shrink-0";
 function RowActions({ tournament: t, isTournamentLead, leads, onStatus, onDelete }) {
   return (
     <>
-      <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" aria-label="Teilnehmer" className={`${ACTION_CLASS} hover:text-[#29B6E8]`}>
+      <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" aria-label={`Teilnehmer: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#29B6E8]`}>
         <Users className={ACTION_ICON} aria-hidden="true" />
       </Link>
       {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
       {isTournamentLead && t.status === "draft" && !isStaffel(t) ? (
-        <button type="button" onClick={() => onStatus(t.id, "registration_open")} title="Anmeldung öffnen" aria-label="Anmeldung öffnen" className={`${ACTION_CLASS} hover:text-ok`}>
+        <button type="button" onClick={() => onStatus(t.id, "registration_open")} title="Anmeldung öffnen" aria-label={`Anmeldung öffnen: ${t.title}`} className={`${ACTION_CLASS} hover:text-ok`}>
           <Play className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}
       {leads && t.status === "live" ? (
-        <button type="button" onClick={() => onStatus(t.id, "paused")} title="Pause" aria-label="Pause" className={`${ACTION_CLASS} hover:text-[#FFD700]`}>
+        <button type="button" onClick={() => onStatus(t.id, "paused")} title="Pause" aria-label={`Pause: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FFD700]`}>
           <Pause className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}
       {leads && canDelete(t) ? (
-        <button type="button" onClick={() => onDelete(t)} title="Löschen" aria-label="Löschen" className={`${ACTION_CLASS} hover:text-[#FF3B30]`}>
+        <button type="button" onClick={() => onDelete(t)} title="Löschen" aria-label={`Löschen: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FF3B30]`}>
           <Trash2 className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}

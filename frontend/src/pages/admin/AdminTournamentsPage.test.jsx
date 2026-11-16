@@ -222,9 +222,9 @@ test("unter 768 px: Karten mit Titel, Spiel, Format, Liga-Stand, was fehlt, Teil
   const cup = screen.getByTestId("admin-tr-eigenes");
   expect(cup).toHaveTextContent("Probe Racer");
   expect(cup).toHaveTextContent("ENTWURF");
-  expect(within(cup).getByRole("button", { name: "Anmeldung öffnen" })).toBeInTheDocument();
-  expect(within(cup).getByRole("button", { name: "Löschen" })).toBeInTheDocument();
-  expect(within(cup).getByRole("link", { name: "Teilnehmer" })).toHaveAttribute("href", "/admin/tournaments/t-own?tab=participants");
+  expect(within(cup).getByRole("button", { name: /^Anmeldung öffnen:/ })).toBeInTheDocument();
+  expect(within(cup).getByRole("button", { name: /^Löschen:/ })).toBeInTheDocument();
+  expect(within(cup).getByRole("link", { name: /^Teilnehmer:/ })).toHaveAttribute("href", "/admin/tournaments/t-own?tab=participants");
   // Filter, Zähler und CSV wie bisher.
   expect(screen.getByText("2 / 2 sichtbar")).toBeInTheDocument();
   fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "league" } });
@@ -250,8 +250,8 @@ test.each([[true, "Karte"], [false, "Tabelle"]])("Aktions-Symbole (%s → %s): f
   await screen.findByText("Live-Cup");
   const actions = [
     ...within(screen.getByTestId("admin-tr-eigenes")).getAllByRole("button"),
-    ...within(screen.getByTestId("admin-tr-eigenes")).getAllByRole("link", { name: "Teilnehmer" }),
-    within(screen.getByTestId("admin-tr-live")).getByRole("button", { name: "Pause" }),
+    ...within(screen.getByTestId("admin-tr-eigenes")).getAllByRole("link", { name: /^Teilnehmer:/ }),
+    within(screen.getByTestId("admin-tr-live")).getByRole("button", { name: /^Pause:/ }),
   ];
   expect(actions.length).toBeGreaterThanOrEqual(4);
   for (const action of actions) {
@@ -287,7 +287,7 @@ test("Liga-Zuständige ohne Turnierleitung: Hinweis auf die eigenen Staffeln, ke
     expect(screen.queryByTestId("admin-new-tournament")).toBeNull();
     expect(screen.queryByTitle("Löschen")).toBeNull();
     expect(screen.queryByTitle("Pause")).toBeNull();
-    expect(screen.getByRole("link", { name: "Teilnehmer" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Teilnehmer:/ })).toBeInTheDocument();
   } finally {
     authState.isTournamentLead = before.lead;
     authState.user = before.user;
