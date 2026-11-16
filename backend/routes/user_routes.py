@@ -922,17 +922,17 @@ async def _club_profile_hint(db, user_id: str) -> dict:
     """``club_profile_slug`` und ``club_role_title`` des Vereinsprofils, das mit dem Konto verbunden ist (#1267) - leer
     ohne Verbindung oder bei einem ausgeblendeten Vereinsprofil. Die Funktion wie auf der Vereinsseite: Vorstandsposten vor
     der redaktionellen Rolle."""
-    from routes.membership_routes import _board_titles_by_profile_id, _public_profile
+    from services.club_board_titles import board_titles_by_profile_id
 
     rows = await db.club_member_profiles.find(
         {"user_id": user_id, "is_active": {"$ne": False}, "slug": {"$nin": [None, ""]}}, {"_id": 0},
     ).sort([("order_index", 1), ("display_name", 1)]).to_list(5)
     if not rows:
         return {"club_profile_slug": None, "club_role_title": None}
-    titles = await _board_titles_by_profile_id(db)
+    titles = await board_titles_by_profile_id(db)
     row = next((item for item in rows if item["id"] in titles), rows[0])
-    public = _public_profile(row, board_title=titles.get(row["id"]))
-    return {"club_profile_slug": public["slug"], "club_role_title": public["role_title"]}
+    # Wie die Vereinsseite (membership_routes._public_profile): Vorstandsposten vor der redaktionellen Rolle.
+    return {"club_profile_slug": row["slug"], "club_role_title": titles.get(row["id"]) or row.get("role_title") or "Mitglied"}
 
 
 @router.get("/{user_id}")
