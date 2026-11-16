@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.88.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.87.1...v1.88.0) (2026-11-16)
+
+
+### Neu
+
+* Abschluss nachholen – fehlende Auszeichnungen und Erfolge eines veröffentlichten Turniers genau einmal nachvergeben, mit Warnung bei gescheiterten Schritten ([#2452](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2452)) ([bd02ce7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/bd02ce731996513875b5971710dff2e89a9704f8))
+* Betrieb – „Alle quittieren“ mit Rückfrage in der Seite, unter Ereignisse genau die gezeigten Einträge, nur bis zum Laden der Seite ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – „Jetzt neu prüfen“ mit Schutz gegen Doppelklick, Ampel oben sofort aktuell ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – „X auffällig“ zählt nur Offenes, ein Tipp auf die Kachel öffnet genau diese Einträge ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – Datei-Uploads zählen nicht als langsame Route, Liste unter Alarme einstellbar ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – Einträge unter Überblick und Ereignisse einzeln quittieren, mit Eintrag im Adminprotokoll ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – Ereignisse mit „Nur offene“ (ohne Zeitgrenze) und „Quittierte zeigen“, mit wer und wann ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – Fehlergruppen direkt in der Zeile als gelöst markieren, auch mehrere auf einmal ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – Überblick zeigt nur offene Probleme, leer „Alles erledigt“, bei Ladefehler „Erneut laden“ ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Betrieb – wieder grüne Auto-Checks und Alarme mit Gegenstück gelten von selbst als behoben ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+
+
+### Fehlerbehebungen
+
+* Auszeichnungen und Erfolge kommen beim Veröffentlichen auch, wenn die Jahreswertung scheitert ([#2452](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2452)) ([bd02ce7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/bd02ce731996513875b5971710dff2e89a9704f8))
+* Datenauskunft zeigt nicht, wer im Betrieb einen Eintrag quittiert hat ([#2447](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2447)) ([a8c9153](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a8c91530d36109791d2018d332e1ffc602b7361e))
+* Lange Spielernamen im Turnierbaum werden gekürzt statt mitten im Wort umgebrochen ([#2452](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2452)) ([bd02ce7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/bd02ce731996513875b5971710dff2e89a9704f8))
+* Läufe-Karte – „Plätze frei“ nur vor dem Lauf, sonst „bleiben leer“ ([#2452](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2452)) ([bd02ce7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/bd02ce731996513875b5971710dff2e89a9704f8))
+* Turnier-Ablauf zählt zusammengelegte Läufe nicht mehr als offene Spiele ([#2452](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2452)) ([bd02ce7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/bd02ce731996513875b5971710dff2e89a9704f8))
+* Turnierbaum zeigt die Medaillen auch nach abgekürzten Runden und entfallenem Grand Final ([#2452](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2452)) ([bd02ce7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/bd02ce731996513875b5971710dff2e89a9704f8))
+
 ## 1.87.1 (16.11.2026)
 
 ### Fehlerbehebungen
