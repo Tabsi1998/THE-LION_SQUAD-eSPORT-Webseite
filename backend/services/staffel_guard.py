@@ -223,6 +223,20 @@ async def attach_season_stand(db, tournaments: list[dict]) -> None:
         row["league_plan"] = {"fixed_matches": int(fixed.get(row["id"], 0))}
 
 
+# Staffel-Seite der Liga-Verwaltung (#2262): dieselbe Form wie die API ``/api/admin/leagues/staffeln/{tid}``. Jeder Link des Servers
+# auf die Verwaltung einer Staffel nimmt diesen Pfad - die Adresse steht nur hier.
+STAFFEL_ADMIN_BASE = "/admin/leagues/staffeln"
+
+
+def staffel_admin_path(tournament: dict | None, anchor: str = "") -> str | None:
+    """Der Weg zur Staffel-Seite der Liga-Verwaltung, auf Wunsch mit Reiter oder Abschnitt (``#teilnehmer``). ``None`` für ein
+    gewöhnliches Turnier oder ohne Kennung - dort bleibt die Turnierverwaltung zuständig."""
+    if not is_league_staffel(tournament) or not (tournament or {}).get("id"):
+        return None
+    path = f"{STAFFEL_ADMIN_BASE}/{tournament['id']}"
+    return f"{path}#{anchor}" if anchor else path
+
+
 async def staffel_links(db, tournament: dict, *, with_admin_path: bool = True) -> dict | None:
     """Für den Kopf der Staffel-Verwaltung (S24, L-C1): „Liga 1 · Staffel A – Season öffnen · Ligaseite“."""
     if not is_league_staffel(tournament):
@@ -249,4 +263,6 @@ async def staffel_links(db, tournament: dict, *, with_admin_path: bool = True) -
     # öffentlich.
     if with_admin_path and context.get("season_id"):
         links["season_admin_path"] = f"/admin/leagues/seasons/{context['season_id']}"
+    if with_admin_path and tournament.get("id"):
+        links["staffel_admin_path"] = staffel_admin_path(tournament)
     return links

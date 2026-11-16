@@ -151,6 +151,7 @@ const AdminGamesPage = lazyPage(() => import("@/pages/admin/AdminGamesPage"));
 const AdminGamePage = lazyPage(() => import("@/pages/admin/games/AdminGamePage"));
 const AdminLeaguesPage = lazyPage(() => import("@/pages/admin/league/AdminLeaguesPage"));
 const AdminLeagueSeasonPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueSeasonPage"));
+const AdminLeagueStaffelPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueStaffelPage"));
 const AdminLeagueRulesPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueRulesPage"));
 const AdminLeagueOverallPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueOverallPage"));
 const AdminUsersPage = lazyPage(() => import("@/pages/admin/AdminUsersPage"));
@@ -430,6 +431,8 @@ function App() {
           <Route path="/admin/games/:gameId/equipment" element={<GameEquipmentLegacyRedirect />} />
           <Route path="/admin/leagues" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeaguesPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueSeasonPage /></ProtectedRoute>} />
+          {/* Staffel-Seite (#2262): flach wie die API, die Brotkrumen zeigen Liga und Season. */}
+          <Route path="/admin/leagues/staffeln/:tournamentId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueStaffelPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueRulesPage /></ProtectedRoute>} />
           <Route path="/admin/leagues/:leagueId/gesamtwertung" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueOverallPage /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />

@@ -390,6 +390,8 @@ test("Ligen und Staffeln: Staffel mit Weg zur Turnierverwaltung, Vorgaben übert
     skipped: [{ group: "before_start", label: "Termine und Kalender", reason: "Die Staffel hat schon begonnen." }] }] } });
   renderPage("#ligen");
   expect(await screen.findByTestId("staffel-manage-1-A")).toHaveAttribute("href", "/admin/tournaments/t1");
+  // Staffel-Seite (#2262) zusätzlich - der Weg in die Turnierverwaltung bleibt bis Paket D.
+  expect(screen.getByTestId("staffel-open-1-A")).toHaveAttribute("href", "/admin/leagues/staffeln/t1");
   expect(screen.getByTestId("staffel-1-A")).toHaveTextContent("3 von 8 Teams");
   fireEvent.click(screen.getByTestId("season-sync-run"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/sync"));
