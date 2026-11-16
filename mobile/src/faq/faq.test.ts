@@ -120,11 +120,20 @@ describe("Sichtbarkeit", () => {
     expect(faqBereichsliste({ fragen, darf: MITGLIED }).map(({ bereich }) => bereich.id)).not.toContain("turnierleitung");
   });
 
+  test("Helfer: aktiver Einsatz oder Mitglied - wie am Server", () => {
+    const helferFrage: FaqFrage = { ...MITGLIED_FRAGE, id: "mein-dienst", sichtbar_fuer: "helfer" };
+    const fragen = alleFragen([helferFrage]);
+    expect(faqBereichsliste({ fragen, darf: OHNE_ZUGANG }).map(({ bereich }) => bereich.id)).not.toContain("helferdienste");
+    expect(bereichInhalt("helferdienste", { fragen, darf: { ...OHNE_ZUGANG, helfer: true } }).fragen).toEqual([helferFrage]);
+    expect(bereichInhalt("helferdienste", { fragen, darf: MITGLIED }).fragen).toEqual([helferFrage]);
+    expect(darfSehen("helfer", { ...OHNE_ZUGANG, turnierleitung: true })).toBe(false);
+  });
+
   test("unbekannte Stufen bleiben zu; Rechte nur, wenn der Server genau true sagt", () => {
     expect(darfSehen("alle")).toBe(true);
     expect(darfSehen("vorstand", { vorstand: true } as never)).toBe(false);
-    const zugang = faqZugangAus({ darf: { mitglied: "ja", turnierleitung: true, admin: true }, fragen: [MITGLIED_FRAGE, { id: "kaputt", frage: "Ohne Antwort" }, null] });
-    expect(zugang.darf).toEqual({ angemeldet: false, mitglied: false, turnierleitung: true, turnierleitung_verwaltung: false });
+    const zugang = faqZugangAus({ darf: { mitglied: "ja", helfer: 1, turnierleitung: true, admin: true }, fragen: [MITGLIED_FRAGE, { id: "kaputt", frage: "Ohne Antwort" }, null] });
+    expect(zugang.darf).toEqual({ angemeldet: false, mitglied: false, helfer: false, turnierleitung: true, turnierleitung_verwaltung: false });
     expect(zugang.fragen.map((row) => row.id)).toEqual([MITGLIED_FRAGE.id]);
     expect(faqZugangAus(undefined)).toEqual({ darf: OHNE_ZUGANG, fragen: [] });
   });

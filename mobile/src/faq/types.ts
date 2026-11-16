@@ -1,7 +1,7 @@
 // FAQ in der App (#2449): dieselben Felder wie die FAQ der Website (frontend/src/hilfe, #2448) und GET /api/faq
 // (backend/services/faq_protected.py). Bilder und Schleifen der Anleitungen gibt es nur im Web - die App verlinkt dorthin.
 
-export type FaqSichtbarkeit = "alle" | "angemeldet" | "mitglied" | "turnierleitung" | "turnierleitung_verwaltung";
+export type FaqSichtbarkeit = "alle" | "angemeldet" | "mitglied" | "helfer" | "turnierleitung" | "turnierleitung_verwaltung";
 
 export type FaqLink = { to: string; label: string };
 
@@ -45,6 +45,8 @@ export type FaqThema = {
 export type FaqDarf = {
   angemeldet: boolean;
   mitglied: boolean;
+  /** Mitglied oder aktiver Helfer-Einsatz bei einem Turnier. */
+  helfer: boolean;
   turnierleitung: boolean;
   turnierleitung_verwaltung: boolean;
 };

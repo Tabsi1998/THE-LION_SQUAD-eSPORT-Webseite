@@ -104,12 +104,12 @@
     {
       "id": "helferdienste",
       "titel": "Helferdienste",
-      "kurz": "Schichten übernehmen und absagen.",
+      "kurz": "Schichten im Verein und Einsätze bei Turnieren.",
       "icon": "hand",
       "rollen": [
         "mitglied"
       ],
-      "sichtbar_fuer": "mitglied"
+      "sichtbar_fuer": "helfer"
     },
     {
       "id": "turnierleitung",
@@ -307,8 +307,8 @@
       "sichtbar_fuer": "alle",
       "haeufig": true,
       "link": {
-        "to": "/membership/join",
-        "label": "Zu Mitglied werden"
+        "to": "/faq/verein-und-mitgliedschaft#mitglied-werden",
+        "label": "Zur Anleitung"
       }
     },
     {
@@ -323,8 +323,8 @@
       ],
       "sichtbar_fuer": "alle",
       "link": {
-        "to": "/privacy-account",
-        "label": "Zu Meine Daten"
+        "to": "/faq/datenschutz-und-konto#daten-herunterladen",
+        "label": "Zur Anleitung"
       }
     },
     {
@@ -368,8 +368,236 @@
       ],
       "sichtbar_fuer": "alle",
       "link": {
-        "to": "/my/prizes",
-        "label": "Zu Meine Gewinne"
+        "to": "/faq/gewinne-und-trophaeen#meine-gewinne",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "ab-welchem-alter",
+      "frage": "Ab welchem Alter kann ich mitmachen?",
+      "antwort": "Ein Konto kannst du ab 14 Jahren anlegen. Vereinsmitglied wirst du ab 18 Jahren. Der Antrag fragt dafür nach deinem Geburtsdatum.",
+      "bereich": "verein-mitgliedschaft",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/verein-und-mitgliedschaft#mitglied-werden",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "was-kostet-mitgliedschaft",
+      "frage": "Was kostet die Mitgliedschaft?",
+      "antwort": "Auf Mitglied werden steht unter Beitrag jede Mitgliedsart mit Betrag und Aufnahmegebühr. Die Art wählst du im Antrag.",
+      "bereich": "verein-mitgliedschaft",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/membership/join#beitrag",
+        "label": "Zum Beitrag"
+      }
+    },
+    {
+      "id": "meine-rechnungen",
+      "frage": "Wo finde ich meine Rechnungen?",
+      "antwort": "Unter Meine Rechnungen stehen deine Belege, etwa für den Mitgliedsbeitrag oder ein Event. Offene stehen oben, bezahlte im Archiv.",
+      "bereich": "verein-mitgliedschaft",
+      "rollen": [
+        "mitglied",
+        "spieler"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/account/invoices",
+        "label": "Zu Meine Rechnungen"
+      }
+    },
+    {
+      "id": "event-begleitung",
+      "frage": "Kann ich jemanden zum Event mitnehmen?",
+      "antwort": "Ja, wenn das Event Begleitpersonen erlaubt. Bei der Anmeldung stellst du die Zahl ein. Jede Begleitperson belegt einen eigenen Platz.",
+      "bereich": "events-kalender",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/events-und-kalender#event-anmelden",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "event-warteliste",
+      "frage": "Was heißt Warteliste bei einem Event?",
+      "antwort": "Ist das Event voll, kommst du auf die Warteliste. Wird ein Platz frei, bekommst du Bescheid. Kosten zahlst du erst dann.",
+      "bereich": "events-kalender",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/events-und-kalender#warteliste",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "event-absagen",
+      "frage": "Wie sage ich ein Event wieder ab?",
+      "antwort": "Öffne das Event und tippe unter Dein Event auf Stornieren. Das geht bis zum Beginn, aber nicht mehr nach dem Check-in.",
+      "bereich": "events-kalender",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/events-und-kalender#anmeldung-aendern",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "wann-bin-ich-dran",
+      "frage": "Woher weiß ich vor Ort, wann ich dran bin?",
+      "antwort": "Dein Stand auf der Turnierseite zeigt dein nächstes Spiel mit Station und Zeit. Bist du dran, kommt eine Benachrichtigung.",
+      "bereich": "turniertag",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/turniertag#aufruf",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "spielzeit-uhr",
+      "frage": "Wie lange dauert ein Spiel vor Ort?",
+      "antwort": "Die Spielzeit-Uhr im Spielplan zeigt, wie lange ein Spiel schon läuft und wie lange es dauern darf.",
+      "bereich": "turniertag",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/turniertag#spielzeit",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "ergebnis-vor-ort",
+      "frage": "Muss ich vor Ort das Ergebnis melden?",
+      "antwort": "Meist nicht: Vor Ort trägt die Turnierleitung das Ergebnis ein. Die Matchseite sagt dir, ob du selbst melden musst.",
+      "bereich": "turniertag",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/turniertag#ergebnis-vor-ort",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "hinweis-turnierleitung",
+      "frage": "Wo sehe ich Hinweise der Turnierleitung?",
+      "antwort": "Oben auf der Turnierseite, solange der Hinweis gilt. Angemeldete bekommen ihn auch als Benachrichtigung.",
+      "bereich": "turniertag",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/turniertag#hinweis-leitung",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "trophaeen-medaillen",
+      "frage": "Wo sehe ich meine Trophäen und Medaillen?",
+      "antwort": "In deinem Profil im Reiter Trophäen. Dort wählst du auch, was neben deinem Namen steht.",
+      "bereich": "gewinne",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/gewinne-und-trophaeen#trophaeen",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "erfolg-teilen",
+      "frage": "Wie teile ich einen Erfolg?",
+      "antwort": "Im Profil unter Erfolge tippst du beim Erfolg auf Teilen. Deine Erfolge müssen dafür öffentlich sein.",
+      "bereich": "gewinne",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/gewinne-und-trophaeen#erfolg-teilen",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "anonymisieren-was-passiert",
+      "frage": "Was passiert, wenn ich mein Konto anonymisiere?",
+      "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben. Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen.",
+      "bereich": "datenschutz",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/datenschutz-und-konto#konto-anonymisieren",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "konto-loeschen-gesperrt",
+      "frage": "Warum kann ich mein Konto nicht löschen?",
+      "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Meine Daten steht je Rolle, wo das geht.",
+      "bereich": "datenschutz",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/datenschutz-und-konto#rollen-abgeben",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "was-bekomme-ich-zugeschickt",
+      "frage": "Wo stelle ich ein, was ich zugeschickt bekomme?",
+      "antwort": "In den Einstellungen unter Benachrichtigungen. Wie das geht, steht in der Anleitung zu Konto und Profil.",
+      "bereich": "datenschutz",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/konto-und-profil#stufe",
+        "label": "Zur Anleitung"
       }
     }
   ],
@@ -949,6 +1177,380 @@
               "id": "weg-zeigen",
               "titel": "Weg durch den Baum",
               "text": "Tippe auf einen Namen, dann leuchtet sein Weg durch alle Runden auf. Am Handy blätterst du mit den Pfeilen von Runde zu Runde."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "verein-und-mitgliedschaft",
+      "titel": "Verein und Mitgliedschaft",
+      "kurz": "Mitglied werden: Beitrag ansehen, Antrag stellen und den Stand verfolgen.",
+      "zielgruppe": "Für alle, die Vereinsmitglied werden wollen",
+      "bereich": "verein-mitgliedschaft",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "mitglied",
+        "mitgliedschaft",
+        "verein",
+        "antrag",
+        "beitrag",
+        "mitgliedsart",
+        "mindestalter",
+        "18",
+        "statuten",
+        "aufnahme",
+        "beitreten"
+      ],
+      "abschnitte": [
+        {
+          "id": "beitritt",
+          "titel": "Mitglied werden",
+          "schritte": [
+            {
+              "id": "mitglied-werden",
+              "titel": "Mitglied werden öffnen",
+              "text": "Öffne Mitglied werden. Dort stehen die Vorteile, der Beitrag je Mitgliedsart und der Ablauf. Tippe auf Antrag stellen.",
+              "hinweis": "Ein Konto kannst du ab 14 Jahren anlegen. Vereinsmitglied wirst du ab 18 Jahren."
+            }
+          ]
+        },
+        {
+          "id": "antrag",
+          "titel": "Antrag",
+          "schritte": [
+            {
+              "id": "antrag-ausfuellen",
+              "titel": "Antrag ausfüllen",
+              "text": "Wähl deine Mitgliedsart und füll die Felder aus. Dazu gehört dein Geburtsdatum.",
+              "hinweis": "Für den Antrag brauchst du ein Konto. Pro Konto gibt es einen Antrag."
+            },
+            {
+              "id": "antrag-einreichen",
+              "titel": "Zustimmen und einreichen",
+              "text": "Hak die Vereinsstatuten und die Datenschutzerklärung ab. Dann tippe auf Antrag einreichen.",
+              "hinweis": "Weitere Einwilligungen darunter sind freiwillig."
+            },
+            {
+              "id": "antrag-stand",
+              "titel": "Stand des Antrags",
+              "text": "Danach steht auf derselben Seite Antrag eingegangen. Der Vorstand prüft jeden Antrag und meldet sich per E-Mail.",
+              "hinweis": "Bis zur Entscheidung kannst du den Antrag mit Antrag zurückziehen zurücknehmen."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "events-und-kalender",
+      "titel": "Events und Kalender",
+      "kurz": "Events finden und anmelden, mit Begleitung oder auf der Warteliste, den Tagesplan lesen und den Kalender abonnieren.",
+      "zielgruppe": "Für alle, die zu Events kommen",
+      "bereich": "events-kalender",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "event",
+        "veranstaltung",
+        "lan",
+        "termin",
+        "kalender",
+        "abo",
+        "abonnieren",
+        "ics",
+        "begleitung",
+        "begleitperson",
+        "warteliste",
+        "stornieren",
+        "absagen",
+        "tagesplan",
+        "programm"
+      ],
+      "abschnitte": [
+        {
+          "id": "finden",
+          "titel": "Events finden",
+          "schritte": [
+            {
+              "id": "events-liste",
+              "titel": "Alle Events",
+              "text": "Unter Events stehen alle kommenden Termine. Oben filterst du nach Events, Turnieren oder Fast Laps.",
+              "hinweis": "Bist du angemeldet, zeigt Nur meine nur das, wobei du dabei bist."
+            }
+          ]
+        },
+        {
+          "id": "anmeldung",
+          "titel": "Anmelden",
+          "schritte": [
+            {
+              "id": "event-anmelden",
+              "titel": "Zum Event anmelden",
+              "text": "Öffne das Event und tippe auf Anmelden. Nimmst du jemanden mit, stellst du bei Begleitpersonen die Zahl ein.",
+              "hinweis": "Jede Begleitperson belegt einen eigenen Platz. Wie viele mitdürfen, legt der Verein je Event fest."
+            },
+            {
+              "id": "warteliste",
+              "titel": "Warteliste",
+              "text": "Ist das Event voll, heißt der Knopf Auf die Warteliste. Wird ein Platz frei, bekommst du Bescheid.",
+              "hinweis": "Kostet das Event etwas, zahlst du erst, wenn du nachrückst."
+            },
+            {
+              "id": "anmeldung-aendern",
+              "titel": "Ändern oder stornieren",
+              "text": "Unter Dein Event steht dein Stand. Mit Anmeldung ändern passt du Begleitpersonen und Hinweis an. Mit Stornieren wird dein Platz frei.",
+              "hinweis": "Beides geht bis zum Beginn des Events und nicht mehr nach dem Check-in. Ist deine Rechnung schon erstellt, ändert die Begleitpersonen nur die Turnierleitung."
+            }
+          ]
+        },
+        {
+          "id": "ablauf",
+          "titel": "Tagesplan",
+          "schritte": [
+            {
+              "id": "tagesplan",
+              "titel": "Was wann läuft",
+              "text": "Unter Was läuft beim Event stehen alle Turniere und Fast Laps mit Tag und Uhrzeit. Du siehst auch, wo du schon dabei bist.",
+              "hinweis": "Bei mehrtägigen Events zeigt Die Tage jeden Tag mit Einlass. Mit Drucken bekommst du den Plan als Blatt."
+            }
+          ]
+        },
+        {
+          "id": "kalender",
+          "titel": "Kalender",
+          "schritte": [
+            {
+              "id": "mein-kalender",
+              "titel": "Mein Kalender",
+              "text": "Unter Kalender zeigt Mein Kalender nur deine Termine. Bei jedem Termin steht dein Stand."
+            },
+            {
+              "id": "kalender-abo",
+              "titel": "Termine automatisch im Kalender",
+              "text": "Tippe bei Automatisch in deinen Kalender auf Abo einrichten. Danach landet jede Anmeldung von selbst in deinem Kalender.",
+              "hinweis": "Die Adresse ist privat und steht nur einmal da. Kopier sie gleich oder tippe auf Im Kalender öffnen."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "turniertag",
+      "titel": "Turniertag vor Ort",
+      "kurz": "Wann du dran bist, an welcher Station, wie lange gespielt wird und wer das Ergebnis einträgt.",
+      "zielgruppe": "Für alle Spieler bei Turnieren vor Ort",
+      "bereich": "turniertag",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "vor ort",
+        "lan",
+        "aufruf",
+        "dran",
+        "station",
+        "warteschlange",
+        "spielzeit",
+        "uhr",
+        "zeit",
+        "hinweis",
+        "durchsage",
+        "turnierleitung",
+        "ergebnis"
+      ],
+      "abschnitte": [
+        {
+          "id": "dein-spiel",
+          "titel": "Dein Spiel",
+          "schritte": [
+            {
+              "id": "naechstes-spiel",
+              "titel": "Wann du spielst",
+              "text": "Auf der Turnierseite zeigt Dein Stand, wann und wo du als Nächstes spielst. Die Zeit ist geschätzt und geht mit dem Turnier mit.",
+              "hinweis": "Läuft das Turnier hinter dem Plan, steht dabei, um wie viele Minuten."
+            },
+            {
+              "id": "aufruf",
+              "titel": "Du bist dran",
+              "text": "Ruft die Turnierleitung dein Spiel auf, steht oben Du bist dran mit deiner Station. Auf der Matchseite läuft die Zeit bis zum Antreten.",
+              "hinweis": "Dazu kommt eine Benachrichtigung, auch während der Ruhezeit. Bist du nach der Frist nicht da, kann die Turnierleitung dich als nicht erschienen werten."
+            }
+          ]
+        },
+        {
+          "id": "stationen",
+          "titel": "Stationen und Spielzeit",
+          "schritte": [
+            {
+              "id": "nach-stationen",
+              "titel": "Spielplan nach Stationen",
+              "text": "Öffne im Turnier den Spielplan und tippe auf Nach Stationen. Je Station steht, was gerade läuft und was als Nächstes kommt."
+            },
+            {
+              "id": "spielzeit",
+              "titel": "Die Spielzeit-Uhr",
+              "text": "Die Uhr zeigt, wie lange ein Spiel schon läuft und wie lange es dauern darf. Wird es knapp, färbt sie sich.",
+              "hinweis": "Ist die Zeit um, kommt ein Warnzeichen mit den Minuten darüber dazu."
+            }
+          ]
+        },
+        {
+          "id": "ergebnis-hinweise",
+          "titel": "Ergebnis und Hinweise",
+          "schritte": [
+            {
+              "id": "ergebnis-vor-ort",
+              "titel": "Ergebnis vor Ort",
+              "text": "Vor Ort trägt meist die Turnierleitung das Ergebnis ein. Auf der Matchseite steht dann, dass du nichts melden musst.",
+              "hinweis": "Sobald das Ergebnis drin ist, bekommst du eine Benachrichtigung. Wer meldet, legt die Turnierleitung je Turnier fest."
+            },
+            {
+              "id": "hinweis-leitung",
+              "titel": "Hinweis der Turnierleitung",
+              "text": "Schreibt die Turnierleitung einen Hinweis, steht er oben auf der Turnierseite. Er bleibt stehen, bis seine Zeit abläuft.",
+              "hinweis": "Alle Angemeldeten bekommen den Hinweis auch als Benachrichtigung."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "gewinne-und-trophaeen",
+      "titel": "Gewinne und Trophäen",
+      "kurz": "Preise und Urkunden, Trophäen und Medaillen im Profil, Erfolge und die Karte zum Teilen.",
+      "zielgruppe": "Für alle Spieler",
+      "bereich": "gewinne",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "gewinn",
+        "preis",
+        "abholen",
+        "urkunde",
+        "trophaee",
+        "pokal",
+        "medaille",
+        "emblem",
+        "titel",
+        "banner",
+        "erfolg",
+        "achievement",
+        "teilen",
+        "vitrine"
+      ],
+      "abschnitte": [
+        {
+          "id": "gewinne",
+          "titel": "Gewinne",
+          "schritte": [
+            {
+              "id": "meine-gewinne",
+              "titel": "Meine Gewinne",
+              "text": "Unter Meine Gewinne stehen deine Preise und Urkunden. Bei jedem Preis steht, ob er noch vorbereitet wird oder abholbereit ist.",
+              "hinweis": "Einen abholbereiten Preis holst du beim nächsten Vereinsabend ab. Ab dann hast du 90 Tage Zeit."
+            }
+          ]
+        },
+        {
+          "id": "trophaeen-medaillen",
+          "titel": "Trophäen und Medaillen",
+          "schritte": [
+            {
+              "id": "trophaeen",
+              "titel": "Deine Trophäen",
+              "text": "In deinem Profil stehen unter Trophäen deine Pokale, Medaillen, Banner und Titel. Mit den Knöpfen oben filterst du nach Art.",
+              "hinweis": "Eine Trophäe kommt dazu, wenn ein Turnier seine Ergebnisse veröffentlicht oder eine Liga-Staffel endet."
+            },
+            {
+              "id": "neben-den-namen",
+              "titel": "Neben deinen Namen",
+              "text": "In deinem Profil wählst du eine Trophäe als Banner, als Titel oder neben deinem Namen. Dort stehen bis zu drei Embleme oder Medaillen."
+            }
+          ]
+        },
+        {
+          "id": "erfolge-und-teilen",
+          "titel": "Erfolge",
+          "schritte": [
+            {
+              "id": "erfolge",
+              "titel": "Deine Erfolge",
+              "text": "Unter Erfolge stehen deine Erfolge nach Gruppen. Tippe auf eine Gruppe, dann siehst du ihre Stufen.",
+              "hinweis": "Erfolge kommen von selbst dazu, wenn du etwas geschafft hast."
+            },
+            {
+              "id": "erfolg-teilen",
+              "titel": "Erfolg teilen",
+              "text": "Tippe bei einer erreichten Stufe auf Teilen. So schickst oder kopierst du den Link zu einer Karte mit Bild. Dort speicherst du sie mit Bild speichern.",
+              "hinweis": "Teilen geht nur, wenn deine Erfolge öffentlich sind."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "datenschutz-und-konto",
+      "titel": "Datenschutz und Konto",
+      "kurz": "Deine Daten herunterladen und das Konto anonymisieren.",
+      "zielgruppe": "Für alle mit Konto",
+      "bereich": "datenschutz",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "datenschutz",
+        "dsgvo",
+        "daten",
+        "export",
+        "herunterladen",
+        "json",
+        "konto loeschen",
+        "loeschen",
+        "anonymisieren",
+        "abmelden"
+      ],
+      "abschnitte": [
+        {
+          "id": "deine-daten",
+          "titel": "Deine Daten",
+          "schritte": [
+            {
+              "id": "daten-herunterladen",
+              "titel": "Daten herunterladen",
+              "text": "Öffne in den Einstellungen Meine Daten und tippe auf Als JSON herunterladen. Die Datei enthält alles, was wir über dich gespeichert haben."
+            }
+          ]
+        },
+        {
+          "id": "konto-loeschen",
+          "titel": "Konto löschen",
+          "schritte": [
+            {
+              "id": "konto-anonymisieren",
+              "titel": "Konto anonymisieren",
+              "text": "Unter Meine Daten tippst du auf Konto anonymisieren. Zur Sicherheit tippst du danach LÖSCHEN ein.",
+              "hinweis": "Das gilt sofort und lässt sich nicht rückgängig machen. Deine Turnier-Ergebnisse bleiben ohne Namen stehen."
+            },
+            {
+              "id": "rollen-abgeben",
+              "titel": "Erst die Rollen abgeben",
+              "text": "Bist du Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Die Seite zeigt dir je Rolle den Weg dorthin.",
+              "hinweis": "Solange eine Rolle offen ist, bleibt der Knopf gesperrt."
             }
           ]
         }

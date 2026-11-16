@@ -25,8 +25,8 @@ export const ROLLEN = [
   { id: "mitglied", label: "Mitglied" },
   { id: "turnierleitung", label: "Turnierleitung" },
 ];
-export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung"];
-export const OHNE_ZUGANG: FaqDarf = Object.freeze({ angemeldet: false, mitglied: false, turnierleitung: false, turnierleitung_verwaltung: false });
+export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "helfer", "turnierleitung", "turnierleitung_verwaltung"];
+export const OHNE_ZUGANG: FaqDarf = Object.freeze({ angemeldet: false, mitglied: false, helfer: false, turnierleitung: false, turnierleitung_verwaltung: false });
 
 /** Adresse einer Anleitung im Web: /faq/<thema>, ein Schritt oder Abschnitt mit Anker - wie hilfePfad im Web. */
 export function hilfePfad(slug: string, anker = ""): string {
@@ -60,6 +60,8 @@ function suchWoerter(anfrage: string): string[] {
 /** Darf jemand eine Stufe sehen? `darf` kommt vom Server (GET /api/faq). Unbekannte Stufen bleiben zu. */
 export function darfSehen(sichtbar: string | undefined, darf: Partial<FaqDarf> = {}): boolean {
   if (!sichtbar || sichtbar === "alle") return true;
+  // „helfer“ wie im Web: Mitglied oder aktiver Helfer-Einsatz - ein Mitglied gilt immer auch als Helfer, wie am Server.
+  if (sichtbar === "helfer") return Boolean(darf?.helfer || darf?.mitglied);
   return SICHTBARKEITEN.includes(sichtbar) && Boolean(darf?.[sichtbar as keyof FaqDarf]);
 }
 
@@ -182,6 +184,7 @@ export function faqZugangAus(data: unknown): { darf: FaqDarf; fragen: FaqFrage[]
     darf: {
       angemeldet: darf.angemeldet === true,
       mitglied: darf.mitglied === true,
+      helfer: darf.helfer === true,
       turnierleitung: darf.turnierleitung === true,
       turnierleitung_verwaltung: darf.turnierleitung_verwaltung === true,
     },

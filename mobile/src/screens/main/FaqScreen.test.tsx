@@ -26,7 +26,7 @@ const LEITUNG = {
   id: "station-aufrufen", frage: "Wie rufe ich ein Spiel an der Station auf?", antwort: "In der Leitungsansicht tippst du auf Aufrufen.",
   bereich: "turnierleitung", rollen: ["turnierleitung"], sichtbar_fuer: "turnierleitung", haeufig: true,
 };
-const ALLES_ZU = { angemeldet: false, mitglied: false, turnierleitung: false, turnierleitung_verwaltung: false };
+const ALLES_ZU = { angemeldet: false, mitglied: false, helfer: false, turnierleitung: false, turnierleitung_verwaltung: false };
 
 function antwort(data: unknown) {
   mockGet.mockImplementation((url: string) => (url === "/faq" ? Promise.resolve({ data }) : Promise.reject(new Error(`unerwartet: ${url}`))));
