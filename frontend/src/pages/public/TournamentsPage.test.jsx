@@ -109,3 +109,38 @@ test("angemeldet: „Nur meine“ fragt den Server nach den eigenen Anmeldungen"
   expect(screen.getByTestId("where")).toHaveTextContent("mine=1");
   expect(screen.getByTestId("tournament-only-mine")).toHaveAttribute("aria-pressed", "true");
 });
+
+test("eine späte Antwort auf den alten Filter überschreibt die neuere nicht (Review #1276)", async () => {
+  const pending = [];
+  apiMock.get.mockImplementation((url) => new Promise((resolve) => pending.push({ url, resolve })));
+  render(<MemoryRouter initialEntries={["/tournaments"]}><TournamentsPage /></MemoryRouter>);
+  await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+  const answer = (status, title) => pending.filter((row) => query(row.url).status === status)
+    .forEach((row) => row.resolve({ data: { items: [{ id: title, title }], total: 1, games: GAMES } }));
+  answer(undefined, "Alle");
+  await screen.findByText("Alle");
+
+  fireEvent.click(screen.getByTestId("tournament-filter-live"));
+  await waitFor(() => expect(pending.some((row) => query(row.url).status === "running")).toBe(true));
+  fireEvent.click(screen.getByTestId("tournament-filter-completed"));
+  await waitFor(() => expect(pending.some((row) => query(row.url).status === "finished")).toBe(true));
+  answer("finished", "Beendet-Cup");
+  await screen.findByText("Beendet-Cup");
+  answer("running", "Live-Cup");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(screen.queryByText("Live-Cup")).toBeNull();
+  expect(screen.getByText("Beendet-Cup")).toBeInTheDocument();
+});
+
+test("„Nur meine“ aus einem Link wartet, bis die Anmeldung geklärt ist (Review #1276)", async () => {
+  serveGames();
+  auth.value = { user: undefined };
+  const { rerender } = render(<MemoryRouter initialEntries={["/tournaments?mine=1"]}><TournamentsPage /></MemoryRouter>);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(apiMock.get).not.toHaveBeenCalled();
+
+  auth.value = { user: { id: "u1" } };
+  rerender(<MemoryRouter initialEntries={["/tournaments?mine=1"]}><TournamentsPage /></MemoryRouter>);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(1));
+  expect(query(apiMock.get.mock.calls[0][0]).mine).toBe("true");
+});

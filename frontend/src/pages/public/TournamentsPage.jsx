@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -48,12 +48,18 @@ export default function TournamentsPage() {
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const signedIn = Boolean(useOptionalAuth()?.user);
+  const auth = useOptionalAuth();
+  const signedIn = Boolean(auth?.user);
   // Zweite Filterzeile (#1276): Spiel (`?game=<slug>`, so verlinkt das Spiele-Regal), online/vor Ort und „Nur meine“ -
   // alles steht in der Adresse, ein geteilter Link öffnet dieselbe Auswahl. „Nur meine“ gilt nur angemeldet.
   const gameFilter = searchParams.get("game") || "";
   const modeFilter = MODES.some((m) => m.v === searchParams.get("mode")) ? searchParams.get("mode") : "";
   const mineFilter = signedIn && searchParams.get("mine") === "1";
+  // Ein geteilter Link mit „Nur meine“ wartet, bis die Anmeldung geklärt ist (`user` noch `undefined`) - sonst käme
+  // erst die ganze Liste und dann die eigene (Review #1276).
+  const waitForAuth = searchParams.get("mine") === "1" && Boolean(auth) && auth.user === undefined;
+  // Nur die jüngste Anfrage zählt (Review #1276): eine späte Antwort auf einen alten Filter überschreibt nichts.
+  const latestRequest = useRef(0);
   const [games, setGames] = useState([]);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,23 +78,31 @@ export default function TournamentsPage() {
     if (modeFilter) params.set("mode", modeFilter);
     if (mineFilter) params.set("mine", "true");
     const { data } = await api.get(`/tournaments?${params.toString()}`);
+    return data;
+  }, [statusFilter, gameFilter, modeFilter, mineFilter]);
+
+  const load = useCallback(async () => {
+    if (waitForAuth) return;
+    const ticket = ++latestRequest.current;
+    let data;
+    try {
+      data = await fetchPage(shown);
+    } catch {
+      if (ticket !== latestRequest.current) return;
+      setError(true);
+      setLoading(false);
+      setLoadingMore(false);
+      return;
+    }
+    if (ticket !== latestRequest.current) return;
     const items = Array.isArray(data) ? data : data?.items || [];
     setList(sortByNearestDate(items));
     setTotal(Array.isArray(data) ? items.length : Number(data?.total ?? items.length));
     if (Array.isArray(data?.games)) setGames(data.games);
-  }, [statusFilter, gameFilter, modeFilter, mineFilter]);
-
-  const load = useCallback(async () => {
-    try {
-      await fetchPage(shown);
-      setError(false);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [fetchPage, shown]);
+    setError(false);
+    setLoading(false);
+    setLoadingMore(false);
+  }, [fetchPage, shown, waitForAuth]);
 
   useEffect(() => {
     load();
