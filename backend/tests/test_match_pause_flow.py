@@ -9,7 +9,7 @@
 
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -112,6 +112,40 @@ async def test_the_station_queue_hands_the_pause_to_the_running_match(flow):
     assert running["match_id"] == match["id"]
     assert running["paused_at"] == since and running["paused_seconds"] == 0
     assert all(row["next"]["paused_at"] is None for row in view["stations"] if row.get("next"))
+
+
+def _at(value: str):
+    return datetime.fromisoformat(value)
+
+
+@pytest.mark.asyncio
+async def test_the_queue_forecast_leaves_the_pause_out_while_it_lasts_and_after_it(flow):
+    """#2398: Ende des laufenden Spiels und „Als Nächstes“ an seiner Station rücken um die Pause nach hinten."""
+    _staff, tournament, stations, _players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    started = await flow.post(
+        f"/api/tournaments/{tournament['id']}/live-queue/start",
+        json={"station_id": stations[0]["id"], "match_id": match["id"]},
+    )
+    assert started.status_code == 200, started.text
+    started_at = now_utc() - timedelta(minutes=15)
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"started_at": started_at.isoformat()}})
+    await set_status(flow, tournament, "paused")
+    await backdate_pause(flow, tournament, minutes=10)
+
+    def station_row(view):
+        return next(row for row in view["stations"] if row["id"] == stations[0]["id"])
+
+    paused_view = station_row(await queue(flow, tournament))
+    running = paused_view["running"]
+    assert running["match_id"] == match["id"]
+    expected = started_at + timedelta(minutes=running["duration_minutes"] + 10)
+    assert abs((_at(running["ends_at"]) - expected).total_seconds()) < 60, (running["ends_at"], expected)
+    assert paused_view["next"] and _at(paused_view["next"]["forecast_at"]) >= expected - timedelta(seconds=60)
+
+    await set_status(flow, tournament, "live")
+    resumed = station_row(await queue(flow, tournament))["running"]
+    assert abs((_at(resumed["ends_at"]) - expected).total_seconds()) < 60, "nach der Pause zählt paused_seconds"
 
 
 @pytest.mark.asyncio

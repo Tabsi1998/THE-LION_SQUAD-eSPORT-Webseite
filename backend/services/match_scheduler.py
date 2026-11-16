@@ -40,6 +40,7 @@ from services.match_audience import playing_ids, teams_by_id
 from services.match_v2_results import group_awaits_draw
 from services.match_duration import effective_match_duration, load_duration_game, load_duration_games
 from services.match_planning import restore_change, station_open_for_matches, undo_revision, written_state
+from services.match_timing import pause_seconds
 from services.matchday_schedule import plays_in_matchdays, schedule_writes
 from services.tournament_rules import match_policy
 
@@ -410,7 +411,9 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 start = _parse(match.get("scheduled_at")) or now
             end = start + timedelta(minutes=duration(match))
             if running:
-                end = max(end, now)
+                # Die Uhr steht in der Turnierpause (#2398, wie ``match_timing.timing``): frühere Pausen und die
+                # laufende verschieben das Ende - sonst hinge „Als Nächstes“ nach einer Pause an „jetzt“.
+                end = max(end + timedelta(seconds=pause_seconds(match, tournament, now)), now)
             # Ein Aufruf hält Station und Spieler ab jetzt, auch wenn die geplante Zeit später liegt - sonst legt der
             # Planer davor noch etwas auf die schon reservierte Station (Codex zu #1595).
             board.block(match["id"], match.get("station_id"), players_of(match), now if called else start, end)
