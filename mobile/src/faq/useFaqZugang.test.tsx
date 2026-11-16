@@ -1,3 +1,4 @@
+import { NavigationContext } from "@react-navigation/native";
 import React from "react";
 import { Text } from "react-native";
 import { act, render, screen } from "@testing-library/react-native";
@@ -77,6 +78,39 @@ test("eine verspätete Antwort für A nach dem Wechsel zu B wird verworfen - der
   await antworte(0, MITGLIED);
   expect(screen.getByTestId("zugang")).toHaveTextContent("ohne|mein-dienst");
   expect(bilder).not.toContain("mitglied|helferdienst-eintragen");
+});
+
+test("im selben Konto: kommt die FAQ wieder nach vorn, fragt sie neu - ohne Flackern, ein Fehler behält den Stand", async () => {
+  const fokus: Array<() => void> = [];
+  const navigation = { addListener: jest.fn((_event: string, handler: () => void) => { fokus.push(handler); return () => undefined; }) };
+  let jetzt = 1_000_000;
+  const uhr = jest.spyOn(Date, "now").mockImplementation(() => jetzt);
+  await render(
+    <NavigationContext.Provider value={navigation as never}>
+      <Probe />
+    </NavigationContext.Provider>,
+  );
+  await antworte(0, GAST);
+  // Der erste Fokus beim Öffnen fragt nicht ein zweites Mal.
+  await act(async () => fokus.forEach((handler) => handler()));
+  expect(mockGet).toHaveBeenCalledTimes(1);
+
+  jetzt += 60_000;
+  bilder.length = 0;
+  await act(async () => fokus.forEach((handler) => handler()));
+  expect(mockGet).toHaveBeenCalledTimes(2);
+  // Bis zur Antwort bleibt der bisherige Stand stehen.
+  expect(bilder.every((bild) => bild === "ohne|")).toBe(true);
+  await antworte(1, MITGLIED);
+  expect(screen.getByTestId("zugang")).toHaveTextContent("mitglied|helferdienst-eintragen");
+
+  jetzt += 60_000;
+  await act(async () => fokus.forEach((handler) => handler()));
+  await act(async () => {
+    mockOffen[2].reject(new Error("offline"));
+  });
+  expect(screen.getByTestId("zugang")).toHaveTextContent("mitglied|helferdienst-eintragen");
+  uhr.mockRestore();
 });
 
 test("ein Fehler beim neuen Konto zeigt nur das Öffentliche", async () => {
