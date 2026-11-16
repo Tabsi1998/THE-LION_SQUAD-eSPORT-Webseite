@@ -63,12 +63,15 @@ test("oben steht nur das aktive Gerät, die alten sind grau eingeklappt und zeig
   const toggle = await screen.findByTestId("push-old-devices-toggle");
   expect(toggle).toHaveTextContent("Alte Geräte (3)");
   expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.queryByTestId("push-old-devices-list")).toBeNull();
+  // Eingeklappt verborgen, aber im DOM: aria-controls zeigt auf ein vorhandenes Ziel.
+  expect(screen.getByTestId("push-old-devices-list")).not.toBeVisible();
+  expect(screen.getByTestId("push-old-devices-list").id).toBe(toggle.getAttribute("aria-controls"));
   expect(screen.queryByText("App gelöscht oder Push am Handy abgeschaltet")).toBeNull();
 
   await user.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   const old = screen.getByTestId("push-old-devices-list");
+  expect(old).toBeVisible();
   expect(within(old).getAllByText("abgemeldet – App gelöscht oder neu installiert")).toHaveLength(3);
   expect(within(old).queryByText("App gelöscht oder Push am Handy abgeschaltet")).toBeNull();
 });

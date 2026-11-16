@@ -78,12 +78,13 @@ for (const width of [390, 1440]) {
     const toggle = page.getByTestId("push-old-devices-toggle");
     await expect(toggle).toHaveText(/Alte Geräte \(7\)/);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByTestId("push-old-devices-list")).toHaveCount(0);
+    await expect(page.getByTestId("push-old-devices-list")).toBeHidden();
     // Keine Waagrecht-Rolle am Handy.
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     await toggle.click();
     const list = page.getByTestId("push-old-devices-list");
+    await expect(list).toBeVisible();
     await expect(list.getByText("abgemeldet – App gelöscht oder neu installiert")).toHaveCount(7);
     await expect(list.getByText("App gelöscht oder Push am Handy abgeschaltet")).toHaveCount(0);
     if (SHOTS) {

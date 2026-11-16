@@ -216,7 +216,7 @@ export default function AdminMobilePushPage() {
                     <div className="font-bold truncate">{userLabel(user)}</div>
                     <div className="text-xs text-white/45 truncate">
                       @{user.username || "-"} · {activeDevices(user.enabled_token_count)}
-                      {Number(user.disabled_token_count) > 0 ? <span className="text-white/25"> · {oldDevices(user.disabled_token_count)}</span> : null}
+                      {Number(user.disabled_token_count) > 0 ? <span className="text-white/50"> · {oldDevices(user.disabled_token_count)}</span> : null}
                     </div>
                     <div className="text-[11px] text-white/35 mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
                     {/* Rot nur bei einem Fehler an einem aktiven Gerät (#2467). */}
@@ -365,7 +365,7 @@ export default function AdminMobilePushPage() {
                     aria-expanded={showOld}
                     aria-controls="push-old-devices-list"
                     data-testid="push-old-devices-toggle"
-                    className="inline-flex items-center gap-2 -mx-1 px-1 py-1 rounded-sm text-xs font-bold uppercase tracking-wider text-white/50 hover:text-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
+                    className="inline-flex items-center gap-2 -mx-1 px-1 py-1 rounded-sm text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
                   >
                     <ChevronDown className={`w-4 h-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${showOld ? "rotate-180" : ""}`} />
                     Alte Geräte ({oldCount})
@@ -380,22 +380,21 @@ export default function AdminMobilePushPage() {
                     <Trash2 className="w-4 h-4" /> Alte Geräte entfernen
                   </button>
                 </div>
-                {showOld && (
-                  <ul id="push-old-devices-list" data-testid="push-old-devices-list" className="divide-y divide-white/5 border-t border-white/5 bg-[#0E0E0E]">
+                {/* Immer im DOM, damit aria-controls ein Ziel hat; eingeklappt nur verborgen. */}
+                <ul id="push-old-devices-list" data-testid="push-old-devices-list" hidden={!showOld} className="divide-y divide-white/5 border-t border-white/5 bg-[#0E0E0E]">
                     {oldTokens.map((token, index) => (
-                      <li key={`${token.token_preview}-old-${index}`} className="px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-white/40">
+                      <li key={`${token.token_preview}-old-${index}`} className="px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-white/55">
                         <div className="min-w-0">
-                          <div className="font-mono text-xs text-white/40 truncate">{token.token_preview}</div>
+                          <div className="font-mono text-xs text-white/50 truncate">{token.token_preview}</div>
                           <div className="text-xs mt-0.5">{token.platform || "-"} · <span>{OLD_DEVICE_TEXT}</span></div>
                         </div>
-                        <div className="text-[11px] text-white/30">Abgemeldet: {formatTime(token.disabled_at || token.updated_at)}</div>
+                        <div className="text-[11px] text-white/50">Abgemeldet: {formatTime(token.disabled_at || token.updated_at)}</div>
                       </li>
                     ))}
                     {oldCount > oldTokens.length && (
-                      <li className="px-4 py-3 text-[11px] text-white/30">… und {oldCount - oldTokens.length} weitere</li>
+                      <li className="px-4 py-3 text-[11px] text-white/50">… und {oldCount - oldTokens.length} weitere</li>
                     )}
-                  </ul>
-                )}
+                </ul>
               </div>
             )}
           </div>
