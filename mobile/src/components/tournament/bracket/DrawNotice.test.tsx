@@ -52,7 +52,7 @@ test("Topf steht: der Hinweis kommt herein - bei „Bewegung reduzieren“ steht
 describe("die Karte hebt sich", () => {
   const model: CardModel = {
     id: "e", key: "E", kind: "duel", title: "E", height: 94, rowHeight: 32, rows: [], cutAfter: -1,
-    text: { name: "E", meta: "", cut: "", rest: "", free: "" }, line: null, walkover: false, mine: false, empty: false, drawState: "ready", anchor: () => 0,
+    text: { name: "E", meta: "", cut: "", rest: "", free: "" }, freeLine: "", line: null, walkover: false, mine: false, empty: false, drawState: "ready", anchor: () => 0,
   };
   const card = (reduce: boolean) => (
     <BracketCard model={model} x={0} y={0} w={200} status="Auslosung bereit" live={null} dim={false} selected={null}

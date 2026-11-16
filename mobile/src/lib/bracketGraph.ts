@@ -350,6 +350,24 @@ export function heatText(match: BracketMatch, edges: BracketEdge[], matches: Bra
   };
 }
 
+/**
+ * Die Zeile zu den freien Plätzen einer Lauf-Karte (#2459, wie HeatCard im Web, #2452) - oder leer.
+ * - „2 Plätze frei“ nur, solange der Lauf noch nicht gefahren ist und das Turnier läuft. Danach kommt niemand mehr dazu;
+ *   „2 Spieler“ oben sagt schon, wie viele gefahren sind.
+ * - „2 Plätze bleiben leer“, wenn die Quelle zusammengelegt wurde oder weniger weiterschickt (`source_result.skipped`).
+ *   Gemischte Runden (#1548): Ein gestrichener Platz ohne Los-Kennung wartet weiter aufs Los, dort bleibt es „frei“.
+ */
+export function heatFreeLine(match: BracketMatch, { finished = false }: { finished?: boolean } = {}): string {
+  const slots = match.slots || [];
+  const freeSlots = slots.filter((slot) => !slot.registration_id && isByeSlot(slot));
+  const count = freeSlots.length;
+  if (!count || finished) return "";
+  const results = new Set((match.results || []).map((row) => row.registration_id).filter(Boolean));
+  if (slots.some((slot) => slot.registration_id && results.has(slot.registration_id))) return "";
+  const stayEmpty = freeSlots.every((slot) => slot.source_result?.skipped && !(slotDraw(slot) && !slot.source_result.draw_id));
+  if (stayEmpty) return `${count} ${count === 1 ? "Platz bleibt" : "Plätze bleiben"} leer`;
+  return `${count} ${count === 1 ? "Platz" : "Plätze"} frei`;
+}
 
 const playersOf = (match: BracketMatch | null | undefined) => new Set((match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean) as string[]);
 

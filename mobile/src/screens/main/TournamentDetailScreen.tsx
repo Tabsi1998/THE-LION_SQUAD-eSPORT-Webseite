@@ -608,6 +608,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                   mineId={ownRegistration?.id || null}
                   plan={plan}
                   crowned={crowned}
+                  finished={isFinished || String(tournament.status || "") === "cancelled"}
                   onOpenMatch={openMatch}
                 />
               ) : <Muted>Noch kein Turnierbaum veröffentlicht.</Muted>}

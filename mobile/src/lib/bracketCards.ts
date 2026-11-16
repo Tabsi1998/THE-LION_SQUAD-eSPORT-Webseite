@@ -5,7 +5,7 @@
 // Namen wie im Web (#1633, #1591): die Lauf-Karte des Grand Final heißt „Grand Final“, ein geloster Platz sagt, wer kommt
 // („Weiter aus Runde 1“, „Sieger aus Viertelfinale“) - bei der Show-Auslosung, sobald der Topf steht, „Auslosung bereit“.
 import { drawStateOf, type DrawState } from "./advancement";
-import { heatText, isByeSlot, isDone, isOut, isWalkover, markedNoShow, matchFate, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
+import { heatFreeLine, heatText, isByeSlot, isDone, isOut, isWalkover, markedNoShow, matchFate, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
 import { treeSlotLabel } from "./bracketNames";
 import { describeSlot } from "./slotSource";
 import { byeLine } from "./tournamentView";
@@ -19,6 +19,17 @@ export const SINGLE_H = 44;
 /** Ab so vielen Zeichen bekommt ein Name zwei Zeilen statt drei Punkte. */
 export const LONG_NAME = 20;
 const OUT_STATUSES = new Set(["withdrawn", "disqualified", "no_show"]);
+
+/**
+ * Wie viele Zeilen ein Name in der Karte bekommt (#2459, wie im Web #2452): Ein Name aus einem Wort bricht nie mitten im
+ * Wort um („KartKönigi / n“). Er bleibt einzeilig und endet mit „…“; der ganze Name steht im Namen des Knopfs.
+ * Namen mit Leerzeichen dürfen in hohen Zeilen weiter auf zwei Zeilen umbrechen.
+ */
+export function nameLines(label: string, tall: boolean): 1 | 2 {
+  if (!tall) return 1;
+  const text = String(label || "").trim();
+  return text && !/\s/.test(text) ? 1 : 2;
+}
 
 export type CardRow = {
   key: string;
@@ -41,6 +52,8 @@ export type CardContext = {
   matches: BracketMatch[];
   finalId: string | null;
   mine: string | null;
+  /** Das Turnier ist zu Ende (#2459): dann keine Zeile „Plätze frei“ mehr. */
+  finished?: boolean;
 };
 export type CardModel = {
   id: string;
@@ -53,6 +66,8 @@ export type CardModel = {
   /** Index der letzten Zeile vor der Trennlinie „2 kommen weiter → E“ (-1: keine). */
   cutAfter: number;
   text: ReturnType<typeof heatText>;
+  /** Die Zeile zu freien Plätzen einer Lauf-Karte (#2459): „2 Plätze frei“, „2 Plätze bleiben leer“ oder leer. */
+  freeLine: string;
   line: { tag?: string; text: string; registrationId?: string | null } | null;
   walkover: boolean;
   mine: boolean;
@@ -80,7 +95,7 @@ export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
   const key = String(match.match_key || "");
   const text = heatText(match, ctx.edges, ctx.matches, ctx.finalId);
   const title = isHeat ? text.name : key || "Spiel";
-  const base = { id: match.id, key, title, text, cutAfter: -1, rows: [] as CardRow[], rowHeight: ROW_H, walkover: false, empty: false, drawState: drawStateOf(match) };
+  const base = { id: match.id, key, title, text, freeLine: "", cutAfter: -1, rows: [] as CardRow[], rowHeight: ROW_H, walkover: false, empty: false, drawState: drawStateOf(match) };
   const single = (kind: "bye" | "fate", line: CardModel["line"], mine: boolean): CardModel => ({ ...base, kind, height: SINGLE_H, line, mine, anchor: () => SINGLE_H / 2 });
 
   const fate = matchFate(match);
@@ -127,8 +142,10 @@ export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
   const rowHeight = rows.some((row) => row.label.length > LONG_NAME) ? ROW_TALL : ROW_H;
   const cutAfter = isHeat && results.size && text.cut && rows.length > qualifiers && qualifiers > 0 ? qualifiers - 1 : -1;
   const empty = isHeat && !rows.some((row) => row.label);
+  // Wie im Web (#2459): keine Zeile auf einer leeren Karte, nach dem Lauf und nach dem Turnier.
+  const freeLine = isHeat && !empty ? heatFreeLine(match, { finished: ctx.finished }) : "";
   const top = HEAD_H + (isHeat ? META_H : 0);
-  const extra = isHeat ? (cutAfter >= 0 ? LINE_H : 0) + (text.free ? LINE_H : 0) + (cutAfter >= 0 && text.rest ? LINE_H : 0) + (empty ? LINE_H : 0) : 0;
+  const extra = isHeat ? (cutAfter >= 0 ? LINE_H : 0) + (freeLine ? LINE_H : 0) + (cutAfter >= 0 && text.rest ? LINE_H : 0) + (empty ? LINE_H : 0) : 0;
   const height = top + (empty ? 0 : rows.length * rowHeight) + extra;
   const anchor = (slotNumber: number) => {
     const index = empty ? -1 : rows.findIndex((row) => row.slot === slotNumber);
@@ -141,6 +158,7 @@ export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
     height,
     rowHeight,
     rows: empty ? [] : rows,
+    freeLine,
     cutAfter,
     line: null,
     walkover,

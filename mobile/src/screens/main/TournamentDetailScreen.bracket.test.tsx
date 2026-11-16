@@ -464,4 +464,14 @@ describe("zusammengelegte Läufe (#2459)", () => {
     for (const stat of screen.getAllByTestId("tournament-stat-Matches")) expect(stat).toHaveTextContent(/^9\s*Matches$/);
   });
 
+  test("laufend: „Matches“ zählt die entfallenen Läufe nicht, der offene Grand Final sagt „2 Plätze bleiben leer“", async () => {
+    serve("lb8_merged_live", {}, undefined, MERGED);
+    await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByText("Lions Cup")).toBeTruthy());
+    expect(await screen.findByTestId("tournament-stat-Matches")).toHaveTextContent(/^9\s*Matches$/);
+    await fireEvent.press(screen.getAllByText("Baum")[0]);
+    const finalId = MERGED.lb8_merged_live.matches_v2.find((match: any) => match.match_key === "FINAL").id;
+    expect(await screen.findByTestId(`bracket-heat-free-${finalId}`)).toHaveTextContent("2 Plätze bleiben leer");
+    expect(screen.queryByText("2 Plätze frei")).toBeNull();
+  });
 });

@@ -38,6 +38,8 @@ type Props = {
   mineId: string | null;
   plan: MotionPlan | null;
   crowned: boolean;
+  /** Das Turnier ist zu Ende (#2459): Lauf-Karten zeigen dann keine freien Plätze mehr. */
+  finished?: boolean;
   onOpenMatch: (matchId: string) => void;
 };
 
@@ -59,7 +61,7 @@ function edgesFor(matches: BracketMatch[]): BracketEdge[] {
   return [...bySection.values()].flatMap((rounds) => orderEdges([...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([, list]) => [...list].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)))));
 }
 
-export function BracketCanvas({ matches: rawMatches, stages, format, advancement, nameOf, statusOf, mineId, plan, crowned, onOpenMatch }: Props) {
+export function BracketCanvas({ matches: rawMatches, stages, format, advancement, nameOf, statusOf, mineId, plan, crowned, finished = false, onOpenMatch }: Props) {
   const reduce = useReduceMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const toggle = useCallback((registrationId: string) => setSelected((current) => (current === registrationId ? null : registrationId)), []);
@@ -78,9 +80,9 @@ export function BracketCanvas({ matches: rawMatches, stages, format, advancement
   const path = useMemo(() => (selected ? pathFor(selected, matches, edges) : null), [edges, matches, selected]);
   const finder = useMemo(() => finderFor(matches), [matches]);
   const models = useMemo(() => {
-    const ctx = { nameOf, statusOf, finder, edges, matches, finalId: final?.id || null, mine: mineId };
+    const ctx = { nameOf, statusOf, finder, edges, matches, finalId: final?.id || null, mine: mineId, finished };
     return new Map(matches.map((match) => [match.id, cardModel(match, ctx)]));
-  }, [edges, final?.id, finder, matches, mineId, nameOf, statusOf]);
+  }, [edges, final?.id, finder, finished, matches, mineId, nameOf, statusOf]);
   // Je Phase eine Leinwand; Tabellen-Phasen (Gruppen, Liga, Swiss) stehen unter „Tabelle“.
   const groups = useMemo(() => {
     const byStage = new Map<string, BracketMatch[]>();
