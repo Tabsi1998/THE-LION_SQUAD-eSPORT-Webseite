@@ -2,22 +2,26 @@
 // Kurzzahlen und die Wege zu Leitstand, Season und Ligaseite. Gesteuert wird mit denselben Bausteinen wie in der Turnierverwaltung -
 // der Status geht über `useTournamentStatus` mit denselben Rückfragen. Den Status ändert nur „Liga verwalten“ (`can_edit_staffel`),
 // so verlangt es der Server (`tournament_lifecycle_routes.py`).
+//
+// Liga-Wörter statt Turnier-Status (Fabian zu #2262): Vor dem Start gibt es nur „Liga starten“ und „Staffel absagen“, kein
+// Auswahlfeld und kein „Entwurf“; danach bietet die Auswahl nur, was eine laufende Staffel braucht. „Liga starten“ steht nur einmal da.
+import { useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, ExternalLink, Zap } from "lucide-react";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
 import { countsAsMatch } from "@/lib/bracketGraph";
 import { seasonAnchorUrl, staffelNeeds } from "@/lib/seasonTabs";
-import { staffelManageUrl } from "@/lib/staffelTabs";
-import { StaffelNeedsHint, STAFFEL_STATUS_VALUES, staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
-import { TOURNAMENT_STATUS_OPTIONS, primaryTournamentAction } from "@/pages/admin/tournament/shared";
+import { staffelAdminUrl, staffelManageUrl } from "@/lib/staffelTabs";
+import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
+import { primaryTournamentAction } from "@/pages/admin/tournament/shared";
 import { PauseUntilControl } from "@/pages/admin/tournament/TvTournamentPanel";
-import { ACTIVE_STAFFEL_REGISTRATION, needsUrl } from "./staffelPage";
+import { ACTIVE_STAFFEL_REGISTRATION, STAFFEL_RUNNING_STATUSES, STAFFEL_STATUS_WORDS, needsUrl, staffelStandText } from "./staffelPage";
 
 const DONE = new Set(["completed", "forfeit"]);
-const STATUS_OPTIONS = TOURNAMENT_STATUS_OPTIONS.filter(([value]) => STAFFEL_STATUS_VALUES.has(value));
-const statusLabel = (value) => TOURNAMENT_STATUS_OPTIONS.find(([key]) => key === value)?.[1] || value;
 const CARD = "min-w-0 rounded-sm border border-white/10 bg-[#121212] p-4";
 const EYEBROW = "text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]";
+const LABEL = "text-[11px] font-bold uppercase tracking-wider text-white/60";
+const SUBTLE = "text-base text-white/60";
 
 /** Teams x von y und Spiele gespielt/gesamt - vor dem Start zählt nur die Vorschau. */
 export function staffelNumbers(tournament, registrations = [], matches = []) {
@@ -36,21 +40,21 @@ function Numbers({ tournament, registrations, matches }) {
       <h2 id="staffel-numbers-title" className={EYEBROW}>Zahlen</h2>
       <dl className="mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
-          <dt className="text-[11px] font-bold uppercase tracking-wider text-white/50">Teams</dt>
+          <dt className={LABEL}>Teams</dt>
           <dd className="mt-0.5 font-heading text-2xl font-black tabular-nums" data-testid="staffel-numbers-teams">
-            {numbers.teams}{numbers.max ? <span className="text-base text-white/45"> von {numbers.max}</span> : null}
+            {numbers.teams}{numbers.max ? <span className={SUBTLE}> von {numbers.max}</span> : null}
           </dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-[11px] font-bold uppercase tracking-wider text-white/50">Spiele</dt>
+          <dt className={LABEL}>Spiele</dt>
           <dd className="mt-0.5 font-heading text-2xl font-black tabular-nums" data-testid="staffel-numbers-matches">
-            {before ? <span className="text-base font-bold text-white/55">noch keine</span> : (
-              <>{numbers.played}<span className="text-base text-white/45"> von {numbers.total}</span></>
+            {before ? <span className="text-base font-bold text-white/60">noch keine</span> : (
+              <>{numbers.played}<span className={SUBTLE}> von {numbers.total}</span></>
             )}
           </dd>
         </div>
       </dl>
-      <p className="mt-2 text-xs text-white/55" data-testid="staffel-numbers-note">
+      <p className="mt-2 text-xs text-white/60" data-testid="staffel-numbers-note">
         {before
           ? numbers.preview ? `Vorschau mit ${numbers.preview} Spielen – fest wird der Spielplan mit „Liga starten“.` : "Der Spielplan entsteht mit den zugeteilten Teams."
           : numbers.open ? `${numbers.open} ${numbers.open === 1 ? "Spiel" : "Spiele"} noch offen.` : numbers.total ? "Alle Spiele gespielt." : "Noch kein festes Spiel."}
@@ -59,57 +63,80 @@ function Numbers({ tournament, registrations, matches }) {
   );
 }
 
-function StatusCard({ tournament, onStatus, onReload }) {
+const ACTION = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 text-sm font-bold uppercase tracking-wider";
+
+function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
   const manage = Boolean(tournament.can_edit_staffel);
+  const before = staffelBeforeStart(tournament);
   const primary = primaryTournamentAction(tournament.status, tournament);
-  const current = STATUS_OPTIONS.some(([value]) => value === tournament.status) ? STATUS_OPTIONS : [[tournament.status, statusLabel(tournament.status)], ...STATUS_OPTIONS];
+  const options = STAFFEL_RUNNING_STATUSES.includes(tournament.status) ? STAFFEL_RUNNING_STATUSES : [tournament.status, ...STAFFEL_RUNNING_STATUSES];
   return (
-    <section className={CARD} aria-labelledby="staffel-status-title" data-testid="staffel-status">
+    <section id="staffel-status" className={`${CARD} scroll-mt-24`} aria-labelledby="staffel-status-title" data-testid="staffel-status">
       <h2 id="staffel-status-title" className={EYEBROW}>Status</h2>
       {manage ? (
         <div className="mt-3 space-y-3">
           {primary ? (
-            <button type="button" onClick={() => onStatus(primary.status)} data-testid="staffel-primary-action"
-              className="tls-btn tls-btn--primary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 text-sm font-bold uppercase tracking-wider">
+            <button ref={primaryRef} type="button" onClick={() => onStatus(primary.status)} data-testid="staffel-primary-action" className={`tls-btn tls-btn--primary ${ACTION}`}>
               <Zap className="h-4 w-4" aria-hidden="true" /> {primary.label}
             </button>
           ) : null}
-          {primary?.label === "Liga starten" ? (
-            <p className="text-xs text-white/55" data-testid="staffel-start-note">Macht den Spielplan fest und schaltet die Staffel live. Danach kommen Teams nur noch als Nachmeldung dazu.</p>
-          ) : null}
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-white/50">Status ändern</span>
-            <select value={tournament.status} onChange={(event) => onStatus(event.target.value)} data-testid="staffel-status-select"
-              className="min-h-[44px] w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none">
-              {current.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
+          {before ? (
+            <>
+              <p className="text-xs text-white/60" data-testid="staffel-start-note">Macht den Spielplan fest und schaltet die Staffel live. Danach kommen Teams nur noch als Nachmeldung dazu.</p>
+              {/* Vor dem Start kein Auswahlfeld: starten oder absagen. */}
+              <button type="button" onClick={() => onStatus("cancelled")} data-testid="staffel-cancel" className={`tls-btn tls-btn--quiet ${ACTION} text-xs`}>
+                Staffel absagen
+              </button>
+            </>
+          ) : (
+            <label className="block">
+              <span className={`mb-1 block ${LABEL}`}>Status ändern</span>
+              <select value={tournament.status} onChange={(event) => onStatus(event.target.value)} data-testid="staffel-status-select"
+                className="min-h-[44px] w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none">
+                {options.map((value) => <option key={value} value={value}>{STAFFEL_STATUS_WORDS[value] || staffelStandText(tournament)}</option>)}
+              </select>
+            </label>
+          )}
           {/* „Pause bis“ (#1123): nur beim Status „Pausiert“. */}
           <PauseUntilControl tournament={tournament} onSaved={onReload} />
         </div>
       ) : (
-        <p className="mt-3 text-sm text-white/70" data-testid="staffel-status-readonly">
-          {statusLabel(tournament.status)}. <span className="text-white/50">Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.</span>
+        <p className="mt-3 text-sm text-white/75" data-testid="staffel-status-readonly">
+          {staffelStandText(tournament)}. <span className="text-white/60">Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.</span>
         </p>
       )}
     </section>
   );
 }
 
-// ``teams``: zugeteilte Co-Teams aus der Liste dieser Seite - frischer als der Zähler am Turnier.
+/** Was fehlt - ohne „Liga starten“, solange die Status-Kachel den Knopf zeigt. Ein Ziel auf genau diesen Reiter wird kein Link. */
 function Needs({ tournament: base, teams }) {
+  // ``teams``: zugeteilte Co-Teams aus der Liste dieser Seite - frischer als der Zähler am Turnier.
   const tournament = { ...base, participant_count: teams };
-  const manageUrl = needsUrl(tournament.id);
-  const empty = staffelNeeds(tournament, { manageUrl }).length === 0;
+  const here = staffelAdminUrl(tournament.id);
+  const needs = staffelNeeds(tournament, { manageUrl: needsUrl(tournament.id) })
+    .filter((need) => !(need.code === "start" && tournament.can_edit_staffel));
   return (
     <section className={CARD} aria-labelledby="staffel-needs-title" data-testid="staffel-needs-card">
       <h2 id="staffel-needs-title" className={EYEBROW}>Was fehlt</h2>
-      {empty ? (
-        <p className="mt-3 flex items-center gap-2 text-sm text-white/65" data-testid="staffel-needs-none">
+      {needs.length ? (
+        <ul className="mt-2" data-testid="staffel-needs">
+          {needs.map((need) => (
+            <li key={need.code}>
+              {need.to === here ? (
+                <span className="inline-flex min-h-[44px] items-center text-sm font-semibold text-warn" data-testid={`staffel-needs-${need.code}`}>{need.text}</span>
+              ) : (
+                <Link to={need.to} data-testid={`staffel-needs-${need.code}`} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-warn hover:text-white">
+                  {need.text} <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 flex items-center gap-2 text-sm text-white/70" data-testid="staffel-needs-none">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-ok" aria-hidden="true" /> Gerade fehlt nichts.
         </p>
-      ) : (
-        <StaffelNeedsHint tournament={tournament} manageUrl={manageUrl} testId="staffel-needs" className="mt-2 [&_a]:min-h-[44px] [&_a]:text-sm" />
       )}
     </section>
   );
@@ -120,25 +147,26 @@ function Ways({ tournament }) {
   const seasonId = tournament.league_context?.season_id;
   const seasonPath = links.season_admin_path || seasonAnchorUrl(seasonId);
   const row = "flex min-h-[44px] min-w-0 items-center justify-between gap-3 px-3 text-sm font-semibold text-white/85 hover:bg-white/5 hover:text-white";
+  const sub = "block text-xs font-normal text-white/60";
   return (
     <nav className={`${CARD} p-0`} aria-label="Wege von dieser Staffel" data-testid="staffel-ways">
       <ul className="divide-y divide-white/5">
         <li>
           <Link to={seasonAnchorUrl(seasonId, "leitstand")} className={row} data-testid="staffel-desk-link">
-            <span className="min-w-0">Offen in dieser Staffel <span className="block text-xs font-normal text-white/50">im Leitstand der Season</span></span>
+            <span className="min-w-0">Offen in dieser Staffel <span className={sub}>im Leitstand der Season</span></span>
             <ArrowRight className="h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
           </Link>
         </li>
         <li>
           <Link to={seasonPath} className={row} data-testid="staffel-season-open">
-            <span className="min-w-0 [overflow-wrap:anywhere]">Season öffnen <span className="block text-xs font-normal text-white/50">Vorgaben, Anmeldung, Strafen</span></span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">Season öffnen <span className={sub}>Vorgaben, Anmeldung, Strafen</span></span>
             <ArrowRight className="h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
           </Link>
         </li>
         {links.public_path ? (
           <li>
             <Link to={links.public_path} target="_blank" className={row} data-testid="staffel-public-open">
-              <span className="min-w-0">Ligaseite <span className="block text-xs font-normal text-white/50">so sehen es die Teams</span></span>
+              <span className="min-w-0">Ligaseite <span className={sub}>so sehen es die Teams</span></span>
               <ExternalLink className="h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
             </Link>
           </li>
@@ -150,13 +178,22 @@ function Ways({ tournament }) {
 
 export function StaffelOverviewTab({ tournament, registrations, matches, onStatus, onReload }) {
   const navigate = useNavigate();
+  const primaryRef = useRef(null);
+  // Ein Schritt des Liga-Ablaufs führt an seine Stelle: „Liga starten“ zum Knopf auf dieser Seite, Zuteilen zum Reiter Teilnehmer,
+  // was es hier noch nicht gibt, in die Turnierverwaltung.
+  const onStep = (key) => {
+    if (key === "matchplan") {
+      document.getElementById("staffel-status")?.scrollIntoView?.({ block: "center" });
+      primaryRef.current?.focus();
+      return;
+    }
+    navigate(staffelManageUrl(tournament.id, key, key === "participants" ? "zuteilen" : ""));
+  };
   return (
     <div className="space-y-5">
-      {/* Liga-Ablauf: ein Schritt führt an seine Stelle - auf diese Seite, solange es den Reiter hier schon gibt. */}
-      <TournamentFlowStepper tournament={tournament} registrations={registrations} matchesV2={matches} stack
-        onNavigate={(key) => navigate(staffelManageUrl(tournament.id, key, key === "participants" ? "zuteilen" : ""))} />
+      <TournamentFlowStepper tournament={tournament} registrations={registrations} matchesV2={matches} stack onNavigate={onStep} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <StatusCard tournament={tournament} onStatus={onStatus} onReload={onReload} />
+        <StatusCard tournament={tournament} onStatus={onStatus} onReload={onReload} primaryRef={primaryRef} />
         <Needs tournament={tournament} teams={staffelNumbers(tournament, registrations, matches).teams} />
         <Numbers tournament={tournament} registrations={registrations} matches={matches} />
       </div>
