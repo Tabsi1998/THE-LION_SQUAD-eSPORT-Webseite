@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.91.0 (16.11.2026)
+
+### Neu
+
+* FAQ „Mein Dienst“ und Helfer-Nachricht auch für Helfer ohne Mitgliedschaft (#2448)
+* FAQ-Anleitung Datenschutz und Konto mit Datenexport und Anonymisieren (#2448)
+* FAQ-Anleitung Events und Kalender mit Begleitung, Warteliste, Tagesplan und Kalender-Abo (#2448)
+* FAQ-Anleitung Gewinne und Trophäen mit Medaillen, Erfolgen und Teilen-Karte (#2448)
+* FAQ-Anleitung Turniertag vor Ort mit Aufruf, Stationen, Spielzeit-Uhr und Hinweisen der Turnierleitung (#2448)
+* FAQ-Anleitung Verein und Mitgliedschaft mit Antrag Schritt für Schritt (#2448)
+* FAQ-Fragen für die Turnierleitung zu Cockpit, Braucht Aufmerksamkeit, Stationen und Abschluss (#2448)
+* FAQ-Fragen nur für Mitglieder zu Mitgliedsnummer, Verzeichnis, Austritt und Helferdiensten (#2448)
+* neue FAQ-Fragen zu Mitgliedschaft, Events, Turniertag, Gewinnen und Datenschutz (#2448)
+
+### Dokumentation
+
+* Handbuch FAQ nennt die neuen Anleitungen und Fragen (#2448)
+
 ## 1.90.0 (16.11.2026)
 
 ### Neu
