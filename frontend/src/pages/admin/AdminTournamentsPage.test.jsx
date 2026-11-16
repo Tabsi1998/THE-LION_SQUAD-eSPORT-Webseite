@@ -103,6 +103,46 @@ test("Staffeln zeigen den Stand ihrer Season, was fehlt, und der Status-Filter p
   expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
 });
 
+// Review #2453 (1): Die Kacheln der Übersicht verlinken „?status=live“ - eine laufende Staffel gehört dazu, gezählt bei „Live“ und
+// bei „Liga: Spielbetrieb“. Nur der Entwurf einer Staffel weicht dem Liga-Stand.
+test("Filter „Live“ aus der Adresse zeigt auch die laufende Staffel", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const at = (offset) => new Date(Date.now() + offset).toISOString();
+  const running = { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live", participant_count: 8, league_plan: { fixed_matches: 28 },
+    league_season: { id: "s0", status: "active", visibility: "public", start_date: at(-20 * day) } };
+  const cup = { ...OWN, id: "t-cup", slug: "cup", title: "Laufender Cup", status: "live" };
+  apiMock.get.mockResolvedValue({ data: [running, cup, { ...OWN, title: "Offenes Turnier" }] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter initialEntries={["/admin/tournaments?status=live"]}><AdminTournamentsPage /></MemoryRouter>);
+  expect(await screen.findByText("Laufende Staffel")).toBeInTheDocument();
+  expect(screen.getByText("Laufender Cup")).toBeInTheDocument();
+  expect(screen.queryByText("Offenes Turnier")).toBeNull();
+  const filter = screen.getByTestId("admin-tournament-status-filter");
+  expect(filter.querySelector("option[value='live']")).toHaveTextContent("Live (2)");
+  expect(filter.querySelector("option[value='league:spielbetrieb']")).toHaveTextContent("Liga: Spielbetrieb (1)");
+  fireEvent.change(filter, { target: { value: "league:spielbetrieb" } });
+  expect(screen.getByText("Laufende Staffel")).toBeInTheDocument();
+  expect(screen.queryByText("Laufender Cup")).toBeNull();
+});
+
+// Review #2453 (4): Was fehlt, steht bei jeder Staffel mit Season-Angaben - der Server schickt sie nur mit dem Liga-Recht.
+test("„was fehlt“ hängt an den Season-Angaben, nicht an beiden Bereichen", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const at = (offset) => new Date(Date.now() + offset).toISOString();
+  const open = { ...STAFFEL, participant_count: 0, max_participants: 8,
+    league_season: { id: "s1", status: "draft", visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) } };
+  apiMock.get.mockResolvedValue({ data: [open, { ...STAFFEL, id: "t-bare", slug: "liga-c", title: "Staffel ohne Angaben" }] });
+  const before = { lead: authState.isTournamentLead, user: authState.user };
+  authState.isTournamentLead = false;
+  authState.user = { ...before.user, areas: ["leagues"] };
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Staffel ohne Angaben");
+  expect(screen.getByTestId("admin-tr-needs-liga-a")).toHaveTextContent("Teams zuteilen · 0 von 8");
+  expect(screen.queryByTestId("admin-tr-needs-liga-c")).toBeNull();
+  authState.isTournamentLead = before.lead;
+  authState.user = before.user;
+});
+
 // Löschen nur für Entwürfe (#2111, TA18) - alles andere sagt man ab oder archiviert.
 test("ein Turnier lässt sich nur als Entwurf löschen", async () => {
   apiMock.get.mockResolvedValue({ data: [{ ...OWN, status: "draft" }, { ...OWN, id: "t-open", slug: "offen", title: "Offenes Turnier", status: "registration_open" }] });

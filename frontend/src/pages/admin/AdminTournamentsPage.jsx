@@ -288,7 +288,8 @@ export default function AdminTournamentsPage() {
                   {isStaffel(t) ? (
                     <>
                       <StaffelStandBadge tournament={t} now={now} testId={`admin-tr-stand-${t.slug}`} />
-                      {leadsRow(t) ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className="mt-1 max-w-[14rem]" /> : null}
+                      {/* Was fehlt, sieht, wer die Staffel als Liga leitet - der Server schickt dann die Season-Angaben mit. */}
+                      {"league_season" in t ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className="mt-1 max-w-[14rem]" /> : null}
                     </>
                   ) : <StatusBadge status={t.status} />}
                   {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
