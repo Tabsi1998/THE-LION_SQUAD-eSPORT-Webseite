@@ -59,3 +59,20 @@ test("ohne Live-Anbindung kein Hinweis; ein Filter fragt weiter nur die Vereinsd
   fireEvent.click(await screen.findByTestId("docs-filter-guideline"));
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/documents", { params: { scope: "club", category: "guideline" } }));
 });
+
+// #2412: kommt die Liste nicht, steht ein Ladefehler mit „Nochmal versuchen“ da - nicht „Keine Dokumente gefunden“.
+test("Dokumente: Ladefehler mit „Nochmal versuchen“, danach die Liste", async () => {
+  mockApi({ available: true, status: "bound", capabilities: ["documents"] });
+  const ok = apiMock.get.getMockImplementation();
+  let fail = true;
+  apiMock.get.mockImplementation(async (url, options) => {
+    if (url === "/documents" && fail) throw { response: { status: 500 } };
+    return ok(url, options);
+  });
+  render(<MemoryRouter><MemberDocumentsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("public-error-state")).toBeInTheDocument();
+  expect(screen.queryByText("Keine Dokumente gefunden")).toBeNull();
+  fail = false;
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("doc-row-dolibarr-3")).toBeInTheDocument();
+});

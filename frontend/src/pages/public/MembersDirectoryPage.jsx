@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { problemKind } from "@/lib/loadProblem";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SkeletonList } from "@/components/tls/Skeleton";
@@ -37,10 +39,12 @@ export default function MembersDirectoryPage() {
   const { isClubMember } = useAuth();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/membership/profiles").then(({ data }) => setMembers(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/membership/profiles").then(({ data }) => { setMembers(data); setProblem(null); }).catch((error) => setProblem(problemKind(error))).finally(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "users"]);
@@ -69,6 +73,8 @@ export default function MembersDirectoryPage() {
 
         {loading ? (
           <SkeletonList rows={6} label="Lade Mitglieder" />
+        ) : problem && members.length === 0 ? (
+          <PublicErrorState kind={problem} onRetry={load} />
         ) : members.length === 0 ? (
           <div className="border border-dashed border-white/15 rounded-sm p-10 text-center text-white/50">
             <UsersIcon className="w-8 h-8 mx-auto opacity-40 mb-3" />

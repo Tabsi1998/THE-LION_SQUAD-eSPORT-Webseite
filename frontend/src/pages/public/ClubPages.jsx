@@ -7,6 +7,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { API, api } from "@/lib/api";
+import { problemKind } from "@/lib/loadProblem";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -53,12 +55,14 @@ export function BoardPage() {
   const [positions, setPositions] = useState([]);
   const [statutes, setStatutes] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
     api.get("/board?active_only=true")
-      .then(({ data }) => setPositions(Array.isArray(data) ? data : []))
-      .catch(() => {})
+      .then(({ data }) => { setPositions(Array.isArray(data) ? data : []); setProblem(null); })
+      .catch((error) => setProblem(problemKind(error)))
       .finally(() => setLoading(false));
     // Statuten (#326 Teil 3, #1252): aus Dolibarr (freigegeben) oder aus den Dokumenten - oder der Hinweis von früher.
     api.get("/board/statutes")
@@ -81,6 +85,8 @@ export function BoardPage() {
 
         {loading ? (
           <SkeletonCards count={3} image={false} className="mt-10" label="Lade Vorstand" />
+        ) : problem && positions.length === 0 ? (
+          <PublicErrorState kind={problem} onRetry={load} className="mt-10" />
         ) : positions.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             Es sind noch keine Vorstandspositionen aktiv.
