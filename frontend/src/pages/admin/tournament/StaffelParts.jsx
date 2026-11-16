@@ -2,13 +2,57 @@
 // vorgibt, steht hier nur zum Lesen - mit dem Hinweis „kommt aus der Season“ und dem Weg dorthin. Der Server lehnt
 // Änderungen daran ohnehin ab (`services/staffel_guard.py`), sonst würde das nächste „Übertragen“ sie still überschreiben.
 import { Link } from "react-router-dom";
-import { ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { StatusBadge } from "@/components/tls/StatusBadge";
+import { staffelNeeds, staffelStand } from "@/lib/seasonTabs";
 import { viennaDateTime } from "@/lib/vienna";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
 
 export const isStaffel = (tournament) => Boolean(tournament?.league_context);
+
+// Liga-Stand statt Turnier-Status (#2453): dieselben Farb-Rollen wie StatusBadge - grün offen, Cyan Marke, Rot läuft gerade, Grau wartet
+// oder ist vorbei.
+const STAND_TONE = {
+  vorbereitung: "bg-white/5 text-white/60 border-white/10",
+  anmeldung: "bg-ok/15 text-ok border-ok/50",
+  einteilung: "bg-brand/15 text-brand border-brand/50",
+  spielbetrieb: "bg-white/10 text-white/80 border-white/20",
+  abschluss: "bg-white/10 text-white/70 border-white/20",
+};
+
+/** Der Stand einer Staffel aus ihrer Season („Anmeldung offen bis …“), sonst der Turnier-Status wie bisher. */
+export function StaffelStandBadge({ tournament, season, now, testId }) {
+  const stand = staffelStand(tournament, { season: season || undefined, now });
+  if (!stand) return <StatusBadge status={tournament?.status} />;
+  const tone = stand.live ? "bg-live/20 text-live border-live/50" : STAND_TONE[stand.key];
+  return (
+    <span data-testid={testId} title={stand.note}
+      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-[3px] text-[10px] font-bold uppercase tracking-wider ${tone}`}>
+      {stand.live ? <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" aria-hidden="true" /> : null}
+      {stand.label}
+    </span>
+  );
+}
+
+/** Was der Staffel noch fehlt („Teams zuteilen · 1 von 8“), jeweils mit dem Weg an die Stelle. */
+export function StaffelNeedsHint({ tournament, season, now, testId, className = "" }) {
+  const needs = staffelNeeds(tournament, { season: season || undefined, now });
+  if (!needs.length) return null;
+  return (
+    <ul data-testid={testId} className={`space-y-0.5 ${className}`}>
+      {needs.map((need) => (
+        <li key={need.code}>
+          <Link to={need.to} data-testid={testId ? `${testId}-${need.code}` : undefined}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold leading-snug text-warn hover:text-white">
+            {need.text} <ArrowRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // Status einer Staffel (#2109, S1): keine Anmeldung, kein Check-in - „Liga starten“ macht den Spielplan fest.
 export const STAFFEL_STATUS_VALUES = new Set(["draft", "live", "paused", "completed", "results_published", "archived", "cancelled"]);
