@@ -388,11 +388,12 @@ export default function AdminTournamentEditPage() {
     }
   };
   // Abschluss nachholen (#2452): ein veröffentlichtes Turnier noch einmal auswerten - Auszeichnungen, Erfolge, Punkte und
-  // Gewinne, die beim Veröffentlichen ausblieben, kommen genau einmal dazu. Kein Statuswechsel, keine Nachricht.
+  // Gewinne, die beim Veröffentlichen ausblieben, kommen genau einmal dazu. Kein Statuswechsel; wer etwas Neues bekommt,
+  // erhält die übliche Meldung zu Erfolg bzw. Gewinn - kein „Turnier beendet“, nichts im Discord-Kanal.
   const recheckResults = async () => {
     const ok = await confirm({
       title: "Abschluss nachholen?",
-      description: "Das System prüft Auszeichnungen, Erfolge, Jahreswertung und Gewinne dieses Turniers noch einmal und vergibt, was fehlt – genau einmal. Ergebnisse und Status bleiben, niemand bekommt eine Nachricht; wer jetzt einen Erfolg bekommt, sieht ihn beim nächsten Öffnen.",
+      description: "Das System prüft Auszeichnungen, Erfolge, Jahreswertung und Gewinne dieses Turniers noch einmal und vergibt, was fehlt – genau einmal. Ergebnisse und Status bleiben. Wer jetzt etwas Neues bekommt, erhält die übliche Meldung zu Erfolg bzw. Gewinn. Kein „Turnier beendet“, nichts im Discord-Kanal.",
       confirmLabel: "Nachholen",
       tone: "info",
     });

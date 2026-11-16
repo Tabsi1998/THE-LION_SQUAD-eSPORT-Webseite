@@ -1067,6 +1067,9 @@ test("Abschluss nachholen: Rückfrage, dann derselbe Status mit recheck", async 
   await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
   await user.click(screen.getByTestId("admin-tr-recheck-results"));
   expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("genau einmal");
+  // Ehrlich: Neues wird wie sonst gemeldet - nur kein „Turnier beendet“ und nichts im Discord-Kanal.
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("erhält die übliche Meldung zu Erfolg bzw. Gewinn");
+  expect(screen.getByTestId("confirm-dialog")).not.toHaveTextContent("niemand bekommt eine Nachricht");
   expect(apiMock.post).not.toHaveBeenCalled();
   await user.click(screen.getByTestId("confirm-dialog-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/status", { status: "results_published", recheck: true }));

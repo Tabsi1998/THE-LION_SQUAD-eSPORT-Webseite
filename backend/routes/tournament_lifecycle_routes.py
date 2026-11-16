@@ -439,7 +439,8 @@ async def _request_finish_evaluation(db, tid: str, status: str) -> None:
 
 
 # Abschluss nachholen (#2452): bei einem veröffentlichten Turnier Auszeichnungen, Erfolge, Punkte und Gewinne noch einmal
-# prüfen - etwa nach einem Fehler beim Veröffentlichen. Ohne Statuswechsel, ohne Discord und ohne „Turnier beendet“.
+# prüfen - etwa nach einem Fehler beim Veröffentlichen. Ohne Statuswechsel. Wer jetzt etwas Neues bekommt, erhält die
+# übliche Meldung zu Erfolg bzw. Gewinn; kein „Turnier beendet“, nichts im Discord-Kanal des Turniers.
 RECHECK_STATUSES = {"results_published", "archived"}
 
 

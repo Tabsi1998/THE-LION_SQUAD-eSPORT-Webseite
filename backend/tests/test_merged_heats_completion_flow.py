@@ -221,6 +221,9 @@ async def test_abschluss_nachholen_vergibt_fehlendes_genau_einmal(flow, monkeypa
     await flow.db.tournament_awards.delete_many({"tournament_id": tournament["id"]})
     await flow.db.user_achievements.delete_many({"tier_code": {"$in": ["tournaments_won_1", "podium_1", "finals_1"]}})
     await flow.db.achievement_eval_queue.delete_many({})
+    # Alle Meldungen vom Veröffentlichen sind schon zugestellt - ab hier zählt jede Zeile absolut.
+    await flow.db.achievement_outbox.delete_many({})
+    await flow.db.notifications.delete_many({})
     assert "tournaments_won_1" not in await unlocked(flow, users[0])
 
     from services import discord_threads, registration_notifications
@@ -241,12 +244,20 @@ async def test_abschluss_nachholen_vergibt_fehlendes_genau_einmal(flow, monkeypa
     assert first.json()["rechecked"] is True and first.json()["awards"] == 8
     await badges_queue(flow, users)
     assert "tournaments_won_1" in await unlocked(flow, users[0]), "der Sieger bekommt seinen Erfolg nachgeholt"
+    # Wer jetzt etwas Neues bekommt, erhält die übliche Meldung - genau eine je neuem Erfolg.
+    won = {"user_id": users[0]["id"], "tier_code": "tournaments_won_1"}
+    assert await flow.db.achievement_outbox.count_documents(won) == 1, "die übliche Meldung zum nachgeholten Erfolg"
     after_first = await footprint(flow, tournament, users)
+    outbox_after_first = await flow.db.achievement_outbox.count_documents({})
+    notifications_after_first = await flow.db.notifications.count_documents({})
 
     second = await recheck(flow, tournament)
     assert second.status_code == 200, second.text
     await badges_queue(flow, users)
     assert await footprint(flow, tournament, users) == after_first, "zweimal nachholen ergibt nichts doppelt"
+    assert await flow.db.achievement_outbox.count_documents(won) == 1
+    assert await flow.db.achievement_outbox.count_documents({}) - outbox_after_first == 0, "der zweite Lauf meldet nichts"
+    assert await flow.db.notifications.count_documents({}) - notifications_after_first == 0, "der zweite Lauf meldet nichts"
     assert (await unlocked(flow, users[0])).count("tournaments_won_1") == 1
     assert calls == [], "kein Discord, kein „Turnier beendet“"
     stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0, "status": 1})
