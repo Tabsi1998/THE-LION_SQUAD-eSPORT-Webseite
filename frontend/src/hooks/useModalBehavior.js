@@ -38,7 +38,19 @@ function inertOutside(root) {
     });
   };
   visit(document.body);
-  return () => locked.forEach((node) => node.removeAttribute("inert"));
+  // Setzt jemand anders (React mit `inert={…}`) das Attribut, solange wir sperren, gehört es ab dann ihm: beim Freigeben
+  // bleibt es stehen. Der Beobachter sieht jedes setAttribute, auch mit gleichem Wert.
+  const owned = new Set(locked);
+  const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver((records) => {
+    records.forEach((record) => owned.delete(record.target));
+  });
+  locked.forEach((node) => observer?.observe(node, { attributes: true, attributeFilter: ["inert"] }));
+  return () => {
+    // Noch nicht zugestellte Änderungen zählen mit.
+    observer?.takeRecords().forEach((record) => owned.delete(record.target));
+    observer?.disconnect();
+    owned.forEach((node) => node.removeAttribute("inert"));
+  };
 }
 
 // Optionsfelder einer Gruppe sind ein einziger Tab-Halt: am Rand zählt die ganze Gruppe als erstes bzw. letztes Element.

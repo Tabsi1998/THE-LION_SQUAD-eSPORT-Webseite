@@ -365,3 +365,32 @@ test("Dialog im Blatt, beide schließen zugleich: der Fokus kehrt zum Auslöser 
     HTMLElement.prototype.focus = realFocus;
   }
 });
+
+// Fix-Runde #2412: setzt React selbst `inert` auf ein Element, während das Overlay es gesperrt hat (die eingeklappte
+// Admin-Leiste beim Wechsel aufs Handy), bleibt es nach dem Schließen gesperrt - das Overlay gibt nur frei, was es selbst
+// gesperrt hat und was inzwischen niemand anders gesperrt hat.
+test("Was React während des Overlays selbst sperrt, bleibt nach dem Schließen gesperrt", async () => {
+  const user = userEvent.setup();
+  function App() {
+    const [open, setOpen] = useState(false);
+    const [hidden, setHidden] = useState(false);
+    return (
+      <>
+        <aside data-testid="drawer" inert={hidden}><button type="button">Menü</button></aside>
+        <main><button type="button" onClick={() => setOpen(true)}>Öffnen</button></main>
+        {open ? (
+          <ModalOverlay onDismiss={() => setOpen(false)}>
+            <button type="button" onClick={() => setHidden(true)}>Leiste einklappen</button>
+          </ModalOverlay>
+        ) : null}
+      </>
+    );
+  }
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Öffnen" }));
+  expect(screen.getByTestId("drawer")).toHaveAttribute("inert");
+  await user.click(screen.getByRole("button", { name: "Leiste einklappen" }));
+  await user.keyboard("{Escape}");
+
+  expect(screen.getByTestId("drawer")).toHaveAttribute("inert");
+});
