@@ -10,6 +10,7 @@ Einsatz zählt nicht. Erfundene Daten, keine echten Personen.
 """
 import json
 import pathlib
+import re
 import sys
 
 import pytest
@@ -194,3 +195,60 @@ def test_protected_questions_are_well_formed_and_not_in_the_public_bundle():
     texts = "\n".join(path.read_text(encoding="utf-8") for path in FRONTEND_HILFE.rglob("*.json"))
     for question in faq_protected.PROTECTED_QUESTIONS:
         assert question["antwort"] not in texts and question["frage"] not in texts, question["id"]
+
+
+# Paket 3 (#2448): die neuen geschützten Fragen je Bereich und Stufe - und nur mit Recht.
+PACKAGE_3 = {
+    "mitgliedsnummer": ("verein-mitgliedschaft", "mitglied"),
+    "mitgliederverzeichnis": ("verein-mitgliedschaft", "mitglied"),
+    "austritt": ("verein-mitgliedschaft", "mitglied"),
+    "helferdienst-stand": ("helferdienste", "mitglied"),
+    "mein-dienst": ("helferdienste", "mitglied"),
+    "helfer-nachricht": ("helferdienste", "mitglied"),
+    "leitung-cockpit": ("turnierleitung", "turnierleitung"),
+    "leitung-aufmerksamkeit": ("turnierleitung", "turnierleitung"),
+    "leitung-alle-aufrufen": ("turnierleitung", "turnierleitung"),
+    "leitung-abschluss": ("turnierleitung", "turnierleitung_verwaltung"),
+}
+
+
+def test_package_3_questions_exist_with_area_and_level():
+    by_id = {question["id"]: question for question in faq_protected.PROTECTED_QUESTIONS}
+    for question_id, (area, level) in PACKAGE_3.items():
+        assert question_id in by_id, question_id
+        assert (by_id[question_id]["bereich"], by_id[question_id]["sichtbar_fuer"]) == (area, level), question_id
+
+
+def test_protected_answers_are_short():
+    """Wie die öffentlichen Antworten (src/hilfe/index.test.js): höchstens drei Sätze, keiner über 22 Wörter."""
+    for question in faq_protected.PROTECTED_QUESTIONS:
+        # Satzende: Punkt, Frage- oder Rufzeichen vor einem Großbuchstaben - „Anm. dorthin“ bleibt ein Satz.
+        sentences = re.split(r"(?<=[.?!]) (?=[A-ZÄÖÜ])", question["antwort"])
+        assert len(sentences) <= 3, question["id"]
+        for sentence in sentences:
+            assert len(sentence.split()) <= 22, (question["id"], sentence)
+
+
+@pytest.mark.asyncio
+async def test_package_3_questions_only_with_the_right(flow):
+    member_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "mitglied"}
+    lead_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "turnierleitung"}
+    admin_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "turnierleitung_verwaltung"}
+
+    _, guest = await faq_as(flow, None)
+    player = await flow.add_user(role="player", name="Spielerin ohne Verein")
+    _, plain = await faq_as(flow, player)
+    assert not (guest | plain) & set(PACKAGE_3)
+
+    member = await flow.add_user(role="player", name="Mitglied Paket drei")
+    await flow.db.memberships.insert_one({"user_id": member["id"], "member_status": "active"})
+    _, ids = await faq_as(flow, member)
+    assert member_ids <= ids and not ids & (lead_ids | admin_ids)
+
+    person = await helper(flow, role="referee")
+    _, ids = await faq_as(flow, person)
+    assert lead_ids <= ids and not ids & (member_ids | admin_ids)
+
+    lead = await flow.add_user(role="tournament_admin", name="Leitung Paket drei")
+    _, ids = await faq_as(flow, lead)
+    assert (lead_ids | admin_ids) <= ids and not ids & member_ids
