@@ -411,7 +411,8 @@ function App() {
           <Route path="/admin/member-profiles" element={<Navigate to="/admin/members?tab=profiles" replace />} />
           <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/einlass" element={<ProtectedRoute requireArea="club"><AdminAdmissionPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments" element={<ProtectedRoute requireTournamentStaff><AdminTournamentsPage /></ProtectedRoute>} />
+          {/* Liga-Zuständige und der Bereich Ligen (#2463): die Liste zeigt ihnen nur ihre Staffeln - das filtert der Server. */}
+          <Route path="/admin/tournaments" element={<ProtectedRoute requireTournamentStaff allowLeagueStaff><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentNewPage /></ProtectedRoute>} />
           <Route path="/admin/tournament-guide" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentGuidePage /></ProtectedRoute>} />
           <Route path="/admin/tv" element={<ProtectedRoute requireArea="tournaments"><AdminTvPage /></ProtectedRoute>} />

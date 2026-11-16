@@ -5,7 +5,8 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 
 **Wo im Admin:**
 
-- **Admin → eSports → Turniere** (`/admin/tournaments`) – Liste aller Turniere mit Suche, Status-Filter und CSV-Export
+- **Admin → eSports → Turniere** (`/admin/tournaments`) – Liste aller Turniere mit Suche, Status-Filter und CSV-Export; am Handy
+  eine Karte je Turnier mit Status, Teilnehmern, Regeln und Knöpfen (Liga-Zuständige sehen hier nur ihre Staffeln, siehe Handbuch Liga)
 - **Admin → eSports → Turniere → Neues Turnier** (`/admin/tournaments/new`) – anlegen
 - **Admin → eSports → Turniere → Turnier öffnen** (`/admin/tournaments/<Turnier>`) – Reiter **Teilnehmer**,
   **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Maps** (nur mit Spiel, siehe 3.14), **Team**, **Rückmeldungen** (erst nach

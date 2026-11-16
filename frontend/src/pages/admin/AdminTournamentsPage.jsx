@@ -8,8 +8,9 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause, Search, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { canUseArea } from "@/lib/permissions";
+import { canUseArea, hasArea, hasLeagueStaff } from "@/lib/permissions";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useNarrowScreen } from "@/hooks/useNarrowScreen";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { formatTournamentDisplay, formatTournamentFormat } from "@/lib/tournamentLabels";
 import { TOURNAMENT_STATUS_OPTIONS } from "./tournament/shared";
@@ -62,6 +63,10 @@ export default function AdminTournamentsPage() {
   const { isTournamentLead, user } = useAuth();
   // Staffeln (#2203): Status und Löschen hier nur mit dem Bereich Ligen - die Turnierleitung allein leitet sie nicht.
   const leadsRow = (t) => isTournamentLead && (!isStaffel(t) || canUseArea(user, "leagues"));
+  // Liga-Zuständige und der Bereich Ligen ohne Turnierleitung und Einsatz (#2463): Der Server gibt ihnen nur ihre Staffeln - die Seite sagt es.
+  const leagueScope = !hasArea(user, "tournaments") && !user?.is_tournament_staff && (hasLeagueStaff(user) || hasArea(user, "leagues"));
+  // Handy (#2463): unter 768 px Karten statt der Tabelle zum Wischen - nur eine Form steht im DOM.
+  const narrow = useNarrowScreen();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   // Ein Zeitpunkt je geladener Liste (#2453): Liga-Stand, Zähler und Filter rechnen mit demselben „jetzt“.
@@ -191,10 +196,14 @@ export default function AdminTournamentsPage() {
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-8">
-        <div>
+      {/* Kopf (#2463): Er bricht als Ganzes um - der Knopf rutscht unter die Überschrift, statt „Turniere“ mitten im Wort zu teilen. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mb-8" data-testid="admin-tournaments-head">
+        <div className="min-w-0">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Turniere</h1>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase [overflow-wrap:normal]">Turniere</h1>
+          {leagueScope ? (
+            <p className="mt-1 text-sm text-white/55" data-testid="admin-tournaments-league-scope">Hier stehen die Staffeln deiner Ligen.</p>
+          ) : null}
         </div>
         {isTournamentLead && (
           <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
@@ -202,7 +211,7 @@ export default function AdminTournamentsPage() {
           </Link>
         )}
       </div>
-      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_16rem_auto_auto]">
+      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_14rem_14rem_auto_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
             <input
@@ -252,15 +261,49 @@ export default function AdminTournamentsPage() {
           Die Liste zeigt die {LIST_LIMIT} zuletzt angelegten Turniere – ältere stehen hier nicht.
         </p>
       )}
+      {narrow ? (
+        <ul className="space-y-3" data-testid="admin-tournament-cards">
+          {filteredList.map((t) => (
+            <li key={t.id} data-testid={`admin-tr-${t.slug}`} className="rounded-sm border border-white/10 bg-[#121212] p-4">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
+                  <LeagueLabel tournament={t} className="mt-1.5 flex w-fit" />
+                  <div className="mt-1 text-xs text-white/55">{[gameLabel(t.game), formatTournamentDisplay(t)].filter(Boolean).join(" · ") || "—"}</div>
+                </div>
+                <div className="shrink-0 text-right" data-testid={`admin-tr-participants-${t.slug}`}>
+                  <div className="text-sm font-bold tabular-nums">{t.participant_count}/{t.max_participants}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-white/55">Teilnehmer</div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <StatusCell tournament={t} now={now} leads={leadsRow(t)} needsClassName="mt-1" endedClassName="mt-1 block" />
+              </div>
+              <div className="mt-2" data-testid={`admin-tr-rules-${t.slug}`}>
+                <RulePills tournament={t} compact />
+              </div>
+              <div className="mt-2 -mb-2 -mr-2 flex items-center justify-end gap-1 border-t border-white/5 pt-1">
+                <RowActions tournament={t} isTournamentLead={isTournamentLead} leads={leadsRow(t)} onStatus={setStatus} onDelete={del} />
+              </div>
+            </li>
+          ))}
+          {filteredList.length === 0 && (
+            <li className={denied ? "" : "rounded-sm border border-white/10 bg-[#121212] py-10 text-center text-white/40"}>
+              {denied ? <AdminDenied text={denied} /> : list.length === 0 ? (leagueScope ? "Keine Staffeln" : "Keine Turniere") : (leagueScope ? "Keine Staffeln für diesen Filter" : "Keine Turniere für diesen Filter")}
+            </li>
+          )}
+        </ul>
+      ) : (
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="tls-swipe pb-0">
-        <table className="w-full text-sm min-w-[860px]">
+        {/* Tablet und schmales Fenster (#2463): ohne Mindestbreite, die Regeln unter dem Titel - die Aktionen bleiben ohne Wischen im Bild. */}
+        <table className="w-full text-sm xl:min-w-[860px]">
           <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
             <tr>
               <th className="text-left px-4 py-3">Titel</th>
               <th className="text-left px-4 py-3">Spiel</th>
               <th className="text-left px-4 py-3">Format</th>
-              <th className="text-left px-4 py-3">Regeln</th>
+              <th className="hidden text-left px-4 py-3 xl:table-cell">Regeln</th>
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-right px-4 py-3">Teilnehmer</th>
               <th className="text-right px-4 py-3">Aktion</th>
@@ -270,44 +313,22 @@ export default function AdminTournamentsPage() {
             {filteredList.map((t) => (
               <tr key={t.id} data-testid={`admin-tr-${t.slug}`}>
                 <td className="px-4 py-3">
-                  <Link to={`/admin/tournaments/${t.id}`} className="font-semibold hover:text-[#29B6E8]">{t.title}</Link>
-                  {/* Kennzeichen „Liga · Staffel A“ (#2109, S26) - der Server liefert es mit. */}
-                  {isStaffel(t) && (
-                    <span data-testid={`admin-tr-league-label-${t.slug}`} className="ml-2 inline-flex rounded-sm border border-[#29B6E8]/35 bg-[#29B6E8]/10 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
-                      {t.league_label || `Liga · Staffel ${t.league_context.staffel || ""}`.trim()}
-                    </span>
-                  )}
+                  <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
+                  <LeagueLabel tournament={t} className="ml-2 inline-flex align-middle" />
+                  <div className="mt-1 xl:hidden"><RulePills tournament={t} compact /></div>
                 </td>
                 <td className="px-4 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
                 <td className="px-4 py-3 text-white/70">{formatTournamentDisplay(t)}</td>
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 xl:table-cell">
                   <RulePills tournament={t} />
                 </td>
                 <td className="px-4 py-3">
-                  {/* Liga-Staffel (#2453): der Stand der Season statt „Entwurf“, darunter was ihr noch fehlt - mit Weg dorthin. */}
-                  {isStaffel(t) ? (
-                    <>
-                      <StaffelStandBadge tournament={t} now={now} testId={`admin-tr-stand-${t.slug}`} />
-                      {/* Was fehlt, sieht, wer die Staffel als Liga leitet - der Server schickt dann die Season-Angaben mit. */}
-                      {"league_season" in t ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className="mt-1 max-w-[14rem]" /> : null}
-                    </>
-                  ) : <StatusBadge status={t.status} />}
-                  {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
-                  {leadsRow(t) && liveAfterEnd(t) ? (
-                    <Link to={`/admin/tournaments/${t.id}`} data-testid={`admin-tr-ended-live-${t.slug}`} title={`Ende war am ${endText(t.end_date)}`}
-                      className="mt-1 block max-w-[14rem] text-[11px] leading-snug text-warn hover:text-white">
-                      Läuft laut Stand noch, Ende war am {endText(t.end_date)} – beenden?
-                    </Link>
-                  ) : null}
+                  <StatusCell tournament={t} now={now} leads={leadsRow(t)} needsClassName="mt-1 max-w-[14rem]" endedClassName="mt-1 block max-w-[14rem]" />
                 </td>
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" className="p-2 hover:text-[#29B6E8]"><Users className="w-3.5 h-3.5" /></Link>
-                    {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
-                    {isTournamentLead && t.status === "draft" && !isStaffel(t) && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-ok"><Play className="w-3.5 h-3.5" /></button>}
-                    {leadsRow(t) && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
-                    {leadsRow(t) && canDelete(t) && <button onClick={() => del(t)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    <RowActions tournament={t} isTournamentLead={isTournamentLead} leads={leadsRow(t)} onStatus={setStatus} onDelete={del} />
                   </div>
                 </td>
               </tr>
@@ -315,7 +336,7 @@ export default function AdminTournamentsPage() {
             {filteredList.length === 0 && (
               <tr>
                 <td colSpan="7" className={denied ? "p-4" : "text-center py-10 text-white/40"}>
-                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}
+                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? (leagueScope ? "Keine Staffeln" : "Keine Turniere") : (leagueScope ? "Keine Staffeln für diesen Filter" : "Keine Turniere für diesen Filter")}
                 </td>
               </tr>
             )}
@@ -323,13 +344,84 @@ export default function AdminTournamentsPage() {
         </table>
         </div>
       </div>
+      )}
     </AdminLayout>
   );
 }
 
-function RulePills({ tournament }) {
+// Kennzeichen „Liga · Staffel A“ (#2109, S26) - der Server liefert es mit.
+function LeagueLabel({ tournament: t, className = "" }) {
+  if (!isStaffel(t)) return null;
+  return (
+    <span data-testid={`admin-tr-league-label-${t.slug}`} className={`${className} rounded-sm border border-[#29B6E8]/35 bg-[#29B6E8]/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]`}>
+      {t.league_label || `Liga · Staffel ${t.league_context.staffel || ""}`.trim()}
+    </span>
+  );
+}
+
+function StatusCell({ tournament: t, now, leads, needsClassName, endedClassName }) {
+  return (
+    <>
+      {/* Liga-Staffel (#2453): der Stand der Season statt „Entwurf“, darunter was ihr noch fehlt - mit Weg dorthin. */}
+      {isStaffel(t) ? (
+        <>
+          <StaffelStandBadge tournament={t} now={now} testId={`admin-tr-stand-${t.slug}`} />
+          {/* Was fehlt, sieht, wer die Staffel als Liga leitet - der Server schickt dann die Season-Angaben mit. */}
+          {"league_season" in t ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className={needsClassName} /> : null}
+        </>
+      ) : <StatusBadge status={t.status} />}
+      {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
+      {leads && liveAfterEnd(t) ? (
+        <Link to={`/admin/tournaments/${t.id}`} data-testid={`admin-tr-ended-live-${t.slug}`} title={`Ende war am ${endText(t.end_date)}`}
+          className={`${endedClassName} text-[11px] leading-snug text-warn hover:text-white`}>
+          Läuft laut Stand noch, Ende war am {endText(t.end_date)} – beenden?
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
+// Aktions-Symbole (#2463): feste Größe (`shrink-0`), Tippfläche 44 px, Name zum Vorlesen - in Tabelle und Karte gleich.
+const ACTION_CLASS = "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm transition-colors";
+const ACTION_ICON = "h-4 w-4 shrink-0";
+
+function RowActions({ tournament: t, isTournamentLead, leads, onStatus, onDelete }) {
+  return (
+    <>
+      <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" aria-label={`Teilnehmer: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#29B6E8]`}>
+        <Users className={ACTION_ICON} aria-hidden="true" />
+      </Link>
+      {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
+      {isTournamentLead && t.status === "draft" && !isStaffel(t) ? (
+        <button type="button" onClick={() => onStatus(t.id, "registration_open")} title="Anmeldung öffnen" aria-label={`Anmeldung öffnen: ${t.title}`} className={`${ACTION_CLASS} hover:text-ok`}>
+          <Play className={ACTION_ICON} aria-hidden="true" />
+        </button>
+      ) : null}
+      {leads && t.status === "live" ? (
+        <button type="button" onClick={() => onStatus(t.id, "paused")} title="Pause" aria-label={`Pause: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FFD700]`}>
+          <Pause className={ACTION_ICON} aria-hidden="true" />
+        </button>
+      ) : null}
+      {leads && canDelete(t) ? (
+        <button type="button" onClick={() => onDelete(t)} title="Löschen" aria-label={`Löschen: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FF3B30]`}>
+          <Trash2 className={ACTION_ICON} aria-hidden="true" />
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+function RulePills({ tournament, compact = false }) {
   // Dieselbe Regel wie Server und Planungs-Warnung (#1132) - an einer Stelle: effectiveRuleModes.
   const { event_mode: eventMode, result_entry_mode: resultMode, schedule_mode: scheduleMode } = effectiveRuleModes(tournament);
+  if (compact) {
+    // Am Handy (#2463) eine Zeile statt drei Schilder.
+    return (
+      <p className="text-[11px] leading-snug text-white/50">
+        {[EVENT_MODE_LABELS[eventMode] || eventMode, RESULT_ENTRY_MODE_LABELS[resultMode] || resultMode, SCHEDULE_MODE_LABELS[scheduleMode] || scheduleMode].filter(Boolean).join(" · ")}
+      </p>
+    );
+  }
   return (
     <div className="flex flex-wrap gap-1.5">
       <RulePill label={EVENT_MODE_LABELS[eventMode] || eventMode} tone={eventMode === "local" ? "gold" : eventMode === "hybrid" ? "purple" : "cyan"} />

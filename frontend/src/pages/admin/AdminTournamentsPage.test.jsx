@@ -189,6 +189,119 @@ test("Turnierliste: Archiv nur im Filter, Suche nach „K.-o.“, Status in Wort
   await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith("Status: Anmeldung offen"));
 });
 
+// Handy (#2463): unter 768 px Karten statt der Tabelle zum Wischen - nur eine Form im DOM, Filter, Zähler und CSV bleiben.
+function withScreen(narrow, run) {
+  const original = window.matchMedia;
+  window.matchMedia = (query) => ({ matches: narrow && query.includes("max-width: 767px"), media: query, addEventListener: () => {}, removeEventListener: () => {} });
+  return Promise.resolve(run()).finally(() => { window.matchMedia = original; });
+}
+
+const OPEN_STAFFEL = () => {
+  const day = 24 * 60 * 60 * 1000;
+  const at = (offset) => new Date(Date.now() + offset).toISOString();
+  return { ...STAFFEL, participant_count: 1, max_participants: 8, league_plan: { fixed_matches: 0 }, game: { name: "Probe Shooter" }, format: "league",
+    league_season: { id: "s1", status: "draft", visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) } };
+};
+
+test("unter 768 px: Karten mit Titel, Spiel, Format, Liga-Stand, was fehlt, Teilnehmern, Regeln und Aktionen", () => withScreen(true, async () => {
+  apiMock.get.mockResolvedValue({ data: [OPEN_STAFFEL(), { ...OWN, status: "draft", game: { name: "Probe Racer" }, format: "single_elim" }] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Eigenes Turnier");
+  expect(screen.getByTestId("admin-tournament-cards")).toBeInTheDocument();
+  expect(screen.queryByRole("table")).toBeNull();
+  const staffel = screen.getByTestId("admin-tr-liga-a");
+  expect(staffel.tagName).toBe("LI");
+  expect(staffel).toHaveTextContent("Probe-Liga Season 1 · Liga 1 · Staffel A");
+  expect(staffel).toHaveTextContent("Probe Shooter");
+  expect(within(staffel).getByTestId("admin-tr-league-label-liga-a")).toHaveTextContent("Liga · Staffel A");
+  expect(within(staffel).getByTestId("admin-tr-stand-liga-a")).toHaveTextContent(/^Anmeldung offen bis /);
+  expect(within(staffel).getByTestId("admin-tr-needs-liga-a")).toHaveTextContent("Teams zuteilen · 1 von 8");
+  expect(within(staffel).getByTestId("admin-tr-participants-liga-a")).toHaveTextContent("1/8");
+  expect(within(staffel).getByTestId("admin-tr-rules-liga-a")).toHaveTextContent(/Online/i);
+  const cup = screen.getByTestId("admin-tr-eigenes");
+  expect(cup).toHaveTextContent("Probe Racer");
+  expect(cup).toHaveTextContent("ENTWURF");
+  expect(within(cup).getByRole("button", { name: /^Anmeldung öffnen:/ })).toBeInTheDocument();
+  expect(within(cup).getByRole("button", { name: /^Löschen:/ })).toBeInTheDocument();
+  expect(within(cup).getByRole("link", { name: /^Teilnehmer:/ })).toHaveAttribute("href", "/admin/tournaments/t-own?tab=participants");
+  // Filter, Zähler und CSV wie bisher.
+  expect(screen.getByText("2 / 2 sichtbar")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "league" } });
+  expect(screen.queryByTestId("admin-tr-eigenes")).toBeNull();
+  expect(screen.getByText("1 / 2 sichtbar")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /CSV/ })).toBeEnabled();
+}));
+
+test("ab 768 px bleibt die Tabelle, ohne Karten", () => withScreen(false, async () => {
+  apiMock.get.mockResolvedValue({ data: [OPEN_STAFFEL(), OWN] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Eigenes Turnier");
+  expect(screen.getByRole("table")).toBeInTheDocument();
+  expect(screen.queryByTestId("admin-tournament-cards")).toBeNull();
+  expect(screen.getByTestId("admin-tr-liga-a").tagName).toBe("TR");
+}));
+
+test.each([[true, "Karte"], [false, "Tabelle"]])("Aktions-Symbole (%s → %s): feste Größe, 44-px-Tippfläche, Name zum Vorlesen", (narrow) => withScreen(narrow, async () => {
+  apiMock.get.mockResolvedValue({ data: [{ ...OWN, status: "draft" }, { ...OWN, id: "t-live", slug: "live", title: "Live-Cup", status: "live" }] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Live-Cup");
+  const actions = [
+    ...within(screen.getByTestId("admin-tr-eigenes")).getAllByRole("button"),
+    ...within(screen.getByTestId("admin-tr-eigenes")).getAllByRole("link", { name: /^Teilnehmer:/ }),
+    within(screen.getByTestId("admin-tr-live")).getByRole("button", { name: /^Pause:/ }),
+  ];
+  expect(actions.length).toBeGreaterThanOrEqual(4);
+  for (const action of actions) {
+    expect(action).toHaveAttribute("aria-label");
+    expect(action.className).toMatch(/\bh-11\b/);
+    expect(action.className).toMatch(/\bw-11\b/);
+    expect(action.className).toMatch(/\bshrink-0\b/);
+    const icon = action.querySelector("svg");
+    expect(icon.getAttribute("class")).toMatch(/\bshrink-0\b/);
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+  }
+}));
+
+test("Überschrift: der Kopf bricht als Ganzes um, nicht das Wort „Turniere“", async () => {
+  apiMock.get.mockResolvedValue({ data: [OWN] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  const heading = await screen.findByRole("heading", { level: 1, name: "Turniere" });
+  // Der Knopf „Neues Turnier“ rutscht unter die Überschrift, statt ihr die Breite zu nehmen; das Wort selbst bricht nicht.
+  expect(screen.getByTestId("admin-tournaments-head").className).toMatch(/\bflex-wrap\b/);
+  expect(heading.className).toMatch(/\[overflow-wrap:normal\]/);
+});
+
+test("Liga-Zuständige ohne Turnierleitung: Hinweis auf die eigenen Staffeln, keine Knöpfe zum Anlegen, Ändern oder Löschen", async () => {
+  apiMock.get.mockResolvedValue({ data: [OPEN_STAFFEL()] });
+  const before = { lead: authState.isTournamentLead, user: authState.user };
+  authState.isTournamentLead = false;
+  authState.user = { role: "player", has_league_staff: true, mfa_enabled: true, auth_mfa_verified: true };
+  try {
+    render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+    await screen.findByText("Probe-Liga Season 1 · Liga 1 · Staffel A");
+    expect(screen.getByTestId("admin-tournaments-league-scope")).toHaveTextContent("Staffeln deiner Ligen");
+    expect(screen.queryByTestId("admin-new-tournament")).toBeNull();
+    expect(screen.queryByTitle("Löschen")).toBeNull();
+    expect(screen.queryByTitle("Pause")).toBeNull();
+    expect(screen.getByRole("link", { name: /^Teilnehmer:/ })).toBeInTheDocument();
+  } finally {
+    authState.isTournamentLead = before.lead;
+    authState.user = before.user;
+  }
+});
+
+test("die Turnierleitung sieht keinen Hinweis auf eigene Staffeln", async () => {
+  apiMock.get.mockResolvedValue({ data: [OWN] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Eigenes Turnier");
+  expect(screen.queryByTestId("admin-tournaments-league-scope")).toBeNull();
+});
+
 test("eine Staffel: die Turnierleitung ohne Bereich Ligen bekommt keine Knöpfe zum Ändern (#2203)", async () => {
   apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }, { ...OWN, status: "draft" }] });
   authState.isTournamentLead = true;

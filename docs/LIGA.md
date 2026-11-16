@@ -643,7 +643,9 @@ je Person läuft über den Index `user_id`, Löschen des Kontos und Auskunft (`p
 Regeln: Wer den Bereich hat, darf alle Ligen. Zuständige haben nur ihre Liga und nur ihre Zuständigkeiten. Liga anlegen und löschen
 und die Vergabe der Zuständigen brauchen den Bereich. Vergabe mit Protokoll (`league.staff.grant`, `league.staff.update`,
 `league.staff.revoke`) und Meldung an die Person (`rights_change`). Ohne bestätigte Zwei-Faktor-Anmeldung gilt weder Bereich noch
-Zuständigkeit. Ein Zuständiger braucht keinen Bereich; `/admin` führt ihn über „Mein Dienst“ zu seinen Ligen.
+Zuständigkeit. Ein Zuständiger braucht keinen Bereich; `/admin` führt ihn über „Mein Dienst“ zu seinen Ligen. Die Turnierliste der
+Verwaltung (`/admin/tournaments`, `GET /api/tournaments?managed=true`) öffnen Bereich und Zuständige auch ohne Turnierleitung (#2463);
+der Server gibt ihnen dort nur die Staffeln, die sie leiten (`StaffelAccess.covers`), keine gewöhnlichen Turniere.
 
 **Befangenheit** (`league_permissions.conflict_of_interest(db, user, match, decided_by=None)`): Befangen ist, wer zu einer Seite des
 Spiels gehört: Kader des Co-Teams, Captain, Vertreter, Hauptteam-Leitung, Person der Anmeldung, oder wer in einer Aufstellung des
