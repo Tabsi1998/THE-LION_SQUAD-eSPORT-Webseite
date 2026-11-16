@@ -485,14 +485,19 @@ gemeinsam, damit das Heimrecht fair bleibt.
   Teamseite).
 - **Liga-Stand in der Verwaltung (#2453):** Eine Staffel steht bis „Liga starten“ im Turnier-Status `draft` – auch während die
   Season zur Anmeldung offen ist. Das blockiert nichts (Anmeldung, Zuteilung, Kader, Start; `test_league_staffel_stand_flow.py`).
-  Die Verwaltungsliste (`GET /api/tournaments?managed=true`, für wer die Staffel verwaltet) und `GET /api/tournaments/{id}` für die
-  Leitung tragen darum je Staffel `league_season` (`id`, `status`, `visibility`, `application_opens_at`, `application_closes_at`,
-  `start_date`) und `league_plan: {fixed_matches}` (`staffel_guard.attach_season_stand`). Den Stand leitet das Web an einer Stelle
+  Die Verwaltungsliste (`GET /api/tournaments?managed=true`) und `GET /api/tournaments/{id}` tragen darum je Staffel – nur mit dem
+  Liga-Recht dieser Staffel, nicht für Helfer oder die Turnierleitung ohne Bereich Ligen – `league_season` (`id`, `status`,
+  `visibility`, `application_opens_at`, `application_closes_at`, `start_date`, `application_effective_closes_at` = wirksames Ende mit
+  Nachmeldefrist #2422) und `league_plan: {fixed_matches}` (`staffel_guard.attach_season_stand`). Ablaufleiste und Stand rechnen mit
+  dem wirksamen Ende (`applicationEnd`). Läuft die Season, diese Staffel aber noch nicht: „Einteilung · Start fehlt“. Offen, aber
+  Season nicht veröffentlicht: „… · Season verborgen“ mit dem Punkt „Sichtbarkeit einschalten“. Beendete oder archivierte Season und
+  die Zeit vor dem Fensterbeginn melden kein „Teams zuteilen“. Den Stand leitet das Web an einer Stelle
   ab: `lib/seasonTabs.js` `staffelStand` ruft die Ablaufleiste `seasonPhases` mit dieser einen Staffel auf („Vorbereitung“,
   „Anmeldung offen bis …“, „Einteilung“, „Spielbetrieb“, „Abgeschlossen“; abgesagt und archiviert bleiben Status). `staffelNeeds`
   nennt, was fehlt („Teams zuteilen“ → Eingang `#anmeldungen` bzw. ohne Fenster die Teilnehmerliste, „Spielplan noch nicht erzeugt –
   Liga starten“ nach der Anmeldung, „Spielplan noch nicht erzeugt“ gestartet ohne feste Spiele). Der Status-Filter der Turnierliste
-  filtert Staffeln nach `league:<phase>`. Turnierliste, Kopf der Staffel-Verwaltung und Reiter „Ligen und Staffeln“ zeigen den Stand;
+  kennt zusätzlich `league:<phase>`; nur der Entwurf einer Staffel weicht dem Liga-Stand, Live, Pausiert und Beendet passen weiter
+  auf ihren Status (`statusFilterKeys`, Kacheln mit `?status=live`). Turnierliste, Kopf der Staffel-Verwaltung und Reiter „Ligen und Staffeln“ zeigen den Stand;
   öffentlich erscheint eine Staffel im Entwurf ohnehin nicht, die App zeigt Turnierleitungen weiter den rohen Status.
 
 | `league_seasons.visibility` | Ligaseite | Staffel-Turniere (`visibility`, `is_public`) |
