@@ -82,7 +82,13 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
 
    Vor dem Veröffentlichen oder Planen kommt eine **Rückfrage**, was hinausgeht: „Der Newsletter geht sofort an 214 Personen
    mit Newsletter-Zustimmung. Discord bekommt eine Meldung.“ Abbrechen speichert nichts. Ein schon verschickter Newsletter geht
-   nie ein zweites Mal von selbst hinaus. **Anpinnen** hält den Beitrag oben in der News-Liste und auf der Startseite.
+   nie ein zweites Mal von selbst hinaus. **Anpinnen** hält den Beitrag oben in der News-Liste und auf der Startseite –
+   bis zum Tag unter **Angepinnt bis** (einschließlich; vorgeschlagen sind 14 Tage ab dem Tag, an dem der Beitrag
+   erscheint – bei einem geplanten Beitrag ab seinem Termin; ein Ende davor nimmt der Server nicht an). Danach rutscht er
+   von selbst normal in die Liste, auf der Website und in der App. Die News-Liste der Verwaltung zeigt das Ende
+   („Angepinnt bis 21.10.2026“) bzw. „Anpinnen abgelaufen“; erneut anpinnen schlägt wieder 14 Tage vor. Beiträge, die schon
+   vor dieser Umstellung angepinnt waren, bleiben 14 Tage ab ihrem Erscheinen angepinnt, frühestens aber bis 14 Tage nach
+   der Umstellung am 20.11.2026, also bis 04.12.2026.
 7. **Personen und Verknüpfungen**: Benutzer markieren (nur aktive öffentliche Profile; ein Klick setzt den Profil-Link in den
    Text) und **Verknüpfte Events**, **Turniere** und **Fast-Lap Challenges** – mit Suchfeld, Gewähltes steht oben, Entwürfe
    sind gekennzeichnet (deren Karte sehen Besucher erst, wenn sie veröffentlicht sind). **Einbetten** setzt die Karte in den Text.

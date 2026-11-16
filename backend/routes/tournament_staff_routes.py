@@ -6,7 +6,7 @@ from fastapi import HTTPException, Depends
 from database import get_db
 from auth import get_current_user
 from services.league_permissions import READ
-from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
+from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission, staff_role_sentence
 from models import TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate, now_utc, new_id
 from routes.tournament_common import (
     require_lead_of,
@@ -44,21 +44,15 @@ async def _scope_problem(db, tid: str, scope: str, scope_id: str | None) -> str 
     return None if found else SCOPE_MISSING[scope]
 
 
-async def _notify_helper(db, tid: str, assignment: dict) -> None:
-    """Der Helfer bekommt Bescheid (#2111, TA25) - im Postfach und per Push, mit dem Weg zu „Mein Dienst“."""
-    from services.user_notifications import create_user_notification
+async def _notify_helper(db, tid: str, assignment: dict, *, role_changed: bool = False) -> None:
+    """Der Helfer bekommt Bescheid (#2111, TA25; #1384) - der Versand steht in services/staff_messages.py."""
+    from services.staff_messages import notify_helper
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "title": 1}) or {}
-    role = ROLE_WORDS.get(assignment.get("role"), "Helfer")
-    title = f"Einsatz: {tournament.get('title') or 'Turnier'}"
-    body = f"Du hilfst bei diesem Turnier als {role}. Unter „Mein Dienst“ siehst du, was du tun kannst."
-    try:
-        await create_user_notification(
-            assignment["user_id"], title, body, url="/admin/dienst", kind="tournament_staff",
-            meta={"category": "tournament_updates", "dedupe_key": f"tournament_staff:{assignment['id']}",
-                  "tournament_id": tid},
-        )
-    except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Zuweisung auf
-        logger.warning("Staff notification failed type=%s", type(exc).__name__)
+    await notify_helper(
+        db, assignment, event_title=tournament.get("title") or "Turnier", role_word=ROLE_WORDS.get(assignment.get("role"), "Helfer"),
+        rights=staff_role_sentence(assignment.get("role") or ""), dedupe_prefix="tournament_staff", meta={"tournament_id": tid},
+        role_changed=role_changed,
+    )
 
 
 # --- Tournament staff assignments ---
@@ -181,6 +175,14 @@ async def update_tournament_staff(tid: str, assignment_id: str, body: Tournament
         {"assignment_id": assignment_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
     )
     updated = await db.tournament_staff_assignments.find_one({"id": assignment_id}, {"_id": 0})
+    # Nachricht (#1384): Wer pausiert eingetragen war und jetzt aktiv wird, bekommt die Nachricht zum Eintragen - je Einsatz
+    # einmal (derselbe Schlüssel wie beim Eintragen). Eine neue Rolle bei aktivem Einsatz: genau eine Nachricht. Während der
+    # Pause und bei unverändertem Speichern: keine.
+    active_now = bool(updated) and updated.get("is_active", True) is not False
+    if active_now and current.get("is_active") is False:
+        await _notify_helper(db, tid, updated)
+    elif active_now and updated.get("role") != current.get("role"):
+        await _notify_helper(db, tid, updated, role_changed=True)
     return (await _enrich_staff_assignments([updated]))[0]
 
 

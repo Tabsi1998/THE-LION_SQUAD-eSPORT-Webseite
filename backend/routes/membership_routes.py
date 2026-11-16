@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import date
 from database import get_db
 from auth import get_current_user, get_optional_user, require_area, require_club_member
+from services.club_board_titles import board_titles_by_profile_id, title_for_position
 from services.levels import level_view
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,
@@ -142,31 +143,9 @@ def _age_from_birth_date(value: str | date | None) -> int | None:
 # Level (#617): services/levels.py ist die einzige Kurve.
 
 
-def _title_for_position(position: dict, person: dict | None = None) -> str:
-    if person and person.get("gender") == "female" and position.get("title_female"):
-        return position["title_female"]
-    return position.get("title_male") or position.get("display_title") or "Vorstand"
-
-
-async def _board_titles_by_profile_id(db) -> dict[str, str]:
-    profiles = await db.club_member_profiles.find(
-        {},
-        {"_id": 0, "id": 1, "user_id": 1, "gender": 1},
-    ).to_list(2000)
-    by_profile_id = {p["id"]: p for p in profiles}
-    by_user_id = {p["user_id"]: p for p in profiles if p.get("user_id")}
-    titles: dict[str, str] = {}
-    positions = await db.board_positions.find(
-        {"is_active": True}, {"_id": 0}
-    ).sort("order_index", 1).to_list(200)
-    for position in positions:
-        main = by_profile_id.get(position.get("user_id")) or by_user_id.get(position.get("user_id"))
-        if main:
-            titles[main["id"]] = _title_for_position(position, main)
-        deputy = by_profile_id.get(position.get("deputy_user_id")) or by_user_id.get(position.get("deputy_user_id"))
-        if deputy:
-            titles[deputy["id"]] = f"{_title_for_position(position, deputy)}-Stv."
-    return titles
+# Funktionen aus dem Vorstand (#1267): in services/club_board_titles.py, damit auch das Spielerprofil sie liest.
+_title_for_position = title_for_position
+_board_titles_by_profile_id = board_titles_by_profile_id
 
 
 def _public_profile(doc: dict, detail: bool = False, board_title: str | None = None) -> dict:

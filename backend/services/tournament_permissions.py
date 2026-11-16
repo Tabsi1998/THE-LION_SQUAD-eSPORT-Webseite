@@ -113,6 +113,35 @@ async def _assignment_permission(user, tournament_id, allowed_roles, scope, scop
 # Stationen automatisch verteilen (routes/station_routes.py): Organisation, Schiedsrichter, Stationsleitung.
 STATION_ASSIGN_ROLES = {"organizer", "referee", "station_manager"}
 
+# Was eine Helfer-Rolle darf (#1384) - in Worten, aus genau den Listen oben, die die Routen prüfen. Die Verwaltung zeigt
+# je Rolle denselben Satz (frontend/src/lib/staffRoleRights.json, ein Gleichheits-Test hält beide gleich), die Nachricht
+# beim Eintragen auch. Reihenfolge = Reihenfolge im Satz.
+STAFF_ROLE_ORDER = ("organizer", "referee", "scorekeeper", "station_manager", "stream_operator")
+STAFF_RIGHTS = (
+    ("structure", "Ablauf und Baum", STRUCTURE_STAFF_ROLES),
+    ("participants", "Teilnehmer", PARTICIPANT_STAFF_ROLES),
+    ("results", "Ergebnisse", RESULT_STAFF_ROLES),
+    ("check_in", "Check-in", CHECKIN_STAFF_ROLES),
+    ("stations", "Stationen", STATION_ASSIGN_ROLES),
+)
+
+
+def staff_role_rights(role: str) -> list[str]:
+    """Die Rechte einer Helfer-Rolle als Wörter - leer, wenn sie nur ansieht."""
+    return [label for _key, label, roles in STAFF_RIGHTS if role in roles]
+
+
+def _words(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} und {items[-1]}"
+
+
+def staff_role_sentence(role: str) -> str:
+    """„Darf hier: Teilnehmer, Ergebnisse und Check-in.“ bzw. „Darf hier nur ansehen …“ (#1384)."""
+    rights = staff_role_rights(role)
+    if not rights:
+        return "Darf hier nur ansehen – ändern kann diese Rolle nichts."
+    return f"Darf hier: {_words(rights)}."
+
 
 async def tournament_rights(user: dict | None, tournament_id: str) -> dict:
     """Was die Person in diesem Turnier darf (#1353) - dieselben Rollen und Bereiche (Scope) wie die Wächter der Routen.

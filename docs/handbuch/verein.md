@@ -206,6 +206,12 @@ Plattformen. **Profil erstellen** legt nur das Vereinsprofil an; ein Profil ist 
 Website-Konto verknüpft ihr im Profil im Kasten **Konto** (optional). Funktionen wie Obmann oder Kassier kommen automatisch aus
 dem Vorstand. Mit Dolibarr kommen Mitglieder mit Einwilligung von selbst ins Verzeichnis (`/members`).
 
+**Vereinsprofil und Spielerprofil** bleiben zwei Seiten: Das Vereinsprofil (`/members/…`) ist die offizielle Vertretung im
+Verein und verlinkt auf das Spielerprofil. Ist ein aktives Vereinsprofil mit dem öffentlichen Konto eines aktiven Mitglieds verknüpft, zeigt das
+Spielerprofil (`/u/…`) im Kopf einen kleinen Hinweis **Vereinsmitglied · Funktion** (etwa „Vereinsmitglied · Kassierin“),
+der zum Vereinsprofil führt. Mehr geht nicht hinüber – Geburtstag, Zusatzfelder und alles andere aus der Vereinsakte bleiben
+im Vereinsprofil bzw. in der Verwaltung. Ein ausgeblendetes Vereinsprofil oder ein privates Konto zeigt keinen Hinweis.
+
 **Streamer oder Creator des Vereins:** Im Profil (Abschnitt **Person**, unter dem Kasten **Konto**) setzt ihr das Häkchen für
 alle, die der Verein als Streamer oder Creator führt. Hat die Person ihr Twitch-Konto **per Anmeldung** verknüpft
 (Einstellungen → Verbindungen, nicht nur den Namen eingetippt), bekommt sie damit den Erfolg **Verifizierter Streamer** –

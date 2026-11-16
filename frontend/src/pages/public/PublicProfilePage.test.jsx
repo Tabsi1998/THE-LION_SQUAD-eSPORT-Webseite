@@ -389,3 +389,28 @@ test("ein Reiter aus der Adresse, den andere nicht sehen, fällt auf die Übersi
   expect(screen.getByTestId("profile-tab-overview").className).toMatch(/text-\[#29B6E8\]/);
   expect(screen.queryByTestId("profile-teams-empty")).toBeNull();
 });
+
+// Vereinsprofil (#1267): nur bei verbundenem Vereinsprofil ein Hinweis mit Funktion und Link - sonst nichts.
+test("Vereinsmitglied mit Vereinsprofil: Hinweis mit Funktion und Link zur Vereinsseite", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: { ...PROFILE, club_profile_slug: "paula-b", club_role_title: "Kassierin" } };
+    return { data: [] };
+  });
+  renderPage();
+  const hint = await screen.findByTestId("profile-club-hint");
+  expect(hint).toHaveTextContent("Vereinsmitglied · Kassierin");
+  expect(hint).toHaveAttribute("href", "/members/paula-b");
+});
+
+test("ohne verbundenes Vereinsprofil kein Hinweis", async () => {
+  mockApi();
+  renderPage();
+  await screen.findByTestId("profile-identity");
+  expect(screen.queryByTestId("profile-club-hint")).toBeNull();
+});
+
+test("Vereinsprofil ohne eigene Funktion: nur „Vereinsmitglied“", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/users/public/paula" ? { data: { ...PROFILE, club_profile_slug: "paula-b", club_role_title: "Mitglied" } } : { data: [] }));
+  renderPage();
+  expect(await screen.findByTestId("profile-club-hint")).toHaveTextContent(/^Vereinsmitglied$/);
+});

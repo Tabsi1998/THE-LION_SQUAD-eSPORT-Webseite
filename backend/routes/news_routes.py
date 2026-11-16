@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from database import get_db
 from auth import get_optional_user, require_area
 from services import game_usage
@@ -14,7 +14,7 @@ from services.news_cards import attach_result_winners, event_signups, tournament
 from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
-from services.news_publish import public_news
+from services.news_publish import PIN_DEFAULT_DAYS, parse_pin_day, pin_active, pin_end, public_news, publish_day
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import dolibarr_policy, reference_checks, reference_season_links, reference_series, season_close
@@ -50,7 +50,7 @@ WITHDRAWN_MESSAGE = "Dieser Beitrag wurde zurückgezogen. Alle aktuellen News fi
 NEWS_FIELD_LABELS = {
     "title": "Titel", "slug": "Adresse", "excerpt": "Kurzbeschreibung", "content": "Text", "banner_url": "Bild",
     "video_url": "Video", "category": "Kategorie", "visibility": "Sichtbarkeit", "published": "Veröffentlichung",
-    "published_at": "Termin", "pinned": "Anpinnen", "discord_skip": "Discord", "share_preview": "Link-Vorschau",
+    "published_at": "Termin", "pinned": "Anpinnen", "pinned_until": "Anpinnen", "discord_skip": "Discord", "share_preview": "Link-Vorschau",
     "linked_event_ids": "Verknüpfungen", "linked_tournament_ids": "Verknüpfungen",
     "linked_f1_challenge_ids": "Verknüpfungen", "linked_team_ids": "Verknüpfungen",
     "mentioned_user_ids": "Markierte Personen", "author_id": "Autor",
@@ -149,7 +149,9 @@ def _compact_news(post: dict) -> dict:
         "banner_url": post.get("banner_url"),
         "category": post.get("category"),
         "visibility": post.get("visibility"),
-        "pinned": bool(post.get("pinned")),
+        # Angeheftet nur bis zum Ende der Anheftung (#1263).
+        "pinned": pin_active(post),
+        "pinned_until": post.get("pinned_until"),
         "published_at": post.get("published_at"),
         "created_at": post.get("created_at"),
         # Sieger eines verknüpften Turniers (#1343) - nur bei Ergebnis-News, sonst leer.
@@ -469,13 +471,18 @@ async def list_news(
     if compact:
         projection = {
             "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1,
-            "category": 1, "visibility": 1, "pinned": 1, "published": 1,
+            "category": 1, "visibility": 1, "pinned": 1, "pinned_until": 1, "published": 1,
             "published_at": 1, "created_at": 1, "linked_tournament_ids": 1,
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
     posts = await db.news_posts.find(q, projection).sort([("published_at", -1), ("created_at", -1)]).to_list(fetch_limit)
     posts = [p for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
+    # Abgelaufene Anheftung (#1263): der Beitrag rutscht normal in die Liste - für Website und App gleich.
+    for post in posts:
+        post["pinned"] = pin_active(post)
+    if pinned_only:
+        posts = [post for post in posts if post["pinned"]]
     if sort == "latest":
         posts.sort(
             key=lambda p: (_parse_dt(p.get("published_at") or p.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc), bool(p.get("pinned"))),
@@ -587,6 +594,9 @@ async def admin_list_news(me: dict = Depends(require_area("content"))):
     for post in posts:
         # Löschen nur, was nie hinausging (#2122 NW3) - sonst „Zurückziehen“.
         post["can_delete"] = not _ever_public(post)
+        # Die Redaktion sieht das Ende der Anheftung (#1263) und ob sie noch gilt - beim Altbestand das errechnete.
+        post["pin_active"] = pin_active(post)
+        post["pin_until"] = _pin_until(post)
     return posts
 
 
@@ -600,7 +610,41 @@ async def admin_get_news(nid: str, me: dict = Depends(require_area("content"))):
     await _attach_mentioned_users(db, [post])
     post["history"] = await _news_history(db, nid)
     post["can_delete"] = not _ever_public(post)
+    post["pin_active"] = pin_active(post)
+    post["pin_until"] = _pin_until(post)
     return post
+
+
+def _pin_until(post: dict) -> str | None:
+    """Das geltende Ende für die Verwaltung - beim Altbestand ohne eigenes Ende das errechnete (#1263)."""
+    end = pin_end(post)
+    return end.isoformat() if end else None
+
+
+def _apply_pin_end(doc: dict, existing: dict | None = None) -> None:
+    """Ende der Anheftung (#1263) setzen: Lösen nimmt das Ende mit; Anheften ohne gültiges Ende bekommt 14 Tage ab dem Tag,
+    an dem der Beitrag erscheint (heute oder sein Termin, Wiener Tag). Ein Ende davor lehnt der Server ab - der Beitrag wäre
+    nie oder nur kurz angeheftet."""
+    existing = existing or {}
+    first_day = publish_day({"published_at": doc.get("published_at", existing.get("published_at"))})
+    pinned = doc.get("pinned", existing.get("pinned"))
+    if not pinned:
+        if "pinned" in doc or "pinned_until" in doc:
+            doc["pinned_until"] = None
+        return
+    if doc.get("pinned_until"):
+        day = parse_pin_day(doc["pinned_until"])
+        if day is None:
+            raise HTTPException(400, "Das Ende der Anheftung ist kein gültiger Tag.")
+        if day < first_day:
+            raise HTTPException(400, f"Das Ende der Anheftung liegt vor dem Tag, an dem der Beitrag erscheint "
+                                     f"({first_day.strftime('%d.%m.%Y')}) - bitte einen späteren Tag wählen.")
+        doc["pinned_until"] = day.isoformat()
+        return
+    doc.pop("pinned_until", None)
+    # Neu angeheftet oder abgelaufen: ohne Ende bleibt nichts für immer oben.
+    if doc.get("pinned") and not pin_active(existing):
+        doc["pinned_until"] = (first_day + timedelta(days=PIN_DEFAULT_DAYS)).isoformat()
 
 
 def _actor_name(user: dict | None) -> str:
@@ -663,6 +707,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_area("content
         doc["published"] = True
         doc["published_at"] = None
     doc["mentioned_user_ids"] = await _mentioned_user_ids_from_content(doc.get("content"), doc.get("mentioned_user_ids") or [])
+    _apply_pin_end(doc)
     doc["id"] = new_id()
     created_at = now_utc().isoformat()
     doc["created_at"] = created_at
@@ -709,6 +754,8 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
         apply_slug_history(existing, update)
     if update.get("published_at"):
         update["published_at"] = update["published_at"].isoformat()
+    if "pinned" in update or "pinned_until" in update:
+        _apply_pin_end(update, existing)
     if "content" in update or "mentioned_user_ids" in update:
         next_content = update.get("content", existing.get("content"))
         update["mentioned_user_ids"] = await _mentioned_user_ids_from_content(
@@ -745,7 +792,7 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
     # Ein schon öffentlicher Beitrag wird nicht still zum Entwurf (#2122): das ist ein Zurückziehen - die Adresse zeigt
     # Besuchern dann den Hinweis statt „nicht gefunden“, und es steht so im Verlauf.
     elif update.get("published") is False and not existing.get("withdrawn_at") and _ever_public(existing):
-        update.update({"pinned": False, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
+        update.update({"pinned": False, "pinned_until": None, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
                        "withdrawn_was_published": existing.get("published") is not False})
         action = "news.withdraw"
     res = await db.news_posts.update_one({"id": nid}, {"$set": update, **({"$unset": unset} if unset else {})})
@@ -797,7 +844,7 @@ async def withdraw_news(nid: str, me: dict = Depends(require_area("content"))):
         return post
     stamp = now_utc().isoformat()
     await db.news_posts.update_one({"id": nid}, {"$set": {
-        "published": False, "pinned": False, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
+        "published": False, "pinned": False, "pinned_until": None, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
         "withdrawn_was_published": post.get("published") is not False,
         "updated_at": stamp, "updated_by": me["id"], "updated_by_name": _actor_name(me),
     }})
@@ -1156,12 +1203,12 @@ async def _partner_news(db, partner: dict, user: dict | None) -> list[dict]:
     rx = {"$regex": re.escape(name), "$options": "i"}
     projection = {
         "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "category": 1,
-        "visibility": 1, "pinned": 1, "published": 1, "published_at": 1, "created_at": 1,
+        "visibility": 1, "pinned": 1, "pinned_until": 1, "published": 1, "published_at": 1, "created_at": 1,
     }
     posts = await db.news_posts.find(
         {"published": True, "$or": [{"title": rx}, {"excerpt": rx}, {"content": rx}]}, projection,
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(30)
-    posts = [p for p in posts if _published_now(p)]
+    posts = [{**p, "pinned": pin_active(p)} for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
     return posts[:6]
 

@@ -55,6 +55,12 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                                   <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} testId={`profile-game-id-${group.slug}-${field.key}`} />
                                 )}
                                 {field.format_hint ? <p className="text-[11px] text-white/45 mt-1.5" data-testid={`profile-game-id-hint-${group.slug}-${field.key}`}>So soll es aussehen: {field.format_hint}</p> : null}
+                                {/* Plattform-Feld (#2281): danach richtet sich, in welcher Liga-Season du spielen darfst. */}
+                                {field.platform === true ? (
+                                  <p className="text-[11px] text-white/45 mt-1.5" data-testid={`profile-game-id-platform-${group.slug}-${field.key}`}>
+                                    Deine Plattform – Liga-Seasons mit Plattform-Regel prüfen diesen Wert.{field.required === false ? " Du kannst ihn jederzeit ändern; es zählt der aktuelle Wert." : ""}
+                                  </p>
+                                ) : null}
                               </Field>
                             ))}
                           </Row>

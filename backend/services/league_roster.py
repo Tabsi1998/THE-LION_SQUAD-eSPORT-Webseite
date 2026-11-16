@@ -262,6 +262,14 @@ def id_fields_problem(fields: list | None, current: list | None = None) -> str |
     keys = id_key_problem(fields, current)
     if keys:
         return keys
+    # Plattform-Feld (#2281): höchstens eines je Spiel, und nur ein Feld mit Auswahl taugt dafür.
+    marked = [item for item in fields or [] if isinstance(item, dict) and item.get("platform") is True]
+    if len(marked) > 1:
+        return "Nur ein ID-Feld kann die Plattform sein – bitte bei den anderen den Haken „Plattform“ entfernen."
+    for item in marked:
+        if not [option for option in item.get("options") or [] if str(option or "").strip()]:
+            label = item.get("label") or item.get("key") or "Feld"
+            return f"{label}: Als Plattform braucht das Feld Auswahlwerte, etwa „PC, PlayStation, Xbox“."
     for item in fields or []:
         if not isinstance(item, dict):
             continue

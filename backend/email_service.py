@@ -353,6 +353,18 @@ def tpl_tournament_finished(tournament_title: str, url: str) -> tuple[str, str]:
     )
 
 
+# Helfer eingetragen oder neue Rolle (#1384): was die Rolle darf, und der Weg zu „Mein Dienst“.
+@mail_template
+def tpl_tournament_staff(tournament_title: str, role: str, rights: str, url: str) -> tuple[str, str]:
+    return f"Du hilfst bei {tournament_title}", _wrap(
+        "Dein Einsatz als Helfer",
+        f"<p>Du hilfst bei <strong>{tournament_title}</strong> als <strong>{role}</strong>.</p>"
+        f"<p>{rights}</p>"
+        "<p>Unter „Mein Dienst“ siehst du deine Einsätze und was du jetzt tun kannst.</p>",
+        "Zu deinem Dienst", url,
+    )
+
+
 # Erinnerung vor dem Spiel: nur noch 10 Minuten vorher (#1133) - die Vorlauf-Mails 24 Stunden, 2 Stunden, 30 und 5 Minuten
 # vorher sind weggefallen; dafür gibt es Push und die Nachricht in App und Website.
 @mail_template
@@ -711,6 +723,7 @@ async def render_named(template_key: str, **kwargs) -> Optional[tuple[str, str]]
         "dispute_resolved": tpl_dispute_resolved,
         "league_notice": tpl_league_notice,
         "tournament_finished": tpl_tournament_finished,
+        "tournament_staff": tpl_tournament_staff,
         "test": tpl_test,
         "match_lead_10m": tpl_match_lead_10m,
         "prize_ready": tpl_prize_ready,
