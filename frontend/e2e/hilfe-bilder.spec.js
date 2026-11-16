@@ -272,10 +272,13 @@ async function liga(page, cam, state) {
     for (const id of ["u1", "u2", "u3"]) await act.click(page.getByTestId(`league-confirm-participants-${id}`));
   }, { area: page.getByTestId("match-report"), start: page.getByTestId("league-confirm-participants-u1") });
   await noSideScroll(page);
-  await cam.clip("problem-melden", page.getByTestId("match-dispute-form"), async (act) => {
-    await act.click(page.getByTestId("match-report-wrong"));
-    await act.type(page.getByTestId("match-dispute-input"), "Map 1 haben wir 250:180 gewonnen, nicht verloren.", { delay: 30 });
-  }, { start: page.getByTestId("match-report-wrong"), block: "start" });
+  // „Stimmt nicht“ rollt das Formular selbst in die Mitte (MatchPage) - das passiert vor der Aufnahme, die Schleife
+  // zeigt das Ausfüllen.
+  await page.getByTestId("match-report-wrong").click();
+  await expect(page.getByTestId("match-dispute-input")).toBeVisible();
+  await page.waitForTimeout(400);
+  await cam.clip("problem-melden", page.getByTestId("match-dispute-form"), (act) => act.type(page.getByTestId("match-dispute-input"), "Map 1 haben wir 250:180 gewonnen, nicht verloren.", { delay: 30 }),
+    { start: page.getByTestId("match-dispute-form") });
   await noSideScroll(page);
 }
 

@@ -4,9 +4,10 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
 // Kurze Schleifen für die FAQ (#2448): je Schritt eine stumme Bewegung wie ein GIF (Klick → Ergebnis), PC und Handy,
-// als WebM (VP9) und MP4 (H.264). Aufgenommen wird die echte Seite über die Bildschirm-Übertragung von Chromium
-// (CDP Page.startScreencast, Zeitstempel je Bild), danach schneidet ffmpeg den Ausschnitt des Standbilds heraus.
-// Das Standbild (Poster) entsteht im selben Moment wie das letzte Bild der Schleife - Größe und Inhalt passen also.
+// als WebM (VP9) und MP4 (H.264). Aufgenommen wird die echte Seite als Bildfolge über CDP Page.captureScreenshot in
+// voller Pixeldichte (Zeitstempel je Bild), danach schneidet ffmpeg den Ausschnitt des Standbilds heraus. Das
+// Standbild (Poster) ist der Haltezustand am Ende (Rahmen an, Tipp-Punkt aus) im selben Ausschnitt - Größe und Inhalt
+// passen also.
 // Nur mit HILFE_CLIPS=1; ohne laufen dieselben Handgriffe als normaler Test (docs/entwicklung/hilfe-bilder.md).
 
 const CLIPS = process.env.HILFE_CLIPS === "1";
@@ -24,6 +25,9 @@ const RING_COLOR = "#FFD23F";
 const HIDE_CSS = `
   [data-sonner-toaster], [data-testid='bottom-nav'], [data-testid='scroll-top-btn'] { display: none !important; }
   [data-hilfe-leiste] { visibility: hidden !important; }
+  /* Platz unter der Seite: Wird sie während der Aufnahme kürzer (ein Kasten klappt zu), muss der Browser die
+     Scroll-Stelle nicht nachziehen - der Ausschnitt bliebe sonst nicht stehen. */
+  body { padding-bottom: 100vh !important; }
   #hilfe-punkt { position: fixed; z-index: 2147483647; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
     border: 2px solid ${RING_COLOR}; background: rgba(255,210,63,0.45); box-shadow: 0 0 0 3px rgba(0,0,0,0.45);
     pointer-events: none; left: -60px; top: -60px; opacity: 0;
@@ -49,7 +53,12 @@ function requireFfmpeg() {
 
 /** Leisten, die oben kleben (Kopfzeile, Unterleisten), unsichtbar machen - ohne dass die Seite springt. */
 async function hideBars(page, keepBars) {
-  await page.addStyleTag({ content: HIDE_CSS });
+  await page.evaluate((css) => {
+    const style = document.createElement("style");
+    style.id = "hilfe-clip-stil";
+    style.textContent = css;
+    document.head.appendChild(style);
+  }, HIDE_CSS);
   if (keepBars) return;
   await page.evaluate(() => {
     for (const node of document.querySelectorAll("header, nav, div")) {
@@ -66,6 +75,7 @@ async function showBars(page) {
     for (const node of document.querySelectorAll("[data-hilfe-leiste]")) node.removeAttribute("data-hilfe-leiste");
     document.getElementById("hilfe-punkt")?.remove();
     document.getElementById("hilfe-markierung")?.remove();
+    document.getElementById("hilfe-clip-stil")?.remove();
   });
 }
 
@@ -169,7 +179,7 @@ function actions(page, form, recording) {
  * 1x, das Poster hat am Handy 2x. Deshalb holt eine Schleife nebenher Bild um Bild (JPEG, auf Tempo gestellt) und
  * merkt sich die Zeit - die Abstände werden im Video genau so lang.
  */
-async function startScreencast(page) {
+async function startCapture(page) {
   const cdp = await page.context().newCDPSession(page);
   const frames = [];
   const view = page.viewportSize();
@@ -226,8 +236,12 @@ function encode({ frames, endTime, clip, viewWidth, outBase }) {
     const length = total * speed;
     if (length < MIN_SECONDS) throw new Error(`${outBase}: nur ${length.toFixed(1)} s - mindestens ${MIN_SECONDS} s.`);
     const factor = `iw/${viewWidth}`;
-    const crop = `crop=w='trunc(${clip.width}*${factor}/2)*2':h='trunc(${clip.height}*${factor}/2)*2':x='${clip.x}*${factor}':y='${clip.y}*${factor}'`;
-    const prep = `${crop},fps=${FPS},format=yuv420p,setsar=1,settb=AVTB`;
+    // Genau der Ausschnitt des Posters; ungerade Pixel (yuv420p braucht gerade) mit Seitenfarbe auffüllen statt
+    // abschneiden - so sind Schleife und Poster gleich groß.
+    const crop = `crop=w='${clip.width}*${factor}':h='${clip.height}*${factor}':x='${clip.x}*${factor}':y='${clip.y}*${factor}'`;
+    const pad = "pad=w='ceil(iw/2)*2':h='ceil(ih/2)*2':x=0:y=0:color=0x0F0F10";
+    // Vorher 4:4:4 - bei 4:2:0 (JPEG) rundet crop ungerade Maße ab, dann fehlte dem Video eine Zeile.
+    const prep = `format=yuv444p,${crop},${pad},fps=${FPS},format=yuv420p,setsar=1,settb=AVTB`;
     const filter = `[0:v]setpts=PTS*${speed.toFixed(4)},${prep}[a];[1:v]${prep}[b];[a][b]xfade=transition=fade:duration=${XFADE}:offset=${(length - XFADE).toFixed(3)},format=yuv420p[v]`;
     const inputs = ["-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", path.join(tmp, "liste.txt"),
       "-loop", "1", "-framerate", String(FPS), "-t", String(XFADE + 0.2), "-i", path.join(tmp, "f00000.jpg"), "-filter_complex", filter, "-map", "[v]", "-an", "-pix_fmt", "yuv420p"];
@@ -238,7 +252,8 @@ function encode({ frames, endTime, clip, viewWidth, outBase }) {
       for (let attempt = 0; ; attempt += 1) {
         const args = codec === "vp9"
           ? ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", String(crf), "-row-mt", "1", "-deadline", "good", "-cpu-used", "2", "-g", String(FPS * 10)]
-          : ["-c:v", "libx264", "-preset", "veryslow", "-crf", String(crf), "-profile:v", "high", "-movflags", "+faststart", "-g", String(FPS * 10)];
+          // Level 4.0 und höchstens 4 Referenzbilder: spielt auch auf älteren iPhones und Android-Geräten.
+          : ["-c:v", "libx264", "-preset", "veryslow", "-crf", String(crf), "-profile:v", "high", "-level:v", "4.0", "-refs", "4", "-movflags", "+faststart", "-g", String(FPS * 10)];
         execFileSync(ffmpegPath(), [...inputs, ...args, "-t", length.toFixed(3), file], { stdio: ["ignore", "ignore", "pipe"] });
         sizes[ext] = fs.statSync(file).size;
         if (sizes[ext] <= MAX_BYTES) break;
@@ -252,4 +267,9 @@ function encode({ frames, endTime, clip, viewWidth, outBase }) {
   }
 }
 
-module.exports = { CLIPS, FPS, HOLD_MS, LEAD_MS, MAX_BYTES, MAX_SECONDS, MIN_SECONDS, actions, encode, hideBars, requireFfmpeg, showBars, startScreencast };
+/** Tipp-Punkt ausblenden - vor dem Halten, damit er weder im Ende der Schleife noch im Poster steht. */
+async function hideDot(page) {
+  await dot(page, null, null, { show: false, press: false });
+}
+
+module.exports = { CLIPS, FPS, HOLD_MS, LEAD_MS, MAX_BYTES, MAX_SECONDS, MIN_SECONDS, actions, encode, hideBars, hideDot, requireFfmpeg, showBars, startCapture };

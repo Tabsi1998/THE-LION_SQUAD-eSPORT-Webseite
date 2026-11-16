@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { CLIPS, HOLD_MS, LEAD_MS, actions, encode, hideBars, requireFfmpeg, showBars, startScreencast } = require("./clips");
+const { CLIPS, HOLD_MS, LEAD_MS, actions, encode, hideBars, hideDot, requireFfmpeg, showBars, startCapture } = require("./clips");
 
 // Kamera für den Hilfe-Bereich (#2295): Bild je Schritt mit markierter Stelle, als WebP direkt in
 // src/hilfe/bilder/<thema>/<schritt>-<handy|pc>.webp, dazu die Größe in src/hilfe/bilder/masse.json (gegen Springen
@@ -248,10 +248,12 @@ async function record(page, key, { marks, area, pad, each, start, block, keepBar
   const scrollBefore = await page.evaluate(() => [window.scrollX, window.scrollY]);
   const startTop = (await start.first().boundingBox())?.y ?? null;
   await page.waitForTimeout(150);
-  const cast = await startScreencast(page);
+  const cast = await startCapture(page);
   try {
     await page.waitForTimeout(LEAD_MS);
     await run(actions(page, form, true));
+    // Der Punkt geht vor dem Halten weg (am PC blieb er sonst im Poster stehen).
+    await hideDot(page);
     for (const item of marks) await item.first().waitFor({ state: "visible" });
     await page.waitForTimeout(500);
     const view = page.viewportSize();
