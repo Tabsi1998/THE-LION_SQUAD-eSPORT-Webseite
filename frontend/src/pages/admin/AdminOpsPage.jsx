@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Activity, AlertTriangle, CheckCircle2, Gauge, PlayCircle, RefreshCw, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -57,13 +57,16 @@ export default function AdminOpsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab = TABS.some((item) => item.key === tabParam) ? tabParam : "overview";
-  const setTab = (next, source = null) => {
+  // `extra.state` (#2447): „open“ öffnet die Ereignisse mit nur den offenen Einträgen - der Tipp auf eine Kachel.
+  const setTab = (next, source = null, extra = {}) => {
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
       if (next === "overview") params.delete("tab");
       else params.set("tab", next);
-      if (source) params.set("source", source);
+      if (source && source !== "all") params.set("source", source);
       else params.delete("source");
+      if (extra.state) params.set("state", extra.state);
+      else params.delete("state");
       return params;
     }, { replace: true });
   };
@@ -76,6 +79,8 @@ export default function AdminOpsPage() {
   const [running, setRunning] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [picked, setPicked] = useState([]);
+  const [resolvingMany, setResolvingMany] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,16 +107,23 @@ export default function AdminOpsPage() {
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, ["admin/ops"], { pollMs: 30000 });
 
+  // Jetzt neu prüfen (#2447): ein Lauf zur Zeit (Doppelklick sperrt der Ref, bevor React neu zeichnet), der Server
+  // drosselt zusätzlich. Die Ampel oben zeigt das Ergebnis sofort, nicht erst nach dem nächsten Laden.
+  const runningRef = useRef(false);
   const runChecks = async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
     setRunning(true);
     try {
       const { data } = await api.post("/admin/ops/checks/run");
       setChecks((current) => ({ ...(current || {}), latest: data }));
+      setSummary((current) => ({ ...(current || {}), checks: { at: data?.at, status: data?.status, counts: data?.counts || {}, failing: data?.failing || [] } }));
       toast.success(data?.status === "ok" ? "Alle Prüfungen grün." : `Lauf fertig: ${STATUS_LABELS[data?.status] || data?.status}.`);
       load();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
   };
@@ -120,16 +132,39 @@ export default function AdminOpsPage() {
     try {
       const { data } = await api.post(`/admin/ops/errors/${row.fingerprint}/${resolved ? "resolve" : "reopen"}`);
       setErrors((items) => items.map((item) => (item.fingerprint === row.fingerprint ? data : item)));
+      setPicked((current) => current.filter((value) => value !== row.fingerprint));
       toast.success(resolved ? "Als gelöst markiert." : "Wieder geöffnet.");
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
   };
 
+  // Mehrfachauswahl (#2447): „Ausgewählte als gelöst“ in einem Schritt.
+  const togglePicked = (fingerprint) => setPicked((current) => (current.includes(fingerprint) ? current.filter((value) => value !== fingerprint) : [...current, fingerprint]));
+  const openErrors = errors.filter((row) => !row.resolved_at);
+  const resolvePicked = async () => {
+    if (resolvingMany || !picked.length) return;
+    setResolvingMany(true);
+    try {
+      const { data } = await api.post("/admin/ops/errors/resolve", { fingerprints: picked });
+      const byFingerprint = new Map((data?.items || []).map((item) => [item.fingerprint, item]));
+      setErrors((items) => items.map((item) => byFingerprint.get(item.fingerprint) || item));
+      setPicked([]);
+      toast.success(`${data?.resolved ?? 0} ${Number(data?.resolved) === 1 ? "Fehlergruppe" : "Fehlergruppen"} als gelöst markiert.`);
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setResolvingMany(false);
+    }
+  };
+
   const tiles = useMemo(() => [
     { label: "Fehlergruppen offen", value: summary?.open_error_groups ?? "–", tone: (summary?.open_error_groups || 0) > 0 ? "danger" : "ok" },
     { label: "Fehlergruppen 24 h", value: summary?.error_groups_24h ?? "–", tone: (summary?.error_groups_24h || 0) > 0 ? "warn" : "ok" },
-    { label: `Langsam (> ${summary?.threshold_ms ?? 1000} ms) 24 h`, value: summary?.slow_requests_24h ?? "–", tone: (summary?.slow_requests_24h || 0) > 20 ? "warn" : "ok" },
+    // Datei-Uploads (#2447) zählen nicht als langsam - die Kachel sagt, wie viele draußen blieben.
+    { label: `Langsam (> ${summary?.threshold_ms ?? 1000} ms) 24 h`, value: summary?.slow_requests_24h ?? "–", tone: (summary?.slow_requests_24h || 0) > 20 ? "warn" : "ok",
+      detail: summary?.slow_uploads_24h ? `ohne ${summary.slow_uploads_24h} Datei-Upload${summary.slow_uploads_24h === 1 ? "" : "s"}` : undefined },
     { label: "Langsamste Route 24 h", value: summary?.slowest_route_24h ? `${summary.slowest_route_24h.duration_ms} ms` : "–", detail: summary?.slowest_route_24h?.route, tone: "plain" },
     {
       label: "Auto-Checks",
@@ -153,7 +188,7 @@ export default function AdminOpsPage() {
         <button
           type="button"
           onClick={load}
-          className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
+          className="inline-flex min-h-[44px] items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
         </button>
@@ -178,13 +213,13 @@ export default function AdminOpsPage() {
             key={item.key}
             type="button"
             onClick={() => setTab(item.key)}
-            className={`px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider border ${tab === item.key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/60 hover:border-white/30"}`}
+            className={`min-h-[44px] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider border ${tab === item.key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/60 hover:border-white/30"}`}
           >
             {item.label}
           </button>
         ))}
         {tab === "errors" ? (
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="ml-auto bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Status">
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="ml-auto min-h-[44px] bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Status">
             <option value="open">Offen</option>
             <option value="resolved">Gelöst</option>
             <option value="all">Alle</option>
@@ -193,7 +228,7 @@ export default function AdminOpsPage() {
       </div>
 
       {tab === "overview" ? (
-        <OpsOverview onOpenSource={(source) => setTab("events", source)} />
+        <OpsOverview onOpenSource={(source, extra) => setTab("events", source, extra)} />
       ) : tab === "events" ? (
         <OpsEventsTab />
       ) : tab === "app" ? (
@@ -205,61 +240,104 @@ export default function AdminOpsPage() {
       ) : tab === "checks" ? (
         <ChecksTab checks={checks} loading={loading} running={running} onRun={runChecks} />
       ) : tab === "errors" ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-testid="ops-errors">
+          {/* Mehrfachauswahl (#2447): offene Gruppen ankreuzen, dann „Ausgewählte als gelöst“. */}
+          {openErrors.length ? (
+            <div className="flex flex-wrap items-center gap-2 border border-white/10 bg-[#121212] rounded-sm p-2" data-testid="ops-errors-bulk">
+              <label className="inline-flex min-h-[44px] items-center gap-3 px-2 text-xs font-bold uppercase tracking-wider text-white/60 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={picked.length > 0 && picked.length === openErrors.length}
+                  ref={(node) => { if (node) node.indeterminate = picked.length > 0 && picked.length < openErrors.length; }}
+                  onChange={(event) => setPicked(event.target.checked ? openErrors.map((row) => row.fingerprint) : [])}
+                  data-testid="ops-errors-pick-all"
+                  className="h-5 w-5 accent-[#00FF88]"
+                />
+                {picked.length ? `${picked.length} ausgewählt` : "Alle offenen auswählen"}
+              </label>
+              <button
+                type="button"
+                onClick={resolvePicked}
+                disabled={!picked.length || resolvingMany}
+                data-testid="ops-errors-resolve-picked"
+                className="ml-auto inline-flex min-h-[44px] items-center gap-2 border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] px-3 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40"
+              >
+                <CheckCircle2 className="w-4 h-4" /> {resolvingMany ? "Markiere …" : "Ausgewählte als gelöst"}
+              </button>
+            </div>
+          ) : null}
           {!loading && !errors.length ? (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-6 text-center text-white/50 flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-[#00FF88]" /> Keine Fehlergruppen {status === "open" ? "offen" : "in dieser Auswahl"}.
+              <CheckCircle2 className="w-5 h-5 text-[#00FF88]" /> {status === "open" ? "Alles erledigt – keine Fehlergruppe offen." : "Keine Fehlergruppen in dieser Auswahl."}
             </div>
           ) : null}
           {errors.map((row) => {
             const isExpanded = expanded === row.fingerprint;
             const resolved = Boolean(row.resolved_at);
+            const isPicked = picked.includes(row.fingerprint);
             return (
-              <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : "border-[#FF3B30]/30"}`}>
-                <button
-                  type="button"
-                  onClick={() => setExpanded(isExpanded ? null : row.fingerprint)}
-                  aria-expanded={isExpanded}
-                  className="w-full text-left p-4 flex flex-col md:flex-row md:items-start gap-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]"}`}>
-                        <AlertTriangle className="w-3 h-3" /> {row.error_type}
-                      </span>
-                      <span className="text-[11px] font-mono text-white/60">{row.method} {row.route}</span>
-                      <span className="text-[11px] text-white/40">HTTP {row.status_code}</span>
-                    </div>
-                    <div className="mt-1 text-sm font-semibold break-words">{row.message || "Ohne Meldung"}</div>
-                    <div className="mt-1 text-[11px] text-white/45">
-                      {row.count}× · zuerst {formatTime(row.first_seen_at)} · zuletzt {formatTime(row.last_seen_at)} · {row.actor}
-                    </div>
+              <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : isPicked ? "border-[#00FF88]/40" : "border-[#FF3B30]/30"}`} data-testid={`ops-error-${row.fingerprint}`}>
+                <div className="flex flex-col md:flex-row md:items-stretch">
+                  <div className="flex flex-1 min-w-0 items-start">
+                    {!resolved ? (
+                      <label className="flex min-h-[44px] min-w-[44px] shrink-0 items-start justify-center pt-4 pl-2 cursor-pointer" title="Auswählen">
+                        <input type="checkbox" checked={isPicked} onChange={() => togglePicked(row.fingerprint)} aria-label={`${row.error_type} auf ${row.route} auswählen`}
+                          data-testid={`ops-error-pick-${row.fingerprint}`} className="h-5 w-5 accent-[#00FF88]" />
+                      </label>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setExpanded(isExpanded ? null : row.fingerprint)}
+                      aria-expanded={isExpanded}
+                      className="flex-1 min-w-0 text-left p-4 flex flex-col md:flex-row md:items-start gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]"}`}>
+                            <AlertTriangle className="w-3 h-3" /> {row.error_type}
+                          </span>
+                          <span className="text-[11px] font-mono text-white/60 break-all">{row.method} {row.route}</span>
+                          <span className="text-[11px] text-white/40">HTTP {row.status_code}</span>
+                        </div>
+                        <div className="mt-1 text-sm font-semibold break-words">{row.message || "Ohne Meldung"}</div>
+                        <div className="mt-1 text-[11px] text-white/45">
+                          {row.count}× · zuerst {formatTime(row.first_seen_at)} · zuletzt {formatTime(row.last_seen_at)} · {row.actor}
+                          {resolved ? ` · gelöst ${formatTime(row.resolved_at)}` : ""}
+                        </div>
+                      </div>
+                      <div className="font-display text-2xl font-bold text-right md:w-16">{row.count}</div>
+                    </button>
                   </div>
-                  <div className="font-display text-2xl font-bold text-right md:w-20">{row.count}</div>
-                </button>
+                  {/* Direkt in der Zeile (#2447) - ohne Aufklappen. */}
+                  <div className="flex shrink-0 items-start gap-2 px-4 pb-4 md:pt-4 md:pl-0">
+                    {resolved ? (
+                      <button type="button" onClick={() => setResolved(row, false)} data-testid={`ops-error-reopen-${row.fingerprint}`}
+                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-white/10 px-3 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">
+                        <RotateCcw className="w-4 h-4" /> Wieder öffnen
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => setResolved(row, true)} data-testid={`ops-error-resolve-${row.fingerprint}`}
+                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] px-3 rounded-sm text-xs font-bold uppercase tracking-wider">
+                        <CheckCircle2 className="w-4 h-4" /> Als gelöst markieren
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {isExpanded ? (
-                  <div className="border-t border-white/10 p-4 space-y-3">
+                  <div className="border-t border-white/10 p-4">
                     {row.stack ? (
                       <pre className="text-[11px] leading-relaxed text-white/70 bg-[#0A0A0A] border border-white/10 rounded-sm p-3 tls-swipe max-h-96">{row.stack}</pre>
                     ) : (
                       <p className="text-sm text-white/50">Keine Ausnahme – der Server hat diese Antwort bewusst gesendet.</p>
                     )}
-                    <div className="flex flex-wrap gap-2">
-                      {resolved ? (
-                        <button type="button" onClick={() => setResolved(row, false)} className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">
-                          <RotateCcw className="w-4 h-4" /> Wieder öffnen
-                        </button>
-                      ) : (
-                        <button type="button" onClick={() => setResolved(row, true)} className="inline-flex items-center gap-2 border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
-                          <CheckCircle2 className="w-4 h-4" /> Als gelöst markieren
-                        </button>
-                      )}
-                    </div>
                   </div>
                 ) : null}
               </article>
             );
           })}
+          {errors.length ? (
+            <p className="text-[11px] text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt die offenen Gruppen – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt.</p>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">
@@ -276,8 +354,11 @@ export default function AdminOpsPage() {
               </thead>
               <tbody>
                 {(slow?.routes || []).map((row) => (
-                  <tr key={`${row.method} ${row.route}`} className="border-b border-white/5">
-                    <td className="p-3 font-mono text-xs"><span className="text-white/40 mr-2">{row.method}</span>{row.route}</td>
+                  <tr key={`${row.method} ${row.route}`} className={`border-b border-white/5 ${row.upload ? "text-white/50" : ""}`} data-testid={`ops-slow-${row.method}-${row.route}`}>
+                    <td className="p-3 font-mono text-xs">
+                      <span className="text-white/40 mr-2">{row.method}</span>{row.route}
+                      {row.upload ? <span className="ml-2 rounded-sm border border-[#29B6E8]/40 px-1.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Upload</span> : null}
+                    </td>
                     <td className="p-3 text-right">{row.count}</td>
                     <td className="p-3 text-right">{row.avg_ms}</td>
                     <td className="p-3 text-right font-semibold">{row.p95_ms}</td>
@@ -295,7 +376,8 @@ export default function AdminOpsPage() {
             </table>
           </div>
           <p className="text-[11px] text-white/40">
-            Gemessen wird die Zeit im Backend je Anfrage; Bilder und Dateien, die nginx liefert, stehen hier nicht.
+            Gemessen wird die Zeit im Backend je Anfrage; Bilder und Dateien, die nginx liefert, stehen hier nicht. Datei-Uploads (Kennzeichen „Upload“)
+            dauern so lange wie die Leitung des Hochladenden – sie stehen am Ende und zählen nicht als langsam (Liste unter Alarme).
           </p>
         </div>
       )}
@@ -383,9 +465,10 @@ function ChecksTab({ checks, loading, running, onRun }) {
           onClick={onRun}
           disabled={running}
           data-testid="ops-checks-run"
-          className="inline-flex items-center gap-2 border border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+          aria-busy={running}
+          className="inline-flex min-h-[44px] items-center gap-2 border border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50"
         >
-          <PlayCircle className={`w-4 h-4 ${running ? "animate-pulse" : ""}`} /> Jetzt prüfen
+          <PlayCircle className={`w-4 h-4 ${running ? "animate-pulse" : ""}`} /> {running ? "Prüfe …" : "Jetzt neu prüfen"}
         </button>
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
@@ -402,7 +485,7 @@ function ChecksTab({ checks, loading, running, onRun }) {
           </div>
         ))}
         {!loading && !latest ? (
-          <div className="p-6 text-center text-white/50">Noch kein Lauf – der Scheduler prüft alle {checks?.interval_minutes ?? 5} Minuten, oder „Jetzt prüfen“.</div>
+          <div className="p-6 text-center text-white/50">Noch kein Lauf – der Scheduler prüft alle {checks?.interval_minutes ?? 5} Minuten, oder „Jetzt neu prüfen“.</div>
         ) : null}
       </div>
       <FileCleanupsPanel onChanged={onRun} />
