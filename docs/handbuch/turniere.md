@@ -773,9 +773,11 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    öffne das Turnier in der Verwaltung, klappe oben **Werkzeuge** auf und tippe **Abschluss nachholen** (nur
    Turnierleitung, nur bei **Ergebnisse veröffentlicht** oder **Archiviert**, auch bei gesperrtem Turnier). Nach der
    Rückfrage prüft das System Auszeichnungen, Erfolge, Jahreswertung und Gewinne dieses Turniers noch einmal und vergibt,
-   was fehlt – genau einmal. Ergebnisse und Status bleiben, es geht keine Nachricht raus (kein „Turnier beendet“, nichts
-   in Discord). Wer jetzt einen Erfolg bekommt, sieht ihn wie sonst beim nächsten Öffnen der Seite; schon vergebene
-   Erfolge kommen nicht ein zweites Mal. Mehrmals tippen schadet nicht. Das Protokoll vermerkt jedes Nachholen.
+   was fehlt – genau einmal. Ergebnisse und Status bleiben. Wer jetzt etwas Neues bekommt, erhält die übliche Meldung zu
+   Erfolg bzw. Gewinn (Glocke, Push, Gratulation). Kein „Turnier beendet“, nichts im Discord-Kanal des Turniers. Schon
+   Vergebenes kommt nicht ein zweites Mal, mehrmals tippen schadet nicht. Scheitert ein Schritt (etwa die
+   Jahreswertung), sagt eine Warnung welcher – die anderen Schritte sind trotzdem gelaufen; dann später noch einmal
+   tippen. Das Protokoll vermerkt jedes Nachholen.
 
    **Gewinne übergeben** (Admin → eSports → Gewinne): Ein neuer Gewinn ist **Offen** und hat noch keine Frist. Mit
    **Bereit** liegt er zur Abholung bereit: ab jetzt laufen **90 Tage** Abholfrist (eine von Hand gesetzte Frist
