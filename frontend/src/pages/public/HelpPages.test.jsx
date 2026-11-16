@@ -243,3 +243,14 @@ test("unbekannte Anleitung: Hinweis und Weg zur FAQ, nicht in Suchmaschinen", as
   expect(screen.getByRole("link", { name: /Zur FAQ/ })).toHaveAttribute("href", "/faq");
   expect(useDocumentTitle).toHaveBeenLastCalledWith("FAQ", undefined, { robots: "noindex, follow" });
 });
+
+// Review-Runde 1 (#2448).
+
+test("F1: zugeklappte Panels sind auch per Stil zu - kein später geladenes Stylesheet kann sie öffnen", async () => {
+  await show("/faq");
+  // Als Stil am Element selbst - das schlägt jede Klasse, auch aus einem später nachgeladenen Stylesheet.
+  expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("none");
+  expect(screen.getByTestId("faq-bereich-inhalt-teams").style.display).toBe("none");
+  fireEvent.click(screen.getByTestId("faq-frage-knopf-team-beitreten"));
+  expect(screen.getByTestId("faq-antwort-team-beitreten").style.display).toBe("");
+});

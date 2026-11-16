@@ -26,6 +26,11 @@ function mehrzahl(anzahl, eins, viele) {
   return `${anzahl} ${anzahl === 1 ? eins : viele}`;
 }
 
+// Zu heißt zu - auch wenn ein später geladenes Stylesheet [hidden] überstimmt (#2448, Review F1).
+function zuStil(offen) {
+  return offen ? undefined : { display: "none" };
+}
+
 function toggleIn(set, id, auf) {
   const next = new Set(set);
   if (auf ?? !next.has(id)) next.add(id);
@@ -46,7 +51,7 @@ function FrageEintrag({ frage, offen, onToggle, anker = true, bereich = "" }) {
           <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-white/45 transition-transform duration-200 motion-reduce:transition-none group-hover:text-[#29B6E8] ${offen ? "rotate-180" : ""}`} />
         </button>
       </h3>
-      <div id={panelId} hidden={!offen} className="tls-reveal pb-4 pr-8" data-testid={panelId}>
+      <div id={panelId} hidden={!offen} style={zuStil(offen)} className="tls-reveal pb-4 pr-8" data-testid={panelId}>
         <p className="text-base leading-relaxed text-white/80">{frage.antwort}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-4">
           {frage.link ? (
@@ -122,7 +127,7 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
           <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-white/45 transition-transform duration-200 motion-reduce:transition-none group-hover:text-[#29B6E8] ${offen ? "rotate-180" : ""}`} />
         </button>
       </h3>
-      <div id={panelId} hidden={!offen} className="tls-reveal px-3 pb-4 sm:pl-16" data-testid={`faq-bereich-inhalt-${bereich.id}`}>
+      <div id={panelId} hidden={!offen} style={zuStil(offen)} className="tls-reveal px-3 pb-4 sm:pl-16" data-testid={`faq-bereich-inhalt-${bereich.id}`}>
         <p className="text-xs text-white/45 sm:hidden">{zaehler}</p>
         {inhalt.anleitungen.length ? (
           <ul className="mt-2 space-y-1">
