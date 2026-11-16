@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -24,9 +24,11 @@ import { AboutTab } from "./profile/AboutTab";
 import { CalendarTab } from "./profile/CalendarTab";
 import { AutosaveStatus } from "./profile/SwitchRow";
 import { channelTopicValue } from "@/lib/notificationLevels";
+import { lazyPage } from "@/lib/chunkReload";
 
 // Benachrichtigungen (#1204) kommen erst beim Öffnen des Reiters - Stufen, Themen und Ruhezeit laden nicht mit jeder Einstellung.
-const NotificationsTab = lazy(() => import("./profile/NotificationsTab").then((module) => ({ default: module.NotificationsTab })));
+// Über lazyPage wie überall: Nach einem Deploy fehlt der alte Teil, dann lädt die Seite einmal neu statt leer zu bleiben.
+const NotificationsTab = lazyPage(() => import("./profile/NotificationsTab").then((module) => ({ default: module.NotificationsTab })));
 
 // Die Einstellungen (#1146): Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine eigene Datei unter ./profile
 // (#253, Regel aus #223). Dieselben Gruppen in derselben Reihenfolge wie in der App - Darstellung, Benachrichtigungen,
@@ -43,7 +45,7 @@ const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 // Regler speichern nach der Pause wie Text - jeder Zwischenwert beim Ziehen wäre sonst ein eigener Lauf.
 const SLIDER_SETTINGS = new Set(["ceremony_volume"]);
 // Beim Verlassen mit offener, ungültiger Eingabe (#1048, nach Codex-Prüfung): was fehlt und wo das Feld steht.
-const LEAVE_REASONS = { display_name: "Name ist leer oder zu lang.", bio: "Bio ist zu lang.", website: "Website ist keine gültige Adresse.", quiet_hours: "Ruhezeit: Beginn und Ende sind gleich." };
+const LEAVE_REASONS = { display_name: "Name ist leer oder zu lang.", bio: "Bio ist zu lang.", website: "Website ist keine gültige Adresse.", quiet_hours: "Die Ruhezeit hat keine gültigen Zeiten." };
 const FIELD_PLACES = {
   display_name: { tab: "basic", testId: "profile-display-name" },
   bio: { tab: "basic", testId: "profile-bio" },
