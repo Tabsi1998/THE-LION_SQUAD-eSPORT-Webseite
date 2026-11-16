@@ -17,6 +17,7 @@ import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, forma
 import { stationText } from "../../lib/matchText";
 import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
 import { countsAsMatch, type BracketMatch } from "../../lib/bracketGraph";
+import { staffelBadgePhase } from "../../lib/staffelStand";
 import { motionPlan, wonJustNow, type MotionPlan } from "../../lib/bracketMotion";
 import { playMoment } from "../../lib/tournamentHaptics";
 import { checkInState, matchStatusText, standingsTables, treeKind } from "../../lib/tournamentView";
@@ -398,7 +399,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <Title>{tournament.title}</Title>
           {tournament.description ? <Muted>{tournament.description.replace(/[#*_`]/g, "").slice(0, 300)}</Muted> : null}
           <View style={styles.pillRow}>
-            <StatusBadge phase={tournament.public_phase} status={tournament.status} />
+            {/* Liga-Staffel (Folge #2453): der Stand der Season statt „Entwurf“ - ohne Liga-Recht vor dem Start neutral. */}
+            <StatusBadge phase={staffelBadgePhase(tournament) || tournament.public_phase} status={tournament.status} />
             <Pill label={formatDate(tournament.start_date)} />
             <Pill label={tournament.format_label || formatTournamentFormat(tournament.format) || "Format offen"} />
             <Pill label={`${tournament.participant_count ?? tournament.participants?.length ?? registrations.length ?? 0}${tournament.max_participants ? `/${tournament.max_participants}` : ""} Teilnehmer`} />
