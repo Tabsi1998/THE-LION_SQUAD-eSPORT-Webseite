@@ -69,6 +69,7 @@ export function flushVitals() {
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
       return navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
     }
+    // Bewusst still: Messwerte beim Verlassen der Seite - geht einer verloren, fehlt nur ein Punkt in der Statistik.
     fetch(url, { method: "POST", body, keepalive: true, headers: { "Content-Type": "application/json" } }).catch(() => {});
     return true;
   } catch {

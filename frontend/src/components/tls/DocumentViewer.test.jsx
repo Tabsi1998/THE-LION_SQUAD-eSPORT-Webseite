@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { DocumentViewer } from "./DocumentViewer";
 import { clampPage, nextZoom, viewerErrorText } from "@/lib/pdfViewer";
 
@@ -65,4 +66,30 @@ test("ohne Download-Erlaubnis gibt es keinen Download-Knopf, und ein Fehler steh
   await waitFor(() => expect(screen.getByTestId("document-viewer-error")).toHaveTextContent("nicht (mehr) freigegeben"));
   expect(screen.queryByTestId("document-viewer-download")).toBeNull();
   expect(screen.queryByTestId("document-viewer-canvas")).toBeNull();
+});
+
+// #2412: der Betrachter ist ein Dialog - Fokus hinein, Seite dahinter gesperrt, Escape schließt mit Fokus zurück.
+test("Tastatur: Fokus im Betrachter, Hintergrund gesperrt, Escape gibt den Fokus zurück", async () => {
+  const user = userEvent.setup();
+  const doc = fakeDocument(2);
+  const open = vi.fn(async () => ({ document: doc, pages: 2, sha256: "abc" }));
+  function Page() {
+    const [shown, setShown] = useState(false);
+    return (
+      <>
+        <main data-testid="page"><button type="button" onClick={() => setShown(true)}>Rechnung ansehen</button></main>
+        {shown ? <DocumentViewer path="/x.pdf" title="Rechnung" open={open} onClose={() => setShown(false)} /> : null}
+      </>
+    );
+  }
+  render(<Page />);
+  const opener = screen.getByRole("button", { name: "Rechnung ansehen" });
+  await user.click(opener);
+  const viewer = screen.getByTestId("document-viewer");
+  await waitFor(() => expect(screen.getByTestId("document-viewer-pages")).toHaveTextContent("1 / 2"));
+  expect(viewer).toContainElement(document.activeElement);
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
+  await user.keyboard("{Escape}");
+  expect(screen.queryByTestId("document-viewer")).toBeNull();
+  expect(opener).toHaveFocus();
 });

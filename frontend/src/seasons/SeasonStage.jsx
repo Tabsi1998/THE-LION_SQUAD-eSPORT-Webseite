@@ -70,6 +70,7 @@ export function useSeasonModules(seasons) {
       if (modules[key]) return;
       loadSeasonModule(key).then((loaded) => {
         if (!cancelled && loaded?.season) setModules((current) => (current[key] ? current : { ...current, [key]: loaded.season }));
+      // Bewusst still: Saison-Deko ist Schmuck - fehlt ein Modul, bleibt die Seite ohne diese Deko.
       }).catch(() => {});
     });
     return () => {

@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Trophy, Crown, Medal, Sparkles, Target, Flame, CircleHelp, Gem, ArrowDownWideNarrow, Layers, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
+import { problemKind } from "@/lib/loadProblem";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AchievementCategoryGroups, CATEGORY_META, categoryProgressSummary, formatPercent } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
@@ -68,6 +70,8 @@ export function categoryRows(overview, mine) {
 export default function AchievementsShowcasePage() {
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
   const [boardLoading, setBoardLoading] = useState(false);
   const [board, setBoard] = useState({ by: "points", category: "", period: "all" });
@@ -89,8 +93,8 @@ export default function AchievementsShowcasePage() {
   // Die Übersicht hängt am Konto (eigener Stand, gefundene Geheimnisse) - nach dem Anmelden neu.
   const loadOverview = useCallback(() => {
     api.get("/achievements/overview")
-      .then(({ data }) => setOverview(data || null))
-      .catch(() => {})
+      .then(({ data }) => { setOverview(data || null); setProblem(null); })
+      .catch((error) => setProblem(problemKind(error)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -233,6 +237,8 @@ export default function AchievementsShowcasePage() {
           </p>
           {loading && rows.length === 0 ? (
             <SkeletonTable rows={4} columns={2} label="Lade Kategorien" />
+          ) : problem && rows.length === 0 ? (
+            <PublicErrorState kind={problem} title="Die Erfolge konnten nicht laden" onRetry={() => { setLoading(true); loadOverview(); }} />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 md:gap-3">
               {rows.map((category, index) => {

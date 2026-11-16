@@ -71,7 +71,7 @@ test("noch kein Türchen, Fehler beim Laden, schließen", async () => {
   expect(await screen.findByTestId("advent-preview-empty")).toHaveTextContent("Für 2026 ist noch kein Türchen angelegt");
   fireEvent.click(screen.getByTestId("advent-preview-close"));
   expect(first.onClose).toHaveBeenCalledTimes(1);
-  fireEvent.keyDown(window, { key: "Escape" });
+  fireEvent.keyDown(document.activeElement, { key: "Escape" });
   expect(first.onClose).toHaveBeenCalledTimes(2);
   first.unmount();
   expect(document.body.style.overflow).toBe("");
@@ -79,4 +79,13 @@ test("noch kein Türchen, Fehler beim Laden, schließen", async () => {
   apiMock.get.mockRejectedValueOnce({ response: { data: { detail: "Diesen Zeitpunkt verstehe ich nicht." } } });
   show();
   expect(await screen.findByTestId("advent-preview-problem")).toHaveTextContent("Diesen Zeitpunkt verstehe ich nicht.");
+});
+
+// #2412: die Vorschau deckt die ganze Verwaltung ab - Fokus hinein, die Seite dahinter ist gesperrt.
+test("Tastatur: Fokus in der Vorschau, Hintergrund gesperrt", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: { active: false, next_start: "2026-12-01T00:00:00+01:00", reason: "empty", preview: true } });
+  render(<><main data-testid="page" /><MemoryRouter><CalendarPreview year={2026} doors={ADMIN_DOORS} onClose={() => {}} /></MemoryRouter></>);
+  await screen.findByTestId("advent-preview-empty");
+  expect(screen.getByTestId("advent-preview")).toContainElement(document.activeElement);
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
 });

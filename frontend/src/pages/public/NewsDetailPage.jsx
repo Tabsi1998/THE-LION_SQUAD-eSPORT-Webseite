@@ -129,6 +129,7 @@ export default function NewsDetailPage() {
       setPost(data);
       setError(null);
       // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund.
+      // Bewusst still: nur die Lesemarke.
       if (user?.id) api.post(`/news/${slug}/read`, null, { skipInvalidation: true }).catch(() => {});
     }).catch((e) => {
       const status = e.response?.status;

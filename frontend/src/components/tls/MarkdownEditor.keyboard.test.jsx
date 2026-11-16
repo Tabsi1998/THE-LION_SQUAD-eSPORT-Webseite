@@ -1,5 +1,5 @@
 import { act, createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -72,4 +72,27 @@ test("@-Vorschläge im Editor: Pfeil wählt weiter, Escape schließt", async () 
   fireEvent.keyDown(wrap, { key: "Escape" });
   fireEvent.keyUp(wrap, { key: "Escape" });
   expect(screen.queryByRole("listbox")).toBeNull();
+});
+
+// #2412: solange der Dialog offen ist, ist der Editor `inert` und nimmt keinen Fokus an. „Bild einfügen“ schließt
+// deshalb erst den Dialog und setzt dann den Fokus zurück in den Text. Der Test spielt nach, was der Browser tut:
+// ein Element unter `inert` bekommt keinen Fokus.
+test("Nach „Bild einfügen“ steht der Fokus wieder im Text, obwohl der Editor hinter dem Dialog gesperrt war", async () => {
+  const realFocus = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = function focusUnlessInert(...args) {
+    if (this.closest("[inert]")) return;
+    realFocus.apply(this, args);
+  };
+  try {
+    apiMock.get.mockResolvedValue({ data: { items: [{ filename: "bild.png", url: "/uploads/bild.png", alt_text: "Mein Bild" }], total: 1 } });
+    const user = userEvent.setup();
+    renderEditor();
+    await user.click(screen.getByTitle("Bild aus Medienbibliothek"));
+    await user.click(await screen.findByTitle("bild.png"));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("markdown-editor-visual")).toContainElement(document.activeElement));
+  } finally {
+    HTMLElement.prototype.focus = realFocus;
+  }
 });

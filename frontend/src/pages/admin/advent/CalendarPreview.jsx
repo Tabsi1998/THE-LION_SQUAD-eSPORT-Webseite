@@ -5,6 +5,7 @@ import { AdventBoard } from "@/advent/AdventBoard";
 import { DoorDialog } from "@/advent/DoorDialog";
 import { doorVariant } from "@/advent/doors";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { defaultMoment, previewMoments } from "./form";
 
 // Vorschau des Adventkalenders (#641): der Kalender, wie ihn Gäste zu einem gewählten Tag sähen. Alle bis dahin
@@ -34,18 +35,17 @@ export function CalendarPreview({ year, doors, onClose }) {
     };
   }, [year, moment]);
 
+  // Escape schließt die Vorschau (ein offenes Türchen schließt zuerst sich selbst), Tab bleibt darin, die Verwaltung
+  // dahinter ist gesperrt (#2412).
+  const previewRef = useModalBehavior(true, () => { if (shownDay === null) onClose(); });
+
   useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === "Escape" && shownDay === null) onClose();
-    };
-    window.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previous;
     };
-  }, [onClose, shownDay]);
+  }, []);
 
   const shown = shownDay === null ? null : (calendar?.doors || []).find((door) => door.day === shownDay && door.state === "opened") || null;
   const answer = useCallback(async (day, choice) => {
@@ -60,7 +60,7 @@ export function CalendarPreview({ year, doors, onClose }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-[#060606]/95 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Vorschau Adventkalender ${year}`} data-testid="advent-preview">
+    <div ref={previewRef} className="fixed inset-0 z-40 flex flex-col bg-[#060606]/95 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Vorschau Adventkalender ${year}`} data-testid="advent-preview">
       <div className="flex flex-wrap items-end gap-3 border-b border-white/10 bg-[#0A0A0A] px-4 py-3 md:px-6">
         <div className="min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]">Vorschau</div>

@@ -50,6 +50,7 @@ export default function AboutPage() {
     api.get("/membership/discord-servers").then(({ data }) => {
       if (!alive) return;
       setJoined(Object.fromEntries((data?.servers || []).map((server) => [server.guild_id, server.member])));
+    // Bewusst still: nur das Häkchen „schon auf dem Server“.
     }).catch(() => {});
     return () => { alive = false; };
   }, [signedIn, hasGameServers]);

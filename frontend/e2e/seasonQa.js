@@ -54,6 +54,8 @@ async function mockSeason(page, payload) {
     if (url.includes("/api/board")) return json([]);
     if (url.includes("/api/sponsors") || url.includes("/api/partners")) return json([]);
     if (url.includes("/api/gallery")) return json([]);
+    // Ohne Themen meldet das Kontaktformular einen Ladefehler (#2412) - der Hinweis gehört nicht in die Deko-Abnahme.
+    if (url.includes("/api/contact/topics")) return json([{ value: "general", label: "Allgemein" }]);
     return route.abort();
   });
 }

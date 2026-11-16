@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
@@ -49,9 +50,9 @@ export default function AdminEventEditPage() {
   const [partners, setPartners] = useState([]);
 
   useEffect(() => {
-    api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
+    api.get("/events/meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden."));
     // Turniere, Fast Laps und Sponsoren kommen seit #1371 aus dem Programm des Events (useEventProgram).
-    api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(() => {});
+    api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(toastLoadFailed("Die Partner für die Auswahl konnten nicht geladen werden."));
   }, []);
 
   useEffect(() => {

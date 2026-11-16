@@ -288,7 +288,8 @@ function App() {
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. Still (#986): reine
                 Deko - der Adventkalender darin hat eine eigene Grenze mit Hinweis (seasons/adventCalendar). */}
             <OptionalBoundary quiet><SeasonStage /></OptionalBoundary>
-            <Toaster theme="dark" position="top-right" richColors />
+            {/* Meldungen bleiben auch hinter einem offenen Fenster hörbar und bedienbar (#2412). */}
+            <div data-modal-exempt=""><Toaster theme="dark" position="top-right" richColors /></div>
             {/* Abo-Hinweis nach einer Anmeldung (#1788): einmal je Konto, unten - die Meldungen bleiben oben rechts. */}
             <OptionalBoundary quiet><CalendarHintHost /></OptionalBoundary>
             {/* Frage nach Browser-Benachrichtigungen (#1163): nach einer Anmeldung, nie beim ersten Besuch, nur einmal. */}

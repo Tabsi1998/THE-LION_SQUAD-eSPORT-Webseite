@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // News-Seite (#1342, #1249): die angepinnte News als breiter Aufmacher, darunter das Raster; darüber eine Zeile
@@ -51,4 +51,20 @@ test("Filter: nur Kategorien mit Artikeln in einer Zeile, die Suche als Symbol",
   expect(screen.queryByTestId("news-filter-sponsors")).toBeNull();
   expect(screen.getByTestId("news-search-open")).toBeInTheDocument();
   expect(screen.queryByTestId("news-search")).toBeNull();
+});
+
+// #2412: kommt die Liste nicht, steht ein Ladefehler mit „Nochmal versuchen“ da - nicht „noch nichts da“.
+test("News: Ladefehler mit „Nochmal versuchen“, danach die Liste", async () => {
+  let fail = true;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: { categories: [], in_use: [] } };
+    if (fail) throw { response: { status: 500 } };
+    return { data: [NEWS[2]] };
+  });
+  render(<MemoryRouter><NewsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("public-error-state")).toBeInTheDocument();
+  expect(screen.queryByText("Noch keine News sichtbar")).toBeNull();
+  fail = false;
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("news-card-neu")).toBeInTheDocument();
 });

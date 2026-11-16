@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { newsCategoryLabel, newsVisibilityLabel } from "@/lib/newsCategories";
 import { newsPublicationState } from "@/lib/newsPublication";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -54,7 +55,7 @@ export default function AdminNewsPage() {
   }, []);
   useEffect(() => {
     load();
-    api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
+    api.get("/news-meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden."));
   }, [load]);
   useApiInvalidation(load, ["news"]);
 

@@ -156,3 +156,21 @@ test("schlimmster Fall: langer Name mit Emoji, 40 Umbauten mit sehr langen Sätz
   expect(within(dialog).getByTestId("admin-reg-removal-confirm")).not.toBeDisabled();
   expect(within(dialog).getByTestId("admin-reg-removal-confirm")).toHaveTextContent("Austritt eintragen");
 });
+
+// #2412: solange der Umbauplan offen ist, ist die Teilnehmerliste dahinter gesperrt; Tab bleibt im Dialog, Escape lehnt
+// ab wie „Abbrechen“.
+test("Tastatur: Hintergrund gesperrt, Tab bleibt im Dialog, Escape lehnt ab", async () => {
+  const user = userEvent.setup();
+  render(<><main data-testid="page" /><ParticipantRemovalActions tournament={TOURNAMENT} registration={REGISTRATION} onDone={vi.fn()} /></>);
+  await user.click(screen.getByTestId("admin-reg-withdraw-r1"));
+  const dialog = await screen.findByRole("dialog");
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
+  for (let i = 0; i < 6; i += 1) {
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/registrations/r1/removal/reject", { plan_id: "plan-1" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(screen.getByTestId("page")).not.toHaveAttribute("inert");
+});

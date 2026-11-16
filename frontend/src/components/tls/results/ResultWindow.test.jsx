@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // Ergebnis-Fenster (#1156): ohne Zahlentastatur eintragen - Plus/Minus, Best-of antippen, Zielreihenfolge oder Punkte.
 // Vor dem Speichern steht der Satz, gespeichert wird mit „hold“ (10 Sekunden „Rückgängig“), korrigiert nur mit Grund.
@@ -169,4 +170,20 @@ test("Ohne Befangenheit kein Feld und kein Grund im Aufruf (#2203)", async () =>
   fireEvent.click(screen.getByTestId("result-score-a-plus"));
   await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
   expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("conflict_reason");
+});
+
+// #2412: Fokus aufs Fenster, Tab bleibt darin, der Rest der Seite ist gesperrt, Escape schließt.
+test("Tastatur: Fokus im Fenster, Hintergrund gesperrt, Escape schließt", async () => {
+  const user = userEvent.setup();
+  const onClose = vi.fn();
+  render(<><main data-testid="page"><button type="button">Spielplan</button></main><ResultWindow entry={DUEL} onClose={onClose} onSaved={() => {}} /></>);
+  const panel = screen.getByTestId("result-window");
+  expect(panel).toHaveFocus();
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
+  for (let i = 0; i < 4; i += 1) {
+    await user.tab({ shift: true });
+    expect(panel).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  expect(onClose).toHaveBeenCalledTimes(1);
 });

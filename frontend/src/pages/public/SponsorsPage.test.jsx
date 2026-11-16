@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Sponsorenseite (#405): „Seit … dabei“ bei den großen Stufen, ehemalige Unterstützer mit ihren
@@ -95,4 +95,23 @@ test("ohne Inhalte bleibt die kleine Karte zum Kontaktformular", async () => {
   await screen.findByTestId("sponsor-a");
   expect(screen.queryByTestId("sponsors-offer")).toBeNull();
   expect(screen.getByTestId("sponsors-become-card")).toHaveAttribute("href", "/contact");
+});
+
+// #2412: kommt die Liste nicht, steht ein Ladefehler mit „Nochmal versuchen“ da - nicht „noch nichts da“.
+test("Sponsoren: Ladefehler mit „Nochmal versuchen“, danach die Liste", async () => {
+  let fail = true;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/sponsors") {
+      if (fail) throw { response: { status: 500 } };
+      return { data: ACTIVE };
+    }
+    return { data: [] };
+  });
+  render(<MemoryRouter><SponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("public-error-state")).toBeInTheDocument();
+  expect(screen.queryByText("Bald hier")).toBeNull();
+  fail = false;
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("sponsor-since-a")).toBeInTheDocument();
+  expect(screen.queryByTestId("public-error-state")).toBeNull();
 });

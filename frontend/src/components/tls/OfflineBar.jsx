@@ -15,7 +15,7 @@ export function OfflineBar() {
   if (!offline) {
     if (!pause.active) return null;
     return (
-      <div role="status" aria-live="polite" data-testid="write-pause-bar" className="tls-offline-bar">
+      <div role="status" aria-live="polite" data-modal-exempt="" data-testid="write-pause-bar" className="tls-offline-bar">
         {/* Der schlafende Löwe: nachts kurz Pause. */}
         <LionArt art="sleep" size={24} className="shrink-0 text-honor" />
         <span>{WRITE_PAUSE_LABEL}</span>
@@ -24,7 +24,7 @@ export function OfflineBar() {
   }
   const label = offlineLabel(stand);
   return (
-    <div role="status" aria-live="polite" data-testid="offline-bar" className="tls-offline-bar">
+    <div role="status" aria-live="polite" data-modal-exempt="" data-testid="offline-bar" className="tls-offline-bar">
       {/* Der Löwe mit Stecker (#1325) - derselbe wie auf der Offline-Seite. */}
       <LionArt art="offline" size={24} className="shrink-0 text-[#FFD700]" />
       <span>{label} · neu laden, sobald das Netz wieder da ist</span>

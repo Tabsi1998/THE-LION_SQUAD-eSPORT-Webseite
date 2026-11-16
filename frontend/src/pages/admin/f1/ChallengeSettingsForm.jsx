@@ -1,6 +1,7 @@
 // Fast Lap (#223): das Formular der Challenge mit Preisen und Wertungsgewicht.
 import { useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -67,7 +68,7 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => {});
+    api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(toastLoadFailed("Die Events für die Auswahl konnten nicht geladen werden."));
   }, []);
 
   const save = async () => {

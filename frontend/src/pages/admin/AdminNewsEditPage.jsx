@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { PUBLISH_MODES, formatTimeUntil, initialPublishMode, needsPublishQuestion, publishFields, publishQuestion } from "@/lib/newsPublication";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -36,7 +37,7 @@ export default function AdminNewsEditPage() {
   const [meta, setMeta] = useState({ categories: [], visibilities: [] });
 
   useEffect(() => {
-    api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
+    api.get("/news-meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden."));
   }, []);
 
   const [version, setVersion] = useState(0);
