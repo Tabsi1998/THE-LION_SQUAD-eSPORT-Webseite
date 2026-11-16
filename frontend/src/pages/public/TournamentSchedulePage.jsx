@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { StationNowNext } from "@/components/tls/live/StationNowNext";
-import { queueSummaryLine } from "@/lib/liveQueue";
+import { queueGoneError, queueSummaryLine } from "@/lib/liveQueue";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
@@ -80,13 +80,14 @@ export default function TournamentSchedulePage() {
     } catch {
       setPlan({ applies: false, matchdays: [] });
     }
-    // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan.
+    // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan. Scheitert
+    // ein Abruf (Netz, Server), bleibt ihr letzter Stand - nur 404/403 heißt „gibt es nicht“ (#2440).
     if (tournament.event_mode === "online") return setQueue(null);
     try {
       const { data: live } = await api.get(`/tournaments/${tournament.id}/live-queue`, accessConfig);
       setQueue(live?.applies ? live : null);
-    } catch {
-      setQueue(null);
+    } catch (err) {
+      if (queueGoneError(err)) setQueue(null);
     }
   }, [slug, accessToken]);
 

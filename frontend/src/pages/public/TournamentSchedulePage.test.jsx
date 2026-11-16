@@ -10,7 +10,9 @@ let refresh = null;
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("sonner", () => ({ toast: (...args) => toastMock(...args) }));
 let liveOptions = null;
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { refresh = callback; liveOptions = options; } }));
+// Alle Ladefunktionen (#2440): die Seite und die Spieler-Zeile (LiveQueueStatus) fragen je selbst.
+const refreshes = new Set();
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { refresh = callback; liveOptions = options; refreshes.add(callback); } }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -204,6 +206,15 @@ test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“
   expect(now).toHaveTextContent("NeonFalke gegen PixelPaula");
   expect(now).toHaveTextContent("Als Nächstes");
   expect(now).toHaveTextContent("Aufgerufen · antreten bis 17:30");
+
+  // #2440: Scheitert das Nachladen der Warteschlange (Server 503), bleiben „Jetzt“/„Als Nächstes“ und die eigene Zeile.
+  const answer = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation((path, ...rest) => (String(path).includes("/live-queue")
+    ? Promise.reject(Object.assign(new Error("503"), { response: { status: 503, data: {} } }))
+    : answer(path, ...rest)));
+  await act(async () => { await Promise.all([...refreshes].map((load) => load())); });
+  expect(screen.getByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+  expect(screen.getByTestId("live-queue-status")).toHaveTextContent("Du bist als Nächstes an PC 2");
 });
 
 // #1801: Der Spielplan lädt nur bei Änderungen seines Turniers nach - und, weil sich die Turniere eines Events Stationen

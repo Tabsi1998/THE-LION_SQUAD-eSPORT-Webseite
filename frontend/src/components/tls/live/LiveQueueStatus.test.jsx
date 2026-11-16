@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 
 // Spieler-Sicht (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“ - auf der Turnierseite die eigenen Spiele,
 // auf der Matchseite genau dieses Spiel.
@@ -6,7 +6,7 @@ import { render, screen } from "@testing-library/react";
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 const live = { resources: null, options: null };
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { Object.assign(live, { resources, options }); } }));
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { Object.assign(live, { resources, options, load }); } }));
 const { LiveQueueStatus } = await import("./LiveQueueStatus");
 
 const NEXT = { match_id: "m1", state: "queued", position: 1, station_text: "Station 2 · Switch 2", forecast_at: "2026-10-31T17:40:00Z", delay_minutes: 11 };
@@ -55,4 +55,22 @@ test("hört auf das eigene Turnier und sein Event", async () => {
   await screen.findByTestId("live-queue-status");
   expect(live.resources).toContain("stations");
   expect(live.options).toMatchObject({ tournamentId: "t1", eventId: "e1" });
+});
+
+// #2440: Ein gescheiterter Abruf (Netz, Server) lässt die Zeile stehen - nur 404/403 nimmt sie weg. Online kein Takt.
+test("scheitert ein späterer Abruf, bleibt der letzte Stand; 404 nimmt ihn weg; online fragt nichts im Takt", async () => {
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [NEXT] } });
+  render(<LiveQueueStatus tournamentId="t1" />);
+  await screen.findByTestId("live-queue-status");
+  expect(live.options).toMatchObject({ pollMs: 60000 });
+  apiMock.get.mockRejectedValue(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" }));
+  await act(async () => { await live.load(); });
+  expect(screen.getByTestId("live-queue-status")).toHaveTextContent("Du bist als Nächstes an Station 2 · Switch 2");
+  apiMock.get.mockRejectedValue(Object.assign(new Error("503"), { response: { status: 503 } }));
+  await act(async () => { await live.load(); });
+  expect(screen.getByTestId("live-queue-status")).toBeInTheDocument();
+  apiMock.get.mockRejectedValue(Object.assign(new Error("404"), { response: { status: 404 } }));
+  await act(async () => { await live.load(); });
+  expect(screen.queryByTestId("live-queue-status")).toBeNull();
+  expect(live.options).toMatchObject({ pollMs: 0, fallbackMs: 0 });
 });
