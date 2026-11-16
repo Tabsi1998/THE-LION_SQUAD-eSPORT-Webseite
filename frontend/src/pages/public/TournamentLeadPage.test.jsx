@@ -637,6 +637,22 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     expect(queueCalls()).toBe(asked);
   });
 
+  test("scheitert der erste Abruf, springt die Ansicht später nicht von selbst ins Cockpit - der Reiter erscheint nur", async () => {
+    queueAnswer = () => Promise.reject(offline());
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/live-queue") ? queueAnswer() : Promise.resolve({ data: LEAD })));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true"));
+    expect(screen.queryByTestId("lead-tab-cockpit")).toBeNull();
+    queueAnswer = () => Promise.resolve({ data: QUEUE });
+    await tick();
+    expect(await screen.findByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true");
+  });
+
   test("Takt nur mit Warteschlange: online (`applies: false`) kein Takt - nur der Rückfall-Takt, solange der Strom fehlt", async () => {
     apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? { applies: false, reason: "online", stations: [] } : { ...LEAD, tournament: { ...LEAD.tournament, event_mode: "online" } } }));
     liveCalls.length = 0;

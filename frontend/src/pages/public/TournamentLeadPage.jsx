@@ -161,6 +161,12 @@ export default function TournamentLeadPage() {
     : (tab === "stations" || tab === "cockpit") && !queue ? (queueLoaded ? null : "")
       : tab === "notice" && !canNotice ? (data ? null : "") : tab;
   const activeTab = chosenTab === "" ? "" : chosenTab || defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded });
+  // Ein Reiter, der einmal von selbst gezeigt wurde, bleibt stehen (#2440): kommt die Warteschlange erst nach einem
+  // gescheiterten ersten Abruf, erscheint der Reiter „Cockpit“, aber die Ansicht springt nicht von selbst dorthin.
+  useEffect(() => {
+    // Als Funktion: hat jemand inzwischen getippt, gilt sein Reiter.
+    if (tab === null && activeTab) setTab((current) => current ?? activeTab);
+  }, [tab, activeTab]);
   // Das Cockpit (#1653) fragt kurz im Takt nach, solange es wirklich zu sehen ist (nicht im Check-in oder einem anderen
   // Reiter) - sonst wie bisher nur bei Änderungen.
   const cockpitOpen = activeTab === "cockpit";
