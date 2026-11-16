@@ -70,7 +70,8 @@ test("gerade vergeben: die neuesten Stufen nach der Zahl des Servers, sofort und
   apiMock.get.mockResolvedValue({ data: { groups: groups(tier("bats_1", "2026-10-28T10:00:00Z")) } });
   render(<AchievementCatchUp />);
   await settle();
-  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  // Der Katalog einmal (dazu fragt die Seite den Zeremonie-Stand am Server, #2450).
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/achievements/me")).toHaveLength(1);
   // Die Uhr des Geräts geht vor: der Merker liegt nach dem Zeitpunkt der Vergabe - die Zahl des Servers zählt trotzdem.
   localStorage.setItem("tls_ach_seen:anna", "2026-12-31T00:00:00Z");
   apiMock.get.mockResolvedValue({ data: { groups: groups(tier("bats_1", "2026-10-28T10:00:00Z"), tier("bats_2", "2026-10-30T19:00:05Z")) } });

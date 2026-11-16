@@ -6,11 +6,11 @@ Zeremonie kam dadurch in der App, am PC und im Handy-Browser je einmal. Jetzt st
 - **Erfolge und Stufen-Aufstiege:** ``user_achievements.ceremony_seen_at`` an der einzelnen Vergabe. Fehlt das Feld, ist
   sie nicht gesehen - auch im Altbestand.
 - **Level-Aufstiege, Sammel-Zeremonie der Neuberechnung und der Beginn:** eine Zeile je Person in ``ceremony_seen``
-  (``level`` = zuletzt gesehener Stand, ``recount_seen`` = gesehene Kennungen der Neuberechnung, ``since`` = erster
-  Abruf am Server, ``horizon`` = ältester gemeldeter Stand eines Geräts).
+  (``level`` = zuletzt gesehener Stand, ``recount_seen`` = gesehene Kennungen der Neuberechnung, ``since`` = erste
+  Meldung eines Geräts am Server, ``horizon`` = ältester gemeldeter Stand eines Geräts).
 
 Keine Flut nach dem Deploy: der Altbestand hat kein ``ceremony_seen_at``. Als „ungesehen“ zählt eine Vergabe darum nur,
-wenn sie nach dem ersten Abruf am Server angelegt wurde (``since``, über den Zeitstempel der ``_id``) oder jünger ist als
+wenn sie nach der ersten Meldung eines Geräts angelegt wurde (``since``, über den Zeitstempel der ``_id``) oder jünger ist als
 der älteste Stand, den ein Gerät einmalig gemeldet hat (``horizon`` - was das Gerät bisher selbst noch nachgeholt
 hätte). Ältere Vergaben, von denen kein Gerät etwas weiß, bekommen keine Zeremonie mehr - wie bisher beim ersten Besuch
 auf einem neuen Gerät.
@@ -73,7 +73,7 @@ async def _current_level(db, user_id: str) -> dict:
 
 
 async def _ensure(db, user_id: str) -> dict:
-    """Die Zeile der Person - beim ersten Abruf angelegt, ``since`` steht danach fest."""
+    """Die Zeile der Person - mit der ersten Meldung eines Geräts angelegt, ``since`` steht danach fest."""
     stamp = now_utc().isoformat()
     fresh = {"user_id": user_id, "since": stamp, "recount_seen": [], "created_at": stamp}
     await db.ceremony_seen.update_one({"user_id": user_id}, {"$setOnInsert": fresh}, upsert=True)
@@ -86,10 +86,10 @@ def _created_at(award: dict) -> datetime | None:
 
 
 def _eligible(award: dict, since: datetime | None, horizon: datetime | None) -> bool:
-    """Neu genug für eine Zeremonie: nach dem ersten Abruf angelegt, oder jünger als der älteste gemeldete Gerätestand."""
+    """Neu genug für eine Zeremonie: nach der ersten Meldung angelegt, oder jünger als der älteste gemeldete Gerätestand."""
     earned = parse_time(award.get("earned_at"))
     created = _created_at(award) or earned
-    # Die _id kennt nur ganze Sekunden - eine Vergabe in derselben Sekunde wie der erste Abruf zählt als neu.
+    # Die _id kennt nur ganze Sekunden - eine Vergabe in derselben Sekunde wie die erste Meldung zählt als neu.
     if since and created and created >= since.replace(microsecond=0):
         return True
     return bool(horizon and earned and earned > horizon)
@@ -107,11 +107,17 @@ async def _unseen_codes(db, user_id: str, row: dict) -> list[str]:
 async def state(db, user_id: str) -> dict:
     """Was die Person schon gesehen hat - für die Prüfung vor jeder Zeremonie, auf jedem Gerät gleich.
 
-    Fehlt der Level-Stand (erster Abruf ohne Meldung eines Geräts), gilt der jetzige als gesehen - kein Aufstieg zum
+    Fehlt der Level-Stand (erste Meldung ohne Level-Stand des Geräts), gilt der jetzige als gesehen - kein Aufstieg zum
     Start. Liegt der gemerkte Stand über dem echten (Prestige zurückgenommen), rückt er auf den echten zurück; ein
-    erneutes Prestige wird dann wieder gefeiert - wie bisher im Gerät."""
-    row = await _ensure(db, user_id)
+    erneutes Prestige wird dann wieder gefeiert - wie bisher im Gerät.
+
+    Nur lesen: Ohne Zeile (noch kein Gerät hat sich gemeldet) kommt der Stand „alles bisher ist Altbestand“, ohne etwas
+    anzulegen. Angelegt wird die Zeile mit der ersten Meldung eines Geräts (``import_device``) - so kann ein Gerät seinen
+    Altbestand melden, bevor der Server einen Beginn festlegt, und ein älterer Client legt nichts an."""
+    row = await db.ceremony_seen.find_one({"user_id": user_id}, {"_id": 0})
     current = await _current_level(db, user_id)
+    if row is None:
+        return {"since": None, "unseen": [], "level": current, "recount_seen": []}
     seen_level = level_state(row.get("level"))
     if seen_level is None or is_level_gain(current, seen_level):
         seen_level = current

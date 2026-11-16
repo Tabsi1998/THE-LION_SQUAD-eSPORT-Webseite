@@ -100,13 +100,14 @@ export function ceremonyState(userId) {
   if (inflight.has(userId)) return inflight.get(userId);
   const request = (async () => {
     try {
-      if (!read(importedKey(userId))) {
-        const { data } = await api.post("/achievements/me/ceremony/import", legacyReport(userId));
-        write(importedKey(userId), new Date().toISOString());
-        return normalise(userId, data);
-      }
+      // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
       const { data } = await api.get("/achievements/me/ceremony");
-      return normalise(userId, data);
+      const state = normalise(userId, data);
+      if (!state || read(importedKey(userId))) return state;
+      // Einmal je Browser und Konto: den Altbestand melden - erst damit legt der Server den Stand an.
+      const { data: imported } = await api.post("/achievements/me/ceremony/import", legacyReport(userId));
+      write(importedKey(userId), new Date().toISOString());
+      return normalise(userId, imported);
     } catch (error) {
       if (notSupported(error)) unsupported.add(userId);
       return null;

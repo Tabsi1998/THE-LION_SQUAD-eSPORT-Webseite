@@ -3,7 +3,7 @@
 Vorher kam dieselbe Zeremonie in der App, am PC und im Handy-Browser je einmal. Jetzt gilt: gesehen setzen und lesen,
 mehrfach ohne Wirkung; nur die eigenen Vergaben; zwei Geräte gleichzeitig - schließt das eine, zeigt das andere bei der
 Prüfung vor dem Anzeigen nichts mehr. Der Altbestand flutet nach dem Deploy nicht: ältere Vergaben ohne Wissen eines
-Geräts bleiben still, was ein Gerät einmalig meldet, gilt am Konto.
+Geräts bleiben still, was ein Gerät einmalig meldet, gilt am Konto. Nur lesen legt nichts an.
 """
 import asyncio
 import os
@@ -63,6 +63,14 @@ async def state(flow, user):
     return res.json()
 
 
+async def start(flow, user, **body):
+    """Die erste Meldung eines Geräts - erst sie legt die Zeile an (wie Website und App beim ersten Laden)."""
+    flow.act_as(user)
+    res = await flow.post(IMPORT, json=body)
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
 async def seen(flow, user, **body):
     flow.act_as(user)
     res = await flow.post(SEEN, json=body)
@@ -73,8 +81,12 @@ async def seen(flow, user, **body):
 @pytest.mark.asyncio
 async def test_seen_is_set_read_and_idempotent(flow):
     person = await flow.add_user()
-    first = await state(flow, person)
-    assert first["unseen"] == [] and first["level"] == LEVEL and first["recount_seen"] == []
+    # Nur lesen legt nichts an: ohne Meldung eines Geräts ist alles Altbestand.
+    before = await state(flow, person)
+    assert before == {"since": None, "unseen": [], "level": LEVEL, "recount_seen": []}
+    assert await flow.db.ceremony_seen.count_documents({}) == 0
+    first = await start(flow, person)
+    assert first["since"] and first["unseen"] == [] and first["level"] == LEVEL and first["recount_seen"] == []
     await award(flow, person, "sieger_1")
     await award(flow, person, "sieger_2")
     assert sorted((await state(flow, person))["unseen"]) == ["sieger_1", "sieger_2"]
@@ -85,16 +97,16 @@ async def test_seen_is_set_read_and_idempotent(flow):
     assert (await state(flow, person))["unseen"] == []
     stored = await flow.db.user_achievements.find_one({"user_id": person["id"], "tier_code": "sieger_1"})
     assert stored["ceremony_seen_at"]
-    # Der erste Abruf steht fest - ein zweiter verschiebt ihn nicht.
-    assert (await state(flow, person))["since"] == first["since"]
+    # Der Beginn steht fest - weitere Abrufe und Meldungen verschieben ihn nicht.
+    assert (await start(flow, person))["since"] == first["since"]
     assert await flow.db.ceremony_seen.count_documents({"user_id": person["id"]}) == 1
 
 
 @pytest.mark.asyncio
 async def test_only_the_own_awards_count(flow):
     owner, other = await flow.add_user(), await flow.add_user()
-    await state(flow, owner)
-    await state(flow, other)
+    await start(flow, owner)
+    await start(flow, other)
     await award(flow, owner, "sieger_1")
 
     # Fremde Kennungen: nichts gesetzt, beim Eigentümer weiter ungesehen.
@@ -117,7 +129,7 @@ async def test_only_the_own_awards_count(flow):
 @pytest.mark.asyncio
 async def test_two_devices_at_once(flow):
     person = await flow.add_user()
-    await state(flow, person)
+    await start(flow, person)
     await award(flow, person, "sieger_1")
     # Beide Geräte laden gleichzeitig und kennen dieselbe ungesehene Stufe.
     phone, desktop = await asyncio.gather(state(flow, person), state(flow, person))
@@ -137,8 +149,10 @@ async def test_no_flood_after_the_deploy(flow):
     # Altbestand: vor dem ersten Abruf am Server angelegt, ohne ceremony_seen_at.
     await award(flow, person, "alt_1", age=timedelta(days=40))
     await award(flow, person, "alt_2", age=timedelta(days=3))
+    # Ein Gerät ohne Merker meldet sich zum ersten Mal: nichts Altes kommt.
+    assert (await start(flow, person))["unseen"] == []
     assert (await state(flow, person))["unseen"] == []
-    # Neu nach dem ersten Abruf - auch mit zurückdatiertem earned_at (Vergabe in der Verwaltung) - zählt.
+    # Neu nach der ersten Meldung - auch mit zurückdatiertem earned_at (Vergabe in der Verwaltung) - zählt.
     await award(flow, person, "neu_1", age=timedelta(days=10), created_age=timedelta(0))
     assert (await state(flow, person))["unseen"] == ["neu_1"]
     # Stille und nachgerechnete Stufen feiert die Einzel-Zeremonie nie.
@@ -177,7 +191,7 @@ async def test_device_report_is_idempotent_and_keeps_its_catch_up(flow):
 async def test_level_seen_is_raised_never_past_the_real_level(flow):
     person = await flow.add_user()
     flow.levels[person["id"]] = {"level": 5, "title": "Welpe", "prestige": 0}
-    assert (await state(flow, person))["level"]["level"] == 5
+    assert (await start(flow, person))["level"]["level"] == 5
     flow.levels[person["id"]] = {"level": 6, "title": "Welpe", "prestige": 0}
     # Noch nicht geschlossen: der gesehene Stand bleibt 5 - jedes Gerät kann den Aufstieg zeigen.
     assert (await state(flow, person))["level"]["level"] == 5

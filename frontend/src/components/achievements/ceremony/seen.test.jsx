@@ -57,17 +57,22 @@ describe("Stand vom Server", () => {
   });
 
   it("gleichzeitige Abfragen teilen sich eine Anfrage", async () => {
+    apiMock.get.mockResolvedValue({ data: serverState() });
     apiMock.post.mockResolvedValue({ data: serverState() });
     const [one, two] = await Promise.all([seen.ceremonyState("anna"), seen.ceremonyState("anna")]);
     expect(one).toEqual(two);
+    expect(apiMock.get).toHaveBeenCalledTimes(1);
     expect(apiMock.post).toHaveBeenCalledTimes(1);
   });
 
   it("älterer Server: null und kein Melden mehr - es bleibt beim Browser", async () => {
-    apiMock.post.mockRejectedValue({ response: { status: 404 } });
+    localStorage.setItem(seen.achSeenKey("anna"), "2026-11-01T10:00:00.000Z");
+    apiMock.get.mockRejectedValue({ response: { status: 404 } });
     expect(await seen.ceremonyState("anna")).toBeNull();
     expect(await seen.ceremonyState("anna")).toBeNull();
-    expect(apiMock.post).toHaveBeenCalledTimes(1);
+    expect(apiMock.get).toHaveBeenCalledTimes(1);
+    // Auch der Altbestand geht nicht an einen Server, der ihn nicht kennt.
+    expect(apiMock.post).not.toHaveBeenCalled();
     seen.markSeen("anna", { codes: ["a"] });
     expect(keepalive).not.toHaveBeenCalled();
     expect(await seen.ceremonyState(null)).toBeNull();
@@ -159,7 +164,7 @@ describe("Prüfung vor dem Anzeigen", () => {
   });
 
   it("ohne Server-Stand zeigt die Bühne das Paket wie bisher", async () => {
-    apiMock.post.mockRejectedValue({ response: { status: 404 } });
+    apiMock.get.mockRejectedValue({ response: { status: 404 } });
     const queue = createCeremonyQueue({ now: () => 1 });
     renderHost(queue);
     enqueueSeen(queue, ["a"]);
