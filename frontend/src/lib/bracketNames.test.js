@@ -97,4 +97,10 @@ test("sectionRoundLabel: Abschnitt wie die Überschrift im Baum, außer der Name
   expect(sectionRoundLabel({ round: 1 })).toBe("Runde 1");
   expect(sectionRoundLabel({ section: "FINAL", round: 6, round_label: "Grand Final" })).toBe("Grand Final");
   expect(sectionRoundLabel({ section: "BRONZE", round: 3, round_label: "Spiel um Platz 3" })).toBe("Spiel um Platz 3");
+  // Tabellen (Review #1947): nur eine Gruppe steht davor.
+  expect(sectionRoundLabel({ section: "LIGA", round: 3, round_label: "Spieltag 3" })).toBe("Spieltag 3");
+  expect(sectionRoundLabel({ section: "round_robin", round: 2, round_label: "Spieltag 2" })).toBe("Spieltag 2");
+  expect(sectionRoundLabel({ section: "swiss", round: 2, round_name: "Runde 2" })).toBe("Runde 2");
+  expect(sectionRoundLabel({ section: "MAIN", stage_type: "league", round: 1, round_label: "Spieltag 1" })).toBe("Spieltag 1");
+  expect(sectionRoundLabel({ section: "group_a", round: 3, round_label: "Spieltag 3" })).toBe("Gruppe A · Spieltag 3");
 });

@@ -2,7 +2,7 @@
 // („# Runde 2“ im Loser Bracket, weil es zur Zeit der zweiten Runde beginnt); angezeigt wird je Abschnitt fortlaufend ab
 // 1. Ein Wort als Spiel-Kürzel („FINAL“) heißt wie seine Runde („Grand Final“). Ein geloster Platz zeigt, wer kommt:
 // „Weiter aus Runde 1“ (Lauf), „Sieger aus Viertelfinale“ (Duell) bzw. „Verlierer aus Runde 2“ - kurz, in einer Zeile.
-import { sectionKind } from "@/lib/bracketSections";
+import { isTableFormat, sectionKind } from "@/lib/bracketSections";
 import { describeSlot, normalizeSource } from "@/lib/slotSource";
 import { formatBracketSection, formatRoundName, matchRoundLabel } from "@/lib/tournamentLabels";
 
@@ -55,7 +55,12 @@ export function roundName(match, number = match?.round) {
 export function sectionRoundLabel(match) {
   const name = roundName(match);
   const kind = sectionKind(match?.section);
-  const section = match?.section && kind !== "grand_final" && kind !== "bronze" ? formatBracketSection(match.section) : "";
+  // Liga, Schweizer System, Gruppen (Tabellen): davor steht nur eine Gruppe („Gruppe A · Spieltag 3“) - nie
+  // „Spieltage · Spieltag 3“ (Review #1947).
+  const table = isTableFormat([match]);
+  const shown = match?.section && kind !== "grand_final" && kind !== "bronze"
+    && (!table || String(match.section).trim().toLowerCase().startsWith("group_"));
+  const section = shown ? formatBracketSection(match.section) : "";
   const side = section.toLowerCase().split(" ")[0];
   return [section && !name.toLowerCase().includes(side) ? section : "", name].filter(Boolean).join(" · ");
 }
