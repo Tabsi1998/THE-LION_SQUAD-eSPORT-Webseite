@@ -13,6 +13,7 @@ import database
 # Was mindestens da sein muss: Sammlung -> Indexnamen (gewöhnliche tragen den Namen, den MongoDB selbst bildet).
 EXPECTED = {
     "user_xp": {"user_unique"},
+    "ceremony_seen": {"user_unique"},  # Zeremonie einmal je Konto (#2450)
     "user_achievement_stats": {"user_unique"},
     "user_signals": {"user_name_unique"},
     "news_reads": {"user_news_unique"},

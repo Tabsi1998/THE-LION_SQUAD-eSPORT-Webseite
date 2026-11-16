@@ -48,6 +48,8 @@ PURGED = (
     "chat_reads", "document_opens", "team_invites", "user_achievements", "achievement_outbox", "user_stickers", "season_rank_snapshots",
     "year_review_notices", "feedback_receipts", "tournament_stream_announcements", "f1_staff_assignments", "dolibarr_identities",
     "dolibarr_honours",
+    # Seit #2450: was die Person von den Zeremonien schon gesehen hat.
+    "ceremony_seen",
     # Seit #1585: der Platz in der Liste „Am Start / Als Nächstes“ einer Fast Lap.
     "f1_queue",
     # Seit #1741: Captain einer externen Serie.
