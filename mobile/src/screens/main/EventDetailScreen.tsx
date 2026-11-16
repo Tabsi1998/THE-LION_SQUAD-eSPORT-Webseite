@@ -12,6 +12,7 @@ import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
 import { offerCalendarHint } from "../../lib/calendarHint";
 import { afterOwnRegistration, registrationKey, rememberOwnRegistration } from "../../notifications/pushPrompt";
+import { PushOffHint } from "../../components/PushOffHint";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { PlayAlongSheet } from "../../components/PlayAlongSheet";
@@ -339,6 +340,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
             url: event.slug ? `https://lionsquad.at/events/${event.slug}` : null,
           }} />
           ) : null}
+          {/* Aufrufe abgelehnt (#1208): eine leise Zeile statt eines Dialogs bei jedem Öffnen. */}
+          <PushOffHint show={!over} testID="event-push-off" />
         </Card>
 
         {recap ? (

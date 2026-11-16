@@ -39,6 +39,7 @@ import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
 import { offerCalendarHint } from "../../lib/calendarHint";
 import { afterOwnRegistration, registrationKey } from "../../notifications/pushPrompt";
+import { PushOffHint } from "../../components/PushOffHint";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -532,6 +533,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentFormat(tournament.format)].filter(Boolean).join(" · ") || null,
                 url: tournament.slug ? `https://lionsquad.at/tournaments/${tournament.slug}` : null,
               } : null} />
+              {/* Aufrufe abgelehnt (#1208): eine leise Zeile statt eines Dialogs bei jedem Öffnen. */}
+              <PushOffHint show={!tournamentIsOver(tournament)} testID="tournament-push-off" />
               {/* Turnierleitung am Handy (#1156): nur wer in diesem Turnier Ergebnisse eintragen darf (der Server sagt es). */}
               {tournament.can_manage_results && !guest ? (
                 <Button
