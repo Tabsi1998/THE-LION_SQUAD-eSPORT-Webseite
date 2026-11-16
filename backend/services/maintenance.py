@@ -39,7 +39,7 @@ logger = logging.getLogger("tls.maintenance")
 
 DOC_ID = "write_pause"
 ERROR_CODE = "write_pause"
-# Kennzeichen der Antwort: die Betriebssicht zählt sie nicht als Serverfehler (server.py, ops_monitoring).
+# Kennzeichen der Antwort: die Betriebssicht zählt sie nicht als Serverfehler (services/ops_monitor.py, OpsMonitorMiddleware).
 MARKER_HEADER = "X-Write-Pause"
 # Grenzen der Lease: kurz genug, dass ein abgestürztes Backup die Website nicht lange sperrt.
 MIN_TTL_SECONDS = 5
@@ -251,6 +251,34 @@ def response_parts(state: dict) -> tuple[int, dict, dict]:
     body = {"detail": MESSAGE, "code": ERROR_CODE, "retry_after": retry}
     headers = {"Retry-After": str(retry), "Cache-Control": "no-store", MARKER_HEADER: "1"}
     return 503, body, headers
+
+
+class WritePauseMiddleware:
+    """Die Schreibpause am Eingang (server.py), als reine ASGI-Middleware (#2446).
+
+    Früher eine ``BaseHTTPMiddleware``: Kam von innen keine Antwort, weil der Browser die Verbindung schon getrennt hatte
+    (``sendBeacon`` beim Seitenwechsel), warf sie „No response returned.“ - die Betriebssicht zählte das als 500.
+    Hier wird nichts umgepackt: gesperrt heißt 503 mit ``Retry-After``, sonst geht die Anfrage unverändert weiter."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            from starlette.requests import Request
+
+            request = Request(scope)
+            if blocks(request.method, request.url.path):
+                from database import get_db
+
+                state = await active_state(get_db())
+                if state:
+                    from starlette.responses import JSONResponse
+
+                    status_code, body, headers = response_parts(state)
+                    await JSONResponse(status_code=status_code, content=body, headers=headers)(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
