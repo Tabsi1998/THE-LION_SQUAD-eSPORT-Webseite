@@ -286,3 +286,24 @@ describe("App-Sperre (#1052)", () => {
     await waitFor(() => expect(mockNavigateToNotification).toHaveBeenCalledWith(expect.objectContaining({ id: "n-privat", url: "/messages/max" })));
   });
 });
+
+describe("Sammelmeldung nach der Ruhezeit (#2444)", () => {
+  test("kommt im Vordergrund nicht als eigener Eintrag in die Glocke - die Meldungen stehen schon dort", async () => {
+    await render(tree());
+    expect(await screen.findByText("Nachricht für A")).toBeTruthy();
+    await act(async () => {
+      mockListeners.receive?.({ id: "n-digest", kind: "quiet_digest", title: "In der Nacht: 4 Meldungen", url: "/notifications", read: false });
+    });
+    expect(screen.queryByText("In der Nacht: 4 Meldungen")).toBeNull();
+    expect(screen.queryByTestId("notification-popup")).toBeNull();
+  });
+
+  test("angetippt öffnet sie die Glocke", async () => {
+    await render(tree());
+    await waitFor(() => expect(mockListeners.open).not.toBeNull());
+    await act(async () => {
+      mockListeners.open?.({ id: "n-digest", kind: "quiet_digest", title: "In der Nacht: 4 Meldungen", url: "/notifications", read: false });
+    });
+    await waitFor(() => expect(mockNavigateToNotification).toHaveBeenCalledWith(expect.objectContaining({ kind: "quiet_digest", url: "/notifications" })));
+  });
+});
