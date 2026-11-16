@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { CeremonyHost } from "./CeremonyHost";
 import { createCeremonyQueue } from "./queue";
 import { type CeremonyTier } from "./select";
-import { ceremonyState, importedKey, markSeen, resetCeremonySeen, serverCheck } from "./seen";
+import { STATE_TIMEOUT_MS, ceremonyState, importedKey, markSeen, resetCeremonySeen, serverCheck } from "./seen";
 
 // Zeremonie einmal je Konto (#2450), wie im Web: jede Art des Schließens meldet „gesehen“ an den Server, vor dem
 // Anzeigen fragt die App noch einmal, der Altbestand des Geräts geht einmalig an den Server. Ohne Server-Stand (ältere
@@ -160,4 +160,21 @@ test("zusammengelegte Pakete melden beide „gesehen“", () => {
   queue.enqueue({ tiers: [], levelUp: { level: 3 }, onDone: () => calls.push("level") });
   queue.advance();
   expect(calls).toEqual(["eins", "zwei", "level"]);
+});
+
+test("hängt die Anfrage, kommt nach der Zeitgrenze null - die App zeigt das Paket wie bisher", async () => {
+  mockStore[importedKey("anna")] = "x";
+  mockGet.mockReturnValue(new Promise(() => {}));
+  const queue = createCeremonyQueue({ now: () => 0 });
+  await render(<CeremonyHost queue={queue} />);
+  await act(async () => {
+    queue.enqueue({ id: "pkg", tiers: [tier("a")], check: serverCheck("anna") });
+  });
+  expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
+  await act(async () => { jest.advanceTimersByTime(STATE_TIMEOUT_MS); });
+  for (let step = 0; step < 5 && !screen.queryByTestId("achievement-unlock-overlay"); step += 1) await act(async () => { await Promise.resolve(); });
+  expect(screen.getByTestId("achievement-unlock-overlay")).toBeTruthy();
+  // Die hängende Anfrage blockiert die nächste nicht.
+  mockGet.mockResolvedValue({ data: serverState({ unseen: ["b"] }) });
+  await expect(ceremonyState("anna")).resolves.toMatchObject({ unseen: ["b"] });
 });

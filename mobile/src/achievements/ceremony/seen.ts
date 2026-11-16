@@ -81,12 +81,18 @@ function notSupported(error: unknown): boolean {
   return status === 404 || status === 405;
 }
 
-/** Der Stand am Server - oder null (älterer Server, keine Verbindung): dann gilt das bisherige Verhalten im Gerät. */
+/** Länger wartet die Bühne nicht auf den Server - danach gilt das bisherige Verhalten (die Zeremonie kommt). */
+export const STATE_TIMEOUT_MS = 4500;
+
+/**
+ * Der Stand am Server - oder null (älterer Server, keine Verbindung, keine Antwort binnen STATE_TIMEOUT_MS): dann gilt
+ * das bisherige Verhalten im Gerät.
+ */
 export function ceremonyState(userId: string | null | undefined): Promise<CeremonyState | null> {
   if (!userId || unsupported.has(userId)) return Promise.resolve(null);
   const running = inflight.get(userId);
   if (running) return running;
-  const request = (async () => {
+  const work = (async () => {
     try {
       // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
       const { data } = await api.get<ServerState>("/achievements/me/ceremony");
@@ -99,10 +105,14 @@ export function ceremonyState(userId: string | null | undefined): Promise<Ceremo
     } catch (error) {
       if (notSupported(error)) unsupported.add(userId);
       return null;
-    } finally {
-      inflight.delete(userId);
     }
   })();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), STATE_TIMEOUT_MS); });
+  const request: Promise<CeremonyState | null> = Promise.race([work, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+    if (inflight.get(userId) === request) inflight.delete(userId);
+  });
   inflight.set(userId, request);
   return request;
 }
