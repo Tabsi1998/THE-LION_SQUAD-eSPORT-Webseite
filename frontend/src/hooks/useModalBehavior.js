@@ -41,6 +41,12 @@ function inertOutside(root) {
   return () => locked.forEach((node) => node.removeAttribute("inert"));
 }
 
+// Optionsfelder einer Gruppe sind ein einziger Tab-Halt: am Rand zählt die ganze Gruppe als erstes bzw. letztes Element.
+function sameStop(a, b) {
+  if (a === b) return true;
+  return Boolean(a && b && a.type === "radio" && b.type === "radio" && a.name && a.name === b.name && a.form === b.form);
+}
+
 // Offene Overlays von unten nach oben. Nur das oberste nimmt Escape und Tab an und sperrt den Rest der Seite; schließt
 // es, gilt wieder das darunter (ein Bild-Dialog im Seitenblatt schließt allein, das Blatt bleibt offen).
 const stack = [];
@@ -93,9 +99,15 @@ function popOverlay(entry) {
  * sheet closes on its own. Escape pressed in a list that lives outside the overlay (a Radix select hangs off the
  * body) belongs to that list.
  *
+ * No `autoFocus` inside: it fires before this hook remembers where the focus came from. Focus a field in an effect
+ * declared after the hook instead.
+ *
+ * `focusContainer`: focus goes to the overlay itself instead of its first control (sheets: the screen reader reads
+ * the title first, Tab leads to the first field).
+ *
  * Returns the ref to put on the element that holds the focusable content.
  */
-export function useModalBehavior(active, onDismiss) {
+export function useModalBehavior(active, onDismiss, { focusContainer = false } = {}) {
   const containerRef = useRef(null);
   const dismissRef = useRef(onDismiss);
   dismissRef.current = onDismiss;
@@ -111,7 +123,7 @@ export function useModalBehavior(active, onDismiss) {
     const isTop = () => stack[stack.length - 1] === entry;
 
     if (container && !container.contains(document.activeElement)) {
-      const [first] = focusableItems();
+      const [first] = focusContainer ? [] : focusableItems();
       (first || container).focus?.();
     }
 
@@ -133,10 +145,10 @@ export function useModalBehavior(active, onDismiss) {
       const first = items[0];
       const last = items[items.length - 1];
       const current = document.activeElement;
-      if (event.shiftKey && (current === first || !container.contains(current))) {
+      if (event.shiftKey && (sameStop(current, first) || current === container || !container.contains(current))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (current === last || !container.contains(current))) {
+      } else if (!event.shiftKey && (sameStop(current, last) || !container.contains(current))) {
         event.preventDefault();
         first.focus();
       }
@@ -150,7 +162,7 @@ export function useModalBehavior(active, onDismiss) {
       const movedOnPurpose = current && current !== document.body && !container?.contains(current);
       if (!movedOnPurpose) previouslyFocused?.focus?.();
     };
-  }, [active]);
+  }, [active, focusContainer]);
 
   return containerRef;
 }

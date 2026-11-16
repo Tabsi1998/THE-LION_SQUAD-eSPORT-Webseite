@@ -254,3 +254,49 @@ test("Escape gehört einer aufgeklappten Auswahl außerhalb des Overlays, nicht 
   expect(onDismiss).not.toHaveBeenCalled();
   popover.remove();
 });
+
+// #2412: Seitenblätter setzen den Fokus auf das Blatt selbst - das Vorleseprogramm liest den Titel, Tab führt zum
+// ersten Feld, Shift+Tab bleibt im Blatt.
+test("focusContainer: der Fokus steht auf dem Overlay selbst, Tab und Shift+Tab bleiben drin", async () => {
+  const user = userEvent.setup();
+  function Sheet() {
+    const ref = useModalBehavior(true, () => {}, { focusContainer: true });
+    return (
+      <div ref={ref} tabIndex={-1} data-testid="sheet">
+        <button type="button">Erste</button>
+        <button type="button">Letzte</button>
+      </div>
+    );
+  }
+  render(<><button type="button">Draußen</button><Sheet /></>);
+
+  expect(screen.getByTestId("sheet")).toHaveFocus();
+  await user.tab({ shift: true });
+  expect(screen.getByRole("button", { name: "Letzte" })).toHaveFocus();
+  screen.getByTestId("sheet").focus();
+  await user.tab();
+  expect(screen.getByRole("button", { name: "Erste" })).toHaveFocus();
+});
+
+// #2412: eine Gruppe von Optionsfeldern ist ein einziger Tab-Halt. Steht der Fokus auf einer anderen als der ersten
+// Option, darf Shift+Tab trotzdem nicht aus dem Overlay herausfallen.
+test("Optionsfelder am Rand: Shift+Tab und Tab bleiben im Overlay", async () => {
+  const user = userEvent.setup();
+  function Choice() {
+    const ref = useModalBehavior(true, () => {});
+    return (
+      <div ref={ref}>
+        <input type="radio" name="team" aria-label="Löwen" />
+        <input type="radio" name="team" aria-label="Falken" />
+        <button type="button">Weiter</button>
+      </div>
+    );
+  }
+  render(<><button type="button">Draußen</button><Choice /></>);
+
+  screen.getByLabelText("Falken").focus();
+  await user.tab({ shift: true });
+  expect(screen.getByRole("button", { name: "Weiter" })).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("radio", { name: "Löwen" }).matches(":focus") || screen.getByRole("radio", { name: "Falken" }).matches(":focus")).toBe(true);
+});
