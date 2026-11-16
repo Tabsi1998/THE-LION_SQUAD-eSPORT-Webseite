@@ -89,3 +89,16 @@ def test_image_sizes_stay_the_same():
               "participant_word": "Spieler", "steps": [], "chips": ["Finale 3:2"], "club_name": "THE LION SQUAD", "domain": "lionsquad.at"}
     assert _size(result_share.render(result, "story")) == share_image.STORY
     assert _size(result_share.render(result, "wide")) == share_image.WIDE
+
+
+def test_a_space_the_font_lacks_counts_as_missing():
+    assert share_image.has_glyph(True, " ") and share_image.has_glyph(False, "\u00a0")
+    assert not share_image.has_glyph(True, "\u2009"), "das schmale Leerzeichen fehlt - sonst stünde ein Kästchen da"
+
+
+def test_the_separator_has_air_on_both_sides():
+    assert share_image.joined(["Probe-Liga", "", "Season 1"]) == "Probe-Liga\u00a0 · \u00a0Season 1"
+    assert share_image.spaced("Nordlicht · Nordlicht A") == "Nordlicht\u00a0 · \u00a0Nordlicht A"
+    assert league_rank_banner.record_text({"won": 5, "lost": 2}) == "5 S\u00a0 · \u00a02 N"
+    brand = share_image.font(22)
+    assert brand.covers(share_image.SEP), "der Trenner bleibt in der Lionsquad-Schrift"

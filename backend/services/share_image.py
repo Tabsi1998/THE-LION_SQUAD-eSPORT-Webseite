@@ -52,6 +52,20 @@ BRAND_FONTS = {
 # Ein Zeichen, das keine der Schriften hat - sein Bild ist das „fehlt“-Kästchen, mit dem jedes andere Zeichen verglichen wird.
 _MISSING_PROBE = "\ue000"
 _PROBE_SIZE = 64
+# Trenner „·“ mit Luft (#2435): Saira Condensed und Outfit haben schmale Leerzeichen - ein festes und ein normales je Seite,
+# damit der Punkt nicht an den Wörtern klebt. Schmale Sonderleerzeichen (U+2009) haben die Schriften nicht.
+SEP = "  ·  "
+
+
+def joined(parts) -> str:
+    """Teile mit dem Trenner der Teilen-Bilder - leere fallen weg, ein „ · “ in einem Teil bekommt dieselbe Luft."""
+    return SEP.join(spaced(part) for part in parts if part)
+
+
+def spaced(text) -> str:
+    return str(text or "").replace(" · ", SEP)
+
+
 # Platz 1–3 in den Farben der Medaillen, alles darunter weiß.
 RANK_COLORS = {1: GOLD, 2: "#D9DEE5", 3: "#E0A06A"}
 
@@ -89,8 +103,7 @@ def has_glyph(bold: bool, char: str) -> bool:
     """Hat die Lionsquad-Schrift dieses Zeichen? Die Dateien tragen nur den lateinischen Zeichensatz (mit Umlauten und ß) - ein
     Zeichen aus Osteuropa, Kyrillisch oder ein Symbol fehlt. Erkannt am Bild: Ein fehlendes Zeichen sieht aus wie das
     „fehlt“-Kästchen."""
-    if char.isspace():
-        return True
+    # Auch Leerzeichen prüfen: ein schmales (U+2009) fehlt den Schriften - ohne Prüfung stünde dort das „fehlt“-Kästchen.
     found = _probe(bold)
     if found is None:
         return False
