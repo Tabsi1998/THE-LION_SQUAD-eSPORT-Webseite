@@ -22,6 +22,8 @@ test("Klassen: Dashboard und News lebendig, Details mittel, Turniere und Formula
   expect(screenClass("DirectThread")).toBe("calm");
   // Der Adventkalender ist selbst das Bild - wie /advent im Web.
   expect(screenClass("AdventCalendar")).toBe("calm");
+  // FAQ (#2449): lesen und suchen.
+  expect(screenClass("Faq")).toBe("calm");
   expect(screenClass("Consent")).toBe("quiet");
   expect(screenClass("NotificationSettings")).toBe("quiet");
   expect(screenClass("")).toBe("lively");
