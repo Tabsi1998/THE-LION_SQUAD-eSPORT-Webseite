@@ -6,7 +6,8 @@ import { act, render, waitFor } from "@testing-library/react";
 const apiMock = { get: vi.fn() };
 const authState = { user: { id: "anna" } };
 const ceremonies = [];
-vi.mock("@/lib/api", () => ({ api: apiMock }));
+const keepaliveMock = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/api", () => ({ api: apiMock, keepaliveRequest: (...args) => keepaliveMock(...args) }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/components/achievements/ceremony/queue", () => ({
   enqueueCeremony: (tiers, context, options) => {
@@ -64,6 +65,8 @@ test("erster Besuch: nur der Merker; beim nächsten Besuch die nachgeholten Stuf
   expect(localStorage.getItem("tls_ach_seen:anna")).toBe("2026-10-29T00:00:00Z");
   ceremonies[0].options.onDone();
   expect(localStorage.getItem("tls_ach_seen:anna")).not.toBe("2026-10-29T00:00:00Z");
+  // Auch im Rückfall ohne Server-Stand geht „gesehen“ an den Server (#2450), sonst käme sie auf einem anderen Gerät noch einmal.
+  expect(keepaliveMock).toHaveBeenCalledWith("POST", "/achievements/me/ceremony/seen", { codes: ["bats_2"] });
 });
 
 test("gerade vergeben: die neuesten Stufen nach der Zahl des Servers, sofort und nie doppelt - auch ohne Merker und bei falscher Uhr", async () => {

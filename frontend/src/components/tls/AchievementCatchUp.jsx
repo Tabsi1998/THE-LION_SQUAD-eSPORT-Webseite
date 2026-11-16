@@ -116,7 +116,8 @@ export function AchievementCatchUp() {
         const marker = data?.recount?.finished ? data.recount.marker : null;
         if (marker && !lastSeen(recountSeenKey(userId, marker))) {
           const late = recountTiers(data?.groups || []);
-          if (late.length) enqueueCeremony(late, { recount: true }, { onDone: () => remember(recountSeenKey(userId, marker)) });
+          // Auch im Rückfall (Server zu langsam) „gesehen“ melden - sonst käme sie auf einem anderen Gerät noch einmal.
+          if (late.length) enqueueCeremony(late, { recount: true }, { onDone: () => { remember(recountSeenKey(userId, marker)); markSeen(userId, { recountMarker: marker }); } });
           else remember(recountSeenKey(userId, marker));
         }
         const last = lastSeen(key);
@@ -131,7 +132,13 @@ export function AchievementCatchUp() {
         }
         fresh.forEach((tier) => shownRef.current.add(tier.code));
         // Der Marker rückt erst vor, wenn die Zeremonie wirklich gezeigt wurde.
-        enqueueCeremony(fresh, { ...describePackage(data?.groups || [], fresh), ...CATCH_UP }, { onDone: () => remember(key) });
+        enqueueCeremony(fresh, { ...describePackage(data?.groups || [], fresh), ...CATCH_UP }, {
+          onDone: () => {
+            remember(key);
+            // Rückfall ohne Server-Stand (langsam, älterer Server): trotzdem melden; ein älterer Server ignoriert es.
+            markSeen(userId, { codes: fresh.map((tier) => tier.code) });
+          },
+        });
       } catch {
         /* rein kosmetisch */
       }

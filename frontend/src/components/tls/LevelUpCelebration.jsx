@@ -80,7 +80,9 @@ export function LevelUpCelebration() {
       if (currentRef.current !== userId) return;
       if (!state) {
         const levelUp = await claimLevelUp(storeKey(userId), next);
-        if (levelUp && currentRef.current === userId) enqueueLevelUp(levelUp);
+        // Rückfall ohne Server-Stand: „gesehen“ trotzdem melden (ein älterer Server ignoriert es), sonst käme der
+        // Aufstieg auf einem anderen Gerät noch einmal.
+        if (levelUp && currentRef.current === userId) enqueueLevelUp(levelUp, { onDone: () => markSeen(userId, { level: next }) });
         return;
       }
       const levelUp = levelUpFrom(state.level, next);
