@@ -5,6 +5,7 @@ import logging
 import json
 import re
 from datetime import datetime, timezone, timedelta
+from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from database import get_db
@@ -16,7 +17,9 @@ from services.user_notifications import create_user_notification
 
 from services.ops_monitor import errors_overview, ops_summary, set_error_resolved, slow_overview
 from services.ops_alerts import ALERT_KINDS, alert_red_checks, load_alert_settings, recent_alerts, save_alert_settings, send_test_alert
-from services.ops_checks import checks_overview, run_checks
+from services.ops_checks import RUN_NOW_LIMIT_PER_MINUTE, checks_overview, run_checks
+from services import ops_acks
+from services.rate_limit import enforce_rate_limit
 from services.ops_vitals import vitals_overview
 from services import github_releases
 from services.form_flags import form_flag
@@ -310,19 +313,47 @@ async def ops_errors(
     return await errors_overview(get_db(), status=status, limit=limit)
 
 
+async def _ops_audit(db, me: dict, action: str, target_id: str | None, data: dict) -> None:
+    """Quittieren, Lösen, Wieder öffnen (#2447) stehen im Adminprotokoll - wer, wann, was."""
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": target_id,
+                                    "data": data, "created_at": now_utc().isoformat()})
+
+
+class OpsErrorsResolveBody(BaseModel):
+    fingerprints: list[str] = Field(min_length=1, max_length=200)
+
+
+@router.post("/ops/errors/resolve")
+async def ops_errors_resolve_many(body: OpsErrorsResolveBody, me: dict = Depends(require_area("system"))):
+    """„Ausgewählte als gelöst“ (#2447): mehrere Fehlergruppen auf einmal."""
+    db = get_db()
+    wanted = list(dict.fromkeys(str(value)[:64] for value in body.fingerprints if value))
+    rows = []
+    for fingerprint in wanted:
+        row = await set_error_resolved(db, fingerprint, True, actor_id=me.get("id"))
+        if row:
+            rows.append(row)
+    await _ops_audit(db, me, "ops.errors.resolve", None, {"fingerprints": [row["fingerprint"] for row in rows][:50], "count": len(rows)})
+    return {"resolved": len(rows), "items": rows}
+
+
 @router.post("/ops/errors/{fingerprint}/resolve")
-async def ops_error_resolve(fingerprint: str, me: dict = Depends(require_club_admin())):
-    row = await set_error_resolved(get_db(), fingerprint, True)
+async def ops_error_resolve(fingerprint: str, me: dict = Depends(require_area("system"))):
+    db = get_db()
+    row = await set_error_resolved(db, fingerprint, True, actor_id=me.get("id"))
     if not row:
         raise HTTPException(status_code=404, detail="Fehlergruppe nicht gefunden")
+    await _ops_audit(db, me, "ops.errors.resolve", fingerprint, {"fingerprints": [fingerprint], "count": 1})
     return row
 
 
 @router.post("/ops/errors/{fingerprint}/reopen")
-async def ops_error_reopen(fingerprint: str, me: dict = Depends(require_club_admin())):
-    row = await set_error_resolved(get_db(), fingerprint, False)
+async def ops_error_reopen(fingerprint: str, me: dict = Depends(require_area("system"))):
+    db = get_db()
+    row = await set_error_resolved(db, fingerprint, False)
     if not row:
         raise HTTPException(status_code=404, detail="Fehlergruppe nicht gefunden")
+    await _ops_audit(db, me, "ops.errors.reopen", fingerprint, {"fingerprints": [fingerprint]})
     return row
 
 
@@ -348,8 +379,11 @@ async def ops_checks(me: dict = Depends(require_club_admin())):
 
 
 @router.post("/ops/checks/run")
-async def ops_checks_run(me: dict = Depends(require_club_admin())):
-    """Jetzt prüfen - mit denselben Alarmen wie der Scheduler, gedrosselt."""
+async def ops_checks_run(request: Request, me: dict = Depends(require_club_admin())):
+    """Jetzt neu prüfen - mit denselben Alarmen wie der Scheduler. Gedrosselt (#2447): höchstens
+    ``RUN_NOW_LIMIT_PER_MINUTE`` Läufe je Minute und Person, die Seite sperrt den Knopf zusätzlich während des Laufs."""
+    await enforce_rate_limit(request, "ops:checks-run", limit=RUN_NOW_LIMIT_PER_MINUTE, window_seconds=60, subject=str(me.get("id") or ""),
+                             message="Gerade erst geprüft. Bitte warte noch {wait}.")
     db = get_db()
     run = await run_checks(db)
     await alert_red_checks(db, run)
@@ -390,6 +424,8 @@ class OpsAlertSettingsBody(BaseModel):
     red_reminder_hours: int | None = None
     rules: dict[str, dict[str, bool]] | None = None
     retention_days: dict[str, int] | None = None
+    # Upload-Routen (#2447): höchstens 40 Zeilen zu je 210 Zeichen - als Liste oder Text mit einer Route je Zeile.
+    upload_routes: Annotated[list[Annotated[str, Field(max_length=210)]], Field(max_length=40)] | Annotated[str, Field(max_length=9000)] | None = None
 
 
 @router.get("/ops/alerts")
@@ -472,42 +508,87 @@ def _since_iso_hours(hours: int) -> str:
     return (now_utc() - timedelta(hours=int(hours))).isoformat() if hours else ""
 
 
-async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict]:
+def _with_state(item: dict, row: dict | None = None, *, ack_id: str = "", acknowledged: dict | None = None, resolved: tuple[str, str] | None = None,
+                problem: bool | None = None, spec_source: str | None = None) -> dict:
+    """Stand eines Eintrags (#2447): ``open`` (Problem, weder quittiert noch behoben), ``acknowledged_at``/``acknowledged_by``
+    (die Kennung, ``_named`` macht daraus den Namen), ``resolved_at``/``resolved_label`` („behoben“, „abgelöst“ …) und
+    ``ackable`` mit ``ack_id`` - dieser Wert geht an ``POST /ops/events/ack``."""
+    if acknowledged is None and row is not None and spec_source:
+        if ops_acks.ack_valid(row, ops_acks.SPECS[spec_source].time_keys):
+            acknowledged = {"at": row.get("acknowledged_at"), "by": row.get("acknowledged_by")}
+    is_problem = item.get("severity") in {"error", "warn"} if problem is None else problem
+    item["ack_id"] = ack_id if is_problem else ""
+    item["acknowledged_at"] = str((acknowledged or {}).get("at") or "")
+    item["acknowledged_by"] = str((acknowledged or {}).get("by") or "")
+    item["resolved_at"] = str((resolved or ("", ""))[0] or "")
+    item["resolved_label"] = (resolved or ("", ""))[1]
+    item["open"] = bool(is_problem and not acknowledged and not resolved)
+    item["ackable"] = bool(item["open"] and item["ack_id"])
+    return item
+
+
+async def _named(db, sources: list[dict]) -> None:
+    """Wer quittiert hat - der Name kommt erst beim Lesen aus der Kennung (gelöschtes Konto: „Gelöschter User“)."""
+    items = [item for source in sources for item in source["items"] if item.get("acknowledged_by")]
+    names = await ops_acks.actor_names(db, [item["acknowledged_by"] for item in items])
+    for item in items:
+        item["acknowledged_by"] = _masked_log_text(names.get(item["acknowledged_by"], ""), 120)
+
+
+async def _rows(db, source: str, query: dict, sort, limit: int, open_only: bool, projection: dict | None = None) -> list[dict]:
+    """Die Zeilen einer Quelle - mit ``open_only`` (#2447) gleich in der Datenbank nur die offenen Probleme."""
+    if open_only:
+        return await ops_acks.problem_rows(db, source, query, sort, limit, projection=projection)
+    collection = getattr(db, ops_acks.SPECS[source].collection)
+    return await collection.find(query, projection or {"_id": 0}).sort(sort).limit(limit).to_list(limit)
+
+
+async def _log_sources(db, safe_limit: int, *, since_iso: str = "", open_only: bool = False) -> list[dict]:
     """Alle Ereignisquellen als eine Liste je Quelle (#517 Teil 2): Uploads, App-Logs, Adminaktionen,
     E-Mail-Versand, Mail-Queue, Serverfehler, Auto-Checks, Alarme, Dolibarr-Abgleich, Discord-Bot.
-    Ohne Namen, Adressen oder Tokens - so, wie die Quellen es selbst schon halten."""
+    Ohne Namen, Adressen oder Tokens - so, wie die Quellen es selbst schon halten.
+
+    Jeder Eintrag trägt seinen Stand (#2447, ``_with_state``); ``problem_count`` je Quelle zählt nur Offenes
+    (``ops_acks.open_count``). ``open_only`` holt je Quelle nur offene Probleme - für „Neueste Probleme“."""
     def since(field: str) -> dict:
         return {field: {"$gte": since_iso}} if since_iso else {}
 
-    upload_rows = await db.upload_events.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    upload_rows = await _rows(db, "uploads", since("created_at"), [("created_at", -1)], safe_limit, open_only)
     upload_items = [
-        _log_item("uploads", "Uploads", HREFS["uploads"], row,
-                  severity="success" if row.get("status") == "success" else "warn" if row.get("status") == "client_failed" else "error",
-                  status=row.get("status") or "", title=row.get("filename") or "Upload",
-                  subtitle=" · ".join(filter(None, [row.get("kind"), row.get("media_scope"), row.get("mime")])),
-                  detail=row.get("detail") or (row.get("result") or {}).get("url") or "", time_keys=("created_at",))
+        _with_state(_log_item("uploads", "Uploads", HREFS["uploads"], row,
+                              severity="success" if row.get("status") == "success" else "warn" if row.get("status") == "client_failed" else "error",
+                              status=row.get("status") or "", title=row.get("filename") or "Upload",
+                              subtitle=" · ".join(filter(None, [row.get("kind"), row.get("media_scope"), row.get("mime")])),
+                              detail=row.get("detail") or (row.get("result") or {}).get("url") or "", time_keys=("created_at",)),
+                    row, ack_id=row.get("id") or "", spec_source="uploads", problem=row.get("status") in {"failed", "client_failed"})
         for row in upload_rows
     ]
 
-    client_rows = await db.mobile_client_logs.find(since("received_at"), {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).limit(safe_limit).to_list(safe_limit)
+    client_rows = await _rows(db, "client", since("received_at"), [("priority_rank", 1), ("received_at", -1)], safe_limit, open_only)
     client_items = []
     for row in client_rows:
         level = row.get("level") or "info"
         severity = "error" if level in {"fatal", "error"} else "warn" if level == "warn" else "info"
-        client_items.append(_log_item("client", "App-Logs", HREFS["client"], row, severity=severity, status=row.get("status") or level,
-                                      title=row.get("message") or row.get("error_name") or "Client-Log",
-                                      subtitle=" · ".join(filter(None, [row.get("source"), row.get("screen"), row.get("display_name") or row.get("username"), row.get("platform")])),
-                                      detail=row.get("stack") or row.get("context") or "", time_keys=("received_at", "created_at")))
+        status = row.get("status") or level
+        # In den App-Logs gelöst oder ignoriert (Stand je Meldung) heißt hier: erledigt.
+        done = {"resolved": "gelöst", "ignored": "ignoriert"}.get(status)
+        client_items.append(_with_state(
+            _log_item("client", "App-Logs", HREFS["client"], row, severity=severity, status=status,
+                      title=row.get("message") or row.get("error_name") or "Client-Log",
+                      subtitle=" · ".join(filter(None, [row.get("source"), row.get("screen"), row.get("display_name") or row.get("username"), row.get("platform")])),
+                      detail=row.get("stack") or row.get("context") or "", time_keys=("received_at", "created_at")),
+            row, ack_id=row.get("id") or "", spec_source="client", resolved=(row.get("resolved_at") or "", done) if done else None,
+            problem=severity in {"error", "warn"} and status in {"open", "resolved", "ignored"}))
 
-    audit_rows = await db.audit_logs.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    audit_rows = [] if open_only else await db.audit_logs.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
     audit_items = [
-        _log_item("audit", "Adminaktionen", HREFS["audit"], row, severity="info", status="audit", title=row.get("action") or "Admin-Aktion",
-                  subtitle=" · ".join(filter(None, [row.get("actor_display_name") or row.get("actor_username") or row.get("actor_id"), row.get("target_id")])),
-                  detail=row.get("data") or "", time_keys=("created_at",))
+        _with_state(_log_item("audit", "Adminaktionen", HREFS["audit"], row, severity="info", status="audit", title=row.get("action") or "Admin-Aktion",
+                              subtitle=" · ".join(filter(None, [row.get("actor_display_name") or row.get("actor_username") or row.get("actor_id"), row.get("target_id")])),
+                              detail=row.get("data") or "", time_keys=("created_at",)), problem=False)
         for row in audit_rows
-    ]
+    ] if not open_only else []
 
-    email_rows = await db.email_logs.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    email_rows = await _rows(db, "email", since("created_at"), [("created_at", -1)], safe_limit, open_only)
     guild_names = await _discord_guild_names(db) if any(row.get("channel") == "discord" for row in email_rows) else {}
     email_items = []
     for row in email_rows:
@@ -522,47 +603,61 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
             item["guild_id"] = str(row.get("guild_id") or "")
             # „Erneut senden“ (#2112): nur fehlgeschlagene Meldungen mit gespeichertem Inhalt - wie die Route es prüft.
             item["resendable"] = status == "failed" and bool(row.get("payload")) and bool(row.get("id"))
-        email_items.append(item)
+        email_items.append(_with_state(item, row, ack_id=row.get("id") or "", spec_source="email"))
 
-    queue_rows = await db.mail_jobs.find(since("created_at"), {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    queue_rows = await _rows(db, "mail_queue", since("created_at"), [("created_at", -1)], safe_limit, open_only, projection={"_id": 0, "html": 0})
     queue_items = []
     for row in queue_rows:
         status = row.get("status") or ""
         severity = "success" if status == "sent" else "error" if status == "failed" else "warn" if status == "skipped" else "info"
-        queue_items.append(_log_item("mail_queue", "Mail-Queue", HREFS["mail_queue"], row, severity=severity, status=status,
-                                     title=row.get("template_key") or row.get("subject") or "Mail-Job",
-                                     subtitle=" · ".join(filter(None, [row.get("to"), f"{row.get('attempts', 0)} Versuch(e)"])),
-                                     detail=row.get("last_error") or row.get("next_attempt_at") or row.get("message_id") or "", time_keys=("updated_at", "created_at")))
+        queue_items.append(_with_state(
+            _log_item("mail_queue", "Mail-Queue", HREFS["mail_queue"], row, severity=severity, status=status,
+                      title=row.get("template_key") or row.get("subject") or "Mail-Job",
+                      subtitle=" · ".join(filter(None, [row.get("to"), f"{row.get('attempts', 0)} Versuch(e)"])),
+                      detail=row.get("last_error") or row.get("next_attempt_at") or row.get("message_id") or "", time_keys=("updated_at", "created_at")),
+            row, ack_id=row.get("id") or "", spec_source="mail_queue", problem=status == "failed"))
 
-    # Serverfehler (Gruppen), Auto-Checks, Alarme - bisher nur unter Betrieb, jetzt auch in der Liste.
-    error_rows = await db.ops_errors.find(since("last_seen_at"), {"_id": 0, "stack": 0}).sort("last_seen_at", -1).limit(safe_limit).to_list(safe_limit)
+    # Serverfehler (Gruppen), Auto-Checks, Alarme - bisher nur unter Betrieb, jetzt auch in der Liste. Quittieren heißt bei
+    # einer Fehlergruppe „gelöst“ (#2447) - tritt sie wieder auf, ist sie wieder offen.
+    error_query = {**since("last_seen_at"), **({"resolved_at": None} if open_only else {})}
+    error_rows = await db.ops_errors.find(error_query, {"_id": 0, "stack": 0}).sort("last_seen_at", -1).limit(safe_limit).to_list(safe_limit)
     server_items = [
-        _log_item("server", "Serverfehler", HREFS["server"], row, severity="info" if row.get("resolved_at") else "error",
-                  status="gelöst" if row.get("resolved_at") else "offen",
-                  title=f"{row.get('error_type') or 'Fehler'} · {row.get('method') or ''} {row.get('route') or ''}".strip(),
-                  subtitle=f"{row.get('count') or 1}× · HTTP {row.get('status_code') or '?'} · {row.get('actor') or ''}".strip(" ·"),
-                  detail=row.get("message") or "", time_keys=("last_seen_at", "first_seen_at"))
+        _with_state(_log_item("server", "Serverfehler", HREFS["server"], row, severity="info" if row.get("resolved_at") else "error",
+                              status="gelöst" if row.get("resolved_at") else "offen",
+                              title=f"{row.get('error_type') or 'Fehler'} · {row.get('method') or ''} {row.get('route') or ''}".strip(),
+                              subtitle=f"{row.get('count') or 1}× · HTTP {row.get('status_code') or '?'} · {row.get('actor') or ''}".strip(" ·"),
+                              detail=row.get("message") or "", time_keys=("last_seen_at", "first_seen_at")),
+                    ack_id=row.get("fingerprint") or "", problem=True,
+                    acknowledged={"at": row.get("resolved_at"), "by": row.get("resolved_by")} if row.get("resolved_at") else None)
         for row in error_rows
     ]
 
     # Auto-Checks (#2080): ein Eintrag je Zustand statt je Lauf - „seit … · 92× geprüft · zuletzt …“; ein laufender
-    # Zustand zählt, solange sein letzter Lauf im Zeitraum liegt.
-    check_rows = await db.ops_check_episodes.find({**since("last_at"), "status": {"$ne": "ok"}}, {"_id": 0, "expires_at": 0}).sort([("since", -1), ("_id", -1)]).limit(safe_limit).to_list(safe_limit)
+    # Zustand zählt, solange sein letzter Lauf im Zeitraum liegt. Ein beendeter Zustand ist von selbst erledigt (#2447):
+    # „behoben“, wenn danach alles grün war, sonst „abgelöst“ vom nächsten Stand.
+    check_rows = await _rows(db, "checks", {**since("last_at"), "status": {"$ne": "ok"}}, [("since", -1), ("_id", -1)], safe_limit, open_only,
+                             projection={"_id": 0, "expires_at": 0})
     check_items = [
-        _log_item("checks", "Auto-Checks", HREFS["checks"], row, severity="error" if row.get("status") == "crit" else "warn", status=row.get("status") or "",
-                  title="Auto-Checks rot" if row.get("status") == "crit" else "Auto-Checks gelb",
-                  subtitle=", ".join(row.get("failing") or []),
-                  detail=_episode_detail(row),
-                  time_keys=("since", "last_at"))
+        _with_state(_log_item("checks", "Auto-Checks", HREFS["checks"], row, severity="error" if row.get("status") == "crit" else "warn", status=row.get("status") or "",
+                              title="Auto-Checks rot" if row.get("status") == "crit" else "Auto-Checks gelb",
+                              subtitle=", ".join(row.get("failing") or []),
+                              detail=_episode_detail(row),
+                              time_keys=("since", "last_at")),
+                    row, ack_id=row.get("id") or "", spec_source="checks", resolved=ops_acks.episode_resolution(row))
         for row in check_rows
     ]
 
-    alert_rows = await db.ops_alert_log.find(since("at"), {"_id": 0}).sort("at", -1).limit(safe_limit).to_list(safe_limit)
+    # Alarme (#2447): mit Gegenstück (Prüfung wieder grün, Fehlergruppe gelöst, Abgleich grün, Bot verbunden) von selbst behoben.
+    alert_query = {**since("at"), **({"kind": {"$ne": "test"}, "resolved_at": None} if open_only else {})}
+    alert_rows = await db.ops_alert_log.find(alert_query, {"_id": 0}).sort("at", -1).limit(safe_limit).to_list(safe_limit)
+    alert_resolved = await ops_acks.alert_resolutions(db, [row for row in alert_rows if row.get("kind") != "test"])
     alert_items = [
-        _log_item("alerts", "Alarme", HREFS["alerts"], row, severity="warn" if row.get("kind") != "test" else "info", status=row.get("kind") or "",
-                  title=row.get("title") or "Alarm",
-                  subtitle=", ".join(row.get("channels") or []) or "kein Weg eingerichtet",
-                  detail=row.get("description") or "", time_keys=("at",))
+        _with_state(_log_item("alerts", "Alarme", HREFS["alerts"], row, severity="warn" if row.get("kind") != "test" else "info", status=row.get("kind") or "",
+                              title=row.get("title") or "Alarm",
+                              subtitle=", ".join(row.get("channels") or []) or "kein Weg eingerichtet",
+                              detail=row.get("description") or "", time_keys=("at",)),
+                    row, ack_id=row.get("id") or "", spec_source="alerts",
+                    resolved=(alert_resolved[row["id"]], "behoben") if row.get("id") in alert_resolved else None)
         for row in alert_rows
     ]
 
@@ -570,11 +665,14 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
     sync_items = []
     last_error = sync_state.get("last_error") if isinstance(sync_state.get("last_error"), dict) else None
     if last_error:
-        sync_items.append(_log_item("sync", "Dolibarr-Abgleich", HREFS["sync"], {"at": sync_state.get("last_run_at") or last_error.get("at")}, severity="error", status="rot",
-                                    title="Dolibarr-Abgleich rot", subtitle=str(last_error.get("kind") or ""), detail=last_error.get("text") or "", time_keys=("at",)))
-    elif sync_state.get("last_ok_at"):
-        sync_items.append(_log_item("sync", "Dolibarr-Abgleich", HREFS["sync"], {"at": sync_state.get("last_ok_at")}, severity="success", status="grün",
-                                    title="Dolibarr-Abgleich grün", subtitle="", detail="", time_keys=("at",)))
+        sync_ack = sync_state.get("ack") if not ops_acks.sync_open(sync_state) else None
+        sync_items.append(_with_state(
+            _log_item("sync", "Dolibarr-Abgleich", HREFS["sync"], {"at": sync_state.get("last_run_at") or last_error.get("at")}, severity="error", status="rot",
+                      title="Dolibarr-Abgleich rot", subtitle=str(last_error.get("kind") or ""), detail=last_error.get("text") or "", time_keys=("at",)),
+            ack_id="current", acknowledged=sync_ack))
+    elif sync_state.get("last_ok_at") and not open_only:
+        sync_items.append(_with_state(_log_item("sync", "Dolibarr-Abgleich", HREFS["sync"], {"at": sync_state.get("last_ok_at")}, severity="success", status="grün",
+                                                title="Dolibarr-Abgleich grün", subtitle="", detail="", time_keys=("at",))))
     if since_iso:
         sync_items = [item for item in sync_items if (item.get("time") or "") >= since_iso]
 
@@ -584,26 +682,36 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
         bot_error = bot_state.get("last_error") or bot_state.get("error")
         status = str(bot_state.get("status") or ("online" if bot_state.get("running") else ""))
         if bot_error:
-            bot_items.append(_log_item("bot", "Discord-Bot", HREFS["bot"], bot_state, severity="error", status=status or "fehler", title="Discord-Bot: Fehler",
-                                       subtitle=str(bot_state.get("guild_name") or ""), detail=bot_error, time_keys=("updated_at",)))
-        elif status:
-            bot_items.append(_log_item("bot", "Discord-Bot", HREFS["bot"], bot_state, severity="success" if status == "online" else "info", status=status,
-                                       title=f"Discord-Bot {status}", subtitle=str(bot_state.get("guild_name") or ""), detail="", time_keys=("updated_at",)))
+            bot_ack = bot_state.get("ack") if not ops_acks.bot_open(bot_state) else None
+            bot_items.append(_with_state(
+                _log_item("bot", "Discord-Bot", HREFS["bot"], bot_state, severity="error", status=status or "fehler", title="Discord-Bot: Fehler",
+                          subtitle=str(bot_state.get("guild_name") or ""), detail=bot_error, time_keys=("updated_at",)),
+                ack_id="current", acknowledged=bot_ack))
+        elif status and not open_only:
+            bot_items.append(_with_state(_log_item("bot", "Discord-Bot", HREFS["bot"], bot_state, severity="success" if status == "online" else "info", status=status,
+                                                   title=f"Discord-Bot {status}", subtitle=str(bot_state.get("guild_name") or ""), detail="", time_keys=("updated_at",))))
     if since_iso:
         bot_items = [item for item in bot_items if (item.get("time") or "") >= since_iso]
 
-    return [
-        _source_summary("server", "Serverfehler", HREFS["server"], total=await db.ops_errors.count_documents({}), problem_count=await db.ops_errors.count_documents({"resolved_at": None}), items=server_items, tone="danger"),
-        _source_summary("checks", "Auto-Checks", HREFS["checks"], total=await db.ops_check_episodes.count_documents({}), problem_count=await db.ops_check_episodes.count_documents({"status": {"$ne": "ok"}}), items=check_items, tone="danger"),
-        _source_summary("alerts", "Alarme", HREFS["alerts"], total=await db.ops_alert_log.count_documents({}), problem_count=0, items=alert_items, tone="warn"),
-        _source_summary("client", "App-Logs", HREFS["client"], total=await db.mobile_client_logs.count_documents({}), problem_count=await db.mobile_client_logs.count_documents({"status": "open"}), items=client_items, tone="danger"),
-        _source_summary("email", "E-Mail-Versand", HREFS["email"], total=await db.email_logs.count_documents({}), problem_count=await db.email_logs.count_documents({"status": {"$in": ["failed", "skipped"]}}), items=email_items, tone="warn"),
-        _source_summary("mail_queue", "Mail-Queue", HREFS["mail_queue"], total=await db.mail_jobs.count_documents({}), problem_count=await db.mail_jobs.count_documents({"status": "failed"}), items=queue_items, tone="warn"),
+    if open_only:
+        server_items, check_items, alert_items, client_items, email_items, queue_items, upload_items, sync_items, bot_items = (
+            [item for item in items if item["open"]]
+            for items in (server_items, check_items, alert_items, client_items, email_items, queue_items, upload_items, sync_items, bot_items))
+
+    sources = [
+        _source_summary("server", "Serverfehler", HREFS["server"], total=await db.ops_errors.count_documents({}), problem_count=await ops_acks.open_count(db, "server"), items=server_items, tone="danger"),
+        _source_summary("checks", "Auto-Checks", HREFS["checks"], total=await db.ops_check_episodes.count_documents({}), problem_count=await ops_acks.open_count(db, "checks"), items=check_items, tone="danger"),
+        _source_summary("alerts", "Alarme", HREFS["alerts"], total=await db.ops_alert_log.count_documents({}), problem_count=await ops_acks.open_count(db, "alerts"), items=alert_items, tone="warn"),
+        _source_summary("client", "App-Logs", HREFS["client"], total=await db.mobile_client_logs.count_documents({}), problem_count=await ops_acks.open_count(db, "client"), items=client_items, tone="danger"),
+        _source_summary("email", "E-Mail-Versand", HREFS["email"], total=await db.email_logs.count_documents({}), problem_count=await ops_acks.open_count(db, "email"), items=email_items, tone="warn"),
+        _source_summary("mail_queue", "Mail-Queue", HREFS["mail_queue"], total=await db.mail_jobs.count_documents({}), problem_count=await ops_acks.open_count(db, "mail_queue"), items=queue_items, tone="warn"),
         _source_summary("audit", "Adminaktionen", HREFS["audit"], total=await db.audit_logs.count_documents({}), problem_count=0, items=audit_items, tone="info"),
-        _source_summary("uploads", "Uploads", HREFS["uploads"], total=await db.upload_events.count_documents({}), problem_count=await db.upload_events.count_documents({"status": {"$ne": "success"}}), items=upload_items, tone="warn"),
-        _source_summary("sync", "Dolibarr-Abgleich", HREFS["sync"], total=len(sync_items), problem_count=1 if last_error else 0, items=sync_items, tone="danger"),
-        _source_summary("bot", "Discord-Bot", HREFS["bot"], total=len(bot_items), problem_count=sum(1 for item in bot_items if item["severity"] == "error"), items=bot_items, tone="danger"),
+        _source_summary("uploads", "Uploads", HREFS["uploads"], total=await db.upload_events.count_documents({}), problem_count=await ops_acks.open_count(db, "uploads"), items=upload_items, tone="warn"),
+        _source_summary("sync", "Dolibarr-Abgleich", HREFS["sync"], total=len(sync_items), problem_count=await ops_acks.open_count(db, "sync"), items=sync_items, tone="danger"),
+        _source_summary("bot", "Discord-Bot", HREFS["bot"], total=len(bot_items), problem_count=await ops_acks.open_count(db, "bot"), items=bot_items, tone="danger"),
     ]
+    await _named(db, sources)
+    return sources
 
 
 @router.get("/logs")
@@ -626,13 +734,17 @@ async def admin_logs_overview(limit: int = Query(default=80, ge=1, le=200), me: 
 @router.get("/ops/events")
 async def ops_events(source: str = "all", severity: str = "all", hours: int = Query(default=168, ge=0, le=24 * 366), q: str = "",
                      limit: int = Query(default=200, ge=1, le=500), format: str = "json", guild: str = "",
+                     state: str = Query(default="unacked", pattern="^(open|unacked|all)$"),
                      me: dict = Depends(require_area("system"))):
     """Ereignisse aller Quellen in einer Liste (#517 Teil 2): Filter nach Quelle, Schwere, Zeitraum und Text;
     `format=csv` liefert dieselbe Auswahl als Datei. Zustand und Zähler je Quelle kommen mit. ``guild`` (#627):
-    nur Discord-Meldungen dieses Servers."""
+    nur Discord-Meldungen dieses Servers. ``state`` (#2447): ``unacked`` (Vorgabe) blendet Quittiertes aus, ``all``
+    zeigt es („Quittierte zeigen“), ``open`` nur offene Probleme - weder quittiert noch von selbst behoben."""
     db = get_db()
+    # Stand dieser Antwort (#2447): „Alle quittieren“ schickt ihn als ``until`` zurück.
+    as_of = now_utc().isoformat()
     since_iso = _since_iso_hours(hours)
-    sources = await _log_sources(db, _safe_log_limit(min(limit, 200)), since_iso=since_iso)
+    sources = await _log_sources(db, _safe_log_limit(min(limit, 200)), since_iso=since_iso, open_only=state == "open")
     wanted = {part.strip() for part in str(source or "all").split(",") if part.strip()} - {"all", ""}
     severities = SEVERITY_FILTERS.get(str(severity or "all").lower())
     needle = str(q or "").strip().lower()
@@ -646,6 +758,10 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
             if needle and needle not in " ".join(str(item.get(key) or "") for key in ("source_label", "title", "subtitle", "detail", "status")).lower():
                 continue
             if guild and item.get("guild_id") != guild:
+                continue
+            if state == "open" and not item.get("open"):
+                continue
+            if state == "unacked" and item.get("acknowledged_at"):
                 continue
             items.append(item)
     items.sort(key=lambda item: item.get("time") or "", reverse=True)
@@ -663,6 +779,7 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
         return Response(content="﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8",
                         headers={"Content-Disposition": 'attachment; filename="ereignisse.csv"'})
     return {
+        "as_of": as_of,
         "items": items,
         "sources": [{key: value for key, value in entry.items() if key != "items"} for entry in sources],
         "summary": {
@@ -670,10 +787,72 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
             "problem_count": sum(source["problem_count"] for source in sources),
             "latest_at": max((source["latest_at"] for source in sources), default=""),
         },
-        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": mask_addresses(q), "limit": limit, "guild": guild},
+        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": mask_addresses(q), "limit": limit, "guild": guild,
+                    "state": state},
         # Server für den Filter (#627) - erst ab zwei Servern sinnvoll.
         "guilds": [{"guild_id": guild_id, "name": mask_addresses(name)} for guild_id, name in sorted((await _discord_guild_names(db)).items(), key=lambda pair: pair[1].lower())],
     }
+
+
+class OpsAckBody(BaseModel):
+    source: str = Field(max_length=40)
+    id: str = Field(default="", max_length=200)
+
+
+class OpsAckItem(BaseModel):
+    source: str = Field(max_length=40)
+    id: str = Field(max_length=200)
+
+
+class OpsAckAllBody(BaseModel):
+    """Ohne ``items``: alles Offene der ``sources`` (Überblick, ohne Filter). Mit ``items``: genau diese gezeigten
+    Einträge (Ereignisse mit Filter). ``until``: der Stand beim Laden (``as_of``) - was danach auftrat, bleibt offen."""
+    sources: list[str] | None = Field(default=None, max_length=20)
+    items: list[OpsAckItem] | None = Field(default=None, max_length=500)
+    until: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/ops/events/ack")
+async def ops_event_ack(body: OpsAckBody, me: dict = Depends(require_area("system"))):
+    """Einen Eintrag quittieren (#2447) - und alle offenen mit derselben Quelle, Art und demselben Schlüssel
+    (``ops_acks.SPECS``). Er verschwindet aus „Neueste Probleme“ und den Zählern; tritt er wieder auf, ist er wieder offen."""
+    if body.source not in ops_acks.ACKABLE_SOURCES:
+        raise HTTPException(status_code=400, detail="Diese Quelle lässt sich nicht quittieren.")
+    db = get_db()
+    try:
+        result = await ops_acks.acknowledge(db, body.source, body.id, me)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden - vielleicht schon erledigt.")
+    except ops_acks.NotOpen:
+        raise HTTPException(status_code=409, detail="Kein offenes Problem - schon quittiert, erledigt oder gar kein Fehler.")
+    await _ops_audit(db, me, "ops.event.ack", f"{body.source}:{body.id}"[:240], {"source": body.source, **result})
+    return {"source": body.source, **result}
+
+
+@router.post("/ops/events/ack-all")
+async def ops_events_ack_all(body: OpsAckAllBody, me: dict = Depends(require_area("system"))):
+    """„Alle quittieren“ (#2447): ohne Filter alles Offene der Quellen, mit Filter genau die gezeigten Einträge - jeweils
+    nur, was bis zum Laden der Seite auftrat. Die Seite fragt vorher nach; die Antwort nennt die wirklich quittierten."""
+    until = None
+    if body.until:
+        stamp = ops_acks.moment(body.until)
+        if stamp is None:
+            raise HTTPException(status_code=400, detail="Ungültiger Zeitpunkt.")
+        until = stamp.astimezone(timezone.utc).isoformat()
+    db = get_db()
+    if body.items is not None:
+        done = await ops_acks.acknowledge_items(db, [item.model_dump() for item in body.items], me, until=until)
+        scope = sorted({item.source for item in body.items})
+    else:
+        wanted = [source for source in (body.sources or []) if source in ops_acks.ACKABLE_SOURCES]
+        if body.sources and not wanted:
+            raise HTTPException(status_code=400, detail="Diese Quellen lassen sich nicht quittieren.")
+        done = await ops_acks.acknowledge_all(db, wanted or None, me, until=until)
+        scope = wanted or ["all"]
+    total = sum(done.values())
+    if total:
+        await _ops_audit(db, me, "ops.event.ack_all", None, {"sources": scope, "counts": done, "count": total, "until": until})
+    return {"acknowledged": done, "total": total}
 
 
 @router.patch("/mobile-logs/{log_id}")
