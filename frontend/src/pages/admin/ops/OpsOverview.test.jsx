@@ -19,6 +19,7 @@ const CHECK = { id: "ep1", ack_id: "ep1", source: "checks", source_label: "Auto-
 const MAIL = { id: "m1", ack_id: "m1", source: "email", source_label: "E-Mail-Versand", href: "/admin/ops?tab=events&source=email", severity: "error", status: "failed",
   time: "2026-11-16T07:00:00Z", title: "password_reset", subtitle: "email · a***@x.at", detail: "550", open: true, ackable: true };
 const OPEN = {
+  as_of: "2026-11-16T08:00:00+00:00",
   items: [MAIL, CHECK],
   sources: [
     { key: "checks", label: "Auto-Checks", total: 10, problem_count: 1, latest_at: "2026-11-13T08:00:00Z" },
@@ -83,7 +84,8 @@ test("Alle quittieren fragt in der Seite nach, Abbrechen tut nichts, danach steh
   await user.click(screen.getByTestId("ops-overview-ack-all"));
   apiMock.get.mockResolvedValue({ data: DONE });
   await user.click(within(await screen.findByTestId("confirm-dialog")).getByTestId("confirm-dialog-confirm"));
-  expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/events/ack-all", {});
+  // Nur bis zum Stand der Liste (Review #2447, M2) - was danach kam, bleibt offen.
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/events/ack-all", { until: "2026-11-16T08:00:00+00:00" });
   expect(await screen.findByTestId("ops-overview-done")).toHaveTextContent("Alles erledigt");
   expect(screen.queryByTestId("ops-overview-ack-all")).toBeNull();
   expect(confirmSpy).not.toHaveBeenCalled();
@@ -96,4 +98,28 @@ test("klappt das Quittieren nicht, steht der Grund in der Meldung", async () => 
   renderOverview();
   await user.click(await screen.findByTestId("ops-event-ack-m1"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Dafür fehlen dir die Rechte."));
+});
+
+test("ein Ladefehler ist kein „Alles erledigt“", async () => {
+  // Review #2447 (N1)
+  const user = userEvent.setup();
+  apiMock.get.mockRejectedValueOnce(new Error("offline"));
+  renderOverview();
+  expect(await screen.findByTestId("ops-overview-error")).toBeInTheDocument();
+  expect(screen.queryByTestId("ops-overview-done")).toBeNull();
+  await user.click(screen.getByRole("button", { name: /Erneut laden/ }));
+  expect(await screen.findByTestId("ops-event-email")).toBeInTheDocument();
+  expect(screen.queryByTestId("ops-overview-error")).toBeNull();
+});
+
+test("ist der letzte Eintrag quittiert, steht der Fokus auf der Überschrift", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockResolvedValue({ data: { ...OPEN, items: [MAIL] } });
+  apiMock.post.mockImplementation(async () => {
+    apiMock.get.mockResolvedValue({ data: DONE });
+    return { data: { count: 1 } };
+  });
+  renderOverview();
+  await user.click(await screen.findByTestId("ops-event-ack-m1"));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("ops-overview-heading")));
 });

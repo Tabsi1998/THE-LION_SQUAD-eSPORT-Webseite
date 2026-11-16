@@ -131,15 +131,56 @@ test("quittierte und behobene Einträge sagen von wem bzw. wann, nur offene habe
   expect(screen.queryByTestId("ops-event-ack-ep1")).toBeNull();
 });
 
-test("Alle quittieren gilt für die gewählte Quelle und fragt vorher in der Seite", async () => {
+test("Alle quittieren nimmt genau die gezeigten offenen Einträge bis zum Stand der Liste", async () => {
+  // Review #2447 (M2): Suche, Schwere, Server und Zeitraum gelten - geschickt werden die gezeigten Einträge mit `until`.
   const user = userEvent.setup();
+  const one = { ...PAYLOAD.items[0], id: "o1", ack_id: "f1", open: true, ackable: true };
+  const two = { ...PAYLOAD.items[0], id: "o2", source: "email", source_label: "E-Mail-Versand", ack_id: "m2", open: true, ackable: true };
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, as_of: "2026-11-16T09:00:00+00:00", items: [one, two, PAYLOAD.items[1]] } });
   apiMock.post.mockResolvedValue({ data: { acknowledged: { server: 1 }, total: 1 } });
-  render(page("/admin/ops?tab=events&source=server"));
-  await user.click(await screen.findByTestId("ops-events-ack-all"));
+  render(page("/admin/ops?tab=events"));
+  await user.type(screen.getByTestId("ops-events-search"), "KeyError");
+  const button = await screen.findByTestId("ops-events-ack-all");
+  expect(button).toHaveTextContent("Alle gezeigten quittieren (2)");
+  await user.click(button);
   const dialog = await screen.findByTestId("confirm-dialog");
-  expect(dialog).toHaveTextContent("1 Eintrag quittieren?");
-  expect(dialog).toHaveTextContent("Serverfehler");
+  expect(dialog).toHaveTextContent("2 gezeigte Einträge quittieren?");
   await user.click(within(dialog).getByTestId("confirm-dialog-confirm"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/events/ack-all", { sources: ["server"] }));
-  expect(toastMock.success).toHaveBeenCalledWith("1 Eintrag quittiert.");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/events/ack-all", {
+    items: [{ source: "server", id: "f1" }, { source: "email", id: "m2" }], until: "2026-11-16T09:00:00+00:00",
+  }));
+  expect(toastMock.success).toHaveBeenCalledWith("1 von 2 quittiert – der Rest war schon erledigt oder ist seit dem Laden wieder aufgetreten.");
+});
+
+test("Nur offene lädt ohne Zeitgrenze, wie die Kacheln zählen", async () => {
+  // Review #2447 (M1): Kachel und Liste zeigen dieselbe Menge - der Zeitraum gilt bei „Nur offene“ nicht.
+  render(page("/admin/ops?tab=events&source=email&state=open"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/ops/events", { params: expect.objectContaining({ source: "email", state: "open", hours: 0 }) }));
+  expect(screen.getByTestId("ops-events-range")).toBeDisabled();
+  expect(screen.getByTestId("ops-events-range")).toHaveValue("0");
+});
+
+test("ein Ladefehler zeigt Erneut laden statt Alles erledigt", async () => {
+  // Review #2447 (N1)
+  const user = userEvent.setup();
+  apiMock.get.mockRejectedValueOnce({ response: { data: { detail: "Server weg" } } });
+  render(page("/admin/ops?tab=events&state=open"));
+  expect(await screen.findByTestId("ops-events-error")).toHaveTextContent("ließen sich nicht laden");
+  expect(screen.queryByText(/Alles erledigt/)).toBeNull();
+  await user.click(screen.getByRole("button", { name: /Erneut laden/ }));
+  expect(await screen.findByTestId("ops-event-server")).toBeInTheDocument();
+});
+
+test("nach dem Quittieren steht der Fokus auf der nächsten Zeile", async () => {
+  const user = userEvent.setup();
+  const first = { ...PAYLOAD.items[0], id: "o1", ack_id: "f1", open: true, ackable: true };
+  const second = { ...PAYLOAD.items[0], id: "o2", ack_id: "f2", open: true, ackable: true, title: "Zweiter" };
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [first, second] } });
+  apiMock.post.mockImplementation(async () => {
+    apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [second] } });
+    return { data: { count: 1 } };
+  });
+  render(page("/admin/ops?tab=events&state=open"));
+  await user.click(await screen.findByTestId("ops-event-ack-o1"));
+  await waitFor(() => expect(document.activeElement?.dataset?.opsRow).toBe("server:o2"));
 });

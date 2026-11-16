@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, Bot, Bug, CheckCheck, CheckCircle2, Clock, Download, ExternalLink, Repeat, Search, Send, ServerCrash, ShieldCheck, UploadCloud } from "lucide-react";
+import { Activity, AlertTriangle, Bot, Bug, CheckCheck, CheckCircle2, Clock, Download, ExternalLink, RefreshCw, Repeat, Search, Send, ServerCrash, ShieldCheck, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -55,7 +55,8 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
   const stateLine = eventStateLine(row);
   const settled = Boolean(stateLine);
   return (
-    <article className={`rounded-sm border bg-[#121212] p-4 transition-opacity ${settled ? "border-white/5 opacity-75" : "border-white/10"}`} data-testid={`ops-event-${row.source}`}>
+    <article tabIndex={-1} data-ops-row={`${row.source}:${row.id}`} aria-label={`${row.source_label}: ${row.title}`}
+      className={`rounded-sm border bg-[#121212] p-4 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] ${settled ? "border-white/5 opacity-75" : "border-white/10"}`} data-testid={`ops-event-${row.source}`}>
       <div className="flex flex-col gap-3 md:flex-row md:items-start">
         <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#29B6E8]" />
         <div className="min-w-0 flex-1">
@@ -104,14 +105,38 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
   );
 }
 
+// Ladefehler (Review #2447, N1): nie „Alles erledigt“, wenn die Liste gar nicht kam.
+export function LoadError({ onRetry, testId }) {
+  return (
+    <div role="alert" className="rounded-sm border border-[#FF3B30]/30 bg-[#FF3B30]/5 p-6 text-center" data-testid={testId}>
+      <AlertTriangle className="mx-auto h-6 w-6 text-[#FF6B61]" />
+      <div className="mt-2 text-sm font-bold text-white">Die Einträge ließen sich nicht laden.</div>
+      <p className="mt-1 text-xs text-white/50">Ob etwas offen ist, steht erst nach dem Laden fest.</p>
+      <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-white/15 px-4 text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">
+        <RefreshCw className="h-4 w-4" /> Erneut laden
+      </button>
+    </div>
+  );
+}
+
+// Nach dem Quittieren verschwindet die Zeile - der Fokus geht auf die nächste Zeile (dieselbe Stelle), sonst auf die
+// vorige, sonst auf die Überschrift; nie auf den Body (Review #2447).
+function focusAfter(listRef, headingRef, index, goneKey) {
+  const rows = [...(listRef?.current?.querySelectorAll("[data-ops-row]") || [])].filter((node) => node.dataset.opsRow !== goneKey);
+  const target = index >= 0 ? rows[index] || rows[index - 1] : null;
+  (target || headingRef?.current)?.focus?.();
+}
+
 // Quittieren über die Seite (#2447): einzeln und „Alle quittieren“ (mit Rückfrage in der Seite). Gibt `ack`, `ackAll`
 // und die Kennung des gerade laufenden Eintrags zurück; nach jedem Schritt lädt `reload` neu.
-export function useOpsAck(reload) {
+export function useOpsAck(reload, { listRef = null, headingRef = null } = {}) {
   const confirm = useConfirm();
   const [acking, setAcking] = useState("");
   const ack = useCallback(async (row) => {
     if (acking) return;
     setAcking(row.id);
+    const key = `${row.source}:${row.id}`;
+    const index = [...(listRef?.current?.querySelectorAll("[data-ops-row]") || [])].findIndex((node) => node.dataset.opsRow === key);
     try {
       const { data: result } = await api.post("/admin/ops/events/ack", { source: row.source, id: row.ack_id });
       const more = Number(result?.count || 0) - 1;
@@ -121,28 +146,36 @@ export function useOpsAck(reload) {
     } finally {
       setAcking("");
       await reload();
+      requestAnimationFrame(() => focusAfter(listRef, headingRef, index, key));
     }
-  }, [acking, reload]);
-  const ackAll = useCallback(async ({ count, sources = null, label = "" }) => {
+  }, [acking, reload, listRef, headingRef]);
+  // Mit `items` genau diese gezeigten Einträge (Filter aktiv), sonst alles Offene der `sources`; `until` = Stand der
+  // Liste beim Laden - was danach dazukam, bleibt offen (Review #2447, M2).
+  const ackAll = useCallback(async ({ count, sources = null, items = null, until = null, label = "" }) => {
     if (acking || !count) return;
+    const noun = count === 1 ? "Eintrag" : "Einträge";
     const ok = await confirm({
-      title: `${count} ${count === 1 ? "Eintrag" : "Einträge"} quittieren?`,
-      description: `${label ? `${label}: ` : ""}Alles Offene verschwindet aus den offenen Problemen und den Zählern. Im Verlauf bleibt es unter „Quittierte zeigen“; tritt etwas davon wieder auf, ist es wieder offen.`,
+      title: items ? `${count} gezeigte ${noun} quittieren?` : `${count} ${noun} quittieren?`,
+      description: `${label ? `${label}: ` : ""}${items ? "Genau die Einträge, die jetzt in der Liste stehen" : "Alles Offene"} verschwindet aus den offenen Problemen und den Zählern. Was seit dem Laden neu dazukam, bleibt offen. Im Verlauf bleibt es unter „Quittierte zeigen“; tritt etwas davon wieder auf, ist es wieder offen.`,
       confirmLabel: "Alle quittieren",
       tone: "info",
     });
     if (!ok) return;
     setAcking("all");
     try {
-      const { data: result } = await api.post("/admin/ops/events/ack-all", sources ? { sources } : {});
-      toast.success(`${result?.total ?? count} ${Number(result?.total ?? count) === 1 ? "Eintrag" : "Einträge"} quittiert.`);
+      const body = { ...(items ? { items } : sources ? { sources } : {}), ...(until ? { until } : {}) };
+      const { data: result } = await api.post("/admin/ops/events/ack-all", body);
+      const total = Number(result?.total ?? 0);
+      toast.success(total === count ? `${total} ${total === 1 ? "Eintrag" : "Einträge"} quittiert.`
+        : `${total} von ${count} quittiert – der Rest war schon erledigt oder ist seit dem Laden wieder aufgetreten.`);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Quittieren hat nicht geklappt.");
     } finally {
       setAcking("");
       await reload();
+      requestAnimationFrame(() => headingRef?.current?.focus?.());
     }
-  }, [acking, confirm, reload]);
+  }, [acking, confirm, reload, headingRef]);
   return { ack, ackAll, acking };
 }
 
@@ -161,22 +194,29 @@ export function OpsEventsTab() {
   const [needle, setNeedle] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const listRef = useRef(null);
+  const headingRef = useRef(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setNeedle(q.trim()), 300);
     return () => clearTimeout(timer);
   }, [q]);
 
-  const params = useMemo(() => ({ source, severity, hours: Number(hours), q: needle, limit: 300, ...(guild ? { guild } : {}), ...(state ? { state } : {}) }),
-    [source, severity, hours, needle, guild, state]);
+  // „Nur offene“ (Review #2447, M1): ohne Zeitgrenze - dieselbe Menge, die die Kachel „X auffällig“ zählt.
+  const effectiveHours = state === "open" ? "0" : hours;
+  const params = useMemo(() => ({ source, severity, hours: Number(effectiveHours), q: needle, limit: 300, ...(guild ? { guild } : {}), ...(state ? { state } : {}) }),
+    [source, severity, effectiveHours, needle, guild, state]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data: payload } = await api.get("/admin/ops/events", { params });
       setData(payload && Array.isArray(payload.items) ? payload : { items: [], sources: [], summary: {} });
+      setLoadFailed(false);
     } catch (err) {
+      setLoadFailed(true);
       toast.error(formatApiError(err.response?.data?.detail) || "Ereignisse konnten nicht geladen werden.");
     } finally {
       setLoading(false);
@@ -201,7 +241,7 @@ export function OpsEventsTab() {
       return nextParams;
     }, { replace: true });
   };
-  const { ack, ackAll, acking } = useOpsAck(load);
+  const { ack, ackAll, acking } = useOpsAck(load, { listRef, headingRef });
 
   const exportCsv = async () => {
     setExporting(true);
@@ -240,8 +280,9 @@ export function OpsEventsTab() {
   const sources = data?.sources || [];
   const rows = data?.items || [];
   const selected = source === "all" ? sources : sources.filter((item) => item.key === source);
-  const openCount = selected.reduce((sum, item) => sum + Number(item.problem_count || 0), 0);
   const selectedLabel = source === "all" ? "Alle Quellen" : selected[0]?.label || source;
+  // „Alle quittieren“ (Review #2447, M2): genau die gezeigten offenen Einträge - Suche, Schwere, Server, Zeitraum gelten.
+  const shownOpen = rows.filter((row) => row.ackable && row.ack_id);
   const toggleClass = (active) => `inline-flex min-h-[44px] items-center gap-2 rounded-sm border px-3 text-xs font-bold uppercase tracking-wider ${active ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`;
 
   return (
@@ -269,7 +310,9 @@ export function OpsEventsTab() {
           <option value="info">Info</option>
           <option value="success">OK</option>
         </select>
-        <select value={hours} onChange={(event) => setHours(event.target.value)} data-testid="ops-events-range" className="h-11 rounded-sm border border-white/10 bg-[#121212] px-3 text-xs font-bold uppercase tracking-wider text-white">
+        <select value={effectiveHours} onChange={(event) => setHours(event.target.value)} disabled={state === "open"} data-testid="ops-events-range" aria-label="Zeitraum"
+          title={state === "open" ? "Offenes zählt ohne Zeitgrenze – wie die Kacheln." : undefined}
+          className="h-11 rounded-sm border border-white/10 bg-[#121212] px-3 text-xs font-bold uppercase tracking-wider text-white disabled:opacity-60">
           {RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         {(data?.guilds || []).length > 1 ? (
@@ -298,11 +341,11 @@ export function OpsEventsTab() {
         <button type="button" onClick={() => toggleState("all")} aria-pressed={state === "all"} data-testid="ops-events-show-acked" className={toggleClass(state === "all")}>
           <CheckCheck className="h-4 w-4" /> Quittierte zeigen
         </button>
-        {openCount > 0 && (
-          <button type="button" onClick={() => ackAll({ count: openCount, sources: source === "all" ? null : [source], label: selectedLabel })} disabled={!!acking}
-            data-testid="ops-events-ack-all"
+        {shownOpen.length > 0 && (
+          <button type="button" disabled={!!acking} data-testid="ops-events-ack-all"
+            onClick={() => ackAll({ count: shownOpen.length, items: shownOpen.map((row) => ({ source: row.source, id: row.ack_id })), until: data?.as_of, label: selectedLabel })}
             className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-ok/40 bg-ok/10 px-3 text-xs font-bold uppercase tracking-wider text-ok hover:bg-ok/15 disabled:opacity-40">
-            <CheckCheck className="h-4 w-4" /> {acking === "all" ? "Quittiere …" : `Alle quittieren (${openCount})`}
+            <CheckCheck className="h-4 w-4" /> {acking === "all" ? "Quittiere …" : `Alle gezeigten quittieren (${shownOpen.length})`}
           </button>
         )}
       </div>
@@ -318,11 +361,13 @@ export function OpsEventsTab() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <h2 ref={headingRef} tabIndex={-1} className="sr-only" data-testid="ops-events-heading">Ereignisse</h2>
+      <div className="space-y-3" ref={listRef}>
         {rows.map((row) => (
           <EventRow key={`${row.source}-${row.id}-${row.time}`} row={row} onResend={resend} resending={resending === row.id} onAck={ack} acking={acking === row.id} />
         ))}
-        {!rows.length && (
+        {!rows.length && loadFailed && <LoadError onRetry={load} testId="ops-events-error" />}
+        {!rows.length && !loadFailed && (
           <div className="rounded-sm border border-white/10 bg-[#121212] p-10 text-center text-white/40" data-testid="ops-events-empty">
             {loading ? "Lade Ereignisse …" : (
               <span className="inline-flex items-center gap-2">

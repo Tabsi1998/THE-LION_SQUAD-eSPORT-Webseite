@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCheck, CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { EventRow, formatEventTime, sourceIcon, useOpsAck } from "./OpsEventsTab";
+import { EventRow, LoadError, formatEventTime, sourceIcon, useOpsAck } from "./OpsEventsTab";
 
 // Überblick (#517 Teil 2): je Quelle eine Karte mit Zähler und Auffälligkeiten (ein Klick öffnet die
 // Ereignisliste mit dieser Quelle), darunter die offenen Probleme.
@@ -15,18 +15,23 @@ const PROBLEM_LIMIT = 20;
 
 export function OpsOverview({ onOpenSource }) {
   const [data, setData] = useState(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const listRef = useRef(null);
+  const headingRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
       const { data: payload } = await api.get("/admin/ops/events", { params: { severity: "problem", hours: 0, limit: PROBLEM_LIMIT, state: "open" } });
       setData(payload && Array.isArray(payload.items) ? payload : { items: [], sources: [] });
+      setLoadFailed(false);
     } catch {
-      setData((current) => current || { items: [], sources: [] });
+      // Ladefehler (Review #2447, N1): eigener Zustand, nie „Alles erledigt“.
+      setLoadFailed(true);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["admin/ops", "admin/logs", "mobile-logs"]);
-  const { ack, ackAll, acking } = useOpsAck(load);
+  const { ack, ackAll, acking } = useOpsAck(load, { listRef, headingRef });
 
   const sources = data?.sources || [];
   const problems = data?.items || [];
@@ -60,15 +65,15 @@ export function OpsOverview({ onOpenSource }) {
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-heading text-lg font-black uppercase">Offene Probleme</h2>
+          <h2 ref={headingRef} tabIndex={-1} className="font-heading text-lg font-black uppercase focus:outline-none" data-testid="ops-overview-heading">Offene Probleme</h2>
           {openTotal > 0 && (
-            <button type="button" onClick={() => ackAll({ count: openTotal, label: "Alle Quellen" })} disabled={!!acking} data-testid="ops-overview-ack-all"
+            <button type="button" onClick={() => ackAll({ count: openTotal, until: data?.as_of, label: "Alle Quellen" })} disabled={!!acking} data-testid="ops-overview-ack-all"
               className="inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-ok/40 bg-ok/10 px-3 text-xs font-bold uppercase tracking-wider text-ok hover:bg-ok/15 disabled:opacity-40">
               <CheckCheck className="h-4 w-4" /> {acking === "all" ? "Quittiere …" : `Alle quittieren (${openTotal})`}
             </button>
           )}
         </div>
-        <div className="space-y-3" data-testid="ops-overview-problems">
+        <div className="space-y-3" data-testid="ops-overview-problems" ref={listRef}>
           {problems.map((row) => <EventRow key={`${row.source}-${row.id}-${row.time}`} row={row} onAck={ack} acking={acking === row.id} />)}
           {openTotal > problems.length && problems.length > 0 && (
             <button type="button" onClick={() => onOpenSource("all", { state: "open" })} data-testid="ops-overview-more"
@@ -76,7 +81,8 @@ export function OpsOverview({ onOpenSource }) {
               Alle {openTotal} offenen ansehen
             </button>
           )}
-          {data && !problems.length && (
+          {loadFailed && !problems.length && <LoadError onRetry={load} testId="ops-overview-error" />}
+          {data && !loadFailed && !problems.length && (
             <div className="rounded-sm border border-ok/20 bg-ok/5 p-8 text-center" data-testid="ops-overview-done">
               <CheckCircle2 className="mx-auto h-8 w-8 text-ok" />
               <div className="mt-3 font-heading text-lg font-black uppercase text-white">Alles erledigt</div>
