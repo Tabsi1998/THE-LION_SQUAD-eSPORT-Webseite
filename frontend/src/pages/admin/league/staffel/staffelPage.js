@@ -3,6 +3,7 @@ import { lateEntryText } from "@/lib/leagueTable";
 import { staffelStand } from "@/lib/seasonTabs";
 import { staffelManageUrl } from "@/lib/staffelTabs";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
+import { STAFFEL_STATUS_WORDS } from "@/pages/admin/tournament/shared";
 
 // Wer in der Staffel spielt: zugeteilt (der Server nennt es „approved“; „checked_in“ aus alten Ständen zählt mit).
 export const ACTIVE_STAFFEL_REGISTRATION = new Set(["approved", "checked_in"]);
@@ -13,11 +14,9 @@ export const hasCapability = (tournament, capability) => (tournament?.league_cap
 /** Für „Was fehlt“ (`staffelNeeds`): Zuteilen führt zum Abschnitt „Co-Team zuteilen“, alles andere an seine Stelle. */
 export const needsUrl = (tournamentId) => (tab) => staffelManageUrl(tournamentId, tab, tab === "participants" ? "zuteilen" : "");
 
-// Liga-Wörter statt Turnier-Status (Fabian zu #2262: kein „Entwurf“ bei Staffeln). Vor dem Start gibt es keinen Status zum Wählen.
-export const STAFFEL_STATUS_WORDS = {
-  live: "Spielbetrieb", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse veröffentlicht", archived: "Archiviert",
-  cancelled: "Abgesagt",
-};
+// Liga-Wörter statt Turnier-Status (Fabian zu #2262: kein „Entwurf“ bei Staffeln) - an einer Stelle in tournament/shared.js, damit auch
+// die Meldungen nach dem Statuswechsel dieselben Wörter tragen. Vor dem Start gibt es keinen Status zum Wählen.
+export { STAFFEL_STATUS_WORDS };
 const BEFORE_START_WORD = "Vor dem Start";
 
 // Was eine laufende Staffel wirklich braucht: weiterspielen, pausieren, beenden, absagen. Archivieren und den Endstand regelt die Season

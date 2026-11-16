@@ -19,6 +19,7 @@ vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 
 const { default: AdminLeagueStaffelPage } = await import("./AdminLeagueStaffelPage");
+const { toast } = await import("sonner");
 
 const ALL = ["applications", "manage", "matches", "results", "roster", "sanctions", "season"];
 const STAFFEL = {
@@ -115,10 +116,12 @@ test("„Liga starten“ fragt wie die Turnierverwaltung nach Hinweisen der Plan
   renderPage();
   await user.click(await screen.findByTestId("staffel-primary-action"));
   const dialog = await screen.findByRole("alertdialog").catch(() => screen.findByRole("dialog"));
-  expect(dialog).toHaveTextContent("Mit Hinweisen live schalten?");
+  expect(dialog).toHaveTextContent("Mit Hinweisen starten?");
   expect(dialog).toHaveTextContent("Woche 2 ohne Termin");
-  await user.click(within(dialog).getByRole("button", { name: "Trotzdem live" }));
+  await user.click(within(dialog).getByRole("button", { name: "Trotzdem starten" }));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/status", { status: "live", force: false }));
+  // Liga-Wörter statt „Status: Live“ (Kann-Punkt aus Paket A).
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Liga gestartet"));
 });
 
 test("Status: Abgesagt fragt nach dem Grund wie in der Turnierverwaltung", async () => {

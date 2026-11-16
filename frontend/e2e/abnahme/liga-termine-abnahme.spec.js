@@ -69,8 +69,8 @@ test.describe("Abnahme: Liga-Termine gegen den echten Server", () => {
     await lead.page.goto(`/admin/tournaments/${tid}`);
     await expect(lead.page.getByTestId("admin-tr-primary-action")).toContainText("Liga starten");
     await lead.page.getByTestId("admin-tr-primary-action").click();
-    // Fünf statt sechs Co-Teams: die Planung fragt nach („Mit Hinweisen live schalten?“).
-    const anyway = lead.page.getByRole("button", { name: "Trotzdem live" });
+    // Fünf statt sechs Co-Teams: die Planung fragt nach („Mit Hinweisen starten?“).
+    const anyway = lead.page.getByRole("button", { name: "Trotzdem starten" });
     if (await anyway.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await anyway.click();
     await expect(lead.page.getByTestId("admin-tr-status-select")).toHaveValue("live");
 
