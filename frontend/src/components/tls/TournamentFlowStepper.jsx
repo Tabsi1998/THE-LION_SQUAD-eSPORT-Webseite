@@ -1,4 +1,5 @@
 import { ClipboardList, UserCheck, Shuffle, Network, Flag, Trophy, Check, Users, Play, CalendarDays, ListOrdered } from "lucide-react";
+import { countsAsMatch, isCancelled } from "@/lib/bracketGraph";
 
 const CHECKED_IN = new Set(["checked_in"]);
 const APPROVED = new Set(["approved", "checked_in", "confirmed"]);
@@ -50,7 +51,7 @@ function tournamentSteps({ r, approved, checkedIn, totalMatches, completedMatche
 // Tabelle. Vor dem Start sind die Spiele nur eine Vorschau und zählen nicht.
 function staffelSteps({ r, approved, matches, published }) {
   const started = r >= rank("live");
-  const real = matches.filter((match) => !match.is_preview && match.status !== "preview" && match.status !== "cancelled");
+  const real = matches.filter(countsAsMatch);
   const completed = real.filter((match) => DONE_MATCH.has(match.status)).length;
   return [
     { id: "assign", key: "participants", icon: Users, label: "Co-Teams zuteilen", meta: `${approved} zugeteilt`, done: started || approved >= 2 },
@@ -70,8 +71,11 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
     (x) => CHECKED_IN.has(x.status) || x.checked_in_at
   ).length;
   const allMatches = matchesV2 || [];
-  const totalMatches = allMatches.length;
-  const completedMatches = allMatches.filter((m) => DONE_MATCH.has(m.status)).length;
+  // Zusammengelegte Läufe, ein nicht nötiger Reset und abgekürzte Runden entfallen (#2452) - sie sind keine offenen
+  // Spiele. Sonst stand nach dem letzten Lauf „Ergebnisse 9/14“, und der Schritt blieb offen.
+  const counted = allMatches.filter((match) => !isCancelled(match));
+  const totalMatches = counted.length;
+  const completedMatches = counted.filter((m) => DONE_MATCH.has(m.status)).length;
   const published = status === "results_published" || status === "archived";
 
   const steps = staffel
