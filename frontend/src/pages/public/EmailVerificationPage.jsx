@@ -10,7 +10,7 @@ import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 
 export default function EmailVerificationPage() {
-  useDocumentTitle("E-Mail bestätigen", "E-Mail-Adresse für den Community-Account bestätigen.", { robots: "noindex, nofollow" });
+  useDocumentTitle("E-Mail bestätigen", "E-Mail-Adresse für das Community-Konto bestätigen.", { robots: "noindex, nofollow" });
   const [params] = useSearchParams();
   const location = useLocation();
   const { submitting, submitOnce } = useSubmissionGuard();
@@ -65,7 +65,7 @@ export default function EmailVerificationPage() {
           {status === "success" && <AuthFormAlert id="verify-success" tone="success">{message}</AuthFormAlert>}
           {status === "error" && <AuthFormAlert id="verify-error">{message}</AuthFormAlert>}
           {status === "sent" && <AuthFormAlert id="verify-sent" tone="info">{message || "Der Versand wurde angefordert. Bitte prüfe in einigen Minuten dein Postfach und den Spam-Ordner."}</AuthFormAlert>}
-          {status === "sent" && <p className="mt-3 text-sm text-white/70">Noch keine Mail? Wiederholtes Einloggen versendet keine Bestätigung. Prüfe die Adresse unten und fordere den Link einmal erneut an. Bleibt die Mail aus, muss der Betreiber die Mail-Warteschlange und den Versand prüfen.</p>}
+          {status === "sent" && <p className="mt-3 text-sm text-white/70">Noch keine Mail? Wiederholtes Anmelden versendet keine Bestätigung. Prüfe die Adresse unten und fordere den Link einmal erneut an. Bleibt die Mail aus, muss der Betreiber die Mail-Warteschlange und den Versand prüfen.</p>}
         </div>
         {status !== "success" && (
           <form onSubmit={resend} className="mt-6 space-y-3">
@@ -78,10 +78,10 @@ export default function EmailVerificationPage() {
         )}
         {status === "success" ? (
           <Link to={`/login${nextQuery(next)}`} className="tls-btn tls-btn--primary mt-6 w-full inline-flex justify-center py-3 font-bold uppercase tracking-wider rounded-sm" data-testid="verify-continue">
-            {next !== DEFAULT_RETURN_PATH ? "Einloggen und weiter" : "Zum Login"}
+            {next !== DEFAULT_RETURN_PATH ? "Anmelden und weiter" : "Zum Anmelden"}
           </Link>
         ) : (
-          <div className="mt-6 text-sm text-center"><Link to={`/login${nextQuery(next)}`} className="text-white/50 hover:text-[#29B6E8]">Zum Login</Link></div>
+          <div className="mt-6 text-sm text-center"><Link to={`/login${nextQuery(next)}`} className="text-white/50 hover:text-[#29B6E8]">Zum Anmelden</Link></div>
         )}
       </div>
     </div>
