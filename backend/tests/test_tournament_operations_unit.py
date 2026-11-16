@@ -477,6 +477,8 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
     )
     matches_v2 = SimpleNamespace(
         find=Mock(return_value=_Cursor(v2_matches or [])),
+        # Struktur anwenden fragt, was wegfällt, und gibt deren Stationen frei (#2386).
+        distinct=AsyncMock(return_value=[match["id"] for match in v2_matches or [] if match.get("id")]),
         delete_many=AsyncMock(),
         insert_many=AsyncMock(),
         replace_one=AsyncMock(),
@@ -507,6 +509,7 @@ def _bracket_rebuild_db(*, tournament, legacy_matches=None, v2_matches=None,
             replace_one=AsyncMock(),
         ),
         audit_logs=SimpleNamespace(insert_one=AsyncMock()),
+        stations=SimpleNamespace(update_many=AsyncMock(return_value=SimpleNamespace(modified_count=0))),
     )
 
 

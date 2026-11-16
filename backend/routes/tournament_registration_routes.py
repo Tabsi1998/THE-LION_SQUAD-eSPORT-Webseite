@@ -12,6 +12,7 @@ from database import get_db
 from services import billing_orders, league_applications, squad_registration
 from services.league_scope import is_league_staffel
 from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
+from services.station_runtime import free_stations_of_deleted_matches
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
@@ -28,9 +29,12 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.bracket_fill_in import (
-    NO_PLACE_DETAIL,
+    NO_PLACE_BEFORE_START,
+    NO_PLACE_CALLED,
+    NO_PLACE_STARTED,
     FillInRefused,
     free_bye_place,
+    has_started,
     reopened_bye,
     replacement_targets,
     slot_ids,
@@ -323,6 +327,7 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
             if match_ids:
                 await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
             await db.matches_v2.delete_many({"stage_id": stage["id"]})
+            await free_stations_of_deleted_matches(db, match_ids)
         await db.matches_v2.insert_many(matches)
         await db.tournament_stages.update_one(
             {"id": stage["id"]},
@@ -500,7 +505,11 @@ async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict 
         return None
     spot = await _open_place(db, tid, matches)
     if not spot:
-        return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_DETAIL}
+        begun = [match for match in fixed if tournament_guard.match_begun(match)]
+        # Nur aufgerufen ist noch nicht gespielt (Review #2046) - ein Freilos zählt nie.
+        played = any(has_started(match) for match in begun)
+        detail = NO_PLACE_STARTED if played else NO_PLACE_CALLED if begun else NO_PLACE_BEFORE_START
+        return {"ok": False, "reason": "no_free_place", "detail": detail}
     if spot["kind"] == "no_show":
         absent_id, targets = spot["registration_id"], spot["targets"]
         await _replace_registration_in_open_matches(db, tid, absent_id, reg, actor_id, targets)

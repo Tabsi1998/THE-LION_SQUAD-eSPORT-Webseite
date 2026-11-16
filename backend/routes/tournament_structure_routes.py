@@ -12,6 +12,7 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.staffel_guard import staffel_rebuild_problem
+from services.station_runtime import free_stations_of_deleted_matches, held_calls, tell_withdrawn_calls
 from services import tournament_guard
 from services.draw_records import record_build_draws
 from services.heat_rebuild import evaluate_after_write
@@ -374,6 +375,48 @@ async def apply_tournament_structure_plan(
     }
 
 
+SCHEMA_SETTING_KEYS = ("schema", "custom_schema", "bracket_schema")
+
+
+def _has_schema(settings: dict | None) -> bool:
+    return any(str((settings or {}).get(key) or "").strip() for key in SCHEMA_SETTING_KEYS)
+
+
+def _stage_name(stage: dict) -> str:
+    return stage.get("name") or (f"Phase {stage['number']}" if stage.get("number") else "Phase")
+
+
+def _quoted(stages: list[dict]) -> str:
+    names = [f"„{_stage_name(stage)}“" for stage in stages]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} und {names[-1]}"
+
+
+def _dropped_structure_note(stages: list[dict], body: TournamentBracketStructurePayload | None) -> tuple[str | None, bool]:
+    """Der Satz für die Rückfrage, wenn Neu bauen aus dem Format mehr verwirft als die Vorschau (#2046) - sonst
+    ``None``. Neu bauen ersetzt alle Phasen durch eine: Weitere Phasen gehen immer verloren, ihr eigenes Schema mit;
+    das Schema der ersten Phase nur, wenn der Aufruf eine Struktur ohne Schema bringt (ohne Struktur baut der Server
+    mit der vorhandenen ersten Phase). Zweiter Wert: geht ein eigenes Schema verloren?"""
+    if not stages:
+        return None, False
+    first, later = stages[0], stages[1:]
+    schema_lost = [stage for stage in later if _has_schema(stage.get("settings"))]
+    if body is not None and _has_schema(first.get("settings")) and not _has_schema(body.settings):
+        schema_lost.insert(0, first)
+    if not later and not schema_lost:
+        return None, False
+    advice = ("Mit dem Schema baust du eine Phase bei den Phasen über „Vorschau“ bzw. „Mit Teilnehmern generieren“ "
+              "neu.")
+    if not later:
+        return (f"Neu bauen aus dem Format verwirft das eigene Schema der Phase {_quoted(schema_lost)} – danach steht "
+                f"der Format-Baum, etwa ohne dein eigenes Loser Bracket. {advice}"), True
+    text = (f"Neu bauen aus dem Format ersetzt alle {len(stages)} Phasen ({_quoted(stages)}) durch einen "
+            "Turnierbaum aus dem Format – die weiteren Phasen samt ihrer Spiele fallen weg.")
+    if schema_lost:
+        text += (f" Dabei geht auch das eigene Schema verloren "
+                 f"({'Phase' if len(schema_lost) == 1 else 'Phasen'} {_quoted(schema_lost)}). {advice}")
+    return text, bool(schema_lost)
+
+
 @router.post("/{tid}/bracket/from-format")
 async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBracketStructurePayload | None = None,
                                                  preview: bool = True, force: bool = False,
@@ -398,6 +441,10 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
 
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     impact = tournament_guard.match_impact(v2_matches)
+    stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).sort("number", 1).to_list(200)
+    existing_stage = stages[0] if stages else None
+    # Nichts geht still verloren (#2046): weder ein eigenes Schema noch weitere Phasen - erst fragt der Server nach.
+    schema_note, own_schema = _dropped_structure_note(stages, body)
     if impact["match_count"] and preview:
         # Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17) - „Speichern & Struktur anwenden“ löschte so im
         # laufenden Turnier alle Spiele samt Ergebnissen.
@@ -413,9 +460,12 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
                    if impact["match_count"] else
                    "Das Turnier läuft schon – der Turnierbaum wird aus dem Format neu aufgebaut.")
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
-            "confirm_destruction", message, impact))
+            "confirm_destruction", f"{message} {schema_note}" if schema_note else message,
+            {**impact, "own_schema": own_schema, "stage_count": len(stages)}))
+    if schema_note and not force:
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction", schema_note, {**impact, "own_schema": own_schema, "stage_count": len(stages)}))
     match_plan = _collect_match_plan(v2_matches)
-    existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
     if body is None and existing_stage:
         body = TournamentBracketStructurePayload(
             name=existing_stage.get("name") or "Turnierbaum",
@@ -477,8 +527,12 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             raise
 
         if v2_match_ids:
+            # Wer aufgerufen war, erfährt, dass der Aufruf nicht mehr gilt (#2386, wie beim Phasen-Neubau).
+            withdrawn = await held_calls(db, v2_match_ids)
             await db.matches_v2.delete_many({"id": {"$in": v2_match_ids}})
             await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+            await free_stations_of_deleted_matches(db, v2_match_ids)
+            await tell_withdrawn_calls(db, withdrawn)
         await db.tournament_stages.delete_many({
             "tournament_id": tid,
             "id": {"$ne": stage["id"]},
@@ -546,10 +600,14 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
             "Berichten. Der Status bleibt.",
             impact,
         ))
-    v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
+    # Alle Kennungen, die gleich gelöscht werden - nicht nur die gelesenen (#2386, Review).
+    v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
+    withdrawn = await held_calls(db, v2_match_ids)
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
+    await free_stations_of_deleted_matches(db, v2_match_ids)
+    await tell_withdrawn_calls(db, withdrawn)
     # Der Status bleibt (#2120, TA16): früher fiel jedes Turnier auf „Entwurf“, und die öffentliche Seite war weg.
     await db.tournaments.update_one({"id": tid}, {"$set": {"updated_at": now_utc().isoformat()}})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen

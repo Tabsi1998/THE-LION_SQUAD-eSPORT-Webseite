@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Clock, Save, Tv } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { displayRoundLabels, sectionRoundLabel } from "@/lib/bracketNames";
 import { asInstant, viennaDay, viennaTime } from "@/lib/vienna";
 
 // Was nur ein Turnier am Bildschirm betrifft (Meilenstein 60) - beim Turnier, nicht unter TV & Beamer:
@@ -58,7 +58,8 @@ const SECTION_ORDER = { WB: 0, LB: 1, BRONZE: 2, GF: 3 };
 function roundsOf(matches = [], stages = []) {
   const stageById = new Map((stages || []).map((stage) => [stage.id, stage]));
   const byKey = new Map();
-  for (const match of matches || []) {
+  // Rundennamen wie im Baum (#1947): dieselbe Regel (round_label, fortlaufend je Abschnitt), keine eigene Benennung.
+  for (const match of displayRoundLabels((matches || []).filter(Boolean))) {
     if (!match?.round) continue;
     const key = `${match.stage_id || ""}::${String(match.section || "").toUpperCase()}::${Number(match.round)}`;
     if (!byKey.has(key)) byKey.set(key, match);
@@ -67,9 +68,7 @@ function roundsOf(matches = [], stages = []) {
   return [...byKey.entries()]
     .map(([key, match]) => {
       const stage = stageById.get(match.stage_id);
-      const section = match.section ? formatBracketSection(match.section) : "";
-      const name = formatRoundName(match.round_name, match.round);
-      const label = [multipleStages ? stage?.name : "", section && !name.toLowerCase().includes(section.toLowerCase().split(" ")[0]) ? section : "", name].filter(Boolean).join(" · ");
+      const label = [multipleStages ? stage?.name : "", sectionRoundLabel(match)].filter(Boolean).join(" · ");
       return { key, stageId: match.stage_id || null, section: match.section ? String(match.section).toUpperCase() : null, round: Number(match.round), label, order: [Number(match.stage_number || stage?.number || 0), SECTION_ORDER[String(match.section || "").toUpperCase()] ?? 9, Number(match.round)] };
     })
     .sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.order[2] - b.order[2]);

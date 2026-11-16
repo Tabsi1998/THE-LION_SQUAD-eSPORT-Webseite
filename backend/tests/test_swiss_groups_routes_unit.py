@@ -8,6 +8,7 @@ instead of moving it, and that a second call does not quietly duplicate a round.
 import asyncio
 import pathlib
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -73,12 +74,21 @@ class FakeCollection:
                 row.update(update.get("$set") or {})
                 return
 
+    async def update_many(self, query, update):
+        hits = [row for row in self.rows if self._matches(row, query)]
+        for row in hits:
+            row.update(update.get("$set") or {})
+            for key in update.get("$unset") or {}:
+                row.pop(key, None)
+        return SimpleNamespace(modified_count=len(hits))
+
 
 class FakeDb:
     def __init__(self, **collections):
+        # stations: Gruppen neu bauen gibt Stationen gelöschter Spiele frei (#2386).
         for name in ("tournaments", "tournament_stages", "tournament_registrations",
                      "tournament_groups", "matches", "matches_v2", "match_reports_v2",
-                     "audit_logs", "competition_write_events"):
+                     "audit_logs", "competition_write_events", "stations"):
             setattr(self, name, FakeCollection(collections.get(name, ())))
 
 
