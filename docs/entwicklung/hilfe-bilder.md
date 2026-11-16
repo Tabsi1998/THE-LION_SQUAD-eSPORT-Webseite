@@ -78,33 +78,36 @@ jeder mit `"clip": true` Handy und PC als WebM und MP4, keine Datei übrig ist u
   `e2e/hilfe/clips.js` holt nebenher Bild um Bild über `Page.captureScreenshot` und merkt sich die Zeit (die
   Bildschirm-Übertragung von Chromium liefert ohne Fenster nur Pixeldichte 1). Ablauf: `start` an die Stelle `block`
   scrollen, Kopfzeile und Leisten unsichtbar machen (`keepBars` lässt sie, etwa für das Menü), 0,6 s Ruhe, Handgriffe
-  mit Tipp-Punkt (am PC gleitet er, am Handy erscheint er wie ein Finger), Ausschnitt des Endstands vermessen, gelben
-  Rahmen einblenden, 1,5 s halten. Das Poster ist genau dieser Endstand im selben Ausschnitt.
+  mit Tipp-Punkt (am PC gleitet er, am Handy erscheint er wie ein Finger), Punkt ausblenden, Ausschnitt des Endstands
+  vermessen, gelben Rahmen einblenden, 1,5 s halten. Das Poster ist genau dieser Haltezustand im selben Ausschnitt.
 - **Scrollt die Seite während der Aufnahme**, bricht sie ab, sonst wäre der Anfang der Schleife verrutscht. Dann
   `start` und `block` (`"start"`, `"center"`) so wählen, dass Anfang und Ende ins Bild passen. Scroll-Verankerung des
   Browsers (oben wächst etwas, der Start bleibt im Fenster stehen) ist erlaubt.
 - **Größen:** 2 bis 6 Sekunden (längere Abläufe werden schneller abgespielt), 15 Bilder je Sekunde, kein Ton, Größe
-  des Posters (auf gerade Pixel gerundet). Grenze **300 KB je Datei** (`MAX_BYTES` in `e2e/hilfe/clips.js`,
-  `CLIP_MAX_BYTES` im Test `src/hilfe/index.test.js`). Ist eine Datei zu groß, komprimiert die Aufnahme stärker;
+  des Posters (ungerade Pixel werden mit der Seitenfarbe auf gerade aufgefüllt). Grenze **300 KB je Datei**
+  (`MAX_BYTES` in `e2e/hilfe/clips.js`, `CLIP_MAX_BYTES` im Test `src/hilfe/index.test.js`) und **8 MB für alle
+  zusammen** (`CLIPS_TOTAL_MAX_BYTES`). MP4 mit H.264 High, Level 4.0, höchstens 4 Referenzbilder. Ist eine Datei zu groß, komprimiert die Aufnahme stärker;
   bleibt sie zu groß, schlägt sie fehl. Dann den Ausschnitt verkleinern oder die Handgriffe kürzen.
 - **ffmpeg:** Je Schleife ein Aufruf je Format. Die Bilder kommen als Concat-Liste mit Dauer je Bild, der Ausschnitt
   wird auf die Pixeldichte umgerechnet, am Ende blendet die Schleife 0,4 s ins erste Bild über (läuft ohne Sprung):
 
   ```bash
   ffmpeg -f concat -safe 0 -i liste.txt -loop 1 -framerate 15 -t 0.6 -i f00000.jpg \
-    -filter_complex "[0:v]crop=W:H:X:Y,fps=15,format=yuv420p,setsar=1,settb=AVTB[a];[1:v]crop=W:H:X:Y,fps=15,format=yuv420p,setsar=1,settb=AVTB[b];[a][b]xfade=transition=fade:duration=0.4:offset=LAENGE-0.4,format=yuv420p[v]" \
+    -filter_complex "[0:v]crop=W:H:X:Y,pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0:0x0F0F10,fps=15,format=yuv420p,setsar=1,settb=AVTB[a];[1:v]crop=W:H:X:Y,pad=ceil(iw/2)*2:ceil(ih/2)*2:0:0:0x0F0F10,fps=15,format=yuv420p,setsar=1,settb=AVTB[b];[a][b]xfade=transition=fade:duration=0.4:offset=LAENGE-0.4,format=yuv420p[v]" \
     -map "[v]" -an -pix_fmt yuv420p -t LAENGE \
     -c:v libvpx-vp9 -b:v 0 -crf 42 -row-mt 1 -deadline good -cpu-used 2 schritt-handy.webm
-  # MP4 statt der letzten Zeile: -c:v libx264 -preset veryslow -crf 30 -profile:v high -movflags +faststart schritt-handy.mp4
+  # MP4 statt der letzten Zeile: -c:v libx264 -preset veryslow -crf 30 -profile:v high -level:v 4.0 -refs 4 -movflags +faststart schritt-handy.mp4
   ```
 
 - **Anzeige (`FaqClip`):** `<video muted loop playsinline preload="none">` mit dem Bild als Poster; WebM (VP9), wenn
   der Browser es kann, sonst MP4 (H.264). Die Handy-Fassung gilt bei `(max-width: 767px), (pointer: coarse) and
   (max-width: 1023px)` (`HANDY_QUERY` in `src/hilfe/index.js`), ohne User-Agent; ändert sich die Breite, wechselt die
   Fassung. Bis der Schritt zu einem Viertel im Bild ist, steht nur das Bild da (`loading="lazy"`), erst dann entsteht
-  das Video. Außerhalb des Bildes hält es an. Unten rechts ein Knopf zum Anhalten und Abspielen. Bei „Bewegung
-  reduzieren“ nur das Bild mit **Abspielen**. Fehlt die Schleife oder bricht das Video ab, bleibt das Bild. Der
-  Schritttext beschreibt den Inhalt, das Video trägt nur ein kurzes Label (`Animation: <Titel>`).
+  das Video. Außerhalb des Bildes hält es an. Unten rechts ein Knopf zum Anhalten und Abspielen; lehnt der Browser das
+  automatische Abspielen ab (Stromsparen), zeigt er **Abspielen** und startet direkt im Klick. Bei „Bewegung
+  reduzieren“ nur das Bild mit **Abspielen**. Bricht WebM ab, kommt MP4; geht keins, bleibt das Bild. Ohne
+  IntersectionObserver startet nichts von selbst, **Abspielen** geht trotzdem. `muted` steht für iOS auch als Attribut.
+  Der Schritttext beschreibt den Inhalt, das Video trägt nur ein kurzes Label (`Animation: <Titel>`).
 - **Nicht im Start:** Die Adressen holt `import.meta.glob(…, { query: "?url" })` nur in `src/hilfe/index.js`, das allein
   die nachgeladenen FAQ-Seiten einbinden. `npm run check:bundle` schlägt fehl, wenn eine Datei des Starts auf ein Video
   verweist oder `index.html` eins vorab lädt.
