@@ -642,3 +642,111 @@ async def test_more_rows_than_one_batch_still_one_digest(monkeypatch, wires):
     assert [row["title"] for row in _digests(db)] == ["In der Nacht: 5 Meldungen"]
     again = await quiet_hours.release_due(db, _utc("2026-11-17T06:10:00"))
     assert _rd(again) == (0, 0) and len(wires) == 2
+
+
+@pytest.mark.anyio
+async def test_a_run_that_finds_the_digest_keeps_its_bounds(monkeypatch, wires):
+    """G1 (Nachprüfung, race_covers5): Lauf B liest eine neuere Zeile X mit, verliert aber beim Anlegen gegen Lauf A. B
+    übernimmt die Abgrenzung von A - X bleibt zurückgehalten und bekommt später ihre eigene Sammelmeldung."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=3)
+    rows = db.notifications.rows
+    for index, row in enumerate(rows):
+        row["created_at"] = f"2026-11-17T05:5{index}:00+00:00"
+    db.notifications = _Yielding(unique=("user_id", "unique_dedupe_key"))
+    db.notifications.rows = rows
+    a_read, b_read, a_done = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    edge, create, release = quiet_hours._edge_row, quiet_hours._create_digest, quiet_hours._release
+
+    def name():
+        return asyncio.current_task().get_name()
+
+    async def gated_edge(db_, user_id, direction):
+        found = await edge(db_, user_id, direction)
+        if direction == -1:
+            (a_read if name() == "A" else b_read).set()
+        return found
+
+    async def gated_create(*args, **kwargs):
+        await (b_read if name() == "A" else a_done).wait()
+        return await create(*args, **kwargs)
+
+    async def gated_release(*args, **kwargs):
+        if name() == "A":
+            await b_read.wait()
+        return await release(*args, **kwargs)
+
+    monkeypatch.setattr(quiet_hours, "_edge_row", gated_edge)
+    monkeypatch.setattr(quiet_hours, "_create_digest", gated_create)
+    monkeypatch.setattr(quiet_hours, "_release", gated_release)
+    now = _utc("2026-11-17T06:01:00")
+
+    async def run_a():
+        try:
+            return await quiet_hours.release_due(db, now)
+        finally:
+            a_done.set()
+
+    async def run_b():
+        await a_read.wait()
+        db.notifications.rows.append({
+            "id": "X", "user_id": "u1", "kind": "tournament_registration", "read": False, "in_app_visible": True,
+            "meta": {"category": "tournament_updates"}, "created_at": "2026-11-17T05:59:30+00:00",
+            "quiet_hold_until": "2026-11-17T06:00:00+00:00", "quiet_held_channels": ["push"]})
+        return await quiet_hours.release_due(db, now)
+
+    first, second = await asyncio.gather(asyncio.create_task(run_a(), name="A"), asyncio.create_task(run_b(), name="B"))
+    assert first["digests"] + second["digests"] == 1
+    held = [row["id"] for row in db.notifications.rows if row.get("quiet_hold_until")]
+    assert held == ["X"], "X stand in keiner Sammelmeldung - sie darf nicht still freigegeben werden"
+    monkeypatch.setattr(quiet_hours, "_edge_row", edge)
+    monkeypatch.setattr(quiet_hours, "_create_digest", create)
+    monkeypatch.setattr(quiet_hours, "_release", release)
+    later = await quiet_hours.release_due(db, _utc("2026-11-17T06:06:00"))
+    assert _rd(later) == (1, 1)
+    assert [row["title"] for row in _digests(db)] == ["In der Nacht: 3 Meldungen", "In der Nacht: 1 Meldung"]
+
+
+@pytest.mark.anyio
+async def test_a_foreign_claim_keeps_delivered_unset(monkeypatch, wires):
+    """G2: Übernimmt ein anderer Lauf den Anspruch, während dieser noch schickt, setzt dieser ``quiet_delivered`` nicht und
+    gibt nichts frei - der andere schließt ab."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=2)
+    push = types.ModuleType("services.push_notifications")
+
+    async def slow_push(notification, *_args):
+        for row in db.notifications.rows:
+            if row["id"] == notification["id"]:
+                row["quiet_claimed_at"] = "2026-11-17T06:20:00+00:00"  # ein anderer Lauf hat übernommen
+        wires.append(("push", notification["kind"], notification["user_id"]))
+        return 1
+
+    push.send_mobile_push_for_notification = slow_push
+    monkeypatch.setitem(sys.modules, "services.push_notifications", push)
+    done = await quiet_hours.release_due(db, _utc("2026-11-17T06:01:00"))
+    assert _rd(done) == (0, 0)
+    assert _digests(db)[0]["quiet_delivered"] is False
+    assert len([row for row in db.notifications.rows if row.get("quiet_hold_until")]) == 2
+
+
+@pytest.mark.anyio
+async def test_a_hanging_discord_does_not_hold_the_run(monkeypatch, wires):
+    """G2: Discord antwortet nicht - nach ``DISCORD_TIMEOUT_SECONDS`` geht der Lauf weiter, die Sammelmeldung ist verschickt."""
+    monkeypatch.setattr(quiet_hours, "DISCORD_TIMEOUT_SECONDS", 0.05)
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {"discord": True}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Nachricht", kind="direct_message", meta={"dedupe_key": "dm"})
+    dm = types.ModuleType("services.discord_dm")
+    dm.EXCLUDED_KINDS = {"moderation", "invoice_ready"}
+
+    async def hanging(*_args, **_kwargs):
+        await asyncio.sleep(30)
+        return 1
+
+    dm.send_discord_dm_for_notification = hanging
+    monkeypatch.setitem(sys.modules, "services.discord_dm", dm)
+    done = await asyncio.wait_for(quiet_hours.release_due(db, _utc("2026-11-17T06:01:00")), 5)
+    assert _rd(done) == (1, 1)
+    assert _digests(db)[0]["quiet_delivered"] is True
+    assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]

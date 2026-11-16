@@ -19,10 +19,11 @@ Doppelt geht nichts, verschluckt wird nichts (``release_due``):
 - Je Person und Freigabe ein fester Schlüssel ``quiet_digest:<id der ältesten zurückgehaltenen Zeile>`` - zwei Läufe zur
   selben Zeit rechnen denselben, und der Teilindex ``user_unique_dedupe`` lässt nur eine Sammelmeldung zu.
 - Versenden darf nur, wer die Sammelmeldung vorher für sich beansprucht (``quiet_claimed_at``); erst nach dem Versand steht
-  ``quiet_delivered``. Bricht ein Lauf vor dem Versand ab, holt ein späterer ihn nach (Anspruch verfällt nach
-  ``CLAIM_SECONDS``).
+  ``quiet_delivered`` - und nur, solange der Anspruch noch der eigene ist. Bricht ein Lauf vor dem Versand ab, holt ein
+  späterer ihn nach (Anspruch verfällt nach ``CLAIM_SECONDS``; Discord wartet höchstens ``DISCORD_TIMEOUT_SECONDS``).
 - Eine Sammelmeldung deckt die Zeilen bis ``meta.covers_until`` (``created_at`` der neuesten) - freigegeben werden genau
-  diese, über alle Zeilen der Person, nicht nur die gelesene Charge.
+  diese, über alle Zeilen der Person, nicht nur die gelesene Charge. Wer eine schon angelegte Sammelmeldung vorfindet,
+  übernimmt ihre Abgrenzung.
 - Ist die Person wieder still, bevor eine angelegte Sammelmeldung hinausging, wird sie verworfen und die Zeilen warten auf
   die nächste Freigabe; ging sie schon hinaus, werden ihre Zeilen freigegeben, neuere warten.
 
@@ -30,6 +31,7 @@ Der Push-Test der Verwaltung (``admin_push_test``) ist ebenfalls eine Ausnahme.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -50,6 +52,8 @@ HELD_CHANNELS = ("push", "browser", "discord")
 RELEASE_BATCH = 2000
 # So lange gilt der Anspruch eines Laufs auf den Versand einer Sammelmeldung; danach darf ein anderer Lauf nachholen.
 CLAIM_SECONDS = 600
+# Die Direktnachricht wartet höchstens so lange auf Discord - ein Lauf darf nie über ``CLAIM_SECONDS`` hängen.
+DISCORD_TIMEOUT_SECONDS = 30
 
 
 def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | None:
@@ -169,11 +173,13 @@ async def _deliver(db, user: dict, digest: dict, channels: set[str], now: dateti
     if "discord" in channels and discord_allowed(user, DIGEST_KIND):
         try:
             from services.discord_dm import send_discord_dm_for_notification
-            sent["discord_sent_count"] = await send_discord_dm_for_notification(digest, None)
+            sent["discord_sent_count"] = await asyncio.wait_for(send_discord_dm_for_notification(digest, None), DISCORD_TIMEOUT_SECONDS)
         except Exception:
             logger.warning("[quiet] Sammel-Direktnachricht %s fehlgeschlagen", log_safe(digest["id"]), exc_info=True)
-    await db.notifications.update_one({"id": digest["id"]}, {"$set": {**sent, "quiet_delivered": True}})
-    return True
+    # Nur mit dem eigenen Anspruch als verschickt markieren - hat ein anderer Lauf ihn inzwischen übernommen, schließt der ab.
+    done = await db.notifications.update_one({"id": digest["id"], "quiet_claimed_at": now.isoformat()},
+                                             {"$set": {**sent, "quiet_delivered": True}})
+    return bool(int(getattr(done, "modified_count", 0) or 0))
 
 
 async def _release(db, user_id: str, covers: str, now_iso: str) -> int:
@@ -250,6 +256,9 @@ async def release_due(db, now: datetime | None = None) -> dict[str, int]:
             if digest is None and user and total and channels:
                 latest = max(str(row.get("quiet_hold_until") or "") for row in rows)
                 digest = await _create_digest(db, user, key, covers, latest, unread, total)
+                # Hat ein paralleler Lauf sie schon angelegt, gilt seine Abgrenzung - sonst gäbe dieser Lauf Zeilen frei, die
+                # in keiner Sammelmeldung stehen.
+                covers = str((digest.get("meta") or {}).get("covers_until") or covers)
             if digest and not digest.get("quiet_delivered") and user:
                 if not await _deliver(db, user, digest, channels, now):
                     # Ein anderer Lauf schickt gerade - er gibt auch frei. Bricht er ab, holt ein späterer Lauf nach.
