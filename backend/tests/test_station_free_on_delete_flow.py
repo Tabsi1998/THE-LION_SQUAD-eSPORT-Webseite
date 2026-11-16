@@ -233,3 +233,42 @@ async def test_applying_a_structure_plan_frees_the_stations_of_the_replaced_prev
 
     assert [match["id"] for match in await flow.matches(tournament)] == [fresh[0]["id"]]
     await assert_released(flow, stations)
+
+
+# ---------------------------------------------------------------- Aufgerufene erfahren es (#2386, Review)
+
+async def called_on_site(flow):
+    from test_live_queue_flow import call, first_round, on_site
+
+    _staff, tournament, stations, _players = await on_site(flow)
+    match = (await first_round(flow, tournament))[0]
+    called = await call(flow, tournament, stations[0], match)
+    assert called.status_code == 200, called.text
+    return tournament, stations, match
+
+
+async def withdrawn_for(flow, match) -> list[dict]:
+    rows = await flow.db.notifications.find({"kind": "match_call"}, {"_id": 0}).to_list(50)
+    return [row for row in rows if row["title"] == "Aufruf zurückgenommen" and row["meta"]["match_id"] == match["id"]]
+
+
+@pytest.mark.asyncio
+async def test_resetting_the_bracket_tells_the_called_players_and_frees_the_station(flow):
+    tournament, stations, match = await called_on_site(flow)
+
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/reset-bracket?force=true")
+    assert response.status_code == 200, response.text
+
+    assert len(await withdrawn_for(flow, match)) == 2, "beide aufgerufenen Spieler"
+    station = await flow.db.stations.find_one({"id": stations[0]["id"]}, {"_id": 0})
+    assert station["status"] == "free" and not station.get("current_match_id")
+
+
+@pytest.mark.asyncio
+async def test_rebuilding_from_the_format_tells_the_called_players(flow):
+    tournament, _stations, match = await called_on_site(flow)
+
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false&force=true")
+    assert response.status_code == 200, response.text
+
+    assert len(await withdrawn_for(flow, match)) == 2
