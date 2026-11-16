@@ -1,0 +1,17 @@
+{
+  "_comment": "Was eine Helfer-Rolle im Turnier darf (#1384) - Spiegel von STAFF_RIGHTS in backend/services/tournament_permissions.py. Ein Gleichheits-Test (backend/tests/test_staff_role_rights_unit.py) hält beide gleich.",
+  "rights": [
+    { "key": "structure", "label": "Ablauf und Baum" },
+    { "key": "participants", "label": "Teilnehmer" },
+    { "key": "results", "label": "Ergebnisse" },
+    { "key": "check_in", "label": "Check-in" },
+    { "key": "stations", "label": "Stationen" }
+  ],
+  "roles": {
+    "organizer": ["structure", "participants", "results", "check_in", "stations"],
+    "referee": ["structure", "participants", "results", "check_in", "stations"],
+    "scorekeeper": ["participants", "results", "check_in"],
+    "station_manager": ["results", "check_in", "stations"],
+    "stream_operator": []
+  }
+}

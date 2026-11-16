@@ -463,6 +463,40 @@ describe("Spiel-IDs", () => {
     expect(toastMock.error).not.toHaveBeenCalled();
     expect(screen.getByTestId("game-tab-dirty-allgemein")).toBeInTheDocument();
   });
+
+  // Plattform-Feld (#2281): ein Haken je Spiel, nur mit Auswahl; ohne Pflicht sagt die Karte, was das heißt.
+  test("ein Feld als Plattform kennzeichnen: höchstens eines, nur mit Auswahl, Hinweis ohne Pflicht", async () => {
+    game = { ...GAME, player_id_fields: [
+      { key: "activision_id", label: "Activision ID", required: true },
+      { key: "plattform", label: "Plattform", required: false, options: ["PC", "PS5"] },
+      { key: "konsole", label: "Konsole", required: true, options: ["PS5", "Xbox"] },
+    ] };
+    renderPage("/admin/games/g1#ids");
+    expect(await screen.findByTestId("game-id-field-platform-0")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("game-id-field-platform-2"));
+    fireEvent.click(screen.getByTestId("game-id-field-platform-1"));
+    expect(screen.getByTestId("game-id-field-platform-1")).toBeChecked();
+    expect(screen.getByTestId("game-id-field-platform-2")).not.toBeChecked();
+    expect(screen.getByTestId("game-id-field-platform-optional-1")).toHaveTextContent("Spieler können sie im Profil jederzeit umstellen");
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+    const [, body] = apiMock.patch.mock.calls[0];
+    expect(body.player_id_fields.map((field) => field.platform ?? null)).toEqual([null, true, null]);
+  });
+
+  test("eine Version, deren ID-Quelle die Plattform schon trägt, nennt sie und bietet keinen zweiten Haken", async () => {
+    game = { ...GAME, kind: "edition", parent_game_id: "p1", player_id_fields: [{ key: "konsole", label: "Konsole", required: true, options: ["PS5"] }] };
+    apiMock.get.mockImplementation(async (url) => {
+      if (url === "/games") return { data: [game, { id: "p1", name: "Call of Duty", slug: "cod", kind: "series",
+        player_id_fields: [{ key: "plattform", label: "Plattform", options: ["PC"], platform: true }] }] };
+      if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
+      if (url === "/games/g1/usage") return { data: usage };
+      return { data: [] };
+    });
+    renderPage("/admin/games/g1#ids");
+    expect(await screen.findByTestId("game-ids-platform-inherited")).toHaveTextContent("Plattform: Feld „Plattform“ von Call of Duty");
+    expect(screen.getByTestId("game-id-field-platform-0")).toBeDisabled();
+  });
 });
 
 describe("Modi", () => {

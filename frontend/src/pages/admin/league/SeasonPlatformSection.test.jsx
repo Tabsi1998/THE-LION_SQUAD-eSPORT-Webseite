@@ -124,3 +124,22 @@ test("Liga-N-Blatt ohne Feld der Season: nur Crossplay und Eingabegerät", async
   expect(screen.queryByTestId("override-platform-own")).toBeNull();
   expect(screen.getByTestId("override-crossplay")).toBeInTheDocument();
 });
+
+// Plattform-Feld am Spiel (#2281): die Season schlägt es vor, solange sie keines gewählt hat - ohne Kennzeichnung wie bisher.
+test("am Spiel gekennzeichnetes Feld: Vorschlag mit „Übernehmen“, in der Auswahl benannt", async () => {
+  apiMock.get.mockResolvedValue({ data: view(EMPTY, { fields: [{ ...FIELD, platform: true }], suggested_field: "platform" }) });
+  render(<Harness />);
+  expect(await screen.findByTestId("season-platform-suggestion")).toHaveTextContent("Vorschlag: „Plattform“");
+  expect(screen.getByRole("option", { name: "Plattform (am Spiel als Plattform gekennzeichnet)" })).toBeInTheDocument();
+  expect(latest.platform_field).toBe("");
+  fireEvent.click(screen.getByTestId("season-platform-suggestion-take"));
+  expect(latest.platform_field).toBe("platform");
+  expect(screen.queryByTestId("season-platform-suggestion")).toBeNull();
+});
+
+test("ohne Kennzeichnung kein Vorschlag", async () => {
+  apiMock.get.mockResolvedValue({ data: view() });
+  render(<Harness />);
+  await screen.findByTestId("season-platform-field");
+  expect(screen.queryByTestId("season-platform-suggestion")).toBeNull();
+});

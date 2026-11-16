@@ -983,10 +983,11 @@ neuen Felder nicht und prüfen nichts Neues.
 | `format_hint` | str ≤ 120 | Beispiel oder Beschreibung, steht im Profil und in jeder Meldung zum Format |
 | `options` | `[str]`, höchstens 30 | Auswahl statt Freitext. So wird die **Plattform** zum Feld: Pflicht über `required`, einmal je Season festgehalten wie jede ID |
 | `unique_in_season` | bool | `false` nimmt das Feld aus der Eindeutigkeit aus (Vorgabe: Felder mit `options` sind ausgenommen, alle anderen dabei) |
+| `platform` | bool | `true` kennzeichnet das Feld als **Plattform** (#2281). Höchstens ein Feld je Spiel, nur mit `options` (sonst 422); geerbt über die ID-Quelle - trägt sie schon eines, darf das Spiel kein zweites kennzeichnen (422). Die Season schlägt es vor (`suggested_field` in `GET …/platform`), gewählt wird weiter `platform_field` an der Season |
 
 Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern` oder `options` passen. Fehlen beide, gibt es keine Prüfung.
 
-**Plattform je Season (#2270).** Das Spiel kennzeichnet kein Feld als Plattform, darum wählt die Season das Feld. Einstellungen an `league_seasons`,
+**Plattform je Season (#2270).** Die Season wählt das Feld; seit #2281 schlägt sie das am Spiel mit `platform` gekennzeichnete vor (ohne Kennzeichnung wie bisher). Einstellungen an `league_seasons`,
 gepflegt im Abschnitt „Plattform und Eingabegerät“ des Reiters „Anmeldung und Kader“ (`#plattform`). Gespeichert wird mit dem Reiter über
 `PATCH /api/admin/leagues/seasons/{id}` (Zuständigkeit `season`; trägt die Anfrage die vier Felder unverändert, prüft sie nichts, damit ein am Spiel
 verschwundenes Feld das Speichern des Reiters nicht aufhält; Protokoll zusätzlich `league.season.platform` mit vorher und nachher). Wählbare Felder,

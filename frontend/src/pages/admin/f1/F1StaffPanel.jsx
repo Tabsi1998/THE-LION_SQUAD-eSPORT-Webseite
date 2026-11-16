@@ -30,7 +30,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
     setSaving(true);
     try {
       await api.post(`/f1/challenges/${challengeId}/staff`, { user_id: person.id, ...form });
-      toast.success(`${person.name} ist im Fast-Lap-Team.`);
+      toast.success(`${person.name} hilft jetzt beim Fast Lap und bekommt Bescheid.`);
       setPerson(null);
       setForm({ role: "scorekeeper", notes: "" });
       onChanged();
@@ -67,7 +67,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
 
   return (
     <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="f1-staff-panel">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Fast-Lap-Team</div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Fast-Lap-Helfer</div>
       <div className="mt-4 grid lg:grid-cols-3 gap-5">
         <form onSubmit={add} className="space-y-3">
           <PersonPicker purpose="fastlap" contextId={challengeId} value={person} onChange={setPerson} label="Person" testId="f1-staff-person" />

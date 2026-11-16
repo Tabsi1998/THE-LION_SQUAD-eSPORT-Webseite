@@ -22,6 +22,7 @@ from services.profile_references import personal_profile_references
 from services import event_days
 from services.public_phase import derive_public_phase
 from services.tournament_permissions import is_staffel, leads_tournament
+from services.news_publish import pin_active
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
 from services.app_releases import app_version_release, current_release, next_check_after, public_release, release_file, update_decision
@@ -358,7 +359,8 @@ def _compact_news(post: dict) -> dict:
         "banner_url": post.get("banner_url"),
         "published_at": post.get("published_at"),
         "created_at": post.get("created_at"),
-        "pinned": bool(post.get("pinned")),
+        # Angeheftet nur bis zum Ende der Anheftung (#1263) - die App folgt ohne eigene Änderung.
+        "pinned": pin_active(post),
     }
 
 
@@ -378,6 +380,7 @@ async def _latest_news(user: dict | None) -> list[dict]:
             "published_at": 1,
             "created_at": 1,
             "pinned": 1,
+            "pinned_until": 1,
             "visibility": 1,
         },
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(80)
@@ -391,7 +394,7 @@ async def _latest_news(user: dict | None) -> list[dict]:
             visible.append(post)
     visible.sort(
         key=lambda row: (
-            bool(row.get("pinned")),
+            pin_active(row),
             _parse_dt(row.get("published_at") or row.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc),
         ),
         reverse=True,

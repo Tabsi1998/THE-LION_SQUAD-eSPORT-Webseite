@@ -185,6 +185,18 @@ logger = logging.getLogger("tls.f1")
 # in der Challenge (f1_staff_assignments).
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 F1_RESULT_STAFF_ROLES = {"organizer", "referee", "scorekeeper"}
+# Nachricht beim Eintragen (#1384): bei der Fast Lap dürfen alle drei Rollen dasselbe - Zeiten eintragen und ändern.
+F1_ROLE_WORDS = {"organizer": "Organisation", "referee": "Schiedsrichter", "scorekeeper": "Ergebnisdienst"}
+F1_RIGHTS = "Darf hier: Zeiten eintragen und ändern."
+
+
+async def _notify_f1_helper(db, cid: str, assignment: dict) -> None:
+    from services.staff_messages import notify_helper
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "title": 1}) or {}
+    await notify_helper(
+        db, assignment, event_title=challenge.get("title") or "Fast Lap", role_word=F1_ROLE_WORDS.get(assignment.get("role"), "Helfer"),
+        rights=F1_RIGHTS, dedupe_prefix="fastlap_staff", meta={"challenge_id": cid},
+    )
 
 
 def _iso(dt):
@@ -668,6 +680,8 @@ async def create_challenge_staff(cid: str, body: dict, me: dict = Depends(requir
     }
     await db.f1_staff_assignments.insert_one(doc)
     doc.pop("_id", None)
+    if doc["is_active"]:
+        await _notify_f1_helper(db, cid, doc)
     return (await _enrich_f1_staff_assignments([doc]))[0]
 
 
@@ -693,6 +707,10 @@ async def update_challenge_staff(cid: str, assignment_id: str, body: dict, me: d
     updates["updated_at"] = now_utc().isoformat()
     await db.f1_staff_assignments.update_one({"id": assignment_id}, {"$set": updates})
     updated = await db.f1_staff_assignments.find_one({"id": assignment_id}, {"_id": 0})
+    # Pausiert eingetragen, jetzt aktiv (#1384): die Nachricht zum Eintragen, je Einsatz einmal.
+    from services.staff_messages import became_active
+    if became_active(current, updated):
+        await _notify_f1_helper(db, cid, updated)
     return (await _enrich_f1_staff_assignments([updated]))[0]
 
 

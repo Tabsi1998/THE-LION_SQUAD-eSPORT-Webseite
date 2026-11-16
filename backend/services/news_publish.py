@@ -1,5 +1,6 @@
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
@@ -25,8 +26,70 @@ INTERNAL_NEWS_FIELDS = frozenset({
 
 
 def public_news(post: dict) -> dict:
-    """Ein Beitrag ohne die internen Felder der Redaktion - für jede öffentliche Antwort."""
-    return {key: value for key, value in (post or {}).items() if key not in INTERNAL_NEWS_FIELDS}
+    """Ein Beitrag ohne die internen Felder der Redaktion - für jede öffentliche Antwort. ``pinned`` gilt nur bis zum
+    Ende der Anheftung (#1263)."""
+    row = {key: value for key, value in (post or {}).items() if key not in INTERNAL_NEWS_FIELDS}
+    if "pinned" in row:
+        row["pinned"] = pin_active(post)
+    return row
+
+
+# Angeheftete News laufen ab (#1263): ``pinned_until`` ist ein Wiener Kalendertag („JJJJ-MM-TT“), angeheftet bleibt der
+# Beitrag bis zum Ende dieses Tages. Beim Anheften ohne Ende schlägt der Editor (und notfalls der Server) 14 Tage vor - ab dem
+# Tag, an dem der Beitrag erscheint. Altbestand ohne Ende rechnet beim Lesen, ohne Migration (Fabian, 16.11.): erschienen + 14
+# Tage, aber nie vor „Tag der Umstellung + 14“ - so verschwindet am ersten Tag keine angeheftete Alt-News.
+VIENNA = ZoneInfo("Europe/Vienna")
+PIN_DEFAULT_DAYS = 14
+# Stichtag der Umstellung (Fabian, 16.11.: nichts wird in die Datenbank geschrieben - keine Migration, keine Einstellungszeile):
+# Ältere angeheftete News ohne Ende gelten bis max(erschienen, angelegt, PIN_RULE_SINCE) + 14 Tage (Wiener Tag).
+PIN_RULE_SINCE = date(2026, 11, 20)
+
+
+def vienna_today(now: datetime | None = None) -> date:
+    return (now or now_utc()).astimezone(VIENNA).date()
+
+
+def default_pinned_until(now: datetime | None = None) -> str:
+    return (vienna_today(now) + timedelta(days=PIN_DEFAULT_DAYS)).isoformat()
+
+
+def parse_pin_day(value) -> date | None:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10]) if value else None
+    except ValueError:
+        return None
+
+
+def vienna_day(value) -> date | None:
+    moment = parse_dt(value)
+    return moment.astimezone(VIENNA).date() if moment else None
+
+
+def publish_day(post: dict | None, now: datetime | None = None) -> date:
+    """Ab diesem Wiener Tag ist der Beitrag zu sehen: heute oder - bei einem geplanten Beitrag - sein Termin."""
+    today = vienna_today(now)
+    planned = vienna_day((post or {}).get("published_at"))
+    return max(today, planned) if planned else today
+
+
+def pin_end(post: dict | None, now: datetime | None = None) -> date | None:
+    """Bis zu welchem Wiener Tag der Beitrag angeheftet ist - ``None``, wenn er es nicht ist."""
+    if not (post or {}).get("pinned"):
+        return None
+    until = parse_pin_day(post.get("pinned_until"))
+    if until is not None:
+        return until
+    # Altbestand ohne Ende: erschienen (bzw. angelegt) + 14 Tage, nie vor dem Stichtag + 14 Tage.
+    days = [day for day in (vienna_day(post.get("published_at")), vienna_day(post.get("created_at"))) if day]
+    return max([*days, PIN_RULE_SINCE]) + timedelta(days=PIN_DEFAULT_DAYS)
+
+
+def pin_active(post: dict | None, now: datetime | None = None) -> bool:
+    """Ist der Beitrag gerade angeheftet? Die eine Regel für alle Leser (Website, App, Startseite, Verwaltung)."""
+    end = pin_end(post, now)
+    return end is not None and vienna_today(now) <= end
 
 
 def parse_dt(value):
