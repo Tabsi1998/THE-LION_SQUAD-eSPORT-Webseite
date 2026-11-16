@@ -144,3 +144,45 @@ test("Stufen kommen vom Server - eine Stufe schickt alle Themen auf einmal", asy
   fireEvent.keyDown(screen.getByTestId("notification-level-all"), { key: "ArrowRight" });
   expect(setNotificationPreferences).toHaveBeenCalledTimes(2);
 });
+
+// Barrierefreiheit (#1204): ein Tab-Stopp je Thema, Pfeiltasten wählen die nächste Stellung.
+test("Themen: nur die gewählte Stellung ist ein Tab-Stopp, Pfeiltasten wechseln", async () => {
+  const { fireEvent } = await import("@testing-library/react");
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/web-push/config" ? { enabled: false } : { discord: { linked: false } } }));
+  const setNotificationPreferences = vi.fn();
+  render(<NotificationsTab
+    form={{ newsletter_consent: true, notification_preferences: {} }}
+    set={vi.fn()}
+    setNotificationPreference={vi.fn()}
+    setNotificationPreferences={setNotificationPreferences}
+    notificationEnabled={() => true}
+    notificationTopicEnabled={() => true}
+    autosave={{ status: "idle", message: "" }}
+  />);
+  expect(screen.getByTestId("notification-topic-prize_updates-push")).toHaveAttribute("tabindex", "0");
+  expect(screen.getByTestId("notification-topic-prize_updates-app")).toHaveAttribute("tabindex", "-1");
+  expect(screen.getByTestId("notification-topic-prize_updates-off")).toHaveAttribute("tabindex", "-1");
+  fireEvent.keyDown(screen.getByTestId("notification-topic-prize_updates-push"), { key: "ArrowRight" });
+  expect(setNotificationPreferences).toHaveBeenLastCalledWith({ "in_app:prize_updates": true, "push:prize_updates": false, "browser:prize_updates": false });
+  expect(document.activeElement).toBe(screen.getByTestId("notification-topic-prize_updates-app"));
+  fireEvent.keyDown(screen.getByTestId("notification-topic-prize_updates-push"), { key: "ArrowLeft" });
+  expect(setNotificationPreferences).toHaveBeenLastCalledWith({ "in_app:prize_updates": false, "push:prize_updates": false, "browser:prize_updates": false });
+});
+
+// Laden gescheitert (#1204): Hinweis mit „Erneut versuchen“ statt leerer Stufen-Karte; der zweite Versuch zeigt die Stufen.
+test("Laden gescheitert: Hinweis und „Erneut versuchen“", async () => {
+  const { fireEvent } = await import("@testing-library/react");
+  let fail = true;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/web-push/config") return { data: { enabled: false } };
+    if (fail) throw new Error("weg");
+    return { data: { discord: { linked: false }, topics: ["match_reminders"], levels: [{ key: "all", label: "Alles", description: "Alles per Push.", modes: { match_reminders: "push" } }] } };
+  });
+  renderTab();
+  expect(await screen.findByTestId("notification-load-failed")).toHaveTextContent("nicht geladen");
+  expect(screen.queryByTestId("notification-levels-loading")).toBeNull();
+  fail = false;
+  fireEvent.click(screen.getByTestId("notification-load-retry"));
+  expect(await screen.findByTestId("notification-level-all")).toBeInTheDocument();
+  expect(screen.queryByTestId("notification-load-failed")).toBeNull();
+});

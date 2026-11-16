@@ -35,14 +35,20 @@ export function NotificationsTab({
   const [webPushStamp, setWebPushStamp] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const [lit, setLit] = useState({ round: 0, keys: [] });
+  const [loadRound, setLoadRound] = useState(0);
   const levelRefs = useRef({});
   useEffect(() => {
     let active = true;
     api.get("/users/me/notification-preferences")
       .then(({ data }) => { if (active) setServer(data || {}); })
-      .catch(() => { if (active) setServer({ discord: { linked: false } }); });
+      // Laden gescheitert (#1204): ein Hinweis mit „Erneut versuchen“ statt einer leeren Stufen-Karte.
+      .catch(() => { if (active) setServer({ discord: { linked: false }, failed: true }); });
     return () => { active = false; };
-  }, []);
+  }, [loadRound]);
+  const reload = () => {
+    setServer(null);
+    setLoadRound((value) => value + 1);
+  };
   useEffect(() => {
     let active = true;
     loadWebPushConfig().then((config) => { if (active) setWebPush(config); });
@@ -59,7 +65,10 @@ export function NotificationsTab({
   const modes = topicModes(pref, topics, newsletter);
   const levelIndex = levels.findIndex((item) => item.key === level);
   const currentLevel = levels[levelIndex];
-  const quiet = quietHoursForm(form.quiet_hours);
+  // Die Felder zeigen den echten Formularwert (auch ein geleertes Feld); Zusammenfassung nur mit gültigen Zeiten.
+  const quietRaw = form.quiet_hours && typeof form.quiet_hours === "object" ? form.quiet_hours : quietHoursForm(null);
+  const quiet = quietHoursForm(quietRaw);
+  const quietError = autosave.fieldErrors?.quiet_hours;
   const exceptions = Array.isArray(server?.quiet_hours_exceptions) && server.quiet_hours_exceptions.length ? server.quiet_hours_exceptions : FALLBACK_EXCEPTIONS;
   const channels = NOTIFICATION_CHANNELS.filter((channel) => (channel.k !== "discord" || discord?.linked) && (channel.k !== "browser" || webPush?.enabled));
   const moreColumns = channels.filter((channel) => MORE_COLUMNS.includes(channel.k));
@@ -85,7 +94,17 @@ export function NotificationsTab({
     pickLevel(next);
     levelRefs.current[next.key]?.focus();
   };
-  const setQuiet = (patch, later = false) => (later ? setLater : set)("quiet_hours", { ...quiet, ...patch });
+  const setQuiet = (patch, later = false) => (later ? setLater : set)("quiet_hours", { ...quietRaw, ...patch });
+  // Themen wie die Stufen-Reihe (#1204): ein Tab-Stopp je Thema, Pfeiltasten wählen die Stellung daneben.
+  const onModeKey = (event, topic) => {
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = MODE_ORDER.indexOf(modes[topic.k]);
+    const next = MODE_ORDER[(index + step + MODE_ORDER.length) % MODE_ORDER.length];
+    pickMode(topic, next);
+    event.currentTarget.parentElement?.querySelector(`[data-mode-option="${next}"]`)?.focus();
+  };
 
   return (
     <Section>
@@ -125,6 +144,13 @@ export function NotificationsTab({
                   </button>
                 );
               })}
+            </div>
+          ) : server?.failed ? (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 p-3 border border-warn/40 rounded-sm text-sm text-warn" data-testid="notification-load-failed">
+              <span>Die Stufen konnten nicht geladen werden. Deine Themen unten gelten weiter.</span>
+              <button type="button" onClick={reload} className="tls-hit min-h-11 px-3 border border-warn/40 rounded-sm font-bold uppercase tracking-wider text-xs hover:bg-warn/10" data-testid="notification-load-retry">
+                Erneut versuchen
+              </button>
             </div>
           ) : server ? null : (
             <div className="grid grid-cols-3 gap-2" aria-hidden="true" data-testid="notification-levels-loading">
@@ -175,7 +201,10 @@ export function NotificationsTab({
                         role="radio"
                         aria-checked={mode === option}
                         aria-label={`${topic.l}: ${MODE_LABELS[option]}`}
+                        tabIndex={mode === option ? 0 : -1}
+                        data-mode-option={option}
                         onClick={() => pickMode(topic, option)}
+                        onKeyDown={(event) => onModeKey(event, topic)}
                         className="tls-seg__option"
                         data-testid={`notification-topic-${topic.k}-${option}`}
                       >
@@ -214,17 +243,19 @@ export function NotificationsTab({
               <div className="grid grid-cols-2 gap-3 mt-4 max-w-sm">
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Von</span>
-                  <input type="time" step="300" value={quiet.start} onChange={(event) => setQuiet({ start: event.target.value }, true)} className="tls-quiet__time mt-1" data-testid="notification-quiet-start" />
+                  <input type="time" step="300" value={quietRaw.start ?? ""} onChange={(event) => setQuiet({ start: event.target.value }, true)} aria-invalid={quietError ? "true" : undefined} aria-describedby={quietError ? "notification-quiet-error" : undefined} className="tls-quiet__time mt-1" data-testid="notification-quiet-start" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Bis</span>
-                  <input type="time" step="300" value={quiet.end} onChange={(event) => setQuiet({ end: event.target.value }, true)} className="tls-quiet__time mt-1" data-testid="notification-quiet-end" />
+                  <input type="time" step="300" value={quietRaw.end ?? ""} onChange={(event) => setQuiet({ end: event.target.value }, true)} aria-invalid={quietError ? "true" : undefined} aria-describedby={quietError ? "notification-quiet-error" : undefined} className="tls-quiet__time mt-1" data-testid="notification-quiet-end" />
                 </label>
               </div>
-              <FieldError message={autosave.fieldErrors?.quiet_hours} testId="notification-quiet-error" />
-              <p className="text-sm text-white/70 mt-3" data-testid="notification-quiet-summary">
-                Täglich {quiet.start} bis {quiet.end} Uhr, Wiener Zeit{crossesMidnight(quiet) ? " – über Mitternacht" : ""}.
-              </p>
+              <div id="notification-quiet-error"><FieldError message={quietError} testId="notification-quiet-error" /></div>
+              {quietError ? null : (
+                <p className="text-sm text-white/70 mt-3" data-testid="notification-quiet-summary">
+                  Täglich {quiet.start} bis {quiet.end} Uhr, Wiener Zeit{crossesMidnight(quiet) ? " – über Mitternacht" : ""}.
+                </p>
+              )}
               <div className="mt-3 text-[11px] uppercase tracking-widest font-bold text-white/45">Kommt trotzdem sofort</div>
               <ul className="mt-1 space-y-1 text-xs text-white/60 list-disc pl-4" data-testid="notification-quiet-exceptions">
                 {exceptions.map((text) => <li key={text}>{text}</li>)}
