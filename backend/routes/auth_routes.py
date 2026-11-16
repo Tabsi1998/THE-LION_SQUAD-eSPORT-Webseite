@@ -29,6 +29,7 @@ from services.secret_store import decrypt_secret, encrypt_secret
 from services.totp import generate_recovery_codes, generate_totp_secret, matching_totp_counter, provisioning_uri
 from services.return_path import safe_next_path
 from services.log_safe import log_safe
+from services.notification_preferences import new_account_preferences
 from services import maintenance
 from services.private_fields import strip_private
 from services.usernames import username_from_name, username_taken
@@ -753,6 +754,8 @@ async def register(body: UserRegister, request: Request, response: Response):
         "accepted_privacy": body.accept_privacy,
         "accepted_terms": body.accept_terms,
         "newsletter_consent": body.newsletter_consent,
+        # Neue Konten starten mit der Stufe „Alles“ (#1204), News & Events ohne Newsletter-Haken nur in der Glocke.
+        "notification_preferences": new_account_preferences(bool(body.newsletter_consent)),
         "privacy_policy_version": os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26"),
         "terms_version": os.environ.get("TERMS_VERSION", "2026-08-26"),
         "password_login_available": True,
@@ -875,6 +878,8 @@ def _google_user_doc(email: str, name: str, picture: str | None, google_id: str 
         "bio": None,
         "is_active": True, "is_banned": False, "email_verified": True,
         "accepted_privacy": False, "accepted_terms": False, "newsletter_consent": False,
+        # Stufe „Alles“ (#1204); News & Events ohne Newsletter-Haken nur in der Glocke - google_session setzt es mit dem Haken neu.
+        "notification_preferences": new_account_preferences(False),
         "password_setup_required": False, "password_login_available": False,
         "created_at": ts, "updated_at": ts,
     }
@@ -921,6 +926,7 @@ async def google_session(body: GoogleCredentialBody, request: Request, response:
             "accepted_privacy": True,
             "accepted_terms": True,
             "newsletter_consent": body.newsletter_consent,
+            "notification_preferences": new_account_preferences(bool(body.newsletter_consent)),
             "privacy_policy_version": os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26"),
             "terms_version": os.environ.get("TERMS_VERSION", "2026-08-26"),
         })
@@ -1071,6 +1077,8 @@ async def mobile_register(body: UserRegister, request: Request):
         "accepted_privacy": body.accept_privacy,
         "accepted_terms": body.accept_terms,
         "newsletter_consent": body.newsletter_consent,
+        # Neue Konten starten mit der Stufe „Alles“ (#1204), News & Events ohne Newsletter-Haken nur in der Glocke.
+        "notification_preferences": new_account_preferences(bool(body.newsletter_consent)),
         "privacy_policy_version": os.environ.get("PRIVACY_POLICY_VERSION", "2026-08-26"),
         "terms_version": os.environ.get("TERMS_VERSION", "2026-08-26"),
         "password_login_available": True,

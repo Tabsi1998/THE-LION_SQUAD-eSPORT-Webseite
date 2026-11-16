@@ -1,7 +1,7 @@
 // Veralteter Baustein nach einem Deploy (#2080): ein offener Tab lädt eine Datei, die es nicht mehr gibt. Statt
 // Fehlerseite und Fehler-Log lädt die Seite einmal neu; ein Merker mit Zeitstempel in sessionStorage verhindert,
 // dass sie sich im Kreis lädt.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const STALE = new TypeError("Failed to fetch dynamically imported module: https://lionsquad.at/assets/ReferenceRoundPage-abc123.js");
@@ -92,6 +92,24 @@ test("andere Fehler und fehlendes Netz laden nicht neu", async () => {
   await expect(importWithReload(() => Promise.reject(broken), { reload })).rejects.toBe(broken);
   expect(requestChunkReload({ reload, online: () => false })).toBe(false);
   expect(reload).not.toHaveBeenCalled();
+});
+
+// Auch außerhalb von App.jsx (#1204, Reiter Benachrichtigungen): Kein Teil lädt über das blanke lazy von React - sonst
+// bleibt er nach einem Deploy leer, statt die Seite einmal neu zu laden. Nur chunkReload.js selbst benutzt es.
+test("kein Teil unter src lädt über das blanke lazy von React", () => {
+  const root = path.resolve(__dirname, "..");
+  const files = (function walk(dir) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(jsx?|tsx?)$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name) ? [full] : [];
+    });
+  })(root);
+  const bare = files.filter((file) => !file.endsWith(`${path.sep}chunkReload.js`)).filter((file) => {
+    const text = readFileSync(file, "utf8");
+    return /import \{[^}]*\blazy\b[^}]*\} from "react"/.test(text) || /React\.lazy\(/.test(text);
+  });
+  expect(bare.map((file) => path.relative(root, file))).toEqual([]);
 });
 
 test("App.jsx lädt jede Seite über lazyPage, keine über das blanke lazy", () => {

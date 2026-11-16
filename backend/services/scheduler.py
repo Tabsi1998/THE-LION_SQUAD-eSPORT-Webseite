@@ -822,6 +822,18 @@ async def _safe_match_attention():
         _log_task_failure("match_attention", exc)
 
 
+async def _safe_quiet_digest():
+    """Ruhezeit (#1206): nach dem Ende zurückgehaltene Meldungen freigeben, je Person eine Sammelmeldung."""
+    try:
+        from database import get_db
+        from services.quiet_hours import release_due
+        done = await release_due(get_db())
+        if done.get("released"):
+            logger.info(f"[scheduler] quiet_digest released={done['released']} digests={done['digests']}")
+    except Exception as exc:
+        _log_task_failure("quiet_digest", exc)
+
+
 async def _safe_media_scan():
     try:
         from services.media_scan import process_pending
@@ -1255,6 +1267,9 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     # Braucht Aufmerksamkeit (#1160): fehlende Ergebnisse und defekte Stationen - jede Minute nachsehen.
     sched.add_job(_single_replica("match_attention", _safe_match_attention, lease_seconds=120.0), IntervalTrigger(seconds=60), id="match_attention",
+                  max_instances=1, coalesce=True)
+    # Ruhezeit (#1206): Sammelmeldung nach dem Ende - alle 5 Minuten nachsehen.
+    sched.add_job(_single_replica("quiet_digest", _safe_quiet_digest, lease_seconds=240.0), IntervalTrigger(minutes=5), id="quiet_digest",
                   max_instances=1, coalesce=True)
     # Ergebnisse mit „Rückgängig“ (#1156): nach 10 Sekunden veröffentlichen, auch nach einem Neustart.
     sched.add_job(_single_replica("result_holds", _safe_result_holds, lease_seconds=60.0), IntervalTrigger(seconds=5), id="result_holds",

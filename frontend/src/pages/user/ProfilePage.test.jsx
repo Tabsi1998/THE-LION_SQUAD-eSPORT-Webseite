@@ -161,7 +161,8 @@ test("kein Knopf Speichern mehr - in keinem Reiter", async () => {
     await user.click(screen.getByRole("button", { name }));
     expect(screen.queryByTestId("profile-save")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Speicher/i })).toBeNull();
-    expect(screen.getByTestId("profile-autosave-status")).toBeInTheDocument();
+    // Benachrichtigungen lädt erst beim Öffnen (#1204) - der Stand erscheint mit dem Reiter.
+    expect(await screen.findByTestId("profile-autosave-status")).toBeInTheDocument();
   }
 });
 
@@ -293,23 +294,126 @@ test("ein einzelnes Feld anders als seine Gruppe zeigt die Gruppe als gemischt",
   expect(screen.getByTestId("profile-vis-group-contact-public")).toHaveAttribute("aria-pressed", "false");
 });
 
-test("der Reiter Benachrichtigungen schaltet Kanaele und graut die Spalte aus", async () => {
+// Stufen und Themen (#1204): was eine Stufe setzt, kommt vom Server - hier dieselben Stufen wie in notification_preferences.py.
+const TOPICS = ["match_reminders", "tournament_updates", "prize_updates", "achievements", "billing_updates",
+  "membership_updates", "community_messages", "news_events", "club_internal", "helper_shifts"];
+const levelModes = (pushed) => Object.fromEntries(TOPICS.map((topic) => [topic, pushed.includes(topic) ? "push" : "app"]));
+const NOTIFICATION_SETTINGS = {
+  discord: { linked: false },
+  topics: TOPICS,
+  levels: [
+    { key: "all", label: "Alles", description: "Jedes Thema per Push.", modes: levelModes(TOPICS) },
+    { key: "important", label: "Wichtiges", description: "Das Wichtige per Push.", modes: levelModes(["match_reminders", "tournament_updates", "billing_updates", "membership_updates", "community_messages", "helper_shifts"]) },
+    { key: "few", label: "Wenig", description: "Nur Spiele und Rechnungen per Push.", modes: levelModes(["match_reminders", "billing_updates"]) },
+  ],
+  quiet_hours_exceptions: ["Aufruf zu deinem Spiel"],
+};
+
+async function openNotifications(user) {
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/users/me/notification-preferences" ? NOTIFICATION_SETTINGS : [] }));
+  await user.click(screen.getByRole("button", { name: /Benachrichtigungen/i }));
+  await screen.findByTestId("notification-level-all");
+}
+
+test("Benachrichtigungen: eine Stufe setzt alle Themen in einem Speichern, eine eigene Stellung zeigt „Eigene Auswahl“", async () => {
   const user = setupUser();
   renderPage();
   await waitForForm();
+  await openNotifications(user);
+  // Altes Konto ohne Schalter und ohne Newsletter: News sind aus - keine Stufe passt.
+  expect(screen.getByTestId("notification-level-custom")).toHaveTextContent("Eigene Auswahl");
+  expect(screen.getByTestId("notification-topic-news_events")).toHaveAttribute("data-mode", "off");
 
-  await user.click(screen.getByRole("button", { name: /Benachrichtigungen/i }));
-  const push = await screen.findByTestId("profile-notification-channel-push");
+  await user.click(screen.getByTestId("notification-level-few"));
+  expect(screen.getByTestId("notification-level-few")).toHaveAttribute("aria-checked", "true");
+  expect(screen.queryByTestId("notification-level-custom")).toBeNull();
+  expect(screen.getByTestId("notification-topic-billing_updates")).toHaveAttribute("data-mode", "push");
+  expect(screen.getByTestId("notification-topic-achievements")).toHaveAttribute("data-mode", "app");
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  const sent = apiMock.patch.mock.calls.at(-1)[1].notification_preferences;
+  expect(sent["push:billing_updates"]).toBe(true);
+  expect(sent["browser:billing_updates"]).toBe(true);
+  expect(sent["push:achievements"]).toBe(false);
+  expect(sent["in_app:achievements"]).toBe(true);
+  expect(sent["in_app:news_events"]).toBe(true);
+  expect(Object.keys(sent)).toHaveLength(TOPICS.length * 3);
+
+  await user.click(screen.getByTestId("notification-topic-achievements-off"));
+  expect(screen.getByTestId("notification-topic-achievements")).toHaveAttribute("data-mode", "off");
+  expect(screen.getByTestId("notification-level-custom")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
+  const after = apiMock.patch.mock.calls.at(-1)[1].notification_preferences;
+  expect([after["in_app:achievements"], after["push:achievements"], after["browser:achievements"]]).toEqual([false, false, false]);
+});
+
+test("Weitere Wege: eingeklappt, darin die Kanäle - Push ganz aus zeigt den Hinweis bei den Themen", async () => {
+  const user = setupUser();
+  renderPage();
+  await waitForForm();
+  await openNotifications(user);
+  const toggle = screen.getByTestId("notification-more-ways");
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTestId("notification-more-panel")).toHaveAttribute("data-open", "false");
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const push = screen.getByTestId("profile-notification-channel-push");
   expect(push).toBeChecked();
   await user.click(push);
-
-  expect(screen.getByTestId("profile-notification-push-match_reminders")).toBeDisabled();
-  expect(screen.getByTestId("profile-notification-column-push")).toHaveTextContent("Kanal aus");
+  expect(screen.getByTestId("notification-push-off")).toBeInTheDocument();
   expect(screen.getByTestId("profile-newsletter")).not.toBeChecked();
-
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
-  const [, payload] = apiMock.patch.mock.calls.at(-1);
-  expect(payload).toEqual({ notification_preferences: { push: false } });
+  expect(apiMock.patch.mock.calls.at(-1)[1]).toEqual({ notification_preferences: { push: false } });
+  await user.click(screen.getByTestId("notification-push-on"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
+  expect(screen.queryByTestId("notification-push-off")).toBeNull();
+});
+
+test("Ruhezeit: Standard aus, beim Einschalten 22:00 bis 7:00; ohne Lücke geht nichts an den Server", async () => {
+  const user = setupUser();
+  renderPage();
+  await waitForForm();
+  await openNotifications(user);
+  const toggle = screen.getByTestId("notification-quiet-toggle");
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+  await user.click(toggle);
+  expect(screen.getByTestId("notification-quiet-summary")).toHaveTextContent("Täglich 22:00 bis 07:00 Uhr, Wiener Zeit – über Mitternacht.");
+  expect(screen.getByTestId("notification-quiet-exceptions")).toHaveTextContent("Aufruf zu deinem Spiel");
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  expect(apiMock.patch.mock.calls.at(-1)[1]).toEqual({ quiet_hours: { enabled: true, start: "22:00", end: "07:00" } });
+
+  fireEvent.change(screen.getByTestId("notification-quiet-end"), { target: { value: "22:00" } });
+  expect(await screen.findByTestId("notification-quiet-error")).toHaveTextContent("mindestens 15 Minuten");
+  await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+
+  fireEvent.change(screen.getByTestId("notification-quiet-end"), { target: { value: "06:30" } });
+  await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
+  expect(apiMock.patch.mock.calls.at(-1)[1]).toEqual({ quiet_hours: { enabled: true, start: "22:00", end: "06:30" } });
+});
+
+test("Ruhezeit: ein geleertes Zeitfeld bleibt Entwurf - andere Änderungen speichern weiter", async () => {
+  const user = setupUser();
+  renderPage();
+  await waitForForm();
+  await openNotifications(user);
+  await user.click(screen.getByTestId("notification-quiet-toggle"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+
+  fireEvent.change(screen.getByTestId("notification-quiet-start"), { target: { value: "" } });
+  // Das Feld zeigt, was wirklich im Formular steht - nicht den Vorschlag.
+  expect(screen.getByTestId("notification-quiet-start")).toHaveValue("");
+  expect(await screen.findByTestId("notification-quiet-error")).toHaveTextContent("Uhrzeit wie 22:00");
+  expect(screen.getByTestId("notification-quiet-start")).toHaveAttribute("aria-invalid", "true");
+  await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+
+  // Eine andere Änderung auf der Seite geht trotzdem - ohne die halbe Ruhezeit.
+  await user.click(screen.getByTestId("notification-topic-achievements-off"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
+  const sent = apiMock.patch.mock.calls.at(-1)[1];
+  expect(sent.quiet_hours).toBeUndefined();
+  expect(sent.notification_preferences["in_app:achievements"]).toBe(false);
 });
 
 test("ohne Aenderung wird nicht gespeichert, auch nicht beim Verlassen eines Felds", async () => {

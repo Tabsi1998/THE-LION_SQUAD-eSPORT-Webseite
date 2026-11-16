@@ -81,7 +81,7 @@ export function SeasonReminderRulesPanel({ seasonId, canEdit = true }) {
 
   return (
     <FormSection title="Erinnerungen" testId="season-reminder-rules"
-      hint="Gilt sofort für alle Staffeln dieser Season (gesperrte nehmen es beim Übertragen mit). Kommt im Web, in der App und per Push – jede Person kann „Match-Erinnerungen“ in ihren Benachrichtigungs-Einstellungen abschalten.">
+      hint="Gilt sofort für alle Staffeln dieser Season (gesperrte nehmen es beim Übertragen mit). Kommt im Web, in der App und per Push – jede Person kann „Spiele & Aufrufe“ in ihren Benachrichtigungs-Einstellungen abschalten.">
       {!state?.active ? (
         <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/75" data-testid="reminder-rules-inactive">
           Für diese Season ist noch nichts gespeichert – es gelten die Vorgaben unten.

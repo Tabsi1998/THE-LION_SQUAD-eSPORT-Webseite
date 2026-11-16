@@ -63,6 +63,30 @@ async function konto(page, cam, state) {
   await cam.shot("plattform", page.getByTestId("profile-platforms"));
   await cam.shot("spiel-ids", [page.getByTestId("profile-game-id-probe-hauptspiel-activision_id"), page.getByTestId("profile-game-id-probe-hauptspiel-platform")]);
   await cam.shot("liga-hinweis", page.getByTestId("profile-league-eligibility-s1"));
+
+  // Benachrichtigungen (#1204, #1206): Stufe, ein Thema selbst, Ruhezeit, Weitere Wege.
+  state.routes["/users/me/notification-preferences"] = D.NOTIFICATION_SETTINGS;
+  await shown(page, "profile-tab-notifications").click();
+  await page.getByTestId("notification-level-important").click();
+  await expect(page.getByTestId("notification-level-important")).toHaveAttribute("aria-checked", "true");
+  await noSideScroll(page);
+  await page.waitForTimeout(400);
+  await cam.shot("stufe", page.getByTestId("notification-level-important"), { area: page.getByTestId("notification-levels") });
+  await page.getByTestId("notification-topic-achievements-off").click();
+  await expect(page.getByTestId("notification-level-custom")).toBeVisible();
+  await page.waitForTimeout(400);
+  await cam.shot("themen", page.getByTestId("notification-topic-achievements"), { area: [page.getByTestId("notification-topic-prize_updates"), page.getByTestId("notification-topic-billing_updates")] });
+  await page.getByTestId("notification-quiet-toggle").click();
+  await expect(page.getByTestId("notification-quiet-start")).toBeVisible();
+  await page.waitForTimeout(400);
+  await cam.shot("ruhezeit", [page.getByTestId("notification-quiet-toggle"), page.getByTestId("notification-quiet-start"), page.getByTestId("notification-quiet-end")], { area: page.getByTestId("notification-quiet") });
+  await page.getByTestId("notification-more-ways").click();
+  await expect(page.getByTestId("profile-notification-channel-email")).toBeVisible();
+  await page.waitForTimeout(400);
+  await noSideScroll(page);
+  // Aufgeklappt reicht der Kasten unter den Bildrand - erst nach oben holen, dann fotografieren.
+  await page.getByTestId("notification-more-ways").evaluate((node) => node.scrollIntoView({ block: "center" }));
+  await cam.shot("weitere-wege", page.getByTestId("notification-more-ways"), { area: [page.getByTestId("notification-more-ways"), page.getByTestId("profile-notification-column-email")] });
 }
 
 async function team(page, cam, state) {
