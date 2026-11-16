@@ -208,6 +208,10 @@ done <<'ROUTES'
 /spielerprofil/tabsi98|/u/tabsi98
 /players/tabsi98|/u/tabsi98
 /lan-party-2024|/events
+/hilfe|/faq
+/hilfe/|/faq
+/hilfe/liga-captains|/faq/liga-captains
+/hilfe?q=check-in|/faq?q=check-in
 /f1|/fastlap
 /f1/monza|/fastlap/monza
 ROUTES
