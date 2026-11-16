@@ -105,6 +105,10 @@ def test_pdf_shows_the_zone_next_to_the_name_and_as_a_mark():
     assert built["zones"] == ["promotion", None, None, "relegation"]
     assert built["rows"][0][1] == "Team 1 (Aufstieg)" and built["rows"][3][1] == "Team 4 (Abstieg)" and built["rows"][1][1] == "Team 2"
     assert pdf_standings({"title": "Probe", "format": "league"}, rows).startswith(b"%PDF")
+    # Nie nur über die Farbe (#1648): die beiden Relegationen sind auch ohne Farbe zu unterscheiden.
+    from pdf_service import _standing_name
+    assert _standing_name({"display_name": "Team 5", "zone": "playoff_promotion"}) == "Team 5 (Relegation um den Aufstieg)"
+    assert _standing_name({"display_name": "Team 6", "zone": "playoff_relegation"}) == "Team 6 (Relegation gegen den Abstieg)"
     # Gegenprobe: ein Turnier ohne Zonen bleibt, wie es war.
     plain = _pdf_standings_tables({"format": "league"}, table(2))[0]
     assert plain["zones"] == [None, None] and plain["rows"][0][1] == "Team 1"

@@ -2,6 +2,7 @@ import { ZONE_LABELS, deductionText, lateEntryText } from "@/lib/leagueTable";
 import { standingCell } from "@/lib/standingsTable";
 import { tvTableColumns, tvTableSections } from "@/lib/tvTable";
 import { useTv } from "./TvScreen";
+import { ZoneMark } from "@/components/tls/league/ZoneMark";
 
 // Die Folie „Tabelle“ (#2121): Liga, Jeder gegen jeden, Schweizer System und Gruppen am TV - dieselben Zahlen und
 // Spalten wie auf der Website (ohne Form), aus 5 Metern lesbar. Gruppen stehen nebeneinander; ab drei Gruppen in einer
@@ -58,7 +59,11 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               data-testid={`tv-standing-${row.registration_id}`}
               style={{ "--tv-i": startRank + index }}
             >
-              <td className="tv-standings__rank font-display">{row.rank}</td>
+              <td className="tv-standings__rank font-display">
+                {/* Zone nie nur über die Farbe (#1648): dasselbe Symbol wie in der Webtabelle. */}
+                <ZoneMark zone={row.zone} className="tv-standings__zone" testId={`tv-zone-${row.registration_id}`} />
+                {row.rank}
+              </td>
               <td className="tv-standings__name" data-tv-name="1">
                 {row.display_name || "Teilnehmer"}
                 {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
