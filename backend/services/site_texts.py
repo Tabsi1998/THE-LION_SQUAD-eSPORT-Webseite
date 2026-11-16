@@ -293,6 +293,12 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "Erfüllung des Nutzungsverhältnisses (Art. 6 Abs. 1 lit. b DSGVO); die Verknüpfung lässt sich im Profil trennen.",
                   "privacy-google-login") if f.get("google_login") else
                 p("Eine Anmeldung über Google oder andere Anbieter bieten wir nicht an.", "privacy-no-google-login")),
+        # Mindestalter (#1698, Fabians Entscheidung vom 16.11.): Konto ab 14, Vereinsmitglied ab 18 - geprüft beim Beitrittsantrag.
+        section("age", "Mindestalter",
+                p("Ein Konto auf der Website und in der LionsAPP kannst du ab 14 Jahren anlegen: Ab diesem Alter darfst du in Österreich "
+                  "selbst in die Verarbeitung deiner Daten einwilligen (Art. 8 DSGVO in Verbindung mit § 4 Abs. 4 DSG). Vereinsmitglied "
+                  "wirst du ab 18 Jahren. Dafür fragt der Mitgliedsantrag nach deinem Geburtsdatum und prüft das Alter; das Datum bleibt "
+                  "beim Antrag, damit der Vorstand ihn prüfen kann, und wird mit deinem Konto gelöscht.", "privacy-age")),
         section("email", "E-Mail-Versand",
                 p("Systemmails (Bestätigung, Passwort-Reset, Mitgliedschaft, Turnier- und Vereinsnachrichten) enthalten Empfängeradresse, Betreff "
                   f"und Inhalt; Versandzeitpunkt und -status werden für die Fehlersuche kurz protokolliert. {email_provider_text(f.get('email_provider') or 'none')}",
