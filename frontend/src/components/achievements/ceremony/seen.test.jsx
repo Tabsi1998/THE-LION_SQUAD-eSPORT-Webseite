@@ -237,3 +237,19 @@ describe("Prüfung mit Zeitgrenze", () => {
     expect(await seen.ceremonyState("anna")).toMatchObject({ unseen: ["b"] });
   });
 });
+
+describe("Stand am Server fehlt trotz Merker", () => {
+  it("meldet den Altbestand neu, wenn der Server keinen Beginn kennt (z. B. nach einer Rücksicherung)", async () => {
+    localStorage.setItem(seen.importedKey("anna"), "2026-11-01T00:00:00.000Z");
+    localStorage.setItem(seen.achSeenKey("anna"), "2026-11-10T10:00:00.000Z");
+    apiMock.get.mockResolvedValue({ data: serverState({ since: null }) });
+    apiMock.post.mockResolvedValue({ data: serverState({ unseen: ["a"] }) });
+    expect(await seen.ceremonyState("anna")).toMatchObject({ unseen: ["a"] });
+    expect(apiMock.post).toHaveBeenCalledWith("/achievements/me/ceremony/import", { seen_until: "2026-11-10T10:00:00.000Z" });
+    // Kennt der Server den Beginn, bleibt es beim Lesen.
+    apiMock.get.mockResolvedValue({ data: serverState() });
+    await seen.ceremonyState("anna");
+    expect(apiMock.post).toHaveBeenCalledTimes(1);
+  });
+});
+

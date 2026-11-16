@@ -106,8 +106,9 @@ export function ceremonyState(userId) {
       // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
       const { data } = await api.get("/achievements/me/ceremony");
       const state = normalise(userId, data);
-      if (!state || read(importedKey(userId))) return state;
-      // Einmal je Browser und Konto: den Altbestand melden - erst damit legt der Server den Stand an.
+      // Einmal je Browser und Konto den Altbestand melden - erst damit legt der Server den Stand an. Kennt der Server
+      // keinen Beginn (Zeile fehlt, etwa nach einer Rücksicherung), meldet der Browser neu, auch mit Merker.
+      if (!state || (read(importedKey(userId)) && data?.since)) return state;
       const { data: imported } = await api.post("/achievements/me/ceremony/import", legacyReport(userId));
       write(importedKey(userId), new Date().toISOString());
       return normalise(userId, imported);
