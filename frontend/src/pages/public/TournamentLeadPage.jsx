@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { AlertTriangle, ClipboardCheck, Clock, Gauge, Megaphone, MonitorPlay, Radio, Shuffle, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -178,22 +178,27 @@ export default function TournamentLeadPage() {
     if (activeTab && !chosenTab && activeTab !== autoTab) setAutoTab(activeTab);
   }, [activeTab, chosenTab, autoTab]);
   // Neue Ziele per Link bei offener Seite (Benachrichtigungen, #2440): ?fall= öffnet „Braucht Aufmerksamkeit“ an genau
-  // diesem Fall, ?reiter= den Reiter. Beim ersten Laden gilt das schon über die Vorgabe bzw. den Startwert.
-  const seenFall = useRef(fall);
+  // diesem Fall, ?reiter= den Reiter. Ausgelöst je Aufruf der Adresse (`location.key`): auch derselbe Link ein zweites
+  // Mal und derselbe ?reiter= in einem anderen Turnier. Ändert die Seite nur selbst die Adresse (?spiel=), bleibt alles.
+  // Die Adresse behält ?fall= - sie bleibt teilbar, und die Karte bleibt markiert. Beim ersten Laden gilt das schon über
+  // die Vorgabe bzw. den Startwert.
+  const location = useLocation();
+  const seenNav = useRef({ key: location.key, search: location.search, slug });
   useEffect(() => {
-    if (seenFall.current === fall) return;
-    seenFall.current = fall;
-    if (!fall) return;
-    scrolledTo.current = "";
-    setCaseJump((value) => value + 1);
-    setTab("attention");
-  }, [fall]);
-  const seenReiter = useRef(reiterParam);
-  useEffect(() => {
-    if (seenReiter.current === reiterParam) return;
-    seenReiter.current = reiterParam;
-    if (REITER_TABS[reiterParam]) setTab(REITER_TABS[reiterParam]);
-  }, [reiterParam]);
+    const prev = seenNav.current;
+    if (prev.key === location.key) return;
+    seenNav.current = { key: location.key, search: location.search, slug };
+    const before = new URLSearchParams(prev.search);
+    // Dieselbe Adresse erneut geöffnet oder ein anderes Turnier: das Ziel gilt wieder.
+    const again = prev.search === location.search || prev.slug !== slug;
+    if (fall && (again || before.get("fall") !== fall)) {
+      scrolledTo.current = "";
+      setCaseJump((value) => value + 1);
+      setTab("attention");
+      return;
+    }
+    if (REITER_TABS[reiterParam] && (again || before.get("reiter") !== reiterParam)) setTab(REITER_TABS[reiterParam]);
+  }, [location.key, location.search, slug, fall, reiterParam]);
   // Das Cockpit (#1653) fragt kurz im Takt nach, solange es wirklich zu sehen ist (nicht im Check-in oder einem anderen
   // Reiter) - sonst wie bisher nur bei Änderungen.
   const cockpitOpen = activeTab === "cockpit";
@@ -259,8 +264,7 @@ export default function TournamentLeadPage() {
       setStationJump((value) => value + 1);
       return;
     }
-    scrolledTo.current = "";
-    setCaseJump((value) => value + 1);
+    // Hinspringen übernimmt der Link selbst (?fall=, #2440: je Aufruf der Adresse) - hier nur sofort der Reiter.
     setTab("attention");
   };
 

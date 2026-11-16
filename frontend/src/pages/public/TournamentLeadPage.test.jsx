@@ -685,6 +685,34 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
   });
 
+  test("derselbe ?fall= ein zweites Mal öffnet den Fall wieder; derselbe ?reiter= in einem anderen Turnier ebenso", async () => {
+    const CASE = { id: "rm-m8", kind: "result_missing", title: "Ergebnis fehlt", action: "enter", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "12 Min. über der Zeit", overdue_minutes: 12 };
+    apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? QUEUE : { ...LEAD, matches: [ENTRY], attention: [CASE] } }));
+    render(
+      <MemoryRouter initialEntries={["/tournaments/fc-cup/leitung"]}>
+        <Link to="/tournaments/fc-cup/leitung?fall=rm-m8" data-testid="note-fall">Fall</Link>
+        <Link to="/tournaments/fc-cup/leitung?reiter=stationen" data-testid="note-a">A</Link>
+        <Link to="/tournaments/b-cup/leitung?reiter=stationen" data-testid="note-b">B</Link>
+        <Routes><Route path="/tournaments/:slug/leitung" element={<TournamentLeadPage />} /></Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("note-fall"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
+    expect(screen.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    // Dieselbe Benachrichtigung noch einmal: wieder der Fall.
+    fireEvent.click(screen.getByTestId("note-fall"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("lead-case-rm-m8")));
+    // ?reiter=stationen in A, Cockpit getippt, dann derselbe ?reiter= in B: B öffnet die Stationen.
+    fireEvent.click(screen.getByTestId("note-a"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
+    fireEvent.click(screen.getByTestId("lead-tab-cockpit"));
+    fireEvent.click(screen.getByTestId("note-b"));
+    await waitFor(() => expect(screen.getByTestId("lead-tab-stations")).toHaveAttribute("aria-selected", "true"));
+  });
+
   test("von selbst gezeigter Check-in folgt nach dem Check-in wieder der Vorgabe - ein getippter Reiter bleibt", async () => {
     let status = "check_in";
     const lead = () => ({ ...LEAD, matches: [ENTRY], tournament: { ...LEAD.tournament, status, can_check_in: true } });
