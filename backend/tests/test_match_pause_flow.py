@@ -254,3 +254,26 @@ async def test_a_result_during_the_pause_that_is_taken_back_leaves_the_pause_out
     assert (await flow.reload(match))["pause_settled_for"] == since
     # Vor der Pause entschieden: bleibt unberührt.
     assert "paused_seconds" not in await flow.reload(other)
+
+
+@pytest.mark.asyncio
+async def test_a_running_match_of_another_tournament_ends_later_by_its_pause(flow):
+    """#2398, Review: „belegt woanders“ rechnet die Pause des anderen Turniers mit - früher und laufend."""
+    from services.match_scheduler import load_plan_inputs
+
+    event_id = "event-pause"
+    here = await flow.create_tournament(event_id=event_id, status="live")
+    started = now_utc() - timedelta(minutes=20)
+    there = await flow.create_tournament(event_id=event_id, status="paused", match_duration_minutes=30,
+                                         paused_at=(now_utc() - timedelta(minutes=5)).isoformat())
+    await flow.db.matches_v2.insert_one({
+        "id": "m-there", "tournament_id": there["id"], "match_key": "A", "status": "in_progress", "slots": [],
+        "started_at": started.isoformat(), "paused_seconds": 600,
+    })
+
+    inputs = await load_plan_inputs(flow.db, here)
+
+    busy = next(row for row in inputs["busy_elsewhere"] if row["match_id"] == "m-there")
+    expected = started + timedelta(minutes=30 + 10 + 5)
+    assert busy["state"] == "running"
+    assert abs((busy["end"] - expected).total_seconds()) < 60, (busy["end"], expected)

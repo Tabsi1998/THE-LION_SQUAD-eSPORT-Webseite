@@ -702,7 +702,8 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
     if event_id:
         others = await db.tournaments.find(
             {"event_id": event_id, "id": {"$ne": tid}, "status": {"$nin": list(TOURNAMENT_DONE_STATUSES)}},
-            {"_id": 0, "id": 1, "title": 1, "game_id": 1, "game_mode": 1, "best_of": 1, "match_duration_minutes": 1},
+            {"_id": 0, "id": 1, "title": 1, "game_id": 1, "game_mode": 1, "best_of": 1, "match_duration_minutes": 1,
+             "status": 1, "paused_at": 1},
         ).to_list(100)
         # Gesammelt laden: ein Zugriff für die Spiele aller anderen Turniere, einmal Anmeldungen und Teams auflösen.
         title_by_id = {other["id"]: other.get("title") or "Turnier" for other in others}
@@ -712,7 +713,8 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
              "$or": [{field: {"$nin": [None, ""]}} for field in ("scheduled_at", "started_at", "called_at")],
              "status": {"$nin": list(DONE_STATUSES)}},
             {"_id": 0, "id": 1, "tournament_id": 1, "slots": 1, "scheduled_at": 1, "started_at": 1, "called_at": 1, "status": 1,
-             "station_id": 1, "duration_minutes": 1, "settings": 1, "match_key": 1, "stage_id": 1, "best_of": 1},
+             "station_id": 1, "duration_minutes": 1, "settings": 1, "match_key": 1, "stage_id": 1, "best_of": 1,
+             "paused_seconds": 1},
         ).to_list(None) if title_by_id else []  # vollständig: ein stilles Kappen ließe Konflikte unbemerkt
         other_keys = await resolve_participant_keys(db, other_matches) if other_matches else {}
         # Die Dauer der fremden Spiele aus ihrer eigenen Kette (Phase, Turnier, Game) - nichts ist mehr eingefroren.
@@ -721,6 +723,7 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
         other_stages = {stage["id"]: stage for stage in await db.tournament_stages.find(
             {"id": {"$in": stage_ids}}, {"_id": 0, "id": 1, "settings": 1}).to_list(len(stage_ids) + 5)} if stage_ids else {}
         other_games = await load_duration_games(db, others) if other_matches else {}
+        now = datetime.now(timezone.utc)
         for match in other_matches:
             start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at")) or _parse(match.get("called_at"))
             if not start:
@@ -733,11 +736,14 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
                 state = "called"
             else:
                 state = "planned"
+            other = other_by_id.get(match.get("tournament_id"))
+            # Ein laufendes Spiel des anderen Turniers steht in dessen Pause (#2398) - es endet um die Pause später.
+            paused = timedelta(seconds=pause_seconds(match, other, now)) if state == "running" else timedelta(0)
             busy_elsewhere.append({
                 "match_id": match["id"], "participants": participants, "start": start, "state": state,
-                "end": start + timedelta(minutes=effective_match_duration(
-                    match, stage=other_stages.get(match.get("stage_id") or ""), tournament=other_by_id.get(match.get("tournament_id")),
-                    game=other_games.get((other_by_id.get(match.get("tournament_id")) or {}).get("game_id") or ""))),
+                "end": start + paused + timedelta(minutes=effective_match_duration(
+                    match, stage=other_stages.get(match.get("stage_id") or ""), tournament=other,
+                    game=other_games.get((other or {}).get("game_id") or ""))),
                 "label": f"{title_by_id.get(match.get('tournament_id'), 'Turnier')} {match.get('match_key') or ''}".strip(),
             })
     return {"matches": matches, "stages": stages, "stations": stations, "proposals": proposals, "busy_elsewhere": busy_elsewhere,
