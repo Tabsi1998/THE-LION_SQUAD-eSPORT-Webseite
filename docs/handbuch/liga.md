@@ -109,6 +109,7 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 
 - Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
 - Zuständige finden ihre Ligen unter **Admin → Mein Dienst → Meine Ligen** und im Menü unter **Liga**. Sie sehen nur ihre Ligen und nur die Knöpfe ihrer Zuständigkeiten. Das gilt auch für Turnierleitung und Helfer, die zugleich zuständig sind.
+- Unter **Admin → eSports → Turniere** stehen für Zuständige und den Bereich **Ligen** die Staffeln, die sie leiten: Zuständige sehen die Staffeln ihrer Ligen, der Bereich alle. Gewöhnliche Turniere stehen dort nicht, und Knöpfe der Turnierleitung (Neues Turnier, Anmeldung öffnen) gibt es nicht.
 - **Bilder:** Zuständige ohne Admin-Medien laden Emblem, Banner und Gewinnbilder als eigene Bilder hoch (kein SVG), die Mediathek zeigt ihnen nur diese.
 - Vergeben und entfernen darf nur der Bereich **Ligen**. Liga anlegen und löschen auch.
 - **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
@@ -426,6 +427,11 @@ Anmeldefensters in den Eingang, ohne Fenster in die Teilnehmerliste) oder nach d
 starten**. Stand und Hinweise sieht, wer das Liga-Recht für die Staffel hat. Der Status-Filter der Turnierliste hat eigene Einträge
 unter **Liga-Staffeln** („Liga: Anmeldung offen“ …); „Entwurf“ meint dort nur gewöhnliche Turniere, laufende Staffeln stehen weiter
 auch unter **Live**.
+
+Am Handy (unter 768 px) steht jede Staffel und jedes Turnier als Karte: Titel, Kennzeichen, Spiel und Format, Teilnehmer, Stand
+mit dem Hinweis, was fehlt, die Regeln in einer Zeile und unten die Knöpfe. Seitlich wischen muss man nicht mehr.
+
+<img src="../assets/liga/turnierliste-karten-handy.png" alt="Turnierliste am Handy: Karten untereinander, Staffel A mit Kennzeichen Liga · Staffel A, Stand Anmeldung offen bis 21.11. und darunter Teams zuteilen 1 von 8, Teilnehmer 1/8, Regeln in einer Zeile und die Knöpfe Teilnehmer und Löschen" width="260">
 
 <img src="../assets/liga/turnierliste-liga-stand-pc.png" alt="Turnierliste am PC: Staffel A mit Stand Anmeldung offen bis 21.11. und darunter Teams zuteilen 1 von 8, eine laufende Staffel mit Spielbetrieb, ein Turnier im Entwurf" width="720">
 
