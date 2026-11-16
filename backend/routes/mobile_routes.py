@@ -969,9 +969,10 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
     # Ein Gerät gehört genau einem Konto (#1053): meldet es sich für dieses an, ist es bei jedem anderen weg - auch wenn
     # die App das vorige Konto beim Wechsel nicht mehr abmelden konnte.
     await db.mobile_push_tokens.delete_many({"token": token, "user_id": {"$ne": user["id"]}})
-    if replaced:
-        # Dieselbe Regel für die Installation: ihre alten Tokens gehen, egal unter welchem Konto sie standen.
-        await db.mobile_push_tokens.delete_many({"installation_id": installation, "token": {"$ne": token}})
+    if installation:
+        # Dieselbe Regel für die Installation: ihre alten Tokens gehen, egal unter welchem Konto sie standen. Nur ältere als
+        # dieser - melden sich zwei Tokens gleichzeitig an, bleibt der spätere stehen, statt dass beide einander löschen.
+        await db.mobile_push_tokens.delete_many({"installation_id": installation, "token": {"$ne": token}, "updated_at": {"$lt": now}})
     stored = await db.mobile_push_tokens.find_one({"token": token, "user_id": user["id"]}, {"_id": 0, "private_content": 1})
     # Die App erfährt, ob der Server Pushes ohne Inhalt schickt (#1052) - ein alter Server antwortet ohne das Feld.
     return {"ok": True, "private_content": bool((stored or {}).get("private_content"))}
