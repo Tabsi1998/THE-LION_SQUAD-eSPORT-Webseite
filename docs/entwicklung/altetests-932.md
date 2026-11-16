@@ -12,14 +12,20 @@ entfallen.
 |---|---|---|
 | Unit- und Flow-Tests | `python -m pytest -m "not live"`: Unit-Tests und Flow-Tests, also die echte App per ASGI gegen mongomock (`backend/tests/flow_harness.py`). Keine Dienste, keine Zugänge. | lokal und in der CI (Job „Backend“, drei Teile) |
 | Echtes MongoDB | Dieselben Flow-Tests eines Gebiets gegen einen echten Server mit echten Indizes und Transaktionen: `FLOW_MONGO_URL=… python scripts/flow_mongo_tests.py`. Das Gebiet steht in `AREA` im Skript; `--all` nimmt jede Flow-Datei. | CI-Job mit MongoDB-Dienst; lokal mit eigenem Container ([Abnahme lokal](abnahme-lokal.md)) |
-| Live-Tests | Die 14 verbliebenen Altdateien in `LIVE_TEST_FILES` (`backend/tests/conftest.py`). Sie brauchen `REACT_APP_BACKEND_URL`, `TEST_ADMIN_EMAIL` und `TEST_ADMIN_PASSWORD`; ohne diese überspringen sie sich. Schreibend nur gegen einen dafür vorbereiteten Teststack, nie gegen die Produktion. | nie in der CI (`-m "not live"`) |
+| Live-Tests | Die 13 verbliebenen Altdateien in `LIVE_TEST_FILES` (`backend/tests/conftest.py`). Sie brauchen `REACT_APP_BACKEND_URL`, `TEST_ADMIN_EMAIL` und `TEST_ADMIN_PASSWORD`; ohne diese überspringen sie sich. Schreibend nur gegen einen dafür vorbereiteten Teststack, nie gegen die Produktion. | nie in der CI (`-m "not live"`) |
 
 Neue Tests sind Flow- oder Unit-Tests. `test_live_test_files_inventory_unit.py` hält `LIVE_TEST_FILES`
 deckungsgleich mit den Dateien, die `REACT_APP_BACKEND_URL` lesen, und lässt die Liste nur schrumpfen.
 
 **Nicht in #932:** die 14 übrigen Altdateien (`test_iter3`–`test_iter14_*`, `test_phase1_*`,
 `test_live_preview_validation.py`). Sie überspringen sich ohne Server schon beim Import und standen
-nicht in der Liste von #932. Für sie gilt dasselbe Vorgehen.
+nicht in der Liste von #932. Für sie gilt dasselbe Vorgehen; es läuft in #2395, Datei für Datei.
+
+### #2395: schon aufgeräumt
+
+| Datei | Test | Kat. | Beleg / neu in |
+|---|---|---|---|
+| test_iter14_logout_regression.py | test_logout_invalidates_me | c | test_logout_ends_session_flow.py::test_logout_ends_the_session_at_once (echte Anmelde-Prüfung: Anmelden mit Passwort, Abmelden, danach `/api/auth/me` = `null` und `/api/auth/sessions` = 401, auch mit altem Zugangs-Cookie). Die Teile davor: test_auth_security_unit.py::test_access_token_is_rejected_after_its_session_is_revoked, test_web_push_flow.py::test_abmelden_vom_konto_nimmt_die_browser_anmeldung_mit |
 
 ## Einordnung
 

@@ -7,10 +7,6 @@
   "rollen": ["captain"],
   "sichtbar_fuer": "alle",
   "suchbegriffe": ["anmeldung", "season", "staffel", "regelwerk", "regeln", "termin", "verschieben", "check-in", "einchecken", "ergebnis", "bestätigen", "protest", "einspruch", "veto", "map", "aufstellung", "kader", "teilnehmerliste"],
-  "videos": [
-    { "id": "liga-anmeldung", "titel": "Liga-Anmeldung im Video", "abschnitt": "anmelden" },
-    { "id": "ergebnis-melden", "titel": "Ergebnis melden im Video", "abschnitt": "nach-dem-spiel" }
-  ],
   "abschnitte": [
     {
       "id": "anmelden",
@@ -28,7 +24,8 @@
           "id": "co-team-auswahl",
           "titel": "Co-Team wählen",
           "text": "Wähle das Co-Team, das mitspielen soll. Tippe auf Weiter.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "passt-alles",
@@ -47,7 +44,8 @@
           "id": "regelwerk",
           "titel": "Regelwerk zustimmen",
           "text": "Lies das Regelwerk. Hake an, dass du für dein Co-Team zustimmst. Dasselbe beim Datenschutz. Tippe auf Weiter.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "einreichen",
@@ -115,7 +113,8 @@
           "titel": "Termin verschieben",
           "text": "Steht der Termin schon fest, trag unter Termin und Verschiebung einen neuen Termin und einen Grund ein. Tippe auf Beantragen. Die Gegenseite muss zustimmen.",
           "hinweis": "Bis zur Zustimmung gilt der alte Termin. Wie oft und bis wann das geht, steht direkt darüber.",
-          "bild": true
+          "bild": true,
+          "clip": true
         }
       ]
     },
@@ -128,7 +127,8 @@
           "titel": "Einchecken",
           "text": "Kurz vor dem Termin öffnet der Check-in. Hake an, wer von euch da ist, und tippe auf Einchecken.",
           "hinweis": "Grau heißt: Diese Person darf gerade nicht spielen. Der Grund steht daneben.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "map-veto",
@@ -154,7 +154,8 @@
           "titel": "Vorfall melden",
           "text": "Fliegt jemand raus oder braucht ihr einen Rehost? Tippe auf der Matchseite auf Vorfall melden. Wähle die Map, was passiert ist und euren Vorschlag.",
           "hinweis": "Je Map hat jedes Team einen Rehost oder eine technische Pause. Die Seite zählt mit. Ein MOSS-Absturz zählt nicht.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "vorfall-antworten",
@@ -186,21 +187,24 @@
           "titel": "Ergebnis melden",
           "text": "Wähl für jede Map Modus und Map und trag die Punkte beider Seiten ein. Wer mehr Punkte hat, steht automatisch als Sieger da. Tippe dann auf Ergebnis melden.",
           "hinweis": "Melden geht erst, wenn beide Seiten eingecheckt sind. Nur bei Gleichstand oder ohne Punkte tippst du den Sieger selbst an.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "wer-hat-gespielt",
           "titel": "Wer hat gespielt?",
           "text": "Hake beim Melden an, wer bei euch gespielt hat. Das ist eure Teilnehmerliste.",
           "hinweis": "In manchen Seasons wählst du stattdessen bei jeder Map „Deine Aufstellung“.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "bestaetigen",
           "titel": "Ergebnis bestätigen",
           "text": "Hat die Gegenseite gemeldet, prüf ihr Ergebnis. Stimmt es, hake an, wer bei euch gespielt hat, und tippe auf Stimmt.",
           "hinweis": "Antwortet ihr nicht, gilt die Meldung nach Ablauf der Frist der Season.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "teilnehmerliste-nachtragen",
@@ -214,7 +218,8 @@
           "titel": "Problem melden (Protest)",
           "text": "Stimmt etwas nicht? Tippe auf Stimmt nicht oder Problem melden. Wähle den Grund, schreib kurz dazu und häng bei Bedarf ein Foto an. Die Leitung entscheidet.",
           "hinweis": "Einen eigenen Knopf „Protest“ gibt es nicht. Bis wann es geht, steht im Formular.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "einspruch",

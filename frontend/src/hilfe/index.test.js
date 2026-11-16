@@ -1,10 +1,10 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import masse from "./bilder/masse.json";
 import anker from "./anker.json";
 import {
-  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, ankerAus, bereichInhalt, darfSehen, faqBereichsliste, fragePfad,
-  haeufigeFragen, hilfeBild, hilfeNormal, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo, passtZuRolle, sichtbareBereiche,
+  BEREICHE, CLIP_ARTEN, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, ankerAus, bereichInhalt, darfSehen, faqBereichsliste, fragePfad,
+  haeufigeFragen, hilfeBild, hilfeClip, hilfeNormal, hilfePfad, hilfeSchritte, hilfeThema, passtZuRolle, sichtbareBereiche,
   sichtbareRollen, sucheFaq, sucheHilfe,
 } from "./index";
 
@@ -59,12 +59,61 @@ test("jeder Schritt mit Bild hat Handy und PC samt Größe; keine verwaisten Bil
   }
 });
 
-test("Videos: jedes genannte Video gibt es, und es hängt an einem echten Abschnitt", () => {
+// Schleifen wie ein GIF (#2448): Grenze je Datei - gleich lautend in e2e/hilfe/clips.js (MAX_BYTES) - und für alle
+// zusammen (das Repository ist öffentlich und wächst mit jeder Neuaufnahme).
+const CLIP_MAX_BYTES = 300 * 1024;
+const CLIPS_TOTAL_MAX_BYTES = 8 * 1024 * 1024;
+
+test("jeder Schritt mit Schleife hat Handy und PC als WebM und MP4 samt Poster; keine verwaisten Schleifen", () => {
+  const expected = new Set();
   for (const thema of THEMEN) {
-    for (const video of thema.videos || []) {
-      expect(hilfeVideo(video.id), video.id).toBeTruthy();
-      expect(thema.abschnitte.some((abschnitt) => abschnitt.id === video.abschnitt), video.abschnitt).toBe(true);
+    for (const schritt of hilfeSchritte(thema)) {
+      if (!schritt.clip) continue;
+      // Das Bild des Schritts ist das Poster - ohne Bild keine Schleife.
+      expect(schritt.bild, `${thema.slug}#${schritt.id}: clip braucht bild`).toBe(true);
+      for (const form of FORMEN) {
+        expect(hilfeBild(thema.slug, schritt.id, form), `Poster fehlt: ${thema.slug}/${schritt.id}-${form}`).not.toBeNull();
+        const clip = hilfeClip(thema.slug, schritt.id, form);
+        for (const art of CLIP_ARTEN) {
+          expected.add(`${thema.slug}/${schritt.id}-${form}.${art}`);
+          expect(clip?.[art], `Schleife fehlt: ${thema.slug}/${schritt.id}-${form}.${art} (HILFE_CLIPS=1, docs/entwicklung/hilfe-bilder.md)`).toBeTruthy();
+        }
+      }
     }
+  }
+  expect(expected.size).toBeGreaterThan(0);
+  const dir = resolve(ROOT, "clips");
+  const files = existsSync(dir) ? readdirSync(dir).flatMap((slug) => readdirSync(resolve(dir, slug)).map((file) => `${slug}/${file}`)) : [];
+  expect(files.sort()).toEqual([...expected].sort());
+});
+
+test(`Schleifen: jede Datei höchstens ${CLIP_MAX_BYTES / 1024} KB, alle zusammen höchstens ${CLIPS_TOTAL_MAX_BYTES / 1024 / 1024} MB`, () => {
+  const dir = resolve(ROOT, "clips");
+  let total = 0;
+  for (const slug of readdirSync(dir)) {
+    for (const file of readdirSync(resolve(dir, slug))) {
+      const size = statSync(resolve(dir, slug, file)).size;
+      total += size;
+      expect(size, `${slug}/${file}`).toBeLessThanOrEqual(CLIP_MAX_BYTES);
+    }
+  }
+  expect(total, "alle Schleifen zusammen").toBeLessThanOrEqual(CLIPS_TOTAL_MAX_BYTES);
+});
+
+test("Schleife eines Schritts: WebM und MP4, eine Art darf fehlen, ohne beide null", () => {
+  const clips = { "./clips/turniere/einchecken-pc.webm": "/a.webm", "./clips/turniere/einchecken-pc.mp4": "/a.mp4", "./clips/turniere/einchecken-handy.mp4": "/b.mp4" };
+  expect(hilfeClip("turniere", "einchecken", "pc", clips)).toEqual({ webm: "/a.webm", mp4: "/a.mp4" });
+  expect(hilfeClip("turniere", "einchecken", "handy", clips)).toEqual({ webm: null, mp4: "/b.mp4" });
+  expect(hilfeClip("turniere", "anmelden", "pc", clips)).toBeNull();
+});
+
+test("Schleifen gehören nicht zum Start: nur die FAQ-Seiten binden src/hilfe/index.js ein, alles nachgeladen", () => {
+  // Der Glob mit den Adressen steht nur hier; FaqPage und HelpTopicPage werden nachgeladen (src/App.jsx). Den Bau
+  // selbst prüft scripts/check-bundle-budget.mjs (keine Schleife im Start, keine im index.html vorab geladen).
+  const app = readFileSync(resolve(ROOT, "..", "App.jsx"), "utf8");
+  for (const page of ["FaqPage", "HelpTopicPage"]) {
+    expect(app, page).toContain(`const ${page} = lazyPage(() => import("@/pages/public/${page}"));`);
+    expect(app, page).not.toContain(`import ${page} from`);
   }
 });
 

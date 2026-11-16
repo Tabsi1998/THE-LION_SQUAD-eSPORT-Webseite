@@ -181,7 +181,7 @@ export default function CalendarPage() {
           <div className="mt-6 max-w-xl border border-white/10 bg-[#121212] rounded-sm p-5 text-sm text-white/65" data-testid="calendar-mine-login">
             <LogIn className="w-4 h-4 text-brand" />
             <p className="mt-2">Melde dich an, dann siehst du hier deine Termine – und kannst sie automatisch in deinen Kalender holen.</p>
-            <Link to={`/login?next=${encodeURIComponent(MY_CALENDAR_PATH)}`} className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Einloggen</Link>
+            <Link to={`/login?next=${encodeURIComponent(MY_CALENDAR_PATH)}`} className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Anmelden</Link>
           </div>
         ) : (
           <div className="mt-6 grid lg:grid-cols-3 gap-6 min-w-0">
@@ -259,8 +259,8 @@ export default function CalendarPage() {
               {!signedIn && !mineScope && (
                 <div className="border border-white/10 rounded-sm p-5 text-sm text-white/65" data-testid="calendar-login-hint">
                   <LogIn className="w-4 h-4 text-brand" />
-                  <p className="mt-2">Nach dem Login siehst du auch Vereinstermine und unter „Mein Kalender“ deine eigenen Termine.</p>
-                  <Link to="/login?next=%2Fcalendar" className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Einloggen</Link>
+                  <p className="mt-2">Nach dem Anmelden siehst du auch Vereinstermine und unter „Mein Kalender“ deine eigenen Termine.</p>
+                  <Link to="/login?next=%2Fcalendar" className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Anmelden</Link>
                 </div>
               )}
             </aside>

@@ -43,6 +43,8 @@ test("Bühne mit Karte (Muster), goldener Antrag-Knopf, vier Vorteile und der Be
   const apply = screen.getByTestId("join-apply-btn");
   expect(apply).toHaveClass("tls-btn", "tls-btn--honor");
   expect(apply).toHaveAttribute("href", "/membership/apply");
+  // Mindestalter (#1698): Konto ab 14, Vereinsmitglied ab 18.
+  expect(screen.getByTestId("join-age")).toHaveTextContent("Ein Konto kannst du ab 14 Jahren anlegen. Vereinsmitglied wirst du ab 18 Jahren.");
   expect(await screen.findByTestId("join-benefit-3")).toHaveTextContent("Eigene Mitgliedskarte");
   // Die Kacheln stehen sofort mit den Vorgabetexten, die Texte vom Server kommen danach.
   await waitFor(() => expect(screen.getByTestId("join-benefit-0")).toHaveTextContent("Stimmrecht im VereinDu redest mit."));

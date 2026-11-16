@@ -1311,10 +1311,7 @@
     "mobile/package-lock.json: node-forge 1.4.0 GHSA-86w9-cpqp-85rv"
   ],
   "shellcheck": [
-    "install.sh: SC2034 (warning)",
-    "install.sh: SC2155 (warning)",
     "scripts/test_crown_events.sh: SC2034 (warning)",
-    "scripts/test_session_features.sh: SC2034 (warning)",
-    "update.sh: SC2034 (warning)"
+    "scripts/test_session_features.sh: SC2034 (warning)"
   ]
 }

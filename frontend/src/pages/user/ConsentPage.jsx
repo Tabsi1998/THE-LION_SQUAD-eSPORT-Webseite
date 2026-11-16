@@ -31,7 +31,7 @@ export default function ConsentPage() {
       <div className="border border-[#29B6E8]/25 bg-[#121212] rounded-sm p-6 md:p-8">
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Datenschutz-Update</span>
         <h1 className="font-heading text-3xl font-black uppercase mt-2">Aktuelle Bedingungen bestätigen</h1>
-        <p className="mt-3 text-sm text-white/60">Für deinen Account gelten aktualisierte Dokumentversionen. Bitte lies sie und bestätige sie ausdrücklich. Ohne Bestätigung bleibt der restliche Mitgliederbereich gesperrt.</p>
+        <p className="mt-3 text-sm text-white/60">Für dein Konto gelten aktualisierte Dokumentversionen. Bitte lies sie und bestätige sie ausdrücklich. Ohne Bestätigung bleibt der restliche Mitgliederbereich gesperrt.</p>
         <div className="mt-3 text-xs text-white/40">Datenschutz: {user?.required_privacy_policy_version || "aktuell"} · Bedingungen: {user?.required_terms_version || "aktuell"}</div>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <label className="flex items-start gap-3 border border-white/10 p-4 rounded-sm">

@@ -36,6 +36,18 @@ automatisch zur FAQ, auch Links auf einzelne Schritte und Suchen (#2448).
 Das prüft der Server. Wer kein Recht hat, bekommt diese Fragen gar nicht erst geschickt. Geheim sind sie trotzdem
 nicht: Der Quelltext der Website ist öffentlich. In die FAQ gehört deshalb nur Bedienung, nichts Vertrauliches.
 
+## Bilder und Animationen
+
+Jeder Schritt zeigt, wo man tippt. Wo eine Bewegung hilft (etwas ankreuzen, eintippen, ein Fenster öffnen), läuft eine
+kurze, stumme Animation in Schleife wie ein GIF. Der gelbe Rahmen am Ende zeigt das Ergebnis.
+
+- **Passend zum Gerät:** Am Handy (und am Tablet mit Touch) läuft die Handy-Fassung, am PC die PC-Fassung. Wird das
+  Fenster schmaler oder breiter, wechselt sie mit.
+- **Sparsam:** Geladen wird eine Animation erst, wenn ihr Schritt ins Bild kommt. Außerhalb des Bildes hält sie an.
+- **Anhalten:** Unten rechts an jeder Animation steht ein Knopf zum Anhalten und wieder Abspielen.
+- **„Bewegung reduzieren“** am Gerät eingeschaltet: Es steht nur das Standbild da, mit dem Knopf **Abspielen**.
+- Klappt das Video nicht (alter Browser, Abbruch beim Laden), bleibt das Standbild.
+
 ## Links verschicken
 
 - **Eine Anleitung:** Link aus der Adresszeile, etwa `lionsquad.at/faq/liga-captains`.
@@ -59,7 +71,7 @@ Discord und WhatsApp zeigen eine Vorschau mit Titel und Kurztext.
 
 ## Aktuell halten
 
-Bilder und Videos entstehen automatisch aus den echten Abläufen mit Testdaten. Ändert sich die Oberfläche, meldet ein
-Test das, und die Bilder werden neu erzeugt – Anleitung für die Entwicklung:
-[FAQ: Inhalte, Sichtbarkeit, Bilder und Videos](../entwicklung/hilfe-bilder.md). Für Captains bleibt der ausführliche
+Bilder und Animationen entstehen automatisch aus den echten Abläufen mit Testdaten. Ändert sich die Oberfläche, meldet
+ein Test das, und Bilder und Animationen werden neu erzeugt – Anleitung für die Entwicklung:
+[FAQ: Inhalte, Sichtbarkeit, Bilder und Animationen](../entwicklung/hilfe-bilder.md). Für Captains bleibt der ausführliche
 [Spickzettel](liga-captains.md) mit allen Fristen.

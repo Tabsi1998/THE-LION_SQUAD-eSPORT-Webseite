@@ -62,9 +62,9 @@ test("Logo: Schriftzug bis 1023 und ab 1440 px, dazwischen der Löwenkopf - der 
 test("Gast: Login als Personen-Symbol mit Namen, der Knopf kurz „Beitreten“ - beide einzeilig", () => {
   renderLayout();
   const login = screen.getByTestId("nav-login");
-  expect(login).toHaveAccessibleName("Login");
+  expect(login).toHaveAccessibleName("Anmelden");
   expect(login.querySelector("svg")).not.toBeNull();
-  expect(within(login).getByText("Login").className).toMatch(/lg:sr-only/);
+  expect(within(login).getByText("Anmelden").className).toMatch(/lg:sr-only/);
   const register = screen.getByTestId("nav-register");
   expect(register.className).toMatch(/whitespace-nowrap/);
   expect(within(register).getByText("Mitglied werden").className).toMatch(/lg:hidden/);

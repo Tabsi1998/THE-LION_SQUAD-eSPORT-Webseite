@@ -13,7 +13,7 @@ import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ForgotPasswordPage() {
-  useDocumentTitle("Passwort vergessen", "Passwort für deinen THE LION SQUAD Account zurücksetzen.", { robots: "noindex, follow" });
+  useDocumentTitle("Passwort vergessen", "Passwort für dein THE LION SQUAD Konto zurücksetzen.", { robots: "noindex, follow" });
 
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -84,13 +84,13 @@ export function ForgotPasswordPage() {
           </button>
         </form>
       )}
-      <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zurück zum Login</Link></div>
+      <div className="mt-6 text-sm text-center"><Link to="/login" className="text-white/50 hover:text-[#29B6E8]">Zurück zum Anmelden</Link></div>
     </AuthShell>
   );
 }
 
 export function ResetPasswordPage() {
-  useDocumentTitle("Passwort setzen", "Neues Passwort für deinen THE LION SQUAD Account vergeben.", { robots: "noindex, follow" });
+  useDocumentTitle("Passwort setzen", "Neues Passwort für dein THE LION SQUAD Konto vergeben.", { robots: "noindex, follow" });
 
   const [params] = useSearchParams();
   const nav = useNavigate();
@@ -140,7 +140,7 @@ export function ResetPasswordPage() {
     }));
     if (!attempt.started) return;
     if (!attempt.error) {
-      toast.success(isInvite ? "Account aktiviert. Du kannst dich jetzt einloggen." : "Passwort aktualisiert.");
+      toast.success(isInvite ? "Konto aktiviert. Du kannst dich jetzt anmelden." : "Passwort aktualisiert.");
       nav("/login");
     } else {
       const err = attempt.error;
@@ -151,7 +151,7 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <AuthShell title={isInvite ? "Account aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort für deinen Account.">
+    <AuthShell title={isInvite ? "Konto aktivieren" : "Passwort setzen"} subtitle="Vergib ein neues Passwort für dein Konto.">
       {!token ? (
         <AuthFormAlert id="reset-token-error">
           Der Link ist unvollstaendig. Bitte fordere einen neuen Link an.

@@ -661,7 +661,7 @@ function TournamentChat({ tournament, user }) {
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         {!user ? (
           <div className="p-5 text-sm text-white/55">
-            <Link to={`/login?next=/tournaments/${tournament.slug || tournament.id}`} className="text-[#29B6E8] font-bold hover:text-white">Einloggen</Link>, um den Chat als Teilnehmer zu nutzen.
+            <Link to={`/login?next=/tournaments/${tournament.slug || tournament.id}`} className="text-[#29B6E8] font-bold hover:text-white">Melde dich an</Link>, um den Chat als Teilnehmer zu nutzen.
           </div>
         ) : blocked ? (
           <div className="p-5 text-sm text-white/45">{blocked}</div>

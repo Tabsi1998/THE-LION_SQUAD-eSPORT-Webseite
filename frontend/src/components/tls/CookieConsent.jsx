@@ -161,7 +161,7 @@ export function CookieConsentProvider({ children }) {
             </button>
             {details && (
               <div id="cookie-sheet-details" className="mt-2 divide-y divide-white/10 border-y border-white/10" data-testid="cookie-details">
-                <ConsentRow title="Essentiell" text="Login, CSRF-Schutz, Formularstatus und diese Einwilligungsinfo." locked checked />
+                <ConsentRow title="Essentiell" text="Anmeldung, CSRF-Schutz, Formularstatus und diese Einwilligungsinfo." locked checked />
                 {OPTIONAL_ROWS.map((row) => (
                   <ConsentRow
                     key={row.key}

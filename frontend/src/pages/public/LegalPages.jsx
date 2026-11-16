@@ -19,7 +19,7 @@ const LINK_CLASS = "text-[#29B6E8] hover:underline";
 const PAGE_META = {
   privacy: { title: "Datenschutzerklärung", intro: "Informationen zur Verarbeitung personenbezogener Daten auf dieser Vereinsplattform." },
   imprint: { title: "Impressum", intro: "Anbieterkennzeichnung, Offenlegung und Kontaktinformationen des Vereins." },
-  terms: { title: "Nutzungsbedingungen", intro: "Regeln für Accounts, Community-Funktionen und Wettbewerbe." },
+  terms: { title: "Nutzungsbedingungen", intro: "Regeln für Konten, Community-Funktionen und Wettbewerbe." },
 };
 
 function formatLegalDate(value) {

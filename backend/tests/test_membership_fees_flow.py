@@ -111,9 +111,9 @@ async def test_application_without_coupling_shows_and_keeps_the_same_amounts(flo
     flow.act_as(player)
     form = (await flow.get("/api/membership/apply/form")).json()
     assert form["coupled"] is False and [fee["label"] for fee in form["fees"]] == ["Ordentliches Mitglied", "Jugend"] and form["fees_as_of"]
-    wrong = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte gerne beim Verein mitmachen.", "accept_statutes": True, "accept_privacy": True, "type_id": 4})
+    wrong = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte gerne beim Verein mitmachen.", "accept_statutes": True, "accept_privacy": True, "type_id": 4, "birth": "1990-04-12"})
     assert wrong.status_code == 422, "Firmen-Mitgliedschaft steht nicht zur Wahl"
-    sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte gerne beim Verein mitmachen.", "accept_statutes": True, "accept_privacy": True, "type_id": 3})
+    sent = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte gerne beim Verein mitmachen.", "accept_statutes": True, "accept_privacy": True, "type_id": 3, "birth": "1990-04-12"})
     assert sent.status_code == 200, sent.text
     stored = await flow.db.membership_applications.find_one({"user_id": player["id"]})
     assert stored["type_id"] == 3 and stored["type_label"] == "Jugend" and stored["status"] == "pending"

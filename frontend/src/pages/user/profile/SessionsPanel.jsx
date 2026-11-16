@@ -51,7 +51,7 @@ export function SessionsPanel() {
     const ok = await confirmSession({
       title: session.current ? "Aktuelle Sitzung abmelden?" : "Gerät abmelden?",
       description: session.current
-        ? "Du meldest damit dieses Gerät ab und musst dich neu einloggen."
+        ? "Du meldest damit dieses Gerät ab und musst dich neu anmelden."
         : "Dieses Gerät wird sofort abgemeldet.",
     });
     if (!ok) return;
@@ -96,7 +96,7 @@ export function SessionsPanel() {
             <div>
               <h3 className="font-heading font-black uppercase mb-1">Aktive Sitzungen & Geräte</h3>
               <p className="text-xs text-white/50">
-                Hier siehst du, wo dein Account angemeldet ist. Melde einzelne Geräte oder alle anderen Sitzungen mit einem Klick ab.
+                Hier siehst du, wo dein Konto angemeldet ist. Melde einzelne Geräte oder alle anderen Sitzungen mit einem Klick ab.
               </p>
             </div>
           </div>

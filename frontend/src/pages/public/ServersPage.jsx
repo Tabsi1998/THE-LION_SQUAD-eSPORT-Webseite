@@ -103,7 +103,7 @@ export default function ServersPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
         <h1 className="mt-3 pb-2 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95]">Server</h1>
         <p className="mt-4 max-w-3xl text-white/65">
-          Unsere Community- und Vereinsserver. Öffentliche Server sind direkt sichtbar, Community-Server nach Login und Vereinsserver nur für aktive Vereinsmitglieder.
+          Unsere Community- und Vereinsserver. Öffentliche Server sind direkt sichtbar, Community-Server nach dem Anmelden und Vereinsserver nur für aktive Vereinsmitglieder.
         </p>
 
         <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -117,10 +117,10 @@ export default function ServersPage() {
           <div className="mt-6 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm p-4 text-sm text-white/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-start gap-3">
               <Lock className="w-4 h-4 text-[#29B6E8] mt-0.5 shrink-0" />
-              <span>Nach dem Login siehst du zusätzlich Server, die nur für registrierte Community-Accounts freigegeben sind.</span>
+              <span>Nach dem Anmelden siehst du zusätzlich Server, die nur für registrierte Community-Konten freigegeben sind.</span>
             </div>
             <Link to="/login?next=/servers" className="tls-btn tls-btn--secondary inline-flex justify-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm">
-              Einloggen
+              Anmelden
             </Link>
           </div>
         )}

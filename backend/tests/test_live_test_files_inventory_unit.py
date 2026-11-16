@@ -31,5 +31,5 @@ def test_live_list_names_exactly_the_files_that_need_a_running_server():
 
 
 def test_the_live_list_only_shrinks():
-    # Stand nach #932. Ein neuer Live-Test ist ein Rückschritt: lieber einen Flow-Test schreiben.
-    assert len(listed_live_files()) <= 14
+    # Stand nach #932 und dem ersten Schritt aus #2395. Ein neuer Live-Test ist ein Rückschritt: lieber einen Flow-Test.
+    assert len(listed_live_files()) <= 13

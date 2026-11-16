@@ -1,12 +1,13 @@
 const { test, expect } = require("@playwright/test");
 const D = require("./hilfe/daten");
-const { POINTER, SHOTS, VIDEOS, camera, saveSizes, saveVideo, showClick, stepsOf, subtitle } = require("./hilfe/kamera");
+const { CLIPS, SHOTS, camera, saveSizes } = require("./hilfe/kamera");
 
 // Hilfe-Bereich (#2295): Jeder Ablauf aus src/hilfe/themen/*.json einmal durchgespielt, bei 390 px (Handy) und
 // 1440 px (PC), mit nachgestellter API und erfundenen Namen. Jeder Schritt mit Bild muss dran gewesen sein, und keine
 // Seite scrollt seitlich - bricht ein Ablauf (Knopf weg, Kennung geändert), wird dieser Test rot.
-// Bilder neu erzeugen:  HILFE_BILDER=1 npx playwright test e2e/hilfe-bilder.spec.js --project=chromium --workers=1
-// Videos neu erzeugen:  HILFE_VIDEOS=1 npx playwright test e2e/hilfe-bilder.spec.js --project=chromium --workers=1 -g Video
+// Schritte mit Schleife (#2448, "clip": true) laufen über cam.clip: Handgriffe als act.click/check/select/type.
+// Bilder neu erzeugen:     HILFE_BILDER=1 npx playwright test e2e/hilfe-bilder.spec.js --project=chromium --workers=1
+// Schleifen neu erzeugen:  HILFE_CLIPS=1 npx playwright test e2e/hilfe-bilder.spec.js --project=chromium --workers=1
 // (docs/entwicklung/hilfe-bilder.md)
 
 const FORMS = [["handy", { width: 390, height: 844 }, 2], ["pc", { width: 1440, height: 900 }, 1]];
@@ -23,14 +24,17 @@ const labelOf = (locator) => locator.locator("xpath=ancestor::label[1]");
 async function konto(page, cam, state) {
   state.routes = { "POST /auth/register": ({ body }) => ({ verification_required: true, email: body?.email }) };
   await page.goto("/register");
-  await page.getByTestId("register-username").fill("neonfalke");
-  await page.getByTestId("register-email").fill("neon@example.test");
-  await page.getByTestId("register-password").fill("Probe-Passwort-2036!");
+  const fields = [page.getByTestId("register-username"), page.getByTestId("register-email"), page.getByTestId("register-password")];
+  await cam.clip("registrieren", fields, async (act) => {
+    await act.type(fields[0], "neonfalke", { delay: 45 });
+    await act.type(fields[1], "neon@example.test", { delay: 35 });
+    await act.type(fields[2], "Probe-Passwort-2036!", { delay: 30 });
+  });
   await noSideScroll(page);
-  await cam.shot("registrieren", [page.getByTestId("register-username"), page.getByTestId("register-email"), page.getByTestId("register-password")]);
-  await page.getByTestId("register-accept").check();
-  await page.getByTestId("register-accept-terms").check();
-  await cam.shot("zustimmen", [labelOf(page.getByTestId("register-accept")), labelOf(page.getByTestId("register-accept-terms")), page.getByTestId("register-submit")]);
+  await cam.clip("zustimmen", [labelOf(page.getByTestId("register-accept")), labelOf(page.getByTestId("register-accept-terms")), page.getByTestId("register-submit")], async (act) => {
+    await act.check(page.getByTestId("register-accept"));
+    await act.check(page.getByTestId("register-accept-terms"));
+  });
   await page.getByTestId("register-submit").click();
   await expect(page).toHaveURL(/verify-email/);
   await noSideScroll(page);
@@ -45,14 +49,15 @@ async function konto(page, cam, state) {
   await page.goto("/profile");
   await expect(shown(page, "settings-nav")).toBeVisible();
   await noSideScroll(page);
-  // Der Weg zu den Einstellungen: am PC über den Namen oben rechts, am Handy über das Menü.
+  // Der Weg zu den Einstellungen: am PC über den Namen oben rechts, am Handy über das Menü. Die Kopfzeile ist hier
+  // selbst zu sehen (keepBars).
   if (cam.form === "pc") {
-    await page.getByTestId("nav-user").click();
-    await cam.shot("einstellungen", page.getByTestId("nav-account-settings"), { area: [page.getByTestId("nav-user"), page.getByTestId("nav-user-menu")] });
+    await cam.clip("einstellungen", page.getByTestId("nav-account-settings"), (act) => act.click(page.getByTestId("nav-user")),
+      { area: [page.getByTestId("nav-user"), page.getByTestId("nav-user-menu")], start: page.getByTestId("nav-user"), keepBars: true });
     await page.keyboard.press("Escape");
   } else {
-    await page.getByTestId("nav-mobile-toggle").click();
-    await cam.shot("einstellungen", page.getByTestId("nav-account-settings-mobile"), { area: [page.getByTestId("nav-dashboard-mobile"), page.getByTestId("nav-logout-mobile")] });
+    await cam.clip("einstellungen", page.getByTestId("nav-account-settings-mobile"), (act) => act.click(page.getByTestId("nav-mobile-toggle")),
+      { area: [page.getByTestId("nav-dashboard-mobile"), page.getByTestId("nav-logout-mobile")], start: page.getByTestId("nav-mobile-toggle"), keepBars: true });
     await page.getByTestId("nav-mobile-toggle").click();
   }
   await shown(page, "profile-tab-basic").click();
@@ -67,26 +72,22 @@ async function konto(page, cam, state) {
   // Benachrichtigungen (#1204, #1206): Stufe, ein Thema selbst, Ruhezeit, Weitere Wege.
   state.routes["/users/me/notification-preferences"] = D.NOTIFICATION_SETTINGS;
   await shown(page, "profile-tab-notifications").click();
-  await page.getByTestId("notification-level-important").click();
+  await expect(page.getByTestId("notification-levels")).toBeVisible();
+  await cam.clip("stufe", page.getByTestId("notification-level-important"), (act) => act.click(page.getByTestId("notification-level-important")),
+    { area: page.getByTestId("notification-levels") });
   await expect(page.getByTestId("notification-level-important")).toHaveAttribute("aria-checked", "true");
   await noSideScroll(page);
-  await page.waitForTimeout(400);
-  await cam.shot("stufe", page.getByTestId("notification-level-important"), { area: page.getByTestId("notification-levels") });
-  await page.getByTestId("notification-topic-achievements-off").click();
+  await cam.clip("themen", page.getByTestId("notification-topic-achievements"), (act) => act.click(page.getByTestId("notification-topic-achievements-off")),
+    { area: [page.getByTestId("notification-topic-prize_updates"), page.getByTestId("notification-topic-billing_updates")], start: page.getByTestId("notification-topic-achievements") });
   await expect(page.getByTestId("notification-level-custom")).toBeVisible();
-  await page.waitForTimeout(400);
-  await cam.shot("themen", page.getByTestId("notification-topic-achievements"), { area: [page.getByTestId("notification-topic-prize_updates"), page.getByTestId("notification-topic-billing_updates")] });
-  await page.getByTestId("notification-quiet-toggle").click();
+  await cam.clip("ruhezeit", [page.getByTestId("notification-quiet-toggle"), page.getByTestId("notification-quiet-start"), page.getByTestId("notification-quiet-end")],
+    (act) => act.click(page.getByTestId("notification-quiet-toggle")), { area: page.getByTestId("notification-quiet"), start: page.getByTestId("notification-quiet-toggle") });
   await expect(page.getByTestId("notification-quiet-start")).toBeVisible();
-  await page.waitForTimeout(400);
-  await cam.shot("ruhezeit", [page.getByTestId("notification-quiet-toggle"), page.getByTestId("notification-quiet-start"), page.getByTestId("notification-quiet-end")], { area: page.getByTestId("notification-quiet") });
-  await page.getByTestId("notification-more-ways").click();
+  // Aufgeklappt reicht der Kasten weit nach unten - der Knopf steht deshalb vorher oben im Bild.
+  await cam.clip("weitere-wege", page.getByTestId("notification-more-ways"), (act) => act.click(page.getByTestId("notification-more-ways")),
+    { area: [page.getByTestId("notification-more-ways"), page.getByTestId("profile-notification-column-email")], block: "start" });
   await expect(page.getByTestId("profile-notification-channel-email")).toBeVisible();
-  await page.waitForTimeout(400);
   await noSideScroll(page);
-  // Aufgeklappt reicht der Kasten unter den Bildrand - erst nach oben holen, dann fotografieren.
-  await page.getByTestId("notification-more-ways").evaluate((node) => node.scrollIntoView({ block: "center" }));
-  await cam.shot("weitere-wege", page.getByTestId("notification-more-ways"), { area: [page.getByTestId("notification-more-ways"), page.getByTestId("profile-notification-column-email")] });
 }
 
 async function team(page, cam, state) {
@@ -110,23 +111,22 @@ async function team(page, cam, state) {
   await noSideScroll(page);
   await cam.shot("team-erstellen", page.getByTestId("team-create-open"));
   await page.getByTestId("team-create-open").click();
-  await page.getByTestId("team-name-input").fill(D.TEAM.name);
-  await page.getByTestId("team-tag").fill(D.TEAM.tag);
+  await cam.clip("team-daten", [page.getByTestId("team-name-input"), page.getByTestId("team-tag"), page.getByTestId("team-save")], async (act) => {
+    await act.type(page.getByTestId("team-name-input"), D.TEAM.name);
+    await act.type(page.getByTestId("team-tag"), D.TEAM.tag, { delay: 90 });
+  }, { area: [page.getByTestId("team-name-input"), page.getByTestId("team-save")] });
   await noSideScroll(page);
-  await cam.shot("team-daten", [page.getByTestId("team-name-input"), page.getByTestId("team-tag"), page.getByTestId("team-save")],
-    { area: [page.getByTestId("team-name-input"), page.getByTestId("team-save")] });
   await page.getByTestId("team-save").click();
 
   await page.goto("/teams/t-1");
-  await page.getByTestId("team-invite-open").click();
+  await cam.clip("einladen", page.getByTestId("team-invite-url"), (act) => act.click(page.getByTestId("team-invite-open")),
+    { area: [page.getByTestId("team-invite-url"), page.getByTestId("team-invite-renew")], start: page.getByTestId("team-invite-open") });
   await expect(page.getByTestId("team-join-code-value")).toHaveText("Pr0beCode");
   await noSideScroll(page);
-  await cam.shot("einladen", page.getByTestId("team-invite-url"), { area: [page.getByTestId("team-invite-url"), page.getByTestId("team-invite-renew")] });
   await cam.shot("beitrittscode", page.getByTestId("team-join-code-box"));
   const search = page.getByTestId("team-invite-members").getByRole("textbox").first();
-  await search.fill("pia");
+  await cam.clip("persoenlich-einladen", page.getByTestId("team-invite-members"), (act) => act.type(search, "pia", { delay: 120 }), { start: search });
   await expect(page.getByTestId("team-invite-members")).toContainText("Pia Probe");
-  await cam.shot("persoenlich-einladen", page.getByTestId("team-invite-members"));
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("team-invite-sheet")).toHaveCount(0);
   await cam.shot("rollen-team", page.getByTestId("team-promote-u-2"), { area: [page.getByTestId("team-manage-members").locator("h2, h3").first(), page.getByTestId("team-member-row-u-2")] });
@@ -136,14 +136,15 @@ async function team(page, cam, state) {
   await noSideScroll(page);
   await cam.shot("co-team-anlegen", add);
   await add.click();
-  await page.getByTestId("team-squad-name").fill("Rudel Alpha");
-  await page.getByTestId("team-squad-game").selectOption("g-1");
+  await cam.clip("co-team-kader", [page.getByTestId("team-squad-name"), page.getByTestId("team-squad-game"), page.getByTestId("team-squad-member-u-1")], async (act) => {
+    await act.type(page.getByTestId("team-squad-name"), "Rudel Alpha");
+    await act.select(page.getByTestId("team-squad-game"), "g-1");
+  }, { area: [page.getByTestId("team-squad-name"), page.getByTestId("team-squad-member-u-4")], start: page.getByTestId("team-squad-name") });
   await noSideScroll(page);
-  await cam.shot("co-team-kader", [page.getByTestId("team-squad-name"), page.getByTestId("team-squad-game"), page.getByTestId("team-squad-member-u-1")],
-    { area: [page.getByTestId("team-squad-name"), page.getByTestId("team-squad-member-u-4")] });
-  await page.getByTestId("team-squad-captain_id").selectOption(D.MATE.id);
-  await page.getByTestId("team-squad-vice_captain_id").selectOption(D.MATE2.id);
-  await cam.shot("captain-vertreter", [page.getByTestId("team-squad-captain_id"), page.getByTestId("team-squad-vice_captain_id")]);
+  await cam.clip("captain-vertreter", [page.getByTestId("team-squad-captain_id"), page.getByTestId("team-squad-vice_captain_id")], async (act) => {
+    await act.select(page.getByTestId("team-squad-captain_id"), D.MATE.id);
+    await act.select(page.getByTestId("team-squad-vice_captain_id"), D.MATE2.id);
+  });
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByTestId("team-squad-roles-s-1")).toContainText("Captain");
 
@@ -176,19 +177,20 @@ async function liga(page, cam, state) {
   await noSideScroll(page);
   await cam.shot("anmeldung-starten", page.getByTestId("league-application-start"), { area: page.getByTestId("league-application") });
   await page.getByTestId("league-application-start").click();
-  await page.getByTestId("apply-squad-sq1").check();
+  await cam.clip("co-team-auswahl", [page.getByTestId("apply-squad-row-sq1"), page.getByTestId("apply-next")], (act) => act.check(page.getByTestId("apply-squad-sq1")),
+    { start: page.getByTestId("apply-squad-row-sq1") });
   await noSideScroll(page);
-  await cam.shot("co-team-auswahl", [page.getByTestId("apply-squad-row-sq1"), page.getByTestId("apply-next")]);
   await page.getByTestId("apply-next").click();
   await expect(page.getByTestId("apply-check-ok")).toContainText("kann angemeldet werden");
   await noSideScroll(page);
   await cam.shot("passt-alles", page.getByTestId("apply-check-ok"));
   await cam.shot("offene-punkte", page.getByTestId("apply-warnings"));
   await page.getByTestId("apply-next").click();
-  await page.getByTestId("apply-accept-rules").check();
-  await page.getByTestId("apply-accept-privacy").check();
+  await cam.clip("regelwerk", [labelOf(page.getByTestId("apply-accept-rules")), labelOf(page.getByTestId("apply-accept-privacy"))], async (act) => {
+    await act.check(page.getByTestId("apply-accept-rules"));
+    await act.check(page.getByTestId("apply-accept-privacy"));
+  });
   await noSideScroll(page);
-  await cam.shot("regelwerk", [labelOf(page.getByTestId("apply-accept-rules")), labelOf(page.getByTestId("apply-accept-privacy"))]);
   await page.getByTestId("apply-next").click();
   await noSideScroll(page);
   await cam.shot("einreichen", page.getByTestId("apply-submit"), { area: [page.getByTestId("apply-summary"), page.getByTestId("apply-submit")] });
@@ -206,16 +208,16 @@ async function liga(page, cam, state) {
 
   match = D.MATCH_FIXED;
   await page.reload();
-  await page.getByTestId("reschedule-form-reason").fill("Zwei Spieler haben an dem Abend Dienst.");
+  await cam.clip("verschieben", page.getByTestId("reschedule-form"), (act) => act.type(page.getByTestId("reschedule-form-reason"), "Zwei Spieler haben an dem Abend Dienst.", { delay: 35 }));
   await noSideScroll(page);
-  await cam.shot("verschieben", page.getByTestId("reschedule-form"));
 
   match = D.checkinPage();
   await page.reload();
-  for (const id of ["u1", "u2", "u3", "u4"]) await page.getByTestId(`checkin-roster-${id}`).click();
+  await cam.clip("check-in", [page.getByTestId("checkin-roster"), page.getByTestId("checkin-submit")], async (act) => {
+    for (const id of ["u1", "u2", "u3", "u4"]) await act.click(page.getByTestId(`checkin-roster-${id}`));
+  }, { start: page.getByTestId("checkin-roster") });
   await expect(page.getByTestId("checkin-submit")).toBeEnabled();
   await noSideScroll(page);
-  await cam.shot("check-in", [page.getByTestId("checkin-roster"), page.getByTestId("checkin-submit")]);
 
   match = D.readyPage();
   await page.reload();
@@ -223,30 +225,31 @@ async function liga(page, cam, state) {
 
   match = D.REPORT_PAGE;
   await page.reload();
-  await page.getByTestId("league-game-1-map-hafen").click();
-  await page.getByTestId("league-game-1-score-a").fill("250");
-  await page.getByTestId("league-game-1-score-b").fill("180");
+  await cam.clip("ergebnis-melden", page.getByTestId("league-game-1"), async (act) => {
+    await act.click(page.getByTestId("league-game-1-map-hafen"));
+    await act.type(page.getByTestId("league-game-1-score-a"), "250", { delay: 110 });
+    await act.type(page.getByTestId("league-game-1-score-b"), "180", { delay: 110 });
+  });
   await noSideScroll(page);
-  await cam.shot("ergebnis-melden", page.getByTestId("league-game-1"));
-  for (const id of ["u1", "u2", "u3", "u4"]) await page.getByTestId(`league-participants-${id}`).click();
+  await cam.clip("wer-hat-gespielt", [page.getByTestId("league-participants-count"), page.getByTestId("match-report-submit")], async (act) => {
+    for (const id of ["u1", "u2", "u3", "u4"]) await act.click(page.getByTestId(`league-participants-${id}`));
+  }, { area: [page.getByTestId("league-participants-u1"), page.getByTestId("league-participants-count"), page.getByTestId("match-report-submit")], start: page.getByTestId("league-participants-u1") });
   await expect(page.getByTestId("league-participants-count")).toContainText("4");
-  await cam.shot("wer-hat-gespielt", [page.getByTestId("league-participants-count"), page.getByTestId("match-report-submit")],
-    { area: [page.getByTestId("league-participants-u1"), page.getByTestId("league-participants-count"), page.getByTestId("match-report-submit")] });
 
   // Vorfälle im Spiel (D.5, #1619): melden, auf die Meldung der Gegenseite antworten, Map in Klärung.
   state.routes["/matches/m1/proofs"] = D.PROOFS;
   match = D.incidentPage();
   await page.reload();
   await page.getByTestId("incident-open-form").click();
-  await page.getByTestId("incident-form-position-2").click();
-  await page.getByTestId("incident-form-kind-disconnect").check();
+  // Das Formular ist lang - die Schleife zeigt die ersten beiden Fragen (welche Map, was ist passiert).
+  await cam.clip("vorfall-melden", [page.getByTestId("incident-form-position-2"), labelOf(page.getByTestId("incident-form-kind-disconnect"))], async (act) => {
+    await act.click(page.getByTestId("incident-form-position-2"));
+    await act.check(page.getByTestId("incident-form-kind-disconnect"));
+  }, { area: [page.getByTestId("incident-form-position-1"), labelOf(page.getByTestId("incident-form-kind-pause-between"))], start: page.getByTestId("incident-form-position-1") });
   await page.getByTestId("incident-form-score-a").fill("3");
   await page.getByTestId("incident-form-score-b").fill("4");
   await page.getByTestId("incident-form-proposal-rehost").check();
   await noSideScroll(page);
-  // Das Formular ist lang - das Bild zeigt die ersten beiden Fragen (welche Map, was ist passiert).
-  await cam.shot("vorfall-melden", [page.getByTestId("incident-form-position-2"), labelOf(page.getByTestId("incident-form-kind-disconnect"))],
-    { area: [page.getByTestId("incident-form-position-1"), labelOf(page.getByTestId("incident-form-kind-pause-between"))] });
 
   match = D.incidentPage([D.incidentRow()], { hold: { code: "proposed", position: 2, text: "Zu Map 2 ist ein Vorfall gemeldet – die Gegenseite antwortet noch. Bis dahin gilt kein Ergebnis." } });
   await page.reload();
@@ -265,13 +268,18 @@ async function liga(page, cam, state) {
 
   match = D.CONFIRM_PAGE;
   await page.reload();
-  for (const id of ["u1", "u2", "u3"]) await page.getByTestId(`league-confirm-participants-${id}`).click();
+  await cam.clip("bestaetigen", [page.getByTestId("match-report-confirm"), page.getByTestId("match-report-wrong")], async (act) => {
+    for (const id of ["u1", "u2", "u3"]) await act.click(page.getByTestId(`league-confirm-participants-${id}`));
+  }, { area: page.getByTestId("match-report"), start: page.getByTestId("league-confirm-participants-u1") });
   await noSideScroll(page);
-  await cam.shot("bestaetigen", [page.getByTestId("match-report-confirm"), page.getByTestId("match-report-wrong")], { area: page.getByTestId("match-report") });
+  // „Stimmt nicht“ rollt das Formular selbst in die Mitte (MatchPage) - das passiert vor der Aufnahme, die Schleife
+  // zeigt das Ausfüllen.
   await page.getByTestId("match-report-wrong").click();
-  await page.getByTestId("match-dispute-input").fill("Map 1 haben wir 250:180 gewonnen, nicht verloren.");
+  await expect(page.getByTestId("match-dispute-input")).toBeVisible();
+  await page.waitForTimeout(400);
+  await cam.clip("problem-melden", page.getByTestId("match-dispute-form"), (act) => act.type(page.getByTestId("match-dispute-input"), "Map 1 haben wir 250:180 gewonnen, nicht verloren.", { delay: 30 }),
+    { start: page.getByTestId("match-dispute-form") });
   await noSideScroll(page);
-  await cam.shot("problem-melden", page.getByTestId("match-dispute-form"));
 }
 
 async function turniere(page, cam, state) {
@@ -291,10 +299,10 @@ async function turniere(page, cam, state) {
   await page.goto("/tournaments/probe-cup");
   await noSideScroll(page);
   await cam.shot("anmelden", page.getByTestId("tournament-register-btn"));
-  await page.getByTestId("tournament-register-btn").click();
+  await cam.clip("anmeldung-pruefen", page.getByTestId("tournament-register-submit"), (act) => act.click(page.getByTestId("tournament-register-btn")),
+    { area: [page.getByTestId("register-sheet-summary"), page.getByTestId("tournament-register-submit")], start: page.getByTestId("tournament-register-btn") });
   await expect(page.getByTestId("register-sheet")).toBeVisible();
   await noSideScroll(page);
-  await cam.shot("anmeldung-pruefen", page.getByTestId("tournament-register-submit"), { area: [page.getByTestId("register-sheet-summary"), page.getByTestId("tournament-register-submit")] });
   await page.getByTestId("tournament-register-submit").click();
   await expect(page.getByTestId("tournament-my-stand")).toBeVisible();
   await cam.shot("dein-stand", page.getByTestId("tournament-my-stand"));
@@ -306,12 +314,13 @@ async function turniere(page, cam, state) {
   await cam.shot("einchecken", page.getByTestId("tournament-checkin-btn"));
 
   await page.goto("/matches/m1");
-  await page.getByTestId("result-score-r1-plus").click();
-  await page.getByTestId("result-score-r1-plus").click();
-  await page.getByTestId("result-score-r2-plus").click();
+  await cam.clip("ergebnis-melden", [page.getByTestId("match-report-sentence"), page.getByTestId("match-report-submit")], async (act) => {
+    await act.click(page.getByTestId("result-score-r1-plus"));
+    await act.click(page.getByTestId("result-score-r1-plus"));
+    await act.click(page.getByTestId("result-score-r2-plus"));
+  }, { area: page.getByTestId("match-report-form"), start: page.getByTestId("result-score-r1-plus") });
   await expect(page.getByTestId("match-report-sentence")).toContainText("2:1");
   await noSideScroll(page);
-  await cam.shot("ergebnis-melden", [page.getByTestId("match-report-sentence"), page.getByTestId("match-report-submit")], { area: page.getByTestId("match-report-form") });
 
   duel = D.DUEL_CONFIRM;
   await page.reload();
@@ -324,9 +333,12 @@ async function turniere(page, cam, state) {
   await noSideScroll(page);
   await cam.shot("turnierbaum", mine, cam.form === "pc" ? { area: page.getByTestId("bracket-tree") } : {});
   const path = page.getByRole("button", { name: /Weg von NeonFalke zeigen/ }).filter({ visible: true }).first();
-  await path.click();
-  if (cam.form === "pc") await cam.shot("weg-zeigen", page.locator("[data-mine='true']"), { area: page.getByTestId("bracket-tree"), each: true });
-  else await cam.shot("weg-zeigen", [page.getByTestId("bracket-step-prev"), page.getByTestId("bracket-step-next")], { area: [page.getByTestId("bracket-step-label"), mine] });
+  if (cam.form === "pc") {
+    await cam.clip("weg-zeigen", page.locator("[data-mine='true']"), (act) => act.click(path), { area: page.getByTestId("bracket-tree"), each: true, start: page.getByTestId("bracket-tree") });
+  } else {
+    await cam.clip("weg-zeigen", [page.getByTestId("bracket-step-prev"), page.getByTestId("bracket-step-next")], (act) => act.click(path),
+      { area: [page.getByTestId("bracket-step-label"), mine], start: path });
+  }
 }
 
 const FLOWS = { "konto-und-profil": konto, "team-und-co-team": team, "liga-captains": liga, turniere };
@@ -337,12 +349,11 @@ test.afterAll(() => saveSizes());
 for (const [form, viewport, scale] of FORMS) {
   test.describe(`Hilfe: Abläufe bei ${viewport.width} px`, () => {
     test.skip(({ isMobile }) => Boolean(isMobile), "Breiten stellt der Test selbst ein");
-    test.skip(VIDEOS && !SHOTS, "nur Videos");
-    test.use({ viewport, deviceScaleFactor: SHOTS ? scale : 1, actionTimeout: 15_000 });
+    test.use({ viewport, deviceScaleFactor: SHOTS || CLIPS ? scale : 1, actionTimeout: 15_000 });
 
     for (const [slug, flow] of Object.entries(FLOWS)) {
       test(`${slug}: alle Schritte mit Bild`, async ({ page }) => {
-        test.setTimeout(180_000);
+        test.setTimeout(CLIPS ? 600_000 : 180_000);
         const state = { user: null, routes: {} };
         await D.serve(page, state);
         const cam = camera(page, slug, form);
@@ -352,137 +363,3 @@ for (const [form, viewport, scale] of FORMS) {
     }
   });
 }
-
-// ---------------------------------------------------------------- Videos (nur mit HILFE_VIDEOS=1)
-
-const VIDEO_SIZE = { width: 390, height: 760 };
-const say = (slug, id) => stepsOf(slug).find((step) => step.id === id).text;
-
-async function recorded(browser, id, run) {
-  const dir = test.info().outputPath("video");
-  const context = await browser.newContext({ viewport: VIDEO_SIZE, deviceScaleFactor: 1, recordVideo: { dir, size: VIDEO_SIZE }, hasTouch: false });
-  const page = await context.newPage();
-  await page.addInitScript(POINTER);
-  const state = { user: null, routes: {} };
-  await D.serve(page, state);
-  try {
-    await run(page, state);
-    await page.waitForTimeout(1500);
-  } finally {
-    await saveVideo(page, context, id);
-  }
-}
-
-async function step(page, text, wait = 900) {
-  await subtitle(page, text);
-  await page.waitForTimeout(Math.round(wait * 1.4));
-}
-
-test.describe("Hilfe: Videos", () => {
-  test.skip(!VIDEOS, "nur mit HILFE_VIDEOS=1");
-  test.skip(({ isMobile }) => Boolean(isMobile), "eigene Größe");
-
-  test("Video: Liga-Anmeldung", async ({ browser }) => {
-    test.setTimeout(180_000);
-    const slug = "liga-captains";
-    await recorded(browser, "liga-anmeldung", async (page, state) => {
-      let submitted = false;
-      state.user = D.CAPTAIN;
-      state.routes = {
-        "/leagues/probe-liga/season-1": D.SEASON_VIEW,
-        "/leagues/probe-liga/season-1/application": () => (submitted ? D.MINE_SUBMITTED : D.MINE),
-        "POST /leagues/probe-liga/season-1/applications": () => { submitted = true; return { id: "a1", status: "submitted" }; },
-      };
-      await page.goto("/liga/probe-liga/season-1");
-      await page.getByTestId("league-application-start").scrollIntoViewIfNeeded();
-      await step(page, say(slug, "anmeldung-starten"), 2500);
-      await showClick(page, page.getByTestId("league-application-start"));
-      await step(page, say(slug, "co-team-auswahl"), 1500);
-      await showClick(page, page.getByTestId("apply-squad-sq1"));
-      await showClick(page, page.getByTestId("apply-next"));
-      await step(page, say(slug, "passt-alles"), 3500);
-      await page.getByTestId("apply-warnings").scrollIntoViewIfNeeded();
-      await step(page, say(slug, "offene-punkte"), 3500);
-      await showClick(page, page.getByTestId("apply-next"));
-      await step(page, say(slug, "regelwerk"), 2000);
-      await showClick(page, page.getByTestId("apply-accept-rules"));
-      await showClick(page, page.getByTestId("apply-accept-privacy"));
-      await showClick(page, page.getByTestId("apply-next"));
-      await step(page, say(slug, "einreichen"), 2500);
-      await showClick(page, page.getByTestId("apply-submit"));
-      await expect(page.getByTestId("league-application-row-sq1")).toBeVisible();
-      await page.getByTestId("league-application-row-sq1").scrollIntoViewIfNeeded();
-      await step(page, say(slug, "stand"), 3500);
-    });
-  });
-
-  test("Video: Ergebnis melden", async ({ browser }) => {
-    test.setTimeout(180_000);
-    const slug = "liga-captains";
-    await recorded(browser, "ergebnis-melden", async (page, state) => {
-      state.user = D.CAPTAIN;
-      state.routes = { "/matches/m1/page": D.REPORT_PAGE, "/matches/m1/chat": [], "POST /matches/m1/report": { awaiting_confirmation: true } };
-      await page.goto("/matches/m1");
-      await page.getByTestId("league-game-1").scrollIntoViewIfNeeded();
-      await step(page, say(slug, "ergebnis-melden"), 2500);
-      await showClick(page, page.getByTestId("league-game-1-map-hafen"));
-      await showClick(page, page.getByTestId("league-game-1-score-a"));
-      await page.keyboard.type("250", { delay: 120 });
-      await showClick(page, page.getByTestId("league-game-1-score-b"));
-      await page.keyboard.type("180", { delay: 120 });
-      await step(page, say(slug, "wer-hat-gespielt"), 1500);
-      for (const id of ["u1", "u2", "u3", "u4"]) await showClick(page, page.getByTestId(`league-participants-${id}`));
-      await page.getByTestId("match-report-submit").scrollIntoViewIfNeeded();
-      await step(page, "Prüf den Satz über dem Knopf. Tippe dann auf Ergebnis melden.", 2500);
-      await showClick(page, page.getByTestId("match-report-submit"));
-      await step(page, "Fertig. Jetzt bestätigt die Gegenseite.", 2500);
-    });
-  });
-
-  test("Video: Team und Co-Team anlegen", async ({ browser }) => {
-    test.setTimeout(180_000);
-    const slug = "team-und-co-team";
-    await recorded(browser, "team-und-co-team", async (page, state) => {
-      let mine = [];
-      let squads = [];
-      state.user = D.LEAD;
-      state.routes = {
-        "/teams": () => mine.map(({ id, name, tag }) => ({ id, name, tag, member_count: 4 })),
-        "/teams/my": () => mine,
-        "POST /teams": () => { mine = [D.TEAM]; return D.TEAM; },
-        "/teams/t-1/squads": () => squads,
-        "/games": D.TEAM_GAMES,
-        "POST /teams/t-1/squads": () => { squads = [D.SQUAD]; return D.SQUAD; },
-      };
-      await page.goto("/teams");
-      await step(page, say(slug, "team-erstellen"), 2000);
-      await showClick(page, page.getByTestId("team-create-open"));
-      await step(page, say(slug, "team-daten"), 1000);
-      await showClick(page, page.getByTestId("team-name-input"));
-      await page.keyboard.type(D.TEAM.name, { delay: 70 });
-      await showClick(page, page.getByTestId("team-tag"));
-      await page.keyboard.type(D.TEAM.tag, { delay: 120 });
-      await showClick(page, page.getByTestId("team-save"));
-      await page.goto("/teams?team=t-1");
-      const add = page.getByRole("button", { name: /^Co-Team$/ });
-      await add.scrollIntoViewIfNeeded();
-      await step(page, say(slug, "co-team-anlegen"), 3500);
-      await showClick(page, add);
-      await step(page, say(slug, "co-team-kader"), 1200);
-      await showClick(page, page.getByTestId("team-squad-name"));
-      await page.keyboard.type("Rudel Alpha", { delay: 70 });
-      await page.getByTestId("team-squad-game").selectOption("g-1");
-      await page.waitForTimeout(800);
-      await page.getByTestId("team-squad-captain_id").scrollIntoViewIfNeeded();
-      await step(page, say(slug, "captain-vertreter"), 2500);
-      await page.getByTestId("team-squad-captain_id").selectOption(D.MATE.id);
-      await page.waitForTimeout(700);
-      await page.getByTestId("team-squad-vice_captain_id").selectOption(D.MATE2.id);
-      await page.waitForTimeout(700);
-      await showClick(page, page.getByRole("button", { name: "Speichern" }));
-      await expect(page.getByTestId("team-squad-roles-s-1")).toBeVisible();
-      await page.getByTestId("team-squad-roles-s-1").scrollIntoViewIfNeeded();
-      await step(page, "Fertig. Das Co-Team steht mit Captain und Vertreter.", 2500);
-    });
-  });
-});

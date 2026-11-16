@@ -783,7 +783,9 @@ def _pdf_group_title(group: dict, index: int) -> str:
 
 _EXIT_SUFFIX = {"withdrawn": "ausgetreten", "disqualified": "disqualifiziert"}
 # Zonen für Auf- und Abstieg (F.2, #1627): dieselben Wörter und Farben wie in der Webtabelle (lib/leagueTable.js ZONE_LABELS).
-_ZONE_TEXT = {"promotion": "Aufstieg", "playoff_promotion": "Relegation", "playoff_relegation": "Relegation", "relegation": "Abstieg"}
+# Nie nur über die Farbe (#1648): die beiden Relegationen heißen verschieden - der Druck hat keine Pfeil-Schrift, das Wort trägt.
+_ZONE_TEXT = {"promotion": "Aufstieg", "playoff_promotion": "Relegation um den Aufstieg",
+              "playoff_relegation": "Relegation gegen den Abstieg", "relegation": "Abstieg"}
 _ZONE_COLORS = {"promotion": colors.HexColor("#1FD08E"), "playoff_promotion": colors.HexColor("#8FE8C7"),
                 "playoff_relegation": colors.HexColor("#FFCFA1"), "relegation": colors.HexColor("#FF9F43")}
 

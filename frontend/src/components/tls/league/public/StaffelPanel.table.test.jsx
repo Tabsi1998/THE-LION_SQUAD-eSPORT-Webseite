@@ -91,6 +91,13 @@ test("Zonen für Auf- und Abstieg (F.2, #1627): Strich an der Zeile, Wort für S
   expect(screen.getByTestId("standing-row-b")).not.toHaveAttribute("data-zone");
   expect(within(screen.getByTestId("standing-row-c")).getByText("Abstieg")).toHaveClass("sr-only");
   expect(screen.getByTestId("league-zones-A")).toHaveTextContent(/Aufstieg.*Abstieg/);
+  // Nie nur über die Farbe (#1648): ↑ bzw. ↓ an der Zeile und in der Legende, für Screenreader verborgen.
+  expect(screen.getByTestId("standing-zone-a")).toHaveAttribute("data-zone", "promotion");
+  expect(screen.getByTestId("standing-zone-a")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByTestId("standing-zone-c")).toHaveAttribute("data-zone", "relegation");
+  expect(screen.queryByTestId("standing-zone-b")).toBeNull();
+  expect(screen.getByTestId("zone-legend-mark-promotion")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByTestId("zone-legend-mark-relegation")).toBeInTheDocument();
   unmount();
   // Gegenprobe: ohne Zonen keine Legende.
   apiMock.get.mockResolvedValue({ data: { ...DATA, standings: [row("a", 1)] } });

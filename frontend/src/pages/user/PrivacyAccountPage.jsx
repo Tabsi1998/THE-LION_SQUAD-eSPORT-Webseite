@@ -49,7 +49,7 @@ export default function PrivacyAccountPage() {
   const anonymize = async () => {
     if (roleBlockers.length) return;
     const answer = await prompt({
-      title: "Account anonymisieren?",
+      title: "Konto anonymisieren?",
       description: 'Diese Aktion ist unwiderruflich. Tippe "LÖSCHEN", um die Anonymisierung zu bestätigen.',
       placeholder: "LÖSCHEN",
       confirmLabel: "Anonymisieren",
@@ -60,7 +60,7 @@ export default function PrivacyAccountPage() {
     setBusy(true);
     try {
       await api.post("/dsgvo/anonymize-me");
-      toast.success("Dein Account wurde anonymisiert.");
+      toast.success("Dein Konto wurde anonymisiert.");
       if (await logout()) nav("/");
     } catch (err) {
       toast.error(formatRequestError(err, "Anonymisierung fehlgeschlagen."));
@@ -105,8 +105,8 @@ export default function PrivacyAccountPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-[#FF3B30] mt-1 shrink-0" />
               <div className="flex-1">
-                <h2 className="font-heading text-lg md:text-xl font-bold uppercase text-[#FF3B30]">Account anonymisieren</h2>
-                <p className="mt-1 text-sm text-white/60">Dein Account wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Statistiken bleiben anonymisiert zur Wahrung der sportlichen Integrität erhalten. Diese Aktion kann <strong>nicht rückgängig gemacht</strong> werden.</p>
+                <h2 className="font-heading text-lg md:text-xl font-bold uppercase text-[#FF3B30]">Konto anonymisieren</h2>
+                <p className="mt-1 text-sm text-white/60">Dein Konto wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Statistiken bleiben anonymisiert zur Wahrung der sportlichen Integrität erhalten. Diese Aktion kann <strong>nicht rückgängig gemacht</strong> werden.</p>
                 {roleBlockers.length > 0 && (
                   <div className="mt-4 border border-warn/35 bg-warn/5 rounded-sm p-4" data-testid="dsgvo-erasure-blockers">
                     <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-warn"><Users className="w-3.5 h-3.5" /> {roleBlockers.every((row) => row.role === "superadmin") ? "Erst deine Rolle abgeben" : "Erst deine Rollen in Teams abgeben"}</div>
@@ -125,7 +125,7 @@ export default function PrivacyAccountPage() {
                   </div>
                 )}
                 <button onClick={anonymize} disabled={busy || roleBlockers.length > 0} data-testid="dsgvo-anonymize-btn" className="mt-4 px-5 py-2.5 border border-[#FF3B30] text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Account anonymisieren
+                  Konto anonymisieren
                 </button>
               </div>
             </div>
@@ -150,7 +150,7 @@ export default function PrivacyAccountPage() {
 
           {/* Current account info */}
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5 md:p-6 text-sm">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Aktueller Account</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Aktuelles Konto</div>
             <dl className="grid grid-cols-2 gap-y-2">
               <dt className="text-white/40">Benutzername</dt><dd>{user?.username}</dd>
               <dt className="text-white/40">E-Mail</dt><dd>{user?.email}</dd>

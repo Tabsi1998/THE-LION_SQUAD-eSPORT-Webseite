@@ -225,7 +225,7 @@ export default function AboutPage() {
           <Paragraphs text={texts.cta_text} className="mt-4 text-white/70 max-w-2xl mx-auto" />
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link to="/register" data-testid="about-cta-register" className="tls-btn tls-btn--primary px-7 py-3.5 font-bold uppercase tracking-wider rounded-sm">
-              Account erstellen
+              Konto erstellen
             </Link>
             <Link to="/membership/join" data-testid="about-cta-join" className="tls-btn tls-btn--primary px-7 py-3.5 font-bold uppercase tracking-wider rounded-sm">
               Mitglied werden

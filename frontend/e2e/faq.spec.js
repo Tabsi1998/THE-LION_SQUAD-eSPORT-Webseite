@@ -195,4 +195,71 @@ test.describe("FAQ (#2448)", () => {
     await expect(page).toHaveURL(/\/faq\?q=check-in$/);
     await expect(page.getByTestId("faq-results")).toBeVisible();
   });
+
+  // Schleifen wie ein GIF (#2448, Paket 2): die Fassung des Geräts, geladen erst im Bild, Anhalten per Knopf.
+  for (const [form, other, viewport] of [["handy", "pc", { width: 390, height: 844 }], ["pc", "handy", { width: 1440, height: 900 }]]) {
+    test(`Anleitung bei ${viewport.width} px: Schleife in der ${form === "pc" ? "PC" : "Handy"}-Fassung, geladen erst im Bild`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await mockServer(page);
+      const clips = [];
+      page.on("request", (request) => {
+        // Nur echte Video-Anfragen - im Dev-Server holt Vite zusätzlich die Adress-Module (?import&url).
+        if (request.resourceType() === "media" && request.url().includes("/hilfe/clips/")) clips.push(new URL(request.url()).pathname);
+      });
+      await page.goto("/faq/turniere");
+      await expect(page.getByTestId("help-topic")).toBeVisible();
+      const figure = page.getByTestId("help-step-media-weg-zeigen");
+      await expect(figure).toHaveAttribute("data-form", form);
+      await page.waitForTimeout(600);
+      // Der letzte Schritt steht weit unten: noch kein Video und keine Anfrage dafür.
+      await expect(page.getByTestId("help-step-clip-weg-zeigen")).toHaveCount(0);
+      expect(clips.filter((url) => url.includes("weg-zeigen"))).toEqual([]);
+      for (const url of clips) expect(url, "nur die Fassung des Geräts").toContain(`-${form}.`);
+
+      await figure.scrollIntoViewIfNeeded();
+      const video = page.getByTestId("help-step-clip-weg-zeigen");
+      await expect(video).toBeVisible();
+      await expect.poll(() => video.evaluate((node) => !node.paused && node.currentTime > 0)).toBe(true);
+      const src = await video.evaluate((node) => node.currentSrc);
+      expect(src).toContain(`weg-zeigen-${form}.`);
+      expect(clips.some((url) => url.includes(`weg-zeigen-${form}.`))).toBe(true);
+      expect(clips.some((url) => url.includes(`-${other}.`))).toBe(false);
+      await expect(video).toHaveJSProperty("muted", true);
+      await expect(video).toHaveJSProperty("loop", true);
+      if (SHOTS) await figure.screenshot({ path: `${SHOTS}/schleife-${form}-laeuft.png` });
+
+      const toggle = page.getByTestId("help-step-clip-toggle-weg-zeigen");
+      await expect(toggle).toHaveAccessibleName(/anhalten/);
+      await toggle.click();
+      await expect.poll(() => video.evaluate((node) => node.paused)).toBe(true);
+      await expect(toggle).toHaveAccessibleName(/abspielen/);
+      if (SHOTS) await figure.screenshot({ path: `${SHOTS}/schleife-${form}-angehalten.png` });
+      await toggle.click();
+      await expect.poll(() => video.evaluate((node) => node.paused)).toBe(false);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    });
+  }
+
+  test("„Bewegung reduzieren“: Standbild mit Abspielen, das Video erst auf Wunsch", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await mockServer(page);
+    const clips = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "media" && request.url().includes("/hilfe/clips/")) clips.push(request.url());
+    });
+    await page.goto("/faq/turniere#weg-zeigen");
+    const figure = page.getByTestId("help-step-media-weg-zeigen");
+    await figure.scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("help-step-image-weg-zeigen")).toBeVisible();
+    await page.waitForTimeout(600);
+    await expect(page.getByTestId("help-step-clip-weg-zeigen")).toHaveCount(0);
+    expect(clips).toEqual([]);
+    const play = page.getByRole("button", { name: "Animation „Weg durch den Baum“ abspielen" });
+    await expect(play).toHaveText(/Abspielen/);
+    if (SHOTS) await figure.screenshot({ path: `${SHOTS}/schleife-bewegung-reduziert.png` });
+    await play.click();
+    const video = page.getByTestId("help-step-clip-weg-zeigen");
+    await expect.poll(() => video.evaluate((node) => !node.paused)).toBe(true);
+  });
 });
