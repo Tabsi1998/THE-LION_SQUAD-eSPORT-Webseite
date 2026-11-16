@@ -34,7 +34,7 @@ test("toastLoadFailed meldet auch einen Fehler im eigenen Code (ohne Serverantwo
 test("toastLoadFailed schweigt bei abgebrochenen Abrufen und ohne Netz", () => {
   const fail = toastLoadFailed("Egal.");
   fail({ code: "ERR_CANCELED", name: "CanceledError" });
-  fail(new DOMException("aborted", "AbortError"));
+  fail(new window.DOMException("aborted", "AbortError"));
   const online = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
   fail({ isAxiosError: true, request: {} });
   online.mockRestore();
