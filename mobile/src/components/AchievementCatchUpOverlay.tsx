@@ -60,7 +60,8 @@ export function AchievementCatchUpOverlay() {
         // Rückfall ohne Server-Stand: lesen, vergleichen und merken unter einer Sperre - zwei gleichzeitige Prüfungen
         // zeigen denselben Aufstieg nur einmal.
         const levelUp = await claimLevelUp(levelKey(forUser), next, sameUser);
-        if (levelUp && sameUser()) enqueueLevelUp(levelUp);
+        // „Gesehen“ trotzdem melden (ein älterer Server ignoriert es), sonst käme der Aufstieg anderswo noch einmal.
+        if (levelUp && sameUser()) enqueueLevelUp(levelUp, { onDone: () => markSeen(forUser, { level: next }) });
         return;
       }
       const levelUp = levelUpFrom(state.level, next);
@@ -125,7 +126,13 @@ export function AchievementCatchUpOverlay() {
       }
       fresh.forEach((tier) => shownRef.current.add(tier.code));
       const context = { ...describePackage(groups, fresh), ...(fromLive ? {} : CATCH_UP) };
-      enqueueCeremony(fresh, context, { onDone: () => remember(key) });
+      // Rückfall ohne Server-Stand: „gesehen“ trotzdem melden, sonst käme sie auf einem anderen Gerät noch einmal.
+      enqueueCeremony(fresh, context, {
+        onDone: () => {
+          remember(key);
+          markSeen(userId, { codes: fresh.map((tier) => tier.code) });
+        },
+      });
     } catch {
       /* rein kosmetisch */
     }
