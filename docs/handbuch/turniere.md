@@ -24,8 +24,14 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung;
   vor Ort startet sie im **Cockpit** (Probleme und Stationen auf einer Seite, 3.8)
 - **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
-  **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Alle Turnierseiten tragen dieselben
+  **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Darunter eine zweite Zeile: die Spiele,
+  zu denen es Turniere gibt, **Online** / **Vor Ort** (hybride Turniere stehen unter beiden) und – angemeldet – **Nur
+  meine** (eigene Anmeldungen und die des Teams). Alles wirkt zusammen und steht in der Adresse
+  (`/tournaments?game=mario-kart&mode=local&mine=1`), ein geteilter Link zeigt dieselbe Auswahl. Ein zweiter Tipp auf
+  einen Chip löst ihn wieder. Am Handy wischt man beide Zeilen seitlich. Alle Turnierseiten tragen dieselben
   Brotkrumen „Start · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
+
+  <img src="../assets/turniere/turnierliste-filter-handy.png" alt="Turnierliste am Handy: oben die Phasen Alle, Anmeldung, Check-in und Live, darunter runde Chips Mario Kart World, Super Smash Bros. Ultimate und angeschnitten Rocket League zum Wischen" width="260">
 - **Terminvorschläge** auf der Matchseite gehen nur in die Zukunft – frühestens 5 Minuten ab jetzt. Bis zu 3 Termine
   gehen auf einmal (**+ weiteren Termin**); die Gegenseite nimmt einen davon an, die übrigen sind damit erledigt.
 

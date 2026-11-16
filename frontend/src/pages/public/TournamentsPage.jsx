@@ -8,6 +8,7 @@ import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useOptionalAuth } from "@/context/AuthContext";
 import { sortByNearestDate } from "@/lib/contentSort";
 
 const PAGE_SIZE = 24;
@@ -16,6 +17,29 @@ const MAX_SHOWN = 200;
 // Status-Gruppen (#2124, TP12): „Beendet“ sind auch veröffentlichte und archivierte Turniere, „Live“ auch pausierte. Die
 // Adresse behält die bisherigen Werte (?status=completed, ?status=live) - Links von früher bleiben gültig.
 const FILTER_QUERY = { completed: "finished", live: "running" };
+// Online oder vor Ort (#1276) - ein hybrides Turnier steht unter beiden (der Server entscheidet).
+const MODES = [
+  { v: "online", label: "Online" },
+  { v: "local", label: "Vor Ort" },
+];
+
+/** Ein Chip der zweiten Filterzeile: weich und rund, aktiv gefüllt (Cyan, „Nur meine“ in Gold wie bei den Events). */
+function Chip({ testId, active, tone = "brand", onClick, children }) {
+  const on = tone === "honor" ? "bg-[#FFD700] text-black" : "bg-[#29B6E8] text-black";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      data-testid={testId}
+      className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8] ${
+        active ? on : "bg-white/[0.05] text-white/65 hover:bg-white/[0.09] hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function TournamentsPage() {
   useDocumentTitle(
@@ -24,6 +48,13 @@ export default function TournamentsPage() {
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const signedIn = Boolean(useOptionalAuth()?.user);
+  // Zweite Filterzeile (#1276): Spiel (`?game=<slug>`, so verlinkt das Spiele-Regal), online/vor Ort und „Nur meine“ -
+  // alles steht in der Adresse, ein geteilter Link öffnet dieselbe Auswahl. „Nur meine“ gilt nur angemeldet.
+  const gameFilter = searchParams.get("game") || "";
+  const modeFilter = MODES.some((m) => m.v === searchParams.get("mode")) ? searchParams.get("mode") : "";
+  const mineFilter = signedIn && searchParams.get("mine") === "1";
+  const [games, setGames] = useState([]);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -37,11 +68,15 @@ export default function TournamentsPage() {
     // Liga-Staffeln haben ihre eigene Seite (docs/LIGA.md) - die Turnierliste fragt ohne sie.
     const params = new URLSearchParams({ compact: "true", paged: "true", limit: String(count), offset: "0", league: "exclude" });
     if (statusFilter !== "all") params.set("status", FILTER_QUERY[statusFilter] || statusFilter);
+    if (gameFilter) params.set("game", gameFilter);
+    if (modeFilter) params.set("mode", modeFilter);
+    if (mineFilter) params.set("mine", "true");
     const { data } = await api.get(`/tournaments?${params.toString()}`);
     const items = Array.isArray(data) ? data : data?.items || [];
     setList(sortByNearestDate(items));
     setTotal(Array.isArray(data) ? items.length : Number(data?.total ?? items.length));
-  }, [statusFilter]);
+    if (Array.isArray(data?.games)) setGames(data.games);
+  }, [statusFilter, gameFilter, modeFilter, mineFilter]);
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +126,24 @@ export default function TournamentsPage() {
     }, { replace: true });
   };
 
+  // Ein Chip der zweiten Zeile: setzt seinen Wert, ein zweiter Tipp löst ihn wieder. Wieder ab der ersten Seite.
+  const toggleParam = (key, value) => {
+    setLoading(true);
+    setShown(PAGE_SIZE);
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (params.get(key) === value) params.delete(key);
+      else params.set(key, value);
+      return params;
+    }, { replace: true });
+  };
+  // Ein Spiel aus einem fremden Link, das (noch) keine Turniere hat, bleibt als Chip sichtbar - sonst ließe es sich
+  // nicht mehr abwählen.
+  const gameChips = gameFilter && !games.some((game) => game.slug === gameFilter)
+    ? [...games, { id: gameFilter, slug: gameFilter, name: gameFilter }]
+    : games;
+  const narrowed = Boolean(gameFilter || modeFilter || mineFilter);
+
   const filters = [
     { v: "all", label: "Alle" },
     { v: "registration_open", label: "Anmeldung" },
@@ -107,13 +160,16 @@ export default function TournamentsPage() {
           <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Alle Turniere</h1>
           <p className="mt-3 text-white/60 max-w-xl">Online und vor Ort. Einzelspieler, Teams und Mehrspieler. Vom kleinen Pokal bis zur Saison-Liga.</p>
         </div>
-        <div className="flex flex-wrap gap-2 mb-8">
+        {/* Handy: beide Zeilen einzeilig zum Wischen; ab Tablet brechen sie um (#1276). */}
+        <div className="flex flex-nowrap md:flex-wrap gap-2 tls-swipe md:overflow-visible md:[mask-image:none] min-w-0" role="group" aria-label="Phase" data-testid="tournament-filters">
           {filters.map((f) => (
             <button
               key={f.v}
+              type="button"
               data-testid={`tournament-filter-${f.v}`}
               onClick={() => selectStatusFilter(f.v)}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${
+              aria-pressed={statusFilter === f.v}
+              className={`shrink-0 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${
                 statusFilter === f.v
                   ? "bg-[#29B6E8] text-black border-[#29B6E8]"
                   : "bg-transparent text-white/70 border-white/10 hover:border-[#29B6E8]/40"
@@ -122,6 +178,24 @@ export default function TournamentsPage() {
               {f.label}
             </button>
           ))}
+        </div>
+        <div className="mt-2 mb-8 flex flex-nowrap md:flex-wrap items-center gap-2 tls-swipe md:overflow-visible md:[mask-image:none] min-w-0" role="group" aria-label="Spiel und Ort" data-testid="tournament-chips">
+          {gameChips.map((game) => (
+            <Chip key={game.slug} testId={`tournament-game-${game.slug}`} active={gameFilter === game.slug} onClick={() => toggleParam("game", game.slug)}>
+              {game.name || game.slug}
+            </Chip>
+          ))}
+          {gameChips.length > 0 && <span aria-hidden="true" className="shrink-0 mx-1 h-5 w-px bg-white/10" />}
+          {MODES.map((m) => (
+            <Chip key={m.v} testId={`tournament-mode-${m.v}`} active={modeFilter === m.v} onClick={() => toggleParam("mode", m.v)}>
+              {m.label}
+            </Chip>
+          ))}
+          {signedIn && (
+            <Chip testId="tournament-only-mine" tone="honor" active={mineFilter} onClick={() => toggleParam("mine", "1")}>
+              Nur meine
+            </Chip>
+          )}
         </div>
         {loading ? (
           <PublicLoadingState cards={6} />
@@ -138,9 +212,13 @@ export default function TournamentsPage() {
             {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
             {list.length === 0 && (
               <PublicEmptyState
-                title={statusFilter === "all" ? "Noch keine Turniere sichtbar" : "Keine Turniere in diesem Filter"}
-                description={statusFilter === "all" ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch." : "Wechsle auf alle Turniere oder schau später wieder rein, wenn sich der Status ändert."}
-                primaryAction={statusFilter === "all" ? { to: "/events", label: "Events ansehen" } : { to: "/tournaments", label: "Alle Turniere" }}
+                title={mineFilter ? "Hier bist du nirgends dabei" : statusFilter === "all" && !narrowed ? "Noch keine Turniere sichtbar" : "Keine Turniere in diesem Filter"}
+                description={mineFilter
+                  ? "„Nur meine“ zeigt, wofür du selbst oder dein Team angemeldet bist."
+                  : statusFilter === "all" && !narrowed
+                    ? "Sobald neue Cups, Ligen oder Community-Turniere angelegt sind, erscheinen sie hier automatisch."
+                    : "Wechsle auf alle Turniere oder schau später wieder rein, wenn sich der Status ändert."}
+                primaryAction={statusFilter === "all" && !narrowed ? { to: "/events", label: "Events ansehen" } : { to: "/tournaments", label: "Alle Turniere" }}
                 secondaryAction={{ to: "/fastlap", label: "Fast Lap" }}
                 className="col-span-full"
               />

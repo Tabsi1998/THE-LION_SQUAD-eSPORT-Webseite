@@ -23,6 +23,7 @@ from services.access_links import (
 from services.event_public import public_event
 from services.public_phase import derive_public_phase
 from services.league_scope import is_league_staffel, league_filter, league_label
+from services.tournament_rules import EVENT_MODES
 from services.tournament_permissions import (
     assigned_tournament_ids,
     leads_tournament,
@@ -199,15 +200,38 @@ async def _enrich_tournaments(tournaments: list[dict], user: dict | None = None)
         t["participant_count"] = participants.get(t["id"], 0)
 
 
+def _mode_query(mode: str) -> dict:
+    """Online oder vor Ort (#1276) als Mongo-Filter - dieselbe Regel wie ``tournament_rules.tournament_event_mode``:
+    hybrid zählt zu beiden; ohne gültigen Modus entscheiden die alten Schalter, sonst gilt online."""
+    unset = {"event_mode": {"$nin": sorted(EVENT_MODES)}}
+    if mode == "local":
+        return {"$or": [{"event_mode": {"$in": ["local", "hybrid"]}}, {**unset, "is_hybrid": True}]}
+    return {"event_mode": {"$ne": "local"}}
+
+
+async def _games_with_tournaments(db, league: str) -> list[dict]:
+    """Die Spiele für die Chips der Turnierliste (#1276): nur Spiele mit öffentlichen Turnieren, ohne Entwürfe."""
+    game_ids = await db.tournaments.distinct("game_id", {
+        "status": {"$ne": "draft"}, "is_public": {"$ne": False}, "game_id": {"$nin": [None, ""]}, **league_filter(league)})
+    games = await db.games.find({"id": {"$in": sorted(game_ids)}}, {"_id": 0, "id": 1, "slug": 1, "name": 1}).to_list(200)
+    return sorted(({"id": game["id"], "slug": game.get("slug"), "name": game.get("name")} for game in games),
+                  key=lambda game: str(game.get("name") or "").lower())
+
+
 @router.get("")
 async def list_tournaments(status: str | None = None, game_id: str | None = None,
                            event_id: str | None = None, limit: int = 100,
                            offset: int = 0, paged: bool = False, compact: bool = False,
                            include_drafts: bool = False, managed: bool = False,
                            league: Literal["include", "exclude", "only"] = "include",
+                           game: str | None = None, mode: Literal["online", "local"] | None = None,
+                           mine: bool = False,
                            user=Depends(get_optional_user)):
     """``league`` (docs/LIGA.md): ``include`` (Vorgabe - die App ohne neuen Build sieht Staffeln als Turniere),
-    ``exclude`` (Web-Listen) oder ``only``."""
+    ``exclude`` (Web-Listen) oder ``only``.
+
+    Filter der Turnierliste (#1276): ``game`` (Kurzname des Spiels, wie ``?game=`` in der Adresse), ``mode`` (online
+    oder vor Ort) und ``mine`` (eigene Anmeldungen und die des Teams; ein Gast bekommt nichts)."""
     db = get_db()
     is_admin = is_confirmed_tournament_lead(user)
     assigned_ids = await assigned_tournament_ids(user)
@@ -241,6 +265,16 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if event_id:
         q["event_id"] = event_id
     q.update(league_filter(league))
+    narrowing = []
+    if game:
+        found = await db.games.find_one({"slug": game}, {"_id": 0, "id": 1})
+        narrowing.append({"game_id": found["id"]} if found else {"id": {"$in": []}})
+    if mode:
+        narrowing.append(_mode_query(mode))
+    if mine:
+        narrowing.append({"id": {"$in": sorted(participant_visible_ids)}})
+    if narrowing:
+        q["$and"] = [*q.get("$and", []), *narrowing]
     safe_limit = max(1, min(int(limit or 100), 500))
     projection = {"_id": 0}
     if compact:
@@ -299,7 +333,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         items = [_compact_tournament(t) for t in tournaments]
         if not paged:
             return items
-        return {"items": items, "total": total, "limit": page_limit, "offset": page_offset}
+        return {"items": items, "total": total, "limit": page_limit, "offset": page_offset,
+                "games": await _games_with_tournaments(db, league)}
     return tournaments
 
 
