@@ -346,6 +346,19 @@ async def test_file_uploads_are_not_slow_routes(flow):
     assert bad.status_code == 400
 
 
+@pytest.mark.asyncio
+async def test_a_slow_get_on_an_upload_route_stays_a_slow_route(flow):
+    """Die Liste gilt ohne Methode nur für POST/PUT: ein langsames GET der App-Releases-Liste bleibt auch in der Übersicht
+    („Langsamste Route“) eine langsame Route - nicht nur unter /slow."""
+    at = now_utc().isoformat()
+    await flow.db.ops_slow_requests.insert_one(
+        {"id": "g1", "route": "/api/admin/app-releases", "method": "GET", "status_code": 200, "duration_ms": 9000, "at": at})
+    flow.act_as(await flow.add_user(role="superadmin"))
+    summary = (await flow.get("/api/admin/ops/summary")).json()
+    assert summary["slow_requests_24h"] == 1 and summary["slow_uploads_24h"] == 0
+    assert summary["slowest_route_24h"]["route"] == "/api/admin/app-releases"
+
+
 # ---------------------------------------------------------------- Review-Runde 1 (#2447)
 
 @pytest.mark.asyncio

@@ -104,7 +104,9 @@ def _occurrence_expr(spec: Spec):
 
 def open_filter(spec: Spec) -> dict:
     """Die Regel von ``ack_valid`` als Mongo-Bedingung (#2447): nie quittiert oder danach wieder aufgetreten. Die
-    Zeitpunkte sind ISO-Texte aus ``now_utc().isoformat()`` - gleich geschrieben, also als Text vergleichbar."""
+    Zeitpunkte sind ISO-Texte aus ``now_utc().isoformat()`` - gleich geschrieben, also als Text vergleichbar. Unterstützt
+    ist nur dieses Format (UTC, „+00:00“): Ein Zeitfeld mit „Z“, anderer Zone oder als BSON-Datum würde hier anders
+    gewertet als in ``ack_valid`` - neue Schreiber müssen ``now_utc().isoformat()`` verwenden."""
     return {"$or": [{"acknowledged_at": None}, {"$expr": {"$gt": [_occurrence_expr(spec), "$acknowledged_at"]}}]}
 
 

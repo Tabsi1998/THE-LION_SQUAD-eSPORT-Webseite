@@ -8,7 +8,8 @@ Sonderfälle gilt die Liste. ``DEFAULT_UPLOAD_ROUTES`` ist die Vorgabe, einstell
 
 Ein Eintrag ist ``/api/…`` oder ``METHODE /api/…``; ``*`` am Ende heißt „beginnt mit“. Ohne Methode gilt er nur für
 ``UPLOAD_METHODS`` (POST, PUT) - ein langsames GET derselben Route bleibt eine langsame Route. Zu breite Muster
-(``/api/*``, ``/api/admin/*``) lehnt ``clean_upload_routes`` ab.
+(``/api/*``, ``/api/admin/*``) lehnt ``clean_upload_routes`` ab; ``*`` steht nur nach einem ganzen Pfadteil
+(``/api/uploads/*``, nicht ``/api/a*``).
 """
 from __future__ import annotations
 
@@ -68,8 +69,8 @@ def clean_upload_routes(values) -> list[str]:
             raise ValueError(f"Höchstens {MAX_ROUTES} Upload-Routen.")
         methods, route = split_entry(text)
         if (not route.startswith("/api/") or len(route) > MAX_ROUTE_LENGTH or " " in route or "*" in route[:-1]
-                or (route.endswith("*") and route[:-1] in TOO_BROAD) or route in TOO_BROAD):
-            raise ValueError(f"„{text[:60]}“ ist keine passende Route (/api/…, ohne Leerzeichen, * nur am Ende, nicht /api/* oder /api/admin/*).")
+                or (route.endswith("*") and (route[:-1] in TOO_BROAD or not route[:-1].endswith("/"))) or route in TOO_BROAD):
+            raise ValueError(f"„{text[:60]}“ ist keine passende Route (/api/…, ohne Leerzeichen, * nur am Ende nach „/“, nicht /api/* oder /api/admin/*).")
         normal = route if text == route else f"{next(iter(methods))} {route}"
         if normal not in seen:
             seen.add(normal)

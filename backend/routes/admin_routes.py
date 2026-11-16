@@ -838,7 +838,7 @@ async def ops_events_ack_all(body: OpsAckAllBody, me: dict = Depends(require_are
         stamp = ops_acks.moment(body.until)
         if stamp is None:
             raise HTTPException(status_code=400, detail="Ungültiger Zeitpunkt.")
-        until = stamp.isoformat()
+        until = stamp.astimezone(timezone.utc).isoformat()
     db = get_db()
     if body.items is not None:
         done = await ops_acks.acknowledge_items(db, [item.model_dump() for item in body.items], me, until=until)

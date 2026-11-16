@@ -392,7 +392,7 @@ async def ops_summary(db) -> dict:
     since = _since_iso(24)
     open_groups = await db.ops_errors.count_documents({"resolved_at": None})
     recent_groups = await db.ops_errors.find({"last_seen_at": {"$gte": since}}, {"_id": 0, "count": 1, "route": 1, "error_type": 1, "last_seen_at": 1}).sort("last_seen_at", -1).to_list(200)
-    every_slow = await db.ops_slow_requests.find({"at": {"$gte": since}}, {"_id": 0, "route": 1, "duration_ms": 1, "upload": 1}).to_list(5000)
+    every_slow = await db.ops_slow_requests.find({"at": {"$gte": since}}, {"_id": 0, "route": 1, "method": 1, "duration_ms": 1, "upload": 1}).to_list(5000)
     # Datei-Uploads (#2447) zählen nicht als langsam und sind nie „Langsamste Route“.
     patterns = await upload_routes(db)
     slow_rows = [row for row in every_slow if not is_upload(row, patterns)]

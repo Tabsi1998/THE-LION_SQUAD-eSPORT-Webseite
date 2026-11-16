@@ -53,7 +53,7 @@ def test_upload_route_settings_are_checked():
     assert ops_alerts.merge_settings({})["upload_routes"] == list(ops_upload_routes.DEFAULT_UPLOAD_ROUTES)
     assert ops_alerts.merge_settings({"upload_routes": []})["upload_routes"] == [], "leer gespeichert heißt leer, nicht Vorgabe"
     assert clean("/api/a\n\n /api/b/* \n/api/a\npatch   /api/c") == ["/api/a", "/api/b/*", "PATCH /api/c"]
-    for bad in ("api/a", "/api/a b", "/api/*/x", "/x", "/api/*", "/api/admin/*", "GET /api/*", "/api/"):
+    for bad in ("api/a", "/api/a b", "/api/*/x", "/x", "/api/*", "/api/admin/*", "GET /api/*", "/api/", "/api/a*", "/api/ad*", "/api/admin/shop*"):
         try:
             clean([bad])
         except ValueError:
