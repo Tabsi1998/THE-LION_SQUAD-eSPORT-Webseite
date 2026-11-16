@@ -17,6 +17,7 @@ export const MAIL_TEMPLATE_LABELS = {
   dispute_resolved: "Dispute entschieden",
   league_notice: "Hinweis aus der Liga",
   tournament_finished: "Turnier beendet",
+  tournament_staff: "Helfer eingetragen",
   membership_activated: "Mitgliedschaft aktiviert",
   membership_deactivated: "Mitgliedschaft deaktiviert",
   membership_blocked: "Mitgliedschaft gesperrt",

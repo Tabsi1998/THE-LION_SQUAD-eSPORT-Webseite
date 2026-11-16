@@ -30,6 +30,7 @@ import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
 import { STAFFEL_STATUS_VALUES, SeasonSourceNote, StaffelHeaderLine, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { SETTLE_WARNING_DURATION, settleFailureMessage } from "@/lib/settleFailure";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -364,6 +365,14 @@ export default function AdminTournamentEditPage() {
         : `Status: ${label}`);
       // Punkte in einer abgeschlossenen Jahreswertung bleiben unverändert (#2123) - das sagt der Server dazu.
       if (data?.season_points_note) toast.info(data.season_points_note, { duration: 10000 });
+      // Ein Abschluss-Schritt gescheitert (#2460): Warnung mit den Schritten und gleich „Abschluss nachholen“.
+      const settleWarning = settleFailureMessage(data);
+      if (settleWarning) {
+        toast.warning(settleWarning, {
+          duration: SETTLE_WARNING_DURATION,
+          action: { label: "Abschluss nachholen", onClick: () => recheckResults(status) },
+        });
+      }
       load();
     } catch (e) {
       const statusDetail = e.response?.data?.detail;
@@ -395,7 +404,8 @@ export default function AdminTournamentEditPage() {
   // Abschluss nachholen (#2452): ein veröffentlichtes Turnier noch einmal auswerten - Auszeichnungen, Erfolge, Punkte und
   // Gewinne, die beim Veröffentlichen ausblieben, kommen genau einmal dazu. Kein Statuswechsel; wer etwas Neues bekommt,
   // erhält die übliche Meldung zu Erfolg bzw. Gewinn - kein „Turnier beendet“, nichts im Discord-Kanal.
-  const recheckResults = async () => {
+  // ``status``: aus der Warnung direkt nach dem Veröffentlichen (#2460) - da ist ``t`` noch der alte Stand.
+  const recheckResults = async (status = t.status) => {
     const ok = await confirm({
       title: "Abschluss nachholen?",
       description: "Das System prüft Auszeichnungen, Erfolge, Jahreswertung und Gewinne dieses Turniers noch einmal und vergibt, was fehlt – genau einmal. Ergebnisse und Status bleiben. Wer jetzt etwas Neues bekommt, erhält die übliche Meldung zu Erfolg bzw. Gewinn. Kein „Turnier beendet“, nichts im Discord-Kanal.",
@@ -404,7 +414,7 @@ export default function AdminTournamentEditPage() {
     });
     if (!ok) return;
     try {
-      const { data } = await api.post(`/tournaments/${id}/status`, { status: t.status, recheck: true });
+      const { data } = await api.post(`/tournaments/${id}/status`, { status, recheck: true });
       // Ist ein Schritt gescheitert, sagt der Server welcher - dann eine Warnung statt „nachgeholt“ (#2452).
       const failed = Array.isArray(data?.failed_labels) ? data.failed_labels : [];
       if (failed.length) toast.warning(`Nicht alles nachgeholt – gescheitert: ${failed.join(", ")}. Die übrigen Schritte sind gelaufen; bitte später noch einmal versuchen.`, { duration: 12000 });
@@ -496,7 +506,8 @@ export default function AdminTournamentEditPage() {
     ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
     // Map-Pool (#1616): nur mit Spiel und für Strukturrollen - ein maploser Cup bekommt keinen Reiter.
     ...(t.game_id && t.can_manage_structure ? [["maps", "Maps"]] : []),
-    ...(isTournamentLead ? [["staff", "Team"]] : []),
+    // Helfer (#1384): „Team“ hieß hier die Helfer-Liste - im selben Turnier heißen aber auch die Teilnehmer so.
+    ...(isTournamentLead ? [["staff", "Helfer"]] : []),
     // Rückmeldungen (#1196): erst, wenn das Turnier vorbei ist - ohne Namen.
     ...(["completed", "results_published", "archived"].includes(t.status) ? [["feedback", "Rückmeldungen"]] : []),
     // Bearbeiten speichert per PATCH - das darf nur die Turnierleitung über alle Turniere (#1353, `require_admin`).
@@ -561,7 +572,7 @@ export default function AdminTournamentEditPage() {
       </button>
     ),
     isTournamentLead && !staffel && ["results_published", "archived"].includes(t.status) && (
-      <button key="recheck" type="button" onClick={recheckResults} data-testid="admin-tr-recheck-results" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+      <button key="recheck" type="button" onClick={() => recheckResults()} data-testid="admin-tr-recheck-results" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Abschluss nachholen
       </button>
     ),

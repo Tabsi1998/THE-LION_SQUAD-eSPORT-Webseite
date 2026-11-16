@@ -332,6 +332,119 @@ async def test_nachholen_meldet_einen_gescheiterten_schritt_statt_erfolg(flow, m
 
 
 @pytest.mark.asyncio
+async def test_veroeffentlichen_meldet_einen_gescheiterten_schritt(flow, monkeypatch):
+    """Scheitert beim normalen Veröffentlichen ein Abschluss-Schritt (#2460), nennt die Antwort ihn - die Leitung sieht
+    die Warnung mit „Abschluss nachholen“. Das Protokoll vermerkt es, und der Betrieb bekommt einen Alarm, falls das
+    Fenster schon zu ist. Der Statuswechsel selbst gilt."""
+    tournament, staff, _users, regs = await heats_cup(flow, 8)
+    await play_out(flow, tournament, [reg["id"] for reg in regs])
+    flow.act_as(staff)
+    done = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "completed"})
+    assert done.status_code == 200, done.text
+    assert "failed" not in done.json(), "nur das Veröffentlichen vergibt"
+    from services import season_service
+
+    async def broken(**kwargs):
+        raise RuntimeError("Jahreswertung kaputt")
+
+    monkeypatch.setattr(season_service, "sync_tournament_points", broken)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "results_published"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is True and body["failed"] == ["season_points"] and body["failed_labels"] == ["Jahreswertung"]
+    assert await flow.db.tournaments.find_one({"id": tournament["id"], "status": "results_published"})
+    audit = await flow.db.audit_logs.find_one({"target_id": tournament["id"], "action": "tournament.results.settle_failed"}, {"_id": 0})
+    assert audit and audit["data"]["failed"] == ["season_points"]
+    alerts = await settle_alerts(flow)
+    assert len(alerts) == 1 and tournament["id"] in alerts[0]["key"] and "Jahreswertung" in alerts[0]["description"]
+
+
+async def settle_alerts(flow, wanted: int = 1) -> list[dict]:
+    """Der Alarm läuft neben der Antwort (#2460, Review) - kurz warten, bis er im Alarm-Log steht."""
+    import asyncio
+
+    rows: list[dict] = []
+    for _ in range(100):
+        rows = await flow.db.ops_alert_log.find({"kind": "tournament_settle_failed"}, {"_id": 0}).to_list(10)
+        if len(rows) >= wanted:
+            break
+        await asyncio.sleep(0.02)
+    return rows
+
+
+@pytest.mark.asyncio
+async def test_der_alarm_haelt_die_antwort_nicht_auf(flow, monkeypatch):
+    """Discord und Mail des Alarms laufen neben der Antwort - ein langsamer Alarm hält das Veröffentlichen nicht auf."""
+    import asyncio
+    from services import ops_alerts, season_service
+
+    tournament, staff, _users, regs = await heats_cup(flow, 8)
+    await play_out(flow, tournament, [reg["id"] for reg in regs])
+    flow.act_as(staff)
+    done = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "completed"})
+    assert done.status_code == 200, done.text
+    release = asyncio.Event()
+    sent = []
+
+    async def slow_notify(db, kind, title, description="", fields=None, *, key=None, **kwargs):
+        await release.wait()
+        sent.append(kind)
+        return {"sent": True, "channels": []}
+
+    async def broken(**kwargs):
+        raise RuntimeError("Jahreswertung kaputt")
+
+    monkeypatch.setattr(season_service, "sync_tournament_points", broken)
+    monkeypatch.setattr(ops_alerts, "notify", slow_notify)
+    response = await asyncio.wait_for(
+        flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "results_published"}), timeout=10)
+    assert response.status_code == 200 and response.json()["failed"] == ["season_points"]
+    assert sent == [], "die Antwort kam, bevor der Alarm fertig war"
+    release.set()
+    for _ in range(100):
+        if sent:
+            break
+        await asyncio.sleep(0.02)
+    assert sent == ["tournament_settle_failed"]
+
+
+@pytest.mark.asyncio
+async def test_zweimal_veroeffentlichen_ergibt_einen_alarm(flow, monkeypatch):
+    """Korrektur und erneutes Veröffentlichen mit demselben Fehler: die Sperrfrist je Turnier hält es bei einem Alarm."""
+    from services import season_service
+
+    tournament, staff, _users, regs = await heats_cup(flow, 8)
+    await play_out(flow, tournament, [reg["id"] for reg in regs])
+    flow.act_as(staff)
+
+    async def broken(**kwargs):
+        raise RuntimeError("Jahreswertung kaputt")
+
+    monkeypatch.setattr(season_service, "sync_tournament_points", broken)
+    for status in ("completed", "results_published", "completed", "results_published"):
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": status})
+        assert response.status_code == 200, response.text
+        if status == "results_published":
+            await settle_alerts(flow)
+    assert response.json()["failed"] == ["season_points"]
+    assert len(await settle_alerts(flow, wanted=2)) == 1, "ein Alarm, nicht zwei"
+    assert await flow.db.audit_logs.count_documents({"target_id": tournament["id"], "action": "tournament.results.settle_failed"}) == 2
+
+
+@pytest.mark.asyncio
+async def test_veroeffentlichen_ohne_fehler_meldet_keinen_schritt(flow):
+    tournament, staff, _users, regs = await heats_cup(flow, 8)
+    await play_out(flow, tournament, [reg["id"] for reg in regs])
+    flow.act_as(staff)
+    for status in ("completed", "results_published"):
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": status})
+        assert response.status_code == 200, response.text
+    assert response.json()["failed"] == [] and response.json()["failed_labels"] == []
+    assert not await flow.db.audit_logs.find_one({"target_id": tournament["id"], "action": "tournament.results.settle_failed"})
+    assert not await flow.db.ops_alert_log.find_one({"kind": "tournament_settle_failed"})
+
+
+@pytest.mark.asyncio
 async def test_nachholen_ohne_platzierungen_kein_500_auszeichnungen_kommen_trotzdem(flow, monkeypatch):
     """Lassen sich die Platzierungen nicht berechnen, gibt es keinen Fehler 500: Jahreswertung und Erfolge der
     Platzierten bleiben unverändert und stehen als gescheitert in der Antwort, Auszeichnungen laufen trotzdem."""

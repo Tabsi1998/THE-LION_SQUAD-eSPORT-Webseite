@@ -109,7 +109,7 @@ export function idFieldKey(field) {
 
 // Was die Verwaltung pflegt; alles andere an einem Feld geht unverändert zurück (Codex-Prüfung #2249: Speichern ersetzt die
 // ganze Liste). Nur die Hilfsfelder der Oberfläche fallen weg.
-const ID_FIELD_OWN = ["key", "label", "help_text", "required", "pattern", "format_hint", "options", "unique_in_season"];
+const ID_FIELD_OWN = ["key", "label", "help_text", "required", "pattern", "format_hint", "options", "unique_in_season", "platform"];
 const ID_FIELD_UI = ["_new", "_keyTouched", "_restoredKey"];
 
 const blankNew = (field) => field?._new && !String(field.label || "").trim() && !String(field.key || "").trim();
@@ -129,6 +129,8 @@ export function normalizePlayerIdFields(fields = []) {
         ...(String(field.format_hint || "").trim() ? { format_hint: String(field.format_hint).trim() } : {}),
         ...(optionList(field.options).length ? { options: optionList(field.options) } : {}),
         ...(field.unique_in_season === false ? { unique_in_season: false } : {}),
+        // Plattform-Feld (#2281): höchstens eines je Spiel - nur der Haken geht mit, kein „false“.
+        ...(field.platform === true ? { platform: true } : {}),
         ...rest,
       };
     });

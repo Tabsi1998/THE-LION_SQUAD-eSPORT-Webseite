@@ -187,6 +187,38 @@ def _check_id_fields(fields: list | None, current: list | None = None) -> None:
         raise HTTPException(status_code=422, detail=problem)
 
 
+def _platform_field(game: dict | None) -> dict | None:
+    return next((item for item in (game or {}).get("player_id_fields") or [] if isinstance(item, dict) and item.get("platform") is True), None)
+
+
+async def _game_name(db, game: dict) -> str:
+    named = await db.games.find_one({"id": game.get("id")}, {"_id": 0, "name": 1}) or {}
+    return named.get("name") or game.get("slug") or "Spiel"
+
+
+async def _check_platform_source(db, game: dict) -> None:
+    """Plattform-Feld (#2281): höchstens eines je Spiel, auch über die ID-Quelle geerbt - in beide Richtungen. Kennzeichnet die
+    ID-Quelle schon ein Feld, darf das Spiel kein zweites eigenes kennzeichnen; kennzeichnet ein Hauptspiel eines, darf keine
+    erbende Version schon ein eigenes haben (Review). Sonst wüsste die Season nicht, welches gilt."""
+    if not _platform_field(game):
+        return
+    by_id = await game_id_keys.games_by_id(db)
+    if game.get("id"):
+        by_id = {**by_id, game["id"]: {**by_id.get(game["id"], {}), **game}}
+    source = game_id_keys.source_of(game, by_id)
+    inherited = _platform_field(source) if source and source.get("id") != game.get("id") else None
+    if inherited:
+        raise HTTPException(status_code=422, detail=(
+            f"Die Plattform steht schon im Feld „{inherited.get('label') or inherited.get('key')}“ der ID-Quelle "
+            f"„{await _game_name(db, source)}“ – hier geht kein zweites Plattform-Feld."))
+    for reader in game_id_keys.readers(game, by_id) if game.get("id") else []:
+        own = _platform_field(reader)
+        if own:
+            raise HTTPException(status_code=422, detail=(
+                f"Die Version „{await _game_name(db, reader)}“ nimmt ihre IDs von diesem Spiel und kennzeichnet schon ein eigenes "
+                f"Plattform-Feld („{own.get('label') or own.get('key')}“). Bitte dort zuerst den Haken „Plattform“ entfernen."))
+
+
 @router.post("")
 async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -205,6 +237,7 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
         if await game_usage.chosen_is_archived(db, chosen):
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     await _check_discord_guild(db, doc)
+    await _check_platform_source(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -301,6 +334,8 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     lost_keys = await _lost_id_keys(db, current, updates, confirmed)
     await _check_discord_guild(db, updates, current)
+    if any(key in updates for key in ID_SOURCE_FIELDS):
+        await _check_platform_source(db, {**current, **updates})
     status = updates.get("status")
     if status and status != (current.get("status") or "active"):
         updates["archived_at"] = now_utc().isoformat() if status == game_usage.ARCHIVED else None

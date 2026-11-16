@@ -4,6 +4,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Flag, MessageCircleWarning, Trophy } from "lucide-react";
 import { STAFF_ROLE_LABELS } from "@/lib/tournamentLabels";
+import { staffRolesSentence } from "@/lib/staffRoles";
 import { viennaDate, viennaTime } from "@/lib/vienna";
 
 const KIND = {
@@ -41,6 +42,10 @@ export function DutyList({ rows, testId = "duty-list" }) {
                 <span className="shrink-0 text-[10px] uppercase tracking-widest text-white/40">{kind.label}</span>
               </div>
               {roles && <div className="mt-1 text-sm text-white/60" data-testid={`duty-roles-${row.id}`}>Deine Rolle: {roles}</div>}
+              {/* Was die Rollen dürfen (#1384) - derselbe Satz wie in der Verwaltung und in der Nachricht. */}
+              {row.kind === "tournament" && staffRolesSentence(row.roles) ? (
+                <div className="mt-0.5 text-xs text-white/45" data-testid={`duty-rights-${row.id}`}>{staffRolesSentence(row.roles)}</div>
+              ) : null}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3 md:mt-0 md:shrink-0">
               <Link to={row.url} data-testid={`duty-open-${row.id}`} className="tls-btn tls-btn--primary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider md:w-auto">

@@ -18,6 +18,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
+from services.log_safe import log_safe
 from services.ops_upload_routes import DEFAULT_UPLOAD_ROUTES, clean_upload_routes
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ ALERT_KINDS = {
     "dolibarr_sync_failed": {"label": "Dolibarr-Abgleich rot", "hint": "Der Abgleich mit der Mitgliederverwaltung ist fehlgeschlagen (nicht erreichbar, Schlüssel, Antwort)."},
     "discord_bot_offline": {"label": "Discord-Bot offline", "hint": "Der Bot ist eingeschaltet, kommt aber nicht mehr auf den Server (Token, Intent, Netz)."},
     "client_log_critical": {"label": "App: kritischer Fehler", "hint": "Die LionsAPP hat einen kritischen Fehler gemeldet (Absturz, Login, Push)."},
+    "tournament_settle_failed": {"label": "Turnierabschluss unvollständig", "hint": "Beim Veröffentlichen der Ergebnisse ist ein Schritt gescheitert (Jahreswertung, Auszeichnungen, Erfolge oder Gewinne) - beim Turnier „Abschluss nachholen“ tippen."},
 }
 
 DEFAULT_RULES = {kind: {"discord": True, "email": False} for kind in ALERT_KINDS}
@@ -277,7 +279,7 @@ async def notify(db, kind: str, title: str, description: str = "", fields: list[
             set_up = set_up or outcome.get("reason") not in DISCORD_NOT_SET_UP
         except Exception:  # noqa: BLE001 - ein Alarm darf nichts abbrechen
             set_up = True
-            logger.warning("[ops] Discord-Alarm %s fehlgeschlagen", alert_key, exc_info=True)
+            logger.warning("[ops] Discord-Alarm %s fehlgeschlagen", log_safe(alert_key), exc_info=True)
     if rule.get("email") and settings["emails"] and (spec is None or spec.get("email_allowed") is not False):
         set_up = True
         try:
@@ -288,7 +290,7 @@ async def notify(db, kind: str, title: str, description: str = "", fields: list[
                                    meta={"kind": kind, "key": alert_key})
             channels.append("email")
         except Exception:  # noqa: BLE001
-            logger.warning("[ops] E-Mail-Alarm %s fehlgeschlagen", alert_key, exc_info=True)
+            logger.warning("[ops] E-Mail-Alarm %s fehlgeschlagen", log_safe(alert_key), exc_info=True)
     reason = None if channels else ("failed" if set_up else "undeliverable")
     if reason == "failed":
         await alert_failed(db, claim)
