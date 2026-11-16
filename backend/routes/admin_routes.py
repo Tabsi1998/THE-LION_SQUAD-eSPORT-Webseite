@@ -945,6 +945,8 @@ async def mobile_push_status_for_user(user_id: str, me: dict = Depends(require_c
     for token in tokens:
         token["token_preview"] = _token_preview(token.get("token"))
         token.pop("token", None)
+        # Die Installations-Kennung (#2467) ist so vertraulich wie der Token; die Verwaltung braucht sie nicht.
+        token.pop("installation_id", None)
     return {
         "user": user,
         "tokens": tokens,
