@@ -76,7 +76,9 @@ check_frontend_route() {
 # 1. Git update (if this is a git checkout)
 if [ -d .git ] && [ "${SKIP_GIT_UPDATE:-false}" != "true" ]; then
   TARGET_BRANCH="${DEPLOY_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
-  [ -n "$TARGET_BRANCH" ] && [ "$TARGET_BRANCH" != "HEAD" ] || fail "Cannot determine git branch. Set DEPLOY_BRANCH=<branch>."
+  if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "HEAD" ]; then
+    fail "Cannot determine git branch. Set DEPLOY_BRANCH=<branch>."
+  fi
 
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     if [ -n "$(git status --porcelain --untracked-files=no -- docker-compose.yml)" ]; then
