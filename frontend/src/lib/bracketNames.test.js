@@ -95,4 +95,6 @@ test("sectionRoundLabel: Abschnitt wie die Überschrift im Baum, außer der Name
   expect(sectionRoundLabel({ section: "WB", round: 2, round_label: "Halbfinale" })).toBe("Winner Bracket · Halbfinale");
   expect(sectionRoundLabel({ section: "LB", round: 3, round_name: "Runde 2" })).toBe("Loser Bracket · Runde 2");
   expect(sectionRoundLabel({ round: 1 })).toBe("Runde 1");
+  expect(sectionRoundLabel({ section: "FINAL", round: 6, round_label: "Grand Final" })).toBe("Grand Final");
+  expect(sectionRoundLabel({ section: "BRONZE", round: 3, round_label: "Spiel um Platz 3" })).toBe("Spiel um Platz 3");
 });

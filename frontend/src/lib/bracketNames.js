@@ -50,10 +50,12 @@ export function roundName(match, number = match?.round) {
 
 /** Abschnitt und Rundenname in einer Zeile - Listen der Verwaltung (#1947: Rundensponsoren, Ablaufplan). Der Name ist
  * der aus dem Baum (`roundName`, das Spiel vorher durch `displayRoundLabels`); der Abschnitt steht davor wie die
- * Überschrift im Baum, außer der Name nennt ihn schon („Loser Runde 1“, „Grand Final“). */
+ * Überschrift im Baum, außer der Name nennt ihn schon („Loser Runde 1“) oder der Abschnitt ist ein Finale oder das
+ * Spiel um Platz 3 - dort ist der Rundenname die ganze Auskunft („Grand Final“). */
 export function sectionRoundLabel(match) {
   const name = roundName(match);
-  const section = match?.section ? formatBracketSection(match.section) : "";
+  const kind = sectionKind(match?.section);
+  const section = match?.section && kind !== "grand_final" && kind !== "bronze" ? formatBracketSection(match.section) : "";
   const side = section.toLowerCase().split(" ")[0];
   return [section && !name.toLowerCase().includes(side) ? section : "", name].filter(Boolean).join(" · ");
 }
