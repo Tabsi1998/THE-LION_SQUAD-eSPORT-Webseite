@@ -83,7 +83,7 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
     {
         "id": "austritt",
         "frage": "Wie trete ich aus dem Verein aus?",
-        "antwort": "Unter Meine Mitgliedschaft erklärst du den Austritt. Die Erklärung geht an den Vorstand. Bis er die Mitgliedschaft beendet, kannst du sie zurücknehmen.",
+        "antwort": "Unter Meine Mitgliedschaft tippst du auf Austritt erklären, auf Wunsch mit Wunschtermin. Wann die Mitgliedschaft endet, ergibt sich aus der Regel des Vereins. Zurücknehmen geht nur, solange der Austritt nicht fest eingetragen ist.",
         "bereich": "verein-mitgliedschaft",
         "rollen": ["mitglied"],
         "sichtbar_fuer": "mitglied",
