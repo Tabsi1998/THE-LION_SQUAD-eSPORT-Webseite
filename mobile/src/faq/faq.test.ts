@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import {
   BEREICHE, FRAGEN, OHNE_ZUGANG, THEMEN, alleFragen, bereichInhalt, darfSehen, faqBereichsliste, faqZugangAus, haeufigeFragen,
   hilfeNormal, sichtbareRollen, sucheFaq, type FaqFrage,
@@ -21,6 +22,15 @@ const LEITUNG_FRAGE: FaqFrage = {
   bereich: "turnierleitung", rollen: ["turnierleitung"], sichtbar_fuer: "turnierleitung",
 };
 const MITGLIED = { ...OHNE_ZUGANG, angemeldet: true, mitglied: true };
+const SRC = path.resolve(__dirname, "..");
+
+function quelle(datei: string) {
+  return fs.readFileSync(path.join(SRC, datei), "utf8");
+}
+
+function antwortVon(id: string) {
+  return APP_FRAGEN.find((frage) => frage.id === id)?.antwort || "";
+}
 
 describe("Kopie aus dem Web", () => {
   test("die gebündelte Datei passt zu frontend/src/hilfe (Bereiche, Fragen, Anleitungen)", () => {
@@ -49,6 +59,12 @@ describe("Bereich LionsAPP", () => {
     for (const frage of APP_FRAGEN) expect([frage.id, frage.bereich]).toEqual([frage.id, "lionsapp"]);
     // Die Themen aus dem Auftrag: Push und Benachrichtigungen, Aufruf-Ton, Anmelden und Biometrie, ohne Netz, Updates.
     expect(APP_FRAGEN.map((frage) => frage.id)).toEqual(expect.arrayContaining(["app-push-stufen", "app-ruhezeit", "app-kanaele", "app-aufruf-ton", "app-passkey", "app-sperre", "app-offline", "app-aktualisieren"]));
+  });
+
+  test("ohne Netz: die Leiste sagt „zum Aktualisieren ziehen“ - die App lädt nicht von selbst neu", () => {
+    expect(quelle("components/ListState.tsx")).toContain("zum Aktualisieren ziehen");
+    expect(antwortVon("app-offline")).toContain("Zum Neuladen ziehst du die Seite nach unten.");
+    expect(antwortVon("app-offline")).not.toMatch(/von selbst neu/);
   });
 
   test("Links der App-Fragen öffnen einen Screen der App", () => {

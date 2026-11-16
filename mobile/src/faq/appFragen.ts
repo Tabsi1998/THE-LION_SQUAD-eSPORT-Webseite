@@ -72,7 +72,7 @@ export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-offline",
     frage: "Was zeigt die App ohne Netz?",
-    antwort: "Was du zuletzt geöffnet hast, solange die App offen bleibt: bis zu einen Tag alt, Spielstände bis zu einer Stunde. Oben steht dann Offline mit der Uhrzeit des Stands. Deine Mitgliedskarte bleibt auch ohne Netz da. Kommt das Netz zurück, lädt die App von selbst neu.",
+    antwort: "Was du zuletzt geöffnet hast, solange die App offen bleibt: bis zu einen Tag alt, Spielstände bis zu einer Stunde. Oben steht dann Offline mit der Uhrzeit des Stands. Deine Mitgliedskarte bleibt auch ohne Netz da. Kommt das Netz zurück, verschwindet die Leiste. Zum Neuladen ziehst du die Seite nach unten.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle",
   },
   {
