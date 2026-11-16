@@ -161,8 +161,13 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   Wer die Chats leise stellt, verpasst den Spielaufruf nicht.
 - **Browser** (#1163): dieselben Meldungen wie Push, aber im Browser – am PC und im Handy-Browser, auch bei geschlossener
   Website. Am iPhone geht das nur mit der Website auf dem Home-Bildschirm (Safari → Teilen → „Zum Home-Bildschirm“). Gefragt
-  wird nie beim ersten Besuch, sondern nach der ersten Turnier- oder Event-Anmeldung, einmal je Browser; „Nicht jetzt“ merkt
-  sich die Seite. Ein Tipp auf die Meldung öffnet die passende Seite (ein offener Tab mit dieser Seite wird nach vorn geholt),
+  wird nie beim ersten Besuch und nie direkt nach dem Anmelden, sondern nach einer Turnier- oder Event-Anmeldung (#1208): Zuerst
+  erscheint unten der Kasten **„Sollen wir dich rufen, wenn du dran bist?“** mit drei Zeilen – Aufruf, Check-in, Ergebnis.
+  Erst **Ja, rufen** ruft die Frage des Browsers auf. **Später** schließt ihn; gefragt wird frühestens bei der nächsten
+  Anmeldung wieder. Wurde das eigene Team angemeldet, kommt der Kasten beim nächsten Öffnen der Übersicht (Dashboard). Gemerkt
+  wird das je Konto im Browser, nicht am Server. Hat der Browser abgelehnt, fragt die Seite nicht mehr; auf Turnier- und
+  Event-Seiten steht dann leise **„Aufrufe sind aus – einschalten“**, der Link führt zu Einstellungen → Benachrichtigungen
+  (dort unter **Dieser Browser**, wie man es im Browser wieder erlaubt). Ein Tipp auf die Meldung öffnet die passende Seite (ein offener Tab mit dieser Seite wird nach vorn geholt),
   beim Check-in gibt es den Knopf **Jetzt einchecken**. Abmelden vom Konto, Passwort ändern und „Überall abmelden“ melden den
   Browser ab; Meldungen kommen, solange die Anmeldung auf der Website in diesem Browser gilt. Einrichten muss es der
   Betreiber einmal mit zwei Schlüsseln in der Server-Konfiguration ([Betrieb](../BETRIEB.md)); ohne sie gibt es den Kanal nicht.
