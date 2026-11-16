@@ -93,7 +93,11 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
   // nichts zu feiern, geht es gleich zum nächsten Paket - der Aufräum-Schritt läuft trotzdem.
   function refine(id, patch = {}) {
     if (!state.current || state.current.id !== id) return state.current;
-    state.current = { ...state.current, ...(patch || {}), checked: true };
+    // Nur was die Prüfung kennt: Stufen und Level-up - Kennung, Kontext und Aufräum-Schritt bleiben.
+    const next = { ...state.current, checked: true };
+    if (Array.isArray(patch?.tiers)) next.tiers = patch.tiers;
+    if (patch && "levelUp" in patch) next.levelUp = patch.levelUp || null;
+    state.current = next;
     if (!planCeremony(state.current)) return advance();
     emit();
     return state.current;

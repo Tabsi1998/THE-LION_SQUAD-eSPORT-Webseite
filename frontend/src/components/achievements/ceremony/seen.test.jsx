@@ -208,4 +208,13 @@ describe("Warteschlange: Level-up neben Belohnung und Sieger-Moment", () => {
     });
   }
 
+  it("die Prüfung vor dem Anzeigen ändert nur Stufen und Level-up", () => {
+    const queue = createCeremonyQueue({ now: () => 1 });
+    const onDone = vi.fn();
+    queue.enqueue({ id: "pkg", tiers: [tier("a")], onDone, check: () => null });
+    queue.refine("pkg", { tiers: [tier("a")], levelUp: null, onDone: null, id: "fremd", context: { recount: true } });
+    expect(queue.getCurrent()).toMatchObject({ id: "pkg", checked: true, context: {} });
+    queue.advance();
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
 });
