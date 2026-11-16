@@ -3,14 +3,19 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { CeremonyHost } from "../achievements/ceremony/CeremonyHost";
 import { enqueueCeremony, enqueueLevelUp } from "../achievements/ceremony/queue";
-import { type LevelState, describePackage } from "../achievements/ceremony/select";
-import { type AchievementGroup, freshTiers, onAchievementUnlocked, onLevelChanged } from "../lib/achievements";
+import { type LevelState, describePackage, levelUpFrom } from "../achievements/ceremony/select";
+import { achSeenKey as seenKey, ceremonyState, levelSeenKey as levelKey, markSeen, serverCheck } from "../achievements/ceremony/seen";
+import { type AchievementGroup, type AchievementTier, freshTiers, onAchievementUnlocked, onLevelChanged } from "../lib/achievements";
 import { api } from "../lib/api";
 import { claimLevelUp } from "../lib/levelSeen";
 
-// SecureStore keys must be alphanumeric + ".-_"; hash the user id into a safe key.
-const seenKey = (id: string) => `tls_ach_seen_${id.replace(/[^a-zA-Z0-9._-]/g, "")}`;
-const levelKey = (id: string) => `tls_level_seen_${id.replace(/[^a-zA-Z0-9._-]/g, "")}`;
+const MAX_TIERS = 8;
+const CATCH_UP = { catchUp: true, heading: "Während du weg warst!", sub: "Nachgeholte Erfolge" };
+
+/** Erreichte, nicht stille Stufen aus /achievements/me - die neueste zuerst, ohne Negatives und Nachgerechnetes. */
+function earnedTiers(groups: AchievementGroup[]): AchievementTier[] {
+  return freshTiers(groups, "1970-01-01T00:00:00Z", 10000).filter((tier) => !(tier as { recount?: boolean }).recount);
+}
 
 /**
  * Der Freischalt-Moment (#218, Erfolge II E13 #623). Beim Start holt er nach, was seit dem letzten Blick dazukam
@@ -18,6 +23,10 @@ const levelKey = (id: string) => `tls_level_seen_${id.replace(/[^a-zA-Z0-9._-]/g
  * dann erscheint die Zeremonie gleich. Gezeigt wird über die Warteschlange (nie zwei zugleich, Level-up am Ende);
  * der Marker rückt erst vor, wenn die Zeremonie wirklich gezeigt wurde. Level-Aufstiege wie im Web: der Stand aus
  * /users/me/level gegen den zuletzt gesehenen je Konto.
+ *
+ * Einmal je Konto (#2450): Was schon gesehen ist, weiß der Server - nachgeholt wird, was dort noch offen ist, jedes
+ * Schließen (X, Tipp daneben, Zurück-Taste, Ablauf zu Ende) meldet „gesehen“, und vor dem Anzeigen prüft die Bühne
+ * noch einmal (CeremonyHost). Ohne Stand vom Server (ältere Fassung) gilt wie bisher der Merker im Gerät.
  */
 export function AchievementCatchUpOverlay() {
   const { user } = useAuth();
@@ -30,6 +39,8 @@ export function AchievementCatchUpOverlay() {
   useEffect(() => {
     currentRef.current = userId;
   }, [userId]);
+  // Der Aufstieg, der gerade in der Warteschlange steht - eine zweite Prüfung reiht ihn nicht noch einmal ein.
+  const queuedLevelRef = useRef<string | null>(null);
 
   const remember = useCallback((key: string) => {
     SecureStore.setItemAsync(key, new Date().toISOString()).catch(() => {});
@@ -43,9 +54,31 @@ export function AchievementCatchUpOverlay() {
       const { data } = await api.get<{ level?: number; title?: string; prestige?: number }>("/users/me/level");
       if (!sameUser()) return;
       const next: LevelState = { level: Number(data?.level || 1), title: String(data?.title || ""), prestige: Number(data?.prestige || 0) };
-      // Lesen, vergleichen und merken unter einer Sperre: zwei gleichzeitige Prüfungen zeigen denselben Aufstieg nur einmal.
-      const levelUp = await claimLevelUp(levelKey(forUser), next, sameUser);
-      if (levelUp && sameUser()) enqueueLevelUp(levelUp);
+      const state = await ceremonyState(forUser);
+      if (!sameUser()) return;
+      if (!state) {
+        // Rückfall ohne Server-Stand: lesen, vergleichen und merken unter einer Sperre - zwei gleichzeitige Prüfungen
+        // zeigen denselben Aufstieg nur einmal.
+        const levelUp = await claimLevelUp(levelKey(forUser), next, sameUser);
+        if (levelUp && sameUser()) enqueueLevelUp(levelUp);
+        return;
+      }
+      const levelUp = levelUpFrom(state.level, next);
+      if (!levelUp) {
+        await SecureStore.setItemAsync(levelKey(forUser), JSON.stringify(next)).catch(() => {});
+        return;
+      }
+      const target = `${forUser}:${next.prestige}:${next.level}`;
+      if (queuedLevelRef.current === target) return;
+      queuedLevelRef.current = target;
+      enqueueLevelUp(levelUp, {
+        onDone: () => {
+          if (queuedLevelRef.current === target) queuedLevelRef.current = null;
+          SecureStore.setItemAsync(levelKey(forUser), JSON.stringify(next)).catch(() => {});
+          markSeen(forUser, { level: next });
+        },
+        check: serverCheck(forUser),
+      });
     } catch {
       /* rein kosmetisch */
     }
@@ -56,6 +89,29 @@ export function AchievementCatchUpOverlay() {
     try {
       const { data } = await api.get<{ groups?: AchievementGroup[] }>("/achievements/me");
       const key = seenKey(userId);
+      const state = await ceremonyState(userId);
+      if (state) {
+        // Der Stand vom Server: offen ist, was dort noch nicht gesehen ist - der Merker im Gerät zählt nicht mehr.
+        const groups = data?.groups || [];
+        const unseen = new Set(state.unseen);
+        const open = earnedTiers(groups).filter((tier) => unseen.has(tier.code) && !shownRef.current.has(tier.code));
+        if (!open.length) {
+          if (!fromLive) await SecureStore.setItemAsync(key, new Date().toISOString());
+          return;
+        }
+        open.forEach((tier) => shownRef.current.add(tier.code));
+        const fresh = open.slice(0, MAX_TIERS);
+        const codes = open.map((tier) => tier.code);
+        const context = { ...describePackage(groups, fresh), ...(fromLive ? {} : CATCH_UP) };
+        enqueueCeremony(fresh, context, {
+          onDone: () => {
+            remember(key);
+            markSeen(userId, { codes });
+          },
+          check: serverCheck(userId),
+        });
+        return;
+      }
       const last = await SecureStore.getItemAsync(key);
       if (!last) {
         await SecureStore.setItemAsync(key, new Date().toISOString());
@@ -68,7 +124,7 @@ export function AchievementCatchUpOverlay() {
         return;
       }
       fresh.forEach((tier) => shownRef.current.add(tier.code));
-      const context = { ...describePackage(groups, fresh), ...(fromLive ? {} : { catchUp: true, heading: "Während du weg warst!", sub: "Nachgeholte Erfolge" }) };
+      const context = { ...describePackage(groups, fresh), ...(fromLive ? {} : CATCH_UP) };
       enqueueCeremony(fresh, context, { onDone: () => remember(key) });
     } catch {
       /* rein kosmetisch */

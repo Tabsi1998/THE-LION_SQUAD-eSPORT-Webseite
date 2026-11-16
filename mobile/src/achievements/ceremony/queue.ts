@@ -7,8 +7,27 @@ import { type CeremonyContext, type CeremonyPackage, type CeremonyTier, type Lev
 
 export const BUNDLE_WINDOW_MS = 1500;
 
-export type QueueEntry = { id: string; tiers: CeremonyTier[]; context: CeremonyContext; levelUp: LevelUp | null; onDone?: ((entry: QueueEntry) => void) | null };
-type EnqueueInput = CeremonyPackage & { onDone?: ((entry: QueueEntry) => void) | null };
+/** Die Prüfung vor dem Anzeigen (#2450): gibt die Stufen und das Level-up zurück, die noch zu feiern sind - oder null (alles bleibt). */
+export type CeremonyCheck = (entry: QueueEntry) => Promise<{ tiers?: CeremonyTier[]; levelUp?: LevelUp | null } | null>;
+export type QueueEntry = {
+  id: string;
+  tiers: CeremonyTier[];
+  context: CeremonyContext;
+  levelUp: LevelUp | null;
+  onDone?: ((entry: QueueEntry) => void) | null;
+  check?: CeremonyCheck | null;
+  checked?: boolean;
+};
+type EnqueueInput = CeremonyPackage & { onDone?: ((entry: QueueEntry) => void) | null; check?: CeremonyCheck | null };
+
+// Zwei Pakete werden eins: beide Aufräum-Schritte laufen (z. B. „gesehen“ für beide, #2450) - keiner geht verloren.
+function chain(first?: ((entry: QueueEntry) => void) | null, second?: ((entry: QueueEntry) => void) | null) {
+  if (!first) return second || null;
+  if (!second) return first;
+  return (entry: QueueEntry) => {
+    try { first(entry); } finally { second(entry); }
+  };
+}
 
 export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_WINDOW_MS }: { now?: () => number; bundleMs?: number } = {}) {
   const listeners = new Set<() => void>();
@@ -28,6 +47,8 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     }
     target.context = { ...target.context, ...(pkg.context || {}) };
     if (pkg.levelUp) target.levelUp = pkg.levelUp;
+    target.onDone = chain(target.onDone, pkg.onDone);
+    target.check = target.check || pkg.check || null;
     return target;
   }
 
@@ -60,18 +81,28 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
       entry = mergeInto(last, pkg);
     } else if (!last && state.current && pkg.levelUp && !(pkg.tiers || []).length) {
       // Ein Level-up während einer laufenden Zeremonie wird Teil davon (am Ende gezeigt).
-      state.current = { ...state.current, levelUp: pkg.levelUp };
+      state.current = { ...state.current, levelUp: pkg.levelUp, onDone: chain(state.current.onDone, pkg.onDone) };
       state.lastEnqueueAt = stamp;
       emit();
       return state.current;
     } else {
-      entry = { id: pkg.id || `pkg-${stamp}-${Math.random().toString(36).slice(2, 7)}`, tiers: [...(pkg.tiers || [])], context: { ...(pkg.context || {}) }, levelUp: pkg.levelUp || null, onDone: pkg.onDone || null };
+      entry = { id: pkg.id || `pkg-${stamp}-${Math.random().toString(36).slice(2, 7)}`, tiers: [...(pkg.tiers || [])], context: { ...(pkg.context || {}) }, levelUp: pkg.levelUp || null, onDone: pkg.onDone || null, check: pkg.check || null, checked: false };
       state.pending.push(entry);
     }
     state.lastEnqueueAt = stamp;
     if (!state.current) advance();
     else emit();
     return entry;
+  }
+
+  // Die Prüfung vor dem Anzeigen (#2450) ist durch: was andere Geräte schon gesehen haben, ist herausgenommen. Bleibt
+  // nichts zu feiern, geht es gleich zum nächsten Paket - der Aufräum-Schritt läuft trotzdem.
+  function refine(id: string, patch: { tiers?: CeremonyTier[]; levelUp?: LevelUp | null } = {}): QueueEntry | null {
+    if (!state.current || state.current.id !== id) return state.current;
+    state.current = { ...state.current, ...(patch || {}), checked: true };
+    if (!planCeremony(state.current)) return advance();
+    emit();
+    return state.current;
   }
 
   function clear() {
@@ -83,6 +114,7 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
   return {
     enqueue,
     advance,
+    refine,
     clear,
     getCurrent: () => state.current,
     getPendingCount: () => state.pending.length,
