@@ -12,6 +12,14 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.12
+
+Neu in 1.7.12:
+• Turnier-Cockpit für die Turnierleitung vor Ort: Probleme auf einen Blick, Stationen aufrufen, starten, freigeben und Defekt melden
+• Spielzeit-Uhr mit Balken: orange, wenn es knapp wird, steht in der Turnierpause
+• Hinweis der Turnierleitung als Banner auf Turnier- und Event-Seite, die Leitung schreibt ihn direkt in der App
+• Ein Hinweis an das ganze Event öffnet die Event-Seite
+
 ## 1.7.11
 
 Neu in 1.7.11:
