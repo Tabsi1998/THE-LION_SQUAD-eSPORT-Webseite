@@ -162,6 +162,10 @@ async def _store(db, match: dict, incidents: list[dict], *, user_ids=()) -> dict
     written = await db.matches_v2.update_one({"id": match["id"], "incidents": match.get("incidents")}, change)
     if not written.matched_count:
         raise IncidentProblem(CHANGED_DETAIL, 409)
+    # „in Klärung“ am Bracket hängt an den Vorfällen: das Discord-Bracket sofort vormerken, auch nach dem Endstand (#2375).
+    from services import discord_bracket_state
+
+    discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
     return {**match, "incidents": incidents, "incident_due_at": due_at(incidents)}
 
 
@@ -479,7 +483,7 @@ async def settle_by_result(db, match_id: str, actor_id: str | None) -> int:
 
 async def unsettle_by_result(db, match_id: str) -> int:
     """„Rückgängig“ nimmt ein eingetragenes Ergebnis zurück - und mit ihm die Feststellung, die nur aus diesem Ergebnis kam."""
-    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0, "id": 1, "incidents": 1})
+    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0, "id": 1, "tournament_id": 1, "incidents": 1})
     rows = incidents_of(match)
 
     def by_result(row: dict) -> bool:

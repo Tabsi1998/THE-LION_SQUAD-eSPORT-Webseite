@@ -178,6 +178,14 @@ async def _save_row(db, match: dict, row: dict, extra: dict | None = None) -> di
     return await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) or match
 
 
+def bracket_changed(match: dict) -> None:
+    """``contested`` oder der Stand des Spiels hat sich geändert: das Discord-Bracket sofort vormerken (#2375), auch wenn es schon
+    auf dem Endstand steht. Ein Turnier mit ``discord_skip`` (jede Liga-Staffel) postet trotzdem nichts - das prüft das Bracket."""
+    from services import discord_bracket_state
+
+    discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
+
+
 def _settle(match: dict, changed: dict) -> dict:
     """Was am Spiel nach Zurückziehen oder Entscheidung gilt: ``contested`` neu, und ohne haltenden Eintrag der Stand von vorher."""
     disputes = [changed if (is_procedure(row) and row["id"] == changed["id"]) else row
@@ -314,6 +322,7 @@ async def submit(db, match: dict, league: League, *, user: dict, registration_id
     await db.matches_v2.update_one({"id": match["id"]}, {"$push": {"disputes": entry}, "$set": change})
     await audit(db, "match.procedure.open", match, user["id"], entry, reason_key=key, reason_length=len(text),
                 **({"incident_id": incident} if incident else {}))
+    bracket_changed(match)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) or match
     from services import league_procedure_notify as notify
     await notify.opened(db, updated, league, entry)
@@ -358,6 +367,7 @@ async def submit_appeal(db, match: dict, league: League, *, user: dict, registra
     await db.matches_v2.update_one({"id": match["id"]}, {
         "$push": {"disputes": entry}, "$set": {"contested": True, "updated_at": now.isoformat()}})
     await audit(db, "match.procedure.open", match, user["id"], entry, against=against_type, reason_length=len(text))
+    bracket_changed(match)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) or match
     from services import league_procedure_notify as notify
     await notify.opened(db, updated, league, entry)
@@ -420,6 +430,7 @@ async def withdraw(db, match: dict, league: League, procedure_id: str, *, user: 
     now = now_utc().isoformat()
     row.update({"state": WITHDRAWN, "withdrawn_at": now, "withdrawn_by": user["id"]})
     updated = await _save_row(db, match, row, _settle(match, row))
+    bracket_changed(match)
     await audit(db, "match.procedure.withdraw", match, user["id"], row, reason_key=row.get("reason_key"))
     from services import league_procedure_notify as notify
     await notify.withdrawn(db, updated, league, row)
@@ -574,6 +585,7 @@ async def decide_keep(db, match: dict, league: League, procedure_id: str, *, use
     row = _decided(row, league, actor_id=user["id"], now=now, decision="keep", note=text)
     extra = _settle(match, row)
     updated = await _save_row(db, match, row, {**extra, "dispute_resolved_at": now.isoformat(), "dispute_resolved_by": user["id"]})
+    bracket_changed(match)
     await audit(db, "match.procedure.decide", match, user["id"], row, decision="keep", note_length=len(text),
                 **({"status": extra["status"]} if "status" in extra else {}))
     from services import league_procedure_notify as notify
@@ -655,6 +667,7 @@ async def close_on_result(db, match: dict, *, actor_id: str, now_iso: str, decis
         # Der Zeit-Job und der MOSS-Upload schreiben nur auf dem Stand, den sie gelesen haben (``_save_row``): Mit dem neuen
         # ``updated_at`` überschreibt ein älterer Schnappschuss diese Entscheidung nicht.
         "updated_at": now_utc().isoformat()}})
+    bracket_changed(match)
     for row in closed:
         await audit(db, "match.procedure.decide", match, actor_id, row, decision=decision, via="result")
     if closed and league is not None:
