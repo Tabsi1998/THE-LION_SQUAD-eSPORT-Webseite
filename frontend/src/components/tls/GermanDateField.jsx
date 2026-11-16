@@ -87,6 +87,9 @@ export function GermanDateField({
     if (!step || !day) return;
     event.preventDefault();
     const next = new Date(view.year, view.month, day + step);
+    // Ohne Zukunft bleibt der Fokus stehen, statt in einen gesperrten Tag (oder Monat) zu springen und verloren zu gehen.
+    const nextIso = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+    if (!allowFuture && nextIso > todayIso) return;
     if (next.getFullYear() === view.year && next.getMonth() === view.month) {
       focusDay(next.getDate());
       return;

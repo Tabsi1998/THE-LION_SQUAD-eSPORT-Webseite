@@ -83,3 +83,28 @@ test("Escape schließt den Kalender und gibt den Fokus an den Auslöser zurück"
   expect(screen.queryByTestId("dob-month")).toBeNull();
   expect(trigger).toHaveFocus();
 });
+
+// Fix-Runde #2412: ohne Zukunft (allowFuture aus) führt ein Pfeil nicht in einen gesperrten Tag - auch nicht über den
+// Monatsrand. Der Fokus bleibt auf dem Tag stehen, statt auf den body zu fallen (im Blatt hätte Escape sonst das Blatt
+// geschlossen).
+test("Pfeil in einen gesperrten Folgemonat: der Fokus bleibt auf dem Tag", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 30, 12, 0, 0));
+  try {
+    const user = userEvent.setup();
+    render(<Field value="2026-11-28" allowFuture={false} />);
+    screen.getByTestId("dob").focus();
+    await user.keyboard("{Enter}");
+    const day28 = await screen.findByTestId("dob-day-28");
+    expect(day28).toHaveFocus();
+
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByTestId("dob-month")).toHaveValue("10");
+    expect(screen.getByTestId("dob-day-28")).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}{ArrowRight}{ArrowRight}");
+    expect(screen.getByTestId("dob-day-30")).toHaveFocus();
+  } finally {
+    vi.useRealTimers();
+  }
+});
