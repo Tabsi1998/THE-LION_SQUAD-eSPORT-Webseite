@@ -251,7 +251,7 @@ export default function AdminOpsPage() {
                   ref={(node) => { if (node) node.indeterminate = picked.length > 0 && picked.length < openErrors.length; }}
                   onChange={(event) => setPicked(event.target.checked ? openErrors.map((row) => row.fingerprint) : [])}
                   data-testid="ops-errors-pick-all"
-                  className="h-5 w-5 accent-[#00FF88]"
+                  className="h-5 w-5 accent-ok"
                 />
                 {picked.length ? `${picked.length} ausgewählt` : "Alle offenen auswählen"}
               </label>
@@ -260,7 +260,7 @@ export default function AdminOpsPage() {
                 onClick={resolvePicked}
                 disabled={!picked.length || resolvingMany}
                 data-testid="ops-errors-resolve-picked"
-                className="ml-auto inline-flex min-h-[44px] items-center gap-2 border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] px-3 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40"
+                className="ml-auto inline-flex min-h-[44px] items-center gap-2 border border-ok/40 bg-ok/10 text-ok px-3 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40"
               >
                 <CheckCircle2 className="w-4 h-4" /> {resolvingMany ? "Markiere …" : "Ausgewählte als gelöst"}
               </button>
@@ -268,7 +268,7 @@ export default function AdminOpsPage() {
           ) : null}
           {!loading && !errors.length ? (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-6 text-center text-white/50 flex items-center justify-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-[#00FF88]" /> {status === "open" ? "Alles erledigt – keine Fehlergruppe offen." : "Keine Fehlergruppen in dieser Auswahl."}
+              <CheckCircle2 className="w-5 h-5 text-ok" /> {status === "open" ? "Alles erledigt – keine Fehlergruppe offen." : "Keine Fehlergruppen in dieser Auswahl."}
             </div>
           ) : null}
           {errors.map((row) => {
@@ -276,13 +276,13 @@ export default function AdminOpsPage() {
             const resolved = Boolean(row.resolved_at);
             const isPicked = picked.includes(row.fingerprint);
             return (
-              <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : isPicked ? "border-[#00FF88]/40" : "border-[#FF3B30]/30"}`} data-testid={`ops-error-${row.fingerprint}`}>
+              <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : isPicked ? "border-ok/40" : "border-[#FF3B30]/30"}`} data-testid={`ops-error-${row.fingerprint}`}>
                 <div className="flex flex-col md:flex-row md:items-stretch">
                   <div className="flex flex-1 min-w-0 items-start">
                     {!resolved ? (
                       <label className="flex min-h-[44px] min-w-[44px] shrink-0 items-start justify-center pt-4 pl-2 cursor-pointer" title="Auswählen">
                         <input type="checkbox" checked={isPicked} onChange={() => togglePicked(row.fingerprint)} aria-label={`${row.error_type} auf ${row.route} auswählen`}
-                          data-testid={`ops-error-pick-${row.fingerprint}`} className="h-5 w-5 accent-[#00FF88]" />
+                          data-testid={`ops-error-pick-${row.fingerprint}`} className="h-5 w-5 accent-ok" />
                       </label>
                     ) : null}
                     <button
@@ -317,7 +317,7 @@ export default function AdminOpsPage() {
                       </button>
                     ) : (
                       <button type="button" onClick={() => setResolved(row, true)} data-testid={`ops-error-resolve-${row.fingerprint}`}
-                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] px-3 rounded-sm text-xs font-bold uppercase tracking-wider">
+                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-ok/40 bg-ok/10 text-ok px-3 rounded-sm text-xs font-bold uppercase tracking-wider">
                         <CheckCircle2 className="w-4 h-4" /> Als gelöst markieren
                       </button>
                     )}
@@ -368,7 +368,7 @@ export default function AdminOpsPage() {
                 {!loading && !(slow?.routes || []).length ? (
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-white/50">
-                      <span className="inline-flex items-center gap-2"><Gauge className="w-4 h-4 text-[#00FF88]" /> Keine Anfrage über {slow?.threshold_ms ?? 1000} ms in den letzten 24 Stunden.</span>
+                      <span className="inline-flex items-center gap-2"><Gauge className="w-4 h-4 text-ok" /> Keine Anfrage über {slow?.threshold_ms ?? 1000} ms in den letzten 24 Stunden.</span>
                     </td>
                   </tr>
                 ) : null}
@@ -388,7 +388,7 @@ export default function AdminOpsPage() {
 function toneClass(tone) {
   if (tone === "crit") return "text-[#FF6B61]";
   if (tone === "warn") return "text-[#FFD95A]";
-  if (tone === "ok") return "text-[#00FF88]";
+  if (tone === "ok") return "text-ok";
   return "text-white/70";
 }
 

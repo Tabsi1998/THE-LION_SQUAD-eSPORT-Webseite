@@ -47,7 +47,7 @@ export function OpsOverview({ onOpenSource }) {
                 {problemCount > 0 ? (
                   <span className="rounded-sm border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-[#FFD700] tabular-nums">{problemCount} auffällig</span>
                 ) : (
-                  <CheckCircle2 className="h-4 w-4 text-[#00FF88]" />
+                  <CheckCircle2 className="h-4 w-4 text-ok" />
                 )}
               </div>
               <div className="mt-4 truncate text-[10px] font-bold uppercase tracking-widest text-white/45">{item.label}</div>
@@ -63,7 +63,7 @@ export function OpsOverview({ onOpenSource }) {
           <h2 className="font-heading text-lg font-black uppercase">Offene Probleme</h2>
           {openTotal > 0 && (
             <button type="button" onClick={() => ackAll({ count: openTotal, label: "Alle Quellen" })} disabled={!!acking} data-testid="ops-overview-ack-all"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-[#00FF88]/40 bg-[#00FF88]/10 px-3 text-xs font-bold uppercase tracking-wider text-[#00FF88] hover:bg-[#00FF88]/15 disabled:opacity-40">
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-ok/40 bg-ok/10 px-3 text-xs font-bold uppercase tracking-wider text-ok hover:bg-ok/15 disabled:opacity-40">
               <CheckCheck className="h-4 w-4" /> {acking === "all" ? "Quittiere …" : `Alle quittieren (${openTotal})`}
             </button>
           )}
@@ -77,8 +77,8 @@ export function OpsOverview({ onOpenSource }) {
             </button>
           )}
           {data && !problems.length && (
-            <div className="rounded-sm border border-[#00FF88]/20 bg-[#00FF88]/5 p-8 text-center" data-testid="ops-overview-done">
-              <CheckCircle2 className="mx-auto h-8 w-8 text-[#00FF88]" />
+            <div className="rounded-sm border border-ok/20 bg-ok/5 p-8 text-center" data-testid="ops-overview-done">
+              <CheckCircle2 className="mx-auto h-8 w-8 text-ok" />
               <div className="mt-3 font-heading text-lg font-black uppercase text-white">Alles erledigt</div>
               <p className="mt-1 text-sm text-white/50">Keine offenen Fehler oder Warnungen. Quittiertes und Behobenes steht unter Ereignisse – mit „Quittierte zeigen“.</p>
             </div>

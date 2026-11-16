@@ -26,7 +26,7 @@ export function formatEventTime(value) {
 }
 
 function severityClass(severity) {
-  if (severity === "success") return "border-[#00FF88]/35 bg-[#00FF88]/10 text-[#00FF88]";
+  if (severity === "success") return "border-ok/35 bg-ok/10 text-ok";
   if (severity === "error") return "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]";
   if (severity === "warn") return "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]";
   return "border-white/10 bg-white/5 text-white/60";
@@ -70,7 +70,7 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
           <div className="break-words text-sm font-bold text-white">{row.title}</div>
           {row.subtitle && <div className="mt-1 break-words text-xs text-white/45">{row.subtitle}</div>}
           {stateLine && (
-            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[#00FF88]/80" data-testid={`ops-event-state-${row.id}`}>
+            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-ok/80" data-testid={`ops-event-state-${row.id}`}>
               <CheckCheck className="h-3.5 w-3.5" /> {stateLine}
             </div>
           )}
@@ -82,7 +82,7 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
           {/* Quittieren (#2447): weg aus „Offene Probleme“ und den Zählern; tritt es wieder auf, ist es wieder da. */}
           {row.ackable && onAck && (
             <button type="button" onClick={() => onAck(row)} disabled={acking} data-testid={`ops-event-ack-${row.id}`}
-              className={`${ROW_BUTTON} border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] hover:bg-[#00FF88]/15`}>
+              className={`${ROW_BUTTON} border-ok/40 bg-ok/10 text-ok hover:bg-ok/15`}>
               <CheckCheck className="h-3.5 w-3.5" /> {acking ? "Quittiere …" : "Quittieren"}
             </button>
           )}
@@ -301,7 +301,7 @@ export function OpsEventsTab() {
         {openCount > 0 && (
           <button type="button" onClick={() => ackAll({ count: openCount, sources: source === "all" ? null : [source], label: selectedLabel })} disabled={!!acking}
             data-testid="ops-events-ack-all"
-            className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-[#00FF88]/40 bg-[#00FF88]/10 px-3 text-xs font-bold uppercase tracking-wider text-[#00FF88] hover:bg-[#00FF88]/15 disabled:opacity-40">
+            className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-ok/40 bg-ok/10 px-3 text-xs font-bold uppercase tracking-wider text-ok hover:bg-ok/15 disabled:opacity-40">
             <CheckCheck className="h-4 w-4" /> {acking === "all" ? "Quittiere …" : `Alle quittieren (${openCount})`}
           </button>
         )}
@@ -326,7 +326,7 @@ export function OpsEventsTab() {
           <div className="rounded-sm border border-white/10 bg-[#121212] p-10 text-center text-white/40" data-testid="ops-events-empty">
             {loading ? "Lade Ereignisse …" : (
               <span className="inline-flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[#00FF88]" /> {state === "open" ? "Alles erledigt – nichts Offenes für diese Auswahl." : "Keine Ereignisse für diese Auswahl."}
+                <CheckCircle2 className="h-4 w-4 text-ok" /> {state === "open" ? "Alles erledigt – nichts Offenes für diese Auswahl." : "Keine Ereignisse für diese Auswahl."}
               </span>
             )}
           </div>
