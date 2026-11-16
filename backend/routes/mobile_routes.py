@@ -983,8 +983,9 @@ async def unregister_mobile_push_token(body: MobilePushTokenCreate, user: dict =
     db = get_db()
     now = now_utc().isoformat()
     result = await db.mobile_push_tokens.update_one(
-        {"token": body.token.strip(), "user_id": user["id"]},
-        # Ab dem Abmelden läuft die Frist, nach der der Eintrag verschwindet (#2467, Job ``ops_retention``).
+        # Ab dem Abmelden läuft die Frist, nach der der Eintrag verschwindet (#2467, Job ``ops_retention``). Nur ein aktiver
+        # Eintrag wird abgemeldet - ein wiederholtes Abmelden schiebt die Frist nicht hinaus.
+        {"token": body.token.strip(), "user_id": user["id"], "enabled": {"$ne": False}},
         {"$set": {"enabled": False, "disabled_at": now, "updated_at": now}},
     )
     return {"ok": True, "updated": result.modified_count}
