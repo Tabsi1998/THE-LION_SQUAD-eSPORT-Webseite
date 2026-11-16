@@ -589,9 +589,10 @@ Link auf einen Fall öffnet den Fall). Die übrigen Reiter bleiben, `?reiter=coc
   „Bewegung reduzieren“ im Gerät springen die Zustände.
 - Hakt das WLAN vor Ort oder antwortet der Server kurz nicht, bleibt der letzte Stand stehen – mit gewähltem Reiter und
   offener Rückfrage (etwa **Freigeben**). Unter den Reitern steht dann ruhig **Letzter Stand vor 25 s – es wird weiter
-  nachgeladen.**; der Hinweis zählt mit und verschwindet, sobald wieder Daten kommen. Nach einem Fehler fragt die Seite
-  mit wachsendem Abstand nach (höchstens jede Minute). Das Cockpit fällt nur weg, wenn das Turnier keine
-  Warteschlange mehr hat (online, keine Station). Dasselbe gilt für **Warteschlange je Station** im Matchplan.
+  nachgeladen.**; der Hinweis zählt mit und verschwindet, sobald wieder Daten kommen. Meldet sich die Verbindung
+  zurück, lädt die Seite sofort nach; bis dahin fragt sie mit wachsendem Abstand nach, spätestens jede Minute. Das
+  Cockpit fällt nur weg, wenn das Turnier keine Warteschlange mehr hat (online, keine Station); die Seite springt auch
+  nicht von selbst in einen anderen Reiter. Dasselbe gilt für **Warteschlange je Station** im Matchplan.
 - Handy, Tablet hochkant und Tablet quer sind gleichwertig, jede Tippfläche ist mindestens 44 px hoch.
 
 <table><tr><th>Tablet quer</th><th>Handy</th></tr><tr>
@@ -724,7 +725,8 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
 Spieler sehen auf der Turnierseite unter **Dein Stand** und oben im **Spielplan** „Du bist als Nächstes an Station 2 ·
 ca. 18:40“ (oder „Läuft“, „Du bist dran“), auf der Matchseite steht dasselbe für das Spiel. Im Spielplan **Nach
 Stationen** steht je Station „Jetzt“ mit Spielzeit und „Als Nächstes“, darüber der Verzug. Online-Turniere haben keine Stationen und keine
-Warteschlange – dort gelten die Fristen.
+Warteschlange – dort gelten die Fristen. Scheitert das Nachladen, steht dort **Letzter Stand vor X s**; kommt drei
+Minuten lang nichts Neues, verschwindet der alte Stand, damit kein veraltetes „Du bist dran“ stehen bleibt.
 
 ### 3.9 TV
 
