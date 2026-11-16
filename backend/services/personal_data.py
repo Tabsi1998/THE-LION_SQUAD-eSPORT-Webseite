@@ -282,6 +282,9 @@ CLUB_CONTENT = frozenset({
     # Hinweis der Turnierleitung (#1166): Text, Ziel, Zeitraum und Zahlen - nur die Kennung, wer geschrieben bzw. entfernt
     # hat; Banner und TV zeigen nie eine Person.
     "tournament_notices",
+    # Betrieb (#2447): Fehlergruppen, Zustände der Auto-Checks und Alarme tragen nach dem Quittieren nur die Kennung, wer
+    # quittiert bzw. gelöst hat (``acknowledged_by``, ``resolved_by``); der Name kommt erst beim Lesen.
+    "ops_alert_log", "ops_check_episodes", "ops_errors",
 })
 
 NO_PERSON = frozenset({
@@ -290,7 +293,7 @@ NO_PERSON = frozenset({
     "games", "mastodon_apps",
     # Schreibpause fürs Backup (#1009): ein Dokument mit Lease, Grund und Rechnername - keine Person.
     "ops_maintenance",
-    "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_check_episodes", "ops_errors",
+    "meeting_admission_counts", "mutation_locks", "ops_alert_state", "ops_check_runs",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",
     # Claims des Printful-Adapters (#1705) vor dem Anlegen eines Entwurfs und vor dem Bestätigen: external_id,
