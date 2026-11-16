@@ -300,3 +300,20 @@ test("Optionsfelder am Rand: Shift+Tab und Tab bleiben im Overlay", async () => 
   await user.tab();
   expect(screen.getByRole("radio", { name: "Löwen" }).matches(":focus") || screen.getByRole("radio", { name: "Falken" }).matches(":focus")).toBe(true);
 });
+
+// #2412: eine Auswahl, die ein Feld im Overlay aufklappt (Radix-Popover am body, z. B. der Kalender im Datumsfeld), ist
+// nicht gesperrt und behält ihre Tab-Reihenfolge - die Falle holt den Fokus nicht ins Overlay zurück.
+test("Tab in einer aufgeklappten Auswahl außerhalb des modalen Overlays bleibt dort", async () => {
+  const user = userEvent.setup();
+  render(<ModalOverlay />);
+  const popover = document.createElement("div");
+  popover.innerHTML = '<button type="button">Mai</button><button type="button">Juni</button>';
+  document.body.appendChild(popover);
+  const [may, june] = popover.querySelectorAll("button");
+  may.focus();
+
+  await user.tab();
+
+  expect(june).toHaveFocus();
+  popover.remove();
+});

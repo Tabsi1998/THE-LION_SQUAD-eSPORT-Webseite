@@ -127,10 +127,17 @@ export function useModalBehavior(active, onDismiss, { focusContainer = false } =
       (first || container).focus?.();
     }
 
+    // Ein Modal sperrt den Rest der Seite. Steht der Fokus trotzdem außerhalb, ist es eine Ebene, die erst danach
+    // aufging (ein Radix-Popover am body, etwa der Kalender im Datumsfeld): Tab und Escape gehören dann ihr.
+    const inForeignLayer = (current) => Boolean(
+      entry.modalRoot && current && current !== document.body && !entry.modalRoot.contains(current) && !current.closest("[inert]"),
+    );
+
     const onKeyDown = (event) => {
       if (!isTop()) return;
+      const current = document.activeElement;
+      if (inForeignLayer(current)) return;
       if (event.key === "Escape") {
-        const current = document.activeElement;
         if (container && current && current !== document.body && !container.contains(current)) return;
         event.stopPropagation();
         dismissRef.current?.();
@@ -144,7 +151,6 @@ export function useModalBehavior(active, onDismiss, { focusContainer = false } =
       }
       const first = items[0];
       const last = items[items.length - 1];
-      const current = document.activeElement;
       if (event.shiftKey && (sameStop(current, first) || current === container || !container.contains(current))) {
         event.preventDefault();
         last.focus();
