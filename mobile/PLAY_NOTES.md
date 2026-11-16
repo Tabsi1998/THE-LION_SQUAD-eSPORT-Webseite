@@ -12,6 +12,17 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.13
+
+Neu in 1.7.13:
+• Benachrichtigungen in drei Stufen, je Thema Push, Nur App oder Aus
+• Ruhezeit: nachts kein Push, danach eine Sammelmeldung
+• Erfolgs-Zeremonien nur noch einmal je Konto statt auf jedem Gerät
+• Kein doppeltes Handy mehr in der Push-Liste
+• Zusammengelegte Läufe zählen nicht mehr mit, klarere Läufe-Karte
+• Liga-Staffeln zeigen den Stand der Liga statt „Entwurf“
+• Profil zeigt „Vereinsmitglied“ mit Funktion
+
 ## 1.7.12
 
 Neu in 1.7.12:

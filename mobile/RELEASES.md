@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.13`: Build 107, Benachrichtigungen in Stufen und Ruhezeit, Zeremonie je Konto, Installations-Kennung, zusammengelegte Läufe, Liga-Stand, Vereinsmitglied (#2444, #2450, #2470, #2459, #2453, #1267)
 - `1.7.12`: Build 106, Turniertag: Cockpit, Spielzeit-Uhr, Hinweis der Turnierleitung (#2393)
 - `1.7.11`: Build 105, Liga Teil 2: Gesamtwertung, Trophäen mit Filtern, Embleme, Rankingbanner, Nachmeldung, Hinweis zur Backup-Pause (#2173)
 - `1.7.10`: Build 104, Liga in der App: Check-in, Map-Veto live, Matchablauf, Anmeldestatus, Tabelle mit Zonen, Season-Historie, Belohnungen und Zeremonie (#2173)

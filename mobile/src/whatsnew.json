@@ -1,13 +1,15 @@
 {
-  "version": "1.7.12",
-  "build": 106,
+  "version": "1.7.13",
+  "build": 107,
   "date": "2026-11-16",
   "items": [
-    "Turnier-Cockpit für die Turnierleitung vor Ort: Probleme nach Dringlichkeit, Stationen aufrufen, starten, freigeben und Defekt melden.",
-    "Spielzeit-Uhr mit Balken in Cockpit, Ergebnissen, Baum und Spielplan, orange ab 80 %, steht in der Turnierpause.",
-    "Auslosung mit „Jetzt auslosen“ und Restzeit nach der Serverzeit.",
-    "Hinweis der Turnierleitung als Banner auf Turnier- und Event-Seite, Reiter „Hinweis“ zum Schreiben mit Protokoll.",
-    "Ein Hinweis an das ganze Event öffnet die Event-Seite.",
-    "Cockpit behält ohne Verbindung den letzten Stand, ein Doppeltipp schickt nichts doppelt."
+    "Benachrichtigungen in drei Stufen mit „Eigene Auswahl“ und je Thema Push, Nur App oder Aus.",
+    "Ruhezeit von–bis mit Ausnahmen; danach eine Sammelmeldung, die die Glocke öffnet.",
+    "E-Mail, Discord und Kanal-Hauptschalter eingeklappt unter „Weitere Wege“.",
+    "Push-Anmeldung mit Installations-Kennung – kein zweiter Geräte-Eintrag mehr.",
+    "Zusammengelegte und entfallene Spiele zählen nicht mehr mit; Läufe-Karte sagt „Plätze frei“ nur vor dem Lauf.",
+    "Liga-Staffeln zeigen den Liga-Stand statt „Entwurf“.",
+    "Profil zeigt „Vereinsmitglied · Funktion“ mit Weg zum Vereinsprofil.",
+    "Erfolgs- und Level-Zeremonien kommen nur noch einmal je Konto statt auf jedem Gerät."
   ]
 }
