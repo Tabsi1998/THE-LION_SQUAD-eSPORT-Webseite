@@ -30,8 +30,9 @@ export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, 
   const { queue: view, status, staleSince, failures, reload } = useLiveQueue(path, { gone: matchId ? QUEUE_GONE_STATUSES : QUEUE_ME_GONE_STATUSES });
   const expired = useStaleExpired(staleSince);
   const entry = view && !expired ? (matchId ? view.matches?.[matchId] || null : (view.entries || [])[0] || null) : null;
-  const applies = status === "applies";
-  useLiveRefresh(reload, ["tournaments", "matches-v2", "stations"], { fallbackMs: applies ? queuePollMs(30000, failures) : 0, pollMs: queuePollMs(applies ? 60000 : 0, failures), tournamentId, eventId });
+  // Im Takt vor Ort - und wenn schon der erste Abruf scheiterte (weiter versuchen, mit wachsendem Abstand).
+  const asks = status === "applies" || status === "unknown";
+  useLiveRefresh(reload, ["tournaments", "matches-v2", "stations"], { fallbackMs: asks ? queuePollMs(30000, failures) : 0, pollMs: queuePollMs(asks ? 60000 : 0, failures), tournamentId, eventId });
 
   if (!entry || (hideCalled && entry.state === "called")) return null;
   const line = myQueueLine(entry, { personal });

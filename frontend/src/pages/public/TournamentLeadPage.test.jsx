@@ -591,7 +591,7 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     expect(queueTakt()).toEqual([COCKPIT_POLL_MS, 15000]);
   });
 
-  test("Takt nur mit Warteschlange: online (`applies: false`) fragt nichts im Takt nach", async () => {
+  test("Takt nur mit Warteschlange: online (`applies: false`) kein Takt - nur der Rückfall-Takt, solange der Strom fehlt", async () => {
     apiMock.get.mockImplementation((url) => Promise.resolve({ data: String(url).endsWith("/live-queue") ? { applies: false, reason: "online", stations: [] } : { ...LEAD, tournament: { ...LEAD.tournament, event_mode: "online" } } }));
     liveCalls.length = 0;
     render(
@@ -601,7 +601,8 @@ describe("Cockpit bei gescheiterter Abfrage (#2440)", () => {
     );
     await waitFor(() => expect(screen.getByTestId("lead-tab-results")).toHaveAttribute("aria-selected", "true"));
     const [, queueOptions] = liveCalls.slice(-2);
-    expect([queueOptions.pollMs, queueOptions.fallbackMs]).toEqual([0, 0]);
+    // Rückfall-Takt (#2440, Review): fehlt der Strom, erscheint eine neu angelegte Station trotzdem.
+    expect([queueOptions.pollMs, queueOptions.fallbackMs]).toEqual([0, 15000]);
   });
 
   test("Zeitüberschreitung lässt den Stand stehen; 404 heißt „gibt es nicht“ - das Cockpit fällt weg, ohne Hinweis", async () => {

@@ -113,10 +113,13 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const liveLocal = live && mode === "local";
   // Scheitert ein Abruf (Netz, Server), bleibt der letzte Stand mit „Letzter Stand vor X s“ stehen; nur `applies: false`
   // oder 404/403 nimmt die Warteschlange weg (#2440, hooks/useLiveQueue). Im Takt nur mit Warteschlange.
-  const { queue, staleSince: queueStaleSince, reload: refreshQueue, failures: queueFailures } = useLiveQueue(liveLocal && tid ? `/tournaments/${encodeURIComponent(tid)}/live-queue` : "");
+  const { queue, status: queueStatus, staleSince: queueStaleSince, reload: refreshQueue, failures: queueFailures } = useLiveQueue(liveLocal && tid ? `/tournaments/${encodeURIComponent(tid)}/live-queue` : "");
 
   useEffect(() => { refreshPlan(); }, [refreshPlan]);
-  useLiveRefresh(refreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, pollMs: queuePollMs(queue ? 60_000 : 0, queueFailures) });
+  // Im Takt mit Warteschlange - und wenn schon der erste Abruf scheiterte (dann weiter versuchen). Ohne Warteschlange
+  // nur, solange der Strom fehlt: eine neu angelegte Station taucht so auch ohne Strom auf (#2440).
+  useLiveRefresh(refreshQueue, ["matches", "stations", "tournaments"], { enabled: liveLocal, fallbackMs: queuePollMs(60_000, queueFailures),
+    pollMs: queuePollMs(queue || queueStatus === "unknown" ? 60_000 : 0, queueFailures) });
   useEffect(() => { refreshRemote(); }, [refreshRemote]);
   useLiveRefresh(refreshPlan, ["matches", "stations", "tournaments"], { enabled: canPlan, pollMs: live ? 60_000 : 0 });
   useLiveRefresh(refreshRemote, ["matches", "tournaments"], { enabled: mode !== "local", pollMs: live ? 60_000 : 0 });

@@ -106,6 +106,18 @@ test("Serverfehler: Hinweis „Letzter Stand“, nach 3 Minuten ohne Erfolg weg"
   }
 });
 
+// #2440 (Review): Scheitert schon der erste Abruf, fragt die Zeile im Takt weiter (mit wachsendem Abstand).
+test("scheitert der erste Abruf, fragt die Zeile im Takt weiter; gelingt es, erscheint sie", async () => {
+  apiMock.get.mockRejectedValue(Object.assign(new Error("503"), { response: { status: 503 } }));
+  const { container } = render(<LiveQueueStatus tournamentId="t1" />);
+  await act(async () => {});
+  expect(container).toBeEmptyDOMElement();
+  expect(live.options).toMatchObject({ pollMs: 60000, fallbackMs: 30000 });
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [NEXT] } });
+  await act(async () => { await live.load(); });
+  expect(screen.getByTestId("live-queue-status")).toBeInTheDocument();
+});
+
 test("abgelaufene Sitzung (401 bei /me): die Zeile fällt weg, der Takt endet", async () => {
   apiMock.get.mockResolvedValue({ data: { applies: true, entries: [NEXT] } });
   render(<LiveQueueStatus tournamentId="t1" />);

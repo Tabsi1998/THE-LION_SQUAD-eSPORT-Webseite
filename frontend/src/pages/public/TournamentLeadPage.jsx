@@ -157,9 +157,10 @@ export default function TournamentLeadPage() {
   // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen, im Cockpit öfter. Im Takt nur
   // mit Warteschlange (#2440): online meldet der Strom Änderungen; scheiterte schon der erste Abruf, versucht es die
   // Seite im Cockpit-Takt weiter. Nach Fehlern wird nur der Takt langsamer (queuePollMs, höchstens 60 s) - Meldungen aus
-  // dem Strom und das Wiederverbinden laden sofort, nie überlappend (useLiveQueue).
+  // dem Strom und das Wiederverbinden laden sofort, nie überlappend (useLiveQueue). Fehlt der Strom, fragt die Seite auch
+  // ohne Warteschlange im Rückfall-Takt - eine neu angelegte Station erscheint so trotzdem.
   const queueBaseMs = queue ? (cockpitOpen ? COCKPIT_POLL_MS : 60000) : queueStatus === "unknown" ? COCKPIT_POLL_MS : 0;
-  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: queue ? queuePollMs(15000, queueFailures) : 0, pollMs: queuePollMs(queueBaseMs, queueFailures), tournamentId, eventId });
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: queuePollMs(15000, queueFailures), pollMs: queuePollMs(queueBaseMs, queueFailures), tournamentId, eventId });
   // Die Probleme des Cockpits (#1653) - aus denselben Daten wie „Braucht Aufmerksamkeit“ und die Stationen.
   const problems = useMemo(() => cockpitProblems({ attention, draws, queue }), [attention, draws, queue]);
   // Viele Reiter am Handy: kurze Wörter, keine Symbole - sonst muss man wischen.
