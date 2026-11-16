@@ -1,4 +1,4 @@
-import { notificationKindLabel } from "./notificationKinds";
+import { isQuietDigest, notificationKindLabel } from "./notificationKinds";
 import { upperDe } from "./format";
 
 // Geräteprüfung vor 1.4.0 (#1296): die Glocke zeigt Arten in Worten statt Rohwerten, Großbuchstaben stehen im Text
@@ -35,4 +35,12 @@ test("Liga-Spieltag und Belohnungen haben eigene Wörter (#2173)", () => {
 test("Hinweis der Turnierleitung heißt wie im Web (#1166, #2393)", () => {
   expect(notificationKindLabel("tournament_notice")).toBe("Hinweis der Turnierleitung");
   expect(notificationKindLabel("tournament_notice", { category: "tournament_updates" })).toBe("Hinweis der Turnierleitung");
+});
+
+test("Sammelmeldung nach der Ruhezeit (#2444): eigenes Wort und erkannt", () => {
+  expect(notificationKindLabel("quiet_digest")).toBe("Ruhezeit");
+  expect(isQuietDigest({ kind: "quiet_digest" })).toBe(true);
+  expect(isQuietDigest({ kind: "QUIET_DIGEST" })).toBe(true);
+  expect(isQuietDigest({ kind: "direct_message" })).toBe(false);
+  expect(isQuietDigest(null)).toBe(false);
 });

@@ -191,6 +191,9 @@ test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst di
   expect(targetFromNotification(note("match_attention", { match_id: "m" }, "/tournaments/cup/leitung?fall=ds-m") as never)).toEqual(detail("TournamentLead", { id: "cup", fall: "ds-m" }));
   expect(targetFromNotification(note("match_attention", { match_id: "m" }, "/matches/m") as never)).toEqual(detail("MatchDetail", { id: "m" }));
   expect(targetFromNotification(note("prize_ready") as never)).toEqual(detail("MyPrizes"));
+  // Sammelmeldung nach der Ruhezeit (#2444): immer die Glocke - auch mit Kennungen in den Metadaten.
+  expect(targetFromNotification(note("quiet_digest", { tournament_id: "t-1", category: "tournament_updates" }, "/notifications") as never)).toEqual(detail("Notifications"));
+  expect(targetFromNotification(note("quiet_digest", {}, "") as never)).toEqual(detail("Notifications"));
   // Hinweis der Turnierleitung (#1166, #2393): öffnet die Seite, auf der das Banner steht - Turnier oder ganzes Event.
   expect(targetFromNotification(note("tournament_notice", { tournament_id: "t-1", notice_id: "n1" }, "/tournaments/fc-cup") as never)).toEqual(detail("TournamentDetail", { id: "fc-cup" }));
   expect(targetFromNotification(note("tournament_notice", { tournament_id: "t-1", event_id: "e-1" }, "/events/herbst-lan") as never)).toEqual(detail("EventDetail", { id: "herbst-lan" }));

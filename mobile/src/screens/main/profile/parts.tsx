@@ -4,6 +4,7 @@ import { Card } from "../../../components/Card";
 import { Body, Muted } from "../../../components/Text";
 import { API_BASE_URL } from "../../../config";
 import { formatDate, formatStatus } from "../../../lib/format";
+import { NOTIFICATION_TOPICS } from "../../../lib/notificationLevels";
 import { prizeKindLabel, prizeKindMark, prizePlaceText, prizeSourceLabel, prizeTarget } from "../../../lib/prizes";
 import { colors, radius } from "../../../theme";
 import type { PrizePickup } from "../../../types";
@@ -29,24 +30,14 @@ export const notificationChannels: Array<{ key: string; label: string; detail: s
 
 export type DiscordDmState = { linked?: boolean; blocked_at?: string | null; hint?: string | null };
 
-export const notificationLabels: Array<{ key: string; label: string; detail: string; channels?: string[] }> = [
-  { key: "match_reminders", label: "Spiel-Erinnerungen", detail: "Startzeiten, Check-in und Match-Hub." },
-  { key: "tournament_updates", label: "Turnier-Updates", detail: "Anmeldungen, Status und Ergebnisse." },
-  { key: "prize_updates", label: "Gewinne", detail: "Gewinn bereit, Übergabe und Fristen." },
-  // Erfolge (#568): In-App, Push und Discord - eine Mail dafür gibt es nicht.
-  { key: "achievements", label: "Erfolge", detail: "Freigeschaltete Erfolge – als Gratulation.", channels: ["in_app", "push", "discord"] },
-  // Wochenrückblick (#622): nur per E-Mail, montags, nur bei Aktivität.
-  { key: "achievement_recap", label: "Wochenrückblick", detail: "Montags eine Mail mit XP, Level und neuen Erfolgen.", channels: ["email"] },
-  // Rechnungen (#841): Postfach, Push und Mail - Beträge nie über Discord.
-  { key: "billing_updates", label: "Rechnungen", detail: "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF.", channels: ["in_app", "push", "email"] },
-  { key: "membership_updates", label: "Mitgliedschaft", detail: "Bewerbung, Status und Vereinsvorteile." },
-  { key: "birthday_greetings", label: "Geburtstag", detail: "Geburtstagsgruß vom Verein." },
-  { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
-  { key: "news_events", label: "News & Events", detail: "Vereinsnews, Events und Ankündigungen." },
-  { key: "club_internal", label: "Vereinsintern", detail: "Interne Events und News nur für Mitglieder." },
-  // Helferdienste (#1197): Aufruf des Vorstands und Erinnerung am Vortag - nur Mitglieder, keine Mail.
-  { key: "helper_shifts", label: "Helferdienste", detail: "Nur für Mitglieder: Aufrufe für offene Schichten und Erinnerung am Vortag.", channels: ["in_app", "push", "discord"] },
-];
+// Die Themen mit denselben Namen und Texten wie im Web (#2444: „Spiele & Aufrufe“, der neue Text bei Turnier-Updates) - eine
+// Quelle für die Stufen-Ansicht und die bisherige Ansicht älterer Server (lib/notificationLevels).
+export const notificationLabels: Array<{ key: string; label: string; detail: string; channels?: string[] }> = NOTIFICATION_TOPICS.map((topic) => ({
+  key: topic.k,
+  label: topic.l,
+  detail: topic.d,
+  ...(topic.channels ? { channels: topic.channels } : {}),
+}));
 export const notificationPreferenceKey = (channel: string, topic: string) => `${channel}:${topic}`;
 
 export const dmOptions = [

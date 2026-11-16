@@ -381,3 +381,33 @@ test("Hinweis der Turnierleitung oben auf der Turnierseite", async () => {
   expect(screen.queryByTestId("notice-banner")).toBeNull();
   expect(screen.queryByTestId("tournament-partial-load")).toBeNull();
 });
+
+describe("Liga-Staffel im Entwurf (Folge #2453)", () => {
+  const STAFFEL = {
+    ...TOURNAMENT, event_gate: null, status: "draft", registration_enabled: false, public_phase: { state: "draft", label: "Entwurf" },
+    league_context: { season_id: "s1" }, league_links: { league_name: "Tiroler Liga", season_name: "Season 1", staffel: "A" },
+  };
+  const day = 24 * 60 * 60 * 1000;
+  const badge = () => screen.getAllByTestId("status-badge-text")[0];
+
+  test("mit Liga-Recht: der Stand der Season statt „Entwurf“", async () => {
+    const season = {
+      id: "s1", status: "draft", visibility: "public",
+      application_opens_at: new Date(Date.now() - day).toISOString(), application_closes_at: new Date(Date.now() + 3 * day).toISOString(),
+      start_date: new Date(Date.now() + 10 * day).toISOString(),
+    };
+    answer({ ...STAFFEL, league_season: season });
+    await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByText("LAN-Cup")).toBeTruthy());
+    expect(badge()).toHaveTextContent(/^ANMELDUNG OFFEN BIS \d\d\.\d\d\., \d\d:\d\d$/);
+    expect(screen.queryByText(/ENTWURF/)).toBeNull();
+  });
+
+  test("ohne Liga-Recht (älterer Server oder keine Season-Angaben): neutral „Vor dem Start“", async () => {
+    answer(STAFFEL);
+    await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByText("LAN-Cup")).toBeTruthy());
+    expect(badge()).toHaveTextContent("VOR DEM START");
+    expect(screen.queryByText(/ENTWURF/)).toBeNull();
+  });
+});
