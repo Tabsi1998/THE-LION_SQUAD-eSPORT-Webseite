@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // „Co-Team zuteilen“ (#1649): erst Hauptteam, dann Co-Team; Co-Teams mit Grund sind nicht wählbar; ein Fehler des
 // Servers steht verständlich im Dialog. Erfundene Namen.
@@ -127,7 +128,7 @@ test("ein Fehler des Servers steht verständlich im Dialog, der bleibt offen", a
 
   fireEvent.click(screen.getByText("Anderes Team"));
   expect(screen.getByText("Schritt 1 von 2: Zu welchem Team gehört das Co-Team?")).toBeInTheDocument();
-  fireEvent.keyDown(window, { key: "Escape" });
+  fireEvent.keyDown(document.activeElement, { key: "Escape" });
   expect(screen.queryByTestId("squad-assign-dialog")).not.toBeInTheDocument();
 });
 
@@ -143,4 +144,25 @@ test("nach einem Ladefehler lädt „Erneut laden“ nach; beim Öffnen steht de
   await waitFor(() => expect(screen.getByTestId("squad-assign-team-t-loewen")).toBeInTheDocument());
   expect(apiMock.get).toHaveBeenCalledTimes(2);
   expect(screen.queryByTestId("squad-assign-reload")).not.toBeInTheDocument();
+});
+
+// #2412: der Dialog sperrt die Seite dahinter, Tab bleibt drin, Escape schließt und gibt den Fokus an „Co-Team
+// zuteilen“ zurück.
+test("Tastatur: Hintergrund gesperrt, Tab bleibt im Dialog, Escape gibt den Fokus zurück", async () => {
+  const user = userEvent.setup();
+  render(<><main data-testid="page" /><SquadAssignDialog tournament={TOURNAMENT} onAssigned={vi.fn()} /></>);
+  const opener = screen.getByTestId("squad-assign-open");
+  await user.click(opener);
+  const dialog = screen.getByTestId("squad-assign-dialog");
+  await waitFor(() => expect(screen.getByTestId("squad-assign-team-t-loewen")).toBeInTheDocument());
+  expect(screen.getByTestId("page")).toHaveAttribute("inert");
+  expect(opener).toHaveAttribute("inert");
+  for (let i = 0; i < 4; i += 1) {
+    await user.tab({ shift: true });
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  expect(screen.queryByTestId("squad-assign-dialog")).toBeNull();
+  expect(opener).not.toHaveAttribute("inert");
+  expect(opener).toHaveFocus();
 });

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { AlertTriangle, Check, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { missingIdsLine } from "@/lib/leagueIds";
 import { personName } from "./squadRoles";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 // „Co-Team zuteilen“ (docs/LIGA.md, #1649, Teil von #1623): die Turnierleitung wählt erst das Hauptteam, dann eines
 // seiner Co-Teams. Der Server prüft alles (gehört zum Team, aktiv, Spiel, Kader, Staffel voll, zwei Co-Teams desselben
@@ -51,7 +52,6 @@ function SquadIds({ players = [], label, squadId }) {
 
 export function SquadAssignDialog({ tournament, onAssigned }) {
   const titleId = useId();
-  const dialogRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -76,17 +76,9 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
     if (open) load();
   }, [open, load]);
 
-  // Beim Öffnen steht der Fokus im Dialog - Tastatur und Vorleser beginnen dort, nicht auf der Seite dahinter.
-  useEffect(() => {
-    if (open) dialogRef.current?.focus();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event) => { if (event.key === "Escape" && !busy) setOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, busy]);
+  // Beim Öffnen steht der Fokus im Dialog - Tastatur und Vorleser beginnen dort, nicht auf der Seite dahinter. Tab
+  // bleibt darin, die Seite ist gesperrt, Escape schließt (nicht während des Speicherns) und gibt den Fokus zurück (#2412).
+  const dialogRef = useModalBehavior(open, () => { if (!busy) setOpen(false); }, { focusContainer: true });
 
   const start = () => {
     setTeamId("");

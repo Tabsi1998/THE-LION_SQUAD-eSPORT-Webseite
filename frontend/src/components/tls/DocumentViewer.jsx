@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Maximize2, Minimize2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { API } from "@/lib/api";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { clampPage, nextZoom, openPdf, viewerErrorText } from "@/lib/pdfViewer";
 
 // Gemeinsamer PDF-Betrachter (#325) für Rechnungen, Statuten, Protokolle: Seiten, Zoom,
@@ -63,7 +64,6 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
   useEffect(() => {
     const onKey = (event) => {
       if (event.target?.tagName === "INPUT" || event.target?.tagName === "TEXTAREA") return;
-      if (event.key === "Escape") onClose?.();
       if (event.key === "ArrowRight" || event.key === "PageDown") go(1);
       if (event.key === "ArrowLeft" || event.key === "PageUp") go(-1);
       if (event.key === "+") setZoom((z) => nextZoom(z, 1));
@@ -71,10 +71,14 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, onClose]);
+  }, [go]);
+
+  // Escape schließt, Tab bleibt im Betrachter, die Seite dahinter ist gesperrt, danach steht der Fokus wieder dort,
+  // wo er vorher war (#2412).
+  const dialogRef = useModalBehavior(true, () => onClose?.());
 
   return (
-    <div className={`fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex flex-col ${fullscreen ? "" : "p-2 sm:p-6"}`} role="dialog" aria-modal="true" aria-label={title} data-testid="document-viewer">
+    <div ref={dialogRef} className={`fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex flex-col ${fullscreen ? "" : "p-2 sm:p-6"}`} role="dialog" aria-modal="true" aria-label={title} data-testid="document-viewer">
       <div className="bg-[#121212] border border-white/10 rounded-sm flex flex-col flex-1 min-h-0">
         <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 flex-wrap">
           <div className="min-w-0 flex-1">

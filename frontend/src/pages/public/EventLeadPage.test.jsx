@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Anmeldungen & Einlass (#1372): Suche, Filter „noch nicht da“, Einchecken mit „Rückgängig“, Nachrücken und
@@ -315,4 +316,34 @@ test("ohne Recht: Hinweis statt Liste", async () => {
     </MemoryRouter>,
   );
   expect(await screen.findByTestId("event-lead-denied")).toHaveTextContent("Für diesen Bereich fehlt dir die Berechtigung.");
+});
+
+// #2412: „Nachricht an alle“ und „Person an der Tür“ sind echte Dialoge - Fokus hinein, Tab bleibt drin, die Liste
+// dahinter ist gesperrt, Escape schließt und gibt den Fokus an den Knopf zurück.
+test.each([
+  ["event-lead-message-open", "event-lead-message"],
+  ["event-lead-walkin-open", "event-lead-walkin"],
+])("Tastatur: %s öffnet einen Dialog mit Fokus, Sperre und Rückgabe", async (openId, dialogId) => {
+  const user = userEvent.setup();
+  renderLead({ ...VIEW, can_add_walk_in: true });
+  const opener = await screen.findByTestId(openId);
+  await user.click(opener);
+  const dialog = screen.getByTestId(dialogId);
+  expect(dialog).toContainElement(document.activeElement);
+  expect(opener.closest("[inert]")).not.toBeNull();
+  for (let i = 0; i < 6; i += 1) {
+    await user.tab();
+    expect(dialog).toContainElement(document.activeElement);
+  }
+  await user.keyboard("{Escape}");
+  expect(screen.queryByTestId(dialogId)).toBeNull();
+  expect(opener.closest("[inert]")).toBeNull();
+  expect(opener).toHaveFocus();
+});
+
+test("„Person an der Tür“: der Fokus steht gleich im Namensfeld", async () => {
+  const user = userEvent.setup();
+  renderLead({ ...VIEW, can_add_walk_in: true });
+  await user.click(await screen.findByTestId("event-lead-walkin-open"));
+  expect(screen.getByTestId("event-lead-walkin-name")).toHaveFocus();
 });
