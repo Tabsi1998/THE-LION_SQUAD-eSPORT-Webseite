@@ -733,6 +733,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     # Die verknüpften Konten mit offizieller Adresse - nur die Plattformen, deren Feld sichtbar ist.
     from services.platform_links import linked_accounts
     base["linked_accounts"] = await linked_accounts(db, u["id"], base["verified_platforms"])
+    # Vereinsprofil (#1267): nur ein Hinweis „Vereinsmitglied · Funktion“ mit Link - Adresse und öffentliche Funktion des
+    # verbundenen, aktiven Vereinsprofils. Kein Zusammenführen, nichts Privates aus der Vereinsakte.
+    base.update(await _club_profile_hint(db, u["id"]))
     # Ehrungen (#848): nur mit Freigabe des Vereins und dem Schalter der Person - aus dem Zwischenstand, nie live aus Dolibarr.
     from services.dolibarr_honours import public_honours
     base["honours"] = await public_honours(db, u["id"])
@@ -913,6 +916,23 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         # Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur aus den öffentlichen Auszeichnungen oben - nie Ruhendes.
         "featured_emblems": featured_emblems(awards, u.get(EMBLEM_FIELD)),
     }
+
+
+async def _club_profile_hint(db, user_id: str) -> dict:
+    """``club_profile_slug`` und ``club_role_title`` des Vereinsprofils, das mit dem Konto verbunden ist (#1267) - leer
+    ohne Verbindung oder bei einem ausgeblendeten Vereinsprofil. Die Funktion wie auf der Vereinsseite: Vorstandsposten vor
+    der redaktionellen Rolle."""
+    from routes.membership_routes import _board_titles_by_profile_id, _public_profile
+
+    rows = await db.club_member_profiles.find(
+        {"user_id": user_id, "is_active": {"$ne": False}, "slug": {"$nin": [None, ""]}}, {"_id": 0},
+    ).sort([("order_index", 1), ("display_name", 1)]).to_list(5)
+    if not rows:
+        return {"club_profile_slug": None, "club_role_title": None}
+    titles = await _board_titles_by_profile_id(db)
+    row = next((item for item in rows if item["id"] in titles), rows[0])
+    public = _public_profile(row, board_title=titles.get(row["id"]))
+    return {"club_profile_slug": public["slug"], "club_role_title": public["role_title"]}
 
 
 @router.get("/{user_id}")
