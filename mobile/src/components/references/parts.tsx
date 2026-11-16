@@ -192,7 +192,8 @@ const styles = StyleSheet.create({
   ringText: { color: ink.text, fontVariant: ["tabular-nums"], fontWeight: "800" },
   sectionRow: { alignItems: "center", flexDirection: "row", gap: 8 },
   sectionLabel: { color: ink.muted, fontSize: 11, fontWeight: "800", letterSpacing: 2.4, textTransform: "uppercase" },
-  chip: { borderColor: "rgba(255,255,255,0.14)", borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 40, paddingHorizontal: 14 },
+  // 40 hoch plus je 4 Punkte hitSlop = 48; kurze Namen wie „R1“ brauchen dazu eine Mindestbreite (#2449, Feinschliff).
+  chip: { alignItems: "center", borderColor: "rgba(255,255,255,0.14)", borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 40, minWidth: 48, paddingHorizontal: 14 },
   chipOn: { backgroundColor: "rgba(41,182,232,0.14)", borderColor: colors.cyan },
   chipText: { color: ink.second, fontSize: 14, fontWeight: "600" },
   chipTextOn: { color: ink.text, fontWeight: "700" },
