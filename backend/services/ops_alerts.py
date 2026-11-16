@@ -18,7 +18,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
-from services.ops_upload_routes import DEFAULT_UPLOAD_ROUTES
+from services.ops_upload_routes import DEFAULT_UPLOAD_ROUTES, clean_upload_routes
 
 logger = logging.getLogger(__name__)
 
@@ -180,24 +180,6 @@ def merge_settings(stored: dict | None) -> dict:
     }
 
 
-def _clean_upload_routes(values) -> list[str]:
-    """Eine Route je Zeile (oder Liste), ``/api/…``, ``*`` am Ende für „beginnt mit“; ohne Leerzeichen, höchstens 40."""
-    if isinstance(values, str):
-        values = values.splitlines()
-    out: list[str] = []
-    for value in values or []:
-        route = str(value or "").strip()
-        if not route:
-            continue
-        if not route.startswith("/api/") or len(route) > 200 or any(char.isspace() for char in route) or "*" in route[:-1]:
-            raise ValueError(f"„{route[:60]}“ ist keine Route (beginnt mit /api/, ohne Leerzeichen, * nur am Ende).")
-        if route not in out:
-            out.append(route)
-    if len(out) > 40:
-        raise ValueError("Höchstens 40 Upload-Routen.")
-    return out
-
-
 async def load_alert_settings(db) -> dict:
     return merge_settings(await db.settings.find_one({"id": SETTINGS_ID}, {"_id": 0}))
 
@@ -238,7 +220,7 @@ async def save_alert_settings(db, patch: dict) -> dict:
             retention[source] = days
         update["retention_days"] = retention
     if "upload_routes" in patch:
-        update["upload_routes"] = _clean_upload_routes(patch["upload_routes"])
+        update["upload_routes"] = clean_upload_routes(patch["upload_routes"])
     if update:
         update["updated_at"] = now_utc().isoformat()
         await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"id": SETTINGS_ID, **update}}, upsert=True)
