@@ -129,7 +129,7 @@ test("Link auf einen Bereich setzt den Rollen-Filter zurück und klappt ihn auf"
   expect(screen.queryByTestId("faq-bereich-liga")).toBeNull();
   await view.rerender(<FaqScreen route={{ key: "faq-4", params: { bereich: "liga" } }} />);
   await waitFor(() => expect(screen.getByTestId("faq-bereich-liga-knopf").props.accessibilityState).toEqual({ expanded: true }));
-  expect(screen.getByTestId("faq-rolle-alle").props.accessibilityState).toMatchObject({ selected: true });
+  expect(screen.getByTestId("faq-rolle-alle").props.accessibilityState).toEqual({ checked: true });
 });
 
 test("Turnierleitung: eigener Bereich und Rollen-Chip", async () => {
@@ -138,7 +138,7 @@ test("Turnierleitung: eigener Bereich und Rollen-Chip", async () => {
   await renderFaq();
   await waitFor(() => expect(screen.getByTestId("faq-rolle-turnierleitung")).toBeTruthy());
   await fireEvent.press(screen.getByTestId("faq-rolle-turnierleitung"));
-  expect(screen.getByTestId("faq-rolle-turnierleitung").props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("faq-rolle-turnierleitung").props.accessibilityState).toEqual({ checked: true });
   expect(screen.getByTestId("faq-bereich-turnierleitung")).toBeTruthy();
   expect(screen.queryByTestId("faq-bereich-liga")).toBeNull();
 });
@@ -226,4 +226,24 @@ test("Bewegung: Pfeil und Antwort laufen an - mit „Bewegung reduzieren“ steh
   // Keine Blende, die erst noch aufgehen müsste; der Pfeil steht gleich gedreht.
   expect(screen.getByTestId("faq-frage-app-aufruf-ton-inhalt")).not.toHaveStyle({ opacity: 0 });
   expect(screen.getByText(/eigenen Gong/)).toBeTruthy();
+});
+
+test("beim Öffnen läuft keine Bewegung an; Wischen schließt die Tastatur; Rollen als Radio-Gruppe", async () => {
+  antwort({ darf: ALLES_ZU, fragen: [] });
+  const timing = jest.spyOn(reanimated, "withTiming");
+  await renderFaq();
+  // Pfeil (200 ms) und Antwort (240 ms) der FAQ - andere Bausteine des Rahmens zählen hier nicht.
+  const faqBewegung = () => timing.mock.calls.filter(([, config]) => [200, 240].includes((config as { duration?: number } | undefined)?.duration ?? 0));
+  expect(faqBewegung()).toEqual([]);
+  await fireEvent.press(screen.getByTestId("faq-frage-app-aufruf-ton-knopf"));
+  expect(faqBewegung().length).toBeGreaterThan(0);
+  expect(screen.getByTestId("faq-screen").props.keyboardDismissMode).toBe("on-drag");
+  const gruppe = screen.getByTestId("faq-rollen-gruppe");
+  expect(gruppe.props.accessibilityRole).toBe("radiogroup");
+  expect(gruppe.props.accessibilityLabel).toBe("Für wen?");
+  expect(screen.getByTestId("faq-rolle-alle").props.accessibilityRole).toBe("radio");
+  expect(screen.getByTestId("faq-rolle-alle").props.accessibilityState).toEqual({ checked: true });
+  await fireEvent.press(screen.getByTestId("faq-rolle-captain"));
+  expect(screen.getByTestId("faq-rolle-alle").props.accessibilityState).toEqual({ checked: false });
+  expect(screen.getByTestId("faq-rolle-captain").props.accessibilityState).toEqual({ checked: true });
 });

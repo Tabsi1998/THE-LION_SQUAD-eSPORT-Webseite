@@ -56,7 +56,13 @@ function useAufklappen(offen: boolean) {
   const reduce = useReduceMotion();
   const dreh = useSharedValue(offen ? 1 : 0);
   const sicht = useSharedValue(offen ? 1 : 0);
+  // Beim ersten Zeichnen stehen die Werte schon richtig - keine Bewegung ins Leere.
+  const erster = useRef(true);
   useEffect(() => {
+    if (erster.current) {
+      erster.current = false;
+      return;
+    }
     const ziel = offen ? 1 : 0;
     if (reduce) {
       dreh.value = ziel;
@@ -332,7 +338,7 @@ export function FaqScreen({ route }: Props = {}) {
 
   return (
     <Screen padded={false}>
-      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" testID="faq-screen">
+      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="faq-screen">
         <View ref={inhaltRef} style={styles.content}>
         <View style={styles.hero}>
           <Muted style={styles.eyebrow}>FAQ</Muted>
@@ -405,15 +411,17 @@ export function FaqScreen({ route }: Props = {}) {
 
         <View style={styles.abschnitt} testID="faq-bereiche">
           <Heading accessibilityRole="header">Alle Bereiche</Heading>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel="Für wen?" testID="faq-rollen">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} testID="faq-rollen">
+            {/* Eine Rolle zur Zeit: Gruppe mit Radio-Knöpfen wie die Stufen der Benachrichtigungen und der Hinweis der Leitung. */}
+            <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Für wen?" testID="faq-rollen-gruppe">
             {[{ id: "", label: "Alle" }, ...rollen].map((row) => {
               const aktiv = rolle === row.id;
               return (
                 <Pressable
                   key={row.id || "alle"}
                   onPress={() => setRolleWahl(row.id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: aktiv }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: aktiv }}
                   style={({ pressed }) => [styles.chip, aktiv && styles.chipAktiv, pressed && styles.pressed]}
                   testID={`faq-rolle-${row.id || "alle"}`}
                 >
@@ -421,6 +429,7 @@ export function FaqScreen({ route }: Props = {}) {
                 </Pressable>
               );
             })}
+            </View>
           </ScrollView>
           {bereiche.length ? (
             <View style={styles.bereichListe} testID="faq-bereich-liste">
