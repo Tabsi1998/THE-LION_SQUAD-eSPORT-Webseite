@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { seasonPayload, seasonToForm } from "./league";
 import {
   SEASON_TABS, TAB_FIELDS, TAB_PAYLOAD_KEYS, changedPlaces, dirtyTabs, nicknameRepeatsLevel, orderPoolHints, readinessAnchor, rebaseForm, rulesNotice,
-  seasonAnchorUrl, seasonPhases, seasonTarget, tabPayload,
+  STAFFEL_STAND_FILTERS, seasonAnchorUrl, seasonPhases, seasonTarget, applicationEnd, staffelNeeds, staffelStand, statusFilterKeys, tabPayload,
 } from "./seasonTabs";
 
 // Season-Seite mit Reitern (#2267): Adresse ↔ Reiter, Felder je Reiter, Speichern je Reiter, Ablaufleiste, Hinweise.
@@ -136,6 +136,122 @@ describe("Ablaufleiste", () => {
     const steps = phase({ calendar, divisions: live, season: { ...SEASON, status: "active" }, now: new Date("2026-11-18T10:00:00Z") });
     expect(steps.find((step) => step.key === "spielbetrieb").note).toBe("Spielwoche 2 von 2");
     expect(current(phase({ season: { ...SEASON, status: "completed" }, now: new Date("2027-02-01T10:00:00Z") }))).toBe("abschluss");
+  });
+});
+
+describe("Liga-Stand einer Staffel (#2453)", () => {
+  const STAFFEL = {
+    id: "t1", status: "draft", participant_count: 1, max_participants: 8, min_participants: 2,
+    league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
+  };
+  // Veröffentlicht - eine verborgene Season hat eigene Fälle (Review #2453, 5c).
+  const OPEN = { ...SEASON, visibility: "public" };
+  const stand = (staffel, now, season = OPEN) => staffelStand({ ...STAFFEL, ...staffel }, { season, now: new Date(now) });
+
+  it("eine Staffel im Entwurf zeigt den Stand der Season, je Phase wie die Ablaufleiste", () => {
+    expect(stand({}, "2026-10-20T10:00:00Z")).toMatchObject({ key: "vorbereitung", label: "Vorbereitung", filter: "league:vorbereitung" });
+    expect(stand({}, "2026-11-02T10:00:00Z")).toMatchObject({ key: "anmeldung", label: "Anmeldung offen bis 06.11., 23:59" });
+    expect(stand({}, "2026-11-08T10:00:00Z")).toMatchObject({ key: "einteilung", label: "Einteilung" });
+    expect(stand({ status: "live" }, "2026-11-12T10:00:00Z", { ...OPEN, status: "active" })).toMatchObject({ key: "spielbetrieb", label: "Spielbetrieb", live: true });
+    expect(stand({ status: "paused" }, "2026-11-12T10:00:00Z", { ...OPEN, status: "active" })).toMatchObject({ label: "Spielbetrieb · pausiert", live: false });
+    expect(stand({ status: "completed" }, "2027-02-01T10:00:00Z", { ...SEASON, status: "active" })).toMatchObject({ key: "abschluss", label: "Abgeschlossen" });
+    expect(stand({ status: "results_published" }, "2027-02-01T10:00:00Z", { ...SEASON, status: "completed" })).toMatchObject({ key: "abschluss" });
+  });
+
+  it("dieselbe Quelle wie die Ablaufleiste: die aktuelle Phase ist dieselbe", () => {
+    for (const now of ["2026-10-20T10:00:00Z", "2026-11-02T10:00:00Z", "2026-11-08T10:00:00Z"]) {
+      const bar = seasonPhases({ season: OPEN, divisions: [{ status: "active", staffeln: [{ status: "draft", participant_count: 1 }] }], now: new Date(now) });
+      expect(stand({}, now).key).toBe(bar.find((step) => step.state === "current").key);
+    }
+  });
+
+  it("ein gewöhnliches Turnier, eine abgesagte oder archivierte Staffel und eine ohne Season-Angaben behalten ihren Status", () => {
+    expect(staffelStand({ id: "x", status: "draft" }, { season: SEASON })).toBeNull();
+    expect(stand({ status: "cancelled" }, "2026-11-02T10:00:00Z")).toBeNull();
+    expect(stand({ status: "archived" }, "2026-11-02T10:00:00Z")).toBeNull();
+    expect(staffelStand(STAFFEL)).toBeNull();
+    expect(statusFilterKeys({ id: "x", status: "draft" })).toEqual(["draft"]);
+    expect(statusFilterKeys({ ...STAFFEL, league_season: OPEN }, new Date("2026-11-02T10:00:00Z"))).toEqual(["league:anmeldung"]);
+    expect(statusFilterKeys({ ...STAFFEL, status: "archived", league_season: OPEN })).toEqual(["archived"]);
+  });
+
+  it("der Filter kennt jeden Stand", () => {
+    expect(STAFFEL_STAND_FILTERS.map(([value]) => value)).toEqual(["league:vorbereitung", "league:anmeldung", "league:einteilung", "league:spielbetrieb", "league:abschluss"]);
+    expect(STAFFEL_STAND_FILTERS[1][1]).toBe("Liga: Anmeldung offen");
+  });
+
+  it("was fehlt: Teams zuteilen mit dem Weg in den Eingang, ohne Anmeldefenster in die Teilnehmerliste", () => {
+    const needs = (staffel, now, season = OPEN) => staffelNeeds({ ...STAFFEL, ...staffel }, { season, now: new Date(now) });
+    expect(needs({}, "2026-11-02T10:00:00Z")).toEqual([{ code: "assign", text: "Teams zuteilen · 1 von 8", to: "/admin/leagues/seasons/s1#anmeldungen" }]);
+    const noWindow = { ...OPEN, application_opens_at: null, application_closes_at: null };
+    expect(needs({ participant_count: 0 }, "2026-11-02T10:00:00Z", noWindow)[0]).toMatchObject({ code: "assign", to: "/admin/tournaments/t1?tab=participants" });
+    // Während der Anmeldung kommen noch Teams - danach fehlt der Start.
+    expect(needs({ participant_count: 4 }, "2026-11-02T10:00:00Z")).toEqual([]);
+    expect(needs({ participant_count: 4 }, "2026-11-08T10:00:00Z")).toEqual([{ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: "/admin/tournaments/t1" }]);
+    // Gestartet ohne feste Spiele - nur, wenn der Server es sagt.
+    const active = { ...OPEN, status: "active" };
+    expect(needs({ status: "live", participant_count: 4, league_plan: { fixed_matches: 0 } }, "2026-11-12T10:00:00Z", active)[0])
+      .toMatchObject({ code: "plan", to: "/admin/tournaments/t1?tab=matchplan" });
+    expect(needs({ status: "live", participant_count: 4, league_plan: { fixed_matches: 6 } }, "2026-11-12T10:00:00Z", active)).toEqual([]);
+    expect(needs({ status: "live", participant_count: 4 }, "2026-11-12T10:00:00Z", active)).toEqual([]);
+    expect(needs({ status: "cancelled", participant_count: 0 }, "2026-11-12T10:00:00Z")).toEqual([]);
+    expect(staffelNeeds({ id: "x", status: "draft", participant_count: 0 })).toEqual([]);
+  });
+
+  it("Filter: nur der Entwurf weicht dem Liga-Stand, Live, Pausiert und Beendet passen weiter auf ihren Status (Review #2453, 1)", () => {
+    const active = { ...OPEN, status: "active" };
+    expect(statusFilterKeys({ ...STAFFEL, status: "live", league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["live", "league:spielbetrieb"]);
+    expect(statusFilterKeys({ ...STAFFEL, status: "paused", league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["paused", "league:spielbetrieb"]);
+    expect(statusFilterKeys({ ...STAFFEL, status: "completed", league_season: active }, new Date("2027-02-01T10:00:00Z"))).toEqual(["completed", "league:abschluss"]);
+    expect(statusFilterKeys({ ...STAFFEL, status: "live" }, new Date("2026-11-12T10:00:00Z"))).toEqual(["live"]);
+  });
+
+  it("Nachmeldefrist kürzer als das Fenster: Label und Phasengrenze nehmen das wirksame Ende (Review #2453, 2)", () => {
+    // Fenster bis 30.11., Start 10.11., Frist 2 Tage: wirksam bis 11.11. 23:00 UTC = 12.11. 00:00 Wien.
+    const late = { ...OPEN, application_closes_at: "2026-11-29T23:00:00+00:00", late_registration_days: 2 };
+    expect(applicationEnd(late)).toBe(new Date("2026-11-11T23:00:00Z").getTime());
+    expect(stand({}, "2026-11-11T10:00:00Z", late)).toMatchObject({ key: "anmeldung", label: "Anmeldung offen bis 12.11., 00:00" });
+    // Nach dem wirksamen Ende, vor dem Fensterende: nicht mehr Anmeldung.
+    expect(stand({}, "2026-11-20T10:00:00Z", late).key).toBe("einteilung");
+    const bar = seasonPhases({ season: late, divisions: [], now: new Date("2026-11-20T10:00:00Z") });
+    expect(bar.find((step) => step.state === "current").key).toBe("einteilung");
+    expect(bar.find((step) => step.key === "anmeldung").when).toMatch(/– 12\.11\., 00:00$/);
+    // Vom Server geliefert geht vor.
+    const served = { ...late, application_effective_closes_at: "2026-11-15T11:00:00+00:00" };
+    expect(stand({}, "2026-11-14T10:00:00Z", served).label).toBe("Anmeldung offen bis 15.11., 12:00");
+    // Endet das Fenster vor dem Start, gilt es selbst.
+    expect(applicationEnd(OPEN)).toBe(new Date(OPEN.application_closes_at).getTime());
+  });
+
+  it("Season läuft, diese Staffel noch nicht gestartet: Einteilung mit fehlendem Start, nicht Spielbetrieb (Review #2453, 5a)", () => {
+    const active = { ...OPEN, status: "active" };
+    expect(stand({ participant_count: 4 }, "2026-11-12T10:00:00Z", active)).toMatchObject({ key: "einteilung", label: "Einteilung · Start fehlt", live: false });
+    const needs = staffelNeeds({ ...STAFFEL, participant_count: 4 }, { season: active, now: new Date("2026-11-12T10:00:00Z") });
+    expect(needs.map((row) => row.code)).toEqual(["start"]);
+    expect(statusFilterKeys({ ...STAFFEL, league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["league:einteilung"]);
+  });
+
+  it("beendete oder archivierte Season: keine fehlenden Punkte für eine nie gestartete Staffel (Review #2453, 5b)", () => {
+    for (const status of ["completed", "archived"]) {
+      expect(staffelNeeds({ ...STAFFEL, participant_count: 0 }, { season: { ...OPEN, status }, now: new Date("2027-02-01T10:00:00Z") })).toEqual([]);
+    }
+  });
+
+  it("verborgene Season mit offenem Fenster: kein grünes „Anmeldung offen“, dafür „Sichtbarkeit einschalten“ (Review #2453, 5c)", () => {
+    for (const visibility of ["off", "admins"]) {
+      const hidden = { ...OPEN, visibility };
+      expect(stand({}, "2026-11-02T10:00:00Z", hidden)).toMatchObject({ key: "anmeldung", hidden: true, label: "Anmeldung offen bis 06.11., 23:59 · Season verborgen" });
+      const needs = staffelNeeds(STAFFEL, { season: hidden, now: new Date("2026-11-02T10:00:00Z") });
+      expect(needs[0]).toEqual({ code: "visibility", text: "Sichtbarkeit einschalten – Teams sehen die Anmeldung nicht", to: "/admin/leagues/seasons/s1" });
+    }
+    expect(stand({}, "2026-11-02T10:00:00Z", { ...OPEN, visibility: "members" }).hidden).toBe(false);
+  });
+
+  it("vor dem Fensterbeginn kein „Teams zuteilen“ (Review #2453, 5d)", () => {
+    expect(staffelNeeds({ ...STAFFEL, participant_count: 0 }, { season: OPEN, now: new Date("2026-10-20T10:00:00Z") })).toEqual([]);
+    // Ohne Fenster teilt die Leitung von Anfang an zu.
+    const noWindow = { ...OPEN, application_opens_at: null, application_closes_at: null };
+    expect(staffelNeeds({ ...STAFFEL, participant_count: 0 }, { season: noWindow, now: new Date("2026-10-20T10:00:00Z") })[0]).toMatchObject({ code: "assign" });
   });
 });
 

@@ -3,6 +3,7 @@
 // Formularfeld und jedes Feld der Anfrage genau einem Reiter gehört. Daten und API bleiben, wie sie sind: Jeder Reiter schickt nur
 // seine Felder an PATCH /api/admin/leagues/seasons/{id}, der Server nimmt Teil-Anfragen an.
 import { seasonPayload } from "@/lib/league";
+import { effectiveCloses } from "@/lib/leagueApplications";
 import { dayNoon, viennaDate, viennaDateTime, viennaDay } from "@/lib/vienna";
 
 export const SEASON_TABS = [
@@ -169,6 +170,30 @@ const WITH_TIME = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "
 const at = (value) => (value ? new Date(value).getTime() : null);
 
 /**
+ * Das wirksame Ende der Anmeldung (#2422, #2453): vom Server (`application_effective_closes_at`), sonst wie dort gerechnet - das Fenster,
+ * höchstens bis zum Ende der Nachmeldefrist (`effectiveCloses`). Zeitpunkt in ms oder `null` ohne Fenster.
+ */
+export function applicationEnd(season = {}) {
+  if (season.application_effective_closes_at) return at(season.application_effective_closes_at);
+  const effective = effectiveCloses(season.application_closes_at, season.start_date, season.late_registration_days,
+    season.application_late_extension?.until || null);
+  return effective ? effective.getTime() : null;
+}
+
+/** Das wirksame Ende als Zeitpunkt für die Anzeige (`viennaDateTime`) - schon gerechnet, kein Serverwert mehr. */
+const endInstant = (season) => {
+  const end = applicationEnd(season);
+  return end == null ? null : new Date(end);
+};
+
+/** Die Season der Verwaltungsseite mit dem wirksamen Ende der Anmeldung vom Server (`late_registration.effective_closes_at`). */
+export function seasonWithEnd(data) {
+  const season = data?.season || {};
+  const end = data?.late_registration?.effective_closes_at;
+  return end ? { ...season, application_effective_closes_at: end } : season;
+}
+
+/**
  * Die Phasen einer Season, abgeleitet aus ihren Einstellungen (Kommentar Obmann 03.11. zu #2267): Vorbereitung → Anmeldung (Fenster)
  * → Einteilung → Spielbetrieb → Abschluss. Jede Phase hat `state` (done, current, upcoming, skipped), `when` und auf Wunsch `note`.
  * Der „Stand“ der Season bleibt die bewusste Schaltung der Leitung; „Beendet“ und „Archiviert“ schließen die Leiste ab.
@@ -176,7 +201,8 @@ const at = (value) => (value ? new Date(value).getTime() : null);
 export function seasonPhases({ season = {}, calendar = null, divisions = [], now = new Date() }) {
   const time = now.getTime();
   const opens = at(season.application_opens_at);
-  const closes = at(season.application_closes_at);
+  // Die Nachmeldefrist (#2422) kann die Anmeldung vor dem Fensterende schließen - die Grenze ist das wirksame Ende.
+  const closes = season.application_closes_at ? applicationEnd(season) : null;
   const start = at(season.start_date);
   const weeks = calendar?.weeks || [];
   const lastDay = weeks.at(-1)?.end_day || "";
@@ -203,7 +229,7 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
   const steps = [
     { key: "vorbereitung", label: "Vorbereitung", when: hasWindow ? `bis ${viennaDate(season.application_opens_at, SHORT)}` : startText ? `bis ${startText}` : "",
       note: "Einstellungen, Regelwerk, Prüfung" },
-    { key: "anmeldung", label: "Anmeldung", when: hasWindow ? `${viennaDateTime(season.application_opens_at, WITH_TIME)} – ${viennaDateTime(season.application_closes_at, WITH_TIME)}` : "ohne Selbstanmeldung",
+    { key: "anmeldung", label: "Anmeldung", when: hasWindow ? `${viennaDateTime(season.application_opens_at, WITH_TIME)} – ${viennaDateTime(endInstant(season), WITH_TIME)}` : "ohne Selbstanmeldung",
       note: hasWindow ? "Co-Teams melden sich auf der Ligaseite an" : "Co-Teams teilst du in der Staffel zu" },
     { key: "einteilung", label: "Einteilung", when: startText ? `bis ${startText}` : "", note: "Staffeln anlegen, Co-Teams zuteilen, Staffel starten" },
     { key: "spielbetrieb", label: "Spielbetrieb", when: startText ? `${startText}${lastDay ? ` – ${viennaDate(dayNoon(lastDay), SHORT)}` : ""}` : "",
@@ -215,6 +241,91 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
     if (step.key === "anmeldung" && !hasWindow) return { ...step, state: index < current ? "skipped" : current === index ? "current" : "skipped" };
     return { ...step, state: index < current ? "done" : index === current ? "current" : "upcoming" };
   });
+}
+
+// ---------------------------------------------------------------- Liga-Stand einer Staffel (#2453)
+
+// Eine Staffel steht bis „Liga starten“ im Turnier-Status „Entwurf“ - das ist ihr einziger Stand vor dem Start (docs/LIGA.md,
+// Abschnitt 6). Die Verwaltung zeigt darum den Stand der Season: dieselbe Ablaufleiste, nur mit dieser einen Staffel. „Abgesagt“ und
+// „Archiviert“ sind eigene Entscheidungen der Leitung und bleiben als Status stehen.
+const OWN_STAFFEL_STATUS = new Set(["cancelled", "archived"]);
+const BEFORE_START = new Set(["draft", "scheduled", "registration_open", "registration_closed", "check_in"]);
+const CLOSED_SEASON = new Set(["completed", "archived"]);
+const PUBLISHED_VISIBILITY = new Set(["members", "public"]);
+const STEP_NOTE_WAITING = "Die Season läuft schon - diese Staffel ist noch nicht gestartet.";
+const STAND_LABEL = {
+  vorbereitung: "Vorbereitung", anmeldung: "Anmeldung offen", einteilung: "Einteilung", spielbetrieb: "Spielbetrieb", abschluss: "Abgeschlossen",
+};
+
+/** Die Liga-Stände für den Status-Filter der Turnierliste - Wert `league:<phase>`. */
+export const STAFFEL_STAND_FILTERS = Object.entries(STAND_LABEL).map(([key, label]) => [`league:${key}`, `Liga: ${label}`]);
+
+/**
+ * Der Stand einer Staffel aus ihrer Season (`staffel.league_season` vom Server oder `season` der Season-Seite): `{key, filter, label, note}`
+ * oder `null` - dann gilt der Turnier-Status (gewöhnliches Turnier, abgesagt, archiviert, ohne Season-Angaben).
+ */
+export function staffelStand(staffel, { season = staffel?.league_season, now = new Date() } = {}) {
+  const status = staffel?.status || "draft";
+  if (!staffel?.league_context || !season || OWN_STAFFEL_STATUS.has(status)) return null;
+  const divisions = [{ status: "active", staffeln: [{ status, participant_count: staffel.participant_count || 0 }] }];
+  const step = seasonPhases({ season, divisions, now }).find((row) => row.state === "current");
+  if (!step) return null;
+  // Die Season läuft schon (eine andere Staffel hat begonnen), diese hier noch nicht: höchstens Einteilung, mit dem fehlenden Start.
+  const waiting = BEFORE_START.has(status) && step.key === "spielbetrieb";
+  const key = waiting ? "einteilung" : step.key;
+  let label = waiting ? `${STAND_LABEL.einteilung} · Start fehlt` : STAND_LABEL[key];
+  // Offen, aber nicht veröffentlicht: Teams sehen die Ligaseite nicht und können sich nicht anmelden.
+  const hidden = key === "anmeldung" && !PUBLISHED_VISIBILITY.has(season.visibility);
+  if (key === "anmeldung") label = `${label} bis ${viennaDateTime(endInstant(season), WITH_TIME)}`;
+  if (hidden) label = `${label} · Season verborgen`;
+  if (key === "spielbetrieb" && status === "paused") label = `${label} · pausiert`;
+  const note = hidden ? "Die Season ist nicht veröffentlicht – Teams sehen die Anmeldung nicht." : waiting ? STEP_NOTE_WAITING : step.note;
+  return { key, filter: `league:${key}`, label, note, hidden, live: key === "spielbetrieb" && status === "live" };
+}
+
+/**
+ * Auf welche Werte des Status-Filters eine Zeile passt. Nur der Entwurf einer Staffel weicht dem Liga-Stand; Live, Pausiert, Beendet …
+ * passen weiter auf ihren Status (Kacheln wie „?status=live“ zeigen laufende Staffeln mit), der Liga-Stand kommt dazu.
+ */
+export function statusFilterKeys(tournament, now = new Date()) {
+  const status = tournament?.status || "unknown";
+  const stand = staffelStand(tournament, { now });
+  if (!stand) return [status];
+  return BEFORE_START.has(status) ? [stand.filter] : [status, stand.filter];
+}
+
+/**
+ * Was der Staffel noch fehlt, mit dem Weg dorthin: `[{code, text, to}]`. Zuteilen läuft mit Anmeldefenster über den Eingang der Season,
+ * sonst über „Co-Team zuteilen“ in der Turnierverwaltung; den Spielplan macht „Liga starten“ in der Staffel fest. Ohne ``league_plan``
+ * (Season-Seite) fragt niemand nach festen Spielen. Eine beendete oder archivierte Season braucht nichts mehr.
+ */
+export function staffelNeeds(staffel, { season = staffel?.league_season, now = new Date() } = {}) {
+  const status = staffel?.status || "draft";
+  if (!staffel?.league_context || OWN_STAFFEL_STATUS.has(status) || CLOSED_SEASON.has(season?.status)) return [];
+  const manage = `/admin/tournaments/${encodeURIComponent(staffel.id || staffel.tournament_id || "")}`;
+  const seasonId = staffel.league_context.season_id;
+  const stand = staffelStand(staffel, { season, now });
+  const needs = [];
+  if (stand?.hidden && seasonId) needs.push({ code: "visibility", text: "Sichtbarkeit einschalten – Teams sehen die Anmeldung nicht", to: seasonAnchorUrl(seasonId) });
+  if (BEFORE_START.has(status)) {
+    const count = Number(staffel.participant_count) || 0;
+    const window = Boolean(season?.application_opens_at && season?.application_closes_at);
+    if (count < (Number(staffel.min_participants) || 2)) {
+      // Vor dem Fensterbeginn meldet sich noch niemand an - zuteilen ist erst ab der Anmeldung dran.
+      if (!(window && stand?.key === "vorbereitung")) {
+        const of = staffel.max_participants ? ` · ${count} von ${staffel.max_participants}` : "";
+        needs.push({ code: "assign", text: `Teams zuteilen${of}`, to: window && seasonId ? seasonAnchorUrl(seasonId, "anmeldungen") : `${manage}?tab=participants` });
+      }
+    } else if (!stand || stand.key === "einteilung") {
+      // Während der Anmeldung kommen noch Teams dazu - „Liga starten“ ist erst danach dran.
+      needs.push({ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: manage });
+    }
+    return needs;
+  }
+  if (["live", "paused"].includes(status) && staffel.league_plan && !(staffel.league_plan.fixed_matches > 0)) {
+    needs.push({ code: "plan", text: "Spielplan noch nicht erzeugt", to: `${manage}?tab=matchplan` });
+  }
+  return needs;
 }
 
 // ---------------------------------------------------------------- Sichtbarkeit und Stand: was sie bewirken

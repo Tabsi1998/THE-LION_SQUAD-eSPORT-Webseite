@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.88.0 (16.11.2026)
+
+### Neu
+
+* Abschluss nachholen – fehlende Auszeichnungen und Erfolge eines veröffentlichten Turniers genau einmal nachvergeben, mit Warnung bei gescheiterten Schritten (#2452)
+* Betrieb – „Alle quittieren“ mit Rückfrage in der Seite, unter Ereignisse genau die gezeigten Einträge, nur bis zum Laden der Seite (#2447)
+* Betrieb – „Jetzt neu prüfen“ mit Schutz gegen Doppelklick, Ampel oben sofort aktuell (#2447)
+* Betrieb – „X auffällig“ zählt nur Offenes, ein Tipp auf die Kachel öffnet genau diese Einträge (#2447)
+* Betrieb – Datei-Uploads zählen nicht als langsame Route, Liste unter Alarme einstellbar (#2447)
+* Betrieb – Einträge unter Überblick und Ereignisse einzeln quittieren, mit Eintrag im Adminprotokoll (#2447)
+* Betrieb – Ereignisse mit „Nur offene“ (ohne Zeitgrenze) und „Quittierte zeigen“, mit wer und wann (#2447)
+* Betrieb – Fehlergruppen direkt in der Zeile als gelöst markieren, auch mehrere auf einmal (#2447)
+* Betrieb – Überblick zeigt nur offene Probleme, leer „Alles erledigt“, bei Ladefehler „Erneut laden“ (#2447)
+* Betrieb – wieder grüne Auto-Checks und Alarme mit Gegenstück gelten von selbst als behoben (#2447)
+
+### Fehlerbehebungen
+
+* Auszeichnungen und Erfolge kommen beim Veröffentlichen auch, wenn die Jahreswertung scheitert (#2452)
+* Datenauskunft zeigt nicht, wer im Betrieb einen Eintrag quittiert hat (#2447)
+* Lange Spielernamen im Turnierbaum werden gekürzt statt mitten im Wort umgebrochen (#2452)
+* Läufe-Karte – „Plätze frei“ nur vor dem Lauf, sonst „bleiben leer“ (#2452)
+* Turnier-Ablauf zählt zusammengelegte Läufe nicht mehr als offene Spiele (#2452)
+* Turnierbaum zeigt die Medaillen auch nach abgekürzten Runden und entfallenem Grand Final (#2452)
+
 ## 1.87.1 (16.11.2026)
 
 ### Fehlerbehebungen

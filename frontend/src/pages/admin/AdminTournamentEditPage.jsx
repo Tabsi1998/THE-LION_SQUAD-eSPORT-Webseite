@@ -29,7 +29,7 @@ import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
-import { STAFFEL_STATUS_VALUES, SeasonSourceNote, StaffelHeaderLine, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { STAFFEL_STATUS_VALUES, SeasonSourceNote, StaffelHeaderLine, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -593,7 +593,8 @@ export default function AdminTournamentEditPage() {
             {/* Staffel (S24, L-C1): woher sie kommt - Liga N, Staffel, Season öffnen, Ligaseite. */}
             <StaffelHeaderLine tournament={t} />
             <div className="mt-2 flex items-center gap-3 flex-wrap">
-              <StatusBadge status={t.status} />
+              {/* Staffel (#2453): der Stand der Season statt „Entwurf“ - ohne Season-Angaben der Status wie bisher. */}
+              {isStaffel(t) ? <StaffelStandBadge tournament={t} testId="admin-tr-stand" /> : <StatusBadge status={t.status} />}
               {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
               <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
               <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
