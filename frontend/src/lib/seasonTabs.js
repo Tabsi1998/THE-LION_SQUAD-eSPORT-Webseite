@@ -217,6 +217,70 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
   });
 }
 
+// ---------------------------------------------------------------- Liga-Stand einer Staffel (#2453)
+
+// Eine Staffel steht bis „Liga starten“ im Turnier-Status „Entwurf“ - das ist ihr einziger Stand vor dem Start (docs/LIGA.md,
+// Abschnitt 6). Die Verwaltung zeigt darum den Stand der Season: dieselbe Ablaufleiste, nur mit dieser einen Staffel. „Abgesagt“ und
+// „Archiviert“ sind eigene Entscheidungen der Leitung und bleiben als Status stehen.
+const OWN_STAFFEL_STATUS = new Set(["cancelled", "archived"]);
+const BEFORE_START = new Set(["draft", "scheduled", "registration_open", "registration_closed", "check_in"]);
+const STAND_LABEL = {
+  vorbereitung: "Vorbereitung", anmeldung: "Anmeldung offen", einteilung: "Einteilung", spielbetrieb: "Spielbetrieb", abschluss: "Abgeschlossen",
+};
+
+/** Die Liga-Stände für den Status-Filter der Turnierliste - Wert `league:<phase>`. */
+export const STAFFEL_STAND_FILTERS = Object.entries(STAND_LABEL).map(([key, label]) => [`league:${key}`, `Liga: ${label}`]);
+
+/**
+ * Der Stand einer Staffel aus ihrer Season (`staffel.league_season` vom Server oder `season` der Season-Seite): `{key, filter, label, note}`
+ * oder `null` - dann gilt der Turnier-Status (gewöhnliches Turnier, abgesagt, archiviert, ohne Season-Angaben).
+ */
+export function staffelStand(staffel, { season = staffel?.league_season, now = new Date() } = {}) {
+  const status = staffel?.status || "draft";
+  if (!staffel?.league_context || !season || OWN_STAFFEL_STATUS.has(status)) return null;
+  const divisions = [{ status: "active", staffeln: [{ status, participant_count: staffel.participant_count || 0 }] }];
+  const step = seasonPhases({ season, divisions, now }).find((row) => row.state === "current");
+  if (!step) return null;
+  let label = STAND_LABEL[step.key];
+  if (step.key === "anmeldung") label = `${label} bis ${viennaDateTime(season.application_closes_at, WITH_TIME)}`;
+  if (step.key === "spielbetrieb" && status === "paused") label = `${label} · pausiert`;
+  return { key: step.key, filter: `league:${step.key}`, label, note: step.note, live: step.key === "spielbetrieb" && status === "live" };
+}
+
+/** Wonach die Turnierliste filtert: der Liga-Stand einer Staffel, sonst der Turnier-Status. */
+export function statusFilterKey(tournament, now = new Date()) {
+  return staffelStand(tournament, { now })?.filter || tournament?.status || "unknown";
+}
+
+/**
+ * Was der Staffel noch fehlt, mit dem Weg dorthin: `[{code, text, to}]`. Zuteilen läuft mit Anmeldefenster über den Eingang der Season,
+ * sonst über „Co-Team zuteilen“ in der Turnierverwaltung; den Spielplan macht „Liga starten“ in der Staffel fest. Ohne ``league_plan``
+ * (Season-Seite) fragt niemand nach festen Spielen.
+ */
+export function staffelNeeds(staffel, { season = staffel?.league_season, now = new Date() } = {}) {
+  const status = staffel?.status || "draft";
+  if (!staffel?.league_context || OWN_STAFFEL_STATUS.has(status)) return [];
+  const manage = `/admin/tournaments/${encodeURIComponent(staffel.id || staffel.tournament_id || "")}`;
+  if (BEFORE_START.has(status)) {
+    const count = Number(staffel.participant_count) || 0;
+    if (count < (Number(staffel.min_participants) || 2)) {
+      const window = Boolean(season?.application_opens_at && season?.application_closes_at);
+      const seasonId = staffel.league_context.season_id;
+      const of = staffel.max_participants ? ` · ${count} von ${staffel.max_participants}` : "";
+      return [{ code: "assign", text: `Teams zuteilen${of}`, to: window && seasonId ? seasonAnchorUrl(seasonId, "anmeldungen") : `${manage}?tab=participants` }];
+    }
+    // Während der Anmeldung kommen noch Teams dazu - „Liga starten“ ist erst danach dran.
+    const stand = staffelStand(staffel, { season, now });
+    return !stand || ["einteilung", "spielbetrieb"].includes(stand.key)
+      ? [{ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: manage }]
+      : [];
+  }
+  if (["live", "paused"].includes(status) && staffel.league_plan && !(staffel.league_plan.fixed_matches > 0)) {
+    return [{ code: "plan", text: "Spielplan noch nicht erzeugt", to: `${manage}?tab=matchplan` }];
+  }
+  return [];
+}
+
 // ---------------------------------------------------------------- Sichtbarkeit und Stand: was sie bewirken
 
 export const VISIBILITY_EFFECT = {
