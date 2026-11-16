@@ -187,6 +187,24 @@ def _check_id_fields(fields: list | None, current: list | None = None) -> None:
         raise HTTPException(status_code=422, detail=problem)
 
 
+async def _check_platform_source(db, game: dict) -> None:
+    """Plattform-Feld (#2281): höchstens eines je Spiel, auch über die ID-Quelle geerbt. Kennzeichnet die ID-Quelle schon ein
+    Feld, darf das Spiel kein zweites eigenes kennzeichnen - sonst wüsste die Season nicht, welches gilt."""
+    if not any(isinstance(item, dict) and item.get("platform") is True for item in game.get("player_id_fields") or []):
+        return
+    by_id = await game_id_keys.games_by_id(db)
+    source = game_id_keys.source_of(game, by_id)
+    if not source or source.get("id") == game.get("id"):
+        return
+    inherited = next((item for item in source.get("player_id_fields") or []
+                      if isinstance(item, dict) and item.get("platform") is True), None)
+    if inherited:
+        named = await db.games.find_one({"id": source.get("id")}, {"_id": 0, "name": 1}) or {}
+        raise HTTPException(status_code=422, detail=(
+            f"Die Plattform steht schon im Feld „{inherited.get('label') or inherited.get('key')}“ der ID-Quelle "
+            f"„{named.get('name') or source.get('slug')}“ – hier geht kein zweites Plattform-Feld."))
+
+
 @router.post("")
 async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -205,6 +223,7 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
         if await game_usage.chosen_is_archived(db, chosen):
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     await _check_discord_guild(db, doc)
+    await _check_platform_source(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -301,6 +320,8 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     lost_keys = await _lost_id_keys(db, current, updates, confirmed)
     await _check_discord_guild(db, updates, current)
+    if any(key in updates for key in ID_SOURCE_FIELDS):
+        await _check_platform_source(db, {**current, **updates})
     status = updates.get("status")
     if status and status != (current.get("status") or "active"):
         updates["archived_at"] = now_utc().isoformat() if status == game_usage.ARCHIVED else None

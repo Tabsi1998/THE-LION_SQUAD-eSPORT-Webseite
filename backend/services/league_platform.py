@@ -71,6 +71,11 @@ def option_fields(game: dict | None) -> list[dict]:
     return [item for item in fields if isinstance(item, dict) and str(item.get("key") or "").strip() and _options(item)]
 
 
+def marked_field(game: dict | None) -> dict | None:
+    """Das am Spiel als „Plattform“ gekennzeichnete Feld (#2281) - auch über die ID-Quelle geerbt; ``None`` ohne Kennzeichnung."""
+    return next((item for item in option_fields(game) if item.get("platform") is True), None)
+
+
 def field_of(game: dict | None, key: str | None) -> dict | None:
     if not key:
         return None
@@ -303,10 +308,13 @@ async def admin_view(db, season: dict) -> dict:
         saved += [value for row in divisions for value in own_overrides(row).get(ALLOWED) or []
                   if item["key"] == settings[FIELD] and value not in options and value not in saved]
         fields.append({"key": item["key"], "label": _label(item), "options": options + saved, "retired": saved,
-                       "required": item.get("required") is not False})
+                       "required": item.get("required") is not False, "platform": item.get("platform") is True})
+    marked = marked_field(game)
     return {
         "settings": settings,
         "fields": fields,
+        # Vorschlag der Season (#2281): das am Spiel gekennzeichnete Plattform-Feld; ohne Kennzeichnung keiner.
+        "suggested_field": marked["key"] if marked else None,
         "field_missing": bool(settings[FIELD]) and not field_of(game, settings[FIELD]),
         "input_devices": [{"value": key, "label": label} for key, label in INPUT_DEVICES.items()],
         "game": {"id": (game or {}).get("id"), "name": (game or {}).get("display_name") or (game or {}).get("name")},

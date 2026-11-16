@@ -18,9 +18,28 @@ function keyHint(field) {
   return field._new ? "Entsteht aus der Bezeichnung; nach dem Speichern fest." : "Fest – daran hängen die IDs der Spieler.";
 }
 
-function IdFieldCard({ field, index, onChange, onLabel, onRemove }) {
+// Plattform-Feld (#2281): Ist es nicht Pflicht, hält die Season die Plattform nicht fest - das sagt die Karte.
+export const PLATFORM_NOT_REQUIRED = "Nicht Pflicht: Die Plattform wird je Season nicht festgehalten, Spieler können sie im Profil jederzeit umstellen.";
+
+function hasOptions(field) {
+  const options = Array.isArray(field.options) ? field.options : String(field.options || "").split(",");
+  return options.some((option) => String(option || "").trim());
+}
+
+/** Das Plattform-Feld der ID-Quelle (#2281), das eine Spielversion erbt - sonst ``null``. Wie am Server: eigene ID-Quelle, sonst
+ *  beim Erben das Hauptspiel. */
+export function inheritedPlatform(games = [], gameId, form = {}) {
+  const current = games.find((game) => game.id === gameId);
+  const sourceId = form.identity_source_game_id || (form.inherit_player_ids !== false ? current?.parent_game_id : "");
+  const source = sourceId && sourceId !== gameId ? games.find((game) => game.id === sourceId) : null;
+  const field = (source?.player_id_fields || []).find((item) => item?.platform === true);
+  return field ? { game: source.display_name || source.name || source.slug, label: field.label || field.key } : null;
+}
+
+function IdFieldCard({ field, index, onChange, onLabel, onRemove, onPlatform, inherited }) {
   const update = (patch) => onChange({ ...field, ...patch });
   const options = Array.isArray(field.options) ? field.options.join(", ") : field.options || "";
+  const platform = field.platform === true;
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 md:p-4 space-y-3" data-testid={`game-id-field-${index}`}>
       <div className="flex items-center justify-between gap-3">
@@ -53,7 +72,16 @@ function IdFieldCard({ field, index, onChange, onLabel, onRemove }) {
         <CheckField label="Pflichtfeld für Turnieranmeldung" checked={field.required !== false} onChange={(value) => update({ required: value })} testId={`game-id-field-required-${index}`} />
         <CheckField label="Je Liga-Season nur einmal vergeben" hint="Für Auswahlfelder wirkungslos, wenn nicht eigens gesetzt."
           checked={field.unique_in_season !== false} onChange={(value) => update({ unique_in_season: value })} testId={`game-id-field-unique-${index}`} />
+        {/* Plattform (#2281): höchstens ein Feld je Spiel; die Season schlägt es vor. Nur ein Feld mit Auswahl taugt dafür. */}
+        <CheckField label="Plattform"
+          hint={inherited && !platform ? `Die Plattform kommt schon von ${inherited.game}.` : hasOptions(field) || platform ? "Dieses Feld sagt, auf welcher Plattform jemand spielt. Seasons schlagen es vor." : "Braucht Auswahlwerte, etwa PC, PlayStation, Xbox."}
+          checked={platform} disabled={!platform && (!hasOptions(field) || Boolean(inherited))} onChange={onPlatform} testId={`game-id-field-platform-${index}`} />
       </div>
+      {platform && field.required === false ? (
+        <p className="rounded-sm border border-warn/40 bg-warn/5 px-3 py-2 text-xs text-warn" role="note" data-testid={`game-id-field-platform-optional-${index}`}>
+          {PLATFORM_NOT_REQUIRED}
+        </p>
+      ) : null}
     </li>
   );
 }
@@ -64,6 +92,7 @@ export function GameIdsTab({ gameId, kind, form, onChange, games, usage }) {
   const fields = form.player_id_fields || [];
   const setFields = (next) => onChange({ ...form, player_id_fields: next });
   const isEdition = kind === "edition";
+  const inherited = isEdition ? inheritedPlatform(games, gameId, form) : null;
   const identityOptions = selectableGames(games, form.identity_source_game_id).filter((game) => game.id !== gameId)
     .map((game) => [game.id, `ID von ${gameOptionLabel(game)}`]);
 
@@ -117,11 +146,17 @@ export function GameIdsTab({ gameId, kind, form, onChange, games, usage }) {
       <FormSection title="Spieler-IDs"
         hint="Welche ID bei der Anmeldung gefragt wird, etwa die Activision ID. Pflichtfelder prüft die Turnieranmeldung; Format und Auswahl gelten für neue Werte im Profil und für die Liga."
         testId="game-ids-fields">
+        {inherited ? (
+          <p className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid="game-ids-platform-inherited">
+            Plattform: Feld „{inherited.label}“ von {inherited.game} – gilt auch für diese Version.
+          </p>
+        ) : null}
         {fields.length ? (
           <ul className="space-y-3">
             {fields.map((field, index) => (
               <IdFieldCard key={index} field={field} index={index} onChange={(next) => setFields(fields.map((row, i) => (i === index ? next : row)))}
-                onLabel={(value) => setLabel(index, value)} onRemove={() => remove(index)} />
+                onPlatform={(on) => setFields(fields.map((row, i) => (i === index ? { ...row, platform: on } : { ...row, platform: on ? false : row.platform })))}
+                onLabel={(value) => setLabel(index, value)} onRemove={() => remove(index)} inherited={inherited} />
             ))}
           </ul>
         ) : (
