@@ -1,3 +1,4 @@
+import type { LeagueSeasonStand } from "./lib/staffelStand";
 import type { NewsResult, NewsSignup } from "./lib/newsCards";
 
 export type User = {
@@ -75,6 +76,9 @@ export type Tournament = {
   // Liga-Staffel (#2173, docs/LIGA.md F.1): eingefrorener Endstand und die Namen von Liga, Season, Liga N und Staffel.
   final_table?: { id?: string; version?: number; closed_at?: string | null } | null;
   league_links?: { league_name?: string | null; season_name?: string | null; division_label?: string | null; staffel?: string | null; public_path?: string | null } | null;
+  league_context?: { season_id?: string | null } | null;
+  // Stand der Season (Folge #2453): nur mit dem Liga-Recht, damit zeigt die App den Liga-Stand statt „Entwurf“ (lib/staffelStand).
+  league_season?: LeagueSeasonStand | null;
   game_name?: string;
   // Spiel des Turniers - mit ihm gibt es einen Map-Pool (#1616).
   game_id?: string | null;

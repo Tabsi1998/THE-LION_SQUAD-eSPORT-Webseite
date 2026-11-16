@@ -3,6 +3,7 @@ import type { AppStackParamList, DetailScreenName, LooseNavigation, MainTabName,
 import type { UserNotification } from "../types";
 import { isLocalPath, ownPath } from "../lib/siteUrls";
 import { overallParams } from "../lib/leagueOverall";
+import { isQuietDigest } from "../lib/notificationKinds";
 
 // Die Navigation von außen (#1144): Benachrichtigungen, Links von außen und Adressen aus Inhalten öffnen ihren Screen
 // über dem Tab, in dem man gerade ist - die Tab-Leiste springt nicht mit. Nur die Übersicht eines Tabs (Home, Events,
@@ -139,6 +140,9 @@ export function flushPendingNotification() {
 export function targetFromNotification(item: UserNotification): AppTarget | null {
   const meta = (item.meta || {}) as Record<string, unknown>;
   const kind = String(item.kind || "").toLowerCase();
+
+  // Sammelmeldung nach der Ruhezeit (#2444): die Meldungen liegen in der Glocke - dorthin, egal was die Adresse sagt.
+  if (isQuietDigest(item)) return detail("Notifications");
 
   // Turnierleitung (#1158, #1160): „Dispute: bitte prüfen“, „Ergebnis fehlt“, „Station defekt“ öffnen ihre Ansicht.
   if (kind === "match_attention" && String(item.url || "").includes("/leitung")) {

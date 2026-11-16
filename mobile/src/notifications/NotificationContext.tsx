@@ -9,6 +9,7 @@ import { isGuestUser } from "../live";
 import { navigateToNotification, navigationRef, openDetail } from "../navigation/rootNavigation";
 import { POPUP_AUTO_HIDE_MS, mergePopup, popupBody, popupTitle, suppressedByOpenChat, type PopupState } from "../lib/popups";
 import { announceAchievementUnlocked } from "../lib/achievements";
+import { isQuietDigest } from "../lib/notificationKinds";
 import { useAppLock } from "../lock/AppLockProvider";
 
 /**
@@ -281,7 +282,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Gesperrt (#1052): nichts in Liste und Banner - nach dem Entsperren lädt die Glocke neu.
       if (lockedRef.current) return;
       // Ein Push ohne Inhalt (#1052) kommt nicht als Platzhalter in die Liste - die Liste vom Server bringt den Eintrag.
-      if (!isContentHiddenPush(item)) mergeIncomingNotification(item);
+      // Die Sammelmeldung der Ruhezeit (#2444) auch nicht: Die Meldungen selbst stehen schon in der Glocke.
+      if (!isContentHiddenPush(item) && !isQuietDigest(item)) mergeIncomingNotification(item);
       load();
     });
 

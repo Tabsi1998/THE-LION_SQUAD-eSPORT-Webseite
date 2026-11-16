@@ -100,6 +100,10 @@ const statusOf = (match: Pick<BracketMatch, "status"> | null | undefined) => Str
 export const isDone = (match: Pick<BracketMatch, "status"> | null | undefined) => DONE.has(statusOf(match));
 export const isLive = (match: Pick<BracketMatch, "status"> | null | undefined) => LIVE.has(statusOf(match));
 export const isCancelled = (match: Pick<BracketMatch, "status"> | null | undefined) => statusOf(match) === "cancelled";
+/** Zählt als Spiel (#2459, wie `countsAsMatch` im Web, #2452): weder Vorschau noch entfallen - ein zusammengelegter Lauf,
+ * ein nicht nötiger Reset oder eine abgekürzte Runde ist kein offenes Spiel. Für Zählungen wie „Gespielt 9 · Matches 9“. */
+export const countsAsMatch = (match: Pick<BracketMatch, "status" | "is_preview"> | null | undefined) =>
+  Boolean(match) && !match?.is_preview && statusOf(match) !== "preview" && !isCancelled(match);
 
 /** Grobe Lage eines Abschnitts: main, loser, final oder bronze - wie `section_kind` am Server (Gruppen zählen als main).
  * Ältere Bäume nennen das Spiel um Platz 3 auch „TP“ oder „Third Place“; das bleibt zusätzlich erkannt. Wie im Web. */
@@ -344,6 +348,25 @@ export function heatText(match: BracketMatch, edges: BracketEdge[], matches: Bra
     rest: exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "",
     free: free ? `${free} ${free === 1 ? "Platz" : "Plätze"} frei` : "",
   };
+}
+
+/**
+ * Die Zeile zu den freien Plätzen einer Lauf-Karte (#2459, wie HeatCard im Web, #2452) - oder leer.
+ * - „2 Plätze frei“ nur, solange der Lauf noch nicht gefahren ist und das Turnier läuft. Danach kommt niemand mehr dazu;
+ *   „2 Spieler“ oben sagt schon, wie viele gefahren sind.
+ * - „2 Plätze bleiben leer“, wenn die Quelle zusammengelegt wurde oder weniger weiterschickt (`source_result.skipped`).
+ *   Gemischte Runden (#1548): Ein gestrichener Platz ohne Los-Kennung wartet weiter aufs Los, dort bleibt es „frei“.
+ */
+export function heatFreeLine(match: BracketMatch, { finished = false }: { finished?: boolean } = {}): string {
+  const slots = match.slots || [];
+  const freeSlots = slots.filter((slot) => !slot.registration_id && isByeSlot(slot));
+  const count = freeSlots.length;
+  if (!count || finished) return "";
+  const results = new Set((match.results || []).map((row) => row.registration_id).filter(Boolean));
+  if (slots.some((slot) => slot.registration_id && results.has(slot.registration_id))) return "";
+  const stayEmpty = freeSlots.every((slot) => slot.source_result?.skipped && !(slotDraw(slot) && !slot.source_result.draw_id));
+  if (stayEmpty) return `${count} ${count === 1 ? "Platz bleibt" : "Plätze bleiben"} leer`;
+  return `${count} ${count === 1 ? "Platz" : "Plätze"} frei`;
 }
 
 const playersOf = (match: BracketMatch | null | undefined) => new Set((match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean) as string[]);

@@ -81,6 +81,8 @@ const KIND_LABELS: Record<string, string> = {
   newsletter_news: "News",
   newsletter_event: "Event",
   admin_push_test: "Test",
+  // Sammelmeldung nach der Ruhezeit (#2444, Web #1206): „In der Nacht: 4 Meldungen“ - die Meldungen selbst liegen in der Glocke.
+  quiet_digest: "Ruhezeit",
   general: "Hinweis",
 };
 
@@ -112,6 +114,13 @@ const PREFIX_LABELS: Array<[string, string]> = [
   ["achievement", "Erfolg"],
   ["friend", "Freunde"],
 ];
+
+/** Die Sammelmeldung nach der Ruhezeit (#2444): Kanal `lion_club`, Ziel `/notifications` - ein Tipp öffnet die Glocke. */
+export const QUIET_DIGEST_KIND = "quiet_digest";
+
+export function isQuietDigest(item: { kind?: string | null } | null | undefined): boolean {
+  return String(item?.kind || "").trim().toLowerCase() === QUIET_DIGEST_KIND;
+}
 
 /** Die Art einer Benachrichtigung in Worten - nie der Rohwert. */
 export function notificationKindLabel(kind?: string | null, meta?: Record<string, unknown> | null): string {

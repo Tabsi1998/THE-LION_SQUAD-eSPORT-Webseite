@@ -20,6 +20,7 @@ import { api } from "../lib/api";
 import { sha256Hex } from "../lib/sha256";
 import type { UserNotification } from "../types";
 import { PUSH_CHANNELS, PUSH_CHANNEL_SET, RETIRED_CHANNEL_IDS } from "./channels";
+import { getInstallationId } from "./installationId";
 
 // Graceful import – falls expo-notifications nicht installiert ist
 // Installieren mit: npx expo install expo-notifications expo-device
@@ -195,16 +196,22 @@ export async function registerPushToken(options: { private?: boolean } = {}): Pr
     console.info(`[PushService] Push-Token: ${token.slice(0, 30)}...`);
 
     // Token beim Backend registrieren - mit dem Stand der Kanäle, damit der Server die neuen Kennungen schickt.
+    // Mit der Installations-Kennung (#2470) ersetzt der Server den alten Eintrag dieses Handys; ein älterer Server
+    // ignoriert das Feld. Ohne sicheren Speicher geht der Token wie bisher ohne Kennung.
+    const installationId = await getInstallationId();
     const { data } = await api.post<{ private_content?: boolean }>("/mobile/push-token", {
       token,
       platform: Platform.OS,
       channels: PUSH_CHANNEL_SET,
       private: Boolean(options.private),
+      ...(installationId ? { installation_id: installationId } : {}),
     });
 
     return { token, privateConfirmed: data?.private_content === Boolean(options.private) };
   } catch (err) {
-    console.warn("[PushService] Fehler bei Token-Registrierung:", err);
+    // Nur die Art des Fehlers: Das Fehlerobjekt trägt die gesendeten Daten samt Installations-Kennung (#2470).
+    const status = (err as { response?: { status?: number } } | null)?.response?.status;
+    console.warn(`[PushService] Fehler bei Token-Registrierung${status ? ` (HTTP ${status})` : ""}.`);
     return null;
   }
 }

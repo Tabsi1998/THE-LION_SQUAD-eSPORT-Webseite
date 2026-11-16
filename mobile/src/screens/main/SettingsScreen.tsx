@@ -22,6 +22,8 @@ import { useAppLock } from "../../lock/AppLockProvider";
 import { DecoSetting } from "../../seasons/DecoSetting";
 import { colors } from "../../theme";
 import { useOptionalAppUpdate } from "../../update/AppUpdateProvider";
+import { quietHoursForm, readNotificationServer, type NotificationServerInfo, type Prefs, type QuietHours } from "../../lib/notificationLevels";
+import { NotificationLevels } from "./profile/NotificationLevels";
 import { dmOptions, MatrixToggle, notificationChannels, notificationLabels, notificationPreferenceKey, profileStyles, Toggle, type DiscordDmState } from "./profile/parts";
 
 // Einstellungen an einem Ort (#1146): eine Seite mit Gruppen, Ort ist das Zahnrad oben im Profil (Fabians Wahl A).
@@ -80,6 +82,9 @@ function settingsForm(user: Record<string, any> | null | undefined) {
     dm_privacy: u.dm_privacy || "everyone",
     newsletter_consent: Boolean(u.newsletter_consent),
     notification_preferences: { ...(u.notification_preferences || {}) } as Record<string, boolean>,
+    // Ruhezeit (#2444, Web #1206): Wiener Zeit, Standard aus. Geht nur mit, wenn sie geändert wurde - ein älterer Server
+    // bekommt das Feld so nie.
+    quiet_hours: quietHoursForm(u.quiet_hours) as QuietHours,
   };
 }
 
@@ -92,6 +97,11 @@ function AccountSettings() {
   const appLock = useAppLock();
   const [discordDm, setDiscordDm] = useState<DiscordDmState | null>(null);
   const [showTopics, setShowTopics] = useState(false);
+  // Stufen, Themen und Ruhezeit (#2444): was der Server dazu sagt. `serverKind` gilt für den Server, nicht für das Konto - beim
+  // Kontowechsel bleibt die Ansicht, bis die neuen Daten da sind. Ein älterer Server ohne Stufen zeigt die bisherige Ansicht.
+  const [server, setServer] = useState<{ status: "loading" | "ready" | "failed"; info: NotificationServerInfo | null }>({ status: "loading", info: null });
+  const [serverKind, setServerKind] = useState<"unknown" | "levels" | "legacy">("unknown");
+  const [loadRound, setLoadRound] = useState(0);
   // Die vollständigen Benachrichtigungs-Vorgaben vom Server; das Konto selbst speichert nur Abweichungen. Sie gehören
   // genau einem Konto - für jedes andere gelten sie nicht (nach Codex-Prüfung von #1528).
   const preferenceDefaults = useRef<{ account: string | null; prefs: Record<string, boolean> }>({ account: null, prefs: {} });
@@ -116,30 +126,42 @@ function AccountSettings() {
   const account = user?.id != null ? String(user.id) : null;
   useEffect(() => {
     setDiscordDm(null);
+    setServer({ status: "loading", info: null });
     if (account == null) return undefined;
     let current = true;
     const stamp = queue.stamp();
-    api.get<{ preferences?: Record<string, boolean>; discord?: DiscordDmState } | Record<string, boolean>>("/users/me/notification-preferences")
+    api.get<unknown>("/users/me/notification-preferences")
       .then(({ data }) => {
+        const info = readNotificationServer(data);
+        // Ob der Server Stufen kennt, sagt auch eine Antwort für ein voriges Konto.
+        setServerKind(info.levelsSupported ? "levels" : "legacy");
         if (!current || queue.getState().account !== account) return;
-        setDiscordDm(((data as any)?.discord as DiscordDmState | undefined) || null);
-        const preferences = ((data as any)?.preferences || data || {}) as Record<string, boolean>;
+        setDiscordDm((info.discord as DiscordDmState | null) || null);
+        const preferences = info.preferences;
         preferenceDefaults.current = { account, prefs: preferences };
         const confirmed = queue.getState().confirmed;
-        queue.merge({ notification_preferences: { ...(confirmed.notification_preferences || {}), ...preferences } }, stamp);
+        queue.merge({
+          notification_preferences: { ...(confirmed.notification_preferences || {}), ...preferences },
+          ...(info.quietHours ? { quiet_hours: info.quietHours } : {}),
+        }, stamp);
+        setServer({ status: "ready", info });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (current) setServer({ status: "failed", info: null });
+      });
     return () => {
       current = false;
     };
-  }, [account, queue]);
+  }, [account, queue, loadRound]);
 
   const change = useCallback((key: keyof SettingsForm, value: unknown) => {
     queue.edit({ [key]: value } as Partial<SettingsForm>);
     saver.schedule();
   }, [queue, saver.schedule]);
-  const changePreference = (key: string, value: boolean) => {
-    queue.edit((current) => ({ ...current, notification_preferences: { ...current.notification_preferences, [key]: value } }));
+  const changePreference = (key: string, value: boolean) => changePreferences({ [key]: value });
+  // Eine Stufe stellt viele Schalter auf einmal (#2444) - ein Schritt, ein PATCH.
+  const changePreferences = (patch: Prefs) => {
+    queue.edit((current) => ({ ...current, notification_preferences: { ...current.notification_preferences, ...patch } }));
     saver.schedule();
   };
   const status = saver.state.status;
@@ -204,7 +226,32 @@ function AccountSettings() {
   return (
     <>
       <Group title="Benachrichtigungen" testID="settings-group-notifications">
-        <Card style={styles.card}>
+        {server.status === "failed" ? (
+          <View style={styles.loadFailed} accessibilityRole="alert" testID="notification-load-failed">
+            <Muted style={styles.loadFailedText}>Die Stufen konnten nicht geladen werden. Deine Themen unten gelten weiter.</Muted>
+            <Pressable onPress={() => setLoadRound((value) => value + 1)} accessibilityRole="button" style={styles.expand} testID="notification-load-retry">
+              <Body style={styles.expandText}>Erneut versuchen</Body>
+            </Pressable>
+          </View>
+        ) : null}
+        {server.status === "ready" && server.info?.levelsSupported ? (
+          <NotificationLevels
+            info={server.info}
+            prefs={form.notification_preferences}
+            newsletter={Boolean(form.newsletter_consent)}
+            quiet={form.quiet_hours}
+            channelEnabled={channelEnabled}
+            topicEnabled={topicEnabled}
+            onPrefs={changePreferences}
+            onNewsletter={(value) => change("newsletter_consent", value)}
+            onQuiet={(next) => change("quiet_hours", next)}
+          />
+        ) : server.status === "loading" && serverKind !== "legacy" ? (
+          <View style={styles.levelSkeleton} accessibilityLabel="Benachrichtigungen werden geladen" testID="notification-levels-loading">
+            {[0, 1, 2].map((index) => <View key={index} style={styles.levelSkeletonCard} />)}
+          </View>
+        ) : (
+        <Card style={styles.card} testID="notification-legacy">
           <Toggle first label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={form.newsletter_consent} onValueChange={(v) => change("newsletter_consent", v)} testID="settings-toggle-newsletter" />
           <Muted style={profileStyles.sectionText}>Kanäle</Muted>
           {visibleChannels.map((item) => (
@@ -232,6 +279,7 @@ function AccountSettings() {
             </View>
           )) : null}
         </Card>
+        )}
       </Group>
 
       <Group title="Sicherheit" testID="settings-group-security">
@@ -445,6 +493,30 @@ const styles = StyleSheet.create({
   },
   danger: {
     color: colors.live,
+  },
+  loadFailed: {
+    borderColor: "rgba(255,159,10,0.45)",
+    borderRadius: 2,
+    borderWidth: 1,
+    gap: 4,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  loadFailedText: {
+    color: "#FF9F0A",
+  },
+  levelSkeleton: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  levelSkeletonCard: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: colors.border,
+    borderRadius: 2,
+    borderWidth: 1,
+    flex: 1,
+    height: 88,
   },
   expand: {
     alignItems: "center",
