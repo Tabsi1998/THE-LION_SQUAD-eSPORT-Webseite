@@ -145,6 +145,15 @@ test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles
   expect(targetFromUrl("/about")).toEqual(detail("ClubAbout"));
   // Jahresrückblick (#1195).
   expect(targetFromUrl("https://lionsquad.at/dein-jahr")).toEqual(detail("YearReview"));
+  // FAQ (#2449): die Übersicht in der App, auch über die alte Hilfe; eine Anleitung mit Bildern bleibt auf der Website.
+  expect(targetFromUrl("/faq")).toEqual(detail("Faq"));
+  // Wie im Web: #frage-<id> und #bereich-<id> klappen auf, ?q= sucht; ein kaputter Anker zählt als keiner.
+  expect(targetFromUrl("/faq#frage-konto-anlegen")).toEqual(detail("Faq", { frage: "konto-anlegen" }));
+  expect(targetFromUrl("https://lionsquad.at/faq#bereich-liga")).toEqual(detail("Faq", { bereich: "liga" }));
+  expect(targetFromUrl("/faq?q=check-in#frage-")).toEqual(detail("Faq", { q: "check-in" }));
+  expect(targetFromUrl("/faq#%E0%A4")).toEqual(detail("Faq"));
+  expect(targetFromUrl("/hilfe?q=ruhezeit")).toEqual(detail("Faq", { q: "ruhezeit" }));
+  expect(targetFromUrl("/faq/turniere#einchecken")).toBeNull();
   for (const url of ["/servers", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
     expect([url, targetFromUrl(url)]).toEqual([url, null]);
   }
