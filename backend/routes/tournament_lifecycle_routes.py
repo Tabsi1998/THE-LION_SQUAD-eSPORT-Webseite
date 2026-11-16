@@ -358,27 +358,78 @@ async def set_round_sponsors(tid: str, body: RoundSponsorsUpdate, me: dict = Dep
     return {"round_sponsors": rows}
 
 
-async def _settle_published_results(db, t: dict, tid: str, me: dict) -> str | None:
+# Die Schritte der Vergabe (#2452) - so heißen sie in ``failed``, wenn einer scheitert.
+SETTLE_STEP_LABELS = {
+    "placements": "Platzierungen",
+    "season_points": "Jahreswertung",
+    "awards": "Auszeichnungen",
+    "achievements": "Erfolge der Platzierten",
+    "prizes": "Gewinne",
+}
+
+
+async def _settle_published_results(db, t: dict, tid: str, me: dict) -> tuple[str | None, list[str]]:
     """Was „Ergebnisse veröffentlicht“ vergibt: Jahreswertung, Auszeichnungen (Platz je Anmeldung), XP und Erfolge der
-    Platzierten, Gewinne. Jeder Schritt ist idempotent und für sich abgesichert - scheitert die Jahreswertung, kommen
-    Auszeichnungen und Erfolge trotzdem (#2452). Die Auszeichnungen stehen vor der Auswertung der Erfolge, damit die
-    Platz-Erfolge den neuen Rang lesen und nicht einen alten. Rückgabe: der Hinweis zur Jahreswertung oder ``None``."""
+    Platzierten, Gewinne. Jeder Schritt ist idempotent und für sich abgesichert - scheitert einer, laufen die anderen
+    trotzdem (#2452). Die Auszeichnungen stehen vor der Auswertung der Erfolge, damit die Platz-Erfolge den neuen Rang
+    lesen und nicht einen alten. Rückgabe: (Hinweis zur Jahreswertung oder ``None``, gescheiterte Schritte)."""
     from services.season_service import season_weight_of, sync_tournament_points
     from badges import on_tournament_completed
     from services.awards import record_tournament_awards
     from services.prize_service import auto_create_for_tournament
 
     season_points_note = None
-    # Build placements once through the canonical Legacy/Stage projection.
-    regs = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(REGISTRATION_LIMIT)
-    read_model = await load_competition_read_model(db, tid)
-    snapshot = read_model.structure_snapshot()
-    observe_structure_read(snapshot, surface="season_points")
-    placements = placement_rows_for_structure(snapshot, regs, tournament=t)
+    failed: list[str] = []
+    # Build placements once through the canonical Legacy/Stage projection. Scheitert das, gibt es keine Platzierungen
+    # für Jahreswertung und Erfolge - Auszeichnungen und Gewinne rechnen selbst und laufen trotzdem.
+    regs: list[dict] = []
+    placements: list[dict] = []
+    try:
+        regs = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
+            {"_id": 0},
+        ).to_list(REGISTRATION_LIMIT)
+        read_model = await load_competition_read_model(db, tid)
+        snapshot = read_model.structure_snapshot()
+        observe_structure_read(snapshot, surface="season_points")
+        placements = placement_rows_for_structure(snapshot, regs, tournament=t)
+    except Exception:
+        failed.append("placements")
+        logger.warning("Platzierungen beim Veröffentlichen nicht berechnet tournament=%s", log_safe(tid), exc_info=True)
     placed_reg_ids = {placement["registration_id"] for placement in placements if placement.get("registration_id")}
+    if "placements" in failed:
+        # Ohne Platzierungen würde die Jahreswertung allen nur Teilnahme-Punkte geben - dann lieber unverändert lassen.
+        failed.append("season_points")
+    else:
+        season_points_note = await _settle_season_points(db, t, tid, me, regs, placements, placed_reg_ids,
+                                                         season_weight_of, sync_tournament_points, failed)
+    # Auszeichnungen (#230): je Anmeldung Platz und Bilanz festhalten - bei erneutem Veröffentlichen neu.
+    try:
+        await record_tournament_awards(db, tid)
+    except Exception:
+        failed.append("awards")
+        logging.getLogger("tls.awards").warning("Auszeichnungen nicht festgehalten tournament=%s", log_safe(tid), exc_info=True)
+    if placements:
+        try:
+            await on_tournament_completed(tid, placements)
+        except Exception:
+            failed.append("achievements")
+            logger.warning("Erfolge der Platzierten nicht ausgewertet tournament=%s", log_safe(tid), exc_info=True)
+    elif "placements" in failed:
+        failed.append("achievements")
+    # Phase 9: Auto-create prize pickups
+    try:
+        await auto_create_for_tournament(tid)
+    except Exception:
+        failed.append("prizes")
+        logging.getLogger("tls.prizes").warning("Gewinne nicht angelegt tournament=%s", log_safe(tid), exc_info=True)
+    return season_points_note, failed
+
+
+async def _settle_season_points(db, t: dict, tid: str, me: dict, regs: list[dict], placements: list[dict],
+                                placed_reg_ids: set, season_weight_of, sync_tournament_points, failed: list[str]) -> str | None:
+    """Die Jahreswertung des Turniers angleichen - scheitert sie, steht ``season_points`` in ``failed``."""
+    season_points_note = None
     try:
         weight = season_weight_of(t)
         # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) zählen nicht für die Jahreswertung - ausdrücklich, nicht über
@@ -404,25 +455,9 @@ async def _settle_published_results(db, t: dict, tid: str, me: dict) -> str | No
         elif synced.get("republished") and (synced["updated"] or synced["added"] or synced["removed"]):
             await _audit_tournament_action(db, "tournament.season_points.resync", me.get("id"), tid,
                                            {key: synced[key] for key in ("updated", "added", "removed", "season_id")})
-    except Exception as exc:  # die Jahreswertung hält Auszeichnungen und Erfolge nicht auf
-        logger.warning("Jahreswertung beim Veröffentlichen nicht angeglichen tournament=%s type=%s",
-                       log_safe(tid), type(exc).__name__)
-    # Auszeichnungen (#230): je Anmeldung Platz und Bilanz festhalten - bei erneutem Veröffentlichen neu.
-    try:
-        await record_tournament_awards(db, tid)
-    except Exception as exc:
-        logging.getLogger("tls.awards").warning("Auszeichnungen nicht festgehalten tournament=%s type=%s",
-                                                log_safe(tid), type(exc).__name__)
-    try:
-        await on_tournament_completed(tid, placements)
-    except Exception as exc:
-        logger.warning("Erfolge der Platzierten nicht ausgewertet tournament=%s type=%s", log_safe(tid), type(exc).__name__)
-    # Phase 9: Auto-create prize pickups
-    try:
-        await auto_create_for_tournament(tid)
-    except Exception as exc:
-        logging.getLogger("tls.prizes").warning("Gewinne nicht angelegt tournament=%s type=%s",
-                                                log_safe(tid), type(exc).__name__)
+    except Exception:  # die Jahreswertung hält Auszeichnungen und Erfolge nicht auf
+        failed.append("season_points")
+        logger.warning("Jahreswertung beim Veröffentlichen nicht angeglichen tournament=%s", log_safe(tid), exc_info=True)
     return season_points_note
 
 
@@ -449,11 +484,13 @@ async def _recheck_published_results(db, t: dict, tid: str, me: dict) -> dict:
         raise HTTPException(status_code=409, detail="Abschluss nachholen geht erst, wenn die Ergebnisse veröffentlicht sind.")
     if is_league_staffel(t):
         raise HTTPException(status_code=409, detail="Eine Liga-Staffel schließt die Liga-Leitung ab, nicht dieser Knopf.")
-    note = await _settle_published_results(db, t, tid, me)
+    note, failed = await _settle_published_results(db, t, tid, me)
     await _request_finish_evaluation(db, tid, "recheck")
     awards = await db.tournament_awards.count_documents({"tournament_id": tid})
-    await _audit_tournament_action(db, "tournament.results.rechecked", me.get("id"), tid, {"awards": awards})
-    return {"ok": True, "rechecked": True, "awards": awards, "idempotent_replay": True,
+    await _audit_tournament_action(db, "tournament.results.rechecked", me.get("id"), tid, {"awards": awards, "failed": failed})
+    # Scheitert ein Schritt, sagt die Antwort welcher - die Seite zeigt dann eine Warnung statt „nachgeholt“.
+    return {"ok": not failed, "rechecked": True, "awards": awards, "idempotent_replay": True,
+            "failed": failed, "failed_labels": [SETTLE_STEP_LABELS[step] for step in failed],
             **({"season_points_note": note} if note else {})}
 
 
@@ -576,7 +613,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     # ---------- Season Points + Badges on results_published ----------
     season_points_note = None
     if prev != status and status == "results_published":
-        season_points_note = await _settle_published_results(db, t, tid, me)
+        season_points_note, _failed = await _settle_published_results(db, t, tid, me)
 
     # „Turnier beendet“ (#1133): einmal je Turnier und Person, beim ersten der beiden Abschluss-Status.
     if prev != status and status in ("completed", "results_published") and prev not in ("completed", "results_published"):

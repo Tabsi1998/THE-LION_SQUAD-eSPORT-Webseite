@@ -302,6 +302,57 @@ async def test_nachholen_nur_fuer_veroeffentlichte_turniere_und_die_leitung(flow
     assert denied.status_code == 403, denied.text
 
 
+async def published_cup(flow):
+    tournament, staff, users, regs = await heats_cup(flow, 8)
+    await play_out(flow, tournament, [reg["id"] for reg in regs])
+    flow.act_as(staff)
+    await publish(flow, tournament)
+    return tournament, staff, users, regs
+
+
+@pytest.mark.asyncio
+async def test_nachholen_meldet_einen_gescheiterten_schritt_statt_erfolg(flow, monkeypatch):
+    """Scheitert die Jahreswertung, sagt die Antwort das (``ok`` falsch, der Schritt genannt) - Auszeichnungen und
+    Gewinne kommen trotzdem."""
+    tournament, _staff, _users, _regs = await published_cup(flow)
+    await flow.db.tournament_awards.delete_many({"tournament_id": tournament["id"]})
+    from services import season_service
+
+    async def broken(**kwargs):
+        raise RuntimeError("Jahreswertung kaputt")
+
+    monkeypatch.setattr(season_service, "sync_tournament_points", broken)
+    response = await recheck(flow, tournament)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False and body["failed"] == ["season_points"] and body["failed_labels"] == ["Jahreswertung"]
+    assert body["awards"] == 8, "die Auszeichnungen kommen trotzdem"
+    audit = await flow.db.audit_logs.find_one({"target_id": tournament["id"], "action": "tournament.results.rechecked"}, {"_id": 0})
+    assert audit["data"]["failed"] == ["season_points"]
+
+
+@pytest.mark.asyncio
+async def test_nachholen_ohne_platzierungen_kein_500_auszeichnungen_kommen_trotzdem(flow, monkeypatch):
+    """Lassen sich die Platzierungen nicht berechnen, gibt es keinen Fehler 500: Jahreswertung und Erfolge der
+    Platzierten bleiben unverändert und stehen als gescheitert in der Antwort, Auszeichnungen laufen trotzdem."""
+    tournament, _staff, _users, _regs = await published_cup(flow)
+    await flow.db.tournament_awards.delete_many({"tournament_id": tournament["id"]})
+    points_before = await flow.db.season_points.find({"source_id": tournament["id"]}, {"_id": 0}).to_list(50)
+    from routes import tournament_lifecycle_routes
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("Platzierungen kaputt")
+
+    monkeypatch.setattr(tournament_lifecycle_routes, "placement_rows_for_structure", broken)
+    response = await recheck(flow, tournament)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False and body["failed"] == ["placements", "season_points", "achievements"]
+    assert body["awards"] == 8
+    assert await flow.db.season_points.find({"source_id": tournament["id"]}, {"_id": 0}).to_list(50) == points_before, \
+        "ohne Platzierungen bleibt die Jahreswertung, wie sie ist"
+
+
 async def badges_queue(flow, users: list[dict]) -> None:
     """Die vorgemerkten Auswertungen abarbeiten - was der Server-Job sonst nach ein paar Sekunden tut -, dann so lange
     nachwerten, bis nichts Neues mehr kommt (Meta-Erfolge wie „Sammler“ zählen erst die frisch vergebenen; das tut sonst
