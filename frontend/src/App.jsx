@@ -29,6 +29,7 @@ import { RouteFallback, StartSplashGate } from "@/components/tls/RouteFallback";
 // „Zurück“ muss vor dem des Routers stehen, deshalb wird das Modul hier früh geladen.
 import "@/lib/navigationGuard";
 import { gamePageUrl } from "@/lib/gameForm";
+import { HilfeUmleitung } from "@/hilfe/HilfeUmleitung";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -122,8 +123,8 @@ const ImprintPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) 
 const TermsPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 // „Neu auf der Website“ (#1240): die letzten Neuerungen aus src/whatsnew.json.
 const WhatsNewPage = lazyPage(() => import("@/pages/public/WhatsNewPage"));
-// Hilfe für Spieler und Captains (#2295)
-const HelpIndexPage = lazyPage(() => import("@/pages/public/HelpIndexPage"));
+// FAQ (#2448, vorher Hilfe #2295): Fragen, Bereiche und Anleitungen.
+const FaqPage = lazyPage(() => import("@/pages/public/FaqPage"));
 const HelpTopicPage = lazyPage(() => import("@/pages/public/HelpTopicPage"));
 
 const DashboardPage = lazyPage(() => import("@/pages/user/DashboardPage"));
@@ -363,8 +364,10 @@ function App() {
           <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/neu" element={<WhatsNewPage />} />
-          <Route path="/hilfe" element={<HelpIndexPage />} />
-          <Route path="/hilfe/:thema" element={<HelpTopicPage />} />
+          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/faq/:thema" element={<HelpTopicPage />} />
+          <Route path="/hilfe" element={<HilfeUmleitung />} />
+          <Route path="/hilfe/:thema" element={<HilfeUmleitung />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

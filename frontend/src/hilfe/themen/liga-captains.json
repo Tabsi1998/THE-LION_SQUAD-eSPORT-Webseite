@@ -3,6 +3,9 @@
   "titel": "Liga für Captains",
   "kurz": "Co-Team zur Liga anmelden, offene Punkte nachtragen, Termin ausmachen, einchecken, Ergebnis melden und bestätigen.",
   "zielgruppe": "Für Captain und Vertreter",
+  "bereich": "liga",
+  "rollen": ["captain"],
+  "sichtbar_fuer": "alle",
   "suchbegriffe": ["anmeldung", "season", "staffel", "regelwerk", "regeln", "termin", "verschieben", "check-in", "einchecken", "ergebnis", "bestätigen", "protest", "einspruch", "veto", "map", "aufstellung", "kader", "teilnehmerliste"],
   "videos": [
     { "id": "liga-anmeldung", "titel": "Liga-Anmeldung im Video", "abschnitt": "anmelden" },
@@ -72,14 +75,14 @@
           "text": "Jeder Spieler trägt fehlende Angaben selbst im eigenen Profil ein. Das Geburtsdatum steht unter Grunddaten, Spiel-ID und Plattform unter Gaming. Schick deinen Spielern einfach den Link zur Hilfe.",
           "hinweis": "Betroffene Spieler bekommen auch selbst eine Nachricht.",
           "bild": false,
-          "link": { "to": "/hilfe/konto-und-profil#liga-hinweis", "label": "Hilfe: Konto und Profil" }
+          "link": { "to": "/faq/konto-und-profil#liga-hinweis", "label": "Hilfe: Konto und Profil" }
         },
         {
           "id": "kader",
           "titel": "Kader im Blick",
           "text": "Unter Teams bei Deine Teams steht bei eurem Co-Team, wer spielen darf und was fehlt. Neue Spieler in den Kader nimmt die Teamleitung auf.",
           "bild": false,
-          "link": { "to": "/hilfe/team-und-co-team#co-team-kader", "label": "Hilfe: Co-Team und Kader" }
+          "link": { "to": "/faq/team-und-co-team#co-team-kader", "label": "Hilfe: Co-Team und Kader" }
         }
       ]
     },

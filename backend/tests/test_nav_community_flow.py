@@ -63,17 +63,50 @@ async def test_a_stored_menu_moves_both_entries_without_doubles(flow):
     # Eigene Beschriftungen des Vereins bleiben.
     assert next(child for child in children(nav, "community") if child["key"] == "players")["label"] == "Spieler"
     assert all(child["label"] != "Achievements" for item in nav["items"] for child in item.get("children") or [])
-    # Hilfe (#2295) kommt in ein gespeichertes Menü ohne sie von selbst dazu, genau einmal.
-    assert community.count("/hilfe") == 1
+    # Die FAQ (#2448) kommt in ein gespeichertes Menü ohne sie von selbst dazu, genau einmal und oben.
+    assert [item.get("to") for item in nav["items"]].count("/faq") == 1
+    assert "/hilfe" not in community
+
+
+def top_level(nav: dict) -> list[str]:
+    return [item.get("key") for item in nav["items"]]
 
 
 @pytest.mark.asyncio
-async def test_a_hidden_help_entry_stays_hidden(flow):
-    """Blendet der Verein die Hilfe im Menü-Editor aus, bleibt sie draußen (#2295)."""
+async def test_faq_is_the_last_entry_of_the_main_bar(flow):
+    """FAQ (#2448, Fabian 16.11.): letzter Eintrag rechts, ohne Untermenü - und nicht mehr unter „Community“."""
+    nav = (await flow.get("/api/nav")).json()
+    assert top_level(nav)[-1] == "faq"
+    faq = nav["items"][-1]
+    assert (faq["to"], faq["label"]) == ("/faq", "FAQ") and not faq.get("children")
+    assert "help" not in {child["key"] for child in children(nav, "community")}
+
+
+@pytest.mark.parametrize("visible", [True, False])
+@pytest.mark.asyncio
+async def test_a_stored_help_entry_under_community_moves_to_the_faq(flow, visible):
+    """Ein gespeichertes Menü aus #2295 hat „Hilfe“ unter „Community“ - ausgeblendet oder nicht. Sie verschwindet
+    dort, die FAQ steht genau einmal in der Hauptleiste."""
     await flow.db.cms_nav.insert_one({"id": "main_nav", "items": [
         {"key": "community", "label": "Community", "visible": True, "order": 5, "children": [
-            {"key": "help", "to": "/hilfe", "label": "Hilfe", "visible": False},
+            {"key": "community_overview", "to": "/community", "label": "Übersicht", "visible": True},
+            {"key": "help", "to": "/hilfe", "label": "Hilfe", "visible": visible},
         ]},
+        {"key": "contact", "to": "/contact", "label": "Kontakt", "visible": True, "order": 6},
     ]})
     nav = (await flow.get("/api/nav")).json()
     assert "/hilfe" not in [child["to"] for child in children(nav, "community")]
+    assert top_level(nav).count("faq") == 1 and top_level(nav)[-1] == "faq"
+    flow.act_as(await flow.add_staff())
+    stored = (await flow.get("/api/admin/nav")).json()
+    assert all(child.get("key") != "help" for item in stored["items"] for child in item.get("children") or [])
+
+
+@pytest.mark.asyncio
+async def test_a_hidden_faq_stays_hidden(flow):
+    """Blendet der Verein die FAQ im Menü-Editor aus, bleibt sie draußen."""
+    await flow.db.cms_nav.insert_one({"id": "main_nav", "items": [
+        {"key": "faq", "to": "/faq", "label": "FAQ", "visible": False, "order": 7},
+    ]})
+    nav = (await flow.get("/api/nav")).json()
+    assert "faq" not in top_level(nav)

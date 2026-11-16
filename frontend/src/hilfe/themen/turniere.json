@@ -3,6 +3,9 @@
   "titel": "Turniere",
   "kurz": "Zum Turnier anmelden, einchecken, Ergebnis melden und den Turnierbaum lesen.",
   "zielgruppe": "Für alle Spieler",
+  "bereich": "turniere",
+  "rollen": ["spieler", "captain"],
+  "sichtbar_fuer": "alle",
   "suchbegriffe": ["turnier", "cup", "anmeldung", "check-in", "einchecken", "ergebnis", "bracket", "turnierbaum", "runde", "warteliste"],
   "abschnitte": [
     {
@@ -35,6 +38,7 @@
     {
       "id": "check-in-turnier",
       "titel": "Einchecken",
+      "bereich": "turniertag",
       "schritte": [
         {
           "id": "einchecken",

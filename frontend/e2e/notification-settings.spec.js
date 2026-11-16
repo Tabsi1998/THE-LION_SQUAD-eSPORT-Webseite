@@ -154,3 +154,22 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     });
   });
 }
+
+// Das Stylesheet dieser Seite wird nachgeladen und bleibt danach im Tab. Es darf keine allgemeine Klasse überschreiben
+// (#2448, Review F1): früher machte sein „.tls-reveal“ auf /faq alle zugeklappten Antworten sichtbar.
+test("danach im selben Tab: die FAQ-Antworten bleiben zu", async ({ page, isMobile }) => {
+  test.skip(Boolean(isMobile), "die Breite steht hier ausdrücklich");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockServer(page);
+  await page.goto("/profile?tab=notifications");
+  await expect(page.getByTestId("notification-level-custom")).toBeVisible();
+  await expect(page.getByTestId("notification-more-panel")).toHaveAttribute("data-open", "false");
+  await page.getByTestId("nav-faq").click();
+  await expect(page).toHaveURL(/\/faq$/);
+  const knopf = page.getByTestId("faq-frage-knopf-team-beitreten");
+  await expect(knopf).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("faq-antwort-team-beitreten")).toBeHidden();
+  await expect(page.getByTestId("faq-bereich-inhalt-teams")).toBeHidden();
+  await knopf.click();
+  await expect(page.getByTestId("faq-antwort-team-beitreten")).toBeVisible();
+});

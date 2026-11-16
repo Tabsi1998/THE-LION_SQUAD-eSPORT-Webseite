@@ -1,0 +1,14 @@
+[
+  { "id": "konto-profil", "titel": "Konto & Profil", "kurz": "Registrieren, Profil, Spiel-IDs und Plattform.", "icon": "user", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle" },
+  { "id": "benachrichtigungen", "titel": "Benachrichtigungen", "kurz": "Push, E-Mail, Discord und Ruhezeit einstellen.", "icon": "bell", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle" },
+  { "id": "verein-mitgliedschaft", "titel": "Verein & Mitgliedschaft", "kurz": "Mitglied werden und alles rund um den Verein.", "icon": "badge", "rollen": ["mitglied", "spieler"], "sichtbar_fuer": "alle" },
+  { "id": "events-kalender", "titel": "Events & Kalender", "kurz": "Termine finden, anmelden und im eigenen Kalender sehen.", "icon": "calendar", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle" },
+  { "id": "turniere", "titel": "Turniere", "kurz": "Anmelden, einchecken, Ergebnis melden, Turnierbaum lesen.", "icon": "trophy", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle" },
+  { "id": "liga", "titel": "Liga", "kurz": "Co-Team anmelden, Termine, Spieltag und Ergebnisse.", "icon": "list", "rollen": ["captain"], "sichtbar_fuer": "alle" },
+  { "id": "teams", "titel": "Teams & Co-Teams", "kurz": "Team gründen, einladen, beitreten und Rollen vergeben.", "icon": "users", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle" },
+  { "id": "turniertag", "titel": "Turniertag vor Ort", "kurz": "Check-in, Aufruf und deine Station.", "icon": "map-pin", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle" },
+  { "id": "gewinne", "titel": "Gewinne & Trophäen", "kurz": "Preise, Urkunden und Erfolge.", "icon": "gift", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle" },
+  { "id": "helferdienste", "titel": "Helferdienste", "kurz": "Schichten übernehmen und absagen.", "icon": "hand", "rollen": ["mitglied"], "sichtbar_fuer": "mitglied" },
+  { "id": "turnierleitung", "titel": "Turnierleitung", "kurz": "Check-in, Aufruf, Stationen und Ergebnisse vor Ort.", "icon": "clipboard", "rollen": ["turnierleitung"], "sichtbar_fuer": "turnierleitung" },
+  { "id": "datenschutz", "titel": "Datenschutz & Konto", "kurz": "Deine Daten herunterladen oder das Konto anonymisieren.", "icon": "shield", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle" }
+]

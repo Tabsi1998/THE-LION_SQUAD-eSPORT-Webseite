@@ -267,7 +267,7 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await reference_meta(db, slug, meta, origin)
     if first == "achievements" and slug == "a" and len(parts) > 2:
         return await achievement_share_meta(db, unquote(parts[2]), meta, origin)
-    if first == "hilfe":
+    if first in {"faq", "hilfe"}:
         return help_meta(slug.lower(), len(parts), meta, origin)
 
     static = static_page_meta(first, meta)
@@ -1319,19 +1319,23 @@ def origin_from_meta(meta: dict) -> str:
 
 
 def help_meta(slug: str, depth: int, base: dict, origin: str) -> dict:
-    """Hilfe (#2295): Übersicht und je Thema eine eigene Karte für Discord und WhatsApp; unbekannte Themen 404."""
+    """FAQ (#2448, vorher Hilfe #2295): Übersicht und je Anleitung eine eigene Karte für Discord und WhatsApp; unbekannte
+    Anleitungen 404. Alte Links auf /hilfe zeigen dieselbe Karte, kanonisch ist immer /faq. Groß/klein egal (F5)."""
+    slug = (slug or "").lower()
     if not slug:
-        meta = {**base, "title": f"{help_topics.HELP_TITLE} · {base['site_name']}", "description": help_topics.HELP_DESCRIPTION}
+        canonical = f"{origin}{help_topics.HELP_PATH}"
+        meta = {**base, "title": f"{help_topics.HELP_TITLE} · {base['site_name']}", "description": help_topics.HELP_DESCRIPTION,
+                "url": canonical, "canonical": canonical}
         meta["json_ld"] = webpage_json_ld(meta)
         return add_breadcrumbs(meta, origin, current_label=help_topics.HELP_TITLE)
     topic = help_topics.HELP_TOPICS.get(slug)
     if not topic or depth > 2:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     title, description = topic
-    canonical = f"{origin}/hilfe/{slug}"
+    canonical = f"{origin}{help_topics.HELP_PATH}/{slug}"
     meta = {**base, "title": f"{title} · {help_topics.HELP_TITLE} · {base['site_name']}", "description": description, "url": canonical, "canonical": canonical}
     meta["json_ld"] = webpage_json_ld(meta)
-    return add_breadcrumbs(meta, origin, [(help_topics.HELP_TITLE, "/hilfe")], title)
+    return add_breadcrumbs(meta, origin, [(help_topics.HELP_TITLE, help_topics.HELP_PATH)], title)
 
 
 def add_breadcrumbs(meta: dict, origin: str, parents: list[tuple[str, str]] | None = None, current_label: str | None = None) -> dict:

@@ -9,8 +9,8 @@ export function footerColumns(settings = {}, { isMember = false } = {}) {
     discord ? { href: discord, label: "Discord", external: true } : null,
     { to: "/calendar", label: "Kalender" },
     isMember ? { to: "/members/area", label: "Mitgliederbereich" } : { to: "/membership/join", label: "Mitglied werden" },
-    // Anleitungen für Spieler und Captains (#2295), gleich neben dem Kontakt.
-    { to: "/hilfe", label: "Hilfe" },
+    // FAQ (#2448, vorher Hilfe #2295), gleich neben dem Kontakt.
+    { to: "/faq", label: "FAQ" },
     { to: "/contact", label: "Kontakt" },
   ].filter(Boolean);
   return [
