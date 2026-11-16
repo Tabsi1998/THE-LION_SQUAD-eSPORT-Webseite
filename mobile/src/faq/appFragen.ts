@@ -32,7 +32,7 @@ export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-ruhezeit",
     frage: "Kann ich nachts Ruhe vor Push-Nachrichten haben?",
-    antwort: "Ja. Schalte unter Benachrichtigungen die Ruhezeit ein und stell Von und Bis ein. In der Zeit kommt kein Push. Der Aufruf zu deinem eigenen Spiel kommt trotzdem. Die übrigen Meldungen liegen in der Glocke.",
+    antwort: "Ja. Schalte unter Benachrichtigungen die Ruhezeit ein und stell Von und Bis ein. In der Zeit kommt kein Push. Trotzdem kommen: der Aufruf zu deinem Spiel und „Match startet jetzt“, in der Liga Check-in und Veto, wenn ihr am Zug seid, und für die Turnierleitung „Braucht Aufmerksamkeit“, solange dein Turnier läuft. Die übrigen Meldungen liegen in der Glocke.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle",
     link: ZU_BENACHRICHTIGUNGEN,
   },
@@ -78,7 +78,7 @@ export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-aktualisieren",
     frage: "Wie aktualisiere ich die App?",
-    antwort: "Updates kommen über Google Play. Gibt es eine neue Version, zeigt die App einen Hinweis. Tippe auf Update starten. Was neu ist, steht in den Einstellungen unter Über die App bei Was ist neu.",
+    antwort: "Updates kommen über Google Play. Ist die App von dort installiert, öffnet sich bei einer neuen Version das Update-Fenster von Google Play von selbst. Sonst zeigt die App einen Hinweis mit dem Knopf Play Store öffnen. Was neu ist, steht in den Einstellungen unter Über die App bei Was ist neu.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle", haeufig: true,
   },
 ];

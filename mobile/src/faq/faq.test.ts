@@ -5,6 +5,7 @@ import {
   hilfeNormal, sichtbareRollen, sucheFaq, type FaqFrage,
 } from ".";
 import { APP_BEREICH, APP_FRAGEN } from "./appFragen";
+import { QUIET_EXCEPTIONS_FALLBACK } from "../lib/notificationLevels";
 import { targetFromUrl } from "../navigation/rootNavigation";
 
 // FAQ in der App (#2449): dieselben Regeln wie die FAQ im Web (#2448). Die öffentlichen Fragen und Anleitungen sind eine
@@ -65,6 +66,25 @@ describe("Bereich LionsAPP", () => {
     expect(quelle("components/ListState.tsx")).toContain("zum Aktualisieren ziehen");
     expect(antwortVon("app-offline")).toContain("Zum Neuladen ziehst du die Seite nach unten.");
     expect(antwortVon("app-offline")).not.toMatch(/von selbst neu/);
+  });
+
+  test("Ruhezeit: alle Ausnahmen des Servers stehen in der Antwort", () => {
+    // Dieselben drei Ausnahmen wie EXEMPTION_TEXTS in backend/services/quiet_hours_rules.py (QUIET_EXCEPTIONS_FALLBACK).
+    const ruhezeit = antwortVon("app-ruhezeit");
+    expect(QUIET_EXCEPTIONS_FALLBACK).toHaveLength(3);
+    for (const teil of ["Aufruf zu deinem Spiel", "„Match startet jetzt“", "Liga Check-in und Veto", "„Braucht Aufmerksamkeit“", "solange dein Turnier läuft"]) {
+      expect([teil, ruhezeit.includes(teil)]).toEqual([teil, true]);
+    }
+  });
+
+  test("Updates: aus Google Play das Fenster von Google, sonst der eigene Hinweis mit „Play Store öffnen“", () => {
+    // Der eigene Hinweis bekommt keinen Start-Knopf für Google Play (AppUpdateProvider gibt onStartPlayUpdate nicht weiter).
+    expect(quelle("update/AppUpdateProvider.tsx")).not.toContain("onStartPlayUpdate");
+    expect(quelle("components/AppUpdateBanner.tsx")).toContain("\"Play Store öffnen\"");
+    const update = antwortVon("app-aktualisieren");
+    expect(update).toContain("Play Store öffnen");
+    expect(update).toContain("Update-Fenster von Google Play");
+    expect(update).not.toContain("Update starten");
   });
 
   test("Links der App-Fragen öffnen einen Screen der App", () => {
