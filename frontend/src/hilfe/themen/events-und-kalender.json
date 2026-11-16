@@ -45,7 +45,7 @@
           "id": "anmeldung-aendern",
           "titel": "Ändern oder stornieren",
           "text": "Unter Dein Event steht dein Stand. Mit Anmeldung ändern passt du Begleitpersonen und Hinweis an. Mit Stornieren wird dein Platz frei.",
-          "hinweis": "Beides geht bis zum Beginn des Events und nicht mehr nach dem Check-in.",
+          "hinweis": "Beides geht bis zum Beginn des Events und nicht mehr nach dem Check-in. Ist deine Rechnung schon erstellt, ändert die Begleitpersonen nur die Turnierleitung.",
           "bild": true
         }
       ]
