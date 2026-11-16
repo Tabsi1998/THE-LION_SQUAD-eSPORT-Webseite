@@ -55,7 +55,7 @@
         {
           "id": "erfolg-teilen",
           "titel": "Erfolg teilen",
-          "text": "Tippe bei einer erreichten Stufe auf Teilen. Daraus wird eine Karte mit Bild, die du schicken oder als Bild speichern kannst.",
+          "text": "Tippe bei einer erreichten Stufe auf Teilen. So schickst oder kopierst du den Link zu einer Karte mit Bild. Dort speicherst du sie mit Bild speichern.",
           "hinweis": "Teilen geht nur, wenn deine Erfolge öffentlich sind.",
           "bild": true
         }
