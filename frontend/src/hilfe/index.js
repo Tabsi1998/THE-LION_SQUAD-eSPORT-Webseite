@@ -11,9 +11,10 @@ export { FAQ_PFAD, ankerAus, fragePfad, hilfePfad, hilfeUmleitung } from "./pfad
 
 // FAQ (#2448, vorher Hilfe #2295): Fragen und Anleitungen unter /faq, eine Anleitung unter /faq/<thema>. Ein Thema ist eine
 // JSON-Datei in ./themen (Abschnitte mit Schritten: kurzer Satz, optional Hinweis und Link). Die Bilder je Schritt
-// (Handy 390 px, PC 1440 px) und die kurzen Videos erzeugt e2e/hilfe-bilder.spec.js mit nachgestellter API; sie liegen
-// in ./bilder/<thema>/<schritt>-handy|pc.webp und ./videos/<id>.webm. Dieselben Texte soll später die geführte Tour
-// (#2296) nutzen - deshalb Daten statt fest geschriebener Seiten.
+// (Handy 390 px, PC 1440 px) und die kurzen Schleifen wie ein GIF (`"clip": true`) erzeugt e2e/hilfe-bilder.spec.js mit
+// nachgestellter API; sie liegen in ./bilder/<thema>/<schritt>-handy|pc.webp und ./clips/<thema>/<schritt>-handy|pc.webm
+// bzw. .mp4. Das Bild ist zugleich das Poster der Schleife. Dieselben Texte soll später die geführte Tour (#2296)
+// nutzen - deshalb Daten statt fest geschriebener Seiten.
 //
 // Inhaltsmodell (#2448): Jede Frage (fragen.json) und jedes Thema trägt `bereich` (bereiche.json), `rollen` für den
 // Filter (spieler, captain, mitglied, turnierleitung) und `sichtbar_fuer` (alle, angemeldet, mitglied, turnierleitung).
@@ -35,8 +36,12 @@ export const ROLLEN = [
 export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung"];
 
 const BILDER = import.meta.glob("./bilder/**/*.webp", { eager: true, query: "?url", import: "default" });
-const VIDEOS = import.meta.glob("./videos/*.webm", { eager: true, query: "?url", import: "default" });
+// Nur Adressen (?url), keine Inhalte: Die Schleifen lädt erst FaqClip, wenn ein Schritt sichtbar wird (#2448).
+const CLIPS = import.meta.glob("./clips/**/*.{webm,mp4}", { eager: true, query: "?url", import: "default" });
 export const FORMEN = ["handy", "pc"];
+export const CLIP_ARTEN = ["webm", "mp4"];
+/** Wann die Handy-Fassung gilt: schmal, oder Touch bis Tablet-Breite. Ohne Raten am User-Agent (#2448). */
+export const HANDY_QUERY = "(max-width: 767px), (pointer: coarse) and (max-width: 1023px)";
 
 export function hilfeThema(slug) {
   return THEMEN.find((thema) => thema.slug === slug) || null;
@@ -57,8 +62,12 @@ export function hilfeBild(slug, schrittId, form, bilder = BILDER, groessen = mas
   return { src, width: width || undefined, height: height || undefined };
 }
 
-export function hilfeVideo(id, videos = VIDEOS) {
-  return videos[`./videos/${id}.webm`] || null;
+/** Schleife eines Schritts für `handy` oder `pc`: `{ webm, mp4 }` (eine Art darf fehlen), sonst null. */
+export function hilfeClip(slug, schrittId, form, clips = CLIPS) {
+  const key = `./clips/${slug}/${schrittId}-${form}`;
+  const webm = clips[`${key}.webm`] || null;
+  const mp4 = clips[`${key}.mp4`] || null;
+  return webm || mp4 ? { webm, mp4 } : null;
 }
 
 /** Klein, ohne Akzente, Umlaute ausgeschrieben - so findet ein Wort mit Umlaut auch die Schreibweise mit ae, oe, ue. */

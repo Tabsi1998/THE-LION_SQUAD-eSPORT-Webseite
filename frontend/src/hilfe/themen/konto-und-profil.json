@@ -18,6 +18,7 @@
           "text": "Tippe oben auf Registrieren. Gib einen Benutzernamen, deine E-Mail und ein Passwort ein.",
           "hinweis": "Der Benutzername steht später in der Adresse deines Profils.",
           "bild": true,
+          "clip": true,
           "link": { "to": "/register", "label": "Zum Registrieren" }
         },
         {
@@ -25,7 +26,8 @@
           "titel": "Zustimmen und Konto erstellen",
           "text": "Hake Datenschutz und Nutzungsbedingungen an. Tippe dann auf Account erstellen.",
           "hinweis": "Discord, Geburtsdatum und Geschlecht sind freiwillig. Du kannst sie auch später im Profil eintragen.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "email-bestaetigen",
@@ -46,6 +48,7 @@
           "text": "Tippe oben rechts auf deinen Namen und dann auf Einstellungen. Am Handy findest du sie im Menü.",
           "hinweis": "Es gibt keinen Speichern-Knopf. Alles, was du einträgst, speichert sich von selbst.",
           "bild": true,
+          "clip": true,
           "link": { "to": "/profile", "label": "Zu den Einstellungen" }
         },
         {
@@ -98,6 +101,7 @@
           "text": "Öffne Benachrichtigungen. Tippe oben eine Stufe an: Alles, Wichtiges oder Wenig. Die Stufe stellt alle Themen auf einmal.",
           "hinweis": "Neue Konten starten mit Alles. Ohne Haken beim Newsletter liegen News & Events nur still in der Glocke.",
           "bild": true,
+          "clip": true,
           "link": { "to": "/profile?tab=notifications", "label": "Benachrichtigungen öffnen" }
         },
         {
@@ -105,20 +109,23 @@
           "titel": "Themen einzeln stellen",
           "text": "Unter Themen wählst du je Thema Push, Nur App oder Aus. Push kommt aufs Handy und in den Browser. Nur App legt es still in die Glocke.",
           "hinweis": "Stellst du ein Thema selbst um, steht oben Eigene Auswahl.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "ruhezeit",
           "titel": "Ruhezeit einschalten",
           "text": "Schalte Ruhezeit ein. Vorgeschlagen ist 22:00 bis 7:00 Uhr. In dieser Zeit kommt kein Push, alles wartet in der Glocke. Danach kommt eine Sammelmeldung.",
           "hinweis": "Der Aufruf zu deinem Spiel und „Match startet jetzt“ kommen trotzdem sofort. E-Mails kommen wie bisher.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "weitere-wege",
           "titel": "E-Mail und Discord",
           "text": "Tippe auf Weitere Wege. Dort stellst du E-Mail und Discord je Thema ein oder schaltest einen Weg ganz ab.",
-          "bild": true
+          "bild": true,
+          "clip": true
         }
       ]
     }

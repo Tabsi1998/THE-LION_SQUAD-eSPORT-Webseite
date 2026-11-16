@@ -25,7 +25,8 @@
           "titel": "Prüfen und verbindlich anmelden",
           "text": "Im Fenster stehen Start, Check-in und die wichtigsten Regeln. Prüf alles und tippe auf Verbindlich anmelden.",
           "hinweis": "Ist das Turnier voll, heißt der Knopf Auf die Warteliste.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "dein-stand",
@@ -58,7 +59,8 @@
           "titel": "Ergebnis melden",
           "text": "Öffne nach dem Spiel dein Match. Stell mit Plus und Minus den Spielstand ein und tippe auf Ergebnis melden.",
           "hinweis": "Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.",
-          "bild": true
+          "bild": true,
+          "clip": true
         },
         {
           "id": "ergebnis-bestaetigen",
@@ -83,7 +85,8 @@
           "id": "weg-zeigen",
           "titel": "Weg durch den Baum",
           "text": "Tippe auf einen Namen, dann leuchtet sein Weg durch alle Runden auf. Am Handy blätterst du mit den Pfeilen von Runde zu Runde.",
-          "bild": true
+          "bild": true,
+          "clip": true
         }
       ]
     }
