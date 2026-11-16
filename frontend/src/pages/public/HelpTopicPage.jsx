@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { THEMEN, hilfeBild, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo } from "@/hilfe";
+import { FAQ_PFAD, THEMEN, faqBereich, hilfeBild, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo } from "@/hilfe";
 
-// Ein Hilfe-Thema (#2295) unter /hilfe/<thema>: Inhalt oben, dann je Abschnitt die Schritte mit Nummer, kurzem Satz,
-// Hinweis und Bild. Jeder Schritt hat einen Anker (#<schritt>), den „?“-Links und „Link kopieren“ nutzen. Am Handy
+// Eine Anleitung der FAQ (#2295, seit #2448 unter /faq/<thema>; /hilfe/<thema> leitet her): Inhalt oben, dann je
+// Abschnitt die Schritte mit Nummer, kurzem Satz, Hinweis und Bild. Jeder Schritt hat einen Anker (#<schritt>), den „?“-Links und „Link kopieren“ nutzen. Am Handy
 // zeigt das Bild die Handy-Ansicht, ab 768 px die PC-Ansicht.
 
 function StepImage({ slug, schritt }) {
@@ -100,13 +100,13 @@ function Step({ slug, schritt, active }) {
 }
 
 export default function HelpTopicPage() {
-  // Groß/klein egal wie beim Server (Teilen-Karte): /hilfe/Liga-Captains zeigt dasselbe Thema.
+  // Groß/klein egal wie beim Server (Teilen-Karte): /faq/Liga-Captains zeigt dasselbe Thema.
   const slug = useParams().thema?.toLowerCase();
   const { hash } = useLocation();
   const thema = hilfeThema(slug);
   const active = decodeURIComponent(hash.replace(/^#/, ""));
   const [scrolled, setScrolled] = useState("");
-  useDocumentTitle(thema ? `${thema.titel} · Hilfe` : "Hilfe", thema?.kurz, thema ? {} : { robots: "noindex, follow" });
+  useDocumentTitle(thema ? `${thema.titel} · FAQ` : "FAQ", thema?.kurz, thema ? {} : { robots: "noindex, follow" });
 
   // Die Seite wird nachgeladen: Kommt jemand über einen Link mit Anker, steht der Schritt erst jetzt da.
   useEffect(() => {
@@ -122,11 +122,11 @@ export default function HelpTopicPage() {
     return (
       <PublicLayout>
         <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="help-missing">
-          <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Hilfe", to: "/hilfe" }]} />
-          <h1 className="font-heading text-3xl font-black uppercase mt-4">Thema nicht gefunden</h1>
-          <p className="mt-3 text-white/70">Dieses Hilfe-Thema gibt es nicht. Alle Themen findest du in der Übersicht.</p>
-          <Link to="/hilfe" className="mt-5 inline-flex min-h-[44px] items-center gap-1 font-semibold text-[#29B6E8] hover:underline">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Zur Hilfe
+          <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "FAQ", to: FAQ_PFAD }]} />
+          <h1 className="font-heading text-3xl font-black uppercase mt-4">Anleitung nicht gefunden</h1>
+          <p className="mt-3 text-white/70">Diese Anleitung gibt es nicht. Alle Fragen und Anleitungen findest du in der FAQ.</p>
+          <Link to={FAQ_PFAD} className="mt-5 inline-flex min-h-[44px] items-center gap-1 font-semibold text-[#29B6E8] hover:underline">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Zur FAQ
           </Link>
         </article>
       </PublicLayout>
@@ -138,8 +138,8 @@ export default function HelpTopicPage() {
   return (
     <PublicLayout>
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12" data-testid="help-topic">
-        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Hilfe", to: "/hilfe" }, { label: thema.titel }]} />
-        <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{thema.zielgruppe}</p>
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "FAQ", to: FAQ_PFAD }, { label: thema.titel }]} />
+        <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{faqBereich(thema.bereich)?.titel || "Anleitung"} · {thema.zielgruppe}</p>
         <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2 [overflow-wrap:anywhere]">{thema.titel}</h1>
         <p className="mt-3 text-white/70 max-w-2xl">{thema.kurz}</p>
 
@@ -177,7 +177,7 @@ export default function HelpTopicPage() {
         ))}
 
         <section className="mt-14 border-t border-white/10 pt-6" aria-labelledby="help-more">
-          <h2 id="help-more" className="text-xs font-bold uppercase tracking-widest text-white/50">Weitere Themen</h2>
+          <h2 id="help-more" className="text-xs font-bold uppercase tracking-widest text-white/50">Weitere Anleitungen</h2>
           <ul className="mt-3 flex flex-wrap gap-2">
             {others.map((item) => (
               <li key={item.slug}>
@@ -185,8 +185,8 @@ export default function HelpTopicPage() {
               </li>
             ))}
           </ul>
-          <Link to="/hilfe" className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[#29B6E8] hover:underline">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Alle Themen und Suche
+          <Link to={FAQ_PFAD} className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[#29B6E8] hover:underline">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Alle Fragen und Suche
           </Link>
         </section>
       </article>
