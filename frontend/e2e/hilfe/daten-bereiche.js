@@ -88,7 +88,7 @@ const PERSONAL_FEED = { active: true, path: "/api/calendar/personal/probe-adress
 // Spielplan vor Ort aus dem echten Planer (fixtures/tableScheduleGenerated.json, Satz „onsite“). Für die FAQ: Zeiten auf
 // heute verschoben, schlichte Namen statt der Grenzfälle, und das laufende Spiel an der ersten Station - dort stehen
 // „Jetzt“ mit der Uhr und „Als Nächstes“ (aufgerufen) zusammen im Bild.
-const NAMES = ["NeonFalke", "KartKönigin", "LuckyLion", "PixelPaula", "Sturmfuchs", "Löwenherz", "Nachteule", "Kometa"];
+const NAMES = ["NeonFalke", "KartKönigin", "Probepanda", "PixelPaula", "Sturmfuchs", "Testkobold", "Nachteule", "Musterwolf"];
 function prepareOnsite() {
   const delta = Date.now() - Date.parse(FIXTURE.tournament.public_phase.now);
   const shifted = JSON.parse(JSON.stringify(FIXTURE), (key, value) => (typeof value === "string" && /^20\d\d-\d\d-\d\dT/.test(value)
