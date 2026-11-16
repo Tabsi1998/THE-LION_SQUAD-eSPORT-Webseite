@@ -587,6 +587,11 @@ Link auf einen Fall öffnet den Fall). Die übrigen Reiter bleiben, `?reiter=coc
 - Die Seite lädt bei jeder Änderung nach und fragt, solange das Cockpit offen ist, zusätzlich alle 20 Sekunden –
   „Ergebnis fehlt“ und Verzug entstehen mit der Zeit. Neue Probleme blenden nacheinander ein, erledigte gleiten hinaus; die Liste baut sich nicht neu auf. Mit
   „Bewegung reduzieren“ im Gerät springen die Zustände.
+- Hakt das WLAN vor Ort oder antwortet der Server kurz nicht, bleibt der letzte Stand stehen – mit gewähltem Reiter und
+  offener Rückfrage (etwa **Freigeben**). Unter den Reitern steht dann ruhig **Letzter Stand vor 25 s – es wird weiter
+  nachgeladen.**; der Hinweis zählt mit und verschwindet, sobald wieder Daten kommen. Nach einem Fehler fragt die Seite
+  mit wachsendem Abstand nach (höchstens jede Minute). Das Cockpit fällt nur weg, wenn das Turnier keine
+  Warteschlange mehr hat (online, keine Station). Dasselbe gilt für **Warteschlange je Station** im Matchplan.
 - Handy, Tablet hochkant und Tablet quer sind gleichwertig, jede Tippfläche ist mindestens 44 px hoch.
 
 <table><tr><th>Tablet quer</th><th>Handy</th></tr><tr>
