@@ -5,10 +5,10 @@ frühere Pausen (``paused_seconds``) und, solange das Turnier pausiert, die lauf
 wie ``match_timing.timing``. Ohne Pause bleibt alles wie bisher.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from services.match_scheduler import plan_schedule
-from services.match_timing import timing
+from services.match_timing import MISSING_AFTER_MINUTES, timing
 from test_live_queue_unit import T0, at, duel, eight, queue, station, tournament
 
 
@@ -35,7 +35,8 @@ def test_a_running_pause_moves_the_end_while_it_lasts():
     end = running_end([match], now, status="paused", paused_at=at(20))
     assert end == at(45), "15 Minuten Pause bisher - die Uhr steht bei 20 von 30"
     paused_tournament = tournament(status="paused", paused_at=at(20))
-    assert timing(match, paused_tournament, now)["due_at"] > end, "dieselbe Rechnung wie die Spielzeit-Uhr"
+    due = datetime.fromisoformat(timing(match, paused_tournament, now)["due_at"])
+    assert due == datetime.fromisoformat(end) + timedelta(minutes=MISSING_AFTER_MINUTES),         "dieselbe Rechnung wie die Spielzeit-Uhr: ihr geplantes Ende ist dieses Ende"
 
 
 def test_several_pauses_add_up():
