@@ -73,10 +73,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
 
     // Stand der Season statt „Entwurf“ - dieselbe Ableitung wie die Ablaufleiste der Season.
     await expect(page.getByTestId("admin-tr-stand-probe-liga-season-1-liga-1-a")).toContainText("Anmeldung offen bis");
-    await expect(staffel).not.toContainText("Entwurf");
+    await expect(staffel).not.toContainText(/entwurf/i);
     await expect(page.getByTestId("admin-tr-stand-probe-liga-season-0-liga-1-a")).toHaveText("Spielbetrieb");
     // Gewöhnliche Turniere behalten ihren Status.
-    await expect(page.getByTestId("admin-tr-winter-cup")).toContainText("Entwurf");
+    await expect(page.getByTestId("admin-tr-winter-cup")).toContainText("ENTWURF");
 
     // Was fehlt: Teams zuteilen - mit dem Weg in den Eingang der Season.
     const needs = page.getByTestId("admin-tr-needs-probe-liga-season-1-liga-1-a");
