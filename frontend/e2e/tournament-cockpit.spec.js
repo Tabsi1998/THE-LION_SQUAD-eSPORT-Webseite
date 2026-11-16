@@ -168,6 +168,8 @@ test.describe("Turnier-Cockpit", () => {
       }
       // Zwei Kacheln nebeneinander (768): die kurze bleibt so hoch wie ihr Inhalt, sie wird nicht auf die lange gestreckt.
       if (width === 768) {
+        // Erst messen, wenn die Kacheln eingeblendet sind (#2390): mitten im Einblenden liegen sie Bruchteile versetzt.
+        await settled(page);
         const short = await page.getByTestId("live-station-pc1").boundingBox();
         const tall = await page.getByTestId("live-station-pc2").boundingBox();
         expect(Math.abs(short.y - tall.y)).toBeLessThan(2);
