@@ -129,3 +129,43 @@ describe("Anmelden des Geräts (#1052)", () => {
     expect(await registerPushToken({ private: true })).toEqual({ token: "ExponentPushToken[geraet]", privateConfirmed: false });
   });
 });
+
+describe("Installations-Kennung (#2470)", () => {
+  test("jede Token-Meldung schickt dieselbe Kennung mit", async () => {
+    mockPost.mockResolvedValue({ data: { ok: true } });
+    await registerPushToken();
+    await registerPushToken({ private: true });
+
+    const first = mockPost.mock.calls[0][1] as Record<string, unknown>;
+    const second = mockPost.mock.calls[1][1] as Record<string, unknown>;
+    expect(first).toEqual(expect.objectContaining({ token: "ExponentPushToken[geraet]", channels: expect.anything(), private: false }));
+    expect(typeof first.installation_id).toBe("string");
+    expect(String(first.installation_id)).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
+    expect(second.installation_id).toBe(first.installation_id);
+  });
+
+  test("die Kennung steht in keiner Konsolen-Ausgabe, auch nicht beim Fehler", async () => {
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((level) => jest.spyOn(console, level).mockImplementation(() => {}));
+    try {
+      mockPost.mockResolvedValueOnce({ data: { ok: true } });
+      await registerPushToken();
+      const id = String((mockPost.mock.calls[0][1] as Record<string, unknown>).installation_id);
+      // Ein Fehler wie von axios: das Fehlerobjekt trägt die gesendeten Daten.
+      mockPost.mockRejectedValueOnce(Object.assign(new Error("Request failed"), {
+        config: { data: JSON.stringify(mockPost.mock.calls[0][1]) },
+        response: { status: 500 },
+      }));
+      expect(await registerPushToken()).toBeNull();
+
+      const printed = spies.flatMap((spy) => spy.mock.calls.flat()).map((arg) => {
+        if (arg instanceof Error) return `${arg.message} ${JSON.stringify((arg as Error & { config?: unknown }).config ?? "")}`;
+        return typeof arg === "string" ? arg : JSON.stringify(arg);
+      }).join("\n");
+      expect(id.length).toBeGreaterThanOrEqual(16);
+      expect(printed).not.toContain(id);
+      expect(printed).toContain("HTTP 500");
+    } finally {
+      spies.forEach((spy) => spy.mockRestore());
+    }
+  });
+});

@@ -137,14 +137,21 @@ test("ein zweiter Schalter während des Speicherns wartet - nie zwei PATCH gleic
   jest.useRealTimers();
 });
 
+// Seit #2444 stehen vor der allerersten Antwort Platzhalter statt Schaltern (der Server entscheidet, welche Ansicht gilt). Die späte
+// Antwort trifft deshalb nach einem Kontowechsel auf einen umgeschalteten Kanal - die Ansicht des Servers ist da schon bekannt.
 test("eine späte Antwort der Benachrichtigungen überschreibt keinen gerade umgeschalteten Kanal", async () => {
-  let resolvePrefs: (value: unknown) => void = () => {};
+  const prefAnswers: Array<(value: unknown) => void> = [];
   mockGet.mockImplementation((path: string) => (path === "/users/me/notification-preferences"
-    ? new Promise((resolve) => { resolvePrefs = resolve; })
+    ? new Promise((resolve) => { prefAnswers.push(resolve); })
     : Promise.resolve({ data: [] })));
-  await renderSettings();
+  const view = await renderSettings();
+  expect(screen.getByTestId("notification-levels-loading")).toBeTruthy();
+  expect(screen.queryByLabelText("Push")).toBeNull();
+  await act(async () => { prefAnswers[0]({ data: { preferences: {}, discord: { linked: false } } }); });
+  mockUser.value = { id: "u-2", username: "zweites", privacy_public_profile: true, dm_privacy: "everyone", notification_preferences: {} };
+  await rerenderSettings(view);
   await fireEvent(screen.getByLabelText("Push"), "valueChange", false);
-  await act(async () => { resolvePrefs({ data: { preferences: { push: true, email: true, in_app: false }, discord: { linked: false } } }); });
+  await act(async () => { prefAnswers[1]({ data: { preferences: { push: true, email: true, in_app: false }, discord: { linked: false } } }); });
   expect(screen.getByLabelText("Push").props.value).toBe(false);
   // Was nicht umgeschaltet war, kommt vom Server.
   expect(screen.getByLabelText("In-App").props.value).toBe(false);

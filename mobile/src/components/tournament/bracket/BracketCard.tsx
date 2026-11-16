@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { HEAD_H, LINE_H, META_H, SINGLE_H, type CardModel, type CardRow } from "../../../lib/bracketCards";
+import { HEAD_H, LINE_H, META_H, nameLines, SINGLE_H, type CardModel, type CardRow } from "../../../lib/bracketCards";
 import type { CardLift, RowMotion } from "../../../lib/bracketMotion";
 import { colors, radius, roles, surfaces } from "../../../theme";
 import { LiveClock } from "./LiveClock";
@@ -111,7 +111,7 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
           ) : null}
         </React.Fragment>
       ))}
-      {model.kind === "heat" && model.text.free ? <Text style={[styles.lineText, styles.quietLine]} maxFontSizeMultiplier={FONT_SCALE}>{model.text.free}</Text> : null}
+      {model.kind === "heat" && model.freeLine ? <Text style={[styles.lineText, styles.quietLine]} maxFontSizeMultiplier={FONT_SCALE} testID={`bracket-heat-free-${model.id}`}>{model.freeLine}</Text> : null}
       {model.kind === "heat" && model.cutAfter >= 0 && model.text.rest ? <Text style={styles.lineText} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{model.text.rest}</Text> : null}
     </Animated.View>
   );
@@ -143,7 +143,7 @@ function Row({ row, height, heat, walkover, selected, motion, pop, popDelay, pla
   );
   const parts = (
     <>
-      <Text style={nameStyle} numberOfLines={tall ? 2 : 1} maxFontSizeMultiplier={FONT_SCALE}>{row.label || "—"}</Text>
+      <Text style={nameStyle} numberOfLines={nameLines(row.label, tall)} ellipsizeMode="tail" maxFontSizeMultiplier={FONT_SCALE}>{row.label || "—"}</Text>
       {row.mine ? <Text style={styles.du} maxFontSizeMultiplier={FONT_SCALE}>Du</Text> : null}
       {walkover && row.winner && !heat ? <Text style={styles.tag} maxFontSizeMultiplier={FONT_SCALE}>kampflos</Text> : null}
       {result}

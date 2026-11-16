@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { Alert } from "react-native";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { isGuestUser } from "../live";
+import { INSTALLATION_ID_KEY } from "../notifications/installationId";
 
 // Der Anmeldepfad der App. Getestet werden die Zusagen, die man einem Nutzer
 // nicht stillschweigend brechen darf: Tokens nur speichern, wenn "angemeldet
@@ -237,10 +238,13 @@ describe("Abmelden", () => {
     await SecureStore.setItemAsync("tls.recent-searches", JSON.stringify(["rocket"]));
     // Die gespeicherte Mitgliedskarte (#1256) auch.
     await SecureStore.setItemAsync("tls.member-card", JSON.stringify({ user_id: "u-1", saved_at: "2026-10-07T16:05:00Z", card: { name: "Fan" } }));
+    // Die Installations-Kennung für Push (#2470) gehört zur Installation, nicht zum Konto - sie bleibt.
+    await SecureStore.setItemAsync(INSTALLATION_ID_KEY, "4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
 
     await act(async () => {
       await result.current.logout();
     });
+    expect(await SecureStore.getItemAsync(INSTALLATION_ID_KEY)).toBe("4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
 
     expect(mockApi.post).toHaveBeenCalledWith("/auth/mobile/logout", { refresh_token: "refresh-neu" });
     expect(mockUnregisterPushToken).toHaveBeenCalled();
@@ -354,10 +358,13 @@ describe("Kontowechsel", () => {
       tokenAtUnregister = bridge.readTokens().accessToken;
     });
 
+    await SecureStore.setItemAsync(INSTALLATION_ID_KEY, "4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
     mockApi.post.mockResolvedValue({ data: { user: { ...USER, id: "u-2" }, access_token: "a2", refresh_token: "r2" } });
     await act(async () => {
       await result.current.login("zweiter@lionsquad.at", "geheim", true);
     });
+    // Die Installations-Kennung (#2470) bleibt beim Kontowechsel.
+    expect(await SecureStore.getItemAsync(INSTALLATION_ID_KEY)).toBe("4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
 
     expect(mockUnregisterPushToken).toHaveBeenCalledTimes(1);
     expect(tokenAtUnregister).toBe("access-neu");
