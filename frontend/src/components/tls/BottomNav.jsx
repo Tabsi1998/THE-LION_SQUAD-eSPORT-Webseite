@@ -96,7 +96,7 @@ export function BottomNav() {
               aria-current={active ? "page" : undefined}
               data-testid={`bottom-nav-${item.key}`}
               className={`relative flex flex-col items-center justify-center flex-1 gap-1 min-h-[44px] transition-colors ${
-                active ? "text-[#29B6E8]" : "text-white/40 hover:text-white/70"
+                active ? "text-[#29B6E8]" : "text-quiet hover:text-white/80"
               }`}
             >
               {/* Aktiv-Indikator oben */}
