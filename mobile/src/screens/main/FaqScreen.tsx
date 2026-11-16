@@ -7,7 +7,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { WEBSITE_BASE_URL } from "../../config";
 import {
-  alleFragen, faqBereich, faqBereichsliste, haeufigeFragen, hilfePfad, hilfeSchritte, sichtbareRollen, sucheFaq,
+  alleFragen, darfSehen, faqBereich, faqBereichsliste, haeufigeFragen, hilfePfad, hilfeSchritte, sichtbareRollen, sucheFaq,
   type FaqAnleitung, type FaqBereich, type FaqBereichInhalt, type FaqFrage, type FaqTreffer,
 } from "../../faq";
 import { useFaqZugang } from "../../faq/useFaqZugang";
@@ -297,7 +297,8 @@ export function FaqScreen({ route }: Props = {}) {
     const schluessel = `${route?.key || ""}|${frageId}|${bereichId}|${q}`;
     if (erledigt.current === schluessel || (!frageId && !bereichId && !q)) return;
     if (frageId) {
-      const frage = fragen.find((row) => row.id === frageId);
+      // Ohne Recht zählt eine geschützte Frage wie eine unbekannte: nichts aufklappen, keinen Filter zurücksetzen.
+      const frage = fragen.find((row) => row.id === frageId && darfSehen(row.sichtbar_fuer, zugang.darf));
       if (!frage && !zugang.geladen) return;
       erledigt.current = schluessel;
       setQuery(q);
@@ -321,7 +322,7 @@ export function FaqScreen({ route }: Props = {}) {
       setOffeneBereiche((set) => new Set(set).add(bereichId));
       setScrollZiel(`bereich-${bereichId}`);
     }
-  }, [fragen, route?.key, ziel?.bereich, ziel?.frage, ziel?.q, zugang.geladen]);
+  }, [fragen, route?.key, ziel?.bereich, ziel?.frage, ziel?.q, zugang.darf, zugang.geladen]);
 
   useEffect(() => {
     if (!scrollZiel) return undefined;
