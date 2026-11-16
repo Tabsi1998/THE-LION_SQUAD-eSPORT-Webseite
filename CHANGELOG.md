@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.87.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.86.0...v1.87.0) (2026-11-16)
+
+
+### Neu
+
+* Benachrichtigungen in drei Stufen (Alles, Wichtiges, Wenig) mit Push, Nur App oder Aus je Thema ([#1204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1204)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+* E-Mail, Discord und Kanal-Hauptschalter eingeklappt unter „Weitere Wege“ ([#1204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1204)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+* Neue Konten starten mit der Stufe „Alles“, News & Events ohne Newsletter-Zustimmung nur in der Glocke ([#1204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1204)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+* Ruhezeit hält Push, Browser und Discord bis zum Ende zurück, danach genau eine Sammelmeldung ([#1206](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1206)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+* Ruhezeit von–bis in Wiener Zeit in den Einstellungen, Vorschlag 22:00 bis 7:00, mindestens 15 Minuten Lücke ([#1206](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1206)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+* Schalter in den Einstellungen geben beim Drücken kurz nach ([#1204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1204)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+* Themen per Pfeiltasten wählbar, beim Ladefehler ein Hinweis mit „Erneut versuchen“ ([#1204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1204)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+
+
+### Dokumentation
+
+* Hilfe und Handbuch zu Stufen, Themen und Ruhezeit mit Bildern ([#1204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1204)) ([9861901](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/98619012e1fadeac7a2e9d8c1a873e0704cfef07))
+
 ## 1.86.0 (16.11.2026)
 
 ### Neu
