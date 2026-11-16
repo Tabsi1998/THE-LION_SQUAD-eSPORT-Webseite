@@ -180,6 +180,12 @@ export function applicationEnd(season = {}) {
   return effective ? effective.getTime() : null;
 }
 
+/** Das wirksame Ende als Zeitpunkt für die Anzeige (`viennaDateTime`) - schon gerechnet, kein Serverwert mehr. */
+const endInstant = (season) => {
+  const end = applicationEnd(season);
+  return end == null ? null : new Date(end);
+};
+
 /** Die Season der Verwaltungsseite mit dem wirksamen Ende der Anmeldung vom Server (`late_registration.effective_closes_at`). */
 export function seasonWithEnd(data) {
   const season = data?.season || {};
@@ -223,7 +229,7 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
   const steps = [
     { key: "vorbereitung", label: "Vorbereitung", when: hasWindow ? `bis ${viennaDate(season.application_opens_at, SHORT)}` : startText ? `bis ${startText}` : "",
       note: "Einstellungen, Regelwerk, Prüfung" },
-    { key: "anmeldung", label: "Anmeldung", when: hasWindow ? `${viennaDateTime(season.application_opens_at, WITH_TIME)} – ${viennaDateTime(new Date(closes), WITH_TIME)}` : "ohne Selbstanmeldung",
+    { key: "anmeldung", label: "Anmeldung", when: hasWindow ? `${viennaDateTime(season.application_opens_at, WITH_TIME)} – ${viennaDateTime(endInstant(season), WITH_TIME)}` : "ohne Selbstanmeldung",
       note: hasWindow ? "Co-Teams melden sich auf der Ligaseite an" : "Co-Teams teilst du in der Staffel zu" },
     { key: "einteilung", label: "Einteilung", when: startText ? `bis ${startText}` : "", note: "Staffeln anlegen, Co-Teams zuteilen, Staffel starten" },
     { key: "spielbetrieb", label: "Spielbetrieb", when: startText ? `${startText}${lastDay ? ` – ${viennaDate(dayNoon(lastDay), SHORT)}` : ""}` : "",
@@ -270,7 +276,7 @@ export function staffelStand(staffel, { season = staffel?.league_season, now = n
   let label = waiting ? `${STAND_LABEL.einteilung} · Start fehlt` : STAND_LABEL[key];
   // Offen, aber nicht veröffentlicht: Teams sehen die Ligaseite nicht und können sich nicht anmelden.
   const hidden = key === "anmeldung" && !PUBLISHED_VISIBILITY.has(season.visibility);
-  if (key === "anmeldung") label = `${label} bis ${viennaDateTime(new Date(applicationEnd(season)), WITH_TIME)}`;
+  if (key === "anmeldung") label = `${label} bis ${viennaDateTime(endInstant(season), WITH_TIME)}`;
   if (hidden) label = `${label} · Season verborgen`;
   if (key === "spielbetrieb" && status === "paused") label = `${label} · pausiert`;
   const note = hidden ? "Die Season ist nicht veröffentlicht – Teams sehen die Anmeldung nicht." : waiting ? STEP_NOTE_WAITING : step.note;
