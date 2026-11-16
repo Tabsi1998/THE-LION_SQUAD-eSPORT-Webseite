@@ -386,14 +386,16 @@ async def mobile_push_health_summary() -> dict[str, Any]:
     active_tokens = await db.mobile_push_tokens.count_documents(active_filter)
     disabled_tokens = await db.mobile_push_tokens.count_documents({"enabled": False})
     users_with_tokens = len(await db.mobile_push_tokens.distinct("user_id", active_filter))
+    # Fehler zählen nur an aktiven Geräten (#2467): ein abgemeldetes altes Handy färbt die Kachel nicht rot.
     ticket_errors = await db.mobile_push_tokens.count_documents(
-        {"last_ticket_error": {"$nin": [None, ""]}},
+        {**active_filter, "last_ticket_error": {"$nin": [None, ""]}},
     )
     receipt_errors = await db.mobile_push_tokens.count_documents(
-        {"last_receipt_error": {"$nin": [None, ""]}},
+        {**active_filter, "last_receipt_error": {"$nin": [None, ""]}},
     )
     latest_problem = await db.mobile_push_tokens.find_one(
         {
+            **active_filter,
             "$or": [
                 {"last_ticket_error": {"$nin": [None, ""]}},
                 {"last_receipt_error": {"$nin": [None, ""]}},

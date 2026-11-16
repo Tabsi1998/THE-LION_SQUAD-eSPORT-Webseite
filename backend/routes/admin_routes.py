@@ -910,11 +910,16 @@ async def mobile_push_users(q: str = "", limit: int = Query(default=40, ge=1, le
         tokens = [row for row in token_rows if row.get("user_id") == user_id]
         enabled_tokens = [row for row in tokens if row.get("enabled") is not False]
         latest = tokens[0] if tokens else {}
+        # Rot nur bei einem Fehler an einem aktiven Gerät (#2467) - ein abgemeldetes altes Handy ist kein Problem.
+        active_error = next((row.get("last_receipt_error") or row.get("last_ticket_error") for row in enabled_tokens
+                             if row.get("last_receipt_error") or row.get("last_ticket_error")), None)
         rows.append({
             **user,
             "token_count": len(tokens),
             "enabled_token_count": len(enabled_tokens),
+            "disabled_token_count": len(tokens) - len(enabled_tokens),
             "has_enabled_token": bool(enabled_tokens),
+            "active_error": active_error,
             "platforms": sorted({row.get("platform") or "unknown" for row in tokens}),
             "latest_token_preview": _token_preview(latest.get("token")),
             "latest_updated_at": latest.get("updated_at"),
@@ -944,8 +949,22 @@ async def mobile_push_status_for_user(user_id: str, me: dict = Depends(require_c
         "user": user,
         "tokens": tokens,
         "enabled_count": len([row for row in tokens if row.get("enabled") is not False]),
+        # Alle abgemeldeten (#2467), auch über die 20 gezeigten hinaus - so viele entfernt „Alte Geräte entfernen“.
+        "disabled_count": await db.mobile_push_tokens.count_documents({"user_id": user_id, "enabled": False}),
         "has_enabled_token": any(row.get("enabled") is not False for row in tokens),
     }
+
+
+@router.delete("/mobile-push/old-devices/{user_id}")
+async def mobile_push_remove_old_devices(user_id: str, me: dict = Depends(require_club_admin())):
+    """Alte Geräte entfernen (#2467): nur abgemeldete Einträge der Person; aktive bleiben. Steht im Adminprotokoll."""
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    result = await db.mobile_push_tokens.delete_many({"user_id": user_id, "enabled": False})
+    removed = int(getattr(result, "deleted_count", 0) or 0)
+    await _ops_audit(db, me, "mobile_push.old_devices.remove", user_id, {"removed": removed})
+    return {"ok": True, "removed": removed}
 
 
 @router.post("/mobile-push/test")
