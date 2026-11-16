@@ -3,9 +3,12 @@ import { AppState, Linking } from "react-native";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { PUSH_OFF_ACTION, PUSH_OFF_TEXT, PushOffHint } from "./PushOffHint";
 import type { PushPermission } from "../notifications/PushService";
+import { markPushAsked } from "../notifications/pushPrompt";
+import { resetPromptStateForTests } from "../notifications/pushPromptStore";
 
 // Der leise Hinweis (#1208): nur wer abgelehnt hat oder wem Android die Erlaubnis verweigert. „einschalten“ fragt Android
-// noch einmal, solange es geht - sonst die Systemeinstellungen. Kein Dialog, nichts für Gäste.
+// noch einmal, solange es geht - sonst die Systemeinstellungen. Kein Dialog, nichts für Gäste. Android 13 meldet vor der
+// ersten Frage schon „denied“ mit „canAskAgain“ - das ist noch kein Nein, also kein Hinweis.
 
 type MockUser = { id: string; username: string };
 const mockAuth: { user: MockUser | null } = { user: { id: "u-1", username: "lena" } };
@@ -28,6 +31,7 @@ let openSettings: jest.SpyInstance;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetPromptStateForTests(null);
   mockListeners.clear();
   mockAuth.user = { id: "u-1", username: "lena" };
   mockPermission.value = { status: "denied", canAskAgain: false };
@@ -46,8 +50,18 @@ test("vom System verweigert: die leise Zeile, „einschalten“ öffnet die Syst
   expect(mockAsk).not.toHaveBeenCalled();
 });
 
-test("einmal abgelehnt: „einschalten“ fragt Android noch einmal - erlaubt verschwindet die Zeile", async () => {
+test("Android 13 vor der ersten Frage („denied“ mit canAskAgain, nie gefragt): keine Zeile", async () => {
   mockPermission.value = { status: "denied", canAskAgain: true };
+  await render(<PushOffHint />);
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(screen.queryByTestId("push-off-hint")).toBeNull();
+});
+
+test("gefragt und einmal abgelehnt: „einschalten“ fragt Android noch einmal - erlaubt verschwindet die Zeile", async () => {
+  mockPermission.value = { status: "denied", canAskAgain: true };
+  await markPushAsked();
   await render(<PushOffHint />);
   await fireEvent.press(await screen.findByTestId("push-off-hint"));
   await waitFor(() => expect(mockAsk).toHaveBeenCalledTimes(1));

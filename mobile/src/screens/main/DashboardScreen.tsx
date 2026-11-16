@@ -26,7 +26,7 @@ import { displayName, formatEventType, formatNewsCategory, formatStatus, formatW
 import { stationText } from "../../lib/matchText";
 import { withoutRepeatedBanners } from "../../lib/newsCards";
 import { isGuestUser } from "../../live";
-import { afterDashboard, dashboardRegistrationKeys } from "../../notifications/pushPrompt";
+import { afterDashboard } from "../../notifications/pushPrompt";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
 import { FeedbackSheet } from "../../components/FeedbackSheet";
 import { YearReviewCard } from "../../components/YearReviewCard";
@@ -117,7 +117,7 @@ export function DashboardScreen({ navigation, route }: Props) {
       setData(nextData);
       if (!isGuest) {
         // Neu angemeldet - etwa durchs Team (#1208): beim nächsten Öffnen die Frage nach Benachrichtigungen.
-        void afterDashboard(user?.id, dashboardRegistrationKeys(nextData.me));
+        void afterDashboard(user?.id, nextData.me);
         await refreshMe().catch(() => {});
         api.get<{ open: boolean; note?: string }>("/membership/invitation/me").then((r) => setInvitation(r.data?.open ? r.data : null)).catch(() => setInvitation(null));
       }

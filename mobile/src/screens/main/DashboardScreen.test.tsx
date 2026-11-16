@@ -240,5 +240,8 @@ test("ein Event mit seinen Turnieren ist auf „Start“ eine Karte", async () =
 test("Benachrichtigungen (#1208): die Startseite meldet ihre Anmeldungen - ein neu angemeldetes Team ist der Anlass zu fragen", async () => {
   dashboard = { ...dashboard, me: { tournaments, events: [{ id: "e-lan", title: "Herbst-LAN", start_date: "2030-03-10T08:00:00Z" }], matches: [], staff_matches: [], actions: [] } };
   await render(<DashboardScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(mockAfterDashboard).toHaveBeenCalledWith("u1", ["t:t0", "t:t1", "e:e-lan"]));
+  await waitFor(() => expect(mockAfterDashboard).toHaveBeenCalledWith("u1", expect.objectContaining({
+    tournaments: expect.arrayContaining([expect.objectContaining({ id: "t0" }), expect.objectContaining({ id: "t1" })]),
+    events: [expect.objectContaining({ id: "e-lan" })],
+  })));
 });

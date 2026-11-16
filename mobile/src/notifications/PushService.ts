@@ -22,6 +22,7 @@ import { sha256Hex } from "../lib/sha256";
 import type { UserNotification } from "../types";
 import { PUSH_CHANNELS, PUSH_CHANNEL_SET, RETIRED_CHANNEL_IDS } from "./channels";
 import { getInstallationId } from "./installationId";
+import { markPushAsked } from "./pushPrompt";
 
 // Graceful import – falls expo-notifications nicht installiert ist
 // Installieren mit: npx expo install expo-notifications expo-device
@@ -209,6 +210,9 @@ export async function askPushPermission(): Promise<PushPermission> {
   } catch {
     after = await getPushPermission();
   }
+  // Gefragt (#1208): Android 13 meldet vorher wie nachher „denied“ - erst der Merker unterscheidet „noch nie gefragt“
+  // von „abgelehnt“ (pushPrompt).
+  await markPushAsked();
   for (const listener of [...permissionListeners]) listener(after);
   return after;
 }

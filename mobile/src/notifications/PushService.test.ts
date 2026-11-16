@@ -13,6 +13,8 @@ import {
   setPushAccount,
 } from "./PushService";
 import type { UserNotification } from "../types";
+import { isPushAsked } from "./pushPrompt";
+import { resetPromptStateForTests } from "./pushPromptStore";
 
 // Pushes am Gerät (#1052, #1053): gesperrt oder Sperrzustand unbekannt zeigt der Vordergrund nichts an - auch einen
 // vollen Push eines alten Servers -, und Pushes für ein anderes Konto verwirft die App überall.
@@ -78,6 +80,7 @@ beforeEach(() => {
   mockNotifications.permission = { status: "granted", canAskAgain: true };
   mockNotifications.answer = { status: "granted", canAskAgain: true };
   mockNotifications.order = [];
+  resetPromptStateForTests(null);
   setPushAccount(ACCOUNT);
   setForegroundPushHidden(false);
 });
@@ -225,6 +228,8 @@ describe("Erlaubnis im richtigen Moment (#1208)", () => {
       expect(mockNotifications.order.indexOf("frage")).toBeGreaterThan(0);
       expect(mockNotifications.order.slice(0, -1).every((step) => step.startsWith("kanal:"))).toBe(true);
       expect(heard).toEqual([{ status: "denied", canAskAgain: true }]);
+      // Gefragt (#1208): Android 13 meldet vorher wie nachher „denied“ - der Merker unterscheidet.
+      expect(await isPushAsked()).toBe(true);
     } finally {
       Object.defineProperty(Platform, "OS", { configurable: true, get: () => os });
     }

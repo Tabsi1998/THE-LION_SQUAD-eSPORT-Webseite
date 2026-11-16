@@ -8,7 +8,8 @@ import { clearAllCache } from "../lib/cache";
 import { signInWithPasskey } from "../lib/passkeys";
 import { accessTokenExpired, isNetworkError, isSessionRejected } from "../lib/session";
 import { isGuestUser, liveGuestUser } from "../live";
-import { dismissAllNotifications, setPushAccount, unregisterPushToken } from "../notifications/PushService";
+import { dismissAllNotifications, getPushPermission, setPushAccount, unregisterPushToken } from "../notifications/PushService";
+import { forgetPushPromptAccounts, notePushUpgrade } from "../notifications/pushPrompt";
 import type { AuthResponse, User } from "../types";
 
 const ACCESS_KEY = "tls.mobile.accessToken";
@@ -70,6 +71,9 @@ function forgetAccountData() {
     clearRecentSearches(),
     // Die gespeicherte Mitgliedskarte (#1256) gehört dem Konto, das geht.
     clearOfflineCard(),
+    // Die gemerkten Anmeldungen für die Frage nach Benachrichtigungen (#1208): Nach dem nächsten Login ist die Startseite
+    // wieder nur Ausgangsstand - keine Frage gleich nach dem Anmelden.
+    forgetPushPromptAccounts(),
   ]);
 }
 
@@ -245,6 +249,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const shouldRestore = storedRemember !== "false";
+        // Erster Start nach dem Update (#1208): Wer mit gespeicherter Sitzung kommt, wurde früher beim Login gefragt.
+        void notePushUpgrade(shouldRestore && Boolean(storedAccess || storedRefresh), getPushPermission).catch(() => {});
         setRememberSession(shouldRestore);
         rememberSessionRef.current = shouldRestore;
         if (!shouldRestore) {

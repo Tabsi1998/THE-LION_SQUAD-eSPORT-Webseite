@@ -22,7 +22,7 @@ export function PushOffHint({ show = true, testID = "push-off-hint" }: { show?: 
   const permission = usePushPermission(signedIn && show);
   const [busy, setBusy] = useState(false);
 
-  if (!signedIn || !show || !pushOffHintVisible(permission)) return null;
+  if (!signedIn || !show || !permission || !pushOffHintVisible(permission, permission.asked)) return null;
 
   const turnOn = async () => {
     if (busy) return;
