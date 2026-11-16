@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, CheckCircle2, RefreshCw, Search, Send, Smartphone } from "lucide-react";
+import { BellRing, CheckCircle2, ChevronDown, RefreshCw, Search, Send, Smartphone, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { viennaDateTime } from "@/lib/vienna";
 import { pushErrorLabel, pushStateLabel } from "@/lib/pushStatus";
 
@@ -11,6 +12,19 @@ import { pushErrorLabel, pushStateLabel } from "@/lib/pushStatus";
 function devices(count) {
   const value = Number(count) || 0;
   return value === 1 ? "1 Gerät" : `${value} Geräte`;
+}
+
+// Abgemeldete Geräte (#2467): kein Fehler der Person, sondern ein altes Handy oder eine frühere Installation.
+const OLD_DEVICE_TEXT = "abgemeldet – App gelöscht oder neu installiert";
+
+function activeDevices(count) {
+  const value = Number(count) || 0;
+  return value === 0 ? "kein Gerät aktiv" : `${devices(value)} aktiv`;
+}
+
+function oldDevices(count) {
+  const value = Number(count) || 0;
+  return value === 1 ? "1 altes" : `${value} alte`;
 }
 
 function formatTime(value) {
@@ -33,6 +47,8 @@ export default function AdminMobilePushPage() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [showOld, setShowOld] = useState(false);
+  const confirm = useConfirm();
   const [form, setForm] = useState({
     title: "Push an dein Handy",
     body: "Wenn du diese Nachricht am Handy siehst, funktionieren Push-Benachrichtigungen.",
@@ -74,6 +90,12 @@ export default function AdminMobilePushPage() {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
   useEffect(() => { loadStatus(selected); }, [loadStatus, selected]);
+  // Eine andere Person: ihre alten Geräte beginnen wieder eingeklappt.
+  useEffect(() => { setShowOld(false); }, [selected]);
+
+  const activeTokens = useMemo(() => (status?.tokens || []).filter((token) => token.enabled !== false), [status]);
+  const oldTokens = useMemo(() => (status?.tokens || []).filter((token) => token.enabled === false), [status]);
+  const oldCount = Number.isFinite(Number(status?.disabled_count)) ? Number(status.disabled_count) : oldTokens.length;
 
   const sendTest = async () => {
     if (!selected || busy) return;
@@ -110,6 +132,29 @@ export default function AdminMobilePushPage() {
     try {
       const { data } = await api.post("/admin/mobile-push/receipts");
       toast.success(`Zustellung für ${devices(data?.checked)} nachgefragt, ${devices(data?.disabled)} abgemeldet.`);
+      await loadUsers();
+      await loadStatus(selected);
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeOld = async () => {
+    if (!selected || busy || !oldCount) return;
+    const ok = await confirm({
+      title: "Alte Geräte entfernen?",
+      description: `${oldCount === 1 ? "Der abgemeldete Eintrag" : `Die ${oldCount} abgemeldeten Einträge`} von ${userLabel(selectedUser)} ${oldCount === 1 ? "wird" : "werden"} gelöscht. Aktive Handys bleiben angemeldet. Der Schritt steht im Adminprotokoll.`,
+      confirmLabel: "Entfernen",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const { data } = await api.delete(`/admin/mobile-push/old-devices/${selected}`);
+      const removed = Number(data?.removed || 0);
+      toast.success(removed === 1 ? "1 altes Gerät entfernt." : `${removed} alte Geräte entfernt.`);
+      setShowOld(false);
       await loadUsers();
       await loadStatus(selected);
     } catch (err) {
@@ -161,6 +206,7 @@ export default function AdminMobilePushPage() {
               <button
                 key={user.id}
                 type="button"
+                data-testid={`push-user-${user.id}`}
                 onClick={() => setSelected(user.id)}
                 className={`w-full p-4 text-left hover:bg-white/5 ${selected === user.id ? "bg-[#29B6E8]/10" : ""}`}
               >
@@ -168,10 +214,14 @@ export default function AdminMobilePushPage() {
                   <Smartphone className={`w-5 h-5 mt-0.5 ${user.has_enabled_token ? "text-[#29B6E8]" : "text-white/25"}`} />
                   <div className="min-w-0 flex-1">
                     <div className="font-bold truncate">{userLabel(user)}</div>
-                    <div className="text-xs text-white/45 truncate">@{user.username || "-"} · {user.enabled_token_count} von {devices(user.token_count)} aktiv</div>
+                    <div className="text-xs text-white/45 truncate">
+                      @{user.username || "-"} · {activeDevices(user.enabled_token_count)}
+                      {Number(user.disabled_token_count) > 0 ? <span className="text-white/50"> · {oldDevices(user.disabled_token_count)}</span> : null}
+                    </div>
                     <div className="text-[11px] text-white/35 mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
-                    {user.last_receipt_error || user.last_ticket_error ? (
-                      <div className="text-[11px] text-[#FF6B61] mt-1 truncate" title={user.last_receipt_error || user.last_ticket_error}>{pushErrorLabel(user.last_receipt_error || user.last_ticket_error)}</div>
+                    {/* Rot nur bei einem Fehler an einem aktiven Gerät (#2467). */}
+                    {user.active_error ? (
+                      <div className="text-[11px] text-[#FF6B61] mt-1 truncate" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
                     ) : null}
                   </div>
                 </div>
@@ -230,7 +280,7 @@ export default function AdminMobilePushPage() {
                 <BellRing className="w-4 h-4" /> Zustellung prüfen
               </button>
             </div>
-            <p className="mt-3 text-xs text-white/45">Der Test landet als „Test: …“ im Postfach der Person und geht als Push an ihre Handys.</p>
+            <p className="mt-3 text-xs text-white/45">Der Test landet als „Test: …“ im Postfach der Person und geht als Push an ihre aktiven Handys.</p>
           </div>
 
           <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
@@ -239,7 +289,7 @@ export default function AdminMobilePushPage() {
               <p className="text-xs text-white/45 mt-1">„Angenommen“: der Push-Dienst hat die Nachricht genommen. „Zugestellt“: Apple oder Google haben sie ans Handy gegeben.</p>
             </div>
             <div className="md:hidden divide-y divide-white/5">
-              {(status?.tokens || []).map((token, index) => (
+              {activeTokens.map((token, index) => (
                 <article key={`${token.token_preview}-card-${index}`} className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -265,7 +315,7 @@ export default function AdminMobilePushPage() {
                   <div className="text-[11px] text-white/40">Letzter Versand: {formatTime(token.last_sent_at)}</div>
                 </article>
               ))}
-              {!(status?.tokens || []).length && (
+              {!activeTokens.length && (
                 <div className="text-center py-10 text-white/40">Auf keinem Handy dieser Person ist die App mit Push angemeldet</div>
               )}
             </div>
@@ -282,7 +332,7 @@ export default function AdminMobilePushPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {(status?.tokens || []).map((token, index) => (
+                  {activeTokens.map((token, index) => (
                     <tr key={`${token.token_preview}-${index}`}>
                       <td className="px-4 py-3 font-mono text-xs text-white/65">{token.token_preview}</td>
                       <td className="px-4 py-3">{token.platform || "-"}</td>
@@ -298,7 +348,7 @@ export default function AdminMobilePushPage() {
                       <td className="px-4 py-3 text-white/50 text-xs">{formatTime(token.last_sent_at)}</td>
                     </tr>
                   ))}
-                  {!(status?.tokens || []).length && (
+                  {!activeTokens.length && (
                     <tr>
                       <td colSpan="6" className="text-center py-10 text-white/40">Auf keinem Handy dieser Person ist die App mit Push angemeldet</td>
                     </tr>
@@ -306,6 +356,47 @@ export default function AdminMobilePushPage() {
                 </tbody>
               </table>
             </div>
+            {oldCount > 0 && (
+              <div className="border-t border-white/10" data-testid="push-old-devices">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOld((open) => !open)}
+                    aria-expanded={showOld}
+                    aria-controls="push-old-devices-list"
+                    data-testid="push-old-devices-toggle"
+                    className="inline-flex items-center gap-2 -mx-1 px-1 py-1 rounded-sm text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
+                  >
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${showOld ? "rotate-180" : ""}`} />
+                    Alte Geräte ({oldCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeOld}
+                    disabled={busy}
+                    data-testid="push-old-devices-remove"
+                    className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider text-white/60 hover:border-[#FF6B61]/50 hover:text-[#FF6B61] disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" /> Alte Geräte entfernen
+                  </button>
+                </div>
+                {/* Immer im DOM, damit aria-controls ein Ziel hat; eingeklappt nur verborgen. */}
+                <ul id="push-old-devices-list" data-testid="push-old-devices-list" hidden={!showOld} className="divide-y divide-white/5 border-t border-white/5 bg-[#0E0E0E]">
+                    {oldTokens.map((token, index) => (
+                      <li key={`${token.token_preview}-old-${index}`} className="px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-white/55">
+                        <div className="min-w-0">
+                          <div className="font-mono text-xs text-white/50 truncate">{token.token_preview}</div>
+                          <div className="text-xs mt-0.5">{token.platform || "-"} · <span>{OLD_DEVICE_TEXT}</span></div>
+                        </div>
+                        <div className="text-[11px] text-white/50">Abgemeldet: {formatTime(token.disabled_at || token.updated_at)}</div>
+                      </li>
+                    ))}
+                    {oldCount > oldTokens.length && (
+                      <li className="px-4 py-3 text-[11px] text-white/50">… und {oldCount - oldTokens.length} weitere</li>
+                    )}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
       </div>

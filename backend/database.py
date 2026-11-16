@@ -321,6 +321,8 @@ async def init_indexes():
     await db.mobile_push_tokens.create_index([("user_id", 1), ("enabled", 1), ("updated_at", -1)])
     await db.mobile_push_tokens.create_index([("enabled", 1), ("last_ticket_status", 1), ("last_ticket_at", -1)])
     await db.mobile_push_tokens.create_index([("last_receipt_checked_at", -1)])
+    # Ein Eintrag je Installation (#2467): beim neuen Token sucht die Anmeldung die alten Einträge derselben Installation.
+    await db.mobile_push_tokens.create_index("installation_id", sparse=True)
     # Browser-Benachrichtigungen (#1163): eine Anmeldung je Browser, gefunden über den Hash der Adresse beim Push-Dienst.
     await db.web_push_subscriptions.create_index("endpoint_hash", unique=True)
     await db.web_push_subscriptions.create_index("id", unique=True)
