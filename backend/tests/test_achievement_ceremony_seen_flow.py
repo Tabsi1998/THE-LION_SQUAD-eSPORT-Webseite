@@ -217,3 +217,25 @@ async def test_bad_bodies_are_refused(flow):
     assert res.status_code == 422
     res = await flow.post(SEEN, json={"level": {"level": 0}})
     assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_catalog_migration_does_not_flood(flow):
+    """Eine Katalog-Migration legt Vergaben mit neuer _id neu an - das sind alte Erfolge, keine neuen."""
+    from services import achievement_migration
+
+    person = await flow.add_user()
+    await flow.db.achievements.insert_many([
+        {"code": "mentor_alt_1", "group_code": "mentor", "name": "Mentor alt", "level": 1},
+        {"code": "mentor_1", "group_code": "mentor", "name": "Mentor I", "level": 1, "manual_only": True},
+    ])
+    await award(flow, person, "mentor_alt_1", age=timedelta(days=90), level=1)
+    assert (await start(flow, person))["unseen"] == []
+
+    async def no_counters(_user_id):
+        return {}
+
+    await achievement_migration.apply_redefined(flow.db, {"mentor": ["mentor_alt_1"]}, compute_progress=no_counters)
+    moved = await flow.db.user_achievements.find_one({"user_id": person["id"], "tier_code": "mentor_1"})
+    assert moved and moved.get("migrated_at")
+    assert (await state(flow, person))["unseen"] == []

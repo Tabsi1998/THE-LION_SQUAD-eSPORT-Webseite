@@ -97,7 +97,9 @@ def _eligible(award: dict, since: datetime | None, horizon: datetime | None) -> 
 
 async def _unseen_codes(db, user_id: str, row: dict) -> list[str]:
     since, horizon = parse_time(row.get("since")), parse_time(row.get("horizon"))
-    query = {"user_id": user_id, "ceremony_seen_at": {"$exists": False}, "silent": {"$ne": True}, "recount": {"$ne": True}}
+    # Umgezogene Vergaben (Katalog-Migration, ``migrated_at``) bekommen eine neue _id, sind aber alte Erfolge - nie feiern.
+    query = {"user_id": user_id, "ceremony_seen_at": {"$exists": False}, "silent": {"$ne": True}, "recount": {"$ne": True},
+             "migrated_at": {"$exists": False}}
     awards = await db.user_achievements.find(query, {"tier_code": 1, "earned_at": 1}).to_list(2000)
     fresh = [award for award in awards if award.get("tier_code") and _eligible(award, since, horizon)]
     fresh.sort(key=lambda award: parse_time(award.get("earned_at")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
