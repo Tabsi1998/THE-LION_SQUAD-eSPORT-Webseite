@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import FaqClip, { clipQuelle } from "./FaqClip";
+import FaqClip, { clipQuellen } from "./FaqClip";
 import { HANDY_QUERY, hilfeBild, hilfeClip, hilfeSchritte, hilfeThema } from "./index";
 
 // FAQ-Schleifen (#2448): Gerätewahl über matchMedia, „Bewegung reduzieren“, Anhalten/Abspielen, Rückfall auf das Bild
@@ -107,9 +107,9 @@ test("Gerätewahl: am Handy die Handy-Fassung, am PC die PC-Fassung, bei Wechsel
 
 test("ohne VP9 (ältere iPhones) die MP4-Fassung", () => {
   window.HTMLMediaElement.prototype.canPlayType = (type) => (type.includes("mp4") ? "maybe" : "");
-  expect(clipQuelle({ webm: "/a.webm", mp4: "/a.mp4" })).toEqual({ src: "/a.mp4", type: "video/mp4" });
-  expect(clipQuelle({ webm: "/a.webm", mp4: null })).toEqual({ src: "/a.webm", type: "video/webm" });
-  expect(clipQuelle(null)).toBeNull();
+  expect(clipQuellen({ webm: "/a.webm", mp4: "/a.mp4" })).toEqual([{ src: "/a.mp4", type: "video/mp4" }, { src: "/a.webm", type: "video/webm" }]);
+  expect(clipQuellen({ webm: "/a.webm", mp4: null })).toEqual([{ src: "/a.webm", type: "video/webm" }]);
+  expect(clipQuellen(null)).toEqual([]);
   setMedia();
   render(<FaqClip slug={SLUG} schritt={SCHRITT} />);
   scrollInto(true);
@@ -132,8 +132,46 @@ test("Anhalten und Abspielen über den Knopf, mit Label", () => {
   scrollInto(true);
   expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   fireEvent.click(button);
-  expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+  expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
   expect(button).toHaveAccessibleName(`Animation „${SCHRITT.titel}“ anhalten`);
+});
+
+test("Knopf zeigt gleich „Anhalten“, wenn die Schleife im Bild von selbst startet - kein kurzes „Abspielen“", () => {
+  // play() meldet sich erst später (Laden): der Knopf richtet sich nach „im Bild und erlaubt“, nicht nach dem Ereignis.
+  window.HTMLMediaElement.prototype.play = vi.fn(() => new Promise(() => {}));
+  setMedia();
+  render(<FaqClip slug={SLUG} schritt={SCHRITT} />);
+  scrollInto(true);
+  expect(screen.getByTestId(`help-step-clip-toggle-${SCHRITT.id}`)).toHaveAccessibleName(`Animation „${SCHRITT.titel}“ anhalten`);
+});
+
+test("lehnt der Browser das Abspielen ab (Stromsparen), startet der Klick auf „Abspielen“ direkt in der Geste", async () => {
+  const play = vi.fn()
+    .mockImplementationOnce(() => Promise.reject(new Error("NotAllowedError")))
+    .mockImplementation(function play() {
+      this.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    });
+  window.HTMLMediaElement.prototype.play = play;
+  setMedia();
+  render(<FaqClip slug={SLUG} schritt={SCHRITT} />);
+  scrollInto(true);
+  await act(async () => {});
+  const button = screen.getByTestId(`help-step-clip-toggle-${SCHRITT.id}`);
+  expect(play).toHaveBeenCalledTimes(1);
+  expect(button).toHaveAccessibleName(`Animation „${SCHRITT.titel}“ abspielen`);
+  fireEvent.click(button);
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(button).toHaveAccessibleName(`Animation „${SCHRITT.titel}“ anhalten`);
+});
+
+test("iOS: stumm auch als Attribut und Vorgabe gesetzt", () => {
+  setMedia();
+  render(<FaqClip slug={SLUG} schritt={SCHRITT} />);
+  scrollInto(true);
+  const video = screen.getByTestId(`help-step-clip-${SCHRITT.id}`);
+  expect(video).toHaveAttribute("muted");
+  expect(video.defaultMuted).toBe(true);
 });
 
 test("„Bewegung reduzieren“: nur das Bild mit Knopf „Abspielen“, die Schleife erst auf Wunsch", () => {
@@ -147,7 +185,7 @@ test("„Bewegung reduzieren“: nur das Bild mit Knopf „Abspielen“, die Sch
   expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   fireEvent.click(button);
   expect(screen.getByTestId(`help-step-clip-${SCHRITT.id}`)).toBeInTheDocument();
-  expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+  expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
   expect(button).toHaveAccessibleName(`Animation „${SCHRITT.titel}“ anhalten`);
 });
 
@@ -161,16 +199,25 @@ test("Rückfall: Schritt ohne Schleife zeigt das Bild ohne Knopf; bricht das Vid
 
   render(<FaqClip slug={SLUG} schritt={SCHRITT} />);
   scrollInto(true);
+  // Erst WebM, bei Abbruch MP4, erst dann das Bild.
+  expect(screen.getByTestId(`help-step-clip-${SCHRITT.id}`)).toHaveAttribute("src", hilfeClip(SLUG, SCHRITT.id, "pc").webm);
+  fireEvent.error(screen.getByTestId(`help-step-clip-${SCHRITT.id}`));
+  expect(screen.getByTestId(`help-step-clip-${SCHRITT.id}`)).toHaveAttribute("src", hilfeClip(SLUG, SCHRITT.id, "pc").mp4);
+  expect(screen.getByTestId(`help-step-clip-toggle-${SCHRITT.id}`)).toBeInTheDocument();
   fireEvent.error(screen.getByTestId(`help-step-clip-${SCHRITT.id}`));
   expect(screen.queryByTestId(`help-step-clip-${SCHRITT.id}`)).toBeNull();
   expect(screen.getByTestId(`help-step-image-${SCHRITT.id}`)).toBeInTheDocument();
   expect(screen.queryByRole("button")).toBeNull();
 });
 
-test("ohne IntersectionObserver (sehr alte Browser) bleibt es beim Bild", () => {
+test("ohne IntersectionObserver (sehr alte Browser) bleibt es beim Bild, „Abspielen“ startet trotzdem", () => {
   vi.stubGlobal("IntersectionObserver", undefined);
   setMedia();
   render(<FaqClip slug={SLUG} schritt={SCHRITT} />);
   expect(screen.getByTestId(`help-step-image-${SCHRITT.id}`)).toBeInTheDocument();
   expect(screen.queryByTestId(`help-step-clip-${SCHRITT.id}`)).toBeNull();
+  expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId(`help-step-clip-toggle-${SCHRITT.id}`));
+  expect(screen.getByTestId(`help-step-clip-${SCHRITT.id}`)).toBeInTheDocument();
+  expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
 });

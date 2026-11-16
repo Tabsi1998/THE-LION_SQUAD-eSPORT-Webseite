@@ -8,8 +8,10 @@ import { FORMEN, HANDY_QUERY, hilfeBild, hilfeClip } from "./index";
 // - Geladen wird erst, wenn der Schritt ins Bild kommt (IntersectionObserver); bis dahin steht nur das Bild da
 //   (loading="lazy"). Außerhalb des Bildes hält die Schleife an, im Bild läuft sie weiter.
 // - „Bewegung reduzieren“: nur das Bild mit Knopf „Abspielen“. Sonst gibt es den Knopf „Anhalten“.
-// - Fehlt die Schleife, kann der Browser sie nicht abspielen oder bricht das Laden ab: das Bild bleibt (wie bisher).
-// - Ohne IntersectionObserver (sehr alte Browser) bleibt es beim Bild.
+// - Lehnt der Browser das automatische Abspielen ab (Stromsparen), zeigt der Knopf „Abspielen“; der Klick startet
+//   direkt in der Geste.
+// - Bricht eine Quelle ab, kommt die andere Art (WebM → MP4); erst wenn keine geht, bleibt das Bild (wie bisher).
+// - Ohne IntersectionObserver (sehr alte Browser) startet nichts von selbst; der Knopf „Abspielen“ geht trotzdem.
 // Der Schritttext beschreibt den Inhalt; die Schleife trägt nur ein kurzes Label wie das Bild sein alt.
 
 const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
@@ -51,12 +53,29 @@ function canPlay(type) {
   }
 }
 
-/** WebM (kleiner), wenn der Browser VP9 kann - sonst MP4 (H.264, etwa ältere iPhones). */
-export function clipQuelle(clip) {
-  if (!clip) return null;
-  if (clip.webm && canPlay('video/webm; codecs="vp9"')) return { src: clip.webm, type: "video/webm" };
-  if (clip.mp4) return { src: clip.mp4, type: "video/mp4" };
-  return clip.webm ? { src: clip.webm, type: "video/webm" } : null;
+/**
+ * Die Quellen in der Reihenfolge, in der sie versucht werden: WebM (kleiner) zuerst, wenn der Browser VP9 kann,
+ * dann MP4 (H.264, etwa ältere iPhones); ohne VP9 steht WebM als letzter Versuch hinten.
+ */
+export function clipQuellen(clip) {
+  if (!clip) return [];
+  const webm = clip.webm ? { src: clip.webm, type: "video/webm" } : null;
+  const mp4 = clip.mp4 ? { src: clip.mp4, type: "video/mp4" } : null;
+  const order = webm && canPlay('video/webm; codecs="vp9"') ? [webm, mp4] : [mp4, webm];
+  return order.filter(Boolean);
+}
+
+/** iOS spielt automatisch nur, wenn „stumm“ auch als Attribut und Vorgabe gesetzt ist - React setzt nur die Eigenschaft. */
+function stumm(video) {
+  video.defaultMuted = true;
+  video.muted = true;
+  video.setAttribute("muted", "");
+}
+
+function abspielen(video, onRejected) {
+  stumm(video);
+  const result = video.play?.();
+  if (result && typeof result.catch === "function") result.catch(onRejected);
 }
 
 export default function FaqClip({ slug, schritt }) {
@@ -69,19 +88,28 @@ export default function FaqClip({ slug, schritt }) {
   // null = wie vorgesehen (läuft, außer bei „Bewegung reduzieren“); true/false = Knopf gedrückt.
   const [wanted, setWanted] = useState(null);
   const [playing, setPlaying] = useState(false);
-  const [failed, setFailed] = useState("");
+  // Der Browser hat das Abspielen abgelehnt (Stromsparen) - bis zum nächsten Klick bzw. Start.
+  const [rejected, setRejected] = useState(false);
+  const [failed, setFailed] = useState([]);
 
   const other = FORMEN.find((item) => item !== form);
   const bild = hilfeBild(slug, schritt.id, form) || hilfeBild(slug, schritt.id, other);
-  const quelle = schritt.clip ? clipQuelle(hilfeClip(slug, schritt.id, form)) : null;
+  const quelle = schritt.clip ? clipQuellen(hilfeClip(slug, schritt.id, form)).find((row) => !failed.includes(row.src)) || null : null;
   const quelleSrc = quelle?.src || "";
-  const hasClip = Boolean(quelle && bild) && failed !== quelleSrc;
+  const hasClip = Boolean(quelle && bild);
   const allowed = reduce ? wanted === true : wanted !== false;
   const mounted = hasClip && seen && (allowed || playing || wanted === false);
+  // Was der Knopf anbietet: „Anhalten“, solange die Schleife läuft oder gleich von selbst startet.
+  const active = playing || (mounted && allowed && inView && !rejected);
 
   useEffect(() => {
     const node = figureRef.current;
-    if (!hasClip || !node || typeof window.IntersectionObserver !== "function") return undefined;
+    if (!hasClip || !node) return undefined;
+    if (typeof window.IntersectionObserver !== "function") {
+      // Kein Beobachter: nichts lädt von selbst (seen bleibt aus), aber „Abspielen“ startet sofort.
+      setInView(true);
+      return undefined;
+    }
     const observer = new window.IntersectionObserver((entries) => {
       const visible = entries.some((entry) => entry.isIntersecting);
       setInView(visible);
@@ -91,29 +119,27 @@ export default function FaqClip({ slug, schritt }) {
     return () => observer.disconnect();
   }, [hasClip]);
 
-  // Abspielen nur im Bild und wenn erlaubt; sonst anhalten. play() kann abgelehnt werden (Stromsparen) - dann zeigt
-  // der Knopf „Abspielen“.
+  // Abspielen nur im Bild und wenn erlaubt; sonst anhalten.
   useEffect(() => {
     const video = videoRef.current;
     if (!mounted || !video) return;
-    if (inView && allowed) {
-      const result = video.play?.();
-      if (result && typeof result.catch === "function") result.catch(() => setPlaying(false));
-    } else {
-      video.pause?.();
-    }
+    if (inView && allowed) abspielen(video, () => { setRejected(true); setPlaying(false); });
+    else video.pause?.();
   }, [mounted, inView, allowed, quelleSrc]);
 
   if (!bild) return null;
   const titel = schritt.titel;
   const toggle = () => {
-    if (playing) {
+    if (active) {
       setWanted(false);
       videoRef.current?.pause?.();
-    } else {
-      setWanted(true);
-      setSeen(true);
+      return;
     }
+    setWanted(true);
+    setSeen(true);
+    setRejected(false);
+    // Direkt in der Geste starten - nach einer Ablehnung ändert der Klick sonst keine Abhängigkeit des Effekts.
+    if (videoRef.current) abspielen(videoRef.current, () => { setRejected(true); setPlaying(false); });
   };
 
   return (
@@ -133,9 +159,10 @@ export default function FaqClip({ slug, schritt }) {
           preload="none"
           aria-label={`Animation: ${titel}`}
           data-testid={`help-step-clip-${schritt.id}`}
-          onPlay={() => setPlaying(true)}
+          data-type={quelle.type}
+          onPlay={() => { setPlaying(true); setRejected(false); }}
           onPause={() => setPlaying(false)}
-          onError={() => { setFailed(quelle.src); setPlaying(false); }}
+          onError={() => { setFailed((rows) => [...rows, quelle.src]); setPlaying(false); }}
           className="block h-auto max-w-full rounded-sm border border-white/10 bg-[#0F0F10]"
         />
       ) : (
@@ -145,10 +172,10 @@ export default function FaqClip({ slug, schritt }) {
       )}
       {hasClip ? (
         <button type="button" onClick={toggle} data-testid={`help-step-clip-toggle-${schritt.id}`}
-          aria-label={playing ? `Animation „${titel}“ anhalten` : `Animation „${titel}“ abspielen`}
+          aria-label={active ? `Animation „${titel}“ anhalten` : `Animation „${titel}“ abspielen`}
           className="absolute bottom-2 right-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border border-white/15 bg-black/75 px-3 text-xs font-bold uppercase tracking-wider text-white transition-colors duration-150 hover:border-[#29B6E8] hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
-          {playing ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
-          {playing ? null : <span aria-hidden="true">Abspielen</span>}
+          {active ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
+          {active ? null : <span aria-hidden="true">Abspielen</span>}
         </button>
       ) : null}
     </figure>
