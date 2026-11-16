@@ -14,13 +14,11 @@ import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable"
 import { PrizeEditor } from "./LeagueLookFields";
 import { DivisionPlatformFields } from "./DivisionPlatformFields";
 import { SeasonTabForm } from "./SeasonTabForm";
+import { StaffelNeedsHint, StaffelStandBadge } from "../tournament/StaffelParts";
 import { toast } from "sonner";
 
-const STAFFEL_STATUS = {
-  draft: "Entwurf", scheduled: "Angekündigt", registration_open: "Anmeldung offen", registration_closed: "Anmeldung zu",
-  check_in: "Check-in", live: "Läuft", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse veröffentlicht",
-  archived: "Archiviert", cancelled: "Abgesagt",
-};
+// Eine Staffel der Season-Seite als Turnier für Liga-Stand und „was fehlt“ (#2453) - die Season kennt die Seite selbst.
+const asStaffel = (staffel, season) => ({ ...staffel, id: staffel.tournament_id, league_context: { season_id: season?.id, staffel: staffel.staffel } });
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
 
@@ -153,6 +151,7 @@ export function SyncResults({ rows }) {
 
 export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staffelCount, syncing, syncRows, onSync, onAddDivision, onEditDivision, onDelete,
   onCreateStaffel }) {
+  const now = new Date();
   return (
     <div className="space-y-6">
       <section id="staffeln" className="scroll-mt-24 space-y-4 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-label="Ligen und Staffeln" data-testid="season-divisions">
@@ -207,7 +206,10 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                 {division.staffeln.map((staffel) => (
                   <li key={staffel.tournament_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2" data-testid={`staffel-${division.level}-${staffel.staffel}`}>
                     <span className="font-semibold text-white">Staffel {staffel.staffel}</span>
-                    <span className="text-xs text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams · {STAFFEL_STATUS[staffel.status] || staffel.status}</span>
+                    <span className="text-xs text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams</span>
+                    {/* Stand aus der Season statt „Entwurf“ (#2453), dazu was fehlt - dieselbe Ableitung wie die Ablaufleiste im Überblick. */}
+                    <StaffelStandBadge tournament={asStaffel(staffel, data.season)} season={data.season} now={now} testId={`staffel-stand-${division.level}-${staffel.staffel}`} />
+                    <StaffelNeedsHint tournament={asStaffel(staffel, data.season)} season={data.season} now={now} testId={`staffel-needs-${division.level}-${staffel.staffel}`} />
                     <span className="ml-auto inline-flex items-center gap-2">
                       <Link to={`/admin/tournaments/${staffel.tournament_id}`} data-testid={`staffel-manage-${division.level}-${staffel.staffel}`}
                         className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">

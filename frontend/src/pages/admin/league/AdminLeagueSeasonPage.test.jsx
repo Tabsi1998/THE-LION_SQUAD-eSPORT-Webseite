@@ -356,6 +356,20 @@ test("Regelwerk: kein Freitextfeld mehr - mit Regelwerk nur der Stand, ohne ein 
 
 // ---------------------------------------------------------------- Ligen und Staffeln
 
+// Liga-Stand (#2453): Die Staffel im Entwurf zeigt den Stand der Season und was fehlt - mit offenem Fenster den Weg in den Eingang.
+test("Ligen und Staffeln: Staffel mit Stand der Season statt „Entwurf“ und was ihr fehlt", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const at = (offset) => new Date(Date.now() + offset).toISOString();
+  body = { ...BODY, season: { ...SEASON, visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) },
+    divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 1, max_participants: 8 }] }] };
+  renderPage("#ligen");
+  expect(await screen.findByTestId("staffel-stand-1-A")).toHaveTextContent(/^Anmeldung offen bis /);
+  expect(screen.getByTestId("staffel-1-A")).not.toHaveTextContent("Entwurf");
+  const needs = screen.getByTestId("staffel-needs-1-A");
+  expect(needs).toHaveTextContent("Teams zuteilen · 1 von 8");
+  expect(within(needs).getByRole("link")).toHaveAttribute("href", "/admin/leagues/seasons/s1#anmeldungen");
+});
+
 test("Ligen und Staffeln: Staffel mit Weg zur Turnierverwaltung, Vorgaben übertragen", async () => {
   apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"],
     skipped: [{ group: "before_start", label: "Termine und Kalender", reason: "Die Staffel hat schon begonnen." }] }] } });
