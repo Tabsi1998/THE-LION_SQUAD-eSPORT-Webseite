@@ -12,6 +12,8 @@ const RETENTION_LABELS = {
   email_logs: "Versandlogs (Tage)", audit_logs: "Adminaktionen (Tage)",
   // Kontaktanfragen (#2131): ab dem letzten Statuswechsel; offene laufen nie ab.
   contact_done: "Kontaktanfragen, erledigt (Tage)", contact_spam: "Kontaktanfragen, Spam (Tage)",
+  // Push-Geräte (#2467): ab dem Abmelden; aktive Handys laufen nie ab.
+  push_devices: "Abgemeldete Push-Geräte (Tage)",
 };
 
 // Formularstand: Empfänger mit Komma, Upload-Routen (#2447) eine je Zeile.

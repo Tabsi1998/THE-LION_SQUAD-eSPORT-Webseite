@@ -6,7 +6,7 @@ auf der **Matchseite** eures Spiels: Ligaseite → **Spieltage** → euer Spiel,
 Vertreter macht das die Teamleitung. Melden, Bestätigen und Nachtragen ausführlich:
 [Turniere, 3.16 Ergebnis je Map melden](turniere.md#316-liga-ergebnis-je-map-melden-für-captains); für die
 Liga-Leitung: [Liga leiten](liga.md). Zum Verschicken an Captains gibt es dieselben Schritte kürzer und mit Bildern
-auf der Website unter `/hilfe/liga-captains` ([Hilfe für Spieler und Captains](hilfe.md)).
+auf der Website unter `/faq/liga-captains` ([FAQ: Fragen und Anleitungen](hilfe.md)).
 
 ## Anmelden
 

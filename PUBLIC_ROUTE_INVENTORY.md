@@ -12,6 +12,7 @@ Statische Routen in der XML-Sitemap:
 | Inhalte | `/news`, `/events`, `/galerie`, `/references` |
 | eSports | `/esports`, `/tournaments`, `/fastlap` |
 | Community und Verein | `/teams`, `/servers`, `/members`, `/membership/join` |
+| FAQ (#2448) | `/faq` und je Anleitung `/faq/<thema>` |
 | Unterstuetzung | `/sponsors`, `/partners` |
 
 Dynamische Sitemap-Routen sind auf veroeffentlichte/oeffentliche Datensaetze begrenzt:
@@ -90,6 +91,7 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 | `/spielerprofil/<username>`, `/players/<username>` | `/u/<username>` |
 | `/lan-party-2024` | `/events` |
 | `/f1` und `/f1/<slug>` | `/fastlap` und `/fastlap/<slug>` |
+| `/hilfe` und `/hilfe/<thema>` (Hilfe #2295, seit #2448 FAQ; `?q=` und der Anker bleiben) | `/faq` und `/faq/<thema>` |
 | `www.lionsquad.at/<path>` | `lionsquad.at/<path>` |
 
 Die SPA besitzt passende clientseitige Fallbacks fuer Aliase, die in der lokalen Entwicklung ohne Nginx geoeffnet werden.

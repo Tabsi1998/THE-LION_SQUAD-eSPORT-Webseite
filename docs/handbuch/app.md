@@ -183,7 +183,13 @@ Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die P
 - **Push testen:** **Admin → System → Push-Tests**: Konto suchen, Titel und Text prüfen, senden. Die Seite zeigt die angemeldeten Handys und den letzten Versand;
   der Test steht als „Test: …“ im Postfach. „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ heißt: Das Konto hat
   kein Gerät mit Push-Erlaubnis.
-- **Monitoring:** In der Kommandozentrale zeigt die Kachel **Push-Monitoring** aktive Tokens und Fehler. Pushes gehen nur an echte Geräte, nie an Emulatoren.
+- **Alte Geräte:** Die Liste links zeigt je Person „1 Gerät aktiv“, abgemeldete Handys stehen dezent dahinter („· 3 alte“). Rechts stehen oben nur die
+  aktiven Handys; die abgemeldeten liegen grau und eingeklappt unter **Alte Geräte (n)** mit „abgemeldet – App gelöscht oder neu installiert“. Das ist
+  kein Fehler. Rot erscheint nur, wenn ein **aktives** Handy einen Fehler meldet. **Alte Geräte entfernen** löscht nach einer Rückfrage nur die
+  abgemeldeten Einträge der Person und steht im Adminprotokoll. Ohne Knopf verschwinden sie nach 30 Tagen von selbst (einstellbar unter
+  **Betrieb → Alarme → Aufbewahrung**). Eine App, die ihre Installations-Kennung mitschickt, legt beim Neuinstallieren oder neuen Token keinen
+  zweiten Eintrag mehr an.
+- **Monitoring:** In der Kommandozentrale zeigt die Kachel **Push-Monitoring** aktive Tokens und Fehler; Fehler zählen nur an aktiven Geräten. Pushes gehen nur an echte Geräte, nie an Emulatoren.
 - Mehr zu Mails, Vorlagen und Discord-Nachrichten im Kapitel **Mails und Benachrichtigungen**.
 
 ### 3.5 Fehler und Abstürze sehen

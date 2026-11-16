@@ -179,8 +179,8 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 ### 3.6 Was Mitglieder selbst einstellen können
 
 **Benutzermenü → Einstellungen → Benachrichtigungen** (`/profile?tab=notifications`). Die Schritte mit Bildern für Mitglieder
-stehen auch in der Hilfe unter [Konto und Profil → Benachrichtigungen](../../frontend/src/hilfe/themen/konto-und-profil.json)
-(`/hilfe/konto-und-profil#stufe`).
+stehen auch in der FAQ unter [Konto und Profil → Benachrichtigungen](../../frontend/src/hilfe/themen/konto-und-profil.json)
+(`/faq/konto-und-profil#stufe`).
 
 <img src="../../frontend/src/hilfe/bilder/konto-und-profil/stufe-handy.webp" alt="Stufe am Handy: drei Karten Alles, Wichtiges und Wenig, Wichtiges ist gewählt" width="300"> <img src="../../frontend/src/hilfe/bilder/konto-und-profil/themen-handy.webp" alt="Themen am Handy: je Thema die Wahl Push, Nur App oder Aus, bei Erfolge ist Aus gewählt" width="300">
 

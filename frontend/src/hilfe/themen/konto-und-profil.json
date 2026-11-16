@@ -3,6 +3,9 @@
   "titel": "Konto und Profil",
   "kurz": "Konto anlegen, Profil einrichten, Geburtsdatum, Plattform und Spiel-IDs wie die Activision-ID eintragen.",
   "zielgruppe": "Für alle Spieler",
+  "bereich": "konto-profil",
+  "rollen": ["spieler", "captain", "mitglied"],
+  "sichtbar_fuer": "alle",
   "suchbegriffe": ["registrieren", "anmelden", "account", "einstellungen", "activision", "id", "gamertag", "alter", "playstation", "xbox", "pc", "benachrichtigungen", "push", "ruhezeit", "nachts"],
   "abschnitte": [
     {
@@ -87,6 +90,7 @@
     {
       "id": "benachrichtigungen",
       "titel": "Benachrichtigungen",
+      "bereich": "benachrichtigungen",
       "schritte": [
         {
           "id": "stufe",

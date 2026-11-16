@@ -68,6 +68,9 @@ const PAGES = [
   { name: "Dashboard", path: "/dashboard", ready: "dashboard-timeline", user: ME },
   { name: "Einstellungen", path: "/profile?tab=basic", ready: null, user: ME },
   { name: "Benachrichtigungen einstellen", path: "/profile?tab=notifications", ready: null, user: ME },
+  // FAQ (#2448): Übersicht mit Suche, Häufigen Fragen und Bereichen; eine Anleitung.
+  { name: "FAQ", path: "/faq", ready: "faq-haeufig", user: null },
+  { name: "FAQ-Anleitung", path: "/faq/team-und-co-team", ready: "help-topic", user: null },
 ];
 
 async function mockServer(page, user) {

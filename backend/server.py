@@ -131,6 +131,7 @@ from routes.phase_fg_routes import (
     seed_default_nav,
 )
 from routes.seo_render_routes import router as seo_render_router
+from routes.faq_routes import router as faq_router
 from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
 from routes.membership_routes import router as membership_router
 from routes.jersey_number_routes import router as jersey_number_router
@@ -532,6 +533,7 @@ app.include_router(admin_discord_router)
 app.include_router(media_router)
 app.include_router(admin_media_router)
 app.include_router(nav_router)
+app.include_router(faq_router)
 app.include_router(admin_nav_router)
 app.include_router(seo_router)
 app.include_router(seo_meta_router)

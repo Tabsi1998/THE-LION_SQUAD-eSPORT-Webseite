@@ -3,6 +3,9 @@
   "titel": "Team und Co-Team",
   "kurz": "Team erstellen, Leute einladen oder beitreten, ein Co-Team für ein Spiel anlegen und Captain und Vertreter festlegen.",
   "zielgruppe": "Für Teamleitung und Spieler",
+  "bereich": "teams",
+  "rollen": ["spieler", "captain"],
+  "sichtbar_fuer": "alle",
   "suchbegriffe": ["clan", "squad", "kader", "einladung", "beitrittscode", "qr", "link", "captain", "vertreter", "teamleitung", "co-leitung"],
   "videos": [
     { "id": "team-und-co-team", "titel": "Team und Co-Team anlegen im Video", "abschnitt": "neues-team" }
