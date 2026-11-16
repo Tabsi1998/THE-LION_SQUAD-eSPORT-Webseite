@@ -1,14 +1,18 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { CLIPS, HOLD_MS, LEAD_MS, actions, encode, hideBars, requireFfmpeg, showBars, startScreencast } = require("./clips");
 
 // Kamera für den Hilfe-Bereich (#2295): Bild je Schritt mit markierter Stelle, als WebP direkt in
 // src/hilfe/bilder/<thema>/<schritt>-<handy|pc>.webp, dazu die Größe in src/hilfe/bilder/masse.json (gegen Springen
 // beim Laden). Ohne HILFE_BILDER=1 entstehen keine Dateien - die Prüfungen laufen trotzdem, und am Ende muss jeder
 // Schritt mit Bild einmal dran gewesen sein. So wird der Test rot, wenn ein Ablauf bricht oder ein Schritt fehlt.
+//
+// Schleifen (#2448): Schritte mit `"clip": true` nehmen mit HILFE_CLIPS=1 eine kurze Bewegung samt Poster auf
+// (cam.clip, Aufnahme in ./clips.js) nach src/hilfe/clips/<thema>/<schritt>-<handy|pc>.webm und .mp4. HILFE_BILDER=1
+// erzeugt nur die Bilder der Schritte ohne Schleife - das Poster einer Schleife entsteht mit ihr.
 
 const ROOT = path.resolve(__dirname, "../../src/hilfe");
 const SHOTS = process.env.HILFE_BILDER === "1";
-const VIDEOS = process.env.HILFE_VIDEOS === "1";
 const QUALITY = 0.8;
 const MARK = "#FFD23F";
 // Was nicht ins Bild gehört: Hinweise (Toasts), die Leiste unten am Handy, „Nach oben“.
@@ -23,29 +27,54 @@ function stepsOf(slug) {
 }
 
 const sizes = {};
+const clipStats = [];
 
 /** Eine Kamera je Thema und Breite: `form` ist „handy“ (390 px) oder „pc“ (1440 px). */
 function camera(page, slug, form) {
   const steps = stepsOf(slug);
   const seen = new Set();
+  const clipped = new Set();
+  const stepOf = (id) => {
+    const step = steps.find((row) => row.id === id);
+    if (!step) throw new Error(`Schritt ${slug}#${id} steht nicht in src/hilfe/themen/${slug}.json`);
+    if (!step.bild) throw new Error(`Schritt ${slug}#${id} hat kein Bild (bild: false)`);
+    return step;
+  };
   return {
     slug,
     form,
     seen,
     /** Schritt `id`: `mark` (Locator oder Liste) muss sichtbar sein und wird gerahmt; `area` ist optional der Ausschnitt. */
     async shot(id, mark, { area = null, pad = 14, each = false } = {}) {
-      const step = steps.find((row) => row.id === id);
-      if (!step) throw new Error(`Schritt ${slug}#${id} steht nicht in src/hilfe/themen/${slug}.json`);
-      if (!step.bild) throw new Error(`Schritt ${slug}#${id} hat kein Bild (bild: false)`);
+      const step = stepOf(id);
+      if (step.clip) throw new Error(`Schritt ${slug}#${id} hat eine Schleife (clip: true) - cam.clip statt cam.shot`);
       const marks = [mark].flat();
       for (const item of marks) await item.first().waitFor({ state: "visible" });
       seen.add(id);
       if (!SHOTS) return;
       await photograph(page, `${slug}/${id}-${form}`, marks, area ? [area].flat() : null, pad, form, each);
     },
-    /** Am Ende: jeder Schritt mit Bild war dran. */
+    /**
+     * Schritt mit Schleife (#2448): `run(act)` führt die Handgriffe aus (act.click/check/select/type/pause), danach
+     * gilt dasselbe wie bei `shot`. Mit HILFE_CLIPS=1 wird dabei aufgenommen: `start` (Locator, sonst die erste
+     * Markierung) steht vorher an der Stelle `block` im Bild, `keepBars` lässt Kopfzeile und Leisten sichtbar.
+     */
+    async clip(id, mark, run, { area = null, pad = 14, each = false, start = null, block = "center", keepBars = false } = {}) {
+      const step = stepOf(id);
+      if (!step.clip) throw new Error(`Schritt ${slug}#${id} hat keine Schleife - "clip": true im JSON oder cam.shot`);
+      const marks = [mark].flat();
+      if (CLIPS) {
+        await record(page, `${slug}/${id}-${form}`, { marks, area: area ? [area].flat() : null, pad, each, start: start || marks[0], block, keepBars, form, run });
+      } else {
+        await run(actions(page, form, false));
+        for (const item of marks) await item.first().waitFor({ state: "visible" });
+      }
+      seen.add(id);
+      clipped.add(id);
+    },
+    /** Am Ende: jeder Schritt mit Bild war dran, und jeder mit Schleife über cam.clip. */
     missing() {
-      return steps.filter((step) => step.bild && !seen.has(step.id)).map((step) => step.id);
+      return steps.filter((step) => (step.bild && !seen.has(step.id)) || (step.clip && !clipped.has(step.id))).map((step) => step.id);
     },
   };
 }
@@ -96,6 +125,7 @@ async function headerBottom(page) {
     for (const node of document.querySelectorAll("header, nav, div")) {
       const style = getComputedStyle(node);
       if (style.position !== "sticky" && style.position !== "fixed") continue;
+      if (getComputedStyle(node).visibility === "hidden") continue;
       const rect = node.getBoundingClientRect();
       if (rect.top <= 1 && rect.bottom > 0 && rect.height < 200 && rect.width > window.innerWidth / 2) bottom = Math.max(bottom, rect.bottom);
     }
@@ -129,6 +159,51 @@ async function frame(page, marks, area, form) {
   return { markBox, box: { left: outer.left, right: outer.right, top: Math.min(top, markBox.top), bottom: Math.max(bottom, markBox.bottom) } };
 }
 
+/** Gelbe Rahmen um das Markierte (ein Rahmen um alles, mit `each` einer je Element). */
+async function drawRings(page, marks, markBox, each) {
+  const rings = each ? (await boxes(marks)).map((item) => ({ left: item.x, top: item.y, right: item.x + item.width, bottom: item.y + item.height })) : [markBox];
+  await page.evaluate(({ rects, color }) => {
+    const holder = document.createElement("div");
+    holder.id = "hilfe-markierung";
+    for (const rect of rects) {
+      const ring = document.createElement("div");
+      Object.assign(ring.style, {
+        position: "fixed", left: `${rect.left - 6}px`, top: `${rect.top - 6}px`, width: `${rect.right - rect.left + 12}px`, height: `${rect.bottom - rect.top + 12}px`,
+        border: `3px solid ${color}`, borderRadius: "6px", boxShadow: `0 0 0 4px rgba(0,0,0,0.55), 0 0 18px ${color}`, pointerEvents: "none", zIndex: 2147483647,
+      });
+      holder.appendChild(ring);
+    }
+    document.body.appendChild(holder);
+  }, { rects: rings, color: MARK });
+}
+
+/** Der Bildausschnitt in CSS-Pixeln: Rahmen samt Markierung und Rand, nicht unter die Kopfzeile, nicht aus dem Bild. */
+function clipRect(box, markBox, pad, header, view) {
+  const x = Math.max(0, Math.floor(Math.min(box.left, markBox.left - 10) - pad));
+  const y = Math.max(Math.ceil(header), Math.floor(Math.min(box.top, markBox.top - 10) - pad));
+  const right = Math.min(view.width, Math.ceil(Math.max(box.right, markBox.right + 10) + pad));
+  const bottom = Math.min(view.height, Math.ceil(Math.max(box.bottom, markBox.bottom + 10) + pad));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/** PNG → WebP im Browser (OffscreenCanvas), nach src/hilfe/bilder/<key>.webp, Größe in CSS-Pixeln für masse.json. */
+async function saveWebp(page, key, png, size) {
+  const webp = await page.evaluate(async ({ data, quality }) => {
+    const bitmap = await window.createImageBitmap(await (await fetch(`data:image/png;base64,${data}`)).blob());
+    const canvas = new window.OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    const blob = await canvas.convertToBlob({ type: "image/webp", quality });
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let text = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(text);
+  }, { data: png.toString("base64"), quality: QUALITY });
+  const file = path.join(ROOT, "bilder", `${key}.webp`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, Buffer.from(webp, "base64"));
+  sizes[key] = [Math.round(size.width), Math.round(size.height)];
+}
+
 async function photograph(page, key, marks, area, pad, form, each = false) {
   await marks[0].first().evaluate((node) => node.scrollIntoView({ block: "center", inline: "nearest" }));
   await page.waitForTimeout(250);
@@ -151,48 +226,74 @@ async function photograph(page, key, marks, area, pad, form, each = false) {
     header = await headerBottom(page);
     ({ markBox, box } = await frame(page, marks, area, form));
   }
-  // Ein Rahmen um alles Markierte - mit `each` einer je Element (etwa der Weg durch den Turnierbaum).
-  const rings = each ? (await boxes(marks)).map((item) => ({ left: item.x, top: item.y, right: item.x + item.width, bottom: item.y + item.height })) : [markBox];
-  await page.evaluate(({ rects, color }) => {
-    const holder = document.createElement("div");
-    holder.id = "hilfe-markierung";
-    for (const rect of rects) {
-      const ring = document.createElement("div");
-      Object.assign(ring.style, {
-        position: "fixed", left: `${rect.left - 6}px`, top: `${rect.top - 6}px`, width: `${rect.right - rect.left + 12}px`, height: `${rect.bottom - rect.top + 12}px`,
-        border: `3px solid ${color}`, borderRadius: "6px", boxShadow: `0 0 0 4px rgba(0,0,0,0.55), 0 0 18px ${color}`, pointerEvents: "none", zIndex: 2147483647,
-      });
-      holder.appendChild(ring);
-    }
-    document.body.appendChild(holder);
-  }, { rects: rings, color: MARK });
-  const x = Math.max(0, Math.floor(Math.min(box.left, markBox.left - 10) - pad));
-  const y = Math.max(Math.ceil(header), Math.floor(Math.min(box.top, markBox.top - 10) - pad));
-  const right = Math.min(view.width, Math.ceil(Math.max(box.right, markBox.right + 10) + pad));
-  const bottom = Math.min(view.height, Math.ceil(Math.max(box.bottom, markBox.bottom + 10) + pad));
-  const clip = { x, y, width: right - x, height: bottom - y };
+  await drawRings(page, marks, markBox, each);
+  const clip = clipRect(box, markBox, pad, header, view);
   const png = await page.screenshot({ clip, animations: "disabled", caret: "hide", style: HIDE });
   await page.evaluate(() => document.getElementById("hilfe-markierung")?.remove());
-  const webp = await page.evaluate(async ({ data, quality }) => {
-    const bitmap = await window.createImageBitmap(await (await fetch(`data:image/png;base64,${data}`)).blob());
-    const canvas = new window.OffscreenCanvas(bitmap.width, bitmap.height);
-    canvas.getContext("2d").drawImage(bitmap, 0, 0);
-    const blob = await canvas.convertToBlob({ type: "image/webp", quality });
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let text = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return btoa(text);
-  }, { data: png.toString("base64"), quality: QUALITY });
-  const file = path.join(ROOT, "bilder", `${key}.webp`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, Buffer.from(webp, "base64"));
-  sizes[key] = [Math.round(clip.width), Math.round(clip.height)];
+  await saveWebp(page, key, png, clip);
   if (need > before.height) await page.setViewportSize(before);
+}
+
+/**
+ * Eine Schleife aufnehmen (#2448): Start in Position bringen, Leisten ausblenden, Übertragung starten, kurz Ruhe,
+ * Handgriffe, dann den Ausschnitt des Endstands vermessen, Rahmen einblenden, halten. Das Poster ist genau dieser
+ * Endstand im selben Ausschnitt.
+ */
+async function record(page, key, { marks, area, pad, each, start, block, keepBars, form, run }) {
+  requireFfmpeg();
+  await start.first().waitFor({ state: "visible" });
+  await start.first().evaluate((node, where) => node.scrollIntoView({ block: where, inline: "nearest" }), block);
+  await page.waitForTimeout(300);
+  await hideBars(page, keepBars);
+  const scrollBefore = await page.evaluate(() => [window.scrollX, window.scrollY]);
+  const startTop = (await start.first().boundingBox())?.y ?? null;
+  await page.waitForTimeout(150);
+  const cast = await startScreencast(page);
+  try {
+    await page.waitForTimeout(LEAD_MS);
+    await run(actions(page, form, true));
+    for (const item of marks) await item.first().waitFor({ state: "visible" });
+    await page.waitForTimeout(500);
+    const view = page.viewportSize();
+    const { markBox, box } = await frame(page, marks, area, form);
+    const header = keepBars ? 0 : await headerBottom(page);
+    const clip = clipRect(box, markBox, pad, header, view);
+    if (clip.height < 60 || clip.width < 60) throw new Error(`${key}: Ausschnitt liegt nicht im Bild (start/block anpassen).`);
+    // Scrollt die Seite während der Aufnahme, passt der Ausschnitt nur zum Ende - der Anfang wäre verrutscht.
+    const now = await page.evaluate(() => [window.scrollX, window.scrollY]);
+    const moved = [{ scrollX: scrollBefore[0], scrollY: scrollBefore[1] }, ...cast.frames].find((row) => Math.abs(row.scrollX - now[0]) > 2 || Math.abs(row.scrollY - now[1]) > 2);
+    // Ausnahme Scroll-Verankerung: Wächst oben etwas, gleicht der Browser aus - der Start steht dann im Fenster noch
+    // genau da, wo er war, und der Ausschnitt passt.
+    const startNow = (await start.first().isVisible().catch(() => false)) ? (await start.first().boundingBox())?.y ?? null : null;
+    const anchored = startTop !== null && startNow !== null && Math.abs(startNow - startTop) <= 2;
+    if (moved && !anchored) throw new Error(`${key}: Die Seite scrollt während der Aufnahme (${moved.scrollY} → ${now[1]} px). start/block so wählen, dass alles im Bild ist.`);
+    await drawRings(page, marks, markBox, each);
+    await page.evaluate(() => {
+      const holder = document.getElementById("hilfe-markierung");
+      holder.getBoundingClientRect();
+      holder.dataset.an = "1";
+    });
+    await page.waitForTimeout(HOLD_MS);
+    await cast.stop();
+    const end = Date.now() / 1000;
+    const png = await page.screenshot({ clip, animations: "disabled", caret: "hide" });
+    await saveWebp(page, key, png, clip);
+    const outBase = path.join(ROOT, "clips", key);
+    fs.mkdirSync(path.dirname(outBase), { recursive: true });
+    const result = encode({ frames: cast.frames, endTime: end, clip, viewWidth: view.width, outBase });
+    clipStats.push({ key, ...result, width: clip.width, height: clip.height });
+  } finally {
+    await cast.stop();
+    await showBars(page);
+  }
 }
 
 /** Größen in masse.json nachtragen (bestehende Einträge anderer Themen bleiben, sortiert für ruhige Diffs). */
 function saveSizes() {
-  if (!SHOTS || !Object.keys(sizes).length) return;
+  if (clipStats.length) {
+    for (const row of clipStats) console.log(`Schleife ${row.key}: ${row.length.toFixed(1)} s, ${row.width}x${row.height}, webm ${row.sizes.webm} B, mp4 ${row.sizes.mp4} B`);
+  }
+  if ((!SHOTS && !CLIPS) || !Object.keys(sizes).length) return;
   const file = path.join(ROOT, "bilder", "masse.json");
   // Direkt lesen statt erst nachzusehen (kein Wettlauf zwischen Prüfen und Lesen); fehlt die Datei, fangen wir leer an.
   let current = {};
@@ -207,60 +308,4 @@ function saveSizes() {
   fs.writeFileSync(file, `{\n${lines.join(",\n")}\n}\n`);
 }
 
-// ---------------------------------------------------------------- Videos
-
-/** Untertitel unten im Bild und ein sichtbarer Zeiger mit Klick-Ring - Videos laufen ohne Ton. */
-async function subtitle(page, text) {
-  await page.evaluate((line) => {
-    let bar = document.getElementById("hilfe-untertitel");
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "hilfe-untertitel";
-      Object.assign(bar.style, {
-        position: "fixed", left: "10px", right: "10px", bottom: "12px", padding: "10px 12px", background: "rgba(0,0,0,0.82)", color: "#fff",
-        font: "600 15px/1.35 system-ui, sans-serif", borderRadius: "6px", borderLeft: "4px solid #29B6E8", zIndex: 2147483646, pointerEvents: "none",
-      });
-      document.body.appendChild(bar);
-    }
-    bar.textContent = line;
-  }, text);
-}
-
-const POINTER = () => {
-  const install = () => {
-    if (document.getElementById("hilfe-zeiger")) return;
-    const dot = document.createElement("div");
-    dot.id = "hilfe-zeiger";
-    Object.assign(dot.style, { position: "fixed", width: "22px", height: "22px", marginLeft: "-11px", marginTop: "-11px", borderRadius: "50%",
-      background: "rgba(255,210,63,0.55)", border: "2px solid #FFD23F", zIndex: 2147483647, pointerEvents: "none", left: "-40px", top: "-40px", transition: "transform 120ms" });
-    document.body.appendChild(dot);
-    window.addEventListener("mousemove", (event) => { dot.style.left = `${event.clientX}px`; dot.style.top = `${event.clientY}px`; }, true);
-    window.addEventListener("mousedown", () => { dot.style.transform = "scale(1.8)"; }, true);
-    window.addEventListener("mouseup", () => { setTimeout(() => { dot.style.transform = "scale(1)"; }, 160); }, true);
-  };
-  if (document.body) install();
-  else document.addEventListener("DOMContentLoaded", install);
-};
-
-/** Klick mit sichtbarer Bewegung dorthin. */
-async function showClick(page, locator) {
-  await locator.scrollIntoViewIfNeeded();
-  const box = await locator.boundingBox();
-  if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 12 });
-    await page.waitForTimeout(350);
-  }
-  await locator.click();
-  await page.waitForTimeout(1100);
-}
-
-async function saveVideo(page, context, id) {
-  const video = page.video();
-  await context.close();
-  const file = path.join(ROOT, "videos", `${id}.webm`);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  await video.saveAs(file);
-  await video.delete();
-}
-
-module.exports = { POINTER, ROOT, SHOTS, VIDEOS, camera, saveSizes, saveVideo, showClick, stepsOf, subtitle, topic };
+module.exports = { CLIPS, ROOT, SHOTS, camera, saveSizes, stepsOf, topic };
