@@ -6,7 +6,8 @@ from fastapi import HTTPException, Depends
 from database import get_db
 from auth import get_current_user
 from services.league_permissions import READ
-from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
+from services.log_safe import log_safe
+from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission, staff_role_sentence
 from models import TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate, now_utc, new_id
 from routes.tournament_common import (
     require_lead_of,
@@ -44,21 +45,40 @@ async def _scope_problem(db, tid: str, scope: str, scope_id: str | None) -> str 
     return None if found else SCOPE_MISSING[scope]
 
 
-async def _notify_helper(db, tid: str, assignment: dict) -> None:
-    """Der Helfer bekommt Bescheid (#2111, TA25) - im Postfach und per Push, mit dem Weg zu „Mein Dienst“."""
-    from services.user_notifications import create_user_notification
+DUTY_PATH = "/admin/dienst"
+
+
+async def _notify_helper(db, tid: str, assignment: dict, *, role_changed: bool = False) -> None:
+    """Der Helfer bekommt Bescheid (#2111, TA25; #1384) - beim Eintragen und beim Rollenwechsel genau einmal: im Postfach,
+    per Push und nach Einstellung „Turnier-Updates“ per Mail, mit dem Satz, was die Rolle darf, und dem Weg zu
+    „Mein Dienst“."""
+    from services.notification_preferences import send_user_template
+    from services.user_notifications import build_public_url, create_user_notification
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "title": 1}) or {}
+    tournament_title = tournament.get("title") or "Turnier"
     role = ROLE_WORDS.get(assignment.get("role"), "Helfer")
-    title = f"Einsatz: {tournament.get('title') or 'Turnier'}"
-    body = f"Du hilfst bei diesem Turnier als {role}. Unter „Mein Dienst“ siehst du, was du tun kannst."
+    rights = staff_role_sentence(assignment.get("role") or "")
+    title = f"{'Neue Rolle' if role_changed else 'Einsatz'}: {tournament_title}"
+    body = f"Du hilfst bei {tournament_title} als {role}. {rights} Unter „Mein Dienst“ siehst du, was du tun kannst."
+    # Eintragen: je Einsatz einmal. Rollenwechsel: je Wechsel einmal - auch zurück zur alten Rolle.
+    dedupe = (f"tournament_staff:{assignment['id']}:role:{assignment.get('role')}:{assignment.get('updated_at')}"
+              if role_changed else f"tournament_staff:{assignment['id']}")
     try:
         await create_user_notification(
-            assignment["user_id"], title, body, url="/admin/dienst", kind="tournament_staff",
-            meta={"category": "tournament_updates", "dedupe_key": f"tournament_staff:{assignment['id']}",
-                  "tournament_id": tid},
+            assignment["user_id"], title, body, url=DUTY_PATH, kind="tournament_staff",
+            meta={"category": "tournament_updates", "dedupe_key": dedupe, "tournament_id": tid},
         )
     except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Zuweisung auf
         logger.warning("Staff notification failed type=%s", type(exc).__name__)
+    try:
+        user = await db.users.find_one({"id": assignment["user_id"]}, {"_id": 0, "id": 1, "email": 1, "notification_preferences": 1})
+        await send_user_template(
+            user, "tournament_staff", dedupe_key=f"{dedupe}:mail",
+            mail_meta={"kind": "tournament_staff", "tournament_id": tid, "user_id": assignment["user_id"]},
+            tournament_title=tournament_title, role=role, rights=rights, url=await build_public_url(DUTY_PATH),
+        )
+    except Exception as exc:  # noqa: BLE001 - eine Mail hält keine Zuweisung auf
+        logger.warning("Staff mail failed tournament=%s type=%s", log_safe(tid), type(exc).__name__)
 
 
 # --- Tournament staff assignments ---
@@ -181,6 +201,9 @@ async def update_tournament_staff(tid: str, assignment_id: str, body: Tournament
         {"assignment_id": assignment_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
     )
     updated = await db.tournament_staff_assignments.find_one({"id": assignment_id}, {"_id": 0})
+    # Neue Rolle (#1384): genau eine Nachricht - nicht bei unverändertem Speichern, nicht für einen pausierten Einsatz.
+    if updated and updated.get("role") != current.get("role") and updated.get("is_active", True) is not False:
+        await _notify_helper(db, tid, updated, role_changed=True)
     return (await _enrich_staff_assignments([updated]))[0]
 
 

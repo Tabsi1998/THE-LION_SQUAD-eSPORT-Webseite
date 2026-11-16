@@ -42,7 +42,7 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 | **Zeiten** | Zeit, Strafsekunden, Beleg, ungültig markieren | Challenge öffnen, Kasten „Zeiten eintragen“ |
 | **Vor Ort** | Schnelleingabe mit Ziffernblock, Gäste ohne Konto, Liste „Am Start / Als Nächstes“ | Challenge öffnen, ganz oben (siehe 3.12) |
 | **Vereins-Referenzzeiten** | Zeiten von Vereinsmitgliedern außer Wertung als „Zielzeit zum Schlagen“ | Formular, Kasten „Teilnahme und Vereins-Referenzzeiten“ |
-| **Fast-Lap-Team** | Helfer, die Zeiten eintragen dürfen | Challenge öffnen, Kasten „Fast-Lap-Team“ |
+| **Fast-Lap-Team** | Helfer, die Zeiten eintragen dürfen | Challenge öffnen, Kasten „Fast-Lap-Helfer“ |
 | **Preise** | Preise je Platz, daraus entstehen Gewinn-Einträge | Formular, Kasten „Preise“ |
 | **Jahreswertung** | Punkte für die Jahreswertung, mit einstellbarem Gewicht | Formular, Kasten „Jahreswertung“ |
 | **Bestenliste** | Strecken-Rangliste und Gesamtwertung auf der Website, PDF und Urkunden | öffentliche Seite der Challenge |
@@ -89,7 +89,7 @@ Die **Zielzeit** ist eine Marke zum Knacken: Wer sie unterbietet, sammelt den Er
 
 Wer Zeiten eintragen soll, ohne sonst etwas verwalten zu dürfen:
 
-1. Challenge öffnen, Kasten **Fast-Lap-Team**.
+1. Challenge öffnen, Kasten **Fast-Lap-Helfer**.
 2. Bei **Person** den Namen suchen und wählen.
 3. **Rolle** wählen: **Ergebnisdienst**, **Schiedsrichter** oder **Organisation**. Alle drei dürfen Zeiten eintragen.
 4. Optional eine **Notiz** (zum Beispiel „Station am Samstag“), dann **Hinzufügen**.
@@ -362,7 +362,7 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 | „Der Gast ist schon mit einem anderen Konto verknüpft.“ | Verknüpfen geht nur einmal | Bei einem Irrtum die Zeiten von Hand korrigieren |
 | „Vereinsmitglieder dürfen bei dieser Challenge nur als Vereins-Referenz eingetragen werden.“ | Der Haken **Vereinsmitglieder aus offizieller Wertung ausschließen** ist an | Als **Vereins-Referenz** eintragen, oder den Haken ausschalten |
 | „Vereins-Referenzzeiten sind bei dieser Challenge deaktiviert.“ | **Vereins-Referenzzeiten erlauben** ist aus | Haken einschalten |
-| „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch im Fast-Lap-Team (oder pausiert) | Im Kasten **Fast-Lap-Team** hinzufügen oder **Aktivieren** |
+| „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch im Fast-Lap-Team (oder pausiert) | Im Kasten **Fast-Lap-Helfer** hinzufügen oder **Aktivieren** |
 | Der Menüpunkt „Fast Lap“ fehlt | Die Person hat keinen Zugang zur Turnierleitung und keinen Einsatz | Zum Fast-Lap-Team machen lassen (siehe 2.3) |
 | Die Challenge ist öffentlich nicht zu sehen | Status **Entwurf** oder Sichtbarkeit zu eng | Status auf **Angekündigt** stellen, **Sichtbarkeit** prüfen |
 | Keine Jahreswertungs-Punkte | Der Status steht noch nicht auf **Ergebnisse veröffentlicht**, oder der Faktor ist 0. Alte Challenges, die von **Beendet** direkt ins Archiv gingen, haben auch keine | Status setzen, Faktor im Kasten **Jahreswertung** prüfen. Bei alten Archiv-Einträgen landen die Punkte in der gerade aktiven Saison, also nur bewusst nachholen |

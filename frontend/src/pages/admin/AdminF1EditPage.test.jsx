@@ -133,7 +133,7 @@ test("Fahrer über die Personensuche: Zeit geht mit der Kennung, die Kontoliste 
   expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/users");
 });
 
-test("fehlt das Recht für das Fast-Lap-Team, steht dort ein Satz – der Rest der Seite geht weiter", async () => {
+test("fehlt das Recht für die Fast-Lap-Helfer, steht dort ein Satz – der Rest der Seite geht weiter", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, tracks: [{ id: "tr-1", name: "Spa" }] } };
     if (url === "/f1/challenges/c-1/staff") throw { response: { status: 403, data: { detail: "Keine Fast-Lap-Berechtigung für diese Aktion" } } };
@@ -141,7 +141,7 @@ test("fehlt das Recht für das Fast-Lap-Team, steht dort ein Satz – der Rest d
   });
   renderPage();
   await screen.findByRole("heading", { name: "Monza Sprint" });
-  expect(await screen.findByTestId("f1-staff-error")).toHaveTextContent("Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.");
+  expect(await screen.findByTestId("f1-staff-error")).toHaveTextContent("Dafür fehlt dir das Recht, die Fast-Lap-Helfer zu sehen.");
   expect(screen.getByTestId("f1-add-time-value")).toBeInTheDocument();
   expect(screen.getByTestId("f1-staff-person-search")).toBeInTheDocument();
 });

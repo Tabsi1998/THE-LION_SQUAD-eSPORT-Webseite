@@ -452,6 +452,8 @@ test("Team-Turnier: fehlt das Recht für die Teams, steht ein Satz – Helfer la
   renderPage();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
   expect(await screen.findByTestId("participant-add-teams-error")).toHaveTextContent("Dafür fehlt dir das Recht: Teams dieses Turniers.");
+  // Der Reiter heißt „Helfer“ (#1384) - „Team“ sind in diesem Turnier die Teilnehmer.
+  expect(screen.getByTestId("admin-tr-tab-staff")).toHaveTextContent("Helfer");
   await user.click(screen.getByTestId("admin-tr-tab-staff"));
   expect(await screen.findByText("Pia Pokal")).toBeInTheDocument();
   expect(screen.getByText("@pia.pokal")).toBeInTheDocument();

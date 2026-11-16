@@ -501,7 +501,8 @@ export default function AdminTournamentEditPage() {
     ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
     // Map-Pool (#1616): nur mit Spiel und für Strukturrollen - ein maploser Cup bekommt keinen Reiter.
     ...(t.game_id && t.can_manage_structure ? [["maps", "Maps"]] : []),
-    ...(isTournamentLead ? [["staff", "Team"]] : []),
+    // Helfer (#1384): „Team“ hieß hier die Helfer-Liste - im selben Turnier heißen aber auch die Teilnehmer so.
+    ...(isTournamentLead ? [["staff", "Helfer"]] : []),
     // Rückmeldungen (#1196): erst, wenn das Turnier vorbei ist - ohne Namen.
     ...(["completed", "results_published", "archived"].includes(t.status) ? [["feedback", "Rückmeldungen"]] : []),
     // Bearbeiten speichert per PATCH - das darf nur die Turnierleitung über alle Turniere (#1353, `require_admin`).

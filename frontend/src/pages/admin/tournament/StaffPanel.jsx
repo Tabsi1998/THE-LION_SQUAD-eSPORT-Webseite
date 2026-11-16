@@ -7,6 +7,8 @@ import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { STAFF_ROLE_OPTIONS, STAFF_SCOPE_OPTIONS, formatBracketSection } from "@/lib/tournamentLabels";
+import { staffRoleSentence } from "@/lib/staffRoles";
+import { useNarrowScreen } from "@/hooks/useNarrowScreen";
 
 // Bereich eines Einsatzes (#2111, TA25): eine Auswahl aus diesem Turnier statt einer rohen Kennung als Freitext - ein
 // Tippfehler ergab vorher einen Helfer ohne Rechte. „Alle …“ (leer) gilt für jede Phase, Gruppe, Station oder jedes Spiel.
@@ -31,6 +33,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
   const [form, setForm] = useState({ role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
+  const narrow = useNarrowScreen();
 
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
   const add = async (e) => {
@@ -48,7 +51,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
         scope_id: form.scope === "tournament" ? null : form.scope_id || null,
         notes: form.notes || null,
       });
-      toast.success("Zuweisung gespeichert.");
+      toast.success(`${person.name || "Die Person"} ist eingetragen und bekommt Bescheid.`);
       setPerson(null);
       setForm({ role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
       onChanged();
@@ -87,15 +90,18 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
     <div className="grid lg:grid-cols-3 gap-5">
       <form onSubmit={add} className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Turnier-Team</div>
-          <h2 className="font-heading text-lg font-bold mt-1">Zuweisung hinzufügen</h2>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Helfer</div>
+          <h2 className="font-heading text-lg font-bold mt-1">Helfer eintragen</h2>
+          <p className="mt-1 text-xs text-white/50">Wer eingetragen wird, bekommt eine Nachricht mit seiner Rolle und dem Weg zu „Mein Dienst“.</p>
         </div>
         <PersonPicker purpose="tournament" contextId={tournamentId} value={person} onChange={setPerson} label="Person" testId="tournament-staff-person" />
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Rolle</div>
-          <select value={form.role} onChange={(e) => set("role", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+          <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="tournament-staff-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {STAFF_ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
+          {/* Je Rolle ein Satz (#1384) - aus derselben Liste, die der Server prüft. */}
+          <p className="mt-1.5 text-xs text-white/55" data-testid="tournament-staff-role-sentence">{staffRoleSentence(form.role)}</p>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
@@ -118,12 +124,43 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Notiz</div>
           <input value={form.notes} onChange={(e) => set("notes", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. Samstag Vormittag" />
         </label>
-        <button disabled={saving} className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">
-          Hinzufügen
+        <button disabled={saving} className="w-full min-h-[44px] px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">
+          Eintragen
         </button>
       </form>
       <div className="lg:col-span-2 border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
         {staffError ? <div className="px-4 py-10 text-center text-sm text-white/55" data-testid="tournament-staff-error">{staffError}</div> : (
+        <>
+        {/* Am Handy (#1384): je Helfer eine Karte mit Rolle und Satz statt einer Tabelle zum Wischen. */}
+        {narrow ? (
+        <ul className="divide-y divide-white/5" data-testid="tournament-staff-cards">
+          {staff.map((a) => (
+            <li key={a.id} className="p-4 space-y-2" data-testid={`tournament-staff-card-${a.id}`}>
+              <div className="flex items-start justify-between gap-3 min-w-0">
+                <div className="min-w-0">
+                  <div className="font-semibold [overflow-wrap:anywhere]">{a.user?.display_name || a.user?.username || "—"}</div>
+                  {a.user?.username && <div className="text-xs text-white/40 truncate">@{a.user.username}</div>}
+                </div>
+                <StatusBadge status={a.is_active === false ? "paused" : "approved"} />
+              </div>
+              <div className="text-sm">
+                <span className="font-bold text-[#29B6E8]">{roleLabel(a.role)}</span>
+                <span className="text-white/45"> · {scopeLabel(a.scope || "tournament")}{a.scope_id ? `: ${scopeName(a.scope, a.scope_id)}` : ""}</span>
+              </div>
+              <p className="text-xs text-white/55">{staffRoleSentence(a.role)}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button type="button" onClick={() => toggleActive(a)} className="min-h-[44px] px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] font-bold uppercase">
+                  {a.is_active === false ? "Aktivieren" : "Pausieren"}
+                </button>
+                <button type="button" onClick={() => remove(a)} className="min-h-[44px] px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">
+                  Entfernen
+                </button>
+              </div>
+            </li>
+          ))}
+          {staff.length === 0 && <li className="text-center py-10 text-white/40">Noch keine Helfer</li>}
+        </ul>
+        ) : (
         <div className="tls-swipe pb-0">
           <table className="w-full text-sm min-w-[760px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
@@ -142,7 +179,10 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                     <div className="font-semibold">{a.user?.display_name || a.user?.username || "—"}</div>
                     {a.user?.username && <div className="text-xs text-white/40">@{a.user.username}</div>}
                   </td>
-                  <td className="px-4 py-3">{roleLabel(a.role)}</td>
+                  <td className="px-4 py-3">
+                    <div>{roleLabel(a.role)}</div>
+                    <div className="text-xs text-white/45 max-w-[16rem]" data-testid={`tournament-staff-sentence-${a.id}`}>{staffRoleSentence(a.role)}</div>
+                  </td>
                   <td className="px-4 py-3">
                     <div>{scopeLabel(a.scope || "tournament")}</div>
                     {a.scope_id ? <div className="text-xs text-white/40">{scopeName(a.scope, a.scope_id)}</div>
@@ -163,10 +203,12 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                   </td>
                 </tr>
               ))}
-              {staff.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Noch keine Zuweisungen</td></tr>}
+              {staff.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Noch keine Helfer</td></tr>}
             </tbody>
           </table>
         </div>
+        )}
+        </>
         )}
       </div>
     </div>
