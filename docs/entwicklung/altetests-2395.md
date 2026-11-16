@@ -209,7 +209,7 @@ die Nummer 1 der Rangliste bekommt Silber. Nicht im Produktcode geändert (Auftr
 | TestCrowns::test_crowns_stable_across_calls | c | erfolge |
 | TestRegression::test_leaderboard_shape | a | test_achievement_visibility_flow.py::test_rangliste_je_kategorie_und_zeitraum |
 | TestRegression::test_leaderboard_limit | c | erfolge |
-| TestRegression::test_public_list | a | Liste: test_public_profile_fields_flow.py::test_lists_follow_the_privacy_levels_and_never_show_the_internal_role; Level: test_xp_flow.py::test_level_stand_prestige_und_ruecknahme |
+| TestRegression::test_public_list | a | Liste: test_public_profile_fields_flow.py::test_lists_follow_the_privacy_levels_and_never_show_the_internal_role; Level in der Spielerliste: test_achievement_ranking_legacy_flow.py::test_the_leaderboard_lists_public_profiles_ranked_and_never_more_than_100 (nach der Prüfung ergänzt) |
 | TestRegression::test_public_profile_top_players | c | erfolge |
 
 ### test_iter14_team_levels_crowns.py (9)
@@ -243,7 +243,7 @@ die Nummer 1 der Rangliste bekommt Silber. Nicht im Produktcode geändert (Auftr
 | TestAuthFlow::test_csrf_rejects_missing_header | a | test_auth_security_unit.py::test_csrf_checks_origin_fetch_metadata_and_refresh_token_pair |
 | TestAuthFlow::test_cross_site_origin_rejected_at_origin_server | a | test_auth_security_unit.py::test_cross_site_login_is_rejected_even_when_path_is_csrf_exempt |
 | TestAdminEndpoints::test_admin_get (10 Pfade) | b | ließ 200 oder 404 gelten |
-| TestAdminEndpoints::test_admin_requires_auth | a | test_my_duty_flow.py::test_dashboard_gives_each_area_only_its_own_blocks |
+| TestAdminEndpoints::test_admin_requires_auth | a | test_my_duty_flow.py::test_dashboard_gives_each_area_only_its_own_blocks (403 je Rolle, Gast 401 nach der Prüfung ergänzt) |
 | TestAdminEndpoints::test_news_create_update_delete | a | test_news_editorial_flow.py::test_edits_record_who_changed_what_and_show_a_history, ::test_drafts_that_never_went_out_can_still_be_deleted |
 
 ### test_phase1_unified_match.py (11, mit Parametern 16 Fälle)

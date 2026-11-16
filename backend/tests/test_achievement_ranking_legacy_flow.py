@@ -25,6 +25,7 @@ Ersetzt:
 - test_iter13_crowns.py::TestCrowns (alle fünf Fälle)
 - test_iter13_crowns.py::TestRegression::test_leaderboard_limit
 - test_iter13_crowns.py::TestRegression::test_public_profile_top_players
+- test_iter13_crowns.py::TestRegression::test_public_list (Level in der Spielerliste)
 - test_iter14_team_levels_crowns.py::TestTeamLevels::test_levels_all_teams
 - test_iter14_team_levels_crowns.py::TestTeamLevels::test_level_detail_matches_summary
 - test_iter14_team_levels_crowns.py::TestCrownsRegression::test_crowns_shape
@@ -99,6 +100,15 @@ async def test_the_leaderboard_lists_public_profiles_ranked_and_never_more_than_
     assert [(row["username"], row["points"], row["rank"]) for row in top] == [("anna", 90, 1), ("ben", 80, 2), ("cara", 50, 3)]
     for row in top:
         assert (await flow.get(f"/api/users/public/{row['username']}")).status_code == 200, row["username"]
+
+    # Die Spielerliste (Web und App) zeigt das Level jeder Person - aus denselben XP wie das Einzelprofil.
+    anna = next(row for row in top if row["username"] == "anna")
+    await flow.db.user_xp.insert_one({"user_id": anna["user_id"], "total": 5000, "prestige": 0})
+    listing = (await flow.get("/api/users/public-list")).json()
+    rows = listing["items"] if isinstance(listing, dict) else listing
+    anna_row = next(row for row in rows if row["username"] == "anna")
+    assert anna_row["achievement_level"]["xp"] == 5000
+    assert anna_row["achievement_level"]["level"] >= 1
 
     everyone = (await flow.get("/api/achievements/leaderboard", params={"limit": 5000})).json()
     assert len(everyone) == 100, "höchstens 100 Zeilen"
