@@ -133,6 +133,9 @@ test.describe("FAQ (#2448)", () => {
       await expect(knopf).toHaveAttribute("aria-expanded", "true");
       await expect(page.getByTestId("faq-antwort-team-beitreten")).toBeVisible();
       await shot(page, `faq-${width}`, { fullPage: true });
+      // Für das Handbuch (docs/handbuch/bilder/faq-pc.png, faq-handy.png): nur der obere Teil.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await shot(page, `handbuch-${width}`);
       await page.keyboard.press(" ");
       await expect(knopf).toHaveAttribute("aria-expanded", "false");
 
