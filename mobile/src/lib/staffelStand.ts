@@ -93,7 +93,7 @@ export function staffelStand(staffel: StaffelLike | null | undefined, { now = ne
   const hidden = key === "anmeldung" && !PUBLISHED_VISIBILITY.has(String(season.visibility || ""));
   if (key === "anmeldung") {
     const end = applicationEnd(season);
-    if (end != null) label = `${label} bis ${viennaDateTime(new Date(end), WITH_TIME)}`;
+    if (end != null) label = `${label} bis ${viennaDateTime(end, WITH_TIME)}`;
   }
   if (hidden) label = `${label} · Season verborgen`;
   if (key === "spielbetrieb" && status === "paused") label = `${label} · pausiert`;
