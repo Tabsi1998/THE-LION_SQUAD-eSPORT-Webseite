@@ -3,27 +3,10 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { enqueueLevelUp } from "@/components/achievements/ceremony/queue";
+import { ceremonyState, isLevelGain, levelSeenKey as storeKey, markSeen, readLevelSeen as readSeen, serverCheck } from "@/components/achievements/ceremony/seen";
 
-export const storeKey = (uid) => `tls-level-seen:${uid}`;
-
-/**
- * Ein Aufstieg: mehr Prestige-Sterne, oder gleich viele Sterne und ein höheres Level. Wer ein Prestige zurücknimmt,
- * hat einen Stern weniger und wieder Level 60 - das ist nichts zum Feiern.
- */
-export function isLevelGain(prev, next) {
-  const prevStars = Number(prev?.prestige || 0);
-  const nextStars = Number(next?.prestige || 0);
-  if (nextStars !== prevStars) return nextStars > prevStars;
-  return Number(next?.level || 0) > Number(prev?.level || 0);
-}
-
-/** Der zuletzt gesehene Stand eines Kontos; ältere Fassungen merkten sich nur die Zahl. */
-export function readSeen(key) {
-  let prev = null;
-  try { prev = JSON.parse(localStorage.getItem(key) || "null"); } catch { prev = null; }
-  if (typeof prev === "number" || (typeof prev === "string" && /^\d+$/.test(prev))) prev = { level: Number(prev), title: "", prestige: 0 };
-  return prev && typeof prev === "object" ? prev : null;
-}
+// Seit #2450 in ceremony/seen.js - hier weiter erreichbar.
+export { isLevelGain, readSeen, storeKey };
 
 /**
  * Das Paket für die Zeremonie, wenn seit dem zuletzt gesehenen Stand (`prev`) ein Aufstieg dazukam - sonst null.
@@ -50,8 +33,7 @@ export function levelUpFrom(prev, next) {
  * über mehrere Tabs desselben Browsers. Mit der Web-Locks-API (alle aktuellen Browser) wartet ein zweiter Tab, bis der
  * erste fertig ist, und findet dann schon den neuen Stand - derselbe Aufstieg wird auf diesem Gerät nur einmal gezeigt.
  * Ohne Locks (alte Browser) läuft dasselbe ohne Sperre; Lesen und Schreiben folgen dann direkt aufeinander.
- * Bewusste Grenze: auf einem anderen Gerät (oder in der App) erscheint der Aufstieg dort noch einmal - der Stand liegt
- * nur im Gerät, nicht auf dem Server.
+ * Das ist der Rückfall ohne Stand vom Server (ältere Fassung); sonst gilt der gesehene Stand am Konto (#2450).
  */
 export async function claimLevelUp(key, next, locks = typeof navigator !== "undefined" ? navigator.locks : undefined) {
   const run = () => {
@@ -65,10 +47,15 @@ export async function claimLevelUp(key, next, locks = typeof navigator !== "unde
   return run();
 }
 
+function remember(key, next) {
+  try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* egal */ }
+}
+
 /**
  * Level-Aufstieg erkennen (#617) und als Zeremonie feiern (E8, #618): die Zahl bricht auf, die neue
- * fällt ein, alle fünf Level ein Titel-Banner, Sterne bei Prestige. Gemerkt wird je Konto im Browser,
- * damit derselbe Aufstieg nicht zweimal gefeiert wird.
+ * fällt ein, alle fünf Level ein Titel-Banner, Sterne bei Prestige. Gemerkt wird je Konto am Server (#2450) - ein
+ * Aufstieg kommt auf einem Gerät, nicht auf jedem; geschlossen (wie auch immer) gilt er als gesehen. Ohne Stand vom
+ * Server merkt sich der Browser den Stand wie bisher.
  */
 export function LevelUpCelebration() {
   const { user } = useAuth();
@@ -79,6 +66,8 @@ export function LevelUpCelebration() {
   // landet der Stand von Konto B im Merker von Konto A.
   const currentRef = useRef(userId);
   useEffect(() => { currentRef.current = userId; }, [userId]);
+  // Der Aufstieg, der gerade in der Warteschlange steht - eine zweite Prüfung (Fokus, Prestige) reiht ihn nicht noch einmal ein.
+  const queuedRef = useRef(null);
 
   const check = useCallback(async () => {
     if (!userId || busyRef.current === userId) return;
@@ -87,8 +76,29 @@ export function LevelUpCelebration() {
       const { data } = await api.get("/users/me/level");
       if (currentRef.current !== userId) return;
       const next = { level: Number(data?.level || 1), title: String(data?.title || ""), prestige: Number(data?.prestige || 0) };
-      const levelUp = await claimLevelUp(storeKey(userId), next);
-      if (levelUp && currentRef.current === userId) enqueueLevelUp(levelUp);
+      const state = await ceremonyState(userId);
+      if (currentRef.current !== userId) return;
+      if (!state) {
+        const levelUp = await claimLevelUp(storeKey(userId), next);
+        if (levelUp && currentRef.current === userId) enqueueLevelUp(levelUp);
+        return;
+      }
+      const levelUp = levelUpFrom(state.level, next);
+      if (!levelUp) {
+        remember(storeKey(userId), next);
+        return;
+      }
+      const target = `${userId}:${next.prestige}:${next.level}`;
+      if (queuedRef.current === target) return;
+      queuedRef.current = target;
+      enqueueLevelUp(levelUp, {
+        onDone: () => {
+          if (queuedRef.current === target) queuedRef.current = null;
+          remember(storeKey(userId), next);
+          markSeen(userId, { level: next });
+        },
+        check: serverCheck(userId),
+      });
     } catch { /* rein kosmetisch */ }
     finally { if (busyRef.current === userId) busyRef.current = null; }
   }, [userId]);

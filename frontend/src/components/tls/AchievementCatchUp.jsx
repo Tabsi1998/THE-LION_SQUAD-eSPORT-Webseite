@@ -3,10 +3,9 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
 import { describePackage } from "@/components/achievements/ceremony/select";
+import { achSeenKey as seenKey, ceremonyState, markSeen, recountSeenKey, serverCheck } from "@/components/achievements/ceremony/seen";
 
-const seenKey = (id) => `tls_ach_seen:${id}`;
-// Die Sammel-Zeremonie der Neuberechnung (#2340) läuft je Person und Kennung der Neuberechnung einmal.
-export const recountSeenKey = (id, marker) => `tls_ach_recount_seen:${id}:${marker}`;
+export { recountSeenKey };
 /** Der Server hat gerade Stufen vergeben (z. B. nach einem Saison-Signal, #678) - `detail.count` sagt, wie viele. */
 export const AWARDED_EVENT = "tls:achievements-awarded";
 export const MAX_TIERS = 8;
@@ -49,9 +48,15 @@ function lastSeen(key) {
   }
 }
 
+const CATCH_UP = { catchUp: true, heading: "Während du weg warst!", sub: "Nachgeholte Erfolge" };
+
 /**
  * Erfolge als Zeremonie (E8: über die Warteschlange, nie doppelt): beim Laden die seit dem letzten Besuch
  * nachgeholten, und - sobald der Server meldet, dass gerade Stufen vergeben wurden - genau diese, sofort.
+ *
+ * Einmal je Konto (#2450): Was schon gesehen ist, weiß der Server - nachgeholt wird, was dort noch offen ist, und jede
+ * Art des Schließens meldet „gesehen“ zurück. Vor dem Anzeigen prüft die Bühne noch einmal (CeremonyHost). Ohne Stand
+ * vom Server (ältere Fassung) gilt wie bisher der Merker im Browser.
  */
 export function AchievementCatchUp() {
   const { user } = useAuth();
@@ -64,10 +69,49 @@ export function AchievementCatchUp() {
     let gone = false;
     const key = seenKey(userId);
 
+    const check = serverCheck(userId);
+
+    // Der Stand vom Server: offen ist, was dort noch nicht gesehen ist - der Merker im Browser zählt nicht mehr.
+    const catchUpFromServer = (data, state) => {
+      const groups = data?.groups || [];
+      const marker = data?.recount?.finished ? data.recount.marker : null;
+      if (marker && !state.recountSeen.includes(marker)) {
+        const late = recountTiers(groups);
+        const done = () => {
+          remember(recountSeenKey(userId, marker));
+          markSeen(userId, { recountMarker: marker });
+        };
+        if (late.length) enqueueCeremony(late, { recount: true, recountMarker: marker }, { onDone: done, check });
+        else done();
+      }
+      const unseen = new Set(state.unseen);
+      const open = earnedTiers(groups).filter((t) => unseen.has(t.code) && !shownRef.current.has(t.code));
+      if (!open.length) {
+        remember(key);
+        return;
+      }
+      open.forEach((tier) => shownRef.current.add(tier.code));
+      // Gezeigt werden die neuesten; gesehen ist danach alles, was offen war - wie bisher mit dem Merker.
+      const fresh = open.slice(0, MAX_TIERS);
+      const codes = open.map((tier) => tier.code);
+      enqueueCeremony(fresh, { ...describePackage(groups, fresh), ...CATCH_UP }, {
+        onDone: () => {
+          remember(key);
+          markSeen(userId, { codes });
+        },
+        check,
+      });
+    };
+
     // Läuft je Person einmal und immer zu Ende - auch wenn React den Effekt (StrictMode) zweimal aufruft.
     const catchUp = async () => {
       try {
         const { data } = await api.get("/achievements/me");
+        const state = await ceremonyState(userId);
+        if (state) {
+          catchUpFromServer(data, state);
+          return;
+        }
         // Neuberechnung (#2340): erst nach dem Abschluss, einmal - alle nachgerechneten Stufen in einer Zeremonie.
         const marker = data?.recount?.finished ? data.recount.marker : null;
         if (marker && !lastSeen(recountSeenKey(userId, marker))) {
@@ -87,7 +131,7 @@ export function AchievementCatchUp() {
         }
         fresh.forEach((tier) => shownRef.current.add(tier.code));
         // Der Marker rückt erst vor, wenn die Zeremonie wirklich gezeigt wurde.
-        enqueueCeremony(fresh, { ...describePackage(data?.groups || [], fresh), catchUp: true, heading: "Während du weg warst!", sub: "Nachgeholte Erfolge" }, { onDone: () => remember(key) });
+        enqueueCeremony(fresh, { ...describePackage(data?.groups || [], fresh), ...CATCH_UP }, { onDone: () => remember(key) });
       } catch {
         /* rein kosmetisch */
       }
@@ -103,7 +147,14 @@ export function AchievementCatchUp() {
         const fresh = earnedTiers(data?.groups || []).slice(0, count).filter((t) => !shownRef.current.has(t.code));
         if (!fresh.length) return;
         fresh.forEach((tier) => shownRef.current.add(tier.code));
-        enqueueCeremony(fresh, describePackage(data?.groups || [], fresh), { onDone: () => remember(key) });
+        const codes = fresh.map((tier) => tier.code);
+        enqueueCeremony(fresh, describePackage(data?.groups || [], fresh), {
+          onDone: () => {
+            remember(key);
+            markSeen(userId, { codes });
+          },
+          check,
+        });
       } catch {
         /* rein kosmetisch - der nächste Besuch holt es nach */
       }
