@@ -1,55 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Info, Link2, PlayCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Info, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { FAQ_PFAD, THEMEN, ankerAus, faqBereich, hilfeBild, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo } from "@/hilfe";
+import { FAQ_PFAD, THEMEN, ankerAus, faqBereich, hilfePfad, hilfeSchritte, hilfeThema } from "@/hilfe";
+import FaqClip from "@/hilfe/FaqClip";
 
 // Eine Anleitung der FAQ (#2295, seit #2448 unter /faq/<thema>; /hilfe/<thema> leitet her): Inhalt oben, dann je
-// Abschnitt die Schritte mit Nummer, kurzem Satz, Hinweis und Bild. Jeder Schritt hat einen Anker (#<schritt>), den „?“-Links und „Link kopieren“ nutzen. Am Handy
-// zeigt das Bild die Handy-Ansicht, ab 768 px die PC-Ansicht.
-
-function StepImage({ slug, schritt }) {
-  const handy = hilfeBild(slug, schritt.id, "handy");
-  const pc = hilfeBild(slug, schritt.id, "pc");
-  const fallback = handy || pc;
-  if (!fallback) return null;
-  return (
-    <figure className="mt-4">
-      <picture>
-        {pc && handy ? <source media="(min-width: 768px)" srcSet={pc.src} width={pc.width} height={pc.height} /> : null}
-        <img src={fallback.src} width={fallback.width} height={fallback.height} alt={`Bildschirmfoto: ${schritt.titel}`} loading="lazy" decoding="async"
-          data-testid={`help-step-image-${schritt.id}`}
-          className="block h-auto max-w-full rounded-sm border border-white/10 bg-[#0F0F10]" />
-      </picture>
-    </figure>
-  );
-}
-
-// Die Videos sind WebM (VP8) - ältere iPhones spielen das nicht. Dort fällt das Video weg, die Bilder bleiben. Eine
-// MP4-Fassung kann das Werkzeug von Playwright nicht erzeugen (kein H.264-Encoder dabei).
-function canPlayWebm() {
-  try {
-    return typeof document !== "undefined" && document.createElement("video").canPlayType?.('video/webm; codecs="vp8"') !== "";
-  } catch {
-    return false;
-  }
-}
-
-function StepVideo({ video }) {
-  const src = hilfeVideo(video.id);
-  if (!src || !canPlayWebm()) return null;
-  return (
-    <figure className="mt-4 rounded-sm border border-white/10 bg-[#0F0F10] p-3" data-testid={`help-video-${video.id}`}>
-      <figcaption className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/85">
-        <PlayCircle className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" /> {video.titel}
-      </figcaption>
-      <video src={src} controls muted playsInline preload="metadata" className="mx-auto block w-full max-w-[360px] rounded-sm bg-black" />
-    </figure>
-  );
-}
+// Abschnitt die Schritte mit Nummer, kurzem Satz, Hinweis und Bild. Jeder Schritt hat einen Anker (#<schritt>), den „?“-Links und „Link kopieren“ nutzen.
+// Bild bzw. Schleife wie ein GIF zeigt FaqClip (#2448): am Handy die Handy-Fassung, sonst die PC-Fassung.
 
 async function copyLink(slug, id) {
   const url = `${window.location.origin}${hilfePfad(slug, id)}`;
@@ -92,7 +53,7 @@ function Step({ slug, schritt, active }) {
               {schritt.link.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : null}
-          {schritt.bild ? <StepImage slug={slug} schritt={schritt} /> : null}
+          {schritt.bild ? <FaqClip slug={slug} schritt={schritt} /> : null}
         </div>
       </div>
     </li>
@@ -166,7 +127,6 @@ export default function HelpTopicPage() {
         {thema.abschnitte.map((abschnitt) => (
           <section key={abschnitt.id} id={abschnitt.id} aria-labelledby={`${abschnitt.id}-titel`} className="mt-12 scroll-mt-24" data-testid={`help-section-${abschnitt.id}`}>
             <h2 id={`${abschnitt.id}-titel`} className="font-heading text-2xl md:text-3xl font-black uppercase text-white">{abschnitt.titel}</h2>
-            {(thema.videos || []).filter((video) => video.abschnitt === abschnitt.id).map((video) => <StepVideo key={video.id} video={video} />)}
             <ol className="mt-4">
               {abschnitt.schritte.map((schritt) => {
                 const row = steps.find((item) => item.id === schritt.id);

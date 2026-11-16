@@ -1,1 +1,5 @@
 *.sh text eol=lf
+# Bilder und Videos (FAQ-Schleifen #2448): nie als Text behandeln - kein Zeilenende-Umbau, kein Text-Diff.
+*.webm binary
+*.mp4 binary
+*.webp binary

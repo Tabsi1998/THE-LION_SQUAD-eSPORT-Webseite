@@ -35,13 +35,12 @@ import secrets
 import time
 from collections import Counter, deque
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
 
 import httpx
 from pymongo.errors import DuplicateKeyError
 
-from services import shop_config
+from services import money, shop_config
 from services.log_safe import log_safe, mask_addresses
 from services.shop_fulfillment import (
     CatalogCategory, CatalogEntry, CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
@@ -113,12 +112,10 @@ def _cents(value) -> int | None:
     if value is None:
         return None
     try:
-        amount = Decimal(str(value))
-    except InvalidOperation as exc:
+        # Kaufmännisch (#1908) - to_integral_value rundete bisher auf die gerade Zahl (0,125 € → 12 Cent).
+        return money.to_cents(value)
+    except ValueError as exc:
         raise FulfillmentPermanent("invalid_response") from exc
-    if not amount.is_finite():
-        raise FulfillmentPermanent("invalid_response")
-    return int((amount * 100).to_integral_value())
 
 
 def _retry_after(response: httpx.Response) -> float | None:

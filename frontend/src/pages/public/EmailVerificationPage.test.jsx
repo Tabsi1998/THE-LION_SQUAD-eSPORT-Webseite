@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-// Mail-Bestätigung mit Ziel (#1225): nach dem Klick in der Mail führt „Einloggen und weiter“ mit dem Ziel zum Login -
+// Mail-Bestätigung mit Ziel (#1225): nach dem Klick in der Mail führt „Anmelden und weiter“ mit dem Ziel zum Login -
 // das Ziel kommt vom Server (beim Registrieren gemerkt) oder aus dem Link; ein fremdes Ziel zählt nicht.
 
 const apiMock = { post: vi.fn() };
@@ -19,11 +19,11 @@ function renderAt(entry) {
   );
 }
 
-test("bestätigt: „Einloggen und weiter“ mit dem Ziel vom Server", async () => {
+test("bestätigt: „Anmelden und weiter“ mit dem Ziel vom Server", async () => {
   apiMock.post.mockResolvedValue({ data: { ok: true, next: "/tournaments/mk-cup" } });
   renderAt("/verify-email?token=abc");
   const link = await screen.findByTestId("verify-continue");
-  expect(link).toHaveTextContent("Einloggen und weiter");
+  expect(link).toHaveTextContent("Anmelden und weiter");
   expect(link).toHaveAttribute("href", "/login?next=%2Ftournaments%2Fmk-cup");
   expect(apiMock.post).toHaveBeenCalledWith("/auth/verify-email", { token: "abc" });
 });
@@ -54,6 +54,6 @@ test("das Ziel aus dem Link zählt, ein fremdes nicht", async () => {
   unmount();
   renderAt("/verify-email?token=abc&next=https%3A%2F%2Ffremd.example");
   const link = await screen.findByTestId("verify-continue");
-  expect(link).toHaveTextContent("Zum Login");
+  expect(link).toHaveTextContent("Zum Anmelden");
   expect(link).toHaveAttribute("href", "/login");
 });

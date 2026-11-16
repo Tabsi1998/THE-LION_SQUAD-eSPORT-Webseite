@@ -56,6 +56,8 @@ const DISALLOWED_VISIBLE_WORDS = [
   "FUER",
   "Fuer",
   "fuer",
+  "Maennlich",
+  "maennlich",
 ];
 
 function sourceFiles(root) {

@@ -62,7 +62,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
             <div>
               <h3 className="font-heading font-black uppercase mb-1">Google-Konto</h3>
               {googleLinked ? (
-                <p className="text-xs text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schneller Login mit einem Klick.</p>
+                <p className="text-xs text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
               ) : (
                 <p className="text-xs text-white/50" data-testid="profile-google-status">Verbinde dein Google-Konto, um dich künftig mit einem Klick anzumelden.</p>
               )}

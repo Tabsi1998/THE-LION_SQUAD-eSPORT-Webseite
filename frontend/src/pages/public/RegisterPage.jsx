@@ -21,6 +21,7 @@ import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 import { useReturnPurpose } from "@/hooks/useReturnPurpose";
 import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
 import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
+import { ACCOUNT_AGE_TEXT } from "@/lib/minimumAge";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -41,7 +42,7 @@ function getPasswordStrength(pw) {
 export default function RegisterPage() {
   useDocumentTitle(
     "Registrieren",
-    "Kostenlosen Community-Account bei THE LION SQUAD eSports erstellen.",
+    "Kostenloses Community-Konto bei THE LION SQUAD eSports erstellen.",
     { robots: "noindex, follow" }
   );
 
@@ -153,10 +154,10 @@ export default function RegisterPage() {
           <div className="flex justify-center mb-8"><Logo size="xl" /></div>
           <h1 className="font-heading text-2xl font-black uppercase">Registrierung geschlossen</h1>
           <p className="text-sm text-white/60 mt-3">
-            Aktuell sind keine neuen Registrierungen möglich. Schau bald wieder vorbei oder melde dich mit einem bestehenden Account an.
+            Aktuell sind keine neuen Registrierungen möglich. Schau bald wieder vorbei oder melde dich mit einem bestehenden Konto an.
           </p>
           <Link to="/login" className="tls-btn tls-btn--primary inline-block mt-6 px-6 py-3 font-bold uppercase tracking-wider rounded-sm" data-testid="registration-closed-login">
-            Zum Login
+            Zum Anmelden
           </Link>
         </div>
       </div>
@@ -167,8 +168,10 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
       <div className="w-full max-w-lg border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10">
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
-        <h1 className="font-heading text-2xl font-black uppercase text-center">Account erstellen</h1>
+        <h1 className="font-heading text-2xl font-black uppercase text-center">Konto erstellen</h1>
         <p className="text-sm text-white/60 text-center mt-1">Werde Teil der THE LION SQUAD Community.</p>
+        {/* Mindestalter (#1698): Konto ab 14 (Art. 8 DSGVO, Österreich), Vereinsmitglied ab 18. */}
+        <p className="text-xs text-white/50 text-center mt-2" data-testid="register-age">{ACCOUNT_AGE_TEXT}</p>
         {purpose && <p className="mt-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/85 text-center" data-testid="register-purpose">{purpose}</p>}
         <form onSubmit={submit} className="mt-8 space-y-4" noValidate aria-describedby={err ? "register-error" : undefined}>
           <AuthTextField
@@ -232,7 +235,7 @@ export default function RegisterPage() {
           </div>
           <AuthSelectField id="register-gender" label="Geschlecht" value={form.gender} onChange={set("gender")} description="Optional">
             <option value="">Keine Angabe</option>
-            <option value="male">Maennlich</option>
+            <option value="male">Männlich</option>
             <option value="female">Weiblich</option>
             <option value="diverse">Divers</option>
           </AuthSelectField>
@@ -255,7 +258,7 @@ export default function RegisterPage() {
             type="submit"
             className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"
           >
-            {loading ? "Registriere ..." : "Account erstellen"}
+            {loading ? "Registriere ..." : "Konto erstellen"}
           </button>
         </form>
         <GoogleAuthButton
@@ -267,7 +270,7 @@ export default function RegisterPage() {
           newsletterConsent={newsletter}
         />
         <div className="mt-6 text-sm text-white/60 text-center">
-          Bereits registriert? <Link to={`/login${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="register-login-link">Login</Link>
+          Bereits registriert? <Link to={`/login${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="register-login-link">Anmelden</Link>
         </div>
         <div className="mt-3 text-[11px] text-white/45 text-center">
           Du wirst <strong className="text-white/65">Community-Spieler</strong>. Eine offizielle Vereinsmitgliedschaft kann nur durch den Vorstand freigeschaltet werden.

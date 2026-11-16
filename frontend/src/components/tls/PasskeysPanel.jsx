@@ -55,7 +55,7 @@ export function PasskeysPanel() {
               className="mt-1 block w-full bg-black border border-white/20 rounded-sm px-3 py-2" />
           </label>
           <p className="text-xs text-white/60">Zum Hinzufügen oder Entfernen bestätigst du dein Passwort. Nutzt du bisher nur Google, kannst du über <Link to="/forgot-password" className="text-[#29B6E8] underline">Passwort festlegen</Link> zuerst ein Passwort einrichten.</p>
-          <button type="button" disabled={submitting || !password || !name.trim()} onClick={() => perform(() => enrollPasskey(name.trim(), password), "Passkey eingerichtet. Beim nächsten Login kannst du ihn verwenden.")}
+          <button type="button" disabled={submitting || !password || !name.trim()} onClick={() => perform(() => enrollPasskey(name.trim(), password), "Passkey eingerichtet. Beim nächsten Anmelden kannst du ihn verwenden.")}
             className="tls-btn tls-btn--primary min-h-11 px-4 py-2 font-bold rounded-sm disabled:opacity-50">{submitting ? "Bitte warten …" : "Passkey hinzufügen"}</button>
           <ul className="space-y-2">
             {items.map((item) => (
@@ -70,7 +70,7 @@ export function PasskeysPanel() {
             ))}
           </ul>
           {items.length > 0 && (
-            <p className="text-xs text-white/60" data-testid="passkeys-login-hint">Schlägt dein Browser den Passkey beim Login nicht im E-Mail-Feld vor? Wähle dort „Mit Passkey anmelden“ – so findest du auch Passkeys auf deinem Handy oder Sicherheitsschlüssel.</p>
+            <p className="text-xs text-white/60" data-testid="passkeys-login-hint">Schlägt dein Browser den Passkey beim Anmelden nicht im E-Mail-Feld vor? Wähle dort „Mit Passkey anmelden“ – so findest du auch Passkeys auf deinem Handy oder Sicherheitsschlüssel.</p>
           )}
         </>
       )}

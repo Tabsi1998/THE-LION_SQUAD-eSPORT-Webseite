@@ -151,11 +151,11 @@ export function PublicLayout({ children }) {
                 <Link
                   to="/login"
                   data-testid="nav-login"
-                  title="Login"
+                  title="Anmelden"
                   className="tls-hit hidden md:inline-flex items-center px-3 py-2 lg:h-10 lg:w-10 lg:justify-center lg:p-0 lg:border lg:border-white/10 lg:rounded-sm min-[1440px]:h-auto min-[1440px]:w-auto min-[1440px]:justify-start min-[1440px]:px-3 min-[1440px]:py-2 min-[1440px]:border-0 min-[1440px]:rounded-none text-xs font-bold uppercase tracking-wider whitespace-nowrap text-white/80 hover:text-[#29B6E8] lg:hover:border-[#29B6E8]/50 lg:hover:bg-[#29B6E8]/10 min-[1440px]:hover:bg-transparent transition"
                 >
                   <UserRound aria-hidden="true" className="hidden lg:block min-[1440px]:hidden w-4 h-4" />
-                  <span className="lg:sr-only min-[1440px]:not-sr-only">Login</span>
+                  <span className="lg:sr-only min-[1440px]:not-sr-only">Anmelden</span>
                 </Link>
                 <Link
                   to="/register"
@@ -235,7 +235,7 @@ export function PublicLayout({ children }) {
                   </>
                 ) : (
                   <>
-                    <Link to="/login" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Login</Link>
+                    <Link to="/login" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Anmelden</Link>
                     <Link to="/register" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">Registrieren</Link>
                   </>
                 )}

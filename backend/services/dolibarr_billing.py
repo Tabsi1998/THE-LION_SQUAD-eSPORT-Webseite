@@ -36,6 +36,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
+from services import money
 from services.billing_amounts import invoice_fields, own_registration, paid_cents
 from services.billing_facts import booking_facts, source_label
 from services.discord_plain_text import _without_tags
@@ -326,9 +327,9 @@ def service_view(product: dict) -> dict | None:
     rate = float(product.get("tva_tx") or 0)
     ttc = product.get("price_ttc")
     if ttc in (None, ""):
-        ht = float(product.get("price") or 0)
-        ttc = ht * (1 + rate / 100)
-    cents = int(round(float(ttc) * 100))
+        # Netto mal Steuersatz in Decimal (#1908): float machte aus 0,935 schon mal 0,93499…
+        ttc = money.to_decimal(product.get("price") or 0) * (1 + money.to_decimal(product.get("tva_tx") or 0) / 100)
+    cents = money.to_cents(ttc)
     profile = "none" if rate == 0 else next((name for name, value in DEFAULT_TAX_RATES.items() if name != "none" and abs(value - rate) < 0.01), "standard")
     return {
         "id": product_id,
@@ -399,11 +400,12 @@ async def assign_thirdparty(db, settings: dict, client: DolibarrClient, user_id:
 # ---------------------------------------------------------------- Belege
 
 def _cents(value) -> int | None:
+    """Ein Dolibarr-Betrag in Cent, kaufmännisch gerundet (#1908) - leer oder unlesbar: ``None``."""
     if value in (None, ""):
         return None
     try:
-        return int(round(float(value) * 100))
-    except (TypeError, ValueError):
+        return money.to_cents(value)
+    except ValueError:
         return None
 
 

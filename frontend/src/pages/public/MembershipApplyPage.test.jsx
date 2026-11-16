@@ -12,7 +12,7 @@ vi.mock("@/lib/api", () => ({ API: "https://api.test/api", api: apiMock, formatA
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/components/tls/GermanDateField", () => ({
-  GermanDateField: ({ label, value, onChange, testId }) => <label>{label}<input data-testid={testId} value={value || ""} onChange={(e) => onChange(e.target.value)} /></label>,
+  GermanDateField: ({ label, value, onChange, testId, error }) => <label>{label}<input data-testid={testId} value={value || ""} onChange={(e) => onChange(e.target.value)} />{error ? <span>{error}</span> : null}</label>,
 }));
 // Ein stabiles Konto-Objekt: die Seite lädt neu, sobald sich `user` ändert - wie in der App selbst.
 const AUTH = { user: { id: "u1", username: "amelie", display_name: "Amelie Beispiel" } };
@@ -65,12 +65,15 @@ test("mit Dolibarr: Formular aus der Mitgliederverwaltung, Prüfung in Worten, A
   fireEvent.click(screen.getByTestId("apply-submit"));
   expect(screen.getByText("Straße und Hausnummer fehlt.")).toBeInTheDocument();
   expect(screen.getByText("Gamertag fehlt.")).toBeInTheDocument();
+  // Mindestalter (#1698): das Geburtsdatum ist immer Pflicht, der Satz sagt warum.
+  expect(screen.getByText("Geburtsdatum fehlt. Vereinsmitglied wirst du ab 18 Jahren.")).toBeInTheDocument();
   expect(apiMock.post).not.toHaveBeenCalled();
 
   fireEvent.change(screen.getByTestId("apply-address"), { target: { value: "Hauptplatz 1" } });
   fireEvent.change(screen.getByTestId("apply-zip"), { target: { value: "6020" } });
   fireEvent.change(screen.getByTestId("apply-town"), { target: { value: "Innsbruck" } });
   fireEvent.change(screen.getByTestId("apply-field-gamertag"), { target: { value: "Ami" } });
+  fireEvent.change(screen.getByTestId("apply-birth"), { target: { value: "1999-03-01" } });
   fireEvent.click(screen.getByTestId("apply-fee-3"));
   fireEvent.click(screen.getByTestId("apply-consent-fotos"));
   fireEvent.click(screen.getByTestId("apply-statutes"));
@@ -79,7 +82,7 @@ test("mit Dolibarr: Formular aus der Mitgliederverwaltung, Prüfung in Worten, A
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
   const [url, payload] = apiMock.post.mock.calls[0];
   expect(url).toBe("/membership/apply");
-  expect(payload).toEqual(expect.objectContaining({ type_id: 3, firstname: "Amelie", lastname: "Beispiel", address: "Hauptplatz 1", zip: "6020", town: "Innsbruck", country_code: "AT", fields: { gamertag: "Ami" }, consents: [{ code: "fotos", version: 2 }] }));
+  expect(payload).toEqual(expect.objectContaining({ type_id: 3, firstname: "Amelie", lastname: "Beispiel", address: "Hauptplatz 1", zip: "6020", town: "Innsbruck", birth: "1999-03-01", country_code: "AT", fields: { gamertag: "Ami" }, consents: [{ code: "fotos", version: 2 }] }));
   expect(payload.motivation).toBeNull();
   expect(payload.notes).toBeNull();
   expect(await screen.findByTestId("apply-pending")).toHaveTextContent("Antrag eingegangen");
@@ -121,11 +124,14 @@ test("ohne Anbindung (oder wenn die Abfrage scheitert) bleibt der Website-Antrag
   expect(screen.queryByTestId("apply-fees")).toBeNull();
   fireEvent.click(screen.getByTestId("apply-submit"));
   expect(screen.getByText("Bitte beschreibe deine Motivation mit mindestens 20 Zeichen.")).toBeInTheDocument();
+  expect(screen.getByText("Geburtsdatum fehlt. Vereinsmitglied wirst du ab 18 Jahren.")).toBeInTheDocument();
+  expect(apiMock.post).not.toHaveBeenCalled();
   fireEvent.change(screen.getByTestId("apply-motivation"), { target: { value: "Ich möchte den Verein langfristig aktiv unterstützen." } });
+  fireEvent.change(screen.getByTestId("apply-birth"), { target: { value: "2000-01-31" } });
   fireEvent.click(screen.getByTestId("apply-statutes"));
   fireEvent.click(screen.getByTestId("apply-privacy"));
   fireEvent.click(screen.getByTestId("apply-submit"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/apply", expect.objectContaining({ motivation: "Ich möchte den Verein langfristig aktiv unterstützen.", contribution_pref: "full" })));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/apply", expect.objectContaining({ motivation: "Ich möchte den Verein langfristig aktiv unterstützen.", contribution_pref: "full", birth: "2000-01-31" })));
   expect(await screen.findByTestId("apply-pending")).toHaveTextContent("Bewerbung eingegangen");
 });
 
@@ -169,6 +175,7 @@ test("ohne Kopplung zeigt die Auswahl dieselben Beträge wie „Mitglied werden�
   expect(screen.queryByTestId("apply-contribution")).toBeNull();
   fireEvent.change(select, { target: { value: "3" } });
   fireEvent.change(screen.getByTestId("apply-motivation"), { target: { value: "Ich möchte den Verein langfristig aktiv unterstützen." } });
+  fireEvent.change(screen.getByTestId("apply-birth"), { target: { value: "2000-01-31" } });
   fireEvent.click(screen.getByTestId("apply-statutes"));
   fireEvent.click(screen.getByTestId("apply-privacy"));
   fireEvent.click(screen.getByTestId("apply-submit"));

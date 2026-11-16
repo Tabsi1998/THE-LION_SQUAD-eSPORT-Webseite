@@ -558,7 +558,7 @@ async def test_a_new_application_reaches_everyone_with_the_club_area(flow):
     outsider = await flow.add_user(role="moderator", name="moderator")
     applicant = await flow.add_user(name="erika")
     flow.act_as(applicant)
-    response = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte gern im Verein mitspielen.", "accept_statutes": True, "accept_privacy": True})
+    response = await flow.post("/api/membership/apply", json={"motivation": "Ich möchte gern im Verein mitspielen.", "accept_statutes": True, "accept_privacy": True, "birth": "1990-04-12"})
     assert response.status_code == 200, response.text
     told = {row["to"] for row in await flow.db.mail_jobs.find({"template_key": "membership_application_admin"}, {"_id": 0, "to": 1}).to_list(20)}
     addresses = {row["id"]: row["email"] for row in await flow.db.users.find({}, {"_id": 0, "id": 1, "email": 1}).to_list(20)}

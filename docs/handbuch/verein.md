@@ -86,6 +86,13 @@ Wer das sieht: der Bereich **Vereinsverwaltung** (auch, wer einen aktiven Vorsta
 5. Entscheiden kann der Vorstand in der **Mitgliederverwaltung (Dolibarr)**. Die Person bekommt immer eine Mail und eine Meldung. Nach der Aufnahme
    erscheinen Mitgliedsnummer und Karte.
 
+**Mindestalter (#1698):** Ein Konto gibt es ab 14 Jahren (Art. 8 DSGVO, Österreich), Vereinsmitglied wird man ab 18. Der
+Antrag verlangt deshalb immer ein **Geburtsdatum**; wer am Tag des Antrags (Wiener Zeit) noch keine 18 ist, bekommt die Meldung
+„Vereinsmitglied wirst du ab 18 Jahren“, und es wird nichts gespeichert. Das gilt mit und ohne Dolibarr; die App öffnet für den Antrag die Website.
+Bestehende Mitglieder, ältere Anträge und Mitgliedschaften, die der Vorstand von Hand einträgt, prüft die Website nicht nach.
+Die Sätze dazu stehen bei **Mitglied werden**, im Antrag, bei der Registrierung und in der Datenschutzerklärung (Abschnitt
+„Mindestalter“).
+
 Ohne Mitgliedschaft schickt eine Seite des Mitgliederbereichs auf **Mitglied werden** und sagt, warum.
 
 ### 3.2 Anträge bearbeiten und einladen

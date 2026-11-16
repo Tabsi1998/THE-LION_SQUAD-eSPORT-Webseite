@@ -47,7 +47,7 @@ const POINT_SOURCES = [
     icon: Star,
     title: "Profilpunkte",
     tone: "violet",
-    text: "Achievements sind eigene Profilpunkte. Sie erklären dein Account-Level, werden aber nicht still in die Jahreswertung gemischt.",
+    text: "Achievements sind eigene Profilpunkte. Sie erklären dein Konto-Level, werden aber nicht still in die Jahreswertung gemischt.",
   },
   {
     icon: MessageCircle,

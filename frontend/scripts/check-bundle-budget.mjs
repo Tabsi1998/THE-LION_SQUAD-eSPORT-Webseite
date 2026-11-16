@@ -75,6 +75,24 @@ export function heavyRouteProblems(manifest, { prefix = LIGHT_ROUTE_PREFIX, requ
   return problems;
 }
 
+// Videos (FAQ-Schleifen #2448 und alles andere) lädt eine Seite erst, wenn sie gebraucht werden: Keine Datei aus dem
+// Start (Einstieg und alles statisch Importierte) verweist auf ein Video, und index.html lädt keins vorab.
+export const VIDEO_EXTENSIONS = [".webm", ".mp4"];
+
+const isVideo = (file) => VIDEO_EXTENSIONS.some((ext) => String(file).toLowerCase().endsWith(ext));
+
+export function startupVideoProblems(manifest, indexHtml = "", entryKey = "index.html") {
+  const problems = [];
+  for (const key of staticClosure(manifest, entryKey)) {
+    for (const asset of (manifest[key].assets || []).filter(isVideo)) problems.push(`${asset} hängt am Start (${key}) - Videos nur nachladen.`);
+  }
+  // Nur echte Dateiendungen: „manifest.webmanifest“ ist kein Video.
+  for (const match of indexHtml.matchAll(/\.(?:webm|mp4)(?![a-z0-9])/gi)) {
+    problems.push(`index.html verweist auf eine ${match[0].toLowerCase()}-Datei - Videos nicht vorab laden.`);
+  }
+  return problems;
+}
+
 /** Harte Grenzen ("<!-- budget:... -->", darüber schlägt das Gate fehl). */
 export function parseBudgets(markdown) {
   return parseMarkers(markdown, "budget");
@@ -147,6 +165,10 @@ function main() {
   for (const item of jsFiles.filter(isForbiddenChunk)) {
     failures.push(`${item.file} gehört nicht in den anonymen Start (Editor, Diagramme, PDF und QR werden nur bei Bedarf geladen).`);
   }
+  const indexHtml = existsSync(path.join(distDir, "index.html")) ? readFileSync(path.join(distDir, "index.html"), "utf8") : "";
+  const videoProblems = startupVideoProblems(manifest, indexHtml);
+  for (const problem of videoProblems) failures.push(problem);
+  if (!videoProblems.length) console.log("Videos: keins im Start, keins vorab geladen – ok");
   const routeProblems = heavyRouteProblems(manifest);
   for (const problem of routeProblems) failures.push(problem);
   if (!routeProblems.length) console.log("Öffentliche Seiten: keine lädt Editor, Diagramme, PDF oder QR statisch mit – ok");

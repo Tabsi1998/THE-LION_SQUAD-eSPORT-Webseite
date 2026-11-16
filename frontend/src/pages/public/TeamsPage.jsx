@@ -107,7 +107,7 @@ function TeamList() {
               <Plus className="w-3.5 h-3.5" /> Team erstellen
             </button>
           ) : (
-            <Link to="/login?next=/teams" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">Login zum Erstellen</Link>
+            <Link to="/login?next=/teams" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">Zum Erstellen anmelden</Link>
           )}
         </div>
 

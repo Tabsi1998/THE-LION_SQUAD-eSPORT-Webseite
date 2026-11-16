@@ -89,7 +89,7 @@ test("Schalter aus oder keine Freigabe: der Hinweis auf den Mitgliederbereich, k
   mockApi({ available: false, reason: "members_only" });
   render(<MemoryRouter><BoardPage /></MemoryRouter>);
   const box = await screen.findByTestId("board-statutes");
-  expect(box).toHaveTextContent("Statuten und ZVR-Nummer werden im Mitgliederbereich nach Login angezeigt.");
+  expect(box).toHaveTextContent("Statuten und ZVR-Nummer werden im Mitgliederbereich nach dem Anmelden angezeigt.");
   expect(box).toHaveAttribute("id", "statuten");
   expect(screen.queryByTestId("board-statutes-current")).not.toBeInTheDocument();
   expect(screen.queryByTestId("board-statutes-archive")).not.toBeInTheDocument();

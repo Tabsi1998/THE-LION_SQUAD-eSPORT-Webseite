@@ -1500,6 +1500,8 @@
 td.tv-standings__rank { font-weight: 800; color: var(--tv-muted); }
 /* Zone für Auf- und Abstieg (F.2, #1627): Strich links am Platz, Farbe aus index.css (--tls-zone-color). */
 .tv-standings__row[data-zone] .tv-standings__rank { box-shadow: inset calc(var(--tv-u) * 0.6) 0 0 var(--tls-zone-color); }
+/* Symbol zur Zone (#1648): klein vor dem Platz, Farbe vom Strich. */
+.tv-standings__zone { display: inline-block; width: calc(var(--tv-u) * 1.4); height: calc(var(--tv-u) * 1.4); margin-right: calc(var(--tv-u) * 0.4); vertical-align: middle; color: var(--tls-zone-color); }
 /* Ein Name, eine Zeile: sonst schiebt ein langer Name die Zeilen aus der Tabelle (64 Spieler in acht Gruppen). */
 .tv-standings__name { text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
 /* Liga-Staffel (E.1, #1625): am Tabellenende „ausgetreten“ bzw. „disqualifiziert“ - leiser als der Name. */

@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from decimal import Decimal, ROUND_HALF_UP
 
 from models import now_utc
+from services import money
 
 PRICE_BASES = ("per_registration", "per_person", "per_team")
 PRICE_BASE_LABELS = {"per_registration": "je Anmeldung", "per_person": "je Person", "per_team": "je Team"}
@@ -49,10 +49,9 @@ def cents_from_amount(value) -> int:
     if isinstance(value, bool):
         raise PricingError("Betrag muss eine Zahl sein.")
     try:
-        amount = Decimal(str(value).replace(",", ".").strip())
-    except Exception as exc:  # noqa: BLE001 - jede Nicht-Zahl ist derselbe Fehler
+        cents = money.to_cents(value)  # dieselbe kaufmännische Regel wie Dolibarr und Printful (#1908)
+    except ValueError as exc:
         raise PricingError("Betrag muss eine Zahl sein.") from exc
-    cents = int((amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     if cents < 0:
         raise PricingError("Beträge sind nicht negativ.")
     if cents > MAX_AMOUNT_CENTS:

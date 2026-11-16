@@ -357,7 +357,7 @@ function EventFactsBox({ e, user, over, onRegister }) {
       ) : null}
       {canRegister && !user ? (
         <Link to={loginTarget} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
-          Einloggen zum Anmelden
+          Zum Teilnehmen anmelden
         </Link>
       ) : null}
       {!over ? <AddToCalendar block days={e.schedule?.multi_day ? e.schedule.days : null} item={calendarItem} /> : null}
@@ -803,7 +803,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
       ) : !user ? (
         <Link to={loginTarget} className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
-          Einloggen zum Anmelden
+          Zum Teilnehmen anmelden
         </Link>
       ) : (
         <form ref={formRef} onSubmit={register} className="mt-5 space-y-3" data-testid="event-register-form">

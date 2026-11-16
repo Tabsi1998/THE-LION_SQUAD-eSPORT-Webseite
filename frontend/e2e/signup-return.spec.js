@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
 // Nach dem Registrieren zurück dorthin, wo man hinwollte (#1225): Turnier → „Jetzt anmelden“ als Gast → Login (mit dem
-// Satz, wofür) → „Registrieren“ → Formular → Mail-Bestätigung (der Link aus der Mail nachgestellt) → „Einloggen und
+// Satz, wofür) → „Registrieren“ → Formular → Mail-Bestätigung (der Link aus der Mail nachgestellt) → „Anmelden und
 // weiter“ → angemeldet zurück auf der Turnierseite. Die API ist nachgestellt, alle Daten sind erfunden.
 
 const json = (body, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -63,7 +63,7 @@ test.describe("Registrieren mit Ziel", () => {
 
     // Der Link aus der Bestätigungs-Mail - so baut ihn der Server.
     await page.goto("/verify-email?token=mail-token&next=%2Ftournaments%2Fmk-cup");
-    await expect(page.getByTestId("verify-continue")).toHaveText("Einloggen und weiter");
+    await expect(page.getByTestId("verify-continue")).toHaveText("Anmelden und weiter");
     await page.getByTestId("verify-continue").click();
     await expect(page).toHaveURL(/\/login\?next=%2Ftournaments%2Fmk-cup$/);
     await page.getByTestId("login-email").fill("neonfalke@lionsquad-test.at");

@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { FORM_LETTERS, STANDING_COLUMNS, formLabel, rankMove, standingCell } from "@/lib/standingsTable";
 import { ZONE_LABELS, standingNotes, zoneLegend } from "@/lib/leagueTable";
 import { CountUp } from "@/components/tls/motion/CountUp";
+import { ZoneMark } from "@/components/tls/league/ZoneMark";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
 // Pfeile zeigen den Weg seit dem vorigen Spieltag (vom Server), die eigene Zeile ist markiert. Sieg hell in Cyan,
@@ -112,6 +113,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                     <span className="font-display text-base font-bold text-white w-5 text-right">{row.rank}</span>
                     {/* Zone für Auf- und Abstieg (F.2): der Strich links trägt die Farbe, für Screenreader das Wort. */}
                     {ZONE_LABELS[row.zone] ? <span className="sr-only">{ZONE_LABELS[row.zone]}</span> : null}
+                    <ZoneMark zone={row.zone} testId={`standing-zone-${row.registration_id}`} />
                     <Move row={row} />
                   </span>
                 </td>
@@ -154,7 +156,8 @@ export function ZoneLegend({ rows, testId }) {
     <ul className="tls-zone-legend mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/60" aria-label="Zonen der Tabelle" data-testid={testId}>
       {items.map((item) => (
         <li key={item.zone} className="inline-flex items-center gap-1.5">
-          <span className="tls-zone-swatch" data-zone={item.zone} aria-hidden="true" /> {item.label}
+          <span className="tls-zone-swatch" data-zone={item.zone} aria-hidden="true" />
+          <ZoneMark zone={item.zone} testId={`zone-legend-mark-${item.zone}`} /> {item.label}
         </li>
       ))}
     </ul>

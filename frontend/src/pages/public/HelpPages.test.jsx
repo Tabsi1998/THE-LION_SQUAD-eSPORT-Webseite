@@ -205,11 +205,12 @@ test("Anleitung: Inhalt, nummerierte Schritte mit Anker, Hinweis und Bild für H
   const image = screen.getByTestId("help-step-image-check-in");
   expect(image).toHaveAttribute("alt", "Bildschirmfoto: Einchecken");
   expect(image).toHaveAttribute("width");
-  expect(image.closest("picture").querySelector("source")).toHaveAttribute("media", "(min-width: 768px)");
+  expect(image).toHaveAttribute("loading", "lazy");
   // Schritt ohne Bild: kein leerer Rahmen.
   expect(screen.queryByTestId("help-step-image-map-veto")).toBeNull();
-  // Video am Abschnitt.
-  expect(screen.getByTestId("help-video-liga-anmeldung")).toBeInTheDocument();
+  // Schritt mit Schleife (#2448): erst das Bild als Poster, dazu der Knopf; das Video lädt erst im Bild (FaqClip.test.jsx).
+  expect(screen.getByTestId("help-step-clip-toggle-check-in")).toBeInTheDocument();
+  expect(screen.queryByTestId("help-step-clip-check-in")).toBeNull();
 });
 
 test("Anker im Link: der Schritt ist hervorgehoben und wird angesprungen", async () => {
@@ -222,13 +223,6 @@ test("Alter Link mit Anker: /hilfe/<thema>#<schritt> landet auf /faq beim selben
   await show("/hilfe/turniere#einchecken");
   expect(screen.getByTestId("where")).toHaveTextContent("/faq/turniere#einchecken");
   expect(screen.getByTestId("help-step-einchecken")).toHaveAttribute("data-active", "true");
-});
-
-test("Browser ohne WebM (ältere iPhones): kein leeres Video, die Bilder bleiben", async () => {
-  window.HTMLMediaElement.prototype.canPlayType = () => "";
-  await show("/faq/liga-captains");
-  expect(screen.queryByTestId("help-video-liga-anmeldung")).toBeNull();
-  expect(screen.getByTestId("help-step-image-check-in")).toBeInTheDocument();
 });
 
 test("Groß- und Kleinschreibung in der Adresse ist egal", async () => {
