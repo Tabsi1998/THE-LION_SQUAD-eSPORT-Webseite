@@ -68,7 +68,7 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
     },
     # Turnierleitung - nur mit dem Bereich Turnierleitung.
     {
-        "id": "leitung-oeffnen",
+        "id": "leitung-ansicht",
         "frage": "Wie öffne ich die Turnierleitung eines Turniers?",
         "antwort": "Die Ansicht liegt unter der Adresse des Turniers mit /leitung am Ende. In der Verwaltung führt beim Turnier unter Teilnehmer der Knopf Zum Check-in hin.",
         "bereich": "turnierleitung",
