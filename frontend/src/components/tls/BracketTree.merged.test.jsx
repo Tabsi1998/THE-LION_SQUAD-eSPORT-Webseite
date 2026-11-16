@@ -1,0 +1,55 @@
+// Baum mit zusammengelegten Läufen (#2452) - der Läufe-Cup vom 31.10. aus dem echten Generator und Umbau
+// (scripts/make_ffa_bracket_fixture.py --merged): 14 Läufe, B in A, D in C, F in E, LB in LA, LD in LC zusammengelegt.
+// Nach dem Ende: die zusammengelegten Läufe sagen, wohin; „Plätze frei“ steht nicht mehr in gefahrenen Läufen; der
+// Sieger trägt im Grand Final seine Medaille.
+import { describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import MERGED from "../../../e2e/fixtures/mergedHeatsGenerated.json";
+import { BracketTree } from "./BracketTree";
+import { TournamentFlowStepper } from "./TournamentFlowStepper";
+
+const state = (name) => structuredClone(MERGED[name]);
+const byKey = (data, key) => data.matches_v2.find((match) => match.match_key === key);
+
+describe("Läufe-Cup mit zusammengelegten Läufen", () => {
+  it("der echte Baum: 14 Läufe, fünf zusammengelegt, neun gefahren", () => {
+    const data = state("lb8_merged_done");
+    expect(data.matches_v2).toHaveLength(14);
+    const merged = Object.fromEntries(data.matches_v2.filter((match) => match.status === "cancelled").map((match) => [match.match_key, match.merged_into_key]));
+    expect(merged).toEqual({ B: "A", D: "C", F: "E", LB: "LA", LD: "LC" });
+  });
+
+  it("Turnier-Ablauf: 9 Spiele, Ergebnisse 9/9 - mit offenem Grand Final 8/9", () => {
+    const done = state("lb8_merged_done");
+    const { unmount } = render(<TournamentFlowStepper tournament={done.tournament} registrations={done.registrations} matchesV2={done.matches_v2} />);
+    expect(screen.getByTestId("flow-step-bracket")).toHaveTextContent("9 Spiele");
+    expect(screen.getByTestId("flow-step-results")).toHaveTextContent("9/9");
+    expect(screen.getByTestId("flow-step-standings")).toHaveAttribute("aria-current", "step");
+    unmount();
+    const live = state("lb8_merged_live");
+    render(<TournamentFlowStepper tournament={{ ...live.tournament, status: "live" }} registrations={live.registrations} matchesV2={live.matches_v2} />);
+    expect(screen.getByTestId("flow-step-results")).toHaveTextContent("8/9");
+  });
+
+  it("nach dem Ende: zusammengelegt in …, kein „Plätze frei“ in Lauf G und im Grand Final, Medaillen im Grand Final", () => {
+    const data = state("lb8_merged_done");
+    render(<BracketTree data={data} layout="tree" />);
+    expect(screen.getByTestId(`bracket-fate-${byKey(data, "B").id}`)).toHaveTextContent("zusammengelegt in A");
+    expect(screen.getByTestId(`bracket-fate-${byKey(data, "LD").id}`)).toHaveTextContent("zusammengelegt in LC");
+    for (const key of ["G", "FINAL", "LE", "LF"]) {
+      expect(screen.queryByTestId(`bracket-heat-free-${byKey(data, key).id}`)).toBeNull();
+    }
+    const final = screen.getByTestId(`bracket-heat-${byKey(data, "FINAL").id}`);
+    expect(final.querySelectorAll(".tls-bracket-row.is-podium")).toHaveLength(2);
+    expect(within(final).getByTestId(`bracket-heat-meta-${byKey(data, "FINAL").id}`)).toHaveTextContent("2 Spieler");
+  });
+
+  it("vor dem Grand Final: der offene Lauf sagt „2 Plätze bleiben leer“ - dorthin kommt niemand mehr", () => {
+    const data = state("lb8_merged_live");
+    render(<BracketTree data={{ ...data, tournament: { ...data.tournament, status: "live" } }} layout="tree" />);
+    expect(screen.getByTestId(`bracket-heat-free-${byKey(data, "FINAL").id}`)).toHaveTextContent("2 Plätze bleiben leer");
+    expect(screen.queryByText("2 Plätze frei")).toBeNull();
+    // Lauf G ist schon gefahren: dort steht keine Zeile mehr.
+    expect(screen.queryByTestId(`bracket-heat-free-${byKey(data, "G").id}`)).toBeNull();
+  });
+});

@@ -357,7 +357,11 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
   const slots = match.slots || [];
   const played = slots.some((slot) => resultMap.has(slot.registration_id));
   // Freie Plätze (kein Spieler, Freilos) stehen als eine Zeile „2 Plätze frei“ statt als einzelne Zeilen (#1259).
-  const freeCount = slots.filter((slot) => !slot.registration_id && isByeSlot(slot)).length;
+  const freeSlots = slots.filter((slot) => !slot.registration_id && isByeSlot(slot));
+  const freeCount = freeSlots.length;
+  // Kommt auf diese Plätze niemand mehr (#2452: die Quelle wurde zusammengelegt oder schickt weniger weiter), heißt es
+  // „bleiben leer“ statt „frei“ - „frei“ klang, als könnte noch jemand dazukommen.
+  const stayEmpty = freeCount > 0 && freeSlots.every((slot) => slot.source_result?.skipped);
   const taken = slots.filter((slot) => slot.registration_id || !isByeSlot(slot));
   const rows = played
     ? [...taken].sort((a, b) => (resultMap.get(a.registration_id)?.rank || 99) - (resultMap.get(b.registration_id)?.rank || 99))
@@ -423,8 +427,11 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
           </div>
         );
       })}
-      {freeCount && !empty ? (
-        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{text.free}</div>
+      {/* „2 Plätze frei“ nur, solange der Lauf noch nicht gefahren ist (#2452): danach kommt niemand mehr dazu - die Karte
+          sagt mit „2 Spieler“ schon, wie viele gefahren sind. Sonst stand in Lauf G und im Grand Final nach dem Ende
+          „2 Plätze frei“, als wäre noch etwas offen. */}
+      {freeCount && !empty && !played && !finished ? (
+        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{stayEmpty ? `${freeCount} ${freeCount === 1 ? "Platz bleibt" : "Plätze bleiben"} leer` : text.free}</div>
       ) : null}
       {dropText && !empty ? (
         <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`} data-exit-anchor={dropText.startsWith("Die anderen →") ? `${match.id}:L` : undefined}>{dropText}</div>
