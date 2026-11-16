@@ -19,9 +19,11 @@ from flow_harness import make_flow  # noqa: E402
 from league_application_world import application_world, base_url, decide, submitted, window  # noqa: E402
 from league_rules_world import ADMIN_LEAGUES  # noqa: E402
 from league_start_world import ok, start  # noqa: E402
+from models import new_id  # noqa: E402
+from services import league_late  # noqa: E402
 
 MANAGED_LIST = "/api/tournaments?include_drafts=true&managed=true&limit=500"
-SEASON_KEYS = {"id", "status", "visibility", "application_opens_at", "application_closes_at", "start_date"}
+SEASON_KEYS = {"id", "status", "visibility", "application_opens_at", "application_closes_at", "start_date", "application_effective_closes_at"}
 
 
 @pytest_asyncio.fixture
@@ -146,3 +148,63 @@ async def test_ordinary_tournaments_and_outsiders_get_no_season_inputs(flow):
     flow.act_as(w["teams"][0]["captain"])
     for row in ok(await flow.get("/api/tournaments?limit=500")):
         assert "league_season" not in row
+
+
+@pytest.mark.asyncio
+async def test_a_shorter_late_deadline_is_the_effective_end_of_the_application(flow):
+    """Nachmeldefrist (#2422): Endet sie vor dem Fenster, ist sie das Ende der Anmeldung - Label und Phasengrenze rechnen damit."""
+    w = await application_world(flow, teams=0, open_window=False, **window(opens_in_hours=-1, closes_in_hours=40 * 24))
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {"late_registration_days": 2}})
+    season = await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 0})
+    effective = league_late.effective_closes_iso(season)
+    assert effective and league_late.aware(effective) < league_late.aware(season["application_closes_at"])
+    row = await managed_row(flow, w)
+    assert row["league_season"]["application_effective_closes_at"] == effective
+    # Ohne Frist vor dem Fensterende ist es das Fenster selbst.
+    w2 = await application_world(flow, teams=0)
+    row2 = await managed_row(flow, w2)
+    assert league_late.aware(row2["league_season"]["application_effective_closes_at"]) == league_late.aware(row2["league_season"]["application_closes_at"])
+
+
+async def started_world(flow) -> dict:
+    w = await application_world(flow, teams=2)
+    for side in w["teams"]:
+        await assign(flow, w, side)
+    ok(await start(flow, w))
+    return w
+
+
+@pytest.mark.asyncio
+async def test_the_tournament_lead_without_leagues_gets_no_season_inputs(flow):
+    w = await started_world(flow)
+    lead = await flow.add_user(role="tournament_admin", name="Turnierleitung ohne Ligen")
+    flow.act_as(lead)
+    rows = ok(await flow.get(MANAGED_LIST))
+    assert any(row["id"] == w["tid"] for row in rows)
+    assert all("league_season" not in row and "league_plan" not in row for row in rows)
+    detail = await flow.get(f"/api/tournaments/{w['tid']}")
+    assert detail.status_code == 200
+    assert "league_season" not in detail.json()
+
+
+@pytest.mark.asyncio
+async def test_a_helper_of_the_staffel_gets_no_season_inputs(flow):
+    w = await started_world(flow)
+    helper = await flow.add_user(name="Helfer der Staffel")
+    await flow.db.tournament_staff_assignments.insert_one({
+        "id": new_id(), "tournament_id": w["tid"], "user_id": helper["id"], "role": "organizer", "scope": "tournament", "is_active": True})
+    flow.act_as(helper)
+    rows = ok(await flow.get(MANAGED_LIST))
+    assert [row["id"] for row in rows] == [w["tid"]]
+    assert "league_season" not in rows[0]
+    detail = ok(await flow.get(f"/api/tournaments/{w['tid']}"))
+    assert "league_season" not in detail
+
+
+@pytest.mark.asyncio
+async def test_a_captain_gets_no_season_inputs(flow):
+    w = await started_world(flow)
+    flow.act_as(w["teams"][0]["captain"])
+    assert all("league_season" not in row for row in ok(await flow.get(MANAGED_LIST)))
+    detail = ok(await flow.get(f"/api/tournaments/{w['tid']}"))
+    assert "league_season" not in detail and "league_plan" not in detail
