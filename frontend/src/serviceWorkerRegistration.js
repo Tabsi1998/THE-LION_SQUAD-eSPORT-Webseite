@@ -4,6 +4,19 @@ const isLocalhost = Boolean(
     window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/),
 );
 
+// Hinweise des Service Workers nur hinter einem Schalter (#1908): im Browser localStorage „tls_sw_debug“ auf „true“
+// setzen. Ohne Schalter bleibt die Konsole still - auch auf localhost, wo der fertige Build sonst bei jedem Laden schrieb.
+export function swNote(message) {
+  let on = false;
+  try {
+    on = window.localStorage.getItem("tls_sw_debug") === "true";
+  } catch {
+    on = false;
+  }
+  // eslint-disable-next-line no-console -- nur mit bewusst gesetztem Schalter, sonst still (siehe oben)
+  if (on) console.info(`[TLS PWA] ${message}`);
+}
+
 export function register(config) {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
 
@@ -13,7 +26,7 @@ export function register(config) {
     if (isLocalhost) {
       checkValidServiceWorker(swUrl, config);
       navigator.serviceWorker.ready.then(() => {
-        console.info("TLS PWA cache is active on localhost.");
+        swNote("Cache auf localhost aktiv.");
       });
       return;
     }
@@ -71,7 +84,7 @@ function checkValidServiceWorker(swUrl, config) {
       registerValidSW(swUrl, config);
     })
     .catch(() => {
-      console.info("TLS app is running offline with the existing cache.");
+      swNote("Offline - die App läuft mit dem vorhandenen Cache.");
     });
 }
 
