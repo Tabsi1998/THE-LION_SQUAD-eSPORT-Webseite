@@ -368,7 +368,7 @@ test("Weitere Wege: eingeklappt, darin die Kanäle - Push ganz aus zeigt den Hin
   expect(screen.queryByTestId("notification-push-off")).toBeNull();
 });
 
-test("Ruhezeit: Standard aus, beim Einschalten 22:00 bis 7:00; gleiche Zeiten gehen nicht an den Server", async () => {
+test("Ruhezeit: Standard aus, beim Einschalten 22:00 bis 7:00; ohne Lücke geht nichts an den Server", async () => {
   const user = setupUser();
   renderPage();
   await waitForForm();
@@ -382,7 +382,7 @@ test("Ruhezeit: Standard aus, beim Einschalten 22:00 bis 7:00; gleiche Zeiten ge
   expect(apiMock.patch.mock.calls.at(-1)[1]).toEqual({ quiet_hours: { enabled: true, start: "22:00", end: "07:00" } });
 
   fireEvent.change(screen.getByTestId("notification-quiet-end"), { target: { value: "22:00" } });
-  expect(await screen.findByTestId("notification-quiet-error")).toHaveTextContent("nicht gleich");
+  expect(await screen.findByTestId("notification-quiet-error")).toHaveTextContent("mindestens 15 Minuten");
   await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
   expect(apiMock.patch).toHaveBeenCalledTimes(1);
 
@@ -390,6 +390,30 @@ test("Ruhezeit: Standard aus, beim Einschalten 22:00 bis 7:00; gleiche Zeiten ge
   await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
   expect(apiMock.patch.mock.calls.at(-1)[1]).toEqual({ quiet_hours: { enabled: true, start: "22:00", end: "06:30" } });
+});
+
+test("Ruhezeit: ein geleertes Zeitfeld bleibt Entwurf - andere Änderungen speichern weiter", async () => {
+  const user = setupUser();
+  renderPage();
+  await waitForForm();
+  await openNotifications(user);
+  await user.click(screen.getByTestId("notification-quiet-toggle"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+
+  fireEvent.change(screen.getByTestId("notification-quiet-start"), { target: { value: "" } });
+  // Das Feld zeigt, was wirklich im Formular steht - nicht den Vorschlag.
+  expect(screen.getByTestId("notification-quiet-start")).toHaveValue("");
+  expect(await screen.findByTestId("notification-quiet-error")).toHaveTextContent("Uhrzeit wie 22:00");
+  expect(screen.getByTestId("notification-quiet-start")).toHaveAttribute("aria-invalid", "true");
+  await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+
+  // Eine andere Änderung auf der Seite geht trotzdem - ohne die halbe Ruhezeit.
+  await user.click(screen.getByTestId("notification-topic-achievements-off"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
+  const sent = apiMock.patch.mock.calls.at(-1)[1];
+  expect(sent.quiet_hours).toBeUndefined();
+  expect(sent.notification_preferences["in_app:achievements"]).toBe(false);
 });
 
 test("ohne Aenderung wird nicht gespeichert, auch nicht beim Verlassen eines Felds", async () => {

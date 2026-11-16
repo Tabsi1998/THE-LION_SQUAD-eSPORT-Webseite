@@ -90,6 +90,18 @@ export function quietHoursForm(value) {
   };
 }
 
+// Wie MIN_GAP_MINUTES in backend/services/quiet_hours_rules.py.
+export const QUIET_MIN_GAP_MINUTES = 15;
+const minutesOf = (value) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+
+/** Was an einer Ruhezeit nicht stimmt - null: passt. Auch eine ausgeschaltete behält gültige Zeiten. */
+export function quietHoursProblem(quiet) {
+  if (!isClock(quiet?.start) || !isClock(quiet?.end)) return "Bitte eine Uhrzeit wie 22:00 angeben.";
+  const gap = (minutesOf(quiet.start) - minutesOf(quiet.end) + 24 * 60) % (24 * 60);
+  if (gap < QUIET_MIN_GAP_MINUTES) return `Zwischen Ende und Beginn der Ruhezeit müssen mindestens ${QUIET_MIN_GAP_MINUTES} Minuten liegen.`;
+  return null;
+}
+
 export function crossesMidnight(quiet) {
   return isClock(quiet?.start) && isClock(quiet?.end) && quiet.start > quiet.end;
 }

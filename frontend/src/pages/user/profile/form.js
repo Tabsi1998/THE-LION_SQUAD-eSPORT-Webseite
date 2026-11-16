@@ -1,5 +1,5 @@
 import { friendsSharing } from "@/lib/eventRecap";
-import { quietHoursForm } from "@/lib/notificationLevels";
+import { quietHoursForm, quietHoursProblem } from "@/lib/notificationLevels";
 
 
 export function dateInputValue(value) {
@@ -139,9 +139,10 @@ export function profileFieldErrors(form) {
   if (website && !WEBSITE_PATTERN.test(website)) {
     errors.website = "Bitte gib eine Adresse wie https://lionsquad.at ein.";
   }
-  if (form.quiet_hours?.enabled && form.quiet_hours.start === form.quiet_hours.end) {
-    errors.quiet_hours = "Beginn und Ende der Ruhezeit dürfen nicht gleich sein.";
-  }
+  // Ruhezeit (#1206): ein geleertes oder halbes Zeitfeld bleibt Entwurf und geht nicht an den Server - sonst scheiterte jede
+  // weitere Änderung der Seite. Wie am Server: mindestens 15 Minuten Lücke zwischen Ende und Beginn.
+  const quietProblem = form.quiet_hours ? quietHoursProblem(form.quiet_hours) : null;
+  if (quietProblem) errors.quiet_hours = quietProblem;
   return errors;
 }
 

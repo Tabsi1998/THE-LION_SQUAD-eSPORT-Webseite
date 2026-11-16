@@ -1,7 +1,7 @@
 import { EMAIL_PREFERENCES } from "@/pages/user/profile/constants";
 import {
   CUSTOM_LEVEL, LEVEL_TOPIC_KEYS, channelTopicValue, crossesMidnight, isExactState, levelOf, levelPatch, modeOfState, modePatch,
-  quietHoursForm, topicModes, topicState,
+  quietHoursForm, quietHoursProblem, topicModes, topicState,
 } from "./notificationLevels";
 
 // Stufen und Themen (#1204) und Ruhezeit (#1206) - dieselben Regeln wie backend/services/notification_preferences.py.
@@ -53,4 +53,12 @@ test("Ruhezeit: Standard aus mit Vorschlag 22:00 bis 7:00, ungültige Zeiten fal
   expect(quietHoursForm({ enabled: true, start: "13:00", end: "25:00" })).toEqual({ enabled: true, start: "13:00", end: "07:00" });
   expect(crossesMidnight({ start: "22:00", end: "07:00" })).toBe(true);
   expect(crossesMidnight({ start: "13:00", end: "15:00" })).toBe(false);
+});
+
+test("Ruhezeit prüfen wie am Server: Uhrzeit und mindestens 15 Minuten Lücke", () => {
+  expect(quietHoursProblem({ enabled: true, start: "22:00", end: "07:00" })).toBeNull();
+  expect(quietHoursProblem({ enabled: true, start: "", end: "07:00" })).toMatch(/Uhrzeit/);
+  expect(quietHoursProblem({ enabled: false, start: "07:05", end: "07:00" })).toMatch(/15 Minuten/);
+  expect(quietHoursProblem({ enabled: true, start: "07:15", end: "07:00" })).toBeNull();
+  expect(quietHoursProblem({ enabled: true, start: "07:00", end: "07:00" })).toMatch(/15 Minuten/);
 });
