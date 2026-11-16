@@ -19,7 +19,7 @@ jest.mock("./sounds", () => ({
 jest.mock("../../navigation/rootNavigation", () => ({ openTab: jest.fn() }));
 const mockGet = jest.fn();
 const mockPost = jest.fn();
-jest.mock("../../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) } }));
+jest.mock("../../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) }, responseFromCache: (response: { _fromCache?: boolean } | null) => Boolean(response?._fromCache) }));
 const mockStore: Record<string, string> = {};
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(async (key: string) => mockStore[key] ?? null),
@@ -189,5 +189,12 @@ test("Stand am Server fehlt trotz Merker (z. B. nach einer Rücksicherung): die 
   mockGet.mockResolvedValue({ data: serverState() });
   await ceremonyState("anna");
   expect(mockPost).toHaveBeenCalledTimes(1);
+});
+
+test("offline aus dem Zwischenspeicher: kein Stand - sonst gälte ein alter Stand als frisch", async () => {
+  mockStore[importedKey("anna")] = "x";
+  mockGet.mockResolvedValue({ data: serverState({ unseen: ["a"] }), _fromCache: true });
+  await expect(ceremonyState("anna")).resolves.toBeNull();
+  expect(mockPost).not.toHaveBeenCalled();
 });
 

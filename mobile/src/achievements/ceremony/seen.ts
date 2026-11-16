@@ -1,5 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import { api } from "../../lib/api";
+import { api, responseFromCache } from "../../lib/api";
 import { type CeremonyTier, type LevelState, type LevelUp, isLevelGain } from "./select";
 
 // Zeremonie einmal je Konto (#2450) - wie im Web (frontend/src/components/achievements/ceremony/seen.js). „Gesehen“
@@ -95,7 +95,10 @@ export function ceremonyState(userId: string | null | undefined): Promise<Ceremo
   const work = (async () => {
     try {
       // Erst lesen: Ein älterer Server kennt den Weg nicht - dann wird auch nichts gemeldet.
-      const { data } = await api.get<ServerState>("/achievements/me/ceremony");
+      const response = await api.get<ServerState>("/achievements/me/ceremony");
+      // Offline liefert der Zwischenspeicher einen alten Stand - der wäre hier falsch (schon Gesehenes käme wieder).
+      if (responseFromCache(response)) return null;
+      const { data } = response;
       const state = normalise(userId, data);
       // Einmal je Gerät und Konto den Altbestand melden - erst damit legt der Server den Stand an. Kennt der Server keinen
       // Beginn (Zeile fehlt, etwa nach einer Rücksicherung), meldet die App neu, auch mit Merker.

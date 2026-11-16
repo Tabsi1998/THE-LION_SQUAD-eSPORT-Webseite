@@ -11,7 +11,7 @@ import { AchievementCatchUpOverlay } from "./AchievementCatchUpOverlay";
 const mockGet = jest.fn();
 const mockPost = jest.fn();
 const mockStore: Record<string, string> = {};
-jest.mock("../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) } }));
+jest.mock("../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) }, responseFromCache: (response: { _fromCache?: boolean } | null) => Boolean(response?._fromCache) }));
 jest.mock("../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 jest.mock("../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => false, navigate: jest.fn() } }));
 jest.mock("expo-secure-store", () => ({
