@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.89.0 (16.11.2026)
+
+### Neu
+
+* „FAQ“ steht als letzter Eintrag rechts in der Hauptleiste und am Handy im Menü, nicht mehr unter „Community“ (#2448)
+* Abgemeldete Push-Geräte werden nach 30 Tagen automatisch gelöscht, die Frist ist unter Betrieb → Alarme einstellbar (#2467)
+* Alte Hilfe-Links (/hilfe, auch auf einzelne Schritte, Suchen und in jeder Schreibweise) führen automatisch zur FAQ (#2448)
+* Die Fußzeile verlinkt die FAQ statt der Hilfe (#2448)
+* Ein Handy bekommt beim neuen Push-Token keinen zweiten Eintrag mehr, wenn die App ihre Installations-Kennung mitschickt (#2467)
+* Fragen für Vereinsmitglieder sieht nur, wer Mitglied ist; Fragen der Turnierleitung sieht, wer eine Turnierleitung öffnen darf, auch Helfer mit Einsatz und die Liga-Leitung (#2448)
+* Knopf „Alte Geräte entfernen“ je Person in den Push-Tests, mit Rückfrage und Eintrag im Adminprotokoll (#2467)
+* Neue FAQ unter /faq mit Suche über Fragen und Schritte, häufigen Fragen zum Aufklappen und kompakter Bereichsliste mit Rollen-Filter (#2448)
+* Push-Tests zeigen oben nur aktive Handys, alte stehen grau und eingeklappt unter „Alte Geräte“ (#2467)
+* Turnierliste nach Spiel, online/vor Ort und „Nur meine“ filtern (#1276)
+* Turnierliste nennt, was einer Staffel noch fehlt („Teams zuteilen“, „Spielplan noch nicht erzeugt“, „Sichtbarkeit einschalten“), mit Link an die richtige Stelle (#2453)
+
+### Fehlerbehebungen
+
+* „Anmeldung offen bis …“ und die Ablaufleiste der Season rechnen mit dem wirksamen Ende der Anmeldung samt Nachmeldefrist (#2453)
+* Das Inhaltsverzeichnis einer Anleitung hat am Handy ausreichend große Tippflächen (#2448)
+* Gelöschte Aufrufe melden auch Zurücksetzen, Neubau und neue Gruppen (#2386)
+* Hinweis für Nachzügler sagt, was noch geht – aufgerufen und gespielt getrennt (#2046)
+* Liga-Stand einer Staffel nur für Personen mit Liga-Recht, nicht für Helfer oder die Turnierleitung ohne Bereich Ligen (#2453)
+* Nach den Benachrichtigungs-Einstellungen bleiben zugeklappte Inhalte auf anderen Seiten zu (#2448)
+* Neu bauen fragt auch, wenn weitere Phasen oder ihr Schema wegfallen (#2046)
+* Neu bauen verwirft ein eigenes Schema nicht mehr still (#2046)
+* Personenliste und Kachel Push-Monitoring zeigen Fehler nur noch an aktiven Geräten rot (#2467)
+* Planer – laufende Spiele anderer Turniere enden um deren Pause später (#2398)
+* Staffel-Verwaltung und Reiter „Ligen und Staffeln“ der Season zeigen den Liga-Stand statt „Entwurf“ (#2453)
+* Stationen werden auf jedem Weg frei, der Spiele löscht (#2386)
+* Status-Filter der Turnierliste kennt die Liga-Stände, laufende, pausierte und beendete Staffeln bleiben unter ihrem Status (#2453)
+* Turnierliste zeigt bei Liga-Staffeln den Stand der Season (z. B. „Anmeldung offen bis …“) statt „Entwurf“ (#2453)
+* Verwaltung – Rundennamen bei Rundensponsoren und im Ablaufplan wie im Baum (#1947)
+* Warteschlange rechnet die Turnierpause aus der Prognose heraus (#2398)
+
 ## 1.88.0 (16.11.2026)
 
 ### Neu
