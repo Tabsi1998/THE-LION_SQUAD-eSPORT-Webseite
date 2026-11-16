@@ -4,8 +4,10 @@ Instagram-Story (1080×1920), breit als Link-Vorschau (1200×630). Gezeichnet mi
 Geteilt wird nur, was öffentlich ist: das Profil der Person ist öffentlich, das Turnier ist öffentlich und hat
 Ergebnisse. Bei Teams steht der Teamname drauf (jedes Mitglied kann teilen), bei Durchgängen die Plätze je Runde.
 Gegner stehen nicht auf dem Bild - nur Runde und Ergebnis. Ein angefochtenes Ergebnis (Liga, E.2) steht „in Klärung“
-da wie auf der Ligaseite (#2363): im Hochformat eine Zeile in Warnfarbe unter dem Schritt, breit am Schildchen. Der
-Zwischenspeicher (``share_image_cache``) zeichnet neu, sobald sich der Stand ändert - er steht in den Daten des Bildes.
+da wie auf der Ligaseite (#2363): im Hochformat eine Zeile in Warnfarbe unter dem Schritt, breit am Schildchen. Wird es
+eng, haben angefochtene Schritte Vorrang beim Platz; passt auch das nicht, sagt ein Sammelhinweis „… in Klärung“, dass
+ein verdeckter Schritt angefochten ist (#2375). Der Zwischenspeicher (``share_image_cache``) zeichnet neu, sobald sich der
+Stand ändert - er steht in den Daten des Bildes.
 
 Die Seite zum Teilen ist /tournaments/<turnier>/ergebnis/<benutzername>; Discord, WhatsApp & Co. bekommen dort das
 breite Bild als Vorschau (seo_render_routes).
@@ -15,7 +17,7 @@ from __future__ import annotations
 from PIL import ImageDraw
 
 from services import share_image
-from services.bracket_common import WARN_RGB
+from services.bracket_common import CLARIFICATION, WARN_RGB
 from services.profile_references import (
     REFERENCE_REGISTRATION_STATUSES,
     RESULT_TOURNAMENT_STATUSES,
@@ -28,6 +30,10 @@ from services.tournament_path import chip_text, clarification_note, path_kind, t
 
 WARN = (*WARN_RGB, 255)
 CLARIFICATION_ROW = 40
+STEP_ROW = 92
+MAX_CHIPS = 8
+CHIP_GAP = 10
+CHIP_LINE = 52
 
 
 async def _tournament(db, ref: str) -> dict | None:
@@ -119,21 +125,93 @@ def _rank_color(rank) -> tuple:
     return share_image.hex_color(share_image.RANK_COLORS.get(int(rank or 0), "#FFFFFF"))
 
 
-def _rows_that_fit(rows: list[dict], room: int) -> list[dict]:
-    """Die Schritte, die ins Hochformat passen: alle, wenn genug Platz ist - sonst die letzten, mit einer Zeile Platz für den
-    Hinweis „+ 2 frühere Runden“. Ein Schritt braucht 92 Punkte, mit „in Klärung“ darunter mehr (#2363)."""
-    def cost(step: dict) -> int:
-        return 92 + (CLARIFICATION_ROW if clarification_note(step) else 0)
-    room = max(room, 92)
-    if sum(cost(step) for step in rows) <= room:
-        return rows
-    budget, shown = room - 92, []
-    for step in reversed(rows):
-        if cost(step) > budget:
+def _row_cost(step: dict) -> int:
+    return STEP_ROW + (CLARIFICATION_ROW if clarification_note(step) else 0)
+
+
+def story_rows(rows: list[dict], room: int) -> dict:
+    """Welche Schritte ins Hochformat passen (Daten vor dem Zeichnen). Alle, wenn genug Platz ist - sonst eine Zeile für den
+    Hinweis „+ 2 frühere Runden“ und davor zuerst die angefochtenen Schritte (#2375, die jüngsten zuerst), dann die letzten
+    Runden am Stück. Ein Schritt braucht 92 Punkte, mit „in Klärung“ darunter mehr (#2363).
+
+    ``shown`` die Schritte in ihrer Reihenfolge, ``hidden`` wie viele fehlen, ``hidden_contested`` wie viele davon angefochten
+    sind (dann sagt es der Hinweis), ``earlier`` ob alle fehlenden vor dem ersten gezeigten liegen."""
+    room = max(room, STEP_ROW)
+    if sum(_row_cost(step) for step in rows) <= room:
+        return {"shown": list(rows), "hidden": 0, "hidden_contested": 0, "earlier": True}
+    budget, kept = room - STEP_ROW, set()
+    for index in reversed(range(len(rows))):
+        if clarification_note(rows[index]) and _row_cost(rows[index]) <= budget:
+            budget -= _row_cost(rows[index])
+            kept.add(index)
+    for index in reversed(range(len(rows))):
+        if index in kept or clarification_note(rows[index]):
+            continue
+        if _row_cost(rows[index]) > budget:
             break
-        budget -= cost(step)
-        shown.insert(0, step)
-    return shown
+        budget -= _row_cost(rows[index])
+        kept.add(index)
+    missing = [index for index in range(len(rows)) if index not in kept]
+    return {"shown": [rows[index] for index in sorted(kept)], "hidden": len(missing),
+            "hidden_contested": sum(1 for index in missing if clarification_note(rows[index])),
+            "earlier": not kept or max(missing) < min(kept)}
+
+
+def _rows_that_fit(rows: list[dict], room: int) -> list[dict]:
+    return story_rows(rows, room)["shown"]
+
+
+def hidden_hint(plan: dict) -> str:
+    """„+ 2 frühere Runden“, mit verdecktem angefochtenen Schritt „+ 2 frühere Runden · 1 davon in Klärung“ (#2375)."""
+    count = plan["hidden"]
+    word = ("frühere" if plan["earlier"] else "weitere") + (" Runde" if count == 1 else " Runden")
+    text = f"+ {count} {word}"
+    if plan["hidden_contested"]:
+        text += f" · {plan['hidden_contested']} davon {CLARIFICATION}"
+    return text
+
+
+def chip_entries(payload: dict) -> list[dict]:
+    """Die Schildchen fürs Breitformat: die ersten acht Schritte - und ein angefochtener Schritt dahinter auch (#2375)."""
+    steps = payload.get("steps") or []
+    entries = [{"index": index, "text": text, "warn": index < len(steps) and bool(clarification_note(steps[index]))}
+               for index, text in enumerate((payload.get("chips") or [])[:MAX_CHIPS])]
+    first = len(entries)
+    entries += [{"index": index, "text": chip_text(step), "warn": True}
+                for index, step in enumerate(steps) if index >= first and clarification_note(step)]
+    return entries
+
+
+def _flow(widths: list[float], left: int, right: int, top: int, bottom: int) -> list[tuple[float, int]] | None:
+    """Schildchen nebeneinander, bei Bedarf in die nächste Zeile; ``None``, wenn eins unter ``bottom`` rutscht."""
+    x, y, spots = left, top, []
+    for width in widths:
+        if x + width > right:
+            x, y = left, y + CHIP_LINE
+        if y > bottom:
+            return None
+        spots.append((x, y))
+        x += width + CHIP_GAP
+    return spots
+
+
+def wide_chips(entries: list[dict], measure, left: int, right: int, top: int, bottom: int) -> list[dict]:
+    """Welche Schildchen ins Breitformat passen und wohin (Daten vor dem Zeichnen). Alle, wenn sie passen - sonst fallen
+    zuerst die hinteren ohne Verfahren weg, angefochtene haben Vorrang (#2375). Passt auch ein angefochtenes nicht mehr,
+    steht am Ende ein Sammelhinweis „+ 1 in Klärung“. ``measure`` gibt die Breite eines Schildchens."""
+    chosen, dropped_warn = list(entries), 0
+    while True:
+        items = chosen + ([{"index": None, "text": f"+ {dropped_warn} {CLARIFICATION}", "warn": True, "hint": True}] if dropped_warn else [])
+        spots = _flow([measure(item["text"]) for item in items], left, right, top, bottom)
+        if spots is not None or not chosen:
+            break
+        plain = [position for position, item in enumerate(chosen) if not item["warn"]]
+        drop = plain[-1] if plain else len(chosen) - 1
+        dropped_warn += 0 if plain else 1
+        chosen.pop(drop)
+    if spots is None:
+        return []
+    return [{**item, "x": x, "y": y} for item, (x, y) in zip(items, spots)]
 
 
 def render(payload: dict, fmt: str = "story") -> bytes:
@@ -180,13 +258,14 @@ def render(payload: dict, fmt: str = "story") -> bytes:
         if rows:
             draw.text((left, y), "UNSER WEG" if payload.get("team_name") else "MEIN WEG", font=share_image.font(30), fill=(255, 255, 255, 140))
             y += 56
-            shown = _rows_that_fit(rows, height - 260 - y)
-            if len(shown) < len(rows):
-                # Zu viele Runden: die letzten zählen (Finale, Halbfinale …), davor ein Hinweis.
-                earlier = len(rows) - len(shown)
-                draw.text((left, y + 18), f"+ {earlier} {'frühere Runde' if earlier == 1 else 'frühere Runden'}", font=share_image.font(30, bold=False), fill=(255, 255, 255, 130))
-                y += 92
-                rows = shown
+            plan = story_rows(rows, height - 260 - y)
+            if plan["hidden"]:
+                # Zu viele Runden: die angefochtenen und die letzten zählen (Finale, Halbfinale …), davor ein Hinweis - in
+                # Warnfarbe, wenn ein verdeckter Schritt angefochten ist (#2375).
+                draw.text((left, y + 18), hidden_hint(plan), font=share_image.font(30, bold=False),
+                          fill=WARN if plan["hidden_contested"] else (255, 255, 255, 130))
+                y += STEP_ROW
+                rows = plan["shown"]
             row_font = share_image.font(38)
             for step in rows:
                 mark, value_color = _step_colors(step, accent)
@@ -220,18 +299,14 @@ def render(payload: dict, fmt: str = "story") -> bytes:
     draw.text((left, y + 16), share_image.ellipsis(draw, person, name_font, right - left), font=name_font, fill=(255, 255, 255, 235))
     y += 76
     chip_font = share_image.font(24)
-    x = left
-    steps = payload.get("steps") or []
-    for index, text in enumerate(payload.get("chips") or []):
-        warn = index < len(steps) and bool(clarification_note(steps[index]))
-        text = share_image.ellipsis(draw, text, chip_font, right - left - 20)
-        chip_width = draw.textlength(text, font=chip_font) + 28
-        if x + chip_width > right:
-            x = left
-            y += 52
-        if y > height - 140:
-            break
-        x += share_image.chip(draw, x, y, text, chip_font, color=WARN if warn else accent) + 10
+    entries = [{**entry, "text": share_image.ellipsis(draw, entry["text"], chip_font, right - left - 20)} for entry in chip_entries(payload)]
+
+    def measure(text: str) -> float:
+        box = draw.textbbox((0, 0), text, font=chip_font)
+        return box[2] - box[0] + 28
+
+    for item in wide_chips(entries, measure, left, right, y, height - 140):
+        share_image.chip(draw, item["x"], item["y"], item["text"], chip_font, color=WARN if item["warn"] else accent)
     foot_font = share_image.font(24)
     draw.text((70, height - 92), payload["domain"].upper(), font=foot_font, fill=(255, 255, 255, 160))
     if count:
