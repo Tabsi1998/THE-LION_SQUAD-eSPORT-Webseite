@@ -40,10 +40,9 @@ def public_news(post: dict) -> dict:
 # Tage, aber nie vor „Tag der Umstellung + 14“ - so verschwindet am ersten Tag keine angeheftete Alt-News.
 VIENNA = ZoneInfo("Europe/Vienna")
 PIN_DEFAULT_DAYS = 14
-PIN_RULE_SETTINGS_ID = "news_pin_rule"
-# Tag der Umstellung: einmal beim Start gemerkt (``load_pin_rule_since``). Ungeladen gilt „heute“ - Altbestand läuft dann nie
-# vorzeitig ab.
-_pin_rule_since: date | None = None
+# Stichtag der Umstellung (Fabian, 16.11.: nichts wird in die Datenbank geschrieben - keine Migration, keine Einstellungszeile):
+# Ältere angeheftete News ohne Ende gelten bis max(erschienen, angelegt, PIN_RULE_SINCE) + 14 Tage (Wiener Tag).
+PIN_RULE_SINCE = date(2026, 11, 20)
 
 
 def vienna_today(now: datetime | None = None) -> date:
@@ -61,25 +60,6 @@ def parse_pin_day(value) -> date | None:
         return date.fromisoformat(str(value)[:10]) if value else None
     except ValueError:
         return None
-
-
-def set_pin_rule_since(day: date | None) -> None:
-    global _pin_rule_since
-    _pin_rule_since = day
-
-
-async def load_pin_rule_since(db, now: datetime | None = None) -> date:
-    """Den Tag der Umstellung einmal festhalten (eine Einstellungszeile, kein Umschreiben der Beiträge) und merken."""
-    from pymongo import ReturnDocument
-
-    today = vienna_today(now)
-    row = await db.settings.find_one_and_update(
-        {"id": PIN_RULE_SETTINGS_ID}, {"$setOnInsert": {"id": PIN_RULE_SETTINGS_ID, "since": today.isoformat()}},
-        upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0},
-    ) or {}
-    day = parse_pin_day(row.get("since")) or today
-    set_pin_rule_since(day)
-    return day
 
 
 def vienna_day(value) -> date | None:
@@ -101,10 +81,9 @@ def pin_end(post: dict | None, now: datetime | None = None) -> date | None:
     until = parse_pin_day(post.get("pinned_until"))
     if until is not None:
         return until
-    # Altbestand ohne Ende: erschienen (bzw. angelegt) + 14 Tage, nie vor dem Tag der Umstellung + 14 Tage.
+    # Altbestand ohne Ende: erschienen (bzw. angelegt) + 14 Tage, nie vor dem Stichtag + 14 Tage.
     days = [day for day in (vienna_day(post.get("published_at")), vienna_day(post.get("created_at"))) if day]
-    since = _pin_rule_since or vienna_today(now)
-    return max([*days, since]) + timedelta(days=PIN_DEFAULT_DAYS)
+    return max([*days, PIN_RULE_SINCE]) + timedelta(days=PIN_DEFAULT_DAYS)
 
 
 def pin_active(post: dict | None, now: datetime | None = None) -> bool:

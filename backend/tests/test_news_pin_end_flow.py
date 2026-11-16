@@ -4,7 +4,7 @@ Erscheinen (heute oder der Termin). Altbestand ohne Ende rechnet beim Lesen, ohn
 + 14 Tage, nie vor dem Tag der Umstellung + 14. Ohne angehefteten Beitrag bleibt die neueste News der Aufmacher."""
 import pathlib
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import migrations, news_publish  # noqa: E402
-from services.news_publish import default_pinned_until, load_pin_rule_since, pin_active, pin_end, vienna_today  # noqa: E402
+from services.news_publish import PIN_RULE_SINCE, default_pinned_until, pin_active, pin_end, vienna_today  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -24,7 +24,6 @@ async def flow():
     try:
         yield instance
     finally:
-        news_publish.set_pin_rule_since(None)
         await shutdown()
 
 
@@ -160,33 +159,46 @@ async def test_a_post_planned_in_three_weeks_counts_from_its_publish_day(flow):
     assert moved.status_code == 400, "auch beim Ändern nie vor dem Erscheinen"
 
 
-# ---------------------------------------------------------------- Altbestand ohne Ende - beim Lesen, ohne Migration
+# ---------------------------------------------------------------- Altbestand ohne Ende - beim Lesen, fester Stichtag
 
-def _legacy(published_days_ago: int) -> dict:
-    stamp = (now_utc() - timedelta(days=published_days_ago)).isoformat()
+def _legacy(published: datetime) -> dict:
+    stamp = published.isoformat()
     return {"pinned": True, "published_at": stamp, "created_at": stamp}
 
 
-def test_old_pins_last_fourteen_days_from_publishing_but_never_before_the_switch_plus_fourteen():
-    today = vienna_today()
-    news_publish.set_pin_rule_since(today)
-    # Am ersten Tag nach dem Deploy verschwindet keine angeheftete Alt-News - auch nicht eine von vor 40 Tagen.
-    assert pin_active(_legacy(40)) is True and pin_end(_legacy(40)) == today + timedelta(days=14)
-    # Später: wer vor der Umstellung schon lange stand, läuft 14 Tage nach der Umstellung ab ...
-    news_publish.set_pin_rule_since(today - timedelta(days=20))
-    assert pin_active(_legacy(40)) is False
-    # ... ein Beitrag kurz vor der Umstellung bleibt 14 Tage ab seinem Erscheinen.
-    news_publish.set_pin_rule_since(today - timedelta(days=5))
-    assert pin_end(_legacy(3)) == today - timedelta(days=3) + timedelta(days=14)
-    assert pin_active(_legacy(3)) is True
-    # Ungeladen gilt „heute“ - nie zu früh weg.
-    news_publish.set_pin_rule_since(None)
-    assert pin_active(_legacy(400)) is True
+def _at(day, hour=10):
+    return datetime(day.year, day.month, day.day, hour, tzinfo=timezone.utc)
+
+
+def test_the_cutoff_is_a_fixed_vienna_day():
+    assert PIN_RULE_SINCE == date(2026, 11, 20)
+
+
+def test_old_pins_before_the_cutoff_last_until_cutoff_plus_fourteen():
+    old = _legacy(_at(date(2026, 9, 1)))
+    end = PIN_RULE_SINCE + timedelta(days=14)
+    assert pin_end(old) == end
+    # Am Stichtag und bis zu seinem 14. Tag danach bleibt auch eine sehr alte angeheftete News oben ...
+    assert pin_active(old, _at(PIN_RULE_SINCE)) is True
+    assert pin_active(old, datetime(end.year, end.month, end.day, 22, 59, tzinfo=timezone.utc)) is True  # 23:59 in Wien
+    # ... danach rutscht sie in die Liste.
+    assert pin_active(old, datetime(end.year, end.month, end.day, 23, 0, tzinfo=timezone.utc)) is False
+
+
+def test_old_pins_after_the_cutoff_count_fourteen_days_from_publishing():
+    published = PIN_RULE_SINCE + timedelta(days=10)
+    post = _legacy(_at(published))
+    assert pin_end(post) == published + timedelta(days=14)
+    assert pin_active(post, _at(published + timedelta(days=14))) is True
+    assert pin_active(post, _at(published + timedelta(days=15))) is False
+    # Angelegt nach dem Erscheinen (Altbestand): das spätere zählt.
+    later = {**post, "created_at": _at(published + timedelta(days=3)).isoformat()}
+    assert pin_end(later) == published + timedelta(days=17)
 
 
 @pytest.mark.asyncio
-async def test_old_pins_without_end_follow_the_rule_on_every_surface(flow):
-    news_publish.set_pin_rule_since(vienna_today() - timedelta(days=30))
+async def test_old_pins_without_end_follow_the_rule_on_every_surface(flow, monkeypatch):
+    monkeypatch.setattr(news_publish, "PIN_RULE_SINCE", vienna_today() - timedelta(days=30))
     old = (now_utc() - timedelta(days=60)).isoformat()
     recent = (now_utc() - timedelta(days=2)).isoformat()
     await news(flow, "lange-her", pinned=True, published_at=old, created_at=old)
@@ -202,14 +214,18 @@ async def test_old_pins_without_end_follow_the_rule_on_every_surface(flow):
     flow.act_as(await flow.add_user(role="club_admin", name="redaktion"))
     row = next(row for row in (await flow.get("/api/admin/news")).json() if row["slug"] == "frisch")
     assert row["pin_active"] is True and row["pin_until"] == (vienna_today() - timedelta(days=2) + timedelta(days=14)).isoformat()
+    assert await flow.db.settings.count_documents({}) == 0, "Lesen schreibt nichts in die Datenbank"
 
 
-@pytest.mark.asyncio
-async def test_the_switch_day_is_kept_once(flow):
-    first = await load_pin_rule_since(flow.db, datetime(2026, 11, 20, 9, 0, tzinfo=timezone.utc))
-    again = await load_pin_rule_since(flow.db, datetime(2026, 12, 24, 9, 0, tzinfo=timezone.utc))
-    assert first == again == datetime(2026, 11, 20).date()
-    assert await flow.db.settings.count_documents({"id": news_publish.PIN_RULE_SETTINGS_ID}) == 1
+def test_nothing_is_written_at_startup_for_pins():
+    """Wächter (Fabian, 16.11.): der Start legt für angeheftete News keine Einstellungszeile an - der Stichtag ist eine
+    Konstante, keine Datenbank-Angabe."""
+    backend = pathlib.Path(__file__).resolve().parents[1]
+    server = (backend / "server.py").read_text(encoding="utf-8")
+    source = (backend / "services" / "news_publish.py").read_text(encoding="utf-8")
+    assert "news_pin_rule" not in server and "pin_rule" not in server.lower()
+    assert "news_pin_rule" not in source and "db.settings" not in source
+    assert not hasattr(news_publish, "load_pin_rule_since")
 
 
 def test_there_is_no_pin_migration():
