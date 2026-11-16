@@ -21,6 +21,7 @@ import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 import { useReturnPurpose } from "@/hooks/useReturnPurpose";
 import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
 import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
+import { ACCOUNT_AGE_TEXT } from "@/lib/minimumAge";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -169,6 +170,8 @@ export default function RegisterPage() {
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Konto erstellen</h1>
         <p className="text-sm text-white/60 text-center mt-1">Werde Teil der THE LION SQUAD Community.</p>
+        {/* Mindestalter (#1698): Konto ab 14 (Art. 8 DSGVO, Österreich), Vereinsmitglied ab 18. */}
+        <p className="text-xs text-white/50 text-center mt-2" data-testid="register-age">{ACCOUNT_AGE_TEXT}</p>
         {purpose && <p className="mt-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/85 text-center" data-testid="register-purpose">{purpose}</p>}
         <form onSubmit={submit} className="mt-8 space-y-4" noValidate aria-describedby={err ? "register-error" : undefined}>
           <AuthTextField
