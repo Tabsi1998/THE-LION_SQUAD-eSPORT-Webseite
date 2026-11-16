@@ -18,6 +18,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
+from services.ops_upload_routes import DEFAULT_UPLOAD_ROUTES, clean_upload_routes
 
 logger = logging.getLogger(__name__)
 
@@ -167,12 +168,15 @@ def merge_settings(stored: dict | None) -> dict:
         rules[kind] = row
     retention = {**DEFAULT_RETENTION, **{k: int(v) for k, v in (stored.get("retention_days") or {}).items() if k in DEFAULT_RETENTION}}
     reminder = stored.get("red_reminder_hours")
+    upload_routes = stored.get("upload_routes")
     return {
         "emails": list(stored.get("emails") or []),
         "cooldown_minutes": int(stored.get("cooldown_minutes") or ALERT_WINDOW_SECONDS // 60),
         "red_reminder_hours": DEFAULT_RED_REMINDER_HOURS if reminder is None else int(reminder),
         "rules": rules,
         "retention_days": retention,
+        # Datei-Uploads, die nicht als langsam zählen (#2447); nie gespeichert = die Vorgabe aus ops_monitor.
+        "upload_routes": list(DEFAULT_UPLOAD_ROUTES if upload_routes is None else upload_routes),
     }
 
 
@@ -215,6 +219,8 @@ async def save_alert_settings(db, patch: dict) -> dict:
                 raise ValueError("Die Aufbewahrung liegt zwischen 7 Tagen und zehn Jahren.")
             retention[source] = days
         update["retention_days"] = retention
+    if "upload_routes" in patch:
+        update["upload_routes"] = clean_upload_routes(patch["upload_routes"])
     if update:
         update["updated_at"] = now_utc().isoformat()
         await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"id": SETTINGS_ID, **update}}, upsert=True)
@@ -390,6 +396,9 @@ async def alert_red_checks(db, run: dict) -> list[str]:
                 await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "check_status": status},
                                                                    "$unset": {"red_since": "", "red_alerted_at": "", "undeliverable_logged": ""}},
                                                     upsert=True)
+                # Gegenstück (#2447): Die Prüfung ist nicht mehr rot - ihre Alarme gelten als behoben, mit Zeitpunkt.
+                await db.ops_alert_log.update_many({"key": key, "resolved_at": None, "at": {"$lte": run.get("at") or now_utc().isoformat()}},
+                                                   {"$set": {"resolved_at": run.get("at") or now_utc().isoformat()}})
             continue
         red_since = state.get("red_since") or run.get("at") or now_utc().isoformat()
         if state.get("check_status") == "crit":

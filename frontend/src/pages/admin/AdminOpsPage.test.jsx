@@ -143,3 +143,79 @@ test("Checks zeigt die Ampel je Prüfung, und Jetzt prüfen stößt einen Lauf a
   expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/checks/run");
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Alle Prüfungen grün."));
 });
+
+// #2447: „Als gelöst markieren“ direkt in der Zeile, Mehrfachauswahl, „Jetzt neu prüfen“ mit sofortiger Ampel oben und
+// Sperre gegen Doppelklick, Datei-Uploads in Tempo gekennzeichnet.
+test("eine Fehlergruppe lässt sich ohne Aufklappen als gelöst markieren", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
+  await user.click(await screen.findByTestId("ops-error-resolve-abc123"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/errors/abc123/resolve");
+  expect(screen.queryByText(/KeyError: 'team_id'/)).toBeNull();
+  expect(await screen.findByTestId("ops-error-reopen-abc123")).toBeInTheDocument();
+});
+
+test("mehrere Fehlergruppen auswählen und auf einmal als gelöst markieren", async () => {
+  const user = userEvent.setup();
+  const second = { ...GROUP, fingerprint: "def456", error_type: "ValueError", route: "/api/x" };
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).startsWith("/admin/ops/errors") ? { data: [GROUP, second] } : respond(url)));
+  apiMock.post.mockResolvedValue({ data: { resolved: 2, items: [{ ...GROUP, resolved_at: "2026-09-15T18:00:00Z" }, { ...second, resolved_at: "2026-09-15T18:00:00Z" }] } });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("ops-errors-resolve-picked")).toBeDisabled();
+  await user.click(screen.getByTestId("ops-error-pick-abc123"));
+  expect(screen.getByTestId("ops-errors-bulk")).toHaveTextContent("1 ausgewählt");
+  await user.click(screen.getByTestId("ops-errors-pick-all"));
+  await user.click(screen.getByTestId("ops-errors-resolve-picked"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/errors/resolve", { fingerprints: ["abc123", "def456"] });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("2 Fehlergruppen als gelöst markiert."));
+  expect(screen.getByTestId("ops-errors-bulk")).toHaveTextContent("Alle offenen auswählen");
+  // Danach lädt die Seite neu, damit die Kachel „Fehlergruppen offen“ gleich stimmt.
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/admin/ops/summary")).length).toBeGreaterThan(1));
+});
+
+test("Jetzt neu prüfen färbt die Ampel oben sofort und läuft nur einmal zugleich", async () => {
+  const user = userEvent.setup();
+  let finish;
+  apiMock.post.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=checks"]}><AdminOpsPage /></MemoryRouter>);
+  const run = await screen.findByTestId("ops-checks-run");
+  expect(run).toHaveTextContent("Jetzt neu prüfen");
+  expect(screen.getByText("rot")).toBeInTheDocument();
+  await user.click(run);
+  await user.click(run);
+  expect(apiMock.post).toHaveBeenCalledTimes(1);
+  expect(run).toBeDisabled();
+  apiMock.get.mockImplementation(() => new Promise(() => {}));
+  finish({ data: { ...CHECKS.latest, status: "ok", counts: { ok: 8, warn: 0, crit: 0 }, failing: [], checks: CHECKS.latest.checks.map((c) => ({ ...c, status: "ok" })) } });
+  await waitFor(() => expect(screen.getByText("grün")).toBeInTheDocument());
+  expect(screen.queryByText("rot")).toBeNull();
+});
+
+test("ein Rate-Limit beim Neu-Prüfen kommt als Meldung", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockRejectedValue({ response: { status: 429, data: { detail: "Gerade erst geprüft. Bitte warte noch 40 Sekunden." } } });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=checks"]}><AdminOpsPage /></MemoryRouter>);
+  await user.click(await screen.findByTestId("ops-checks-run"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Gerade erst geprüft. Bitte warte noch 40 Sekunden."));
+  // Danach ist der Knopf wieder frei - der Ref gibt den Lauf auch beim Fehler zurück.
+  expect(screen.getByTestId("ops-checks-run")).not.toBeDisabled();
+  expect(screen.getByTestId("ops-checks-run")).toHaveTextContent("Jetzt neu prüfen");
+});
+
+test("Datei-Uploads stehen in Tempo gekennzeichnet, die Kachel nennt sie", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/admin/ops/slow")) {
+      return Promise.resolve({ data: { hours: 24, threshold_ms: 1000, total: 3, upload_count: 1, routes: [
+        { method: "GET", route: "/api/gallery", count: 3, avg_ms: 1800, p95_ms: 2400, max_ms: 2400, upload: false },
+        { method: "POST", route: "/api/admin/app-releases", count: 1, avg_ms: 47000, p95_ms: 47000, max_ms: 47000, upload: true },
+      ], recent: [] } });
+    }
+    if (path.startsWith("/admin/ops/summary")) return Promise.resolve({ data: { ...respond(url).data, slow_uploads_24h: 1 } });
+    return Promise.resolve(respond(url));
+  });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=slow"]}><AdminOpsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("ops-slow-POST-/api/admin/app-releases")).toHaveTextContent("Upload");
+  expect(screen.getByTestId("ops-slow-GET-/api/gallery")).not.toHaveTextContent("Upload");
+  expect(screen.getByText("ohne 1 Datei-Upload")).toBeInTheDocument();
+});

@@ -126,8 +126,13 @@ App lehnen das Login ohne bestätigte Adresse ab –, ohne Anmeldung gibt es wed
 Es bleiben zwei Folgen: Benutzername und Adresse sind belegt, und an die angegebene Adresse geht eine Bestätigungsmail
 (darum die Limits). Unbestätigte Konten werden derzeit nicht automatisch gelöscht.
 
-Betriebsdaten ohne Personenbezug (`ops_errors`, `ops_slow_requests`, `ops_vitals`: nur „angemeldet“ oder „anonym“)
-laufen nach 30 Tagen ab. Die Ereignis-Kennungen signierter Webhooks der Mitgliederverwaltung (`dolibarr_webhook_events`:
+Betriebsdaten (`ops_errors`, `ops_slow_requests`, `ops_vitals`: über Besucher nur „angemeldet“ oder „anonym“)
+laufen nach 30 Tagen ab. Quittieren im Betrieb (#2447) hält fest, wer einen Eintrag gesehen bzw. gelöst hat - nur als
+Kennung der Person aus der Verwaltung, der Name kommt erst beim Lesen (gelöschtes Konto: „Gelöschter User“):
+`resolved_by` an `ops_errors` (30 Tage), `acknowledged_by` an `ops_alert_log` (ein Jahr), `ops_check_episodes`
+(7 Tage nach dem letzten Lauf), `mobile_client_logs`, `email_logs`, `mail_jobs` und `upload_events` (deren Fristen), beim
+Dolibarr-Abgleich und Discord-Bot im Zustand unter `settings`. In der Auskunft der betroffenen Person fehlt diese
+fremde Kennung. Die Ereignis-Kennungen signierter Webhooks der Mitgliederverwaltung (`dolibarr_webhook_events`:
 Kennung, Objektart, Zeitpunkt – ohne Mitgliedsnummer) laufen nach sieben Tagen ab.
 
 ## Auskunft: was die Datei enthält

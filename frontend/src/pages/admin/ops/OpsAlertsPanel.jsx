@@ -14,6 +14,15 @@ const RETENTION_LABELS = {
   contact_done: "Kontaktanfragen, erledigt (Tage)", contact_spam: "Kontaktanfragen, Spam (Tage)",
 };
 
+// Formularstand: Empfänger mit Komma, Upload-Routen (#2447) eine je Zeile.
+function toForm(settings) {
+  return {
+    ...settings,
+    emails: (settings?.emails || []).join(", "),
+    upload_routes: Array.isArray(settings?.upload_routes) ? settings.upload_routes.join("\n") : undefined,
+  };
+}
+
 function formatTime(value) {
   if (!value) return "–";
   const date = asInstant(value);
@@ -29,7 +38,7 @@ export function OpsAlertsPanel() {
     try {
       const { data: next } = await api.get("/admin/ops/alerts");
       setData(next);
-      setForm({ ...next.settings, emails: (next.settings.emails || []).join(", ") });
+      setForm(toForm(next.settings));
     } catch (err) {
       toast.error(formatApiError(err?.response?.data?.detail) || "Alarme konnten nicht geladen werden.");
     }
@@ -44,8 +53,9 @@ export function OpsAlertsPanel() {
     setBusy("save");
     try {
       const payload = { emails: form.emails, cooldown_minutes: Number(form.cooldown_minutes), red_reminder_hours: Number(form.red_reminder_hours ?? 24), rules: form.rules, retention_days: Object.fromEntries(Object.entries(form.retention_days).map(([k, v]) => [k, Number(v)])) };
+      if (form.upload_routes !== undefined) payload.upload_routes = form.upload_routes;
       const { data: saved } = await api.put("/admin/ops/alerts", payload);
-      setForm({ ...saved, emails: (saved.emails || []).join(", ") });
+      setForm(toForm(saved));
       setData((current) => ({ ...current, settings: saved }));
       toast.success("Alarme gespeichert.");
     } catch (err) {
@@ -124,6 +134,15 @@ export function OpsAlertsPanel() {
               <input type="number" min={7} max={3650} value={form.retention_days[key] ?? ""} onChange={(e) => setForm((c) => ({ ...c, retention_days: { ...c.retention_days, [key]: e.target.value } }))} data-testid={`ops-retention-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
           ))}
+          {/* Datei-Uploads (#2447): dauern so lange wie die Leitung, sind kein Tempo-Problem - zählen nicht als langsam. */}
+          {form.upload_routes !== undefined ? (
+            <label className="block sm:col-span-2">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Upload-Routen, die nicht als langsam zählen (eine je Zeile, * am Ende = beginnt mit)</div>
+              <textarea value={form.upload_routes} onChange={(e) => setForm((c) => ({ ...c, upload_routes: e.target.value }))} rows={5} spellCheck={false} data-testid="ops-alert-upload-routes"
+                className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
+              <div className="text-xs text-white/40 mt-1">Anfragen mit Datei (multipart) erkennt die Website selbst; die Liste gilt für ältere Einträge und Sonderfälle.</div>
+            </label>
+          ) : null}
         </div>
         <p className="text-xs text-white/40 mt-2">App-Logs, Fehlergruppen, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
         <button type="button" onClick={save} disabled={!!busy} data-testid="ops-alert-save" className="mt-3 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy === "save" ? "Speichere …" : "Alarme speichern"}</button>

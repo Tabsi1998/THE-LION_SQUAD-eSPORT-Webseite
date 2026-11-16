@@ -6,13 +6,13 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 
 | Seite | Was | Woher |
 |---|---|---|
-| System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens) | `ops_errors`, 30 Tage |
-| System → Betrieb & Logs → **Tempo** | Anfragen über der Schwelle (Route, Dauer) | `ops_slow_requests` |
+| System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens); „Als gelöst markieren“ direkt in der Zeile, mehrere ankreuzen und „Ausgewählte als gelöst“ (#2447) | `ops_errors`, 30 Tage |
+| System → Betrieb & Logs → **Tempo** | Anfragen über der Schwelle (Route, Dauer); Datei-Uploads mit Kennzeichen „Upload“ am Ende, sie zählen nicht als langsam (#2447) | `ops_slow_requests` |
 | System → Betrieb & Logs → **Vitals** | Ladezeiten aus dem Browser je Route (LCP, INP, CLS, TTFB), anonym | `ops_vitals` |
-| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse, eindeutige Indizes, Datei-Nacharbeit, Bild-Erkennung (Tesseract und zweiter Leser, #2018), Shop (Stufe, Notschalter, Printful-Schlüssel, Fehler des letzten Verbindungstests, #1706); darunter die Dateien, deren Löschung scheiterte, mit „Erneut versuchen“ | `ops_check_runs`, `ops_check_episodes`, `pending_file_cleanups` |
+| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse, eindeutige Indizes, Datei-Nacharbeit, Bild-Erkennung (Tesseract und zweiter Leser, #2018), Shop (Stufe, Notschalter, Printful-Schlüssel, Fehler des letzten Verbindungstests, #1706); darunter die Dateien, deren Löschung scheiterte, mit „Erneut versuchen“. „Jetzt neu prüfen“ läuft sofort, höchstens dreimal je Minute und Person (#2447) | `ops_check_runs`, `ops_check_episodes`, `pending_file_cleanups` |
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
-| System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und Auffälligkeiten, die neuesten Probleme der letzten sieben Tage | Sammelsicht |
-| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“. Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`, zugleich Sperre: bleibt er nach einem Abbruch länger als 10 Minuten auf „running“, übernimmt ihn der nächste Start; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
+| System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und „X auffällig“ (nur Offenes), darunter die offenen Probleme zum Quittieren – siehe [Quittieren](#quittieren-und-von-selbst-erledigt-2447) | Sammelsicht |
+| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“; „Nur offene“ und „Quittierte zeigen“ (#2447). Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`, zugleich Sperre: bleibt er nach einem Abbruch länger als 10 Minuten auf „running“, übernimmt ihn der nächste Start; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
 | System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP und der Website (Gerät, Version, Stufe) mit Status und Notiz; die Suche findet auch die Kennung, die Admins auf der Fehlerseite der Website sehen (#1230) | `mobile_client_logs`, 90 Tage |
 | E-Mail → Mail-Queue | Wartende und fehlgeschlagene Sendungen, neu einreihen | `mail_jobs` |
 
@@ -172,7 +172,7 @@ wird dabei nie etwas – bereinigt wird bewusst, im Backend-Container:
    sie noch genau so aussieht wie beim Suchen; eine inzwischen geänderte Zeile bleibt und steht unter `skipped`
    (dann später noch einmal). Ins Adminprotokoll kommen nur die Zahlen (`ops.unique_duplicates.apply`). Mit
    `--nur sammlung.index` (mehrfach möglich) nur einzelne Indizes.
-4. Unter Checks „Jetzt prüfen“: die Prüfung ist grün.
+4. Unter Checks „Jetzt neu prüfen“: die Prüfung ist grün.
 
 Zwei Indizes bereinigt das Werkzeug nie, es meldet sie mit „HAND“: dasselbe fremde Konto bei mehreren Personen
 (`platform_links.platform_external`) und mehrere Rechnungsaufträge für dieselbe Buchung
@@ -189,6 +189,59 @@ die Einträge mit Datei, Versuchen und Fehlerart (Klasse und Code, etwa `Permiss
 nennen weder Pfad noch Konto, ältere Einträge werden beim Anzeigen entsprechend gekürzt. Nach dem Beheben am Server (meist die Rechte am Upload-Volume) „Erneut versuchen“: Das gibt
 aufgegebenen Einträgen eine neue Runde und versucht alles Offene sofort. Was schon weg ist, gilt als gelöscht; was
 inzwischen wieder verwendet wird, bleibt.
+
+## Quittieren und von selbst erledigt (#2447)
+
+Unter **Überblick** stehen nur noch **offene Probleme**: Fehler und Warnungen, die weder quittiert noch von selbst
+erledigt sind. Die Kacheln „X auffällig“ zählen genau diese; ein Tipp auf eine auffällige Kachel öffnet die
+Ereignisse mit dieser Quelle und **Nur offene**. Ist nichts offen, steht dort „Alles erledigt“.
+
+- **Quittieren** (Knopf in der Zeile) heißt: gesehen, erledigt. Der Eintrag verschwindet aus den offenen Problemen und
+  aus den Zählern. Unter **Ereignisse** bleibt er mit **Quittierte zeigen** sichtbar, mit „Quittiert von … · Zeitpunkt“.
+  **Alle quittieren** fragt vorher in der Seite nach und nennt die Zahl. Im Überblick nimmt es alles Offene, unter
+  Ereignisse **genau die gezeigten** offenen Einträge (Quelle, Schwere, Suche, Discord-Server und Zeitraum gelten). In
+  beiden Fällen nur, was bis zum Laden der Seite auftrat – was danach neu dazukam, bleibt offen. Wer schon gültig
+  quittiert hat, bleibt mit Namen und Zeitpunkt stehen; gezählt wird nur, was neu quittiert wurde. Ein Eintrag, der kein
+  offenes Problem ist (gesendete Mail, schon quittiert, gelöste Fehlergruppe), lässt sich nicht quittieren.
+  Jede Quittierung steht im Adminprotokoll (`ops.event.ack`, `ops.event.ack_all`), das Lösen von Fehlergruppen als
+  `ops.errors.resolve` bzw. `ops.errors.reopen`.
+- **Dasselbe Problem** heißt gleiche Quelle, Art und Schlüssel. Quittieren trifft alle offenen Einträge mit diesem Schlüssel:
+
+  | Quelle | Art + Schlüssel |
+  |---|---|
+  | Serverfehler | Fehlerart + Fingerabdruck der Gruppe; quittieren heißt hier „gelöst“ |
+  | Auto-Checks | Ampel (gelb/rot) + betroffene Prüfungen (der laufende Zustand) |
+  | Alarme | Ereignisart + Alarmschlüssel (etwa `check:disk`, `error:<Fingerabdruck>`, `job:<Job>`) |
+  | App-Logs | Stufe + Fingerabdruck der Meldung |
+  | E-Mail-Versand | Stand (fehlgeschlagen/übersprungen) + Weg + Vorlage bzw. Anlass + bei Discord Server und Ziel + Grund bzw. Fehlertext; freie Mails (Vorlage `custom`) und Zeilen ohne Vorlage/Anlass einzeln |
+  | Mail-Queue, Uploads | der einzelne Eintrag |
+  | Dolibarr-Abgleich, Discord-Bot | der aktuelle Fehler |
+
+- **Kachel und Liste:** „X auffällig“ zählt ohne Zeitgrenze; **Nur offene** unter Ereignisse zeigt darum ebenfalls
+  alles Offene, der Zeitraum ist dort ausgeschaltet.
+- **Tritt es wieder auf**, ist es wieder offen: eine neue Zeile mit demselben Schlüssel, eine Zeile, deren Zeitpunkt
+  nach der Quittierung liegt (App-Log wiederholt sich, Mail-Job scheitert erneut), eine Fehlergruppe, die wieder
+  auftritt, ein neuer gelber oder roter Zustand der Auto-Checks, ein Dolibarr-Fehler nach einem grünen Abgleich,
+  ein Bot-Fehler, nachdem der Bot wieder verbunden war.
+- **Von selbst erledigt:** Ein Zustand der Auto-Checks ist **behoben**, sobald danach alles grün war, oder
+  **abgelöst**, wenn ein anderer gelber/roter Stand folgte (der steht selbst als offenes Problem da). Ein Alarm mit
+  Gegenstück ist **behoben**, wenn die Prüfung nicht mehr rot ist, die Fehlergruppe gelöst ist, der Dolibarr-Abgleich
+  wieder grün läuft oder der Bot wieder verbunden ist. Unter Ereignisse steht dann „Behoben um …“. Alarme ohne
+  Gegenstück (Hintergrundjob, Mail nicht zustellbar, App-Fehler) bleiben offen, bis jemand quittiert.
+- **Rechte:** Quittieren, Lösen und „Jetzt neu prüfen“ prüft der Server – nur mit dem Bereich System und bestätigter
+  Zwei-Faktor-Anmeldung.
+
+Gespeichert wird an der Zeile selbst (`acknowledged_at`, `acknowledged_by` bzw. bei Fehlergruppen `resolved_at`,
+`resolved_by`; beim Dolibarr-Abgleich und Bot `ack` im Zustand unter `settings`), nur die Kennung – der Name kommt erst
+beim Lesen. Die Regel steht in `backend/services/ops_acks.py`.
+
+**Langsame Routen:** Datei-Uploads dauern so lange wie die Leitung des Hochladenden (der APK-Upload beim App-Release
+brauchte 47 s) und zählen weder bei „Langsam“ noch als „Langsamste Route“. Anfragen mit Datei (`multipart/form-data`)
+erkennt der Server selbst; für ältere Einträge und Sonderfälle gilt die Liste **Upload-Routen** unter Alarme (eine
+Route je Zeile, `*` am Ende heißt „beginnt mit“; Vorgabe: App-Releases, Shop-Druckdateien und -Designs,
+`/api/uploads/*`). Ohne Methode gilt eine Zeile nur für POST und PUT – ein langsames GET derselben Route bleibt eine
+langsame Route; mit Methode davor (`PATCH /api/…`) nur für diese. Höchstens 40 Zeilen; zu breite Muster wie `/api/*`
+oder `/api/admin/*` lehnt die Seite ab.
 
 ## Alarme (#517)
 

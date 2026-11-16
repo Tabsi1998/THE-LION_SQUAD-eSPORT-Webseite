@@ -29,6 +29,7 @@ from starlette.routing import Match
 from database import get_db
 from models import new_id, now_utc
 from services.log_safe import log_safe
+from services.ops_upload_routes import is_upload
 
 logger = logging.getLogger("tls.ops")
 
@@ -39,6 +40,7 @@ MESSAGE_LIMIT = 500
 # Gesundheitsprüfungen und der Änderungsstrom (der absichtlich offen bleibt)
 # sagen nichts über das Tempo der Anwendung.
 IGNORED_PATH_PREFIXES = ("/api/health", "/api/changes/stream")
+# Datei-Uploads (#2447) zählen nicht als langsam - Vorgabe und Regel in ``ops_upload_routes``.
 
 _SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]+=*", re.IGNORECASE), "Bearer [redacted]"),
@@ -128,6 +130,7 @@ async def _upsert_error(app: Any, request: Any, *, error_type: str, message: str
                     "last_seen_at": now_iso,
                     "expires_at": _expires_at(),
                     "resolved_at": None,
+                    "resolved_by": None,
                 },
                 "$inc": {"count": 1},
             },
@@ -188,10 +191,22 @@ async def record_http_error(app: Any, request: Any, status_code: int) -> str | N
     )
 
 
+def is_multipart(request: Any) -> bool:
+    headers = getattr(request, "headers", {}) or {}
+    return str(headers.get("content-type") or "").lower().startswith("multipart/form-data")
+
+
+async def upload_routes(db) -> list[str]:
+    from services.ops_alerts import load_alert_settings
+
+    return list((await load_alert_settings(db)).get("upload_routes") or [])
+
+
 async def record_slow_request(app: Any, request: Any, duration_ms: float, status_code: int) -> None:
     try:
         db = get_db()
         await db.ops_slow_requests.insert_one({
+            "upload": is_multipart(request),
             "id": new_id(),
             "route": route_template(app, request.scope)[:200],
             "method": str(request.method or "GET").upper(),
@@ -324,10 +339,11 @@ async def errors_overview(db, status: str = "open", limit: int = 100) -> list[di
     return rows
 
 
-async def set_error_resolved(db, fingerprint: str, resolved: bool) -> dict | None:
+async def set_error_resolved(db, fingerprint: str, resolved: bool, actor_id: str | None = None) -> dict | None:
+    """Gelöst bzw. wieder offen; ``resolved_by`` (#2447) ist die Kennung, wer gelöst bzw. quittiert hat."""
     await db.ops_errors.update_one(
         {"fingerprint": fingerprint},
-        {"$set": {"resolved_at": now_utc().isoformat() if resolved else None}},
+        {"$set": {"resolved_at": now_utc().isoformat() if resolved else None, "resolved_by": actor_id if resolved else None}},
     )
     return await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0})
 
@@ -344,9 +360,14 @@ async def slow_overview(db, hours: int = 24, limit: int = 50) -> dict:
     """Die langsamsten Routen des Zeitraums - gerechnet in Python, damit es
     auch mit der In-Memory-Datenbank der Tests dasselbe Ergebnis ist."""
     rows = await db.ops_slow_requests.find({"at": {"$gte": _since_iso(hours)}}, {"_id": 0}).sort("at", -1).to_list(5000)
+    patterns = await upload_routes(db)
     buckets: dict[tuple[str, str], list[int]] = {}
+    uploads: set[tuple[str, str]] = set()
     for row in rows:
-        buckets.setdefault((row.get("method") or "GET", row.get("route") or "/"), []).append(int(row.get("duration_ms") or 0))
+        bucket = (row.get("method") or "GET", row.get("route") or "/")
+        buckets.setdefault(bucket, []).append(int(row.get("duration_ms") or 0))
+        if is_upload(row, patterns):
+            uploads.add(bucket)
     routes = [
         {
             "method": method,
@@ -355,11 +376,15 @@ async def slow_overview(db, hours: int = 24, limit: int = 50) -> dict:
             "avg_ms": int(sum(durations) / len(durations)),
             "max_ms": max(durations),
             "p95_ms": _percentile(durations, 0.95),
+            # Datei-Upload (#2447): steht da, zählt aber nicht als langsam - darum ans Ende.
+            "upload": (method, route) in uploads,
         }
         for (method, route), durations in buckets.items()
     ]
-    routes.sort(key=lambda item: (-item["p95_ms"], -item["count"]))
-    return {"hours": hours, "threshold_ms": SLOW_REQUEST_MS, "total": len(rows), "routes": routes[:limit], "recent": rows[:limit]}
+    routes.sort(key=lambda item: (item["upload"], -item["p95_ms"], -item["count"]))
+    upload_count = sum(1 for row in rows if is_upload(row, patterns))
+    return {"hours": hours, "threshold_ms": SLOW_REQUEST_MS, "total": len(rows) - upload_count, "upload_count": upload_count,
+            "routes": routes[:limit], "recent": rows[:limit]}
 
 
 async def ops_summary(db) -> dict:
@@ -367,7 +392,10 @@ async def ops_summary(db) -> dict:
     since = _since_iso(24)
     open_groups = await db.ops_errors.count_documents({"resolved_at": None})
     recent_groups = await db.ops_errors.find({"last_seen_at": {"$gte": since}}, {"_id": 0, "count": 1, "route": 1, "error_type": 1, "last_seen_at": 1}).sort("last_seen_at", -1).to_list(200)
-    slow_rows = await db.ops_slow_requests.find({"at": {"$gte": since}}, {"_id": 0, "route": 1, "duration_ms": 1}).to_list(5000)
+    every_slow = await db.ops_slow_requests.find({"at": {"$gte": since}}, {"_id": 0, "route": 1, "method": 1, "duration_ms": 1, "upload": 1}).to_list(5000)
+    # Datei-Uploads (#2447) zählen nicht als langsam und sind nie „Langsamste Route“.
+    patterns = await upload_routes(db)
+    slow_rows = [row for row in every_slow if not is_upload(row, patterns)]
     slowest = max(slow_rows, key=lambda row: int(row.get("duration_ms") or 0), default=None)
     from services.ops_checks import latest_checks_summary
 
@@ -375,6 +403,7 @@ async def ops_summary(db) -> dict:
         "open_error_groups": open_groups,
         "error_groups_24h": len(recent_groups),
         "slow_requests_24h": len(slow_rows),
+        "slow_uploads_24h": len(every_slow) - len(slow_rows),
         "slowest_route_24h": {"route": slowest.get("route"), "duration_ms": slowest.get("duration_ms")} if slowest else None,
         "threshold_ms": SLOW_REQUEST_MS,
         "checks": await latest_checks_summary(db),
