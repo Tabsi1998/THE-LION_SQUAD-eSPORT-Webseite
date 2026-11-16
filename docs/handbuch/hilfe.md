@@ -33,6 +33,8 @@ automatisch zur FAQ, auch Links auf einzelne Schritte und Suchen (#2448).
 - **Vereinsmitglieder** sehen zusätzlich Fragen zur Mitgliedschaft (Beitrag, Mitgliedsnummer und Karte,
   Mitgliederverzeichnis, Austritt, Versammlungen, Dokumente) und den Bereich **Helferdienste** (Dienst eintragen und
   absagen, Stand der Anfrage, „Mein Dienst“ und die Nachricht beim Eintragen).
+- **Helfer bei Turnieren** mit einem aktiven Einsatz sehen den Bereich **Helferdienste** auch ohne Mitgliedschaft, dort
+  aber nur die Fragen zu „Mein Dienst“ und zur Nachricht beim Eintragen. Ein beendeter Einsatz zählt nicht.
 - **Turnierleitung** sieht zusätzlich den Bereich **Turnierleitung** mit Fragen zu Check-in, Aufruf, Stationen,
   Cockpit, „Braucht Aufmerksamkeit“ und Ergebnissen. Dazu zählt jeder, der die Leitungsansicht eines Turniers öffnen darf: der Bereich Turnierleitung (Rolle
   oder Freigabe, mit Zwei-Faktor-Anmeldung), Helfer mit einem aktiven Einsatz in einem Turnier und die Liga-Leitung.

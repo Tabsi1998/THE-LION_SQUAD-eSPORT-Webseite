@@ -11,6 +11,10 @@ Stufen „turnierleitung“ und „turnierleitung_verwaltung“ (Review #2448, F
 Fragen zu Check-in, Aufruf und Ergebnissen. Fragen, deren Weg über die Verwaltung führt, sehen nur Personen mit dem
 Bereich Turnierleitung.
 
+Stufe „helfer“ (Fabian 16.11., #2448 Paket 3): Fragen zu „Mein Dienst“ und zur Nachricht beim Eintragen sehen
+Mitglieder und alle mit einem aktiven Helfer-Einsatz in einem Turnier - auch ohne Mitgliedschaft. Ein beendeter Einsatz
+zählt nicht.
+
 Achtung, das Repository ist öffentlich: Diese Datei liest jeder auf GitHub. Hier steht nur Bedienung, nichts
 Vertrauliches (keine Zugänge, keine internen Abläufe, keine Namen). Die Prüfung am Server regelt nur, wem die Seite
 eine Frage zeigt - geheim ist sie dadurch nicht.
@@ -26,7 +30,7 @@ from services.tournament_permissions import READ_STAFF_ROLES, RESULT_STAFF_ROLES
 from services.visibility import sees_member_content
 
 # Stufen der Sichtbarkeit, von offen nach eng. „alle“ liefert das Frontend selbst aus.
-VISIBILITIES = ("alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung")
+VISIBILITIES = ("alle", "angemeldet", "mitglied", "helfer", "turnierleitung", "turnierleitung_verwaltung")
 ROLES = ("spieler", "captain", "mitglied", "turnierleitung")
 
 PROTECTED_QUESTIONS: tuple[dict, ...] = (
@@ -120,7 +124,7 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "antwort": "Oben rechts im Menü unter Mein Dienst. Bei Deine Einsätze steht jedes Turnier, bei dem du hilfst, mit deiner Rolle.",
         "bereich": "helferdienste",
         "rollen": ["mitglied"],
-        "sichtbar_fuer": "mitglied",
+        "sichtbar_fuer": "helfer",
     },
     {
         "id": "helfer-nachricht",
@@ -128,7 +132,7 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "antwort": "Trägt dich die Turnierleitung ein, kommt eine Nachricht in die Glocke. Sie nennt deine Rolle und was du darfst. Ein Tipp führt zu Mein Dienst.",
         "bereich": "helferdienste",
         "rollen": ["mitglied"],
-        "sichtbar_fuer": "mitglied",
+        "sichtbar_fuer": "helfer",
     },
     # Turnierleitung - nur mit dem Bereich Turnierleitung.
     {
@@ -210,7 +214,7 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
 )
 
 
-NO_ACCESS = {"angemeldet": False, "mitglied": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
+NO_ACCESS = {"angemeldet": False, "mitglied": False, "helfer": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
 
 
 async def _helps_in_a_tournament(user: dict) -> bool:
@@ -221,6 +225,14 @@ async def _helps_in_a_tournament(user: dict) -> bool:
         {"user_id": user["id"], "is_active": {"$ne": False}, "role": {"$in": sorted(READ_STAFF_ROLES | RESULT_STAFF_ROLES)}},
         {"_id": 1},
     )
+    return row is not None
+
+
+async def _has_helper_assignment(user: dict) -> bool:
+    """Irgendein aktiver Helfer-Einsatz in einem Turnier, gleich mit welcher Rolle (Stufe „helfer“)."""
+    if not user.get("id"):
+        return False
+    row = await get_db().tournament_staff_assignments.find_one({"user_id": user["id"], "is_active": {"$ne": False}}, {"_id": 1})
     return row is not None
 
 
@@ -235,13 +247,16 @@ async def _leads_a_league(user: dict) -> bool:
 async def viewer_access(user: dict | None) -> dict[str, bool]:
     """Was die Person einer Anfrage sehen darf. Mitglied wie bei allen Mitglieder-Inhalten (``sees_member_content``).
     Turnierleitung (Verwaltung) wie ``require_area("tournaments")`` samt Zwei-Faktor; die Stufe „turnierleitung“ hat
-    zusätzlich, wer die Leitungsansicht eines Turniers öffnen darf - aktiver Helfer-Einsatz oder Liga-Leitung."""
+    zusätzlich, wer die Leitungsansicht eines Turniers öffnen darf - aktiver Helfer-Einsatz oder Liga-Leitung. „helfer“:
+    Mitglied oder irgendein aktiver Helfer-Einsatz."""
     if not user:
         return dict(NO_ACCESS)
     area = await can_use_area(user, "tournaments")
+    member = await sees_member_content(user)
     return {
         "angemeldet": True,
-        "mitglied": await sees_member_content(user),
+        "mitglied": member,
+        "helfer": member or await _has_helper_assignment(user),
         "turnierleitung": area or await _helps_in_a_tournament(user) or await _leads_a_league(user),
         "turnierleitung_verwaltung": area,
     }

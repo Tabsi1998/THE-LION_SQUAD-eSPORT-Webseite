@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import masse from "./bilder/masse.json";
 import anker from "./anker.json";
+import { faqZugangAus } from "./useFaqZugang";
 import {
   BEREICHE, CLIP_ARTEN, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, ankerAus, bereichInhalt, darfSehen, faqBereichsliste, fragePfad,
   haeufigeFragen, hilfeBild, hilfeClip, hilfeNormal, hilfePfad, hilfeSchritte, hilfeThema, passtZuRolle, sichtbareBereiche,
@@ -178,7 +179,7 @@ test("Bild-Adresse mit Größe; Pfade mit Anker", () => {
 
 const BEREICH_IDS = new Set(BEREICHE.map((bereich) => bereich.id));
 const ROLLEN_IDS = new Set(ROLLEN.map((rolle) => rolle.id));
-const GESCHUETZT = /"sichtbar_fuer":\s*"(angemeldet|mitglied|turnierleitung)"/;
+const GESCHUETZT = /"sichtbar_fuer":\s*"(angemeldet|mitglied|helfer|turnierleitung)"/;
 
 test("Kein geschützter Inhalt im öffentlichen Datensatz: Fragen und Anleitungen nur „alle“", () => {
   for (const frage of FRAGEN) expect(frage.sichtbar_fuer, frage.id).toBe("alle");
@@ -370,4 +371,21 @@ test("Paket 3: Benachrichtigungen stehen nur einmal - Datenschutz verweist auf d
   const verweis = FRAGEN.find((frage) => frage.id === "was-bekomme-ich-zugeschickt");
   expect(verweis.link.to).toBe("/faq/konto-und-profil#stufe");
   expect(hilfeSchritte(hilfeThema("datenschutz-und-konto")).some((schritt) => /Ruhezeit|Benachrichtigung/.test(`${schritt.text} ${schritt.hinweis || ""}`))).toBe(false);
+});
+
+test("Stufe helfer (Fabian 16.11.): Mitglied oder aktiver Helfer-Einsatz, sonst zu", () => {
+  expect(SICHTBARKEITEN).toContain("helfer");
+  expect(darfSehen("helfer", {})).toBe(false);
+  expect(darfSehen("helfer", { angemeldet: true, turnierleitung: true })).toBe(false);
+  expect(darfSehen("helfer", { helfer: true })).toBe(true);
+  expect(darfSehen("helfer", { mitglied: true })).toBe(true);
+  // Helfer ohne Verein sieht den Bereich Helferdienste, aber keine Mitglieder-Fragen.
+  expect(sichtbareBereiche({ darf: { angemeldet: true, helfer: true } }).map((bereich) => bereich.id)).toContain("helferdienste");
+  expect(sichtbareBereiche({ darf: { angemeldet: true } }).map((bereich) => bereich.id)).not.toContain("helferdienste");
+  const dienst = { id: "mein-dienst", frage: "Wo?", antwort: "Dort.", bereich: "helferdienste", rollen: ["mitglied"], sichtbar_fuer: "helfer" };
+  const schicht = { id: "schicht", frage: "Wie?", antwort: "So.", bereich: "helferdienste", rollen: ["mitglied"], sichtbar_fuer: "mitglied" };
+  expect(bereichInhalt("helferdienste", { fragen: [dienst, schicht], darf: { helfer: true } }).fragen).toEqual([dienst]);
+  // Die Antwort des Servers behält die Stufe.
+  expect(faqZugangAus({ darf: { helfer: true } }).darf.helfer).toBe(true);
+  expect(faqZugangAus({ darf: {} }).darf.helfer).toBe(false);
 });

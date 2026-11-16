@@ -27,7 +27,9 @@ FRONTEND_HILFE = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "src
 MEMBER_IDS = {q["id"] for q in faq_protected.PROTECTED_QUESTIONS if q["sichtbar_fuer"] == "mitglied"}
 LEAD_IDS = {q["id"] for q in faq_protected.PROTECTED_QUESTIONS if q["sichtbar_fuer"] == "turnierleitung"}
 ADMIN_LEAD_IDS = {q["id"] for q in faq_protected.PROTECTED_QUESTIONS if q["sichtbar_fuer"] == "turnierleitung_verwaltung"}
-NOTHING = {"angemeldet": False, "mitglied": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
+# Stufe „helfer“ (Fabian 16.11.): Mitglied oder aktiver Helfer-Einsatz.
+HELPER_IDS = {q["id"] for q in faq_protected.PROTECTED_QUESTIONS if q["sichtbar_fuer"] == "helfer"}
+NOTHING = {"angemeldet": False, "mitglied": False, "helfer": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
 
 
 @pytest_asyncio.fixture
@@ -58,7 +60,7 @@ async def helper(flow, *, active=True, role="referee"):
 
 
 def test_both_lead_levels_have_questions():
-    assert MEMBER_IDS and LEAD_IDS and ADMIN_LEAD_IDS
+    assert MEMBER_IDS and HELPER_IDS and LEAD_IDS and ADMIN_LEAD_IDS
     # Fragen mit Weg über die Verwaltung (Link nach /admin) sehen nur Personen mit dem Bereich.
     for question in faq_protected.PROTECTED_QUESTIONS:
         if str((question.get("link") or {}).get("to", "")).startswith("/admin"):
@@ -93,8 +95,8 @@ async def test_member_gets_member_questions_but_not_the_lead(flow):
     member = await flow.add_user(role="player", name="Vereinsmitglied")
     await flow.db.memberships.insert_one({"user_id": member["id"], "member_status": "active"})
     body, ids = await faq_as(flow, member)
-    assert ids == MEMBER_IDS
-    assert body["darf"] == {**NOTHING, "angemeldet": True, "mitglied": True}
+    assert ids == MEMBER_IDS | HELPER_IDS
+    assert body["darf"] == {**NOTHING, "angemeldet": True, "mitglied": True, "helfer": True}
     # Die Antwort bringt den Inhalt mit - Frage, Antwort, Bereich -, nicht nur die Kennungen.
     shift = next(question for question in body["fragen"] if question["id"] == "helferdienst-eintragen")
     assert shift["bereich"] == "helferdienste" and "Ich helfe" in shift["antwort"]
@@ -125,7 +127,7 @@ async def test_tournament_area_by_grant_counts_and_member_lead_sees_both(flow):
     await flow.db.users.update_one({"id": granted["id"]}, {"$set": {"areas": ["tournaments"]}})
     await flow.db.memberships.insert_one({"user_id": granted["id"], "member_status": "active"})
     _, ids = await faq_as(flow, granted)
-    assert ids == MEMBER_IDS | LEAD_IDS | ADMIN_LEAD_IDS
+    assert ids == MEMBER_IDS | HELPER_IDS | LEAD_IDS | ADMIN_LEAD_IDS
 
 
 @pytest.mark.parametrize("role", ["referee", "scorekeeper", "station_manager", "stream_operator", "organizer"])
@@ -133,8 +135,8 @@ async def test_tournament_area_by_grant_counts_and_member_lead_sees_both(flow):
 async def test_helper_with_active_assignment_sees_the_lead_questions_but_not_the_admin_ones(flow, role):
     person = await helper(flow, role=role)
     body, ids = await faq_as(flow, person)
-    assert ids == LEAD_IDS
-    assert body["darf"] == {**NOTHING, "angemeldet": True, "turnierleitung": True}
+    assert ids == LEAD_IDS | HELPER_IDS
+    assert body["darf"] == {**NOTHING, "angemeldet": True, "helfer": True, "turnierleitung": True}
 
 
 @pytest.mark.asyncio
@@ -203,8 +205,8 @@ PACKAGE_3 = {
     "mitgliederverzeichnis": ("verein-mitgliedschaft", "mitglied"),
     "austritt": ("verein-mitgliedschaft", "mitglied"),
     "helferdienst-stand": ("helferdienste", "mitglied"),
-    "mein-dienst": ("helferdienste", "mitglied"),
-    "helfer-nachricht": ("helferdienste", "mitglied"),
+    "mein-dienst": ("helferdienste", "helfer"),
+    "helfer-nachricht": ("helferdienste", "helfer"),
     "leitung-cockpit": ("turnierleitung", "turnierleitung"),
     "leitung-aufmerksamkeit": ("turnierleitung", "turnierleitung"),
     "leitung-alle-aufrufen": ("turnierleitung", "turnierleitung"),
@@ -232,6 +234,7 @@ def test_protected_answers_are_short():
 @pytest.mark.asyncio
 async def test_package_3_questions_only_with_the_right(flow):
     member_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "mitglied"}
+    helper_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "helfer"}
     lead_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "turnierleitung"}
     admin_ids = {key for key, (_, level) in PACKAGE_3.items() if level == "turnierleitung_verwaltung"}
 
@@ -243,12 +246,33 @@ async def test_package_3_questions_only_with_the_right(flow):
     member = await flow.add_user(role="player", name="Mitglied Paket drei")
     await flow.db.memberships.insert_one({"user_id": member["id"], "member_status": "active"})
     _, ids = await faq_as(flow, member)
-    assert member_ids <= ids and not ids & (lead_ids | admin_ids)
+    assert (member_ids | helper_ids) <= ids and not ids & (lead_ids | admin_ids)
 
     person = await helper(flow, role="referee")
     _, ids = await faq_as(flow, person)
-    assert lead_ids <= ids and not ids & (member_ids | admin_ids)
+    assert (lead_ids | helper_ids) <= ids and not ids & (member_ids | admin_ids)
 
     lead = await flow.add_user(role="tournament_admin", name="Leitung Paket drei")
     _, ids = await faq_as(flow, lead)
-    assert (lead_ids | admin_ids) <= ids and not ids & member_ids
+    assert (lead_ids | admin_ids) <= ids and not ids & (member_ids | helper_ids)
+
+
+@pytest.mark.parametrize("role", ["referee", "scorekeeper", "station_manager", "stream_operator", "organizer"])
+@pytest.mark.asyncio
+async def test_helper_without_membership_sees_the_helper_questions(flow, role):
+    """Fabian 16.11.: „Mein Dienst“ und die Nachricht beim Eintragen sehen alle mit aktivem Einsatz - auch ohne Verein."""
+    person = await helper(flow, role=role)
+    body, ids = await faq_as(flow, person)
+    assert HELPER_IDS <= ids and not ids & MEMBER_IDS
+    assert body["darf"]["helfer"] is True and body["darf"]["mitglied"] is False
+
+
+@pytest.mark.asyncio
+async def test_helper_questions_not_for_guest_player_or_ended_assignment(flow):
+    _, guest = await faq_as(flow, None)
+    player = await flow.add_user(role="player", name="Spieler ohne Einsatz")
+    _, plain = await faq_as(flow, player)
+    ended = await helper(flow, active=False)
+    body, old = await faq_as(flow, ended)
+    assert not (guest | plain | old) & HELPER_IDS
+    assert body["darf"]["helfer"] is False
