@@ -435,9 +435,11 @@ async def _report_settle_failure(db, t: dict, tid: str, me: dict, failed: list[s
     es auffällt, auch wenn die Leitung das Fenster mit der Warnung schon geschlossen hat. Hält nie etwas auf."""
     labels = [SETTLE_STEP_LABELS[step] for step in failed]
     await _audit_tournament_action(db, "tournament.results.settle_failed", me.get("id"), tid, {"failed": failed})
+    # Der Alarm läuft neben der Antwort (Discord, Mail) - die Leitung wartet nicht darauf. Die Sperrfrist je Turnier hält
+    # mehrfaches Veröffentlichen bei einem Alarm.
     try:
-        from services.ops_alerts import notify
-        await notify(
+        from services.ops_alerts import schedule_notify
+        schedule_notify(
             db, "tournament_settle_failed", "Turnierabschluss unvollständig",
             f"Beim Veröffentlichen von „{t.get('title') or tid}“ ist gescheitert: {', '.join(labels)}. "
             "In der Verwaltung beim Turnier unter Werkzeuge „Abschluss nachholen“ tippen.",
