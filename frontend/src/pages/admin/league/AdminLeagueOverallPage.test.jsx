@@ -48,9 +48,13 @@ test("Einstellungen: eigene Punkte und beste X - gespeichert werden nur die Punk
   renderPage();
   const panel = await screen.findByTestId("overall-panel-einstellungen");
   expect(within(panel).getByTestId("overall-settings-save")).toBeDisabled();
-  fireEvent.click(within(panel).getByTestId("overall-points-mode-table"));
   // Der Hinweis erscheint nach dem Neuzeichnen - warten statt sofort prüfen (wackelte in der Zeitreise-Probe, #775).
-  await waitFor(() => expect(within(panel).getByTestId("overall-settings-bar")).toHaveTextContent("mindestens Platz 1"));
+  // Unter Last kann der Klick vor dem Ende des Ladens kommen; das Laden setzt den Entwurf dann zurück („Gespeichert.“,
+  // CI zu #2466). Die Wahl „Tabelle“ ist idempotent - also im waitFor wiederholen, bis der Entwurf sie hält.
+  await waitFor(() => {
+    fireEvent.click(within(panel).getByTestId("overall-points-mode-table"));
+    expect(within(panel).getByTestId("overall-settings-bar")).toHaveTextContent("mindestens Platz 1");
+  });
   fireEvent.click(within(panel).getByTestId("overall-points-add"));
   fireEvent.click(within(panel).getByTestId("overall-counting-best"));
   fireEvent.change(within(panel).getByTestId("overall-best"), { target: { value: "3" } });
