@@ -167,4 +167,35 @@ test.describe("Warteschlange vor Ort", () => {
     await mine.scrollIntoViewIfNeeded();
     await shot(page, testInfo, "spieler-turnierseite-375.png");
   });
+
+  // #2440: Scheitert das Nachladen (Server 503), bleibt „Du bist als Nächstes“ mit „Letzter Stand vor X s“ - nach drei
+  // Minuten ohne Erfolg verschwindet die Zeile, damit kein veraltetes „Du bist dran“ stehen bleibt.
+  test("Spieler-Sicht bei 375 px: gescheitertes Nachladen zeigt „Letzter Stand“, nach 3 Minuten ist die Zeile weg", async ({ page }, testInfo) => {
+    await prepare(page, { width: 375, height: 812, now: fixture.now });
+    const entry = fixture.me.entries[0];
+    let meDown = false;
+    await page.route("**/api/**", (route) => {
+      const url = new URL(route.request().url()).pathname;
+      if (url === "/api/auth/me") return route.fulfill(json({ id: "u1", username: "spieler", display_name: "Spieler", role: "user" }));
+      if (url === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
+      if (url === `/api/tournaments/${TID}/live-queue/me`) return meDown ? route.fulfill(json({ detail: "Fehler" }, 503)) : route.fulfill(json(fixture.me));
+      if (url === `/api/tournaments/${SLUG}`) return route.fulfill(json({ ...fixture.match_page.tournament, ...fixture.tournament, status: "live", format: "single_elim", is_public: true, visibility: "public", participant_count: 8, max_participants: 8, platform: "Switch 2" }));
+      if (url === `/api/tournaments/${TID}/registrations`) return route.fulfill(json([{ id: "r-me", tournament_id: TID, user_id: "u1", status: "checked_in", display_name: "NeonFalke" }]));
+      return route.fulfill(json([]));
+    });
+    await page.goto(`/tournaments/${SLUG}`);
+    const mine = page.getByTestId("tournament-my-stand").getByTestId("live-queue-status");
+    await expect(mine).toContainText(`Du bist als Nächstes an ${entry.station_text}`);
+    await expect(mine.getByTestId("live-queue-status-stale")).toHaveCount(0);
+    // Der Takt (jede Minute) fragt nach - der Server antwortet nicht.
+    meDown = true;
+    await page.clock.runFor(61_000);
+    await expect(mine.getByTestId("live-queue-status-stale")).toContainText("Letzter Stand vor 1 Min.");
+    await expect(mine).toContainText(`Du bist als Nächstes an ${entry.station_text}`);
+    await mine.scrollIntoViewIfNeeded();
+    await shot(page, testInfo, "2440-spieler-letzter-stand-375.png");
+    // Drei Minuten ohne Erfolg: die Zeile ist weg.
+    await page.clock.runFor(3 * 60_000);
+    await expect(page.getByTestId("tournament-my-stand").getByTestId("live-queue-status")).toHaveCount(0);
+  });
 });
