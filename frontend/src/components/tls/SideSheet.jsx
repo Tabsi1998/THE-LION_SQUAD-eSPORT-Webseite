@@ -1,26 +1,23 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { X } from "lucide-react";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 // Blatt für öffentliche Seiten (#1191, #1274): am PC rechts neben der Seite, am Handy von unten über die ganze Breite.
 // Kopf mit Titel und Schließen, scrollender Inhalt, optional eine feste Leiste unten. Esc und ein Klick daneben
 // schließen, der Hintergrund scrollt nicht mit. Knöpfe darin nur über die tls-btn-Arten.
 
 export function SideSheet({ title, eyebrow, onClose, footer = null, testId = "side-sheet", children }) {
-  const panelRef = useRef(null);
+  // Tastatur (#2412): Fokus aufs Blatt, Tab bleibt darin, Escape schließt, der Rest der Seite ist solange gesperrt
+  // (`inert`), danach steht der Fokus wieder dort, wo er vorher war.
+  const panelRef = useModalBehavior(true, () => onClose?.(), { focusContainer: true });
 
   useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === "Escape") onClose?.();
-    };
-    window.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div
