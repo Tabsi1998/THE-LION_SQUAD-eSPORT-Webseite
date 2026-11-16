@@ -108,8 +108,8 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
 // Ladefehler (Review #2447, N1): nie „Alles erledigt“, wenn die Liste gar nicht kam.
 export function LoadError({ onRetry, testId }) {
   return (
-    <div role="alert" className="rounded-sm border border-[#FF3B30]/30 bg-[#FF3B30]/5 p-6 text-center" data-testid={testId}>
-      <AlertTriangle className="mx-auto h-6 w-6 text-[#FF6B61]" />
+    <div role="alert" className="rounded-sm border border-warn/30 bg-warn/5 p-6 text-center" data-testid={testId}>
+      <AlertTriangle className="mx-auto h-6 w-6 text-warn" />
       <div className="mt-2 text-sm font-bold text-white">Die Einträge ließen sich nicht laden.</div>
       <p className="mt-1 text-xs text-white/50">Ob etwas offen ist, steht erst nach dem Laden fest.</p>
       <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-white/15 px-4 text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">
