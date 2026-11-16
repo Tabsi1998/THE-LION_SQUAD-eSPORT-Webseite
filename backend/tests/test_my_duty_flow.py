@@ -170,6 +170,9 @@ async def test_dashboard_gives_each_area_only_its_own_blocks(flow):
     for role in ("moderator", "user"):
         flow.act_as(await flow.add_user(role=role))
         assert (await flow.get("/api/admin/dashboard")).status_code == 403, role
+    # Ohne Anmeldung (#2395, aus test_iter*::test_admin_requires_auth): 401, nicht 403.
+    flow.act_as(None)
+    assert (await flow.get("/api/admin/dashboard")).status_code == 401
 
 
 @pytest.mark.asyncio

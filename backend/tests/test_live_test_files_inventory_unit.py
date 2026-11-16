@@ -1,11 +1,13 @@
-"""Live-Tests bleiben gezählt (#932): Wer einen laufenden Server braucht, steht in ``LIVE_TEST_FILES`` - und nur der.
+"""Keine Live-Tests mehr (#932, #2395): ``LIVE_TEST_FILES`` ist leer und bleibt es.
 
-Die CI wählt diese Dateien mit ``-m "not live"`` ab. Steht eine neue Datei mit ``REACT_APP_BACKEND_URL`` nicht in der
-Liste, liefe sie in der CI gegen keinen Server; steht eine gelöschte noch drin, beschreibt die Liste (und das Inventar in
-docs/entwicklung/altetests-932.md) etwas, das es nicht mehr gibt. Neue Abläufe gehören in Flow-Tests (flow_harness.py).
+Live-Tests liefen per ``requests`` gegen einen laufenden Server; die CI wählte sie mit ``-m "not live"`` ab und führte
+sie nie aus. Mit #932 und #2395 sind alle entfallen, ihre gültigen Fälle laufen als Flow-Tests (Inventar:
+docs/entwicklung/altetests-932.md und altetests-2395.md). Liest eine neue Datei ``REACT_APP_BACKEND_URL``, liefe sie in
+der CI gegen keinen Server - dieser Wächter schlägt dann an. Neue Abläufe gehören in Flow-Tests (flow_harness.py).
 """
 import ast
 import pathlib
+import re
 
 TESTS = pathlib.Path(__file__).resolve().parent
 
@@ -30,6 +32,17 @@ def test_live_list_names_exactly_the_files_that_need_a_running_server():
     assert sorted(files_needing_a_server() - listed_live_files()) == [], "braucht einen Server, fehlt in der Liste"
 
 
-def test_the_live_list_only_shrinks():
-    # Stand nach #932 und dem ersten Schritt aus #2395. Ein neuer Live-Test ist ein Rückschritt: lieber einen Flow-Test.
-    assert len(listed_live_files()) <= 13
+def files_calling_a_server_directly() -> set[str]:
+    # Auch ohne die Variable: `requests` gegen eine feste Adresse wäre wieder ein Live-Test (Prüfung #2395).
+    pattern = re.compile(r"^\s*(import requests|from requests import)", re.MULTILINE)
+    return {
+        path.name for path in TESTS.glob("**/test_*.py")
+        if path.name != pathlib.Path(__file__).name and pattern.search(path.read_text(encoding="utf-8"))
+    }
+
+
+def test_the_live_list_stays_empty():
+    # Stand nach #2395. Ein neuer Live-Test ist ein Rückschritt: lieber einen Flow-Test.
+    assert listed_live_files() == set()
+    assert files_needing_a_server() == set()
+    assert files_calling_a_server_directly() == set(), "Tests rufen die API über flow_harness, nicht per requests"

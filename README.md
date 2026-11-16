@@ -156,10 +156,9 @@ Benötigte Python-Pakete stehen in `backend/requirements.txt` und
 Unit- und Flow-Tests (die echte App gegen mongomock, `backend/tests/flow_harness.py`)
 laufen mit `-m "not live"` lokal und in der CI. Ein Teil der Flow-Tests läuft in der CI
 zusätzlich gegen echtes MongoDB (`scripts/flow_mongo_tests.py`, Indizes und
-Transaktionen). Die wenigen älteren Live-Tests (`LIVE_TEST_FILES` in
-`backend/tests/conftest.py`) brauchen einen laufenden Server und laufen nie in der CI,
-schreibend nur auf einem dafür vorbereiteten Teststack. Sie schicken kein Formular-Token
-des Spamschutzes (#2067) mit; die Flow-Tests holen es über `backend/tests/spam_forms.py`.
+Transaktionen). Tests gegen einen laufenden Server gibt es keine mehr (#932, #2395):
+`LIVE_TEST_FILES` in `backend/tests/conftest.py` bleibt leer. Formular-Token des
+Spamschutzes (#2067) holen die Flow-Tests über `backend/tests/spam_forms.py`.
 
 **Lokal zuerst, GitHub bestätigt.** Die [CI-Workflows](.github/workflows/ci.yml)
 enthalten die verbindlichen automatischen Prüfungen. Sie laufen vor dem Push auf dem
