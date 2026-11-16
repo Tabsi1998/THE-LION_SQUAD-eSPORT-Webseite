@@ -24,6 +24,7 @@ import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import type { Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
+import { openLink } from "../../lib/openLink";
 import { showLapTime } from "../../lib/laptime";
 import { CountUp } from "../../components/motion";
 import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
@@ -110,6 +111,10 @@ export type PublicProfilePayload = {
   gaming_subscriptions?: string[] | string | null;
   favorite_games?: string[];
   is_club_member?: boolean;
+  // Vereinsprofil (#1267): Adresse und Funktion nur bei einem aktiven, mit dem Konto verbundenen Vereinsprofil - ältere Server
+  // schicken die Felder nicht.
+  club_profile_slug?: string | null;
+  club_role_title?: string | null;
   user_type?: string;
   membership?: Record<string, unknown> | null;
   socials?: Array<{ platform?: string; value?: string; url?: string }>;
@@ -146,6 +151,33 @@ export type ProfileTabCounts = {
 /** Die Reiter (#1149): eigenes und fremdes Profil in derselben Reihenfolge, Referenzen (Turniere, Fast Laps,
  * Jahreswertung) und Trophäen (Pokale, Banner, Liga-Belohnungen) getrennt. Profile ohne Nullen (#1916, wie #1268 im Web): andere
  * sehen nur Reiter mit Inhalt; das eigene Profil behält alle (Ehrungen für Mitglieder) mit einem Satz und Weg. */
+/**
+ * Vereinsprofil (#1267, wie ClubProfileHint im Web): „Vereinsmitglied · Funktion“ mit dem Weg zur offiziellen Vereinsseite. Nur mit
+ * `club_profile_slug` vom Server; die Funktion „Mitglied“ steht nicht noch einmal da.
+ */
+export function clubProfileHint(profile: { club_profile_slug?: string | null; club_role_title?: string | null } | null | undefined): { label: string; path: string } | null {
+  const slug = String(profile?.club_profile_slug || "").trim();
+  if (!slug) return null;
+  const role = String(profile?.club_role_title || "").trim();
+  return { label: role && role !== "Mitglied" ? `Vereinsmitglied · ${role}` : "Vereinsmitglied", path: `/members/${encodeURIComponent(slug)}` };
+}
+
+function ClubProfileHint({ hint }: { hint: { label: string; path: string } }) {
+  return (
+    <Pressable
+      onPress={() => { openLink(hint.path); }}
+      accessibilityRole="link"
+      accessibilityLabel={`${hint.label} – zum Vereinsprofil`}
+      hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}
+      style={({ pressed }) => [styles.clubHint, pressed && styles.clubHintPressed]}
+      testID="profile-club-hint"
+    >
+      <Ionicons name="ribbon-outline" size={12} color={colors.gold} />
+      <Muted style={styles.clubHintText} numberOfLines={1}>{hint.label}</Muted>
+    </Pressable>
+  );
+}
+
 export function profileTabs({ own, clubMember = false, achievements = 0, awards = 0, references = 0, teams = 0, honours = 0 }: ProfileTabCounts): Array<{ key: ProfileTabKey; label: string }> {
   const tabs: Array<{ key: ProfileTabKey; label: string; shown: boolean }> = [
     { key: "overview", label: "Übersicht", shown: true },
@@ -315,6 +347,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   const headerStats = shown ? profileStats(shown) : [];
   const display = shown?.display_name || shown?.username || "Spieler";
   const member = Boolean(shown?.is_club_member);
+  const clubHint = clubProfileHint(shown);
   // Wie im Web: ein privates Profil zeigt anderen weder Referenzen noch Teams (der Server antwortet ohnehin mit 404).
   const hiddenForOthers = !ownMode && shown?.privacy_public_profile === false;
   // Vereinsplatzierungen (#1945): bei Vereinsmitgliedern über ihr öffentlich verknüpftes Vereinsprofil - nicht im eigenen
@@ -448,7 +481,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
                 </View>
               ) : null}
               <View style={styles.wrap}>
-                <Pill label={member ? "Vereinsmitglied" : "Community"} tone={member ? "success" : "cyan"} />
+                {clubHint ? <ClubProfileHint hint={clubHint} /> : <Pill label={member ? "Vereinsmitglied" : "Community"} tone={member ? "success" : "cyan"} />}
                 <Pill label={`${shown.achievement_level?.title || `Level ${shown.achievement_level?.level || stats.level || 1}`}${Number(shown.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(shown.achievement_level?.prestige)}` : ""}`} tone="gold" />
                 {shown.role && shown.role !== "player" ? <Pill label={formatStatus(shown.role)} /> : null}
               </View>
@@ -738,6 +771,29 @@ function membershipLabel(profile: PublicProfilePayload) {
 }
 
 const styles = StyleSheet.create({
+  clubHint: {
+    alignItems: "center",
+    borderColor: "rgba(255,215,0,0.4)",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexShrink: 1,
+    gap: 4,
+    maxWidth: "100%",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clubHintPressed: {
+    backgroundColor: "rgba(255,215,0,0.1)",
+  },
+  clubHintText: {
+    color: colors.gold,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
   asOthers: {
     alignItems: "center",
     backgroundColor: colors.surface,

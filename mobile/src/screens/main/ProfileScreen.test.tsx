@@ -2,7 +2,7 @@ import React from "react";
 import { NavigationContext } from "@react-navigation/native";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { ProfileScreen } from "./ProfileScreen";
-import { PublicProfileScreen, profileStats, profileTabs } from "./PublicProfileScreen";
+import { PublicProfileScreen, clubProfileHint, profileStats, profileTabs } from "./PublicProfileScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Ein Profil, ein Aufbau (#1149): eigenes und fremdes Profil haben dieselben Reiter in derselben Reihenfolge. Was nur dich
@@ -63,10 +63,10 @@ function answer(path: string, config?: { params?: Record<string, string> }) {
     "/achievements/user/u-kiwi": { awards: [], groups: [], pinned: [] },
   };
   if (path === "/users/public/neonfalke") return mockPublic.private ? Promise.reject(notFound()) : Promise.resolve({ data: config?.params?.view_as === "public" ? asOthers : publicNeon });
-  if (path === "/users/public/kiwikomet") return mockPublic.kiwiHidden ? Promise.reject(notFound()) : Promise.resolve({ data: { id: "u-kiwi", username: "kiwikomet", display_name: "KiwiKomet", is_club_member: false, stats: { wins: 2 }, can_message: true, relationship: { status: "none" }, teams: [], awards: [], references: { items: [] } } });
+  if (path === "/users/public/kiwikomet") return mockPublic.kiwiHidden ? Promise.reject(notFound()) : Promise.resolve({ data: { id: "u-kiwi", username: "kiwikomet", display_name: "KiwiKomet", is_club_member: false, stats: { wins: 2 }, can_message: true, relationship: { status: "none" }, teams: [], awards: [], references: { items: [] }, ...mockPublic.kiwiExtra } });
   return path in responses ? Promise.resolve({ data: responses[path] }) : Promise.reject(new Error(`unerwartet ${path}`));
 }
-const mockPublic = { private: false, kiwiHidden: false };
+const mockPublic: { private: boolean; kiwiHidden: boolean; kiwiExtra: Record<string, unknown> } = { private: false, kiwiHidden: false, kiwiExtra: {} };
 /** Ein 404 des Servers, wie ihn axios liefert (#1152: „nicht gefunden“ ist etwas anderes als „ohne Netz“). */
 function notFound() {
   return Object.assign(new Error("404"), { isAxiosError: true, response: { status: 404, data: { detail: "Nicht gefunden." } } });
@@ -86,6 +86,7 @@ function renderOwn() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockPublic.private = false;
+  mockPublic.kiwiExtra = {};
   mockPublic.kiwiHidden = false;
   mockGet.mockImplementation(answer);
 });
@@ -331,4 +332,34 @@ test("fremdes Profil eines Vereinsmitglieds: der Reiter Referenzen erscheint mit
   await waitFor(() => expect(screen.getByTestId("profile-reference-club:r-liga")).toBeTruthy());
   await fireEvent.press(screen.getByTestId("profile-reference-club:r-liga"));
   expect(screen.getByTestId("lineup-me").props.accessibilityLabel).toBe("Kai Funke, du");
+});
+
+// Vereinsprofil (#1267): „Vereinsmitglied · Funktion“ mit dem Weg zur Vereinsseite, nur mit den Feldern vom Server.
+describe("Vereinsprofil im Profil", () => {
+  test("Schild aus Adresse und Funktion; „Mitglied“ steht nicht doppelt; ohne Adresse nichts", () => {
+    expect(clubProfileHint({ club_profile_slug: "kiwi-komet", club_role_title: "Kassier" })).toEqual({ label: "Vereinsmitglied · Kassier", path: "/members/kiwi-komet" });
+    expect(clubProfileHint({ club_profile_slug: "kiwi-komet", club_role_title: "Mitglied" })?.label).toBe("Vereinsmitglied");
+    expect(clubProfileHint({ club_profile_slug: "ä b", club_role_title: null })?.path).toBe("/members/%C3%A4%20b");
+    expect(clubProfileHint({ club_profile_slug: null, club_role_title: "Kassier" })).toBeNull();
+    expect(clubProfileHint({})).toBeNull();
+  });
+
+  test("mit verbundenem Vereinsprofil steht das Schild im Kopf und öffnet die Vereinsseite", async () => {
+    const { Linking } = require("react-native");
+    const open = jest.spyOn(Linking, "openURL").mockImplementation(async () => true);
+    mockPublic.kiwiExtra = { is_club_member: true, club_profile_slug: "kiwi-komet", club_role_title: "Kassier" };
+    await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
+    await waitFor(() => expect(screen.getByTestId("profile-club-hint")).toBeTruthy());
+    expect(screen.getByTestId("profile-club-hint")).toHaveTextContent("Vereinsmitglied · Kassier");
+    await fireEvent.press(screen.getByTestId("profile-club-hint"));
+    expect(open).toHaveBeenCalledWith(expect.stringMatching(/\/members\/kiwi-komet$/));
+    open.mockRestore();
+  });
+
+  test("älterer Server ohne die Felder: kein Schild, wie bisher", async () => {
+    await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
+    await waitFor(() => expect(screen.getByText("KiwiKomet")).toBeTruthy());
+    expect(screen.queryByTestId("profile-club-hint")).toBeNull();
+    expect(screen.getByText("Community")).toBeTruthy();
+  });
 });
