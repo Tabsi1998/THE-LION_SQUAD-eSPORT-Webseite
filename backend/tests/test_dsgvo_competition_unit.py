@@ -74,6 +74,8 @@ class FakeDb:
             "mobile_client_logs", "audit_logs", "event_messages", "platform_links", "user_signals", "news_reads", "stream_watches",
             "user_achievement_stats", "match_commendations", "advent_openings", "season_raffle_entries",
             "easter_finds", "easter_progress",
+            # Zeremonie einmal je Konto (#2450)
+            "ceremony_seen",
             # Auskunft Fassung 3 (#928)
             "user_xp", "xp_events", "club_member_profiles", "membership_applications", "membership_invitations",
             "board_positions", "tournament_staff_assignments", "league_staff", "moderation_items", "discord_activity",

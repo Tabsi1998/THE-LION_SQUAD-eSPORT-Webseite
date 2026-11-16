@@ -6,7 +6,8 @@ import { act, render, waitFor } from "@testing-library/react";
 const apiMock = { get: vi.fn() };
 const authState = { user: { id: "anna" } };
 const ceremonies = [];
-vi.mock("@/lib/api", () => ({ api: apiMock }));
+const keepaliveMock = vi.fn(() => Promise.resolve());
+vi.mock("@/lib/api", () => ({ api: apiMock, keepaliveRequest: (...args) => keepaliveMock(...args) }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/components/achievements/ceremony/queue", () => ({
   enqueueCeremony: (tiers, context, options) => {
@@ -64,13 +65,16 @@ test("erster Besuch: nur der Merker; beim nächsten Besuch die nachgeholten Stuf
   expect(localStorage.getItem("tls_ach_seen:anna")).toBe("2026-10-29T00:00:00Z");
   ceremonies[0].options.onDone();
   expect(localStorage.getItem("tls_ach_seen:anna")).not.toBe("2026-10-29T00:00:00Z");
+  // Auch im Rückfall ohne Server-Stand geht „gesehen“ an den Server (#2450), sonst käme sie auf einem anderen Gerät noch einmal.
+  expect(keepaliveMock).toHaveBeenCalledWith("POST", "/achievements/me/ceremony/seen", { codes: ["bats_2"] });
 });
 
 test("gerade vergeben: die neuesten Stufen nach der Zahl des Servers, sofort und nie doppelt - auch ohne Merker und bei falscher Uhr", async () => {
   apiMock.get.mockResolvedValue({ data: { groups: groups(tier("bats_1", "2026-10-28T10:00:00Z")) } });
   render(<AchievementCatchUp />);
   await settle();
-  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  // Der Katalog einmal (dazu fragt die Seite den Zeremonie-Stand am Server, #2450).
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/achievements/me")).toHaveLength(1);
   // Die Uhr des Geräts geht vor: der Merker liegt nach dem Zeitpunkt der Vergabe - die Zahl des Servers zählt trotzdem.
   localStorage.setItem("tls_ach_seen:anna", "2026-12-31T00:00:00Z");
   apiMock.get.mockResolvedValue({ data: { groups: groups(tier("bats_1", "2026-10-28T10:00:00Z"), tier("bats_2", "2026-10-30T19:00:05Z")) } });

@@ -8,6 +8,9 @@ Public/User endpoints (prefix /api/achievements):
   POST /api/achievements/evaluate          — re-evaluate (auto-award) for self
   PUT  /api/achievements/me/pins           — bis zu sechs eigene Erfolge anheften (#619)
   GET  /api/achievements/me/summary        — Dashboard-Kachel: Level, Als Nächstes, letzte Freischaltung
+  GET  /api/achievements/me/ceremony       — Zeremonie einmal je Konto (#2450): was schon gesehen ist
+  POST /api/achievements/me/ceremony/seen  — gesehen (nach jeder Art des Schließens)
+  POST /api/achievements/me/ceremony/import — Altbestand eines Geräts, einmalig und idempotent
   GET  /api/achievements/overview          — Kategorien, Seltenheit, Geheim-Zähler, Woche, Laufband (#619)
   GET  /api/achievements/leaderboard       — Punkte (je Kategorie/Zeitraum) oder Level
   GET  /api/achievements/award/{id}        — Daten einer öffentlichen Vergabe für die Teilen-Seite
@@ -101,6 +104,49 @@ async def my_summary(user: dict = Depends(get_current_user)):
     groups = await list_groups_for_user(user["id"], user)
     awards = await list_user_awards(user["id"], user)
     return await visibility.my_summary(get_db(), user["id"], groups, awards)
+
+
+class CeremonyLevel(BaseModel):
+    level: int = Field(ge=1, le=1000)
+    title: str = Field(default="", max_length=120)
+    prestige: int = Field(default=0, ge=0, le=1000)
+
+
+class CeremonySeenBody(BaseModel):
+    codes: list[str] = Field(default_factory=list, max_length=200)
+    level: Optional[CeremonyLevel] = None
+    recount_marker: Optional[str] = Field(default=None, max_length=120)
+
+
+class CeremonyImportBody(BaseModel):
+    seen_until: Optional[str] = Field(default=None, max_length=64)
+    level: Optional[CeremonyLevel] = None
+    recount_markers: list[str] = Field(default_factory=list, max_length=20)
+
+
+@router.get("/me/ceremony")
+async def my_ceremony_state(user: dict = Depends(get_current_user)):
+    """Zeremonie einmal je Konto (#2450): was schon gesehen ist - Website und App fragen vor jeder Zeremonie nach."""
+    from services import achievement_ceremony
+    return await achievement_ceremony.state(get_db(), user["id"])
+
+
+@router.post("/me/ceremony/seen")
+async def my_ceremony_seen(body: CeremonySeenBody, user: dict = Depends(get_current_user)):
+    """Gesehen (#2450) - nach jeder Art des Schließens, nur für eigene Vergaben; mehrfach ohne weitere Wirkung."""
+    from services import achievement_ceremony
+    return await achievement_ceremony.mark_seen(get_db(), user["id"], codes=body.codes,
+                                                level=body.level.model_dump() if body.level else None,
+                                                recount_marker=body.recount_marker)
+
+
+@router.post("/me/ceremony/import")
+async def my_ceremony_import(body: CeremonyImportBody, user: dict = Depends(get_current_user)):
+    """Altbestand eines Geräts (#2450): einmalig gemeldet, was es bisher selbst als gesehen kannte - idempotent."""
+    from services import achievement_ceremony
+    return await achievement_ceremony.import_device(get_db(), user["id"], seen_until=body.seen_until,
+                                                    level=body.level.model_dump() if body.level else None,
+                                                    recount_markers=body.recount_markers)
 
 
 class PinsBody(BaseModel):

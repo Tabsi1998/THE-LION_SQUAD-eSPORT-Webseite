@@ -121,7 +121,9 @@ Ein einmal freigeschalteter Erfolg bleibt, auch wenn ein Ergebnis später korrig
 
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
-[Mails und Benachrichtigungen](mails.md)). Dazu kommt eine Meldung im Thema **Erfolge** (In-App, Push, Discord; **nie** per Mail).
+[Mails und Benachrichtigungen](mails.md)). Jede Zeremonie kommt **einmal je Konto**, nicht einmal je Gerät: Wer sie in der App, am
+PC oder im Handy-Browser schließt (X, Tipp daneben, Escape, Zurück-Taste oder sie läuft zu Ende), bekommt sie auf den anderen Geräten
+nicht mehr. Dazu kommt eine Meldung im Thema **Erfolge** (In-App, Push, Discord; **nie** per Mail).
 Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg lässt sich teilen: Er hat eine eigene Seite
 (`/achievements/a/<id>`).
 
@@ -476,7 +478,7 @@ Zwei-Faktor-Anmeldung):
 **Was die Person sieht:** Beim nächsten Besuch der Webseite nach dem Abschluss kommt **eine** Zeremonie „Du hast X Erfolge
 nachträglich bekommen“ mit allen nachgerechneten Abzeichen (bis zu zwölf, der Rest als „+ n“) und dem Knopf **Alle ansehen**.
 Einzeln gefeiert werden nachgerechnete Erfolge nicht, auch nicht während des stillen Modus. Danach gelten sie als gesehen; die
-Zeremonie kommt je Gerät einmal. Ansehen könnt ihr sie vorher unter Reiter **Vorschau** → Sonderablauf **Nachträglich bekommen**.
+Zeremonie kommt je Konto einmal. Ansehen könnt ihr sie vorher unter Reiter **Vorschau** → Sonderablauf **Nachträglich bekommen**.
 
 Der Abschluss ist **gefahrlos wiederholbar**: Ein zweiter Klick nach dem Ende tut nichts, und niemand bekommt die Nachricht zweimal.
 Bricht der Lauf ab (etwa durch ein Update), steht bei **Abschluss** „Unterbrochen“ – ein neuer Klick macht dort weiter. Probelauf und
@@ -535,6 +537,10 @@ Ja, mit dem Datumsfeld bei der Vergabe.
 
 **Werden Erfolge per Mail gemeldet?**
 Nein, nur In-App, Push und Discord. Eine Mail gibt es nur im Wochenrückblick.
+
+**Warum kam die Zeremonie am Handy nicht, obwohl ich den Erfolg dort noch nie gesehen habe?**
+Eine Zeremonie kommt einmal je Konto. Wurde sie auf einem anderen Gerät schon geschlossen, gilt sie überall als gesehen. Erfolge
+von vor der Umstellung, von denen kein Gerät etwas wusste, bekommen keine eigene Zeremonie mehr.
 
 **Warum kam für nachgerechnete Erfolge keine Meldung?**
 Während der Neuberechnung kommen sie still; zum Schluss gibt es eine Sammel-Nachricht je Person (3.10).

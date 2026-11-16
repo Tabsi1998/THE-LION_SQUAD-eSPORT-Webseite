@@ -96,6 +96,8 @@ PERSONAL: dict[str, Entry] = {
     "user_xp": Entry(DELETED, ("xp",)),
     "xp_events": Entry(DELETED, ("xp_events",)),
     "user_achievements": Entry(DELETED, ("achievements",)),
+    # Zeremonie einmal je Konto (#2450): gesehener Level-Stand, gesehene Neuberechnungen, erster Abruf.
+    "ceremony_seen": Entry(DELETED, ("ceremony_seen",)),
     "user_achievement_stats": Entry(DELETED, ("achievement_counters",)),
     "user_signals": Entry(DELETED, ("achievement_signals",)),
     "achievement_eval_queue": Entry(DELETED, note="interne Warteschlange für die Auswertung der Erfolge"),

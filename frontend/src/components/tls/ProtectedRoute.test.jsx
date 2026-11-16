@@ -255,3 +255,20 @@ test.each([
   if (expected === "mfa-setup") expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
   else expect(screen.getByText(expected)).toBeInTheDocument();
 });
+
+// Turnierliste (#2463): dieselbe Tür wie der Turnier-Weg einer Staffel - Zuständige und der Bereich Ligen kommen hinein (der Server
+// zeigt ihnen nur ihre Staffeln), ohne Recht bleibt es „Kein Zugriff“; Redaktion oder Moderation allein öffnen sie nicht.
+test.each([
+  ["Zuständig", { role: "player", has_league_staff: true, ...mfa }, "turniere"],
+  ["Freigabe Ligen", { role: "player", areas: ["leagues"], ...mfa }, "turniere"],
+  ["Zuständig ohne Zwei-Faktor", { role: "player", has_league_staff: true, mfa_enabled: false }, "mfa-setup"],
+  ["Turnierleitung", { role: "tournament_admin", areas: ["tournaments", "moderation"], ...mfa }, "turniere"],
+  ["Spieler", { role: "player", ...mfa }, "verboten"],
+  ["Redaktion", { role: "player", areas: ["content"], ...mfa }, "verboten"],
+  ["Moderation", { role: "moderator", areas: ["moderation"] }, "verboten"],
+])("Turnierliste (#2463): %s", (_name, user, expected) => {
+  authState.user = { id: "z", ...user };
+  renderAt("/admin/tournaments", <ProtectedRoute requireTournamentStaff allowLeagueStaff><div>turniere</div></ProtectedRoute>);
+  if (expected === "mfa-setup") expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
+  else expect(screen.getByText(expected)).toBeInTheDocument();
+});
