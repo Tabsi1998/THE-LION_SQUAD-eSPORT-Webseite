@@ -1,6 +1,7 @@
 """Ruhezeit (#1206, Fabians Wahl A): von–bis in Wiener Zeit, Standard aus. In der Ruhezeit kein Push, keine Browser-Meldung
 und keine Discord-Direktnachricht - alles liegt in der Glocke; danach genau eine Sammelmeldung. Ausnahmen: Aufruf zum eigenen
 Spiel, „Match startet jetzt“, Liga-Check-in und Veto am Zug, „Braucht Aufmerksamkeit“ während des eigenen Turniers."""
+import asyncio
 import pathlib
 import sys
 import types
@@ -37,11 +38,17 @@ def _value(row, dotted):
 
 def _matches(row, query):
     for key, expected in query.items():
+        if key == "$or":
+            if not any(_matches(row, part) for part in expected):
+                return False
+            continue
         actual = _value(row, key)
         if isinstance(expected, dict):
             if "$gte" in expected and not (actual is not None and actual >= expected["$gte"]):
                 return False
             if "$lte" in expected and not (actual is not None and actual <= expected["$lte"]):
+                return False
+            if "$lt" in expected and not (actual is not None and actual < expected["$lt"]):
                 return False
             if "$in" in expected and actual not in expected["$in"]:
                 return False
@@ -60,7 +67,9 @@ class _Cursor:
         self.rows = rows
 
     def sort(self, key, direction=1):
-        self.rows.sort(key=lambda row: row.get(key) or "", reverse=direction < 0)
+        keys = key if isinstance(key, list) else [(key, direction)]
+        for field, way in reversed(keys):
+            self.rows.sort(key=lambda row, field=field: row.get(field) or "", reverse=way < 0)
         return self
 
     async def to_list(self, limit=None):
@@ -116,6 +125,13 @@ class _Collection:
     async def count_documents(self, query):
         return sum(1 for row in self.rows if _matches(row, query))
 
+    async def delete_one(self, query):
+        for index, row in enumerate(self.rows):
+            if _matches(row, query):
+                del self.rows[index]
+                return _Result(1)
+        return _Result(0)
+
 
 class _Db:
     def __init__(self, users, tournaments=None):
@@ -168,6 +184,8 @@ def _rd(result):
 def _at(monkeypatch, db, when):
     monkeypatch.setattr("services.user_notifications.get_db", lambda: db)
     monkeypatch.setattr("services.quiet_hours.now_utc", lambda: _utc(when))
+    # Auch ``created_at`` der Meldungen nach dieser Uhr - die Windows-Uhr ist zu grob, um zwei Nächte sicher zu trennen.
+    monkeypatch.setattr("services.user_notifications.now_utc", lambda: _utc(when))
 
 
 # ---------------------------------------------------------------- Zeitfenster
@@ -485,3 +503,142 @@ def test_a_gap_of_at_least_15_minutes_and_ascii_digits_only():
     assert quiet_hours_rules.window({"quiet_hours": {"enabled": True, "start": "07:05", "end": "07:00"}}) is None
     assert quiet_hours_rules.parse_time("\u0661\u0662:00") is None  # arabisch-indische Ziffern
     assert quiet_hours_rules.parse_time("１２:00") is None  # breite Ziffern
+
+
+class _Yielding(_Collection):
+    """Gibt bei jedem Zugriff die Kontrolle ab - wie echte Netzwerk-Aufrufe (Nachprüfung, race_check)."""
+
+    async def find_one(self, *args, **kwargs):
+        await asyncio.sleep(0)
+        return await super().find_one(*args, **kwargs)
+
+    async def update_one(self, *args, **kwargs):
+        await asyncio.sleep(0)
+        return await super().update_one(*args, **kwargs)
+
+    async def update_many(self, *args, **kwargs):
+        await asyncio.sleep(0)
+        return await super().update_many(*args, **kwargs)
+
+    async def insert_one(self, *args, **kwargs):
+        await asyncio.sleep(0)
+        return await super().insert_one(*args, **kwargs)
+
+
+def _digests(db):
+    return [row for row in db.notifications.rows if row["kind"] == "quiet_digest"]
+
+
+@pytest.mark.anyio
+async def test_two_runs_at_the_same_time_send_one_digest(monkeypatch, wires):
+    """F1: Zwei Läufe gleichzeitig rechnen denselben Schlüssel - eine Sammelmeldung, ein Push, ein Browser-Push."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=3)
+    rows = db.notifications.rows
+    db.notifications = _Yielding(unique=("user_id", "unique_dedupe_key"))
+    db.notifications.rows = rows
+    db.users.__class__ = _Yielding
+    now = _utc("2026-11-17T06:01:00")
+    first, second = await asyncio.gather(quiet_hours.release_due(db, now), quiet_hours.release_due(db, now))
+    assert first["digests"] + second["digests"] == 1
+    assert len(_digests(db)) == 1 and _digests(db)[0]["quiet_delivered"] is True
+    assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
+    assert all("quiet_hold_until" not in row for row in db.notifications.rows)
+
+
+@pytest.mark.anyio
+async def test_created_but_never_sent_then_quiet_again_comes_next_morning(monkeypatch, wires):
+    """F2: Sammelmeldung angelegt, Lauf bricht vor dem Versand ab, die Person ist wieder still - die angelegte wird
+    verworfen, am nächsten Morgen kommt eine für beide Nächte."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=2)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Lauf bricht ab")
+
+    original = quiet_hours._deliver
+    monkeypatch.setattr(quiet_hours, "_deliver", broken)
+    with pytest.raises(RuntimeError):
+        await quiet_hours.release_due(db, _utc("2026-11-17T06:01:00"))
+    monkeypatch.setattr(quiet_hours, "_deliver", original)
+    assert len(_digests(db)) == 1 and wires == []
+    _at(monkeypatch, db, "2026-11-17T23:00:00")
+    await create_user_notification("u1", "Zweite Nacht", kind="tournament_registration",
+                                   meta={"category": "tournament_updates", "dedupe_key": "n2", "tournament_id": "t9"})
+    quiet = await quiet_hours.release_due(db, _utc("2026-11-17T23:30:00"))
+    assert quiet["restamped"] == 2 and _digests(db) == []
+    done = await quiet_hours.release_due(db, _utc("2026-11-18T06:00:00"))
+    assert _rd(done) == (3, 1)
+    assert [row["title"] for row in _digests(db)] == ["In der Nacht: 3 Meldungen"]
+    assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
+
+
+@pytest.mark.anyio
+async def test_sent_but_not_released_then_quiet_again_keeps_the_second_night(monkeypatch, wires):
+    """F2: Sammelmeldung verschickt, Lauf bricht vor der Freigabe ab, die Person ist wieder still - die gemeldeten Zeilen
+    werden freigegeben, die zweite Nacht bekommt ihre eigene Sammelmeldung (nicht verschluckt, nichts doppelt)."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=2)
+    original = db.notifications.update_many
+
+    async def broken(query, update):
+        if "$unset" in update:
+            raise RuntimeError("Lauf bricht ab")
+        return await original(query, update)
+
+    db.notifications.update_many = broken
+    with pytest.raises(RuntimeError):
+        await quiet_hours.release_due(db, _utc("2026-11-17T06:01:00"))
+    db.notifications.update_many = original
+    assert len(wires) == 2  # die erste Sammelmeldung ging hinaus
+    _at(monkeypatch, db, "2026-11-17T23:00:00")
+    await create_user_notification("u1", "Zweite Nacht", kind="tournament_registration",
+                                   meta={"category": "tournament_updates", "dedupe_key": "n2", "tournament_id": "t9"})
+    quiet = await quiet_hours.release_due(db, _utc("2026-11-17T23:30:00"))
+    assert quiet["released"] == 2 and quiet["restamped"] == 0  # die neue Zeile hat schon das jetzige Ende
+    done = await quiet_hours.release_due(db, _utc("2026-11-18T06:00:00"))
+    assert _rd(done) == (1, 1)
+    assert [row["title"] for row in _digests(db)] == ["In der Nacht: 2 Meldungen", "In der Nacht: 1 Meldung"]
+    assert len(wires) == 4
+
+
+@pytest.mark.anyio
+async def test_claimed_but_not_sent_is_sent_later(monkeypatch, wires):
+    """F2: Ein Lauf beansprucht den Versand und bricht ab - erst nach Ablauf des Anspruchs holt ein anderer Lauf nach."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=2)
+
+    def broken_push(*_args, **_kwargs):
+        raise SystemExit("Prozess weg")
+
+    sys.modules["services.push_notifications"].send_mobile_push_for_notification = broken_push
+    with pytest.raises(SystemExit):
+        await quiet_hours.release_due(db, _utc("2026-11-17T06:01:00"))
+    del sys.modules["services.push_notifications"].send_mobile_push_for_notification
+    push = types.ModuleType("services.push_notifications")
+
+    async def _send(notification, *_args):
+        wires.append(("push", notification["kind"], notification["user_id"]))
+        return 1
+
+    push.send_mobile_push_for_notification = _send
+    monkeypatch.setitem(sys.modules, "services.push_notifications", push)
+    soon = await quiet_hours.release_due(db, _utc("2026-11-17T06:05:00"))
+    assert _rd(soon) == (0, 0) and wires == []
+    later = await quiet_hours.release_due(db, _utc("2026-11-17T06:12:00"))
+    assert _rd(later) == (2, 1)
+    assert len(_digests(db)) == 1 and _digests(db)[0]["quiet_delivered"] is True
+    assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
+
+
+@pytest.mark.anyio
+async def test_more_rows_than_one_batch_still_one_digest(monkeypatch, wires):
+    """F3: Mehr zurückgehaltene Zeilen als eine Charge - eine Sammelmeldung mit allen, alle freigegeben."""
+    monkeypatch.setattr(quiet_hours, "RELEASE_BATCH", 2)
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=5)
+    done = await quiet_hours.release_due(db, _utc("2026-11-17T06:01:00"))
+    assert _rd(done) == (5, 1)
+    assert [row["title"] for row in _digests(db)] == ["In der Nacht: 5 Meldungen"]
+    again = await quiet_hours.release_due(db, _utc("2026-11-17T06:10:00"))
+    assert _rd(again) == (0, 0) and len(wires) == 2
