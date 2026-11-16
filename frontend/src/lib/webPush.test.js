@@ -4,7 +4,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock }));
 
 const webPush = await import("./webPush");
 const { askDecision, markVisit, offerWebPush, enableWebPush, syncWebPush, forgetWebPush, browserPushStatus, keyBytes, needsHomeScreen, WEB_PUSH_EVENT } = webPush;
-const { dashboardRegistrationKeys, noteWebPushRegistrations, registrationKey, rememberWebPushRegistration } = webPush;
+const { dashboardRegistrationKeys, noteWebPushRegistrations, registrationKey, rememberWebPushRegistration, webPushBlocked } = webPush;
 
 const CONFIG = { enabled: true, public_key: `B${"Q".repeat(86)}`, subscriptions: 0 };
 
@@ -236,6 +236,13 @@ describe("Erlaubnis im richtigen Moment (#1208)", () => {
       expect(await offerWebPush(win)).toBeNull();
     }
     expect(apiMock.get).not.toHaveBeenCalled();
+  });
+
+  test("der leise Hinweis nur, wenn der Browser abgelehnt hat", () => {
+    expect(webPushBlocked(fakeWindow({ permission: "denied" }).win)).toBe(true);
+    expect(webPushBlocked(fakeWindow({ permission: "default" }).win)).toBe(false);
+    expect(webPushBlocked(fakeWindow({ permission: "granted" }).win)).toBe(false);
+    expect(webPushBlocked(fakeWindow({ supported: false }).win)).toBe(false);
   });
 
   test("die Anmeldungen der Übersicht: Turniere und Events, jede einmal", () => {

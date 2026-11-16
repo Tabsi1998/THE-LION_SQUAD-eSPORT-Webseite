@@ -337,6 +337,12 @@ export async function forgetWebPush(win = currentWindow()) {
   }
 }
 
+/** Hat der Browser Benachrichtigungen für diese Website abgelehnt? Dann zeigt die Seite leise „Aufrufe sind aus“ (#1208). */
+export const webPushBlocked = (win = currentWindow()) => {
+  const env = pushEnvironment(win);
+  return env.supported && env.permission === "denied";
+};
+
 /** Zustand für die Einstellungen: "subscribed", "available", "denied", "ios-hint" oder "unsupported". */
 export async function browserPushStatus(user, win = currentWindow()) {
   const env = pushEnvironment(win);

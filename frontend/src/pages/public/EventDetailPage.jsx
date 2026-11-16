@@ -16,6 +16,7 @@ import { EventRecap } from "@/components/tls/EventRecap";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerWebPush, registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { WebPushOffHint } from "@/components/notifications/WebPushOffHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { NoticeBanner, useNotices } from "@/components/tls/tournament/NoticeBanner";
@@ -361,6 +362,8 @@ function EventFactsBox({ e, user, over, onRegister }) {
         </Link>
       ) : null}
       {!over ? <AddToCalendar block days={e.schedule?.multi_day ? e.schedule.days : null} item={calendarItem} /> : null}
+      {/* Aufrufe im Browser abgelehnt (#1208): eine leise Zeile statt einer Frage bei jedem Öffnen. */}
+      <WebPushOffHint user={user} show={!over} testId="event-push-off" className="w-full justify-center" />
     </FactsBox>
   );
 }

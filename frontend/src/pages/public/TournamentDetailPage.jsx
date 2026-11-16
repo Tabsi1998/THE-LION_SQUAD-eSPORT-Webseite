@@ -48,6 +48,7 @@ import { RegistrationSheet } from "@/components/tls/tournament/RegistrationSheet
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerWebPush, registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { WebPushOffHint } from "@/components/notifications/WebPushOffHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -488,6 +489,8 @@ function TournamentDetailView() {
             canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")}
             responsible={respondsForMyReg} canRemoveRejected={canRemoveRejected} onRemoveRejected={handleRemoveRejected}
             detailsEdit={myReg ? <MyRegistrationEdit tournament={t} registration={myReg} onSaved={load} /> : null} />
+          {/* Aufrufe im Browser abgelehnt (#1208): eine leise Zeile statt einer Frage bei jedem Öffnen. */}
+          <WebPushOffHint user={user} show={!tournamentIsOver(t)} testId="tournament-push-off" />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
