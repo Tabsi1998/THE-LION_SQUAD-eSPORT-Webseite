@@ -404,7 +404,7 @@ test("missing public settings never create a fake email or internal placeholder"
 test("public community structure is reachable", async ({ page }) => {
   await page.goto("/community");
   await acceptCookies(page);
-  await expect(page.getByRole("heading", { name: /accounts,\s*teams\s*&\s*verein/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /konten,\s*teams\s*&\s*verein/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /profile öffnen/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /teams öffnen/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /mitglieder öffnen/i })).toBeVisible();
