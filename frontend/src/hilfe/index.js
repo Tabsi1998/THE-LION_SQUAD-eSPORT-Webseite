@@ -7,7 +7,7 @@ import bereiche from "./bereiche.json";
 import fragen from "./fragen.json";
 import { fragePfad, hilfePfad } from "./pfade";
 
-export { FAQ_PFAD, fragePfad, hilfePfad, hilfeUmleitung } from "./pfade";
+export { FAQ_PFAD, ankerAus, fragePfad, hilfePfad, hilfeUmleitung } from "./pfade";
 
 // FAQ (#2448, vorher Hilfe #2295): Fragen und Anleitungen unter /faq, eine Anleitung unter /faq/<thema>. Ein Thema ist eine
 // JSON-Datei in ./themen (Abschnitte mit Schritten: kurzer Satz, optional Hinweis und Link). Die Bilder je Schritt

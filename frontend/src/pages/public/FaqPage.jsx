@@ -10,6 +10,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   FRAGEN, HILFE_BESCHREIBUNG, faqBereich, faqBereichsliste, haeufigeFragen, hilfePfad, hilfeSchritte, sichtbareRollen, sucheFaq,
 } from "@/hilfe";
+import { ankerAus } from "@/hilfe/pfade";
 import { useFaqZugang } from "@/hilfe/useFaqZugang";
 
 // FAQ (#2448, Fabian 16.11.): oben die Suche über Fragen und Schritte (?q=), darunter „Häufige Fragen“ zum Aufklappen,
@@ -189,7 +190,7 @@ export default function FaqPage() {
   // Ein Link auf eine Frage (#frage-<id>) oder einen Bereich (#bereich-<id>) klappt ihn auf und springt hin. Geschützte
   // Fragen stehen erst nach der Antwort des Servers da - deshalb hängt das auch an `fragen`.
   useEffect(() => {
-    const anker = decodeURIComponent(hash.replace(/^#/, ""));
+    const anker = ankerAus(hash);
     if (anker.startsWith("frage-")) {
       const frage = fragen.find((row) => row.id === anker.slice(6));
       if (!frage) return;

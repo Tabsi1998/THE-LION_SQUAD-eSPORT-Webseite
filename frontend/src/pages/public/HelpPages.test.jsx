@@ -267,3 +267,10 @@ test("F4: mit Rollen-Filter kein „Kommt bald“ - leere Bereiche fallen weg, o
     expect(screen.queryAllByTestId(/^faq-bereich-bald-/), rolle).toEqual([]);
   }
 });
+
+test("F6: ein kaputter Anker (#%E0%A4) bricht weder die FAQ noch eine Anleitung", async () => {
+  await show("/faq#%E0%A4");
+  expect(screen.getByTestId("faq-haeufig")).toBeInTheDocument();
+  await show("/faq/turniere#%E0%A4");
+  expect(screen.getAllByTestId("help-topic").length).toBeGreaterThan(0);
+});

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { FAQ_PFAD, THEMEN, faqBereich, hilfeBild, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo } from "@/hilfe";
+import { FAQ_PFAD, THEMEN, ankerAus, faqBereich, hilfeBild, hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo } from "@/hilfe";
 
 // Eine Anleitung der FAQ (#2295, seit #2448 unter /faq/<thema>; /hilfe/<thema> leitet her): Inhalt oben, dann je
 // Abschnitt die Schritte mit Nummer, kurzem Satz, Hinweis und Bild. Jeder Schritt hat einen Anker (#<schritt>), den „?“-Links und „Link kopieren“ nutzen. Am Handy
@@ -104,7 +104,7 @@ export default function HelpTopicPage() {
   const slug = useParams().thema?.toLowerCase();
   const { hash } = useLocation();
   const thema = hilfeThema(slug);
-  const active = decodeURIComponent(hash.replace(/^#/, ""));
+  const active = ankerAus(hash);
   const [scrolled, setScrolled] = useState("");
   useDocumentTitle(thema ? `${thema.titel} · FAQ` : "FAQ", thema?.kurz, thema ? {} : { robots: "noindex, follow" });
 

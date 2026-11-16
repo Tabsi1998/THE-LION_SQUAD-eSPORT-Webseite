@@ -13,6 +13,16 @@ export function fragePfad(id) {
   return `${FAQ_PFAD}#frage-${id}`;
 }
 
+/** Anker aus der Adresse ohne „#“, entschlüsselt. Ein kaputter Anker (z. B. #%E0%A4) zählt als keiner, statt die Seite
+ * mit einem Fehler zu beenden. */
+export function ankerAus(hash = "") {
+  try {
+    return decodeURIComponent(String(hash || "").replace(/^#/, ""));
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Wohin eine alte Hilfe-Adresse führt: /hilfe → /faq, /hilfe/<thema> → /faq/<thema>; Suche (?q=) und Anker (#schritt)
  * bleiben stehen. Für alles andere null. Dieselbe Regel steht in frontend/nginx.conf (301 für Suchmaschinen).

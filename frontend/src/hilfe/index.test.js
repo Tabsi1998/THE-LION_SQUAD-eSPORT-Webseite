@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import masse from "./bilder/masse.json";
 import anker from "./anker.json";
 import {
-  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, faqBereichsliste, bereichInhalt, darfSehen, fragePfad, haeufigeFragen, hilfeBild, hilfeNormal,
+  BEREICHE, FORMEN, FRAGEN, ROLLEN, SICHTBARKEITEN, THEMEN, ankerAus, faqBereichsliste, bereichInhalt, darfSehen, fragePfad, haeufigeFragen, hilfeBild, hilfeNormal,
   hilfePfad, hilfeSchritte, hilfeThema, hilfeVideo, passtZuRolle, sichtbareBereiche, sichtbareRollen, sucheFaq, sucheHilfe,
 } from "./index";
 
@@ -263,4 +263,11 @@ test("F4: Rollen von Bereich und Inhalt passen zusammen, jede Rolle gegen jeden 
   }
   // Ohne Filter bleibt „Kommt bald“: leere Bereiche stehen in der Liste.
   expect(faqBereichsliste({ darf: { mitglied: true } }).find((row) => row.bereich.id === "helferdienste")?.inhalt.leer).toBe(true);
+});
+
+test("F6: ein kaputter Anker zählt als keiner", () => {
+  expect(ankerAus("#%E0%A4")).toBe("");
+  expect(ankerAus("#check-in")).toBe("check-in");
+  expect(ankerAus("#frage-%C3%BC")).toBe("frage-ü");
+  expect(ankerAus("")).toBe("");
 });
