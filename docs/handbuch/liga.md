@@ -418,11 +418,14 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
 
 **Stand einer Staffel:** Bis **Liga starten** (2.6) ist eine Staffel technisch ein Entwurf – das hält nichts auf, Anmeldung und
 Zuteilen laufen trotzdem. Unter **Turniere**, im Kopf der Staffel und im Reiter **Ligen und Staffeln** steht darum der Stand der
-Season, wie in der Ablaufleiste: **Vorbereitung**, **Anmeldung offen bis …**, **Einteilung**, **Spielbetrieb**, **Abgeschlossen**.
-Darunter steht in Orange, was der Staffel noch fehlt, mit Link an die richtige Stelle: **Teams zuteilen · 1 von 8** (mit
-Anmeldefenster in den Eingang, sonst in die Teilnehmerliste) oder nach der Anmeldung **Spielplan noch nicht erzeugt – Liga
-starten**. Der Status-Filter der Turnierliste hat dafür eigene Einträge unter **Liga-Staffeln** („Liga: Anmeldung offen“ …);
-„Entwurf“ meint dort nur gewöhnliche Turniere.
+Season, wie in der Ablaufleiste: **Vorbereitung**, **Anmeldung offen bis …** (mit Nachmeldefrist das wirksame Ende),
+**Einteilung**, **Spielbetrieb**, **Abgeschlossen**. Läuft die Season schon, diese Staffel aber noch nicht, steht **Einteilung · Start
+fehlt**; ist die Season noch nicht veröffentlicht, steht orange **… · Season verborgen**. Darunter steht in Orange, was der Staffel
+noch fehlt, mit Link an die richtige Stelle: **Sichtbarkeit einschalten**, **Teams zuteilen · 1 von 8** (ab Beginn des
+Anmeldefensters in den Eingang, ohne Fenster in die Teilnehmerliste) oder nach der Anmeldung **Spielplan noch nicht erzeugt – Liga
+starten**. Stand und Hinweise sieht, wer das Liga-Recht für die Staffel hat. Der Status-Filter der Turnierliste hat eigene Einträge
+unter **Liga-Staffeln** („Liga: Anmeldung offen“ …); „Entwurf“ meint dort nur gewöhnliche Turniere, laufende Staffeln stehen weiter
+auch unter **Live**.
 
 <img src="../assets/liga/turnierliste-liga-stand-pc.png" alt="Turnierliste am PC: Staffel A mit Stand Anmeldung offen bis 21.11. und darunter Teams zuteilen 1 von 8, eine laufende Staffel mit Spielbetrieb, ein Turnier im Entwurf" width="720">
 
