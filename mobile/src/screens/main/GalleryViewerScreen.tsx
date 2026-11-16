@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { ErrorState, SkeletonList } from "../../components/ListState";
+import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { ZoomableImage } from "../../components/ZoomableImage";
 import { Body, Muted } from "../../components/Text";
@@ -31,6 +31,8 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
   const height = viewerFrameHeight(area?.height ?? window.height, chromeHeight);
   const [album, setAlbum] = useState<GalleryAlbum | null>(null);
   const [error, setError] = useState("");
+  // Zurückgezogen (410, #2164): der Hinweis des Servers statt der Fehlermeldung; alle anderen Fehler zeigen weiter `error`.
+  const [problem, setProblem] = useState<LoadProblem | null>(null);
   const [index, setIndex] = useState(startIndex);
   const [chrome, setChrome] = useState(true);
   const [sharing, setSharing] = useState(false);
@@ -40,7 +42,11 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
   useEffect(() => {
     api.get<GalleryAlbum>(`/gallery/${encodeURIComponent(albumId)}`)
       .then((response) => setAlbum(response.data))
-      .catch((err) => setError(errorMessage(err, "Das Album konnte nicht geladen werden.")));
+      .catch((err) => {
+        setError(errorMessage(err, "Das Album konnte nicht geladen werden."));
+        const found = loadProblem(err);
+        setProblem(found.gone ? found : null);
+      });
   }, [albumId]);
 
   const items = useMemo(() => (album ? groupBySection(album).flatMap((group) => group.items) : []), [album]);
@@ -71,7 +77,7 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
     }
   }, [album?.title, current, sharing]);
 
-  if (error) return <Screen><ErrorState title="Album nicht erreichbar" detail={error} /></Screen>;
+  if (error) return <Screen><ErrorState title="Album nicht erreichbar" detail={error} goneTitle="Album zurückgezogen" problem={problem} /></Screen>;
   if (!album) return <Screen><SkeletonList count={1} hasImage /></Screen>;
 
   return (
