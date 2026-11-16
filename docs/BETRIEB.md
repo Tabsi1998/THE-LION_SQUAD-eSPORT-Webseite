@@ -198,7 +198,11 @@ Ereignisse mit dieser Quelle und **Nur offene**. Ist nichts offen, steht dort �
 
 - **Quittieren** (Knopf in der Zeile) heißt: gesehen, erledigt. Der Eintrag verschwindet aus den offenen Problemen und
   aus den Zählern. Unter **Ereignisse** bleibt er mit **Quittierte zeigen** sichtbar, mit „Quittiert von … · Zeitpunkt“.
-  **Alle quittieren** (Überblick: alle Quellen; Ereignisse: die gewählte Quelle) fragt vorher in der Seite nach.
+  **Alle quittieren** fragt vorher in der Seite nach und nennt die Zahl. Im Überblick nimmt es alles Offene, unter
+  Ereignisse **genau die gezeigten** offenen Einträge (Quelle, Schwere, Suche, Discord-Server und Zeitraum gelten). In
+  beiden Fällen nur, was bis zum Laden der Seite auftrat – was danach neu dazukam, bleibt offen. Wer schon gültig
+  quittiert hat, bleibt mit Namen und Zeitpunkt stehen; gezählt wird nur, was neu quittiert wurde. Ein Eintrag, der kein
+  offenes Problem ist (gesendete Mail, schon quittiert, gelöste Fehlergruppe), lässt sich nicht quittieren.
   Jede Quittierung steht im Adminprotokoll (`ops.event.ack`, `ops.event.ack_all`), das Lösen von Fehlergruppen als
   `ops.errors.resolve` bzw. `ops.errors.reopen`.
 - **Dasselbe Problem** heißt gleiche Quelle, Art und Schlüssel. Quittieren trifft alle offenen Einträge mit diesem Schlüssel:
@@ -209,10 +213,12 @@ Ereignisse mit dieser Quelle und **Nur offene**. Ist nichts offen, steht dort �
   | Auto-Checks | Ampel (gelb/rot) + betroffene Prüfungen (der laufende Zustand) |
   | Alarme | Ereignisart + Alarmschlüssel (etwa `check:disk`, `error:<Fingerabdruck>`, `job:<Job>`) |
   | App-Logs | Stufe + Fingerabdruck der Meldung |
-  | E-Mail-Versand | Stand (fehlgeschlagen/übersprungen) + Weg + Vorlage bzw. Anlass |
+  | E-Mail-Versand | Stand (fehlgeschlagen/übersprungen) + Weg + Vorlage bzw. Anlass + bei Discord Server und Ziel + Grund bzw. Fehlertext; freie Mails (Vorlage `custom`) und Zeilen ohne Vorlage/Anlass einzeln |
   | Mail-Queue, Uploads | der einzelne Eintrag |
   | Dolibarr-Abgleich, Discord-Bot | der aktuelle Fehler |
 
+- **Kachel und Liste:** „X auffällig“ zählt ohne Zeitgrenze; **Nur offene** unter Ereignisse zeigt darum ebenfalls
+  alles Offene, der Zeitraum ist dort ausgeschaltet.
 - **Tritt es wieder auf**, ist es wieder offen: eine neue Zeile mit demselben Schlüssel, eine Zeile, deren Zeitpunkt
   nach der Quittierung liegt (App-Log wiederholt sich, Mail-Job scheitert erneut), eine Fehlergruppe, die wieder
   auftritt, ein neuer gelber oder roter Zustand der Auto-Checks, ein Dolibarr-Fehler nach einem grünen Abgleich,
@@ -233,7 +239,9 @@ beim Lesen. Die Regel steht in `backend/services/ops_acks.py`.
 brauchte 47 s) und zählen weder bei „Langsam“ noch als „Langsamste Route“. Anfragen mit Datei (`multipart/form-data`)
 erkennt der Server selbst; für ältere Einträge und Sonderfälle gilt die Liste **Upload-Routen** unter Alarme (eine
 Route je Zeile, `*` am Ende heißt „beginnt mit“; Vorgabe: App-Releases, Shop-Druckdateien und -Designs,
-`/api/uploads/*`).
+`/api/uploads/*`). Ohne Methode gilt eine Zeile nur für POST und PUT – ein langsames GET derselben Route bleibt eine
+langsame Route; mit Methode davor (`PATCH /api/…`) nur für diese. Höchstens 40 Zeilen; zu breite Muster wie `/api/*`
+oder `/api/admin/*` lehnt die Seite ab.
 
 ## Alarme (#517)
 
