@@ -1320,7 +1320,8 @@ def origin_from_meta(meta: dict) -> str:
 
 def help_meta(slug: str, depth: int, base: dict, origin: str) -> dict:
     """FAQ (#2448, vorher Hilfe #2295): Übersicht und je Anleitung eine eigene Karte für Discord und WhatsApp; unbekannte
-    Anleitungen 404. Alte Links auf /hilfe zeigen dieselbe Karte, kanonisch ist immer /faq."""
+    Anleitungen 404. Alte Links auf /hilfe zeigen dieselbe Karte, kanonisch ist immer /faq. Groß/klein egal (F5)."""
+    slug = (slug or "").lower()
     if not slug:
         canonical = f"{origin}{help_topics.HELP_PATH}"
         meta = {**base, "title": f"{help_topics.HELP_TITLE} · {base['site_name']}", "description": help_topics.HELP_DESCRIPTION,

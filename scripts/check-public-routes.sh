@@ -212,6 +212,8 @@ done <<'ROUTES'
 /hilfe/|/faq
 /hilfe/liga-captains|/faq/liga-captains
 /hilfe?q=check-in|/faq?q=check-in
+/Hilfe|/faq
+/HILFE/liga-captains|/faq/liga-captains
 /f1|/fastlap
 /f1/monza|/fastlap/monza
 ROUTES

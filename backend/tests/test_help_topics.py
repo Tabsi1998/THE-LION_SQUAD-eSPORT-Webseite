@@ -47,7 +47,7 @@ def test_titles_match_frontend_topics():
     assert f'"{help_topics.HELP_DESCRIPTION}"' in FRONTEND_INDEX.read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("path", ["/faq", "/hilfe"])
+@pytest.mark.parametrize("path", ["/faq", "/hilfe", "/FAQ", "/Hilfe/"])
 def test_faq_overview_has_own_card(monkeypatch, path):
     meta = _meta(path, monkeypatch)
     assert meta["title"].startswith("FAQ · ")
@@ -56,13 +56,20 @@ def test_faq_overview_has_own_card(monkeypatch, path):
     assert meta["robots"] == "index, follow"
 
 
-@pytest.mark.parametrize("path", ["/faq/liga-captains", "/hilfe/liga-captains", "/hilfe/Liga-Captains"])
+@pytest.mark.parametrize("path", ["/faq/liga-captains", "/hilfe/liga-captains", "/hilfe/Liga-Captains", "/FAQ/LIGA-CAPTAINS", "/Hilfe/Liga-captains"])
 def test_faq_topic_card_with_breadcrumb(monkeypatch, path):
     meta = _meta(path, monkeypatch)
     assert meta["title"].startswith("Liga für Captains · FAQ · ")
     assert meta["description"] == help_topics.HELP_TOPICS["liga-captains"][1]
     assert meta["canonical"] == "https://lionsquad.at/faq/liga-captains"
     assert [crumb["name"] for crumb in meta["breadcrumbs"]] == ["Startseite", "FAQ", "Liga für Captains"]
+
+
+def test_help_meta_itself_ignores_case():
+    """Auch ohne Vorarbeit des Aufrufers (Review F5): help_meta findet das Thema in jeder Schreibweise."""
+    base = {"site_name": "THE LION SQUAD", "title": "x", "description": "y"}
+    meta = seo_render_routes.help_meta("Liga-CAPTAINS", 2, base, "https://lionsquad.at")
+    assert meta["canonical"] == "https://lionsquad.at/faq/liga-captains"
 
 
 @pytest.mark.parametrize("path", ["/faq/gibt-es-nicht", "/faq/turniere/zu-tief", "/hilfe/gibt-es-nicht"])
@@ -81,7 +88,8 @@ def test_sitemap_lists_faq_pages_and_no_old_ones():
 
 
 def test_nginx_redirects_old_help_links_permanently():
-    """/hilfe und /hilfe/<thema> leiten mit 301 auf /faq um - Suche (?q=) bleibt, der Anker (#schritt) bleibt im Browser."""
+    """/hilfe und /hilfe/<thema> leiten mit 301 auf /faq um - Suche (?q=) bleibt, der Anker (#schritt) bleibt im Browser.
+    Groß- und Kleinschreibung egal (~*, Review F5): /Hilfe aus einer alten Mail führt genauso hin."""
     conf = (Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text(encoding="utf-8")
-    assert "location ~ ^/hilfe/?$ { return 301 /faq$is_args$args; }" in conf
-    assert r"location ~ ^/hilfe/([^/?#\r\n]+)/?$ { return 301 /faq/$1$is_args$args; }" in conf
+    assert "location ~* ^/hilfe/?$ { return 301 /faq$is_args$args; }" in conf
+    assert r"location ~* ^/hilfe/([^/?#\r\n]+)/?$ { return 301 /faq/$1$is_args$args; }" in conf
