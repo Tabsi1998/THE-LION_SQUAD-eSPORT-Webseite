@@ -173,10 +173,15 @@ Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die P
 - **Wann die App nach der Erlaubnis fragt:** nicht beim Anmelden oder Registrieren, sondern direkt nach der ersten Anmeldung zu einem Turnier oder Event
   (auch über „Spielst du auch mit?“). Zuerst kommt ein Blatt von unten: **„Sollen wir dich rufen, wenn du dran bist?“** mit drei Zeilen – Aufruf, Check-in,
   Ergebnis. Erst bei **Ja, rufen** fragt Android. **Später** schließt das Blatt; die App fragt dann frühestens bei der nächsten Anmeldung wieder.
-  Wer im Team ist und dessen Team angemeldet wurde, sieht die Frage beim nächsten Öffnen der Startseite. Gemerkt wird das nur auf dem Handy, nicht am Server.
+  Wer im Team ist und dessen Team angemeldet wurde, sieht die Frage beim nächsten Öffnen der Startseite; über der Frage steht dann
+  **„Dein Team ist angemeldet“** statt „Nach deiner Anmeldung“. Gemerkt wird das nur auf dem Handy, nicht am Server; Abmelden setzt die
+  gemerkten Anmeldungen zurück, damit nach dem nächsten Anmelden nicht sofort gefragt wird. Steht gerade ein anderes Fenster offen
+  (Abstimmung, Belohnung, Erfolg, Passkey, „Spielst du auch mit?“), wartet die Frage, bis es zu ist.
 - **Abgelehnt:** Wer Nein gesagt hat oder wem Android die Erlaubnis verweigert, sieht auf Turnier- und Event-Seiten und unter **Zahnrad → Benachrichtigungen**
   die leise Zeile **„Aufrufe sind aus – einschalten“**. Ein Tipp fragt Android noch einmal, solange Android das zulässt, sonst öffnen sich die
   Systemeinstellungen der App. Einen Dialog bei jedem Öffnen gibt es nicht. Wer schon erlaubt hat, merkt von alldem nichts.
+  Wer mit einer älteren LionsAPP angemeldet war, wurde damals schon beim Anmelden gefragt: Nach dem Update kommt bei ihm ohne Erlaubnis
+  nur die leise Zeile, keine neue Erklärung.
 - **Kanäle vor der Frage:** Die App legt ihre Android-Kanäle an, bevor Android fragt. Ohne Kanal zeigt Android 13 und neuer die Frage gar nicht.
 
 - **Themen und Kanäle einstellen:** in der App **Profil → Zahnrad → Benachrichtigungen**, auf der Website
