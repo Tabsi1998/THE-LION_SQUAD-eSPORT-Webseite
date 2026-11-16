@@ -406,9 +406,10 @@ oder **Stationsleitung** in diesem Turnier; im Status **Check-in offen** öffnet
   eingetragen wird, übernimmt genau einen freien Platz – zuerst den einer Person mit **Nicht erschienen**, sonst einen
   leeren Platz neben einem **Freilos** (das Freilos-Spiel wird dann normal gespielt). Das geht, solange das erste Spiel
   dieses Platzes nicht begonnen hat; in Liga und Gruppen, solange höchstens ein Spieltag gespielt ist. Ist kein Platz
-  frei, sagt die Seite es und auch, was noch geht: Solange kein Spiel begonnen hat, holen **Zurücksetzen** und neu
-  bauen die Person in den Baum; danach kommt sie nicht mehr hinein. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
-  Person mit Freilos.
+  frei, sagt die Seite es und auch, was noch geht: Solange nichts gespielt ist, holen **Zurücksetzen** und neu bauen
+  die Person in den Baum (schon aufgerufene Spiele werden dabei zurückgenommen). Wird schon gespielt, geht es nur noch
+  über **Zurücksetzen** – dann gehen die bisherigen Ergebnisse verloren. Gezielt ersetzt **Teilnehmer hinzufügen** mit
+  **Ersetzt Nicht-Erschienen** – auch eine Person mit Freilos.
 - Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
 - **Weiterkommen (Gegner der nächsten Runde)** (Spieloptionen, auch je Phase; nur bei K.-o., Doppel-K.-o. und freien
   Bäumen – bei Jeder gegen jeden – Hin- und Rückrunde steht dafür der Schalter **Spieltage auslosen**), vier Modi:

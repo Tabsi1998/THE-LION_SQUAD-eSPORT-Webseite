@@ -33,10 +33,14 @@ STARTED_DETAIL = "Das erste Spiel dieses Platzes hat schon begonnen – ein Nach
 LEAGUE_DETAIL = "In der Liga ist schon mehr als ein Spieltag gespielt – ein Nachrücker übernimmt den Platz nicht mehr."
 RUNNING_DETAIL = "Ein Spiel dieses Platzes läuft gerade – bitte erst das Ergebnis eintragen."
 NO_PLACE_DETAIL = "Im Turnierbaum ist kein Platz frei. Die Anmeldung steht auf der Liste, aber in keinem Spiel."
-# Was dann noch geht (#2046): vor dem ersten Spiel holt Zurücksetzen und neu bauen sie in den Baum, danach nichts mehr.
-NO_PLACE_BEFORE_START = (f"{NO_PLACE_DETAIL} Solange kein Spiel begonnen hat, holt „Zurücksetzen“ und neu bauen sie in "
-                         "den Baum.")
-NO_PLACE_STARTED = f"{NO_PLACE_DETAIL} Das erste Spiel hat schon begonnen – in den Baum kommt sie nicht mehr."
+# Was dann noch geht (#2046, Review): vor dem ersten Spiel geht neu bauen ohne Verlust; ist ein Spiel nur aufgerufen,
+# nehmen Zurücksetzen und neu bauen die Aufrufe zurück; wird schon gespielt, kostet es die bisherigen Ergebnisse.
+NO_PLACE_BEFORE_START = (f"{NO_PLACE_DETAIL} Noch hat kein Spiel begonnen: Setzt du den Turnierbaum zurück und baust "
+                         "ihn neu, ist sie dabei.")
+NO_PLACE_CALLED = (f"{NO_PLACE_DETAIL} Ein Spiel ist erst aufgerufen, gespielt wird noch nicht: Setzt du den Turnierbaum "
+                   "zurück und baust ihn neu, ist sie dabei – die Aufrufe gehen dabei zurück.")
+NO_PLACE_STARTED = (f"{NO_PLACE_DETAIL} In den Baum kommt sie nur noch über „Zurücksetzen“ – dann gehen bisherige "
+                    "Ergebnisse verloren.")
 
 
 class FillInRefused(Exception):

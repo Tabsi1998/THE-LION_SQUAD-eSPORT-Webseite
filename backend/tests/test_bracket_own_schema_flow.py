@@ -134,14 +134,19 @@ async def test_a_latecomer_without_a_place_hears_what_still_works_before_and_aft
 
     before = await latecomer(flow, tournament, "Nachzügler 1")
     assert before["ok"] is False and before["reason"] == "no_free_place"
-    assert "„Zurücksetzen“" in before["detail"] and "neu bauen" in before["detail"], before["detail"]
+    assert "Noch hat kein Spiel begonnen" in before["detail"] and "baust ihn neu, ist sie dabei" in before["detail"]
 
     first = sorted(await flow.matches(tournament), key=lambda row: (row.get("round") or 0, row["id"]))[0]
+    await flow.db.matches_v2.update_one({"id": first["id"]}, {"$set": {"called_at": now_utc().isoformat()}})
+    called = await latecomer(flow, tournament, "Nachzügler 2")
+    assert "erst aufgerufen" in called["detail"] and "begonnen" not in called["detail"], called["detail"]
+    assert "die Aufrufe gehen dabei zurück" in called["detail"]
+
     await flow.db.matches_v2.update_one({"id": first["id"]},
                                         {"$set": {"status": "in_progress", "started_at": now_utc().isoformat()}})
-    after = await latecomer(flow, tournament, "Nachzügler 2")
+    after = await latecomer(flow, tournament, "Nachzügler 3")
     assert after["ok"] is False and after["reason"] == "no_free_place"
-    assert "begonnen" in after["detail"] and "Zurücksetzen" not in after["detail"], after["detail"]
+    assert "nur noch über „Zurücksetzen“ – dann gehen bisherige Ergebnisse verloren" in after["detail"], after["detail"]
 
 
 # ---------------------------------------------------------------- Weitere Phasen (#2046, Review)
