@@ -4,8 +4,8 @@ import { type LevelState, type LevelUp, levelUpFrom } from "../achievements/cere
 // Der zuletzt gesehene Level-Stand je Konto (#617, #1456). Zwei Prüfungen auf demselben Gerät (Start, Benachrichtigung,
 // Prestige) können gleichzeitig laufen - dann würden beide den alten Stand lesen und denselben Aufstieg zweimal zeigen.
 // Darum läuft „lesen, vergleichen, schreiben“ je Schlüssel nacheinander (Sperre im Speicher der App): die zweite
-// Prüfung findet schon den neuen Stand. Bewusste Grenze: auf einem anderen Gerät (oder im Web) erscheint der Aufstieg
-// dort noch einmal - der Stand liegt nur im Gerät, nicht auf dem Server.
+// Prüfung findet schon den neuen Stand. Das ist der Rückfall ohne Stand vom Server (ältere Fassung); sonst gilt der
+// gesehene Stand am Konto (#2450, achievements/ceremony/seen.ts).
 
 const chains = new Map<string, Promise<unknown>>();
 
