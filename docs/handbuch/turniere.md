@@ -177,6 +177,11 @@ Zu den Besonderheiten:
   ist das Finale). Unter **Bearbeiten → Spieloptionen → Läufe umbauen** wählst du **Vorschlag** (Standard: der Vorschlag
   steht als Leiste oben in der Turnierverwaltung, du bestätigst oder lehnst ab) oder **Automatisch**. Auffüllen und
   Freilose laufen immer von selbst; laufende und aufgerufene Läufe werden nie umgebaut.
+  Ein zusammengelegter Lauf steht im Baum als „Lauf B · zusammengelegt in A“ und zählt nirgends als Spiel: Die
+  Ablauf-Leiste zeigt etwa „Läufe 9 Spiele“ und „Ergebnisse 9/9“, auch wenn der Baum 14 Läufe hatte; im Reiter
+  **Spiele** stehen die entfallenen als „Entfällt“ daneben. Kommt auf Plätze eines Laufs niemand mehr (weil ihre Quelle
+  zusammengelegt wurde), sagt die Karte vor dem Lauf „2 Plätze bleiben leer“. Nach dem Lauf steht dort nur noch
+  „2 Spieler“. Abschluss, Auszeichnungen und Erfolge hängen nicht daran, dass alle Läufe des Baums gefahren sind.
 - **Sehr viele Begegnungen:** Bei Jeder gegen jeden mit sehr vielen Teilnehmern zeichnet das System keinen
   Entwurf. Dann Teilnehmerzahl senken oder Gruppen nutzen.
 - **Setzliste** (Spieloptionen): **Zufall** oder **Manuell** – Manuell ordnet nach dem **Setzplatz**, ohne Setzplatz nach
@@ -756,6 +761,14 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    Protokoll vermerkt „übersprungen“. Fehlende Gewinne kommen dazu;
    ein Gewinn, dessen Platz nicht mehr stimmt, wird nie entzogen, sondern steht unter **Gewinne** mit **Nach Korrektur
    prüfen**.
+
+   **Abschluss nachholen:** Fehlen nach dem Veröffentlichen Auszeichnungen, Medaillen oder Erfolge (etwa beim Sieger),
+   öffne das Turnier in der Verwaltung, klappe oben **Werkzeuge** auf und tippe **Abschluss nachholen** (nur
+   Turnierleitung, nur bei **Ergebnisse veröffentlicht** oder **Archiviert**, auch bei gesperrtem Turnier). Nach der
+   Rückfrage prüft das System Auszeichnungen, Erfolge, Jahreswertung und Gewinne dieses Turniers noch einmal und vergibt,
+   was fehlt – genau einmal. Ergebnisse und Status bleiben, es geht keine Nachricht raus (kein „Turnier beendet“, nichts
+   in Discord). Wer jetzt einen Erfolg bekommt, sieht ihn wie sonst beim nächsten Öffnen der Seite; schon vergebene
+   Erfolge kommen nicht ein zweites Mal. Mehrmals tippen schadet nicht. Das Protokoll vermerkt jedes Nachholen.
 
    **Gewinne übergeben** (Admin → eSports → Gewinne): Ein neuer Gewinn ist **Offen** und hat noch keine Frist. Mit
    **Bereit** liegt er zur Abholung bereit: ab jetzt laufen **90 Tage** Abholfrist (eine von Hand gesetzte Frist
