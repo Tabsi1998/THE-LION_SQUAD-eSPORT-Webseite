@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import discord_bot, discord_bracket  # noqa: E402
+from services import discord_bot, discord_bracket, discord_bracket_state  # noqa: E402
 
 EVENTS_CHANNEL = "100000000000000003"
 TOKEN = "test" * 6 + ".fake." + "token" * 8
@@ -75,6 +75,7 @@ def bot(monkeypatch):
 
     monkeypatch.setattr(discord_bot.bot, "apply_settings", fake_apply)
     discord_bracket._dirty.clear()
+    discord_bracket_state._revise.clear()
     return fake
 
 
@@ -269,3 +270,130 @@ async def test_a_contested_result_brings_a_new_image_and_the_decision_another(fl
     await flow.db.matches_v2.update_one({"id": "a"}, {"$set": {"contested": False}})
     decided = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=10))
     assert decided["reason"] == "edited" and len(bot.files) == 5
+
+
+@pytest.mark.asyncio
+async def test_a_procedure_after_the_end_revises_the_final_bracket_in_place(flow, bot):
+    """#2375: Verfahren und Vorfälle merken das Bracket mit ``revise`` vor. Auch ein stehender Endstand wird dann bearbeitet -
+    an seinem Platz, ohne neue Nachricht; doppelt vorgemerkt heißt eine Bearbeitung. Ohne ``revise`` bleibt er wie bisher."""
+    await configure(flow)
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": match("a", 1, 1, "r1", "r2", status="completed", score=(2, 1))})
+    await flow.db.matches_v2.update_one({"id": "b"}, {"$set": match("b", 1, 2, "r3", "r4", status="completed", score=(0, 2))})
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": match("c", 2, 1, "r1", "r4", status="completed", score=(2, 1))})
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "completed"}})
+    final = await discord_bracket.refresh(flow.db, "t1", now=now_utc() - timedelta(minutes=5))
+    assert final["reason"] == "posted" and final["final"] is True, final
+    sent, files = len(bot.sent), len(bot.files)
+
+    # Protest gegen das Finale nach dem Ende.
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": {"contested": True}})
+    discord_bracket.request_refresh("t1")
+    plain = await discord_bracket.sweep(flow.db)
+    assert plain["checked"] == 1 and plain["edited"] == 0 and bot.edited == [], "ohne revise bleibt der Endstand wie er ist"
+
+    discord_bracket.request_refresh("t1", revise=True)
+    discord_bracket.request_refresh("t1", revise=True)
+    assert list(discord_bracket.pending()) == ["t1"], "doppelt vorgemerkt ist einmal vorgemerkt"
+    revised = await discord_bracket.sweep(flow.db)
+    assert revised["checked"] == 1 and revised["edited"] == 1 and len(bot.sent) == sent, revised
+    assert bot.edited[-1]["message_id"] == final["message_id"] and bot.edited[-1]["embed"]["title"] == "🏆 Sommer-Cup – Endstand"
+    assert len(bot.files) == files + 1, "neues Bild mit „in Klärung“"
+    state = (await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0}))["discord_bracket_embed"]
+    assert state["final"] is True and state["message_id"] == final["message_id"]
+    assert "t1" not in discord_bracket.pending() and not discord_bracket.revising("t1")
+
+    # Nichts geändert: keine Bearbeitung.
+    again = await discord_bracket.refresh(flow.db, "t1", revise=True, now=now_utc() + timedelta(minutes=2))
+    assert again["reason"] == "unchanged" and len(bot.edited) == 1
+
+
+async def ended_with_final(flow, bot) -> dict:
+    """Das Turnier ist zu Ende, der Endstand steht (vor fünf Minuten, also ohne Bremse); danach wird das Finale angefochten."""
+    await configure(flow)
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": match("a", 1, 1, "r1", "r2", status="completed", score=(2, 1))})
+    await flow.db.matches_v2.update_one({"id": "b"}, {"$set": match("b", 1, 2, "r3", "r4", status="completed", score=(0, 2))})
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": match("c", 2, 1, "r1", "r4", status="completed", score=(2, 1))})
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "completed"}})
+    final = await discord_bracket.refresh(flow.db, "t1", now=now_utc() - timedelta(minutes=5))
+    assert final["reason"] == "posted" and final["final"] is True, final
+    await flow.db.matches_v2.update_one({"id": "c"}, {"$set": {"contested": True}})
+    return final
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason", ["unknown_channel", "http", "forbidden", "unknown_message"])
+async def test_a_failed_revision_of_the_final_bracket_is_noted_once_and_never_reposts(flow, bot, monkeypatch, reason):
+    """#2375: Scheitert das Nachziehen eines Endstands (Thread gelöscht, Rechte weg, Nachricht gelöscht), wird der Fehler
+    notiert und die Vormerkung abgeräumt - der Endstand bleibt mit seiner Nachricht stehen, nichts wird neu gepostet."""
+    final = await ended_with_final(flow, bot)
+    sent = len(bot.sent)
+
+    async def failing(channel_id, message_id, embed, buttons=None, files=None):
+        return {"ok": False, "reason": reason}
+
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", failing)
+    discord_bracket.request_refresh("t1", revise=True)
+    outcome = await discord_bracket.sweep(flow.db)
+    assert outcome["checked"] == 1 and outcome["posted"] == 0 and len(bot.sent) == sent, outcome
+    assert "t1" not in discord_bracket.pending() and not discord_bracket.revising("t1"), "keine Wiederholung jede Minute"
+    state = (await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0}))["discord_bracket_embed"]
+    assert state["final"] is True and state["message_id"] == final["message_id"] and state["error"], state
+    assert (await discord_bracket.sweep(flow.db))["checked"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_failed_revision_on_the_game_server_does_not_fall_back_to_a_second_final(flow, bot, monkeypatch):
+    """#2375: Steht der Endstand auf dem Spielserver und scheitert dort das Nachziehen, kommt kein zweiter Endstand an den
+    Hauptserver (der Rückfall gilt nur, wenn das Bracket dort gar nicht steht)."""
+    await ended_with_final(flow, bot)
+    game_channel = "200000000000000001"
+    field = "discord_bracket_by_guild.g1"
+    game = {"key": "g1", "guild_id": "g1", "field": field, "thread_field": "discord_threads_by_guild.g1", "channel": game_channel,
+            "thread_id": None}
+    main = {"key": "main", "guild_id": None, "field": discord_bracket.FIELD, "thread_field": "discord_thread", "channel": EVENTS_CHANNEL,
+            "thread_id": None}
+
+    async def lanes(db, cfg, tournament, members):
+        return [game], main
+
+    monkeypatch.setattr(discord_bracket, "_lanes", lanes)
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {field: {
+        "channel_id": game_channel, "message_id": "g1m", "hash": "alt", "final": True,
+        "updated_at": (now_utc() - timedelta(minutes=5)).isoformat()}}, "$unset": {discord_bracket.FIELD: ""}})
+
+    async def refused(channel_id, message_id, embed, buttons=None, files=None):
+        return {"ok": False, "reason": "http", "error": "HTTP 503"}
+
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", refused)
+    sent = len(bot.sent)
+    discord_bracket.request_refresh("t1", revise=True)
+    outcome = await discord_bracket.sweep(flow.db)
+    assert outcome["posted"] == 0 and len(bot.sent) == sent, "kein zweiter Endstand am Hauptserver"
+    stored = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
+    assert discord_bracket.FIELD not in stored and stored["discord_bracket_by_guild"]["g1"]["final"] is True
+    assert stored["discord_bracket_by_guild"]["g1"]["message_id"] == "g1m" and "t1" not in discord_bracket.pending()
+
+
+@pytest.mark.asyncio
+async def test_a_request_during_the_discord_call_is_kept_for_the_next_run(flow, bot, monkeypatch):
+    """#2375: Kommt während des Discord-Aufrufs eine neue Vormerkung (etwa ein zweites Verfahren), bleibt sie stehen."""
+    await configure(flow)
+    t0 = now_utc() - timedelta(minutes=5)
+    assert (await discord_bracket.refresh(flow.db, "t1", now=t0))["reason"] == "posted"
+    edit = bot.edit_embed
+
+    async def edit_and_meanwhile(channel_id, message_id, embed, buttons=None, files=None):
+        discord_bracket.request_refresh("t1", revise=True)
+        return await edit(channel_id, message_id, embed, buttons=buttons, files=files)
+
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", edit_and_meanwhile)
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": match("a", 1, 1, "r1", "r2", status="completed", score=(2, 0))})
+    discord_bracket.request_refresh("t1")
+    outcome = await discord_bracket.sweep(flow.db)
+    assert outcome["edited"] == 1, outcome
+    assert "t1" in discord_bracket.pending() and discord_bracket.revising("t1"), "die neue Vormerkung ging nicht verloren"
+
+    # Ohne neue Vormerkung räumt der nächste Lauf sie ab.
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", edit)
+    await discord_bracket.refresh(flow.db, "t1", revise=True, now=now_utc() + timedelta(minutes=2))
+    assert "t1" not in discord_bracket.pending()

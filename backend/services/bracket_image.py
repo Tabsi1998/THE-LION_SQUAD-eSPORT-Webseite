@@ -24,7 +24,12 @@ from services.bracket_common import CLARIFICATION, WARN_RGB, in_clarification
 
 FILENAME = "bracket.png"
 BOX_W, BOX_H = 250, 58
-GAP_X, GAP_Y = 56, 14
+NOTE_SIZE = 15                          # Schrift der kleinen Zeile unter der Karte (kampflos, live, Termin)
+NOTE_OFFSET = 1                         # Abstand dieser Zeile zur Karte
+NOTE_LINE_H = round(NOTE_SIZE * 1.3)    # ihre Höhe samt Unterlängen
+# Die Lücke zwischen zwei Karten einer Runde trägt die Zeile unter der oberen (#2375: vorher 14 bei Schrift 15 - in vollen
+# Runden lag sie unter der nächsten Karte).
+GAP_X, GAP_Y = 56, NOTE_OFFSET + NOTE_LINE_H + 3
 MARGIN = 28
 HEADER_H = 86
 SECTION_LABEL_H = 34
@@ -130,6 +135,11 @@ def _note(match: dict) -> str:
     return f"{when.astimezone(VIENNA).strftime('%d.%m., %H:%M')} Uhr" if when and status not in ("completed",) else ""
 
 
+def note_top(card_top: float) -> float:
+    """Oberkante der Zeile unter einer Karte, deren Oberkante ``card_top`` ist."""
+    return card_top + BOX_H + NOTE_OFFSET
+
+
 def signature(sections: list[dict]) -> str:
     """Was das Bild zeigt, als Prüfsumme - ein neues Bild nur, wenn sich daran etwas ändert (auch frühere Runden)."""
     compact = [[[{"status": match.get("status"), "slots": [(slot.get("registration_id"), (slot.get("source") or {}).get("type")) for slot in match.get("slots") or []],
@@ -163,7 +173,7 @@ def render(tournament: dict, matches: list[dict], stages: list[dict], registrati
     height += MARGIN // 2
     image = Image.new("RGB", (width, height), COLORS["bg"])
     draw = ImageDraw.Draw(image)
-    title_font, small, name_font, name_bold, label_font = _font(30), _font(15, bold=False), _font(17, bold=False), _font(17), _font(16)
+    title_font, small, name_font, name_bold, label_font = _font(30), _font(NOTE_SIZE, bold=False), _font(17, bold=False), _font(17), _font(16)
 
     title = f"{tournament.get('title') or 'Turnier'} – {'Endstand' if final else 'Bracket'}"
     draw.text((MARGIN, 22), _ellipsis(draw, title, title_font, width - 2 * MARGIN), font=title_font, fill=COLORS["final"] if final else COLORS["title"])
@@ -211,7 +221,7 @@ def _card(draw: ImageDraw.ImageDraw, match: dict, names: dict[str, str], x: floa
     if note == CLARIFICATION:
         _badge(draw, note, x + BOX_W - 10, y, small)
     elif note:
-        draw.text((x + 2, y + BOX_H + 1), note, font=small, fill=COLORS["live"] if note == "live" else COLORS["dim"])
+        draw.text((x + 2, note_top(y)), note, font=small, fill=COLORS["live"] if note == "live" else COLORS["dim"])
 
 
 def _badge(draw: ImageDraw.ImageDraw, text: str, right: float, top: float, font) -> None:
