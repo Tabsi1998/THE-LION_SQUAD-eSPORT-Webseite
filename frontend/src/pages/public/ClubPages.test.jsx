@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Vorstandsseite: Porträts aus einem Guss (#1332), offene Funktionen als Einladung (#1252) und die Statuten - aus Dolibarr
@@ -123,4 +123,22 @@ test("statuteLine, formatDay und die Abschnitte", () => {
   expect(sections.deputies.map((seat) => [seat.slug, seat.vacant])).toEqual([["kassier-stv", false]]);
   expect(sections.rest.map((seat) => [seat.slug, seat.vacant, seat.withheld])).toEqual([["jugend", false, true]]);
   expect(boardSections("kaputt")).toEqual({ core: [], deputies: [], rest: [] });
+});
+
+// #2412: kommt die Liste nicht, steht ein Ladefehler mit „Nochmal versuchen“ da - nicht „noch nichts da“.
+test("Vorstand: Ladefehler mit „Nochmal versuchen“, danach die Funktionen", async () => {
+  let fail = true;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/board/statutes") return { data: { available: false, reason: "members_only" } };
+    if (url.startsWith("/board")) {
+      if (fail) throw { response: { status: 500 } };
+      return { data: BOARD };
+    }
+    return { data: [] };
+  });
+  render(<MemoryRouter><BoardPage /></MemoryRouter>);
+  expect(await screen.findByTestId("public-error-state")).toBeInTheDocument();
+  fail = false;
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("board-core")).toBeInTheDocument();
 });

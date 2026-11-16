@@ -30,6 +30,7 @@ export function useApiInvalidation(callback, resources = [], options = {}) {
       if (!invalidationMatches(event, selectedResources, scopeRef.current)) return;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
+        // Bewusst still: der Rückruf lädt nur nach; seinen Ladefehler zeigt die Seite selbst, der alte Stand bleibt stehen.
         Promise.resolve(callbackRef.current?.(event)).catch(() => {});
       }, debounceMs);
     });

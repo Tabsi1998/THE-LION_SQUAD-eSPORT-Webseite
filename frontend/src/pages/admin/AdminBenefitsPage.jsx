@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
@@ -40,7 +41,7 @@ export default function AdminBenefitsPage() {
     const { data } = await api.get("/membership/benefits/all");
     setList(data);
   }, []);
-  useEffect(() => { load(); api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, [load]);
+  useEffect(() => { load(); api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden.")); }, [load]);
   useApiInvalidation(load, ["membership"]);
 
   const remove = async (id) => {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { api, formatApiError } from "@/lib/api";
 import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
@@ -57,7 +58,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const overriding = Boolean(league?.can_override_rules) && ruleOverride.trim().length >= 5;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const panelRef = useRef(null);
+  // Tastatur (#2412): Fokus aufs Fenster, Tab bleibt darin, Escape schließt, die Seite dahinter ist gesperrt.
+  const panelRef = useModalBehavior(Boolean(entry), () => onClose?.(), { focusContainer: true });
   // Gedächtnis je Map (#2334): Ein Zwischenstand beim Tippen der Punkte kann die Serie kurz entscheiden - die Maps danach
   // kommen mit ihren Angaben zurück, sobald sie wieder offen ist. Je Spiel neu.
   const mapMemory = useRef({ entryId: entry?.id, games: {} });
@@ -95,16 +97,12 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   }
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === "Escape") onClose?.(); };
-    window.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previous;
     };
-  }, [onClose]);
+  }, []);
 
   if (!entry) return null;
 

@@ -34,6 +34,7 @@ export function useProfileSave({ user, refresh }) {
       toPayload: profileFormPayload,
       onSaved: () => {
         // Die Sitzung (Name oben, Avatar …) nachziehen; ältere Stände verwirft die Warteschlange selbst.
+        // Bewusst still: Nachladen nach dem Speichern - gespeichert ist schon, den Ladefehler zeigt die Seite selbst.
         void Promise.resolve(refreshRef.current?.()).catch(() => {});
       },
     });

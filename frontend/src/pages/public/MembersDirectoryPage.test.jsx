@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Mitgliederverzeichnis (#410): kein Alter mehr als „Level“, Initialen ohne Foto, Mitglieder sehen
@@ -53,4 +53,13 @@ test("die Überschrift trägt eine weiche Trennstelle", async () => {
   render(<MemoryRouter><MembersDirectoryPage /></MemoryRouter>);
   await screen.findByTestId("member-card-paula");
   expect(screen.getByTestId("members-heading").textContent).toBe("Vereins\u00ADmitglieder");
+});
+
+// #2412: kommt die Liste nicht, steht ein Ladefehler mit „Nochmal versuchen“ da - nicht „noch nichts da“.
+test("Mitglieder: Ladefehler mit „Nochmal versuchen“, danach die Liste", async () => {
+  apiMock.get.mockRejectedValueOnce({ response: { status: 500 } });
+  render(<MemoryRouter><MembersDirectoryPage /></MemoryRouter>);
+  expect(await screen.findByTestId("public-error-state")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("public-error-retry"));
+  expect(await screen.findByTestId("member-card-paula")).toBeInTheDocument();
 });

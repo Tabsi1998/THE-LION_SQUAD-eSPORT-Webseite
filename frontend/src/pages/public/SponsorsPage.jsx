@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { API, api, resolveMediaUrl } from "@/lib/api";
+import { problemKind } from "@/lib/loadProblem";
+import { PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -42,8 +44,10 @@ export default function SponsorsPage() {
   const [former, setFormer] = useState([]);
   // Sponsor werden (#1254): Zahlen, Leistungen je Stufe, „Unterlagen anfordern“ - ohne gepflegte Inhalte die kleine Karte.
   const [offer, setOffer] = useState(null);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
   const load = useCallback(() => {
-    api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {});
+    api.get("/sponsors").then(({ data }) => { setList(data); setProblem(null); }).catch((error) => setProblem(problemKind(error)));
     api.get("/sponsoring/offer").then(({ data }) => setOffer(data?.available ? data : null)).catch(() => setOffer(null));
     // Ehemalige Unterstützer (#405): abgelaufene Sponsoren mit Logo bleiben mit ihren Jahren sichtbar.
     api.get("/sponsors/former").then(({ data }) => setFormer(Array.isArray(data) ? data : [])).catch(() => setFormer([]));
@@ -78,7 +82,8 @@ export default function SponsorsPage() {
           <SupportLink to={offer ? "/sponsors#sponsor-werden" : "/contact"} icon={ArrowRight} label="Sponsor werden" text="Kontakt für Kooperationen, Pakete und gemeinsame Aktionen." testId="sponsors-become-card" />
         </Reveal>
 
-        {publicSponsors.length === 0 && (
+        {problem && publicSponsors.length === 0 ? <PublicErrorState kind={problem} onRetry={load} className="mt-12" /> : null}
+        {!problem && publicSponsors.length === 0 && (
           <div className="mt-12 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <Star className="w-10 h-10 mx-auto opacity-40 mb-4" />
             <div className="font-heading font-bold text-lg">Bald hier</div>

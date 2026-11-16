@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { loadOk, toastLoadFailed } from "@/lib/loadProblem";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { shortageAfter, shortageWarning } from "@/lib/squadShortage";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -61,21 +62,22 @@ export function TeamsPanel() {
 
   // Aufgelöste Teams (#2128, TM8): nur für die frühere Teamleitung, bis die Frist vorbei ist.
   const loadDissolved = useCallback(() => {
-    api.get("/teams/dissolved/mine").then(({ data }) => setDissolved(Array.isArray(data) ? data : [])).catch(() => {});
+    api.get("/teams/dissolved/mine").then(({ data }) => { setDissolved(Array.isArray(data) ? data : []); loadOk("Aufgelöste Teams konnten nicht geladen werden."); }).catch(toastLoadFailed("Aufgelöste Teams konnten nicht geladen werden."));
   }, []);
 
   // Stand der Liga-Anmeldungen (#2205): nur die eigenen Co-Teams, kein Fehler, wenn er nicht kommt.
   const loadApplications = useCallback(() => {
+    // Bewusst still: der Stand der Liga-Anmeldungen ist eine Zugabe; ohne ihn steht die Teamliste wie bisher.
     Promise.resolve(api.get("/me/league-applications")).then((answer) => setApplications(answer?.data?.items || [])).catch(() => {});
   }, []);
 
   const loadMeta = useCallback(() => {
-    api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => {});
+    api.get("/games").then(({ data }) => { setGames(Array.isArray(data) ? data : []); loadOk("Die Spiele für die Auswahl konnten nicht geladen werden."); }).catch(toastLoadFailed("Die Spiele für die Auswahl konnten nicht geladen werden."));
   }, []);
 
   useEffect(() => {
     loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
-    loadInvites().catch(() => {});
+    loadInvites().then(() => loadOk("Deine Team-Einladungen konnten nicht geladen werden.")).catch(toastLoadFailed("Deine Team-Einladungen konnten nicht geladen werden."));
     loadDissolved();
     loadMeta();
     loadApplications();

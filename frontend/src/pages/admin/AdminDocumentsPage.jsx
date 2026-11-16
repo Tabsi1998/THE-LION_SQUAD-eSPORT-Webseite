@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { API, api, formatRequestError, formatUploadError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
@@ -64,7 +65,7 @@ export default function AdminDocumentsPage() {
     const { data } = await api.get("/documents/admin");
     setList(data);
   }, []);
-  useEffect(() => { load(); api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, [load]);
+  useEffect(() => { load(); api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden.")); }, [load]);
   useApiInvalidation(load, ["documents", "uploads"]);
 
   const remove = async (id) => {

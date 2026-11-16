@@ -133,7 +133,8 @@ export default function DashboardPage() {
   }, []);
   useEffect(() => {
     const refreshVisible = () => {
-      if (typeof document === "undefined" || !document.hidden) load().catch(() => {});
+      // `load` wirft nicht (allSettled): was nicht kam, behält seinen letzten Stand.
+      if (typeof document === "undefined" || !document.hidden) load();
     };
     refreshVisible();
     window.addEventListener("focus", refreshVisible);
@@ -340,7 +341,7 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
-      {feedbackTarget ? <FeedbackDialog target={feedbackTarget} onClose={closeFeedback} onDone={() => { closeFeedback(); load().catch(() => {}); }} /> : null}
+      {feedbackTarget ? <FeedbackDialog target={feedbackTarget} onClose={closeFeedback} onDone={() => { closeFeedback(); load(); }} /> : null}
     </PublicLayout>
   );
 }

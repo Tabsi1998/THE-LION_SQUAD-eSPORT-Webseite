@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { viennaDateTime } from "@/lib/vienna";
@@ -434,11 +435,9 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
   const [sending, setSending] = useState(false);
   const trimmed = text.trim();
 
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape schließt, Tab bleibt im Dialog, die Liste dahinter ist gesperrt, danach steht der Fokus wieder auf dem Knopf
+  // (#2412).
+  const dialogRef = useModalBehavior(true, () => onClose());
 
   const send = async () => {
     setSending(true);
@@ -458,7 +457,7 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="event-lead-message-title" data-testid="event-lead-message">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 print:hidden" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="event-lead-message-title" data-testid="event-lead-message">
       <div className="w-full max-w-lg rounded-t-lg sm:rounded-sm border border-white/10 bg-[#121212] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -509,11 +508,13 @@ function WalkInDialog({ event, rows, onClose, onAdded }) {
   const trimmed = name.trim();
   const twin = rows.find((row) => normalizeName(row.display_name) === normalizeName(trimmed) && trimmed);
 
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape schließt, Tab bleibt im Dialog, die Liste dahinter ist gesperrt, danach steht der Fokus wieder auf dem Knopf
+  // (#2412).
+  const dialogRef = useModalBehavior(true, () => onClose());
+  // Der Fokus springt gleich ins Namensfeld - erst nach dem Dialog-Hook, damit der sich den Knopf davor merkt (ein
+  // `autoFocus` käme ihm zuvor, und der Fokus fände nach dem Schließen nicht zurück).
+  const nameRef = useRef(null);
+  useEffect(() => { nameRef.current?.focus(); }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -532,7 +533,7 @@ function WalkInDialog({ event, rows, onClose, onAdded }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="event-lead-walkin-title" data-testid="event-lead-walkin">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 print:hidden" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="event-lead-walkin-title" data-testid="event-lead-walkin">
       <form onSubmit={submit} className="w-full max-w-lg rounded-t-lg sm:rounded-sm border border-white/10 bg-[#121212] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -544,8 +545,7 @@ function WalkInDialog({ event, rows, onClose, onAdded }) {
         <p className="mt-3 text-sm text-white/65">Ohne Konto und ohne Preis. Die Person ist danach gleich „Da“, belegt einen Platz und steht im Protokoll. Öffentlich steht ihr Name nicht.</p>
         <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
           Name
-          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- an der Tür geht es direkt mit dem Tippen los */}
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
+          <input value={name} onChange={(e) => setName(e.target.value)} ref={nameRef} maxLength={80} autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
         </label>
         {twin ? <p className="mt-2 text-xs text-honor" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
         {maxCompanions ? (

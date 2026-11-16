@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -67,13 +67,59 @@ export function GermanDateField({
     setOpen(false);
   };
 
+  // Tastatur im Kalender (#2412): Pfeile links/rechts wandern einen Tag, hoch/runter eine Woche; über den Monatsrand
+  // blättert der Kalender mit und der Fokus landet auf dem Tag im neuen Monat.
+  const triggerRef = useRef(null);
+  const gridRef = useRef(null);
+  const pendingFocus = useRef(null);
+  const focusDay = (day) => gridRef.current?.querySelector(`[data-day="${day}"]:not(:disabled)`)?.focus();
+
+  useEffect(() => {
+    if (pendingFocus.current === null) return;
+    focusDay(pendingFocus.current);
+    pendingFocus.current = null;
+  }, [view]);
+
+  const STEPS = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+  const onGridKeyDown = (event) => {
+    const step = STEPS[event.key];
+    const day = Number(event.target?.dataset?.day);
+    if (!step || !day) return;
+    event.preventDefault();
+    const next = new Date(view.year, view.month, day + step);
+    // Ohne Zukunft bleibt der Fokus stehen, statt in einen gesperrten Tag (oder Monat) zu springen und verloren zu gehen.
+    const nextIso = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+    if (!allowFuture && nextIso > todayIso) return;
+    if (next.getFullYear() === view.year && next.getMonth() === view.month) {
+      focusDay(next.getDate());
+      return;
+    }
+    if (next.getFullYear() < minYear || next.getFullYear() > effMaxYear) return;
+    pendingFocus.current = next.getDate();
+    setView({ year: next.getFullYear(), month: next.getMonth() });
+  };
+
+  // Beim Aufklappen steht der Fokus auf dem gewählten Tag, sonst auf heute, sonst auf dem ersten wählbaren Tag.
+  const focusOnOpen = (event) => {
+    event.preventDefault();
+    const grid = gridRef.current;
+    const target = grid?.querySelector('[aria-pressed="true"]') || grid?.querySelector('[aria-current="date"]:not(:disabled)') || grid?.querySelector("[data-day]:not(:disabled)");
+    target?.focus();
+  };
+
+  const clear = () => {
+    onChange("");
+    triggerRef.current?.focus();
+  };
+
   const selectCls = "bg-[#0A0A0A] border border-white/10 rounded-sm px-2 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-[#29B6E8] cursor-pointer";
-  const describedBy = [description ? `${id}-description` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
+  const describedBy = [hint ? `${id}-hint` : null, description ? `${id}-description` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
+  const showClear = Boolean(value) && !disabled;
 
   return (
     <div className="block">
       {label && (
-        <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-widest text-white/65 mb-1.5">
+        <label htmlFor={id} id={`${id}-label`} className="block text-[11px] font-bold uppercase tracking-widest text-white/65 mb-1.5">
           <span className="flex items-center justify-between gap-3">
             <span>{label}</span>
             {required && <span className="text-[9px] text-[#FFD700]">Pflichtfeld</span>}
@@ -81,41 +127,43 @@ export function GermanDateField({
         </label>
       )}
       <Popover open={open && !disabled} onOpenChange={(next) => { if (!disabled) handleOpen(next); }}>
-        <PopoverTrigger asChild>
-          <button
-            id={id}
-            type="button"
-            data-testid={testId}
-            disabled={disabled}
-            // Ein Fehler hängt über aria-describedby am Knopf (und meldet sich als Hinweis) - aria-invalid gibt es für
-            // Knöpfe nicht, Vorleseprogramme übergehen es dort (#937).
-            aria-describedby={describedBy}
-            className={`w-full bg-[#0A0A0A] border px-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
-              error ? "border-[#FF3B30] focus:border-[#FF3B30]" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
-            }`}
-          >
-            <span className={value ? "text-white" : "text-white/35"}>
-              {value ? formatGermanDate(value) : "Datum wählen"}
-            </span>
-            <span className="flex items-center gap-1.5 shrink-0">
-              {value && !disabled && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Datum entfernen"
-                  data-testid={testId ? `${testId}-clear` : undefined}
-                  onClick={(e) => { e.stopPropagation(); onChange(""); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onChange(""); } }}
-                  className="text-white/35 hover:text-[#FF3B30] transition"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </span>
-              )}
-              <CalendarDays className="w-4 h-4 text-white/45" />
-            </span>
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={6} className="w-[19.5rem] p-0 z-[130] border border-white/12 bg-[#101012] rounded-sm shadow-2xl shadow-black/70 text-white">
+        {/* Auslöser und „Datum entfernen“ liegen nebeneinander - kein Knopf im Knopf (#2412). Der Entfernen-Knopf sitzt
+            optisch im Feld, ist aber ein eigener Tab-Halt. */}
+        <div className="relative">
+          <PopoverTrigger asChild>
+            <button
+              ref={triggerRef}
+              id={id}
+              type="button"
+              data-testid={testId}
+              disabled={disabled}
+              // Name = Beschriftung + Wert. Hinweis, Beschreibung und Fehler hängen über aria-describedby am Knopf (der
+              // Fehler meldet sich zusätzlich als Hinweis) - aria-invalid gibt es für Knöpfe nicht (#937, #2412).
+              aria-labelledby={label ? `${id}-label ${id}-value` : undefined}
+              aria-describedby={describedBy}
+              className={`w-full bg-[#0A0A0A] border pl-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${showClear ? "pr-14" : "pr-3"} ${
+                error ? "border-[#FF3B30] focus:border-[#FF3B30]" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
+              }`}
+            >
+              <span id={`${id}-value`} className={value ? "text-white" : "text-muted-text"}>
+                {value ? formatGermanDate(value) : "Datum wählen"}
+              </span>
+              <CalendarDays className="w-4 h-4 shrink-0 text-muted-text" aria-hidden="true" />
+            </button>
+          </PopoverTrigger>
+          {showClear && (
+            <button
+              type="button"
+              aria-label="Datum entfernen"
+              data-testid={testId ? `${testId}-clear` : undefined}
+              onClick={clear}
+              className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-text hover:text-[#FF3B30] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition"
+            >
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <PopoverContent align="start" sideOffset={6} onOpenAutoFocus={focusOnOpen} className="w-[19.5rem] p-0 z-[130] border border-white/12 bg-[#101012] rounded-sm shadow-2xl shadow-black/70 text-white">
           <div className="flex items-center gap-2 p-3 border-b border-white/10">
             <button
               type="button"
@@ -160,7 +208,7 @@ export function GermanDateField({
                 <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider text-white/40 py-1">{d}</div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-0.5">
+            <div ref={gridRef} className="grid grid-cols-7 gap-0.5">
               {cells.map((day, i) => {
                 if (!day) return <div key={`x${i}`} />;
                 const iso = `${view.year}-${pad(view.month + 1)}-${pad(day)}`;
@@ -173,6 +221,11 @@ export function GermanDateField({
                     type="button"
                     disabled={isFuture}
                     onClick={() => pick(day)}
+                    data-day={day}
+                    onKeyDown={onGridKeyDown}
+                    aria-label={formatGermanDate(iso)}
+                    aria-pressed={isSelected}
+                    aria-current={isToday ? "date" : undefined}
                     data-testid={testId ? `${testId}-day-${day}` : undefined}
                     className={`h-9 rounded-sm text-sm tabular-nums transition ${
                       isSelected
@@ -204,7 +257,7 @@ export function GermanDateField({
           </div>
         </PopoverContent>
       </Popover>
-      {hint && <div className="mt-1 text-xs text-white/45">{hint}</div>}
+      {hint && <div id={`${id}-hint`} className="mt-1 text-xs text-white/45">{hint}</div>}
       {description && <div id={`${id}-description`} className="mt-1 text-[10px] text-white/45">{description}</div>}
       {error && <div id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#FF8A80]">{error}</div>}
     </div>

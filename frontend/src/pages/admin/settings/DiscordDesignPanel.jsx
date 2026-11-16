@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Braces, FlaskConical, Palette, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { DiscordMessagePreview } from "@/components/tls/DiscordMessagePreview";
 
 // Gestaltung der Discord-Meldungen (#866): je Meldungsart die Vorlage als Formular oder als JSON im Discord-Format,
@@ -96,7 +97,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
     const id = window.setTimeout(() => {
       api.post(`/settings/discord/design/${kind.key}/preview`, { template: draft, data: dataMode })
         .then(({ data: next }) => setPreview(next))
-        .catch(() => {});
+        .catch(toastLoadFailed("Die Vorschau konnte nicht erstellt werden."));
     }, 350);
     return () => window.clearTimeout(id);
   }, [kind, draft, dataMode]);

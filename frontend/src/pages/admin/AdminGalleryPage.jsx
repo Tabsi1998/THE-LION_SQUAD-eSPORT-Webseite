@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -30,7 +31,7 @@ export default function AdminGalleryPage() {
 
   useEffect(() => {
     load();
-    if (editsAlbums) api.get("/events?include_drafts=true").then(({ data }) => setEvents(data)).catch(() => {});
+    if (editsAlbums) api.get("/events?include_drafts=true").then(({ data }) => setEvents(data)).catch(toastLoadFailed("Die Events für die Auswahl konnten nicht geladen werden."));
   }, [load, editsAlbums]);
   useApiInvalidation(load, ["gallery"]);
 

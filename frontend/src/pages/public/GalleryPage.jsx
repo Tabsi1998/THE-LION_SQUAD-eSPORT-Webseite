@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { problemKind } from "@/lib/loadProblem";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
-import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
+import { PublicEmptyState, PublicErrorState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -20,10 +21,12 @@ export default function GalleryPage() {
 
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Ladefehler (#2412): ohne Liste steht der Fehler mit „Nochmal versuchen“ da, nicht „noch nichts da“.
+  const [problem, setProblem] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/gallery?compact=true&limit=80").then(({ data }) => setAlbums(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get("/gallery?compact=true&limit=80").then(({ data }) => { setAlbums(data); setProblem(null); }).catch((error) => setProblem(problemKind(error))).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -43,6 +46,8 @@ export default function GalleryPage() {
 
         {loading ? (
           <PublicLoadingState cards={4} className="mt-10 lg:grid-cols-4" />
+        ) : problem && albums.length === 0 ? (
+          <PublicErrorState kind={problem} onRetry={load} className="mt-10" />
         ) : albums.length === 0 ? (
           <PublicEmptyState
             title="Noch keine Alben sichtbar"

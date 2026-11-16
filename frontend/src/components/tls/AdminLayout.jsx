@@ -522,7 +522,7 @@ export function AdminLayout({ children }) {
 
         <div className="p-3 border-b border-white/10">
           <label className="relative block">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-quiet" aria-hidden="true" />
             <input
               value={navQuery}
               onChange={(e) => setNavQuery(e.target.value)}
@@ -533,14 +533,14 @@ export function AdminLayout({ children }) {
               autoCapitalize="none"
               spellCheck={false}
               placeholder="Admin suchen..."
-              className="w-full h-10 rounded-sm border border-white/10 bg-black/30 pl-9 pr-9 text-sm text-white placeholder:text-white/30 outline-none focus:border-[#29B6E8]/70"
+              className="w-full h-10 rounded-sm border border-white/10 bg-black/30 pl-9 pr-9 text-sm text-white placeholder:text-quiet outline-none focus:border-[#29B6E8]/70"
               data-testid="admin-nav-search"
             />
             {navQuery && (
               <button
                 type="button"
                 onClick={() => setNavQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/35 hover:text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-quiet hover:text-white"
                 aria-label="Suche leeren"
               >
                 <X className="w-3.5 h-3.5" />
@@ -571,11 +571,11 @@ export function AdminLayout({ children }) {
                 onClick={() => toggleGroup(RECENT_GROUP)}
                 aria-expanded={groupIsOpen(RECENT_GROUP)}
                 data-testid={`admin-nav-group-${RECENT_GROUP}`}
-                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25 hover:text-white/60 transition-colors"
+                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-quiet hover:text-white/80 transition-colors"
               >
                 <span className="truncate">{RECENT_GROUP}</span>
                 <span className="flex items-center gap-1.5 shrink-0">
-                  {!groupIsOpen(RECENT_GROUP) && <span className="tabular-nums tracking-normal text-white/20">{recentItems.length}</span>}
+                  {!groupIsOpen(RECENT_GROUP) && <span className="tabular-nums tracking-normal text-quiet">{recentItems.length}</span>}
                   <ChevronDown className={`w-3 h-3 transition-transform ${groupIsOpen(RECENT_GROUP) ? "" : "-rotate-90"}`} />
                 </span>
               </button>
@@ -608,11 +608,11 @@ export function AdminLayout({ children }) {
                   onClick={() => toggleGroup(group.label)}
                   aria-expanded={open}
                   data-testid={`admin-nav-group-${group.label}`}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25 hover:text-white/60 transition-colors"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-quiet hover:text-white/80 transition-colors"
                 >
                   <span className="truncate">{group.label}</span>
                   <span className="flex items-center gap-1.5 shrink-0">
-                    {!open && <span className="tabular-nums tracking-normal text-white/20">{group.items.length}</span>}
+                    {!open && <span className="tabular-nums tracking-normal text-quiet">{group.items.length}</span>}
                     {group.label === activeGroup && !open && <span className="w-1.5 h-1.5 rounded-full bg-[#29B6E8]" />}
                     <ChevronDown className={`w-3 h-3 transition-transform ${open ? "" : "-rotate-90"}`} />
                   </span>
@@ -638,7 +638,7 @@ export function AdminLayout({ children }) {
                         <span className="min-w-0">
                           <span className="block truncate">{it.label}</span>
                           {/* Untertitel nur in der Suche (#2111, N1): welche „Saison“ gemeint ist. */}
-                          {searchQuery && it.hint ? <span className="block truncate text-[10px] font-normal text-white/40" data-testid={`admin-nav-hint-${it.to.split("/").pop()}`}>{it.hint}</span> : null}
+                          {searchQuery && it.hint ? <span className="block truncate text-[10px] font-normal text-quiet" data-testid={`admin-nav-hint-${it.to.split("/").pop()}`}>{it.hint}</span> : null}
                         </span>
                       </NavLink>
                     ))}
@@ -648,7 +648,7 @@ export function AdminLayout({ children }) {
             );
           })}
           {visibleGroups.length === 0 && (searchQuery || !mfaHint) && (
-            <div className="px-3 py-8 text-center text-xs text-white/40">
+            <div className="px-3 py-8 text-center text-xs text-quiet">
               <div>Keine Admin-Seite gefunden.</div>
               <button
                 type="button"

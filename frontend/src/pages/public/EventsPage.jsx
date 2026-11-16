@@ -57,6 +57,7 @@ export default function EventsPage() {
   const [mode, setMode] = useState(storedMode);
   const [loading, setLoading] = useState(true);
 
+  // Bewusst still: nur Filter und Namen der Arten; die Liste selbst meldet ihren Ladefehler.
   useEffect(() => { api.get("/events/meta").then(({ data: body }) => setMeta(body)).catch(() => {}); }, []);
 
   const load = useCallback(() => {

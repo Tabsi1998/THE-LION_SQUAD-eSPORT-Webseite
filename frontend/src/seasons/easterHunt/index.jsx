@@ -28,6 +28,7 @@ export function Widget() {
       return undefined;
     }
     let alive = true;
+    // Bewusst still: der Korb-Stand im Osterspiel kommt mit dem nächsten Fund wieder.
     fetchBasket().then((data) => { if (alive) setProgress(data); }).catch(() => {});
     const stop = onHuntProgress((update) => setProgress((current) => ({ ...(current || {}), ...update })));
     return () => {

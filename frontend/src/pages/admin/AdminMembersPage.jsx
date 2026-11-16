@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatMemberSince, formatRequestError } from "@/lib/api";
+import { toastLoadFailed } from "@/lib/loadProblem";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
@@ -86,7 +87,7 @@ export default function AdminMembersPage() {
   const loadOpenApplications = useCallback(() => {
     api.get("/membership/applications?status=pending").then(({ data }) => setOpenApplications(Array.isArray(data) ? data.length : null)).catch(() => setOpenApplications(null));
   }, []);
-  useEffect(() => { api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
+  useEffect(() => { api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(toastLoadFailed("Die Auswahllisten konnten nicht geladen werden.")); }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadOpenApplications(); }, [loadOpenApplications]);
   useApiInvalidation(load, ["users", "membership"]);
