@@ -253,6 +253,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   Settings: { title: "Einstellungen" },
   ProfileEdit: { title: "Profil bearbeiten" },
   CalendarSubscription: { title: "Mein Kalender-Abo" },
+  Faq: { title: "FAQ" },
 };
 
 /**

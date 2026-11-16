@@ -86,6 +86,9 @@ test("Gast: nur Darstellung und Über die App", async () => {
   expect(mockGet).not.toHaveBeenCalled();
   await fireEvent.press(screen.getByTestId("more-whats-new"));
   expect(mockWhatsNew).toHaveBeenCalledTimes(1);
+  // FAQ (#2449): unter Über die App - auch für Gäste.
+  await fireEvent.press(screen.getByTestId("settings-faq"));
+  expect(navigate).toHaveBeenCalledWith("Faq");
 });
 
 test("Schalter speichern von selbst - nur die Einstellungen, nicht das ganze Profil", async () => {

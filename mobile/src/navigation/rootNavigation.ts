@@ -303,6 +303,11 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
       return detail("InfoCenter", { section: "partners" });
     case "references":
       return detail("InfoCenter", { section: "references" });
+    // FAQ (#2449): /faq und die alte Hilfe (/hilfe) öffnen die FAQ der App. Eine Anleitung (/faq/<thema>) bleibt im Web -
+    // dort stehen die Bilder.
+    case "faq":
+    case "hilfe":
+      return detail("Faq");
     default:
       return null;
   }
