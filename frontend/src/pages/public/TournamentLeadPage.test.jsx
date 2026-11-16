@@ -189,7 +189,8 @@ test("„Alle freien Stationen aufrufen“ (#1162): nacheinander über den Aufru
 
 // Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit Topf, Restzeit bis zum automatischen Los und „Jetzt auslosen“.
 test("Auslosung bereit: Topf mit Namen, Restzeit, „Jetzt auslosen“ nur mit Aufbau-Recht", async () => {
-  // Die Browser-Uhr steht drei Minuten nach der Server-Uhr der Antwort - die Restzeit zählt von dort weiter.
+  // Die Browser-Uhr geht drei Minuten vor (10:06:30, der Server sagt 10:03:30): die Restzeit zählt nach der Serveruhr
+  // (#2440) - bis 10:20 sind es 16,5 Minuten, also „17 Min.“ (nach der Geräteuhr wären es 14).
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-14T10:06:30+00:00"));
   apiMock.post.mockResolvedValue({ data: { ok: true } });
@@ -207,7 +208,7 @@ test("Auslosung bereit: Topf mit Namen, Restzeit, „Jetzt auslosen“ nur mit A
   expect(shown).toHaveTextContent("Auslosung bereit · 4 Namen");
   expect(shown).toHaveTextContent("nach Runde 1 → E, F");
   expect(screen.getByTestId("lead-draw-pot-WB:2").querySelectorAll("li")).toHaveLength(4);
-  expect(screen.getByTestId("lead-draw-countdown-WB:2")).toHaveTextContent("automatisch in 14 Min.");
+  expect(screen.getByTestId("lead-draw-countdown-WB:2")).toHaveTextContent("automatisch in 17 Min.");
   fireEvent.click(screen.getByTestId("lead-draw-now-WB:2"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/stages/s1/draw", { group: "WB:2" }));
   // Nach dem Auslosen lädt die Ansicht neu (die Warteschlange vor Ort fragt die Seite getrennt, #1556).
@@ -231,8 +232,8 @@ test("Auslosung bereit ohne Aufbau-Recht: Karte ohne Knopf; nach der Frist steht
   expect(await screen.findByTestId("lead-draw-LB:3")).toHaveTextContent("Auslosung bereit · 1 Name");
   expect(screen.queryByTestId("lead-draw-now-LB:3")).toBeNull();
   expect(screen.getByTestId("lead-draw-countdown-LB:3")).toHaveTextContent("jeden Moment");
-  expect(drawCountdown(card, "2026-10-14T10:09:30+00:00", new Date("2026-10-14T10:09:30+00:00").getTime())).toBe("automatisch in 11 Min.");
-  expect(drawCountdown({ due_at: null }, "2026-10-14T10:09:30+00:00")).toBe("");
+  expect(drawCountdown(card, Date.parse("2026-10-14T10:09:30+00:00"))).toBe("automatisch in 11 Min.");
+  expect(drawCountdown({ due_at: null }, Date.parse("2026-10-14T10:09:30+00:00"))).toBe("");
   vi.useRealTimers();
 });
 

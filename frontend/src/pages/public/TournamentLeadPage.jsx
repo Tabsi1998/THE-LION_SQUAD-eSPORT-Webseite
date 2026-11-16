@@ -18,6 +18,7 @@ import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
+import { serverNow, serverOffset } from "@/seasons/clock";
 import { MatchClock } from "@/components/tls/live/MatchClock";
 import { CheckinBoard } from "@/components/tls/tournament/CheckinBoard";
 import { NoticeComposer } from "@/components/tls/tournament/NoticeComposer";
@@ -74,11 +75,17 @@ export default function TournamentLeadPage() {
   const stationScrolled = useRef("");
   const [stationJump, setStationJump] = useState(0);
 
+  // Die Restzeit der Auslosung zählt nach der Serveruhr (#2440): der Abstand zur Geräteuhr aus `now` der Antwort.
+  const [clockOffset, setClockOffset] = useState(0);
+
   const load = useCallback(async () => {
+    const requestedAt = Date.now();
     try {
       const { data: view } = await api.get(`/tournaments/${encodeURIComponent(slug)}/lead`);
+      const receivedAt = Date.now();
       setData(view);
       setError(null);
+      setClockOffset(serverOffset(view?.now, requestedAt, receivedAt));
     } catch (err) {
       setError({ status: err.response?.status || 0, detail: formatApiError(err.response?.data?.detail) });
     }
@@ -353,7 +360,7 @@ export default function TournamentLeadPage() {
         {activeTab === "attention" ? (
           <div className="mt-5 space-y-3" data-testid="lead-attention">
             {data && cases === 0 ? <div className="rounded-sm border border-white/10 bg-[#121212] p-6 text-center text-white/50" data-testid="lead-attention-empty">Gerade hängt nichts.</div> : null}
-            {draws.map((card) => <DrawCard key={card.id} card={card} now={data?.now} highlighted={fall === card.id} busy={deciding} onDraw={() => drawNow(card)} />)}
+            {draws.map((card) => <DrawCard key={card.id} card={card} offset={clockOffset} highlighted={fall === card.id} busy={deciding} onDraw={() => drawNow(card)} />)}
             {attention.map((item) => (item.kind === "dispute" && byId[item.match_id]?.dispute ? (
               <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note, conflictReason) => keepResult(byId[item.match_id], note, conflictReason)} onChange={() => openEntry(item.match_id)} />
             ) : (
@@ -435,14 +442,14 @@ export function defaultLeadTab({ fall = "", cases = 0, checkinPhase = false, que
   return "results";
 }
 
-/** Restzeit bis zum automatischen Los: ganze Minuten, aus der Server-Uhr (`now`) weitergezählt. */
-export function drawCountdown(card, serverNow, clientNow = Date.now()) {
+/**
+ * Restzeit bis zum automatischen Los in ganzen Minuten. `now` ist die Serverzeit (ms) - seasons/clock.serverNow mit dem
+ * Abstand aus der Antwort (#2440), damit eine falsch gehende Geräteuhr nichts verschiebt.
+ */
+export function drawCountdown(card, now = Date.now()) {
   const due = card?.due_at ? new Date(card.due_at).getTime() : NaN;
-  const base = serverNow ? new Date(serverNow).getTime() : NaN;
   if (Number.isNaN(due)) return "";
-  // Die Server-Uhr gilt; was seit dem Laden vergangen ist, zählt der Browser dazu.
-  const elapsed = Number.isNaN(base) ? 0 : Math.max(0, clientNow - Math.min(base, clientNow));
-  const left = Math.ceil((due - (Number.isNaN(base) ? clientNow : base + elapsed)) / 60000);
+  const left = Math.ceil((due - now) / 60000);
   if (left <= 0) return "der Server lost jeden Moment selbst";
   return `automatisch in ${left} Min.`;
 }
@@ -454,7 +461,7 @@ export function drawTargetText(card) {
 }
 
 /** Show-Auslosung (#1590): der Topf steht - die Leitung lost mit einem Tipp, sonst der Server nach der Frist. */
-function DrawCard({ card, now, highlighted, busy, onDraw }) {
+function DrawCard({ card, offset = 0, highlighted, busy, onDraw }) {
   const [tick, setTick] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setTick(Date.now()), 30000);
@@ -470,7 +477,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold text-white">Auslosung bereit · {card.pot_size} {card.pot_size === 1 ? "Name" : "Namen"}</div>
           <div className="text-xs text-white/55 [overflow-wrap:anywhere]">{card.stage_name ? `${card.stage_name} · ` : ""}{drawTargetText(card)}</div>
-          <div className="text-[11px] text-brand" data-testid={`lead-draw-countdown-${card.group}`}>{drawCountdown(card, now, tick)}</div>
+          <div className="text-[11px] text-brand" data-testid={`lead-draw-countdown-${card.group}`}>{drawCountdown(card, serverNow(offset, tick))}</div>
         </div>
         {card.can_draw ? (
           <button type="button" disabled={busy} onClick={onDraw} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-draw-now-${card.group}`}>Jetzt auslosen</button>
