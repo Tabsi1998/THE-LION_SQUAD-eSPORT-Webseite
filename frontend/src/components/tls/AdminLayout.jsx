@@ -76,8 +76,9 @@ export const ADMIN_GROUPS = [
   {
     label: "eSports",
     items: [
-      // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht.
-      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true, hint: "Einzelne Turniere – K.-o., Gruppen, Jeder gegen jeden" },
+      // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht. Die Turnierliste
+      // auch für Liga-Zuständige und den Bereich Ligen (`leagueStaff`, #2463) - mit ihren Staffeln.
+      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true, leagueStaff: true, hint: "Einzelne Turniere – K.-o., Gruppen, Jeder gegen jeden" },
       // Liga (docs/LIGA.md, #1622): Liga → Season → Liga N → Staffel; die Staffel selbst ist ein Turnier.
       { to: "/admin/leagues", label: "Liga", icon: Layers, areas: ["leagues"], leagueStaff: true, hint: "Vereinsliga – Seasons, Ligen, Staffeln" },
       // Events unter eSports (#2111, F6): sie brauchen den Bereich Turniere - Content-Leute sahen sie nie, Turnierleute
@@ -267,7 +268,7 @@ export function navGroupsFor(user, query, disabledPlatforms = []) {
     ...group,
     items: group.items.filter((item) => {
       if (item.platform && off.has(item.platform)) return false;
-      const allowed = item.duty ? duty : canUseArea(user, ...(item.areas || [])) || (item.staff && helper) || (item.leagueStaff && leagueStaff);
+      const allowed = item.duty ? duty : canUseArea(user, ...(item.areas || [])) || (item.staff && helper) || (item.leagueStaff && (leagueStaff || canUseArea(user, "leagues")));
       if (item.searchOnly && !searchQuery) return false;
       return allowed && itemMatchesQuery(item, group.label, searchQuery);
     }),

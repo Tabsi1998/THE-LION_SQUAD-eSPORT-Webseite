@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.13 - 2026-11-16
+
+- Mobile: Benachrichtigungen in drei Stufen mit „Eigene Auswahl“ und je Thema Push, Nur App oder Aus. (#2444)
+- Mobile: Ruhezeit von–bis mit Ausnahmen; danach eine Sammelmeldung, die die Glocke öffnet. (#2444)
+- Mobile: E-Mail, Discord und Kanal-Hauptschalter eingeklappt unter „Weitere Wege“. (#2444)
+- Mobile: Push-Anmeldung mit Installations-Kennung – kein zweiter Geräte-Eintrag mehr. (#2470)
+- Mobile: Zusammengelegte und entfallene Spiele zählen nicht mehr mit; Läufe-Karte sagt „Plätze frei“ nur vor dem Lauf. (#2459)
+- Mobile: Liga-Staffeln zeigen den Liga-Stand statt „Entwurf“. (#2453)
+- Mobile: Profil zeigt „Vereinsmitglied · Funktion“ mit Weg zum Vereinsprofil. (#1267)
+- Mobile: Erfolgs- und Level-Zeremonien kommen nur noch einmal je Konto statt auf jedem Gerät. (#2450)
+
 ## 1.7.12 - 2026-11-16
 
 - Mobile: Turnier-Cockpit für die Turnierleitung vor Ort: Probleme nach Dringlichkeit, Stationen aufrufen, starten, freigeben und Defekt melden. (#2393)
