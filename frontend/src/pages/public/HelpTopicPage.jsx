@@ -152,7 +152,7 @@ export default function HelpTopicPage() {
                 <ol className="mt-1 space-y-0.5">
                   {abschnitt.schritte.map((schritt) => (
                     <li key={schritt.id}>
-                      <a href={`#${schritt.id}`} className="inline-block py-0.5 text-sm text-white/60 hover:text-[#29B6E8]">
+                      <a href={`#${schritt.id}`} className="flex min-h-[44px] items-center text-sm text-white/60 hover:text-[#29B6E8] sm:inline-block sm:min-h-0 sm:py-0.5">
                         {steps.find((row) => row.id === schritt.id)?.nummer}. {schritt.titel}
                       </a>
                     </li>
