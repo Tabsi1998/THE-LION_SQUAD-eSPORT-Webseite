@@ -14,24 +14,31 @@ import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/Squa
 import { ParticipantRemovalActions } from "@/pages/admin/tournament/ParticipantRemovalActions";
 import { fixedRegistrationIds, normalizeSearch } from "@/pages/admin/tournament/shared";
 import { SquadKaderSheet } from "../SquadKaderSheet";
-import { ACTIVE_STAFFEL_REGISTRATION, registrationLateText } from "./staffelPage";
+import { ACTIVE_STAFFEL_REGISTRATION, kaderLine, registrationLateText } from "./staffelPage";
 
 const nameOf = (registration) => registration.display_name || registration.squad_name || registration.user?.display_name || registration.ingame_name || "Co-Team";
 const SMALL_BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 text-[11px] font-bold uppercase tracking-wider";
 
-function Assigned({ status }) {
-  if (ACTIVE_STAFFEL_REGISTRATION.has(status)) {
-    return <span data-testid="status-assigned" className="inline-flex items-center gap-1 rounded-sm border border-ok/50 bg-ok/15 px-2 py-[3px] text-[10px] font-bold uppercase tracking-wider text-ok">Zugeteilt</span>;
-  }
-  return <StatusBadge status={status} />;
+/** Kader-Hinweis aus der Kaderübersicht der Season („6 im Kader · alle IDs gültig“) - nur, wenn sie geladen ist („Kader prüfen“). */
+function KaderHint({ registration, squad }) {
+  const line = kaderLine(squad);
+  if (!line) return null;
+  return (
+    <div className={`mt-1 text-xs ${line.warn ? "text-warn" : "text-white/60"}`} data-testid={`staffel-reg-kaderline-${registration.id}`}>{line.text}</div>
+  );
 }
 
-/** Was an einem Co-Team hängt: nachgemeldet, aktive Strafen (mit Link in den Strafen-Reiter der Season). */
+/**
+ * Was an einem Co-Team abweicht: ausgetreten oder disqualifiziert, nachgemeldet, aktive Strafen (mit Link in den Strafen-Reiter der
+ * Season). Wer ganz normal zugeteilt ist, trägt kein Kennzeichen - „Zugeteilt“ in jeder Zeile wäre nur Rauschen.
+ */
 function Marks({ registration, sanctions = [], seasonId }) {
   const late = registrationLateText(registration);
-  if (!late && !sanctions.length) return null;
+  const left = !ACTIVE_STAFFEL_REGISTRATION.has(registration.status);
+  if (!late && !left && !sanctions.length) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5">
+      {left ? <span className="inline-flex min-h-[24px] items-center" data-testid={`staffel-reg-status-${registration.id}`}><StatusBadge status={registration.status} /></span> : null}
       {late ? (
         <span className="inline-flex items-center rounded-sm border border-brand/40 bg-brand/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand" data-testid={`staffel-reg-late-${registration.id}`}>{late}</span>
       ) : null}
@@ -120,9 +127,9 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
       {registrations.length > 6 ? (
         <label className="relative block">
           <span className="sr-only">Co-Team suchen</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" aria-hidden="true" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" aria-hidden="true" />
           <input value={query} onChange={(event) => setQuery(event.target.value)} data-testid="staffel-reg-search" placeholder="Co-Team oder Team suchen"
-            className="min-h-[44px] w-full rounded-sm border border-white/10 bg-[#0A0A0A] pl-10 pr-3 text-base text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none md:text-sm" />
+            className="min-h-[44px] w-full rounded-sm border border-white/10 bg-[#0A0A0A] pl-10 pr-3 text-base text-white placeholder:text-white/55 focus:border-[#29B6E8]/60 focus:outline-none md:text-sm" />
         </label>
       ) : null}
 
@@ -133,41 +140,40 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
             <li key={registration.id} className="space-y-3 p-4" data-testid={`staffel-reg-card-${registration.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-widest text-white/35">#{index + 1}</div>
+                  <div className="text-[11px] uppercase tracking-widest text-white/60">#{index + 1}</div>
                   <div className="mt-0.5 font-heading font-bold uppercase [overflow-wrap:anywhere]">{nameOf(registration)}</div>
+                  <KaderHint registration={registration} squad={squads[registration.id]} />
                   <LineupMark info={lineups[registration.id]} />
                   <Marks registration={registration} sanctions={sanctions[registration.id]} seasonId={seasonId} />
                 </div>
-                <div className="shrink-0"><Assigned status={registration.status} /></div>
               </div>
               <Actions {...rowProps(registration)} />
             </li>
           ))}
-          {shown.length === 0 ? <li className="px-4 py-10 text-center text-sm text-white/45" data-testid="staffel-reg-empty">{empty}</li> : null}
+          {shown.length === 0 ? <li className="px-4 py-10 text-center text-sm text-white/60" data-testid="staffel-reg-empty">{empty}</li> : null}
         </ul>
         <table className="hidden w-full table-fixed text-sm md:table">
-          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/60">
             <tr>
               <th scope="col" className="w-12 px-4 py-3 text-left">#</th>
               <th scope="col" className="px-4 py-3 text-left">Co-Team</th>
-              <th scope="col" className="w-32 px-4 py-3 text-left">Stand</th>
               <th scope="col" className="w-[22rem] px-4 py-3 text-right xl:w-[29rem]">Aktion</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {shown.map((registration, index) => (
               <tr key={registration.id} data-testid={`staffel-reg-row-${registration.id}`}>
-                <td className="px-4 py-3 align-top text-white/50 tabular-nums">{index + 1}</td>
+                <td className="px-4 py-3 align-top text-white/60 tabular-nums">{index + 1}</td>
                 <td className="min-w-0 px-4 py-3 align-top">
                   <div className="font-semibold text-white [overflow-wrap:anywhere]">{nameOf(registration)}</div>
+                  <KaderHint registration={registration} squad={squads[registration.id]} />
                   <LineupMark info={lineups[registration.id]} />
                   <Marks registration={registration} sanctions={sanctions[registration.id]} seasonId={seasonId} />
                 </td>
-                <td className="px-4 py-3 align-top"><Assigned status={registration.status} /></td>
                 <td className="px-4 py-3 align-top"><Actions {...rowProps(registration)} /></td>
               </tr>
             ))}
-            {shown.length === 0 ? <tr><td colSpan={4} className="px-4 py-10 text-center text-white/45">{empty}</td></tr> : null}
+            {shown.length === 0 ? <tr><td colSpan={3} className="px-4 py-10 text-center text-white/60">{empty}</td></tr> : null}
           </tbody>
         </table>
       </div>
