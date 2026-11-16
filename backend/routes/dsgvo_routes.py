@@ -237,6 +237,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("achievement_signals", _rows(db.user_signals, me)),
         ("news_reads", _rows(db.news_reads, me)),
         ("stream_watches", _rows(db.stream_watches, me)),
+        # Zeremonie einmal je Konto (#2450): gesehener Level-Stand, gesehene Neuberechnungen, erster Abruf.
+        ("ceremony_seen", _rows(db.ceremony_seen, me)),
         # Adventkalender (#641): welches Türchen wann geöffnet wurde - beim Quiz nur, dass mitgemacht wurde.
         ("advent_openings", _rows(db.advent_openings, me)),
         # Ostereiersuche (#646): welche Eier wann gefunden wurden und der Korb.
