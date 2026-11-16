@@ -33,20 +33,28 @@ class Spec:
     # Art + Schlüssel: diese Felder gleich heißt „dasselbe Problem“; leer = nur diese eine Zeile.
     group: tuple[str, ...]
     label: str
+    # Ohne einen dieser Werte (oder mit einem Sammelwert wie „custom“) ist der Schlüssel zu grob - dann nur die Zeile.
+    anchor: tuple[str, ...] = ()
 
 
 # Quelle -> Sammlung, was dort ein Problem ist, wann es (zuletzt) auftrat, und was „dasselbe“ heißt.
 SPECS: dict[str, Spec] = {
     "checks": Spec("ops_check_episodes", {"open": True, "status": {"$ne": "ok"}}, ("since",), ("status", "signature"),
-                   "Auto-Checks: Ampel (gelb/rot) + betroffene Prüfungen"),
-    "alerts": Spec("ops_alert_log", {"kind": {"$ne": "test"}}, ("at",), ("kind", "key"), "Alarme: Ereignisart + Alarmschlüssel"),
+                   "Auto-Checks: Ampel (gelb/rot) + betroffene Prüfungen", ("signature",)),
+    "alerts": Spec("ops_alert_log", {"kind": {"$ne": "test"}}, ("at",), ("kind", "key"), "Alarme: Ereignisart + Alarmschlüssel", ("key",)),
     "client": Spec("mobile_client_logs", {"status": "open"}, ("received_at", "created_at"), ("level", "fingerprint"),
-                   "App-Logs: Stufe + Fingerabdruck"),
-    "email": Spec("email_logs", {"status": {"$in": ["failed", "skipped"]}}, ("created_at",), ("status", "channel", "template_key", "event_key"),
-                  "E-Mail-Versand: Stand + Weg + Vorlage bzw. Anlass"),
+                   "App-Logs: Stufe + Fingerabdruck", ("fingerprint",)),
+    # Fehler bzw. Grund gehören dazu (Review #2447): eine andere Ursache ist ein anderes Problem; Discord je Server und Ziel.
+    "email": Spec("email_logs", {"status": {"$in": ["failed", "skipped"]}}, ("created_at",),
+                  ("status", "channel", "template_key", "event_key", "guild_id", "target", "reason", "error"),
+                  "E-Mail-Versand: Stand + Weg + Vorlage bzw. Anlass + Discord-Server und Ziel + Grund/Fehlertext; freie Mails (custom) einzeln",
+                  ("template_key", "event_key")),
     "mail_queue": Spec("mail_jobs", {"status": "failed"}, ("updated_at", "created_at"), (), "Mail-Queue: der einzelne Auftrag"),
-    "uploads": Spec("upload_events", {"status": {"$ne": "success"}}, ("created_at",), (), "Uploads: der einzelne Upload"),
+    # Nur echte Fehlschläge - ein laufender oder unbekannter Stand ist kein Problem.
+    "uploads": Spec("upload_events", {"status": {"$in": ["failed", "client_failed"]}}, ("created_at",), (), "Uploads: der einzelne Upload"),
 }
+# Sammelwerte, die keinen Anlass benennen: so eine Zeile wird nur einzeln quittiert.
+GENERIC_KEYS = frozenset({"custom"})
 # Serverfehler (Fehlergruppe = Art + Fingerabdruck), Dolibarr-Abgleich und Discord-Bot haben ihren Stand anderswo.
 STATE_SOURCES = ("server", "sync", "bot")
 ACKABLE_SOURCES = (*SPECS, *STATE_SOURCES)
@@ -85,6 +93,26 @@ def ack_valid(row: dict, time_keys: tuple[str, ...]) -> bool:
     return seen is None or seen <= acked
 
 
+def _occurrence_expr(spec: Spec):
+    """Der erste vorhandene Zeitschlüssel; ohne jeden ein leerer Text (so vergleicht MongoDB ein fehlendes Feld -
+    mongomock bräche sonst ab)."""
+    expr = ""
+    for key in reversed(spec.time_keys):
+        expr = {"$ifNull": [f"${key}", expr]}
+    return expr
+
+
+def open_filter(spec: Spec) -> dict:
+    """Die Regel von ``ack_valid`` als Mongo-Bedingung (#2447): nie quittiert oder danach wieder aufgetreten. Die
+    Zeitpunkte sind ISO-Texte aus ``now_utc().isoformat()`` - gleich geschrieben, also als Text vergleichbar."""
+    return {"$or": [{"acknowledged_at": None}, {"$expr": {"$gt": [_occurrence_expr(spec), "$acknowledged_at"]}}]}
+
+
+def until_filter(spec: Spec, until: str | None) -> dict:
+    """Nur, was spätestens ``until`` auftrat - was nach dem Laden der Seite neu kam, bleibt offen."""
+    return {"$expr": {"$lte": [_occurrence_expr(spec), str(until)]}} if until else {}
+
+
 def _and(*parts: dict) -> dict:
     parts = tuple(part for part in parts if part)
     if not parts:
@@ -99,22 +127,15 @@ async def problem_rows(db, source: str, query: dict, sort, limit: int, *, projec
     viele quittierte Zeilen die offenen nicht aus dem Fenster drängen."""
     spec = SPECS[source]
     collection = getattr(db, spec.collection)
-    base = _and(query, spec.problem)
-    fields = projection or {"_id": 0}
-    fresh = await collection.find(_and(base, {"acknowledged_at": None}), fields).sort(sort).limit(limit).to_list(limit)
-    acked = await collection.find(_and(base, {"acknowledged_at": {"$ne": None}}), fields).sort(sort).limit(limit).to_list(limit)
-    rows = fresh + [row for row in acked if not ack_valid(row, spec.time_keys)]
+    rows = await collection.find(_and(query, spec.problem, open_filter(spec)), projection or {"_id": 0}).sort(sort).limit(limit).to_list(limit)
     rows.sort(key=lambda row: occurrence(row, spec.time_keys) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-    return rows[:limit]
+    return rows
 
 
 async def _count_open_rows(db, source: str) -> int:
+    """Gezählt in der Datenbank (Review #2447, N6) - keine Zeilen nach Python."""
     spec = SPECS[source]
-    collection = getattr(db, spec.collection)
-    fresh = await collection.count_documents(_and(spec.problem, {"acknowledged_at": None}))
-    acked = await collection.find(_and(spec.problem, {"acknowledged_at": {"$ne": None}}),
-                                  {"_id": 0, "acknowledged_at": 1, **{key: 1 for key in spec.time_keys}}).to_list(ACK_SCAN_LIMIT)
-    return fresh + sum(1 for row in acked if not ack_valid(row, spec.time_keys))
+    return await getattr(db, spec.collection).count_documents(_and(spec.problem, open_filter(spec)))
 
 
 def sync_open(state: dict) -> bool:
@@ -201,10 +222,12 @@ async def alert_resolutions(db, rows: list[dict]) -> dict[str, str]:
     return resolved
 
 
-async def _open_alerts(db, *, limit: int = ACK_SCAN_LIMIT) -> list[dict]:
+async def _open_alerts(db, *, limit: int = ACK_SCAN_LIMIT, until: str | None = None) -> list[dict]:
+    """Offene Alarme: nicht quittiert und nicht behoben. Das Gegenstück prüft Python (``alert_resolutions``); die
+    Sammlung ist klein (ein Eintrag je gesendetem Alarm, nach einem Jahr gelöscht)."""
     spec = SPECS["alerts"]
-    rows = await db.ops_alert_log.find(_and(spec.problem, {"resolved_at": None}), {"_id": 0}).sort("at", -1).to_list(limit)
-    rows = [row for row in rows if not ack_valid(row, spec.time_keys)]
+    rows = await db.ops_alert_log.find(_and(spec.problem, {"resolved_at": None}, open_filter(spec), until_filter(spec, until)),
+                                       {"_id": 0, "id": 1, "key": 1, "at": 1, "resolved_at": 1}).sort("at", -1).to_list(limit)
     resolved = await alert_resolutions(db, rows)
     return [row for row in rows if row.get("id") not in resolved]
 
@@ -237,9 +260,14 @@ async def actor_names(db, ids) -> dict[str, str]:
 
 # ---------------------------------------------------------------- Quittieren
 
+class NotOpen(Exception):
+    """Der Eintrag ist kein offenes Problem (kein Fehler, schon quittiert oder erledigt) - 409, kein Protokoll."""
+
+
 def _group_filter(spec: Spec, row: dict) -> dict:
-    """Art + Schlüssel dieser Zeile. Fehlt der Schlüssel ganz (alte Zeilen), zählt nur die Zeile selbst."""
-    if not spec.group or not any(row.get(field) for field in spec.group[1:]):
+    """Art + Schlüssel dieser Zeile. Fehlt der Anker oder ist er ein Sammelwert („custom“), zählt nur die Zeile selbst."""
+    anchored = any(row.get(field) and str(row.get(field)) not in GENERIC_KEYS for field in spec.anchor)
+    if not spec.group or not anchored:
         return {"id": row["id"]}
     return {field: row.get(field) for field in spec.group}
 
@@ -248,16 +276,28 @@ def _stamp(actor: dict) -> dict:
     return {"acknowledged_at": now_utc().isoformat(), "acknowledged_by": actor.get("id")}
 
 
+def _modified(result) -> int:
+    return int(getattr(result, "modified_count", 0) or 0)
+
+
+async def _resolve_server(db, query: dict, actor: dict) -> int:
+    result = await db.ops_errors.update_many(_and(query, {"resolved_at": None}),
+                                             {"$set": {"resolved_at": now_utc().isoformat(), "resolved_by": actor.get("id")}})
+    return _modified(result)
+
+
 async def acknowledge(db, source: str, item_id: str, actor: dict) -> dict:
-    """Einen Eintrag quittieren - und alle offenen mit demselben Schlüssel. ``LookupError``, wenn es ihn nicht gibt."""
+    """Einen Eintrag quittieren - und alle offenen mit demselben Schlüssel. Nur Offenes wird geschrieben: wer schon
+    gültig quittiert hat, bleibt stehen (Review #2447, M3). ``LookupError``: gibt es nicht; ``NotOpen``: kein offenes
+    Problem (nichts geschrieben)."""
     if source == "server":
-        row = await db.ops_errors.find_one({"$or": [{"fingerprint": item_id}, {"id": item_id}]}, {"_id": 0, "fingerprint": 1, "error_type": 1})
+        row = await db.ops_errors.find_one({"$or": [{"fingerprint": item_id}, {"id": item_id}]}, {"_id": 0, "fingerprint": 1, "error_type": 1, "resolved_at": 1})
         if not row:
             raise LookupError(source)
-        from services.ops_monitor import set_error_resolved
-
-        await set_error_resolved(db, row["fingerprint"], True, actor_id=actor.get("id"))
-        return {"count": 1, "kind": row.get("error_type") or "", "key": row["fingerprint"]}
+        if row.get("resolved_at"):
+            raise NotOpen(source)
+        count = await _resolve_server(db, {"fingerprint": row["fingerprint"]}, actor)
+        return {"count": count, "kind": row.get("error_type") or "", "key": row["fingerprint"]}
     if source in ("sync", "bot"):
         return await _acknowledge_state(db, source, actor)
     spec = SPECS.get(source)
@@ -267,13 +307,22 @@ async def acknowledge(db, source: str, item_id: str, actor: dict) -> dict:
     row = await collection.find_one({"id": item_id}, {"_id": 0})
     if not row:
         raise LookupError(source)
+    if not await collection.count_documents(_and({"id": item_id}, spec.problem, open_filter(spec))):
+        raise NotOpen(source)
     group = _group_filter(spec, row)
-    result = await collection.update_many({"$or": [{"id": item_id}, _and(group, spec.problem)]}, {"$set": _stamp(actor)})
-    key = " · ".join(str(group[field] or "") for field in spec.group[1:]) if "id" not in group else item_id
-    return {"count": int(getattr(result, "modified_count", 0) or 0), "kind": str(row.get(spec.group[0] if spec.group else "status") or ""), "key": key}
+    result = await collection.update_many(_and(group, spec.problem, open_filter(spec)), {"$set": _stamp(actor)})
+    key = " · ".join(str(group[field] or "") for field in spec.group[1:] if group.get(field)) if "id" not in group else item_id
+    return {"count": _modified(result), "kind": str(row.get(spec.group[0] if spec.group else "status") or ""), "key": key}
 
 
-async def _acknowledge_state(db, source: str, actor: dict) -> dict:
+def _state_occurrence(source: str, state: dict) -> str:
+    if source == "sync":
+        error = state.get("last_error") if isinstance(state.get("last_error"), dict) else {}
+        return str(state.get("last_run_at") or error.get("at") or "")
+    return str(state.get("updated_at") or "")
+
+
+async def _acknowledge_state(db, source: str, actor: dict, until: str | None = None) -> dict:
     state_id = SYNC_STATE_ID if source == "sync" else BOT_STATE_ID
     state = await db.settings.find_one({"id": state_id}, {"_id": 0}) or {}
     stamp = _stamp(actor)
@@ -281,38 +330,65 @@ async def _acknowledge_state(db, source: str, actor: dict) -> dict:
         error = state.get("last_error") if isinstance(state.get("last_error"), dict) else None
         if not error:
             raise LookupError(source)
+        if not sync_open(state):
+            raise NotOpen(source)
         ack = {"at": stamp["acknowledged_at"], "by": stamp["acknowledged_by"], "kind": error.get("kind"), "text": error.get("text")}
         kind, key = str(error.get("kind") or ""), "dolibarr:sync"
     else:
         error = bot_error(state)
         if not error:
             raise LookupError(source)
+        if not bot_open(state):
+            raise NotOpen(source)
         ack = {"at": stamp["acknowledged_at"], "by": stamp["acknowledged_by"], "error": error}
         kind, key = "error", "discord:bot"
+    seen, bound = moment(_state_occurrence(source, state)), moment(until)
+    if bound and seen and seen > bound:
+        raise NotOpen(source)
     await db.settings.update_one({"id": state_id}, {"$set": {"ack": ack}})
     return {"count": 1, "kind": kind, "key": key}
 
 
-async def acknowledge_all(db, sources, actor: dict) -> dict[str, int]:
-    """„Alle quittieren“: alles Offene der Quellen (leer = alle). Liefert je Quelle, wie viele offen waren."""
+async def _ack_source(db, source: str, actor: dict, *, until: str | None, ids: list[str] | None = None) -> int:
+    """Alles Offene einer Quelle bis ``until`` - mit ``ids`` nur diese Einträge. Gibt die geschriebenen Zeilen zurück."""
+    if source == "server":
+        query = _and({"last_seen_at": {"$lte": until}} if until else {}, {"$or": [{"fingerprint": {"$in": ids}}, {"id": {"$in": ids}}]} if ids is not None else {})
+        return await _resolve_server(db, query, actor)
+    if source in ("sync", "bot"):
+        try:
+            return (await _acknowledge_state(db, source, actor, until))["count"]
+        except (LookupError, NotOpen):
+            return 0
+    if source == "alerts":
+        open_ids = [row["id"] for row in await _open_alerts(db, until=until) if row.get("id")]
+        if ids is not None:
+            open_ids = [value for value in open_ids if value in set(ids)]
+        if not open_ids:
+            return 0
+        return _modified(await db.ops_alert_log.update_many({"id": {"$in": open_ids}}, {"$set": _stamp(actor)}))
+    spec = SPECS[source]
+    query = _and(spec.problem, open_filter(spec), until_filter(spec, until), {"id": {"$in": ids}} if ids is not None else {})
+    return _modified(await getattr(db, spec.collection).update_many(query, {"$set": _stamp(actor)}))
+
+
+async def acknowledge_all(db, sources, actor: dict, *, until: str | None = None) -> dict[str, int]:
+    """„Alle quittieren“ ohne Filter (Überblick): alles Offene der Quellen (leer = alle), das spätestens ``until``
+    auftrat. Liefert je Quelle die wirklich geschriebenen Einträge."""
     wanted = [source for source in (sources or ACKABLE_SOURCES) if source in ACKABLE_SOURCES]
-    done: dict[str, int] = {}
-    for source in wanted:
-        count = await open_count(db, source)
-        if not count:
-            continue
-        if source == "server":
-            await db.ops_errors.update_many({"resolved_at": None}, {"$set": {"resolved_at": now_utc().isoformat(), "resolved_by": actor.get("id")}})
-        elif source in ("sync", "bot"):
-            await _acknowledge_state(db, source, actor)
-        elif source == "alerts":
-            ids = [row["id"] for row in await _open_alerts(db) if row.get("id")]
-            await db.ops_alert_log.update_many({"id": {"$in": ids}}, {"$set": _stamp(actor)})
-        else:
-            spec = SPECS[source]
-            await getattr(db, spec.collection).update_many(spec.problem, {"$set": _stamp(actor)})
-        done[source] = count
-    return done
+    done = {source: await _ack_source(db, source, actor, until=until) for source in wanted}
+    return {source: count for source, count in done.items() if count}
+
+
+async def acknowledge_items(db, items: list[dict], actor: dict, *, until: str | None = None) -> dict[str, int]:
+    """„Alle quittieren“ mit Filter (Ereignisse): genau die gezeigten Einträge (Quelle + ``ack_id``), ohne Gleiche
+    außerhalb der Auswahl, und nur, was seit dem Laden nicht wieder auftrat (Review #2447, M2)."""
+    by_source: dict[str, list[str]] = {}
+    for item in items:
+        source, value = str(item.get("source") or ""), str(item.get("id") or "")
+        if source in ACKABLE_SOURCES and value:
+            by_source.setdefault(source, []).append(value)
+    done = {source: await _ack_source(db, source, actor, until=until, ids=list(dict.fromkeys(ids))) for source, ids in by_source.items()}
+    return {source: count for source, count in done.items() if count}
 
 
 def episode_resolution(row: dict) -> tuple[str, str] | None:

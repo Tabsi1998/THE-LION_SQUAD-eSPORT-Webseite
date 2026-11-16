@@ -46,7 +46,7 @@ DYNAMIC = {
     "routes/admin_routes.py:_rows:getattr(db, ops_acks.SPECS[source].collection)": OPS_ACKS,
     "services/ops_acks.py:_count_open_rows:getattr(db, spec.collection)": OPS_ACKS,
     "services/ops_acks.py:acknowledge:getattr(db, spec.collection)": OPS_ACKS,
-    "services/ops_acks.py:acknowledge_all:getattr(db, spec.collection)": OPS_ACKS,
+    "services/ops_acks.py:_ack_source:getattr(db, spec.collection)": OPS_ACKS,
     "services/ops_acks.py:problem_rows:getattr(db, spec.collection)": OPS_ACKS,
     # Bestand fürs Backup-Manifest (#1009/#1010): zählt nur, liest keine Inhalte und schreibt nichts.
     "services/backup_inventory.py:collection_counts:db[name]": "alle Sammlungen, nur gezählt (Backup-Manifest)",

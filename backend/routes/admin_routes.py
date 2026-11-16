@@ -5,6 +5,7 @@ import logging
 import json
 import re
 from datetime import datetime, timezone, timedelta
+from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from database import get_db
@@ -423,7 +424,8 @@ class OpsAlertSettingsBody(BaseModel):
     red_reminder_hours: int | None = None
     rules: dict[str, dict[str, bool]] | None = None
     retention_days: dict[str, int] | None = None
-    upload_routes: list[str] | str | None = None
+    # Upload-Routen (#2447): höchstens 40 Zeilen zu je 210 Zeichen - als Liste oder Text mit einer Route je Zeile.
+    upload_routes: Annotated[list[Annotated[str, Field(max_length=210)]], Field(max_length=40)] | Annotated[str, Field(max_length=9000)] | None = None
 
 
 @router.get("/ops/alerts")
@@ -558,7 +560,7 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "", open_only: b
                               status=row.get("status") or "", title=row.get("filename") or "Upload",
                               subtitle=" · ".join(filter(None, [row.get("kind"), row.get("media_scope"), row.get("mime")])),
                               detail=row.get("detail") or (row.get("result") or {}).get("url") or "", time_keys=("created_at",)),
-                    row, ack_id=row.get("id") or "", spec_source="uploads")
+                    row, ack_id=row.get("id") or "", spec_source="uploads", problem=row.get("status") in {"failed", "client_failed"})
         for row in upload_rows
     ]
 
@@ -739,6 +741,8 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
     nur Discord-Meldungen dieses Servers. ``state`` (#2447): ``unacked`` (Vorgabe) blendet Quittiertes aus, ``all``
     zeigt es („Quittierte zeigen“), ``open`` nur offene Probleme - weder quittiert noch von selbst behoben."""
     db = get_db()
+    # Stand dieser Antwort (#2447): „Alle quittieren“ schickt ihn als ``until`` zurück.
+    as_of = now_utc().isoformat()
     since_iso = _since_iso_hours(hours)
     sources = await _log_sources(db, _safe_log_limit(min(limit, 200)), since_iso=since_iso, open_only=state == "open")
     wanted = {part.strip() for part in str(source or "all").split(",") if part.strip()} - {"all", ""}
@@ -775,6 +779,7 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
         return Response(content="﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8",
                         headers={"Content-Disposition": 'attachment; filename="ereignisse.csv"'})
     return {
+        "as_of": as_of,
         "items": items,
         "sources": [{key: value for key, value in entry.items() if key != "items"} for entry in sources],
         "summary": {
@@ -794,8 +799,17 @@ class OpsAckBody(BaseModel):
     id: str = Field(default="", max_length=200)
 
 
+class OpsAckItem(BaseModel):
+    source: str = Field(max_length=40)
+    id: str = Field(max_length=200)
+
+
 class OpsAckAllBody(BaseModel):
+    """Ohne ``items``: alles Offene der ``sources`` (Überblick, ohne Filter). Mit ``items``: genau diese gezeigten
+    Einträge (Ereignisse mit Filter). ``until``: der Stand beim Laden (``as_of``) - was danach auftrat, bleibt offen."""
     sources: list[str] | None = Field(default=None, max_length=20)
+    items: list[OpsAckItem] | None = Field(default=None, max_length=500)
+    until: str | None = Field(default=None, max_length=40)
 
 
 @router.post("/ops/events/ack")
@@ -809,20 +823,35 @@ async def ops_event_ack(body: OpsAckBody, me: dict = Depends(require_area("syste
         result = await ops_acks.acknowledge(db, body.source, body.id, me)
     except LookupError:
         raise HTTPException(status_code=404, detail="Eintrag nicht gefunden - vielleicht schon erledigt.")
+    except ops_acks.NotOpen:
+        raise HTTPException(status_code=409, detail="Kein offenes Problem - schon quittiert, erledigt oder gar kein Fehler.")
     await _ops_audit(db, me, "ops.event.ack", f"{body.source}:{body.id}"[:240], {"source": body.source, **result})
     return {"source": body.source, **result}
 
 
 @router.post("/ops/events/ack-all")
 async def ops_events_ack_all(body: OpsAckAllBody, me: dict = Depends(require_area("system"))):
-    """„Alle quittieren“ (#2447): alles Offene der genannten Quellen (ohne Angabe: aller). Die Seite fragt vorher nach."""
-    wanted = [source for source in (body.sources or []) if source in ops_acks.ACKABLE_SOURCES]
-    if body.sources and not wanted:
-        raise HTTPException(status_code=400, detail="Diese Quellen lassen sich nicht quittieren.")
+    """„Alle quittieren“ (#2447): ohne Filter alles Offene der Quellen, mit Filter genau die gezeigten Einträge - jeweils
+    nur, was bis zum Laden der Seite auftrat. Die Seite fragt vorher nach; die Antwort nennt die wirklich quittierten."""
+    until = None
+    if body.until:
+        stamp = ops_acks.moment(body.until)
+        if stamp is None:
+            raise HTTPException(status_code=400, detail="Ungültiger Zeitpunkt.")
+        until = stamp.isoformat()
     db = get_db()
-    done = await ops_acks.acknowledge_all(db, wanted or None, me)
+    if body.items is not None:
+        done = await ops_acks.acknowledge_items(db, [item.model_dump() for item in body.items], me, until=until)
+        scope = sorted({item.source for item in body.items})
+    else:
+        wanted = [source for source in (body.sources or []) if source in ops_acks.ACKABLE_SOURCES]
+        if body.sources and not wanted:
+            raise HTTPException(status_code=400, detail="Diese Quellen lassen sich nicht quittieren.")
+        done = await ops_acks.acknowledge_all(db, wanted or None, me, until=until)
+        scope = wanted or ["all"]
     total = sum(done.values())
-    await _ops_audit(db, me, "ops.event.ack_all", None, {"sources": wanted or ["all"], "counts": done, "count": total})
+    if total:
+        await _ops_audit(db, me, "ops.event.ack_all", None, {"sources": scope, "counts": done, "count": total, "until": until})
     return {"acknowledged": done, "total": total}
 
 
