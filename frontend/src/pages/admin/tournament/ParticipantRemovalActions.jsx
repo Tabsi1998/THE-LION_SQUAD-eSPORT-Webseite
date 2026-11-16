@@ -48,8 +48,9 @@ export function canRemoveParticipants(tournament) {
   return Boolean(tournament?.league_context ? tournament?.can_manage_participants : tournament?.can_manage_structure);
 }
 
-// ``allowed``: das Recht von außen (Staffel-Seite der Liga-Verwaltung); ohne Angabe gilt `canRemoveParticipants`.
-export function ParticipantRemovalActions({ tournament, registration, onDone, compact = false, allowed }) {
+// ``allowed``: das Recht von außen (Staffel-Seite der Liga-Verwaltung); ohne Angabe gilt `canRemoveParticipants`. ``touch``: Knöpfe
+// mit 44 px Tippfläche (Staffel-Seite, #2262) - die Turnierverwaltung bleibt, wie sie ist.
+export function ParticipantRemovalActions({ tournament, registration, onDone, compact = false, allowed, touch = false }) {
   const [plan, setPlan] = useState(null);
   const [kind, setKind] = useState("");
   const [reason, setReason] = useState("");
@@ -125,7 +126,9 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
   };
   cancelRef.current = cancel;
 
-  const buttonClass = compact
+  const buttonClass = touch
+    ? "inline-flex min-h-[44px] items-center justify-center px-3 border border-live/40 text-live rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50"
+    : compact
     ? "px-2 py-2 border border-live/40 text-live rounded-sm text-[10px] font-bold uppercase disabled:opacity-50"
     : "px-2 py-1 border border-live/40 text-live rounded-sm text-[10px] font-bold uppercase disabled:opacity-50";
   const ops = Array.isArray(plan?.ops) ? plan.ops.filter(Boolean) : [];

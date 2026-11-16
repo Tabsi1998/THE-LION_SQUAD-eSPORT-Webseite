@@ -1,0 +1,182 @@
+// Staffel-Seite der Liga-Verwaltung (#2262) unter /admin/leagues/staffeln/<id>: eine Liga-Staffel bedienen, ohne in die
+// Turnierverwaltung zu wechseln. Reiter nach dem Muster der Season-Seite (lib/staffelTabs.js), per Sprungmarke ansteuerbar
+// (`#teilnehmer`, `#zuteilen`). Die Seite wächst in Paketen neben der alten Bedienung (Entscheidung Nr. 189): Paket A bringt
+// Überblick und Teilnehmer; bis Paket D bleibt die Turnierbearbeitung voll nutzbar, Ziele ohne eigenen Reiter führen noch dorthin.
+//
+// Daten wie in der Turnierverwaltung: `GET /tournaments/{id}?include_draft=true` (Rechte als `league_capabilities` und `can_*`,
+// `league_links`, `league_season`), dazu Anmeldungen und Spiele. Knöpfe nur nach den Rechten des Servers - er prüft selbst noch einmal.
+import { useCallback, useEffect, useId, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
+import { toast } from "sonner";
+import { api, formatRequestError } from "@/lib/api";
+import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminTabBar } from "@/components/tls/AdminTabBar";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
+import { useTeamLineups } from "@/components/tls/tournament/LineupMark";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { seasonAnchorUrl } from "@/lib/seasonTabs";
+import { STAFFEL_TABS, STAFFEL_TABS_READY, staffelTarget } from "@/lib/staffelTabs";
+import { StaffelStandBadge, isStaffel, staffelLabel } from "@/pages/admin/tournament/StaffelParts";
+import { useTournamentStatus } from "@/pages/admin/tournament/useTournamentStatus";
+import { StaffelOverviewTab } from "./staffel/StaffelOverviewTab";
+import { StaffelParticipantsTab } from "./staffel/StaffelParticipantsTab";
+import { sanctionsByRegistration } from "./staffel/staffelPage";
+
+// Satz des Servers ohne Liga-Recht (`league_permissions.NO_LEAGUE_RIGHT`) - die Seite zeigt ihn auch, wenn der Server die Staffel
+// liefert, aber keine Zuständigkeit nennt (etwa nur Bereich Turniere).
+const NO_LEAGUE_RIGHT = "Dafür fehlt dir das Recht in dieser Liga. Den Bereich „Ligen“ vergibt der Superadmin unter Admin → Alle Benutzer, Zuständige vergibt der Bereich „Ligen“ auf der Liga-Seite.";
+const TABS = STAFFEL_TABS.filter((tab) => STAFFEL_TABS_READY.has(tab.key));
+
+/** Rollt zu einem Abschnitt (`#zuteilen`), sobald er gezeichnet ist. */
+function useScrollToSection(section, ready) {
+  useEffect(() => {
+    if (!section || !ready) return undefined;
+    const timer = window.setTimeout(() => document.getElementById(section)?.scrollIntoView?.({ block: "start" }), 60);
+    return () => window.clearTimeout(timer);
+  }, [section, ready]);
+}
+
+function Breadcrumbs({ tournament }) {
+  const links = tournament.league_links || {};
+  const seasonPath = links.season_admin_path || seasonAnchorUrl(tournament.league_context?.season_id);
+  const season = [links.league_name, links.season_name].filter(Boolean).join(" · ") || "Season";
+  const crumb = "inline-flex min-h-[44px] items-center hover:text-[#29B6E8] [overflow-wrap:anywhere]";
+  return (
+    <nav aria-label="Brotkrumen" data-testid="staffel-breadcrumbs">
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs font-bold uppercase tracking-wider text-white/50">
+        <li><Link to="/admin/leagues" className={crumb} data-testid="staffel-crumb-leagues">Liga</Link></li>
+        <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
+        <li className="min-w-0"><Link to={seasonPath} className={crumb} data-testid="staffel-crumb-season">{season}</Link></li>
+        {/* Am Handy steht die Staffel gleich darunter als Überschrift - die letzte Stufe nur ab 640 px. */}
+        <li aria-hidden="true" className="hidden sm:block"><ChevronRight className="h-3.5 w-3.5" /></li>
+        <li className="hidden min-w-0 text-white/75 sm:block [overflow-wrap:anywhere]" aria-current="page">{staffelLabel(tournament)}</li>
+      </ol>
+    </nav>
+  );
+}
+
+export default function AdminLeagueStaffelPage() {
+  const { tournamentId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
+  const idBase = useId().replace(/:/g, "");
+  const target = staffelTarget(location.hash);
+  const [t, setT] = useState(null);
+  const [registrations, setRegistrations] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [sanctions, setSanctions] = useState([]);
+  const [squads, setSquads] = useState({});
+  const [error, setError] = useState("");
+  const lineups = useTeamLineups(t);
+
+  const load = useCallback(async () => {
+    const { data } = await api.get(`/tournaments/${tournamentId}?include_draft=true`);
+    setT(data);
+    if (!isStaffel(data) || !(data.league_capabilities || []).length) return;
+    const [regs, plan] = await Promise.all([
+      api.get(`/tournaments/${tournamentId}/registrations`),
+      api.get(`/tournaments/${tournamentId}/matches-v2`).catch(() => ({ data: [] })),
+    ]);
+    setRegistrations(Array.isArray(regs.data) ? regs.data : []);
+    setMatches(Array.isArray(plan.data) ? plan.data : []);
+    // Aktive Strafen (nur mit „Strafen“) und der Kader je Co-Team (nur mit „Kader prüfen“) - je für sich, ein Fehler hält die Seite nicht auf.
+    const seasonId = data.league_context.season_id;
+    const capabilities = data.league_capabilities;
+    if (capabilities.includes("sanctions")) {
+      api.get(`/admin/leagues/seasons/${seasonId}/sanctions`).then(({ data: body }) => setSanctions(body?.items || [])).catch(() => setSanctions([]));
+    }
+    if (capabilities.includes("roster")) {
+      api.get(`/admin/leagues/seasons/${seasonId}/roster`)
+        .then(({ data: body }) => setSquads(Object.fromEntries((body?.squads || []).filter((row) => row.squad_id).map((row) => [row.registration_id, row]))))
+        .catch(() => setSquads({}));
+    }
+  }, [tournamentId]);
+  const loadSafely = useCallback(() => load()
+    .then(() => setError(""))
+    .catch((failure) => setError(formatRequestError(failure, "Die Staffel konnte nicht geladen werden."))), [load]);
+  useEffect(() => { loadSafely(); }, [loadSafely]);
+  useApiInvalidation(loadSafely, ["tournaments", "matches", "leagues"]);
+
+  // Status und „Liga starten“ mit denselben Rückfragen wie in der Turnierverwaltung.
+  const { setTournStatus } = useTournamentStatus({ id: tournamentId, tournament: t, registrations, onChanged: loadSafely });
+
+  const tab = TABS.some((row) => row.key === target.tab) ? target.tab : TABS[0].key;
+  useScrollToSection(target.section, Boolean(t));
+  const go = (key) => navigate({ pathname: location.pathname, search: location.search, hash: key === TABS[0].key ? "" : `#${key}` }, { replace: true });
+
+  // Zuteilung zurücknehmen (#1649): nur ohne festes Spiel - danach Austritt oder Disqualifizieren.
+  const removeSquad = async (registration) => {
+    const name = registration.display_name || registration.squad_name || "Dieses Co-Team";
+    const ok = await confirm({
+      title: "Co-Team entfernen?",
+      description: `${name} wird aus der Staffel genommen. Eine Vorschau des Spielplans wird danach neu gemischt.`,
+      confirmLabel: "Entfernen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.delete(`/tournaments/${tournamentId}/squad-registrations/${registration.id}`);
+      toast.success(data?.auto_bracket_update?.match_count ? `${name} entfernt. Vorschau neu gemischt.` : `${name} entfernt.`);
+      loadSafely();
+    } catch (failure) {
+      toast.error(formatRequestError(failure, "Das Co-Team konnte nicht entfernt werden."));
+    }
+  };
+
+  if (!t) {
+    return (
+      <AdminLayout>
+        {error ? <p className="p-6 text-sm text-warn" role="alert" data-testid="staffel-error">{error}</p> : <div className="p-6"><SkeletonDetailHeader label="Lade Staffel" /></div>}
+      </AdminLayout>
+    );
+  }
+  if (!isStaffel(t)) {
+    return (
+      <AdminLayout>
+        <div className="max-w-xl space-y-3 p-2" data-testid="staffel-not-league">
+          <p className="text-sm text-white/70">„{t.title}“ ist ein Turnier, keine Liga-Staffel.</p>
+          <Link to={`/admin/tournaments/${encodeURIComponent(t.id)}`} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center rounded-sm px-4 text-xs font-bold uppercase tracking-wider">Zur Turnierverwaltung</Link>
+        </div>
+      </AdminLayout>
+    );
+  }
+  if (!(t.league_capabilities || []).length) {
+    return (
+      <AdminLayout>
+        <p className="max-w-xl p-2 text-sm text-warn" role="alert" data-testid="staffel-no-right">{NO_LEAGUE_RIGHT}</p>
+      </AdminLayout>
+    );
+  }
+
+  const bySanction = sanctionsByRegistration(sanctions, registrations, t.id);
+  const panels = {
+    ueberblick: () => <StaffelOverviewTab tournament={t} registrations={registrations} matches={matches} onStatus={setTournStatus} onReload={loadSafely} />,
+    teilnehmer: () => (
+      <StaffelParticipantsTab tournament={t} registrations={registrations} matches={matches} lineups={lineups} sanctions={bySanction} squads={squads}
+        onReload={loadSafely} onRemove={removeSquad} />
+    ),
+  };
+
+  return (
+    <AdminLayout>
+      <Breadcrumbs tournament={t} />
+      <header className="mt-3 mb-5 min-w-0">
+        <h1 className="font-heading text-3xl font-black uppercase break-words [overflow-wrap:anywhere] md:text-4xl" data-testid="staffel-title">{staffelLabel(t)}</h1>
+        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="inline-flex" data-testid="staffel-stand"><StaffelStandBadge tournament={t} /></span>
+          {t.locked_at ? <span className="rounded-sm border border-[#FFD700]/40 px-2 py-[3px] text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">Gesperrt</span> : null}
+        </div>
+      </header>
+
+      <AdminTabBar tabs={TABS} active={tab} onSelect={go} idBase={idBase} label="Bereiche der Staffel" testPrefix="staffel" />
+      {TABS.map((row) => (row.key === tab ? (
+        <div key={row.key} role="tabpanel" id={`${idBase}-panel-${row.key}`} aria-labelledby={`${idBase}-tab-${row.key}`} data-testid={`staffel-panel-${row.key}`} className="min-w-0">
+          {panels[row.key]()}
+        </div>
+      ) : null))}
+    </AdminLayout>
+  );
+}
