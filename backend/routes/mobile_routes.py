@@ -52,6 +52,9 @@ class MobilePushTokenCreate(BaseModel):
     channels: int | None = Field(default=None, ge=1, le=99)
     # App-Sperre am Gerät an (#1052): Pushes ohne Inhalt. Eine ältere App meldet nichts - dann bleibt alles, wie es war.
     private: bool | None = None
+    # Zufällige Kennung der Installation aus dem SecureStore der App (#2467), keine Hardware-ID. Meldet dieselbe
+    # Installation einen neuen Token, ersetzt er den alten Eintrag. Eine ältere App schickt keine.
+    installation_id: str | None = Field(default=None, min_length=16, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class MobileClientLogCreate(BaseModel):
@@ -929,6 +932,20 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
     # Die Kanäle des Geräts (#1138): eine ältere App meldet nichts und bekommt weiter die zwei alten Kanäle.
     channel_set = {"channel_set": body.channels} if body.channels else {}
     private_content = {"private_content": body.private} if body.private is not None else {}
+    installation = body.installation_id
+    replaced: list[dict] = []
+    if installation:
+        # Eine Installation, ein Eintrag (#2467): frühere Tokens derselben Installation ersetzt der neue. Kanäle und
+        # „ohne Inhalt“ hängen am Gerät und gehen mit, wenn die App sie diesmal nicht meldet.
+        replaced = await db.mobile_push_tokens.find(
+            {"installation_id": installation, "token": {"$ne": token}},
+            {"_id": 0, "token": 1, "user_id": 1, "channel_set": 1, "private_content": 1, "updated_at": 1},
+        ).sort("updated_at", -1).to_list(50)
+        own = [row for row in replaced if row.get("user_id") == user["id"]] or replaced
+        if own and not channel_set and own[0].get("channel_set"):
+            channel_set = {"channel_set": own[0]["channel_set"]}
+        if own and not private_content and own[0].get("private_content") is not None:
+            private_content = {"private_content": own[0]["private_content"]}
     await db.mobile_push_tokens.update_one(
         {"token": token},
         {
@@ -939,16 +956,22 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
                 "device_name": body.device_name,
                 "enabled": True,
                 "updated_at": now,
+                **({"installation_id": installation} if installation else {}),
                 **channel_set,
                 **private_content,
             },
             "$setOnInsert": {"created_at": now},
+            # Wieder angemeldet: die Frist für alte Geräte (#2467) läuft nicht mehr.
+            "$unset": {"disabled_at": ""},
         },
         upsert=True,
     )
     # Ein Gerät gehört genau einem Konto (#1053): meldet es sich für dieses an, ist es bei jedem anderen weg - auch wenn
     # die App das vorige Konto beim Wechsel nicht mehr abmelden konnte.
     await db.mobile_push_tokens.delete_many({"token": token, "user_id": {"$ne": user["id"]}})
+    if replaced:
+        # Dieselbe Regel für die Installation: ihre alten Tokens gehen, egal unter welchem Konto sie standen.
+        await db.mobile_push_tokens.delete_many({"installation_id": installation, "token": {"$ne": token}})
     stored = await db.mobile_push_tokens.find_one({"token": token, "user_id": user["id"]}, {"_id": 0, "private_content": 1})
     # Die App erfährt, ob der Server Pushes ohne Inhalt schickt (#1052) - ein alter Server antwortet ohne das Feld.
     return {"ok": True, "private_content": bool((stored or {}).get("private_content"))}
@@ -957,8 +980,10 @@ async def register_mobile_push_token(body: MobilePushTokenCreate, user: dict = D
 @router.delete("/push-token")
 async def unregister_mobile_push_token(body: MobilePushTokenCreate, user: dict = Depends(get_current_user)):
     db = get_db()
+    now = now_utc().isoformat()
     result = await db.mobile_push_tokens.update_one(
         {"token": body.token.strip(), "user_id": user["id"]},
-        {"$set": {"enabled": False, "updated_at": now_utc().isoformat()}},
+        # Ab dem Abmelden läuft die Frist, nach der der Eintrag verschwindet (#2467, Job ``ops_retention``).
+        {"$set": {"enabled": False, "disabled_at": now, "updated_at": now}},
     )
     return {"ok": True, "updated": result.modified_count}
