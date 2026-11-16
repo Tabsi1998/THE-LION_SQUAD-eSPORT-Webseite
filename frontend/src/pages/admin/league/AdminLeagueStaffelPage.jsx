@@ -16,13 +16,15 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { loadOk, toastLoadFailed } from "@/lib/loadProblem";
 import { seasonAnchorUrl } from "@/lib/seasonTabs";
 import { STAFFEL_TABS, STAFFEL_TABS_READY, staffelTarget } from "@/lib/staffelTabs";
-import { StaffelStandBadge, isStaffel, staffelLabel } from "@/pages/admin/tournament/StaffelParts";
+import { isStaffel, staffelBeforeStart, staffelLabel } from "@/pages/admin/tournament/StaffelParts";
 import { useTournamentStatus } from "@/pages/admin/tournament/useTournamentStatus";
 import { StaffelOverviewTab } from "./staffel/StaffelOverviewTab";
 import { StaffelParticipantsTab } from "./staffel/StaffelParticipantsTab";
-import { sanctionsByRegistration } from "./staffel/staffelPage";
+import { StaffelStand } from "./staffel/StaffelStand";
+import { hasCapability, sanctionsByRegistration } from "./staffel/staffelPage";
 
 // Satz des Servers ohne Liga-Recht (`league_permissions.NO_LEAGUE_RIGHT`) - die Seite zeigt ihn auch, wenn der Server die Staffel
 // liefert, aber keine Zuständigkeit nennt (etwa nur Bereich Turniere).
@@ -45,7 +47,7 @@ function Breadcrumbs({ tournament }) {
   const crumb = "inline-flex min-h-[44px] items-center hover:text-[#29B6E8] [overflow-wrap:anywhere]";
   return (
     <nav aria-label="Brotkrumen" data-testid="staffel-breadcrumbs">
-      <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs font-bold uppercase tracking-wider text-white/50">
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs font-bold uppercase tracking-wider text-white/60">
         <li><Link to="/admin/leagues" className={crumb} data-testid="staffel-crumb-leagues">Liga</Link></li>
         <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
         <li className="min-w-0"><Link to={seasonPath} className={crumb} data-testid="staffel-crumb-season">{season}</Link></li>
@@ -70,28 +72,36 @@ export default function AdminLeagueStaffelPage() {
   const [sanctions, setSanctions] = useState([]);
   const [squads, setSquads] = useState({});
   const [error, setError] = useState("");
-  const lineups = useTeamLineups(t);
+  // Anmeldungen und Spiele geladen? Vorher (und nach einem Ladefehler) zeigt die Seite keine Zahlen - nie ein falsches „0 von 8“.
+  const [lists, setLists] = useState(false);
+  // Aufstellung je Co-Team verlangt in der Staffel „Spiele betreuen“ (`team_day_routes.py`) - ohne das Recht fragt die Seite gar nicht erst.
+  const lineups = useTeamLineups(hasCapability(t, "matches") ? t : null);
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${tournamentId}?include_draft=true`);
     setT(data);
     if (!isStaffel(data) || !(data.league_capabilities || []).length) return;
+    // Scheitert eine der beiden Listen, gilt die Seite als nicht geladen (Hinweis mit „Nochmal versuchen“) - ein alter Stand bleibt stehen.
     const [regs, plan] = await Promise.all([
       api.get(`/tournaments/${tournamentId}/registrations`),
-      api.get(`/tournaments/${tournamentId}/matches-v2`).catch(() => ({ data: [] })),
+      api.get(`/tournaments/${tournamentId}/matches-v2`),
     ]);
     setRegistrations(Array.isArray(regs.data) ? regs.data : []);
     setMatches(Array.isArray(plan.data) ? plan.data : []);
-    // Aktive Strafen (nur mit „Strafen“) und der Kader je Co-Team (nur mit „Kader prüfen“) - je für sich, ein Fehler hält die Seite nicht auf.
+    setLists(true);
+    // Aktive Strafen (nur mit „Strafen“) und der Kader je Co-Team (nur mit „Kader prüfen“) - Zusätze: ein Fehler meldet sich, hält die Seite aber nicht auf.
     const seasonId = data.league_context.season_id;
-    const capabilities = data.league_capabilities;
-    if (capabilities.includes("sanctions")) {
-      api.get(`/admin/leagues/seasons/${seasonId}/sanctions`).then(({ data: body }) => setSanctions(body?.items || [])).catch(() => setSanctions([]));
+    if (hasCapability(data, "sanctions")) {
+      api.get(`/admin/leagues/seasons/${seasonId}/sanctions`).then(({ data: body }) => {
+        setSanctions(body?.items || []);
+        loadOk("staffel-sanctions");
+      }).catch(toastLoadFailed("Die Strafen der Season ließen sich nicht laden.", "staffel-sanctions"));
     }
-    if (capabilities.includes("roster")) {
-      api.get(`/admin/leagues/seasons/${seasonId}/roster`)
-        .then(({ data: body }) => setSquads(Object.fromEntries((body?.squads || []).filter((row) => row.squad_id).map((row) => [row.registration_id, row]))))
-        .catch(() => setSquads({}));
+    if (hasCapability(data, "roster")) {
+      api.get(`/admin/leagues/seasons/${seasonId}/roster`).then(({ data: body }) => {
+        setSquads(Object.fromEntries((body?.squads || []).filter((row) => row.squad_id).map((row) => [row.registration_id, row])));
+        loadOk("staffel-roster");
+      }).catch(toastLoadFailed("Die Kader ließen sich nicht laden.", "staffel-roster"));
     }
   }, [tournamentId]);
   const loadSafely = useCallback(() => load()
@@ -104,15 +114,18 @@ export default function AdminLeagueStaffelPage() {
   const { setTournStatus } = useTournamentStatus({ id: tournamentId, tournament: t, registrations, onChanged: loadSafely });
 
   const tab = TABS.some((row) => row.key === target.tab) ? target.tab : TABS[0].key;
-  useScrollToSection(target.section, Boolean(t));
+  useScrollToSection(target.section, Boolean(t) && lists);
   const go = (key) => navigate({ pathname: location.pathname, search: location.search, hash: key === TABS[0].key ? "" : `#${key}` }, { replace: true });
 
-  // Zuteilung zurücknehmen (#1649): nur ohne festes Spiel - danach Austritt oder Disqualifizieren.
+  // Zuteilung zurücknehmen (#1649): nur ohne festes Spiel - danach Austritt oder Disqualifizieren. Vor dem Start mischt sich die
+  // Vorschau neu, danach (Nachmeldung ohne festes Spiel) bleibt der Spielplan, wie er ist.
   const removeSquad = async (registration) => {
     const name = registration.display_name || registration.squad_name || "Dieses Co-Team";
     const ok = await confirm({
       title: "Co-Team entfernen?",
-      description: `${name} wird aus der Staffel genommen. Eine Vorschau des Spielplans wird danach neu gemischt.`,
+      description: staffelBeforeStart(t)
+        ? `${name} wird aus der Staffel genommen. Die Vorschau des Spielplans wird danach neu gemischt.`
+        : `${name} wird aus der Staffel genommen. Es hat noch kein festes Spiel – Spielplan und Tabelle bleiben, wie sie sind.`,
       confirmLabel: "Entfernen",
       tone: "danger",
     });
@@ -152,6 +165,19 @@ export default function AdminLeagueStaffelPage() {
   }
 
   const bySanction = sanctionsByRegistration(sanctions, registrations, t.id);
+  // Ladefehler bei schon geladener Staffel: ein sichtbarer Hinweis mit „Nochmal versuchen“ statt stiller Leere.
+  const loadNotice = error ? (
+    <div role="alert" className="mb-5 flex flex-col gap-3 rounded-sm border border-warn/40 bg-warn/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="staffel-load-error">
+      <p className="min-w-0 text-sm text-white/85 [overflow-wrap:anywhere]">
+        {lists ? "Neu laden hat nicht geklappt – was hier steht, kann veraltet sein." : "Co-Teams und Spiele ließen sich nicht laden – darum stehen hier noch keine Teams und Zahlen."}
+        <span className="block text-white/60">{error}</span>
+      </p>
+      <button type="button" onClick={loadSafely} data-testid="staffel-retry"
+        className="tls-btn tls-btn--secondary inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-sm px-4 text-xs font-bold uppercase tracking-wider">
+        Nochmal versuchen
+      </button>
+    </div>
+  ) : null;
   const panels = {
     ueberblick: () => <StaffelOverviewTab tournament={t} registrations={registrations} matches={matches} onStatus={setTournStatus} onReload={loadSafely} />,
     teilnehmer: () => (
@@ -166,13 +192,15 @@ export default function AdminLeagueStaffelPage() {
       <header className="mt-3 mb-5 min-w-0">
         <h1 className="font-heading text-3xl font-black uppercase break-words [overflow-wrap:anywhere] md:text-4xl" data-testid="staffel-title">{staffelLabel(t)}</h1>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="inline-flex" data-testid="staffel-stand"><StaffelStandBadge tournament={t} /></span>
+          <span className="inline-flex" data-testid="staffel-stand"><StaffelStand tournament={t} /></span>
           {t.locked_at ? <span className="rounded-sm border border-[#FFD700]/40 px-2 py-[3px] text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">Gesperrt</span> : null}
         </div>
       </header>
 
+      {loadNotice}
       <AdminTabBar tabs={TABS} active={tab} onSelect={go} idBase={idBase} label="Bereiche der Staffel" testPrefix="staffel" />
-      {TABS.map((row) => (row.key === tab ? (
+      {!lists && !error ? <p className="text-sm text-white/60" data-testid="staffel-lists-loading">Lade Co-Teams und Spiele …</p> : null}
+      {lists && TABS.map((row) => (row.key === tab ? (
         <div key={row.key} role="tabpanel" id={`${idBase}-panel-${row.key}`} aria-labelledby={`${idBase}-tab-${row.key}`} data-testid={`staffel-panel-${row.key}`} className="min-w-0">
           {panels[row.key]()}
         </div>

@@ -41,7 +41,12 @@ async function mockServer(page, { staffel = {}, registrations = REGS, matches = 
   await page.route("**/api/admin/my-leagues**", json({ leagues: [{ id: "l1", capabilities: ALL }] }));
   await page.route("**/api/tournaments/t1/registrations", json(registrations));
   await page.route("**/api/tournaments/t1/matches-v2", json(matches));
-  await page.route("**/api/team-day/t1/lineups", json({}));
+  // Aufstellung je Co-Team: der Server verlangt in der Staffel „Spiele betreuen“ - ohne das Recht antwortet er mit 403.
+  await page.route("**/api/team-day/t1/lineups", (route) => {
+    calls.push({ url: route.request().url(), body: null });
+    const allowed = (staffel.league_capabilities || ALL).includes("matches");
+    return route.fulfill({ status: allowed ? 200 : 403, contentType: "application/json", body: JSON.stringify(allowed ? {} : { detail: "Nur für die Turnierleitung." }) });
+  });
   await page.route("**/api/tournaments/t1/squad-candidates", json(CANDIDATES));
   await page.route("**/api/admin/leagues/seasons/s1/sanctions", json({ items: [
     { id: "x1", status: "active", kind_label: "Spielsperre", target_type: "squad", registration_id: "r1", squad_id: "sq1", tournament_id: "t1" },
@@ -132,7 +137,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await mockServer(page, { staffel: { status: "live", league_capabilities: ["season"], can_edit_staffel: false, can_manage_participants: false } });
     await page.goto("/admin/leagues/staffeln/t1");
-    await expect(page.getByTestId("staffel-status-readonly")).toContainText("Live");
+    await expect(page.getByTestId("staffel-status-readonly")).toContainText("Spielbetrieb");
     await expect(page.getByTestId("staffel-primary-action")).toHaveCount(0);
     await expect(page.getByTestId("staffel-status-select")).toHaveCount(0);
     await page.getByTestId("staffel-tab-teilnehmer").click();
@@ -144,3 +149,31 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await noSideScroll(page);
   });
 }
+
+test("ohne „Spiele betreuen“ fragt die Seite keine Aufstellung ab - keine 403 in der Konsole", async ({ page }) => {
+  const problems = [];
+  // Nur 403 zählt hier - der nachgestellte Server beantwortet auch den Live-Strom mit JSON, das meldet der Browser gesondert.
+  page.on("console", (message) => { if (message.type() === "error" && message.text().includes("403")) problems.push(message.text()); });
+  page.on("response", (response) => { if (response.status() === 403) problems.push(`403 ${response.url()}`); });
+  const calls = await mockServer(page, { staffel: { league_capabilities: ["applications", "manage", "season"] } });
+  await page.goto("/admin/leagues/staffeln/t1#teilnehmer");
+  await expect(page.getByTestId("staffel-teams-count")).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(calls.filter((row) => row.url.includes("/team-day/"))).toEqual([]);
+  expect(problems).toEqual([]);
+});
+
+test("Ladefehler der Co-Teams: Hinweis mit „Nochmal versuchen“ statt falscher Zahlen", async ({ page }) => {
+  await mockServer(page);
+  let fail = true;
+  await page.route("**/api/tournaments/t1/registrations", (route) => (fail
+    ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ detail: "Serverfehler" }) })
+    : route.fulfill({ contentType: "application/json", body: JSON.stringify(REGS) })));
+  await page.goto("/admin/leagues/staffeln/t1");
+  await expect(page.getByTestId("staffel-load-error")).toContainText("ließen sich nicht laden");
+  await expect(page.getByTestId("staffel-numbers-teams")).toHaveCount(0);
+  fail = false;
+  await page.getByTestId("staffel-retry").click();
+  await expect(page.getByTestId("staffel-numbers-teams")).toContainText("2 von 8");
+  await expect(page.getByTestId("staffel-load-error")).toHaveCount(0);
+});
