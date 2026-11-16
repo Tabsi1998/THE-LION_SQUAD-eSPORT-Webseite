@@ -27,6 +27,26 @@ HELP_TOPICS: dict[str, tuple[str, str]] = {
         "Turniere",
         "Zum Turnier anmelden, einchecken, Ergebnis melden und den Turnierbaum lesen.",
     ),
+    "verein-und-mitgliedschaft": (
+        "Verein und Mitgliedschaft",
+        "Mitglied werden: Beitrag ansehen, Antrag stellen und den Stand verfolgen.",
+    ),
+    "events-und-kalender": (
+        "Events und Kalender",
+        "Events finden und anmelden, mit Begleitung oder auf der Warteliste, den Tagesplan lesen und den Kalender abonnieren.",
+    ),
+    "turniertag": (
+        "Turniertag vor Ort",
+        "Wann du dran bist, an welcher Station, wie lange gespielt wird und wer das Ergebnis einträgt.",
+    ),
+    "gewinne-und-trophaeen": (
+        "Gewinne und Trophäen",
+        "Preise und Urkunden, Trophäen und Medaillen im Profil, Erfolge und die Karte zum Teilen.",
+    ),
+    "datenschutz-und-konto": (
+        "Datenschutz und Konto",
+        "Deine Daten herunterladen und das Konto anonymisieren.",
+    ),
 }
 
 

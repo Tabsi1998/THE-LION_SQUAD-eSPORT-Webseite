@@ -1,0 +1,55 @@
+{
+  "slug": "verein-und-mitgliedschaft",
+  "titel": "Verein und Mitgliedschaft",
+  "kurz": "Mitglied werden: Beitrag ansehen, Antrag stellen und den Stand verfolgen.",
+  "zielgruppe": "Für alle, die Vereinsmitglied werden wollen",
+  "bereich": "verein-mitgliedschaft",
+  "rollen": ["spieler", "mitglied"],
+  "sichtbar_fuer": "alle",
+  "suchbegriffe": ["mitglied", "mitgliedschaft", "verein", "antrag", "beitrag", "mitgliedsart", "mindestalter", "18", "statuten", "aufnahme", "beitreten"],
+  "abschnitte": [
+    {
+      "id": "beitritt",
+      "titel": "Mitglied werden",
+      "schritte": [
+        {
+          "id": "mitglied-werden",
+          "titel": "Mitglied werden öffnen",
+          "text": "Öffne Mitglied werden. Dort stehen die Vorteile, der Beitrag je Mitgliedsart und der Ablauf. Tippe auf Antrag stellen.",
+          "hinweis": "Ein Konto kannst du ab 14 Jahren anlegen. Vereinsmitglied wirst du ab 18 Jahren.",
+          "bild": true,
+          "link": { "to": "/membership/join", "label": "Zu Mitglied werden" }
+        }
+      ]
+    },
+    {
+      "id": "antrag",
+      "titel": "Antrag",
+      "schritte": [
+        {
+          "id": "antrag-ausfuellen",
+          "titel": "Antrag ausfüllen",
+          "text": "Wähl deine Mitgliedsart und füll die Felder aus. Dazu gehört dein Geburtsdatum.",
+          "hinweis": "Für den Antrag brauchst du ein Konto. Pro Konto gibt es einen Antrag.",
+          "bild": true,
+          "clip": true
+        },
+        {
+          "id": "antrag-einreichen",
+          "titel": "Zustimmen und einreichen",
+          "text": "Hak die Vereinsstatuten und die Datenschutzerklärung ab. Dann tippe auf Antrag einreichen.",
+          "hinweis": "Weitere Einwilligungen darunter sind freiwillig.",
+          "bild": true,
+          "clip": true
+        },
+        {
+          "id": "antrag-stand",
+          "titel": "Stand des Antrags",
+          "text": "Danach steht auf derselben Seite Antrag eingegangen. Der Vorstand prüft jeden Antrag und meldet sich per E-Mail.",
+          "hinweis": "Bis zur Entscheidung kannst du den Antrag mit Antrag zurückziehen zurücknehmen.",
+          "bild": true
+        }
+      ]
+    }
+  ]
+}
