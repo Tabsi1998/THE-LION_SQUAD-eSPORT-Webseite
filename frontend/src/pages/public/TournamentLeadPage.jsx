@@ -63,7 +63,10 @@ export default function TournamentLeadPage() {
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
   const [deciding, setDeciding] = useState(false);
-  const [tab, setTab] = useState(() => ({ cockpit: "cockpit", checkin: "checkin", stationen: "stations", hinweis: "notice" })[searchParams.get("reiter")] || null);
+  // `tab`: was jemand gewählt hat (Tipp, ?reiter=, ?fall=) - sonst null, dann gilt die Vorgabe (`autoTab`, unten).
+  const reiterParam = searchParams.get("reiter") || "";
+  const [tab, setTab] = useState(() => REITER_TABS[reiterParam] || null);
+  const [autoTab, setAutoTab] = useState("");
   const [movingId, setMovingId] = useState("");
   const [busyStation, setBusyStation] = useState("");
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
@@ -160,13 +163,32 @@ export default function TournamentLeadPage() {
   const chosenTab = tab === "checkin" && !canCheckIn ? null
     : (tab === "stations" || tab === "cockpit") && !queue ? (queueLoaded ? null : "")
       : tab === "notice" && !canNotice ? (data ? null : "") : tab;
-  const activeTab = chosenTab === "" ? "" : chosenTab || defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded });
-  // Ein Reiter, der einmal von selbst gezeigt wurde, bleibt stehen (#2440): kommt die Warteschlange erst nach einem
-  // gescheiterten ersten Abruf, erscheint der Reiter „Cockpit“, aber die Ansicht springt nicht von selbst dorthin.
+  const keepAuto = autoTab && autoTabHolds(autoTab, { fall, cases, checkinPhase, queue });
+  const activeTab = chosenTab === "" ? "" : chosenTab || (keepAuto ? autoTab : defaultLeadTab({ fall, cases, checkinPhase, queue, ready: Boolean(data) && queueLoaded }));
+  // Der von selbst gezeigte Reiter bleibt stehen, solange sein Grund gilt (#2440): kommt die Warteschlange erst nach einem
+  // gescheiterten ersten Abruf, erscheint der Reiter „Cockpit“, die Ansicht springt aber nicht dorthin. Endet der Grund
+  // (Check-in vorbei, keine Fälle mehr, keine Warteschlange), folgt die Ansicht wieder der Vorgabe. Was jemand getippt
+  // hat (`tab`), bleibt ohnehin.
   useEffect(() => {
-    // Als Funktion: hat jemand inzwischen getippt, gilt sein Reiter.
-    if (tab === null && activeTab) setTab((current) => current ?? activeTab);
-  }, [tab, activeTab]);
+    if (activeTab && !chosenTab && activeTab !== autoTab) setAutoTab(activeTab);
+  }, [activeTab, chosenTab, autoTab]);
+  // Neue Ziele per Link bei offener Seite (Benachrichtigungen, #2440): ?fall= öffnet „Braucht Aufmerksamkeit“ an genau
+  // diesem Fall, ?reiter= den Reiter. Beim ersten Laden gilt das schon über die Vorgabe bzw. den Startwert.
+  const seenFall = useRef(fall);
+  useEffect(() => {
+    if (seenFall.current === fall) return;
+    seenFall.current = fall;
+    if (!fall) return;
+    scrolledTo.current = "";
+    setCaseJump((value) => value + 1);
+    setTab("attention");
+  }, [fall]);
+  const seenReiter = useRef(reiterParam);
+  useEffect(() => {
+    if (seenReiter.current === reiterParam) return;
+    seenReiter.current = reiterParam;
+    if (REITER_TABS[reiterParam]) setTab(REITER_TABS[reiterParam]);
+  }, [reiterParam]);
   // Das Cockpit (#1653) fragt kurz im Takt nach, solange es wirklich zu sehen ist (nicht im Check-in oder einem anderen
   // Reiter) - sonst wie bisher nur bei Änderungen.
   const cockpitOpen = activeTab === "cockpit";
@@ -469,6 +491,21 @@ export default function TournamentLeadPage() {
       <ResultUndoBar undo={undo} />
     </PublicLayout>
   );
+}
+
+// ?reiter= aus Links (Verwaltung, Benachrichtigungen) → Reiter.
+const REITER_TABS = Object.freeze({ cockpit: "cockpit", checkin: "checkin", stationen: "stations", hinweis: "notice" });
+
+/**
+ * Ob ein von selbst gezeigter Reiter stehen bleibt (#2440): solange sein Grund gilt - Check-in im Check-in, „Braucht
+ * Aufmerksamkeit“ mit Fall oder Link, Cockpit mit Warteschlange; „Ergebnisse“ immer. Sonst folgt die Ansicht der Vorgabe.
+ */
+export function autoTabHolds(key, { fall = "", cases = 0, checkinPhase = false, queue = null } = {}) {
+  if (key === "results") return true;
+  if (key === "checkin") return Boolean(checkinPhase);
+  if (key === "attention") return Boolean(fall) || cases > 0;
+  if (key === "cockpit") return Boolean(queue);
+  return false;
 }
 
 /**
