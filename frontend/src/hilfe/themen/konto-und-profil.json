@@ -92,7 +92,7 @@
           "id": "stufe",
           "titel": "Stufe wählen",
           "text": "Öffne Benachrichtigungen. Tippe oben eine Stufe an: Alles, Wichtiges oder Wenig. Die Stufe stellt alle Themen auf einmal.",
-          "hinweis": "Neue Konten starten mit Alles.",
+          "hinweis": "Neue Konten starten mit Alles. Ohne Haken beim Newsletter liegen News & Events nur still in der Glocke.",
           "bild": true,
           "link": { "to": "/profile?tab=notifications", "label": "Benachrichtigungen öffnen" }
         },

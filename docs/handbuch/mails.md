@@ -190,7 +190,9 @@ stehen auch in der Hilfe unter [Konto und Profil → Benachrichtigungen](../../f
     Helferdienste per Push, der Rest nur in der App.
   - **Wenig:** nur Spiele & Aufrufe und Rechnungen per Push, der Rest nur in der App.
   - Eine Stufe stellt alle Themen auf einmal. Stellt jemand ein Thema selbst um, steht dort **Eigene Auswahl**.
-  - Neue Konten starten mit **Alles**. Bestehende Konten behalten ihre bisherigen Schalter und sehen meist „Eigene Auswahl“.
+  - Neue Konten starten mit **Alles** – nur **News & Events** liegt ohne Newsletter-Haken bei der Registrierung still in der
+    Glocke („Nur App“); diese Konten zeigen deshalb „Eigene Auswahl“. Wer von der Verwaltung eingeladen wird, hat keinen
+    Haken. Bestehende Konten behalten ihre bisherigen Schalter und sehen meist „Eigene Auswahl“.
 - **Themen:** je Thema **Push**, **Nur App** oder **Aus**.
   - **Push** heißt: aufs Handy (LionsAPP) und in angemeldete Browser.
   - **Nur App** legt die Meldung still in die Glocke.
