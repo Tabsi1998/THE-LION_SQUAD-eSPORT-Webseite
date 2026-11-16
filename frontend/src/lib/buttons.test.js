@@ -46,6 +46,7 @@ const EXCEPTIONS = {
   "components/tls/PublicLayout.jsx": 2, // offizieller Discord-Knopf; Login als Personen-Symbol wie Lupe und Glocke (#1234)
   "pages/public/CalendarPage.jsx": 1, // Terminzeile
   "pages/public/EventDetailPage.jsx": 1, // Zeile eines Turniers am Event
+  "pages/public/FaqPage.jsx": 1, // Zeile einer Anleitung in einem Bereich der FAQ (#2448)
   "pages/public/NewsDetailPage.jsx": 1, // verwandter Beitrag
   "pages/public/PartnerDetailPage.jsx": 1, // Werkzeug-Zeile in der Partnerfarbe
   "pages/public/PublicProfilePage.jsx": 3, // Zeilen (Team, Referenz); Schild „Vereinsmitglied · Funktion“ mit Link zum Vereinsprofil (#1267)

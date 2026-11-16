@@ -284,7 +284,7 @@ STATIC_SITEMAP_PATHS = [
     "/", "/about", "/news", "/events", "/calendar", "/esports", "/tournaments", "/fastlap",
     "/teams", "/servers", "/members", "/membership/join",
     "/sponsors", "/partners", "/contact", "/board", "/galerie", "/references",
-    # Hilfe für Spieler und Captains (#2295): Übersicht und jedes Thema.
+    # FAQ (#2448, vorher Hilfe #2295): Übersicht und jede Anleitung.
     *help_topics.help_paths(),
 ]
 

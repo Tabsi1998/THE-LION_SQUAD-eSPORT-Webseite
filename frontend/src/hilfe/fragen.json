@@ -1,0 +1,107 @@
+[
+  {
+    "id": "konto-anlegen",
+    "frage": "Wie lege ich ein Konto an?",
+    "antwort": "Tippe oben auf Registrieren. Gib Benutzername, E-Mail und Passwort ein. Danach bestätigst du den Link aus der E-Mail.",
+    "bereich": "konto-profil", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/konto-und-profil#registrieren", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "keine-bestaetigung",
+    "frage": "Die Bestätigungs-E-Mail kommt nicht. Was tun?",
+    "antwort": "Schau im Spam-Ordner nach. Auf derselben Seite kannst du den Link neu anfordern.",
+    "bereich": "konto-profil", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/konto-und-profil#email-bestaetigen", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "activision-id",
+    "frage": "Wo trage ich meine Activision-ID ein?",
+    "antwort": "In den Einstellungen unter Gaming bei den Spiel-IDs. Trag sie genau so ein, wie sie im Spiel steht, mit # und Zahlen.",
+    "bereich": "konto-profil", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/konto-und-profil#spiel-ids", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "weniger-push",
+    "frage": "Wie bekomme ich weniger Benachrichtigungen?",
+    "antwort": "Öffne in den Einstellungen Benachrichtigungen und wähl die Stufe Wichtiges oder Wenig. Mit der Ruhezeit kommt nachts kein Push.",
+    "bereich": "benachrichtigungen", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/konto-und-profil#stufe", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "team-gruenden",
+    "frage": "Wie gründe ich ein Team?",
+    "antwort": "Öffne Teams und tippe auf Team erstellen. Gib Name und Kürzel ein. Danach bist du die Teamleitung.",
+    "bereich": "teams", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/team-und-co-team#team-erstellen", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "team-beitreten",
+    "frage": "Wie trete ich einem Team bei?",
+    "antwort": "Öffne den Einladungs-Link und tippe auf Beitreten. Oder gib den Beitrittscode auf der Teamseite unter Team beitreten ein.",
+    "bereich": "teams", "rollen": ["spieler"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/team-und-co-team#beitreten", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "was-ist-co-team",
+    "frage": "Was ist ein Co-Team?",
+    "antwort": "Dein Team ist eure Organisation. Ein Co-Team ist die feste Aufstellung für ein Spiel, mit Kader, Captain und Vertreter.",
+    "bereich": "teams", "rollen": ["captain", "spieler"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/team-und-co-team#co-team-anlegen", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "turnier-anmelden",
+    "frage": "Wie melde ich mich zu einem Turnier an?",
+    "antwort": "Öffne das Turnier und tippe auf Jetzt anmelden. Bei Teamturnieren meldet die Teamleitung oder Co-Leitung das Team an.",
+    "bereich": "turniere", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/turniere#anmelden", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "liga-wer-meldet-an",
+    "frage": "Wer darf ein Team zur Liga anmelden?",
+    "antwort": "Captain und Vertreter eines Co-Teams. Fehlen beide, trägt die Teamleitung zuerst einen Captain ein.",
+    "bereich": "liga", "rollen": ["captain"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/liga-captains#anmeldung-starten", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "ergebnis-melden",
+    "frage": "Wo melde ich ein Ergebnis?",
+    "antwort": "Auf der Matchseite deines Spiels. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Leitung.",
+    "bereich": "turniere", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/faq/turniere#ergebnis-melden", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "mitglied-werden",
+    "frage": "Wie werde ich Vereinsmitglied?",
+    "antwort": "Du brauchst ein Konto. Öffne Mitglied werden und tippe auf Antrag stellen. Der Vorstand prüft jeden Antrag und meldet sich per E-Mail.",
+    "bereich": "verein-mitgliedschaft", "rollen": ["mitglied", "spieler"], "sichtbar_fuer": "alle", "haeufig": true,
+    "link": { "to": "/membership/join", "label": "Zu Mitglied werden" }
+  },
+  {
+    "id": "daten-und-konto",
+    "frage": "Wie lade ich meine Daten herunter oder lösche mein Konto?",
+    "antwort": "Unter Meine Daten lädst du alles als JSON herunter. Dort kannst du dein Konto auch anonymisieren. Das lässt sich nicht rückgängig machen.",
+    "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/privacy-account", "label": "Zu Meine Daten" }
+  },
+  {
+    "id": "kalender-abo",
+    "frage": "Kann ich den Kalender abonnieren?",
+    "antwort": "Ja. Tippe im Kalender bei Kalender abonnieren auf Im Kalender öffnen. Angemeldet richtest du auch ein Abo nur mit deinen Terminen ein.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/calendar", "label": "Zum Kalender" }
+  },
+  {
+    "id": "check-in-vor-ort",
+    "frage": "Wie checke ich bei einem Turnier vor Ort ein?",
+    "antwort": "Vor Ort checkst du bei der Turnierleitung ein. Online tippst du während des Check-ins auf der Turnierseite auf Check-in.",
+    "bereich": "turniertag", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/turniere#einchecken", "label": "Zur Anleitung" }
+  },
+  {
+    "id": "gewinn-abholen",
+    "frage": "Ich habe etwas gewonnen. Wie bekomme ich den Preis?",
+    "antwort": "Unter Meine Gewinne stehen deine Preise und Urkunden. Ist ein Preis abholbereit, holst du ihn beim nächsten Vereinsabend ab. Dafür hast du 90 Tage Zeit.",
+    "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/my/prizes", "label": "Zu Meine Gewinne" }
+  }
+]

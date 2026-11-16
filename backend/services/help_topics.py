@@ -1,12 +1,14 @@
-"""Hilfe-Bereich (#2295): Titel und Kurztext je Thema für die Teilen-Karte (Discord, WhatsApp) und die Sitemap.
+"""FAQ (#2448, vorher Hilfe #2295): Titel und Kurztext je Anleitung für die Teilen-Karte (Discord, WhatsApp) und die
+Sitemap. Die FAQ liegt unter /faq; die alten Adressen /hilfe und /hilfe/<thema> leiten weiter (frontend/nginx.conf).
 
 Die Anleitungen selbst stehen im Frontend (frontend/src/hilfe/themen/<slug>.json). Hier stehen nur Titel und Kurztext,
 weil der Server die Vorschau ohne JavaScript baut. tests/test_help_topics.py prüft, dass beide gleich lauten.
 """
 from __future__ import annotations
 
-HELP_TITLE = "Hilfe"
-HELP_DESCRIPTION = "Kurze Anleitungen mit Bildern für Spieler und Captains: Konto und Profil, Team und Co-Team, Liga, Turniere."
+HELP_TITLE = "FAQ"
+HELP_PATH = "/faq"
+HELP_DESCRIPTION = "Häufige Fragen und kurze Anleitungen mit Bildern: Konto und Profil, Teams, Liga, Turniere und mehr."
 
 HELP_TOPICS: dict[str, tuple[str, str]] = {
     "konto-und-profil": (
@@ -29,5 +31,5 @@ HELP_TOPICS: dict[str, tuple[str, str]] = {
 
 
 def help_paths() -> list[str]:
-    """Übersicht und alle Themen, für die Sitemap."""
-    return ["/hilfe", *(f"/hilfe/{slug}" for slug in HELP_TOPICS)]
+    """Übersicht und alle Anleitungen, für die Sitemap - nur die neuen Adressen."""
+    return [HELP_PATH, *(f"{HELP_PATH}/{slug}" for slug in HELP_TOPICS)]

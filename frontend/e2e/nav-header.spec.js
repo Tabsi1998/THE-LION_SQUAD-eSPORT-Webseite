@@ -11,8 +11,10 @@ const NAV = [
   { to: "/events", label: "Events", order: 2 },
   { to: "/about", label: "Verein", order: 3, children: kids([["/about", "Über uns"], ["/board", "Vorstand"], ["/partners", "Partner"], ["/sponsors", "Sponsoren"], ["/members", "Vereinsmitglieder"], ["/membership/join", "Mitglied werden"], ["/galerie", "Galerie"], ["/references", "Referenzen"]]) },
   { to: "/esports", label: "eSports", order: 4, children: kids([["/esports", "Übersicht"], ["/tournaments", "Turniere"], ["/fastlap", "Fast Lap"]]) },
-  { label: "Community", order: 5, children: kids([["/community", "Übersicht"], ["/messages", "Chats", true], ["/servers", "Server"], ["/players", "Community-Spieler"], ["/teams", "Teams"], ["/seasons/current", "Jahreswertung"], ["/achievements", "Erfolge"], ["/hilfe", "Hilfe"]]) },
+  { label: "Community", order: 5, children: kids([["/community", "Übersicht"], ["/messages", "Chats", true], ["/servers", "Server"], ["/players", "Community-Spieler"], ["/teams", "Teams"], ["/seasons/current", "Jahreswertung"], ["/achievements", "Erfolge"]]) },
   { to: "/contact", label: "Kontakt", order: 6 },
+  // FAQ (#2448): letzter Eintrag rechts - zählt für die Breite der Kopfzeile mit.
+  { to: "/faq", label: "FAQ", order: 7 },
 ];
 
 async function mockServer(page, { user = null, season = null, now = null } = {}) {

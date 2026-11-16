@@ -61,7 +61,7 @@ test("Link mit Anker, neuer Tab, sprechender Name; unbekannter Schritt zeigt nic
     </MemoryRouter>,
   );
   const link = screen.getByRole("link", { name: "Hilfe: Einchecken (neuer Tab)" });
-  expect(link).toHaveAttribute("href", "/hilfe/liga-captains#check-in");
+  expect(link).toHaveAttribute("href", "/faq/liga-captains#check-in");
   expect(link).toHaveAttribute("target", "_blank");
   expect(container.querySelectorAll("a")).toHaveLength(1);
 });

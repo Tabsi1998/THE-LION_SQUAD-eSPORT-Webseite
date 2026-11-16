@@ -88,11 +88,11 @@
 }
 
 /* ---- Aufklappen (Ruhezeit, Weitere Wege): Höhe über grid-template-rows, Inhalt blendet mit ---- */
-.tls-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--tls-ease-out); }
-.tls-reveal[data-open="true"] { grid-template-rows: 1fr; }
+.tls-notify-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--tls-ease-out); }
+.tls-notify-reveal[data-open="true"] { grid-template-rows: 1fr; }
 /* Zu heißt auch unsichtbar (visibility nach dem Zuklappen) - dann springt die Tab-Taste nicht in verborgene Felder. */
-.tls-reveal__inner { min-height: 0; overflow: hidden; opacity: 0; transform: translateY(-4px); visibility: hidden; transition: opacity 180ms ease, transform 260ms var(--tls-ease-out), visibility 0s linear 260ms; }
-.tls-reveal[data-open="true"] > .tls-reveal__inner { opacity: 1; transform: none; visibility: visible; transition: opacity 180ms ease 40ms, transform 260ms var(--tls-ease-out) 40ms, visibility 0s linear 0s; }
+.tls-notify-reveal__inner { min-height: 0; overflow: hidden; opacity: 0; transform: translateY(-4px); visibility: hidden; transition: opacity 180ms ease, transform 260ms var(--tls-ease-out), visibility 0s linear 260ms; }
+.tls-notify-reveal[data-open="true"] > .tls-notify-reveal__inner { opacity: 1; transform: none; visibility: visible; transition: opacity 180ms ease 40ms, transform 260ms var(--tls-ease-out) 40ms, visibility 0s linear 0s; }
 
 .tls-more__toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; text-align: left; -webkit-tap-highlight-color: transparent; }
 .tls-more__toggle:focus-visible { outline: 2px solid #29b6e8; outline-offset: -2px; }
@@ -113,6 +113,6 @@
   .tls-level__card, .tls-seg__option, .tls-level__icon, .tls-more__chevron, .tls-quiet__moon { transition: color 120ms ease, border-color 120ms ease; }
   .tls-level__card:active, .tls-seg__option:active { transform: none; }
   .tls-level__card[aria-checked="true"] .tls-level__icon, .tls-notify-card[data-enabled="true"] .tls-quiet__moon { transform: none; }
-  .tls-reveal, .tls-reveal__inner { transition: none; transform: none; }
+  .tls-notify-reveal, .tls-notify-reveal__inner { transition: none; transform: none; }
   .tls-notify-chip { animation: none; }
 }

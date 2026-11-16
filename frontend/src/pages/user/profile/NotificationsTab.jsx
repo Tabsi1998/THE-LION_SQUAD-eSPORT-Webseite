@@ -238,8 +238,8 @@ export function NotificationsTab({
               className="mt-1"
             />
           </div>
-          <div className="tls-reveal" data-open={quiet.enabled ? "true" : "false"} inert={!quiet.enabled}>
-            <div className="tls-reveal__inner">
+          <div className="tls-notify-reveal" data-open={quiet.enabled ? "true" : "false"} inert={!quiet.enabled}>
+            <div className="tls-notify-reveal__inner">
               <div className="grid grid-cols-2 gap-3 mt-4 max-w-sm">
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Von</span>
@@ -273,8 +273,8 @@ export function NotificationsTab({
             </span>
             <ChevronDown className="tls-more__chevron" aria-hidden="true" />
           </button>
-          <div id="notification-more-panel" className="tls-reveal" data-open={moreOpen ? "true" : "false"} inert={!moreOpen} data-testid="notification-more-panel">
-            <div className="tls-reveal__inner">
+          <div id="notification-more-panel" className="tls-notify-reveal" data-open={moreOpen ? "true" : "false"} inert={!moreOpen} data-testid="notification-more-panel">
+            <div className="tls-notify-reveal__inner">
               <div className="px-5 pb-5 space-y-4">
                 <div className="grid sm:grid-cols-2 gap-3">
                   {channels.map((channel) => (
