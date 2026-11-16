@@ -233,3 +233,11 @@ test("Suche über Fragen und Schritte: Bereich am Treffer, Geschütztes nur mit 
   expect(sucheFaq("Schichtplan", { fragen: [...FRAGEN, geschuetzt], darf: { mitglied: true } }).map((row) => row.id)).toEqual(["geheim"]);
   expect(sucheFaq("gibtsnichtwirklich")).toEqual([]);
 });
+
+// Review-Runde 1 (#2448).
+
+test("F2: Leitungs-Fragen mit Weg über die Verwaltung brauchen die eigene Stufe", () => {
+  expect(SICHTBARKEITEN).toContain("turnierleitung_verwaltung");
+  expect(darfSehen("turnierleitung_verwaltung", { turnierleitung: true })).toBe(false);
+  expect(darfSehen("turnierleitung_verwaltung", { turnierleitung: true, turnierleitung_verwaltung: true })).toBe(true);
+});

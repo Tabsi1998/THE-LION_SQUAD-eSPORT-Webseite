@@ -32,7 +32,7 @@ export const ROLLEN = [
   { id: "mitglied", label: "Mitglied" },
   { id: "turnierleitung", label: "Turnierleitung" },
 ];
-export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "turnierleitung"];
+export const SICHTBARKEITEN = ["alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung"];
 
 const BILDER = import.meta.glob("./bilder/**/*.webp", { eager: true, query: "?url", import: "default" });
 const VIDEOS = import.meta.glob("./videos/*.webm", { eager: true, query: "?url", import: "default" });

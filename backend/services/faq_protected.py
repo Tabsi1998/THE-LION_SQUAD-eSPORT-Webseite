@@ -2,19 +2,27 @@
 
 Öffentliche Fragen und Anleitungen stehen im Frontend (frontend/src/hilfe/fragen.json, themen/*.json) und dürfen dort
 nur ``sichtbar_fuer: "alle"`` tragen. Alles andere steht nur hier und geht erst nach der Prüfung am Server hinaus
-(``GET /api/faq``): Mitglieder-Fragen an Vereinsmitglieder, Fragen der Turnierleitung an Personen mit dem Bereich
-Turnierleitung. Dieselben Felder wie im Frontend: ``id``, ``frage``, ``antwort``, ``bereich``, ``rollen``,
+(``GET /api/faq``): Mitglieder-Fragen an Vereinsmitglieder, Fragen der Turnierleitung an alle, die eine Turnierleitung
+öffnen dürfen. Dieselben Felder wie im Frontend: ``id``, ``frage``, ``antwort``, ``bereich``, ``rollen``,
 ``sichtbar_fuer``, optional ``haeufig`` und ``link`` (``to``, ``label``).
+
+Stufen „turnierleitung“ und „turnierleitung_verwaltung“ (Review #2448, F2): Die Leitungsansicht eines Turniers
+(``routes/tournament_lead_routes.py``) öffnen auch Helfer mit aktivem Einsatz und die Liga-Leitung. Sie sehen die
+Fragen zu Check-in, Aufruf und Ergebnissen. Fragen, deren Weg über die Verwaltung führt, sehen nur Personen mit dem
+Bereich Turnierleitung.
 """
 from __future__ import annotations
 
 import copy
 
-from services.permissions import can_use_area
+from database import get_db
+from services import league_permissions
+from services.permissions import can_use_area, needs_mfa
+from services.tournament_permissions import READ_STAFF_ROLES, RESULT_STAFF_ROLES
 from services.visibility import sees_member_content
 
 # Stufen der Sichtbarkeit, von offen nach eng. „alle“ liefert das Frontend selbst aus.
-VISIBILITIES = ("alle", "angemeldet", "mitglied", "turnierleitung")
+VISIBILITIES = ("alle", "angemeldet", "mitglied", "turnierleitung", "turnierleitung_verwaltung")
 ROLES = ("spieler", "captain", "mitglied", "turnierleitung")
 
 PROTECTED_QUESTIONS: tuple[dict, ...] = (
@@ -73,7 +81,7 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "antwort": "Die Ansicht liegt unter der Adresse des Turniers mit /leitung am Ende. In der Verwaltung führt beim Turnier unter Teilnehmer der Knopf Zum Check-in hin.",
         "bereich": "turnierleitung",
         "rollen": ["turnierleitung"],
-        "sichtbar_fuer": "turnierleitung",
+        "sichtbar_fuer": "turnierleitung_verwaltung",
         "haeufig": True,
         "link": {"to": "/admin/tournaments", "label": "Zu den Turnieren in der Verwaltung"},
     },
@@ -107,21 +115,46 @@ PROTECTED_QUESTIONS: tuple[dict, ...] = (
         "antwort": "Auf der Seite Anmeldungen & Einlass des Events. In der Verwaltung führt bei Events der Knopf Anm. dorthin. Je Person tippst du auf Check-in.",
         "bereich": "turnierleitung",
         "rollen": ["turnierleitung"],
-        "sichtbar_fuer": "turnierleitung",
+        "sichtbar_fuer": "turnierleitung_verwaltung",
         "link": {"to": "/admin/events", "label": "Zu den Events in der Verwaltung"},
     },
 )
 
 
+NO_ACCESS = {"angemeldet": False, "mitglied": False, "turnierleitung": False, "turnierleitung_verwaltung": False}
+
+
+async def _helps_in_a_tournament(user: dict) -> bool:
+    """Ein aktiver Helfer-Einsatz mit einer Rolle, die die Leitungsansicht öffnet (wie ``tournament_lead_routes``)."""
+    if not user.get("id"):
+        return False
+    row = await get_db().tournament_staff_assignments.find_one(
+        {"user_id": user["id"], "is_active": {"$ne": False}, "role": {"$in": sorted(READ_STAFF_ROLES | RESULT_STAFF_ROLES)}},
+        {"_id": 1},
+    )
+    return row is not None
+
+
+async def _leads_a_league(user: dict) -> bool:
+    """Liga-Leitung wie der Einstieg der Liga-Verwaltung (``require_any_league``): Bereich Ligen oder eine Zuständigkeit,
+    beides nur mit bestätigter Zwei-Faktor-Anmeldung."""
+    if league_permissions.has_leagues_area(user):
+        return True
+    return not needs_mfa(user) and bool(await league_permissions.staffed_league_ids(get_db(), user))
+
+
 async def viewer_access(user: dict | None) -> dict[str, bool]:
-    """Was die Person einer Anfrage sehen darf. Mitglied wie bei allen Mitglieder-Inhalten
-    (``sees_member_content``), Turnierleitung wie ``require_area("tournaments")`` - samt Zwei-Faktor."""
+    """Was die Person einer Anfrage sehen darf. Mitglied wie bei allen Mitglieder-Inhalten (``sees_member_content``).
+    Turnierleitung (Verwaltung) wie ``require_area("tournaments")`` samt Zwei-Faktor; die Stufe „turnierleitung“ hat
+    zusätzlich, wer die Leitungsansicht eines Turniers öffnen darf - aktiver Helfer-Einsatz oder Liga-Leitung."""
     if not user:
-        return {"angemeldet": False, "mitglied": False, "turnierleitung": False}
+        return dict(NO_ACCESS)
+    area = await can_use_area(user, "tournaments")
     return {
         "angemeldet": True,
         "mitglied": await sees_member_content(user),
-        "turnierleitung": await can_use_area(user, "tournaments"),
+        "turnierleitung": area or await _helps_in_a_tournament(user) or await _leads_a_league(user),
+        "turnierleitung_verwaltung": area,
     }
 
 

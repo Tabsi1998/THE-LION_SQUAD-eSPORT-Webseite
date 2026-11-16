@@ -27,10 +27,14 @@ automatisch zur FAQ, auch Links auf einzelne Schritte und Suchen (#2448).
 - **Alle** sehen die öffentlichen Fragen und Anleitungen.
 - **Vereinsmitglieder** sehen zusätzlich Fragen zur Mitgliedschaft (Beitrag, Versammlungen, Dokumente) und den Bereich
   **Helferdienste**.
-- **Turnierleitung** (Bereich Turnierleitung mit Zwei-Faktor-Anmeldung) sieht zusätzlich den Bereich **Turnierleitung**
-  mit Fragen zu Check-in, Aufruf, Stationen und Ergebnissen.
+- **Turnierleitung** sieht zusätzlich den Bereich **Turnierleitung** mit Fragen zu Check-in, Aufruf, Stationen und
+  Ergebnissen. Dazu zählt jeder, der die Leitungsansicht eines Turniers öffnen darf: der Bereich Turnierleitung (Rolle
+  oder Freigabe, mit Zwei-Faktor-Anmeldung), Helfer mit einem aktiven Einsatz in einem Turnier und die Liga-Leitung.
+- Fragen, deren Weg über die **Verwaltung** führt (Turnierleitung öffnen, Einlass beim Event), sehen nur Personen mit
+  dem Bereich Turnierleitung. Helfer und Liga-Leitung sehen sie nicht.
 
-Das prüft der Server. Wer kein Recht hat, bekommt diese Fragen gar nicht erst geschickt.
+Das prüft der Server. Wer kein Recht hat, bekommt diese Fragen gar nicht erst geschickt. Geheim sind sie trotzdem
+nicht: Der Quelltext der Website ist öffentlich. In die FAQ gehört deshalb nur Bedienung, nichts Vertrauliches.
 
 ## Links verschicken
 
