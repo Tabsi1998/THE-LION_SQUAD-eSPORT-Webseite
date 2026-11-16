@@ -8,7 +8,7 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
 import { InlineMatchClock } from "@/components/tls/live/MatchClock";
 import { MOTION, motionAllowed } from "@/lib/motion";
-import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
+import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, slotDraw, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
   DurationContext, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
@@ -194,6 +194,9 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const label = slotLabel(slot, regMap);
   const bye = !reg && isByeSlot(slot);
   const pending = reg || bye ? "" : pendingLabel(slot, findMatch, match);
+  // Ein Name aus einem Wort bricht nie mitten im Wort um („KartKönigi / n“, #2452): passt er nicht, endet er mit „…“, der
+  // ganze Name steht im Hinweis (und im Namen des Knopfs). Namen mit Leerzeichen dürfen weiter umbrechen.
+  const singleWord = Boolean(label) && !bye && !/\s/.test(String(label).trim());
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
   useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);
@@ -233,7 +236,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
     >
       <span className="w-4 shrink-0 text-right font-display text-[11px] tabular-nums text-quiet">{seed || ""}</span>
       <SlotAvatar avatar={reg?.user?.avatar_url || reg?.avatar_url} label={label} empty={!reg} />
-      <span className={`min-w-0 flex-1 leading-tight ${!label && pending ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : undefined}>
+      <span className={`min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
       {isMine ? <span className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-brand">Du</span> : null}
@@ -357,7 +360,13 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
   const slots = match.slots || [];
   const played = slots.some((slot) => resultMap.has(slot.registration_id));
   // Freie Plätze (kein Spieler, Freilos) stehen als eine Zeile „2 Plätze frei“ statt als einzelne Zeilen (#1259).
-  const freeCount = slots.filter((slot) => !slot.registration_id && isByeSlot(slot)).length;
+  const freeSlots = slots.filter((slot) => !slot.registration_id && isByeSlot(slot));
+  const freeCount = freeSlots.length;
+  // Kommt auf diese Plätze niemand mehr (#2452: die Quelle wurde zusammengelegt oder schickt weniger weiter), heißt es
+  // „bleiben leer“ statt „frei“ - „frei“ klang, als könnte noch jemand dazukommen.
+  // Gemischte Runden (#1548, #1590): ein gestrichener Platz ohne Los-Kennung wartet weiter aufs Los (wie slotDrawn) -
+  // dort kann noch jemand hinkommen, also nicht „bleibt leer“.
+  const stayEmpty = freeCount > 0 && freeSlots.every((slot) => slot.source_result?.skipped && !(slotDraw(slot) && !slot.source_result.draw_id));
   const taken = slots.filter((slot) => slot.registration_id || !isByeSlot(slot));
   const rows = played
     ? [...taken].sort((a, b) => (resultMap.get(a.registration_id)?.rank || 99) - (resultMap.get(b.registration_id)?.rank || 99))
@@ -423,8 +432,11 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
           </div>
         );
       })}
-      {freeCount && !empty ? (
-        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{text.free}</div>
+      {/* „2 Plätze frei“ nur, solange der Lauf noch nicht gefahren ist (#2452): danach kommt niemand mehr dazu - die Karte
+          sagt mit „2 Spieler“ schon, wie viele gefahren sind. Sonst stand in Lauf G und im Grand Final nach dem Ende
+          „2 Plätze frei“, als wäre noch etwas offen. */}
+      {freeCount && !empty && !played && !finished ? (
+        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{stayEmpty ? `${freeCount} ${freeCount === 1 ? "Platz bleibt" : "Plätze bleiben"} leer` : text.free}</div>
       ) : null}
       {dropText && !empty ? (
         <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`} data-exit-anchor={dropText.startsWith("Die anderen →") ? `${match.id}:L` : undefined}>{dropText}</div>

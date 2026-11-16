@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.87.1 (16.11.2026)
+
+### Fehlerbehebungen
+
+* Abgebrochene Messwert-Sendungen beim Verlassen der Seite zählen nicht mehr als Serverfehler und lösen keinen Alarm aus (#2446)
+* Fehler, die erst während einer gestreamten Antwort auftreten, erscheinen jetzt in der Betriebssicht (#2446)
+* Hinweis „Letzter Stand“ wird von Screenreadern einmal vorgelesen (#2440)
+* Matchplan – „Warteschlange je Station“ bleibt bei einer gescheiterten Abfrage mit Hinweis stehen und fragt weiter nach (#2440)
+* Schreibpause und Betriebssicht laufen als schlanke ASGI-Middleware, Verhalten unverändert (#2446)
+* Spielplan und „Du bist als Nächstes“ – bei Fehlern „Letzter Stand vor X s“, nach 3 Minuten ohne Erfolg verschwindet der alte Stand; abgelaufene Sitzung beendet das Nachfragen (#2440)
+* Turnierleitung – Cockpit, Reiter und offene Rückfragen bleiben bei einer gescheiterten Abfrage stehen, mit „Letzter Stand vor X s“ (#2440)
+* Turnierleitung – ein kurzer Netzfehler zeigt nicht mehr „Nur für die Turnierleitung“, der letzte Stand bleibt (#2440)
+* Turnierleitung – ein verlinkter Fall (Benachrichtigung) öffnet sich auch bei offener Seite und auch ein zweites Mal (#2440)
+* Turnierleitung – kommt das Netz zurück, lädt die Warteschlange sofort; nur der Takt wird nach Fehlern langsamer (#2440)
+* Turnierleitung – nach einem Turnierwechsel bleibt nichts vom vorigen Turnier stehen, auch nicht der Reiter (#2440)
+* Turnierleitung – Restzeit der Auslosung nach Serverzeit statt Geräteuhr (#2440)
+* Turnierleitung – springt nicht mehr von selbst in einen anderen Reiter; nach dem Check-in folgt sie wieder der Vorgabe (#2440)
+
+### Schneller
+
+* Warteschlange nur mit Warteschlange im Takt abgefragt, nie doppelt, nach Fehlern mit wachsendem Abstand (#2440)
+
 ## 1.87.0 (16.11.2026)
 
 ### Neu

@@ -32,6 +32,29 @@ test("eine laufende Staffel zählt die Spieltage", () => {
   expect(screen.getByTestId("flow-step-matchdays")).toHaveAttribute("aria-current", "step");
 });
 
+// Das Turnier vom 31.10. (#2452): 14 Läufe, davon fünf zusammengelegt (B in A, D in C, F in E, LB in LA, LD in LC).
+// Gefahren sind alle neun übrigen - der Ablauf zählt nur sie: „9 Spiele“, „Ergebnisse 9/9“, der Schritt ist fertig.
+const MERGED = { B: "A", D: "C", F: "E", LB: "LA", LD: "LC" };
+const LB_CUP = ["A", "B", "C", "D", "E", "F", "G", "LA", "LB", "LC", "LD", "LE", "LF", "FINAL"].map((key) => (MERGED[key]
+  ? { id: `m-${key}`, match_key: key, match_type: "ffa", status: "cancelled", merged_into_key: MERGED[key] }
+  : { id: `m-${key}`, match_key: key, match_type: "ffa", status: "completed" }));
+
+test("zusammengelegte Läufe zählen nicht: 9 Spiele, Ergebnisse 9/9, der Schritt ist fertig", () => {
+  render(<TournamentFlowStepper tournament={{ status: "results_published", format: "ffa_custom_bracket" }} registrations={[]} matchesV2={LB_CUP} />);
+  expect(screen.getByTestId("flow-step-bracket")).toHaveTextContent("9 Spiele");
+  expect(screen.getByTestId("flow-step-results")).toHaveTextContent("9/9");
+  expect(screen.getByTestId("flow-step-results")).not.toHaveAttribute("aria-current");
+  // Alles erledigt: der letzte Schritt (Endstand veröffentlicht) ist der aktuelle, nicht „Ergebnisse“.
+  expect(screen.getByTestId("flow-step-standings")).toHaveAttribute("aria-current", "step");
+});
+
+test("ein offener Lauf neben zusammengelegten: 8/9, „Ergebnisse“ ist dran", () => {
+  const matches = LB_CUP.map((match) => (match.match_key === "FINAL" ? { ...match, status: "ready" } : match));
+  render(<TournamentFlowStepper tournament={{ status: "live", format: "ffa_custom_bracket" }} registrations={[]} matchesV2={matches} />);
+  expect(screen.getByTestId("flow-step-results")).toHaveTextContent("8/9");
+  expect(screen.getByTestId("flow-step-results")).toHaveAttribute("aria-current", "step");
+});
+
 // Je Format der passende Schritt (#2111, T6): ohne Baum der Spielplan, beim Schweizer System die Runden, bei
 // Mehrspieler die Läufe; Zeitfahren und Rennserie ohne Setzliste und Spiele.
 test("je Format: Spielplan, Runden, Läufe - Zeitfahren ohne Spiele", () => {
