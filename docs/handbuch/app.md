@@ -217,7 +217,7 @@ Crashlytics. Die Datenschutzerklärung der Website bekommt den App-Abschnitt (Pu
 - Vorne steht der Bereich **LionsAPP** mit Fragen, die nur die App betreffen: Push-Stufen, Ruhezeit, Kanäle am Handy, der Gong beim
   Aufruf, Anmelden mit Passkey, App-Sperre, ohne Netz und Updates. Ein Link wie „Zu den Einstellungen“ öffnet den Screen der App.
 - **Anleitungen mit Bildern** zeigt nur die Website. In der App steht die Anleitung mit Zahl der Schritte, ein Tipp öffnet sie im Browser.
-- **Fragen für Mitglieder und die Turnierleitung** kommen wie im Web erst nach der Prüfung am Server dazu. Ein älterer Server ohne
+- **Fragen für Mitglieder, Helfer und die Turnierleitung** kommen wie im Web erst nach der Prüfung am Server dazu. Ein älterer Server ohne
   FAQ-Schnittstelle zeigt nur die öffentlichen Fragen, ohne Fehlermeldung.
 - Links auf `/faq` (etwa in News oder Benachrichtigungen) öffnen die FAQ der App, ebenso die alte Adresse `/hilfe`.
 
