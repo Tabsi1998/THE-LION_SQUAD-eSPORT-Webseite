@@ -84,7 +84,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
   if (!post) {
     return (
       <Screen>
-        <ErrorState title="Beitrag nicht gefunden" detail={error ? errorMessage(error, "News-Beitrag konnte nicht geladen werden.") : "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void reload(); }} />
+        <ErrorState title="Beitrag nicht gefunden" goneTitle="Beitrag zurückgezogen" goneDetail="Dieser Beitrag wurde zurückgezogen." detail={error ? errorMessage(error, "News-Beitrag konnte nicht geladen werden.") : "Dieser Beitrag ist nicht sichtbar oder wurde entfernt."} problem={problem} onRetry={() => { void reload(); }} />
       </Screen>
     );
   }

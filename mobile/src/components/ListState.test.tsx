@@ -67,6 +67,38 @@ test("Fehler: je nach Art eigener Text - ohne Netz und bei Fehlern „Nochmal ve
   expect(screen.getByText("Nur für Mitglieder.")).toBeTruthy();
 });
 
+test("zurückgezogen (410): Hinweis des Servers ohne Nochmal versuchen, ohne Text ein ruhiger Rückfall; 404 und 500 bleiben wie sie waren", async () => {
+  const retry = jest.fn();
+  const withdrawn = "Dieser Beitrag wurde zurückgezogen. Alle aktuellen News findest du auf der News-Seite.";
+  expect(loadProblem(axiosError(410, withdrawn))).toMatchObject({ kind: "notFound", gone: true, message: withdrawn });
+  expect(loadProblem(axiosError(404, "Beitrag nicht gefunden.")).gone).toBeFalsy();
+
+  await render(<ErrorState problem={loadProblem(axiosError(410, withdrawn))} title="Beitrag nicht gefunden" goneTitle="Beitrag zurückgezogen" detail="Dieser Beitrag ist nicht sichtbar." onRetry={retry} />);
+  expect(screen.getByText("Beitrag zurückgezogen")).toBeTruthy();
+  expect(screen.getByText(withdrawn)).toBeTruthy();
+  expect(screen.queryByText("Beitrag nicht gefunden")).toBeNull();
+  expect(screen.queryByText("Laden hat nicht geklappt")).toBeNull();
+  expect(screen.queryByTestId("error-state-retry")).toBeNull();
+  await screen.unmount();
+
+  // Ohne Text vom Server: ruhiger Rückfalltext, auch ohne eigenen Titel der Seite.
+  await render(<ErrorState problem={loadProblem(axiosError(410))} onRetry={retry} />);
+  expect(screen.getByText("Zurückgezogen")).toBeTruthy();
+  expect(screen.getByText("Das wurde zurückgezogen und ist nicht mehr zu sehen.")).toBeTruthy();
+  expect(screen.queryByTestId("error-state-retry")).toBeNull();
+  await screen.unmount();
+
+  // 404 zeigt weiter den Text der Seite, 500 behält Nochmal versuchen.
+  await render(<ErrorState problem={loadProblem(axiosError(404, "Beitrag nicht gefunden."))} title="Beitrag nicht gefunden" goneTitle="Beitrag zurückgezogen" detail="Dieser Beitrag ist nicht sichtbar." onRetry={retry} />);
+  expect(screen.getByText("Dieser Beitrag ist nicht sichtbar.")).toBeTruthy();
+  expect(screen.queryByText("Beitrag zurückgezogen")).toBeNull();
+  await screen.unmount();
+  await render(<ErrorState problem={loadProblem(axiosError(500, "kaputt"))} title="Beitrag nicht gefunden" onRetry={retry} />);
+  expect(screen.getByText("Laden hat nicht geklappt")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("error-state-retry"));
+  expect(retry).toHaveBeenCalledTimes(1);
+});
+
 test("Offline-Leiste: erscheint ohne Netz mit dem Stand der gezeigten Daten und verschwindet mit dem Netz", async () => {
   await render(<OfflineBar />);
   expect(screen.queryByTestId("offline-bar")).toBeNull();

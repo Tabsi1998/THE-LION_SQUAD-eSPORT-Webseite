@@ -1,6 +1,7 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { NewsDetailScreen } from "./NewsDetailScreen";
+import { targetFromUrl } from "../../navigation/rootNavigation";
 
 // Gelesen-Marker (#616): ein Beitrag, den eine angemeldete Person öffnet, meldet sich beim Server -
 // Gäste und Fehler bleiben still, der Beitrag wird trotzdem gezeigt.
@@ -108,4 +109,36 @@ test("Nochmal versuchen lädt die aktuelle Kennung (#1000)", async () => {
   await fireEvent.press(screen.getByTestId("error-state-retry"));
   await waitFor(() => expect(screen.getByText("Beitrag B")).toBeTruthy());
   expect(mockGet).toHaveBeenLastCalledWith("/news/b");
+});
+
+const WITHDRAWN = "Dieser Beitrag wurde zurückgezogen. Alle aktuellen News findest du auf der News-Seite.";
+const gone = (detail?: string) => Object.assign(new Error("weg"), { isAxiosError: true, response: { status: 410, data: detail ? { detail } : {} } });
+
+test("zurückgezogener Beitrag (410): der Hinweis des Servers statt Ladefehler, ohne Nochmal versuchen", async () => {
+  mockGet.mockRejectedValue(gone(WITHDRAWN));
+  await render(<NewsDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Beitrag zurückgezogen")).toBeTruthy());
+  expect(screen.getByText(WITHDRAWN)).toBeTruthy();
+  expect(screen.queryByText("Laden hat nicht geklappt")).toBeNull();
+  expect(screen.queryByTestId("error-state-retry")).toBeNull();
+  expect(mockPost).not.toHaveBeenCalled();
+});
+
+test("Link aus Discord oder Newsletter auf einen zurückgezogenen Beitrag landet auf demselben Hinweis", async () => {
+  // Die Adresse wird wie in der App aufgelöst und öffnet NewsDetail mit der Kennung aus dem Link.
+  const target = targetFromUrl("https://www.lionsquad.at/news/saisonstart-vorbei");
+  expect(target).toEqual({ kind: "detail", screen: "NewsDetail", params: { id: "saisonstart-vorbei" } });
+  mockGet.mockRejectedValue(gone());
+  await render(<NewsDetailScreen navigation={navigation} route={{ key: "n", name: "NewsDetail", params: target?.params } as never} />);
+  await waitFor(() => expect(screen.getByText("Beitrag zurückgezogen")).toBeTruthy());
+  expect(mockGet).toHaveBeenCalledWith("/news/saisonstart-vorbei");
+  expect(screen.getByText("Dieser Beitrag wurde zurückgezogen.")).toBeTruthy();
+  expect(screen.queryByTestId("error-state-retry")).toBeNull();
+});
+
+test("Serverfehler (500) bleibt ein Ladefehler mit Nochmal versuchen", async () => {
+  mockGet.mockRejectedValue(Object.assign(new Error("kaputt"), { isAxiosError: true, response: { status: 500, data: {} } }));
+  await render(<NewsDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Laden hat nicht geklappt")).toBeTruthy());
+  expect(screen.getByTestId("error-state-retry")).toBeTruthy();
 });
