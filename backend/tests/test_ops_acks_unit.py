@@ -1,5 +1,5 @@
 """Die Regel „quittiert, bis es wieder auftritt“ (#2447) und die Upload-Routen der langsamen Anfragen - ohne Datenbank."""
-from services import ops_acks, ops_alerts, ops_monitor
+from services import ops_acks, ops_alerts, ops_upload_routes
 
 
 def test_an_ack_holds_until_the_problem_occurs_again():
@@ -36,16 +36,16 @@ def test_closed_check_states_say_how_they_ended():
 
 
 def test_upload_routes_match_exactly_or_by_prefix():
-    patterns = ops_monitor.DEFAULT_UPLOAD_ROUTES
-    assert ops_monitor.is_upload({"route": "/api/admin/app-releases"}, patterns)
-    assert ops_monitor.is_upload({"route": "/api/uploads/image"}, patterns)
-    assert ops_monitor.is_upload({"route": "/api/teams", "upload": True}, patterns), "selbst erkannt"
-    assert not ops_monitor.is_upload({"route": "/api/admin/app-releases/{release_id}"}, patterns)
-    assert not ops_monitor.is_upload({"route": "/api/teams"}, patterns)
+    patterns = ops_upload_routes.DEFAULT_UPLOAD_ROUTES
+    assert ops_upload_routes.is_upload({"route": "/api/admin/app-releases"}, patterns)
+    assert ops_upload_routes.is_upload({"route": "/api/uploads/image"}, patterns)
+    assert ops_upload_routes.is_upload({"route": "/api/teams", "upload": True}, patterns), "selbst erkannt"
+    assert not ops_upload_routes.is_upload({"route": "/api/admin/app-releases/{release_id}"}, patterns)
+    assert not ops_upload_routes.is_upload({"route": "/api/teams"}, patterns)
 
 
 def test_upload_route_settings_are_checked():
-    assert ops_alerts.merge_settings({})["upload_routes"] == list(ops_monitor.DEFAULT_UPLOAD_ROUTES)
+    assert ops_alerts.merge_settings({})["upload_routes"] == list(ops_upload_routes.DEFAULT_UPLOAD_ROUTES)
     assert ops_alerts.merge_settings({"upload_routes": []})["upload_routes"] == [], "leer gespeichert heißt leer, nicht Vorgabe"
     assert ops_alerts._clean_upload_routes("/api/a\n\n /api/b/* \n/api/a") == ["/api/a", "/api/b/*"]
     for bad in ("api/a", "/api/a b", "/api/*/x", "/x"):

@@ -27,6 +27,7 @@ from starlette.routing import Match
 
 from database import get_db
 from models import new_id, now_utc
+from services.ops_upload_routes import is_upload
 
 logger = logging.getLogger("tls.ops")
 
@@ -37,17 +38,7 @@ MESSAGE_LIMIT = 500
 # Gesundheitsprüfungen und der Änderungsstrom (der absichtlich offen bleibt)
 # sagen nichts über das Tempo der Anwendung.
 IGNORED_PATH_PREFIXES = ("/api/health", "/api/changes/stream")
-# Datei-Uploads (#2447) dauern so lange wie die Leitung des Hochladenden, das ist kein Tempo-Problem (der APK-Upload beim
-# App-Release brauchte 47 s). Die Middleware erkennt sie selbst (``multipart/form-data`` -> ``upload: true``); für ältere
-# Einträge und Sonderfälle gilt diese Liste. Sie ist die Vorgabe, einstellbar unter Betrieb -> Alarme
-# (``ops_alerts`` ``upload_routes``); ``*`` am Ende heißt „beginnt mit“.
-DEFAULT_UPLOAD_ROUTES = (
-    "/api/admin/app-releases",
-    "/api/admin/shop/print-files/upload",
-    "/api/admin/shop/designs/upload",
-    "/api/admin/shop/designs/upload-pair",
-    "/api/uploads/*",
-)
+# Datei-Uploads (#2447) zählen nicht als langsam - Vorgabe und Regel in ``ops_upload_routes``.
 
 _SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]+=*", re.IGNORECASE), "Bearer [redacted]"),
@@ -201,23 +192,6 @@ async def record_http_error(app: Any, request: Any, status_code: int) -> str | N
 def is_multipart(request: Any) -> bool:
     headers = getattr(request, "headers", {}) or {}
     return str(headers.get("content-type") or "").lower().startswith("multipart/form-data")
-
-
-def matches_upload_route(route: str, patterns) -> bool:
-    for pattern in patterns or ():
-        pattern = str(pattern or "").strip()
-        if not pattern:
-            continue
-        if pattern.endswith("*") and route.startswith(pattern[:-1]):
-            return True
-        if route == pattern:
-            return True
-    return False
-
-
-def is_upload(row: dict, patterns) -> bool:
-    """Ein Datei-Upload (#2447): selbst erkannt oder auf der Liste."""
-    return bool(row.get("upload")) or matches_upload_route(str(row.get("route") or ""), patterns)
 
 
 async def upload_routes(db) -> list[str]:

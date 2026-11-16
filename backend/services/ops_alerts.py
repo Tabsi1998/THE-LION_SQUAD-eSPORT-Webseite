@@ -18,7 +18,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
-from services.ops_monitor import DEFAULT_UPLOAD_ROUTES
+from services.ops_upload_routes import DEFAULT_UPLOAD_ROUTES
 
 logger = logging.getLogger(__name__)
 
