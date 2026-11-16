@@ -118,8 +118,10 @@ async def create_user_notification(
         from services.quiet_hours import hold_until
         held_until = await hold_until(db, user, kind, meta)
     if held_until:
+        # Discord nur, wenn diese Art überhaupt als Direktnachricht ginge (nie: Moderation, Rechnungen).
+        from services.discord_dm import EXCLUDED_KINDS as NO_DM_KINDS
         held_channels = [name for name, allowed in (("push", push_channel_allowed), ("browser", browser_channel_allowed),
-                                                    ("discord", discord_channel_allowed)) if allowed]
+                                                    ("discord", discord_channel_allowed and kind not in NO_DM_KINDS)) if allowed]
         push_channel_allowed = browser_channel_allowed = discord_channel_allowed = False
         in_app_allowed = True
     dedupe_key = meta.get("dedupe_key")

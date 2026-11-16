@@ -14,8 +14,9 @@ Ausnahmen, die auch in der Ruhezeit sofort kommen:
 - ``match_attention`` für die Turnierleitung (#1160), solange ihr Turnier läuft (Check-in, live, Pause) - nicht bei
   Liga-Staffeln: deren Leitungs-Meldungen (Verfahren, Fristen) haben Tage Zeit, die Sammelmeldung am Morgen reicht.
 
-Doppelt geht nichts: Die Sammelmeldung hat den eindeutigen Schlüssel ``quiet_digest:<ende>`` (Teilindex
-``user_unique_dedupe``); zwei gleichzeitige Läufe legen nur eine an, und erst danach werden die Meldungen freigegeben.
+Doppelt geht nichts: Je Person und Freigabe gibt es einen Schlüssel ``quiet_digest:<spätestes Ende>:<zufall>``, der vor dem
+Versand an den Zeilen steht (Teilindex ``user_unique_dedupe``); erst danach werden die Meldungen freigegeben. Siehe
+``release_due``. Der Push-Test der Verwaltung (``admin_push_test``) ist ebenfalls eine Ausnahme.
 """
 from __future__ import annotations
 
@@ -86,11 +87,11 @@ def digest_body(rows: list[dict]) -> str:
     return " · ".join(parts[:4]) + " – alles liegt in der Glocke."
 
 
-async def _send_digest(db, user: dict, until: str, rows: list[dict], channels: set[str]) -> bool:
-    """Die Sammelmeldung einmal anlegen und über die zurückgehaltenen Wege schicken. ``False``: gab es schon."""
+async def _send_digest(db, user: dict, dedupe: str, until: str, rows: list[dict], channels: set[str]) -> bool:
+    """Die Sammelmeldung einmal anlegen (Schlüssel ``dedupe``) und über die zurückgehaltenen Wege schicken. ``False``: gab
+    es schon."""
     from services.notification_preferences import browser_allowed, discord_allowed, push_allowed
 
-    dedupe = f"{DIGEST_KIND}:{until}"
     doc = {
         "id": new_id(),
         "user_id": user["id"],
@@ -135,31 +136,53 @@ async def _send_digest(db, user: dict, until: str, rows: list[dict], channels: s
 
 
 async def release_due(db, now: datetime | None = None) -> dict[str, int]:
-    """Zurückgehaltene Meldungen nach dem Ende der Ruhezeit freigeben - je Person und Ruhezeit eine Sammelmeldung."""
+    """Zurückgehaltene Meldungen freigeben, sobald die Person nicht mehr still ist - je Person und Freigabe genau eine
+    Sammelmeldung.
+
+    Je Person, nicht je altem Ende: Wer die Ruhezeit verlängert oder den Job über zwei Nächte verpasst, bekommt trotzdem nur
+    eine Sammelmeldung. Ist die Person gerade still, bekommen ihre Zeilen das neue Ende (umstempeln) - so blockieren sie
+    nichts. Wer die Ruhezeit ausschaltet oder verkürzt, bekommt seine Meldungen beim nächsten Lauf. Der Schlüssel der
+    Sammelmeldung steht vor dem Versand an den Zeilen (``quiet_release_key``): bricht ein Lauf nach dem Versand ab, nimmt der
+    nächste denselben Schlüssel, und der eindeutige Index lässt keine zweite zu."""
     now = now or now_utc()
-    rows = await db.notifications.find(
-        {"quiet_hold_until": {"$lte": now.isoformat()}},
-        {"_id": 0, "id": 1, "user_id": 1, "kind": 1, "read": 1, "meta": 1, "quiet_hold_until": 1, "quiet_held_channels": 1},
-    ).sort("quiet_hold_until", 1).to_list(RELEASE_BATCH)
-    groups: dict[tuple[str, str], list[dict]] = {}
-    for row in rows:
-        groups.setdefault((row.get("user_id") or "", row.get("quiet_hold_until") or ""), []).append(row)
-    counts = {"released": 0, "digests": 0}
-    for (user_id, until), group in groups.items():
+    now_iso = now.isoformat()
+    counts = {"released": 0, "digests": 0, "restamped": 0}
+    user_ids = sorted(await db.notifications.distinct("user_id", {"quiet_hold_until": {"$exists": True}}))
+    for user_id in user_ids:
+        rows = await db.notifications.find(
+            {"user_id": user_id, "quiet_hold_until": {"$exists": True}},
+            {"_id": 0, "id": 1, "kind": 1, "read": 1, "meta": 1, "quiet_hold_until": 1, "quiet_held_channels": 1,
+             "quiet_release_key": 1},
+        ).to_list(RELEASE_BATCH)
+        if not rows:
+            continue
+        ids = [row["id"] for row in rows]
         user = await db.users.find_one(
             {"id": user_id},
             {"_id": 0, "id": 1, "newsletter_consent": 1, "notification_preferences": 1, "quiet_hours": 1},
         )
-        # Hat die Person ihre Ruhezeit inzwischen verschoben und ist gerade wieder still: später freigeben.
-        if user and quiet_until(user, now) is not None:
+        still = quiet_until(user, now) if user else None
+        if still is not None:
+            # Noch (oder wieder) still: alle Zeilen auf das jetzige Ende - die Freigabe kommt einmal, danach.
+            until = still.isoformat()
+            stale = [row["id"] for row in rows if row.get("quiet_hold_until") != until]
+            if stale:
+                result = await db.notifications.update_many({"id": {"$in": stale}}, {"$set": {"quiet_hold_until": until}})
+                counts["restamped"] += int(getattr(result, "modified_count", 0) or 0)
             continue
-        unread = [row for row in group if not row.get("read")]
+        latest = max(str(row.get("quiet_hold_until") or "") for row in rows)
+        key = next((row["quiet_release_key"] for row in rows if row.get("quiet_release_key")), None)
+        if not key:
+            key = f"{DIGEST_KIND}:{latest}:{new_id()[:8]}"
+            await db.notifications.update_many({"id": {"$in": ids}}, {"$set": {"quiet_release_key": key}})
+        unread = [row for row in rows if not row.get("read")]
         channels = {channel for row in unread for channel in (row.get("quiet_held_channels") or []) if channel in HELD_CHANNELS}
-        if user and unread and channels and await _send_digest(db, user, until, unread, channels):
+        if user and unread and channels and await _send_digest(db, user, key, latest, unread, channels):
             counts["digests"] += 1
         result = await db.notifications.update_many(
-            {"id": {"$in": [row["id"] for row in group]}, "quiet_hold_until": until},
-            {"$unset": {"quiet_hold_until": "", "quiet_held_channels": ""}, "$set": {"quiet_released_at": now.isoformat()}},
+            {"id": {"$in": ids}},
+            {"$unset": {"quiet_hold_until": "", "quiet_held_channels": "", "quiet_release_key": ""},
+             "$set": {"quiet_released_at": now_iso}},
         )
         counts["released"] += int(getattr(result, "modified_count", 0) or 0)
     return counts

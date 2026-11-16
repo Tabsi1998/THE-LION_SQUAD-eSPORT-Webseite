@@ -83,6 +83,9 @@ class _Collection:
                 return dict(row)
         return None
 
+    async def distinct(self, key, query=None):
+        return sorted({row.get(key) for row in self.rows if _matches(row, query or {})})
+
     def find(self, query, projection=None):
         return _Cursor([dict(row) for row in self.rows if _matches(row, query)])
 
@@ -144,6 +147,7 @@ def wires(monkeypatch):
 
     web.has_browser_subscription = _has_browser
     dm = _module("services.discord_dm", "send_discord_dm_for_notification", "discord")
+    dm.EXCLUDED_KINDS = {"moderation", "invoice_ready"}
     events = types.ModuleType("services.change_events")
 
     async def _publish(*_args, **_kwargs):
@@ -154,6 +158,11 @@ def wires(monkeypatch):
                          ("services.discord_dm", dm), ("services.change_events", events)):
         monkeypatch.setitem(sys.modules, name, module)
     return sent
+
+
+def _rd(result):
+    """Freigegeben und Sammelmeldungen eines Laufs."""
+    return result["released"], result["digests"]
 
 
 def _at(monkeypatch, db, when):
@@ -218,7 +227,9 @@ def test_the_profile_model_accepts_only_clock_times():
 
     body = UserUpdate(quiet_hours={"enabled": True, "start": "22:00", "end": "07:00"})
     assert body.model_dump(exclude_unset=True)["quiet_hours"] == NIGHT
-    for bad in ({"enabled": True, "start": "25:00", "end": "07:00"}, {"enabled": True, "start": "07:00", "end": "07:00"}):
+    # Ein Teil-PATCH bleibt ein Teil - die Route führt ihn mit dem gespeicherten Stand zusammen (Lücke prüft sie dort).
+    assert UserUpdate(quiet_hours={"enabled": True}).model_dump(exclude_unset=True)["quiet_hours"] == {"enabled": True}
+    for bad in ({"enabled": True, "start": "25:00"}, {"end": "7:00"}, {"start": "１２:00"}):
         with pytest.raises(ValidationError):
             UserUpdate(quiet_hours=bad)
 
@@ -314,9 +325,9 @@ async def test_exactly_one_digest_after_the_night(monkeypatch, wires):
     assert wires == []
     # Noch Ruhezeit: nichts geht.
     early = await quiet_hours.release_due(db, _utc("2026-11-17T05:59:00"))
-    assert early == {"released": 0, "digests": 0} and wires == []
+    assert _rd(early) == (0, 0) and wires == []
     done = await quiet_hours.release_due(db, _utc("2026-11-17T06:00:00"))
-    assert done == {"released": 4, "digests": 1}
+    assert _rd(done) == (4, 1)
     digest = [row for row in db.notifications.rows if row["kind"] == "quiet_digest"]
     assert len(digest) == 1
     assert digest[0]["title"] == "In der Nacht: 4 Meldungen"
@@ -326,21 +337,30 @@ async def test_exactly_one_digest_after_the_night(monkeypatch, wires):
     assert all("quiet_hold_until" not in row for row in db.notifications.rows)
     # Ein zweiter Lauf findet nichts mehr.
     again = await quiet_hours.release_due(db, _utc("2026-11-17T06:05:00"))
-    assert again == {"released": 0, "digests": 0} and len(wires) == 2
+    assert _rd(again) == (0, 0) and len(wires) == 2
 
 
 @pytest.mark.anyio
 async def test_two_runs_at_once_send_one_digest(monkeypatch, wires):
-    """Stürzt ein Lauf nach der Sammelmeldung ab, legt der nächste keine zweite an - der Schlüssel ist eindeutig."""
+    """Bricht ein Lauf nach der Sammelmeldung ab (vor der Freigabe), legt der nächste keine zweite an: Der Schlüssel steht vor
+    dem Versand an den Zeilen, der eindeutige Index hält den zweiten Versuch auf."""
     db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
     await _night(monkeypatch, db, count=2)
-    user = await db.users.find_one({"id": "u1"})
-    rows = [row for row in db.notifications.rows if row.get("quiet_hold_until")]
-    assert await quiet_hours._send_digest(db, user, rows[0]["quiet_hold_until"], rows, {"push"}) is True
-    done = await quiet_hours.release_due(db, _utc("2026-11-17T06:00:00"))
-    assert done == {"released": 2, "digests": 0}
+    original = db.notifications.update_many
+
+    async def broken(query, update):
+        if "$unset" in update:
+            raise RuntimeError("Lauf bricht ab")
+        return await original(query, update)
+
+    db.notifications.update_many = broken
+    with pytest.raises(RuntimeError):
+        await quiet_hours.release_due(db, _utc("2026-11-17T06:00:00"))
+    db.notifications.update_many = original
+    done = await quiet_hours.release_due(db, _utc("2026-11-17T06:01:00"))
+    assert _rd(done) == (2, 0)
     assert len([row for row in db.notifications.rows if row["kind"] == "quiet_digest"]) == 1
-    assert [channel for channel, _kind, _user in wires] == ["push"]
+    assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
 
 
 @pytest.mark.anyio
@@ -350,7 +370,7 @@ async def test_no_digest_when_everything_was_read_already(monkeypatch, wires):
     for row in db.notifications.rows:
         row["read"] = True
     done = await quiet_hours.release_due(db, _utc("2026-11-17T06:30:00"))
-    assert done == {"released": 2, "digests": 0} and wires == []
+    assert _rd(done) == (2, 0) and wires == []
 
 
 @pytest.mark.anyio
@@ -372,5 +392,96 @@ async def test_held_messages_wait_while_the_person_is_quiet_again(monkeypatch, w
     db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
     await _night(monkeypatch, db, count=1)
     db.users.rows[0]["quiet_hours"] = {"enabled": True, "start": "22:00", "end": "09:00"}
-    assert await quiet_hours.release_due(db, _utc("2026-11-17T06:30:00")) == {"released": 0, "digests": 0}
-    assert await quiet_hours.release_due(db, _utc("2026-11-17T08:00:00")) == {"released": 1, "digests": 1}
+    assert _rd(await quiet_hours.release_due(db, _utc("2026-11-17T06:30:00"))) == (0, 0)
+    assert _rd(await quiet_hours.release_due(db, _utc("2026-11-17T08:00:00"))) == (1, 1)
+
+
+@pytest.mark.anyio
+async def test_extended_window_sends_one_digest_not_two(monkeypatch, wires):
+    """Meldung um 23:00 (Ende 7:00), um 1:00 auf 8:00 verlängert, noch eine Meldung: um 8:00 genau eine Sammelmeldung."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=1)
+    db.users.rows[0]["quiet_hours"] = {"enabled": True, "start": "22:00", "end": "08:00"}
+    _at(monkeypatch, db, "2026-11-17T00:00:00")
+    await create_user_notification("u1", "Später", kind="tournament_registration",
+                                   meta={"category": "tournament_updates", "dedupe_key": "spaet", "tournament_id": "tx"})
+    assert {row["quiet_hold_until"] for row in db.notifications.rows} == {"2026-11-17T06:00:00+00:00", "2026-11-17T07:00:00+00:00"}
+    # 7:00 Wien: noch still - die alte Zeile bekommt das neue Ende, nichts geht.
+    early = await quiet_hours.release_due(db, _utc("2026-11-17T06:00:00"))
+    assert _rd(early) == (0, 0) and early["restamped"] == 1 and wires == []
+    done = await quiet_hours.release_due(db, _utc("2026-11-17T07:00:00"))
+    assert _rd(done) == (2, 1)
+    digest = [row for row in db.notifications.rows if row["kind"] == "quiet_digest"]
+    assert len(digest) == 1 and digest[0]["title"] == "In der Nacht: 2 Meldungen"
+    assert len(wires) == 2  # Push und Browser, je einmal
+
+
+@pytest.mark.anyio
+async def test_job_down_over_two_nights_sends_one_digest(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=1)
+    _at(monkeypatch, db, "2026-11-17T23:00:00")
+    await create_user_notification("u1", "Zweite Nacht", kind="tournament_registration",
+                                   meta={"category": "tournament_updates", "dedupe_key": "n2", "tournament_id": "t9"})
+    # Der Job läuft erst in der zweiten Nacht wieder: alles wartet auf das zweite Ende.
+    first = await quiet_hours.release_due(db, _utc("2026-11-18T02:00:00"))
+    assert _rd(first) == (0, 0) and wires == []
+    done = await quiet_hours.release_due(db, _utc("2026-11-18T06:00:00"))
+    assert _rd(done) == (2, 1)
+    assert len([row for row in db.notifications.rows if row["kind"] == "quiet_digest"]) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("change", [{"enabled": False, "start": "22:00", "end": "07:00"}, {"enabled": True, "start": "22:00", "end": "00:30"}])
+async def test_switched_off_or_shortened_releases_at_the_next_run(monkeypatch, wires, change):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    await _night(monkeypatch, db, count=2)
+    db.users.rows[0]["quiet_hours"] = change
+    done = await quiet_hours.release_due(db, _utc("2026-11-17T00:00:00"))
+    assert _rd(done) == (2, 1)
+    assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
+
+
+@pytest.mark.anyio
+async def test_discord_is_only_held_for_kinds_that_go_by_direct_message(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {"discord": True}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Rechnung", kind="invoice_ready", meta={"category": "billing_updates", "dedupe_key": "inv"})
+    await create_user_notification("u1", "Nachricht", kind="direct_message", meta={"dedupe_key": "dm"})
+    held = {row["kind"]: row["quiet_held_channels"] for row in db.notifications.rows}
+    assert held == {"invoice_ready": ["push", "browser"], "direct_message": ["push", "browser", "discord"]}
+
+
+@pytest.mark.anyio
+async def test_the_push_test_of_the_admin_comes_through(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Test: Push", kind="admin_push_test", meta={"dedupe_key": "t"})
+    assert ("push", "admin_push_test", "u1") in wires
+    assert "quiet_hold_until" not in db.notifications.rows[0]
+
+
+def test_second_pass_of_the_fall_back_night_ends_in_the_future():
+    """25.10.2026: 02:00–02:59 gibt es zweimal. Fenster 00:00–02:30, im zweiten Durchlauf um 02:15 MEZ (01:15 UTC)."""
+    user = {"quiet_hours": {"enabled": True, "start": "00:00", "end": "02:30"}}
+    first = quiet_hours_rules.quiet_until(user, _utc("2026-10-25T00:15:00"))   # 02:15 MESZ
+    assert first == _utc("2026-10-25T00:30:00")
+    second = quiet_hours_rules.quiet_until(user, _utc("2026-10-25T01:15:00"))  # 02:15 MEZ
+    assert second == _utc("2026-10-25T01:30:00") and second > _utc("2026-10-25T01:15:00")
+
+
+def test_display_and_effect_use_the_same_fallback():
+    """Nur ``enabled`` gespeichert (alter Teil-PATCH): Anzeige 22–7, und genau dann wird auch zurückgehalten."""
+    user = {"quiet_hours": {"enabled": True}}
+    assert quiet_hours_rules.settings_payload(user) == {"enabled": True, "start": "22:00", "end": "07:00"}
+    assert quiet_hours_rules.window(user) == (22 * 60, 7 * 60)
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-11-16T23:00:00")) == _utc("2026-11-17T06:00:00")
+
+
+def test_a_gap_of_at_least_15_minutes_and_ascii_digits_only():
+    assert quiet_hours_rules.gap_problem("07:05", "07:00")
+    assert quiet_hours_rules.gap_problem("07:00", "07:00")
+    assert quiet_hours_rules.gap_problem("07:15", "07:00") is None
+    assert quiet_hours_rules.window({"quiet_hours": {"enabled": True, "start": "07:05", "end": "07:00"}}) is None
+    assert quiet_hours_rules.parse_time("\u0661\u0662:00") is None  # arabisch-indische Ziffern
+    assert quiet_hours_rules.parse_time("１２:00") is None  # breite Ziffern
