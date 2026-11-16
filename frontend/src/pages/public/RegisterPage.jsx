@@ -235,7 +235,7 @@ export default function RegisterPage() {
           </div>
           <AuthSelectField id="register-gender" label="Geschlecht" value={form.gender} onChange={set("gender")} description="Optional">
             <option value="">Keine Angabe</option>
-            <option value="male">Maennlich</option>
+            <option value="male">Männlich</option>
             <option value="female">Weiblich</option>
             <option value="diverse">Divers</option>
           </AuthSelectField>
