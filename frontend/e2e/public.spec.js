@@ -168,6 +168,11 @@ test("membership application waits for auth, validates inline and submits only o
   expect(submissions).toBe(0);
 
   await page.getByTestId("apply-motivation").fill("Ich möchte den Verein langfristig aktiv unterstützen.");
+  // Mindestalter (#1698): ohne Geburtsdatum geht kein Antrag hinaus - der Satz sagt „ab 18“.
+  await expect(page.locator("#apply-birth-error")).toContainText("ab 18 Jahren");
+  await page.getByTestId("apply-birth").click();
+  await page.getByTestId("apply-birth-year").selectOption("1995");
+  await page.getByTestId("apply-birth-day-15").click();
   await page.getByTestId("apply-statutes").check();
   await page.getByTestId("apply-privacy").check();
   await dispatchDoubleSubmit(page, "apply-submit");
