@@ -142,3 +142,53 @@ async def test_a_latecomer_without_a_place_hears_what_still_works_before_and_aft
     after = await latecomer(flow, tournament, "Nachzügler 2")
     assert after["ok"] is False and after["reason"] == "no_free_place"
     assert "begonnen" in after["detail"] and "Zurücksetzen" not in after["detail"], after["detail"]
+
+
+# ---------------------------------------------------------------- Weitere Phasen (#2046, Review)
+
+@pytest.mark.asyncio
+async def test_rebuilding_asks_when_a_later_stage_has_its_own_schema(flow):
+    """Neu bauen ersetzt alle Phasen - auch ohne Schema in Phase 1 geht das von Phase 2 nicht still verloren."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="double_elim")
+    await flow.db.tournament_stages.insert_many([
+        {"id": new_id(), "tournament_id": tournament["id"], "number": 1, "status": "pending", "name": "Vorrunde",
+         "stage_type": "double_elimination", "match_type": "duel", "settings": {}},
+        {"id": new_id(), "tournament_id": tournament["id"], "number": 2, "status": "pending", "name": "Finalrunde",
+         "stage_type": "custom_bracket", "match_type": "duel",
+         "settings": {"schema": CUP_WITH_LOSER_BRACKET, "match_size": 2, "qualifiers_per_match": 1}},
+    ])
+
+    for body in (None, FORM_BODY):
+        asked = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true",
+                                **({"json": body} if body else {}))
+        assert asked.status_code == 409, asked.text
+        detail = asked.json()["detail"]
+        assert detail["code"] == "confirm_destruction" and detail["own_schema"] is True and detail["stage_count"] == 2
+        assert "alle 2 Phasen („Vorrunde“ und „Finalrunde“)" in detail["message"]
+        assert "eigene Schema verloren (Phase „Finalrunde“)" in detail["message"]
+    assert await flow.db.tournament_stages.count_documents({"tournament_id": tournament["id"]}) == 2
+
+    confirmed = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true&force=true",
+                                json=FORM_BODY)
+    assert confirmed.status_code == 200, confirmed.text
+    assert await flow.db.tournament_stages.count_documents({"tournament_id": tournament["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_rebuilding_asks_before_replacing_several_stages_without_schema(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4)
+    for number, name in ((1, "Gruppen"), (2, "Playoffs")):
+        await flow.db.tournament_stages.insert_one({
+            "id": new_id(), "tournament_id": tournament["id"], "number": number, "status": "pending", "name": name,
+            "stage_type": "single_elimination", "match_type": "duel", "settings": {}})
+
+    asked = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true", json=FORM_BODY)
+
+    assert asked.status_code == 409, asked.text
+    detail = asked.json()["detail"]
+    assert detail["own_schema"] is False and "„Gruppen“ und „Playoffs“" in detail["message"]
+    assert "Schema" not in detail["message"]

@@ -207,6 +207,8 @@ Terminplanung, Spieldauer, Weiterkommen) stellt die Turnierleitung je Phase unte
   **Speichern & Struktur anwenden** erst nach: **Schema verwerfen** baut den Baum aus dem Format, **Abbrechen** lässt
   alles stehen. Mit dem Schema baust du die Phase bei den Phasen über **Vorschau** bzw. **Mit Teilnehmern
   generieren** neu.
+- Gibt es mehrere Phasen, ersetzt **Speichern & Struktur anwenden** sie alle durch einen Turnierbaum aus dem Format.
+  Auch das fragt vorher und nennt die Phasen – und, falls eine davon ein eigenes Schema hat, auch dieses.
 - Ab dem Ende des Check-ins (oder sobald es feste Spiele gibt, etwa generierte Gruppen) stehen **Turnierstruktur**,
   **Teilnahme**, **Spieler pro Team** und **Spiel** nur noch lesend da, und **Speichern & Struktur anwenden** fehlt.
   Beim Schweizer System, bei Zeitfahren und Rennserie gibt es den Knopf nie – dort gibt es keinen Baum zum Vorausbauen.

@@ -382,15 +382,39 @@ def _has_schema(settings: dict | None) -> bool:
     return any(str((settings or {}).get(key) or "").strip() for key in SCHEMA_SETTING_KEYS)
 
 
-def _dropped_schema_note(stage: dict | None, body: TournamentBracketStructurePayload | None) -> str | None:
-    """Der Satz für die Rückfrage, wenn Neu bauen das eigene Schema der Phase verwerfen würde (#2046) - sonst ``None``.
-    Ohne Struktur im Aufruf baut der Server mit der vorhandenen Phase, das Schema bleibt."""
-    if not stage or body is None or not _has_schema(stage.get("settings")) or _has_schema(body.settings):
-        return None
-    name = stage.get("name") or "Turnierbaum"
-    return (f"Neu bauen aus dem Format verwirft das eigene Schema der Phase „{name}“ – danach steht der Format-Baum, "
-            "etwa ohne dein eigenes Loser Bracket. Mit dem Schema baust du die Phase bei den Phasen über „Vorschau“ "
-            "bzw. „Mit Teilnehmern generieren“ neu.")
+def _stage_name(stage: dict) -> str:
+    return stage.get("name") or (f"Phase {stage['number']}" if stage.get("number") else "Phase")
+
+
+def _quoted(stages: list[dict]) -> str:
+    names = [f"„{_stage_name(stage)}“" for stage in stages]
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} und {names[-1]}"
+
+
+def _dropped_structure_note(stages: list[dict], body: TournamentBracketStructurePayload | None) -> tuple[str | None, bool]:
+    """Der Satz für die Rückfrage, wenn Neu bauen aus dem Format mehr verwirft als die Vorschau (#2046) - sonst
+    ``None``. Neu bauen ersetzt alle Phasen durch eine: Weitere Phasen gehen immer verloren, ihr eigenes Schema mit;
+    das Schema der ersten Phase nur, wenn der Aufruf eine Struktur ohne Schema bringt (ohne Struktur baut der Server
+    mit der vorhandenen ersten Phase). Zweiter Wert: geht ein eigenes Schema verloren?"""
+    if not stages:
+        return None, False
+    first, later = stages[0], stages[1:]
+    schema_lost = [stage for stage in later if _has_schema(stage.get("settings"))]
+    if body is not None and _has_schema(first.get("settings")) and not _has_schema(body.settings):
+        schema_lost.insert(0, first)
+    if not later and not schema_lost:
+        return None, False
+    advice = ("Mit dem Schema baust du eine Phase bei den Phasen über „Vorschau“ bzw. „Mit Teilnehmern generieren“ "
+              "neu.")
+    if not later:
+        return (f"Neu bauen aus dem Format verwirft das eigene Schema der Phase {_quoted(schema_lost)} – danach steht "
+                f"der Format-Baum, etwa ohne dein eigenes Loser Bracket. {advice}"), True
+    text = (f"Neu bauen aus dem Format ersetzt alle {len(stages)} Phasen ({_quoted(stages)}) durch einen "
+            "Turnierbaum aus dem Format – die weiteren Phasen samt ihrer Spiele fallen weg.")
+    if schema_lost:
+        text += (f" Dabei geht auch das eigene Schema verloren "
+                 f"({'Phase' if len(schema_lost) == 1 else 'Phasen'} {_quoted(schema_lost)}). {advice}")
+    return text, bool(schema_lost)
 
 
 @router.post("/{tid}/bracket/from-format")
@@ -417,9 +441,10 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
 
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     impact = tournament_guard.match_impact(v2_matches)
-    existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
-    # Ein eigenes Schema geht nie still verloren (#2046): Bringt der Aufruf keines mit, fragt der Server erst nach.
-    schema_note = _dropped_schema_note(existing_stage, body)
+    stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).sort("number", 1).to_list(200)
+    existing_stage = stages[0] if stages else None
+    # Nichts geht still verloren (#2046): weder ein eigenes Schema noch weitere Phasen - erst fragt der Server nach.
+    schema_note, own_schema = _dropped_structure_note(stages, body)
     if impact["match_count"] and preview:
         # Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17) - „Speichern & Struktur anwenden“ löschte so im
         # laufenden Turnier alle Spiele samt Ergebnissen.
@@ -436,10 +461,10 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
                    "Das Turnier läuft schon – der Turnierbaum wird aus dem Format neu aufgebaut.")
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
             "confirm_destruction", f"{message} {schema_note}" if schema_note else message,
-            {**impact, "own_schema": bool(schema_note)}))
+            {**impact, "own_schema": own_schema, "stage_count": len(stages)}))
     if schema_note and not force:
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
-            "confirm_destruction", schema_note, {**impact, "own_schema": True}))
+            "confirm_destruction", schema_note, {**impact, "own_schema": own_schema, "stage_count": len(stages)}))
     match_plan = _collect_match_plan(v2_matches)
     if body is None and existing_stage:
         body = TournamentBracketStructurePayload(
