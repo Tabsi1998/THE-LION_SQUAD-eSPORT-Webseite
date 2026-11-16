@@ -6,7 +6,8 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { STAFF_ROLE_OPTIONS, STAFF_SCOPE_OPTIONS, formatBracketSection } from "@/lib/tournamentLabels";
+import { STAFF_ROLE_OPTIONS, STAFF_SCOPE_OPTIONS } from "@/lib/tournamentLabels";
+import { displayRoundLabels, sectionRoundLabel } from "@/lib/bracketNames";
 
 // Bereich eines Einsatzes (#2111, TA25): eine Auswahl aus diesem Turnier statt einer rohen Kennung als Freitext - ein
 // Tippfehler ergab vorher einen Helfer ohne Rechte. „Alle …“ (leer) gilt für jede Phase, Gruppe, Station oder jedes Spiel.
@@ -17,9 +18,10 @@ export function scopeChoices({ stages = [], groups = [], stations = [], matches 
     stage: stages.map((stage) => [stage.id, stage.name || `Phase ${stage.number || ""}`.trim()]),
     group: groups.map((group) => [group.id, group.name || "Gruppe"]),
     station: stations.map((station) => [station.id, station.name ? `Station ${station.name}` : "Station"]),
-    match: matches.filter((match) => !match.is_preview).map((match) => [
+    // Rundennamen wie im Baum (#1947).
+    match: displayRoundLabels(matches).filter((match) => !match.is_preview).map((match) => [
       match.id,
-      [formatBracketSection(match.section), match.round_name, match.match_key].filter(Boolean).join(" · "),
+      [sectionRoundLabel(match), match.match_key].filter(Boolean).join(" · "),
     ]),
   };
 }

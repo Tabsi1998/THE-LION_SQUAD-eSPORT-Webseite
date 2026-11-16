@@ -24,8 +24,14 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung;
   vor Ort startet sie im **Cockpit** (Probleme und Stationen auf einer Seite, 3.8)
 - **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
-  **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Alle Turnierseiten tragen dieselben
+  **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Darunter eine zweite Zeile: die Spiele,
+  zu denen es Turniere gibt, **Online** / **Vor Ort** (hybride Turniere stehen unter beiden) und – angemeldet – **Nur
+  meine** (eigene Anmeldungen und die des Teams). Alles wirkt zusammen und steht in der Adresse
+  (`/tournaments?game=mario-kart&mode=local&mine=1`), ein geteilter Link zeigt dieselbe Auswahl. Ein zweiter Tipp auf
+  einen Chip löst ihn wieder. Am Handy wischt man beide Zeilen seitlich. Alle Turnierseiten tragen dieselben
   Brotkrumen „Start · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
+
+  <img src="../assets/turniere/turnierliste-filter-handy.png" alt="Turnierliste am Handy: oben die Phasen Alle, Anmeldung, Check-in und Live, darunter runde Chips Mario Kart World, Super Smash Bros. Ultimate und angeschnitten Rocket League zum Wischen" width="260">
 - **Terminvorschläge** auf der Matchseite gehen nur in die Zukunft – frühestens 5 Minuten ab jetzt. Bis zu 3 Termine
   gehen auf einmal (**+ weiteren Termin**); die Gegenseite nimmt einen davon an, die übrigen sind damit erledigt.
 
@@ -202,6 +208,12 @@ Terminplanung, Spieldauer, Weiterkommen) stellt die Turnierleitung je Phase unte
   **Spieler pro Team** bleibt die Phase, wie sie ist (Name, Best of, Schema), samt geplanter Zeiten und Stationen.
   Eine eigene Phase (anderer Name, eigene Einstellungen oder mehrere Phasen) baut ein Formatwechsel nicht still um –
   die baust du mit **Speichern & Struktur anwenden** neu.
+- Hat die Phase ein eigenes Schema (etwa ein Cup mit eigenem Loser Bracket) und das Formular bringt keines mit, fragt
+  **Speichern & Struktur anwenden** erst nach: **Schema verwerfen** baut den Baum aus dem Format, **Abbrechen** lässt
+  alles stehen. Mit dem Schema baust du die Phase bei den Phasen über **Vorschau** bzw. **Mit Teilnehmern
+  generieren** neu.
+- Gibt es mehrere Phasen, ersetzt **Speichern & Struktur anwenden** sie alle durch einen Turnierbaum aus dem Format.
+  Auch das fragt vorher und nennt die Phasen – und, falls eine davon ein eigenes Schema hat, auch dieses.
 - Ab dem Ende des Check-ins (oder sobald es feste Spiele gibt, etwa generierte Gruppen) stehen **Turnierstruktur**,
   **Teilnahme**, **Spieler pro Team** und **Spiel** nur noch lesend da, und **Speichern & Struktur anwenden** fehlt.
   Beim Schweizer System, bei Zeitfahren und Rennserie gibt es den Knopf nie – dort gibt es keinen Baum zum Vorausbauen.
@@ -399,8 +411,10 @@ oder **Stationsleitung** in diesem Turnier; im Status **Check-in offen** öffnet
   eingetragen wird, übernimmt genau einen freien Platz – zuerst den einer Person mit **Nicht erschienen**, sonst einen
   leeren Platz neben einem **Freilos** (das Freilos-Spiel wird dann normal gespielt). Das geht, solange das erste Spiel
   dieses Platzes nicht begonnen hat; in Liga und Gruppen, solange höchstens ein Spieltag gespielt ist. Ist kein Platz
-  frei, sagt die Seite es. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
-  Person mit Freilos.
+  frei, sagt die Seite es und auch, was noch geht: Solange nichts gespielt ist, holen **Zurücksetzen** und neu bauen
+  die Person in den Baum (schon aufgerufene Spiele werden dabei zurückgenommen). Wird schon gespielt, geht es nur noch
+  über **Zurücksetzen** – dann gehen die bisherigen Ergebnisse verloren. Gezielt ersetzt **Teilnehmer hinzufügen** mit
+  **Ersetzt Nicht-Erschienen** – auch eine Person mit Freilos.
 - Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
 - **Weiterkommen (Gegner der nächsten Runde)** (Spieloptionen, auch je Phase; nur bei K.-o., Doppel-K.-o. und freien
   Bäumen – bei Jeder gegen jeden – Hin- und Rückrunde steht dafür der Schalter **Spieltage auslosen**), vier Modi:
@@ -634,9 +648,12 @@ Stationsleitung – fürs ganze Turnier oder nur an der eigenen Station, ohne Ad
 - **Anderes Turnier**: An einer geteilten Station des Events spielt gerade ein anderes Turnier. Aufrufen, Freigeben und
   Räumen macht dessen Leitung. **Defekt** geht nach einer Rückfrage – dessen Leitung bekommt sofort Bescheid, sieht den
   Fall unter **Braucht Aufmerksamkeit** und legt das Spiel um; beide Protokolle halten es fest.
-- **Hängt**: Die Station ist als belegt gespeichert, hält aber kein offenes Spiel (etwa nach dem Löschen einer Phase).
-  **Station räumen** macht sie wieder frei – nie, solange ein offenes Spiel daran steht. Beim Löschen oder Neubauen
-  einer Phase werden die Stationen ihrer Spiele ohnehin frei; wer dort aufgerufen war, bekommt „Aufruf zurückgenommen“.
+- **Hängt**: Die Station ist als belegt gespeichert, hält aber kein offenes Spiel (etwa nach einer Störung beim
+  Speichern). **Station räumen** macht sie wieder frei – nie, solange ein offenes Spiel daran steht. Wo Spiele gelöscht
+  werden, werden ihre Stationen ohnehin frei: Phase löschen oder neu bauen, Turnierbaum zurücksetzen oder neu bauen,
+  Gruppen neu bilden, Vorschau neu bauen (Format, Anmeldung, Check-in-Ende) und Turnier löschen. Eine defekte Station
+  bleibt dabei defekt. Beim Löschen oder Neubauen einer Phase bekommt, wer dort aufgerufen war, „Aufruf
+  zurückgenommen“.
 - Tippen zwei Leute zugleich, gilt genau ein Tipp; der andere bekommt eine Meldung und sieht den neuen Stand. Jede
   Aktion steht im Protokoll.
 
@@ -699,7 +716,9 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
 (nur bei Turnieren vor Ort mit Stationen):
 
 - Je Station: was **läuft** (mit Spielzeit-Uhr „12:34 / 30 Min.“, orange ab 80 %, ab der vollen Dauer orange hinterlegt mit Warn-Symbol), was **als
-  Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“.
+  Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“. Eine
+  Turnierpause rechnet die Prognose heraus wie die Uhr: Nach zehn Minuten Pause rücken „als Nächstes“ und das Finale um
+  zehn Minuten nach hinten.
 - Wird eine Station frei, rückt das nächste bereite Spiel nach – an die Station, die zuerst frei ist. Ein Spiel wartet
   nur auf seine eigenen Vorspiele (die Linien im Baum), nicht auf die ganze Runde. Steht ein Platz noch nicht fest,
   heißt es „wartet auf die Vorspiele“, bei der Show-Auslosung „wartet auf die Auslosung“, und die Zeit „voraussichtlich“.

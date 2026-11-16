@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { flowLayout, relatedOf } from "@/lib/matchFlow";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection } from "@/lib/tournamentLabels";
 import { viennaTime } from "@/lib/vienna";
 
 // „Wer wartet auf wen“ (#1557): die Abhängigkeiten als Ablauf von links nach rechts. Durchgezogen kommt weiter,
@@ -92,8 +92,8 @@ export function FlowGraph({ graph, itemsById, laneNames = {}, selectedId = null,
           <>
             <div>
               <strong className="text-white">{selected.key}</strong>
-              {selected.section ? ` · ${formatBracketSection(selected.section)}` : ""}
-              {selectedItem?.roundName ? ` · ${formatRoundName(selectedItem.roundName, selected.round)}` : ""}
+              {/* Abschnitt und Runde wie im Baum (#1947) - dieselbe Regel wie bei den Rundensponsoren. */}
+              {selectedItem?.roundLabel ? ` · ${selectedItem.roundLabel}` : selected.section ? ` · ${formatBracketSection(selected.section)}` : ""}
               {selectedItem?.start ? ` · ${hm(selectedItem.start)}–${hm(selectedItem.end)}` : " · noch ohne Zeit"}
               {selectedItem && selectedItem.laneId !== "none" ? ` · ${laneNames[selectedItem.laneId] || ""}` : ""}
             </div>

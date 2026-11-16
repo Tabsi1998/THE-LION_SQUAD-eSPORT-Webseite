@@ -1128,6 +1128,27 @@ test("„Speichern & Struktur anwenden“ vor dem Check-in-Ende schickt kein for
   expect(url).toBe("/tournaments/t-1/bracket/from-format?preview=true");
 });
 
+test("„Speichern & Struktur anwenden“ über einem eigenen Schema fragt mit „Schema verwerfen“ (#2046)", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const refusal = { response: { status: 409, data: { detail: {
+    code: "confirm_destruction", own_schema: true, match_count: 0, played_count: 0,
+    message: "Neu bauen aus dem Format verwirft das eigene Schema der Phase „Cup“ – danach steht der Format-Baum.",
+  } } } };
+  apiMock.post.mockImplementation((url) => (String(url) === "/tournaments/t-1/bracket/from-format?preview=true"
+    ? Promise.reject(refusal)
+    : Promise.resolve({ data: { ok: true, preview: true, match_count: 3 } })));
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  await user.click(await screen.findByTestId("tr-edit-save-rebuild"));
+  const dialog = await screen.findByTestId("confirm-dialog");
+  expect(dialog).toHaveTextContent("eigene Schema der Phase „Cup“");
+  expect(screen.getByTestId("confirm-dialog-confirm")).toHaveTextContent("Schema verwerfen");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
+    "/tournaments/t-1/bracket/from-format?preview=true&force=true", expect.anything()));
+});
+
 test("Gruppen neu generieren: die Rückfrage nennt die Zahlen des Servers, erst dann force", async () => {
   const user = userEvent.setup();
   serveFixed({ format: "groups" });

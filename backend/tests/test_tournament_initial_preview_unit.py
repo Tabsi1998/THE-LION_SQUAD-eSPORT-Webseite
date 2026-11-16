@@ -1,5 +1,6 @@
 import pathlib
 import sys
+from types import SimpleNamespace
 
 import anyio
 
@@ -54,6 +55,14 @@ class FakeCollection:
                     row.pop(key, None)
                 return
 
+    async def update_many(self, query, update):
+        hits = [row for row in self.rows if self._matches(row, query)]
+        for row in hits:
+            row.update((update or {}).get("$set") or {})
+            for key in ((update or {}).get("$unset") or {}):
+                row.pop(key, None)
+        return SimpleNamespace(modified_count=len(hits))
+
     async def distinct(self, key, query):
         return list({row.get(key) for row in self.rows if self._matches(row, query) and row.get(key) is not None})
 
@@ -77,6 +86,8 @@ class FakeDb:
         self.match_reports_v2 = FakeCollection()
         self.tournament_registrations = FakeCollection(registrations)
         self.audit_logs = FakeCollection()
+        # Neu bauen gibt Stationen gelöschter Spiele frei (#2386).
+        self.stations = FakeCollection()
 
 
 def test_initial_preview_uses_selected_tournament_format():

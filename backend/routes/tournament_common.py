@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from services.visibility import user_can_see
 from services.station_labels import attach_station_info
+from services.station_runtime import free_stations_of_deleted_matches, held_calls, tell_withdrawn_calls
 from services.match_duration import effective_match_duration, load_duration_game
 from auth import get_current_user
 from services.league_permissions import READ
@@ -716,10 +717,14 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
     ).sort("number", 1).to_list(200)
     if stages:
         if v2_matches:
-            match_ids = [match["id"] for match in v2_matches if match.get("id")]
+            # Alle Kennungen, die gleich gelöscht werden - nicht nur die gelesenen (#2386, Review).
+            match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
+            withdrawn = await held_calls(db, match_ids)
             if match_ids:
                 await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
             await db.matches_v2.delete_many({"tournament_id": tid})
+            await free_stations_of_deleted_matches(db, match_ids)
+            await tell_withdrawn_calls(db, withdrawn)
 
         changed_stages: list[dict] = []
         total_matches = 0
