@@ -28,6 +28,12 @@ jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 const mockOfferCalendar = jest.fn();
 jest.mock("../../lib/calendarHint", () => ({ offerCalendarHint: () => mockOfferCalendar() }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
+// Die Frage nach Benachrichtigungen (#1208): hier nur, wann die Seite sie anstößt.
+const mockAfterOwn = jest.fn();
+jest.mock("../../notifications/pushPrompt", () => ({
+  ...jest.requireActual("../../notifications/pushPrompt"),
+  afterOwnRegistration: (...args: unknown[]) => mockAfterOwn(...args),
+}));
 // Der Kalender-Knopf als Marke: da, wenn die Seite ihm einen Termin gibt (#1221).
 jest.mock("../../components/AddToCalendarButton", () => ({
   AddToCalendarButton: ({ item, items }: { item?: unknown; items?: unknown[] | null }) => {
@@ -351,4 +357,23 @@ test("Hinweis der Turnierleitung oben auf der Event-Seite", async () => {
   await render(<EventDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("notice-n2")).toBeTruthy());
   expect(screen.getByTestId("notice-text")).toHaveTextContent("Pause bis 14:30");
+});
+
+test("Benachrichtigungen (#1208): die Frage kommt nach der Anmeldung - mit Turnieren erst, wenn „Spielst du auch mit?“ zu ist", async () => {
+  mockEventWith({ tournaments: [{ id: "t1", slug: "lan-cup", title: "LAN-Cup", team_mode: "solo", status: "registration_open" }] });
+  const { unmount } = await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await fireEvent.press(await screen.findByTestId("event-register-submit"));
+  expect(await screen.findByTestId("play-along-check-t1")).toBeTruthy();
+  expect(mockAfterOwn).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByTestId("play-along-skip"));
+  await waitFor(() => expect(mockAfterOwn).toHaveBeenCalledTimes(1));
+  expect(mockAfterOwn).toHaveBeenCalledWith("u-1", "e:e1", expect.any(Promise));
+  await unmount();
+
+  jest.clearAllMocks();
+  mockPost.mockResolvedValue({ data: {} });
+  mockEventWith({ tournaments: [], f1_challenges: [] });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await fireEvent.press(await screen.findByTestId("event-register-submit"));
+  await waitFor(() => expect(mockAfterOwn).toHaveBeenCalledWith("u-1", "e:e1", expect.any(Promise)));
 });

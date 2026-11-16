@@ -30,6 +30,8 @@ type Props = {
   from?: string | null;
   onClose: () => void;
   onOpenTournament: (key: string) => void;
+  /** Die Turniere, zu denen die Anmeldung geklappt hat (#1208: die Startseite zählt sie dann nicht noch einmal als neu). */
+  onRegistered?: (tournamentIds: string[]) => void;
 };
 
 function stateColor(state: string): string {
@@ -53,7 +55,7 @@ function When({ row }: { row: PlayAlongRow }) {
   );
 }
 
-export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose, onOpenTournament }: Props) {
+export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose, onOpenTournament, onRegistered }: Props) {
   const [entries, setEntries] = useState<PlayAlongEntry[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [acceptRules, setAcceptRules] = useState(false);
@@ -107,6 +109,8 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
         tournament_ids: selected, accept_rules: true, accept_privacy: true, accept_costs: acceptCosts,
       });
       setResult(data);
+      const registered = (data?.results || []).filter((entry) => ["registered", "pending", "waitlist"].includes(entry.state)).map((entry) => entry.id);
+      if (registered.length) onRegistered?.(registered);
       // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
       if ((data?.results || []).some((entry) => entry.state === "registered")) {
         void offerFriendsHint();

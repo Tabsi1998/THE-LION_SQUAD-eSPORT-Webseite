@@ -38,6 +38,7 @@ import { isGuestUser } from "../../live";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
 import { offerCalendarHint } from "../../lib/calendarHint";
+import { afterOwnRegistration, registrationKey } from "../../notifications/pushPrompt";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -304,15 +305,17 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       setRegisterModal(false);
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2), nicht erst auf der Event-Seite.
-      void offerFriendsHint();
+      const friends = offerFriendsHint();
       // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
       void offerCalendarHint();
+      // „Sollen wir dich rufen, wenn du dran bist?“ (#1208): nach dem Freunde-Hinweis, nur solange Android nicht entschieden ist.
+      afterOwnRegistration(user?.id, registrationKey("tournament", tournament.id), friends);
     } catch (err) {
       setError(errorMessage(err, "Turnier-Anmeldung konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, load, tournament, user?.discord_name, user?.display_name, user?.username]);
+  }, [busy, load, tournament, user?.discord_name, user?.display_name, user?.id, user?.username]);
 
   // Jede Anmeldung geht über das Bestätigungs-Blatt (#1904): auch ein Einzelturnier ohne Startgeld und ohne Kennungen -
   // ein versehentlicher Tipp ist keine Anmeldung mehr.

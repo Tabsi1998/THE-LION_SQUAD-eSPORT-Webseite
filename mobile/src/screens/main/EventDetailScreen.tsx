@@ -11,6 +11,7 @@ import { FormInput } from "../../components/FormInput";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
 import { offerCalendarHint } from "../../lib/calendarHint";
+import { afterOwnRegistration, registrationKey, rememberOwnRegistration } from "../../notifications/pushPrompt";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { PlayAlongSheet } from "../../components/PlayAlongSheet";
@@ -99,6 +100,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
   // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events. Kam man von einem Turnier mit
   // Event-Pflicht (#875), geht es danach dorthin zurück.
   const [playAlongFor, setPlayAlongFor] = useState<string | null>(null);
+  // Die Frage nach Benachrichtigungen (#1208) wartet, bis „Spielst du auch mit?“ zu ist - nie zwei Blätter übereinander.
+  const pushAfterPlayAlong = useRef<{ key: string | null; after: Promise<unknown> } | null>(null);
+  const pushUserId = user?.id;
+  useEffect(() => {
+    if (playAlongFor || !pushAfterPlayAlong.current) return;
+    const pending = pushAfterPlayAlong.current;
+    pushAfterPlayAlong.current = null;
+    afterOwnRegistration(pushUserId, pending.key, pending.after);
+  }, [playAlongFor, pushUserId]);
   const returnTournament = route.params.returnTournament || null;
 
   const refresh = useCallback(async () => {
@@ -175,11 +185,18 @@ export function EventDetailScreen({ navigation, route }: Props) {
       await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null, selected_positions: selectedPositions });
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
-      void offerFriendsHint();
+      const friends = offerFriendsHint();
       // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
       void offerCalendarHint();
-      if (offersPlayAlong(event, Boolean(user) && !guest)) setPlayAlongFor(event.id);
-      else finishPlayAlong();
+      // „Sollen wir dich rufen?“ (#1208): nach dem Freunde-Hinweis und nach „Spielst du auch mit?“.
+      const pushKey = registrationKey("event", event.id);
+      if (offersPlayAlong(event, Boolean(user) && !guest)) {
+        pushAfterPlayAlong.current = { key: pushKey, after: friends };
+        setPlayAlongFor(event.id);
+      } else {
+        afterOwnRegistration(user?.id, pushKey, friends);
+        finishPlayAlong();
+      }
     } catch (err) {
       setError(errorMessage(err, "Event-Anmeldung konnte nicht gespeichert werden."));
     } finally {
@@ -701,6 +718,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
         multiDay={Boolean(event.schedule?.multi_day)}
         from={returnTournament}
         onClose={finishPlayAlong}
+        onRegistered={(ids) => {
+          if (user?.id) for (const id of ids) void rememberOwnRegistration(user.id, registrationKey("tournament", id) as string);
+        }}
         onOpenTournament={(key) => {
           setPlayAlongFor(null);
           navigation.navigate("TournamentDetail", { id: key });

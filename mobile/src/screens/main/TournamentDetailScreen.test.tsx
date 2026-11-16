@@ -23,6 +23,12 @@ jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unkn
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 jest.mock("../../seasons/anchors", () => ({ useSeasonOverlay: () => null, SeasonAnchor: ({ children }: { children?: React.ReactNode }) => children ?? null }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+// Die Frage nach Benachrichtigungen (#1208): hier nur, wann die Seite sie anstößt.
+const mockAfterOwn = jest.fn();
+jest.mock("../../notifications/pushPrompt", () => ({
+  ...jest.requireActual("../../notifications/pushPrompt"),
+  afterOwnRegistration: (...args: unknown[]) => mockAfterOwn(...args),
+}));
 // Der Kalender-Knopf als Marke: da, wenn die Seite ihm einen Termin gibt (#1221).
 jest.mock("../../components/AddToCalendarButton", () => ({
   AddToCalendarButton: ({ item, items }: { item?: unknown; items?: unknown[] | null }) => {
@@ -318,6 +324,14 @@ describe("Bestätigungs-Blatt", () => {
     await fireEvent.press(screen.getByTestId("tournament-register-submit"));
     await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
     expect(mockPost).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true, accept_privacy: true }));
+    // Erst nach der geklappten Anmeldung der Anlass für die Frage nach Benachrichtigungen (#1208).
+    await waitFor(() => expect(mockAfterOwn).toHaveBeenCalledWith("u-1", "t:t1", expect.any(Promise)));
+  });
+
+  test("Abbrechen fragt auch nicht nach Benachrichtigungen (#1208)", async () => {
+    await openSheet(SOLO);
+    await fireEvent.press(screen.getByTestId("register-sheet-cancel"));
+    expect(mockAfterOwn).not.toHaveBeenCalled();
   });
 
   // Voller Cup (#1941, App-Teil): Kopfzeile und Knopf sagen „Warteliste“ - wie im Web.
