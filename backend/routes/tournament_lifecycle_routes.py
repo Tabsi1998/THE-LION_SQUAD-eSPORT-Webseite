@@ -175,7 +175,8 @@ async def _finalize_bracket_for_checkin(
     if v2_matches and not all(_v2_match_can_be_rebuilt(match) for match in v2_matches):
         return None
     if v2_matches:
-        match_ids = [match["id"] for match in v2_matches if match.get("id")]
+        # Alle Kennungen, die gleich gelöscht werden - nicht nur die gelesenen (#2386, Review).
+        match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
         if match_ids:
             await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
         await db.matches_v2.delete_many({"tournament_id": tid})

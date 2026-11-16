@@ -138,6 +138,8 @@ async def activate_structure_plan(
         for field in tournament_fields
     }
     tournament_updated = False
+    # Was gleich wegfällt - alle Spiele des Turniers außer den neuen; ihre Stationen werden danach frei (#2386).
+    removed_ids = await db.matches_v2.distinct("id", {"tournament_id": tournament["id"], "id": {"$nin": new_match_ids}})
 
     try:
         await db.tournament_stages.insert_one(new_stage)
@@ -213,7 +215,7 @@ async def activate_structure_plan(
         raise
 
     # Die ersetzte Vorschau ist weg: eine Station, die eines ihrer Spiele hielt, wird frei (#2386).
-    await free_stations_of_deleted_matches(db, old_v2_ids)
+    await free_stations_of_deleted_matches(db, removed_ids)
     return {
         "ok": True,
         "idempotent_replay": False,
