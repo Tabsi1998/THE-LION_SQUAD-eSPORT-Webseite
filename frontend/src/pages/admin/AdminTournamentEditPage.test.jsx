@@ -1089,6 +1089,40 @@ test("Abschluss nachholen mit gescheitertem Schritt: Warnung mit dem Schritt sta
   expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("Abschluss nachgeholt"));
 });
 
+// Veröffentlichen mit gescheitertem Schritt (#2460): Warnung mit dem Schritt und gleich „Abschluss nachholen“ - für den
+// neuen Status, nicht den alten Stand der Seite.
+test("Veröffentlichen mit gescheitertem Schritt: Warnung mit „Abschluss nachholen“", async () => {
+  const user = userEvent.setup();
+  const { toast } = await import("sonner");
+  serveFixed({ status: "completed" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  toast.warning.mockClear();
+  apiMock.post.mockClear();
+  apiMock.post.mockImplementation(() => Promise.resolve({ data: { ok: true, failed: ["season_points", "prizes"], failed_labels: ["Jahreswertung", "Gewinne"] } }));
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "results_published");
+  if (screen.queryByTestId("confirm-dialog")) await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("gescheitert: Jahreswertung, Gewinne"),
+    expect.objectContaining({ action: expect.objectContaining({ label: "Abschluss nachholen" }) })));
+  expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/status", { status: "results_published", force: false });
+  const [, options] = toast.warning.mock.calls.at(-1);
+  options.action.onClick();
+  await user.click(await screen.findByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/status", { status: "results_published", recheck: true }));
+});
+
+test("Veröffentlichen ohne gescheiterten Schritt: keine Warnung", async () => {
+  const user = userEvent.setup();
+  const { toast } = await import("sonner");
+  serveFixed({ status: "completed" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  toast.warning.mockClear();
+  apiMock.post.mockImplementation(() => Promise.resolve({ data: { ok: true, failed: [], failed_labels: [] } }));
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "results_published");
+  if (screen.queryByTestId("confirm-dialog")) await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Status:")));
+  expect(toast.warning).not.toHaveBeenCalled();
+});
+
 test("Abschluss nachholen gibt es erst nach dem Veröffentlichen", async () => {
   serveFixed({ status: "completed" });
   await screen.findByRole("heading", { name: "Winter Cup 2026" });

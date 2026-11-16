@@ -258,6 +258,7 @@ und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 | Dolibarr-Abgleich rot | der Abgleich mit der Mitgliederverwaltung schlägt fehl (nicht erreichbar, Schlüssel, Antwort) |
 | Discord-Bot offline | der Bot ist eingeschaltet, kommt aber nicht mehr auf den Server |
 | App: kritischer Fehler | die LionsAPP meldet einen kritischen Fehler (Absturz, Login, Push) |
+| Turnierabschluss unvollständig | beim Veröffentlichen der Ergebnisse ist ein Schritt gescheitert (Jahreswertung, Auszeichnungen, Erfolge, Gewinne) – beim Turnier **Abschluss nachholen** tippen (#2460) |
 
 Vorgabe: Discord an, E-Mail aus. **Sperrfrist:** je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job,
 ein App-Fingerabdruck) meldet die Website höchstens einmal je Frist (Vorgabe 60 Minuten) – ein

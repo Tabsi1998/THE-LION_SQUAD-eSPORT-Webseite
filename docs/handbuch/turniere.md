@@ -779,6 +779,11 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    Jahreswertung), sagt eine Warnung welcher – die anderen Schritte sind trotzdem gelaufen; dann später noch einmal
    tippen. Das Protokoll vermerkt jedes Nachholen.
 
+   **Warnung beim Veröffentlichen:** Scheitert schon beim Wechsel auf **Ergebnisse veröffentlicht** ein Schritt, bleibt
+   der Status trotzdem gesetzt. Eine gelbe Meldung nennt die gescheiterten Schritte und hat gleich den Knopf **Abschluss
+   nachholen**. Wer das Fenster schon zugemacht hat: Der Betrieb bekommt den Alarm **Turnierabschluss unvollständig**
+   (System → Betrieb & Logs → Alarme), das Protokoll vermerkt es.
+
    **Gewinne übergeben** (Admin → eSports → Gewinne): Ein neuer Gewinn ist **Offen** und hat noch keine Frist. Mit
    **Bereit** liegt er zur Abholung bereit: ab jetzt laufen **90 Tage** Abholfrist (eine von Hand gesetzte Frist
    bleibt), und der Gewinner bekommt Bescheid – in der Glocke, per Push und per Mail; bei Team-Gewinnen die
