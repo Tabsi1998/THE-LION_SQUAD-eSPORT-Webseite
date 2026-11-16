@@ -2,6 +2,8 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { StationNowNext } from "@/components/tls/live/StationNowNext";
 import { queueGoneError, queueSummaryLine } from "@/lib/liveQueue";
+import { useStaleExpired } from "@/hooks/useLiveQueue";
+import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
@@ -65,7 +67,9 @@ export default function TournamentSchedulePage() {
   const [activeMatchday, setActiveMatchday] = useState(null);
   const [view, setView] = useState("rounds");
   const [mineOnly, setMineOnly] = useState(false);
-  const [queue, setQueue] = useState(null);
+  // Die Live-Warteschlange (#1556) mit dem Zeitpunkt des letzten guten Stands und ob das Nachladen gerade scheitert
+  // (#2440): dann „Letzter Stand vor X s“; nach 3 Minuten ohne Erfolg fällt der alte Stand weg.
+  const [queueState, setQueueState] = useState({ view: null, okAt: 0, failing: false });
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
@@ -82,18 +86,22 @@ export default function TournamentSchedulePage() {
     }
     // Live-Warteschlange je Station (#1556): nur vor Ort; online gibt es sie nicht. Fehlt sie, bleibt der Plan. Scheitert
     // ein Abruf (Netz, Server), bleibt ihr letzter Stand - nur 404/403 heißt „gibt es nicht“ (#2440).
-    if (tournament.event_mode === "online") return setQueue(null);
+    if (tournament.event_mode === "online") return setQueueState({ view: null, okAt: 0, failing: false });
     try {
       const { data: live } = await api.get(`/tournaments/${tournament.id}/live-queue`, accessConfig);
-      setQueue(live?.applies ? live : null);
+      setQueueState({ view: live?.applies ? live : null, okAt: Date.now(), failing: false });
     } catch (err) {
-      if (queueGoneError(err)) setQueue(null);
+      if (queueGoneError(err)) setQueueState({ view: null, okAt: Date.now(), failing: false });
+      else setQueueState((prev) => ({ ...prev, failing: true }));
     }
   }, [slug, accessToken]);
 
   useEffect(() => {
     load();
   }, [load]);
+  const queueStaleSince = queueState.failing && queueState.view ? queueState.okAt : 0;
+  const queueExpired = useStaleExpired(queueStaleSince);
+  const queue = queueExpired ? null : queueState.view;
   // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801).
   useLiveRefresh(load, ["tournaments", "matches", "matches-v2", "stations"], {
     fallbackMs: 7000, tournamentId: data?.tournament?.id, eventId: data?.tournament?.event_id,
@@ -267,7 +275,7 @@ export default function TournamentSchedulePage() {
             </div>
           </div>
         ) : activeView === "stations" ? (
-          <StationView entries={filtered} changedMatches={changedMatches} queue={queue} />
+          <StationView entries={filtered} changedMatches={changedMatches} queue={queue} staleSince={queue ? queueStaleSince : 0} />
         ) : (
           <div className="mt-8 space-y-10">
             {groupByRound(filtered).map((group) => (
@@ -369,13 +377,14 @@ function ScheduleCard({ entry, resolved, changed = false }) {
 }
 
 /** Je Station eine einfache Liste nach Zeit - keine Zeitleiste der Verwaltung. */
-function StationView({ entries, changedMatches, queue = null }) {
+function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) {
   const stations = groupByStation(entries);
   const live = Object.fromEntries((queue?.stations || []).map((row) => [row.id, row]));
   const summary = queueSummaryLine(queue?.summary);
   return (
     <>
     {summary ? <p className="mt-8 text-sm font-bold text-white" data-testid="schedule-live-summary">{summary}</p> : null}
+    <LiveStaleNote since={staleSince} className="mt-3" testId="schedule-live-stale" />
     <div className="mt-8 grid gap-8 lg:grid-cols-2" data-testid="schedule-stations">
       {stations.map((station) => (
         <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>

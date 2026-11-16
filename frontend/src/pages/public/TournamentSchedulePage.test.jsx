@@ -207,14 +207,27 @@ test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“
   expect(now).toHaveTextContent("Als Nächstes");
   expect(now).toHaveTextContent("Aufgerufen · antreten bis 17:30");
 
-  // #2440: Scheitert das Nachladen der Warteschlange (Server 503), bleiben „Jetzt“/„Als Nächstes“ und die eigene Zeile.
-  const answer = apiMock.get.getMockImplementation();
-  apiMock.get.mockImplementation((path, ...rest) => (String(path).includes("/live-queue")
-    ? Promise.reject(Object.assign(new Error("503"), { response: { status: 503, data: {} } }))
-    : answer(path, ...rest)));
-  await act(async () => { await Promise.all([...refreshes].map((load) => load())); });
-  expect(screen.getByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
-  expect(screen.getByTestId("live-queue-status")).toHaveTextContent("Du bist als Nächstes an PC 2");
+  // #2440: Scheitert das Nachladen der Warteschlange (Server 503), bleiben „Jetzt“/„Als Nächstes“ und die eigene Zeile -
+  // mit „Letzter Stand vor X s“. Nach 3 Minuten ohne Erfolg fällt der alte Stand weg (kein falsches „Du bist dran“).
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+  try {
+    const answer = apiMock.get.getMockImplementation();
+    apiMock.get.mockImplementation((path, ...rest) => (String(path).includes("/live-queue")
+      ? Promise.reject(Object.assign(new Error("503"), { response: { status: 503, data: {} } }))
+      : answer(path, ...rest)));
+    await act(async () => { await Promise.all([...refreshes].map((load) => load())); });
+    expect(screen.getByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+    expect(screen.getByTestId("live-queue-status")).toHaveTextContent("Du bist als Nächstes an PC 2");
+    expect(screen.getByTestId("schedule-live-stale")).toHaveTextContent("Letzter Stand vor");
+    expect(screen.getByTestId("live-queue-status-stale")).toHaveTextContent("Letzter Stand vor");
+    act(() => { vi.advanceTimersByTime(3 * 60 * 1000 + 1000); });
+    expect(screen.queryByTestId("schedule-live-summary")).toBeNull();
+    expect(screen.queryByTestId("schedule-live-stale")).toBeNull();
+    expect(screen.queryByTestId("live-queue-status")).toBeNull();
+    expect(screen.queryByTestId(`schedule-now-${live.station_id}`)).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 // #1801: Der Spielplan lädt nur bei Änderungen seines Turniers nach - und, weil sich die Turniere eines Events Stationen

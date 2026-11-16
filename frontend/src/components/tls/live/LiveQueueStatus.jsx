@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
 import { BellRing, Clock, Radio } from "lucide-react";
-import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { myQueueLine, queueGoneError } from "@/lib/liveQueue";
+import { useLiveQueue, useStaleExpired } from "@/hooks/useLiveQueue";
+import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
+import { QUEUE_GONE_STATUSES, QUEUE_ME_GONE_STATUSES, myQueueLine, queuePollMs } from "@/lib/liveQueue";
 
 // Spieler-Sicht vor Ort (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“, „Läuft an Station 2“, „Du bist dran“.
 // Ohne `matchId` die eigenen Spiele (GET /tournaments/<id>/live-queue/me, angemeldet) - für die Turnierseite. Mit
 // `matchId` genau dieses Spiel aus der öffentlichen Warteschlange - für die Matchseite; dort zeigt die Aufruf-Karte
 // den Aufruf selbst (`hideCalled`). Online, ohne Spiel oder wenn schon der erste Abruf scheitert: nichts. Scheitert ein
-// späterer Abruf (Netz, Server), bleibt der letzte Stand stehen - nur 404/403 nimmt ihn weg (#2440).
+// späterer Abruf (Netz, Server), bleibt der letzte Stand mit „Letzter Stand vor X s“ stehen - höchstens 3 Minuten
+// (QUEUE_STALE_MAX_MS), dann fällt er weg, damit kein falsches „Du bist dran“ stehen bleibt. 404/403 nimmt ihn sofort
+// weg, bei den eigenen Spielen auch 401 (Sitzung abgelaufen) - dann endet der Takt (#2440, hooks/useLiveQueue).
 // Die Prognose ändert sich mit der Zeit, auch ohne Ereignis - deshalb fragt der Baustein vor Ort zusätzlich jede Minute;
 // online (`applies: false`) nicht.
 
@@ -24,25 +26,12 @@ const TONE = {
 export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, hideCalled = false, className = "" }) {
   // Auf der Matchseite (`matchId`) schauen auch Zuschauer - dort ohne „du“.
   const personal = !matchId;
-  const [entry, setEntry] = useState(null);
-  const [applies, setApplies] = useState(false);
-  const load = useCallback(async () => {
-    if (!tournamentId) return;
-    try {
-      const path = `/tournaments/${encodeURIComponent(tournamentId)}/live-queue${matchId ? "" : "/me"}`;
-      const { data } = await api.get(path);
-      setApplies(Boolean(data?.applies));
-      if (!data?.applies) return setEntry(null);
-      setEntry(matchId ? data.matches?.[matchId] || null : (data.entries || [])[0] || null);
-    } catch (err) {
-      if (queueGoneError(err)) {
-        setApplies(false);
-        setEntry(null);
-      }
-    }
-  }, [tournamentId, matchId]);
-  useEffect(() => { load(); }, [load]);
-  useLiveRefresh(load, ["tournaments", "matches-v2", "stations"], { fallbackMs: applies ? 30000 : 0, pollMs: applies ? 60000 : 0, tournamentId, eventId });
+  const path = tournamentId ? `/tournaments/${encodeURIComponent(tournamentId)}/live-queue${matchId ? "" : "/me"}` : "";
+  const { queue: view, status, staleSince, failures, reload } = useLiveQueue(path, { gone: matchId ? QUEUE_GONE_STATUSES : QUEUE_ME_GONE_STATUSES });
+  const expired = useStaleExpired(staleSince);
+  const entry = view && !expired ? (matchId ? view.matches?.[matchId] || null : (view.entries || [])[0] || null) : null;
+  const applies = status === "applies";
+  useLiveRefresh(reload, ["tournaments", "matches-v2", "stations"], { fallbackMs: applies ? queuePollMs(30000, failures) : 0, pollMs: queuePollMs(applies ? 60000 : 0, failures), tournamentId, eventId });
 
   if (!entry || (hideCalled && entry.state === "called")) return null;
   const line = myQueueLine(entry, { personal });
@@ -53,6 +42,7 @@ export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, 
       <div className="min-w-0">
         <div className="font-heading text-base font-black uppercase text-white [overflow-wrap:anywhere]">{line.title}</div>
         {line.detail ? <div className="mt-0.5 text-sm text-white/70">{line.detail}</div> : null}
+        <LiveStaleNote since={staleSince} className="mt-1.5" testId="live-queue-status-stale" inRegion />
       </div>
     </div>
   );
