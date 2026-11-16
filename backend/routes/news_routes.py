@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from database import get_db
 from auth import get_optional_user, require_area
 from services import game_usage
@@ -14,7 +14,7 @@ from services.news_cards import attach_result_winners, event_signups, tournament
 from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
-from services.news_publish import default_pinned_until, parse_pin_day, pin_active, public_news, vienna_today
+from services.news_publish import PIN_DEFAULT_DAYS, parse_pin_day, pin_active, pin_end, public_news, publish_day
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import dolibarr_policy, reference_checks, reference_season_links, reference_series, season_close
@@ -594,8 +594,9 @@ async def admin_list_news(me: dict = Depends(require_area("content"))):
     for post in posts:
         # Löschen nur, was nie hinausging (#2122 NW3) - sonst „Zurückziehen“.
         post["can_delete"] = not _ever_public(post)
-        # Die Redaktion sieht das Ende der Anheftung (#1263) und ob sie noch gilt.
+        # Die Redaktion sieht das Ende der Anheftung (#1263) und ob sie noch gilt - beim Altbestand das errechnete.
         post["pin_active"] = pin_active(post)
+        post["pin_until"] = _pin_until(post)
     return posts
 
 
@@ -610,13 +611,22 @@ async def admin_get_news(nid: str, me: dict = Depends(require_area("content"))):
     post["history"] = await _news_history(db, nid)
     post["can_delete"] = not _ever_public(post)
     post["pin_active"] = pin_active(post)
+    post["pin_until"] = _pin_until(post)
     return post
 
 
+def _pin_until(post: dict) -> str | None:
+    """Das geltende Ende für die Verwaltung - beim Altbestand ohne eigenes Ende das errechnete (#1263)."""
+    end = pin_end(post)
+    return end.isoformat() if end else None
+
+
 def _apply_pin_end(doc: dict, existing: dict | None = None) -> None:
-    """Ende der Anheftung (#1263) setzen: Lösen nimmt das Ende mit; Anheften ohne gültiges Ende bekommt heute + 14 Tage
-    (Wiener Tag). Ein Ende in der Vergangenheit lehnt der Server ab - der Beitrag wäre sofort wieder gelöst."""
+    """Ende der Anheftung (#1263) setzen: Lösen nimmt das Ende mit; Anheften ohne gültiges Ende bekommt 14 Tage ab dem Tag,
+    an dem der Beitrag erscheint (heute oder sein Termin, Wiener Tag). Ein Ende davor lehnt der Server ab - der Beitrag wäre
+    nie oder nur kurz angeheftet."""
     existing = existing or {}
+    first_day = publish_day({"published_at": doc.get("published_at", existing.get("published_at"))})
     pinned = doc.get("pinned", existing.get("pinned"))
     if not pinned:
         if "pinned" in doc or "pinned_until" in doc:
@@ -626,14 +636,15 @@ def _apply_pin_end(doc: dict, existing: dict | None = None) -> None:
         day = parse_pin_day(doc["pinned_until"])
         if day is None:
             raise HTTPException(400, "Das Ende der Anheftung ist kein gültiger Tag.")
-        if day < vienna_today():
-            raise HTTPException(400, "Das Ende der Anheftung liegt in der Vergangenheit - bitte einen späteren Tag wählen.")
+        if day < first_day:
+            raise HTTPException(400, f"Das Ende der Anheftung liegt vor dem Tag, an dem der Beitrag erscheint "
+                                     f"({first_day.strftime('%d.%m.%Y')}) - bitte einen späteren Tag wählen.")
         doc["pinned_until"] = day.isoformat()
         return
     doc.pop("pinned_until", None)
     # Neu angeheftet oder abgelaufen: ohne Ende bleibt nichts für immer oben.
     if doc.get("pinned") and not pin_active(existing):
-        doc["pinned_until"] = default_pinned_until()
+        doc["pinned_until"] = (first_day + timedelta(days=PIN_DEFAULT_DAYS)).isoformat()
 
 
 def _actor_name(user: dict | None) -> str:

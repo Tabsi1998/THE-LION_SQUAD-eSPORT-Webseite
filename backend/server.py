@@ -252,6 +252,12 @@ async def lifespan(app: FastAPI):
         raise
     for migration in applied_migrations:
         logger.info("[migration] Applied %s: %s", migration["version"], migration["name"])
+    # Angeheftete News (#1263): den Tag der Umstellung merken - Altbestand ohne Ende läuft nie vor diesem Tag + 14 ab.
+    from services.news_publish import load_pin_rule_since
+    try:
+        await load_pin_rule_since(get_db())
+    except Exception:  # noqa: BLE001 - ungeladen gilt „heute“, kein angehefteter Beitrag verschwindet zu früh
+        logger.warning("[news] Tag der Umstellung für angeheftete News nicht geladen", exc_info=True)
     # Auto-Checks je Zustand (#2080): einmaliger Nachtrag aus den gespeicherten Läufen, mit Merker.
     from services.ops_checks import safe_backfill_check_episodes
     await safe_backfill_check_episodes(get_db())

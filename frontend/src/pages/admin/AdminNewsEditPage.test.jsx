@@ -315,3 +315,28 @@ test("eine abgelaufene Anheftung steht nicht mehr als angepinnt im Editor", asyn
   expect(await screen.findByTestId("news-pinned")).not.toBeChecked();
   expect(screen.queryByTestId("news-pinned-until")).toBeNull();
 });
+
+// Geplante Beiträge (Review #1263): Vorschlag und Mindestwert zählen ab dem Termin, ein Ende davor zeigt einen Hinweis.
+test("geplanter Beitrag: Anpinnen schlägt 14 Tage ab dem Termin vor, ein Ende davor wird angemahnt", async () => {
+  const { shiftDay } = await import("@/lib/newsPin");
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Dezember-Cup" } });
+  fireEvent.click(screen.getByTestId("news-publish-scheduled"));
+  fireEvent.change(screen.getByTestId("news-published-at"), { target: { value: "2099-03-10T10:00" } });
+  fireEvent.click(screen.getByTestId("news-pinned"));
+  expect(screen.getByTestId("news-pinned-until")).toHaveValue(shiftDay("2099-03-10", 14));
+  expect(screen.getByTestId("news-pinned-until")).toHaveAttribute("min", "2099-03-10");
+  fireEvent.change(screen.getByTestId("news-pinned-until"), { target: { value: "2099-03-01" } });
+  expect(screen.getByTestId("news-pinned-until-early")).toHaveTextContent("10.03.2099");
+});
+
+test("Altbestand ohne eigenes Ende: das errechnete Ende steht im Feld, Speichern geht ohne Änderung daran", async () => {
+  const posts = [{ ...POSTS[0], pinned: true, pin_active: true, pin_until: "2099-01-20" }];
+  apiMock.get.mockImplementation(async (url) => (url === "/news-meta" ? { data: META } : url.startsWith("/admin/news/") ? adminPost(url, posts) : { data: [] }));
+  apiMock.patch.mockResolvedValue({ data: posts[0] });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-pinned-until")).toHaveValue("2099-01-20");
+  fireEvent.change(screen.getByTestId("news-excerpt"), { target: { value: "Neu." } });
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", { excerpt: "Neu." }));
+});

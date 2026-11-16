@@ -675,19 +675,6 @@ async def migrate_achievements_catalog_recheck(db) -> str:
     return result
 
 
-async def migrate_news_pinned_until(db) -> str:
-    """Angeheftete News laufen ab (#1263): wer schon angeheftet ist, bekommt einmalig heute + 14 Tage (Wiener Tag). Ein
-    zweiter Lauf findet nichts mehr - jeder angeheftete Beitrag hat dann ein Ende."""
-    from services.news_publish import default_pinned_until
-
-    until = default_pinned_until()
-    result = await db.news_posts.update_many(
-        {"pinned": True, "$or": [{"pinned_until": {"$exists": False}}, {"pinned_until": None}, {"pinned_until": ""}]},
-        {"$set": {"pinned_until": until}},
-    )
-    return f"{result.modified_count} pinned news end on {until}"
-
-
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -726,8 +713,6 @@ MIGRATIONS = (
     (22, "achievements_recount_silent", migrate_achievements_recount),
     # #2339: neuer Katalog - im stillen Modus alle still neu prüfen (services/achievement_recount.recheck), sonst nichts.
     (23, "achievements_catalog_recheck_2339", migrate_achievements_catalog_recheck),
-    # #1263: angeheftete News bekommen ein Ende - der Altbestand einmalig heute + 14 Tage (services/news_publish.py).
-    (24, "news_pinned_until", migrate_news_pinned_until),
 )
 
 

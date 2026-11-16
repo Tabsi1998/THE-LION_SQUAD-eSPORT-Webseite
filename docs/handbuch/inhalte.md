@@ -83,9 +83,12 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
    Vor dem Veröffentlichen oder Planen kommt eine **Rückfrage**, was hinausgeht: „Der Newsletter geht sofort an 214 Personen
    mit Newsletter-Zustimmung. Discord bekommt eine Meldung.“ Abbrechen speichert nichts. Ein schon verschickter Newsletter geht
    nie ein zweites Mal von selbst hinaus. **Anpinnen** hält den Beitrag oben in der News-Liste und auf der Startseite –
-   bis zum Tag unter **Angepinnt bis** (einschließlich; vorgeschlagen sind 14 Tage). Danach rutscht er von selbst normal
-   in die Liste, auf der Website und in der App. Die News-Liste der Verwaltung zeigt das Ende („Angepinnt bis 21.10.2026“)
-   bzw. „Anpinnen abgelaufen“; erneut anpinnen schlägt wieder 14 Tage vor.
+   bis zum Tag unter **Angepinnt bis** (einschließlich; vorgeschlagen sind 14 Tage ab dem Tag, an dem der Beitrag
+   erscheint – bei einem geplanten Beitrag ab seinem Termin; ein Ende davor nimmt der Server nicht an). Danach rutscht er
+   von selbst normal in die Liste, auf der Website und in der App. Die News-Liste der Verwaltung zeigt das Ende
+   („Angepinnt bis 21.10.2026“) bzw. „Anpinnen abgelaufen“; erneut anpinnen schlägt wieder 14 Tage vor. Beiträge, die schon
+   vor dieser Umstellung angepinnt waren, bleiben 14 Tage ab ihrem Erscheinen angepinnt, frühestens aber bis 14 Tage nach
+   der Umstellung.
 7. **Personen und Verknüpfungen**: Benutzer markieren (nur aktive öffentliche Profile; ein Klick setzt den Profil-Link in den
    Text) und **Verknüpfte Events**, **Turniere** und **Fast-Lap Challenges** – mit Suchfeld, Gewähltes steht oben, Entwürfe
    sind gekennzeichnet (deren Karte sehen Besucher erst, wenn sie veröffentlicht sind). **Einbetten** setzt die Karte in den Text.
@@ -137,8 +140,7 @@ Uhr des Servers.
 
 - **Angepinnt** heißt: Der Beitrag steht als breiter **Aufmacher** oben auf **/news** und auf der Startseite – Bild links,
   Kategorie, Titel, Kurzbeschreibung und „Weiterlesen“ rechts (am Handy untereinander). Sind mehrere angepinnt, ist der
-  neueste der Aufmacher, die anderen stehen vorne im Raster. Ohne angepinnten Beitrag steht auf der Startseite oben das
-  nächste Event (**Nächste Termine**), die neueste News führt das Raster **Aktuelle News** an.
+  neueste der Aufmacher, die anderen stehen vorne im Raster. Ohne angepinnten Beitrag zeigt die Startseite den neuesten.
 - **Ohne Banner** bekommt der Beitrag eine **Text-Karte**: eine Fläche in der Farbe der Kategorie (Turniere Cyan, Events
   Violett, Verein und Mitglieder Gold, sonst Grau) mit dem ersten Satz der Kurzbeschreibung und dem Vereinslöwen. Ist ein
   Turnier mit veröffentlichten Ergebnissen verknüpft, zeigt die Karte stattdessen Pokal und den Sieger. Dasselbe Bild steht

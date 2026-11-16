@@ -15,9 +15,16 @@ export function viennaToday(now = new Date()) {
   return viennaDay(now);
 }
 
-/** Vorschlag beim Anheften: heute + 14 Tage (Wiener Tag). */
-export function defaultPinUntil(now = new Date()) {
-  return shiftDay(viennaToday(now), PIN_DEFAULT_DAYS);
+/** Ab diesem Wiener Tag ist der Beitrag zu sehen: heute oder - bei einem geplanten Beitrag - sein Termin (wie der Server). */
+export function pinBaseDay(publishAt = null, now = new Date()) {
+  const today = viennaToday(now);
+  const planned = publishAt ? viennaDay(publishAt) : "";
+  return planned && planned > today ? planned : today;
+}
+
+/** Vorschlag beim Anheften: 14 Tage ab dem Erscheinen (Wiener Tag). */
+export function defaultPinUntil(now = new Date(), publishAt = null) {
+  return shiftDay(pinBaseDay(publishAt, now), PIN_DEFAULT_DAYS);
 }
 
 /** „bis 21.10.2026“ für das Ende - leer ohne gültigen Tag. */
@@ -32,6 +39,8 @@ export function pinUntilText(day) {
  */
 export function pinState(post, now = new Date()) {
   if (!post?.pinned) return null;
-  const active = typeof post.pin_active === "boolean" ? post.pin_active : !post.pinned_until || viennaToday(now) <= post.pinned_until;
-  return { active, until: post.pinned_until || "", text: pinUntilText(post.pinned_until) };
+  // ``pin_until``: das geltende Ende vom Server - beim Altbestand ohne eigenes Ende das errechnete.
+  const until = post.pin_until || post.pinned_until || "";
+  const active = typeof post.pin_active === "boolean" ? post.pin_active : !until || viennaToday(now) <= until;
+  return { active, until, text: pinUntilText(until) };
 }

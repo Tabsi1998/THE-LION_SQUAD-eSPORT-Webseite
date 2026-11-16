@@ -18,7 +18,8 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toDateTimeLocalInput } from "@/lib/datetime";
 import { viennaDateTime } from "@/lib/vienna";
-import { PIN_DEFAULT_DAYS, defaultPinUntil, viennaToday } from "@/lib/newsPin";
+import { PIN_DEFAULT_DAYS, defaultPinUntil, pinBaseDay, pinUntilText } from "@/lib/newsPin";
+import { fromViennaInput } from "@/lib/vienna";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
@@ -96,7 +97,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
     published: source.published ?? false,
     // Eine abgelaufene Anheftung (#1263) gilt nicht mehr - der Haken ist dann aus, neues Anheften schlägt 14 Tage vor.
     pinned: Boolean(source.pinned) && source.pin_active !== false,
-    pinned_until: source.pinned && source.pin_active !== false ? source.pinned_until || "" : "",
+    // Altbestand ohne eigenes Ende: das errechnete (pin_until) - sonst hielte das Pflichtfeld jedes Speichern auf.
+    pinned_until: source.pinned && source.pin_active !== false ? source.pinned_until || source.pin_until || "" : "",
     published_at: toDateTimeLocalInput(source.published_at),
     discord_skip: source.discord_skip ?? false,
     share_preview: source.share_preview ?? false,
@@ -153,7 +155,11 @@ function NewsForm({ post, meta, onDone, onReload }) {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   // Anheften schlägt das Ende vor (#1263): heute + 14 Tage, solange noch keines gewählt ist.
-  const togglePinned = (on) => setForm((f) => ({ ...f, pinned: on, pinned_until: on ? f.pinned_until || defaultPinUntil() : "" }));
+  // Geplant: 14 Tage ab dem Termin, nicht ab heute (Review #1263).
+  const publishAt = mode === "scheduled" ? fromViennaInput(scheduleAt) : form.published_at || null;
+  const pinFirstDay = pinBaseDay(publishAt);
+  const togglePinned = (on) => setForm((f) => ({ ...f, pinned: on, pinned_until: on ? f.pinned_until || defaultPinUntil(new Date(), publishAt) : "" }));
+  const pinTooEarly = form.pinned && form.pinned_until && form.pinned_until < pinFirstDay;
   const insertEmbed = (kind, item) => {
     setForm((f) => ({ ...f, content: appendEmbedToken(f.content, kind, item) }));
     if (kind === "event") setLinkedE((ids) => (ids.includes(item.id) ? ids : [...ids, item.id]));
@@ -333,7 +339,14 @@ function NewsForm({ post, meta, onDone, onReload }) {
             )}
             <CheckField label="Anpinnen" hint="Bleibt bis zum gewählten Tag oben in der News-Liste und auf der Startseite, danach rutscht der Beitrag normal in die Liste." checked={form.pinned} onChange={togglePinned} testId="news-pinned" accent="#FFD700" />
             {form.pinned && (
-              <TextField label="Angepinnt bis" type="date" value={form.pinned_until} onChange={(v) => set("pinned_until", v)} min={viennaToday()} required testId="news-pinned-until" hint={`Einschließlich dieses Tages. Vorschlag: ${PIN_DEFAULT_DAYS} Tage.`} />
+              <>
+                <TextField label="Angepinnt bis" type="date" value={form.pinned_until} onChange={(v) => set("pinned_until", v)} min={pinFirstDay} required testId="news-pinned-until" hint={`Einschließlich dieses Tages. Vorschlag: ${PIN_DEFAULT_DAYS} Tage ab dem Erscheinen.`} />
+                {pinTooEarly ? (
+                  <p role="alert" className="text-xs text-warn" data-testid="news-pinned-until-early">
+                    Das Ende liegt vor dem Tag, an dem der Beitrag erscheint ({pinUntilText(pinFirstDay).replace("bis ", "")}) – so wäre er nie angeheftet.
+                  </p>
+                ) : null}
+              </>
             )}
           </FormSection>
           <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility}>

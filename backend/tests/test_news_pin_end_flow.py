@@ -1,6 +1,7 @@
 """Angeheftete News laufen ab (#1263): ``pinned`` gilt bis zum Ende des Wiener Tages ``pinned_until`` - auf der
-News-Seite, der Startseite und in der App, ohne dass jemand etwas tut. Beim Anheften ohne Ende gibt es heute + 14 Tage,
-der Altbestand bekommt das einmalig über die Migration. Ohne angehefteten Beitrag zeigt die Startseite oben keine News."""
+News-Seite, der Startseite und in der App, ohne dass jemand etwas tut. Beim Anheften ohne Ende gibt es 14 Tage ab dem
+Erscheinen (heute oder der Termin). Altbestand ohne Ende rechnet beim Lesen, ohne Migration (Fabian, 16.11.): erschienen
++ 14 Tage, nie vor dem Tag der Umstellung + 14. Ohne angehefteten Beitrag bleibt die neueste News der Aufmacher."""
 import pathlib
 import sys
 from datetime import datetime, timedelta, timezone
@@ -13,8 +14,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import migrations  # noqa: E402
-from services.news_publish import default_pinned_until, pin_active, vienna_today  # noqa: E402
+from services import migrations, news_publish  # noqa: E402
+from services.news_publish import default_pinned_until, load_pin_rule_since, pin_active, pin_end, vienna_today  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -23,6 +24,7 @@ async def flow():
     try:
         yield instance
     finally:
+        news_publish.set_pin_rule_since(None)
         await shutdown()
 
 
@@ -89,14 +91,13 @@ async def test_an_expired_pin_drops_into_the_list_everywhere(flow):
 
 
 @pytest.mark.asyncio
-async def test_home_without_pinned_news_has_no_news_lead(flow):
-    """Ohne angehefteten Beitrag zeigt die Startseite oben das nächste Event - die neueste News steht im Raster."""
+async def test_home_without_pinned_news_leads_with_the_newest(flow):
+    """Startseite wie bisher (Fabian, 16.11.): Ist die Anheftung abgelaufen, ist die neueste News der Aufmacher."""
     await news(flow, "abgelaufen", pinned=True, pinned_until=day(-3), days_ago=10)
     await news(flow, "gestern", days_ago=1)
     flow.act_as(None)
     home = (await flow.get("/api/home/state")).json()
-    assert home["featured_news"] == []
-    assert [row["slug"] for row in home["news"]][:2] == ["gestern", "abgelaufen"]
+    assert [row["slug"] for row in home["featured_news"]] == ["gestern"]
 
 
 # ---------------------------------------------------------------- Redaktion
@@ -139,17 +140,78 @@ async def test_an_end_in_the_past_is_refused_and_an_expired_pin_can_be_renewed(f
     assert (await flow.db.news_posts.find_one({"id": "n-vorbei"}))["pinned_until"] == default_pinned_until()
 
 
-# ---------------------------------------------------------------- Einmal-Umstellung
+# ---------------------------------------------------------------- Geplante Beiträge
 
 @pytest.mark.asyncio
-async def test_existing_pins_get_today_plus_fourteen_days_once(flow):
-    await news(flow, "alt-angeheftet", pinned=True)
-    await news(flow, "mit-ende", pinned=True, pinned_until=day(2))
-    await news(flow, "normal", pinned=False)
-    first = await migrations.migrate_news_pinned_until(flow.db)
-    assert first.startswith("1 ")
-    rows = {row["slug"]: row.get("pinned_until") async for row in flow.db.news_posts.find({}, {"_id": 0})}
-    assert rows == {"alt-angeheftet": default_pinned_until(), "mit-ende": day(2), "normal": None}
-    second = await migrations.migrate_news_pinned_until(flow.db)
-    assert second.startswith("0 ")
-    assert "news_pinned_until" in [name for _version, name, _migration in migrations.MIGRATIONS]
+async def test_a_post_planned_in_three_weeks_counts_from_its_publish_day(flow):
+    flow.act_as(await flow.add_user(role="club_admin", name="redaktion"))
+    later = (now_utc() + timedelta(days=21)).replace(hour=10, minute=0, second=0, microsecond=0)
+    publish_day = news_publish.vienna_day(later)
+    created = await flow.post("/api/news", json={"title": "Turnier im Dezember", "content": "Text", "published": True,
+                                                 "published_at": later.isoformat(), "pinned": True})
+    assert created.status_code == 200, created.text
+    assert created.json()["pinned_until"] == (publish_day + timedelta(days=14)).isoformat(), "14 Tage ab dem Erscheinen"
+
+    too_early = await flow.post("/api/news", json={"title": "Zu früh", "content": "Text", "published": True,
+                                                   "published_at": later.isoformat(), "pinned": True, "pinned_until": day(5)})
+    assert too_early.status_code == 400, too_early.text
+    assert publish_day.strftime("%d.%m.%Y") in too_early.json()["detail"]
+    moved = await flow.patch(f"/api/news/{created.json()['id']}", json={"pinned_until": day(3)})
+    assert moved.status_code == 400, "auch beim Ändern nie vor dem Erscheinen"
+
+
+# ---------------------------------------------------------------- Altbestand ohne Ende - beim Lesen, ohne Migration
+
+def _legacy(published_days_ago: int) -> dict:
+    stamp = (now_utc() - timedelta(days=published_days_ago)).isoformat()
+    return {"pinned": True, "published_at": stamp, "created_at": stamp}
+
+
+def test_old_pins_last_fourteen_days_from_publishing_but_never_before_the_switch_plus_fourteen():
+    today = vienna_today()
+    news_publish.set_pin_rule_since(today)
+    # Am ersten Tag nach dem Deploy verschwindet keine angeheftete Alt-News - auch nicht eine von vor 40 Tagen.
+    assert pin_active(_legacy(40)) is True and pin_end(_legacy(40)) == today + timedelta(days=14)
+    # Später: wer vor der Umstellung schon lange stand, läuft 14 Tage nach der Umstellung ab ...
+    news_publish.set_pin_rule_since(today - timedelta(days=20))
+    assert pin_active(_legacy(40)) is False
+    # ... ein Beitrag kurz vor der Umstellung bleibt 14 Tage ab seinem Erscheinen.
+    news_publish.set_pin_rule_since(today - timedelta(days=5))
+    assert pin_end(_legacy(3)) == today - timedelta(days=3) + timedelta(days=14)
+    assert pin_active(_legacy(3)) is True
+    # Ungeladen gilt „heute“ - nie zu früh weg.
+    news_publish.set_pin_rule_since(None)
+    assert pin_active(_legacy(400)) is True
+
+
+@pytest.mark.asyncio
+async def test_old_pins_without_end_follow_the_rule_on_every_surface(flow):
+    news_publish.set_pin_rule_since(vienna_today() - timedelta(days=30))
+    old = (now_utc() - timedelta(days=60)).isoformat()
+    recent = (now_utc() - timedelta(days=2)).isoformat()
+    await news(flow, "lange-her", pinned=True, published_at=old, created_at=old)
+    await news(flow, "frisch", pinned=True, published_at=recent, created_at=recent)
+    flow.act_as(None)
+    listed = {row["slug"]: row["pinned"] for row in (await flow.get("/api/news?compact=true")).json()}
+    assert listed == {"lange-her": False, "frisch": True}
+    assert [row["slug"] for row in (await flow.get("/api/home/state")).json()["featured_news"]] == ["frisch"]
+    app = {row["slug"]: row["pinned"] for row in (await flow.get("/api/mobile/dashboard")).json()["news"]}
+    assert app == {"lange-her": False, "frisch": True}
+    stored = await flow.db.news_posts.find_one({"slug": "lange-her"}, {"_id": 0})
+    assert "pinned_until" not in stored, "nichts wird umgeschrieben"
+    flow.act_as(await flow.add_user(role="club_admin", name="redaktion"))
+    row = next(row for row in (await flow.get("/api/admin/news")).json() if row["slug"] == "frisch")
+    assert row["pin_active"] is True and row["pin_until"] == (vienna_today() - timedelta(days=2) + timedelta(days=14)).isoformat()
+
+
+@pytest.mark.asyncio
+async def test_the_switch_day_is_kept_once(flow):
+    first = await load_pin_rule_since(flow.db, datetime(2026, 11, 20, 9, 0, tzinfo=timezone.utc))
+    again = await load_pin_rule_since(flow.db, datetime(2026, 12, 24, 9, 0, tzinfo=timezone.utc))
+    assert first == again == datetime(2026, 11, 20).date()
+    assert await flow.db.settings.count_documents({"id": news_publish.PIN_RULE_SETTINGS_ID}) == 1
+
+
+def test_there_is_no_pin_migration():
+    assert "news_pinned_until" not in [name for _version, name, _migration in migrations.MIGRATIONS]
+    assert not hasattr(migrations, "migrate_news_pinned_until")
