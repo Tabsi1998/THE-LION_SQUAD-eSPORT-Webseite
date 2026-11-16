@@ -99,7 +99,7 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 | --- | --- |
 | **Liga verwalten** | Liga bearbeiten, Seasons anlegen und löschen, Staffel starten, pausieren, beenden und sperren, Helfer der Staffel. Sieht auch, wer zuständig ist |
 | **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
-| **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
+| **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt und Disqualifizieren |
 | **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
 | **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben, Check-in im Notfall für eine Seite eintragen und das Spiel starten (3.1b), ins Veto eingreifen (3.1c) |
 | **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
@@ -456,6 +456,15 @@ aber nicht aufgestellt werden (3.7). Verlangt die Season ein Mindestalter, brauc
 Unter jedem Co-Team, das in einer Staffel spielt, zeigt **Spielberechtigung** die Regeln der Season, wer spielen darf und was fehlt.
 
 ### 2.5 Co-Teams zuteilen
+
+**Neu: die Staffel-Seite.** Im Reiter **Ligen und Staffeln** steht bei jeder Staffel zusätzlich **Staffel öffnen**. Die Seite gehört zur
+Liga-Verwaltung: Oben stehen die Brotkrumen **Liga › Season › Liga 1 · Staffel A** und der Stand. Im Reiter **Überblick** findest du den
+Liga-Ablauf, was noch fehlt, **Liga starten** bzw. den Status (mit denselben Rückfragen wie bisher), die Zahlen und die Wege zu Leitstand,
+Season und Ligaseite. Im Reiter **Teilnehmer** stehen die Co-Teams mit **Co-Team zuteilen**, **Entfernen**, **Austritt**,
+**Disqualifizieren**, **Kader**, aktiven Strafen und „Nachgemeldet ab Woche …“. Spielplan, Spiele und Tabelle kommen später dazu – bis
+dahin führen diese Ziele weiter in die Turnierverwaltung, und die Schritte unten gelten unverändert. Knöpfe gibt es nur mit der passenden
+Zuständigkeit: Zuteilen, Entfernen, Austritt und Disqualifizieren mit **Teams freigeben**, Status und **Liga starten** mit **Liga verwalten**
+(das gilt jetzt auch in der Turnierverwaltung).
 
 1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
