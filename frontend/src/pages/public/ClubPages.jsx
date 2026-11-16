@@ -139,7 +139,7 @@ function StatutesBox({ statutes }) {
       <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten</h2>
       {!available ? (
         <p className="text-sm text-white/60">
-          THE LION SQUAD — eSports ist ein eingetragener österreichischer eSports-Verein. Statuten und ZVR-Nummer werden im Mitgliederbereich nach Login angezeigt.
+          THE LION SQUAD — eSports ist ein eingetragener österreichischer eSports-Verein. Statuten und ZVR-Nummer werden im Mitgliederbereich nach dem Anmelden angezeigt.
         </p>
       ) : (
         <div className="space-y-4">

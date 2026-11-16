@@ -48,6 +48,14 @@
   ist auf dem Artikel sichtbar. Sehen können sie sonst nur das Mitglied (Auskunft) und die Finanzen (Bestellansicht); nie
   im Server- oder Adminprotokoll, in Ereignissen oder Mails. Die Nummerndatei (`shop_gamertag_files`, `kind: "number"`)
   und die Bestelldatei sind personenbezogen wie die Gamertag-Dateien.
+- Mitgliederverwaltung Dolibarr (#1542): Die Anbindung liest nicht nur. Auf Auftrag der Person (meist mit bestätigter Zuordnung) schreibt
+  die Website nach Dolibarr: Beitrittsantrag (Schalter), Einwilligungen, Änderungswünsche zu den
+  eigenen Kontaktdaten, Austritt, das eigene Website-Profil, auf Wunsch geprüfte Plattform-Konten (Name und Kennung,
+  nie Kennwörter oder Tokens), Zu- und Absagen, Anträge und Stimmen zur Versammlung, Helferdienste und die Wunschnummer.
+  Ohne Zutun der Person schreibt sie Teilnahmen an Vereinsevents und Turnieren (Schalter), den Einlass durch den
+  Vorstand sowie Geschäftspartner und Rechnungen zu Anmeldungen mit Preis (Name, E-Mail, Vorgang). Welche Antwort
+  jemand bei einer Abstimmung gibt, speichert die Website nicht. Die vollständige Liste mit Auslöser, führender Quelle
+  und Fehlerverhalten steht in [docs/DOLIBARR.md](docs/DOLIBARR.md), Abschnitt „Datenfluss“.
 
 ## Konto löschen: was mit welchen Daten passiert
 

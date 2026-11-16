@@ -293,6 +293,12 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "Erfüllung des Nutzungsverhältnisses (Art. 6 Abs. 1 lit. b DSGVO); die Verknüpfung lässt sich im Profil trennen.",
                   "privacy-google-login") if f.get("google_login") else
                 p("Eine Anmeldung über Google oder andere Anbieter bieten wir nicht an.", "privacy-no-google-login")),
+        # Mindestalter (#1698, Fabians Entscheidung vom 16.11.): Konto ab 14, Vereinsmitglied ab 18 - geprüft beim Beitrittsantrag.
+        section("age", "Mindestalter",
+                p("Ein Konto auf der Website und in der LionsAPP kannst du ab 14 Jahren anlegen: Ab diesem Alter darfst du in Österreich "
+                  "selbst in die Verarbeitung deiner Daten einwilligen (Art. 8 DSGVO in Verbindung mit § 4 Abs. 4 DSG). Vereinsmitglied "
+                  "wirst du ab 18 Jahren. Dafür fragt der Mitgliedsantrag nach deinem Geburtsdatum und prüft das Alter; das Datum bleibt "
+                  "beim Antrag, damit der Vorstand ihn prüfen kann, und wird mit deinem Konto gelöscht.", "privacy-age")),
         section("email", "E-Mail-Versand",
                 p("Systemmails (Bestätigung, Passwort-Reset, Mitgliedschaft, Turnier- und Vereinsnachrichten) enthalten Empfängeradresse, Betreff "
                   f"und Inhalt; Versandzeitpunkt und -status werden für die Fehlersuche kurz protokolliert. {email_provider_text(f.get('email_provider') or 'none')}",
@@ -361,7 +367,7 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         # Konto löschen (#390): öffentlich lesbar, weil Google Play einen Link dorthin verlangt - die Anker-ID bleibt.
         section("account-deletion", "Konto löschen",
                 p("Du kannst dein Konto jederzeit selbst löschen – in der LionsAPP unter Profil → Einstellungen (Zahnrad) → „Konto löschen“, "
-                  f"oder auf der Website nach der Anmeldung unter {link('Datenschutz → Meine Daten → „Account anonymisieren“', '/privacy-account')}. "
+                  f"oder auf der Website nach der Anmeldung unter {link('Datenschutz → Meine Daten → „Konto anonymisieren“', '/privacy-account')}. "
                   "Ein Login ist dafür nötig, damit niemand ein fremdes Konto löscht; wer sich nicht mehr anmelden kann, schreibt an "
                   f"{_contact_or_form(legal)}."),
                 p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, deine Bilder (Avatar, Banner und was du sonst für dein "

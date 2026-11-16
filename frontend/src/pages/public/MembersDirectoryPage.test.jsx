@@ -24,12 +24,12 @@ beforeEach(() => {
   authState.isClubMember = false;
 });
 
-test("Karten ohne Alter, Initialen ohne Foto, Account-Level bleibt", async () => {
+test("Karten ohne Alter, Initialen ohne Foto, Konto-Level bleibt", async () => {
   render(<MemoryRouter><MembersDirectoryPage /></MemoryRouter>);
   const card = await screen.findByTestId("member-card-paula");
   expect(card).toHaveTextContent("PaulaGG");
   expect(card).not.toHaveTextContent("Level 24");
-  expect(card).toHaveTextContent("Account-Level 7");
+  expect(card).toHaveTextContent("Konto-Level 7");
   expect(screen.getByTestId("member-card-initials-paula")).toHaveTextContent("PB");
   expect(screen.queryByTestId("member-card-initials-otto")).toBeNull();
   expect(screen.getByTestId("members-join-cta")).toBeInTheDocument();

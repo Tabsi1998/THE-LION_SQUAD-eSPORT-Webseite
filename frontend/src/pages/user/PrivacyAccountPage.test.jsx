@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-// Konto löschen mit Rollen in Teams (#2113, L-C5): die Seite nennt je Rolle den Weg und sperrt „Account anonymisieren“,
+// Konto löschen mit Rollen in Teams (#2113, L-C5): die Seite nennt je Rolle den Weg und sperrt „Konto anonymisieren“,
 // bis die Rollen abgegeben sind. Ohne Rolle geht es wie bisher über die Rückfrage. Erfundene Daten.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
@@ -27,7 +27,7 @@ beforeEach(() => {
   promptMock.mockReset();
 });
 
-test("mit Rollen in Teams: Weg je Rolle mit Link, „Account anonymisieren“ gesperrt", async () => {
+test("mit Rollen in Teams: Weg je Rolle mit Link, „Konto anonymisieren“ gesperrt", async () => {
   serve({
     can_erase: false,
     closing: "Kommst du so nicht weiter, schreib an datenschutz@verein.example – der Verein löscht dein Konto dann.",

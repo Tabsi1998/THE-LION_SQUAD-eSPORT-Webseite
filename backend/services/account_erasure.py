@@ -162,7 +162,7 @@ async def _series_links(db, profile_ids: list[str], now: str) -> None:
 async def _applications(db, user_id: str, now: str) -> None:
     await db.membership_applications.update_many({"user_id": user_id}, {
         "$set": {"motivation": None, "notes": None, "decision_note": None, "anonymized_at": now, "updated_at": now},
-        "$unset": {"person": "", "fields": "", "consents": ""},
+        "$unset": {"person": "", "birth": "", "fields": "", "consents": ""},
     })
     await db.membership_applications.update_many(
         {"user_id": user_id, "status": {"$in": list(OPEN_APPLICATIONS)}}, {"$set": {"status": "withdrawn", "withdrawn_at": now}},

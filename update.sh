@@ -76,7 +76,9 @@ check_frontend_route() {
 # 1. Git update (if this is a git checkout)
 if [ -d .git ] && [ "${SKIP_GIT_UPDATE:-false}" != "true" ]; then
   TARGET_BRANCH="${DEPLOY_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
-  [ -n "$TARGET_BRANCH" ] && [ "$TARGET_BRANCH" != "HEAD" ] || fail "Cannot determine git branch. Set DEPLOY_BRANCH=<branch>."
+  if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "HEAD" ]; then
+    fail "Cannot determine git branch. Set DEPLOY_BRANCH=<branch>."
+  fi
 
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
     if [ -n "$(git status --porcelain --untracked-files=no -- docker-compose.yml)" ]; then
@@ -172,7 +174,7 @@ if [ "$BACKEND_READY_TIMEOUT" -lt 30 ]; then BACKEND_READY_TIMEOUT=30; fi
 if [ "$BACKEND_READY_TIMEOUT" -gt 86400 ]; then BACKEND_READY_TIMEOUT=86400; fi
 info "Waiting for backend health (up to ${BACKEND_READY_TIMEOUT}s)…"
 BACKEND_READY=false
-for i in $(seq 1 $(( (BACKEND_READY_TIMEOUT + 1) / 2 ))); do
+for _ in $(seq 1 $(( (BACKEND_READY_TIMEOUT + 1) / 2 ))); do
   if curl -fsS "http://localhost:${BACKEND_PORT:-8001}/api/health/ready" >/dev/null 2>&1; then
     ok "Backend up."
     BACKEND_READY=true
@@ -191,7 +193,7 @@ FRONTEND_PORT="$(grep -E '^FRONTEND_PORT=' .env 2>/dev/null | cut -d= -f2 || ech
 FRONTEND_LOCAL_URL="http://localhost:${FRONTEND_PORT:-3000}"
 info "Waiting for frontend health…"
 FRONTEND_READY=false
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
   if curl -fsS "${FRONTEND_LOCAL_URL}/health" >/dev/null 2>&1; then
     ok "Frontend up."
     FRONTEND_READY=true

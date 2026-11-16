@@ -23,6 +23,7 @@ import { Crown, FileText, Mail, Clock, Send, Undo2, AlertTriangle } from "lucide
 import { viennaDate } from "@/lib/vienna";
 import { statutesHref } from "@/lib/statutes";
 import { feeLine } from "@/lib/membershipFees";
+import { BIRTH_MISSING_TEXT, MEMBERSHIP_AGE_TEXT } from "@/lib/minimumAge";
 
 const CONTRIB_OPTIONS = [
   { value: "full", label: "Vollmitgliedschaft" },
@@ -100,18 +101,19 @@ export default function MembershipApplyPage() {
     setSubmitError("");
   };
   const coupled = Boolean(setup.coupled && setup.available);
-  const requiredPerson = new Set([...(setup.form?.required || []), "firstname", "lastname"]);
+  // Mindestalter (#1698): das Geburtsdatum ist auf beiden Wegen Pflicht - der Server prüft „ab 18“ am Wiener Tag.
+  const requiredPerson = new Set([...(setup.form?.required || []), "firstname", "lastname", "birth"]);
 
   const validate = () => {
     const errors = {};
     if (coupled) {
       for (const [key, label] of PERSON_FIELDS) if (requiredPerson.has(key) && !String(form[key] || "").trim()) errors[key] = `${label} fehlt.`;
-      if (requiredPerson.has("birth") && !form.birth) errors.birth = "Geburtsdatum fehlt.";
       if (!form.type_id) errors.type_id = "Bitte eine Mitgliedsart wählen.";
       for (const field of setup.form?.fields || []) if (field.required && !String(form.fields[field.code] || "").trim()) errors[`field:${field.code}`] = `${field.label} fehlt.`;
     } else if (form.motivation.trim().length < 20) {
       errors.motivation = "Bitte beschreibe deine Motivation mit mindestens 20 Zeichen.";
     }
+    if (!form.birth) errors.birth = BIRTH_MISSING_TEXT;
     if (!form.accept_statutes) errors.accept_statutes = "Bitte akzeptiere die Vereinsstatuten.";
     if (!form.accept_privacy) errors.accept_privacy = "Bitte akzeptiere die Datenschutzerklärung.";
     setFieldErrors(errors);
@@ -123,7 +125,7 @@ export default function MembershipApplyPage() {
   const payloadFor = () => {
     if (!coupled) {
       const withFees = (setup.fees || []).length > 0;
-      return { motivation: form.motivation.trim(), contribution_pref: form.contribution_pref, notes: form.notes.trim() || null, accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy, ...(withFees ? { type_id: form.type_id } : {}) };
+      return { motivation: form.motivation.trim(), contribution_pref: form.contribution_pref, notes: form.notes.trim() || null, birth: form.birth || null, accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy, ...(withFees ? { type_id: form.type_id } : {}) };
     }
     return {
       accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy, type_id: form.type_id,
@@ -218,6 +220,7 @@ export default function MembershipApplyPage() {
                 <Field id="apply-motivation" label={`Motivation (${form.motivation.length}/2000)`} error={fieldErrors.motivation}>
                   <textarea id="apply-motivation" required minLength={20} maxLength={2000} rows={6} value={form.motivation} onChange={(e) => updateField("motivation", e.target.value)} placeholder="Warum möchtest du Mitglied werden? Welche Spiele/Plattformen? Wie viel Zeit kannst du einbringen?" className={INPUT} data-testid="apply-motivation" aria-invalid={!!fieldErrors.motivation} aria-describedby={fieldErrors.motivation ? "apply-motivation-error" : undefined} />
                 </Field>
+                <GermanDateField id="apply-birth" label="Geburtsdatum" value={form.birth} onChange={(v) => updateField("birth", v)} testId="apply-birth" error={fieldErrors.birth} description={MEMBERSHIP_AGE_TEXT} />
                 <Field id="apply-notes" label="Anmerkungen (optional)">
                   <textarea id="apply-notes" rows={2} maxLength={2000} value={form.notes} onChange={(e) => updateField("notes", e.target.value)} className={INPUT} />
                 </Field>
@@ -288,7 +291,7 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
             </select>
           </Field>
           <div className={requiredPerson.has("birth") ? "" : "opacity-90"}>
-            <GermanDateField id="apply-birth" label={`Geburtsdatum${requiredPerson.has("birth") ? "" : " (optional)"}`} value={form.birth} onChange={(v) => setPerson("birth", v)} testId="apply-birth" error={fieldErrors.birth} description={requiredPerson.has("birth") ? undefined : "Nur nötig für Ermäßigungen nach Alter."} />
+            <GermanDateField id="apply-birth" label={`Geburtsdatum${requiredPerson.has("birth") ? "" : " (optional)"}`} value={form.birth} onChange={(v) => setPerson("birth", v)} testId="apply-birth" error={fieldErrors.birth} description={MEMBERSHIP_AGE_TEXT} />
           </div>
           {(setup.form?.fields || []).map((field) => (
             <Field key={field.code} id={`apply-field-${field.code}`} label={`${field.label}${field.required ? "" : " (optional)"}`} error={fieldErrors[`field:${field.code}`]}>

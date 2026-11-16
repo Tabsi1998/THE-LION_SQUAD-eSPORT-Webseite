@@ -54,6 +54,7 @@ test("vom Turnier: Satz, Ziel zum Server und weiter zur Mail-Bestätigung, Login
   renderAt("/register?next=%2Ftournaments%2Fmk-cup");
   expect(await screen.findByTestId("register-purpose")).toHaveTextContent("Erstelle ein Konto, um dich für „Mario Kart Cup“ anzumelden.");
   expect(screen.getByTestId("register-login-link")).toHaveAttribute("href", "/login?next=%2Ftournaments%2Fmk-cup");
+  expect(screen.getByTestId("register-age")).toHaveTextContent("Ein Konto kannst du ab 14 Jahren anlegen. Vereinsmitglied wirst du ab 18 Jahren.");
   expect(screen.getByTestId("google")).toHaveAttribute("data-return", "/tournaments/mk-cup");
   await fillAndSubmit(user);
   await waitFor(() => expect(authState.register).toHaveBeenCalledWith(expect.objectContaining({ next: "/tournaments/mk-cup" })));

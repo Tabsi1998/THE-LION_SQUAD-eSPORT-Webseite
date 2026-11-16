@@ -158,7 +158,7 @@ BACKEND_PORT_VALUE="$(get_env BACKEND_PORT)"
 BACKEND_PORT_VALUE="${BACKEND_PORT_VALUE:-8001}"
 FRONTEND_PORT_VALUE="$(get_env FRONTEND_PORT)"
 FRONTEND_PORT_VALUE="${FRONTEND_PORT_VALUE:-3000}"
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
   if curl -fsS "http://localhost:${BACKEND_PORT_VALUE}/api/health/ready" >/dev/null 2>&1; then
     HEALTHY=true
     break
@@ -173,8 +173,10 @@ if $HEALTHY; then ok "Backend up."; else warn "Backend did not become healthy wi
 # reactivates accounts during normal startup.
 if $HEALTHY; then
   info "Creating the initial superadmin if none exists…"
-  export BOOTSTRAP_ADMIN_EMAIL="$(get_env ADMIN_EMAIL)"
-  export BOOTSTRAP_ADMIN_PASSWORD="$(get_env ADMIN_PASSWORD)"
+  # Erst zuweisen, dann exportieren (ShellCheck SC2155); "|| true" hält den bisherigen Stand: ohne Eintrag leer.
+  BOOTSTRAP_ADMIN_EMAIL="$(get_env ADMIN_EMAIL || true)"
+  BOOTSTRAP_ADMIN_PASSWORD="$(get_env ADMIN_PASSWORD || true)"
+  export BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_PASSWORD
   docker compose run --rm --no-deps \
     -e BOOTSTRAP_ADMIN_EMAIL \
     -e BOOTSTRAP_ADMIN_PASSWORD \
