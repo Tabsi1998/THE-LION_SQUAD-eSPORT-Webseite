@@ -86,7 +86,7 @@ async def share_payload(db, tournament_ref: str, username: str) -> dict | None:
         "kind": path_kind(steps),
         "steps": [{"label": step["label"], "result": step["result"], "outcome": step["outcome"], "kind": step["kind"],
                    **({"contested": step["contested"]} if step.get("contested") else {})} for step in steps],
-        "chips": [chip_text(step) for step in steps][:8],
+        "chips": [chip_text(step) for step in steps][:MAX_CHIPS],
         "club_name": branding.get("club_name") or "THE LION SQUAD",
         "domain": str(branding.get("domain") or "lionsquad.at").replace("https://", "").replace("http://", "").strip("/"),
         "path": f"/tournaments/{slug}/ergebnis/{user['username']}",
@@ -197,16 +197,17 @@ def _flow(widths: list[float], left: int, right: int, top: int, bottom: int) -> 
 
 def wide_chips(entries: list[dict], measure, left: int, right: int, top: int, bottom: int) -> list[dict]:
     """Welche Schildchen ins Breitformat passen und wohin (Daten vor dem Zeichnen). Alle, wenn sie passen - sonst fallen
-    zuerst die hinteren ohne Verfahren weg, angefochtene haben Vorrang (#2375). Passt auch ein angefochtenes nicht mehr,
-    steht am Ende ein Sammelhinweis „+ 1 in Klärung“. ``measure`` gibt die Breite eines Schildchens."""
+    zuerst die hinteren ohne Verfahren weg, angefochtene haben Vorrang (#2375). Passt auch ein angefochtenes nicht mehr, weicht
+    das älteste - wie im Hochformat bleiben die jüngsten - und am Ende steht der Sammelhinweis „+ 1 weitere in Klärung“.
+    ``measure`` gibt die Breite eines Schildchens."""
     chosen, dropped_warn = list(entries), 0
     while True:
-        items = chosen + ([{"index": None, "text": f"+ {dropped_warn} {CLARIFICATION}", "warn": True, "hint": True}] if dropped_warn else [])
+        items = chosen + ([{"index": None, "text": f"+ {dropped_warn} weitere {CLARIFICATION}", "warn": True, "hint": True}] if dropped_warn else [])
         spots = _flow([measure(item["text"]) for item in items], left, right, top, bottom)
         if spots is not None or not chosen:
             break
         plain = [position for position, item in enumerate(chosen) if not item["warn"]]
-        drop = plain[-1] if plain else len(chosen) - 1
+        drop = plain[-1] if plain else 0
         dropped_warn += 0 if plain else 1
         chosen.pop(drop)
     if spots is None:

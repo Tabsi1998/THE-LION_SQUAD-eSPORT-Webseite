@@ -357,7 +357,15 @@ def test_a_contested_step_keeps_its_place_or_the_hint_says_it_wide():
 
     # Nicht einmal Platz für den angefochtenen Schritt neben dem Hinweis: nur der Sammelhinweis.
     only = result_share.wide_chips([entries[-1]], lambda text: 700 if "Runde" in text else 100, 0, 630, 0, 0)
-    assert [item["text"] for item in only] == ["+ 1 in Klärung"] and only[0].get("hint") is True
+    assert [item["text"] for item in only] == ["+ 1 weitere in Klärung"] and only[0].get("hint") is True
+
+    # Lauter angefochtene Schritte: wie im Hochformat bleiben die jüngsten, die ältesten nennt der Sammelhinweis.
+    contested = [{"index": index, "text": f"Runde {index + 1} · in Klärung", "warn": True} for index in range(9)]
+    kept = result_share.wide_chips(contested, measure, 0, 630, 0, 52)
+    assert [item["index"] for item in kept] == [4, 5, 6, 7, 8, None] and kept[-1]["text"] == "+ 4 weitere in Klärung"
+    story = result_share.story_rows([{"label": f"Runde {n}", "result": "2:1", "kind": "duel", "contested": True} for n in range(1, 10)],
+                                    result_share.STEP_ROW + 2 * result_share._row_cost({"contested": True}))
+    assert [row["label"] for row in story["shown"]] == ["Runde 8", "Runde 9"], "Hochformat: ebenfalls die jüngsten"
 
     # Ohne Verfahren wie bisher: die ersten, die passen.
     plain = result_share.wide_chips([{**entry, "warn": False} for entry in entries[:8]], measure, 0, 630, 0, 52)
