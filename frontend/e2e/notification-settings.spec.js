@@ -25,11 +25,11 @@ const SETTINGS = {
   ],
 };
 
-async function mockServer(page) {
+async function mockServer(page, { failFirst = false } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
-  const seen = { patches: [], me: { id: "u-ruhe", username: "nachtloewe", display_name: "NachtLöwe", role: "player", email: "ruhe@lionsquad-test.at", notification_preferences: {}, newsletter_consent: false, updated_at: "2026-11-01T10:00:00.000000+00:00" } };
+  const seen = { fail: failFirst, patches: [], me: { id: "u-ruhe", username: "nachtloewe", display_name: "NachtLöwe", role: "player", email: "ruhe@lionsquad-test.at", notification_preferences: {}, newsletter_consent: false, updated_at: "2026-11-01T10:00:00.000000+00:00" } };
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace(/^\/api/, "");
@@ -44,7 +44,11 @@ async function mockServer(page) {
       return json(seen.me);
     }
     if (path === "/users/me" && request.method() === "GET") return json(seen.me);
-    if (path === "/users/me/notification-preferences") return json(SETTINGS);
+    if (path === "/users/me/notification-preferences") {
+      // Bis zum Klick auf „Erneut versuchen“ scheitert jeder Versuch (der API-Client fragt bei 503 selbst noch einmal).
+      if (seen.fail) return json({ detail: "kurz weg" }, 503);
+      return json(SETTINGS);
+    }
     if (path === "/web-push/config") return json({ enabled: false });
     if (request.method() !== "GET") return json({ ok: true });
     if (path === "/me/platform-links") return json({ links: [], available: {}, platforms: {} });
@@ -111,6 +115,31 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await page.waitForTimeout(300);
         await page.locator(".tls-notify").screenshot({ path: `${SHOTS}/einstellungen-${width}.png` });
       }
+    });
+
+    test("Laden scheitert: „Erneut versuchen“; geleertes Zeitfeld bleibt Entwurf", async ({ page }) => {
+      const seen = await mockServer(page, { failFirst: true });
+      await page.goto("/profile?tab=notifications");
+      await expect(page.getByTestId("notification-load-failed")).toBeVisible();
+      await page.getByTestId("notification-quiet-toggle").click();
+      await expect.poll(() => seen.patches.length).toBe(1);
+      await page.getByTestId("notification-quiet-start").fill("");
+      await expect(page.getByTestId("notification-quiet-error")).toContainText("Uhrzeit wie 22:00");
+      await page.waitForTimeout(1200);
+      expect(seen.patches).toHaveLength(1);
+      expect(await noSidewaysScroll(page)).toBe(true);
+      if (SHOTS) {
+        await page.evaluate(() => document.activeElement?.blur());
+        await page.setViewportSize({ width, height: 3400 });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.waitForTimeout(300);
+        await page.locator(".tls-notify").screenshot({ path: `${SHOTS}/einstellungen-fehler-${width}.png` });
+        await page.setViewportSize({ width, height });
+      }
+      seen.fail = false;
+      await page.getByTestId("notification-load-retry").click();
+      await expect(page.getByTestId("notification-level-all")).toBeVisible();
+      await expect(page.getByTestId("notification-load-failed")).toHaveCount(0);
     });
 
     test("bei weniger Bewegung bleibt alles bedienbar", async ({ page }) => {
