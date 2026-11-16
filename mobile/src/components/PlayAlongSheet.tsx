@@ -18,6 +18,8 @@ import { useSeasonOverlay } from "../seasons/anchors";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { Body, Heading, Muted } from "./Text";
+import { useModalGate } from "../lib/modalGate";
+import { useReduceMotion } from "./motion/useReduceMotion";
 
 // „Spielst du auch mit?“ (#1184) in der App - wie im Web: nach der Event-Anmeldung ein Blatt von unten mit den Turnieren
 // des Events. Haken nur bei Einzel-Turnieren (Tippfläche mindestens 48 Punkte); Team-Turniere sagen, dass der Kapitän
@@ -67,6 +69,10 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
   const lock = useRef(false);
   const visible = Boolean(eventId && entries?.length);
   useSeasonOverlay("play-along-sheet", visible);
+  // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
+  useModalGate("play-along-sheet", visible);
+  // „Bewegung reduzieren“: das Blatt steht sofort da, statt von unten zu gleiten.
+  const reduce = useReduceMotion();
 
   useEffect(() => {
     if (!eventId) return undefined;
@@ -126,7 +132,7 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
   };
 
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+    <Modal animationType={reduce ? "none" : "slide"} onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.backdrop}>
         <View style={styles.sheet} testID="play-along-sheet" accessibilityViewIsModal>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
