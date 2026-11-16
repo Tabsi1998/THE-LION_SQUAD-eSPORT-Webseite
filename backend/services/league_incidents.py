@@ -165,7 +165,10 @@ async def _store(db, match: dict, incidents: list[dict], *, user_ids=()) -> dict
     # „in Klärung“ am Bracket hängt an den Vorfällen: das Discord-Bracket sofort vormerken, auch nach dem Endstand (#2375).
     from services import discord_bracket_state
 
-    discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
+    try:
+        discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
+    except Exception:  # noqa: BLE001 - Discord hält keinen Vorfall auf
+        logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", log_safe(match.get("tournament_id")), exc_info=True)
     return {**match, "incidents": incidents, "incident_due_at": due_at(incidents)}
 
 

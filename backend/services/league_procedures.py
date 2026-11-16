@@ -13,6 +13,7 @@ Wer was sieht, steht in ``view`` (Nr. 133): die Gegenseite ohne „sofort hingew
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -20,8 +21,11 @@ from models import new_id, now_utc
 from services import league_protest_settings as protest_settings
 from services import match_proof_refs as refs
 from services.league_scope import is_league_staffel
+from services.log_safe import log_safe
 from services.match_disputes import CATEGORIES, DECIDED_STATUSES, decided_at, league_window_of
 from services.matchday_schedule import response_deadline
+
+logger = logging.getLogger("tls.league_procedures")
 
 OBJECTION, PROTEST, APPEAL = "objection", "protest", "appeal"
 KINDS = (OBJECTION, PROTEST, APPEAL)
@@ -183,7 +187,10 @@ def bracket_changed(match: dict) -> None:
     auf dem Endstand steht. Ein Turnier mit ``discord_skip`` (jede Liga-Staffel) postet trotzdem nichts - das prüft das Bracket."""
     from services import discord_bracket_state
 
-    discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
+    try:
+        discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
+    except Exception:  # noqa: BLE001 - Discord hält kein Verfahren auf
+        logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", log_safe(match.get("tournament_id")), exc_info=True)
 
 
 def _settle(match: dict, changed: dict) -> dict:

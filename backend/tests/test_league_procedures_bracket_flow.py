@@ -138,3 +138,20 @@ async def test_a_staffel_with_discord_skip_posts_nothing(flow, asked, monkeypatc
     assert outcome["checked"] == 1 and outcome["posted"] == 0 and outcome["edited"] == 0 and posted == []
     assert (await discord_bracket.refresh(flow.db, tid, revise=True))["reason"] == "author_opt_out"
     assert tid not in discord_bracket_state.pending() and not discord_bracket_state.revising(tid)
+
+
+@pytest.mark.asyncio
+async def test_a_failing_discord_never_holds_up_a_procedure_or_an_incident(flow, monkeypatch):
+    """Discord darf ein Verfahren nie aufhalten: Wirft die Vormerkung, gelingt der Schritt trotzdem."""
+    def broken(*args, **kwargs):
+        raise RuntimeError("discord kaputt")
+
+    monkeypatch.setattr(discord_bracket_state, "request_refresh", broken)
+    w = await league_world(flow)
+    flow.act_as(w["users"]["Kapitaen"])
+    response = await flow.post(f"/api/matches/{w['match']['id']}/incidents", json={
+        "position": 2, "kind": "disconnect", "proposal": "replay", "note": "Verbindung der Löwen weg",
+        "score": {w["reg_a"]["id"]: 3, w["reg_h"]["id"]: 4}, "round": 8})
+    assert response.status_code == 200, response.text
+    await opened(flow, w)
+    assert (await stored(flow, w))["status"] == "disputed"
