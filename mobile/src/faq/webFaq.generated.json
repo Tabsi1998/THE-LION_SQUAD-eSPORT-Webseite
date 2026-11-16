@@ -1,0 +1,958 @@
+{
+  "_quelle": "Erzeugt von mobile/scripts/sync-faq.js aus frontend/src/hilfe (#2449) - nicht von Hand ändern. Neu erzeugen: node scripts/sync-faq.js",
+  "bereiche": [
+    {
+      "id": "konto-profil",
+      "titel": "Konto & Profil",
+      "kurz": "Registrieren, Profil, Spiel-IDs und Plattform.",
+      "icon": "user",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "benachrichtigungen",
+      "titel": "Benachrichtigungen",
+      "kurz": "Push, E-Mail, Discord und Ruhezeit einstellen.",
+      "icon": "bell",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "verein-mitgliedschaft",
+      "titel": "Verein & Mitgliedschaft",
+      "kurz": "Mitglied werden und alles rund um den Verein.",
+      "icon": "badge",
+      "rollen": [
+        "mitglied",
+        "spieler"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "events-kalender",
+      "titel": "Events & Kalender",
+      "kurz": "Termine finden, anmelden und im eigenen Kalender sehen.",
+      "icon": "calendar",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "turniere",
+      "titel": "Turniere",
+      "kurz": "Anmelden, einchecken, Ergebnis melden, Turnierbaum lesen.",
+      "icon": "trophy",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "liga",
+      "titel": "Liga",
+      "kurz": "Co-Team anmelden, Termine, Spieltag und Ergebnisse.",
+      "icon": "list",
+      "rollen": [
+        "captain"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "teams",
+      "titel": "Teams & Co-Teams",
+      "kurz": "Team gründen, einladen, beitreten und Rollen vergeben.",
+      "icon": "users",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "turniertag",
+      "titel": "Turniertag vor Ort",
+      "kurz": "Check-in, Aufruf und deine Station.",
+      "icon": "map-pin",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "gewinne",
+      "titel": "Gewinne & Trophäen",
+      "kurz": "Preise, Urkunden und Erfolge.",
+      "icon": "gift",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
+      "id": "helferdienste",
+      "titel": "Helferdienste",
+      "kurz": "Schichten übernehmen und absagen.",
+      "icon": "hand",
+      "rollen": [
+        "mitglied"
+      ],
+      "sichtbar_fuer": "mitglied"
+    },
+    {
+      "id": "turnierleitung",
+      "titel": "Turnierleitung",
+      "kurz": "Check-in, Aufruf, Stationen und Ergebnisse vor Ort.",
+      "icon": "clipboard",
+      "rollen": [
+        "turnierleitung"
+      ],
+      "sichtbar_fuer": "turnierleitung"
+    },
+    {
+      "id": "datenschutz",
+      "titel": "Datenschutz & Konto",
+      "kurz": "Deine Daten herunterladen oder das Konto anonymisieren.",
+      "icon": "shield",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle"
+    }
+  ],
+  "fragen": [
+    {
+      "id": "konto-anlegen",
+      "frage": "Wie lege ich ein Konto an?",
+      "antwort": "Tippe oben auf Registrieren. Gib Benutzername, E-Mail und Passwort ein. Danach bestätigst du den Link aus der E-Mail.",
+      "bereich": "konto-profil",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/konto-und-profil#registrieren",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "keine-bestaetigung",
+      "frage": "Die Bestätigungs-E-Mail kommt nicht. Was tun?",
+      "antwort": "Schau im Spam-Ordner nach. Auf derselben Seite kannst du den Link neu anfordern.",
+      "bereich": "konto-profil",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/konto-und-profil#email-bestaetigen",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "activision-id",
+      "frage": "Wo trage ich meine Activision-ID ein?",
+      "antwort": "In den Einstellungen unter Gaming bei den Spiel-IDs. Trag sie genau so ein, wie sie im Spiel steht, mit # und Zahlen.",
+      "bereich": "konto-profil",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/konto-und-profil#spiel-ids",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "weniger-push",
+      "frage": "Wie bekomme ich weniger Benachrichtigungen?",
+      "antwort": "Öffne in den Einstellungen Benachrichtigungen und wähl die Stufe Wichtiges oder Wenig. Mit der Ruhezeit kommt nachts kein Push.",
+      "bereich": "benachrichtigungen",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/konto-und-profil#stufe",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "team-gruenden",
+      "frage": "Wie gründe ich ein Team?",
+      "antwort": "Öffne Teams und tippe auf Team erstellen. Gib Name und Kürzel ein. Danach bist du die Teamleitung.",
+      "bereich": "teams",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/team-und-co-team#team-erstellen",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "team-beitreten",
+      "frage": "Wie trete ich einem Team bei?",
+      "antwort": "Öffne den Einladungs-Link und tippe auf Beitreten. Oder gib den Beitrittscode auf der Teamseite unter Team beitreten ein.",
+      "bereich": "teams",
+      "rollen": [
+        "spieler"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/team-und-co-team#beitreten",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "was-ist-co-team",
+      "frage": "Was ist ein Co-Team?",
+      "antwort": "Dein Team ist eure Organisation. Ein Co-Team ist die feste Aufstellung für ein Spiel, mit Kader, Captain und Vertreter.",
+      "bereich": "teams",
+      "rollen": [
+        "captain",
+        "spieler"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/team-und-co-team#co-team-anlegen",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "turnier-anmelden",
+      "frage": "Wie melde ich mich zu einem Turnier an?",
+      "antwort": "Öffne das Turnier und tippe auf Jetzt anmelden. Bei Teamturnieren meldet die Teamleitung oder Co-Leitung das Team an.",
+      "bereich": "turniere",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/turniere#anmelden",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "liga-wer-meldet-an",
+      "frage": "Wer darf ein Team zur Liga anmelden?",
+      "antwort": "Captain und Vertreter eines Co-Teams. Fehlen beide, trägt die Teamleitung zuerst einen Captain ein.",
+      "bereich": "liga",
+      "rollen": [
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/liga-captains#anmeldung-starten",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "ergebnis-melden",
+      "frage": "Wo melde ich ein Ergebnis?",
+      "antwort": "Auf der Matchseite deines Spiels. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Leitung.",
+      "bereich": "turniere",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/faq/turniere#ergebnis-melden",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "mitglied-werden",
+      "frage": "Wie werde ich Vereinsmitglied?",
+      "antwort": "Du brauchst ein Konto. Öffne Mitglied werden und tippe auf Antrag stellen. Der Vorstand prüft jeden Antrag und meldet sich per E-Mail.",
+      "bereich": "verein-mitgliedschaft",
+      "rollen": [
+        "mitglied",
+        "spieler"
+      ],
+      "sichtbar_fuer": "alle",
+      "haeufig": true,
+      "link": {
+        "to": "/membership/join",
+        "label": "Zu Mitglied werden"
+      }
+    },
+    {
+      "id": "daten-und-konto",
+      "frage": "Wie lade ich meine Daten herunter oder lösche mein Konto?",
+      "antwort": "Unter Meine Daten lädst du alles als JSON herunter. Dort kannst du dein Konto auch anonymisieren. Das lässt sich nicht rückgängig machen.",
+      "bereich": "datenschutz",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/privacy-account",
+        "label": "Zu Meine Daten"
+      }
+    },
+    {
+      "id": "kalender-abo",
+      "frage": "Kann ich den Kalender abonnieren?",
+      "antwort": "Ja. Tippe im Kalender bei Kalender abonnieren auf Im Kalender öffnen. Angemeldet richtest du auch ein Abo nur mit deinen Terminen ein.",
+      "bereich": "events-kalender",
+      "rollen": [
+        "spieler",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/calendar",
+        "label": "Zum Kalender"
+      }
+    },
+    {
+      "id": "check-in-vor-ort",
+      "frage": "Wie checke ich bei einem Turnier vor Ort ein?",
+      "antwort": "Vor Ort checkst du bei der Turnierleitung ein. Online tippst du während des Check-ins auf der Turnierseite auf Check-in.",
+      "bereich": "turniertag",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/turniere#einchecken",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
+      "id": "gewinn-abholen",
+      "frage": "Ich habe etwas gewonnen. Wie bekomme ich den Preis?",
+      "antwort": "Unter Meine Gewinne stehen deine Preise und Urkunden. Ist ein Preis abholbereit, holst du ihn beim nächsten Vereinsabend ab. Dafür hast du 90 Tage Zeit.",
+      "bereich": "gewinne",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/my/prizes",
+        "label": "Zu Meine Gewinne"
+      }
+    }
+  ],
+  "themen": [
+    {
+      "slug": "konto-und-profil",
+      "titel": "Konto und Profil",
+      "kurz": "Konto anlegen, Profil einrichten, Geburtsdatum, Plattform und Spiel-IDs wie die Activision-ID eintragen.",
+      "zielgruppe": "Für alle Spieler",
+      "bereich": "konto-profil",
+      "rollen": [
+        "spieler",
+        "captain",
+        "mitglied"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "registrieren",
+        "anmelden",
+        "account",
+        "einstellungen",
+        "activision",
+        "id",
+        "gamertag",
+        "alter",
+        "playstation",
+        "xbox",
+        "pc",
+        "benachrichtigungen",
+        "push",
+        "ruhezeit",
+        "nachts"
+      ],
+      "abschnitte": [
+        {
+          "id": "konto-anlegen",
+          "titel": "Konto anlegen",
+          "schritte": [
+            {
+              "id": "registrieren",
+              "titel": "Registrieren",
+              "text": "Tippe oben auf Registrieren. Gib einen Benutzernamen, deine E-Mail und ein Passwort ein.",
+              "hinweis": "Der Benutzername steht später in der Adresse deines Profils."
+            },
+            {
+              "id": "zustimmen",
+              "titel": "Zustimmen und Konto erstellen",
+              "text": "Hake Datenschutz und Nutzungsbedingungen an. Tippe dann auf Account erstellen.",
+              "hinweis": "Discord, Geburtsdatum und Geschlecht sind freiwillig. Du kannst sie auch später im Profil eintragen."
+            },
+            {
+              "id": "email-bestaetigen",
+              "titel": "E-Mail bestätigen",
+              "text": "Du bekommst eine E-Mail mit einem Link. Öffne den Link. Danach kannst du dich einloggen.",
+              "hinweis": "Keine E-Mail da? Schau im Spam-Ordner nach. Auf derselben Seite kannst du den Link neu anfordern."
+            }
+          ]
+        },
+        {
+          "id": "profil",
+          "titel": "Profil einrichten",
+          "schritte": [
+            {
+              "id": "einstellungen",
+              "titel": "Einstellungen öffnen",
+              "text": "Tippe oben rechts auf deinen Namen und dann auf Einstellungen. Am Handy findest du sie im Menü.",
+              "hinweis": "Es gibt keinen Speichern-Knopf. Alles, was du einträgst, speichert sich von selbst."
+            },
+            {
+              "id": "grunddaten",
+              "titel": "Grunddaten",
+              "text": "Unter Grunddaten stehen dein Anzeigename, dein Bild und ein kurzer Text über dich. Unten siehst du, wenn alles gespeichert ist."
+            },
+            {
+              "id": "geburtsdatum",
+              "titel": "Geburtsdatum eintragen",
+              "text": "Trag unter Grunddaten dein Geburtsdatum ein. Manche Ligen haben ein Mindestalter. Ohne Datum kannst du dort nicht spielen."
+            },
+            {
+              "id": "plattform",
+              "titel": "Plattform wählen",
+              "text": "Öffne Gaming. Tippe unter Plattformen alles an, worauf du spielst. Mehrere sind möglich."
+            },
+            {
+              "id": "spiel-ids",
+              "titel": "Spiel-IDs eintragen",
+              "text": "Unter Gaming stehen die Spiel-IDs. Trag deine ID genau so ein, wie sie im Spiel steht. Für Call of Duty ist das die Activision-ID mit # und Zahlen.",
+              "hinweis": "Fragt eine Liga nach deiner Plattform, steht das Feld direkt bei der Spiel-ID. Felder mit * sind Pflicht."
+            },
+            {
+              "id": "liga-hinweis",
+              "titel": "Fehlt noch etwas für die Liga?",
+              "text": "Spielst du in einer Liga, zeigt ein Hinweis unter Gaming, ob noch etwas fehlt. Trag es nach. Sonst kannst du nicht einchecken und nicht aufgestellt werden.",
+              "hinweis": "Für die Liga gilt die ID, die bei der Anmeldung festgehalten wurde. Änderst du sie später, gibt die Liga-Leitung die neue frei."
+            }
+          ]
+        },
+        {
+          "id": "benachrichtigungen",
+          "titel": "Benachrichtigungen",
+          "bereich": "benachrichtigungen",
+          "schritte": [
+            {
+              "id": "stufe",
+              "titel": "Stufe wählen",
+              "text": "Öffne Benachrichtigungen. Tippe oben eine Stufe an: Alles, Wichtiges oder Wenig. Die Stufe stellt alle Themen auf einmal.",
+              "hinweis": "Neue Konten starten mit Alles. Ohne Haken beim Newsletter liegen News & Events nur still in der Glocke."
+            },
+            {
+              "id": "themen",
+              "titel": "Themen einzeln stellen",
+              "text": "Unter Themen wählst du je Thema Push, Nur App oder Aus. Push kommt aufs Handy und in den Browser. Nur App legt es still in die Glocke.",
+              "hinweis": "Stellst du ein Thema selbst um, steht oben Eigene Auswahl."
+            },
+            {
+              "id": "ruhezeit",
+              "titel": "Ruhezeit einschalten",
+              "text": "Schalte Ruhezeit ein. Vorgeschlagen ist 22:00 bis 7:00 Uhr. In dieser Zeit kommt kein Push, alles wartet in der Glocke. Danach kommt eine Sammelmeldung.",
+              "hinweis": "Der Aufruf zu deinem Spiel und „Match startet jetzt“ kommen trotzdem sofort. E-Mails kommen wie bisher."
+            },
+            {
+              "id": "weitere-wege",
+              "titel": "E-Mail und Discord",
+              "text": "Tippe auf Weitere Wege. Dort stellst du E-Mail und Discord je Thema ein oder schaltest einen Weg ganz ab."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "team-und-co-team",
+      "titel": "Team und Co-Team",
+      "kurz": "Team erstellen, Leute einladen oder beitreten, ein Co-Team für ein Spiel anlegen und Captain und Vertreter festlegen.",
+      "zielgruppe": "Für Teamleitung und Spieler",
+      "bereich": "teams",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "clan",
+        "squad",
+        "kader",
+        "einladung",
+        "beitrittscode",
+        "qr",
+        "link",
+        "captain",
+        "vertreter",
+        "teamleitung",
+        "co-leitung"
+      ],
+      "abschnitte": [
+        {
+          "id": "neues-team",
+          "titel": "Team erstellen",
+          "schritte": [
+            {
+              "id": "team-erstellen",
+              "titel": "Team erstellen öffnen",
+              "text": "Öffne Teams und tippe auf Team erstellen. Dafür musst du eingeloggt sein."
+            },
+            {
+              "id": "team-daten",
+              "titel": "Name und Kürzel",
+              "text": "Gib den Namen und ein Kürzel mit 2 bis 8 Zeichen ein. Tippe auf Speichern. Du bist dann die Teamleitung.",
+              "hinweis": "Logo, Banner und Discord-Link kannst du auch später ergänzen."
+            }
+          ]
+        },
+        {
+          "id": "mitglieder",
+          "titel": "Leute einladen und beitreten",
+          "schritte": [
+            {
+              "id": "einladen",
+              "titel": "Einladungs-Link teilen",
+              "text": "Öffne eure Teamseite und tippe auf Einladen. Teile den Link oder zeig den QR-Code. Wer ihn öffnet, kann sofort beitreten.",
+              "hinweis": "Einladen dürfen Teamleitung und Co-Leitung. Mit Neuen Link erzeugen wird der alte Link ungültig."
+            },
+            {
+              "id": "beitrittscode",
+              "titel": "Beitrittscode weitergeben",
+              "text": "Im selben Fenster steht der Beitrittscode. Wer ihn hat, öffnet eure Teamseite und gibt ihn unter Team beitreten ein."
+            },
+            {
+              "id": "persoenlich-einladen",
+              "titel": "Gezielt einladen",
+              "text": "Such unter Persönlich einladen nach dem Benutzernamen und tippe auf Einladen. Die Person sieht die Einladung bei den Benachrichtigungen und unter Teams."
+            },
+            {
+              "id": "beitreten",
+              "titel": "Einladung annehmen",
+              "text": "Hast du einen Link bekommen? Öffne ihn und tippe auf Beitreten. Ohne Konto meldest du dich zuerst an."
+            }
+          ]
+        },
+        {
+          "id": "co-team",
+          "titel": "Co-Team anlegen",
+          "schritte": [
+            {
+              "id": "co-team-anlegen",
+              "titel": "Was ist ein Co-Team?",
+              "text": "Dein Team ist eure Organisation. Ein Co-Team ist die feste Aufstellung für ein Spiel. Öffne Teams, wähle unter Deine Teams dein Team und tippe auf Co-Team.",
+              "hinweis": "Co-Teams anlegen dürfen Teamleitung und Co-Leitung."
+            },
+            {
+              "id": "co-team-kader",
+              "titel": "Name, Spiel und Kader",
+              "text": "Gib dem Co-Team einen Namen und wähle das Spiel. Hake alle Spieler an, die zum Kader gehören."
+            },
+            {
+              "id": "captain-vertreter",
+              "titel": "Captain und Vertreter",
+              "text": "Wähle Captain und Vertreter aus dem Kader. Die beiden machen in der Liga Termine aus und melden und bestätigen Ergebnisse. Tippe auf Speichern.",
+              "hinweis": "Gibt es keinen Captain und keinen Vertreter, macht das die Teamleitung."
+            }
+          ]
+        },
+        {
+          "id": "rollen",
+          "titel": "Rollen im Team",
+          "schritte": [
+            {
+              "id": "rollen-team",
+              "titel": "Teamleitung und Co-Leitung",
+              "text": "Auf der Teamseite unter Mitglieder verwalten vergibt die Teamleitung die Rollen. Co-Leitungen pflegen die Teamdaten, laden ein und verwalten Co-Teams.",
+              "hinweis": "Die Teamleitung kann die Leitung auch an jemand anderen übergeben."
+            },
+            {
+              "id": "rolle-abgeben",
+              "titel": "Rolle als Captain abgeben",
+              "text": "Willst du nicht mehr Captain oder Vertreter sein? Tippe beim Co-Team auf Rolle abgeben. Die Teamleitung vergibt sie dann neu."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "liga-captains",
+      "titel": "Liga für Captains",
+      "kurz": "Co-Team zur Liga anmelden, offene Punkte nachtragen, Termin ausmachen, einchecken, Ergebnis melden und bestätigen.",
+      "zielgruppe": "Für Captain und Vertreter",
+      "bereich": "liga",
+      "rollen": [
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "anmeldung",
+        "season",
+        "staffel",
+        "regelwerk",
+        "regeln",
+        "termin",
+        "verschieben",
+        "check-in",
+        "einchecken",
+        "ergebnis",
+        "bestätigen",
+        "protest",
+        "einspruch",
+        "veto",
+        "map",
+        "aufstellung",
+        "kader",
+        "teilnehmerliste"
+      ],
+      "abschnitte": [
+        {
+          "id": "anmelden",
+          "titel": "Co-Team anmelden",
+          "schritte": [
+            {
+              "id": "anmeldung-starten",
+              "titel": "Anmeldung starten",
+              "text": "Öffne die Ligaseite. Ist die Anmeldung offen, tippe auf Mit Co-Team anmelden.",
+              "hinweis": "Anmelden dürfen nur Captain und Vertreter eines Co-Teams. Fehlen beide, trägt die Teamleitung zuerst einen Captain ein. Läuft die Anmeldung nach dem Season-Start weiter, geht es genauso."
+            },
+            {
+              "id": "co-team-auswahl",
+              "titel": "Co-Team wählen",
+              "text": "Wähle das Co-Team, das mitspielen soll. Tippe auf Weiter."
+            },
+            {
+              "id": "passt-alles",
+              "titel": "Passt alles?",
+              "text": "Die Seite prüft euer Co-Team. Steht dort ein grüner Haken, geht die Anmeldung. Steht dort „So geht die Anmeldung noch nicht“, löst ihr das zuerst, zum Beispiel einen zu kleinen Kader."
+            },
+            {
+              "id": "offene-punkte",
+              "titel": "Offene Punkte",
+              "text": "Fehlt jemandem noch eine Angabe, steht sie darunter als Hinweis. Die Anmeldung geht trotzdem. Bis zum ersten Spiel muss es nachgetragen sein.",
+              "hinweis": "Wer dann noch etwas offen hat, kann nicht einchecken und nicht aufgestellt werden."
+            },
+            {
+              "id": "regelwerk",
+              "titel": "Regelwerk zustimmen",
+              "text": "Lies das Regelwerk. Hake an, dass du für dein Co-Team zustimmst. Dasselbe beim Datenschutz. Tippe auf Weiter."
+            },
+            {
+              "id": "einreichen",
+              "titel": "Anmeldung einreichen",
+              "text": "Prüf die Zusammenfassung und tippe auf Anmeldung einreichen. Je nach Season prüft die Liga-Leitung die Anmeldung, oder ihr seid gleich angemeldet. Die Zusammenfassung sagt dir, was gilt. Du bekommst eine Nachricht.",
+              "hinweis": "Werden Anmeldungen automatisch angenommen und ist ein Startplatz frei, steht danach Angemeldet da. Sind alle Plätze vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, außer es gibt nur eine Staffel."
+            },
+            {
+              "id": "stand",
+              "titel": "Stand und offene Punkte",
+              "text": "Den Stand eurer Anmeldung siehst du auf der Ligaseite. „Eingereicht“: Die Liga-Leitung prüft noch. „Angemeldet“: Ihr habt einen Startplatz. Steht „Zuteilung folgt“ dabei, fehlt nur noch die Staffel. Darunter stehen die offenen Punkte, bis alle erledigt sind.",
+              "hinweis": "Zurückziehen geht, bis die Liga-Leitung euch einer Staffel zuteilt. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange noch kein Spielplan steht."
+            }
+          ]
+        },
+        {
+          "id": "vor-dem-spiel",
+          "titel": "Vor dem ersten Spiel",
+          "schritte": [
+            {
+              "id": "nachtragen",
+              "titel": "Offene Punkte nachtragen",
+              "text": "Jeder Spieler trägt fehlende Angaben selbst im eigenen Profil ein. Das Geburtsdatum steht unter Grunddaten, Spiel-ID und Plattform unter Gaming. Schick deinen Spielern einfach den Link zur Hilfe.",
+              "hinweis": "Betroffene Spieler bekommen auch selbst eine Nachricht."
+            },
+            {
+              "id": "kader",
+              "titel": "Kader im Blick",
+              "text": "Unter Teams bei Deine Teams steht bei eurem Co-Team, wer spielen darf und was fehlt. Neue Spieler in den Kader nimmt die Teamleitung auf."
+            }
+          ]
+        },
+        {
+          "id": "termin",
+          "titel": "Termin ausmachen",
+          "schritte": [
+            {
+              "id": "matchseite",
+              "titel": "Die Matchseite",
+              "text": "Alles rund um ein Spiel läuft auf der Matchseite. Du kommst über die Ligaseite oder über die Benachrichtigung hin."
+            },
+            {
+              "id": "termin-vorschlagen",
+              "titel": "Termin vorschlagen",
+              "text": "Wähle unter Terminabstimmung Datum und Uhrzeit und tippe auf Vorschlagen. Die Gegenseite bekommt eine Nachricht.",
+              "hinweis": "Je nach Season gilt ein unbeantworteter Vorschlag der Heimseite nach einer Frist. Sie steht unter „So laufen Termine in dieser Season“. Sonst gilt ohne Einigung der Standardtermin."
+            },
+            {
+              "id": "termin-antworten",
+              "titel": "Auf einen Vorschlag antworten",
+              "text": "Hat die Gegenseite etwas vorgeschlagen? Nimm einen Vorschlag mit dem Haken an oder lehne ihn mit dem X ab. Du kannst auch einen Gegenvorschlag machen.",
+              "hinweis": "Antworte rechtzeitig. Sonst kann der Vorschlag der Heimseite gelten."
+            },
+            {
+              "id": "verschieben",
+              "titel": "Termin verschieben",
+              "text": "Steht der Termin schon fest, trag unter Termin und Verschiebung einen neuen Termin und einen Grund ein. Tippe auf Beantragen. Die Gegenseite muss zustimmen.",
+              "hinweis": "Bis zur Zustimmung gilt der alte Termin. Wie oft und bis wann das geht, steht direkt darüber."
+            }
+          ]
+        },
+        {
+          "id": "spieltag",
+          "titel": "Am Spieltag",
+          "schritte": [
+            {
+              "id": "check-in",
+              "titel": "Einchecken",
+              "text": "Kurz vor dem Termin öffnet der Check-in. Hake an, wer von euch da ist, und tippe auf Einchecken.",
+              "hinweis": "Grau heißt: Diese Person darf gerade nicht spielen. Der Grund steht daneben."
+            },
+            {
+              "id": "map-veto",
+              "titel": "Map-Veto",
+              "text": "Hat eure Season ein Map-Veto, kommt es nach dem Check-in beider Seiten. Ihr sperrt oder wählt abwechselnd Maps. Seid ihr dran, tippst du im markierten Modus eine Map-Karte an. Die Uhr zeigt, wie viel Zeit bleibt. Die Leiste darüber zeigt den ganzen Ablauf. Die Seite aktualisiert sich von selbst, der Zug der Gegenseite leuchtet kurz auf. Steht eine Map als Vorgabe der Woche da, hat die Liga-Leitung sie festgelegt. Die könnt ihr weder sperren noch wählen.",
+              "hinweis": "Nicht jede Season hat ein Veto. Ohne Veto fällt dieser Schritt weg. Fehlt die Vorgabe der Woche noch, wartet das Veto, bis die Liga-Leitung sie eingetragen hat. Gewertet wird dabei nichts. Danach tippen beide Seiten auf Bereit zum Veto. Die Seite zeigt, wer schon bereit ist. Erst wenn beide bereit sind, beginnt das Veto und läuft die Uhr."
+            },
+            {
+              "id": "spiel-starten",
+              "titel": "Spiel starten",
+              "text": "Sobald beide eingecheckt sind und das Veto fertig ist, falls es eins gibt, tippt eine Seite auf Spiel starten. Ab dann läuft die Spielzeit."
+            }
+          ]
+        },
+        {
+          "id": "im-spiel",
+          "titel": "Wenn im Spiel etwas passiert",
+          "schritte": [
+            {
+              "id": "vorfall-melden",
+              "titel": "Vorfall melden",
+              "text": "Fliegt jemand raus oder braucht ihr einen Rehost? Tippe auf der Matchseite auf Vorfall melden. Wähle die Map, was passiert ist und euren Vorschlag.",
+              "hinweis": "Je Map hat jedes Team einen Rehost oder eine technische Pause. Die Seite zählt mit. Ein MOSS-Absturz zählt nicht."
+            },
+            {
+              "id": "vorfall-antworten",
+              "titel": "Auf einen Vorfall antworten",
+              "text": "Meldet die Gegenseite einen Vorfall, bekommst du eine Nachricht. Auf der Matchseite läuft die Antwortzeit. Tippe auf Zustimmen oder Ablehnen.",
+              "hinweis": "Antwortet ihr nicht in der Zeit, entscheidet die Liga-Leitung. Wird eine Map neu gestartet oder wiederholt, meldet ihr die Serie danach neu."
+            },
+            {
+              "id": "in-klaerung",
+              "titel": "Map in Klärung",
+              "text": "Seid ihr euch nicht einig, ist die Map in Klärung. Die Liga-Leitung entscheidet. Bis dahin gilt kein Ergebnis. Hängt am Vorfall Screenshots oder einen Clip an.",
+              "hinweis": "Je nach Season spielt ihr unter Vorbehalt weiter oder die Serie pausiert. Das steht auf der Matchseite."
+            },
+            {
+              "id": "map-pause",
+              "titel": "Pause zwischen den Maps",
+              "text": "Pausiert ihr zwischen zwei Maps anders als üblich? Haltet es fest. Tippe auf Vorfall melden und wähle Pause zwischen den Maps. Niemand muss antworten."
+            }
+          ]
+        },
+        {
+          "id": "nach-dem-spiel",
+          "titel": "Nach dem Spiel",
+          "schritte": [
+            {
+              "id": "ergebnis-melden",
+              "titel": "Ergebnis melden",
+              "text": "Wähl für jede Map Modus und Map und trag die Punkte beider Seiten ein. Wer mehr Punkte hat, steht automatisch als Sieger da. Tippe dann auf Ergebnis melden.",
+              "hinweis": "Melden geht erst, wenn beide Seiten eingecheckt sind. Nur bei Gleichstand oder ohne Punkte tippst du den Sieger selbst an."
+            },
+            {
+              "id": "wer-hat-gespielt",
+              "titel": "Wer hat gespielt?",
+              "text": "Hake beim Melden an, wer bei euch gespielt hat. Das ist eure Teilnehmerliste.",
+              "hinweis": "In manchen Seasons wählst du stattdessen bei jeder Map „Deine Aufstellung“."
+            },
+            {
+              "id": "bestaetigen",
+              "titel": "Ergebnis bestätigen",
+              "text": "Hat die Gegenseite gemeldet, prüf ihr Ergebnis. Stimmt es, hake an, wer bei euch gespielt hat, und tippe auf Stimmt.",
+              "hinweis": "Antwortet ihr nicht, gilt die Meldung nach Ablauf der Frist der Season."
+            },
+            {
+              "id": "teilnehmerliste-nachtragen",
+              "titel": "Teilnehmerliste nachtragen",
+              "text": "Steht auf der Matchseite „Teilnehmerliste fehlt noch“, tragt ihr nach, wer gespielt hat. Das Ergebnis gilt schon.",
+              "hinweis": "Wer nicht auf der Liste steht, zählt nicht als Einsatz."
+            },
+            {
+              "id": "problem-melden",
+              "titel": "Problem melden (Protest)",
+              "text": "Stimmt etwas nicht? Tippe auf Stimmt nicht oder Problem melden. Wähle den Grund, schreib kurz dazu und häng bei Bedarf ein Foto an. Die Leitung entscheidet.",
+              "hinweis": "Einen eigenen Knopf „Protest“ gibt es nicht. Bis wann es geht, steht im Formular."
+            },
+            {
+              "id": "einspruch",
+              "titel": "Einspruch einlegen",
+              "text": "Passt euch eine Entscheidung der Liga-Leitung nicht? Tippe am Verfahren auf Einspruch einlegen und begründe ihn.",
+              "hinweis": "Einspruch geht einmal, innerhalb der Frist. Es entscheidet eine andere Person. Bis dahin gilt die Entscheidung weiter."
+            },
+            {
+              "id": "strafen",
+              "titel": "Strafen im Blick",
+              "text": "Verhängt die Liga-Leitung eine Strafe, bekommst du eine Nachricht. Unter Meine Strafen steht sie mit Grund und Frist.",
+              "hinweis": "Eine gesperrte Person ist beim Check-in grau. Die Sperre gilt auch während eines Einspruchs."
+            }
+          ]
+        },
+        {
+          "id": "saisonende",
+          "titel": "Am Ende der Season",
+          "schritte": [
+            {
+              "id": "abschluss",
+              "titel": "Endstand",
+              "text": "Sind alle Spiele entschieden, schließt die Liga-Leitung die Staffel ab. Dann steht der Endstand fest.",
+              "hinweis": "Protest und Einspruch gehören vor den Abschluss. Danach ändern sich Plätze und Punkte nicht mehr."
+            },
+            {
+              "id": "belohnungen",
+              "titel": "Belohnungen",
+              "text": "Mit dem Abschluss vergibt die Liga ihre Belohnungen nach eurem Platz. Ihr seht sie an der Teamseite und im Profil.",
+              "hinweis": "Spieler-Belohnungen bekommt, wer mindestens ein Spiel gespielt hat. Kampflose Spiele zählen nicht."
+            },
+            {
+              "id": "neue-season",
+              "titel": "Neue Season",
+              "text": "Legt die Liga-Leitung die nächste Season an, ist euer Co-Team automatisch dabei. Wollt ihr nicht, tippt auf Abmelden.",
+              "hinweis": "Abmelden geht bis zum Start der Season. Gibt es eine neue Fassung des Regelwerks, stimmt ihr vor dem ersten Spiel zu."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "turniere",
+      "titel": "Turniere",
+      "kurz": "Zum Turnier anmelden, einchecken, Ergebnis melden und den Turnierbaum lesen.",
+      "zielgruppe": "Für alle Spieler",
+      "bereich": "turniere",
+      "rollen": [
+        "spieler",
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "suchbegriffe": [
+        "turnier",
+        "cup",
+        "anmeldung",
+        "check-in",
+        "einchecken",
+        "ergebnis",
+        "bracket",
+        "turnierbaum",
+        "runde",
+        "warteliste"
+      ],
+      "abschnitte": [
+        {
+          "id": "anmeldung",
+          "titel": "Anmelden",
+          "schritte": [
+            {
+              "id": "anmelden",
+              "titel": "Zum Turnier anmelden",
+              "text": "Öffne das Turnier und tippe auf Jetzt anmelden. Bei Teamturnieren heißt der Knopf Team anmelden.",
+              "hinweis": "Ein Team anmelden kann nur die Teamleitung oder Co-Leitung."
+            },
+            {
+              "id": "anmeldung-pruefen",
+              "titel": "Prüfen und verbindlich anmelden",
+              "text": "Im Fenster stehen Start, Check-in und die wichtigsten Regeln. Prüf alles und tippe auf Verbindlich anmelden.",
+              "hinweis": "Ist das Turnier voll, heißt der Knopf Auf die Warteliste."
+            },
+            {
+              "id": "dein-stand",
+              "titel": "Dein Stand",
+              "text": "Danach zeigt die Turnierseite die Karte Dein Stand. Dort siehst du, ob du dabei bist und wann der Check-in ist."
+            }
+          ]
+        },
+        {
+          "id": "check-in-turnier",
+          "titel": "Einchecken",
+          "bereich": "turniertag",
+          "schritte": [
+            {
+              "id": "einchecken",
+              "titel": "Check-in",
+              "text": "Während des Check-ins tippst du auf der Turnierseite auf Check-in. Bei Teamturnieren checkt die Teamleitung oder Co-Leitung ein.",
+              "hinweis": "Bei Turnieren vor Ort checkst du bei der Turnierleitung ein."
+            }
+          ]
+        },
+        {
+          "id": "ergebnis",
+          "titel": "Ergebnis",
+          "schritte": [
+            {
+              "id": "ergebnis-melden",
+              "titel": "Ergebnis melden",
+              "text": "Öffne nach dem Spiel dein Match. Stell mit Plus und Minus den Spielstand ein und tippe auf Ergebnis melden.",
+              "hinweis": "Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung."
+            },
+            {
+              "id": "ergebnis-bestaetigen",
+              "titel": "Ergebnis bestätigen",
+              "text": "Hat die Gegenseite zuerst gemeldet, steht ihr Ergebnis da. Tippe auf Stimmt oder auf Stimmt nicht.",
+              "hinweis": "Bei Online-Turnieren gilt die Meldung nach einer kurzen Frist, wenn du nicht widersprichst. Vor Ort bestätigt die Turnierleitung."
+            }
+          ]
+        },
+        {
+          "id": "baum-lesen",
+          "titel": "Turnierbaum lesen",
+          "schritte": [
+            {
+              "id": "turnierbaum",
+              "titel": "Dein Spiel im Turnierbaum",
+              "text": "Unter Turnierbaum siehst du alle Runden. Dein Spiel ist hervorgehoben und mit „Du“ markiert. Der Sieger steht fett."
+            },
+            {
+              "id": "weg-zeigen",
+              "titel": "Weg durch den Baum",
+              "text": "Tippe auf einen Namen, dann leuchtet sein Weg durch alle Runden auf. Am Handy blätterst du mit den Pfeilen von Runde zu Runde."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
