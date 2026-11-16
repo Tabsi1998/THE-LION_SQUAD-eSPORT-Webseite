@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -12,6 +12,10 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { OpsEventsTab } = await import("./OpsEventsTab");
+const { ConfirmDialogProvider } = await import("@/components/tls/ConfirmDialog");
+
+// Quittieren (#2447) fragt über die Rückfrage der Seite nach - die steht in der App ganz außen.
+const page = (path = "/admin/ops?tab=events") => <ConfirmDialogProvider><MemoryRouter initialEntries={[path]}><OpsEventsTab /></MemoryRouter></ConfirmDialogProvider>;
 
 const PAYLOAD = {
   items: [
@@ -32,7 +36,7 @@ beforeEach(() => {
 
 test("zeigt Ereignisse aller Quellen, schickt Filter an den Server und hält die Quelle in der Adresse", async () => {
   const user = userEvent.setup();
-  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  render(page("/admin/ops?tab=events"));
   expect(await screen.findByTestId("ops-event-server")).toHaveTextContent("KeyError");
   expect(screen.getByTestId("ops-event-audit")).toHaveTextContent("user.role.change");
   expect(screen.getByTestId("ops-events-problems")).toHaveTextContent("1 auffällige");
@@ -47,20 +51,20 @@ test("zeigt Ereignisse aller Quellen, schickt Filter an den Server und hält die
 });
 
 test("die Quelle aus der Adresse gilt beim Laden (Umleitung der alten Audit-Seite)", async () => {
-  render(<MemoryRouter initialEntries={["/admin/ops?tab=events&source=email"]}><OpsEventsTab /></MemoryRouter>);
+  render(page("/admin/ops?tab=events&source=email"));
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/ops/events", { params: expect.objectContaining({ source: "email" }) }));
 });
 
 // Versand-Routing (#627): ab zwei Discord-Servern lässt sich das Protokoll nach Server filtern, sonst gibt es den Filter nicht.
 test("Discord-Meldungen nach Server filtern, erst ab zwei Servern", async () => {
   const user = userEvent.setup();
-  const { unmount } = render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  const { unmount } = render(page("/admin/ops?tab=events"));
   await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
   expect(screen.queryByTestId("ops-events-guild")).toBeNull();
   unmount();
 
   apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, guilds: [{ guild_id: "111", name: "LION (Hauptserver)" }, { guild_id: "222", name: "CoD-Server" }] } });
-  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  render(page("/admin/ops?tab=events"));
   await user.selectOptions(await screen.findByTestId("ops-events-guild"), "222");
   await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/ops/events", { params: expect.objectContaining({ guild: "222" }) }));
 });
@@ -72,7 +76,7 @@ test("eine fehlgeschlagene Discord-Meldung lässt sich erneut senden", async () 
     time: "2026-09-24T21:00:00Z", title: "news", subtitle: "discord · LION", detail: "Missing Access", resendable: true };
   apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [discord, PAYLOAD.items[0]] } });
   apiMock.post.mockResolvedValue({ data: { ok: true } });
-  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  render(page("/admin/ops?tab=events"));
   expect(screen.queryByTestId("ops-event-resend-e1")).toBeNull();
   await user.click(await screen.findByTestId("ops-event-resend-d1"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/discord/resend/d1"));
@@ -84,8 +88,58 @@ test("klappt das erneute Senden nicht, steht der Grund in der Meldung", async ()
   const user = userEvent.setup();
   apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [{ ...PAYLOAD.items[0], id: "d2", source: "email", resendable: true }] } });
   apiMock.post.mockResolvedValue({ data: { ok: false, error: "Der Bot darf in diesem Kanal nicht schreiben." } });
-  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  render(page("/admin/ops?tab=events"));
   await user.click(await screen.findByTestId("ops-event-resend-d2"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Der Bot darf in diesem Kanal nicht schreiben."));
 });
 
+// Quittieren (#2447): „Quittierte zeigen“ und „Nur offene“ gehen an den Server und stehen in der Adresse; quittierte und
+// von selbst erledigte Einträge sagen, von wem bzw. wann; „Alle quittieren“ gilt für die gewählte Quelle.
+test("Quittierte zeigen und Nur offene schicken den Stand an den Server", async () => {
+  const user = userEvent.setup();
+  render(page());
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
+  await user.click(screen.getByTestId("ops-events-show-acked"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/ops/events", { params: expect.objectContaining({ state: "all" }) }));
+  expect(screen.getByTestId("ops-events-show-acked")).toHaveAttribute("aria-pressed", "true");
+  await user.click(screen.getByTestId("ops-events-only-open"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/ops/events", { params: expect.objectContaining({ state: "open" }) }));
+  expect(screen.getByTestId("ops-events-show-acked")).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByTestId("ops-events-only-open"));
+  await waitFor(() => expect(apiMock.get.mock.lastCall[1].params.state).toBeUndefined());
+});
+
+test("der Tipp auf eine Kachel kommt mit state=open an, leer heißt Alles erledigt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [], sources: PAYLOAD.sources.map((row) => ({ ...row, problem_count: 0 })) } });
+  render(page("/admin/ops?tab=events&source=server&state=open"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/ops/events", { params: expect.objectContaining({ source: "server", state: "open" }) }));
+  expect(await screen.findByTestId("ops-events-empty")).toHaveTextContent("Alles erledigt");
+  expect(screen.queryByTestId("ops-events-ack-all")).toBeNull();
+});
+
+test("quittierte und behobene Einträge sagen von wem bzw. wann, nur offene haben den Knopf", async () => {
+  const acked = { ...PAYLOAD.items[0], id: "q1", ack_id: "f1", open: false, ackable: false, acknowledged_at: "2026-11-16T08:00:00Z", acknowledged_by: "Obmann" };
+  const fixed = { id: "ep1", source: "checks", source_label: "Auto-Checks", severity: "warn", status: "warn", time: "2026-11-13T08:00:00Z", title: "Auto-Checks gelb",
+    open: false, ackable: false, resolved_at: "2026-11-13T09:30:00Z", resolved_label: "behoben" };
+  const open = { ...PAYLOAD.items[0], id: "o1", ack_id: "f2", open: true, ackable: true };
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [open, acked, fixed] } });
+  render(page("/admin/ops?tab=events&state=all"));
+  expect(await screen.findByTestId("ops-event-state-q1")).toHaveTextContent("Quittiert von Obmann · 16.11.2026");
+  expect(screen.getByTestId("ops-event-state-ep1")).toHaveTextContent("Behoben um 13.11.2026");
+  expect(screen.getByTestId("ops-event-ack-o1")).toBeInTheDocument();
+  expect(screen.queryByTestId("ops-event-ack-q1")).toBeNull();
+  expect(screen.queryByTestId("ops-event-ack-ep1")).toBeNull();
+});
+
+test("Alle quittieren gilt für die gewählte Quelle und fragt vorher in der Seite", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValue({ data: { acknowledged: { server: 1 }, total: 1 } });
+  render(page("/admin/ops?tab=events&source=server"));
+  await user.click(await screen.findByTestId("ops-events-ack-all"));
+  const dialog = await screen.findByTestId("confirm-dialog");
+  expect(dialog).toHaveTextContent("1 Eintrag quittieren?");
+  expect(dialog).toHaveTextContent("Serverfehler");
+  await user.click(within(dialog).getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/ops/events/ack-all", { sources: ["server"] }));
+  expect(toastMock.success).toHaveBeenCalledWith("1 Eintrag quittiert.");
+});
