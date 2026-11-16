@@ -178,10 +178,10 @@ function Ways({ tournament }) {
 export function StaffelOverviewTab({ tournament, registrations, matches, onStatus, onReload }) {
   const navigate = useNavigate();
   const primaryRef = useRef(null);
-  // Ein Schritt des Liga-Ablaufs führt an seine Stelle: „Liga starten“ zum Knopf auf dieser Seite, Zuteilen zum Reiter Teilnehmer,
-  // was es hier noch nicht gibt, in die Turnierverwaltung.
+  // Ein Schritt des Liga-Ablaufs führt an seine Stelle: „Liga starten“ vor dem Start zum Knopf auf dieser Seite (danach zum Spielplan),
+  // Zuteilen zum Reiter Teilnehmer, Spieltage zu Spiele und Ergebnisse, Tabelle zur Tabelle.
   const onStep = (key) => {
-    if (key === "matchplan") {
+    if (key === "matchplan" && staffelBeforeStart(tournament)) {
       document.getElementById("staffel-status")?.scrollIntoView?.({ block: "center" });
       primaryRef.current?.focus();
       return;

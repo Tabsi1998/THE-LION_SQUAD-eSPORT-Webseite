@@ -85,7 +85,7 @@ test("Kopf mit Brotkrumen Liga › Season › Liga 1 · Staffel A, Stand und nur
   expect(crumbs).toHaveTextContent("Probe-Liga · Season 1");
   expect(screen.getByTestId("staffel-stand")).toBeInTheDocument();
   const tabs = within(screen.getByTestId("staffel-tabs")).getAllByRole("tab").map((tab) => tab.textContent);
-  expect(tabs).toEqual(["Überblick", "Teilnehmer"]);
+  expect(tabs).toEqual(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle"]);
 });
 
 test("Überblick: Liga-Ablauf, was fehlt mit Weg auf diese Seite, Zahlen und die Wege zu Leitstand, Season und Ligaseite", async () => {
@@ -99,7 +99,7 @@ test("Überblick: Liga-Ablauf, was fehlt mit Weg auf diese Seite, Zahlen und die
   expect(screen.getByTestId("staffel-public-open")).toHaveAttribute("href", "/liga/probe-liga/season-1");
 });
 
-test("Überblick: der Schritt Spieltage führt noch in die Turnierverwaltung, Co-Teams zuteilen auf diese Seite", async () => {
+test("Überblick: die Schritte des Liga-Ablaufs führen auf diese Seite - Zuteilen, Spieltage und Tabelle", async () => {
   const user = userEvent.setup();
   renderPage();
   await user.click(await screen.findByTestId("flow-step-assign"));
@@ -107,7 +107,11 @@ test("Überblick: der Schritt Spieltage führt noch in die Turnierverwaltung, Co
   expect(await screen.findByTestId("staffel-panel-teilnehmer")).toBeInTheDocument();
   await user.click(screen.getByTestId("staffel-tab-ueberblick"));
   await user.click(await screen.findByTestId("flow-step-matchdays"));
-  expect(screen.getByTestId("where")).toHaveTextContent("/admin/tournaments/t1");
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/staffeln/t1#spiele");
+  expect(await screen.findByTestId("staffel-panel-spiele")).toBeInTheDocument();
+  await user.click(screen.getByTestId("staffel-tab-ueberblick"));
+  await user.click(await screen.findByTestId("flow-step-table"));
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/staffeln/t1#tabelle");
 });
 
 test("„Liga starten“ fragt wie die Turnierverwaltung nach Hinweisen der Planung und setzt dann Live", async () => {
