@@ -91,9 +91,15 @@ def test_image_sizes_stay_the_same():
     assert _size(result_share.render(result, "wide")) == share_image.WIDE
 
 
-def test_a_space_the_font_lacks_counts_as_missing():
+def test_a_space_the_font_lacks_counts_as_missing(monkeypatch):
+    """Leerzeichen werden wie jedes Zeichen geprüft (nicht übersprungen). Ob eine bestimmte Schrift U+2009 hat, hängt von
+    FreeType bzw. Rechner ab (CI unter Linux anders als Windows, PR #2476) - darum ohne plattformabhängigen Golden-Wert:
+    ein Leerzeichen, dessen Bild dem „fehlt“-Kästchen gleicht, zählt als fehlend."""
     assert share_image.has_glyph(True, " ") and share_image.has_glyph(False, "\u00a0")
-    assert not share_image.has_glyph(True, "\u2009"), "das schmale Leerzeichen fehlt - sonst stünde ein Kästchen da"
+    _probe, missing = share_image._probe(True)
+    real = share_image._glyph_print
+    monkeypatch.setattr(share_image, "_glyph_print", lambda font, char: missing if char == "\u2009" else real(font, char))
+    assert not share_image.has_glyph(True, "\u2009"), "ein fehlendes Leerzeichen muss als fehlend gelten - sonst stünde ein Kästchen da"
 
 
 def test_the_separator_has_air_on_both_sides():
