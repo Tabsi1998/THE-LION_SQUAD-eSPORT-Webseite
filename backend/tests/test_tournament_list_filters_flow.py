@@ -100,3 +100,39 @@ async def test_paged_list_names_the_games_with_tournaments_for_the_chips(flow):
         {"id": "g-mk", "slug": "mario-kart", "name": "Mario Kart World"},
         {"id": "g-ssb", "slug": "smash", "name": "Super Smash Bros."},
     ], "nur Spiele mit Turnieren - auch wenn gerade nach einem Spiel gefiltert ist"
+
+
+# ---------------------------------------------------------------- Review #1276
+
+@pytest.mark.asyncio
+async def test_game_chips_follow_the_visibility_of_the_list(flow):
+    await seed(flow)
+    await flow.db.games.insert_one({"id": "g-club", "slug": "vereinsspiel", "name": "Vereinsspiel"})
+    await flow.create_tournament(id="t-club", slug="cup-club", game_id="g-club", status="registration_open",
+                                 visibility="members")
+    await flow.create_tournament(id="t-hidden", slug="cup-hidden", game_id="g-leer", status="registration_open",
+                                 is_public=False)
+
+    flow.act_as(None)
+    guest = (await flow.get("/api/tournaments", params={"compact": "true", "paged": "true", "league": "exclude"})).json()
+    assert [game["slug"] for game in guest["games"]] == ["mario-kart", "smash"], "keine Chips für Unsichtbares"
+
+    player = await flow.add_user(name="Mitspielerin")
+    await flow.db.tournament_registrations.insert_one(
+        {"id": "r-club", "tournament_id": "t-club", "user_id": player["id"], "status": "approved"})
+    flow.act_as(player)
+    own = (await flow.get("/api/tournaments", params={"compact": "true", "paged": "true", "league": "exclude"})).json()
+    assert "vereinsspiel" in [game["slug"] for game in own["games"]], "eigene Turniere zählen immer"
+
+
+@pytest.mark.asyncio
+async def test_games_only_on_the_first_page_old_slugs_and_a_length_limit(flow):
+    await seed(flow)
+    await flow.db.games.update_one({"id": "g-mk"}, {"$set": {"slug_history": ["mk8"]}})
+    flow.act_as(None)
+
+    later = (await flow.get("/api/tournaments", params={"compact": "true", "paged": "true", "offset": 1})).json()
+    assert "games" not in later
+    assert await ids(flow, game="mk8") == {"t-mk-local", "t-mk-online"}, "ein alter Kurzname aus einem Link"
+    too_long = await flow.get("/api/tournaments", params={"game": "x" * 121})
+    assert too_long.status_code == 422

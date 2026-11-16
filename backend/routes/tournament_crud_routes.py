@@ -3,7 +3,7 @@
 import hashlib
 import json
 from typing import Literal
-from fastapi import HTTPException, Depends, Request
+from fastapi import HTTPException, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
@@ -209,10 +209,30 @@ def _mode_query(mode: str) -> dict:
     return {"event_mode": {"$ne": "local"}}
 
 
-async def _games_with_tournaments(db, league: str) -> list[dict]:
-    """Die Spiele für die Chips der Turnierliste (#1276): nur Spiele mit öffentlichen Turnieren, ohne Entwürfe."""
-    game_ids = await db.tournaments.distinct("game_id", {
-        "status": {"$ne": "draft"}, "is_public": {"$ne": False}, "game_id": {"$nin": [None, ""]}, **league_filter(league)})
+async def _games_with_tournaments(db, user, league: str, *, is_admin: bool, own_ids) -> list[dict]:
+    """Die Spiele für die Chips der Turnierliste (#1276): nur Spiele mit Turnieren, die diese Person in der Liste sehen
+    kann - dieselbe Sichtbarkeit wie die Liste (Review): ohne Entwürfe, ohne versteckte, ohne fremde Mitglieder-Turniere.
+    Eigene (angemeldet oder als Helfer eingesetzt) zählen immer."""
+    rows = await db.tournaments.find(
+        {"status": {"$ne": "draft"}, "game_id": {"$nin": [None, ""]}, **league_filter(league)},
+        {"_id": 0, "id": 1, "game_id": 1, "visibility": 1, "is_public": 1, "league_context": 1},
+    ).to_list(5000)
+    check = user_can_see if is_admin else lead_can_see
+    allowed: dict[str, bool] = {}
+    game_ids: set[str] = set()
+    for row in rows:
+        if row["game_id"] in game_ids:
+            continue
+        if row.get("id") in own_ids or (is_admin and not is_league_staffel(row)):
+            game_ids.add(row["game_id"])
+            continue
+        if row.get("is_public") is False:
+            continue
+        visibility = row.get("visibility") or "public"
+        if visibility not in allowed:
+            allowed[visibility] = bool(await check(user, visibility))
+        if allowed[visibility]:
+            game_ids.add(row["game_id"])
     games = await db.games.find({"id": {"$in": sorted(game_ids)}}, {"_id": 0, "id": 1, "slug": 1, "name": 1}).to_list(200)
     return sorted(({"id": game["id"], "slug": game.get("slug"), "name": game.get("name")} for game in games),
                   key=lambda game: str(game.get("name") or "").lower())
@@ -224,7 +244,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                            offset: int = 0, paged: bool = False, compact: bool = False,
                            include_drafts: bool = False, managed: bool = False,
                            league: Literal["include", "exclude", "only"] = "include",
-                           game: str | None = None, mode: Literal["online", "local"] | None = None,
+                           game: str | None = Query(default=None, max_length=120),
+                           mode: Literal["online", "local"] | None = None,
                            mine: bool = False,
                            user=Depends(get_optional_user)):
     """``league`` (docs/LIGA.md): ``include`` (Vorgabe - die App ohne neuen Build sieht Staffeln als Turniere),
@@ -267,7 +288,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     q.update(league_filter(league))
     narrowing = []
     if game:
-        found = await db.games.find_one({"slug": game}, {"_id": 0, "id": 1})
+        # Auch ein alter Kurzname aus einem geteilten Link findet das Spiel (Review #1276).
+        found, _renamed = await find_by_slug_or_history(db.games, game, {"_id": 0, "id": 1})
         narrowing.append({"game_id": found["id"]} if found else {"id": {"$in": []}})
     if mode:
         narrowing.append(_mode_query(mode))
@@ -333,8 +355,13 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         items = [_compact_tournament(t) for t in tournaments]
         if not paged:
             return items
-        return {"items": items, "total": total, "limit": page_limit, "offset": page_offset,
-                "games": await _games_with_tournaments(db, league)}
+        page = {"items": items, "total": total, "limit": page_limit, "offset": page_offset}
+        if page_offset == 0:
+            # Die Chips braucht nur die erste Seite (Review #1276) - „Mehr laden“ fragt ab 0 mit größerem limit.
+            page["games"] = await _games_with_tournaments(
+                db, user, league, is_admin=is_admin,
+                own_ids={*participant_visible_ids, *assigned_visible_ids, *(assigned_ids if is_admin else [])})
+        return page
     return tournaments
 
 
