@@ -78,8 +78,21 @@ export default function TournamentSchedulePage() {
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
     const current = () => slugRef.current === slug;
-    const { data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig);
-    const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig);
+    // Scheitert schon das Turnier oder der Baum (WLAN ohne Internet, Server), gilt der Stand der Warteschlange als alt:
+    // „Letzter Stand vor X s“ und nach 3 Minuten weg - wie bei einem gescheiterten Abruf der Warteschlange (#2440).
+    const markFailing = (err) => {
+      if (!current() || queueGoneError(err)) return;
+      setQueueState((prev) => (prev.slug === slug ? { ...prev, failing: true } : { slug, view: null, okAt: 0, failing: true }));
+    };
+    let tournament;
+    let bracket;
+    try {
+      ({ data: tournament } = await api.get(`/tournaments/${slug}`, accessConfig));
+      ({ data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, accessConfig));
+    } catch (err) {
+      markFailing(err);
+      return;
+    }
     if (!current()) return;
     setData(bracket);
     // Spielwochen gibt es nur bei Liga, Round Robin und Gruppen. Schlägt der
@@ -99,7 +112,7 @@ export default function TournamentSchedulePage() {
     } catch (err) {
       if (!current()) return;
       if (queueGoneError(err)) setQueueState({ slug, view: null, okAt: Date.now(), failing: false });
-      else setQueueState((prev) => (prev.slug === slug ? { ...prev, failing: true } : { slug, view: null, okAt: 0, failing: true }));
+      else markFailing(err);
     }
   }, [slug, accessToken]);
 

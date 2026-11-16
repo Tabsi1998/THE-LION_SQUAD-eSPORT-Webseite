@@ -230,6 +230,42 @@ test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“
   }
 });
 
+// #2440 (Nachprüfung): Scheitert schon der Baum (WLAN ohne Internet), gilt der Stand der Warteschlange als alt - mit
+// Hinweis und nach 3 Minuten weg.
+test("scheitert schon /bracket, zeigt der Spielplan „Letzter Stand“ und blendet die Warteschlange nach 3 Minuten aus", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const set = generated.onsite;
+  const live = set.bracket.matches_v2.find((match) => match.status === "in_progress");
+  const queue = {
+    applies: true, summary: null, matches: {},
+    stations: [{ id: live.station_id, name: "PC 1", station_text: "PC 1", status: "busy", waiting: 0,
+      running: { match_id: live.id, state: "running", names: ["NeonFalke", "PixelPaula"], label: "Viertelfinale", started_at: "2026-10-31T16:00:00Z", duration_minutes: 30 }, next: null, after: null }],
+  };
+  let bracketDown = false;
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === `/tournaments/${set.tournament.id}/bracket`) return bracketDown ? Promise.reject(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" })) : Promise.resolve({ data: set.bracket });
+    if (String(path).endsWith("/matchdays")) return Promise.resolve({ data: { applies: false, matchdays: [] } });
+    if (path === `/tournaments/${set.tournament.id}/live-queue`) return Promise.resolve({ data: queue });
+    return Promise.reject(new Error(path));
+  });
+  const earlier = new Set(refreshes);
+  renderSchedule();
+  await user.click(await screen.findByTestId("schedule-view-stations"));
+  expect(await screen.findByTestId(`schedule-now-${live.station_id}`)).toHaveTextContent("NeonFalke gegen PixelPaula");
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+  try {
+    bracketDown = true;
+    // Alles, was diese Seite im Takt lädt.
+    await act(async () => { await Promise.all([...refreshes].filter((load) => !earlier.has(load)).map((load) => Promise.resolve(load()).catch(() => {}))); });
+    expect(screen.getByTestId("schedule-live-stale")).toHaveTextContent("Letzter Stand vor");
+    act(() => { vi.advanceTimersByTime(3 * 60 * 1000 + 1000); });
+    expect(screen.queryByTestId(`schedule-now-${live.station_id}`)).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 // #2440 (Review): Nach einem Turnierwechsel zeigt der Spielplan nicht die Stationen des vorigen Turniers - auch nicht,
 // wenn der erste Abruf der Warteschlange des neuen scheitert.
 test("Turnierwechsel: scheitert der erste Abruf des neuen Turniers, bleibt nichts vom vorigen stehen", async () => {
