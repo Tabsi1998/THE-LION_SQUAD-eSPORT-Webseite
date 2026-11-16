@@ -95,12 +95,29 @@ def _eligible(award: dict, since: datetime | None, horizon: datetime | None) -> 
     return bool(horizon and earned and earned > horizon)
 
 
+def _candidates(since: datetime | None, horizon: datetime | None) -> list[dict]:
+    """Vorfilter in der Datenbank: nur was nach ``since`` angelegt wurde oder ab dem Tag des ``horizon`` vergeben ist - der
+    Altbestand bleibt draußen. Genau entscheidet danach ``_eligible``; ISO-Texte vergleicht die Datenbank nur grob (ab
+    dem Tag), Zeitpunkte als Datum nimmt sie ganz mit."""
+    either = []
+    if since:
+        either.append({"_id": {"$gte": ObjectId.from_datetime(since.replace(microsecond=0))}})
+    if horizon:
+        either.append({"earned_at": {"$gte": horizon.astimezone(timezone.utc).date().isoformat()}})
+        either.append({"earned_at": {"$type": "date"}})
+    return either
+
+
 async def _unseen_codes(db, user_id: str, row: dict) -> list[str]:
     since, horizon = parse_time(row.get("since")), parse_time(row.get("horizon"))
+    either = _candidates(since, horizon)
+    if not either:
+        return []
     # Umgezogene Vergaben (Katalog-Migration, ``migrated_at``) bekommen eine neue _id, sind aber alte Erfolge - nie feiern.
     query = {"user_id": user_id, "ceremony_seen_at": {"$exists": False}, "silent": {"$ne": True}, "recount": {"$ne": True},
-             "migrated_at": {"$exists": False}}
-    awards = await db.user_achievements.find(query, {"tier_code": 1, "earned_at": 1}).to_list(2000)
+             "migrated_at": {"$exists": False}, "$or": either}
+    cursor = db.user_achievements.find(query, {"tier_code": 1, "earned_at": 1}).sort("earned_at", -1)
+    awards = await cursor.to_list(2000)
     fresh = [award for award in awards if award.get("tier_code") and _eligible(award, since, horizon)]
     fresh.sort(key=lambda award: parse_time(award.get("earned_at")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return [str(award["tier_code"]) for award in fresh[:MAX_UNSEEN]]
@@ -187,9 +204,10 @@ async def import_device(db, user_id: str, *, seen_until=None, level=None, recoun
         known = parse_time(row.get("horizon"))
         if known is None or until < known:
             await db.ceremony_seen.update_one({"user_id": user_id}, {"$set": {"horizon": stamp}})
+        # Alles, was das Gerät bis ``until`` gezeigt hat, gilt als gesehen - ohne Obergrenze, auch unter dem ``horizon``:
+        # meldet später ein Gerät mit älterem Stand, darf das hier Gesehene nicht wieder auftauchen.
         query = {"user_id": user_id, "ceremony_seen_at": {"$exists": False}}
-        awards = await db.user_achievements.find(query, {"_id": 0, "tier_code": 1, "earned_at": 1}).to_list(2000)
-        older = [award["tier_code"] for award in awards
+        older = [award["tier_code"] async for award in db.user_achievements.find(query, {"_id": 0, "tier_code": 1, "earned_at": 1})
                  if award.get("tier_code") and (parse_time(award.get("earned_at")) or now) <= until]
         for start in range(0, len(older), MAX_CODES):
             await _mark_codes(db, user_id, older[start:start + MAX_CODES])

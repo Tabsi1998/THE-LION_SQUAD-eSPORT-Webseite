@@ -253,3 +253,33 @@ async def test_recount_markers_keep_the_newest(flow):
     assert markers[-5:] == [f"neu-{n}" for n in range(5)]
     stored = await flow.db.ceremony_seen.find_one({"user_id": person["id"]})
     assert len(stored["recount_seen"]) == achievement_ceremony.MAX_MARKERS
+
+
+async def old_awards(flow, person, count, past):
+    rows = []
+    for n in range(count):
+        oid = ObjectId(ObjectId.from_datetime(past).binary[:4] + os.urandom(8))
+        rows.append({"_id": oid, "id": f"{person['id']}-alt-{n}", "user_id": person["id"], "tier_code": f"alt_{n}", "group_code": "alt",
+                     "earned_at": past.isoformat()})
+    await flow.db.user_achievements.insert_many(rows)
+
+
+@pytest.mark.asyncio
+async def test_many_old_awards_do_not_hide_a_new_one(flow):
+    """Viele Altvergaben ohne ceremony_seen_at: die Abfrage filtert sie in der Datenbank, die neue geht nicht unter."""
+    past = datetime.now(timezone.utc) - timedelta(days=30)
+    person = await flow.add_user()
+    await old_awards(flow, person, 2100, past)
+    await start(flow, person)
+    await award(flow, person, "neu_1")
+    assert (await state(flow, person))["unseen"] == ["neu_1"]
+
+    # Kannte ein Gerät einen Stand von vor 31 Tagen, holt die Sammel-Zeremonie die alten nach - höchstens MAX_UNSEEN,
+    # die neueste vorne.
+    other = await flow.add_user()
+    await old_awards(flow, other, 2100, past)
+    await start(flow, other, seen_until=(past - timedelta(days=1)).isoformat())
+    await award(flow, other, "neu_1")
+    unseen = (await state(flow, other))["unseen"]
+    assert unseen[0] == "neu_1"
+    assert len(unseen) == achievement_ceremony.MAX_UNSEEN
