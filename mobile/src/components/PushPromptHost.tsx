@@ -4,10 +4,11 @@ import { Animated, Modal, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../auth/AuthContext";
 import { whenFriendsHintClosed } from "../lib/friendsHint";
+import { anyModalOpen, whenNoModalOpen } from "../lib/modalGate";
 import { motionEasing } from "../lib/motion";
 import { isGuestUser } from "../live";
 import { askPushPermission, getPushPermission } from "../notifications/PushService";
-import { onPushPrompt, shouldAskForPush } from "../notifications/pushPrompt";
+import { isPushAsked, onPushPrompt, shouldAskForPush, type PushPromptReason } from "../notifications/pushPrompt";
 import { useSeasonOverlay } from "../seasons/anchors";
 import { colors, motion, radius } from "../theme";
 import { Button } from "./Button";
@@ -17,7 +18,9 @@ import { Body, Heading, Muted } from "./Text";
 // „Sollen wir dich rufen, wenn du dran bist?“ (#1208): die eigene Erklärung vor der Frage von Android - ein Blatt von unten
 // wie „Spielst du auch mit?“, nach einer Turnier- oder Event-Anmeldung (oder beim nächsten Öffnen, wenn das Team
 // angemeldet wurde; lib: notifications/pushPrompt). Erst „Ja, rufen“ ruft die Frage des Systems auf. „Später“ und Zurück
-// schließen still - gefragt wird erst bei der nächsten Anmeldung wieder. Ein offener Freunde-Hinweis geht vor.
+// schließen still - gefragt wird erst bei der nächsten Anmeldung wieder. Ein offener Freunde-Hinweis und andere Fenster
+// (Abstimmung, Belohnung, Zeremonie, Passkey, „Spielst du auch mit?“, lib/modalGate) gehen vor. Die Zeile über der Frage
+// sagt den Anlass: die eigene Anmeldung oder das angemeldete Team.
 // Bewegung: Das Blatt steigt auf (Verschieben und Deckkraft), die drei Zeilen staffeln, die Glocke leuchtet einmal auf;
 // mit „Bewegung reduzieren“ steht alles sofort.
 
@@ -28,15 +31,23 @@ export const PUSH_PROMPT_LINES: { icon: keyof typeof Ionicons.glyphMap; title: s
   { icon: "trophy-outline", title: "Ergebnis", text: "Dein Ergebnis steht fest." },
 ];
 
+/** Die Zeile über der Frage, je nach Anlass. */
+export const PUSH_PROMPT_EYEBROW: Record<PushPromptReason, string> = {
+  own: "NACH DEINER ANMELDUNG",
+  team: "DEIN TEAM IST ANGEMELDET",
+};
+
 const RISE_PX = 24;
+/** Nach dem Schließen eines anderen Fensters kurz Luft lassen, bevor das Blatt kommt. */
+export const AFTER_MODAL_MS = 350;
 
 export function PushPromptHost() {
   const { user } = useAuth();
   const userId = user && !isGuestUser(user) ? user.id : null;
   const userRef = useRef(userId);
   userRef.current = userId;
-  const [open, setOpen] = useState(false);
-  const openRef = useRef(false);
+  const [open, setOpen] = useState<PushPromptReason | null>(null);
+  const openRef = useRef<PushPromptReason | null>(null);
   openRef.current = open;
   const [busy, setBusy] = useState(false);
 
@@ -45,21 +56,25 @@ export function PushPromptHost() {
     if (!askedFor) return;
     void (async () => {
       await request.after;
-      // Nie zwei Fragen übereinander: erst den Freunde-Hinweis beantworten lassen.
+      // Nie zwei Fragen übereinander: erst den Freunde-Hinweis beantworten lassen, dann jedes andere offene Fenster.
       await whenFriendsHintClosed();
-      const permission = await getPushPermission();
-      if (!shouldAskForPush(permission) || userRef.current !== askedFor || openRef.current) return;
-      setOpen(true);
+      while (anyModalOpen()) {
+        await whenNoModalOpen();
+        await new Promise((resolve) => setTimeout(resolve, AFTER_MODAL_MS));
+      }
+      const [permission, asked] = await Promise.all([getPushPermission(), isPushAsked()]);
+      if (!shouldAskForPush(permission, asked) || userRef.current !== askedFor || openRef.current) return;
+      setOpen(request.reason || "own");
     })().catch(() => {});
   }), []);
 
   // Abmelden oder Kontowechsel: Das Blatt gehört dem vorigen Konto.
   useEffect(() => {
-    setOpen(false);
+    setOpen(null);
   }, [userId]);
 
   const later = () => {
-    if (!busy) setOpen(false);
+    if (!busy) setOpen(null);
   };
 
   const yes = async () => {
@@ -69,16 +84,16 @@ export function PushPromptHost() {
       await askPushPermission();
     } finally {
       setBusy(false);
-      setOpen(false);
+      setOpen(null);
     }
   };
 
   if (!open) return null;
-  return <PushPromptSheet busy={busy} onYes={() => { void yes(); }} onLater={later} />;
+  return <PushPromptSheet reason={open} busy={busy} onYes={() => { void yes(); }} onLater={later} />;
 }
 
 /** Das Blatt selbst - nur, solange es offen ist (Abstand unten, Saison-Deko und Bewegung erst dann). */
-function PushPromptSheet({ busy, onYes, onLater }: { busy: boolean; onYes: () => void; onLater: () => void }) {
+function PushPromptSheet({ reason, busy, onYes, onLater }: { reason: PushPromptReason; busy: boolean; onYes: () => void; onLater: () => void }) {
   const reduce = useReduceMotion();
   const insets = useSafeAreaInsets();
   useSeasonOverlay("push-prompt-sheet", true);
@@ -95,7 +110,7 @@ function PushPromptSheet({ busy, onYes, onLater }: { busy: boolean; onYes: () =>
                 <Glow active delay={motion.slow} radius={radius.lg} />
               </View>
               <View style={styles.flex}>
-                <Muted style={styles.eyebrow}>NACH DEINER ANMELDUNG</Muted>
+                <Muted style={styles.eyebrow} testID="push-prompt-eyebrow">{PUSH_PROMPT_EYEBROW[reason]}</Muted>
                 <Heading style={styles.question} accessibilityRole="header">{PUSH_PROMPT_TITLE}</Heading>
               </View>
             </View>
