@@ -198,3 +198,13 @@ test("offline aus dem Zwischenspeicher: kein Stand - sonst gälte ein alter Stan
   expect(mockPost).not.toHaveBeenCalled();
 });
 
+test("die Prüfung vor dem Anzeigen ändert nur Stufen und Level-up", () => {
+  const queue = createCeremonyQueue({ now: () => 1 });
+  const calls: string[] = [];
+  queue.enqueue({ id: "pkg", tiers: [tier("a")], onDone: () => calls.push("done"), check: async () => null });
+  queue.refine("pkg", { tiers: [tier("a")], levelUp: null, onDone: null, id: "fremd", context: { catchUp: true } } as never);
+  expect(queue.getCurrent()).toMatchObject({ id: "pkg", checked: true, context: {} });
+  queue.advance();
+  expect(calls).toEqual(["done"]);
+});
+
