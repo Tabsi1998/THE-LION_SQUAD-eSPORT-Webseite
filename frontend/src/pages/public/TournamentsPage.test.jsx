@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useNavigate } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 
 // Turnierliste (#2124): „Beendet“ und „Live“ fragen Status-Gruppen am Server, ältere Turniere kommen mit „Mehr laden“.
 
@@ -10,6 +10,8 @@ vi.mock("@/components/tls/Reveal", () => ({ Reveal: ({ children, className }) =>
 vi.mock("@/components/tls/TournamentCard", () => ({ TournamentCard: ({ tournament }) => <div data-testid="tournament-card">{tournament.title}</div> }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
+const auth = vi.hoisted(() => ({ value: null }));
+vi.mock("@/context/AuthContext", () => ({ useOptionalAuth: () => auth.value }));
 
 const TournamentsPage = (await import("./TournamentsPage")).default;
 
@@ -20,6 +22,7 @@ function query(url) {
 }
 
 beforeEach(() => {
+  auth.value = null;
   apiMock.get.mockReset();
   apiMock.get.mockImplementation(async (url) => {
     const { limit } = query(url);
@@ -56,4 +59,88 @@ test("Filterwechsel über die Adresse (Review O7, Zurück im Browser): wieder ab
   await waitFor(() => expect(screen.getAllByTestId("tournament-card")).toHaveLength(30));
   fireEvent.click(screen.getByTestId("go"));
   await waitFor(() => expect(query(apiMock.get.mock.calls.at(-1)[0])).toMatchObject({ status: "finished", limit: "24" }));
+});
+// Zweite Filterzeile (#1276): Spiel, online/vor Ort und - angemeldet - „Nur meine“; alles steht in der Adresse.
+const GAMES = [{ id: "g-mk", slug: "mario-kart", name: "Mario Kart World" }, { id: "g-ssb", slug: "smash", name: "Super Smash Bros." }];
+
+function serveGames() {
+  apiMock.get.mockImplementation(async (url) => ({ data: { items: cups(Math.min(Number(query(url).limit), 3)), total: 3, games: GAMES } }));
+}
+
+function Where() {
+  const location = useLocation();
+  return <div data-testid="where">{location.search}</div>;
+}
+
+test("ein geteilter Link öffnet dieselbe Auswahl - Spiel, Modus und Phase gehen zusammen an den Server", async () => {
+  serveGames();
+  render(<MemoryRouter initialEntries={["/tournaments?status=live&game=smash&mode=local"]}><TournamentsPage /></MemoryRouter>);
+  await screen.findAllByTestId("tournament-card");
+  expect(query(apiMock.get.mock.calls.at(-1)[0])).toMatchObject({ status: "running", game: "smash", mode: "local" });
+  expect(screen.getByTestId("tournament-game-smash")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("tournament-mode-local")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("tournament-game-mario-kart")).toHaveAttribute("aria-pressed", "false");
+});
+
+test("Chips setzen und lösen die Auswahl in der Adresse; „Nur meine“ gibt es nur angemeldet", async () => {
+  serveGames();
+  render(<MemoryRouter initialEntries={["/tournaments?mine=1"]}><TournamentsPage /><Where /></MemoryRouter>);
+  await screen.findAllByTestId("tournament-card");
+  expect(screen.queryByTestId("tournament-only-mine")).toBeNull();
+  expect(query(apiMock.get.mock.calls.at(-1)[0]).mine).toBeUndefined();
+
+  fireEvent.click(screen.getByTestId("tournament-game-mario-kart"));
+  await waitFor(() => expect(query(apiMock.get.mock.calls.at(-1)[0]).game).toBe("mario-kart"));
+  expect(screen.getByTestId("where")).toHaveTextContent("game=mario-kart");
+  fireEvent.click(screen.getByTestId("tournament-mode-online"));
+  await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("mode=online"));
+  fireEvent.click(screen.getByTestId("tournament-game-mario-kart"));
+  await waitFor(() => expect(screen.getByTestId("where")).not.toHaveTextContent("game="));
+  expect(query(apiMock.get.mock.calls.at(-1)[0])).toMatchObject({ mode: "online" });
+});
+
+test("angemeldet: „Nur meine“ fragt den Server nach den eigenen Anmeldungen", async () => {
+  serveGames();
+  auth.value = { user: { id: "u1" } };
+  render(<MemoryRouter initialEntries={["/tournaments"]}><TournamentsPage /><Where /></MemoryRouter>);
+  await screen.findAllByTestId("tournament-card");
+  fireEvent.click(screen.getByTestId("tournament-only-mine"));
+  await waitFor(() => expect(query(apiMock.get.mock.calls.at(-1)[0]).mine).toBe("true"));
+  expect(screen.getByTestId("where")).toHaveTextContent("mine=1");
+  expect(screen.getByTestId("tournament-only-mine")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("eine späte Antwort auf den alten Filter überschreibt die neuere nicht (Review #1276)", async () => {
+  const pending = [];
+  apiMock.get.mockImplementation((url) => new Promise((resolve) => pending.push({ url, resolve })));
+  render(<MemoryRouter initialEntries={["/tournaments"]}><TournamentsPage /></MemoryRouter>);
+  await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+  const answer = (status, title) => pending.filter((row) => query(row.url).status === status)
+    .forEach((row) => row.resolve({ data: { items: [{ id: title, title }], total: 1, games: GAMES } }));
+  answer(undefined, "Alle");
+  await screen.findByText("Alle");
+
+  fireEvent.click(screen.getByTestId("tournament-filter-live"));
+  await waitFor(() => expect(pending.some((row) => query(row.url).status === "running")).toBe(true));
+  fireEvent.click(screen.getByTestId("tournament-filter-completed"));
+  await waitFor(() => expect(pending.some((row) => query(row.url).status === "finished")).toBe(true));
+  answer("finished", "Beendet-Cup");
+  await screen.findByText("Beendet-Cup");
+  answer("running", "Live-Cup");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(screen.queryByText("Live-Cup")).toBeNull();
+  expect(screen.getByText("Beendet-Cup")).toBeInTheDocument();
+});
+
+test("„Nur meine“ aus einem Link wartet, bis die Anmeldung geklärt ist (Review #1276)", async () => {
+  serveGames();
+  auth.value = { user: undefined };
+  const { rerender } = render(<MemoryRouter initialEntries={["/tournaments?mine=1"]}><TournamentsPage /></MemoryRouter>);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(apiMock.get).not.toHaveBeenCalled();
+
+  auth.value = { user: { id: "u1" } };
+  rerender(<MemoryRouter initialEntries={["/tournaments?mine=1"]}><TournamentsPage /></MemoryRouter>);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(1));
+  expect(query(apiMock.get.mock.calls[0][0]).mine).toBe("true");
 });

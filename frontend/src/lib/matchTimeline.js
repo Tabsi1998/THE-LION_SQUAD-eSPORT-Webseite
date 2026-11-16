@@ -1,6 +1,7 @@
 import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { advancementModeOf, drawGroupOf, slotDrawn } from "@/lib/bracketGraph";
+import { displayRoundLabels, sectionRoundLabel } from "@/lib/bracketNames";
 
 // Matchplan-Seite (#1557): die Zeitleiste je Station. Hier wird nichts geplant - Zeit, Station und Warnungen kommen
 // vom Spielplaner (POST …/schedule/plan, services/match_scheduler.py) oder stehen gespeichert am Spiel. Diese Datei
@@ -97,6 +98,8 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
   const known = knownStations(stations, plan);
   const stationById = new Map(known.map((station) => [station.id, station]));
   const keyById = new Map(rows.map((match) => [match.id, match.match_key || match.round_name || "Spiel"]));
+  // Rundennamen wie im Baum (#1947): fortlaufend je Abschnitt, wie der Server sie nennt (round_label).
+  const roundLabelById = new Map(displayRoundLabels(rows).map((match) => [match.id, sectionRoundLabel(match)]));
 
   const items = [];
   const unscheduled = [];
@@ -114,7 +117,7 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
       key: keyById.get(match.id),
       label: match.match_key || match.round_name || "Spiel",
       round: match.round,
-      roundName: match.round_name || "",
+      roundLabel: roundLabelById.get(match.id) || "",
       section: match.section || "",
       tone: sectionTone(match.section),
       status: match.status,

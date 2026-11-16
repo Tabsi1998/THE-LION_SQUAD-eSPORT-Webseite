@@ -27,6 +27,7 @@ from services.match_calls import report_by, report_minutes
 from services.match_deadlines import no_show_deadline
 from services.match_duration import effective_match_duration
 from services.match_pause import clock_pause_fields
+from services.match_timing import pause_seconds
 from services.match_scheduler import (
     KEPT_SOURCES,
     RUNNING_STATUSES,
@@ -231,7 +232,9 @@ def build_live_queue(
             "forecast_at": _iso(row["start"]),
             "delay_minutes": _minutes_between(row["start"], planned),
             "duration_minutes": minutes,
-            "ends_at": _iso(row["start"] + timedelta(minutes=minutes)),
+            # Ein laufendes Spiel endet um die Pausenzeit später (#2398) - die Uhr steht in der Turnierpause.
+            "ends_at": _iso(row["start"] + timedelta(minutes=minutes)
+                            + timedelta(seconds=pause_seconds(match, tournament, now) if row["state"] == "running" else 0)),
             "called_at": match.get("called_at") if called else None,
             "report_by": _iso(due),
             "no_show_due_at": _iso(no_show["due_at"]) if no_show else None,

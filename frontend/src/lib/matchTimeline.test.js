@@ -269,3 +269,24 @@ describe("Stationen, die der Planer kennt - und eine, die es nicht mehr gibt", (
     expect(dropConflicts(timeline, lf.id, state.deleted_station_id, lf.start)).toEqual([{ key: "gelöscht", missing: true }]);
   });
 });
+
+describe("Ablaufplan: Rundennamen wie im Baum (#1947)", () => {
+  // Die Leitung schreibt Loser-Runden nach der Uhr („Runde 2“); der Baum nennt sie fortlaufend („Loser Runde 1“).
+  const matches = [
+    { id: "a", match_key: "A", stage_id: "s1", section: "WB", round: 1, round_name: "Runde 1", round_label: "Runde 1", slots: [] },
+    { id: "la", match_key: "LA", stage_id: "s1", section: "LB", round: 2, round_name: "Runde 2", round_label: "Loser Runde 1", slots: [] },
+    { id: "lb", match_key: "LB", stage_id: "s1", section: "LB", round: 3, round_name: "Runde 3", slots: [] },
+    { id: "gf", match_key: "FINAL", stage_id: "s1", section: "GF", round: 4, round_name: "Grand Final", round_label: "Grand Final", slots: [] },
+  ];
+
+  it("jedes Spiel trägt den Namen aus dem Baum, mit Abschnitt nur, wo der Name ihn nicht schon nennt", () => {
+    const { unscheduled } = buildTimeline({ matches, now: new Date("2026-10-31T10:00:00Z") });
+    const labels = Object.fromEntries(unscheduled.map((item) => [item.key, item.roundLabel]));
+    expect(labels).toEqual({
+      A: "Winner Bracket · Runde 1",
+      LA: "Loser Runde 1",
+      LB: "Loser Bracket · Runde 2",
+      FINAL: "Grand Final",
+    });
+  });
+});

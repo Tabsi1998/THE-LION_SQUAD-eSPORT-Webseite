@@ -63,6 +63,26 @@ test("Sponsor je Runde: nur TV-Sponsoren zur Wahl, gespeichert wird je Runde ein
   }));
 });
 
+// Doppel-K.-o., wie die Leitung ihn schreibt (#1792): Die Loser-Runden tragen die Nummer ihrer Zeit; der Server nennt sie
+// im Baum fortlaufend (`round_label`).
+const DOUBLE_WITH_LOSER = [
+  { id: "a", match_key: "A", stage_id: "s1", section: "WB", round: 1, round_name: "Runde 1", round_label: "Runde 1", slots: [] },
+  { id: "c", match_key: "C", stage_id: "s1", section: "WB", round: 2, round_name: "Finale", round_label: "Finale", slots: [] },
+  { id: "la", match_key: "LA", stage_id: "s1", section: "LB", round: 2, round_name: "Runde 2", round_label: "Loser Runde 1", slots: [] },
+  { id: "lb", match_key: "LB", stage_id: "s1", section: "LB", round: 3, round_name: "Runde 3", round_label: "Loser Runde 2", slots: [] },
+  { id: "gf", match_key: "FINAL", stage_id: "s1", section: "GF", round: 4, round_name: "Grand Final", round_label: "Grand Final", slots: [] },
+];
+
+test("Rundensponsoren heißen wie im Baum - auch im Loser Bracket (#1947)", async () => {
+  render(<MemoryRouter><RoundSponsorsPanel tournament={{ id: "t1" }} matches={DOUBLE_WITH_LOSER} stages={[{ id: "s1", name: "Cup" }]} /></MemoryRouter>);
+  const loserOne = await screen.findByTestId("admin-tr-round-sponsor-s1::LB::2");
+  expect(loserOne).toHaveTextContent("Loser Runde 1");
+  expect(loserOne).not.toHaveTextContent("Runde 2");
+  expect(screen.getByTestId("admin-tr-round-sponsor-s1::LB::3")).toHaveTextContent("Loser Runde 2");
+  expect(screen.getByTestId("admin-tr-round-sponsor-s1::GF::4")).toHaveTextContent("Grand Final");
+  expect(screen.getByTestId("admin-tr-round-sponsor-s1::WB::2")).toHaveTextContent("Winner Bracket · Finale");
+});
+
 test("ohne Sponsor mit „TV / Anzeige“ sagt das Feld, was zu tun ist", async () => {
   apiMock.get.mockResolvedValue({ data: [] });
   const bracket = singleElimination(4);
