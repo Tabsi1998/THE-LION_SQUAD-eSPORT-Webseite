@@ -30,7 +30,7 @@ import logging
 from datetime import datetime, timedelta
 
 from models import REGISTRATION_LIMIT, now_utc
-from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
+from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, forget, pending, request_refresh, revising  # noqa: F401 - umgezogen (#1420)
 from services.bracket_common import (
     CLARIFICATION, DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, clarification_count, in_clarification, late_entry_note, round_label,
     section_label,
@@ -268,10 +268,12 @@ async def _lanes(db, cfg: dict, tournament: dict, members: bool) -> tuple[list[d
     return ([game, main], None) if plan["main"] == "full" else ([game], main)
 
 
-async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | None = None, now: datetime | None = None) -> dict:
+async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | None = None, revise: bool = False,
+                  now: datetime | None = None) -> dict:
     """Die Bracket-Nachricht eines Turniers aktuell halten - posten, pinnen, bearbeiten; nach dem Ende einmal „Endstand“.
     Je Bahn (#628): Spielserver, Hauptserver, Mitglieder-Thread - jede mit eigenem Stand und eigener Bremse. Das
-    Ergebnis ist das der ersten Bahn, dazu ``lanes`` mit allen."""
+    Ergebnis ist das der ersten Bahn, dazu ``lanes`` mit allen. ``revise`` (#2375): Ein stehender Endstand wird bearbeitet,
+    wenn sich sein Inhalt geändert hat (Verfahren, Vorfall) - an seinem Platz, ohne neue Nachricht."""
     from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_buttons
     from services import discord_routing
     from services.discord_threads import members_only
@@ -279,16 +281,16 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     current = now or now_utc()
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if not tournament:
-        _dirty.pop(tournament_id, None)
+        forget(tournament_id)
         return {"ok": False, "reason": "unknown_tournament"}
     if final is None:
         final = str(tournament.get("status") or "") in FINAL_STATUSES
     if tournament.get("discord_skip"):
-        _dirty.pop(tournament_id, None)
+        forget(tournament_id)
         return {"ok": False, "reason": "author_opt_out"}
     members = members_only(tournament)
     if not members and (tournament.get("is_public") is False or (tournament.get("visibility") or "public") != "public"):
-        _dirty.pop(tournament_id, None)
+        forget(tournament_id)
         return {"ok": False, "reason": "private_visibility"}
     cfg = await _get_discord_config()
     if not cfg["master"]:
@@ -314,20 +316,23 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
 
     results: dict[str, dict] = {}
     for lane in lanes:
-        results[lane["key"]] = await _refresh_lane(db, tournament, lane, message, force=force, final=bool(final), current=current)
+        results[lane["key"]] = await _refresh_lane(db, tournament, lane, message, force=force, final=bool(final), revise=revise, current=current)
     first = results[lanes[0]["key"]]
     if fallback and not first.get("ok") and first.get("reason") in discord_routing.FALLBACK_REASONS + ("channel_missing", "unknown_channel"):
         # Der Spielserver nimmt das Bracket nicht an: voll am Hauptserver statt nirgends.
-        results[fallback["key"]] = await _refresh_lane(db, tournament, fallback, message, force=force, final=bool(final), current=current)
+        results[fallback["key"]] = await _refresh_lane(db, tournament, fallback, message, force=force, final=bool(final), revise=revise,
+                                                     current=current)
     if any(result.get("reason") == "throttled" for result in results.values()):
         _dirty[tournament_id] = bool(_dirty.get(tournament_id)) or bool(final)
     elif all(result.get("ok") or result.get("reason") in ("final",) for result in results.values()):
-        _dirty.pop(tournament_id, None)
+        forget(tournament_id)
     return {**first, "lanes": results}
 
 
-async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: bool, final: bool, current: datetime) -> dict:
-    """Eine Bahn: posten, pinnen, bearbeiten - der Endstand als letzte Nachricht im Thread (#572)."""
+async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: bool, final: bool, current: datetime,
+                        revise: bool = False) -> dict:
+    """Eine Bahn: posten, pinnen, bearbeiten - der Endstand als letzte Nachricht im Thread (#572). ``revise``: ein stehender
+    Endstand mit geändertem Inhalt wird an seinem Platz bearbeitet (#2375)."""
     from discord_service import REASON_TEXTS
     from services.discord_runtime import bot
 
@@ -338,7 +343,8 @@ async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: boo
         # War das Turnier vorher öffentlich: die Bracket-Nachricht beginnt im Mitglieder-Thread neu - die Fassung für
         # Mitglieder landet nie in der alten, öffentlichen Nachricht (#910).
         state = {}
-    if state.get("final") and not force:
+    revising_final = revise and final and bool(state.get("final")) and bool(state.get("message_id"))
+    if state.get("final") and not force and not revising_final:
         return {"ok": False, "reason": "final", "message_id": state.get("message_id")}
     channel_id = str(state.get("channel_id") or thread_id or lane["channel"] or "")
     in_thread = bool(thread_id) and channel_id == thread_id
@@ -350,12 +356,12 @@ async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: boo
     built = await message()
     digest, embed, buttons = built["digest"], built["embed"], built["buttons"]
     attach = {"files": built["files"]} if built.get("files") else {}
-    if state.get("message_id") and state.get("hash") == digest and not force and not final:
+    if state.get("message_id") and state.get("hash") == digest and not force and (not final or revising_final):
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
     message_id = str(state.get("message_id") or "")
     # Endstand als letzte Nachricht im Thread (#572): steht etwas darunter, kommt er neu ans Ende.
     replaced = ""
-    if final and in_thread and message_id and str(_state_at(tournament, lane["thread_field"]).get("last_message_id") or "") != message_id:
+    if final and not revising_final and in_thread and message_id and str(_state_at(tournament, lane["thread_field"]).get("last_message_id") or "") != message_id:
         replaced, message_id = message_id, ""
     action = "edited"
     result: dict = {"ok": False, "reason": "error"}
@@ -411,7 +417,8 @@ async def sweep(db, *, full: bool = False) -> dict:
         targets = dict(_dirty)
     for tournament_id, final in targets.items():
         outcome["checked"] += 1
-        result = await refresh(db, tournament_id, final=True if final else None, force=full and not final)
+        result = await refresh(db, tournament_id, final=True if final else None, force=full and not final,
+                               revise=revising(tournament_id))
         if result.get("ok") and result.get("reason") in ("edited", "posted"):
             outcome[result["reason"]] += 1
         elif result.get("reason") == "throttled":
