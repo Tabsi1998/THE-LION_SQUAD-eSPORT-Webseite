@@ -309,3 +309,64 @@ def test_rows_with_clarification_take_more_room_and_still_fit():
     assert warn_pixels(result_share.render(payload, "story")) > 200 and warn_pixels(result_share.render(payload, "wide")) > 200
     assert warn_pixels(result_share.render({**payload, "steps": rows}, "story")) == 0
     assert warn_pixels(result_share.render({**payload, "steps": rows}, "wide")) == 0
+
+
+def test_a_contested_step_keeps_its_place_or_the_hint_says_it_story():
+    """#2375 Hochformat: Bei vielen Schritten hat der angefochtene Vorrang; passt er nicht, sagt es der Hinweis darüber."""
+    rows = [{"label": f"Runde {n}", "result": "2:1", "kind": "duel"} for n in range(1, 9)]
+    early = [{**rows[0], "contested": True}, *rows[1:]]
+    room = 5 * result_share.STEP_ROW
+
+    before = result_share.story_rows(rows, room)
+    assert before["shown"] == rows[4:] and before["hidden"] == 4 and before["hidden_contested"] == 0
+    assert result_share.hidden_hint(before) == "+ 4 frühere Runden"
+
+    plan = result_share.story_rows(early, room)
+    assert early[0] in plan["shown"], "die angefochtene erste Runde bleibt sichtbar"
+    assert plan["shown"] == [early[0], *early[6:]] and plan["hidden_contested"] == 0 and plan["earlier"] is False
+    assert result_share.hidden_hint(plan) == "+ 5 weitere Runden"
+    assert sum(result_share._row_cost(step) for step in plan["shown"]) + result_share.STEP_ROW <= room
+
+    # Kein Platz mehr für die angefochtene Zeile: der Sammelhinweis.
+    tight = result_share.story_rows(early, result_share.STEP_ROW + 100)
+    assert early[0] not in tight["shown"] and tight["hidden_contested"] == 1
+    assert result_share.hidden_hint(tight).endswith(" · 1 davon in Klärung")
+
+    # Eine angefochtene Tabelle zählt genauso.
+    table = [{"label": "Gruppe A", "result": "1 Sieg", "kind": "table", "contested": 2}, *rows]
+    assert table[0] in result_share.story_rows(table, room)["shown"]
+
+
+def test_a_contested_step_keeps_its_place_or_the_hint_says_it_wide():
+    """#2375 Breitformat: Die Schildchen-Schleife lässt hinten ohne Verfahren weg, nicht den angefochtenen Schritt - und
+    passt auch der nicht, steht am Ende „+ 1 in Klärung“. Geprüft wird die Auswahl, nicht das Bild."""
+    steps = [{"label": f"Runde {n}", "result": "2:1", "kind": "duel"} for n in range(1, 11)]
+    steps[8] = {**steps[8], "contested": True}
+    payload = {"steps": steps, "chips": [chip_text(step) for step in steps][:8]}
+    entries = result_share.chip_entries(payload)
+    assert [entry["index"] for entry in entries] == [*range(8), 8] and entries[-1]["warn"] is True
+    assert entries[-1]["text"] == "Runde 9 2:1 · in Klärung", "ein angefochtener Schritt hinter den ersten acht kommt dazu"
+
+    def measure(text):
+        return 200
+
+    # Platz für zwei Zeilen à drei Schildchen (Breite 200, Abstand 10, Zeilen 52 Punkte).
+    shown = result_share.wide_chips(entries, measure, 0, 630, 0, 52)
+    assert [item["index"] for item in shown] == [0, 1, 2, 3, 4, 8], "vorne ohne Verfahren bleibt, hinten weicht für den angefochtenen"
+    assert shown[-1]["warn"] and (shown[-1]["x"], shown[-1]["y"]) == (420, 52)
+
+    # Nicht einmal Platz für den angefochtenen Schritt neben dem Hinweis: nur der Sammelhinweis.
+    only = result_share.wide_chips([entries[-1]], lambda text: 700 if "Runde" in text else 100, 0, 630, 0, 0)
+    assert [item["text"] for item in only] == ["+ 1 weitere in Klärung"] and only[0].get("hint") is True
+
+    # Lauter angefochtene Schritte: wie im Hochformat bleiben die jüngsten, die ältesten nennt der Sammelhinweis.
+    contested = [{"index": index, "text": f"Runde {index + 1} · in Klärung", "warn": True} for index in range(9)]
+    kept = result_share.wide_chips(contested, measure, 0, 630, 0, 52)
+    assert [item["index"] for item in kept] == [4, 5, 6, 7, 8, None] and kept[-1]["text"] == "+ 4 weitere in Klärung"
+    story = result_share.story_rows([{"label": f"Runde {n}", "result": "2:1", "kind": "duel", "contested": True} for n in range(1, 10)],
+                                    result_share.STEP_ROW + 2 * result_share._row_cost({"contested": True}))
+    assert [row["label"] for row in story["shown"]] == ["Runde 8", "Runde 9"], "Hochformat: ebenfalls die jüngsten"
+
+    # Ohne Verfahren wie bisher: die ersten, die passen.
+    plain = result_share.wide_chips([{**entry, "warn": False} for entry in entries[:8]], measure, 0, 630, 0, 52)
+    assert [item["index"] for item in plain] == list(range(6))

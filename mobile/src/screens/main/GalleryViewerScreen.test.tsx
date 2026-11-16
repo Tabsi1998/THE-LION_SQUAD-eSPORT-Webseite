@@ -25,6 +25,14 @@ beforeEach(() => {
   mockGet.mockResolvedValue({ data: album });
 });
 
+test("zurückgezogenes Album (410): der Hinweis des Servers, ohne Nochmal versuchen", async () => {
+  mockGet.mockRejectedValue(Object.assign(new Error("weg"), { isAxiosError: true, response: { status: 410, data: { detail: "Dieses Album wurde zurückgezogen." } } }));
+  await render(<GalleryViewerScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Album zurückgezogen")).toBeTruthy());
+  expect(screen.getByText("Dieses Album wurde zurückgezogen.")).toBeTruthy();
+  expect(screen.queryByTestId("error-state-retry")).toBeNull();
+});
+
 test("Bildrahmen endet über dem Bildtext, nicht am Fensterrand", async () => {
   await render(<GalleryViewerScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("gallery-viewer")).toBeTruthy());

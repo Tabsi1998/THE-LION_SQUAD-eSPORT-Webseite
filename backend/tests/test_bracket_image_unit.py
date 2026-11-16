@@ -118,3 +118,20 @@ def test_the_signature_knows_in_clarification_and_stays_the_same_without():
     assert marked != plain, "Protest eingelegt: neues Bild"
     contested[0] = {**contested[0], "contested": False}
     assert bracket_image.signature(bracket_image.bracket_sections(contested, STAGES)) == plain, "entschieden: wieder das Bild ohne Hinweis"
+
+
+def test_the_line_under_a_card_has_room_in_a_full_round():
+    """#2375: Die Zeile unter einer Karte (kampflos, Termin) liegt in einer vollen Runde nicht unter der nächsten Karte -
+    geprüft an den berechneten Koordinaten, nicht an Pixeln."""
+    from PIL import ImageDraw
+
+    from services.share_image import font
+
+    tops = [center - bracket_image.BOX_H / 2 for center in bracket_image.positions([8, 4, 2, 1])[0]]
+    for upper, lower in zip(tops, tops[1:]):
+        assert bracket_image.note_top(upper) + bracket_image.NOTE_LINE_H < lower, (upper, lower)
+    assert bracket_image.NOTE_LINE_H >= bracket_image.NOTE_SIZE * 1.25, "Zeilenhöhe samt Unterlängen"
+    # Die geladene Schrift bleibt in dieser Zeilenhöhe (eine Ungleichung, kein fester Pixelwert).
+    draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    box = draw.textbbox((0, 0), "kampflos · 03.10., 21:00 Uhr · live", font=font(bracket_image.NOTE_SIZE, bold=False))
+    assert box[3] <= bracket_image.NOTE_LINE_H, box
