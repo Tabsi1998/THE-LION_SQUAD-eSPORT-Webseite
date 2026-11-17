@@ -241,6 +241,7 @@ function bigWorld({ teams = 16 } = {}) {
   if (standings.length > 6) standings[5] = { ...standings[5], rank: 5, points: standings[4].points, score_diff: standings[4].score_diff, score_for: standings[4].score_for };
   const table = {
     can_decide: true, superadmin: false, rules: { tiebreakers: ["head_to_head", "score_diff", "score_for", "lead_decision"] }, standings,
+    methods: { playoff: "Entscheidungsspiel", lot: "Los", lead: "Entscheid der Leitung" },
     ties: standings.length > 6 ? [{ rank: 5, registration_ids: [standings[4].registration_id, standings[5].registration_id], names: [standings[4].display_name, standings[5].display_name], points: standings[4].points, own_team: false }] : [],
     decisions: [],
   };
@@ -391,3 +392,30 @@ test("ohne „Spiele betreuen“ und „Ergebnisse korrigieren“: kein „ände
   await expect(page.getByTestId("season-tie-decide-5")).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+  test(`Staffel-Seite (${width} px): Meister-Gleichstand nur mit Art der Entscheidung`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const world = bigWorld();
+    const [first, second] = world.table.standings;
+    world.table.standings[1] = { ...second, rank: 1, points: first.points };
+    world.table.ties = [{ rank: 1, registration_ids: [first.registration_id, second.registration_id], names: [first.display_name, second.display_name],
+      points: first.points, own_team: false, kind: "champion", method_required: true }];
+    const calls = await mockLeague(page, world);
+    await page.goto("/admin/leagues/staffeln/t1#gleichstand");
+    const panel = page.getByTestId("staffel-table-t1");
+    await expect(panel.getByTestId("season-tie-kind-t1-1")).toHaveText("Meisterplatz");
+    await panel.getByTestId("season-tie-decide-1").click();
+    const sheet = page.getByTestId("table-decision-sheet");
+    await sheet.getByTestId("table-decision-reason").fill("Entscheidungsspiel 2:1 gewonnen");
+    await sheet.getByTestId("table-decision-save").click();
+    // Ohne Art geht nichts hinaus - das Pflichtfeld hält das Absenden auf.
+    await expect(sheet).toBeVisible();
+    expect(calls.filter((row) => row.url.endsWith("/table-decision"))).toEqual([]);
+    await sheet.getByTestId("table-decision-method").selectOption("playoff");
+    await noSideScroll(page);
+    await sheet.getByTestId("table-decision-save").click();
+    await expect.poll(() => calls.find((row) => row.url.endsWith("/table-decision"))?.body).toEqual({
+      registration_ids: [first.registration_id, second.registration_id], reason: "Entscheidungsspiel 2:1 gewonnen", method: "playoff" });
+  });
+}
