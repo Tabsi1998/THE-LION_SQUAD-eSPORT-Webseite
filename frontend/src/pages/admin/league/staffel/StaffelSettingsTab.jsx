@@ -229,12 +229,12 @@ export function StaffelSettingsTab({ tournament, matches = [], onReload }) {
   return (
     <div className="space-y-5" data-testid="staffel-settings">
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
-        <Section id="darstellung" title="Darstellung" testId="staffel-look" className="xl:p-5"
+        <Section id="darstellung" title="Titel und Auftritt" testId="staffel-look" className="xl:p-5"
           hint="Titel, Beschreibung, Banner, Partner und Stream dieser Staffel. Alles Weitere gibt die Season vor.">
           {manage ? (
             <TournamentEditForm key={tournament.updated_at || tournament.id} tournament={tournament} onSaved={onReload} seasonValues={false} remix={false} />
           ) : (
-            <RightNote testId="staffel-look-right">Die Darstellung ändert, wer in dieser Liga „Liga verwalten“ hat.</RightNote>
+            <RightNote testId="staffel-look-right">Titel und Auftritt ändert, wer in dieser Liga „Liga verwalten“ hat.</RightNote>
           )}
         </Section>
         <aside className="min-w-0" data-testid="staffel-season-values">

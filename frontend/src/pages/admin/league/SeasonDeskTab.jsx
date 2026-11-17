@@ -146,7 +146,8 @@ export function SeasonLog({ seasonId, staffelId = "", version = 0, title = "Prot
                   </span>
                 ) : null}
                 {row.staffel && !staffelId ? <span className="text-white/60"> · {row.staffel}</span> : null}
-                {row.match_id ? <> · <Link to={`/matches/${row.match_id}`} className="text-[#29B6E8] hover:underline">Spiel</Link></> : null}
+                {/* Tippfläche 44 px, ohne die Zeile höher zu machen (negativer Rand gleicht die Höhe aus). */}
+                {row.match_id ? <> · <Link to={`/matches/${row.match_id}`} className="-my-3 inline-flex min-h-[44px] items-center px-1 text-[#29B6E8] hover:underline" data-testid={`desk-log-match-${row.id}`}>Spiel</Link></> : null}
               </span>
               <span className="shrink-0 text-xs text-white/60 [overflow-wrap:anywhere]">{row.actor}</span>
             </li>
@@ -213,7 +214,8 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
   const scoped = useMemo(() => staffelGroups(data?.groups, staffelId), [data, staffelId]);
   const scopedTotal = scoped.reduce((sum, group) => sum + group.items.length, 0);
   const scopedMine = scoped.reduce((sum, group) => sum + group.items.filter((item) => item.mine).length, 0);
-  const hiddenBySeason = staffelId && data ? data.total - scopedTotal : 0;
+  // Ausgeblendet und erwähnt werden nur Aufgaben der ganzen Season (Anmeldungen, Transfers, Regelwerk) - die anderer Staffeln gehören dorthin.
+  const hiddenBySeason = staffelId && data ? (data.groups || []).reduce((sum, group) => sum + (group.items || []).filter((item) => !item.staffel_id).length, 0) : 0;
   const total = staffelId ? scopedTotal : data?.total;
   const mine = staffelId ? scopedMine : data?.mine;
   const groups = useMemo(() => filterGroups(scoped, filter), [scoped, filter]);

@@ -140,7 +140,7 @@ test("Staffel-Filter (#2262): nur Aufgaben und Protokoll der Staffel, sichtbar u
   expect(screen.queryByTestId("desk-item-applications:x")).not.toBeInTheDocument();
   expect(screen.getByTestId("desk-total")).toHaveTextContent("2");
   expect(screen.getByTestId("desk-summary")).toHaveTextContent("1 von 2 kannst du selbst erledigen");
-  expect(screen.getByTestId("desk-staffel-filter-hidden")).toHaveTextContent("2 Aufgaben der ganzen Season sind ausgeblendet.");
+  expect(screen.getByTestId("desk-staffel-filter-hidden")).toHaveTextContent("1 Aufgabe der ganzen Season ist ausgeblendet.");
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/desk/log", { params: { page: 1, staffel: "t1" } }));
   expect(screen.getByRole("heading", { name: "Protokoll · Liga 1 · Staffel A" })).toBeInTheDocument();
 
