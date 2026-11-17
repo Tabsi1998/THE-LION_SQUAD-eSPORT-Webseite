@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 
 from database import get_db
+from services.achievement_visibility import ranked_users_query
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +32,9 @@ async def _points_rows() -> list[dict]:
         e["points"] += points_map.get(a["tier_code"], 0)
     if not agg:
         return []
-    # „Erfolge öffentlich“ aus (#2126): die Krone verriete, wie viele Punkte jemand hat - wie in der Erfolge-Rangliste nicht dabei.
-    users = await db.users.find(
-        {"id": {"$in": list(agg.keys())}, "privacy_public_profile": True, "privacy_achievements_public": {"$ne": False}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1},
-    ).to_list(5000)
+    # Dieselben Konten wie in der Erfolge-Rangliste (#2492): ohne gesperrte, deaktivierte, gelöschte und nicht öffentliche,
+    # und ohne „Erfolge öffentlich“ aus (#2126) - die Krone verriete sonst, wie viele Punkte jemand hat.
+    users = await db.users.find(ranked_users_query(agg), {"_id": 0, "id": 1, "username": 1, "display_name": 1}).to_list(5000)
     rows = []
     for u in users:
         s = agg.get(u["id"], {})
@@ -97,9 +96,10 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
             events.append({"user_id": uid, "type": "changed", "variant": n, "prev": o})
         elif o and not n:
             events.append({"user_id": uid, "type": "lost", "variant": None, "prev": o})
-    # Wer „Erfolge öffentlich“ selbst ausschaltet, hat die Krone nicht verloren (#2126): keine Meldung.
+    # „Krone verloren“ nur, wer überholt wurde und noch auf der Rangliste steht: Wer „Erfolge öffentlich“ selbst ausschaltet
+    # (#2126), sein Profil verbirgt, gesperrt, deaktiviert oder gelöscht wurde (#2492), bekommt keine Meldung.
     lost_ids = [ev["user_id"] for ev in events if ev["type"] == "lost"]
-    hid_themselves = {row["id"] async for row in db.users.find({"id": {"$in": lost_ids}, "privacy_achievements_public": False}, {"_id": 0, "id": 1})} if lost_ids else set()
+    still_ranked = {row["id"] async for row in db.users.find(ranked_users_query(lost_ids), {"_id": 0, "id": 1})} if lost_ids else set()
     for ev in events:
         uid = ev["user_id"]
         dedupe = f"crown-v{version}-{uid}"
@@ -123,7 +123,7 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
                 kind="crown_changed",
                 meta={"variant": ev["variant"], "prev": ev["prev"], "category": "achievements", "dedupe_key": dedupe},
             )
-        elif uid not in hid_themselves:
+        elif uid in still_ranked:
             await create_user_notification(
                 uid,
                 title="Krone verloren",
