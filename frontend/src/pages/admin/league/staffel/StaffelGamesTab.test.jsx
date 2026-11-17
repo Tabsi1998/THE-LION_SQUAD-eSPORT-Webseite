@@ -50,7 +50,7 @@ test("je Spielwoche Stand, Ergebnis und Chips - Vorschau-Spiele zählen nicht", 
   const chips = screen.getByTestId("staffel-game-chips-m2");
   expect(chips).toHaveTextContent("Check-in 1 von 2");
   expect(chips).toHaveTextContent("Vorfall offen");
-  expect(screen.getByTestId("staffel-week-warn-2")).toHaveTextContent("1 Spiel mit offenem Punkt");
+  expect(screen.getByTestId("staffel-week-warn-2")).toHaveTextContent("1 Vorfall offen");
   expect(screen.queryByTestId("staffel-week-warn-1")).toBeNull();
   // Gespielte Wochen klappen zu, offene sind aufgeklappt.
   expect(screen.getByTestId("staffel-week-1")).not.toHaveAttribute("open");

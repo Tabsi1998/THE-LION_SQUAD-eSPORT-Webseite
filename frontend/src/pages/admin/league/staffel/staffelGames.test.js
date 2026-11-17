@@ -1,4 +1,4 @@
-import { gameChips, gameScore, gameState, gamesByWeek, matchdayOf } from "./staffelGames";
+import { gameChips, gameScore, gameState, gamesByWeek, matchdayOf, weekWarnText } from "./staffelGames";
 
 // Reiter „Spiele und Ergebnisse“ der Staffel-Seite (#2262, Paket B): Spiele je Spielwoche mit Stand, Ergebnis und den Chips aus
 // `league_marks` (Server, nur gelesen). Erfundene Werte.
@@ -62,5 +62,23 @@ describe("Chips aus league_marks", () => {
     expect(gameChips(game({ league_marks: { checkin: "running", veto: "running" } })).map((chip) => chip.text)).toEqual(["Veto läuft"]);
     expect(gameChips(game({ league_marks: { checkin: "running", veto: "paused" } }))[0]).toMatchObject({ text: "Veto pausiert", tone: "warn" });
     expect(gameChips(game({ league_marks: { checkin: "finished", veto: "done", incidents: 0, procedures: 2 } })).map((chip) => chip.text)).toEqual(["2 Verfahren offen"]);
+  });
+});
+
+describe("offene Punkte im Kopf der Woche", () => {
+  const marks = (fields) => game({ league_marks: { checkin: "none", checked_in: 0, veto: null, incidents: 0, procedures: 0, ...fields } });
+  it("nennt die Art, wenn nur eine vorkommt - mit Zahl und Mehrzahl", () => {
+    expect(weekWarnText([marks({ procedures: 1 })])).toBe("1 Verfahren offen");
+    expect(weekWarnText([marks({ procedures: 1 }), marks({ procedures: 2 })])).toBe("3 Verfahren offen");
+    expect(weekWarnText([marks({ incidents: 1 })])).toBe("1 Vorfall offen");
+    expect(weekWarnText([marks({ incidents: 2 })])).toBe("2 Vorfälle offen");
+    expect(weekWarnText([marks({ checkin: "closed", checked_in: 1 })])).toBe("1 Check-in vorbei");
+    expect(weekWarnText([marks({ checkin: "closed" }), marks({ checkin: "closed" })])).toBe("2 Check-ins vorbei");
+    expect(weekWarnText([marks({ checkin: "running", veto: "paused" })])).toBe("1 Veto pausiert");
+  });
+  it("gemischt: „N offene Punkte“, ohne Warnung leer", () => {
+    expect(weekWarnText([marks({ procedures: 1, incidents: 1 })])).toBe("2 offene Punkte");
+    expect(weekWarnText([marks({ procedures: 2 }), marks({ checkin: "closed" })])).toBe("3 offene Punkte");
+    expect(weekWarnText([marks({ checkin: "open", checked_in: 1 }), game()])).toBe("");
   });
 });

@@ -13,7 +13,7 @@ import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUnd
 import { matchWhen } from "@/lib/leaguePage";
 import { matchRights } from "@/lib/tournamentRights";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
-import { gameChips, gameScore, gameState, gamesByWeek } from "./staffelGames";
+import { gameChips, gameScore, gameState, gamesByWeek, weekWarnText } from "./staffelGames";
 
 const RESULTS_OPEN = new Set(["live", "paused"]);
 const DONE_TONE = new Set(["done"]);
@@ -117,14 +117,14 @@ export function StaffelGamesTab({ tournament, registrations = [], matches = [], 
       ) : weeks.map((week) => {
         const done = week.matches.filter((match) => DONE_TONE.has(gameState(match).tone)).length;
         // Was in der Woche noch jemanden braucht (warnender Chip) - schon im zugeklappten Kopf sichtbar.
-        const warns = week.matches.filter((match) => gameChips(match).some((chip) => chip.tone === "warn")).length;
+        const warns = weekWarnText(week.matches);
         return (
           <details key={week.number ?? "ohne"} open={week.number === firstOpen || weekNeedsLook(week)} className="group min-w-0 overflow-hidden rounded-sm border border-white/10 bg-[#121212]"
             data-testid={`staffel-week-${week.number ?? "ohne"}`}>
             <summary className="flex min-h-[44px] cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-white/5 [&::-webkit-details-marker]:hidden">
               <span className="shrink-0 whitespace-nowrap font-heading text-base font-black uppercase">{week.number ? `Spielwoche ${week.number}` : "Ohne Spielwoche"}</span>
               <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-white/60 tabular-nums">
-                {warns ? <span className="font-semibold text-warn" data-testid={`staffel-week-warn-${week.number ?? "ohne"}`}>{warns === 1 ? "1 Spiel mit offenem Punkt" : `${warns} Spiele mit offenem Punkt`}</span> : null}
+                {warns ? <span className="font-semibold text-warn" data-testid={`staffel-week-warn-${week.number ?? "ohne"}`}>{warns}</span> : null}
                 {done === week.matches.length ? "alle gespielt" : `${done} von ${week.matches.length} gespielt`}
                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
               </span>

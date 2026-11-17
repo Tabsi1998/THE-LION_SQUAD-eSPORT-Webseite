@@ -323,7 +323,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.getByTestId(`staffel-game-state-m${CURRENT}-5`)).toContainText("In Klärung");
     // Woche 5 ist gespielt, ein Verfahren ist aber offen - sie bleibt aufgeklappt.
     await expect(page.getByTestId("staffel-week-5")).toHaveAttribute("open", "");
-    await expect(page.getByTestId("staffel-week-warn-5")).toHaveText("1 Spiel mit offenem Punkt");
+    await expect(page.getByTestId("staffel-week-warn-5")).toHaveText("1 Verfahren offen");
     await page.getByTestId("staffel-week-2").locator("summary").click();
     await expect(page.getByTestId("staffel-game-state-m2-2")).toContainText("Kampflos gewertet");
     await page.getByTestId("staffel-week-3").locator("summary").click();

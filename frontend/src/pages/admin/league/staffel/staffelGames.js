@@ -71,3 +71,20 @@ export function gameChips(match) {
   if (procedures) chips.push({ key: "procedures", text: plural(procedures, "Verfahren offen", "Verfahren offen"), tone: "warn" });
   return chips;
 }
+
+// Was im Kopf einer Woche steht, wenn etwas jemanden braucht - dieselben warnenden Chips, zusammengezählt.
+const WARN_KINDS = [
+  { key: "procedures", count: (marks) => Number(marks.procedures) || 0, one: "Verfahren offen", many: "Verfahren offen" },
+  { key: "incidents", count: (marks) => Number(marks.incidents) || 0, one: "Vorfall offen", many: "Vorfälle offen" },
+  { key: "checkin", count: (marks) => (marks.checkin === "closed" ? 1 : 0), one: "Check-in vorbei", many: "Check-ins vorbei" },
+  { key: "veto", count: (marks) => (marks.veto === "paused" ? 1 : 0), one: "Veto pausiert", many: "Vetos pausiert" },
+];
+
+/** „1 Verfahren offen“, „2 Vorfälle offen“ - bei verschiedenen Arten „3 offene Punkte“, ohne Warnung leer. */
+export function weekWarnText(matches = []) {
+  const totals = WARN_KINDS.map((kind) => ({ ...kind, total: (matches || []).reduce((sum, match) => sum + (match?.league_marks ? kind.count(match.league_marks) : 0), 0) }))
+    .filter((kind) => kind.total > 0);
+  if (!totals.length) return "";
+  if (totals.length === 1) return `${totals[0].total} ${totals[0].total === 1 ? totals[0].one : totals[0].many}`;
+  return `${totals.reduce((sum, kind) => sum + kind.total, 0)} offene Punkte`;
+}
