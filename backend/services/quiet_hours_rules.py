@@ -92,7 +92,10 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
     if not found:
         return None
     start, end = found
-    local = (now or datetime.now(timezone.utc)).astimezone(VIENNA)
+    # Der Vergleichszeitpunkt bleibt die UTC-Zeit selbst: aus der Wiener Zeit zurückgerechnet hinge er an ``fold`` - und
+    # das geht etwa beim Umwandeln in eine Unterklasse von ``datetime`` verloren (02:15 MEZ würde zu 02:15 MESZ).
+    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    local = moment.astimezone(VIENNA)
     minute = local.hour * 60 + local.minute
     day = local.date()
     if start < end:
@@ -104,7 +107,6 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
         if minute >= start:
             day = day + timedelta(days=1)
     # In der Nacht der Rückstellung gibt es 02:00–02:59 zweimal: das erste Ende, das noch vor uns liegt (fold 0, dann 1).
-    moment = local.astimezone(timezone.utc)
     for fold in (0, 1):
         until = datetime(day.year, day.month, day.day, end // 60, end % 60, tzinfo=VIENNA, fold=fold).astimezone(timezone.utc)
         if until > moment:

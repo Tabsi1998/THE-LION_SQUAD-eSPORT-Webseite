@@ -488,6 +488,26 @@ def test_second_pass_of_the_fall_back_night_ends_in_the_future():
     assert second == _utc("2026-10-25T01:30:00") and second > _utc("2026-10-25T01:15:00")
 
 
+class _ForgetfulClock(datetime):
+    """Wie ``FakeDatetime`` aus freezegun (Zeitreise-Probe, #2474): Umwandeln in eine Zeitzone baut ein neues Objekt
+    aus Datum und Uhrzeit - ``fold`` geht dabei verloren."""
+
+    def astimezone(self, tz=None):
+        moment = datetime.astimezone(self, tz)
+        return _ForgetfulClock(moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second,
+                               moment.microsecond, tzinfo=moment.tzinfo)
+
+
+def test_the_second_pass_does_not_depend_on_fold_surviving_the_conversion():
+    """#2474: 02:15 MEZ ist 01:15 UTC. Geht ``fold`` beim Umrechnen verloren, darf daraus nicht 02:15 MESZ werden - das
+    Ende läge sonst eine Stunde zu früh, schon vor dem Jetzt, und die Ruhezeit wäre vorbei."""
+    user = {"quiet_hours": {"enabled": True, "start": "00:00", "end": "02:30"}}
+    now = _ForgetfulClock(2026, 10, 25, 1, 15, tzinfo=timezone.utc)  # 02:15 MEZ, zweiter Durchlauf
+    until = quiet_hours_rules.quiet_until(user, now)
+    assert until == _utc("2026-10-25T01:30:00")
+    assert until > now
+
+
 def test_display_and_effect_use_the_same_fallback():
     """Nur ``enabled`` gespeichert (alter Teil-PATCH): Anzeige 22–7, und genau dann wird auch zurückgehalten."""
     user = {"quiet_hours": {"enabled": True}}
