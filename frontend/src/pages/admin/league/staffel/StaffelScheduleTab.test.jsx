@@ -111,24 +111,56 @@ test("Spielwochen nicht ladbar: sichtbarer Hinweis statt leerer Fläche", async 
   expect(await screen.findByTestId("mp-remote-error")).toHaveTextContent("Spielwochen konnten nicht geladen werden");
 });
 
-test("vor dem Start mit „Season konfigurieren“: Vorschau neu mischen mit Rückfrage, Spieltage neu auslosen", async () => {
+const PREVIEW = [
+  { id: "p1", is_preview: true, status: "pending", matchday_number: 1, slots, settings: { randomize_advancement_rounds: true } },
+  { id: "p2", is_preview: true, status: "pending", matchday_number: 2, slots, settings: { randomize_advancement_rounds: true } },
+];
+
+test("vor dem Start mit „Season konfigurieren“: Vorschau neu mischen ohne force, Spieltage neu auslosen", async () => {
   const user = userEvent.setup();
-  const preview = [
-    { id: "p1", is_preview: true, status: "pending", matchday_number: 1, slots, settings: { randomize_advancement_rounds: true } },
-    { id: "p2", is_preview: true, status: "pending", matchday_number: 2, slots, settings: { randomize_advancement_rounds: true } },
-  ];
   serve({ stages: [{ id: "st1", stage_type: "league" }] });
-  const onReload = renderTab({ ...LIVE, status: "draft" }, preview);
+  const onReload = renderTab({ ...LIVE, status: "draft" }, PREVIEW);
   expect(screen.getByTestId("staffel-preview-tools")).toHaveTextContent("Die Vorschau hat 2 Spiele.");
   expect(await screen.findByTestId("redraw-league")).toHaveTextContent("Spieltage neu auslosen");
   expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/matchdays");
   await user.click(screen.getByTestId("staffel-remix"));
-  const dialog = await screen.findByRole("dialog");
-  expect(dialog).toHaveTextContent("Vorschau neu mischen?");
-  await user.click(within(dialog).getByRole("button", { name: "Neu mischen" }));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/bracket/from-format?preview=true&force=true"));
+  // Nur eine Vorschau: der Server fragt nicht nach - kein force, keine Rückfrage.
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/bracket/from-format?preview=true"));
+  expect(apiMock.post).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("dialog")).toBeNull();
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Vorschau mit 6 Spielen neu gemischt."));
   expect(onReload).toHaveBeenCalled();
+});
+
+test("Vorschau neu mischen: fragt der Server nach (etwas ginge verloren), erst nach Bestätigen mit force", async () => {
+  const user = userEvent.setup();
+  serve({ stages: [{ id: "st1", stage_type: "league" }] });
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: { code: "confirm_destruction", message: "Ein eigenes Schema geht dabei verloren." } } } });
+  renderTab({ ...LIVE, status: "draft" }, PREVIEW);
+  await user.click(screen.getByTestId("staffel-remix"));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent("Ein eigenes Schema geht dabei verloren.");
+  await user.click(within(dialog).getByRole("button", { name: "Neu mischen" }));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/tournaments/t1/bracket/from-format?preview=true&force=true"));
+  expect(apiMock.post.mock.calls.map(([url]) => url)).toEqual([
+    "/tournaments/t1/bracket/from-format?preview=true", "/tournaments/t1/bracket/from-format?preview=true&force=true"]);
+});
+
+test("nach dem Start: Spieltage neu auslosen, bis Spieltag 1 beginnt - danach nicht mehr", async () => {
+  serve({ stages: [{ id: "st1", stage_type: "league" }] });
+  const fixed = MATCHES.map((match) => ({ ...match, status: "scheduled", settings: { randomize_advancement_rounds: true } }));
+  const { unmount } = render(
+    <ConfirmDialogProvider>
+      <MemoryRouter><StaffelScheduleTab tournament={LIVE} registrations={REGS} matches={fixed} onReload={vi.fn()} /></MemoryRouter>
+    </ConfirmDialogProvider>,
+  );
+  expect(await screen.findByTestId("redraw-league")).toBeInTheDocument();
+  expect(await screen.findByTestId("mp-week-1")).toBeInTheDocument();
+  unmount();
+  renderTab(LIVE, [{ ...fixed[0], status: "in_progress", started_at: "2026-11-20T19:00:00Z" }, fixed[1]]);
+  expect(await screen.findByTestId("mp-week-1")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/stages"));
+  expect(screen.queryByTestId("redraw-league")).toBeNull();
 });
 
 test("vor dem Start ohne „Season konfigurieren“: nur der Satz, keine Knöpfe", () => {
@@ -137,4 +169,12 @@ test("vor dem Start ohne „Season konfigurieren“: nur der Satz, keine Knöpfe
   expect(screen.queryByTestId("staffel-remix")).toBeNull();
   expect(screen.queryByTestId("redraw-league")).toBeNull();
   expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/stages");
+});
+
+test("nach dem Start ohne „Season konfigurieren“: keine Phasen-Abfrage, kein Auslosen", async () => {
+  serve({ stages: [{ id: "st1", stage_type: "league" }] });
+  renderTab({ ...LIVE, can_manage_structure: false }, MATCHES.map((match) => ({ ...match, status: "scheduled", settings: { randomize_advancement_rounds: true } })));
+  expect(await screen.findByTestId("mp-week-1")).toBeInTheDocument();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/stages");
+  expect(screen.queryByTestId("redraw-league")).toBeNull();
 });
