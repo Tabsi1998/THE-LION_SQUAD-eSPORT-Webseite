@@ -97,6 +97,7 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Turnier-Cockpit vor Ort: oben die Probleme (Einspruch, nicht erschienen, Defekt, Ergebnis fehlt, Verzug ab 5 Min., Auslosung), darunter bzw. am Tablet quer daneben die Stationen mit „Aufrufen“, „Starten“, „Freigeben“ und „Defekt“; lädt alle 20 Sekunden neu, solange es offen ist | Turnier → Turnierleitung → Cockpit (nur vor Ort mit Stationen) |
 | Spielzeit-Uhr „12:34 / 30 Min.“ mit Balken: ab 80 % orange („knapp“), ab 100 % orange gefüllt mit Warn-Symbol; ohne Dauer nur die Zeit, in der Turnierpause steht sie | Cockpit, Turnierleitung → Ergebnisse, Turnier → Baum und Spielplan |
 | Hinweis der Turnierleitung: Banner oben auf Turnier- und Event-Seite; die Leitung schreibt ihn im Reiter „Hinweis“ (Vorlagen, an wen, wie lange, auch am TV) | Turnier, Event; Turnier → Turnierleitung → Hinweis |
+| Saison-Deko am Turniertag: Reiter „Baum“, Matchseite (mit „Du bist dran“) und Turnierleitung samt Cockpit immer ohne Deko; ist das eigene Spiel aufgerufen oder läuft es (allein, im Team, im Durchgang), pausiert sie überall, bis das Ergebnis da ist (spätestens nach drei Stunden; Saison-Grüße warten so lange) – wie im Web ([Auftritt](auftritt.md), 3.5) | überall |
 | Mitgliedskarte (auch ohne Netz), Versammlungen und Abstimmung, Helfen, Vereinsdokumente, Vorteile, Meine Mitgliedschaft | Tab Verein |
 | Einlass bei der Generalversammlung (Vorstand) | Tab Verein → Einlass |
 | Profil, Rechnungen, Gewinne, „Deine Unterlagen“, Jahresrückblick | Tab Profil |

@@ -326,3 +326,14 @@ test("die Dauer kommt vom Server, auch ohne eigenen Wert am Spiel", async () => 
   await render(<MatchDetailScreen navigation={navigation} route={route} />);
   expect(await screen.findByText("15 Min.")).toBeTruthy();
 });
+
+// Turniertag (#1169): Das Ergebnis des eigenen Spiels beendet die Pause der Saison-Deko; ein fremdes Spiel ändert nichts.
+test("das Ergebnis des eigenen Spiels beendet die Pause der Saison-Deko", async () => {
+  const { clearOwnMatches, noteOwnMatches, ownMatchesPaused } = require("../../seasons/matchPause");
+  noteOwnMatches([{ id: PAGE.match.id, status: "in_progress" }], "dashboard");
+  answer({ ...PAGE, can_player_report_result: false, report_state: null, match: { ...PAGE.match, status: "completed", winner_id: "r2" } });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-headline")).toBeTruthy());
+  await waitFor(() => expect(ownMatchesPaused()).toBe(false));
+  clearOwnMatches();
+});

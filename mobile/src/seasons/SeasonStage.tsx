@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { NavigationRouteContext } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,6 +22,8 @@ import { SnowCap } from "./snow/SnowCap";
 import { WinterSkyBackdrop } from "./snow/WinterSky";
 import { WeatherSky } from "./weather";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
+import { stillScreen } from "./intensity";
+import { useDecoPaused } from "./matchPause";
 import { claimCardTouch } from "./cardLift";
 import { useCardKey } from "./useCardLift";
 
@@ -94,6 +96,9 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
  */
 export const ROOM_SEASONS = new Set(["halloween", "christmas", "club_birthday", "carnival", "easter", "easter_hunt"]);
 
+/** So lange wartet ein Saison-Gruß in der Pause oder auf einem stillen Screen (#1169) - danach ist er überholt. */
+export const GREETING_WAIT_MS = 60 * 1000;
+
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
 export const SCREEN_SEASONS = new Set(["advent_calendar"]);
 
@@ -119,17 +124,38 @@ export function useCurrentScreen(): string {
   return screen;
 }
 
-export function useMountedSeasons(): Array<{ season: ActiveSeason; module: SeasonModule }> {
+/**
+ * Die Saisonen, die gerade etwas zeigen. Leer auf stillen Screens (`screen`, #1169: Matchseite, Turnierleitung,
+ * Verwaltung), solange ein stiller Reiter offen ist (Turnierbaum) und solange das eigene Spiel aufgerufen ist oder
+ * läuft - dann pausiert die Deko überall, bis das Ergebnis da ist.
+ */
+export function useMountedSeasons(screen?: string): Array<{ season: ActiveSeason; module: SeasonModule }> {
   const { seasons, ready } = useSeason();
-  if (!ready) return [];
+  const paused = useDecoPaused();
+  if (!ready || paused || (screen !== undefined && stillScreen(screen))) return [];
   return seasons.filter((season) => season.effective !== "off" && SEASON_MODULES[season.key]).map((season) => ({ season, module: SEASON_MODULES[season.key] }));
 }
 
 export function SeasonStage() {
-  const mounted = useMountedSeasons();
-  const { reducedMotion, toast } = useSeason();
-  const insets = useSafeAreaInsets();
   const screen = useCurrentScreen();
+  const mounted = useMountedSeasons(screen);
+  const { reducedMotion, toast: current, showToast } = useSeason();
+  const insets = useSafeAreaInsets();
+  // Saison-Grüße nur, wenn Deko zu sehen ist (#1169): in der Pause und auf stillen Screens wartet ein Gruß und kommt,
+  // sobald die Deko zurück ist. Meldungen mit `always` (neue Erfolge) stehen immer.
+  const hidden = useDecoPaused() || stillScreen(screen);
+  const toast = current && (current.always || !hidden) ? current : null;
+  // Wartet ein Gruß länger als GREETING_WAIT_MS, ist er überholt und fällt weg.
+  const waiting = useRef<{ text: string; ms?: number; at: number } | null>(null);
+  useEffect(() => {
+    if (current && !current.always && hidden) waiting.current = { text: current.text, ms: current.ms, at: Date.now() };
+  }, [current, hidden]);
+  useEffect(() => {
+    if (hidden || !waiting.current) return;
+    const held = waiting.current;
+    waiting.current = null;
+    if (Date.now() - held.at <= GREETING_WAIT_MS) showToast(held.text, held.ms);
+  }, [hidden, showToast]);
   const probing = mounted.some(({ season }) => ROOM_SEASONS.has(season.key));
   useEffect(() => {
     setRoomProbe(probing);
@@ -156,8 +182,8 @@ export function SeasonStage() {
 
 /** Das Widget im Dashboard-Kopf - nur, wenn eine Saison eines hat. */
 export function SeasonWidgetSlot() {
-  const mounted = useMountedSeasons().filter(({ module }) => module.Widget);
   const screen = useCurrentScreen();
+  const mounted = useMountedSeasons(screen).filter(({ module }) => module.Widget);
   // Das Widget hat seine eigene Antwort aufs Antippen (Kranz, Schneeflocke, Kürbis): ein Tippen darauf ist kein Tippen
   // auf die Begrüßungskarte, deren Deko bleibt dann ruhig (#1087).
   const cardKey = useCardKey();
@@ -188,8 +214,8 @@ function useSlotScreen(): string {
 
 /** Die Unterkante der Begrüßungskarte im Dashboard - eine Ebene über der Karte, nie klickbar. */
 export function SeasonEdgeSlot() {
-  const mounted = useMountedSeasons().filter(({ module }) => module.Edge);
   const screen = useSlotScreen();
+  const mounted = useMountedSeasons(screen).filter(({ module }) => module.Edge);
   if (!mounted.length) return null;
   return (
     <>
@@ -203,8 +229,8 @@ export function SeasonEdgeSlot() {
 
 /** Rechts im Kopf von „Mehr“: eine Figur, die auf der Kante der ersten Karte steht (Nikolausstiefel). */
 export function SeasonShelfSlot() {
-  const mounted = useMountedSeasons().filter(({ module }) => module.Shelf);
   const screen = useSlotScreen();
+  const mounted = useMountedSeasons(screen).filter(({ module }) => module.Shelf);
   if (!mounted.length) return null;
   const { season, module } = mounted[0];
   const Shelf = module.Shelf as React.ComponentType<{ season: ActiveSeason; screen: string }>;
@@ -213,8 +239,8 @@ export function SeasonShelfSlot() {
 
 /** Hinter dem Inhalt eines Screens (`Screen` legt sie unter alles) - nur, wenn eine Saison dort etwas zeigt. */
 export function SeasonBackdropSlot() {
-  const mounted = useMountedSeasons().filter(({ module }) => module.Backdrop);
   const screen = useSlotScreen();
+  const mounted = useMountedSeasons(screen).filter(({ module }) => module.Backdrop);
   if (!mounted.length) return null;
   return (
     <>
@@ -228,7 +254,7 @@ export function SeasonBackdropSlot() {
 
 /** Ein Saison-Symbol für die Tab-Leiste, oder null, wenn keine Saison eines hat. */
 export function useSeasonTabIcon(): React.ComponentType<{ size: number }> | null {
-  const mounted = useMountedSeasons().filter(({ module }) => module.TabIcon);
+  const mounted = useMountedSeasons(useCurrentScreen()).filter(({ module }) => module.TabIcon);
   return mounted.length ? (mounted[0].module.TabIcon as React.ComponentType<{ size: number }>) : null;
 }
 

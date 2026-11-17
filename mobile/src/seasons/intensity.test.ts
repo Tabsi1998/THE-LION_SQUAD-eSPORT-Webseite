@@ -13,7 +13,8 @@ test("Klassen: Dashboard und News lebendig, Details mittel, Turniere und Formula
   expect(screenClass("VereinHub")).toBe("medium");
   expect(screenClass("CommunityHub")).toBe("medium");
   expect(screenClass("TournamentDetail")).toBe("calm");
-  expect(screenClass("MatchDetail")).toBe("calm");
+  // Turniertag (#1169): die Matchseite ist still - ganz ohne Deko (stillness.test.ts).
+  expect(screenClass("MatchDetail")).toBe("quiet");
   expect(screenClass("FastLapDetail")).toBe("calm");
   expect(screenClass("Search")).toBe("calm");
   expect(screenClass("MyPrizes")).toBe("calm");
