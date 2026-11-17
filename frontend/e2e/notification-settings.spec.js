@@ -121,12 +121,23 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const seen = await mockServer(page, { failFirst: true });
       await page.goto("/profile?tab=notifications");
       await expect(page.getByTestId("notification-load-failed")).toBeVisible();
+      // Ruhezeit an: erst wenn die Antwort da ist, weiter. (Früher ging es schon weiter, sobald der Server die Anfrage hatte -
+      // eine Eingabe währenddessen drehte den Schalter mit einem zweiten Lauf zurück; behoben in useAutosave, #1208.)
+      const firstSaved = page.waitForResponse((response) => response.request().method() === "PATCH" && new URL(response.url()).pathname === "/api/users/me");
       await page.getByTestId("notification-quiet-toggle").click();
-      await expect.poll(() => seen.patches.length).toBe(1);
-      await page.getByTestId("notification-quiet-start").fill("");
-      await expect(page.getByTestId("notification-quiet-error")).toContainText("Uhrzeit wie 22:00");
-      await page.waitForTimeout(1200);
+      await firstSaved;
       expect(seen.patches).toHaveLength(1);
+      const start = page.getByTestId("notification-quiet-start");
+      await start.fill("");
+      await expect(page.getByTestId("notification-quiet-error")).toContainText("Uhrzeit wie 22:00");
+      // Feld verlassen speichert Wartendes sofort - ein ungültiger Entwurf geht nicht hinaus. Statt blind zu warten: auf
+      // eine solche Anfrage warten, höchstens bis nach der Tipp-Pause (0,8 s).
+      const secondSave = page.waitForRequest((request) => request.method() === "PATCH" && new URL(request.url()).pathname === "/api/users/me", { timeout: 1500 })
+        .then(() => true, () => false);
+      await start.blur();
+      expect(await secondSave).toBe(false);
+      expect(seen.patches).toHaveLength(1);
+      await expect(page.getByTestId("notification-quiet")).toHaveAttribute("data-enabled", "true");
       expect(await noSidewaysScroll(page)).toBe(true);
       if (SHOTS) {
         await page.evaluate(() => document.activeElement?.blur());

@@ -206,11 +206,15 @@ export function useProfileSave({ user, refresh }) {
     const errors = profileFieldErrors(next);
     const nextDrafts = {};
     const forQueue = { ...next };
+    // Der Stand des Servers - läuft gerade ein Lauf, der, den er schickt. Sonst würde eine ungültige Eingabe während des
+    // Speicherns den Stand von vorher zurückschreiben (Ruhezeit an, gleich danach Zeitfeld geleert: der zweite Lauf
+    // schaltete sie wieder aus, #1208).
+    const base = current.sending || current.confirmed;
     Object.keys(errors).forEach((key) => {
       // Ein ungültiger Stand, den der Server schon so hat (alte Daten), ist keine offene Eingabe.
-      if (sameValue(next[key], current.confirmed?.[key])) return;
+      if (sameValue(next[key], base?.[key])) return;
       nextDrafts[key] = next[key];
-      forQueue[key] = current.confirmed?.[key];
+      forQueue[key] = base?.[key];
     });
     draftsRef.current = nextDrafts;
     setDrafts(nextDrafts);

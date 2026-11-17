@@ -876,3 +876,25 @@ test("Abmelden mit leerem Namen fragt erst; Zurück zum Feld meldet nicht ab", a
   await waitFor(() => expect(logoutMock).toHaveBeenCalledTimes(1));
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
+
+// Ursache des Wackel-Tests in e2e/notification-settings.spec.js (#1208): Ruhezeit an, und noch während dieser Lauf
+// unterwegs ist, wird ein Zeitfeld geleert. Der Entwurf darf den Schalter nicht auf den Stand vor dem Lauf zurückdrehen.
+test("Ruhezeit an, Zeitfeld geleert, während das Speichern noch läuft: kein zweiter Lauf, der sie wieder ausschaltet", async () => {
+  const user = setupUser();
+  renderPage();
+  await waitForForm();
+  await openNotifications(user);
+  const first = deferredPatch();
+  await user.click(screen.getByTestId("notification-quiet-toggle"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  expect(first.body.quiet_hours.enabled).toBe(true);
+
+  // Noch keine Antwort - jetzt das Zeitfeld leeren.
+  fireEvent.change(screen.getByTestId("notification-quiet-start"), { target: { value: "" } });
+  expect(await screen.findByTestId("notification-quiet-error")).toHaveTextContent("Uhrzeit wie 22:00");
+
+  await act(async () => { first.resolve({ ...USER, ...first.body }); });
+  await advance(AUTOSAVE_DELAY_MS + 400);
+  expect(apiMock.patch).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId("notification-quiet")).toHaveAttribute("data-enabled", "true");
+});

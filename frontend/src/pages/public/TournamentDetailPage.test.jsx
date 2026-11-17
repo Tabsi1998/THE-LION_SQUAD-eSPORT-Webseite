@@ -707,3 +707,46 @@ test("disqualifiert: „Dein Stand“ ohne Abmelden - das nimmt nur die Turnierl
   expect(await screen.findByTestId("tournament-my-stand")).toBeInTheDocument();
   expect(screen.queryByTestId("tournament-unregister-btn")).toBeNull();
 });
+
+// Erlaubnis im richtigen Moment (#1208): nach der Anmeldung merkt sich der Browser das Turnier - die Übersicht zählt es
+// dann nicht noch einmal als neu. Hat der Browser Benachrichtigungen abgelehnt, steht leise „Aufrufe sind aus“.
+test("nach der Anmeldung merkt sich der Browser das Turnier für die Frage nach Benachrichtigungen", async () => {
+  window.localStorage.removeItem("tls-web-push-seen:u1");
+  const user = userEvent.setup();
+  mockApi(base);
+  renderPage();
+  await user.click(await screen.findByTestId("tournament-register-btn"));
+  await screen.findByRole("dialog");
+  await user.click(screen.getByTestId("tournament-register-submit"));
+  await waitFor(() => expect(JSON.parse(window.localStorage.getItem("tls-web-push-seen:u1") || "null")?.seen).toEqual(["t:t1"]));
+});
+
+test("Browser hat Benachrichtigungen abgelehnt: leise „Aufrufe sind aus – einschalten“, nur mit Konto", async () => {
+  const { resetWebPushOffHintCache } = await import("@/components/notifications/WebPushOffHint");
+  resetWebPushOffHintCache();
+  const saved = { Notification: window.Notification, PushManager: window.PushManager, serviceWorker: Object.getOwnPropertyDescriptor(window.navigator, "serviceWorker") };
+  window.Notification = { permission: "denied" };
+  window.PushManager = function PushManager() {};
+  Object.defineProperty(window.navigator, "serviceWorker", { configurable: true, value: { ready: new Promise(() => {}) } });
+  try {
+    apiMock.get.mockImplementation((path) => {
+      if (path === "/web-push/config") return Promise.resolve({ data: { enabled: true, public_key: "BQQ" } });
+      if (path === "/tournaments/cup") return Promise.resolve({ data: base });
+      return Promise.resolve({ data: [] });
+    });
+    const { unmount } = renderPage();
+    const hint = await screen.findByTestId("tournament-push-off");
+    expect(hint).toHaveTextContent("Aufrufe sind aus – einschalten");
+    expect(hint).toHaveAttribute("href", "/profile?tab=notifications#dieser-browser");
+    unmount();
+    authUser = null;
+    renderPage();
+    expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
+    expect(screen.queryByTestId("tournament-push-off")).toBeNull();
+  } finally {
+    if (saved.Notification === undefined) delete window.Notification; else window.Notification = saved.Notification;
+    if (saved.PushManager === undefined) delete window.PushManager; else window.PushManager = saved.PushManager;
+    if (saved.serviceWorker) Object.defineProperty(window.navigator, "serviceWorker", saved.serviceWorker);
+    else delete window.navigator.serviceWorker;
+  }
+});

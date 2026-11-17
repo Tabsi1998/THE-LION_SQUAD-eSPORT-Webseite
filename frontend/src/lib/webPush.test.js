@@ -4,6 +4,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock }));
 
 const webPush = await import("./webPush");
 const { askDecision, markVisit, offerWebPush, enableWebPush, syncWebPush, forgetWebPush, browserPushStatus, keyBytes, needsHomeScreen, WEB_PUSH_EVENT } = webPush;
+const { dashboardRegistrationKeys, dashboardTeamKeys, noteWebPushRegistrations, registrationKey, rememberWebPushRegistration, webPushBlocked } = webPush;
 
 const CONFIG = { enabled: true, public_key: `B${"Q".repeat(86)}`, subscriptions: 0 };
 
@@ -13,6 +14,8 @@ function storage() {
     getItem: (key) => (values.has(key) ? values.get(key) : null),
     setItem: (key, value) => values.set(key, String(value)),
     removeItem: (key) => values.delete(key),
+    get length() { return values.size; },
+    key: (index) => [...values.keys()][index] ?? null,
     values,
   };
 }
@@ -62,9 +65,12 @@ describe("Zeitpunkt der Frage", () => {
     expect(askDecision({ config: CONFIG, env, state: "pending", firstVisit: false })).toBe("ask");
   });
 
-  test("nur einmal, und ein Nein bleibt ein Nein", () => {
-    expect(askDecision({ config: CONFIG, env, state: "asked", firstVisit: false })).toBeNull();
-    expect(askDecision({ config: CONFIG, env, state: "declined", firstVisit: false })).toBeNull();
+  // #1208: „Später“ fragt bei der nächsten Anmeldung wieder - nur die Antwort des Browsers ist endgültig.
+  test("„Später“ hält die nächste Anmeldung nicht auf; ein Nein des Browsers bleibt ein Nein", () => {
+    expect(askDecision({ config: CONFIG, env, state: "later", firstVisit: false })).toBe("ask");
+    // Ein „Nicht jetzt“ von früher (#1163) zählt wie „Später“.
+    expect(askDecision({ config: CONFIG, env, state: "declined", firstVisit: false })).toBe("ask");
+    expect(askDecision({ config: CONFIG, env, state: "asked", firstVisit: false })).toBe("ask");
     expect(askDecision({ config: CONFIG, env: { ...env, permission: "denied" }, state: "", firstVisit: false })).toBeNull();
     expect(askDecision({ config: CONFIG, env: { ...env, permission: "granted" }, state: "", firstVisit: false })).toBeNull();
   });
@@ -77,6 +83,9 @@ describe("Zeitpunkt der Frage", () => {
     const iphone = { supported: false, ios: true, standalone: false, permission: "unsupported" };
     expect(needsHomeScreen(iphone)).toBe(true);
     expect(askDecision({ config: CONFIG, env: iphone, state: "", firstVisit: false })).toBe("ios-hint");
+    // Den Hinweis fürs iPhone gibt es nur einmal.
+    expect(askDecision({ config: CONFIG, env: iphone, state: "ios-seen", firstVisit: false })).toBeNull();
+    expect(askDecision({ config: CONFIG, env: iphone, state: "asked", firstVisit: false })).toBeNull();
     // Vom Home-Bildschirm aus kann das iPhone Web-Push - dann die echte Frage.
     expect(askDecision({ config: CONFIG, env: { supported: true, ios: true, standalone: true, permission: "default" }, state: "", firstVisit: false })).toBe("ask");
     // Ein Browser ohne Web-Push und kein iPhone: nichts.
@@ -109,7 +118,7 @@ describe("nach einer Anmeldung", () => {
     const asked = vi.fn();
     win.addEventListener(WEB_PUSH_EVENT, asked);
     expect(await offerWebPush(win)).toBe("ask");
-    expect(asked.mock.calls[0][0].detail).toEqual({ mode: "ask", config: CONFIG });
+    expect(asked.mock.calls[0][0].detail).toEqual({ mode: "ask", config: CONFIG, reason: "own" });
   });
 
   test("ohne Web-Push am Server bleibt alles still", async () => {
@@ -201,5 +210,109 @@ describe("Inhalt verbergen (#1163)", () => {
     const { win } = fakeWindow({ permission: "granted" });
     expect(await webPush.setWebPushPrivate(true, win)).toBe(false);
     expect(apiMock.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("Erlaubnis im richtigen Moment (#1208)", () => {
+  function laterVisit() {
+    const made = fakeWindow();
+    markVisit(made.win);
+    made.win.sessionStorage = storage();
+    return made;
+  }
+
+  test("„Später“ - die nächste Anmeldung fragt wieder", async () => {
+    const { win } = laterVisit();
+    const asked = vi.fn();
+    win.addEventListener(WEB_PUSH_EVENT, asked);
+    win.localStorage.setItem("tls-web-push-ask", "later");
+    expect(await offerWebPush(win)).toBe("ask");
+    expect(asked).toHaveBeenCalledTimes(1);
+  });
+
+  test("abgelehnt oder erlaubt: keine Frage, nicht einmal die Einstellungen vom Server", async () => {
+    for (const permission of ["denied", "granted"]) {
+      const { win } = fakeWindow({ permission });
+      markVisit(win);
+      win.sessionStorage = storage();
+      expect(await offerWebPush(win)).toBeNull();
+    }
+    expect(apiMock.get).not.toHaveBeenCalled();
+  });
+
+  test("der leise Hinweis nur, wenn der Browser abgelehnt hat", () => {
+    expect(webPushBlocked(fakeWindow({ permission: "denied" }).win)).toBe(true);
+    expect(webPushBlocked(fakeWindow({ permission: "default" }).win)).toBe(false);
+    expect(webPushBlocked(fakeWindow({ permission: "granted" }).win)).toBe(false);
+    expect(webPushBlocked(fakeWindow({ supported: false }).win)).toBe(false);
+  });
+
+  test("die Anmeldungen der Übersicht: Turniere und Events, jede einmal", () => {
+    expect(dashboardRegistrationKeys({ tournaments: [{ id: "t1" }, { id: "t1" }, {}], events: [{ id: "e1" }] })).toEqual(["t:t1", "e:e1"]);
+    expect(dashboardRegistrationKeys(null)).toEqual([]);
+    expect(registrationKey("event", null)).toBeNull();
+  });
+
+  test("kein Dialog nach dem Login: die erste Übersicht ist nur der Ausgangsstand", () => {
+    const { win } = fakeWindow();
+    expect(noteWebPushRegistrations("u1", ["t:alt", "e:alt"], { win })).toBeNull();
+    expect(JSON.parse(win.localStorage.getItem("tls-web-push-seen:u1"))).toEqual({ seen: ["t:alt", "e:alt"] });
+  });
+
+  test("Teammitglied: das Team wurde angemeldet - beim nächsten Öffnen ist das der Anlass, danach nicht noch einmal", () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], { win });
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:team"], { win, teamKeys: ["t:team"] })).toBe("team");
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:team"], { win, teamKeys: ["t:team"] })).toBeNull();
+    // In der App selbst angemeldet: Anlass „eigene Anmeldung“.
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:team", "t:app"], { win, teamKeys: ["t:team"] })).toBe("own");
+  });
+
+  test("eigene Anmeldung zählt auf der Übersicht nicht noch einmal als neu", () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], { win });
+    rememberWebPushRegistration("u1", "t:neu", win);
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:neu"], { win })).toBeNull();
+  });
+
+  test("eigene Anmeldung ohne Ausgangsstand: die nächste Übersicht gilt als Ausgangsstand", () => {
+    const { win } = fakeWindow();
+    rememberWebPushRegistration("u1", "t:neu", win);
+    expect(noteWebPushRegistrations("u1", ["t:neu", "t:alt"], { win })).toBeNull();
+    expect(noteWebPushRegistrations("u1", ["t:neu", "t:alt", "t:team"], { win })).toBe("own");
+  });
+
+  test("der Merker gehört dem Konto in diesem Browser", () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], { win });
+    expect(noteWebPushRegistrations("u2", ["t:alt", "t:x"], { win })).toBeNull();
+    expect(noteWebPushRegistrations(null, ["t:y"], { win })).toBeNull();
+  });
+});
+
+describe("Kontowechsel und Anlass (#1208)", () => {
+  test("Abmelden räumt die gemerkten Anmeldungen ab - nach dem nächsten Login ist die Übersicht Ausgangsstand", async () => {
+    const { win } = fakeWindow();
+    noteWebPushRegistrations("u1", ["t:alt"], { win });
+    win.localStorage.setItem("andere-einstellung", "bleibt");
+    await forgetWebPush(win);
+    expect(win.localStorage.getItem("tls-web-push-seen:u1")).toBeNull();
+    expect(win.localStorage.getItem("andere-einstellung")).toBe("bleibt");
+    expect(noteWebPushRegistrations("u1", ["t:alt", "t:neu"], { win })).toBeNull();
+  });
+
+  test("Team-Anmeldungen der Übersicht erkannt", () => {
+    expect(dashboardTeamKeys({ tournaments: [{ id: "t1", my_registration: { team_id: "team-1" } }, { id: "t2", my_registration: { team_id: null } }] })).toEqual(["t:t1"]);
+    expect(dashboardTeamKeys(null)).toEqual([]);
+  });
+
+  test("der Anlass reist mit der Frage zum Kasten", async () => {
+    const { win } = fakeWindow();
+    markVisit(win);
+    win.sessionStorage = storage();
+    const asked = vi.fn();
+    win.addEventListener(WEB_PUSH_EVENT, asked);
+    await offerWebPush(win, { reason: "team" });
+    expect(asked.mock.calls[0][0].detail).toEqual({ mode: "ask", config: CONFIG, reason: "team" });
   });
 });

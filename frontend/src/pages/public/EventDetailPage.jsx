@@ -15,7 +15,8 @@ import { FactsBox } from "@/components/tls/FactsBox";
 import { EventRecap } from "@/components/tls/EventRecap";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
-import { offerWebPush } from "@/lib/webPush";
+import { offerWebPush, registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { WebPushOffHint } from "@/components/notifications/WebPushOffHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { NoticeBanner, useNotices } from "@/components/tls/tournament/NoticeBanner";
@@ -165,6 +166,8 @@ export default function EventDetailPage() {
   // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events. Kam man von einem Turnier mit
   // Event-Pflicht (#875, ?turnier=…), geht es danach dorthin zurück.
   const [playAlong, setPlayAlong] = useState(false);
+  // Die Frage nach Browser-Benachrichtigungen (#1208) wartet, bis „Spielst du auch mit?“ zu ist - nie dahinter.
+  const pushAfterPlayAlong = useRef(null);
   const returnFrom = searchParams.get(RETURN_PARAM) || "";
   const navigate = useNavigate();
   const { hasConsent } = useCookieConsent();
@@ -229,12 +232,21 @@ export default function EventDetailPage() {
   };
   const finishPlayAlong = () => {
     setPlayAlong(false);
+    const pending = pushAfterPlayAlong.current;
+    pushAfterPlayAlong.current = null;
+    if (pending) void pending.then(() => offerWebPush());
     const back = returnTournamentPath(returnFrom);
     if (back) navigate(back);
   };
-  const afterRegistration = () => {
-    if (offersPlayAlong(e, user)) setPlayAlong(true);
-    else finishPlayAlong();
+  const afterRegistration = (calendar) => {
+    const afterCalendar = Promise.resolve(calendar).catch(() => null);
+    if (offersPlayAlong(e, user)) {
+      pushAfterPlayAlong.current = afterCalendar;
+      setPlayAlong(true);
+    } else {
+      void afterCalendar.then(() => offerWebPush());
+      finishPlayAlong();
+    }
   };
   const openRegistration = () => {
     setRegisterOpen(true);
@@ -261,7 +273,7 @@ export default function EventDetailPage() {
           )}
         </div>
       </div>
-      {playAlong && <PlayAlongSheet event={e} from={returnFrom} onClose={finishPlayAlong} />}
+      {playAlong && <PlayAlongSheet event={e} from={returnFrom} userId={user?.id || null} onClose={finishPlayAlong} />}
     </PublicLayout>
   );
 }
@@ -361,6 +373,8 @@ function EventFactsBox({ e, user, over, onRegister }) {
         </Link>
       ) : null}
       {!over ? <AddToCalendar block days={e.schedule?.multi_day ? e.schedule.days : null} item={calendarItem} /> : null}
+      {/* Aufrufe im Browser abgelehnt (#1208): eine leise Zeile statt einer Frage bei jedem Öffnen. */}
+      <WebPushOffHint user={user} show={!over} testId="event-push-off" className="w-full justify-center" />
     </FactsBox>
   );
 }
@@ -689,12 +703,14 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       // Was der Server entschieden hat (#2127, EV7) - in der Zwischenzeit kann der letzte Platz weg sein.
       toast.success(response?.data?.status === "waitlist" ? "Du stehst auf der Warteliste. Wird ein Platz frei, bekommst du Bescheid." : "Du bist angemeldet.");
       await onChanged();
-      onRegistered?.();
+      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet. Danach (#1163) die Frage nach
+      // Browser-Benachrichtigungen - die stellt die Seite, erst wenn „Spielst du auch mit?“ zu ist (#1208). Die Anmeldung
+      // merkt sich der Browser, damit die Übersicht sie nicht noch einmal als neu zählt.
+      rememberWebPushRegistration(user?.id, registrationKey("event", event.id));
+      const calendar = offerCalendarHint();
+      onRegistered?.(calendar);
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
       void offerFriendsHint();
-      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet. Danach (#1163) die Frage nach
-      // Browser-Benachrichtigungen.
-      void offerCalendarHint().then(() => offerWebPush());
     });
     if (attempt.started && attempt.error) {
       const message = formatRequestError(attempt.error, "Anmeldung konnte nicht gespeichert werden.");
