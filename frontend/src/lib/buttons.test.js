@@ -36,7 +36,7 @@ test("die fünf Arten haben je ihren Stil, Fokus ist für alle sichtbar, Hover n
 // Cyan, 11 px lang, 2 px stark, 5 px außerhalb - statt eines weißen Rahmens oder Rings. Der Rahmen bleibt da, aber
 // durchsichtig: Im Kontrast-Modus von Windows bekommt er die Systemfarbe, Verläufe und Schatten fallen dort weg.
 test("Fokus: Ecken-Klammern an Knöpfen und Karten, dazu ein durchsichtiger Rahmen für den Kontrast-Modus", () => {
-  const root = rule(":root", system.slice(system.indexOf("/* Ecken-Klammern (#1316)")));
+  const root = rule(":root, :where(.tls-you), :where(.tls-btn), :where(.tls-card)", system.slice(system.indexOf("/* Ecken-Klammern (#1316)")));
   expect(root).toMatch(/--tls-corner-len: 11px;/);
   expect(root).toMatch(/--tls-corner-width: 2px;/);
   expect(root).toMatch(/--tls-corner-out: 5px;/);
@@ -63,6 +63,8 @@ test("Fokus: Ecken-Klammern an Knöpfen und Karten, dazu ein durchsichtiger Rahm
   expect(system).toMatch(/:where\(\.tls-you\), :where\(\.tls-btn\), :where\(\.tls-card\) \{ position: relative; \}/);
   // In wischbaren Leisten sitzen die Winkel an der Kante - die Leiste schneidet oben und unten ab.
   expect(css).toMatch(/\n\.tls-swipe :is\(\.tls-btn, \.tls-card\) \{ --tls-corner-out: 0px; \}/);
+  // Karten heben sich um 5 px - Leisten mit Karten haben oben 6 px Luft, fest (kein Sprung beim Fokus).
+  expect(css).toMatch(/\n\.tls-swipe:has\(\.tls-card\) \{ padding-top: 6px; \}/);
   // Alle anderen Stellen behalten den Ring, aber auch dort mit durchsichtigem Rahmen statt `outline: none`.
   expect(css).toMatch(/\n:focus-visible \{ outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 2px var\(--tls-cyan\); \}/);
 });

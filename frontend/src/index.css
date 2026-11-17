@@ -3879,8 +3879,11 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 /* Die Marke an der Zeile („Du“, „Dein Team“, „Verein“) sieht aus wie das Etikett „Du“ (.tls-you-tag): eine Pille in
    gemischter Schreibung, nie wie ein Initialen-Kästchen. */
 .tls-standing-me { border-radius: 999px; padding: 1px 7px; font-size: 11px; line-height: 1.35; letter-spacing: 0.02em; text-transform: none; }
-/* Wischbare Leisten schneiden oben und unten ab: Fokus-Winkel an Knöpfen und Karten sitzen dort an der Kante. */
+/* Wischbare Leisten schneiden oben und unten ab: Fokus-Winkel an Knöpfen und Karten sitzen dort an der Kante. Eine
+   Karte hebt sich beim Fokus und Drüberfahren um 5 px - Leisten mit Karten haben darum oben 6 px Luft (fest, kein
+   Sprung beim Fokus), sonst schnitte die Leiste die oberen Winkel und die Kante der Karte ab. */
 .tls-swipe :is(.tls-btn, .tls-card) { --tls-corner-out: 0px; }
+.tls-swipe:has(.tls-card) { padding-top: 6px; }
 .tls-card.tls-you:not(.tls-card--own):focus-visible {
   box-shadow: var(--tls-you-fill), 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
 }
