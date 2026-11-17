@@ -92,3 +92,8 @@ export function staleText(ms) {
   const seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
   return `Letzter Stand vor ${seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} Min.`} – es wird weiter nachgeladen.`;
 }
+
+// Turniertag (#1169): Wer eigene Spiele kennt (Startseite, Matchseite, „Mein nächstes Spiel“), meldet sie über diesen
+// Weg - die Regeln liegen in seasons/matchPause.js. Der Umweg hält sie im selben Teil wie die Warteschlange: kein
+// eigenes Bundle-Stück, der Start-Teil bleibt unter dem Ziel (check:bundle).
+export { noteOwnMatches } from "@/seasons/matchPause";

@@ -29,7 +29,9 @@ test("Seite: lebendige Seiten alles, ruhigere weniger, stille nichts", () => {
   expect(weatherShare("/")).toBe(1);
   expect(weatherShare("/events")).toBe(1);
   expect(weatherShare("/login")).toBe(0.6);
-  expect(weatherShare("/tournaments/cup/bracket")).toBe(0.6);
+  expect(weatherShare("/tournaments/cup/standings")).toBe(0.6);
+  // Turniertag (#1169): der Baum ist still.
+  expect(weatherShare("/tournaments/cup/bracket")).toBe(0);
   expect(weatherShare("/admin/x")).toBe(0);
 });
 
