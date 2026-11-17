@@ -375,3 +375,19 @@ test("Wechsel auf eine andere Staffel zeigt nichts von der vorigen, bis die neue
   release({ data: [] });
   expect(await screen.findByTestId("staffel-teams-count")).toHaveTextContent("0");
 });
+
+test("Tabelle: den Gleichstand entscheidet nur, wer „Ergebnisse korrigieren“ hat", async () => {
+  const table = { can_decide: true, superadmin: false, rules: {}, standings: [], decisions: [],
+    ties: [{ rank: 1, registration_ids: ["r1", "r2"], names: ["Nebelwölfe · Rudel", "Sturmfalken · Horst"], points: 3 }] };
+  for (const [capabilities, allowed] of [[ALL, true], [ALL.filter((item) => item !== "results"), false]]) {
+    serve({ tournament: { status: "live", league_capabilities: capabilities } });
+    const base = apiMock.get.getMockImplementation();
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/admin/leagues/staffeln/t1/table") ? Promise.resolve({ data: table }) : base(url)));
+    const { unmount } = renderPage("#gleichstand");
+    expect(await screen.findByTestId("season-tie-t1-1")).toBeInTheDocument();
+    if (allowed) expect(screen.getByTestId("season-tie-decide-1")).toBeInTheDocument();
+    else expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
+    expect(screen.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", "http://test.local/api/exports/tournaments/t1/standings.pdf");
+    unmount();
+  }
+});

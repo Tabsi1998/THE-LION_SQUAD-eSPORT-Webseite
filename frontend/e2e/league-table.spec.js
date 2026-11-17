@@ -41,6 +41,12 @@ const STAFFEL = {
       away: { registration_id: "r5", name: TEAMS[4], score: null }, winner_registration_id: null, games: [] }] }],
 };
 
+const STAFFEL_TOURNAMENT = {
+  id: "t1", slug: "probe-a", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "live", format: "league", team_mode: "team", max_participants: 8,
+  league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
+  league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A", season_admin_path: "/admin/leagues/seasons/s1" },
+  league_capabilities: ["results", "season"], can_manage_structure: true, can_manage_all_results: true,
+};
 const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const day = (offset) => new Date(Date.UTC(2026, 10, 10 + offset)).toISOString().slice(0, 10);
 const CALENDAR = { weeks: Array.from({ length: 10 }, (_, index) => ({ number: index + 1, start_day: day(index * 7), end_day: day(index * 7 + 6), blocked: false })),
@@ -76,6 +82,11 @@ async function mockServer(page, { admin = false } = {}) {
   await page.route("**/api/leagues/probe-liga/season-1/staffeln/**", json(STAFFEL));
   await page.route("**/api/admin/leagues/seasons/s1", json(SEASON_PAGE));
   await page.route("**/api/admin/leagues/staffeln/t1/table", json(TABLE));
+  // Staffel-Seite der Liga-Verwaltung (#2262): die Staffel mit Liga-Rechten, Co-Teams und Spiele.
+  await page.route("**/api/admin/my-leagues**", json({ leagues: [{ id: "l1", capabilities: ["results", "season"] }] }));
+  await page.route(/\/api\/tournaments\/t1(\?.*)?$/, json(STAFFEL_TOURNAMENT));
+  await page.route("**/api/tournaments/t1/registrations", json([]));
+  await page.route("**/api/tournaments/t1/matches-v2", json([]));
 }
 
 async function noSideScroll(page) {
@@ -109,7 +120,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await screenshot(staffel.locator(".tls-league-table"), "liga-tabelle-gleichstand", width, 1440);
   });
 
-  test(`Season-Verwaltung (${width} px): geteilter Platz, Reihenfolge festlegen mit Grund`, async ({ page }) => {
+  test(`Staffel-Seite (${width} px): geteilter Platz, Reihenfolge festlegen mit Grund`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await mockServer(page, { admin: true });
     let sent = null;
@@ -117,15 +128,20 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       sent = route.request().postDataJSON();
       return route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "d1", ...sent }) });
     });
-    // Reiter Tabelle (#2267): Punkte, Gleichstand und Ausscheiden über den Gleichständen der Staffeln.
+    // Season-Reiter Tabelle (#2267): Punkte, Gleichstand und Ausscheiden - Tabelle und Entscheid stehen seit #2262 (Nr. 190) auf der
+    // Staffel-Seite, die Season führt mit „Tabelle öffnen“ dorthin.
     await page.goto("/admin/leagues/seasons/s1#tabelle");
-    const panel = page.getByTestId("season-table-panel");
-    await expect(panel.getByTestId("season-tie-t1-4")).toContainText("Platz 4: Wüstenfüchse · Füchse A, Steinböcke · Steinböcke 2");
-    await expect(panel.getByTestId("season-decision-d0")).toContainText("Gilt nicht mehr");
     await expect(page.getByTestId("tiebreaker-head_to_head")).toBeChecked();
     await expect(page.getByTestId("season-form-exit-rule")).toHaveValue("all_for_opponents");
+    await expect(page.getByTestId("season-table-panel")).toHaveCount(0);
+    await page.getByTestId("season-table-open-t1").click();
+    await expect(page).toHaveURL(/\/admin\/leagues\/staffeln\/t1#tabelle$/);
+    const panel = page.getByTestId("staffel-table-t1");
+    await expect(panel.getByTestId("season-tie-t1-4")).toContainText("Platz 4: Wüstenfüchse · Füchse A, Steinböcke · Steinböcke 2");
+    await expect(panel.getByTestId("season-decision-d0")).toContainText("Gilt nicht mehr");
+    await expect(panel.getByTestId("standing-row-r1")).toContainText("Nordlicht");
     await noSideScroll(page);
-    await screenshot(panel, "liga-gleichstand-entscheid", width, 390);
+    await screenshot(panel.locator("#gleichstand"), "liga-gleichstand-entscheid", width, 390);
     await panel.getByTestId("season-tie-decide-4").click();
     const sheet = page.getByTestId("table-decision-sheet");
     await sheet.getByTestId("table-decision-down-0").click();

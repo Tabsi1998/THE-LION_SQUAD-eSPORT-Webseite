@@ -1,8 +1,9 @@
 const { test, expect } = require("@playwright/test");
 
-// Staffel-Seite der Liga-Verwaltung (#2262, Paket A) im echten Browser, Server nachgestellt: Kopf mit Brotkrumen, Reiter Überblick
-// und Teilnehmer, Co-Team zuteilen, Austritt, Rechte ohne Knöpfe. Bei 390 und 1440 px ohne seitliches Scrollen, Tippflächen ab 44 px.
-// Nur erfundene Namen.
+// Staffel-Seite der Liga-Verwaltung (#2262, Pakete A und B) im echten Browser, Server nachgestellt: Kopf mit Brotkrumen, Reiter Überblick
+// und Teilnehmer, Co-Team zuteilen, Austritt, Rechte ohne Knöpfe; Spielplan, Spiele und Ergebnisse, Tabelle samt Gleichstand. Bei 390
+// und 1440 px ohne seitliches Scrollen, Tippflächen ab 44 px. Mit E2E_SCREENS_DIR legt der Test die Bilder je Reiter ab. Nur erfundene Namen.
+const path = require("node:path");
 
 const LEAD = { id: "lead-1", username: "ligaleitung", display_name: "Ligaleitung", role: "user", areas: ["leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const ALL = ["applications", "manage", "matches", "results", "roster", "sanctions", "season"];
@@ -87,7 +88,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.goto("/admin/leagues/staffeln/t1");
     await expect(page.getByTestId("staffel-title")).toHaveText("Liga 1 · Staffel A");
     await expect(page.getByTestId("staffel-crumb-season")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
-    await expect(page.getByTestId("staffel-tabs").getByRole("tab")).toHaveText(["Überblick", "Teilnehmer"]);
+    await expect(page.getByTestId("staffel-tabs").getByRole("tab")).toHaveText(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle"]);
     await expect(page.getByTestId("tournament-flow-stepper")).toContainText("Co-Teams zuteilen");
     await expect(page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
     await expect(page.getByTestId("staffel-numbers-teams")).toContainText("2 von 8");
@@ -137,7 +138,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await mockServer(page, { staffel: { status: "live", league_capabilities: ["season"], can_edit_staffel: false, can_manage_participants: false } });
     await page.goto("/admin/leagues/staffeln/t1");
-    await expect(page.getByTestId("staffel-status-readonly")).toContainText("Spielbetrieb");
+    // Der Stand steht einmal im Abzeichen oben, die Kachel sagt nur, wer ihn ändert.
+    await expect(page.getByTestId("staffel-stand")).toContainText("Spielbetrieb");
+    await expect(page.getByTestId("staffel-status-readonly")).not.toContainText("Spielbetrieb");
     await expect(page.getByTestId("staffel-primary-action")).toHaveCount(0);
     await expect(page.getByTestId("staffel-status-select")).toHaveCount(0);
     await page.getByTestId("staffel-tab-teilnehmer").click();
@@ -176,4 +179,215 @@ test("Ladefehler der Co-Teams: Hinweis mit „Nochmal versuchen“ statt falsche
   await page.getByTestId("staffel-retry").click();
   await expect(page.getByTestId("staffel-numbers-teams")).toContainText("2 von 8");
   await expect(page.getByTestId("staffel-load-error")).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------- Paket B: Spielplan, Spiele und Ergebnisse, Tabelle
+
+// Härtefall (break-ui): 16 Co-Teams mit langen Namen, 15 Spielwochen je 8 Partien, offene Verfahren, Kampflos, beide nicht erschienen,
+// Gleichstand. Woche 7 läuft gerade.
+const LONG = ["Wolkenkratzer-Sturmfalken Ostalpen · Zweite Mannschaft Reserve", "Nebelwölfe · Rudel", "Bergdohlen · Schwarm", "Eisbären Nord · Eisbären B",
+  "Wüstenfüchse · Füchse A", "Steinböcke · Steinböcke 2", "Nordlicht · Nordlicht A", "Gipfelstürmer Hochkönig Allstars · Gipfel", "Sturmfalken · Horst",
+  "Murmeltiere · Bau", "Adlerhorst · Adler 1", "Waldkäuze · Käuze", "Talwind · Böe", "Felsenspringer · Gämsen", "Donnergroll · Blitz", "Silberpfeile · Pfeil B"];
+const WEEKS = 15;
+const CURRENT = 7;
+
+function bigWorld({ teams = 16 } = {}) {
+  const regs = LONG.slice(0, teams).map((name, index) => ({ id: `r${index + 1}`, status: "approved", display_name: name, team_id: `tm${index + 1}`, squad_id: `sq${index + 1}` }));
+  const ids = regs.map((row) => row.id);
+  const circle = ids.length % 2 ? [...ids, null] : [...ids];
+  const matches = [];
+  const matchdays = [];
+  const rounds = circle.length > 1 ? Math.min(WEEKS, circle.length - 1) : 0;
+  for (let week = 1; week <= rounds; week += 1) {
+    const start = new Date(Date.UTC(2026, 8, 7 + (week - 1) * 7));
+    const end = new Date(start.getTime() + 7 * 86400000 - 60000);
+    const entries = [];
+    // Kreisverfahren: der erste bleibt, die übrigen drehen sich je Woche weiter.
+    const order = [circle[0], ...circle.slice(1).map((_, index, rest) => rest[(index + week - 1) % rest.length])];
+    for (let pair = 0; pair < order.length / 2; pair += 1) {
+      const home = order[pair];
+      const away = order[order.length - 1 - pair];
+      if (!home || !away) continue;
+      const id = `m${week}-${pair + 1}`;
+      const at = new Date(start.getTime() + 5 * 86400000 + 19 * 3600000).toISOString();
+      const match = { id, tournament_id: "t1", match_key: `W${week}-${pair + 1}`, matchday_number: week, status: "scheduled", scheduled_at: at,
+        slots: [{ slot: 1, status: "filled", registration_id: home }, { slot: 2, status: "filled", registration_id: away }],
+        league_marks: { checkin: "none", checked_in: 0, veto: null, incidents: 0, procedures: 0 } };
+      if (week < CURRENT) {
+        Object.assign(match, { status: "completed", results: [{ registration_id: home, score: 2, rank: 1 }, { registration_id: away, score: pair % 2, rank: 2 }] });
+        if (week === 2 && pair === 1) Object.assign(match, { status: "forfeit", results: [{ registration_id: home, score: 0, rank: 2, forfeit: true }, { registration_id: away, score: 2, rank: 1 }] });
+        if (week === 3 && pair === 2) Object.assign(match, { status: "forfeit", double_forfeit: true, results: [] });
+        if (week === 5 && pair === 0) match.league_marks = { checkin: "finished", checked_in: 2, veto: "done", incidents: 0, procedures: 1 };
+      } else if (week === CURRENT) {
+        const marks = [
+          { status: "in_progress", started_at: at, league_marks: { checkin: "running", checked_in: 2, veto: "running", incidents: 2, procedures: 0 } },
+          { league_marks: { checkin: "open", checked_in: 1, veto: null, incidents: 0, procedures: 0 } },
+          { league_marks: { checkin: "closed", checked_in: 1, veto: null, incidents: 0, procedures: 1 } },
+          { league_marks: { checkin: "veto", checked_in: 2, veto: null, incidents: 0, procedures: 0 } },
+          { status: "disputed", league_marks: { checkin: "finished", checked_in: 2, veto: "done", incidents: 1, procedures: 2 } },
+        ][pair];
+        if (marks) Object.assign(match, marks);
+      }
+      matches.push(match);
+      entries.push({ match_id: id, scheduled_at: at, schedule_source: ["accepted", "home", "default", "manual"][pair % 4] });
+    }
+    matchdays.push({ number: week, starts_at: start.toISOString(), ends_at: end.toISOString(), matches: entries });
+  }
+  const standings = regs.map((row, index) => ({ registration_id: row.id, display_name: row.display_name, rank: index + 1, played: 6, won: 6 - Math.min(index, 6),
+    drawn: 0, lost: Math.min(index, 6), score_for: 12 - index, score_against: index, score_diff: 12 - 2 * index, points: 18 - 3 * Math.min(index, 6),
+    form: ["W", "L", "W", "W", "L"], previous_rank: null, forfeit_won: index === 2 ? 1 : 0, forfeit_lost: index === 9 ? 1 : 0, deducted_points: 0, exit: null, tiebreak: null, lead_decision: null,
+    zone: index < 2 ? "promotion" : index >= regs.length - 2 && regs.length > 4 ? "relegation" : null }));
+  // Gleichstand auf Platz 5: zwei Teams nach allen Kriterien gleich.
+  if (standings.length > 6) standings[5] = { ...standings[5], rank: 5, points: standings[4].points, score_diff: standings[4].score_diff, score_for: standings[4].score_for };
+  const table = {
+    can_decide: true, superadmin: false, rules: { tiebreakers: ["head_to_head", "score_diff", "score_for", "lead_decision"] }, standings,
+    ties: standings.length > 6 ? [{ rank: 5, registration_ids: [standings[4].registration_id, standings[5].registration_id], names: [standings[4].display_name, standings[5].display_name], points: standings[4].points, own_team: false }] : [],
+    decisions: [],
+  };
+  return { regs, matches, matchdays: { applies: true, current: matchdays.length >= CURRENT ? CURRENT : null, matchdays }, table };
+}
+
+const entryFor = (match, names) => ({
+  id: match.id, kind: "duel", best_of: 3, ranking_mode: "higher_score", allows_draw: false, has_result: false, result: [], label: `Spielwoche ${match.matchday_number}`,
+  participants: match.slots.map((slot) => ({ registration_id: slot.registration_id, name: names.get(slot.registration_id) })),
+});
+
+async function mockLeague(page, world, { staffel = {} } = {}) {
+  // Ohne Hochzählen - die Bilder zeigen den Endstand.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const calls = await mockServer(page, { staffel: { status: "live", can_plan_matches: true, can_manage_all_results: true, ...staffel }, registrations: world.regs, matches: world.matches });
+  const json = (body) => (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
+  const names = new Map(world.regs.map((row) => [row.id, row.display_name]));
+  await page.route("**/api/tournaments/t1/matchdays", json(world.matchdays));
+  await page.route("**/api/tournaments/t1/stages", json([{ id: "st1", stage_type: "league", tournament_id: "t1" }]));
+  await page.route("**/api/admin/leagues/staffeln/t1/table", json(world.table));
+  await page.route("**/api/admin/leagues/staffeln/t1/table-decision", (route) => {
+    calls.push({ url: route.request().url(), body: route.request().postDataJSON() });
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "d1" }) });
+  });
+  await page.route(/\/api\/matches\/[^/]+$/, (route) => {
+    calls.push({ url: route.request().url(), body: route.request().postDataJSON() });
+    return route.fulfill({ contentType: "application/json", body: "{}" });
+  });
+  await page.route(/\/api\/matches\/[^/]+\/page$/, (route) => {
+    const id = new URL(route.request().url()).pathname.split("/")[3];
+    const match = world.matches.find((row) => row.id === id);
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ match, result_entry: entryFor(match, names) }) });
+  });
+  return calls;
+}
+
+async function shot(page, name) {
+  const dir = process.env.E2E_SCREENS_DIR;
+  if (!dir) return;
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", style: ".tls-bottom-nav { display: none !important; }" });
+}
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+  test(`Staffel-Seite (${width} px): Spielplan mit 15 Spielwochen, Termin setzen`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const world = bigWorld();
+    const calls = await mockLeague(page, world);
+    await page.goto("/admin/leagues/staffeln/t1#termine");
+    const weeks = page.getByTestId("mp-league");
+    await expect(weeks.locator('[data-testid^="mp-week-"]')).toHaveCount(15);
+    await expect(page.getByTestId(`mp-week-${CURRENT}`)).toContainText("läuft");
+    await expect(page.getByTestId("mp-week-8")).toContainText("von der Liga-Leitung");
+    // Ganz gespielte Wochen klappen zu, die laufende und die kommenden bleiben offen.
+    await expect(page.getByTestId("mp-week-1")).toHaveAttribute("data-played", "true");
+    await expect(page.getByTestId("mp-week-1").locator("details")).not.toHaveAttribute("open", "");
+    await expect(page.getByTestId(`mp-week-${CURRENT}`).locator("details")).toHaveCount(0);
+    await expect(page.getByTestId("staffel-csv-matchplan")).toHaveAttribute("href", /\/api\/tournaments\/t1\/match-plan\.csv$/);
+    await expect(page.getByTestId("staffel-pdf-matches")).toHaveAttribute("href", /\/api\/exports\/tournaments\/t1\/matches\.pdf$/);
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-panel-spielplan");
+    await shot(page, `spielplan-${width}`);
+    await page.getByTestId("mp-week-8").getByRole("button", { name: "W8-1 ändern" }).click();
+    await page.getByTestId("mp-editor").getByRole("button", { name: "Speichern" }).click();
+    await expect.poll(() => calls.some((row) => row.url.endsWith("/api/matches/m8-1"))).toBe(true);
+    await noSideScroll(page);
+  });
+
+  test(`Staffel-Seite (${width} px): Spiele und Ergebnisse mit Chips, Ergebnis eintragen`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const world = bigWorld();
+    await mockLeague(page, world);
+    await page.goto("/admin/leagues/staffeln/t1#ergebnisse");
+    await expect(page.getByTestId("staffel-games-count")).toContainText("gespielt");
+    await expect(page.getByTestId("staffel-week-1")).not.toHaveAttribute("open", "");
+    await expect(page.getByTestId(`staffel-week-${CURRENT}`)).toHaveAttribute("open", "");
+    await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-1`)).toContainText("Veto läuft");
+    await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-1`)).toContainText("2 Vorfälle offen");
+    await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-3`)).toContainText("Check-in vorbei · 1 von 2");
+    await expect(page.getByTestId(`staffel-game-state-m${CURRENT}-5`)).toContainText("In Klärung");
+    // Woche 5 ist gespielt, ein Verfahren ist aber offen - sie bleibt aufgeklappt.
+    await expect(page.getByTestId("staffel-week-5")).toHaveAttribute("open", "");
+    await expect(page.getByTestId("staffel-week-warn-5")).toHaveText("1 Spiel mit offenem Punkt");
+    await page.getByTestId("staffel-week-2").locator("summary").click();
+    await expect(page.getByTestId("staffel-game-state-m2-2")).toContainText("Kampflos gewertet");
+    await page.getByTestId("staffel-week-3").locator("summary").click();
+    await expect(page.getByTestId("staffel-game-state-m3-3")).toContainText("Beide nicht erschienen");
+    await page.getByTestId("staffel-week-2").locator("summary").click();
+    await page.getByTestId("staffel-week-3").locator("summary").click();
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-panel-spiele");
+    await shot(page, `spiele-${width}`);
+    await page.getByTestId(`staffel-game-result-m${CURRENT}-2`).click();
+    await expect(page.getByTestId("result-window")).toBeVisible();
+    await noSideScroll(page);
+    if (width === 390) await shot(page, "ergebnis-fenster-390");
+  });
+
+  test(`Staffel-Seite (${width} px): Tabelle mit Zonen, Gleichstand entscheiden, PDF`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const world = bigWorld();
+    const calls = await mockLeague(page, world);
+    await page.goto("/admin/leagues/staffeln/t1#tabelle");
+    const panel = page.getByTestId("staffel-table-t1");
+    await expect(panel.locator('[data-testid^="standing-row-"]')).toHaveCount(16);
+    await expect(panel.getByTestId("staffel-table-zones")).toBeVisible();
+    await expect(panel.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", /\/api\/exports\/tournaments\/t1\/standings\.pdf$/);
+    await expect(panel.getByTestId("season-tie-t1-5")).toContainText("Platz 5");
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-panel-tabelle");
+    await shot(page, `tabelle-${width}`);
+    await panel.getByTestId("season-tie-decide-5").click();
+    const sheet = page.getByTestId("table-decision-sheet");
+    await sheet.getByTestId("table-decision-reason").fill("Losentscheid vor beiden Captains");
+    await sheet.getByTestId("table-decision-save").click();
+    await expect.poll(() => calls.find((row) => row.url.endsWith("/table-decision"))?.body?.reason).toBe("Losentscheid vor beiden Captains");
+  });
+
+  test(`Staffel-Seite (${width} px): 0 und 1 Co-Team - alle Reiter ohne seitliches Scrollen`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    for (const teams of [0, 1]) {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+      await mockLeague(page, bigWorld({ teams }), { staffel: { status: "draft" } });
+      for (const tab of ["spielplan", "spiele", "tabelle"]) {
+        await page.goto(`/admin/leagues/staffeln/t1?probe=${teams}#${tab}`);
+        await expect(page.getByTestId(`staffel-panel-${tab}`)).toBeVisible();
+        await noSideScroll(page);
+      }
+      if (!teams) await expect(page.getByTestId("staffel-table-t1")).toContainText("Noch keine Ergebnisse");
+      else await expect(page.getByTestId("staffel-table-t1").locator('[data-testid^="standing-row-"]')).toHaveCount(1);
+    }
+  });
+}
+
+test("ohne „Spiele betreuen“ und „Ergebnisse korrigieren“: kein „ändern“, kein Ergebnis, kein Entscheid - keine 403", async ({ page }) => {
+  const problems = [];
+  page.on("response", (response) => { if (response.status() === 403) problems.push(`403 ${response.url()}`); });
+  await mockLeague(page, bigWorld(), { staffel: { league_capabilities: ["season"], can_plan_matches: false, can_manage_all_results: false } });
+  await page.goto("/admin/leagues/staffeln/t1#spielplan");
+  await expect(page.getByTestId("mp-week-8")).toBeVisible();
+  await expect(page.getByRole("button", { name: /ändern$/ })).toHaveCount(0);
+  await page.getByTestId("staffel-tab-spiele").click();
+  await expect(page.getByTestId("staffel-games-count")).toBeVisible();
+  await expect(page.locator('[data-testid^="staffel-game-result-"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="match-double-no-show"]')).toHaveCount(0);
+  await page.getByTestId("staffel-tab-tabelle").click();
+  await expect(page.getByTestId("season-tie-t1-5")).toBeVisible();
+  await expect(page.getByTestId("season-tie-decide-5")).toHaveCount(0);
+  expect(problems).toEqual([]);
 });
