@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { BellRing, Clock, Radio } from "lucide-react";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useLiveQueue, useStaleExpired } from "@/hooks/useLiveQueue";
 import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
 import { QUEUE_GONE_STATUSES, QUEUE_ME_GONE_STATUSES, myQueueLine, queuePollMs } from "@/lib/liveQueue";
+import { noteOwnMatches } from "@/seasons/matchPause";
 
 // Spieler-Sicht vor Ort (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“, „Läuft an Station 2“, „Du bist dran“.
 // Ohne `matchId` die eigenen Spiele (GET /tournaments/<id>/live-queue/me, angemeldet) - für die Turnierseite. Mit
@@ -33,6 +35,11 @@ export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, 
   // Im Takt vor Ort - und wenn schon der erste Abruf scheiterte (weiter versuchen, mit wachsendem Abstand).
   const asks = status === "applies" || status === "unknown";
   useLiveRefresh(reload, ["tournaments", "matches-v2", "stations"], { fallbackMs: asks ? queuePollMs(30000, failures) : 0, pollMs: queuePollMs(asks ? 60000 : 0, failures), tournamentId, eventId });
+  // Turniertag (#1169): die eigenen Spiele vor Ort - aufgerufen oder laufend pausiert die Saison-Deko überall.
+  const ownEntries = personal && view && !expired ? view.entries : null;
+  useEffect(() => {
+    if (Array.isArray(ownEntries)) noteOwnMatches(ownEntries, "queue");
+  }, [ownEntries]);
 
   if (!entry || (hideCalled && entry.state === "called")) return null;
   const line = myQueueLine(entry, { personal });

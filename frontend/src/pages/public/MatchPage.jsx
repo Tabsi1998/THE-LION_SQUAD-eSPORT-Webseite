@@ -49,6 +49,7 @@ import { ProposalTimesEditor, ScheduleProposalList } from "@/components/tls/tour
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
+import { noteOwnMatches } from "@/seasons/matchPause";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",
@@ -195,6 +196,9 @@ function MatchPageView() {
     setData(next);
     setChat(messages || []);
     const nextMatch = page.match || {};
+    // Turniertag (#1169): Ist das ein eigenes Spiel (schon bekannt), sagt die Matchseite, ob es läuft, aufgerufen ist
+    // oder das Ergebnis da ist - dann kommt die Saison-Deko zurück. Fremde Spiele ändern nichts.
+    if (nextMatch.id) noteOwnMatches([{ id: nextMatch.id, status: nextMatch.status, live_state: page.call ? "called" : null }], "match");
     if (preserveDrafts) {
       setProposalTimes((current) => (current.some(Boolean) ? current : [toLocalInput(nextMatch.scheduled_at)]));
     } else {

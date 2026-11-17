@@ -127,3 +127,19 @@ test("abgelaufene Sitzung (401 bei /me): die Zeile fällt weg, der Takt endet", 
   expect(screen.queryByTestId("live-queue-status")).toBeNull();
   expect(live.options).toMatchObject({ pollMs: 0, fallbackMs: 0 });
 });
+
+test("Turniertag (#1169): ein eigenes aufgerufenes Spiel pausiert die Saison-Deko - die Matchseite fremder Spiele nicht", async () => {
+  const { clearOwnMatches, ownMatchesPaused } = await import("@/seasons/matchPause");
+  clearOwnMatches();
+  apiMock.get.mockResolvedValue({ data: { applies: true, matches: { m1: { ...NEXT, state: "called" } } } });
+  const { unmount } = render(<LiveQueueStatus tournamentId="t1" matchId="m1" />);
+  await screen.findByTestId("live-queue-status");
+  expect(ownMatchesPaused()).toBe(false);
+  unmount();
+
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [{ ...NEXT, state: "called" }] } });
+  render(<LiveQueueStatus tournamentId="t1" />);
+  await screen.findByTestId("live-queue-status");
+  expect(ownMatchesPaused()).toBe(true);
+  clearOwnMatches();
+});
