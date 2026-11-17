@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { broadcastProblem, broadcastResultText, deskResponsible, deskWhen, filterGroups, peopleText, scopeOptions, splitScope } from "./leagueDesk";
+import {
+  broadcastProblem, broadcastResultText, deskResponsible, deskWhen, filterGroups, peopleText, scopeOptions, seasonDeskUrl, splitScope, staffelGroups,
+  staffelOpenCount,
+} from "./leagueDesk";
 
 // Leitstand (E.4): Filter, Frist, Zuständigkeit und die Kreise der Rundnachricht.
 
@@ -25,6 +28,24 @@ describe("Leitstand", () => {
     expect(deskResponsible({ assignee: { name: "Ich", own: true } }, group)).toBe("Von dir übernommen");
     expect(deskResponsible({ kind: "reschedule" }, group)).toBe("Gegenseite, sonst „Proteste“");
     expect(deskResponsible({}, group)).toBe("„Proteste“");
+  });
+
+  it("Staffel-Filter (#2262): nur Aufgaben dieser Staffel, Aufgaben der Season fallen weg", () => {
+    const desk = { groups: [
+      { key: "overdue", items: [{ id: "a", staffel_id: "t1", mine: true }, { id: "b", staffel_id: "t2", mine: true }] },
+      { key: "applications", items: [{ id: "c", staffel_id: null, mine: true }] },
+      { key: "procedures", items: [{ id: "d", staffel_id: "t1", mine: false }] },
+    ] };
+    expect(staffelGroups(desk.groups, "t1").map((group) => group.items.map((row) => row.id))).toEqual([["a"], [], ["d"]]);
+    expect(staffelGroups(desk.groups, "")).toBe(desk.groups);
+    expect(staffelOpenCount(desk, "t1")).toEqual({ total: 2, mine: 1 });
+    expect(staffelOpenCount(desk, "t3")).toEqual({ total: 0, mine: 0 });
+    expect(staffelOpenCount(null, "t1")).toEqual({ total: 0, mine: 0 });
+  });
+
+  it("Leitstand-Adresse mit und ohne Staffel-Filter", () => {
+    expect(seasonDeskUrl("s1")).toBe("/admin/leagues/seasons/s1#leitstand");
+    expect(seasonDeskUrl("s1", "t 1")).toBe("/admin/leagues/seasons/s1?staffel=t%201#leitstand");
   });
 });
 

@@ -2,7 +2,8 @@
 
 - ``GET  /api/admin/leagues/seasons/{season_id}/desk``: alle offenen Aufgaben der Season, je Gruppe - nur die Gruppen der eigenen
   Zuständigkeiten, eigene Spiele mit dem Hinweis auf die Befangenheit.
-- ``GET  …/desk/log?page=``: das Protokoll der Season, seitenweise, ohne freien Text.
+- ``GET  …/desk/log?page=&staffel=``: das Protokoll der Season, seitenweise, ohne freien Text - mit ``staffel`` nur diese Staffel
+  (#2262, Reiter Protokoll der Staffel-Seite).
 - ``POST …/broadcast/preview``: wie viele Personen eine Rundnachricht bekämen - vor dem Senden.
 - ``POST …/broadcast``: die Rundnachricht anlegen, einmal je ``request_id`` (Doppelklick, zweiter Versuch). Die Antwort kommt sofort
   mit ``state: sending``, verschickt wird danach im Hintergrund - kein Zeitlimit eines Proxys lässt jemanden mit neuer Kennung doppelt senden.
@@ -61,9 +62,14 @@ async def season_desk(season_id: str, me: dict = Depends(require_any)):
 
 
 @admin_router.get("/seasons/{season_id}/desk/log")
-async def season_log(season_id: str, page: int = Query(1, ge=1, le=10000), me: dict = Depends(require_any)):
+async def season_log(season_id: str, page: int = Query(1, ge=1, le=10000),
+                     staffel: Optional[str] = Query(None, min_length=1, max_length=100), me: dict = Depends(require_any)):
+    """``staffel`` (#2262): nur die Einträge dieser Staffel - für den Reiter Protokoll der Staffel-Seite und den Leitstand mit Filter."""
     db = get_db()
-    return await desk.season_log(db, await _season(db, season_id), page, me=me)
+    try:
+        return await desk.season_log(db, await _season(db, season_id), page, me=me, staffel=staffel)
+    except desk.UnknownStaffel:
+        raise HTTPException(status_code=404, detail="Staffel in dieser Season nicht gefunden.") from None
 
 
 @admin_router.post("/seasons/{season_id}/broadcast/preview")

@@ -269,7 +269,7 @@ Kontoliste mit E-Mail-Adressen bleibt bei „Alle Benutzer“ (Vereinsverwaltung
 | --- | --- | --- | --- |
 | `tournament` | Turnier: Teilnehmer hinzufügen, Helfer | Turnierleitung (Rolle oder Freigabe) und Helfer dieses Turniers mit Organisation, Schiedsrichter oder Ergebnisdienst – nicht Stationsleitung oder Stream-Betreuung | aktive Konten |
 | `fastlap` | Fast Lap: Fahrer, Fast-Lap-Team | Turnierleitung und Helfer dieser Fast Lap | aktive Konten (mit „Vereinsmitglied ja/nein“ für die Wertung) |
-| `access_links` | Speziallinks | Turnierleitung | aktive Konten |
+| `access_links` | Speziallinks | Turnierleitung; an einer Liga-Staffel (`context_id`) stattdessen „Liga verwalten“ (#2262) | aktive Konten |
 | `board` | Vorstand besetzen | Vereinsverwaltung, System | nur Vereinsmitglieder (und gepflegte Mitgliederprofile ohne Konto) |
 | `invite` | Bewerbungen: zum Antrag einladen | Vereinsverwaltung | Konten ohne aktive Mitgliedschaft, mit „ist schon eingeladen“ |
 | `reference_series` | Serien: Captain einer Saison hinzufügen (#1749) | Redaktion | nur aktive Vereinsmitglieder |

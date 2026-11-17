@@ -74,8 +74,9 @@ function roundsOf(matches = [], stages = []) {
     .sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1] || a.order[2] - b.order[2]);
 }
 
-/** Je Runde ein Sponsor für „präsentiert von“ - eine Liste, gespeichert mit einem Klick. */
-export function RoundSponsorsPanel({ tournament, matches = [], stages = [], onSaved }) {
+/** Je Runde ein Sponsor für „präsentiert von“ - eine Liste, gespeichert mit einem Klick. `league` (#2262, Staffel-Seite): in
+ * Liga-Wörtern (Spielwoche, TV-Ansicht der Staffel) und ohne den Weg zu „TV & Beamer“, den die Liga-Leitung nicht hat. */
+export function RoundSponsorsPanel({ tournament, matches = [], stages = [], onSaved, league = false }) {
   const rounds = useMemo(() => roundsOf(matches, stages), [matches, stages]);
   const [sponsors, setSponsors] = useState(null);
   const initial = useMemo(() => {
@@ -106,22 +107,28 @@ export function RoundSponsorsPanel({ tournament, matches = [], stages = [], onSa
     try {
       const items = rounds.filter((round) => choice[round.key]).map((round) => ({ stage_id: round.stageId, section: round.section, round: round.round, sponsor_id: choice[round.key] }));
       await api.put(`/tournaments/${tournament.id}/round-sponsors`, { items });
-      toast.success(items.length ? "Gespeichert – solange die Runde läuft, steht ihr Sponsor oben am TV." : "Keine Runde hat mehr einen Sponsor.");
+      toast.success(league
+        ? (items.length ? "Gespeichert – solange die Spielwoche läuft, steht ihr Sponsor oben in der TV-Ansicht." : "Keine Spielwoche hat mehr einen Sponsor.")
+        : (items.length ? "Gespeichert – solange die Runde läuft, steht ihr Sponsor oben am TV." : "Keine Runde hat mehr einen Sponsor."));
       onSaved?.();
     } catch (error) {
-      toast.error(formatRequestError(error, "Die Sponsoren je Runde konnten nicht gespeichert werden."));
+      toast.error(formatRequestError(error, league ? "Die Sponsoren je Spielwoche konnten nicht gespeichert werden." : "Die Sponsoren je Runde konnten nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
   };
   return (
-    <section className="mt-4 border border-white/10 bg-[#0F0F0F] rounded-sm p-4" data-testid="admin-tr-round-sponsors">
+    <section className={league ? "" : "mt-4 border border-white/10 bg-[#0F0F0F] rounded-sm p-4"} data-testid="admin-tr-round-sponsors">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-heading text-sm font-black uppercase inline-flex items-center gap-2"><Tv className="w-4 h-4 text-[#29B6E8]" /> Runde präsentiert von</h3>
-          <p className="mt-1 text-xs text-white/50 max-w-2xl">Wählst du für eine Runde einen Sponsor, steht am Turnierbaum-TV oben „Runde 2 präsentiert von“ mit Logo – solange diese Runde läuft. Ob das überhaupt läuft, steht unter <Link to="/admin/tv" className="text-[#29B6E8] hover:underline">TV &amp; Beamer</Link>.</p>
-        </div>
-        <button type="button" onClick={save} disabled={busy || !dirty} className="inline-flex items-center gap-2 px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40" data-testid="admin-tr-round-sponsors-save">
+        {league ? (
+          <p className="min-w-0 flex-1 text-xs text-white/60 max-w-2xl" data-testid="admin-tr-round-sponsors-league">Wählst du für eine Spielwoche einen Sponsor, steht in der TV-Ansicht der Staffel oben „präsentiert von“ mit Logo – solange diese Spielwoche läuft.</p>
+        ) : (
+          <div>
+            <h3 className="font-heading text-sm font-black uppercase inline-flex items-center gap-2"><Tv className="w-4 h-4 text-[#29B6E8]" /> Runde präsentiert von</h3>
+            <p className="mt-1 text-xs text-white/50 max-w-2xl">Wählst du für eine Runde einen Sponsor, steht am Turnierbaum-TV oben „Runde 2 präsentiert von“ mit Logo – solange diese Runde läuft. Ob das überhaupt läuft, steht unter <Link to="/admin/tv" className="text-[#29B6E8] hover:underline">TV &amp; Beamer</Link>.</p>
+          </div>
+        )}
+        <button type="button" onClick={save} disabled={busy || !dirty} className={`inline-flex items-center gap-2 px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40${league ? " min-h-[44px] w-full justify-center sm:w-auto" : ""}`} data-testid="admin-tr-round-sponsors-save">
           <Save className="w-3.5 h-3.5" /> Speichern
         </button>
       </div>
@@ -137,7 +144,7 @@ export function RoundSponsorsPanel({ tournament, matches = [], stages = [], onSa
                 if (event.target.value) next[round.key] = event.target.value;
                 else delete next[round.key];
                 return next;
-              })} className={`w-full ${INPUT}`} disabled={!sponsors}>
+              })} className={`w-full ${INPUT}${league ? " min-h-[44px]" : ""}`} disabled={!sponsors}>
                 <option value="">Kein Sponsor</option>
                 {(sponsors || []).map((sponsor) => <option key={sponsor.id} value={sponsor.id}>{sponsor.name}</option>)}
               </select>

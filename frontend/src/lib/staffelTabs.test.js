@@ -1,16 +1,16 @@
 import {
-  LEGACY_TAB_ANCHORS, STAFFEL_SECTIONS, STAFFEL_TABS, STAFFEL_TABS_READY, legacyTabAnchor, staffelAdminUrl, staffelManageUrl, staffelTabOf,
-  staffelTarget,
+  LEGACY_TAB_ANCHORS, STAFFEL_SECTIONS, STAFFEL_SETTINGS_TABS, STAFFEL_TABS, STAFFEL_TABS_READY, legacyTabAnchor, staffelAdminUrl, staffelManageUrl,
+  staffelSettingsTab, staffelTabOf, staffelTarget,
 } from "./staffelTabs";
 
 // Staffel-Seite (#2262): Jede Marke - Reiter, Abschnitt oder Ziel eines alten Reiters - gehört zu genau einem Reiter.
 
 const TAB_KEYS = STAFFEL_TABS.map((tab) => tab.key);
 
-test("alle sieben Reiter stehen fest, nach Paket B sind fünf davon fertig", () => {
+test("alle sieben Reiter stehen fest und seit Paket C auf der Seite", () => {
   expect(TAB_KEYS).toEqual(["ueberblick", "teilnehmer", "spielplan", "spiele", "tabelle", "protokoll", "einstellungen"]);
   expect(new Set(TAB_KEYS).size).toBe(TAB_KEYS.length);
-  expect([...STAFFEL_TABS_READY]).toEqual(["ueberblick", "teilnehmer", "spielplan", "spiele", "tabelle"]);
+  expect([...STAFFEL_TABS_READY]).toEqual(TAB_KEYS);
   for (const key of STAFFEL_TABS_READY) expect(TAB_KEYS).toContain(key);
 });
 
@@ -48,14 +48,14 @@ test("alte Reiter der Turnierverwaltung haben ihr Ziel auf der Staffel-Seite", (
   expect(legacyTabAnchor("stages")).toBe("spiele");
   expect(legacyTabAnchor("bracket")).toBe("tabelle");
   expect(legacyTabAnchor("edit")).toBe("einstellungen");
-  expect(legacyTabAnchor("maps")).toBe("einstellungen");
+  expect(legacyTabAnchor("maps")).toBe("vorgaben");
   expect(legacyTabAnchor("staff")).toBe("helfer");
   expect(legacyTabAnchor("feedback")).toBe("ueberblick");
   expect(legacyTabAnchor("")).toBe("ueberblick");
   expect(legacyTabAnchor("gibtsnicht")).toBe("ueberblick");
 });
 
-test("Ziele auf der Staffel-Seite führen dorthin, die übrigen noch in die Turnierverwaltung", () => {
+test("jedes Ziel führt auf die Staffel-Seite, keins mehr in die Turnierverwaltung", () => {
   expect(staffelManageUrl("t-1")).toBe("/admin/leagues/staffeln/t-1");
   expect(staffelManageUrl("t-1", "participants")).toBe("/admin/leagues/staffeln/t-1#teilnehmer");
   expect(staffelManageUrl("t-1", "participants", "zuteilen")).toBe("/admin/leagues/staffeln/t-1#zuteilen");
@@ -66,7 +66,29 @@ test("Ziele auf der Staffel-Seite führen dorthin, die übrigen noch in die Turn
   expect(staffelManageUrl("t-1", "matchplan", "termine")).toBe("/admin/leagues/staffeln/t-1#termine");
   expect(staffelManageUrl("t-1", "stages", "ergebnisse")).toBe("/admin/leagues/staffeln/t-1#ergebnisse");
   expect(staffelManageUrl("t-1", "bracket", "gleichstand")).toBe("/admin/leagues/staffeln/t-1#gleichstand");
-  // Noch ohne Reiter (Paket C): weiter die Turnierverwaltung.
-  expect(staffelManageUrl("t-1", "edit")).toBe("/admin/tournaments/t-1?tab=edit");
-  expect(staffelManageUrl("t-1", "staff")).toBe("/admin/tournaments/t-1?tab=staff");
+  // Paket C: Einstellungen samt Darstellung und Helfer, Protokoll, Rückmeldungen im Überblick.
+  expect(staffelManageUrl("t-1", "edit")).toBe("/admin/leagues/staffeln/t-1#einstellungen");
+  expect(staffelManageUrl("t-1", "maps")).toBe("/admin/leagues/staffeln/t-1#vorgaben");
+  expect(staffelManageUrl("t-1", "staff")).toBe("/admin/leagues/staffeln/t-1#helfer");
+  expect(staffelManageUrl("t-1", "feedback")).toBe("/admin/leagues/staffeln/t-1");
+  expect(staffelManageUrl("t-1", "edit", "darstellung")).toBe("/admin/leagues/staffeln/t-1#darstellung");
+  expect(staffelManageUrl("t-1", "", "protokoll")).toBe("/admin/leagues/staffeln/t-1#protokoll");
+  for (const tab of Object.keys(LEGACY_TAB_ANCHORS)) expect(staffelManageUrl("t-1", tab)).not.toContain("/admin/tournaments");
+});
+
+test("Unterreiter der Einstellungen: jede Marke genau einmal, jede öffnet ihren Unterreiter", () => {
+  const keys = STAFFEL_SETTINGS_TABS.map((tab) => tab.key);
+  expect(keys).toEqual(["darstellung", "vorgaben", "links", "helfer", "werkzeuge"]);
+  expect(new Set(keys).size).toBe(keys.length);
+  // Jeder Unterreiter ist ein Abschnitt der Einstellungen, und jeder Abschnitt der Einstellungen ist genau ein Unterreiter.
+  for (const key of keys) {
+    expect(STAFFEL_SECTIONS[key]).toBe("einstellungen");
+    expect(staffelTarget(`#${key}`)).toEqual({ tab: "einstellungen", section: key });
+    expect(staffelSettingsTab(key)).toBe(key);
+  }
+  const settingsSections = Object.keys(STAFFEL_SECTIONS).filter((key) => STAFFEL_SECTIONS[key] === "einstellungen");
+  expect(settingsSections.sort()).toEqual([...keys].sort());
+  expect(staffelSettingsTab("")).toBe("darstellung");
+  expect(staffelSettingsTab("gibtsnicht")).toBe("darstellung");
+  expect(staffelManageUrl("t-1", "staff")).toBe("/admin/leagues/staffeln/t-1#helfer");
 });
