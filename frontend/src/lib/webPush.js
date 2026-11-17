@@ -21,7 +21,7 @@ const OWNER_KEY = "tls-web-push-owner";
 const PRIVATE_KEY = "tls-web-push-private";
 const SEEN_PREFIX = "tls-web-push-seen:";
 /** Höchstens so viele Anmeldungen merkt sich der Browser je Konto (die neuesten). */
-export const SEEN_MAX = 300;
+export const SEEN_MAX = 80;
 const READY_TIMEOUT_MS = 5000;
 
 function local(win) {
@@ -114,6 +114,14 @@ export function registrationKey(kind, id) {
   return id ? `${kind === "tournament" ? "t" : "e"}:${id}` : null;
 }
 
+/** Die Turniere, in denen das Team angemeldet ist (die Anmeldung trägt eine Team-Kennung). */
+export function dashboardTeamKeys(me) {
+  return (Array.isArray(me?.tournaments) ? me.tournaments : [])
+    .filter((row) => Boolean(row?.my_registration?.team_id))
+    .map((row) => registrationKey("tournament", row?.id))
+    .filter(Boolean);
+}
+
 /** Die Anmeldungen der Übersicht (eigene und die des Teams, so wie der Server sie unter „Meine“ führt). */
 export function dashboardRegistrationKeys(me) {
   const keys = [
@@ -155,20 +163,35 @@ export function rememberWebPushRegistration(userId, key, win = currentWindow()) 
 }
 
 /**
- * Die Übersicht meldet die aktuellen Anmeldungen. Zurück kommt, ob eine neue dabei ist (Team angemeldet oder in der App
- * angemeldet). Die erste Übersicht nach dem Login ist nur der Ausgangsstand - keine Frage direkt nach dem Anmelden.
+ * Die Übersicht meldet die aktuellen Anmeldungen. Zurück kommt der Anlass zu fragen - "team", wenn eine neue Anmeldung
+ * die des Teams ist, sonst "own" (etwa in der App angemeldet) - oder null. Die erste Übersicht nach dem Login ist nur der
+ * Ausgangsstand - keine Frage direkt nach dem Anmelden.
  */
-export function noteWebPushRegistrations(userId, keys, win = currentWindow()) {
-  if (!userId || !win) return false;
+export function noteWebPushRegistrations(userId, keys, { teamKeys = [], win = currentWindow() } = {}) {
+  if (!userId || !win) return null;
   const stored = readSeen(win, userId);
   if (!stored) {
     writeSeen(win, userId, { seen: keys });
-    return false;
+    return null;
   }
   const fresh = keys.filter((key) => !stored.seen.includes(key));
-  if (!fresh.length && !stored.fresh) return false;
+  if (!fresh.length && !stored.fresh) return null;
   writeSeen(win, userId, { seen: mergeKeys(stored.seen, fresh) });
-  return fresh.length > 0 && !stored.fresh;
+  if (!fresh.length || stored.fresh) return null;
+  return fresh.some((key) => teamKeys.includes(key)) ? "team" : "own";
+}
+
+/** Abmelden: die gemerkten Anmeldungen aller Konten gehen - nach dem nächsten Login ist die Übersicht Ausgangsstand. */
+function forgetSeen(win) {
+  const store = local(win);
+  try {
+    for (let index = (store?.length || 0) - 1; index >= 0; index -= 1) {
+      const key = store.key(index);
+      if (key && key.startsWith(SEEN_PREFIX)) store.removeItem(key);
+    }
+  } catch {
+    // privates Fenster - dann ist ohnehin nichts gemerkt
+  }
 }
 
 export async function loadWebPushConfig() {
@@ -181,7 +204,7 @@ export async function loadWebPushConfig() {
 }
 
 /** Nach einer Turnier- oder Event-Anmeldung (oder beim nächsten Besuch): fragen, wenn es so weit ist. */
-export async function offerWebPush(win = currentWindow(), { firstVisit } = {}) {
+export async function offerWebPush(win = currentWindow(), { firstVisit, reason = "own" } = {}) {
   if (!win) return null;
   const state = askState(win);
   const env = pushEnvironment(win);
@@ -190,7 +213,7 @@ export async function offerWebPush(win = currentWindow(), { firstVisit } = {}) {
   const config = await loadWebPushConfig();
   const decision = askDecision({ config, env, state, firstVisit: firstVisit ?? markVisit(win) });
   if (decision === "pending") rememberAsk("pending", win);
-  if (decision === "ask" || decision === "ios-hint") win.dispatchEvent(new CustomEvent(WEB_PUSH_EVENT, { detail: { mode: decision, config } }));
+  if (decision === "ask" || decision === "ios-hint") win.dispatchEvent(new CustomEvent(WEB_PUSH_EVENT, { detail: { mode: decision, config, reason } }));
   return decision;
 }
 
@@ -334,6 +357,7 @@ export async function forgetWebPush(win = currentWindow()) {
   } finally {
     write(local(win), OWNER_KEY, "");
     write(local(win), PRIVATE_KEY, "");
+    forgetSeen(win);
   }
 }
 

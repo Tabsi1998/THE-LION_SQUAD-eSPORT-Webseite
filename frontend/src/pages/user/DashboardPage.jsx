@@ -16,7 +16,7 @@ import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
-import { dashboardRegistrationKeys, noteWebPushRegistrations, offerWebPush } from "@/lib/webPush";
+import { dashboardRegistrationKeys, dashboardTeamKeys, noteWebPushRegistrations, offerWebPush } from "@/lib/webPush";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -133,7 +133,8 @@ export default function DashboardPage() {
       setDashboard(data);
       // Neu angemeldet - etwa durchs Team (#1208): jetzt die Frage nach Browser-Benachrichtigungen. Die erste Übersicht
       // nach dem Login ist nur der Ausgangsstand.
-      if (data && noteWebPushRegistrations(userId, dashboardRegistrationKeys(data.me))) void offerWebPush();
+      const reason = data ? noteWebPushRegistrations(userId, dashboardRegistrationKeys(data.me), { teamKeys: dashboardTeamKeys(data.me) }) : null;
+      if (reason) void offerWebPush(undefined, { reason });
     }
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     if (c.status === "fulfilled") setCompleteness(c.value.data);

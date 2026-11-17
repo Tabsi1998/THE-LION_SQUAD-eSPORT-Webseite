@@ -15,12 +15,12 @@ vi.mock("@/lib/webPush", async (importOriginal) => {
 });
 vi.mock("@/lib/api", () => ({ api: { get: vi.fn(async () => ({ data: { enabled: false } })), post: vi.fn() } }));
 
-const { WEB_PUSH_TITLE, WebPushHost } = await import("./WebPushHost");
+const { WEB_PUSH_EYEBROW, WEB_PUSH_TITLE, WebPushHost } = await import("./WebPushHost");
 const { WEB_PUSH_EVENT } = await import("@/lib/webPush");
 const { CALENDAR_HINT_CLOSED_EVENT, CALENDAR_HINT_EVENT } = await import("@/lib/calendarHint");
 
 const CONFIG = { enabled: true, public_key: "BQQ" };
-const ask = (mode = "ask") => act(() => { window.dispatchEvent(new CustomEvent(WEB_PUSH_EVENT, { detail: { mode, config: CONFIG } })); });
+const ask = (mode = "ask", reason = "own") => act(() => { window.dispatchEvent(new CustomEvent(WEB_PUSH_EVENT, { detail: { mode, config: CONFIG, reason } })); });
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -87,5 +87,25 @@ test("ohne Konto keine Frage", () => {
   authState.user = null;
   render(<WebPushHost />);
   ask();
+  expect(screen.queryByTestId("web-push-hint")).toBeNull();
+});
+
+test("die Zeile über der Frage nennt den Anlass: eigene Anmeldung oder das Team (#1208)", () => {
+  render(<WebPushHost />);
+  ask();
+  expect(screen.getByTestId("web-push-hint-eyebrow")).toHaveTextContent(WEB_PUSH_EYEBROW.own);
+  ask("ask", "team");
+  expect(screen.getByTestId("web-push-hint-eyebrow")).toHaveTextContent("Dein Team ist angemeldet");
+});
+
+test("Kontowechsel: eine offene Frage von Konto A erscheint nicht bei Konto B (#1208)", () => {
+  const view = render(<WebPushHost />);
+  ask();
+  expect(screen.getByTestId("web-push-hint")).toBeInTheDocument();
+  authState.user = null;
+  view.rerender(<WebPushHost />);
+  expect(screen.queryByTestId("web-push-hint")).toBeNull();
+  authState.user = { id: "u2" };
+  view.rerender(<WebPushHost />);
   expect(screen.queryByTestId("web-push-hint")).toBeNull();
 });

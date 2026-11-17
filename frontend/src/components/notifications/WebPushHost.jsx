@@ -20,6 +20,9 @@ export const WEB_PUSH_LINES = [
   { icon: Trophy, title: "Ergebnis", text: "Dein Ergebnis steht fest." },
 ];
 
+/** Die Zeile über der Frage, je nach Anlass (#1208). */
+export const WEB_PUSH_EYEBROW = { own: "Nach deiner Anmeldung", team: "Dein Team ist angemeldet" };
+
 export function WebPushHost() {
   const auth = useOptionalAuth();
   const user = auth?.user || null;
@@ -47,6 +50,8 @@ export function WebPushHost() {
   // Mit Konto: die Anmeldung dieses Browsers auffrischen und eine aufgeschobene Frage beim nächsten Besuch stellen.
   const userId = user?.id || null;
   useEffect(() => {
+    // Kontowechsel oder Abmelden (#1208): eine offene Frage gehört dem vorigen Konto.
+    setRequest(null);
     if (!userId) return;
     void syncWebPush({ id: userId }).catch(() => null);
     if (askState() === "pending" && !firstVisit.current) void offerWebPush(window, { firstVisit: false });
@@ -113,7 +118,7 @@ export function WebPushHost() {
             </>
           ) : (
             <>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FFD700]">Nach deiner Anmeldung</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FFD700]" data-testid="web-push-hint-eyebrow">{WEB_PUSH_EYEBROW[request.reason] || WEB_PUSH_EYEBROW.own}</p>
               <h2 id="web-push-hint-title" className="mt-0.5 text-sm font-bold">{WEB_PUSH_TITLE}</h2>
               <StaggerIn as="ul" className="mt-2 space-y-1.5 text-xs" data-testid="web-push-hint-lines">
                 {WEB_PUSH_LINES.map(({ icon: Icon, title, text }) => (
