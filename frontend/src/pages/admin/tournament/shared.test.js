@@ -1,6 +1,6 @@
 import {
-  bracketFixed, fixedRegistrationIds, guardDetail, impactText, matchImpact, primaryTournamentAction, statusChangeNotice,
-  swissUndoInfo,
+  bracketFixed, fixedRegistrationIds, guardDetail, impactText, liveCheckWords, matchImpact, primaryTournamentAction, statusChangeNotice,
+  statusDoneText, swissUndoInfo,
 } from "./shared";
 
 // Folgenschwere Aktionen (#2120): dieselben Regeln wie der Server (services/tournament_guard.py).
@@ -53,6 +53,40 @@ describe("Absichern (#2120)", () => {
     const cancel = statusChangeNotice("cancelled", t, { activeRegistrations: 5 });
     expect(cancel.askReason).toBe(true);
     expect(cancel.description).toMatch(/Alle 5 Anmeldungen bekommen eine Nachricht/);
+  });
+
+  it("eine Staffel beenden fragt mit Liga-Wörtern - ohne Turnier und Podest (#2262)", () => {
+    const staffel = { status: "live", league_context: { season_id: "s1", staffel: "A" } };
+    const notice = statusChangeNotice("completed", staffel);
+    expect(notice.title).toBe("Staffel beenden?");
+    expect(notice.description).not.toMatch(/Turnier|Podest/);
+    expect(notice.description).toMatch(/Abschluss/);
+    expect(statusChangeNotice("completed", { status: "live" }).description).toMatch(/Podest/);
+  });
+});
+
+describe("Rückfrage und Meldung beim Live-Schalten (#2262)", () => {
+  const report = (ok) => ({ ok, error_count: ok ? 0 : 2, warning_count: 1 });
+  it("ein Turnier schaltet wie bisher live", () => {
+    expect(liveCheckWords(report(true), { status: "check_in" })).toEqual({ title: "Mit Hinweisen live schalten?", confirmLabel: "Trotzdem live" });
+    expect(liveCheckWords(report(false), { status: "paused" })).toEqual({ title: "Mit Planungskonflikten live schalten?", confirmLabel: "Trotzdem live" });
+    expect(statusDoneText("live", { status: "paused" })).toBe("Status: Live");
+    expect(statusDoneText("completed", { status: "live" })).toBe("Status: Beendet");
+  });
+
+  it("eine Staffel startet, setzt fort und heißt mit Liga-Wörtern", () => {
+    const staffel = (status) => ({ status, league_context: { season_id: "s1", staffel: "A" } });
+    expect(liveCheckWords(report(true), staffel("draft"))).toEqual({ title: "Mit Hinweisen starten?", confirmLabel: "Trotzdem starten" });
+    expect(liveCheckWords(report(false), staffel("paused"))).toEqual({ title: "Mit Planungskonflikten fortsetzen?", confirmLabel: "Trotzdem fortsetzen" });
+    expect(statusDoneText("live", staffel("draft"))).toBe("Liga gestartet");
+    expect(statusDoneText("live", staffel("paused"))).toBe("Spielbetrieb läuft weiter");
+    expect(statusDoneText("paused", staffel("live"))).toBe("Status: Pausiert");
+    expect(statusDoneText("completed", staffel("live"))).toBe("Status: Beendet");
+    expect(statusDoneText("cancelled", staffel("live"))).toBe("Status: Abgesagt");
+    // Nie ein rohes „Status: draft“ - vor dem Start heißt es „Vor dem Start“, sonst das Wort der Turnierliste.
+    expect(statusDoneText("draft", staffel("live"))).toBe("Status: Vor dem Start");
+    expect(statusDoneText("registration_closed", staffel("live"))).toBe("Status: Vor dem Start");
+    expect(statusDoneText("irgendwas", staffel("live"))).toBe("Status geändert");
   });
 });
 

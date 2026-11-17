@@ -5,7 +5,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SETTLE_WARNING_DURATION, settleFailureMessage } from "@/lib/settleFailure";
-import { TOURNAMENT_STATUS_OPTIONS, statusChangeNotice } from "./shared";
+import { liveCheckWords, statusChangeNotice, statusDoneText } from "./shared";
 
 /**
  * ``id``: Kennung des Turniers, ``t``: das geladene Turnier, ``regs``: seine Anmeldungen (für „Alle 5 Anmeldungen bekommen …“),
@@ -27,6 +27,7 @@ export function useTournamentStatus({ id, tournament: t, registrations: regs = [
     return data;
   };
   const setTournStatus = async (status) => {
+    const staffel = Boolean(t?.league_context);
     let forceStart = false;
     let reason = null;
     // Status mit Folgen (#2120, TA24): Entwurf nimmt die Seite weg, Beendet und Veröffentlicht verschicken und
@@ -49,10 +50,10 @@ export function useTournamentStatus({ id, tournament: t, registrations: regs = [
             .slice(0, 10)
             .map((item) => item.message)
             .join("\n");
+          // Eine Staffel startet bzw. setzt fort (#2262) - ein Turnier schaltet live.
           const ok = await confirm({
-            title: report.ok ? "Mit Hinweisen live schalten?" : "Mit Planungskonflikten live schalten?",
+            ...liveCheckWords(report, t),
             description: `${report.error_count} Konflikte, ${report.warning_count} Hinweise.${lines ? `\n\n${lines}` : ""}`,
-            confirmLabel: "Trotzdem live",
             tone: report.ok ? "info" : "danger",
           });
           if (!ok) return;
@@ -60,10 +61,10 @@ export function useTournamentStatus({ id, tournament: t, registrations: regs = [
         }
       }
       const { data } = await api.post(`/tournaments/${id}/status`, reason ? { status, force: forceStart, reason } : { status, force: forceStart });
-      const label = TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status;
+      const done = statusDoneText(status, t);
       toast.success(status === "cancelled" && Number.isFinite(data?.notified)
-        ? `Status: ${label} – ${data.notified === 1 ? "1 Person benachrichtigt" : `${data.notified} Personen benachrichtigt`}.`
-        : `Status: ${label}`);
+        ? `${done} – ${data.notified === 1 ? "1 Person benachrichtigt" : `${data.notified} Personen benachrichtigt`}.`
+        : done);
       // Punkte in einer abgeschlossenen Jahreswertung bleiben unverändert (#2123) - das sagt der Server dazu.
       if (data?.season_points_note) toast.info(data.season_points_note, { duration: 10000 });
       // Ein Abschluss-Schritt gescheitert (#2460): Warnung mit den Schritten und gleich „Abschluss nachholen“.
@@ -78,10 +79,10 @@ export function useTournamentStatus({ id, tournament: t, registrations: regs = [
     } catch (e) {
       const statusDetail = e.response?.data?.detail;
       if (statusDetail?.code === "tournament_not_ready") {
-        toast.error(statusDetail.message || "Turnier ist noch nicht startbereit.");
+        toast.error(statusDetail.message || (staffel ? "Die Staffel ist noch nicht startbereit." : "Turnier ist noch nicht startbereit."));
         return;
       }
-      toast.error(formatRequestError(e, "Turnierstatus konnte nicht gespeichert werden."));
+      toast.error(formatRequestError(e, staffel ? "Der Status der Staffel konnte nicht gespeichert werden." : "Turnierstatus konnte nicht gespeichert werden."));
     }
   };
   // Abschluss nachholen (#2452): ein veröffentlichtes Turnier noch einmal auswerten - Auszeichnungen, Erfolge, Punkte und

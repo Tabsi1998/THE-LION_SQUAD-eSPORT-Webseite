@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Staffel-Seite der Liga-Verwaltung (#2262, Paket A): Kopf mit Brotkrumen, nur die fertigen Reiter Überblick und Teilnehmer, die
@@ -19,6 +19,7 @@ vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 
 const { default: AdminLeagueStaffelPage } = await import("./AdminLeagueStaffelPage");
+const { toast } = await import("sonner");
 
 const ALL = ["applications", "manage", "matches", "results", "roster", "sanctions", "season"];
 const STAFFEL = {
@@ -84,7 +85,7 @@ test("Kopf mit Brotkrumen Liga › Season › Liga 1 · Staffel A, Stand und nur
   expect(crumbs).toHaveTextContent("Probe-Liga · Season 1");
   expect(screen.getByTestId("staffel-stand")).toBeInTheDocument();
   const tabs = within(screen.getByTestId("staffel-tabs")).getAllByRole("tab").map((tab) => tab.textContent);
-  expect(tabs).toEqual(["Überblick", "Teilnehmer"]);
+  expect(tabs).toEqual(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle"]);
 });
 
 test("Überblick: Liga-Ablauf, was fehlt mit Weg auf diese Seite, Zahlen und die Wege zu Leitstand, Season und Ligaseite", async () => {
@@ -98,7 +99,7 @@ test("Überblick: Liga-Ablauf, was fehlt mit Weg auf diese Seite, Zahlen und die
   expect(screen.getByTestId("staffel-public-open")).toHaveAttribute("href", "/liga/probe-liga/season-1");
 });
 
-test("Überblick: der Schritt Spieltage führt noch in die Turnierverwaltung, Co-Teams zuteilen auf diese Seite", async () => {
+test("Überblick: die Schritte des Liga-Ablaufs führen auf diese Seite - Zuteilen, Spieltage und Tabelle", async () => {
   const user = userEvent.setup();
   renderPage();
   await user.click(await screen.findByTestId("flow-step-assign"));
@@ -106,7 +107,11 @@ test("Überblick: der Schritt Spieltage führt noch in die Turnierverwaltung, Co
   expect(await screen.findByTestId("staffel-panel-teilnehmer")).toBeInTheDocument();
   await user.click(screen.getByTestId("staffel-tab-ueberblick"));
   await user.click(await screen.findByTestId("flow-step-matchdays"));
-  expect(screen.getByTestId("where")).toHaveTextContent("/admin/tournaments/t1");
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/staffeln/t1#spiele");
+  expect(await screen.findByTestId("staffel-panel-spiele")).toBeInTheDocument();
+  await user.click(screen.getByTestId("staffel-tab-ueberblick"));
+  await user.click(await screen.findByTestId("flow-step-table"));
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/staffeln/t1#tabelle");
 });
 
 test("„Liga starten“ fragt wie die Turnierverwaltung nach Hinweisen der Planung und setzt dann Live", async () => {
@@ -115,10 +120,12 @@ test("„Liga starten“ fragt wie die Turnierverwaltung nach Hinweisen der Plan
   renderPage();
   await user.click(await screen.findByTestId("staffel-primary-action"));
   const dialog = await screen.findByRole("alertdialog").catch(() => screen.findByRole("dialog"));
-  expect(dialog).toHaveTextContent("Mit Hinweisen live schalten?");
+  expect(dialog).toHaveTextContent("Mit Hinweisen starten?");
   expect(dialog).toHaveTextContent("Woche 2 ohne Termin");
-  await user.click(within(dialog).getByRole("button", { name: "Trotzdem live" }));
+  await user.click(within(dialog).getByRole("button", { name: "Trotzdem starten" }));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/status", { status: "live", force: false }));
+  // Liga-Wörter statt „Status: Live“ (Kann-Punkt aus Paket A).
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Liga gestartet"));
 });
 
 test("Status: Abgesagt fragt nach dem Grund wie in der Turnierverwaltung", async () => {
@@ -134,7 +141,10 @@ test("Status: Abgesagt fragt nach dem Grund wie in der Turnierverwaltung", async
 test("ohne „Liga verwalten“ weder „Liga starten“ noch Statusauswahl - auch mit „Season konfigurieren“", async () => {
   serve({ tournament: { can_edit_staffel: false, can_manage_structure: true, league_capabilities: ["season", "applications"] } });
   renderPage();
-  expect(await screen.findByTestId("staffel-status-readonly")).toHaveTextContent("Vor dem Start");
+  // Der Stand steht nur einmal - im Abzeichen oben; die Kachel sagt nur, wer ihn ändert (Kann-Punkt aus Paket A).
+  const readonly = await screen.findByTestId("staffel-status-readonly");
+  expect(readonly).toHaveTextContent("Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.");
+  expect(readonly).not.toHaveTextContent("Vor dem Start");
   expect(screen.getByTestId("staffel-stand")).toHaveTextContent("Vor dem Start");
   expect(screen.queryByTestId("staffel-primary-action")).toBeNull();
   expect(screen.queryByTestId("staffel-status-select")).toBeNull();
@@ -327,4 +337,57 @@ test("Entfernen in einer laufenden Staffel (Nachmeldung ohne festes Spiel) versp
   const dialog = await screen.findByRole("dialog");
   expect(dialog).toHaveTextContent("Es hat noch kein festes Spiel");
   expect(dialog).not.toHaveTextContent("neu gemischt");
+});
+
+function Jump({ to }) {
+  const navigate = useNavigate();
+  return <button type="button" data-testid="jump" onClick={() => navigate(to)}>weiter</button>;
+}
+
+test("Wechsel auf eine andere Staffel zeigt nichts von der vorigen, bis die neue geladen ist", async () => {
+  // Kann-Punkt aus Paket A: neue `tournamentId`, frischer Zustand - nie die Co-Teams von Staffel A unter dem Kopf von Staffel B.
+  const user = userEvent.setup();
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  serve();
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.match(/\/tournaments\/t2(\?|$)/)) return Promise.resolve({ data: { ...STAFFEL, id: "t2", league_context: { ...STAFFEL.league_context, staffel: "B" }, league_links: { ...STAFFEL.league_links, staffel: "B" } } });
+    if (path.includes("/tournaments/t2/registrations")) return pending;
+    if (path.includes("/tournaments/t2/")) return Promise.resolve({ data: [] });
+    return base(url);
+  });
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/leagues/staffeln/t1#teilnehmer"]}>
+        <Routes>
+          <Route path="/admin/leagues/staffeln/:tournamentId" element={<><AdminLeagueStaffelPage /><Jump to="/admin/leagues/staffeln/t2#teilnehmer" /></>} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>,
+  );
+  expect((await screen.findAllByText("Nebelwölfe · Rudel")).length).toBeGreaterThan(0);
+  await user.click(screen.getByTestId("jump"));
+  expect(await screen.findByTestId("staffel-title")).toHaveTextContent("Staffel B");
+  expect(screen.getByTestId("staffel-lists-loading")).toBeInTheDocument();
+  expect(screen.queryByText("Nebelwölfe · Rudel")).toBeNull();
+  release({ data: [] });
+  expect(await screen.findByTestId("staffel-teams-count")).toHaveTextContent("0");
+});
+
+test("Tabelle: den Gleichstand entscheidet nur, wer „Ergebnisse korrigieren“ hat", async () => {
+  const table = { can_decide: true, superadmin: false, rules: {}, standings: [], decisions: [],
+    ties: [{ rank: 1, registration_ids: ["r1", "r2"], names: ["Nebelwölfe · Rudel", "Sturmfalken · Horst"], points: 3 }] };
+  for (const [capabilities, allowed] of [[ALL, true], [ALL.filter((item) => item !== "results"), false]]) {
+    serve({ tournament: { status: "live", league_capabilities: capabilities } });
+    const base = apiMock.get.getMockImplementation();
+    apiMock.get.mockImplementation((url) => (String(url).endsWith("/admin/leagues/staffeln/t1/table") ? Promise.resolve({ data: table }) : base(url)));
+    const { unmount } = renderPage("#gleichstand");
+    expect(await screen.findByTestId("season-tie-t1-1")).toBeInTheDocument();
+    if (allowed) expect(screen.getByTestId("season-tie-decide-1")).toBeInTheDocument();
+    else expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
+    expect(screen.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", "http://test.local/api/exports/tournaments/t1/standings.pdf");
+    unmount();
+  }
 });

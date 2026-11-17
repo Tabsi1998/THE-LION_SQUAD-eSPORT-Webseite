@@ -3,6 +3,7 @@ import { lateEntryText } from "@/lib/leagueTable";
 import { staffelStand } from "@/lib/seasonTabs";
 import { staffelManageUrl } from "@/lib/staffelTabs";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
+import { STAFFEL_STATUS_WORDS } from "@/pages/admin/tournament/shared";
 
 // Wer in der Staffel spielt: zugeteilt (der Server nennt es „approved“; „checked_in“ aus alten Ständen zählt mit).
 export const ACTIVE_STAFFEL_REGISTRATION = new Set(["approved", "checked_in"]);
@@ -13,11 +14,9 @@ export const hasCapability = (tournament, capability) => (tournament?.league_cap
 /** Für „Was fehlt“ (`staffelNeeds`): Zuteilen führt zum Abschnitt „Co-Team zuteilen“, alles andere an seine Stelle. */
 export const needsUrl = (tournamentId) => (tab) => staffelManageUrl(tournamentId, tab, tab === "participants" ? "zuteilen" : "");
 
-// Liga-Wörter statt Turnier-Status (Fabian zu #2262: kein „Entwurf“ bei Staffeln). Vor dem Start gibt es keinen Status zum Wählen.
-export const STAFFEL_STATUS_WORDS = {
-  live: "Spielbetrieb", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse veröffentlicht", archived: "Archiviert",
-  cancelled: "Abgesagt",
-};
+// Liga-Wörter statt Turnier-Status (Fabian zu #2262: kein „Entwurf“ bei Staffeln) - an einer Stelle in tournament/shared.js, damit auch
+// die Meldungen nach dem Statuswechsel dieselben Wörter tragen. Vor dem Start gibt es keinen Status zum Wählen.
+export { STAFFEL_STATUS_WORDS };
 const BEFORE_START_WORD = "Vor dem Start";
 
 // Was eine laufende Staffel wirklich braucht: weiterspielen, pausieren, beenden, absagen. Archivieren und den Endstand regelt die Season
@@ -41,18 +40,26 @@ export function registrationLateText(registration) {
 
 /**
  * Kader-Hinweis je Co-Team aus der Kaderübersicht der Season (`GET …/roster`, nur mit „Kader prüfen“): „6 im Kader · alle IDs gültig“,
- * „4 im Kader · 1 ohne gültige ID“, unter der Mindestgröße als Warnung. Die Anmeldungen selbst tragen weder Kadergröße noch IDs - ohne
- * die Übersicht steht hier nichts. `{text, warn}` oder `null`.
+ * „4 im Kader · 1 ohne gültige ID · 1 gesperrt“, unter der Mindestgröße als Warnung. Nicht spielberechtigt steht nach Grund getrennt da
+ * (`state` aus `league_roster.status`): gesperrtes Konto, nach dem Stichtag gekommen (wartet auf Freigabe der ID), sonst eine fehlende,
+ * falsche oder vergebene ID. Die Anmeldungen selbst tragen weder Kadergröße noch IDs - ohne die Übersicht steht hier nichts.
+ * `{text, warn}` oder `null`.
  */
 export function kaderLine(squad) {
   if (!squad) return null;
   const players = Array.isArray(squad.players) ? squad.players : [];
   const count = Number.isFinite(squad.member_count) ? squad.member_count : players.length;
-  const missing = players.filter((player) => player && player.ok === false).length;
+  const blocked = players.filter((player) => player && player.ok === false);
+  const banned = blocked.filter((player) => player.state === "banned").length;
+  const late = blocked.filter((player) => player.state === "late").length;
+  const noId = blocked.length - banned - late;
   const parts = [`${count} im Kader`];
-  if (players.length) parts.push(missing ? `${missing} ohne gültige ID` : "alle IDs gültig");
+  if (players.length && !blocked.length) parts.push("alle IDs gültig");
+  if (noId) parts.push(`${noId} ohne gültige ID`);
+  if (banned) parts.push(`${banned} gesperrt`);
+  if (late) parts.push(late === 1 ? "1 wartet auf Freigabe" : `${late} warten auf Freigabe`);
   if (squad.short) parts.push(`unter Mindestkader ${squad.min_squad_size}`);
-  return { text: parts.join(" · "), warn: Boolean(missing || squad.short) };
+  return { text: parts.join(" · "), warn: Boolean(blocked.length || squad.short) };
 }
 
 const ACTIVE_SANCTION = new Set(["active", "provisional"]);

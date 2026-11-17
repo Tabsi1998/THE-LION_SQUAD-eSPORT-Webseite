@@ -3,19 +3,41 @@ import { useEffect, useRef, useState } from "react";
 // Reiter einer Verwaltungsseite (Spielseite #2249, Season-Seite #2267) als Wischleiste: am Handy seitlich wischbar, mit Hinweis,
 // sobald nicht alle Platz haben. Pfeiltasten, Pos1 und Ende wechseln den Reiter. Ein Punkt am Reiter heißt: dort ist etwas nicht
 // gespeichert. Die Test-Kennungen tragen das Präfix der Seite (`game-tab-modi`, `season-tab-termine`).
+/** Wo noch Reiter liegen: `{left, right}` - beide `false`, wenn alle Platz haben. */
+export function hiddenSides(node) {
+  if (!node) return { left: false, right: false };
+  const rest = node.scrollWidth - node.clientWidth;
+  return { left: rest > 1 && node.scrollLeft > 1, right: rest > 1 && rest - node.scrollLeft > 1 };
+}
+
+const HINT = {
+  right: "Seitlich wischen: weitere Reiter liegen rechts.",
+  left: "Seitlich wischen: weitere Reiter liegen links.",
+  both: "Seitlich wischen: weitere Reiter liegen links und rechts.",
+};
+
 export function AdminTabBar({ tabs, active, dirty = {}, onSelect, idBase, label, testPrefix }) {
   const ref = useRef(null);
-  const [overflow, setOverflow] = useState(false);
+  // Der Hinweis folgt dem Scrollstand (#2262): rechts, links, beides - und verschwindet, sobald alle Reiter zu sehen sind.
+  const [sides, setSides] = useState({ left: false, right: false });
   useEffect(() => {
     const node = ref.current;
     if (!node) return undefined;
-    const measure = () => setOverflow(node.scrollWidth - node.clientWidth > 1);
+    const measure = () => setSides((current) => {
+      const next = hiddenSides(node);
+      return next.left === current.left && next.right === current.right ? current : next;
+    });
     measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
+    node.addEventListener("scroll", measure, { passive: true });
+    if (typeof ResizeObserver === "undefined") return () => node.removeEventListener("scroll", measure);
     const observer = new ResizeObserver(measure);
     observer.observe(node);
-    return () => observer.disconnect();
+    return () => {
+      node.removeEventListener("scroll", measure);
+      observer.disconnect();
+    };
   }, [tabs.length]);
+  const hint = sides.left && sides.right ? HINT.both : sides.left ? HINT.left : sides.right ? HINT.right : "";
   // Der aktive Reiter bleibt am Handy sichtbar, auch wenn er weit rechts liegt (etwa nach einem Sprung aus dem Überblick).
   useEffect(() => {
     const node = ref.current?.querySelector(`[data-tab="${active}"]`);
@@ -50,7 +72,7 @@ export function AdminTabBar({ tabs, active, dirty = {}, onSelect, idBase, label,
           );
         })}
       </div>
-      {overflow ? <p className="mt-1.5 text-[11px] text-white/45" data-testid={`${testPrefix}-tabs-hint`}>Seitlich wischen: weitere Reiter liegen rechts.</p> : null}
+      {hint ? <p className="mt-1.5 text-[11px] text-white/60" data-testid={`${testPrefix}-tabs-hint`}>{hint}</p> : null}
     </div>
   );
 }

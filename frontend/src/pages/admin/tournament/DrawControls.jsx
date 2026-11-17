@@ -42,10 +42,12 @@ export function drawStatusText(row, matches) {
 
 const BUTTON = "tls-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider disabled:opacity-50";
 
-export function DrawControls({ tournamentId, stage, matches = [], onChanged }) {
+/** ``touch``: Tippflächen ab 44 px (Staffel-Seite der Liga-Verwaltung, #2262) - die Turnierverwaltung bleibt, wie sie ist. */
+export function DrawControls({ tournamentId, stage, matches = [], onChanged, touch = false }) {
   const confirm = useConfirm();
   const [busy, setBusy] = useState("");
   const groups = drawGroupsOf(matches);
+  const button = touch ? `${BUTTON} min-h-[44px]` : BUTTON;
   const league = leagueRedrawAllowed(stage, matches);
   if (!groups.length && !league) return null;
 
@@ -83,7 +85,7 @@ export function DrawControls({ tournamentId, stage, matches = [], onChanged }) {
               disabled={busy === `draw:${row.group}`}
               data-testid={`draw-now-${row.group}`}
               onClick={() => post(`draw:${row.group}`, "draw", { group: row.group }, { success: `${row.label} ausgelost.` })}
-              className={`${BUTTON} tls-btn--primary`}
+              className={`${button} tls-btn--primary`}
             >
               Jetzt auslosen
             </button>
@@ -101,7 +103,7 @@ export function DrawControls({ tournamentId, stage, matches = [], onChanged }) {
                   : `Alle Weiterkommer werden neu auf ${matchList(row.matchKeys)} verteilt. Das geht nur, solange keines davon begonnen hat; die neue Auslosung steht im Protokoll.`,
                 success: `${row.label} neu ausgelost.`,
               })}
-              className={`${BUTTON} tls-btn--secondary`}
+              className={`${button} tls-btn--secondary`}
             >
               Neu auslosen
             </button>
@@ -123,7 +125,7 @@ export function DrawControls({ tournamentId, stage, matches = [], onChanged }) {
               description: "Jeder spielt weiter genau einmal je Hin- und Rückrunde gegen jeden; neu gelost werden, wer in welcher Woche gegen wen spielt, und das Heimrecht. Termine der Spieltage werden neu gerechnet, von Hand gesetzte bleiben.",
               success: "Spieltage neu ausgelost.",
             })}
-            className={`${BUTTON} tls-btn--secondary`}
+            className={`${button} tls-btn--secondary`}
           >
             Spieltage neu auslosen
           </button>

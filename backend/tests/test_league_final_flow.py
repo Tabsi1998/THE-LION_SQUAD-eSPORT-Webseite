@@ -993,3 +993,36 @@ async def test_a_close_cut_off_before_its_version_shows_honestly_and_can_be_free
     again = await must_close(flow, staffel)
     assert again.json()["version"] == 1
     assert (await cockpit(flow, season, staffel))["closed"] is True
+
+
+async def staffel_table(flow, staffel):
+    response = await flow.get(f"{ADMIN}/staffeln/{staffel['id']}/table")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.asyncio
+async def test_the_staffel_table_marks_the_champion_tie_with_the_required_method(flow):
+    # Staffel-Seite (#2262): Der Meister-Gleichstand verlangt dort dieselbe Art der Entscheidung wie im Abschluss - der Server sagt es.
+    _admin, _league, _season, _division, staffel = await setup(flow)
+    winners = await tie_on_top(flow, staffel)
+    table = await staffel_table(flow, staffel)
+    top = next(tie for tie in table["ties"] if tie["rank"] == 1)
+    assert sorted(top["registration_ids"]) == sorted(winners)
+    assert top["kind"] == "champion" and top["method_required"] is True
+    assert table["methods"] == {"playoff": "Entscheidungsspiel", "lot": "Los", "lead": "Entscheid der Leitung"}
+    assert all(tie["kind"] == "other" and tie["method_required"] is False for tie in table["ties"] if tie["rank"] != 1)
+
+
+@pytest.mark.asyncio
+async def test_the_staffel_table_marks_a_zone_tie_without_the_required_method(flow):
+    _admin, _league, season, _division, _staffel = await setup(flow)
+    second = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={"zones": {"promote": 1}})).json()
+    lower = await add_staffel(flow, second, "b")
+    await tie_on_top(flow, lower)
+    top = next(tie for tie in (await staffel_table(flow, lower))["ties"] if tie["rank"] == 1)
+    assert top["kind"] == "zone" and top["method_required"] is False
+    # Zwei Aufsteiger: Der geteilte Platz liegt ganz in der Zone - ein gewöhnlicher Gleichstand.
+    await flow.db.league_divisions.update_one({"id": second["id"]}, {"$set": {"zones": {"promote": 2}}})
+    top = next(tie for tie in (await staffel_table(flow, lower))["ties"] if tie["rank"] == 1)
+    assert top["kind"] == "other" and top["method_required"] is False

@@ -43,7 +43,7 @@ import { SeasonCloseTab } from "./SeasonCloseTab";
 import { SeasonRewardsTab } from "./SeasonRewardsTab";
 import { SeasonSuccessorSheet } from "./SeasonSuccessorSheet";
 import { SeasonRecomputeSheet } from "./SeasonRecomputeSheet";
-import { SeasonTablePanel } from "./SeasonTablePanel";
+import { SeasonTableLinks } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
@@ -383,8 +383,8 @@ export default function AdminLeagueSeasonPage() {
             </FormSection>
           </SeasonTabForm>
         ) : null}
-        {/* Tabelle (E.1, #1625): Gleichstände je Staffel, Entscheid der Leitung - lesen darf jede Zuständigkeit. */}
-        <div id="gleichstand" className="scroll-mt-24"><SeasonTablePanel divisions={data.divisions} canDecide={can("results")} /></div>
+        {/* Tabelle und Gleichstand-Entscheid je Staffel stehen auf der Staffel-Seite (#2262, Nr. 190) - hier nur der Weg dorthin. */}
+        <div id="gleichstand" className="scroll-mt-24"><SeasonTableLinks divisions={data.divisions} /></div>
       </div>
     ),
     // Proteste (E.2, #1619): Eingang für „Proteste“, Einstellungen für „Season konfigurieren“ (lesen darf jede Zuständigkeit).

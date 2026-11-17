@@ -199,6 +199,25 @@ async def test_match_list_marks_the_own_matches_for_the_plan(flow):
 
 
 @pytest.mark.asyncio
+async def test_match_list_carries_the_marks_for_the_staffel_page(flow):
+    # Staffel-Seite (#2262, Paket B): Check-in, Veto, Vorfall und Verfahren je Spiel als reines Lesefeld - nur für die Leitung.
+    w = await world(flow)
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {
+        "incidents": [{"id": "i1", "state": "proposed"}],
+        "disputes": [{"id": "p1", "kind": "protest", "state": "open"}]}})
+    url = f"/api/tournaments/{w['tournament']['id']}/matches-v2"
+    flow.act_as(await holder(flow, "matches"))
+    row = next(item for item in (await flow.get(url)).json() if item["id"] == w["match"]["id"])
+    assert row["league_marks"]["incidents"] == 1
+    assert row["league_marks"]["procedures"] == 1
+    assert {"checkin", "checked_in", "veto"} <= set(row["league_marks"])
+
+    flow.act_as(await flow.add_user(name="Gast"))
+    rows = (await flow.get(url)).json()
+    assert all("league_marks" not in item for item in rows), "ohne Liga-Recht kein Kennzeichen"
+
+
+@pytest.mark.asyncio
 async def test_a_tournament_without_league_knows_nothing_of_this(flow):
     tournament, users, regs = await flow.with_participants(2, status="live")
     match = {"id": new_id(), "tournament_id": tournament["id"], "stage_id": new_id(), "match_type": "duel", "status": "scheduled", "round": 1,
@@ -210,3 +229,4 @@ async def test_a_tournament_without_league_knows_nothing_of_this(flow):
     assert response.status_code == 200, response.text
     rows = (await flow.get(f"/api/tournaments/{tournament['id']}/matches-v2")).json()
     assert "viewer_involved" not in rows[0]
+    assert "league_marks" not in rows[0]
