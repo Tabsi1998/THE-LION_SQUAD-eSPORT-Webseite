@@ -8,7 +8,7 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
-import { offerWebPush } from "@/lib/webPush";
+import { registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
 
 // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt. Am Handy ein Blatt
 // von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass die Teamleitung anmeldet (Teamleitungen
@@ -71,7 +71,7 @@ function EntryRow({ row, checked, onToggle }) {
   );
 }
 
-export function PlayAlongSheet({ event, from = "", onClose }) {
+export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
   const [entries, setEntries] = useState(null);
   const [selected, setSelected] = useState([]);
   const [acceptRules, setAcceptRules] = useState(false);
@@ -121,10 +121,14 @@ export function PlayAlongSheet({ event, from = "", onClose }) {
       });
       setResult(data);
       // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
+      // Die neuen Anmeldungen merkt sich der Browser (#1208), damit die Übersicht sie nicht noch einmal als neu zählt.
+      for (const entry of data?.results || []) {
+        if (["registered", "pending", "waitlist"].includes(entry.state)) rememberWebPushRegistration(userId, registrationKey("tournament", entry.id));
+      }
       if ((data?.results || []).some((entry) => entry.state === "registered")) {
         void offerFriendsHint();
-        // Danach die Frage nach Browser-Benachrichtigungen (#1163).
-        void offerCalendarHint().then(() => offerWebPush());
+        // Die Frage nach Browser-Benachrichtigungen stellt die Event-Seite, wenn dieses Blatt zu ist (#1208).
+        void offerCalendarHint();
       }
     });
     if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Die Anmeldung hat nicht geklappt."));

@@ -1,7 +1,8 @@
 import React from "react";
-import { StyleSheet } from "react-native";
+import { AccessibilityInfo, StyleSheet } from "react-native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { PlayAlongSheet } from "./PlayAlongSheet";
+import { anyModalOpen } from "../lib/modalGate";
 import type { PlayAlongEntry } from "../lib/playAlong";
 
 // „Spielst du auch mit?“ (#1184) in der App: Haken je Einzel-Turnier mit 48-Punkt-Tippfläche, Hinweise für Team und
@@ -118,4 +119,37 @@ test("geschlossene oder deaktivierte Turniere stehen ohne Haken mit Grund da", a
   expect(screen.queryByTestId("play-along-check-t9")).toBeNull();
   expect(screen.getByTestId("play-along-note-t9")).toHaveTextContent("Anmeldung für dieses Turnier geschlossen.");
   expect(screen.getByTestId("play-along-row-t9")).not.toHaveTextContent(/Plätze frei/);
+});
+
+/** Die Art, wie das Fenster erscheint - am nächsten Vorfahren des Blatts, der sie trägt (das Modal). */
+function modalAnimation() {
+  type Node = { props: Record<string, unknown>; parent: Node | null };
+  let node: Node | null = screen.getByTestId("play-along-sheet") as unknown as Node;
+  while (node && node.props.animationType === undefined) node = node.parent;
+  return node ? node.props.animationType : undefined;
+}
+
+// Feinschliff (#1208): mit „Bewegung reduzieren“ steht das Blatt sofort da; solange es offen ist, wartet die Frage nach
+// Benachrichtigungen (lib/modalGate).
+test("„Bewegung reduzieren“: das Blatt gleitet nicht; offen hält es die Frage nach Benachrichtigungen auf", async () => {
+  const motion = jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
+  try {
+    await renderSheet([SOLO]);
+    expect(await screen.findByTestId("play-along-sheet")).toBeTruthy();
+    await waitFor(() => expect(modalAnimation()).toBe("none"));
+    expect(anyModalOpen()).toBe(true);
+  } finally {
+    motion.mockRestore();
+  }
+});
+
+test("ohne „Bewegung reduzieren“ gleitet das Blatt wie bisher", async () => {
+  const motion = jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false);
+  try {
+    await renderSheet([SOLO]);
+    expect(await screen.findByTestId("play-along-sheet")).toBeTruthy();
+    await waitFor(() => expect(modalAnimation()).toBe("slide"));
+  } finally {
+    motion.mockRestore();
+  }
 });

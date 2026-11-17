@@ -37,6 +37,12 @@ jest.mock("../../advent/entry", () => ({ AdventHint: () => null }));
 jest.mock("../../components/YearReviewCard", () => ({ YearReviewCard: () => null }));
 jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: jest.fn() }));
 jest.mock("../../lib/openLink", () => ({ openLink: jest.fn() }));
+// Die Frage nach Benachrichtigungen (#1208): die Startseite meldet ihre Anmeldungen (eigene und die des Teams).
+const mockAfterDashboard = jest.fn(async (..._args: unknown[]) => false);
+jest.mock("../../notifications/pushPrompt", () => ({
+  ...jest.requireActual("../../notifications/pushPrompt"),
+  afterDashboard: (...args: unknown[]) => mockAfterDashboard(...args),
+}));
 
 const navigation = { navigate: jest.fn() } as never;
 const route = { key: "dashboard", name: "Dashboard" } as never;
@@ -229,4 +235,13 @@ test("ein Event mit seinen Turnieren ist auf „Start“ eine Karte", async () =
   expect(screen.queryByText("Kart Cup")).toBeNull();
   expect(screen.getByText(/2 Turniere: Kart Cup, Rocket Cup/)).toBeTruthy();
   expect(screen.getByText("Cup 0")).toBeTruthy();
+});
+
+test("Benachrichtigungen (#1208): die Startseite meldet ihre Anmeldungen - ein neu angemeldetes Team ist der Anlass zu fragen", async () => {
+  dashboard = { ...dashboard, me: { tournaments, events: [{ id: "e-lan", title: "Herbst-LAN", start_date: "2030-03-10T08:00:00Z" }], matches: [], staff_matches: [], actions: [] } };
+  await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(mockAfterDashboard).toHaveBeenCalledWith("u1", expect.objectContaining({
+    tournaments: expect.arrayContaining([expect.objectContaining({ id: "t0" }), expect.objectContaining({ id: "t1" })]),
+    events: [expect.objectContaining({ id: "e-lan" })],
+  })));
 });

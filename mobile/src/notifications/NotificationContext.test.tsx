@@ -21,6 +21,11 @@ const mockSetForegroundPushHidden = jest.fn();
 const mockRenders: { user: string | undefined; titles: string[] }[] = [];
 const mockNavigateToNotification = jest.fn();
 const mockListeners: { receive: ReceiveListener | null; open: ReceiveListener | null } = { receive: null, open: null };
+type MockPermission = { status: string; canAskAgain: boolean };
+const mockPermission: { value: MockPermission; listeners: Set<(permission: MockPermission) => void> } = {
+  value: { status: "granted", canAskAgain: true },
+  listeners: new Set(),
+};
 
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -44,6 +49,11 @@ jest.mock("./PushService", () => ({
   configurePushNotifications: jest.fn(),
   consumeInitialPushNotification: async () => null,
   registerPushToken: (...args: unknown[]) => mockRegisterPushToken(...args),
+  getPushPermission: async () => mockPermission.value,
+  onPushPermissionChange: (listener: (permission: MockPermission) => void) => {
+    mockPermission.listeners.add(listener);
+    return () => mockPermission.listeners.delete(listener);
+  },
   setBadgeCount: (...args: unknown[]) => mockSetBadgeCount(...args),
   setForegroundPushHidden: (...args: unknown[]) => mockSetForegroundPushHidden(...args),
   isContentHiddenPush: (item: UserNotification) => item.meta?.content_hidden === true,
@@ -93,6 +103,8 @@ beforeEach(() => {
   Object.assign(mockLock, { ready: true, enabled: false, locked: false });
   mockListeners.receive = null;
   mockListeners.open = null;
+  mockPermission.value = { status: "granted", canAskAgain: true };
+  mockPermission.listeners.clear();
   mockApi.get.mockResolvedValue(listFor([ITEM_A]));
   mockApi.post.mockResolvedValue({ data: {} });
 });
@@ -305,5 +317,47 @@ describe("Sammelmeldung nach der Ruhezeit (#2444)", () => {
       mockListeners.open?.({ id: "n-digest", kind: "quiet_digest", title: "In der Nacht: 4 Meldungen", url: "/notifications", read: false });
     });
     await waitFor(() => expect(mockNavigateToNotification).toHaveBeenCalledWith(expect.objectContaining({ kind: "quiet_digest", url: "/notifications" })));
+  });
+});
+
+describe("Erlaubnis im richtigen Moment (#1208)", () => {
+  test("nach dem Login ohne Erlaubnis: das Gerät meldet sich nicht an und versucht es auch nicht später", async () => {
+    jest.useFakeTimers();
+    try {
+      mockPermission.value = { status: "undetermined", canAskAgain: true };
+      await render(tree());
+      expect(await screen.findByText("Nachricht für A")).toBeTruthy();
+      await act(async () => {
+        jest.advanceTimersByTime(PUSH_RETRY_MS + 1000);
+      });
+      expect(mockRegisterPushToken).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test("abgelehnt: keine Anmeldung des Geräts", async () => {
+    mockPermission.value = { status: "denied", canAskAgain: false };
+    await render(tree());
+    expect(await screen.findByText("Nachricht für A")).toBeTruthy();
+    expect(mockRegisterPushToken).not.toHaveBeenCalled();
+  });
+
+  test("gerade erlaubt („Ja, rufen“): das Gerät meldet sich sofort an", async () => {
+    mockPermission.value = { status: "undetermined", canAskAgain: true };
+    await render(tree());
+    expect(await screen.findByText("Nachricht für A")).toBeTruthy();
+    expect(mockRegisterPushToken).not.toHaveBeenCalled();
+
+    mockPermission.value = { status: "granted", canAskAgain: true };
+    await act(async () => {
+      for (const listener of mockPermission.listeners) listener(mockPermission.value);
+    });
+    await waitFor(() => expect(mockRegisterPushToken).toHaveBeenCalledTimes(1));
+  });
+
+  test("schon erlaubt (bestehendes Konto): alles wie bisher", async () => {
+    await render(tree());
+    await waitFor(() => expect(mockRegisterPushToken).toHaveBeenCalledTimes(1));
   });
 });

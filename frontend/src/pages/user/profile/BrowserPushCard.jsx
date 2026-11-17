@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { browserPushStatus, disableWebPush, enableWebPush, setWebPushPrivate, webPushPrivate } from "@/lib/webPush";
@@ -14,8 +14,12 @@ const TEXT = {
   unsupported: "Dieser Browser kann keine Benachrichtigungen empfangen.",
 };
 
+/** Anker der Karte - dorthin führt der leise Hinweis „Aufrufe sind aus – einschalten“ (#1208). */
+export const BROWSER_PUSH_ANCHOR = "dieser-browser";
+
 export function BrowserPushCard({ user, config, onChanged }) {
   const [status, setStatus] = useState("loading");
+  const cardRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [hidden, setHidden] = useState(() => webPushPrivate());
 
@@ -26,6 +30,14 @@ export function BrowserPushCard({ user, config, onChanged }) {
       .catch(() => { if (active) setStatus("unsupported"); });
     return () => { active = false; };
   }, [user]);
+
+  // Vom Hinweis „Aufrufe sind aus“ gekommen (#dieser-browser): die Karte in den Blick holen, sobald klar ist, was sie sagt.
+  const ready = status !== "loading";
+  useEffect(() => {
+    if (!ready || typeof window === "undefined" || window.location.hash !== `#${BROWSER_PUSH_ANCHOR}`) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    cardRef.current?.scrollIntoView?.({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  }, [ready]);
 
   const enable = async () => {
     setBusy(true);
@@ -62,7 +74,7 @@ export function BrowserPushCard({ user, config, onChanged }) {
 
   const count = Number(config?.subscriptions || 0);
   return (
-    <div className="border border-white/10 rounded-sm p-4 bg-[#0A0A0A]" data-testid="profile-browser-push" data-status={status}>
+    <div ref={cardRef} id={BROWSER_PUSH_ANCHOR} className="border border-white/10 rounded-sm p-4 bg-[#0A0A0A] scroll-mt-24" data-testid="profile-browser-push" data-status={status}>
       <div className="flex flex-wrap sm:flex-nowrap items-start gap-3">
         <BellRing className={`w-5 h-5 mt-0.5 shrink-0 ${status === "subscribed" ? "text-[#29B6E8]" : "text-white/40"}`} aria-hidden="true" />
         <div className="min-w-0 flex-1 basis-[220px]">

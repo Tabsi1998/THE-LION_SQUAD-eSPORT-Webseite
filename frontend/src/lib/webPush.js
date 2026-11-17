@@ -2,9 +2,12 @@
 // iPhone nur mit der Website auf dem Home-Bildschirm. Der Server schaltet es frei (GET /web-push/config: ohne Schlüssel
 // aus - dann kein Knopf und keine Frage).
 //
-// Gefragt wird nie beim ersten Besuch und erst im richtigen Moment: nach einer Turnier- oder Event-Anmeldung, und nur
-// einmal je Browser. „Nicht jetzt“ merkt sich die Seite. Fällt die erste Anmeldung in den ersten Besuch, kommt die Frage
-// beim nächsten Besuch. Am iPhone ohne Home-Bildschirm erscheint statt der Frage ein Hinweis, wie es geht.
+// Gefragt wird nie beim ersten Besuch und erst im richtigen Moment (#1208): nach einer Turnier- oder Event-Anmeldung -
+// erst die eigene Erklärung, bei „Ja, rufen“ dann der Browser. „Später“ fragt frühestens bei der nächsten Anmeldung wieder.
+// Wurde das Team angemeldet, kommt die Frage beim nächsten Öffnen der Übersicht (neue Anmeldung, die dieser Browser noch
+// nicht kannte - gemerkt je Konto im Browser, nicht am Server). Fällt die Anmeldung in den ersten Besuch, kommt die Frage
+// beim nächsten Besuch. Am iPhone ohne Home-Bildschirm erscheint statt der Frage einmal ein Hinweis, wie es geht. Hat der
+// Browser abgelehnt, fragt die Seite nie wieder; Turnier- und Event-Seiten zeigen dann leise „Aufrufe sind aus“.
 //
 // Die Anmeldung gehört dem Konto, das sie im Browser angelegt hat (OWNER_KEY). Meldet sich jemand anderes im selben Browser
 // an, endet sie; Abmelden vom Konto beendet sie auch (forgetWebPush, der Server löscht seine Seite mit der Sitzung).
@@ -16,6 +19,9 @@ const FIRST_VISIT_KEY = "tls-web-push-first-visit";
 const VISIT_KEY = "tls-web-push-visit";
 const OWNER_KEY = "tls-web-push-owner";
 const PRIVATE_KEY = "tls-web-push-private";
+const SEEN_PREFIX = "tls-web-push-seen:";
+/** Höchstens so viele Anmeldungen merkt sich der Browser je Konto (die neuesten). */
+export const SEEN_MAX = 80;
 const READY_TIMEOUT_MS = 5000;
 
 function local(win) {
@@ -88,15 +94,104 @@ export function markVisit(win = currentWindow()) {
 export const askState = (win = currentWindow()) => read(local(win), ASK_KEY);
 export const rememberAsk = (state, win = currentWindow()) => write(local(win), ASK_KEY, state);
 
-/** Was nach einer Anmeldung passiert: "ask" (fragen), "ios-hint" (Hinweis), "pending" (beim nächsten Besuch) oder null. */
+/**
+ * Was nach einer Anmeldung passiert: "ask" (fragen), "ios-hint" (Hinweis), "pending" (beim nächsten Besuch) oder null.
+ * Entscheidet der Browser (erlaubt oder abgelehnt), fragt die Seite nicht mehr. „Später“ (later) und ein früheres „Nicht
+ * jetzt“ (declined) halten die nächste Anmeldung nicht auf (#1208). Den Hinweis fürs iPhone gibt es nur einmal.
+ */
 export function askDecision({ config, env, state, firstVisit }) {
   if (!config?.enabled || !config?.public_key) return null;
-  if (state === "asked" || state === "declined") return null;
   if (env?.permission === "granted" || env?.permission === "denied") return null;
   const hint = needsHomeScreen(env);
   if (!env?.supported && !hint) return null;
+  if (hint && (state === "asked" || state === "ios-seen")) return null;
   if (firstVisit) return "pending";
   return hint ? "ios-hint" : "ask";
+}
+
+/** Die Kennung einer Anmeldung: Turnier oder Event. */
+export function registrationKey(kind, id) {
+  return id ? `${kind === "tournament" ? "t" : "e"}:${id}` : null;
+}
+
+/** Die Turniere, in denen das Team angemeldet ist (die Anmeldung trägt eine Team-Kennung). */
+export function dashboardTeamKeys(me) {
+  return (Array.isArray(me?.tournaments) ? me.tournaments : [])
+    .filter((row) => Boolean(row?.my_registration?.team_id))
+    .map((row) => registrationKey("tournament", row?.id))
+    .filter(Boolean);
+}
+
+/** Die Anmeldungen der Übersicht (eigene und die des Teams, so wie der Server sie unter „Meine“ führt). */
+export function dashboardRegistrationKeys(me) {
+  const keys = [
+    ...(Array.isArray(me?.tournaments) ? me.tournaments : []).map((row) => registrationKey("tournament", row?.id)),
+    ...(Array.isArray(me?.events) ? me.events : []).map((row) => registrationKey("event", row?.id)),
+  ];
+  return [...new Set(keys.filter(Boolean))];
+}
+
+function seenKey(userId) {
+  return `${SEEN_PREFIX}${String(userId)}`;
+}
+
+function readSeen(win, userId) {
+  try {
+    const parsed = JSON.parse(read(local(win), seenKey(userId)) || "null");
+    if (parsed && Array.isArray(parsed.seen)) return { seen: parsed.seen.filter((key) => typeof key === "string"), fresh: parsed.fresh === true };
+  } catch {
+    // kaputter Merker: wie neu
+  }
+  return null;
+}
+
+function writeSeen(win, userId, { seen, fresh = false }) {
+  const kept = seen.slice(-SEEN_MAX);
+  write(local(win), seenKey(userId), JSON.stringify(fresh ? { seen: kept, fresh: true } : { seen: kept }));
+}
+
+const mergeKeys = (seen, keys) => [...seen.filter((key) => !keys.includes(key)), ...keys];
+
+/**
+ * Eigene Anmeldung: merken, damit die Übersicht sie nicht noch einmal als neu zählt. Gab es noch keinen Ausgangsstand,
+ * wird die nächste Übersicht zum Ausgangsstand - ältere Anmeldungen sind kein neuer Anlass.
+ */
+export function rememberWebPushRegistration(userId, key, win = currentWindow()) {
+  if (!userId || !key || !win) return;
+  const stored = readSeen(win, userId);
+  writeSeen(win, userId, stored ? { ...stored, seen: mergeKeys(stored.seen, [key]) } : { seen: [key], fresh: true });
+}
+
+/**
+ * Die Übersicht meldet die aktuellen Anmeldungen. Zurück kommt der Anlass zu fragen - "team", wenn eine neue Anmeldung
+ * die des Teams ist, sonst "own" (etwa in der App angemeldet) - oder null. Die erste Übersicht nach dem Login ist nur der
+ * Ausgangsstand - keine Frage direkt nach dem Anmelden.
+ */
+export function noteWebPushRegistrations(userId, keys, { teamKeys = [], win = currentWindow() } = {}) {
+  if (!userId || !win) return null;
+  const stored = readSeen(win, userId);
+  if (!stored) {
+    writeSeen(win, userId, { seen: keys });
+    return null;
+  }
+  const fresh = keys.filter((key) => !stored.seen.includes(key));
+  if (!fresh.length && !stored.fresh) return null;
+  writeSeen(win, userId, { seen: mergeKeys(stored.seen, fresh) });
+  if (!fresh.length || stored.fresh) return null;
+  return fresh.some((key) => teamKeys.includes(key)) ? "team" : "own";
+}
+
+/** Abmelden: die gemerkten Anmeldungen aller Konten gehen - nach dem nächsten Login ist die Übersicht Ausgangsstand. */
+function forgetSeen(win) {
+  const store = local(win);
+  try {
+    for (let index = (store?.length || 0) - 1; index >= 0; index -= 1) {
+      const key = store.key(index);
+      if (key && key.startsWith(SEEN_PREFIX)) store.removeItem(key);
+    }
+  } catch {
+    // privates Fenster - dann ist ohnehin nichts gemerkt
+  }
 }
 
 export async function loadWebPushConfig() {
@@ -109,16 +204,16 @@ export async function loadWebPushConfig() {
 }
 
 /** Nach einer Turnier- oder Event-Anmeldung (oder beim nächsten Besuch): fragen, wenn es so weit ist. */
-export async function offerWebPush(win = currentWindow(), { firstVisit } = {}) {
+export async function offerWebPush(win = currentWindow(), { firstVisit, reason = "own" } = {}) {
   if (!win) return null;
   const state = askState(win);
-  if (state === "asked" || state === "declined") return null;
   const env = pushEnvironment(win);
+  if (env.permission === "granted" || env.permission === "denied") return null;
   if (!env.supported && !needsHomeScreen(env)) return null;
   const config = await loadWebPushConfig();
   const decision = askDecision({ config, env, state, firstVisit: firstVisit ?? markVisit(win) });
   if (decision === "pending") rememberAsk("pending", win);
-  if (decision === "ask" || decision === "ios-hint") win.dispatchEvent(new CustomEvent(WEB_PUSH_EVENT, { detail: { mode: decision, config } }));
+  if (decision === "ask" || decision === "ios-hint") win.dispatchEvent(new CustomEvent(WEB_PUSH_EVENT, { detail: { mode: decision, config, reason } }));
   return decision;
 }
 
@@ -262,8 +357,15 @@ export async function forgetWebPush(win = currentWindow()) {
   } finally {
     write(local(win), OWNER_KEY, "");
     write(local(win), PRIVATE_KEY, "");
+    forgetSeen(win);
   }
 }
+
+/** Hat der Browser Benachrichtigungen für diese Website abgelehnt? Dann zeigt die Seite leise „Aufrufe sind aus“ (#1208). */
+export const webPushBlocked = (win = currentWindow()) => {
+  const env = pushEnvironment(win);
+  return env.supported && env.permission === "denied";
+};
 
 /** Zustand für die Einstellungen: "subscribed", "available", "denied", "ios-hint" oder "unsupported". */
 export async function browserPushStatus(user, win = currentWindow()) {

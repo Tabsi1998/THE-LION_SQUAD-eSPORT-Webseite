@@ -5,6 +5,8 @@ import { Alert } from "react-native";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { isGuestUser } from "../live";
 import { INSTALLATION_ID_KEY } from "../notifications/installationId";
+import { isPushAsked, noteRegistrations } from "../notifications/pushPrompt";
+import { readPromptState, resetPromptStateForTests } from "../notifications/pushPromptStore";
 
 // Der Anmeldepfad der App. Getestet werden die Zusagen, die man einem Nutzer
 // nicht stillschweigend brechen darf: Tokens nur speichern, wenn "angemeldet
@@ -18,6 +20,7 @@ const mockClearAllCache = jest.fn(async (..._args: unknown[]) => {});
 const mockUnregisterPushToken = jest.fn(async (..._args: unknown[]) => {});
 const mockDismissAllNotifications = jest.fn(async (..._args: unknown[]) => {});
 const mockSetPushAccount = jest.fn();
+const mockPushPermission = { value: { status: "granted", canAskAgain: true } };
 
 // Die Fabriken werden vor den Konstanten oben ausgefuehrt, deshalb wird die
 // Referenz erst beim Aufruf aufgeloest statt beim Erzeugen des Mocks.
@@ -37,6 +40,7 @@ jest.mock("../notifications/PushService", () => ({
   unregisterPushToken: (...args: unknown[]) => mockUnregisterPushToken(...args),
   dismissAllNotifications: (...args: unknown[]) => mockDismissAllNotifications(...args),
   setPushAccount: (...args: unknown[]) => mockSetPushAccount(...args),
+  getPushPermission: async () => mockPushPermission.value,
 }));
 
 const ACCESS_KEY = "tls.mobile.accessToken";
@@ -73,6 +77,8 @@ async function renderAuth() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetPromptStateForTests(null);
+  mockPushPermission.value = { status: "granted", canAskAgain: true };
   mockApi.get.mockRejectedValue(new Error("kein Token"));
   mockApi.post.mockResolvedValue({ data: SESSION });
 });
@@ -622,5 +628,39 @@ describe("Angemeldet bleiben", () => {
     });
     expect(mockApi.post).toHaveBeenLastCalledWith("/auth/mobile/login", { email: "fan@lionsquad.at", password: "geheim", remember: true });
     expect(JSON.parse((await SecureStore.getItemAsync(USER_KEY)) || "null")).toEqual(USER);
+  });
+});
+
+// Frage nach Benachrichtigungen (#1208): Die gemerkten Anmeldungen gehen beim Abmelden - beim nächsten Login ist die
+// Startseite wieder nur Ausgangsstand. Bestandsgeräte, die früher beim Login gefragt wurden, gelten als gefragt.
+describe("Frage nach Benachrichtigungen (#1208)", () => {
+  test("Abmelden räumt die gemerkten Anmeldungen ab", async () => {
+    const { result } = await renderAuth();
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    await noteRegistrations("u-1", ["t:alt"]);
+    expect((await readPromptState()).users["u-1"]).toBeTruthy();
+    await act(async () => {
+      await result.current.logout();
+    });
+    expect((await readPromptState()).users).toEqual({});
+  });
+
+  test("Bestandsgerät: gespeicherte Sitzung beim ersten Start, Push nicht erlaubt - gilt als gefragt", async () => {
+    mockPushPermission.value = { status: "denied", canAskAgain: true };
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    mockApi.get.mockResolvedValue({ data: USER });
+    await renderAuth();
+    await waitFor(async () => expect(await isPushAsked()).toBe(true));
+  });
+
+  test("frisch installiert (ohne Sitzung): nicht als gefragt - nach der ersten Anmeldung kommt die Erklärung", async () => {
+    mockPushPermission.value = { status: "denied", canAskAgain: true };
+    await renderAuth();
+    await waitFor(async () => expect((await readPromptState()).migrated).toBe(true));
+    expect(await isPushAsked()).toBe(false);
   });
 });

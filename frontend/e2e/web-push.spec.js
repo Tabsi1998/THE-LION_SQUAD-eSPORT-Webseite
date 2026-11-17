@@ -1,7 +1,8 @@
 const { test, expect } = require("@playwright/test");
 
-// Browser-Benachrichtigungen (#1163) bei 390 und 1440 px: die Frage kommt nie beim ersten Besuch, sondern nach einer
-// Anmeldung beim nächsten; „Benachrichtigen“ holt die Zustimmung des Browsers und meldet ihn beim Server an. In den
+// Browser-Benachrichtigungen (#1163, #1208) bei 390 und 1440 px: die Frage kommt nie beim ersten Besuch, sondern nach einer
+// Anmeldung - zuerst die eigene Erklärung, erst „Ja, rufen“ holt die Zustimmung des Browsers und meldet ihn beim Server an.
+// Hat der Browser abgelehnt, steht auf der Turnierseite leise „Aufrufe sind aus – einschalten“. In den
 // Einstellungen stehen Kanal „Browser“ und „Dieser Browser“. Zustimmung und Push-Dienst sind nachgestellt (headless gibt
 // es keinen echten Push-Dienst); was ein Tipp auf die Meldung öffnet, prüft src/lib/serviceWorker.test.js. Seit #1204 gilt
 // „Push“ je Thema für App und Browser; den Kanal „Browser“ ganz abschalten geht unter „Weitere Wege“.
@@ -10,8 +11,15 @@ const ME = { id: "u-push", username: "pushloewe", display_name: "PushLöwe", rol
 const CONFIG = { enabled: true, public_key: `B${"Q".repeat(86)}`, subscriptions: 0 };
 const SHOTS = process.env.WEB_PUSH_SHOTS || "";
 
-async function mockServer(page, { storage = {} } = {}) {
-  await page.addInitScript(({ storage: values }) => {
+const TOURNAMENT = {
+  id: "tournament-push", slug: "probe-cup", title: "Probe Cup", status: "registration_open", registration_enabled: true,
+  participant_count: 0, max_participants: 16, team_mode: "solo", event_mode: "online", start_date: "2099-10-04T18:00:00+00:00",
+  game: { id: "game-1", slug: "probe-game", name: "Probespiel", player_id_fields: [] },
+  public_phase: { state: "registration_open", label: "Anmeldung" },
+};
+
+async function mockServer(page, { storage = {}, permission: startPermission = "default" } = {}) {
+  await page.addInitScript(({ storage: values, startPermission: initial }) => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
     for (const [key, value] of Object.entries(values)) {
       if (!window.localStorage.getItem(`${key}:gesetzt`)) {
@@ -20,7 +28,7 @@ async function mockServer(page, { storage = {} } = {}) {
       }
     }
     // Zustimmung und Push-Dienst nachgestellt: der Browser sagt „erlaubt“, die Anmeldung hat eine erfundene Adresse.
-    let permission = "default";
+    let permission = initial;
     let current = null;
     window.__pushAsked = 0;
     const Notification = function Notification() {};
@@ -41,8 +49,8 @@ async function mockServer(page, { storage = {} } = {}) {
       },
     };
     Object.defineProperty(window.navigator, "serviceWorker", { configurable: true, value: { ready: Promise.resolve({ pushManager }), register: async () => ({}), getRegistration: async () => undefined, addEventListener() {} } });
-  }, { storage });
-  const seen = { subscribed: [] };
+  }, { storage, startPermission });
+  const seen = { subscribed: [], registered: 0 };
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace(/^\/api/, "");
@@ -57,6 +65,15 @@ async function mockServer(page, { storage = {} } = {}) {
       return json({ ok: true, private: Boolean(seen.private) });
     }
     if (path === "/settings/public") return json({ club_name: "THE LION SQUAD" });
+    if (path === "/tournaments/probe-cup") return json({ ...TOURNAMENT, participant_count: seen.registered });
+    if (path === "/mobile/dashboard") return json(seen.dashboard || { me: { tournaments: [], events: [], matches: [], staff_matches: [], actions: [] } });
+    if (path === `/tournaments/${TOURNAMENT.id}/register` && request.method() === "POST") {
+      seen.registered += 1;
+      return json({ id: "registration-push", user_id: ME.id, display_name: ME.display_name, status: "approved" });
+    }
+    if (path === `/tournaments/${TOURNAMENT.id}/registrations`) {
+      return json(seen.registered ? [{ id: "registration-push", user_id: ME.id, display_name: ME.display_name, status: "approved" }] : []);
+    }
     if (path === "/users/me" && request.method() === "GET") return json(ME);
     if (request.method() !== "GET") return json({ ok: true });
     if (path === "/me/platform-links") return json({ links: [], available: {}, platforms: {} });
@@ -86,7 +103,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await page.goto("/notifications");
       const hint = page.getByTestId("web-push-hint");
       await expect(hint).toBeVisible();
-      await expect(hint).toContainText("Bescheid sagen, wenn es losgeht?");
+      await expect(hint).toContainText("Sollen wir dich rufen, wenn du dran bist?");
       expect(await page.evaluate(() => window.__pushAsked)).toBe(0);
       expect(await noSidewaysScroll(page)).toBe(true);
       if (SHOTS && width === 390) await page.screenshot({ path: `${SHOTS}/1163-frage-390.png` });
@@ -98,16 +115,95 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       expect(await page.evaluate(() => window.localStorage.getItem("tls-web-push-ask"))).toBe("asked");
     });
 
-    test("„Nicht jetzt“ merkt sich die Seite - nach dem Neuladen keine Frage", async ({ page }) => {
+    test("„Später“ - nach dem Neuladen keine Frage, erst bei der nächsten Anmeldung", async ({ page }) => {
       await mockServer(page, { storage: { "tls-web-push-ask": "pending", "tls-web-push-first-visit": "frueher" } });
       await page.goto("/notifications");
       await page.getByTestId("web-push-hint-later").click();
       await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
+      expect(await page.evaluate(() => window.localStorage.getItem("tls-web-push-ask"))).toBe("later");
       await page.reload();
       await expect(page.getByTestId("notifications-settings-link")).toBeVisible();
       await page.waitForTimeout(600);
       await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
       expect(await page.evaluate(() => window.__pushAsked)).toBe(0);
+    });
+
+    test("Turnier-Anmeldung: erst die Erklärung mit Aufruf, Check-in und Ergebnis, „Ja, rufen“ fragt den Browser (#1208)", async ({ page }) => {
+      const seen = await mockServer(page, { storage: { "tls-web-push-first-visit": "frueher" } });
+      await page.goto("/tournaments/probe-cup");
+      await page.getByTestId("tournament-register-btn").click();
+      await page.getByTestId("tournament-register-submit").click();
+      const hint = page.getByTestId("web-push-hint");
+      await expect(hint).toBeVisible();
+      await expect(hint).toContainText("Sollen wir dich rufen, wenn du dran bist?");
+      for (const line of ["Aufruf", "Check-in", "Ergebnis"]) await expect(page.getByTestId(`web-push-hint-line-${line}`)).toBeVisible();
+      expect(await page.evaluate(() => window.__pushAsked)).toBe(0);
+      for (const id of ["web-push-hint-allow", "web-push-hint-later"]) {
+        const box = await page.getByTestId(id).boundingBox();
+        expect(box.height).toBeGreaterThanOrEqual(44);
+      }
+      expect(await noSidewaysScroll(page)).toBe(true);
+      if (SHOTS) {
+        await page.waitForTimeout(700);
+        await page.screenshot({ path: `${SHOTS}/1208-erklaerung-${width}.png` });
+      }
+      await page.getByTestId("web-push-hint-allow").click();
+      await expect(hint).toHaveCount(0);
+      expect(await page.evaluate(() => window.__pushAsked)).toBe(1);
+      await expect.poll(() => seen.subscribed.length).toBe(1);
+    });
+
+    test("Browser hat abgelehnt: leise „Aufrufe sind aus – einschalten“ führt zu den Einstellungen, keine Frage (#1208)", async ({ page }) => {
+      await mockServer(page, { storage: { "tls-web-push-first-visit": "frueher" }, permission: "denied" });
+      await page.goto("/tournaments/probe-cup");
+      const off = page.getByTestId("tournament-push-off");
+      await expect(off).toBeVisible();
+      await expect(off).toHaveText("Aufrufe sind aus – einschalten");
+      expect((await off.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      expect(await noSidewaysScroll(page)).toBe(true);
+      if (SHOTS) {
+        await off.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: `${SHOTS}/1208-hinweis-${width}.png` });
+      }
+      // Auch nach einer Anmeldung keine Frage - der Browser hat entschieden.
+      await page.getByTestId("tournament-register-btn").click();
+      await page.getByTestId("tournament-register-submit").click();
+      await expect(page.getByTestId("tournament-my-stand")).toBeVisible();
+      await page.waitForTimeout(600);
+      await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
+      await off.click();
+      // Direkt zur Karte „Dieser Browser“, die erklärt, wie man es im Browser erlaubt.
+      await expect(page).toHaveURL(/\/profile\?tab=notifications#dieser-browser$/);
+      await expect(page.getByTestId("profile-browser-push")).toHaveAttribute("data-status", "denied");
+      await expect(page.getByTestId("profile-browser-push")).toBeInViewport();
+      if (SHOTS) {
+        await page.waitForTimeout(600);
+        await page.screenshot({ path: `${SHOTS}/1208-hinweis-ziel-v2-${width}.png` });
+      }
+    });
+
+    test("Team angemeldet: beim nächsten Öffnen der Übersicht die Frage mit „Dein Team ist angemeldet“ (#1208)", async ({ page }) => {
+      // Ausgangsstand von früher: dieser Browser kannte für das Konto noch keine Anmeldung.
+      const seen = await mockServer(page, { storage: { "tls-web-push-first-visit": "frueher", [`tls-web-push-seen:${ME.id}`]: JSON.stringify({ seen: [] }) } });
+      seen.dashboard = { me: { tournaments: [{ ...TOURNAMENT, id: "t-team", title: "Team-Cup", my_registration: { id: "r-team", team_id: "team-1", status: "approved" } }], events: [], matches: [], staff_matches: [], actions: [] } };
+      await page.goto("/dashboard");
+      const hint = page.getByTestId("web-push-hint");
+      await expect(hint).toBeVisible();
+      await expect(page.getByTestId("web-push-hint-eyebrow")).toHaveText("Dein Team ist angemeldet");
+      expect(await page.evaluate(() => window.__pushAsked)).toBe(0);
+      expect(await noSidewaysScroll(page)).toBe(true);
+      if (SHOTS) {
+        await page.waitForTimeout(700);
+        await page.screenshot({ path: `${SHOTS}/1208-erklaerung-team-v2-${width}.png` });
+      }
+      await page.getByTestId("web-push-hint-later").click();
+      await expect(hint).toHaveCount(0);
+      // Neu laden: dieselbe Anmeldung ist kein neuer Anlass.
+      const reloaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/mobile/dashboard");
+      await page.reload();
+      await reloaded;
+      await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
     });
 
     test("Einstellungen: Kanal Browser und „Dieser Browser“ anmelden", async ({ page }) => {

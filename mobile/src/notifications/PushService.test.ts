@@ -1,5 +1,9 @@
+import { Platform } from "react-native";
 import {
   addPushNotificationReceivedListener,
+  askPushPermission,
+  getPushPermission,
+  onPushPermissionChange,
   addPushNotificationResponseListener,
   configurePushNotifications,
   consumeInitialPushNotification,
@@ -9,6 +13,8 @@ import {
   setPushAccount,
 } from "./PushService";
 import type { UserNotification } from "../types";
+import { isPushAsked } from "./pushPrompt";
+import { resetPromptStateForTests } from "./pushPromptStore";
 
 // Pushes am Gerät (#1052, #1053): gesperrt oder Sperrzustand unbekannt zeigt der Vordergrund nichts an - auch einen
 // vollen Push eines alten Servers -, und Pushes für ein anderes Konto verwirft die App überall.
@@ -16,12 +22,24 @@ import type { UserNotification } from "../types";
 type Handler = (notification: unknown) => Promise<Record<string, boolean>>;
 type Listener = (event: unknown) => void;
 
-const mockNotifications: { handler: Handler | null; received: Listener | null; response: Listener | null; last: unknown } = {
+type Permission = { status: string; canAskAgain?: boolean };
+const mockNotifications: {
+  handler: Handler | null; received: Listener | null; response: Listener | null; last: unknown;
+  permission: Permission; answer: Permission; order: string[];
+} = {
   handler: null,
   received: null,
   response: null,
   last: null,
+  permission: { status: "granted", canAskAgain: true },
+  answer: { status: "granted", canAskAgain: true },
+  order: [],
 };
+const mockRequest = jest.fn(async () => {
+  mockNotifications.order.push("frage");
+  mockNotifications.permission = mockNotifications.answer;
+  return mockNotifications.answer;
+});
 const mockPost = jest.fn();
 
 jest.mock("expo-notifications", () => ({
@@ -38,10 +56,13 @@ jest.mock("expo-notifications", () => ({
   },
   getLastNotificationResponseAsync: async () => mockNotifications.last,
   clearLastNotificationResponseAsync: async () => {},
-  getPermissionsAsync: async () => ({ status: "granted" }),
+  getPermissionsAsync: async () => mockNotifications.permission,
+  requestPermissionsAsync: () => mockRequest(),
   getExpoPushTokenAsync: async () => ({ data: "ExponentPushToken[geraet]" }),
   AndroidImportance: {},
-  setNotificationChannelAsync: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async (id: string) => {
+    mockNotifications.order.push(`kanal:${id}`);
+  }),
   deleteNotificationChannelAsync: jest.fn(),
 }));
 jest.mock("expo-device", () => ({ isDevice: true }));
@@ -56,6 +77,10 @@ function push(data: Record<string, unknown>) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockNotifications.last = null;
+  mockNotifications.permission = { status: "granted", canAskAgain: true };
+  mockNotifications.answer = { status: "granted", canAskAgain: true };
+  mockNotifications.order = [];
+  resetPromptStateForTests(null);
   setPushAccount(ACCOUNT);
   setForegroundPushHidden(false);
 });
@@ -167,5 +192,51 @@ describe("Installations-Kennung (#2470)", () => {
     } finally {
       spies.forEach((spy) => spy.mockRestore());
     }
+  });
+});
+
+describe("Erlaubnis im richtigen Moment (#1208)", () => {
+  test("ohne Erlaubnis meldet sich das Gerät nicht an - und fragt dabei nicht (kein Dialog nach dem Login)", async () => {
+    mockNotifications.permission = { status: "undetermined", canAskAgain: true };
+    expect(await registerPushToken()).toBeNull();
+    expect(mockRequest).not.toHaveBeenCalled();
+    expect(mockPost).not.toHaveBeenCalled();
+
+    mockNotifications.permission = { status: "denied", canAskAgain: false };
+    expect(await registerPushToken()).toBeNull();
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
+  test("die Erlaubnis lesen fragt nicht", async () => {
+    mockNotifications.permission = { status: "undetermined", canAskAgain: true };
+    expect(await getPushPermission()).toEqual({ status: "undetermined", canAskAgain: true });
+    mockNotifications.permission = { status: "denied", canAskAgain: false };
+    expect(await getPushPermission()).toEqual({ status: "denied", canAskAgain: false });
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
+  test("„Ja, rufen“: erst die Android-Kanäle (#1014), dann die Frage des Systems - und alle erfahren die Antwort", async () => {
+    const os = Platform.OS;
+    Object.defineProperty(Platform, "OS", { configurable: true, get: () => "android" });
+    try {
+      mockNotifications.permission = { status: "undetermined", canAskAgain: true };
+      mockNotifications.answer = { status: "denied", canAskAgain: true };
+      const heard: unknown[] = [];
+      const stop = onPushPermissionChange((permission) => heard.push(permission));
+      expect(await askPushPermission()).toEqual({ status: "denied", canAskAgain: true });
+      stop();
+      expect(mockNotifications.order.indexOf("frage")).toBeGreaterThan(0);
+      expect(mockNotifications.order.slice(0, -1).every((step) => step.startsWith("kanal:"))).toBe(true);
+      expect(heard).toEqual([{ status: "denied", canAskAgain: true }]);
+      // Gefragt (#1208): Android 13 meldet vorher wie nachher „denied“ - der Merker unterscheidet.
+      expect(await isPushAsked()).toBe(true);
+    } finally {
+      Object.defineProperty(Platform, "OS", { configurable: true, get: () => os });
+    }
+  });
+
+  test("schon erlaubt: keine zweite Frage", async () => {
+    expect(await askPushPermission()).toEqual({ status: "granted", canAskAgain: true });
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverl
 import { RewardMomentHost } from "../components/league/RewardMomentHost";
 import { BallotPopupOverlay } from "../components/BallotPopupOverlay";
 import { CalendarHintHost } from "../components/calendar/CalendarHintHost";
+import { PushPromptHost } from "../components/PushPromptHost";
 import { PasskeyInvite } from "../components/PasskeyInvite";
 import { markSignInNudgeSeen, SignInNudge } from "../components/SignInNudge";
 import { LoginScreen } from "../screens/auth/LoginScreen";
@@ -87,6 +88,8 @@ export function AppNavigator() {
       {signedIn && !user?.consent_required ? <PasskeyInvite /> : null}
       {/* Abo-Hinweis (#1788): einmal nach einer Anmeldung zu Event oder Turnier, nur ohne aktives Abo. */}
       {signedIn && !user?.consent_required ? <CalendarHintHost /> : null}
+      {/* Benachrichtigungen (#1208): erst nach einer Turnier- oder Event-Anmeldung die Erklärung, dann Android. */}
+      {signedIn && !user?.consent_required ? <PushPromptHost /> : null}
       {/* Gast zuerst (#918): beim ersten Start nach ein paar Sekunden einmal „Konto erstellen oder anmelden“. */}
       {!signedIn ? <SignInNudge /> : null}
     </NavigationContainer>

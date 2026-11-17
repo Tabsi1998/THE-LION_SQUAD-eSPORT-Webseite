@@ -25,6 +25,7 @@ import { useOptionalAppUpdate } from "../../update/AppUpdateProvider";
 import { quietHoursForm, readNotificationServer, type NotificationServerInfo, type Prefs, type QuietHours } from "../../lib/notificationLevels";
 import { NotificationLevels } from "./profile/NotificationLevels";
 import { dmOptions, MatrixToggle, notificationChannels, notificationLabels, notificationPreferenceKey, profileStyles, Toggle, type DiscordDmState } from "./profile/parts";
+import { PushOffHint } from "../../components/PushOffHint";
 
 // Einstellungen an einem Ort (#1146): eine Seite mit Gruppen, Ort ist das Zahnrad oben im Profil (Fabians Wahl A).
 // Reihenfolge wie auf der Website (/profile): Darstellung, Benachrichtigungen, Sicherheit, Privatsphäre, Konto, Über die
@@ -226,6 +227,8 @@ function AccountSettings() {
   return (
     <>
       <Group title="Benachrichtigungen" testID="settings-group-notifications">
+        {/* Android lässt nichts durch (#1208): hier derselbe leise Weg zum Einschalten wie auf Turnier- und Event-Seiten. */}
+        <PushOffHint testID="settings-push-off" />
         {server.status === "failed" ? (
           <View style={styles.loadFailed} accessibilityRole="alert" testID="notification-load-failed">
             <Muted style={styles.loadFailedText}>Die Stufen konnten nicht geladen werden. Deine Themen unten gelten weiter.</Muted>

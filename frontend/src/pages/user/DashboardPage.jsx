@@ -16,6 +16,7 @@ import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
+import { dashboardRegistrationKeys, dashboardTeamKeys, noteWebPushRegistrations, offerWebPush } from "@/lib/webPush";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -103,6 +104,7 @@ function TimelineRow({ item, live = false }) {
 
 export default function DashboardPage() {
   const { user, isClubMember, isModerator } = useAuth();
+  const userId = user?.id || null;
   const [dashboard, setDashboard] = useState(null);
   const [openPrizes, setOpenPrizes] = useState(0);
   const [completeness, setCompleteness] = useState(null);
@@ -126,11 +128,18 @@ export default function DashboardPage() {
       api.get("/users/me/profile-completeness"),
       api.get("/penalties/me"),
     ]);
-    if (home.status === "fulfilled") setDashboard(home.value.data && typeof home.value.data === "object" ? home.value.data : null);
+    if (home.status === "fulfilled") {
+      const data = home.value.data && typeof home.value.data === "object" ? home.value.data : null;
+      setDashboard(data);
+      // Neu angemeldet - etwa durchs Team (#1208): jetzt die Frage nach Browser-Benachrichtigungen. Die erste Übersicht
+      // nach dem Login ist nur der Ausgangsstand.
+      const reason = data ? noteWebPushRegistrations(userId, dashboardRegistrationKeys(data.me), { teamKeys: dashboardTeamKeys(data.me) }) : null;
+      if (reason) void offerWebPush(undefined, { reason });
+    }
     if (p.status === "fulfilled") setOpenPrizes(p.value.data?.count || 0);
     if (c.status === "fulfilled") setCompleteness(c.value.data);
     if (pen.status === "fulfilled") setPenaltyCount(pen.value.data?.count || 0);
-  }, []);
+  }, [userId]);
   useEffect(() => {
     const refreshVisible = () => {
       // `load` wirft nicht (allSettled): was nicht kam, behält seinen letzten Stand.

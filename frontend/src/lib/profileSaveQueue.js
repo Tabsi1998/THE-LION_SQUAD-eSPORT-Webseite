@@ -131,7 +131,8 @@ export function createSaveQueue({
     if (inflight) status = "saving";
     else if (error) status = "error";
     else if (saved && !dirty) status = "saved";
-    return { account, local, confirmed, dirty, busy: !!inflight, status, error };
+    // `sending`: der Stand, den der laufende Lauf gerade schickt - nach seiner Antwort der Stand des Servers.
+    return { account, local, confirmed, sending: inflight ? inflight.snapshot : null, dirty, busy: !!inflight, status, error };
   }
 
   function emit() {

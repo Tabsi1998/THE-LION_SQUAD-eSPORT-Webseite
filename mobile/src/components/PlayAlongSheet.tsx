@@ -18,6 +18,8 @@ import { useSeasonOverlay } from "../seasons/anchors";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
 import { Body, Heading, Muted } from "./Text";
+import { useModalGate } from "../lib/modalGate";
+import { useReduceMotion } from "./motion/useReduceMotion";
 
 // „Spielst du auch mit?“ (#1184) in der App - wie im Web: nach der Event-Anmeldung ein Blatt von unten mit den Turnieren
 // des Events. Haken nur bei Einzel-Turnieren (Tippfläche mindestens 48 Punkte); Team-Turniere sagen, dass der Kapitän
@@ -30,6 +32,8 @@ type Props = {
   from?: string | null;
   onClose: () => void;
   onOpenTournament: (key: string) => void;
+  /** Die Turniere, zu denen die Anmeldung geklappt hat (#1208: die Startseite zählt sie dann nicht noch einmal als neu). */
+  onRegistered?: (tournamentIds: string[]) => void;
 };
 
 function stateColor(state: string): string {
@@ -53,7 +57,7 @@ function When({ row }: { row: PlayAlongRow }) {
   );
 }
 
-export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose, onOpenTournament }: Props) {
+export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose, onOpenTournament, onRegistered }: Props) {
   const [entries, setEntries] = useState<PlayAlongEntry[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [acceptRules, setAcceptRules] = useState(false);
@@ -65,6 +69,10 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
   const lock = useRef(false);
   const visible = Boolean(eventId && entries?.length);
   useSeasonOverlay("play-along-sheet", visible);
+  // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
+  useModalGate("play-along-sheet", visible);
+  // „Bewegung reduzieren“: das Blatt steht sofort da, statt von unten zu gleiten.
+  const reduce = useReduceMotion();
 
   useEffect(() => {
     if (!eventId) return undefined;
@@ -107,6 +115,8 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
         tournament_ids: selected, accept_rules: true, accept_privacy: true, accept_costs: acceptCosts,
       });
       setResult(data);
+      const registered = (data?.results || []).filter((entry) => ["registered", "pending", "waitlist"].includes(entry.state)).map((entry) => entry.id);
+      if (registered.length) onRegistered?.(registered);
       // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
       if ((data?.results || []).some((entry) => entry.state === "registered")) {
         void offerFriendsHint();
@@ -122,7 +132,7 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
   };
 
   return (
-    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+    <Modal animationType={reduce ? "none" : "slide"} onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.backdrop}>
         <View style={styles.sheet} testID="play-along-sheet" accessibilityViewIsModal>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

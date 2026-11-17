@@ -7,6 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 import { api, errorMessage } from "../lib/api";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors, radius } from "../theme";
+import { useModalGate } from "../lib/modalGate";
 
 // Abstimmung live (#844) in der App - wie im Web: Öffnet die Versammlungsleitung in Dolibarr eine Abstimmung, erscheint
 // sie über jedem Screen für Mitglieder mit offenem Stimmrecht. Antwort wählen, „Stimme abgeben“, fertig. „Später“ macht
@@ -54,6 +55,9 @@ export function BallotPopupOverlay() {
     const timer = setInterval(load, pollSeconds * 1000);
     return () => clearInterval(timer);
   }, [active, pollSeconds, load]);
+
+  // Nie zwei Fenster übereinander (#1208): solange die Abstimmung offen ist, wartet die Frage nach Benachrichtigungen.
+  useModalGate("ballot-popup", Boolean(active && view?.ballots?.some((item) => !later.includes(item.id))));
 
   if (!active || !view?.ballots?.length) return null;
   const ballot = view.ballots.find((item) => !later.includes(item.id)) || null;

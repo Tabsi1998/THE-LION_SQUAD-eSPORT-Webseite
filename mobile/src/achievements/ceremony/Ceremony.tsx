@@ -16,6 +16,7 @@ import { playCeremonySound, readCeremonySoundPrefs, writeCeremonyMuted } from ".
 import { Motion } from "./motions";
 import { CeremonyParticles } from "./particles";
 import { type CeremonyPlan, type CeremonyTier, groupTier, levelTexts, particleKind } from "./select";
+import { useModalGate } from "../../lib/modalGate";
 
 // Erfolge II (E13, #623): die Zeremonie in der App - dieselbe Bühne wie im Web (Ceremony.jsx): das Abzeichen kommt
 // je Kategorie anders herein, Material bestimmt Look, Partikel und Haptik, Sonderabläufe für die großen Momente
@@ -247,6 +248,8 @@ type SoundUser = { ceremony_sound?: boolean | null; ceremony_volume?: number | n
 
 export function Ceremony({ plan, onClose, reduced = false, autoClose = true, user = null }: { plan: CeremonyPlan; onClose: () => void; reduced?: boolean; autoClose?: boolean; user?: SoundUser }) {
   useSeasonOverlay("achievement-ceremony", true);
+  // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
+  useModalGate("achievement-ceremony", true);
   const { width, height } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const tiers = plan.tiers;
