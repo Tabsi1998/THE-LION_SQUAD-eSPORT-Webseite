@@ -60,7 +60,7 @@ def test_calls_and_chats_are_apart_and_events_are_with_tournaments():
         assert _channel_for_kind(kind) == "lion_tournaments"
     for kind in ("news_member", "membership_update", "invoice_ready", "ballot_open", "helper_call", "helper_reminder"):
         assert _channel_for_kind(kind) == "lion_club"
-    for kind in ("achievement", "level", "crown_gained", "prestige", "year_review"):
+    for kind in ("achievement", "level", "crown_gained", "crown_onyx", "prestige", "year_review"):
         assert _channel_for_kind(kind) == "lion_achievements"
 
 
