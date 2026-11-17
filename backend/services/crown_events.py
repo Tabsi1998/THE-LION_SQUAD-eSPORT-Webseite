@@ -190,7 +190,9 @@ async def forget_person(db, user_id: str) -> None:
     """Kontolöschung (#2501): Die Kennung fällt aus dem Kronen-Stand - Rangkronen, Onyx und „Onyx erreicht schon gemeldet“."""
     await db.crown_state.update_many(
         {"id": "current"},
-        {"$pull": {"onyx": user_id, "onyx_announced": user_id}, "$unset": {f"holders.{user_id}": ""}},
+        # Version hoch: Ein gleichzeitiger Kronen-Lauf mit dem alten Stand scheitert an der Versionsprüfung und schreibt die
+        # Kennung nicht zurück; der nächste Lauf rechnet frisch.
+        {"$pull": {"onyx": user_id, "onyx_announced": user_id}, "$unset": {f"holders.{user_id}": ""}, "$inc": {"version": 1}},
     )
 
 
