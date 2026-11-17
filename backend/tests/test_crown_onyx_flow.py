@@ -5,9 +5,11 @@ Vertrag:
   einmal „Onyx erreicht“ (Art ``crown_onyx``). Ein zweiter Lauf meldet nichts.
 - Wer erstmals Onyx erreicht, ohne vorher eine Rangkrone getragen zu haben, bekommt dieselbe Meldung genau einmal.
 - Wer Onyx wieder verliert (Erfolge privat, gesperrt, Punkte entzogen), bekommt keine Verlust-Meldung - auch kein
-  „Krone erobert“, wenn er danach wieder eine Rangkrone trägt. Kommt Onyx zurück, kommt die Meldung nicht noch einmal.
+  „Krone erobert“, wenn er danach wieder eine Rangkrone trägt. Kommt Onyx zurück, kommt die Meldung nicht noch einmal -
+  auch dann nicht, wenn die alte Meldung inzwischen gelöscht ist: Der Kronen-Stand merkt sich in ``onyx_announced``, wer
+  „Onyx erreicht“ schon bekommen hat.
 - Ein gespeicherter Kronen-Stand ohne Onyx-Liste (vor #2501) meldet nur, wer gerade von einer Rangkrone zu Onyx wechselt;
-  wer schon Onyx trug, erfährt nichts Neues.
+  wer schon Onyx trug, erfährt nichts Neues und gilt als gemeldet.
 Erfundene Personen.
 """
 import pathlib
@@ -163,10 +165,37 @@ async def test_a_stored_state_without_onyx_list_only_announces_the_real_step_up(
     assert await crown_mail(flow) == [], "nichts hat sich geändert - auch der alte Onyx-Träger erfährt nichts"
     state = await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0})
     assert state["onyx"] == [veteran["id"]]
+    assert state["onyx_announced"] == [veteran["id"]], "wer schon Onyx trug, gilt als gemeldet"
 
     await award(flow, top, "probe_onyx")
     await crowns(flow)
     assert sorted(row for row in await crown_mail(flow) if row[1] == "crown_onyx") == [(top["id"], "crown_onyx")]
+
+    # Der alte Onyx-Träger verliert Onyx und bekommt es zurück: auch jetzt keine Meldung.
+    await flow.db.users.update_one({"id": veteran["id"]}, {"$set": {"is_banned": True}})
+    await crowns(flow)
+    await flow.db.users.update_one({"id": veteran["id"]}, {"$set": {"is_banned": False}})
+    assert (await crowns(flow))[veteran["id"]] == "onyx"
+    assert (veteran["id"], "crown_onyx") not in await crown_mail(flow)
+
+
+@pytest.mark.asyncio
+async def test_onyx_reached_stays_once_even_after_the_message_was_deleted(flow):
+    top, second, third, fourth = await four_players(flow)
+    await crowns(flow)
+    await award(flow, top, "probe_onyx")
+    await crowns(flow)
+    assert (top["id"], "crown_onyx") in await crown_mail(flow)
+
+    # „Gelesene löschen“ im Postfach, dann Onyx verlieren und zurückbekommen.
+    await flow.db.notifications.delete_many({"user_id": top["id"]})
+    await flow.db.users.update_one({"id": top["id"]}, {"$set": {"privacy_achievements_public": False}})
+    await crowns(flow)
+    await flow.db.users.update_one({"id": top["id"]}, {"$set": {"privacy_achievements_public": True}})
+    assert (await crowns(flow))[top["id"]] == "onyx"
+    assert [row for row in await crown_mail(flow) if row[0] == top["id"]] == [], "„Onyx erreicht“ kommt nur einmal"
+    state = await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0})
+    assert top["id"] in state["onyx_announced"]
 
 
 @pytest.mark.asyncio

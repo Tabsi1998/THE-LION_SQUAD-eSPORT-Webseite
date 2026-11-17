@@ -75,18 +75,24 @@ async def _persist_and_notify(rank_crowns: dict[str, str], onyx_holders: set[str
     onyx_now = set(onyx_holders)
     state = await db.crown_state.find_one({"id": "current"}, {"_id": 0})
     if state is None:
-        await db.crown_state.insert_one({"id": "current", "holders": rank_crowns, "onyx": sorted(onyx_now), "version": 1, "updated_at": now})
+        await db.crown_state.insert_one({"id": "current", "holders": rank_crowns, "onyx": sorted(onyx_now),
+                                         "onyx_announced": sorted(onyx_now), "version": 1, "updated_at": now})
         return []
     old = state.get("holders") or {}
     # Onyx (#2501): Ein Stand von vor #2501 kennt nur die Rangkronen. Wer jetzt Onyx trägt und vorher keine Rangkrone hatte,
     # trug Onyx schon - neu ist nur der Wechsel von einer Rangkrone zu Onyx.
     old_onyx = set(state["onyx"]) if "onyx" in state else {uid for uid in onyx_now if uid not in old}
-    if old == rank_crowns and "onyx" in state and old_onyx == onyx_now:
+    # „Onyx erreicht“ einmal je Person, unabhängig vom Postfach: Wer hier steht, hat die Meldung schon bekommen - oder trug
+    # Onyx schon vor #2501 und gilt damit als gemeldet.
+    announced = set(state["onyx_announced"]) if "onyx_announced" in state else set(old_onyx)
+    announced_now = announced | onyx_now
+    if old == rank_crowns and "onyx" in state and old_onyx == onyx_now and "onyx_announced" in state and announced_now == announced:
         return []
     version = int(state.get("version", 1)) + 1
     res = await db.crown_state.update_one(
         {"id": "current", "version": state.get("version", 1)},
-        {"$set": {"holders": rank_crowns, "onyx": sorted(onyx_now), "version": version, "updated_at": now}},
+        {"$set": {"holders": rank_crowns, "onyx": sorted(onyx_now), "onyx_announced": sorted(announced_now),
+                  "version": version, "updated_at": now}},
     )
     if getattr(res, "modified_count", 0) == 0:
         return []  # concurrent update won the race — that run notifies
@@ -94,8 +100,9 @@ async def _persist_and_notify(rank_crowns: dict[str, str], onyx_holders: set[str
     for uid in set(old) | set(rank_crowns) | (onyx_now - old_onyx):
         o, n = old.get(uid), rank_crowns.get(uid)
         if uid in onyx_now and uid not in old_onyx:
-            # Der Aufstieg zu Onyx ist kein Verlust der Rangkrone (#2501): eine Meldung „Onyx erreicht“.
-            events.append({"user_id": uid, "type": "onyx", "variant": "onyx", "prev": o})
+            # Der Aufstieg zu Onyx ist kein Verlust der Rangkrone (#2501): eine Meldung „Onyx erreicht“ - nur beim ersten Mal.
+            if uid not in announced:
+                events.append({"user_id": uid, "type": "onyx", "variant": "onyx", "prev": o})
             continue
         if o == n:
             continue
