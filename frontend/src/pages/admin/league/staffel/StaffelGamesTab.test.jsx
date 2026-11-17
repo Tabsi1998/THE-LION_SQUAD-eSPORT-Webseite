@@ -66,9 +66,18 @@ test("Ergebnis eintragen öffnet das eine Ergebnis-Fenster; im eigenen Spiel ste
   expect(within(screen.getByTestId("staffel-game-m2")).getByTestId("match-double-no-show")).toBeInTheDocument();
   expect(screen.queryByTestId("staffel-game-result-m3")).toBeNull();
   expect(screen.getByTestId("staffel-game-own-m3")).toHaveTextContent("eigenes Team");
-  expect(within(screen.getByTestId("staffel-game-m3")).getByTestId("match-double-no-show-own")).toBeInTheDocument();
+  // Der Satz steht nur einmal - kein zweiter aus „Beide nicht erschienen“.
+  expect(within(screen.getByTestId("staffel-game-m3")).getAllByText(/eigenes Team/)).toHaveLength(1);
+  expect(within(screen.getByTestId("staffel-game-m3")).queryByTestId("match-double-no-show-own")).toBeNull();
   await user.click(screen.getByTestId("staffel-game-result-m2"));
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/matches/m2/page"));
+});
+
+test("Superadmin im eigenen Spiel: Knöpfe mit Notausnahme statt des Satzes", () => {
+  renderTab(LIVE, [{ ...MATCHES[2], viewer_override: true }]);
+  expect(screen.queryByTestId("staffel-game-own-m3")).toBeNull();
+  expect(screen.getByTestId("staffel-game-result-m3")).toBeInTheDocument();
+  expect(within(screen.getByTestId("staffel-game-m3")).getByTestId("match-double-no-show")).toBeInTheDocument();
 });
 
 test("ohne „Ergebnisse korrigieren“ oder außerhalb des Spielbetriebs nur „Zum Spiel“", () => {

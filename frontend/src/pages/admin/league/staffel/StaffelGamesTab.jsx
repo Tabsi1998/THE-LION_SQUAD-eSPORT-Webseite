@@ -74,7 +74,8 @@ function GameRow({ match, byId, canResults, onResult, onReload }) {
             <PenLine className="h-3.5 w-3.5" aria-hidden="true" /> {(match.results || []).length ? "Ergebnis korrigieren" : "Ergebnis eintragen"}
           </button>
         ) : null}
-        {canResults && filled ? <DoubleNoShowAction match={match} conflict={conflict} onDone={onReload} /> : null}
+        {/* Im eigenen Spiel steht der Satz schon einmal - „Beide nicht erschienen“ nur ohne Befangenheit oder als Notausnahme. */}
+        {canResults && filled && !own ? <DoubleNoShowAction match={match} conflict={conflict} onDone={onReload} /> : null}
         <Link to={`/matches/${encodeURIComponent(match.id)}`} data-testid={`staffel-game-open-${match.id}`} className={`${BUTTON} tls-btn tls-btn--quiet`}>
           Zum Spiel <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
