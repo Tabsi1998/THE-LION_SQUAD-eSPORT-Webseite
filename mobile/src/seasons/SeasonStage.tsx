@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { NavigationRouteContext } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -136,8 +136,22 @@ export function useMountedSeasons(screen?: string): Array<{ season: ActiveSeason
 export function SeasonStage() {
   const screen = useCurrentScreen();
   const mounted = useMountedSeasons(screen);
-  const { reducedMotion, toast } = useSeason();
+  const { reducedMotion, toast: current, showToast } = useSeason();
   const insets = useSafeAreaInsets();
+  // Saison-Grüße nur, wenn Deko zu sehen ist (#1169): in der Pause und auf stillen Screens wartet ein Gruß und kommt,
+  // sobald die Deko zurück ist. Meldungen mit `always` (neue Erfolge) stehen immer.
+  const hidden = useDecoPaused() || stillScreen(screen);
+  const toast = current && (current.always || !hidden) ? current : null;
+  const waiting = useRef<{ text: string; ms?: number } | null>(null);
+  useEffect(() => {
+    if (current && !current.always && hidden) waiting.current = { text: current.text, ms: current.ms };
+  }, [current, hidden]);
+  useEffect(() => {
+    if (hidden || !waiting.current) return;
+    const held = waiting.current;
+    waiting.current = null;
+    showToast(held.text, held.ms);
+  }, [hidden, showToast]);
   const probing = mounted.some(({ season }) => ROOM_SEASONS.has(season.key));
   useEffect(() => {
     setRoomProbe(probing);

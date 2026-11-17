@@ -80,7 +80,11 @@ export async function readStoredPreference(): Promise<SeasonPreference> {
   }
 }
 
-export type SeasonToast = { id: number; text: string };
+/**
+ * Eine kurze Karte über dem Screen. Saison-Grüße erscheinen nur, wenn Deko zu sehen ist - in der Pause und auf stillen
+ * Screens warten sie (#1169). `always`: eine Meldung, die nicht zur Deko gehört (neue Erfolge), steht immer.
+ */
+export type SeasonToast = { id: number; text: string; ms?: number; always?: boolean };
 
 type SeasonContextValue = {
   ready: boolean;
@@ -92,7 +96,7 @@ type SeasonContextValue = {
   reload: () => Promise<void>;
   /** Gruß als Overlay-Karte (#655): ein Text für ein paar Sekunden, unabhängig vom Screen-Layout. */
   toast: SeasonToast | null;
-  showToast: (text: string, ms?: number) => void;
+  showToast: (text: string, ms?: number, options?: { always?: boolean }) => void;
   /** Das Wetter am Vereinsort (Wind, Regen, Schnee, Gewitter) - alle zehn Minuten mit der Saison-Abfrage neu. */
   weather: SeasonWeather | null;
   /** Silvester (#741): Abstand der Serveruhr zur Geräteuhr (ms) und der Zeitpunkt der letzten Antwort. */
@@ -114,9 +118,9 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [toast, setToast] = useState<SeasonToast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = useCallback((text: string, ms = 4000) => {
+  const showToast = useCallback((text: string, ms = 4000, { always = false }: { always?: boolean } = {}) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ id: Date.now(), text });
+    setToast({ id: Date.now(), text, ms, always });
     toastTimer.current = setTimeout(() => setToast(null), ms);
   }, []);
   useEffect(() => () => {
@@ -160,7 +164,8 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   // Saison-Fundstücke (#678): was in der App gesammelt wird, geht an den Server - nicht für Gäste. Vergibt der
   // Server dabei eine Stufe, sagt es die App gleich.
   useSignalSync(user?.id && !isGuestUser(user) ? user.id : null, (count) => {
-    showToast(count > 1 ? `${count} neue Erfolge freigeschaltet` : "Neuer Erfolg freigeschaltet", 5000);
+    // Ein Erfolg ist eine Nachricht ans Konto, keine Deko - er steht auch in der Pause und auf stillen Screens (#1169).
+    showToast(count > 1 ? `${count} neue Erfolge freigeschaltet` : "Neuer Erfolg freigeschaltet", 5000, { always: true });
   });
 
   const accountPreference = (user as { seasonal_decorations?: string } | null)?.seasonal_decorations;

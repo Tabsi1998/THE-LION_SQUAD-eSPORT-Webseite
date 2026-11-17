@@ -20,6 +20,8 @@ const { clearOwnMatches, clearStillHolds, noteOwnMatches, setStillHold } = requi
 const halloween = () => ({ key: "halloween", label: "Halloween", phase: "deko", intensity: "normal", effective: "normal", channels: ["app"], texts: {}, data: {} });
 
 beforeEach(() => {
+  mockSeasonState.toast = null;
+  (mockSeasonState.showToast as jest.Mock).mockClear();
   mockSeasonState.seasons = [halloween()];
   mockRoute.name = "Dashboard";
   clearOwnMatches();
@@ -69,4 +71,30 @@ test("Gegenprobe: ein geplantes eigenes Spiel pausiert nichts", async () => {
   await render(<SeasonStage />);
   await act(async () => noteOwnMatches([{ id: "m-1", status: "scheduled" }], "dashboard"));
   expect(screen.getByTestId("season-stage")).toBeTruthy();
+});
+
+// Gruß-Karten (#1169): Ein Saison-Gruß erscheint nur, wenn Deko zu sehen ist - in der Pause und auf stillen Screens
+// wartet er, bis die Deko zurück ist. Meldungen über Erfolge (`always`) zeigt die Bühne immer.
+test("ein Gruß wartet in der Pause und kommt danach - eine Erfolgsmeldung kommt sofort", async () => {
+  await render(<SeasonStage />);
+  await act(async () => noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard"));
+  mockSeasonState.toast = { id: 1, text: "Happy Halloween", ms: 4000 };
+  await screen.rerender(<SeasonStage />);
+  expect(screen.queryByTestId("season-toast")).toBeNull();
+  await act(async () => noteOwnMatches([{ id: "m-1", status: "completed" }], "match"));
+  expect(mockSeasonState.showToast).toHaveBeenCalledWith("Happy Halloween", 4000);
+  mockSeasonState.toast = { id: 2, text: "Neuer Erfolg freigeschaltet", ms: 5000, always: true };
+  await act(async () => noteOwnMatches([{ id: "m-2", status: "in_progress" }], "dashboard"));
+  await screen.rerender(<SeasonStage />);
+  expect(screen.getByTestId("season-toast")).toHaveTextContent("Neuer Erfolg freigeschaltet");
+});
+
+test("auf stillen Screens wartet ein Gruß ebenfalls - Gegenprobe: auf dem Dashboard steht er sofort", async () => {
+  mockRoute.name = "MatchDetail";
+  mockSeasonState.toast = { id: 1, text: "Happy Halloween", ms: 4000 };
+  await render(<SeasonStage />);
+  expect(screen.queryByTestId("season-toast")).toBeNull();
+  mockRoute.name = "Dashboard";
+  await render(<SeasonStage />);
+  expect(screen.getByTestId("season-toast")).toHaveTextContent("Happy Halloween");
 });
