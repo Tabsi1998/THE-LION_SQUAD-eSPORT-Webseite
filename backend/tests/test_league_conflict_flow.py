@@ -493,8 +493,15 @@ async def test_league_lead_without_the_tournament_area_handles_the_access_links_
     assert everything.status_code == 403, "die Liste aller Links bleibt beim Bereich Turniere"
     revoked = await flow.delete(f"/api/access-links/{made.json()['id']}")
     assert revoked.status_code == 200, revoked.text
+    # Die Person für einen gebundenen Link sucht dieselbe Leitung - an der Staffel, nicht ohne sie.
+    found = await flow.get("/api/admin/people/search", params={"purpose": "access_links", "q": "Mila", "context_id": tid})
+    assert found.status_code == 200 and found.json(), found.text
+    loose = await flow.get("/api/admin/people/search", params={"purpose": "access_links", "q": "Mila"})
+    assert loose.status_code == 403
 
     flow.act_as(await holder(flow, w, "results", name="Ergebnisse"))
+    picker = await flow.get("/api/admin/people/search", params={"purpose": "access_links", "q": "Mila", "context_id": tid})
+    assert picker.status_code == 403
     refused = [await flow.post("/api/access-links", json=body),
                await flow.get(f"/api/access-links?target_type=tournament&target_id={tid}"),
                await flow.delete(f"/api/access-links/{made.json()['id']}")]

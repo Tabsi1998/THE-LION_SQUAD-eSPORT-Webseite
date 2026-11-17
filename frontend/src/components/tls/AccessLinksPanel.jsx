@@ -48,6 +48,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
   const [notifyUser, setNotifyUser] = useState(false);
   const [createdUrl, setCreatedUrl] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     if (!targetType || !targetId) return;
@@ -55,10 +56,15 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       params: { target_type: targetType, target_id: targetId, include_inactive: includeInactive },
     });
     setLinks(data || []);
+    setLoadError("");
   }, [targetType, targetId, includeInactive]);
 
+  // Ladefehler sichtbar (#2262): sonst stünde „Noch keine aktiven Speziallinks“ da, obwohl es welche gibt.
   useEffect(() => {
-    load().catch(() => setLinks([]));
+    load().catch((failure) => {
+      setLinks([]);
+      setLoadError(formatRequestError(failure, "Die Speziallinks ließen sich nicht laden."));
+    });
   }, [load]);
 
   const create = async () => {
@@ -224,7 +230,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       </div>
 
       <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-end">
-        <PersonPicker purpose="access_links" value={person} onChange={setPerson} label="Person (optional)" placeholder="Name tippen …" testId={`access-link-person-${targetType}`} />
+        <PersonPicker purpose="access_links" contextId={targetType === "tournament" ? targetId : null} value={person} onChange={setPerson} label="Person (optional)" placeholder="Name tippen …" testId={`access-link-person-${targetType}`} />
         {person ? (
           <div className="text-xs text-white/50 pb-2">Der Link gilt nur für dieses Konto; die Adresse kommt aus dem Konto.</div>
         ) : (
@@ -282,7 +288,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
             </div>
           </div>
         ))}
-        {links.length === 0 && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven Speziallinks.</div>}
+        {loadError ? <div role="alert" className="text-xs text-warn border border-warn/40 bg-warn/10 rounded-sm p-3" data-testid="access-links-error">{loadError}</div> : null}
+        {links.length === 0 && !loadError && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven Speziallinks.</div>}
       </div>
     </>
   );
