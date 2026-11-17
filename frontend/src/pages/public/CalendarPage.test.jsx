@@ -60,7 +60,10 @@ test("Raster mit Punkten, Tag antippen zeigt seine Termine, Abo-Adresse und Logi
   expect(screen.getByTestId("calendar-dot-2099-10-05-event")).toBeInTheDocument();
   expect(screen.getByTestId("calendar-dot-2099-10-05-tournament")).toBeInTheDocument();
   expect(screen.queryByTestId("calendar-dot-2099-10-06-event")).toBeNull();
-  expect(screen.getByTestId("calendar-day-2099-10-12").className).toContain("border-brand");
+  // Ecken-Klammern (#1316) statt des blauen Rahmens: ein Zeichen für „du“.
+  expect(screen.getByTestId("calendar-day-2099-10-12")).toHaveClass("tls-you", "tls-you--inset");
+  expect(screen.getByTestId("calendar-day-2099-10-12").className).not.toContain("border-brand");
+  expect(screen.getByTestId("calendar-day-2099-10-06")).not.toHaveClass("tls-you");
 
   await userEvent.click(screen.getByTestId("calendar-day-2099-10-05"));
   const day = screen.getByTestId("calendar-day-items");
@@ -246,7 +249,10 @@ test("Mein Kalender als Monat zeigt die eigenen Termine im Raster", async () => 
   renderMine();
   await waitFor(() => expect(screen.getByTestId("calendar-title")).toHaveTextContent("Oktober 2099"));
   expect(screen.getByTestId("calendar-dot-2099-10-12-tournament")).toBeInTheDocument();
-  expect(screen.getByTestId("calendar-day-2099-10-12").className).toContain("border-brand");
+  // Ecken-Klammern (#1316) statt des blauen Rahmens: ein Zeichen für „du“.
+  expect(screen.getByTestId("calendar-day-2099-10-12")).toHaveClass("tls-you", "tls-you--inset");
+  expect(screen.getByTestId("calendar-day-2099-10-12").className).not.toContain("border-brand");
+  expect(screen.getByTestId("calendar-day-2099-10-06")).not.toHaveClass("tls-you");
   expect(screen.queryByTestId("calendar-dot-2099-10-05-event")).toBeNull();
 });
 

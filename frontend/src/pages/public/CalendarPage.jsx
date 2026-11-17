@@ -16,7 +16,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, LogIn } from "lu
 import { viennaDay } from "@/lib/vienna";
 
 // Kalender (#402): dieselbe Monatsansicht wie in der App (#216) - Punkte je Tag in der Farbe der
-// Art, ein blauer Rahmen um Tage mit eigener Anmeldung (#1305: Cyan heißt „du“), darunter die Termine des gewählten Tags.
+// Art, Ecken-Klammern um Tage mit eigener Anmeldung (#1305: Cyan heißt „du“, #1316), darunter die Termine des gewählten Tags.
 // Was jemand sieht, entscheidet der Server (/api/calendar); der Abo-Feed ist die öffentliche Sicht.
 // Seit #1271: öffnet im aktuellen Monat mit „Heute“, Mehrtägiges ist ein Balken über die Tage und in Listen eine Zeile,
 // am Handy startet die Liste (letzte Wahl je Gerät). Seit #1190 stehen für Mitglieder Versammlungen und die eigenen
@@ -136,7 +136,7 @@ export default function CalendarPage() {
         <p className="mt-3 text-white/60 max-w-2xl">
           {mineScope
             ? "Nur deine Termine: Anmeldungen (auch mit deinem Team), Fast Laps, zugesagte Versammlungen und deine Schichten – mit deinem Stand je Termin."
-            : "Events, Turniere und Fast-Lap-Challenges als Liste oder Monat. Mehrtägiges ist ein Balken; ein blauer Rahmen heißt: du bist angemeldet."}
+            : "Events, Turniere und Fast-Lap-Challenges als Liste oder Monat. Mehrtägiges ist ein Balken; Ecken-Klammern heißen: du bist angemeldet."}
         </p>
 
         <nav aria-label="Kalender" className="mt-6 inline-flex gap-1 border-b border-white/10" data-testid="calendar-scope">
@@ -169,7 +169,7 @@ export default function CalendarPage() {
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: KIND_COLORS[kind] }} /> {KIND_LABELS[kind]}
                   </button>
                 ))}
-                {!mineScope && <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm border-[1.5px] border-brand" /> angemeldet</span>}
+                {!mineScope && <span className="inline-flex items-center gap-1.5"><span className="tls-you tls-you--inset tls-you--plain inline-block w-3.5 h-3.5" style={{ "--tls-corner-len": "4px" }} aria-hidden="true" data-testid="calendar-legend-you" /> angemeldet</span>}
               </div>
             )}
           </div>
@@ -316,7 +316,7 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
                     aria-pressed={selected}
                     data-testid={`calendar-day-${cell.key}`}
                     style={{ gridRow: 1 }}
-                    className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : mine ? "border-brand" : "border-transparent hover:border-white/20"} ${cell.inMonth ? "" : "opacity-40"}`}
+                    className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : "border-transparent hover:border-white/20"} ${mine ? "tls-you tls-you--inset" : ""} ${cell.inMonth ? "" : "opacity-40"}`}
                   >
                     <span className={`text-xs sm:text-sm font-bold ${cell.key === todayKey ? "text-[#9F7AEA] underline underline-offset-4" : ""}`}>{cell.day}</span>
                     <span className="flex gap-0.5 min-h-1.5">
