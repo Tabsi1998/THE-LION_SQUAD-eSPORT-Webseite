@@ -30,6 +30,7 @@ from fastapi import HTTPException
 from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
+from services.achievement_visibility import ranked_users_query
 from services.private_fields import private_projection
 from services.season_collections import PROGRESS  # noqa: F401 - umgezogen (#1420)
 
@@ -382,16 +383,17 @@ async def _current_or_latest(db, now: datetime) -> dict | None:
 
 
 async def fastest(db, hunt: dict, limit: int = 10) -> list[dict]:
-    """Die Schnellsten mit vollem Korb - gezeigt werden nur öffentliche Profile mit öffentlichen Erfolgen; der Platz
-    zählt trotzdem unter allen."""
+    """Die Schnellsten mit vollem Korb - gezeigt werden nur Konten, die auch auf der Erfolge-Rangliste stünden (öffentlich,
+    Erfolge öffentlich, nicht gesperrt, deaktiviert oder gelöscht, #2492); der Platz zählt trotzdem unter allen."""
     rows = await db[PROGRESS].find({"hunt_id": hunt["id"], "completed_at": {"$ne": None}}, {"_id": 0}).sort("completed_at", 1).to_list(500)
     if not rows:
         return []
-    users = {u["id"]: u async for u in db.users.find({"id": {"$in": [r["user_id"] for r in rows]}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "privacy_public_profile": 1, "privacy_achievements_public": 1, "is_banned": 1})}
+    shown = ranked_users_query([r["user_id"] for r in rows])
+    users = {u["id"]: u async for u in db.users.find(shown, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1})}
     out = []
     for index, row in enumerate(rows):
         user = users.get(row["user_id"])
-        if not user or not user.get("privacy_public_profile") or user.get("privacy_achievements_public") is False or user.get("is_banned"):
+        if not user:
             continue
         out.append({"rank": index + 1, "display_name": user.get("display_name") or user.get("username") or "Spieler", "username": user.get("username"),
                     "avatar_url": user.get("avatar_url"), "duration_seconds": int(row.get("duration_seconds") or 0), "completed_at": row["completed_at"]})
