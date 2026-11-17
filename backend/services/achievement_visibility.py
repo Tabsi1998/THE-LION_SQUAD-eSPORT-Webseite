@@ -71,6 +71,19 @@ def _user_projection() -> dict:
             "privacy_achievements_public": 1}
 
 
+def listed_accounts_query(user_ids) -> dict:
+    """Welche Konten auf einer öffentlichen Rangliste stehen dürfen (#2492): öffentliches Profil, nicht gesperrt, nicht
+    deaktiviert, nicht gelöscht - so auch die Level-Rangliste."""
+    return {"id": {"$in": list(user_ids)}, "privacy_public_profile": True, "is_active": {"$ne": False},
+            "is_banned": {"$ne": True}, "anonymized_at": None}
+
+
+def ranked_users_query(user_ids) -> dict:
+    """Wessen Erfolge auf Rangliste, Kronen, Erfolg der Woche und Laufband stehen (#2492) - eine Stelle, damit Rangliste
+    und Kronen nicht wieder auseinanderlaufen: die Konten aus ``listed_accounts_query`` mit „Erfolge öffentlich“ an."""
+    return {**listed_accounts_query(user_ids), "privacy_achievements_public": {"$ne": False}}
+
+
 def _public_user(user: dict) -> dict:
     return {
         "id": user["id"], "user_id": user["id"], "username": user.get("username"),
@@ -371,8 +384,7 @@ async def leaderboard(db, *, category: str | None = None, period: str = "all", l
         entry["points"] += points
     if not agg:
         return []
-    users = await db.users.find({"id": {"$in": list(agg)}, "privacy_public_profile": True, "is_active": {"$ne": False}, "is_banned": {"$ne": True}},
-                                _user_projection()).to_list(5000)
+    users = await db.users.find(ranked_users_query(agg), _user_projection()).to_list(5000)
     levels = {doc["user_id"]: doc async for doc in db.user_xp.find({"user_id": {"$in": [u["id"] for u in users]}}, {"_id": 0, "user_id": 1, "level": 1, "prestige": 1})}
     rows = []
     for user in users:
@@ -424,7 +436,7 @@ async def _pick_week_award(db, start: datetime, end: datetime) -> dict | None:
         return None
     candidates.sort(key=lambda c: c[:3])
     for _holders, _rank, _ts, award, tier, group, rare in candidates:
-        user = await db.users.find_one({"id": award["user_id"], "privacy_public_profile": True, "is_active": {"$ne": False}, "is_banned": {"$ne": True}}, _user_projection())
+        user = await db.users.find_one(ranked_users_query([award["user_id"]]), _user_projection())
         if not user or not achievements_public(user):
             continue
         return {
@@ -466,7 +478,7 @@ async def recent_unlocks(db, limit: int = 20) -> list[dict]:
         if not tier or not group or group.get("is_negative"):
             continue
         if award["user_id"] not in users:
-            users[award["user_id"]] = await db.users.find_one({"id": award["user_id"], "privacy_public_profile": True, "is_active": {"$ne": False}, "is_banned": {"$ne": True}}, _user_projection())
+            users[award["user_id"]] = await db.users.find_one(ranked_users_query([award["user_id"]]), _user_projection())
         user = users[award["user_id"]]
         if not user or not achievements_public(user):
             continue

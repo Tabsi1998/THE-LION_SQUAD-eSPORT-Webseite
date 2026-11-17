@@ -19,6 +19,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from models import new_id, now_utc
 from services import levels
+from services.achievement_visibility import listed_accounts_query
 from services.xp_view import _is_member, own_view, state, view  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 logger = logging.getLogger("tls.xp")
@@ -417,12 +418,14 @@ async def rebuild_missing(limit: int = 200) -> int:
 
 
 async def leaderboard(limit: int = 24) -> list[dict]:
-    """Rangliste nach Sternen, dann Level, dann XP - nur öffentliche Profile."""
+    """Rangliste nach Sternen, dann Level, dann XP - nur öffentliche Profile aktiver, nicht gesperrter Konten."""
     db = get_db()
     rows = await db.user_xp.find({"total": {"$gt": 0}}, {"_id": 0}).sort([("prestige", -1), ("level", -1), ("total", -1)]).to_list(500)
     if not rows:
         return []
-    users = {u["id"]: u for u in await db.users.find({"id": {"$in": [r["user_id"] for r in rows]}, "privacy_public_profile": True}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1}).to_list(500)}
+    # Dieselben Konten wie die übrigen Ranglisten (#2492): ohne gesperrte, deaktivierte und gelöschte.
+    shown = listed_accounts_query(r["user_id"] for r in rows)
+    users = {u["id"]: u for u in await db.users.find(shown, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1}).to_list(500)}
     out = []
     for row in rows:
         user = users.get(row["user_id"])

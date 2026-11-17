@@ -1,15 +1,15 @@
 {
-  "version": "1.7.13",
-  "build": 107,
-  "date": "2026-11-16",
+  "version": "1.7.14",
+  "build": 108,
+  "date": "2026-11-17",
   "items": [
-    "Benachrichtigungen in drei Stufen mit „Eigene Auswahl“ und je Thema Push, Nur App oder Aus.",
-    "Ruhezeit von–bis mit Ausnahmen; danach eine Sammelmeldung, die die Glocke öffnet.",
-    "E-Mail, Discord und Kanal-Hauptschalter eingeklappt unter „Weitere Wege“.",
-    "Push-Anmeldung mit Installations-Kennung – kein zweiter Geräte-Eintrag mehr.",
-    "Zusammengelegte und entfallene Spiele zählen nicht mehr mit; Läufe-Karte sagt „Plätze frei“ nur vor dem Lauf.",
-    "Liga-Staffeln zeigen den Liga-Stand statt „Entwurf“.",
-    "Profil zeigt „Vereinsmitglied · Funktion“ mit Weg zum Vereinsprofil.",
-    "Erfolgs- und Level-Zeremonien kommen nur noch einmal je Konto statt auf jedem Gerät."
+    "Eigene FAQ unter Einstellungen › Über die App – Suche, häufige Fragen und Bereiche mit Rollen-Filter.",
+    "Bereich „LionsAPP“ in der FAQ mit Push-Stufen, Ruhezeit, Kanälen, Aufruf-Ton, Passkey, App-Sperre, ohne Netz und Updates.",
+    "Fragen für Mitglieder, Helfer und Turnierleitung kommen nach Prüfung vom Server; Links auf /faq öffnen die FAQ der App.",
+    "Keine Frage nach Benachrichtigungen mehr direkt nach dem Login.",
+    "Nach der ersten Turnier- oder Event-Anmeldung erst die Erklärung „Sollen wir dich rufen, wenn du dran bist?“, dann Android.",
+    "Leiser Hinweis „Aufrufe sind aus – einschalten“ auf Turnier- und Event-Seiten und in den Einstellungen.",
+    "Zurückgezogene News-Beiträge und Alben zeigen einen Hinweis statt eines Ladefehlers.",
+    "Filter-Chips der Referenzen mit größerer Tippfläche, „Spielst du auch mit?“ ohne Gleiten bei reduzierter Bewegung."
   ]
 }
