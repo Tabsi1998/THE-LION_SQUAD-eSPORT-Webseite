@@ -239,11 +239,12 @@ NOTE = {"note": "Beide Teams nicht in der Lobby"}
 async def test_both_no_show_only_before_the_game_starts_and_with_the_side_effects(flow, monkeypatch):
     """Codex zu E.1: nicht nach Spielbeginn, nicht mit Meldung oder gehaltenem Ergebnis - und dieselben Nebenwirkungen wie
     beim kampflos (Station frei, Discord vorgemerkt), auch beim Neu ansetzen."""
-    from services import change_events, competition_versions, discord_bracket, station_runtime, walkover_incidents
+    from services import change_events, competition_versions, discord_bracket_state, station_runtime, walkover_incidents
 
     _admin, _league, staffel = await setup(flow)
     refreshed, released, events, versions, incidents, revoked = [], [], [], [], [], []
-    monkeypatch.setattr(discord_bracket, "request_refresh", lambda tid: refreshed.append(tid))
+    # Mit ``revise`` (#2494): eine Wertung nach dem Ende zieht den Endstand nach.
+    monkeypatch.setattr(discord_bracket_state, "request_refresh", lambda tid, revise=False: refreshed.append(tid) if revise else None)
 
     async def release(_db, match, _collection):
         released.append(match["id"])

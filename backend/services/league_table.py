@@ -213,7 +213,7 @@ async def after_change(db, tournament: dict, before: dict, *, scored: bool) -> N
     """Dieselben Nebenwirkungen wie beim kampflos (``v2_result_submission._finish_result_side_effects``): Station und
     Aufruf frei, Discord-Baum vorgemerkt, Anzeige-Ereignis für Web und TV, Stand der Wettbewerbsstruktur. ``scored``:
     gewertet (sonst neu angesetzt). Keine dieser Folgen hält die Wertung auf."""
-    from services import discord_bracket, station_runtime
+    from services import discord_bracket_state, station_runtime
     from services.change_events import publish_tournament_event
     from services.competition_versions import persist_competition_versions
 
@@ -224,7 +224,8 @@ async def after_change(db, tournament: dict, before: dict, *, scored: bool) -> N
         except Exception as exc:  # noqa: BLE001
             logger.warning("Station release failed for match=%s type=%s", before.get("id"), type(exc).__name__)
     try:
-        discord_bracket.request_refresh(str(tid or ""))
+        # ``revise`` (#2494): eine Wertung nach dem Ende zieht den Endstand nach (eine Staffel postet ohnehin nicht, ``discord_skip``).
+        discord_bracket_state.request_refresh(str(tid or ""), revise=True)
     except Exception:  # noqa: BLE001
         logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", tid, exc_info=True)
     try:
