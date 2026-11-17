@@ -7,10 +7,10 @@ import {
 
 const TAB_KEYS = STAFFEL_TABS.map((tab) => tab.key);
 
-test("alle sieben Reiter stehen fest, in Paket A sind davon Überblick und Teilnehmer fertig", () => {
+test("alle sieben Reiter stehen fest, nach Paket B sind fünf davon fertig", () => {
   expect(TAB_KEYS).toEqual(["ueberblick", "teilnehmer", "spielplan", "spiele", "tabelle", "protokoll", "einstellungen"]);
   expect(new Set(TAB_KEYS).size).toBe(TAB_KEYS.length);
-  expect([...STAFFEL_TABS_READY]).toEqual(["ueberblick", "teilnehmer"]);
+  expect([...STAFFEL_TABS_READY]).toEqual(["ueberblick", "teilnehmer", "spielplan", "spiele", "tabelle"]);
   for (const key of STAFFEL_TABS_READY) expect(TAB_KEYS).toContain(key);
 });
 
@@ -59,7 +59,14 @@ test("Ziele auf der Staffel-Seite führen dorthin, die übrigen noch in die Turn
   expect(staffelManageUrl("t-1")).toBe("/admin/leagues/staffeln/t-1");
   expect(staffelManageUrl("t-1", "participants")).toBe("/admin/leagues/staffeln/t-1#teilnehmer");
   expect(staffelManageUrl("t-1", "participants", "zuteilen")).toBe("/admin/leagues/staffeln/t-1#zuteilen");
-  expect(staffelManageUrl("t-1", "matchplan")).toBe("/admin/tournaments/t-1?tab=matchplan");
-  expect(staffelManageUrl("t-1", "stages")).toBe("/admin/tournaments/t-1?tab=stages");
-  expect(staffelManageUrl("t-1", "bracket")).toBe("/admin/tournaments/t-1?tab=bracket");
+  // Paket B: Spielplan, Spiele und Tabelle stehen auf der Staffel-Seite - samt Abschnitten.
+  expect(staffelManageUrl("t-1", "matchplan")).toBe("/admin/leagues/staffeln/t-1#spielplan");
+  expect(staffelManageUrl("t-1", "stages")).toBe("/admin/leagues/staffeln/t-1#spiele");
+  expect(staffelManageUrl("t-1", "bracket")).toBe("/admin/leagues/staffeln/t-1#tabelle");
+  expect(staffelManageUrl("t-1", "matchplan", "termine")).toBe("/admin/leagues/staffeln/t-1#termine");
+  expect(staffelManageUrl("t-1", "stages", "ergebnisse")).toBe("/admin/leagues/staffeln/t-1#ergebnisse");
+  expect(staffelManageUrl("t-1", "bracket", "gleichstand")).toBe("/admin/leagues/staffeln/t-1#gleichstand");
+  // Noch ohne Reiter (Paket C): weiter die Turnierverwaltung.
+  expect(staffelManageUrl("t-1", "edit")).toBe("/admin/tournaments/t-1?tab=edit");
+  expect(staffelManageUrl("t-1", "staff")).toBe("/admin/tournaments/t-1?tab=staff");
 });

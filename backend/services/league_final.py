@@ -31,6 +31,10 @@ from services import league_rewards
 from services import league_protest_settings as protest_settings
 from services import league_zones
 from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
+# Gleichstände um Meister und Zonengrenze (#2262): im Blatt-Modul, damit Tabelle und Abschluss dieselbe Rechnung nutzen.
+from services.league_ties import (  # noqa: F401 - weiter über league_final erreichbar
+    METHODS, champion_ties, classify_ties, division_levels, leaders, tie_context, top_division_id,
+)
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.log_safe import log_safe
 from services.match_disputes import decided_at, league_window_of
@@ -47,7 +51,6 @@ CLOSABLE_STATUSES = frozenset({"live", "paused", "completed", "results_published
 SETTLED_MATCH_STATUSES = frozenset({"completed", "forfeit", "cancelled", "archived", "bye"})
 # Staffeln, die für den Abschluss der Season nicht zählen.
 IGNORED_STAFFEL_STATUSES = frozenset({"cancelled", "archived", "draft"})
-METHODS = {"playoff": "Entscheidungsspiel", "lot": "Los", "lead": "Entscheid der Leitung"}
 ITEM_LIMIT = 50
 HISTORY_LIMIT = 50
 KIND = "tournament_registration"
@@ -141,25 +144,6 @@ def running_deadlines(match: dict, tournament: dict, settings: dict, now: dateti
         if _running(until, now) and not appealed("protest_decision", row["id"]):
             out.append({"kind": "appeal", "until": until.isoformat()})
     return out
-
-
-def leaders(rows: list[dict]) -> list[dict]:
-    """Die Teams auf dem besten Platz unter denen, die noch in der Wertung stehen. Ausgeschiedene zählen nicht mit - auch wenn sie
-    rechnerisch vorn stehen (Regel ``half``: Das ausgetretene Team behält seine Punkte, Meister wird es nicht)."""
-    active = [row for row in rows if not row.get("exit") and int(row.get("rank") or 0) > 0]
-    if not active:
-        return []
-    best = min(int(row["rank"]) for row in active)
-    return [row for row in active if int(row["rank"]) == best]
-
-
-def champion_ties(rows: list[dict]) -> list[dict]:
-    """Echter Gleichstand um den Meistertitel (Nr. 156) - unter den Teams, die noch in der Wertung stehen."""
-    first = leaders(rows)
-    if len(first) < 2:
-        return []
-    return [{"rank": int(first[0]["rank"]), "registration_ids": [row["registration_id"] for row in first],
-             "names": [row.get("display_name") or "Team" for row in first], "points": first[0].get("points")}]
 
 
 METHOD_REQUIRED = "Für den Meisterplatz bitte angeben, wie entschieden wurde: Entscheidungsspiel, Los oder Entscheid der Leitung."
@@ -288,13 +272,6 @@ async def live_rows(db, tournament: dict) -> list[dict]:
     from routes.tournament_view_routes import _standing_rows
 
     return await _standing_rows(db, tournament, None, False, live=True)
-
-
-async def top_division_id(db, season_id: str | None) -> str | None:
-    """Die oberste Liga N der Season (kleinste Stufe) - nur dort ist Platz 1 der Meister."""
-    rows = await db.league_divisions.find({"season_id": season_id}, {"_id": 0, "id": 1, "level": 1, "status": 1}).to_list(50)
-    rows = [row for row in rows if (row.get("status") or "active") == "active"] or rows
-    return min(rows, key=lambda row: (row.get("level") if isinstance(row.get("level"), int) else 99, row["id"]))["id"] if rows else None
 
 
 def champion_of(rows: list[dict]) -> dict | None:
@@ -838,10 +815,7 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
     found = await blockers(db, tournament, season, rows=rows, decisive=decisive, zones=zones, now=now)
     # Je Gleichstand: Gehört die Person zu einer der Seiten? Dann entscheidet eine andere (wie im Reiter „Tabelle“). Dazu die
     # Gleichstände an einer Zonengrenze (F.2) - nur die, die noch nicht im Meister-Gleichstand stehen.
-    champion = [{**tie, "kind": "champion"} for tie in champion_ties(rows)] if decisive else []
-    taken = {tie["rank"] for tie in champion}
-    zone_ties = [tie for tie in league_zones.boundary_ties(rows, zones) if tie["rank"] not in taken] if zones else []
-    ties = [{**tie, "own_team": bool(own_ids & set(tie["registration_ids"]))} for tie in [*champion, *zone_ties]]
+    ties = [{**tie, "own_team": bool(own_ids & set(tie["registration_ids"]))} for tie in classify_ties(rows, decisive=decisive, zones=zones)]
     return {**base, "closed": False, "final": None, "standings": rows, "table_rules": public_rules(tournament), "blockers": found,
             "ties": ties, "can_decide": can_decide(tournament),
             "champion": champion_of(rows) if decisive else None,
@@ -857,7 +831,7 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
     can_act = CLOSE_CAPABILITY in capabilities
     divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0}).to_list(50)}
     top = await top_division_id(db, season["id"])
-    levels = sorted({row["level"] for row in divisions.values() if isinstance(row.get("level"), int) and row.get("status") != "archived"})
+    levels = division_levels(divisions.values())
     tournaments = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE},
                                             {"_id": 0, "creation_key": 0, "billing": 0}).to_list(500)
     tournaments = [row for row in tournaments if is_closed(row) or row.get("status") not in IGNORED_STAFFEL_STATUSES]

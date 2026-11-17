@@ -15,8 +15,9 @@ export const STAFFEL_TABS = [
   { key: "einstellungen", label: "Einstellungen" },
 ];
 
-// Was schon auf der Seite steht (Paket A). Spielplan, Spiele und Tabelle kommen mit Paket B, Protokoll und Einstellungen mit C.
-export const STAFFEL_TABS_READY = new Set(["ueberblick", "teilnehmer"]);
+// Was schon auf der Seite steht: Paket A Überblick und Teilnehmer, Paket B Spielplan, Spiele und Tabelle. Protokoll und Einstellungen
+// kommen mit Paket C.
+export const STAFFEL_TABS_READY = new Set(["ueberblick", "teilnehmer", "spielplan", "spiele", "tabelle"]);
 
 // Abschnitte innerhalb der Reiter, per Sprungmarke erreichbar (Hinweise, Nachrichten des Servers, Handbuch).
 export const STAFFEL_SECTIONS = {

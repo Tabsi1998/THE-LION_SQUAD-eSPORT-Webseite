@@ -383,6 +383,15 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 }
 .tls-standing-row[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.28); }
 .tls-standing-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
+/* Staffel-Seite der Verwaltung (#2262): Am Handy wischt die Tabelle in ihrem Rahmen, statt Namen mitten im Wort zu brechen. */
+.staffel-standings .tls-standing-name { overflow-wrap: break-word; }
+/* Am Handy: ohne Spalte „Form“ passen Name und Pkt ohne Wischen; # und Name bleiben beim Wischen stehen (große Schrift). */
+@media (max-width: 639px) {
+  .staffel-standings [data-col="form"] { display: none; }
+  .staffel-standings .tls-standings > table { min-width: 340px; }
+  .staffel-standings tr > :nth-child(-n+2) { position: sticky; left: 0; z-index: 1; background: var(--tls-surface-1); }
+  .staffel-standings tr > :nth-child(2) { left: 3rem; }
+}
 .tls-standing-me {
   flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -3347,6 +3356,8 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .mp-btn:disabled { opacity: 0.45; cursor: default; }
 .mp-btn--small { padding: 4px 8px; font-size: 11px; gap: 4px; }
+/* Staffel-Seite (#2262): dieselben Knöpfe mit Tippfläche ab 44 px. */
+.mp-btn--touch { min-height: 44px; padding: 8px 12px; font-size: 11px; gap: 4px; }
 .mp-link { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tls-brand); text-underline-offset: 3px; }
 .mp-link:hover { text-decoration: underline; }
 .mp-desktop-only { display: none; }
@@ -3536,6 +3547,15 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-remote[data-tone="open"] .mp-remote__state { color: var(--tls-brand); }
 .mp-remote[data-tone="accepted"] .mp-remote__state { color: var(--tls-ok); }
 .mp-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; }
+/* Staffel-Seite (#2262): Wochen brechen um, statt seitlich zu wischen - am Handy untereinander. */
+.mp-weeks--stack { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); align-items: start; }
+.mp-week__summary { min-height: 44px; align-items: center; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.mp-week__summary::-webkit-details-marker { display: none; }
+.mp-week__summary .mp-week__done { flex-basis: 100%; color: rgba(255, 255, 255, 0.6); }
+.mp-week__fold[open] .mp-week__summary { margin-bottom: 4px; }
+.mp-week__summary { position: relative; padding-right: 22px; }
+.mp-week__summary::after { content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; border-right: 2px solid rgba(255, 255, 255, 0.6); border-bottom: 2px solid rgba(255, 255, 255, 0.6); transform: translateY(-75%) rotate(45deg); transition: transform var(--tls-motion-fast) var(--tls-ease); }
+.mp-week__fold[open] .mp-week__summary::after { transform: translateY(-25%) rotate(225deg); }
 .mp-week { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; background: var(--tls-surface-0); min-width: 0; }
 .mp-week[data-current="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }
 .mp-week__deadline { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }

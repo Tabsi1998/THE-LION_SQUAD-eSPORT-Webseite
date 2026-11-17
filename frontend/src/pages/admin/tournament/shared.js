@@ -356,6 +356,15 @@ export function statusChangeNotice(status, tournament, { activeRegistrations = 0
     };
   }
   if (status === "completed" && !FINISHED_STATUSES.has(tournament.status)) {
+    // Liga-Staffel (#2262): kein Podest - den Endstand hält die Season im Reiter „Abschluss“ fest.
+    if (tournament.league_context) {
+      return {
+        title: "Staffel beenden?",
+        description: "Alle Spieler der zugeteilten Co-Teams bekommen einmal eine Nachricht zum Ende. Den Endstand hält die Season danach im Reiter „Abschluss“ fest.",
+        confirmLabel: "Beenden",
+        tone: "info",
+      };
+    }
     return {
       title: "Turnier beenden?",
       description: "Alle Beteiligten bekommen einmal die Nachricht „Turnier beendet“, die Erfolge werden ausgewertet. Die Turnierseite zeigt das Podest als vorläufig.",
@@ -412,4 +421,31 @@ export function primaryTournamentAction(status, tournament = null) {
     return { status: "live", label: "Fortsetzen" };
   }
   return null;
+}
+
+// Liga-Wörter für den Status einer Staffel (#2262: kein „Entwurf“, kein „Live“) - Staffel-Seite und Meldungen nach dem Statuswechsel.
+export const STAFFEL_STATUS_WORDS = {
+  live: "Spielbetrieb", paused: "Pausiert", completed: "Beendet", results_published: "Ergebnisse veröffentlicht", archived: "Archiviert",
+  cancelled: "Abgesagt",
+};
+const BEFORE_LIVE = new Set(["draft", "scheduled", "registration_open", "registration_closed", "check_in"]);
+
+/** Rückfrage, wenn die Planung vor „Live“ Hinweise oder Konflikte meldet - eine Staffel startet bzw. setzt fort (#2262). */
+export function liveCheckWords(report, tournament) {
+  if (!tournament?.league_context) {
+    return { title: report?.ok ? "Mit Hinweisen live schalten?" : "Mit Planungskonflikten live schalten?", confirmLabel: "Trotzdem live" };
+  }
+  const verb = BEFORE_LIVE.has(tournament.status) ? "starten" : "fortsetzen";
+  return { title: report?.ok ? `Mit Hinweisen ${verb}?` : `Mit Planungskonflikten ${verb}?`, confirmLabel: `Trotzdem ${verb}` };
+}
+
+/** Meldung nach dem Statuswechsel: im Turnier „Status: Live“, in einer Staffel Liga-Wörter (#2262). ``tournament``: der Stand davor. */
+export function statusDoneText(status, tournament) {
+  if (tournament?.league_context) {
+    if (status === "live") return BEFORE_LIVE.has(tournament.status) ? "Liga gestartet" : "Spielbetrieb läuft weiter";
+    // Nie ein rohes „Status: draft“: vor dem Start „Vor dem Start“, sonst das Wort der Turnierliste.
+    const word = STAFFEL_STATUS_WORDS[status] || (BEFORE_LIVE.has(status) ? "Vor dem Start" : TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1]);
+    return word ? `Status: ${word}` : "Status geändert";
+  }
+  return `Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`;
 }
