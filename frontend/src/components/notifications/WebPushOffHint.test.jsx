@@ -12,7 +12,7 @@ vi.mock("@/lib/webPush", async (importOriginal) => {
   return { ...actual, loadWebPushConfig: () => configMock(), webPushBlocked: () => blockedMock() };
 });
 
-const { WEB_PUSH_OFF_ACTION, WEB_PUSH_OFF_TEXT, WebPushOffHint } = await import("./WebPushOffHint");
+const { WEB_PUSH_OFF_ACTION, WEB_PUSH_OFF_TEXT, WebPushOffHint, resetWebPushOffHintCache } = await import("./WebPushOffHint");
 
 async function show(props = {}) {
   render(<MemoryRouter><WebPushOffHint user={authState.user} {...props} /></MemoryRouter>);
@@ -20,6 +20,7 @@ async function show(props = {}) {
 }
 
 beforeEach(() => {
+  resetWebPushOffHintCache();
   authState.user = { id: "u1" };
   configMock.mockReset();
   configMock.mockResolvedValue({ enabled: true, public_key: "BQQ" });
@@ -32,7 +33,8 @@ test("Browser hat abgelehnt: die leise Zeile führt zu den Einstellungen", async
   const hint = screen.getByTestId("web-push-off");
   expect(hint).toHaveTextContent(`${WEB_PUSH_OFF_TEXT} – ${WEB_PUSH_OFF_ACTION}`);
   expect(hint).toHaveTextContent("Aufrufe sind aus – einschalten");
-  expect(hint).toHaveAttribute("href", "/profile?tab=notifications");
+  // Direkt zur Karte „Dieser Browser“, die erklärt, wie man es im Browser erlaubt.
+  expect(hint).toHaveAttribute("href", "/profile?tab=notifications#dieser-browser");
   expect(hint.className).toContain("min-h-[44px]");
 });
 
@@ -46,6 +48,7 @@ test("nicht abgelehnt: keine Zeile und keine Frage an den Server", async () => {
 test("ohne Web-Push am Server, ohne Konto oder nach dem Ende: keine Zeile", async () => {
   configMock.mockResolvedValue({ enabled: false });
   await show();
+  resetWebPushOffHintCache();
   expect(screen.queryByTestId("web-push-off")).toBeNull();
 
   configMock.mockResolvedValue({ enabled: true, public_key: "BQQ" });
@@ -64,4 +67,13 @@ test("zurück mit erlaubtem Browser: die Zeile ist weg", async () => {
   blockedMock.mockReturnValue(false);
   await act(async () => { window.dispatchEvent(new Event("focus")); });
   expect(screen.queryByTestId("web-push-off")).toBeNull();
+});
+
+test("die Einstellung des Servers kommt einmal je Sitzung, nicht bei jedem Fokuswechsel", async () => {
+  await show();
+  expect(screen.getByTestId("web-push-off")).toBeInTheDocument();
+  for (let i = 0; i < 3; i += 1) await act(async () => { window.dispatchEvent(new Event("focus")); });
+  await show({ testId: "zweite-seite" });
+  expect(screen.getByTestId("zweite-seite")).toBeInTheDocument();
+  expect(configMock).toHaveBeenCalledTimes(1);
 });

@@ -722,6 +722,8 @@ test("nach der Anmeldung merkt sich der Browser das Turnier für die Frage nach 
 });
 
 test("Browser hat Benachrichtigungen abgelehnt: leise „Aufrufe sind aus – einschalten“, nur mit Konto", async () => {
+  const { resetWebPushOffHintCache } = await import("@/components/notifications/WebPushOffHint");
+  resetWebPushOffHintCache();
   const saved = { Notification: window.Notification, PushManager: window.PushManager, serviceWorker: Object.getOwnPropertyDescriptor(window.navigator, "serviceWorker") };
   window.Notification = { permission: "denied" };
   window.PushManager = function PushManager() {};
@@ -735,7 +737,7 @@ test("Browser hat Benachrichtigungen abgelehnt: leise „Aufrufe sind aus – ei
     const { unmount } = renderPage();
     const hint = await screen.findByTestId("tournament-push-off");
     expect(hint).toHaveTextContent("Aufrufe sind aus – einschalten");
-    expect(hint).toHaveAttribute("href", "/profile?tab=notifications");
+    expect(hint).toHaveAttribute("href", "/profile?tab=notifications#dieser-browser");
     unmount();
     authUser = null;
     renderPage();

@@ -9,6 +9,20 @@ import { loadWebPushConfig, webPushBlocked } from "@/lib/webPush";
 // Konto und nur, wenn der Server Web-Push anbietet. Kommt man mit erlaubtem Browser zurück, ist die Zeile weg.
 export const WEB_PUSH_OFF_TEXT = "Aufrufe sind aus";
 export const WEB_PUSH_OFF_ACTION = "einschalten";
+/** Der Link führt direkt zur Karte „Dieser Browser“ (BrowserPushCard), die erklärt, wie man es im Browser erlaubt. */
+export const WEB_PUSH_OFF_LINK = "/profile?tab=notifications#dieser-browser";
+
+// Die Einstellung des Servers ändert sich selten: einmal je Sitzung laden, nicht bei jedem Fokuswechsel.
+let sessionConfig = null;
+function webPushConfigOnce() {
+  if (!sessionConfig) sessionConfig = loadWebPushConfig();
+  return sessionConfig;
+}
+
+/** Nur für Tests: die gemerkte Einstellung vergessen. */
+export function resetWebPushOffHintCache() {
+  sessionConfig = null;
+}
 
 export function WebPushOffHint({ user, show = true, className = "", testId = "web-push-off" }) {
   const signedIn = Boolean(user?.id);
@@ -25,7 +39,7 @@ export function WebPushOffHint({ user, show = true, className = "", testId = "we
         if (active) setVisible(false);
         return;
       }
-      void loadWebPushConfig().then((config) => { if (active) setVisible(Boolean(config?.enabled)); });
+      void webPushConfigOnce().then((config) => { if (active) setVisible(Boolean(config?.enabled)); });
     };
     check();
     const onVisible = () => { if (!document.hidden) check(); };
@@ -41,7 +55,7 @@ export function WebPushOffHint({ user, show = true, className = "", testId = "we
   if (!visible) return null;
   return (
     <Link
-      to="/profile?tab=notifications"
+      to={WEB_PUSH_OFF_LINK}
       data-testid={testId}
       aria-label={`${WEB_PUSH_OFF_TEXT} – ${WEB_PUSH_OFF_ACTION}`}
       className={`inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-white/10 rounded-sm text-xs text-white/55 hover:text-white hover:border-white/25 ${className}`.trim()}
