@@ -149,6 +149,9 @@ function Needs({ tournament: base, teams }) {
  * „Offen in dieser Staffel“: die Aufgaben des Leitstands mit dieser Staffel (`staffel_id`, #2262) - eine Zahl, keine Kopie der Liste.
  * Lesen darf jede Zuständigkeit der Liga (wie der Leitstand selbst). `null` beim Laden, `{ failed }` nach einem Fehler.
  */
+const DESK_RESOURCES = ["leagues", "matches", "tournaments"];
+const DESK_REFRESH = { debounceMs: 5000 };
+
 function useDeskCount(tournament) {
   const seasonId = tournament.league_context?.season_id;
   const [count, setCount] = useState(null);
@@ -159,7 +162,8 @@ function useDeskCount(tournament) {
       .catch(() => setCount({ failed: true }));
   }, [seasonId, tournament.id]);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["leagues", "matches", "tournaments"]);
+  // Der Leitstand rechnet alle Quellen der Season - nachgezählt wird höchstens alle 5 s, nicht bei jeder Meldung im Spielbetrieb.
+  useApiInvalidation(load, DESK_RESOURCES, DESK_REFRESH);
   return count;
 }
 

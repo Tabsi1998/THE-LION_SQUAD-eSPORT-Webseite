@@ -5,11 +5,18 @@ import { toast } from "sonner";
 import { viennaDate } from "@/lib/vienna";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 
-const TARGET_LABELS = {
-  event: "Event",
-  tournament: "Turnier",
-  fastlap: "Fast-Lap",
+// Wofür der Link gilt, im Satz „Gezielt Zugriff auf ein gesperrtes oder internes … geben“ (#2262: vorher „interne Turnier“).
+const TARGET_PHRASES = {
+  event: "ein gesperrtes oder internes Event",
+  tournament: "ein gesperrtes oder internes Turnier",
+  fastlap: "eine gesperrte oder interne Fast-Lap",
 };
+
+/** Der Satz unter der Überschrift: „Gezielt Zugriff auf ein gesperrtes oder internes Turnier geben.“ */
+export function accessLinksHint(kind) {
+  if (kind === "staffel") return "Gezielt Zugriff auf die Staffel geben, solange sie nicht öffentlich ist.";
+  return `Gezielt Zugriff auf ${TARGET_PHRASES[kind] || "gesperrte oder interne Inhalte"} geben.`;
+}
 
 function linkStateLabel(link) {
   if (link.is_active === false) return "Deaktiviert";
@@ -35,7 +42,9 @@ async function copyText(value) {
   await navigator.clipboard?.writeText(value).catch(() => null);
 }
 
-export function AccessLinksPanel({ targetType, targetId, allowRegister = false, collapsible = false }) {
+// `bare` (#2262, Staffel-Seite): ohne eigenen Rahmen und ohne eigene Überschrift - die Seite setzt beides, keine Karte in der Karte.
+// `kind`: wie die Liste das Ziel nennt (`staffel` statt `tournament`), die Anfragen gehen weiter an `targetType`.
+export function AccessLinksPanel({ targetType, targetId, allowRegister = false, collapsible = false, bare = false, kind = "" }) {
   const [links, setLinks] = useState([]);
   const [busy, setBusy] = useState(false);
   const [includeRegister, setIncludeRegister] = useState(allowRegister);
@@ -49,6 +58,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
   const [createdUrl, setCreatedUrl] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);
   const [loadError, setLoadError] = useState("");
+  // In der Staffel heißen sie wie auf der Seite „Zugangslinks“ - ein Wort für eine Sache.
+  const word = kind === "staffel" ? "Zugangslinks" : "Speziallinks";
 
   const load = useCallback(async () => {
     if (!targetType || !targetId) return;
@@ -63,9 +74,9 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
   useEffect(() => {
     load().catch((failure) => {
       setLinks([]);
-      setLoadError(formatRequestError(failure, "Die Speziallinks ließen sich nicht laden."));
+      setLoadError(formatRequestError(failure, `Die ${word} ließen sich nicht laden.`));
     });
-  }, [load]);
+  }, [load, word]);
 
   const create = async () => {
     setBusy(true);
@@ -134,7 +145,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
         <Link2 className="w-3.5 h-3.5" /> Speziallinks
       </div>
       <p className="mt-1 text-xs text-white/50">
-        Gezielt Zugriff auf gesperrte oder interne {TARGET_LABELS[targetType] || "Inhalte"} geben.
+        {accessLinksHint(kind || targetType)}
       </p>
     </div>
   );
@@ -289,7 +300,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           </div>
         ))}
         {loadError ? <div role="alert" className="text-xs text-warn border border-warn/40 bg-warn/10 rounded-sm p-3" data-testid="access-links-error">{loadError}</div> : null}
-        {links.length === 0 && !loadError && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven Speziallinks.</div>}
+        {links.length === 0 && !loadError && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven {word}.</div>}
       </div>
     </>
   );
@@ -308,6 +319,15 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
         </summary>
         <div className="mt-4 space-y-4">{body}</div>
       </details>
+    );
+  }
+
+  if (bare) {
+    return (
+      <div className="space-y-4" data-testid="access-links-bare">
+        <div className="flex justify-end">{createButton}</div>
+        {body}
+      </div>
     );
   }
 

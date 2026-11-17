@@ -100,7 +100,7 @@ export function SeasonSourceNote({ tournament, children = "Kommt aus der Season 
   return (
     <p className="text-xs text-white/50" data-testid={testId}>
       {children}{" "}
-      {seasonPath && <Link to={seasonPath} className="text-[#29B6E8] font-bold hover:text-white">Season öffnen</Link>}
+      {seasonPath && <Link to={seasonPath} className="-my-3 inline-flex min-h-[44px] items-center text-[#29B6E8] font-bold hover:text-white">Season öffnen</Link>}
     </p>
   );
 }

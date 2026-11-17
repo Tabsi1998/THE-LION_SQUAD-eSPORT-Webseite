@@ -204,7 +204,8 @@ function StaffelPage({ tournamentId }) {
     ),
     // Protokoll der Season auf diese Staffel gefiltert (Paket C): lesen jede Zuständigkeit, Strafen und Notausnahmen nur mit der passenden.
     protokoll: () => <SeasonLog seasonId={t.league_context.season_id} staffelId={t.id} title="Protokoll der Staffel" sectionId="staffel-log" />,
-    einstellungen: () => <StaffelSettingsTab tournament={t} matches={matches} onReload={loadSafely} />,
+    // Unterreiter per Sprungmarke (`#vorgaben`, `#helfer` …) - wie die Reiter oben, ohne neuen Eintrag im Verlauf.
+    einstellungen: () => <StaffelSettingsTab tournament={t} matches={matches} onReload={loadSafely} section={target.section} onSection={go} />,
   };
 
   return (

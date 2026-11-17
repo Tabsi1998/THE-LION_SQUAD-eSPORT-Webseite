@@ -499,7 +499,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await noSideScroll(page);
   });
 
-  test(`Staffel-Seite (${width} px): Einstellungen mit langem Titel und ohne Banner`, async ({ page }) => {
+  test(`Staffel-Seite (${width} px): Einstellungen in Unterreitern, langer Titel, ohne Banner`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     const problems = [];
     page.on("response", (response) => { if (response.status() === 403) problems.push(`403 ${response.url()}`); });
@@ -509,45 +509,71 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       staff: [{ id: "h1", role: "referee", scope: "tournament", user: { display_name: "Helferin aus dem Probelauf mit langem Namen" } }] });
     await page.goto("/admin/leagues/staffeln/t1#einstellungen");
     const panel = page.getByTestId("staffel-panel-einstellungen");
+    await expect(panel.getByTestId("staffel-settings-tabs").getByRole("tab")).toHaveText(["Auftritt", "Aus der Season", "Links und Sponsor", "TV und Helfer", "Werkzeuge"]);
     await expect(panel.getByTestId("tr-edit-title")).toHaveValue(LONG_TITLE);
+    await expect(panel.getByTestId("tr-edit-season-values")).toHaveCount(0);
+    await noSideScroll(page);
+    await fullShot(page, `2262c-einstellungen-${width}-v2`);
+    // Je Unterreiter höchstens ein Speichern-Weg: das Formular hier, der Sponsor unter „Links und Sponsor“.
+    await expect(panel.getByRole("button", { name: /^Speichern$/ })).toHaveCount(1);
+
+    await panel.getByTestId("staffel-settings-tab-vorgaben").click();
+    await expect(page).toHaveURL(/#vorgaben$/);
     await expect(panel.getByTestId("tr-edit-season-values")).toHaveCount(1);
     await expect(panel.getByTestId("staffel-map-pool")).toContainText("Raffinerie mit sehr langem Kartennamen");
-    await expect(panel.getByTestId("staffel-access-links")).toBeVisible();
+    await panel.getByTestId("staffel-map-pool-toggle").click();
+    await expect(panel.getByTestId("staffel-map-pool-season")).toBeHidden();
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-settings-panel-vorgaben");
+
+    await panel.getByTestId("staffel-settings-tab-links").click();
+    await expect(panel.getByTestId("access-links-bare")).toBeVisible();
+    await expect(panel.getByText("Speziallinks", { exact: true })).toHaveCount(0);
+    await expect(panel.getByTestId("access-links-bare")).toContainText("Noch keine aktiven Zugangslinks.");
     await expect(panel.getByTestId("admin-tr-round-sponsors-league")).toContainText("Spielwoche");
+    await noSideScroll(page);
+
+    await panel.getByTestId("staffel-settings-tab-helfer").click();
     await expect(panel.getByTestId("staffel-tv-open")).toHaveAttribute("href", "/display/bracket/t1");
     await expect(panel.getByTestId("staffel-helper-h1")).toContainText("Schiedsrichter");
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-settings-panel-helfer");
+
+    await panel.getByTestId("staffel-settings-tab-werkzeuge").click();
     await expect(panel.getByTestId("staffel-tools-lock-later")).toBeVisible();
     await expect(panel.getByTestId("staffel-tools-delete-later")).toBeVisible();
     await noSideScroll(page);
-    for (const testId of ["staffel-map-pool", "staffel-tv", "staffel-helpers", "staffel-tools"]) await touchTargets(page, testId);
-    await fullShot(page, `2262c-einstellungen-${width}`);
+    await touchTargets(page, "staffel-settings-panel-werkzeuge");
     expect(problems).toEqual([]);
   });
 }
 
-test("Einstellungen: Sprungmarken #darstellung und #helfer führen an ihre Stelle", async ({ page }) => {
+test("Einstellungen: Sprungmarken öffnen ihren Unterreiter - #darstellung, #vorgaben, #helfer, #werkzeuge", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockPackageC(page);
-  await page.goto("/admin/leagues/staffeln/t1#helfer");
-  await expect(page.getByTestId("staffel-tab-einstellungen")).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByTestId("staffel-helpers")).toBeInViewport();
-  await page.goto("/admin/leagues/staffeln/t1#darstellung");
-  await expect(page.getByTestId("staffel-look")).toBeInViewport();
+  for (const [hash, testId] of [["helfer", "staffel-helpers"], ["darstellung", "staffel-look"], ["vorgaben", "staffel-map-pool"], ["werkzeuge", "staffel-tools"]]) {
+    await page.goto(`/admin/leagues/staffeln/t1?probe=${hash}#${hash}`);
+    await expect(page.getByTestId("staffel-tab-einstellungen")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId(`staffel-settings-tab-${hash}`)).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId(testId)).toBeVisible();
+    await expect(page.getByTestId("staffel-settings-tabs")).toBeInViewport();
+  }
 });
 
-test("Einstellungen nur lesend: ohne „Liga verwalten“ kein Formular, keine Zugangslinks - keine 403", async ({ page }) => {
+test("Einstellungen nur lesend: ohne „Liga verwalten“ kein Formular, kein Unterreiter Links und Sponsor - keine 403", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const problems = [];
   page.on("response", (response) => { if (response.status() === 403) problems.push(`403 ${response.url()}`); });
   const requested = [];
   page.on("request", (request) => requested.push(new URL(request.url()).pathname));
   await mockPackageC(page, { staffel: { status: "live", league_capabilities: ["results"], can_edit_staffel: false, can_manage_participants: false, can_manage_structure: false } });
-  await page.goto("/admin/leagues/staffeln/t1#einstellungen");
+  await page.goto("/admin/leagues/staffeln/t1#links");
   await expect(page.getByTestId("staffel-look-right")).toBeVisible();
   await expect(page.getByTestId("tr-edit-title")).toHaveCount(0);
-  await expect(page.getByTestId("staffel-access-links")).toHaveCount(0);
-  await expect(page.getByTestId("staffel-round-sponsors")).toHaveCount(0);
+  await expect(page.getByTestId("staffel-settings-tab-links")).toHaveCount(0);
+  await page.getByTestId("staffel-settings-tab-werkzeuge").click();
   await expect(page.getByTestId("staffel-tools-delete-right")).toBeVisible();
+  await page.getByTestId("staffel-settings-tab-helfer").click();
   await expect(page.getByTestId("staffel-tv-open")).toBeVisible();
   expect(requested.some((where) => where.startsWith("/api/access-links"))).toBe(false);
   expect(problems).toEqual([]);

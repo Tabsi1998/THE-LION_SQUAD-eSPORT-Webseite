@@ -122,6 +122,18 @@ test("Staffel-Seite (#2262): ohne „Aus der Season“ und ohne „Vorschau neu 
   expect(screen.getByText("Banner der Staffel")).toBeInTheDocument();
 });
 
+test("Staffel: Liga-Wörter statt Turnier-Beispiel und kein Event-Satz - normale Turniere unverändert", async () => {
+  const { unmount } = renderStaffel();
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.getByTestId("tr-edit-format-label")).toHaveAttribute("placeholder", "z. B. Liga · Staffel A");
+  expect(screen.queryByTestId("tr-edit-event")).toBeNull();
+  unmount();
+  render(<MemoryRouter><TournamentEditForm tournament={BASE} onSaved={() => {}} /></MemoryRouter>);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.getByTestId("tr-edit-format-label")).toHaveAttribute("placeholder", "z.B. Gamers Heaven F1 Heat");
+  expect(screen.getByTestId("tr-edit-event")).toHaveTextContent("Gehört zu keinem Event");
+});
+
 test("Staffel nach dem Start: kein Neu-Mischen mehr", async () => {
   renderStaffel({ ...STAFFEL, status: "live" });
   await screen.findByTestId("tr-edit-season-values");

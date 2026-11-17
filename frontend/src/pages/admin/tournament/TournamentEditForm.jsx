@@ -34,7 +34,8 @@ const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archive
 
 // `seasonValues` und `remix` (#2262, Staffel-Seite): Dort steht „Aus der Season“ als eigener Abschnitt (für jede Zuständigkeit lesbar)
 // und „Vorschau neu mischen“ im Reiter Spielplan - das Formular zeigt dann beides nicht noch einmal.
-export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false, seasonValues = true, remix = true }) {
+// `onDirtyChange` (#2262): meldet, ob ungespeicherte Eingaben da sind - die Staffel-Seite übernimmt einen neuen Stand dann nicht still.
+export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false, seasonValues = true, remix = true, onDirtyChange }) {
   const dt = toDateTimeLocalInput;
   // Liga-Staffel (#2109): Season-Werte nur lesend in der Seitenleiste, Liga-fremde Felder fehlen ganz.
   const staffel = isStaffel(tournament);
@@ -307,6 +308,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   const dirtyPayload = buildDirtyPayload(normalizeTournamentPayload(f), normalizeTournamentPayload(formFromTournament()));
   const sendBilling = canFinance && billingDirty;
   const hasFormChanges = hasPayloadChanges(dirtyPayload) || sendBilling;
+  useEffect(() => { onDirtyChange?.(hasFormChanges); }, [hasFormChanges, onDirtyChange]);
   // Staffel (#2109, S15): die Vorschau neu mischen mit der vorhandenen Phase - Struktur und Format gibt die Liga vor.
   // Ohne force (#2120, TA17): im laufenden Turnier fragt der Server mit Zahlen nach, echte Spiele ersetzt eine
   // Vorschau nie.
@@ -403,7 +405,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             {show && <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={f.discord_skip} onChange={(v)=>set("discord_skip",v)} accent="#5865F2" testId="tr-edit-discord-skip" />}
           </FormGrid>
           {/* Event als Klammer (#1371): verbunden wird nur im Event - hier steht nur, wozu das Turnier gehört. */}
-          <EventMembershipLine eventId={f.event_id} events={events} testId="tr-edit-event" />
+          {/* Eine Staffel gehört nie zu einem Event - der Satz „im Event unter Programm“ hätte dort keinen Weg. */}
+          {show || f.event_id ? <EventMembershipLine eventId={f.event_id} events={events} testId="tr-edit-event" /> : null}
         </FormSection>
 
         <FormSection title="Spielweise" hint={staffel
@@ -442,7 +445,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team melden Teamleitung oder Co-Leitung das Team an."}>
           <FormGrid cols={3}>
             {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={tournamentFormatOptions(tournament.format)} disabled={structureFixed} hint={fixedHint || <FormatHint format={f.format} testId="tr-edit-format-hint" />} testId="tr-edit-format" />}
-            <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
+            <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder={staffel ? "z. B. Liga · Staffel A" : "z.B. Gamers Heaven F1 Heat"} testId="tr-edit-format-label"/>
             {show && <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} disabled={structureFixed} testId="tr-edit-team-mode" />}
             {show && f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} disabled={structureFixed} testId="tr-edit-team-size"/>}
             {show && <TextField label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>}

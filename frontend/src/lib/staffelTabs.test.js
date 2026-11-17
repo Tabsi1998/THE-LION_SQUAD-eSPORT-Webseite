@@ -1,6 +1,6 @@
 import {
-  LEGACY_TAB_ANCHORS, STAFFEL_SECTIONS, STAFFEL_TABS, STAFFEL_TABS_READY, legacyTabAnchor, staffelAdminUrl, staffelManageUrl, staffelTabOf,
-  staffelTarget,
+  LEGACY_TAB_ANCHORS, STAFFEL_SECTIONS, STAFFEL_SETTINGS_TABS, STAFFEL_TABS, STAFFEL_TABS_READY, legacyTabAnchor, staffelAdminUrl, staffelManageUrl,
+  staffelSettingsTab, staffelTabOf, staffelTarget,
 } from "./staffelTabs";
 
 // Staffel-Seite (#2262): Jede Marke - Reiter, Abschnitt oder Ziel eines alten Reiters - gehört zu genau einem Reiter.
@@ -74,4 +74,21 @@ test("jedes Ziel führt auf die Staffel-Seite, keins mehr in die Turnierverwaltu
   expect(staffelManageUrl("t-1", "edit", "darstellung")).toBe("/admin/leagues/staffeln/t-1#darstellung");
   expect(staffelManageUrl("t-1", "", "protokoll")).toBe("/admin/leagues/staffeln/t-1#protokoll");
   for (const tab of Object.keys(LEGACY_TAB_ANCHORS)) expect(staffelManageUrl("t-1", tab)).not.toContain("/admin/tournaments");
+});
+
+test("Unterreiter der Einstellungen: jede Marke genau einmal, jede öffnet ihren Unterreiter", () => {
+  const keys = STAFFEL_SETTINGS_TABS.map((tab) => tab.key);
+  expect(keys).toEqual(["darstellung", "vorgaben", "links", "helfer", "werkzeuge"]);
+  expect(new Set(keys).size).toBe(keys.length);
+  // Jeder Unterreiter ist ein Abschnitt der Einstellungen, und jeder Abschnitt der Einstellungen ist genau ein Unterreiter.
+  for (const key of keys) {
+    expect(STAFFEL_SECTIONS[key]).toBe("einstellungen");
+    expect(staffelTarget(`#${key}`)).toEqual({ tab: "einstellungen", section: key });
+    expect(staffelSettingsTab(key)).toBe(key);
+  }
+  const settingsSections = Object.keys(STAFFEL_SECTIONS).filter((key) => STAFFEL_SECTIONS[key] === "einstellungen");
+  expect(settingsSections.sort()).toEqual([...keys].sort());
+  expect(staffelSettingsTab("")).toBe("darstellung");
+  expect(staffelSettingsTab("gibtsnicht")).toBe("darstellung");
+  expect(staffelManageUrl("t-1", "staff")).toBe("/admin/leagues/staffeln/t-1#helfer");
 });

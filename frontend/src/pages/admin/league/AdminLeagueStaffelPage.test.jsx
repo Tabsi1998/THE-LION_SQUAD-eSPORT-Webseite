@@ -14,7 +14,9 @@ vi.mock("@/lib/api", () => ({
   formatRequestError: (_error, fallback) => fallback,
   resolveMediaUrl: (value) => value || "",
 }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+// Wer sich wie oft nachladen lässt (Ressourcen und Entprellung) - der Leitstand im Überblick höchstens alle 5 s.
+const invalidations = vi.hoisted(() => []);
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (_callback, resources, options) => { invalidations.push({ resources, options }); } }));
 // Das Formular der Darstellung fragt nach dem Bereich Finanzen (Abrechnung) - hier nie.
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: () => false }) }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div data-testid="admin-layout">{children}</div> }));
@@ -308,8 +310,11 @@ test("das Wort „Entwurf“ kommt auf der Staffel-Seite nirgends vor", async ()
     await screen.findByTestId("staffel-teams-count");
     expect(container.textContent).not.toMatch(/Entwurf/);
     await user.click(screen.getByTestId("staffel-tab-einstellungen"));
-    await screen.findByTestId("staffel-tools");
-    expect(container.textContent).not.toMatch(/Entwurf/);
+    const subTabs = within(await screen.findByTestId("staffel-settings-tabs")).getAllByRole("tab");
+    for (const tab of subTabs) {
+      await user.click(tab);
+      expect(container.textContent).not.toMatch(/Entwurf/);
+    }
     unmount();
   }
 });
@@ -446,61 +451,117 @@ test("Protokoll: das Protokoll der Season, gefiltert auf diese Staffel", async (
   expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/desk/log", { params: { page: 1, staffel: "t1" } });
 });
 
-test("Einstellungen mit „Liga verwalten“: Darstellung, Aus der Season, Map-Pool, Zugangslinks, Sponsor, TV, Helfer, Werkzeuge", async () => {
+test("Einstellungen in Unterreitern: Auftritt, Aus der Season, Links und Sponsor, TV und Helfer, Werkzeuge - je eins zur Zeit", async () => {
+  const user = userEvent.setup();
   serveC({ staff: [{ id: "h1", role: "referee", scope: "tournament", user: { display_name: "Alte Helferin" } }] });
   renderPage("#einstellungen");
-  expect(await screen.findByTestId("staffel-look")).toBeInTheDocument();
-  expect(screen.getByTestId("tr-edit-title")).toBeInTheDocument();
-  // „Aus der Season“ steht einmal - als eigener Abschnitt, nicht noch einmal im Formular; kein „Vorschau neu mischen“ (das ist im Spielplan).
-  expect(screen.getAllByTestId("tr-edit-season-values")).toHaveLength(1);
+  const tabs = within(await screen.findByTestId("staffel-settings-tabs")).getAllByRole("tab").map((tab) => tab.textContent);
+  expect(tabs).toEqual(["Auftritt", "Aus der Season", "Links und Sponsor", "TV und Helfer", "Werkzeuge"]);
+  // Auftritt: nur das Formular - „Aus der Season“ und „Vorschau neu mischen“ nicht noch einmal, genau ein Speichern-Weg.
+  expect(await screen.findByTestId("tr-edit-title")).toBeInTheDocument();
+  expect(screen.queryByTestId("tr-edit-season-values")).toBeNull();
   expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Speichern/ })).toHaveLength(1);
+  expect(screen.queryByTestId("tr-edit-event")).toBeNull();
+  expect(screen.getByTestId("tr-edit-format-label")).toHaveAttribute("placeholder", "z. B. Liga · Staffel A");
+  expect(requested()).not.toContain("/tournaments/t1/staff");
+
+  await user.click(screen.getByTestId("staffel-settings-tab-vorgaben"));
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/staffeln/t1#vorgaben");
+  expect(screen.getAllByTestId("tr-edit-season-values")).toHaveLength(1);
   expect(await screen.findByTestId("staffel-map-pool-empty")).toBeInTheDocument();
   expect(screen.getByTestId("staffel-map-pool-season")).toHaveAttribute("href", "/admin/leagues/seasons/s1#modi");
-  expect(screen.getByTestId("staffel-access-links")).toBeInTheDocument();
+  expect(screen.queryByTestId("tr-edit-title")).toBeNull();
+
+  await user.click(screen.getByTestId("staffel-settings-tab-links"));
+  expect(await screen.findByTestId("access-links-bare")).toBeInTheDocument();
+  // Keine Karte in der Karte und keine zweite Überschrift „Speziallinks“.
+  expect(screen.queryByText("Speziallinks")).toBeNull();
+  expect(screen.getByTestId("staffel-access-links")).toHaveTextContent("Gezielt Zugriff auf die Staffel geben, solange sie nicht öffentlich ist.");
   expect(screen.getByTestId("staffel-round-sponsors-later")).toBeInTheDocument();
+
+  await user.click(screen.getByTestId("staffel-settings-tab-helfer"));
   expect(screen.getByTestId("staffel-tv-open")).toHaveAttribute("href", "/display/bracket/t1");
   expect(await screen.findByTestId("staffel-helper-h1")).toHaveTextContent("Alte Helferin");
   expect(screen.getByTestId("staffel-helpers-note")).toHaveTextContent("nur zum Nachlesen");
-  expect(screen.queryByRole("button", { name: /Helfer hinzufügen|Zuweisen/ })).toBeNull();
-  // Vor dem Start: Löschen mit „Season konfigurieren“, Sperren erst nach dem Ende.
+
+  await user.click(screen.getByTestId("staffel-settings-tab-werkzeuge"));
   expect(screen.getByTestId("staffel-delete")).toBeInTheDocument();
   expect(screen.getByTestId("staffel-tools-lock-later")).toBeInTheDocument();
-  expect(requested()).toContain("/access-links");
 });
 
-test("Sprungmarken #darstellung und #helfer öffnen die Einstellungen", async () => {
+test("Sprungmarken der Einstellungen öffnen ihren Unterreiter, eine unbekannte den ersten", async () => {
   serveC();
-  const { unmount } = renderPage("#darstellung");
-  expect(await screen.findByTestId("staffel-panel-einstellungen")).toBeInTheDocument();
-  expect(screen.getByTestId("staffel-tab-einstellungen")).toHaveAttribute("aria-selected", "true");
-  unmount();
-  renderPage("#helfer");
-  expect(await screen.findByTestId("staffel-helpers")).toBeInTheDocument();
+  for (const [hash, tab, testId] of [["#darstellung", "darstellung", "tr-edit-title"], ["#vorgaben", "vorgaben", "tr-edit-season-values"],
+    ["#links", "links", "staffel-access-links"], ["#helfer", "helfer", "staffel-helpers"], ["#werkzeuge", "werkzeuge", "staffel-tools"],
+    ["#einstellungen", "darstellung", "tr-edit-title"]]) {
+    const { unmount } = renderPage(hash);
+    expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    expect(screen.getByTestId("staffel-tab-einstellungen")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId(`staffel-settings-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
+    unmount();
+  }
 });
 
-test("Einstellungen nur lesend: ohne „Liga verwalten“ kein Formular, keine Zugangslinks, kein Sponsor - und keine Abrufe dafür", async () => {
+test("Sponsor je Spielwoche bleibt zu, solange nur Vorschau-Spiele da sind", async () => {
+  const preview = [1, 2].map((week) => ({ id: `p${week}`, stage_id: "st1", round: week, matchday_number: week, status: "scheduled", is_preview: true,
+    slots: [{ registration_id: "r1" }, { registration_id: "r2" }] }));
+  serveC({ matches: preview });
+  renderPage("#links");
+  expect(await screen.findByTestId("staffel-round-sponsors-later")).toBeInTheDocument();
+  expect(screen.queryByTestId("admin-tr-round-sponsors")).toBeNull();
+  expect(requested().some((url) => url.startsWith("/sponsors"))).toBe(false);
+});
+
+test("Einstellungen nur lesend: ohne „Liga verwalten“ kein Formular, kein Unterreiter Links und Sponsor - und keine Abrufe dafür", async () => {
+  const user = userEvent.setup();
   serveC({ tournament: { status: "live", can_edit_staffel: false, league_capabilities: ["results"] } });
-  renderPage("#einstellungen");
+  renderPage("#links");
   expect(await screen.findByTestId("staffel-look-right")).toHaveTextContent("„Liga verwalten“");
+  expect(screen.queryByTestId("staffel-settings-tab-links")).toBeNull();
   expect(screen.queryByTestId("tr-edit-title")).toBeNull();
-  expect(screen.queryByTestId("staffel-access-links")).toBeNull();
-  expect(screen.queryByTestId("staffel-round-sponsors")).toBeNull();
+  await user.click(screen.getByTestId("staffel-settings-tab-vorgaben"));
   expect(screen.getByTestId("tr-edit-season-values")).toBeInTheDocument();
+  await user.click(screen.getByTestId("staffel-settings-tab-helfer"));
   expect(screen.getByTestId("staffel-tv-open")).toBeInTheDocument();
   expect(await screen.findByTestId("staffel-helpers-none")).toBeInTheDocument();
+  await user.click(screen.getByTestId("staffel-settings-tab-werkzeuge"));
   expect(screen.getByTestId("staffel-tools-lock-right")).toBeInTheDocument();
   expect(screen.getByTestId("staffel-tools-delete-right")).toBeInTheDocument();
   expect(screen.queryByTestId("staffel-lock")).toBeNull();
   expect(screen.queryByTestId("staffel-delete")).toBeNull();
-  await waitFor(() => expect(requested()).toContain("/tournaments/t1/staff"));
   expect(requested()).not.toContain("/access-links");
   expect(requested().some((url) => url.startsWith("/sponsors"))).toBe(false);
+});
+
+test("Auftritt: ein neuer Stand nimmt ungespeicherte Eingaben nicht weg - Hinweis und Übernehmen nur auf Wunsch; ohne Eingaben still", async () => {
+  const user = userEvent.setup();
+  serveC();
+  const { StaffelSettingsTab } = await import("./staffel/StaffelSettingsTab");
+  const base = { ...STAFFEL, updated_at: "2026-11-16T10:00:00Z" };
+  const view = (tournament) => (
+    <ConfirmDialogProvider><MemoryRouter><StaffelSettingsTab tournament={tournament} section="darstellung" onSection={() => {}} /></MemoryRouter></ConfirmDialogProvider>
+  );
+  const { rerender } = render(view(base));
+  const title = await screen.findByTestId("tr-edit-title");
+  await user.clear(title);
+  await user.type(title, "Mein neuer Titel");
+  rerender(view({ ...base, title: "Fremd geändert", updated_at: "2026-11-16T10:05:00Z" }));
+  expect(await screen.findByTestId("staffel-look-stale")).toHaveTextContent("zwischendurch geändert");
+  expect(screen.getByTestId("tr-edit-title")).toHaveValue("Mein neuer Titel");
+  await user.click(screen.getByTestId("staffel-look-reload"));
+  await waitFor(() => expect(screen.getByTestId("tr-edit-title")).toHaveValue("Fremd geändert"));
+  expect(screen.queryByTestId("staffel-look-stale")).toBeNull();
+  // Ohne eigene Eingaben kommt der neue Stand still.
+  rerender(view({ ...base, title: "Noch einmal neu", updated_at: "2026-11-16T10:10:00Z" }));
+  await waitFor(() => expect(screen.getByTestId("tr-edit-title")).toHaveValue("Noch einmal neu"));
+  expect(screen.queryByTestId("staffel-look-stale")).toBeNull();
 });
 
 test("Werkzeuge: Sperren nach dem Ende mit Rückfrage in Liga-Wörtern, Löschen nach dem Start nicht mehr", async () => {
   const user = userEvent.setup();
   serveC({ tournament: { status: "completed" } });
-  renderPage("#einstellungen");
+  renderPage("#werkzeuge");
   await user.click(await screen.findByTestId("staffel-lock"));
   const dialog = await screen.findByTestId("confirm-dialog");
   expect(dialog).toHaveTextContent("Staffel sperren?");
@@ -513,7 +574,7 @@ test("Werkzeuge: Sperren nach dem Ende mit Rückfrage in Liga-Wörtern, Löschen
 test("Werkzeuge: Löschen vor dem Start mit Grund, danach zurück zu den Staffeln der Season", async () => {
   const user = userEvent.setup();
   serveC();
-  renderPage("#einstellungen");
+  renderPage("#werkzeuge");
   await user.click(await screen.findByTestId("staffel-delete"));
   expect(await screen.findByTestId("league-delete-sheet")).toBeInTheDocument();
 });
@@ -530,4 +591,12 @@ test("Rückmeldungen der Teams nach dem Ende im Überblick - nur mit „Liga ver
   await screen.findByTestId("staffel-desk-count");
   expect(screen.queryByTestId("staffel-feedback")).toBeNull();
   expect(requested().some((url) => url.startsWith("/admin/feedback/"))).toBe(false);
+});
+
+test("Überblick: der Leitstand wird höchstens alle 5 s nachgezählt, nicht bei jeder Meldung", async () => {
+  serveC();
+  invalidations.length = 0;
+  renderPage();
+  await screen.findByTestId("staffel-desk-count");
+  expect(invalidations.some((row) => row.options?.debounceMs === 5000 && row.resources?.includes("matches"))).toBe(true);
 });

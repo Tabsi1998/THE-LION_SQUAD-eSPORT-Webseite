@@ -35,3 +35,11 @@ test("Person über die Suche binden: der Link geht mit der Kennung, ohne Adresse
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/access-links", expect.objectContaining({ user_id: "u-3", email: null })));
   expect(apiMock.get.mock.calls.map(([url]) => url)).not.toContain("/users");
 });
+
+test("Satz unter der Überschrift in richtigem Deutsch (#2262) - je Ziel", async () => {
+  const { accessLinksHint } = await import("./AccessLinksPanel");
+  expect(accessLinksHint("tournament")).toBe("Gezielt Zugriff auf ein gesperrtes oder internes Turnier geben.");
+  expect(accessLinksHint("event")).toBe("Gezielt Zugriff auf ein gesperrtes oder internes Event geben.");
+  expect(accessLinksHint("fastlap")).toBe("Gezielt Zugriff auf eine gesperrte oder interne Fast-Lap geben.");
+  expect(accessLinksHint("staffel")).toBe("Gezielt Zugriff auf die Staffel geben, solange sie nicht öffentlich ist.");
+});

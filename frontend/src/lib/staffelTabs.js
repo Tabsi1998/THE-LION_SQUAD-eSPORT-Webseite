@@ -26,8 +26,27 @@ export const STAFFEL_SECTIONS = {
   ergebnisse: "spiele",
   gleichstand: "tabelle",
   darstellung: "einstellungen",
+  vorgaben: "einstellungen",
+  links: "einstellungen",
   helfer: "einstellungen",
+  werkzeuge: "einstellungen",
 };
+
+// Unterreiter der Einstellungen (Fix-Runde Paket C, #2249/#2267: Reiter statt langer Seiten). Jeder ist zugleich eine Sprungmarke
+// (`#vorgaben` öffnet „Aus der Season“), `manage`: nur mit „Liga verwalten“ zu sehen, sonst öffnet die Marke den ersten.
+export const STAFFEL_SETTINGS_TABS = [
+  { key: "darstellung", label: "Auftritt" },
+  { key: "vorgaben", label: "Aus der Season" },
+  { key: "links", label: "Links und Sponsor", manage: true },
+  { key: "helfer", label: "TV und Helfer" },
+  { key: "werkzeuge", label: "Werkzeuge" },
+];
+
+/** Der Unterreiter der Einstellungen zu einer Marke - leer oder unbekannt: der erste. */
+export function staffelSettingsTab(section) {
+  const key = String(section || "").replace(/^#/, "").trim().toLowerCase();
+  return STAFFEL_SETTINGS_TABS.some((tab) => tab.key === key) ? key : STAFFEL_SETTINGS_TABS[0].key;
+}
 
 // Die Reiter der Turnierverwaltung (`/admin/tournaments/<id>?tab=…`) und wohin sie auf der Staffel-Seite führen - für die
 // Weiterleitung alter Adressen (Paket D). Unbekannt oder leer: Überblick.
