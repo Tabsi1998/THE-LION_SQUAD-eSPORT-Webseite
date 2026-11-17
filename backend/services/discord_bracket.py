@@ -49,6 +49,29 @@ FIELD_LIMIT = 1000
 TOTAL_LIMIT = 5500
 TOP_TABLE = 8
 FINAL_STATUSES = {"completed", "results_published", "archived"}
+# Nachziehen eines Endstands (#2494): So viele Läufe des Minuten-Jobs bekommt ein vorübergehender Fehler, dann ist Schluss.
+REVISE_ATTEMPTS = 3
+TRANSIENT_REASONS = ("bot_offline", "error")
+
+
+def _http_status(result: dict) -> int | None:
+    """Der HTTP-Status einer Discord-Antwort - aus ``status`` oder dem Text „Discord 503: …“."""
+    if isinstance(result.get("status"), int):
+        return result["status"]
+    for token in str(result.get("error") or "").replace(":", " ").split():
+        if len(token) == 3 and token.isdigit():
+            return int(token)
+    return None
+
+
+def transient(result: dict) -> bool:
+    """Kommt der Fehler beim nächsten Mal vielleicht nicht mehr (#2494)? Bot offline, Zeitüberschreitung, Discord 5xx oder 429 -
+    ja. Nachricht, Kanal oder Rechte weg, jeder andere HTTP-Fehler - nein, der bleibt."""
+    reason = result.get("reason")
+    if reason in TRANSIENT_REASONS:
+        return True
+    status = _http_status(result) if reason == "http" else None
+    return status is not None and (status >= 500 or status == 429)
 
 
 def match_line(match: dict, names: dict[str, str]) -> str:
@@ -328,8 +351,10 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
                                                      current=current)
     if any(result.get("reason") == "throttled" for result in results.values()):
         _dirty[tournament_id] = bool(_dirty.get(tournament_id)) or bool(final)
-    elif all(result.get("ok") or result.get("reason") in ("final",) or result.get("revising") for result in results.values()):
-        # Ein gescheitertes Nachziehen eines Endstands ist notiert und wird nicht jede Minute wiederholt (#2375).
+    elif all(result.get("ok") or result.get("reason") in ("final",) or (result.get("revising") and not result.get("retry"))
+             for result in results.values()):
+        # Ein gescheitertes Nachziehen eines Endstands ist notiert und wird nicht jede Minute wiederholt (#2375) - ein
+        # vorübergehender Fehler (``retry``) bleibt vorgemerkt, bis seine Versuche aufgebraucht sind (#2494).
         forget(tournament_id, since=started)
     return {**first, "lanes": results}
 
@@ -393,7 +418,8 @@ async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: boo
                  "error": None, "final": bool(final), "last_action": action}
         if action == "posted":
             patch["posted_at"] = stamp
-        updates = {field: {**state, **patch}}
+        # Geklappt: der Zähler der Fehlversuche beim Nachziehen (#2494) fällt weg.
+        updates = {field: {key: value for key, value in {**state, **patch}.items() if key != "revise_failures"}}
         if in_thread and action == "posted":
             updates[f"{lane['thread_field']}.last_message_id"] = patch["message_id"]
             updates[f"{lane['thread_field']}.last_message_at"] = stamp
@@ -402,9 +428,14 @@ async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: boo
                 "moved": bool(replaced)}
     error = result.get("error") or REASON_TEXTS.get(result.get("reason") or "", "") or str(result.get("reason") or "error")
     if revising_final:
-        # Nachziehen gescheitert (#2375): einmal notieren, der Endstand mit Nachricht bleibt - kein Neu-Post, keine Wiederholung.
+        # Nachziehen gescheitert (#2375): Der Endstand mit Nachricht bleibt - kein Neu-Post, kein Rückfall. Ein vorübergehender
+        # Fehler (#2494) bleibt vorgemerkt, bis ``REVISE_ATTEMPTS`` Läufe gescheitert sind; ein bleibender wird einmal notiert.
+        failures = _safe_int(state.get("revise_failures"), 0) + 1
+        if transient(result) and failures < REVISE_ATTEMPTS:
+            await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{field}.error": error, f"{field}.revise_failures": failures}})
+            return {"ok": False, "reason": result.get("reason") or "error", "error": error, "revising": True, "retry": True}
         logger.info("[discord-bracket] %s: Endstand nicht nachgezogen (%s)", log_safe(tournament_id), log_safe(result.get("reason")))
-        await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{field}.error": error}})
+        await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{field}.error": error}, "$unset": {f"{field}.revise_failures": ""}})
         return {"ok": False, "reason": result.get("reason") or "error", "error": error, "revising": True}
     if result.get("reason") == "unknown_channel" and state.get("channel_id"):
         # Kanal oder Thread gelöscht: beim nächsten Mal neu - im heutigen Thread oder Kanal.

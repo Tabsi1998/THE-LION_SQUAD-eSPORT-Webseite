@@ -166,10 +166,11 @@ async def _finish_reset_side_effects(db, match: dict, reset_docs: list[dict], no
 
 
 async def _finish_result_side_effects(db, match: dict, force: bool, dispute_resolved: bool = False) -> None:
-    # Bracket im Discord (#571): jedes bestätigte Ergebnis merkt das Turnier für die nächste Bearbeitung vor.
+    # Bracket im Discord (#571): jedes bestätigte Ergebnis merkt das Turnier für die nächste Bearbeitung vor. ``revise`` (#2494):
+    # Eine Korrektur nach dem Ende zieht auch einen stehenden Endstand nach - im laufenden Turnier ändert das nichts.
     try:
-        from services.discord_bracket import request_refresh
-        request_refresh(str(match.get("tournament_id") or ""))
+        from services import discord_bracket_state
+        discord_bracket_state.request_refresh(str(match.get("tournament_id") or ""), revise=True)
     except Exception:  # noqa: BLE001
         logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", match.get("tournament_id"), exc_info=True)
     try:

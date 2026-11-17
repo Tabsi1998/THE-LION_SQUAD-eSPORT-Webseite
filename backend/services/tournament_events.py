@@ -712,8 +712,10 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
         logger.warning("Fee close failed for registration=%s type=%s", registration.get("id"), type(exc).__name__)
     await persist_competition_versions(db, tournament, "graph")
     try:
-        from services.discord_bracket import request_refresh
-        request_refresh(tid)
+        # ``revise`` (#2494): Eine Disqualifikation nach dem Ende (etwa Betrug nachträglich bewiesen) wertet Spiele kampflos und
+        # ändert das Podium - der stehende Endstand zieht nach. Im laufenden Turnier ändert das nichts.
+        from services import discord_bracket_state
+        discord_bracket_state.request_refresh(tid, revise=True)
     except Exception:  # noqa: BLE001
         logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", tid, exc_info=True)
     await publish_tournament_event(tid, DISPLAY_EVENTS[kind], match_ids=[m["id"] for m in changed],
