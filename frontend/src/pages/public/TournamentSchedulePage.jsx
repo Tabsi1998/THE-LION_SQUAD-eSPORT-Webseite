@@ -444,7 +444,7 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
                       </span>
                     )}
                     <span className="flex min-w-0 items-center gap-2 text-[11px] text-white/45">
-                      {entry.mine ? <span className="tls-you-tag" data-testid={`schedule-line-you-${entry.match.id}`}>Du</span> : null}
+                      {entry.mine ? <span className="tls-you-tag" data-testid={`schedule-you-${entry.match.id}`}>Du</span> : null}
                       <span className="truncate">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
                     </span>
                   </span>
