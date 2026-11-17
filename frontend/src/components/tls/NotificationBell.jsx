@@ -43,20 +43,24 @@ function handleCrownNotifications(rows, userId) {
   }
   const fresh = crownRows.filter((item) => CELEBRATED_KINDS.has(item.kind) && item.id && !seen.includes(item.id));
   refreshCrowns().then((crowns) => {
-    if (!fresh.length) return;
-    const raw = userId ? (crowns || {})[userId] : null;
+    // Netzfehler (#2501): weder feiern noch merken - beim nächsten Laden wird die Meldung wieder geprüft.
+    if (!fresh.length || !crowns) return;
+    const raw = userId ? crowns[userId] : null;
     // Ältere Antworten nennen Onyx noch „obsidian“ (#1458).
     const current = raw === "obsidian" ? "onyx" : raw;
     // Nur die neueste frische Meldung feiern (#2501): Die Feier zeigt das zuletzt gemeldete Ereignis - feuerte die Glocke
-    // für jede, stünde am Ende die älteste Krone da. Alle gelten danach als gesehen.
+    // für jede, stünde am Ende die älteste Krone da. Die älteren gelten als gesehen.
     const newest = [...fresh].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
-    fresh.forEach((item) => seen.push(item.id));
+    fresh.forEach((item) => { if (item !== newest) seen.push(item.id); });
     const variant = celebratedVariant(newest, current);
     if (variant) {
+      seen.push(newest.id);
       window.dispatchEvent(new CustomEvent("tls-crown-celebration", {
         detail: { id: newest.id, kind: newest.kind, variant, prev: newest.meta?.prev || null, title: newest.title, body: newest.body },
       }));
     }
+    // Passt die neueste nicht zur heutigen Krone, bleibt sie ungemerkt: Der Kronen-Abruf kann dem Live-Hinweis einen
+    // Moment hinterherhinken - beim nächsten Laden wird sie wieder geprüft.
     try {
       localStorage.setItem("tls-crowns-celebrated", JSON.stringify(seen.slice(-50)));
     } catch {
