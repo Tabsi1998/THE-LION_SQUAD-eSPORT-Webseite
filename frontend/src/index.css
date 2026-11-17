@@ -1417,8 +1417,10 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   }
 }
 
-/* focus ring */
-:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--tls-cyan); }
+/* focus ring - Knöpfe und Karten tragen statt des Rings die Ecken-Klammern (#1316, unten bei .tls-btn und .tls-card).
+   Der durchsichtige Rahmen bleibt überall: Im Kontrast-Modus von Windows (forced-colors) fällt der Schatten weg, der
+   Rahmen bekommt dort die Systemfarbe - sonst wäre der Fokus weg. */
+:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 2px var(--tls-cyan); }
 
 .input {
   width: 100%;
@@ -2338,6 +2340,18 @@ html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
 .tls-card:focus-visible {
   transform: translateY(calc(-5px * var(--tls-motion-on)));
 }
+/* Fokus mit der Tastatur (#1316): die Ecken-Klammern 5 px außerhalb der Karte (styles/system.css, --tls-corners). Eine
+   Karte, die ihr Bild abschneidet (overflow-hidden), schneidet beim Fokus erst 6 px außerhalb ab - sonst wären die
+   Winkel weg. Browser ohne overflow-clip-margin zeigen den Fokus dann über Rand und Anheben. */
+.tls-card:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tls-corner-out));
+  z-index: 1;
+  pointer-events: none;
+  background: var(--tls-corners);
+}
+.tls-card.overflow-hidden:focus-visible { overflow: clip; overflow-clip-margin: calc(var(--tls-corner-out) + 1px); }
 .tls-card:not(.tls-card--own):focus-visible {
   border-color: rgba(var(--tls-card-accent), 0.55);
   box-shadow: 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
@@ -3031,9 +3045,21 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   background-repeat: no-repeat;
   background-position: 150% 0;
 }
+/* Fokus mit der Tastatur (#1316): die Ecken-Klammern 5 px außerhalb des Knopfs (styles/system.css, --tls-corners)
+   statt eines weißen Rahmens; kein Ring dazu. Der Rahmen bleibt durchsichtig da - im Kontrast-Modus von Windows wird
+   er in der Systemfarbe sichtbar, Verläufe und Schatten fallen dort weg. */
 .tls-btn:focus-visible {
-  outline: 2px solid #FFFFFF;
+  outline: 2px solid transparent;
   outline-offset: 2px;
+  box-shadow: none;
+}
+.tls-btn:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tls-corner-out));
+  z-index: 1;
+  pointer-events: none;
+  background: var(--tls-corners);
 }
 .tls-btn--secondary {
   background-color: transparent;
