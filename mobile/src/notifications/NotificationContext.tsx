@@ -27,7 +27,9 @@ import {
   addPushNotificationResponseListener,
   configurePushNotifications,
   consumeInitialPushNotification,
+  getPushPermission,
   isContentHiddenPush,
+  onPushPermissionChange,
   registerPushToken,
   setBadgeCount,
   setForegroundPushHidden,
@@ -95,6 +97,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const ensurePushRegistered = useCallback(async () => {
     if (!registration || registeredAs.current === registration) return;
+    // Ohne Erlaubnis meldet sich das Gerät nicht an - und fragt hier auch nicht (#1208): gefragt wird erst nach einer
+    // Turnier- oder Event-Anmeldung (PushPromptHost). Erlaubt die Person es später, meldet onPushPermissionChange bzw.
+    // die Rückkehr in die App das Gerät an.
+    const permission = await getPushPermission().catch(() => null);
+    if (permission?.status === "denied" || permission?.status === "undetermined") return;
+    if (registrationRef.current !== registration) return;
     const result = await registerPushToken({ private: privatePush }).catch(() => null);
     if (registrationRef.current !== registration) return;
     if (!result) {
@@ -117,6 +125,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => () => {
     if (retryTimer.current) clearTimeout(retryTimer.current);
   }, []);
+
+  // Gerade erlaubt (#1208, „Ja, rufen“ oder „einschalten“): das Gerät gleich anmelden, nicht erst beim nächsten Öffnen.
+  useEffect(() => onPushPermissionChange((permission) => {
+    if (permission.status === "granted") void ensureRef.current();
+  }), []);
 
   // Kontowechsel (#1053): auch die Merker des vorigen Kontos gehen - bekannte Hinweise und ein wartender Push.
   const resetFor = useRef(userId);

@@ -6,6 +6,7 @@ import { Body, Heading, Muted } from "./Text";
 import { useAuth } from "../auth/AuthContext";
 import { createPasskey, listPasskeys, passkeyCreateError, passkeysSupported, silentPasskeyMiss } from "../lib/passkeys";
 import { colors, radius } from "../theme";
+import { useModalGate } from "../lib/modalGate";
 
 // Passkey-Einladung (#919): direkt nach einer Anmeldung mit Passwort - hat das Konto noch keinen Passkey und kann das Gerät
 // welche, lädt die App einmal ein. Hat das Konto schon welche anderswo (etwa am PC mit Windows Hello), aber dieses Handy
@@ -69,6 +70,9 @@ export function PasskeyInvite() {
       setBusy(false);
     }
   };
+
+  // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
+  useModalGate("passkey-invite", visible);
 
   if (!visible) return null;
   return (

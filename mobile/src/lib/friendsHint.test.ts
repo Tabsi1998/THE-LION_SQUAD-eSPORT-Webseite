@@ -1,5 +1,5 @@
 import { Alert } from "react-native";
-import { FRIENDS_HINT_TEXT, offerFriendsHint } from "./friendsHint";
+import { FRIENDS_HINT_TEXT, offerFriendsHint, whenFriendsHintClosed } from "./friendsHint";
 
 // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2): nur wenn der Server ihn fällig meldet, dann
 // mit „Verstanden“ und „Ausschalten“; ein Fehler beim Fragen zeigt nichts.
@@ -44,4 +44,19 @@ test("fällig: der Hinweis mit „Ausschalten“ und „Verstanden“", async ()
   buttons[1].onPress?.();
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(mockPost).toHaveBeenLastCalledWith("/users/me/friends-hint", { turn_off: false });
+});
+
+test("die Frage nach Benachrichtigungen (#1208) wartet, bis der Hinweis beantwortet ist", async () => {
+  let done = false;
+  await whenFriendsHintClosed();
+  mockGet.mockResolvedValue({ data: { due: true, sharing: true } });
+  mockPost.mockResolvedValue({ data: {} });
+  await offerFriendsHint();
+  void whenFriendsHintClosed().then(() => { done = true; });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(done).toBe(false);
+  const [, , buttons] = alertSpy.mock.calls[0] as [string, string, AlertButton[]];
+  buttons[1].onPress?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(done).toBe(true);
 });

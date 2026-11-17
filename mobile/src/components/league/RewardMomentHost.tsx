@@ -11,6 +11,7 @@ import { Button } from "../Button";
 import { Glow, StaggerIn, useReduceMotion } from "../motion";
 import { Body, Muted } from "../Text";
 import { RewardArt } from "./RewardArt";
+import { useModalGate } from "../../lib/modalGate";
 
 // Zeremonie bei neuer Belohnung (#2173, Web: components/tls/rewards/RewardWatcher.jsx und RewardMoment.jsx, docs/LIGA.md F.4, Nr. 165):
 // Nach dem Anmelden fragt die App einmal, welche Belohnungen noch nicht gefeiert wurden, und zeigt je Staffel ein Paket - nie zugleich
@@ -104,6 +105,9 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
     api.post("/me/rewards/seen", { ids: current.map((award) => award.id) }).catch(() => {});
     setPackages((rest) => rest.slice(1));
   }, [current]);
+
+  // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
+  useModalGate("reward-moment", Boolean(current && !busy));
 
   if (!current || busy) return null;
   return (

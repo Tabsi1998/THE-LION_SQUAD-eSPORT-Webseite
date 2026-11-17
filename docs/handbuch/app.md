@@ -65,7 +65,7 @@ Die technische Seite (Bauen, Signieren, Hochladen in die Play Console) steht in 
    dem **MFA- oder Wiederherstellungscode**.
 4. Nach der Anmeldung mit Passwort bietet die App einmal einen **Passkey** an. Er lässt sich später im Profil unter **Zahnrad → Sicherheit** anlegen und entfernen.
 5. **Angemeldet bleiben** (Standard) hält die Sitzung; jedes Gerät hat seine eigene.
-6. Push: Die App fragt einmal nach der Erlaubnis für Benachrichtigungen. Ohne Erlaubnis kommen keine Pushes (3.4).
+6. Push: Nach dem Anmelden fragt die App **nicht** nach Benachrichtigungen. Das kommt erst nach der ersten Turnier- oder Event-Anmeldung (3.4).
 
 ### 2.3 Updates im Admin vorbereiten
 
@@ -170,6 +170,20 @@ Was mit eingeschalteter Sperre zusätzlich gilt (Stand #1461, kommt mit dem näc
 
 Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die Person eingestellt hat (E-Mail, Push, In-App, Discord). Im Detail:
 
+- **Wann die App nach der Erlaubnis fragt:** nicht beim Anmelden oder Registrieren, sondern direkt nach der ersten Anmeldung zu einem Turnier oder Event
+  (auch über „Spielst du auch mit?“). Zuerst kommt ein Blatt von unten: **„Sollen wir dich rufen, wenn du dran bist?“** mit drei Zeilen – Aufruf, Check-in,
+  Ergebnis. Erst bei **Ja, rufen** fragt Android. **Später** schließt das Blatt; die App fragt dann frühestens bei der nächsten Anmeldung wieder.
+  Wer im Team ist und dessen Team angemeldet wurde, sieht die Frage beim nächsten Öffnen der Startseite; über der Frage steht dann
+  **„Dein Team ist angemeldet“** statt „Nach deiner Anmeldung“. Gemerkt wird das nur auf dem Handy, nicht am Server; Abmelden setzt die
+  gemerkten Anmeldungen zurück, damit nach dem nächsten Anmelden nicht sofort gefragt wird. Steht gerade ein anderes Fenster offen
+  (Abstimmung, Belohnung, Erfolg, Passkey, „Spielst du auch mit?“), wartet die Frage, bis es zu ist.
+- **Abgelehnt:** Wer Nein gesagt hat oder wem Android die Erlaubnis verweigert, sieht auf Turnier- und Event-Seiten und unter **Zahnrad → Benachrichtigungen**
+  die leise Zeile **„Aufrufe sind aus – einschalten“**. Ein Tipp fragt Android noch einmal, solange Android das zulässt, sonst öffnen sich die
+  Systemeinstellungen der App. Einen Dialog bei jedem Öffnen gibt es nicht. Wer schon erlaubt hat, merkt von alldem nichts.
+  Wer mit einer älteren LionsAPP angemeldet war, wurde damals schon beim Anmelden gefragt: Nach dem Update kommt bei ihm ohne Erlaubnis
+  nur die leise Zeile, keine neue Erklärung.
+- **Kanäle vor der Frage:** Die App legt ihre Android-Kanäle an, bevor Android fragt. Ohne Kanal zeigt Android 13 und neuer die Frage gar nicht.
+
 - **Themen und Kanäle einstellen:** in der App **Profil → Zahnrad → Benachrichtigungen**, auf der Website
   **Benutzermenü → Einstellungen → Benachrichtigungen einstellen**. Die Einstellungen sind für Web und App dieselben, mit denselben Wörtern (ab LionsAPP 1.7.13):
   - **Stufe:** Alles, Wichtiges oder Wenig. Eine Stufe stellt alle Themen auf einmal; wer danach ein Thema selbst stellt, sieht „Eigene Auswahl“.
@@ -239,7 +253,8 @@ des Bereichs LionsAPP stehen in `mobile/src/faq/appFragen.ts`.
 | Neues GitHub-Release fehlt in der Liste | Kein Token, Abgleich aus, oder Beta ohne den Haken | Token und Repository eintragen, **Betas gleich ausrollen** prüfen, **Jetzt abgleichen** |
 | „Token gespeichert, aber mit dem aktuellen Schlüssel nicht lesbar“ | Der Schlüssel der Einstellungen hat sich geändert | Token neu eintragen |
 | Der Banner „Dieses Update ist Pflicht“ lässt sich nicht schließen | **Pflicht ab Build** liegt über dem eigenen Build | Update einspielen, oder den Wert im Admin zurücknehmen |
-| Kein Push | Keine Erlaubnis am Handy, Kanal am Handy stumm, Push im Profil aus, oder kein Konto angemeldet | Push-Tests ausführen; Handy-Einstellungen und Profil → Benachrichtigungen prüfen |
+| Kein Push | Keine Erlaubnis am Handy (dann steht auf Turnier- und Event-Seiten „Aufrufe sind aus – einschalten“), Kanal am Handy stumm, Push im Profil aus, oder kein Konto angemeldet | Push-Tests ausführen; „einschalten“ tippen oder Handy-Einstellungen und Profil → Benachrichtigungen prüfen |
+| Die App hat nie nach Benachrichtigungen gefragt | Gefragt wird erst nach einer Turnier- oder Event-Anmeldung, nicht beim Anmelden | Gewollt; ohne Anmeldung lässt sich Push in den Android-Einstellungen der App einschalten |
 | Push zeigt nur „Neue Benachrichtigung“ | App-Sperre ist an: Der Inhalt wird erst nach dem Entsperren geladen | Gewollt |
 | Beim Tippen auf einen Push passiert nichts | Die App ist noch gesperrt | Entsperren, dann öffnet sich der Inhalt |
 | „Dieses Gerät kann keine Passkeys anlegen.“ | Keine Gerätesperre oder kein Passkey-Dienst | Displaysperre einrichten; Passwort-Anmeldung nutzen |

@@ -19,6 +19,14 @@ async function answer(turnOff: boolean): Promise<void> {
   }
 }
 
+// Solange der Hinweis offen ist, wartet die Frage nach Benachrichtigungen (#1208) - nie zwei Fragen übereinander.
+let open: Promise<void> | null = null;
+
+/** Wartet, bis ein offener Freunde-Hinweis beantwortet ist (sofort, wenn keiner offen ist). */
+export function whenFriendsHintClosed(): Promise<void> {
+  return open || Promise.resolve();
+}
+
 /** Fragt nach einer Anmeldung, ob der Hinweis fällig ist, und zeigt ihn dann einmal. Gibt zurück, ob er erschien. */
 export async function offerFriendsHint(): Promise<boolean> {
   let due = false;
@@ -29,9 +37,16 @@ export async function offerFriendsHint(): Promise<boolean> {
     return false;
   }
   if (!due) return false;
+  let close: () => void = () => {};
+  const closed = new Promise<void>((resolve) => { close = resolve; });
+  open = closed;
+  const done = () => {
+    if (open === closed) open = null;
+    close();
+  };
   Alert.alert(FRIENDS_HINT_TITLE, `${FRIENDS_HINT_TEXT} Das kannst du jederzeit unter Einstellungen → Privatsphäre ändern.`, [
-    { text: "Ausschalten", style: "destructive", onPress: () => { void answer(true); } },
-    { text: "Verstanden", onPress: () => { void answer(false); } },
-  ]);
+    { text: "Ausschalten", style: "destructive", onPress: () => { done(); void answer(true); } },
+    { text: "Verstanden", onPress: () => { done(); void answer(false); } },
+  ], { onDismiss: done });
   return true;
 }

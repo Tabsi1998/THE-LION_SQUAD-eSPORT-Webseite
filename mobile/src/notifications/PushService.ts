@@ -2,7 +2,8 @@
  * PushService.ts — Expo Push Notifications Integration für LionsAPP
  *
  * Funktionsweise:
- * 1. Beim Login: Push-Permission anfragen + Expo-Push-Token beim Backend registrieren
+ * 1. Mit Konto und Erlaubnis: Expo-Push-Token beim Backend registrieren. Nach der Erlaubnis fragt die App erst nach der
+ *    ersten Turnier- oder Event-Anmeldung, mit eigener Erklärung davor (#1208, PushPromptHost) - nie beim Login.
  * 2. Beim Logout: Push-Token beim Backend deregistrieren
  * 3. Foreground-Notifications: Werden als System-Banner plus In-App-Popup angezeigt
  * 4. Background/Tap: App öffnet die richtige Seite (Deep-Link via navigateToNotification)
@@ -21,6 +22,7 @@ import { sha256Hex } from "../lib/sha256";
 import type { UserNotification } from "../types";
 import { PUSH_CHANNELS, PUSH_CHANNEL_SET, RETIRED_CHANNEL_IDS } from "./channels";
 import { getInstallationId } from "./installationId";
+import { markPushAsked } from "./pushPrompt";
 
 // Graceful import – falls expo-notifications nicht installiert ist
 // Installieren mit: npx expo install expo-notifications expo-device
@@ -155,7 +157,68 @@ export async function setupAndroidChannels(): Promise<void> {
 export type PushRegistration = { token: string; privateConfirmed: boolean };
 
 /**
- * Fragt Push-Permission an und registriert den Token beim Backend.
+ * Die Erlaubnis des Systems (#1208). `unavailable`: ohne expo-notifications oder im Emulator - dann fragt die App nie
+ * und zeigt auch keinen Hinweis. `canAskAgain`: Android zeigt seine Frage noch einmal (nach dem zweiten Nein nicht mehr).
+ */
+export type PushPermissionStatus = "granted" | "denied" | "undetermined" | "unavailable";
+export type PushPermission = { status: PushPermissionStatus; canAskAgain: boolean };
+
+const UNAVAILABLE: PushPermission = { status: "unavailable", canAskAgain: false };
+
+function permissionFrom(value: unknown): PushPermission {
+  const raw = value as { status?: string; canAskAgain?: boolean } | null;
+  const status: PushPermissionStatus = raw?.status === "granted" || raw?.status === "denied" ? raw.status : "undetermined";
+  return { status, canAskAgain: raw?.canAskAgain !== false };
+}
+
+type PermissionListener = (permission: PushPermission) => void;
+const permissionListeners = new Set<PermissionListener>();
+
+/** Ändert sich die Erlaubnis aus der App heraus (Frage beantwortet), erfahren es Glocke und Hinweise sofort. */
+export function onPushPermissionChange(listener: PermissionListener): () => void {
+  permissionListeners.add(listener);
+  return () => {
+    permissionListeners.delete(listener);
+  };
+}
+
+/** Liest die Erlaubnis, ohne zu fragen. */
+export async function getPushPermission(): Promise<PushPermission> {
+  if (!Notifications || !Device || !Device.isDevice) return UNAVAILABLE;
+  try {
+    return permissionFrom(await Notifications.getPermissionsAsync());
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+/**
+ * Die Frage des Systems (#1208) - nur nach „Ja, rufen“ oder aus dem Hinweis „einschalten“, nie von selbst. Vorher legt
+ * die App die Android-Kanäle an (#1014): Android 13 und neuer fragt erst, wenn es einen Kanal gibt.
+ */
+export async function askPushPermission(): Promise<PushPermission> {
+  const before = await getPushPermission();
+  if (before.status === "unavailable" || before.status === "granted") return before;
+  try {
+    await setupAndroidChannels();
+  } catch {
+    // Ohne Kanäle fragt Android 13 nicht - die Frage kommt dann beim nächsten Versuch.
+  }
+  let after = before;
+  try {
+    after = permissionFrom(await Notifications.requestPermissionsAsync());
+  } catch {
+    after = await getPushPermission();
+  }
+  // Gefragt (#1208): Android 13 meldet vorher wie nachher „denied“ - erst der Merker unterscheidet „noch nie gefragt“
+  // von „abgelehnt“ (pushPrompt).
+  await markPushAsked();
+  for (const listener of [...permissionListeners]) listener(after);
+  return after;
+}
+
+/**
+ * Registriert den Token beim Backend - nur mit Erlaubnis; gefragt wird hier nicht mehr (#1208).
  * `private` (#1052): mit App-Sperre schickt der Server nur Pushes ohne Inhalt - die Details lädt die App nach dem Entsperren.
  */
 export async function registerPushToken(options: { private?: boolean } = {}): Promise<PushRegistration | null> {
@@ -168,17 +231,9 @@ export async function registerPushToken(options: { private?: boolean } = {}): Pr
   }
 
   try {
-    // Permission anfragen
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== "granted") {
-      console.info("[PushService] Push-Permission verweigert.");
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") {
+      console.info("[PushService] Keine Push-Erlaubnis - kein Token.");
       return null;
     }
 
@@ -302,12 +357,5 @@ export async function dismissAllNotifications(): Promise<void> {
 
 /** Gibt true zurück wenn Push-Notifications verfügbar und erlaubt sind */
 export async function isPushEnabled(): Promise<boolean> {
-  if (!Notifications || !Device) return false;
-  if (!Device.isDevice) return false;
-  try {
-    const { status } = await Notifications.getPermissionsAsync();
-    return status === "granted";
-  } catch {
-    return false;
-  }
+  return (await getPushPermission()).status === "granted";
 }
