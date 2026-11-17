@@ -820,7 +820,8 @@ class BotRunner:
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:
-            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+            # ``status`` (#2494): 5xx und 429 sind vorübergehend, das Nachziehen eines Endstands versucht es dann noch einmal.
+            return {"ok": False, "reason": "http", "status": exc.status, "error": f"Discord {exc.status}: {exc.text}"[:200]}
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         self.last_action = f"Einbettung in #{getattr(channel, 'name', channel_id)} aktualisiert ({now_utc().strftime('%H:%M')} UTC)"

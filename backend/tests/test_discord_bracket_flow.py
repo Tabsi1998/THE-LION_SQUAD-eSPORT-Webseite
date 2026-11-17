@@ -342,6 +342,90 @@ async def test_a_failed_revision_of_the_final_bracket_is_noted_once_and_never_re
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [{"reason": "http", "status": 400, "error": "Discord 400: Bad Request"},
+                                     {"reason": "http", "error": "Discord 404: Not Found"}])
+async def test_a_lasting_http_refusal_is_given_up_after_one_attempt(flow, bot, monkeypatch, failure):
+    """#2494: Ein HTTP-Fehler, der kein 5xx und kein 429 ist, kommt beim nächsten Mal genauso - einmal notieren, aufgeben."""
+    await ended_with_final(flow, bot)
+    tries: list[str] = []
+
+    async def refused(channel_id, message_id, embed, buttons=None, files=None):
+        tries.append(message_id)
+        return dict(failure)
+
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", refused)
+    discord_bracket.request_refresh("t1", revise=True)
+    await discord_bracket.sweep(flow.db)
+    assert tries == ["m1"] and "t1" not in discord_bracket.pending() and not discord_bracket.revising("t1")
+
+
+TRANSIENT = [{"reason": "bot_offline"}, {"reason": "error", "error": "TimeoutError: "},
+             {"reason": "http", "status": 503, "error": "Discord 503: Service Unavailable"},
+             {"reason": "http", "error": "Discord 429: Too Many Requests"}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", TRANSIENT)
+async def test_a_transient_failure_is_retried_and_the_next_run_revises_in_place(flow, bot, monkeypatch, failure):
+    """#2494: Ein kurzer Discord-Ausfall (Bot offline, 5xx, 429, Zeitüberschreitung) beim Nachziehen bleibt vorgemerkt - der nächste
+    Lauf bearbeitet den Endstand an seinem Platz. Kein Neu-Post, kein Rückfall, der Zähler steht danach wieder auf null."""
+    final = await ended_with_final(flow, bot)
+    sent = len(bot.sent)
+    working = bot.edit_embed
+    tries: list[str] = []
+
+    async def flaky(channel_id, message_id, embed, buttons=None, files=None):
+        tries.append(message_id)
+        if len(tries) == 1:
+            return dict(failure)
+        return await working(channel_id, message_id, embed, buttons=buttons, files=files)
+
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", flaky)
+    discord_bracket.request_refresh("t1", revise=True)
+    first = await discord_bracket.sweep(flow.db)
+    assert first["edited"] == 0 and len(bot.sent) == sent, first
+    assert "t1" in discord_bracket.pending() and discord_bracket.revising("t1"), "vorübergehend: bleibt für den nächsten Lauf"
+    state = (await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0}))["discord_bracket_embed"]
+    assert state["final"] is True and state["message_id"] == final["message_id"] and state["revise_failures"] == 1, state
+
+    second = await discord_bracket.sweep(flow.db)
+    assert second["edited"] == 1 and second["posted"] == 0 and len(bot.sent) == sent, second
+    assert tries == [final["message_id"]] * 2 and bot.edited[-1]["channel_id"] == EVENTS_CHANNEL
+    state = (await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0}))["discord_bracket_embed"]
+    assert state["message_id"] == final["message_id"] and state["channel_id"] == EVENTS_CHANNEL and state["final"] is True
+    assert not state.get("revise_failures") and not state.get("error"), state
+    assert "t1" not in discord_bracket.pending() and not discord_bracket.revising("t1")
+
+
+@pytest.mark.asyncio
+async def test_a_lasting_outage_gives_up_after_a_few_attempts(flow, bot, monkeypatch):
+    """#2494: Bleibt Discord weg, ist nach ``REVISE_ATTEMPTS`` Läufen Schluss - Fehler notiert, keine Endlosschleife, kein
+    Neu-Post. Eine neue Korrektur danach bekommt wieder alle Versuche."""
+    final = await ended_with_final(flow, bot)
+    sent = len(bot.sent)
+    tries: list[str] = []
+
+    async def offline(channel_id, message_id, embed, buttons=None, files=None):
+        tries.append(message_id)
+        return {"ok": False, "reason": "bot_offline"}
+
+    monkeypatch.setattr(discord_bot.bot, "edit_embed", offline)
+    discord_bracket.request_refresh("t1", revise=True)
+    for _ in range(discord_bracket.REVISE_ATTEMPTS + 3):
+        await discord_bracket.sweep(flow.db)
+    assert len(tries) == discord_bracket.REVISE_ATTEMPTS and len(bot.sent) == sent
+    assert "t1" not in discord_bracket.pending() and not discord_bracket.revising("t1"), "keine Endlosschleife"
+    state = (await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0}))["discord_bracket_embed"]
+    assert state["final"] is True and state["message_id"] == final["message_id"] and state["error"], state
+    assert not state.get("revise_failures"), "aufgegeben: der Zähler steht für die nächste Korrektur wieder auf null"
+
+    discord_bracket.request_refresh("t1", revise=True)
+    for _ in range(discord_bracket.REVISE_ATTEMPTS + 1):
+        await discord_bracket.sweep(flow.db)
+    assert len(tries) == 2 * discord_bracket.REVISE_ATTEMPTS
+
+
+@pytest.mark.asyncio
 async def test_a_failed_revision_on_the_game_server_does_not_fall_back_to_a_second_final(flow, bot, monkeypatch):
     """#2375: Steht der Endstand auf dem Spielserver und scheitert dort das Nachziehen, kommt kein zweiter Endstand an den
     Hauptserver (der Rückfall gilt nur, wenn das Bracket dort gar nicht steht)."""
@@ -367,8 +451,10 @@ async def test_a_failed_revision_on_the_game_server_does_not_fall_back_to_a_seco
     monkeypatch.setattr(discord_bot.bot, "edit_embed", refused)
     sent = len(bot.sent)
     discord_bracket.request_refresh("t1", revise=True)
-    outcome = await discord_bracket.sweep(flow.db)
-    assert outcome["posted"] == 0 and len(bot.sent) == sent, "kein zweiter Endstand am Hauptserver"
+    # 503 ist vorübergehend (#2494): wiederholt bis zur Grenze - auch dabei nie ein zweiter Endstand.
+    for _ in range(discord_bracket.REVISE_ATTEMPTS):
+        outcome = await discord_bracket.sweep(flow.db)
+        assert outcome["posted"] == 0 and len(bot.sent) == sent, "kein zweiter Endstand am Hauptserver"
     stored = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
     assert discord_bracket.FIELD not in stored and stored["discord_bracket_by_guild"]["g1"]["final"] is True
     assert stored["discord_bracket_by_guild"]["g1"]["message_id"] == "g1m" and "t1" not in discord_bracket.pending()
