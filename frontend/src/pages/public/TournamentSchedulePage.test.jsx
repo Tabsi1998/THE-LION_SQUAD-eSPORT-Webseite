@@ -162,6 +162,22 @@ test("Nur meine Spiele: zeigt nur die Spiele der eigenen Anmeldung", async () =>
   const mine = generated.onsite.bracket.matches_v2.filter((match) => match.slots.some((slot) => slot.registration_id === mineId));
   expect(cards).toHaveLength(mine.length);
   expect(cards.every((card) => card.getAttribute("data-mine") === "true")).toBe(true);
+  // Ecken-Klammern (#1316): deine Spiele tragen Ecken statt des Leuchtrands.
+  expect(cards.every((card) => card.classList.contains("tls-you"))).toBe(true);
+});
+
+test("Ecken-Klammern (#1316): im Spielplan tragen nur deine Spiele Ecken und „Du“", async () => {
+  mockGenerated(generated.onsite);
+  renderSchedule();
+  const cards = await screen.findAllByTestId(/^schedule-match-/);
+  const mineId = generated.onsite.bracket.registrations.find((reg) => reg.is_mine).id;
+  const mineIds = new Set(generated.onsite.bracket.matches_v2.filter((match) => match.slots.some((slot) => slot.registration_id === mineId)).map((match) => match.id));
+  expect(mineIds.size).toBeGreaterThan(0);
+  expect(cards.length).toBeGreaterThan(mineIds.size);
+  for (const card of cards) {
+    const own = mineIds.has(card.getAttribute("data-testid").replace("schedule-match-", ""));
+    expect([card.getAttribute("data-testid"), card.classList.contains("tls-you")]).toEqual([card.getAttribute("data-testid"), own]);
+  }
 });
 
 test("ohne eigene Anmeldung und ohne Stationen gibt es weder Filter noch Stations-Sicht", async () => {

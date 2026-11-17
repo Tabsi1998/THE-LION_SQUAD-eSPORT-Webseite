@@ -361,7 +361,7 @@ function ScheduleCard({ entry, resolved, changed = false }) {
       data-changed={changed ? "true" : undefined}
       data-tone={tone}
       data-mine={entry.mine ? "true" : undefined}
-      className={`tls-bracket-node tls-sched-card block rounded-md border border-white/10 ${tone === "live" ? "tls-bracket-live" : ""} ${entry.mine ? "is-mine" : ""} ${changed ? "tls-changed" : ""}`}
+      className={`tls-bracket-node tls-sched-card block rounded-md border border-white/10 ${tone === "live" ? "tls-bracket-live" : ""} ${entry.mine ? "is-mine tls-you" : ""} ${changed ? "tls-changed" : ""}`}
     >
       <div className="tls-bracket-head">
         <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">{head}</span>
@@ -426,7 +426,7 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
                   data-testid={`schedule-line-${entry.match.id}`}
                   data-tone={entry.tone}
                   data-mine={entry.mine ? "true" : undefined}
-                  className={`tls-sched-line ${changedMatches.has(entry.id) ? "tls-changed-row" : ""}`}
+                  className={`tls-sched-line ${changedMatches.has(entry.id) ? "tls-changed-row" : ""}${entry.mine ? " tls-you tls-you--inset" : ""}`}
                 >
                   <span className="tls-sched-line__time tabular-nums">
                     {entry.scheduledAt ? formatWhen(entry.scheduledAt) : "offen"}
@@ -443,7 +443,10 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
                         {entry.sides.map((side) => side.label).join(" gegen ")}
                       </span>
                     )}
-                    <span className="block truncate text-[11px] text-white/45">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
+                    <span className="flex min-w-0 items-center gap-2 text-[11px] text-white/45">
+                      {entry.mine ? <span className="tls-you-tag" data-testid={`schedule-line-you-${entry.match.id}`}>Du</span> : null}
+                      <span className="truncate">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
+                    </span>
                   </span>
                   <StatusLabel entry={entry} compact />
                 </Link>

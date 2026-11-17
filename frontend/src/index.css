@@ -186,7 +186,7 @@ html { scrollbar-color: #2C2C33 var(--tls-surface-0); }
   background: linear-gradient(180deg, var(--tls-surface-2) 0%, var(--tls-surface-1) 100%);
   transition: opacity var(--tls-motion-mid) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease), box-shadow var(--tls-motion-mid) var(--tls-ease);
 }
-.tls-bracket-node.is-mine { box-shadow: 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.45); }
+/* Dein Match (is-mine) trägt seit #1316 die Ecken-Klammern (tls-you, styles/system.css) statt eines Leuchtrands. */
 .tls-bracket-node--line { border: 1px dashed rgb(255 255 255 / 0.12); border-radius: 6px; background: transparent; }
 .tls-bracket-node--fate { opacity: 0.7; }
 .tls-bracket-head {
@@ -460,7 +460,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 @media (hover: hover) and (pointer: fine) {
   .tls-sched-line:hover { background-color: rgb(255 255 255 / 0.035); }
 }
-.tls-sched-line[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); }
+/* Dein Spiel (data-mine) trägt seit #1316 Ecken, Fläche und „Du“ (tls-you tls-you--inset, styles/system.css). */
 .tls-sched-line[data-tone="live"] { box-shadow: inset 0 0 0 1px rgb(var(--tls-live-rgb) / 0.4); }
 .tls-sched-line[data-tone="done"] .tls-sched-name { color: rgb(255 255 255 / 0.6); }
 .tls-sched-line__time { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 14px; font-weight: 700; color: rgb(255 255 255 / 0.8); }
