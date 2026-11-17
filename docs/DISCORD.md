@@ -102,6 +102,16 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   Podium neu ans Ende, die alte Fassung verschwindet; kommt danach noch „Ergebnisse
   veröffentlicht“, wandert er wieder nach unten. Discord archiviert den Thread nach einer Woche
   Ruhe; eine neue Meldung öffnet ihn wieder.
+- **Endstand nachziehen (#2375, #2494):** Verfahren, Vorfälle, Ergebnis-Korrekturen, Liga-Wertungen, Austritt und
+  Disqualifikation sowie das erneute Beenden eines wieder geöffneten Turniers merken das Bracket mit `revise` vor
+  (`discord_bracket_state.request_refresh`). Ein stehender Endstand mit geändertem Inhalt wird dann an seinem Platz
+  bearbeitet – kein Neu-Post, kein Rückfall auf den Hauptserver; gleicher Inhalt bleibt unberührt, im laufenden Turnier
+  ändert `revise` nichts. Ein vorübergehender Fehler (Bot offline, Zeitüberschreitung, Discord 5xx oder 429) wird in den
+  nächsten Läufen wiederholt, höchstens `REVISE_ATTEMPTS` (3) Mal, gezählt in `revise_failures` am Stand der Bahn; ein
+  bleibender (Nachricht, Kanal oder Rechte weg, andere HTTP-Fehler) wird einmal notiert. Discord bearbeitet in einem
+  archivierten Thread nichts: `edit_embed` öffnet ihn kurz und archiviert ihn danach sofort wieder. Steht der Endstand
+  im Thread und kommt eine neue Meldung darunter (etwa „Beendet“ nach dem erneuten Beenden), gilt weiter die Regel
+  „Endstand ist die letzte Nachricht“: er wird neu ans Ende gesetzt, auch wenn ihn jemand gelöscht hatte (#572).
 - Gemeldet wird jeder Statuswechsel, egal woher: Knopf der Turnierleitung, Turnier-Formular,
   Anlegen mit Status, Zeitplan (Anmeldung öffnet, Check-in, Start, Ende), Start an einer
   Station, Gruppen- und Swiss-Runden. Vor #572 blieben die Wechsel aus dem Zeitplan stumm.
