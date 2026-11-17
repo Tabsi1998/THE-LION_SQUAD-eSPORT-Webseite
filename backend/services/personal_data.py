@@ -111,7 +111,7 @@ PERSONAL: dict[str, Entry] = {
     "easter_progress": Entry(DELETED, ("easter_progress",)),
     "season_raffle_entries": Entry(DELETED, ("raffle_entries",)),
     "season_raffles": Entry(KEPT, note="Ziehung des Vereins; der eigene Gewinn steht unter prize_pickups"),
-    "crown_state": Entry(KEPT, note="Kronen der Rangliste, bei jeder Änderung neu berechnet; nur Kennungen"),
+    "crown_state": Entry(DETACHED, note="Kronen der Rangliste, bei jeder Änderung neu berechnet; nur Kennungen. Dazu die Liste, wer „Onyx erreicht“ schon bekommen hat - beim Löschen fällt die Kennung überall heraus"),
     # Discord und Streams
     "discord_activity": Entry(DELETED, ("discord_activity",)),
     "discord_guild_active": Entry(DELETED, ("discord_activity_servers",)),

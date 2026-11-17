@@ -60,6 +60,6 @@ async def test_level_messages_follow_the_achievements_switch(flow):
 def test_every_crown_and_level_kind_belongs_to_the_achievements_topic():
     from services.notification_preferences import NOTIFICATION_KIND_CATEGORY, notification_allowed
 
-    for kind in ("crown_gained", "crown_changed", "crown_lost", "level"):
+    for kind in ("crown_gained", "crown_changed", "crown_lost", "crown_onyx", "level"):
         assert NOTIFICATION_KIND_CATEGORY[kind] == "achievements", kind
         assert notification_allowed({"notification_preferences": OFF}, kind) is False, kind

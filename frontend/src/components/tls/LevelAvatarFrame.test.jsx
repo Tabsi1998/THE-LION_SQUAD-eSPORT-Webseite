@@ -3,7 +3,8 @@ import path from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
 import RING from "@/lib/loewenRangRing.json";
 import { frameFit } from "@/lib/loewenRang";
-import { CROWN_LABELS, LevelAvatarFrame, crownVariant, levelFrameConfig } from "./LevelAvatarFrame";
+import { api } from "@/lib/api";
+import { CROWN_LABELS, LevelAvatarFrame, crownVariant, levelFrameConfig, refreshCrowns } from "./LevelAvatarFrame";
 
 // Löwen-Rang (#1454): der Rahmen des Rangs als Grafik, am gemessenen Ring ausgerichtet, Schild mit Rauten.
 
@@ -20,6 +21,13 @@ function frame(props = {}, testId = "f") {
   render(<LevelAvatarFrame testId={testId} {...props}><span>Foto</span></LevelAvatarFrame>);
   return screen.getByTestId(testId);
 }
+
+test("Kronen-Abruf mit Netzfehler liefert null statt „keine Kronen“ (#2501)", async () => {
+  api.get.mockRejectedValueOnce(new Error("offline"));
+  await expect(refreshCrowns()).resolves.toBeNull();
+  api.get.mockResolvedValueOnce({ data: { crowns: { "u-1": "onyx" } } });
+  await expect(refreshCrowns()).resolves.toEqual({ "u-1": "onyx" });
+});
 
 test("Rang-Zuordnung: Level 9 zeigt Rahmen 2 (Fährte), Level 55 den Löwenkönig", () => {
   const nine = frame({ level: 9 });

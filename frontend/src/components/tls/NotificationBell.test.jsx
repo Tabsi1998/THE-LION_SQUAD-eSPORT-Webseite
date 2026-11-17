@@ -10,7 +10,11 @@ vi.mock("@/lib/api", () => ({ api: apiMock }));
 const live = { reload: null };
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback) => { live.reload = callback; } }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "neonfalke" } }) }));
-vi.mock("@/components/tls/LevelAvatarFrame", () => ({ refreshCrowns: () => Promise.resolve({}) }));
+// ``current``: was der Kronen-Abruf liefert - null heißt Netzfehler (refreshCrowns löst dann mit null auf).
+const crownState = vi.hoisted(() => ({ current: {}, calls: 0 }));
+vi.mock("@/components/tls/LevelAvatarFrame", () => ({
+  refreshCrowns: () => { crownState.calls += 1; return Promise.resolve(crownState.current); },
+}));
 const toastMock = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -40,7 +44,85 @@ async function freshToast() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  crownState.current = {};
+  crownState.calls = 0;
+  localStorage.removeItem("tls-crowns-celebrated");
   apiMock.get.mockResolvedValue({ data: [OLD] });
+});
+
+const ONYX = { id: "n-7", kind: "crown_onyx", title: "👑 Onyx erreicht!", body: "Du trägst jetzt die Onyx-Krone.", url: "/achievements",
+  meta: { variant: "onyx", prev: "gold", category: "achievements" }, read: false, created_at: "2026-10-14T10:00:00Z" };
+const GOLD = { id: "n-6", kind: "crown_gained", title: "👑 Krone erobert!", body: "Die Gold-Krone gehört dir!", url: "/achievements",
+  meta: { variant: "gold", category: "achievements" }, read: false, created_at: "2026-10-14T09:00:00Z" };
+
+const celebratedIds = () => JSON.parse(localStorage.getItem("tls-crowns-celebrated") || "[]");
+
+/** Die Glocke mit diesen Meldungen öffnen und mitschreiben, welche Feiern sie auslöst. ``crown`` null: Netzfehler. */
+async function celebrations(rows, crown) {
+  crownState.current = crown === null ? null : { "u-1": crown };
+  crownState.calls = 0;
+  apiMock.get.mockResolvedValue({ data: rows });
+  const seen = [];
+  const listen = (event) => seen.push(event.detail);
+  window.addEventListener("tls-crown-celebration", listen);
+  try {
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
+    await waitFor(() => expect(crownState.calls).toBeGreaterThan(0));
+    await act(async () => { await new Promise((done) => setTimeout(done, 0)); });
+    return seen;
+  } finally {
+    window.removeEventListener("tls-crown-celebration", listen);
+  }
+}
+
+test("„Onyx erreicht“ feiert die Onyx-Krone wie eine eroberte Krone (#2501)", async () => {
+  const seen = await celebrations([ONYX], "onyx");
+  expect(seen).toHaveLength(1);
+  expect(seen[0]).toMatchObject({ id: "n-7", kind: "crown_onyx", variant: "onyx", body: "Du trägst jetzt die Onyx-Krone." });
+});
+
+test("Gold erobert, dann Onyx erreicht: gefeiert wird nur die neueste, beide gelten als gesehen (#2501)", async () => {
+  const seen = await celebrations([ONYX, GOLD], "onyx");
+  expect(seen).toHaveLength(1);
+  expect(seen[0]).toMatchObject({ id: "n-7", variant: "onyx" });
+  expect(celebratedIds()).toEqual(expect.arrayContaining(["n-6", "n-7"]));
+});
+
+test("„Onyx erreicht“, aber heute nur Gold: keine Feier mit falscher Krone (#2501)", async () => {
+  expect(await celebrations([ONYX], "gold")).toEqual([]);
+});
+
+test("Kronen noch nicht nachgezogen: erst keine Feier und nichts gemerkt, beim nächsten Laden genau eine (#2501)", async () => {
+  expect(await celebrations([ONYX], "gold")).toEqual([]);
+  expect(celebratedIds()).toEqual([]);
+  cleanup();
+  const seen = await celebrations([ONYX], "onyx");
+  expect(seen).toHaveLength(1);
+  expect(seen[0]).toMatchObject({ id: "n-7", variant: "onyx" });
+  expect(celebratedIds()).toEqual(["n-7"]);
+});
+
+test("Netzfehler beim Kronen-Abruf: keine Feier, nichts gemerkt (#2501)", async () => {
+  expect(await celebrations([ONYX, GOLD], null)).toEqual([]);
+  expect(celebratedIds()).toEqual([]);
+});
+
+test("verdrängte ältere Meldungen gelten als gesehen, die unpassende neueste nicht (#2501)", async () => {
+  expect(await celebrations([ONYX, GOLD], "gold")).toEqual([]);
+  expect(celebratedIds()).toEqual(["n-6"]);
+});
+
+test("„Krone erobert“, aber heute Onyx oder eine andere Krone: keine Feier (#2501)", async () => {
+  expect(await celebrations([GOLD], "onyx")).toEqual([]);
+  cleanup();
+  localStorage.removeItem("tls-crowns-celebrated");
+  expect(await celebrations([GOLD], "silver")).toEqual([]);
+});
+
+test("„Krone erobert“ mit passender Krone feiert diese Krone", async () => {
+  const seen = await celebrations([GOLD], "gold");
+  expect(seen).toHaveLength(1);
+  expect(seen[0]).toMatchObject({ id: "n-6", kind: "crown_gained", variant: "gold" });
 });
 
 test("„Öffnen“ führt ans Ziel und markiert gelesen", async () => {

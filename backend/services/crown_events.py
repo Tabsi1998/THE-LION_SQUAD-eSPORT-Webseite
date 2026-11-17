@@ -68,28 +68,46 @@ def _split_crowns(rows: list[dict]) -> tuple[dict, dict]:
     return merged, rank_only
 
 
-async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
+async def _persist_and_notify(rank_crowns: dict[str, str], onyx_holders: set[str] | frozenset[str] = frozenset()) -> list[dict]:
     from services.user_notifications import create_user_notification
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
+    onyx_now = set(onyx_holders)
     state = await db.crown_state.find_one({"id": "current"}, {"_id": 0})
     if state is None:
-        await db.crown_state.insert_one({"id": "current", "holders": rank_crowns, "version": 1, "updated_at": now})
+        await db.crown_state.insert_one({"id": "current", "holders": rank_crowns, "onyx": sorted(onyx_now),
+                                         "onyx_announced": sorted(onyx_now), "version": 1, "updated_at": now})
         return []
     old = state.get("holders") or {}
-    if old == rank_crowns:
+    # Onyx (#2501): Ein Stand von vor #2501 kennt nur die Rangkronen. Wer jetzt Onyx trägt und vorher keine Rangkrone hatte,
+    # trug Onyx schon - neu ist nur der Wechsel von einer Rangkrone zu Onyx.
+    old_onyx = set(state["onyx"]) if "onyx" in state else {uid for uid in onyx_now if uid not in old}
+    # „Onyx erreicht“ einmal je Person, unabhängig vom Postfach: Wer hier steht, hat die Meldung schon bekommen - oder trug
+    # Onyx schon vor #2501 und gilt damit als gemeldet.
+    announced = set(state["onyx_announced"]) if "onyx_announced" in state else set(old_onyx)
+    announced_now = announced | onyx_now
+    if old == rank_crowns and "onyx" in state and old_onyx == onyx_now and "onyx_announced" in state and announced_now == announced:
         return []
     version = int(state.get("version", 1)) + 1
     res = await db.crown_state.update_one(
         {"id": "current", "version": state.get("version", 1)},
-        {"$set": {"holders": rank_crowns, "version": version, "updated_at": now}},
+        {"$set": {"holders": rank_crowns, "onyx": sorted(onyx_now), "onyx_announced": sorted(announced_now),
+                  "version": version, "updated_at": now}},
     )
     if getattr(res, "modified_count", 0) == 0:
         return []  # concurrent update won the race — that run notifies
     events = []
-    for uid in set(old) | set(rank_crowns):
+    for uid in set(old) | set(rank_crowns) | (onyx_now - old_onyx):
         o, n = old.get(uid), rank_crowns.get(uid)
+        if uid in onyx_now and uid not in old_onyx:
+            # Der Aufstieg zu Onyx ist kein Verlust der Rangkrone (#2501): eine Meldung „Onyx erreicht“ - nur beim ersten Mal.
+            if uid not in announced:
+                events.append({"user_id": uid, "type": "onyx", "variant": "onyx", "prev": o})
+            continue
         if o == n:
+            continue
+        if uid in old_onyx and uid not in onyx_now:
+            # Onyx verloren (#2501): keine Verlust-Meldung, und wer danach eine Rangkrone trägt, hat sie nicht „erobert“.
             continue
         if n and (not o or RANK_ORDER[n] < RANK_ORDER[o]):
             events.append({"user_id": uid, "type": "gained", "variant": n, "prev": o})
@@ -104,7 +122,17 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
     for ev in events:
         uid = ev["user_id"]
         dedupe = f"crown-v{version}-{uid}"
-        if ev["type"] == "gained":
+        if ev["type"] == "onyx":
+            await create_user_notification(
+                uid,
+                title="👑 Onyx erreicht!",
+                body="Du trägst jetzt die Onyx-Krone. Sie ist die höchste Krone der Punktewertung und bleibt dir, auch wenn andere dich überholen.",
+                url="/achievements",
+                kind="crown_onyx",
+                # Einmal je Person (#2501): Wer Onyx verliert und zurückbekommt, erfährt es nicht noch einmal.
+                meta={"variant": "onyx", "prev": ev["prev"], "category": "achievements", "dedupe_key": f"crown-onyx-{uid}"},
+            )
+        elif ev["type"] == "gained":
             place = RANK_ORDER[ev["variant"]]
             await create_user_notification(
                 uid,
@@ -143,17 +171,29 @@ async def get_crowns(force: bool = False) -> dict[str, str]:
         return _cache["data"]
     rows = await _points_rows()
     merged, rank_only = _split_crowns(rows)
+    # Erst den neuen Stand ablegen, dann melden (#2501): Die Glocke lädt die Kronen gleich nach dem Live-Hinweis, während Push
+    # und Discord noch laufen - sie muss dann schon die neue Krone sehen, sonst fällt die Feier aus.
+    _cache["at"] = now
+    _cache["data"] = merged
     try:
         # Stiller Modus der Neuberechnung (#2340): Kronenwechsel weder speichern noch melden - der Abschluss rechnet sie
         # einmal neu, dann erfährt nur, wer netto eine Krone gewonnen, gewechselt oder verloren hat.
         from services.achievement_core import recount_silent
         if not await recount_silent(get_db()):
-            await _persist_and_notify(rank_only)
+            await _persist_and_notify(rank_only, {uid for uid, crown in merged.items() if crown == "onyx"})
     except Exception as e:
         logger.warning("crown transition notify failed: %s", log_safe(e))
-    _cache["at"] = now
-    _cache["data"] = merged
     return merged
+
+
+async def forget_person(db, user_id: str) -> None:
+    """Kontolöschung (#2501): Die Kennung fällt aus dem Kronen-Stand - Rangkronen, Onyx und „Onyx erreicht schon gemeldet“."""
+    await db.crown_state.update_many(
+        {"id": "current"},
+        # Version hoch: Ein gleichzeitiger Kronen-Lauf mit dem alten Stand scheitert an der Versionsprüfung und schreibt die
+        # Kennung nicht zurück; der nächste Lauf rechnet frisch.
+        {"$pull": {"onyx": user_id, "onyx_announced": user_id}, "$unset": {f"holders.{user_id}": ""}, "$inc": {"version": 1}},
+    )
 
 
 def schedule_crown_sync() -> None:

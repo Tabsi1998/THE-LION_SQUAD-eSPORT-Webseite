@@ -116,6 +116,7 @@ PUSH_CHANNELS = {
     "crown_gained": "lion_achievements",
     "crown_lost": "lion_achievements",
     "crown_changed": "lion_achievements",
+    "crown_onyx": "lion_achievements",
     "year_review": "lion_achievements",
 }
 # Ab diesem Stand legt die App die Kanäle oben an (sie meldet ihn beim Registrieren des Geräts mit).

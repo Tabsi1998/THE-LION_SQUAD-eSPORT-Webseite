@@ -233,6 +233,7 @@ NOTIFICATION_KIND_CATEGORY = {
     "crown_gained": "achievements",
     "crown_changed": "achievements",
     "crown_lost": "achievements",
+    "crown_onyx": "achievements",
     "level": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
