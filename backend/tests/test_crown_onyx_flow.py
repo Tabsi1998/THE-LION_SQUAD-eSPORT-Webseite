@@ -230,3 +230,19 @@ async def test_while_onyx_reached_is_sent_the_crowns_already_show_onyx(flow, mon
     await crown_events.get_crowns(force=True)
     assert seen_during == ["onyx"], "die Glocke sähe sonst noch Gold und feierte nicht"
 
+
+@pytest.mark.asyncio
+async def test_a_deleted_account_leaves_the_onyx_lists(flow):
+    top, second, third, fourth = await four_players(flow)
+    await crowns(flow)
+    await award(flow, top, "probe_onyx")
+    await crowns(flow)
+    state = await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0})
+    assert top["id"] in state["onyx_announced"] and top["id"] in state["onyx"]
+
+    flow.act_as(top)
+    response = await flow.post("/api/dsgvo/anonymize-me")
+    assert response.status_code == 200
+    state = await flow.db.crown_state.find_one({"id": "current"}, {"_id": 0})
+    assert top["id"] not in state["onyx_announced"], "die Kennung bleibt nach der Löschung nicht stehen"
+    assert top["id"] not in state["onyx"] and top["id"] not in state["holders"]
