@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 // Reiter „Leitstand“ der Season (E.4, Nr. 152): Gruppen mit Zähler, Frist, Zuständigkeit und Weg, Filter „Nur meine“, Hinweis bei
 // Befangenheit, leerer Zustand, Protokoll seitenweise, Rundnachricht nur mit Recht. Erfundene Namen.
@@ -8,7 +8,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(d
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => vi.fn(async () => true) }));
 
-const { SeasonDeskTab, deskText } = await import("./SeasonDeskTab");
+const { SeasonDeskTab, SeasonLog, deskText } = await import("./SeasonDeskTab");
 
 const item = (id, extra = {}) => ({
   id, kind: "overdue", title: "Staffel A · Spieltag 2", text: "Nie gemeldet, der Termin ist vorbei.", url: "/matches/m1", action: "Spiel öffnen",
@@ -102,6 +102,69 @@ test("Protokoll mit Absender, Kreis und Seiten", async () => {
   expect(screen.getByTestId("desk-log-page")).toHaveTextContent("Seite 1 von 2");
   fireEvent.click(screen.getByTestId("desk-log-older"));
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/desk/log", { params: { page: 2 } }));
+});
+
+const DIVISIONS = [{ id: "d1", level: 1, label: "Liga 1", status: "active", staffeln: [{ tournament_id: "t1", staffel: "A" }, { tournament_id: "t2", staffel: "B" }] }];
+const SCOPED = {
+  ...DESK, total: 4, mine: 3,
+  groups: [
+    { key: "overdue", label: "Überfällige Spiele", responsible: "„Spiele betreuen“", failed: false, items: [
+      item("overdue:m1", { staffel_id: "t1" }), item("overdue:m9", { staffel_id: "t2", title: "Staffel B · Spieltag 1" }),
+    ] },
+    { key: "applications", label: "Anmeldungen", responsible: "„Teams freigeben“", failed: false, items: [
+      item("applications:x", { kind: "applications", staffel_id: null, title: "Neue Wölfe" }),
+    ] },
+    { key: "procedures", label: "Verfahren", responsible: "„Proteste“", failed: false, items: [item("procedures:p1", { kind: "procedures", staffel_id: "t1", mine: false })] },
+  ],
+};
+
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="where">{`${location.pathname}${location.search}${location.hash}`}</span>;
+}
+
+function renderScoped(entry = "/admin/leagues/seasons/s1?staffel=t1#leitstand") {
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/desk") ? SCOPED : LOG }));
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes><Route path="/admin/leagues/seasons/:id" element={<><SeasonDeskTab seasonId="s1" divisions={DIVISIONS} /><LocationProbe /></>} /></Routes>
+    </MemoryRouter>,
+  );
+}
+
+test("Staffel-Filter (#2262): nur Aufgaben und Protokoll der Staffel, sichtbar und aufhebbar", async () => {
+  renderScoped();
+  expect(await screen.findByTestId("desk-staffel-filter-label")).toHaveTextContent("Liga 1 · Staffel A");
+  expect(await screen.findByTestId("desk-item-overdue:m1")).toBeInTheDocument();
+  expect(screen.queryByTestId("desk-item-overdue:m9")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("desk-item-applications:x")).not.toBeInTheDocument();
+  expect(screen.getByTestId("desk-total")).toHaveTextContent("2");
+  expect(screen.getByTestId("desk-summary")).toHaveTextContent("1 von 2 kannst du selbst erledigen");
+  expect(screen.getByTestId("desk-staffel-filter-hidden")).toHaveTextContent("2 Aufgaben der ganzen Season sind ausgeblendet.");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/desk/log", { params: { page: 1, staffel: "t1" } }));
+  expect(screen.getByRole("heading", { name: "Protokoll · Liga 1 · Staffel A" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId("desk-staffel-filter-clear"));
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/seasons/s1#leitstand");
+  expect(await screen.findByTestId("desk-item-overdue:m9")).toBeInTheDocument();
+  expect(screen.queryByTestId("desk-staffel-filter")).not.toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/leagues/seasons/s1/desk/log", { params: { page: 1 } }));
+});
+
+test("Protokoll einer Staffel nennt die Staffel nicht in jeder Zeile, ein Ladefehler bleibt sichtbar mit „Nochmal versuchen“", async () => {
+  let fail = true;
+  apiMock.get.mockImplementation(async () => {
+    if (fail) throw Object.assign(new Error("x"), { response: { data: { detail: "Server weg" } } });
+    return { data: { ...LOG, items: [{ id: "s1", label: "Staffel · Liga gestartet", at: "2026-11-12T18:00:00+00:00", actor: "Leitung", staffel: "Liga 1 · Staffel A", match_id: null }], pages: 1, total: 1 } };
+  });
+  render(<MemoryRouter><SeasonLog seasonId="s1" staffelId="t1" title="Protokoll der Staffel" /></MemoryRouter>);
+  expect(await screen.findByTestId("desk-log-error")).toHaveTextContent("Server weg");
+  fail = false;
+  fireEvent.click(screen.getByTestId("desk-log-retry"));
+  const row = await screen.findByTestId("desk-log-s1");
+  expect(row).toHaveTextContent("Staffel · Liga gestartet");
+  expect(row).not.toHaveTextContent("Staffel A");
+  expect(screen.getByTestId("desk-log-total")).toHaveTextContent("1 Eintrag");
 });
 
 test("Rundnachricht nur mit Recht", async () => {
