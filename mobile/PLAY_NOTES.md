@@ -12,6 +12,14 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.14
+
+Neu in 1.7.14:
+• FAQ in der App: Suche, häufige Fragen und Tipps zu Push, Aufruf-Ton, Anmelden und Updates
+• Push-Frage erst nach deiner ersten Turnier- oder Event-Anmeldung, mit kurzer Erklärung
+• Aufrufe aus? Ein Tipp auf Turnier- und Event-Seiten schaltet sie wieder ein
+• Zurückgezogene Beiträge zeigen einen Hinweis statt eines Ladefehlers
+
 ## 1.7.13
 
 Neu in 1.7.13:
