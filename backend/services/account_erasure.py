@@ -618,6 +618,9 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.
     from services.team_forget import forget_person
     await forget_person(db, user_id)
+    # Kronen (#2501): „Onyx erreicht“ merkt sich, wer schon gemeldet wurde - über die Neuberechnung hinaus. Die Kennung fällt heraus.
+    from services.crown_events import forget_person as forget_crowns
+    await forget_crowns(db, user_id)
     await _retention(db, user_id, until)
     images = await _own_images(db, user_id, [user.get("avatar_url"), user.get("banner_url"), *directory_images])
     return {"purged_rows": purged, "images": images, "unlinked_contact_messages": unlinked_contacts}

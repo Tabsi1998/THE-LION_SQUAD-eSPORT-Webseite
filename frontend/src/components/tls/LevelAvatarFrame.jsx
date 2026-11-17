@@ -35,7 +35,8 @@ async function loadCrowns() {
         crownsListeners.forEach((fn) => fn(crownsCache));
         return crownsCache;
       })
-      .catch(() => ({}))
+      // Netzfehler (#2501): null statt „keine Kronen“ - die Glocke soll eine Kronen-Meldung dann später noch einmal prüfen.
+      .catch(() => null)
       .finally(() => { crownsPromise = null; });
   }
   return crownsPromise;
