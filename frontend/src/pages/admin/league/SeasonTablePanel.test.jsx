@@ -128,6 +128,15 @@ test("Tabelle der Staffel mit Zonen und PDF; ein Ladefehler zeigt sich mit „No
   expect(await screen.findByTestId("season-ties-t1")).toBeInTheDocument();
 });
 
+test("abgeschlossene Staffel: statt der Knöpfe der Satz zum Wiederöffnen (#2262)", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...TABLE, closed: true } });
+  render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
+  expect(await screen.findByTestId("season-tie-t1-1")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-ties-closed")).toHaveTextContent("erst nach dem Wiederöffnen");
+  expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
+  expect(screen.queryByTestId("season-decision-remove-d0")).toBeNull();
+});
+
 function RulesHarness({ initial }) {
   const [form, setForm] = useState(tableRulesToForm(initial));
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));

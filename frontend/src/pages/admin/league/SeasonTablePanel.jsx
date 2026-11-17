@@ -147,7 +147,10 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
     setSheet(null);
     onSaved();
   };
-  const decide = canDecide && data.can_decide;
+  // Abgeschlossen (Endstand festgehalten): entschieden und zurückgenommen wird erst nach dem Wiederöffnen - der Satz statt der Knöpfe.
+  const closed = Boolean(data.closed);
+  const change = canDecide && !closed;
+  const decide = change && data.can_decide;
   const ties = Array.isArray(data.ties) ? data.ties : [];
   const decisions = Array.isArray(data.decisions) ? data.decisions : [];
   // Befangen (eigenes Team): nur der Superadmin, mit Grund für die Notausnahme - sonst der Satz statt des Knopfs.
@@ -161,6 +164,9 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
         ) : null}
       </div>
       {!ties.length ? <p className="text-sm text-white/60">Kein offener Gleichstand.</p> : null}
+      {canDecide && closed && (ties.length || decisions.length) ? (
+        <p className="text-sm text-white/70" data-testid="staffel-ties-closed">Abgeschlossen – entscheiden und zurücknehmen geht erst nach dem Wiederöffnen im Reiter „Abschluss“ der Season.</p>
+      ) : null}
       {ties.map((tie) => (
         <div key={tie.rank} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2" data-testid={`season-tie-${tournamentId}-${tie.rank}`}>
           <span className="min-w-0 text-sm text-white [overflow-wrap:anywhere]">Platz {tie.rank}: {tie.names.join(", ")}</span>
@@ -182,8 +188,8 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
               </span>
               <span className="text-white [overflow-wrap:anywhere]">{decision.names.join(" vor ")}</span>
               <span className="min-w-0 break-words">„{decision.reason}“ · {when(decision.decided_at)}</span>
-              {canDecide && blocked(decision) ? <span className="ml-auto"><OwnTeamNote testId={`season-decision-own-${decision.id}`} /></span> : null}
-              {canDecide && !blocked(decision) ? (
+              {change && blocked(decision) ? <span className="ml-auto"><OwnTeamNote testId={`season-decision-own-${decision.id}`} /></span> : null}
+              {change && !blocked(decision) ? (
                 <button type="button" onClick={() => setSheet({ kind: "remove", decision })} data-testid={`season-decision-remove-${decision.id}`}
                   className="tls-btn tls-btn--quiet ml-auto min-h-[44px] rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider">Zurücknehmen</button>
               ) : null}

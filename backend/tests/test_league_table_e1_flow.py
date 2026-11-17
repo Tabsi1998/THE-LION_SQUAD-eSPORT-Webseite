@@ -394,3 +394,17 @@ async def test_a_season_with_draws_still_takes_a_draw(flow):
     response = await flow.post(f"/api/matches/{match['id']}/result", json={"results": [
         {"registration_id": home, "rank": 1}, {"registration_id": away, "rank": 1}]})
     assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test_the_table_overview_says_when_the_staffel_is_closed(flow):
+    # Staffel-Seite (#2262): Ist der Endstand festgehalten, zeigt die Seite statt der Knöpfe „Abgeschlossen“ - ein reines Lesefeld.
+    _admin, _league, staffel = await setup(flow)
+    await two_ties(flow, staffel)
+    overview = (await flow.get(f"{TABLE}/{staffel['id']}/table")).json()
+    assert overview["closed"] is False
+
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"final_table": {"version": 1}}})
+    overview = (await flow.get(f"{TABLE}/{staffel['id']}/table")).json()
+    assert overview["closed"] is True
+    assert overview["ties"], "die Gleichstände stehen weiter da - nur entscheiden geht nicht mehr"

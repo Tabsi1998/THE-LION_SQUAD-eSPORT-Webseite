@@ -103,7 +103,7 @@ def can_decide(tournament: dict) -> bool:
 async def overview(db, tournament: dict, user: dict | None = None) -> dict:
     """Was die Verwaltung sieht. ``own_team`` je Gleichstand und Entscheid: gehört die Person zu einer der Seiten
     (Befangenheit wie beim Festlegen); ``superadmin``: nur der darf dann, als Notausnahme mit Grund."""
-    from services import league_permissions
+    from services import league_final_read, league_permissions
 
     rows = await table_rows(db, tournament)
     open_ties, decisions = ties(rows), decisions_view(tournament, rows)
@@ -115,8 +115,10 @@ async def overview(db, tournament: dict, user: dict | None = None) -> dict:
            if league_permissions.belongs_to_side(user, row, teams.get(row.get("team_id") or ""))}
     for entry in (*open_ties, *decisions):
         entry["own_team"] = bool(own & set(entry["registration_ids"]))
+    # ``closed`` (#2262): Der Endstand ist festgehalten - entschieden wird erst nach dem Wiederöffnen (die Routen sperren es ohnehin).
     return {"standings": rows, "ties": open_ties, "decisions": decisions, "can_decide": can_decide(tournament),
-            "rules": public_rules(tournament), "superadmin": league_permissions.is_superadmin(user)}
+            "rules": public_rules(tournament), "superadmin": league_permissions.is_superadmin(user),
+            "closed": league_final_read.is_closed(tournament)}
 
 
 DECISION_METHODS = ("playoff", "lot", "lead")
