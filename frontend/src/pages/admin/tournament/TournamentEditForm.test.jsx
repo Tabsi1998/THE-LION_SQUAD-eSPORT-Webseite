@@ -114,6 +114,14 @@ test("Staffel: die Antwortfrist auf Terminvorschläge kommt seit #2106 aus der S
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-s", { title: "Staffel A (Probe)" }));
 });
 
+test("Staffel-Seite (#2262): ohne „Aus der Season“ und ohne „Vorschau neu mischen“ - beides steht dort an eigener Stelle", async () => {
+  render(<MemoryRouter><TournamentEditForm tournament={STAFFEL} onSaved={() => {}} seasonValues={false} remix={false} /></MemoryRouter>);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-season-values")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
+  expect(screen.getByText("Banner der Staffel")).toBeInTheDocument();
+});
+
 test("Staffel nach dem Start: kein Neu-Mischen mehr", async () => {
   renderStaffel({ ...STAFFEL, status: "live" });
   await screen.findByTestId("tr-edit-season-values");
