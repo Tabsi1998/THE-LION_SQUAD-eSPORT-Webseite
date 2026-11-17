@@ -64,9 +64,10 @@ function Notes({ row }) {
  * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile; `nameLabel`: Kopf der Namensspalte („Team“
  * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable);
  * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit);
- * `championKey`: Schlüssel der Meister-Zeile (Liga, #2268) - nur sie trägt Gold.
+ * `championKey`: Schlüssel der Meister-Zeile (Liga, #2268) - nur sie trägt Gold. `nameTitle`: der volle Name als `title` an jeder Zeile
+ * (Staffel-Seite der Verwaltung, #2262) - ohne Angabe bleibt die Zeile, wie sie ist.
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null }) {
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null, nameTitle = false }) {
   const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league)
     .filter((column) => !(hideDraws && column.key === "drawn"))
     .map((column) => {
@@ -119,7 +120,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 </td>
                 <td className="px-2 py-2.5 align-middle min-w-0">
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="tls-standing-name text-white font-medium">{row.display_name || "Teilnehmer"}</span>
+                    <span className="tls-standing-name text-white font-medium" title={nameTitle ? row.display_name || undefined : undefined}>{row.display_name || "Teilnehmer"}</span>
                     {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
                   <Notes row={row} />

@@ -245,8 +245,11 @@ export function StaffelTablePanel({ tournamentId, label = "Tabelle", canDecide =
             </a>
           ) : null}
         </div>
-        {/* Eigener Container wischt seitlich, die Seite nicht. */}
-        <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" hideDraws={hidesDraws(data.rules, rows)} mapPoints={byMaps(data.rules)} />
+        {/* Eigener Container wischt seitlich, die Seite nicht: Am Handy bekommt die Tabelle Platz für ganze Namen (index.css,
+            `.staffel-standings`), der volle Name steht zusätzlich im `title`. Öffentliche Tabellen bleiben, wie sie sind. */}
+        <div className="staffel-standings min-w-0" data-testid="staffel-standings">
+          <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" hideDraws={hidesDraws(data.rules, rows)} mapPoints={byMaps(data.rules)} nameTitle />
+        </div>
         <ZoneLegend rows={rows} testId="staffel-table-zones" />
       </section>
       <section id="gleichstand" className="scroll-mt-24 rounded-sm border border-white/10 bg-[#121212] p-4">

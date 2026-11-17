@@ -120,6 +120,9 @@ test("Tabelle der Staffel mit Zonen und PDF; ein Ladefehler zeigt sich mit „No
   expect(await screen.findByTestId("standing-row-r1")).toHaveTextContent("Nordlicht");
   expect(screen.getByTestId("standing-zone-r1")).toBeInTheDocument();
   expect(screen.getByTestId("staffel-table-zones")).toBeInTheDocument();
+  // Lange Namen: eigener Rahmen zum Wischen, der volle Name im title - öffentliche Tabellen tragen keinen.
+  expect(screen.getByTestId("staffel-standings")).toContainElement(screen.getByTestId("standing-row-r1"));
+  expect(within(screen.getByTestId("standing-row-r1")).getByText("Nordlicht")).toHaveAttribute("title", "Nordlicht");
   expect(screen.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", "/api/exports/tournaments/t1/standings.pdf");
   unmount();
 
