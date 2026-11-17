@@ -19,6 +19,7 @@ from database import get_db
 from models import now_utc
 from services import wiring as _wiring_safety_net
 from services.dolibarr_policy import CLUB_TZ
+from services.log_safe import log_safe
 from services.secret_store import decrypt_secret
 from services.private_fields import private_projection
 
@@ -772,11 +773,23 @@ class BotRunner:
         return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
 
     @staticmethod
-    async def _reopen(channel) -> None:
+    async def _reopen(channel) -> bool:
         """Ein Thread im Archiv (Discord: nach einer Woche Ruhe) wird vor dem Schreiben wieder geöffnet (#572) -
-        ein gesperrter bleibt zu, dann scheitert das Schreiben mit seinem Grund."""
+        ein gesperrter bleibt zu, dann scheitert das Schreiben mit seinem Grund. True: er war im Archiv und ist jetzt offen."""
         if getattr(channel, "archived", False) and not getattr(channel, "locked", False):
             await channel.edit(archived=False)
+            return True
+        return False
+
+    @staticmethod
+    async def _archive_again(channel) -> None:
+        """Nach einer Bearbeitung zurück ins Archiv (#2494): Discord bearbeitet im Archiv nichts, also öffnet der Bot den Thread
+        kurz - er soll dadurch nicht wieder in der Thread-Liste auftauchen. Archivieren darf der Ersteller des Threads (der Bot)
+        oder wer „Threads verwalten“ hat; scheitert es, bleibt der Thread offen und geht nach einer Woche Ruhe von selbst zu."""
+        try:
+            await channel.edit(archived=True)
+        except Exception as exc:  # noqa: BLE001 - die Bearbeitung selbst ist gelungen oder hat ihren eigenen Grund
+            logger.info("[discord] Thread %s nicht wieder archiviert: %s", log_safe(getattr(channel, "id", "")), type(exc).__name__)
 
     async def _channel(self, client, channel_id: str):
         import discord
@@ -803,8 +816,10 @@ class BotRunner:
         channel, problem = await self._channel(client, channel_id)
         if problem:
             return problem
+        reopened = False
         try:
-            await self._reopen(channel)
+            # Ein Thread im Archiv (#2494): kurz öffnen, bearbeiten, gleich wieder archivieren (``finally`` unten).
+            reopened = await self._reopen(channel)
             message = await channel.fetch_message(int(message_id))
             changes = {"embed": discord.Embed.from_dict(embed)}
             if buttons is not None:
@@ -824,6 +839,9 @@ class BotRunner:
             return {"ok": False, "reason": "http", "status": exc.status, "error": f"Discord {exc.status}: {exc.text}"[:200]}
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        finally:
+            if reopened:
+                await self._archive_again(channel)
         self.last_action = f"Einbettung in #{getattr(channel, 'name', channel_id)} aktualisiert ({now_utc().strftime('%H:%M')} UTC)"
         return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
 

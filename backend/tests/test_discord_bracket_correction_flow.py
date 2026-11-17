@@ -31,7 +31,8 @@ class FakeBot:
     async def send_embed(self, channel_id, embed, buttons=None, files=None, **kwargs):
         self.counter += 1
         self.sent.append({"channel_id": channel_id, "embed": embed})
-        return {"ok": True, "message_id": f"m{self.counter}", "channel_id": channel_id}
+        # Kennungen wie bei Discord (Zahlen) - die echte ``BotRunner.edit_embed`` liest sie als ``int``.
+        return {"ok": True, "message_id": str(900000000000000000 + self.counter), "channel_id": channel_id}
 
     async def edit_embed(self, channel_id, message_id, embed, buttons=None, files=None, **kwargs):
         self.edited.append({"channel_id": channel_id, "message_id": message_id, "embed": embed})
@@ -208,6 +209,85 @@ async def test_a_disqualification_after_the_end_revises_the_final_bracket(flow, 
     assert outcome["edited"] == 1 and outcome["posted"] == 0 and len(bot.sent) == sent, outcome
     assert bot.edited[-1]["message_id"] == posted["message_id"]
     assert bot.edited[-1]["embed"]["description"].startswith(f"🥇 {names[loser]}"), "das Finale kampflos für den Gegner"
+
+
+class FakeThread:
+    """Ein Turnier-Thread wie in discord.py: Im Archiv nimmt Discord keine Bearbeitung an (nur Löschen) - ein Bearbeiten ohne
+    vorheriges Öffnen scheitert hier wie dort."""
+
+    def __init__(self, *, archived: bool, locked: bool = False, message_gone: bool = False):
+        self.id, self.name = int(EVENTS_CHANNEL), "herbst-cup"
+        self.archived, self.locked, self.message_gone = archived, locked, message_gone
+        self.calls: list = []
+
+    async def edit(self, **changes):
+        self.calls.append(("thread", changes))
+        self.archived = changes.get("archived", self.archived)
+
+    async def fetch_message(self, message_id):
+        if self.message_gone:
+            raise ValueError("Nachricht weg")
+        thread = self
+
+        class Message:
+            id = message_id
+
+            async def edit(self, **changes):
+                if thread.archived:
+                    raise RuntimeError("Operation cannot be performed on an archived thread")
+                thread.calls.append(("message", sorted(changes)))
+
+        return Message()
+
+
+class FakeClient:
+    def __init__(self, channel):
+        self.channel = channel
+
+    def get_channel(self, channel_id):
+        return self.channel if channel_id == self.channel.id else None
+
+
+async def revise_in(flow, bot, monkeypatch, thread: FakeThread) -> dict:
+    """Endstand steht, dann ein Vorfall am Finale (``revise``) - bearbeitet über die echte ``BotRunner.edit_embed``."""
+    tournament, names, final_match, posted = await ended_with_final(flow, bot)
+    runner = discord_bot.bot
+    monkeypatch.setattr(runner, "edit_embed", functools.partial(discord_runtime.BotRunner.edit_embed, runner))
+    monkeypatch.setattr(runner, "_client", FakeClient(thread))
+    monkeypatch.setattr(runner, "connected", True)
+    await flow.db.matches_v2.update_one({"id": final_match["id"]}, {"$set": {"contested": True}})
+    discord_bracket_state.request_refresh(tournament["id"], revise=True)
+    return await discord_bracket.sweep(flow.db)
+
+
+@pytest.mark.asyncio
+async def test_an_archived_thread_is_opened_for_the_edit_and_archived_again(flow, bot, monkeypatch):
+    """Discord bearbeitet im Archiv nichts: Der Bot öffnet den Thread, bearbeitet den Endstand und archiviert ihn sofort wieder -
+    er taucht nicht dauerhaft wieder in der Liste auf."""
+    thread = FakeThread(archived=True)
+    outcome = await revise_in(flow, bot, monkeypatch, thread)
+    assert outcome["edited"] == 1, outcome
+    assert [call[0] for call in thread.calls] == ["thread", "message", "thread"], thread.calls
+    assert thread.calls[0][1] == {"archived": False} and thread.calls[2][1] == {"archived": True}
+    assert thread.archived is True
+
+
+@pytest.mark.asyncio
+async def test_an_open_thread_is_only_edited_and_stays_open(flow, bot, monkeypatch):
+    """Gegenprobe: Ein offener Thread wird nur bearbeitet - nie archiviert."""
+    open_thread = FakeThread(archived=False)
+    assert (await revise_in(flow, bot, monkeypatch, open_thread))["edited"] == 1
+    assert [call[0] for call in open_thread.calls] == ["message"] and open_thread.archived is False
+
+
+@pytest.mark.asyncio
+async def test_a_failed_edit_in_an_archived_thread_archives_it_again(flow, bot, monkeypatch):
+    """Scheitert die Bearbeitung nach dem Öffnen (Nachricht gelöscht), kommt der Thread trotzdem zurück ins Archiv - und es
+    wird nichts neu gepostet (#2375)."""
+    gone = FakeThread(archived=True, message_gone=True)
+    outcome = await revise_in(flow, bot, monkeypatch, gone)
+    assert outcome["edited"] == 0 and outcome["posted"] == 0, outcome
+    assert gone.calls == [("thread", {"archived": False}), ("thread", {"archived": True})] and gone.archived is True
 
 
 @pytest.mark.asyncio
