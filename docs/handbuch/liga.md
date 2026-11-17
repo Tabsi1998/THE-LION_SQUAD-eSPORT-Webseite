@@ -276,7 +276,7 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 | **Spielbetrieb** | Modi der Season mit Maps, Mindestgröße, Ergebnisregeln, Serie (Best of, Teamgröße, Modus je Map, Map-Wiederholung), Fristen nach dem Spiel, Check-in (2.7b), Veto (2.7d), Vorfälle (2.7e) | `#spielbetrieb` |
 | **Termine** | Kalender, Standardtermin, Sperrzeiten, Antwortfrist, Terminregeln (2.7a), Erinnerungen (2.7f) | `#termine` |
 | **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7c), Eingang der Anmeldungen, Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#kader` |
-| **Tabelle** | Punkte, Gleichstand, Ausscheiden, Gleichstände der Staffeln (3.5) | `#tabelle` |
+| **Tabelle** | Punkte, Gleichstand, Ausscheiden; je Staffel **Tabelle öffnen** zur Staffel-Seite mit Tabelle und Gleichstand-Entscheid (3.5) | `#tabelle` |
 | **Proteste** | Eingang der Verfahren und ihre Fristen (3.4) | `#proteste` |
 | **Strafen** | verhängen, bestätigen, widerrufen, Einsprüche (3.4a) | `#strafen` |
 | **Regelwerk und Sperrliste** | Stand des Regelwerks mit Weg dorthin (2.11), Sperrliste (2.1a) | `#regelwerk`, `#sperrliste` |
@@ -461,10 +461,16 @@ Unter jedem Co-Team, das in einer Staffel spielt, zeigt **Spielberechtigung** di
 Liga-Verwaltung: Oben stehen die Brotkrumen **Liga › Season › Liga 1 · Staffel A** und der Stand. Im Reiter **Überblick** findest du den
 Liga-Ablauf, was noch fehlt, **Liga starten** bzw. den Status (mit denselben Rückfragen wie bisher), die Zahlen und die Wege zu Leitstand,
 Season und Ligaseite. Im Reiter **Teilnehmer** stehen die Co-Teams mit **Co-Team zuteilen**, **Entfernen**, **Austritt**,
-**Disqualifizieren**, **Kader**, aktiven Strafen und „Nachgemeldet ab Woche …“. Spielplan, Spiele und Tabelle kommen später dazu – bis
-dahin führen diese Ziele weiter in die Turnierverwaltung, und die Schritte unten gelten unverändert. Knöpfe gibt es nur mit der passenden
-Zuständigkeit: Zuteilen, Entfernen, Austritt und Disqualifizieren mit **Teams freigeben**, Status und **Liga starten** mit **Liga verwalten**
-(das gilt jetzt auch in der Turnierverwaltung).
+**Disqualifizieren**, **Kader** (mit „1 gesperrt“, „1 wartet auf Freigabe“ oder „1 ohne gültige ID“), aktiven Strafen und „Nachgemeldet ab
+Woche …“. Im Reiter **Spielplan** stehen die Spielwochen mit Frist und dem Termin je Partie samt Herkunft (vereinbart, Heimrecht,
+Standardzeit, von der Liga-Leitung); **ändern** setzt einen Termin (**Spiele betreuen**). Vor dem Start gibt es dort **Vorschau neu
+mischen** und **Spieltage neu auslosen** (**Season konfigurieren**), dazu immer **CSV Matchplan** und **PDF Spiele**. Im Reiter **Spiele und
+Ergebnisse** steht je Spielwoche jedes Spiel mit Stand, Ergebnis und Hinweisen zu Check-in, Veto, Vorfall und Verfahren; bedient wird das
+auf der Matchseite (**Zum Spiel**). Hier gibt es **Ergebnis eintragen** bzw. **korrigieren** und **Beide nicht erschienen** (**Ergebnisse
+korrigieren**, im eigenen Spiel trägt eine zweite Person ein). Der Reiter **Tabelle** zeigt die Tabelle mit Zonen, **PDF Tabelle** und den
+Gleichstand-Entscheid (3.5). Bis zur Umstellung bleibt auch die Turnierverwaltung nutzbar, die Schritte unten gelten unverändert. Knöpfe
+gibt es nur mit der passenden Zuständigkeit: Zuteilen, Entfernen, Austritt und Disqualifizieren mit **Teams freigeben**, Status und **Liga
+starten** mit **Liga verwalten** (das gilt jetzt auch in der Turnierverwaltung).
 
 1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
@@ -1435,14 +1441,15 @@ Spalte **Maps** (gewonnen:verloren) gibt es am PC. App und TV zeigen dieselben P
 </tr>
 </table>
 
-**Entscheid der Leitung:** Admin → Liga → Season → Reiter **Tabelle** → **Tabelle und Gleichstand**. Je gestarteter Staffel stehen dort die
-geteilten Plätze. **Reihenfolge festlegen** → mit den Pfeilen sortieren → **Grund** (mindestens fünf Zeichen, steht
+**Entscheid der Leitung:** Admin → Liga → Season → Reiter **Tabelle** → bei der Staffel **Tabelle öffnen** (oder auf der Staffel-Seite der
+Reiter **Tabelle**). Unter der Tabelle mit Zonen und **PDF Tabelle** stehen im Feld **Gleichstand** die geteilten Plätze. Die Season selbst
+hält nur die Regeln (Punkte, Gleichstand, Ausscheiden). **Reihenfolge festlegen** → mit den Pfeilen sortieren → **Grund** (mindestens fünf Zeichen, steht
 öffentlich an der Tabelle: „Platz durch Entscheid der Leitung: …“) → **Festlegen**. Das geht nur bei echtem Gleichstand und
 nur für alle Teams auf diesem Platz; über das eigene Team entscheidet eine andere Person. Recht: **Ergebnisse
 korrigieren**. Ändert ein späteres Ergebnis den Gleichstand, gilt der Entscheid nicht mehr (Hinweis **Gilt nicht mehr**)
 und bleibt zur Nachvollziehbarkeit stehen; **Zurücknehmen** löscht ihn mit Grund.
 
-<img src="../assets/liga/liga-gleichstand-entscheid-handy.png" alt="Season-Verwaltung am Handy, Feld Tabelle und Gleichstand: Platz 4 geteilt mit Knopf Reihenfolge festlegen, darunter ein älterer Entscheid mit Gilt nicht mehr und Zurücknehmen" width="300">
+<img src="../assets/liga/liga-gleichstand-entscheid-handy.png" alt="Staffel-Seite am Handy, Reiter Tabelle, Feld Gleichstand: Platz 4 geteilt mit dem Knopf Reihenfolge festlegen, darunter ein älterer Entscheid mit Gilt nicht mehr und Zurücknehmen" width="300">
 
 **Austritt, Auflösung, Disqualifikation:** In der Teilnehmerliste der Staffel **Austritt eintragen** bzw.
 **Disqualifizieren** (eine Auflösung tragt ihr als Austritt mit Grund „Team aufgelöst“ ein). Mit der Vorgabe neuer
