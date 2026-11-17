@@ -164,10 +164,11 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   wird nie beim ersten Besuch und nie direkt nach dem Anmelden, sondern nach einer Turnier- oder Event-Anmeldung (#1208): Zuerst
   erscheint unten der Kasten **„Sollen wir dich rufen, wenn du dran bist?“** mit drei Zeilen – Aufruf, Check-in, Ergebnis.
   Erst **Ja, rufen** ruft die Frage des Browsers auf. **Später** schließt ihn; gefragt wird frühestens bei der nächsten
-  Anmeldung wieder. Wurde das eigene Team angemeldet, kommt der Kasten beim nächsten Öffnen der Übersicht (Dashboard). Gemerkt
-  wird das je Konto im Browser, nicht am Server. Hat der Browser abgelehnt, fragt die Seite nicht mehr; auf Turnier- und
-  Event-Seiten steht dann leise **„Aufrufe sind aus – einschalten“**, der Link führt zu Einstellungen → Benachrichtigungen
-  (dort unter **Dieser Browser**, wie man es im Browser wieder erlaubt). Ein Tipp auf die Meldung öffnet die passende Seite (ein offener Tab mit dieser Seite wird nach vorn geholt),
+  Anmeldung wieder. Bei einer Event-Anmeldung mit **„Spielst du auch mit?“** kommt der Kasten erst, wenn dieses Blatt zu ist.
+  Wurde das eigene Team angemeldet, kommt er beim nächsten Öffnen der Übersicht (Dashboard), dann mit **„Dein Team ist
+  angemeldet“** über der Frage. Gemerkt wird das je Konto im Browser, nicht am Server; Abmelden setzt es zurück. Hat der Browser abgelehnt, fragt die Seite nicht mehr; auf Turnier- und
+  Event-Seiten steht dann leise **„Aufrufe sind aus – einschalten“**, der Link führt direkt zur Karte **Dieser Browser** unter
+  Einstellungen → Benachrichtigungen, die erklärt, wie man es im Browser wieder erlaubt. Ein Tipp auf die Meldung öffnet die passende Seite (ein offener Tab mit dieser Seite wird nach vorn geholt),
   beim Check-in gibt es den Knopf **Jetzt einchecken**. Abmelden vom Konto, Passwort ändern und „Überall abmelden“ melden den
   Browser ab; Meldungen kommen, solange die Anmeldung auf der Website in diesem Browser gilt. Einrichten muss es der
   Betreiber einmal mit zwei Schlüsseln in der Server-Konfiguration ([Betrieb](../BETRIEB.md)); ohne sie gibt es den Kanal nicht.
