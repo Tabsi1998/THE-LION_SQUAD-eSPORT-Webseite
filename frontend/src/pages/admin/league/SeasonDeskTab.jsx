@@ -24,6 +24,8 @@ import { SeasonBroadcastSheet } from "./SeasonBroadcastSheet";
 // Stand einer Rundnachricht im Protokoll (M-1): „hängt“ heißt, im Dialog der Rundnachricht lässt sie sich fortsetzen.
 const BROADCAST_STATE = { sent: "verschickt", sending: "wird verschickt", interrupted: "Versand hängt", failed: "abgebrochen" };
 const WHEN = { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" };
+// Gruppen, deren Aufgaben nie zu einer Staffel gehören - mit Staffel-Filter blendet der Leitstand sie ganz aus.
+const SEASON_GROUPS = new Set(["applications", "rules"]);
 const ACTION = "tls-btn tls-btn--secondary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider sm:w-auto";
 
 /** Der Satz einer Aufgabe. Vorfälle und Regelwerk sagen es wie „Mein Dienst“ - mit derselben Funktion. */
@@ -220,7 +222,10 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
   const mine = staffelId ? scopedMine : data?.mine;
   const groups = useMemo(() => filterGroups(scoped, filter), [scoped, filter]);
   const open = groups.filter((group) => group.items.length);
-  const quiet = groups.filter((group) => !group.items.length);
+  // Mit Staffel-Filter fehlen die Gruppen der ganzen Season (Anmeldungen, Regelwerk) und alle, deren Aufgaben ausgeblendet sind - sie
+  // stehen nicht als „ohne offene Aufgabe“ da, der Filter nennt sie.
+  const quiet = groups.filter((group) => !group.items.length && !(staffelId && (SEASON_GROUPS.has(group.key)
+    || (data?.groups || []).some((row) => row.key === group.key && (row.items || []).some((item) => !item.staffel_id)))));
   const failed = groups.filter((group) => group.failed);
   const shown = open.reduce((sum, group) => sum + group.items.length, 0);
   const now = Date.now();
