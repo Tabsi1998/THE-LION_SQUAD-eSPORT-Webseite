@@ -87,7 +87,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
             <th scope="col" className="text-left pl-3 sm:pl-4 pr-1 py-2.5 w-12 sm:w-16 font-semibold">#</th>
             <th scope="col" className="text-left px-2 py-2.5 font-semibold">{nameLabel}</th>
             {columns.map((column) => (
-              <th key={column.key} scope="col" title={column.title} className={`px-1.5 sm:px-2.5 py-2.5 font-semibold ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4" : ""}`}>
+              <th key={column.key} scope="col" title={column.title} data-col={column.key} className={`px-1.5 sm:px-2.5 py-2.5 font-semibold ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4" : ""}`}>
                 {column.label}
               </th>
             ))}
@@ -126,7 +126,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                   <Notes row={row} />
                 </td>
                 {columns.map((column) => (
-                  <td key={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-display text-base font-bold text-white" : "text-white/70"}`}>
+                  <td key={column.key} data-col={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-display text-base font-bold text-white" : "text-white/70"}`}>
                     {/* Punkte zählen beim ersten Sichtbarwerden hoch (#1969); beim Nachladen steht der neue Wert sofort da -
                         die Zeile selbst leuchtet schon auf (tls-changed-row), ein zweites Aufleuchten wäre zu viel. */}
                     {column.key === "form" ? <Form form={row.form} /> : column.strong ? <CountUp value={standingCell(column, row)} flash={false} /> : standingCell(column, row)}

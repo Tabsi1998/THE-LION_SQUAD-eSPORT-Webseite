@@ -350,6 +350,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(panel.getByTestId("staffel-table-zones")).toBeVisible();
     await expect(panel.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", /\/api\/exports\/tournaments\/t1\/standings\.pdf$/);
     await expect(panel.getByTestId("season-tie-t1-5")).toContainText("Platz 5");
+    // Name und Pkt ohne Wischen (am Handy ohne Spalte „Form“), der lange Name ganz.
+    const row = panel.getByTestId("standing-row-r1");
+    const points = await row.locator('[data-col="points"]').boundingBox();
+    expect(points.x + points.width).toBeLessThanOrEqual(width);
+    await expect(row.locator(".tls-standing-name")).toHaveAttribute("title", LONG[0]);
+    if (width < 640) await expect(row.locator('[data-col="form"]')).toBeHidden();
+    else await expect(row.locator('[data-col="form"]')).toBeVisible();
     await noSideScroll(page);
     await touchTargets(page, "staffel-panel-tabelle");
     await shot(page, `tabelle-${width}`);
