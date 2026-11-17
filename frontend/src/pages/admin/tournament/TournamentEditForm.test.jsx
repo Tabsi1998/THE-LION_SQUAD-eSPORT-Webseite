@@ -114,6 +114,26 @@ test("Staffel: die Antwortfrist auf Terminvorschläge kommt seit #2106 aus der S
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-s", { title: "Staffel A (Probe)" }));
 });
 
+test("Staffel-Seite (#2262): ohne „Aus der Season“ und ohne „Vorschau neu mischen“ - beides steht dort an eigener Stelle", async () => {
+  render(<MemoryRouter><TournamentEditForm tournament={STAFFEL} onSaved={() => {}} seasonValues={false} remix={false} /></MemoryRouter>);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-season-values")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
+  expect(screen.getByText("Banner der Staffel")).toBeInTheDocument();
+});
+
+test("Staffel: Liga-Wörter statt Turnier-Beispiel und kein Event-Satz - normale Turniere unverändert", async () => {
+  const { unmount } = renderStaffel();
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.getByTestId("tr-edit-format-label")).toHaveAttribute("placeholder", "z. B. Liga · Staffel A");
+  expect(screen.queryByTestId("tr-edit-event")).toBeNull();
+  unmount();
+  render(<MemoryRouter><TournamentEditForm tournament={BASE} onSaved={() => {}} /></MemoryRouter>);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.getByTestId("tr-edit-format-label")).toHaveAttribute("placeholder", "z.B. Gamers Heaven F1 Heat");
+  expect(screen.getByTestId("tr-edit-event")).toHaveTextContent("Gehört zu keinem Event");
+});
+
 test("Staffel nach dem Start: kein Neu-Mischen mehr", async () => {
   renderStaffel({ ...STAFFEL, status: "live" });
   await screen.findByTestId("tr-edit-season-values");

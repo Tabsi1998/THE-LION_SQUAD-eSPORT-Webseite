@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from auth import require_admin
+from auth import get_current_user
 from database import get_db
 from models import new_id, now_utc
 from services.access_links import (
@@ -18,7 +18,8 @@ from services.access_links import (
     parse_dt,
 )
 from services.league_scope import is_league_staffel
-from services.tournament_permissions import require_lead_for_staffel
+from services.permissions import area_refusal
+from services.tournament_permissions import is_staffel, require_lead_for_staffel
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/access-links", tags=["access-links"])
@@ -34,6 +35,18 @@ class AccessLinkCreate(BaseModel):
     email: str | None = Field(default=None, max_length=320)
     note: str | None = Field(default=None, max_length=500)
     notify_user: bool = False
+
+
+async def _require_link_rights(me: dict, target_type: str | None, target_id: str | None) -> None:
+    """Zugangslinks gehören zur Turnierleitung (Bereich Turniere). An einer Liga-Staffel zählt nur das Liga-Recht „Liga verwalten“
+    (#2262, Entwurf 1.4 Nr. 3, Nr. 79/80): Der Bereich Turniere gibt dort nichts, und die Liga-Leitung braucht ihn nicht - sonst sah
+    die reine Liga-Leitung die Zugangslinks ihrer Staffel nie."""
+    if target_type == "tournament" and target_id and await is_staffel(target_id):
+        await require_lead_for_staffel(me, target_id)
+        return
+    refusal = await area_refusal(me, ("tournaments",))
+    if refusal:
+        raise HTTPException(status_code=403, detail=refusal)
 
 
 def _collection_for_target(target_type: str):
@@ -105,11 +118,10 @@ async def list_access_links(
     target_type: str | None = None,
     target_id: str | None = None,
     include_inactive: bool = False,
-    me: dict = Depends(require_admin()),
+    me: dict = Depends(get_current_user),
 ):
     db = get_db()
-    if target_type == "tournament" and target_id:
-        await require_lead_for_staffel(me, target_id)
+    await _require_link_rights(me, target_type, target_id)
     # TV-Schlüssel (#1110) wohnen unter TV & Beamer - hier stünden sie doppelt.
     query: dict = {"grants": {"$ne": "display"}}
     if target_type:
@@ -128,11 +140,10 @@ async def list_access_links(
 async def cleanup_access_links(
     target_type: str | None = None,
     target_id: str | None = None,
-    me: dict = Depends(require_admin()),
+    me: dict = Depends(get_current_user),
 ):
     db = get_db()
-    if target_type == "tournament" and target_id:
-        await require_lead_for_staffel(me, target_id)
+    await _require_link_rights(me, target_type, target_id)
     query: dict = {"is_active": {"$ne": False}}
     if target_type:
         if target_type not in TARGET_TYPES:
@@ -177,11 +188,10 @@ def _utc_iso(moment: datetime | None) -> str | None:
 
 
 @router.post("")
-async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_admin())):
+async def create_access_link(body: AccessLinkCreate, me: dict = Depends(get_current_user)):
     db = get_db()
+    await _require_link_rights(me, body.target_type, body.target_id)
     target = await _target_doc(body.target_type, body.target_id)
-    if body.target_type == "tournament":
-        await require_lead_for_staffel(me, body.target_id)
     bound_user = None
     if body.user_id:
         bound_user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1})
@@ -251,13 +261,13 @@ async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_
 
 
 @router.delete("/{link_id}")
-async def revoke_access_link(link_id: str, me: dict = Depends(require_admin())):
+async def revoke_access_link(link_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     existing = await db.access_links.find_one({"id": link_id}, {"_id": 0})
     if not existing:
+        await _require_link_rights(me, None, None)
         raise HTTPException(status_code=404, detail="Speziallink nicht gefunden")
-    if existing.get("target_type") == "tournament":
-        await require_lead_for_staffel(me, existing.get("target_id"))
+    await _require_link_rights(me, existing.get("target_type"), existing.get("target_id"))
     now = now_utc().isoformat()
     await db.access_links.update_one(
         {"id": link_id},

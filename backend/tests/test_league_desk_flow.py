@@ -818,6 +818,135 @@ def test_log_query_uses_anchored_prefixes_without_alternation_on_indexed_fields(
         assert set(branch) in ({"target_id", "action"}, {"data.season_id", "action"})
 
 
+def test_log_query_takes_the_staffel_actions_as_a_fixed_list_on_the_target_index():
+    """#2262: Die Staffel-Aktionen auf dem Turnierweg zählen nur an den Staffeln und nur aus der festen Liste - kein Präfix
+    ``tournament.``, sonst stünden Phasen, Läufe und Auswertungen der Staffel-Turniere mit im Protokoll."""
+    from services.league_desk import STAFFEL_LOG_ACTIONS, log_query
+
+    query = log_query("s1", ["s1", "t1", "t2"], staffel_ids=["t1", "t2"])
+    fixed = [branch for branch in query["$or"] if "$in" in branch["action"]]
+    assert fixed == [{"target_id": {"$in": ["t1", "t2"]}, "action": {"$in": sorted(STAFFEL_LOG_ACTIONS)}}]
+    assert all(action.startswith("tournament.") for action in STAFFEL_LOG_ACTIONS)
+    one = log_query("s1", ["t1"], staffel_ids=["t1"], staffel="t1")
+    season_branches = [branch for branch in one["$or"] if "data.season_id" in branch]
+    assert season_branches and all(branch["data.tournament_id"] == "t1" for branch in season_branches)
+    assert all(branch.get("target_id", {"$in": ["t1"]}) == {"$in": ["t1"]} for branch in one["$or"])
+
+
+def test_log_label_names_the_new_stand_of_a_staffel_in_league_words():
+    from services.league_desk import log_label
+
+    assert log_label("tournament.status.change", {"previous_status": "draft", "status": "live"}) == "Staffel · Liga gestartet"
+    assert log_label("tournament.status.change", {"previous_status": "paused", "status": "live"}) == "Staffel · fortgesetzt"
+    assert log_label("tournament.status.change", {"status": "completed"}) == "Staffel · beendet"
+    assert log_label("tournament.status.change", {"status": "cancelled"}) == "Staffel · abgesagt"
+    assert log_label("tournament.status.change", None) == "Staffel · Stand geändert"
+    assert log_label("tournament.participant.withdrawn") == "Co-Team · ausgetreten"
+    assert log_label("tournament.lock") == "Staffel · gesperrt"
+    assert log_label("match.walkover") == "Kampflos gewertet"
+    assert log_label("match.forfeit.double") == "Kampflos gewertet · beide nicht erschienen"
+    assert "Entwurf" not in str([log_label("tournament.status.change", {"status": value}) for value in ("draft", "live", "archived")])
+
+
+async def staffel_log_world(flow) -> dict:
+    """Zwei Staffeln derselben Season und ein Turnier ohne Liga - je mit Einträgen auf dem Turnierweg."""
+    from league_match_world import staffel as make_staffel
+
+    world = await desk_world(flow)
+    other = await make_staffel(flow, world["season_id"], "B")
+    plain = await flow.create_tournament(title="Probe-Cup")
+    a, b = world["tournament"]["id"], other["id"]
+    base = now_utc()
+    rows = [
+        ("t-start", "tournament.status.change", a, {"previous_status": "draft", "status": "live", "reason": "Mila fehlt"}),
+        ("t-edit", "tournament.update", a, {"fields": ["title"]}),
+        ("t-out", "tournament.participant.withdrawn", a, {"registration_id": world["reg_a"]["id"], "reason": "Ida zieht um",
+                                                         "summary": "Loewen treten aus"}),
+        ("t-back", "tournament.participant.reinstated", a, {"registration_id": world["reg_a"]["id"], "sanction_id": "x"}),
+        ("t-stage", "tournament.stage.create", a, {"stage_id": "s"}),
+        ("b-lock", "tournament.lock", b, {"status": "completed"}),
+        ("cup-start", "tournament.status.change", plain["id"], {"status": "live"}),
+        ("a-match", "match.reschedule.request", a, {"match_id": world["match"]["id"]}),
+        ("a-sanction", "league.sanction.create", "sanktion-1", {"season_id": world["season_id"], "tournament_id": a}),
+        ("b-sanction", "league.sanction.create", "sanktion-2", {"season_id": world["season_id"], "tournament_id": b}),
+        ("season", "league.season.update", world["season_id"], {}),
+    ]
+    await flow.db.audit_logs.insert_many([
+        {"id": key, "action": action, "actor_id": world["staff"]["id"], "target_id": target, "data": data,
+         "created_at": (base - timedelta(minutes=index)).isoformat()} for index, (key, action, target, data) in enumerate(rows)])
+    world["other"] = other
+    world["log"] = f"{ADMIN}/seasons/{world['season_id']}/desk/log"
+    return world
+
+
+@pytest.mark.asyncio
+async def test_season_log_shows_the_staffel_actions_of_the_tournament_way_in_league_words(flow):
+    """#2262 (Entwurf 1.4 Nr. 5): Liga starten, Bearbeiten, Sperren und Austritt der Staffeln stehen im Protokoll der Season - mit
+    Liga-Wörtern und ohne Gründe aus den Daten. Phasen und fremde Turniere bleiben draußen."""
+    world = await staffel_log_world(flow)
+    flow.act_as(world["staff"])
+    body = (await flow.get(world["log"])).json()
+    labels = {row["id"]: row["label"] for row in body["items"]}
+    assert set(labels) == {"t-start", "t-edit", "t-out", "t-back", "b-lock", "a-match", "a-sanction", "b-sanction", "season"}
+    assert labels["t-start"] == "Staffel · Liga gestartet" and labels["t-out"] == "Co-Team · ausgetreten"
+    assert labels["b-lock"] == "Staffel · gesperrt" and labels["t-edit"] == "Staffel · Darstellung geändert"
+    staffel_of = {row["id"]: row["staffel"] for row in body["items"]}
+    assert staffel_of["t-start"] == world["tournament"]["title"] and staffel_of["b-lock"] == world["other"]["title"]
+    assert "Mila" not in str(body) and "Ida" not in str(body) and "Loewen" not in str(body), "keine Gründe und Namen aus den Daten"
+
+
+@pytest.mark.asyncio
+async def test_staffel_filter_shows_only_that_staffel_and_reads_with_any_capability(flow):
+    """Reiter Protokoll der Staffel-Seite: nur diese Staffel, auch ihre Strafen an der Season; lesen darf jede Zuständigkeit, die
+    Wiederaufnahme nach einer Strafe nur „Strafen“. Eine Staffel einer anderen Season gibt 404."""
+    world = await staffel_log_world(flow)
+    a = world["tournament"]["id"]
+
+    async def seen(user, staffel=a) -> set[str]:
+        flow.act_as(user)
+        response = await flow.get(world["log"], params={"staffel": staffel})
+        assert response.status_code == 200, response.text
+        return {row["id"] for row in response.json()["items"]}
+
+    assert await seen(world["staff"]) == {"t-start", "t-edit", "t-out", "t-back", "a-match", "a-sanction"}
+    assert await seen(world["staff"], world["other"]["id"]) == {"b-lock", "b-sanction"}
+    assert await seen(await lead_of(flow, "Spielleitung", "matches")) == {"t-start", "t-edit", "t-out", "a-match"}
+    assert await seen(await lead_of(flow, "Strafleitung", "sanctions")) == {"t-start", "t-edit", "t-out", "t-back", "a-match", "a-sanction"}
+
+    foreign = await flow.create_tournament(title="Fremde Staffel", league_context={"league_id": "liga", "season_id": "andere", "staffel": "C"})
+    flow.act_as(world["staff"])
+    response = await flow.get(world["log"], params={"staffel": foreign["id"]})
+    assert response.status_code == 404
+    flow.act_as(await flow.add_user(name="Fremd2"))
+    response = await flow.get(world["log"], params={"staffel": a})
+    assert response.status_code == 403, "ohne Zuständigkeit in der Liga kein Protokoll"
+
+
+@pytest.mark.asyncio
+async def test_locking_a_finished_staffel_lands_in_its_log(flow):
+    """Über die echte Route: Sperren schreibt ``tournament.lock`` - die Staffel-Seite zeigt es im Reiter Protokoll."""
+    world = await desk_world(flow)
+    tid = world["tournament"]["id"]
+    await flow.db.tournaments.update_one({"id": tid}, {"$set": {"status": "completed"}})
+    flow.act_as(world["staff"])
+    response = await flow.post(f"/api/tournaments/{tid}/lock")
+    assert response.status_code == 200, response.text
+    items = (await flow.get(f"{ADMIN}/seasons/{world['season_id']}/desk/log", params={"staffel": tid})).json()["items"]
+    assert [row["label"] for row in items if row["action"] == "tournament.lock"] == ["Staffel · gesperrt"]
+
+
+@pytest.mark.asyncio
+async def test_desk_items_name_their_staffel(flow):
+    """#2262: „Offen in dieser Staffel“ zählt die Aufgaben mit ``staffel_id`` - Aufgaben der Season haben keine."""
+    world = await desk_world(flow)
+    await set_match(flow, world, result_overdue_at=at(hours=-2), scheduled_at=at(days=-3))
+    await flow.db.league_applications.insert_one({"id": "app-1", "season_id": world["season_id"], "status": "submitted",
+                                                  "display_name": "Neue Wölfe", "created_at": at(hours=-1)})
+    data = await desk(flow, world)
+    assert [row["staffel_id"] for row in group(data, "overdue")] == [world["tournament"]["id"]]
+    assert [row["staffel_id"] for row in group(data, "applications")] == [None]
+
+
 @pytest.mark.asyncio
 async def test_log_shows_only_this_season_without_free_text_and_in_pages(flow):
     world = await desk_world(flow)
