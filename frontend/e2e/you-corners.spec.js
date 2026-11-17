@@ -99,6 +99,64 @@ function corners(locator, pseudo) {
 
 const ownRegistration = (set) => set.bracket.registrations.find((reg) => reg.is_mine);
 
+/**
+ * Tabellenzeile (#1316, Fix-Runde): die Winkel liegen als Hintergrund an der ersten und der letzten sichtbaren Zelle -
+ * je vier Striche plus die Fläche. Dazu: hängt etwas an der Zeile selbst (::after)?
+ */
+function rowCorners(row) {
+  return row.evaluate((tr) => {
+    const cells = [...tr.children].filter((cell) => getComputedStyle(cell).display !== "none");
+    const layers = (cell) => (getComputedStyle(cell).backgroundImage.match(/linear-gradient/g) || []).length;
+    const pos = (cell) => getComputedStyle(cell).backgroundPosition;
+    return {
+      first: layers(cells[0]), firstPos: pos(cells[0]),
+      last: layers(cells[cells.length - 1]), lastPos: pos(cells[cells.length - 1]),
+      middle: cells.slice(1, -1).map(layers),
+      rowAfter: getComputedStyle(tr, "::after").content,
+      firstColor: getComputedStyle(cells[0]).backgroundColor,
+    };
+  });
+}
+
+const SEASON_ROW = (rank, id, name) => ({ rank, user_id: id, username: name.toLowerCase(), display_name: name, points: 120 - rank * 10, events_count: 4, wins: 1, source_breakdown: [] });
+const SEASON = {
+  season: { id: "s1", slug: "2026", name: "Jahreswertung 2026", status: "active" },
+  standings: [SEASON_ROW(1, "u-1", "NeonFalke"), SEASON_ROW(2, PLAYER.id, "Spieler"), SEASON_ROW(3, "u-3", "LunaByte"), SEASON_ROW(4, "u-4", "PixelPirat"), SEASON_ROW(5, "u-5", "KartKönigin")],
+};
+
+async function mockSeason(page) {
+  await consent(page);
+  await page.route("**/api/**", (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === "/api/seasons/2026/standings") return route.fulfill(json(SEASON));
+    if (pathname === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD" }));
+    if (pathname === "/api/auth/me") return route.fulfill(json(PLAYER));
+    return route.fulfill(json({}));
+  });
+}
+
+const GAMES = ["Rocket League", "Mario Kart 8", "EA FC 26", "Valorant"].map((name, index) => ({ id: `g${index}`, name, slug: `spiel-${index}`, tournaments: 3 + index, references: 0 }));
+
+async function mockEsports(page) {
+  await consent(page);
+  await page.route("**/api/**", (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === "/api/home/about") return route.fulfill(json({ games: GAMES }));
+    if (pathname === "/api/tournaments" || pathname === "/api/f1/challenges") return route.fulfill(json([]));
+    if (pathname === "/api/leagues") return route.fulfill(json({ leagues: [] }));
+    if (pathname === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD" }));
+    if (pathname === "/api/auth/me") return route.fulfill(json({ detail: "anonym" }, 401));
+    return route.fulfill(json({}));
+  });
+}
+
+// Baum mit Team-Anmeldung: die eigene Anmeldung gehört einem Team - das Etikett heißt „Dein Team“.
+const teamFinished = () => {
+  const set = JSON.parse(JSON.stringify(fixture.finished));
+  for (const reg of set.bracket.registrations) if (reg.is_mine) reg.team_id = "tm-1";
+  return set;
+};
+
 test.describe("„du“ mit Ecken und Etikett (#1316)", () => {
   test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
 
@@ -111,8 +169,32 @@ test.describe("„du“ mit Ecken und Etikett (#1316)", () => {
       await expect(own).toHaveCount(1);
       await expect(own).toHaveClass(/\btls-you\b/);
       await expect(own.locator(".tls-standing-me")).toHaveText("Du");
-      expect(await corners(own, "::after")).toMatchObject({ layers: 8 });
+      // Nichts hängt an der Zeile selbst: erste und letzte sichtbare Zelle tragen je vier Striche und die Fläche.
+      const cells = await rowCorners(own);
+      expect(cells).toMatchObject({ first: 5, last: 5, rowAfter: "none" });
+      expect(cells.firstPos).toContain("0% 0%");
+      expect(cells.lastPos).toContain("100% 0%");
+      expect(cells.middle.every((count) => count === 1)).toBe(true);
       await expect(page.locator("tr.tls-you")).toHaveCount(1);
+      expect(await sideScroll(page)).toBeLessThanOrEqual(1);
+    });
+
+    test(`Rangliste mit Sticky-Spalten: die Winkel bleiben über der Fläche der Spalte - ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await mockTournament(page, fixture.league);
+      await page.goto(`/tournaments/${fixture.league.tournament.slug}/standings`);
+      const own = page.locator("tr[data-mine='true']");
+      await expect(own).toHaveCount(1);
+      // Dieselbe Tabelle in der Hülle der Staffel-Seite (#2262): # und Name kleben beim Wischen und haben eine eigene Fläche.
+      await page.locator(".tls-standings").first().evaluate((node) => node.parentElement.classList.add("staffel-standings"));
+      const cells = await rowCorners(own);
+      expect(cells).toMatchObject({ first: 5, last: 5 });
+      if (width < 640) {
+        const sticky = await own.evaluate((tr) => getComputedStyle(tr.children[0]).position);
+        expect(sticky).toBe("sticky");
+        // Die Fläche der Sticky-Spalte bleibt deckend, die Winkel liegen darauf.
+        expect(cells.firstColor).not.toBe("rgba(0, 0, 0, 0)");
+      }
       expect(await sideScroll(page)).toBeLessThanOrEqual(1);
     });
 
@@ -130,7 +212,22 @@ test.describe("„du“ mit Ecken und Etikett (#1316)", () => {
       await expect(page.locator(".tls-bracket-node.tls-you:not([data-mine='true'])")).toHaveCount(0);
       const node = page.locator(".tls-bracket-node.tls-you").first();
       expect(await corners(node, "::after")).toMatchObject({ layers: 8, inset: "-5px" });
-      await expect(node.getByText("Du", { exact: true }).first()).toBeVisible();
+      await expect(node.locator(".tls-you-tag").first()).toHaveText("Du");
+      // Pille in gemischter Schreibung - nicht wie ein Initialen-Kästchen „DU“.
+      expect(await node.locator(".tls-you-tag").first().evaluate((tag) => getComputedStyle(tag).textTransform)).toBe("none");
+      expect(await sideScroll(page)).toBeLessThanOrEqual(1);
+    });
+
+    test(`Jahreswertung: Ecken an deiner Zeile, am Podest nur „Du“ - ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await mockSeason(page);
+      await page.goto("/seasons/2026");
+      const own = width >= 768 ? page.getByTestId(`season-row-${PLAYER.id}`) : page.getByTestId(`season-item-${PLAYER.id}`);
+      await expect(own).toHaveClass(/\btls-you\b/);
+      await expect(page.locator(".tls-you:visible")).toHaveCount(1);
+      const podium = page.locator("a[href='/u/spieler']").filter({ hasNot: page.locator("tr") }).first();
+      await expect(podium.locator(".tls-you-tag")).toHaveText("Du");
+      await expect(podium).not.toHaveClass(/\btls-you\b/);
       expect(await sideScroll(page)).toBeLessThanOrEqual(1);
     });
 
@@ -145,6 +242,15 @@ test.describe("„du“ mit Ecken und Etikett (#1316)", () => {
       await expect(own.locator(".tls-you-tag")).toHaveText("Du");
       expect(await corners(frame, "::after")).toMatchObject({ layers: 8, inset: "-5px" });
       await expect(page.getByTestId("calendar-list").getByTestId("calendar-item-event-e-lan").locator(".tls-you")).toHaveCount(0);
+      expect(await sideScroll(page)).toBeLessThanOrEqual(1);
+      // Monat: der Tag mit deinem Termin trägt die Ecken an der Kante, ohne Etikett; die Legende zeigt dasselbe Zeichen.
+      await page.getByTestId("calendar-view-month").click();
+      const day = page.getByTestId("calendar-day-2026-12-12");
+      await expect(day).toHaveClass(/\btls-you\b/);
+      expect(await corners(day, "::after")).toMatchObject({ layers: 8, inset: "0px" });
+      await expect(day.locator(".tls-you-tag")).toHaveCount(0);
+      await expect(page.getByTestId("calendar-day-2026-12-11")).not.toHaveClass(/\btls-you\b/);
+      await expect(page.getByTestId("calendar-legend-you")).toHaveClass(/\btls-you\b/);
       expect(await sideScroll(page)).toBeLessThanOrEqual(1);
     });
   }
@@ -173,7 +279,50 @@ test.describe("Tastatur-Fokus mit Ecken (#1316)", () => {
     expect(forced.style).toBe("solid");
     expect(forced.width).toBe("2px");
     expect(forced.color).not.toBe("rgba(0, 0, 0, 0)");
+    // „du“ hängt im Kontrast-Modus nicht nur am Wort: der Tag mit deinem Termin bekommt einen Rahmen in der Systemfarbe.
+    const you = page.locator("[data-testid^='calendar-day-'].tls-you").first();
+    await expect(you).toBeVisible();
+    const youOutline = await you.evaluate((node) => { const s = getComputedStyle(node); return { style: s.outlineStyle, width: s.outlineWidth }; });
+    expect(youOutline).toEqual({ style: "solid", width: "2px" });
+    await page.emulateMedia({ forcedColors: "none" });
+    expect(await you.evaluate((node) => getComputedStyle(node).outlineStyle)).toBe("none");
     expect(await sideScroll(page)).toBeLessThanOrEqual(1);
+  });
+
+  test("wischbare Leiste: die Fokus-Winkel einer Karte sitzen an der Kante und werden nicht abgeschnitten (390 px)", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockEsports(page);
+    await page.goto("/esports");
+    const card = page.getByTestId("esports-game-g0");
+    await expect(card).toBeVisible();
+    await card.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(card).toBeFocused();
+    expect(await corners(card, "::after")).toMatchObject({ layers: 8, inset: "0px" });
+    // Die Leiste schneidet an ihrer Innenkante - die Winkel liegen ganz innerhalb der Karte.
+    const fits = await card.evaluate((node) => {
+      const strip = node.closest(".tls-swipe").getBoundingClientRect();
+      const box = node.getBoundingClientRect();
+      return box.top >= strip.top && box.bottom <= strip.bottom;
+    });
+    expect(fits).toBe(true);
+    expect(await sideScroll(page)).toBeLessThanOrEqual(1);
+  });
+
+  test("Live-Karte mit Fokus: Live-Licht (::before) und Fokus-Winkel (::after) nebeneinander", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockEsports(page);
+    await page.goto("/esports");
+    const card = page.getByTestId("esports-game-g1");
+    await expect(card).toBeVisible();
+    await card.evaluate((node) => node.classList.add("tls-live-frame"));
+    await card.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(card).toBeFocused();
+    expect(await card.evaluate((node) => getComputedStyle(node, "::before").backgroundImage)).toContain("conic-gradient");
+    expect(await corners(card, "::after")).toMatchObject({ layers: 8 });
   });
 
   test("ohne Tastatur keine Ecken: ein Mausklick zeigt keinen Fokus-Winkel", async ({ page }) => {
@@ -186,9 +335,74 @@ test.describe("Tastatur-Fokus mit Ecken (#1316)", () => {
   });
 });
 
+// Bilder der Fix-Runde (nur mit YOU_SHOTS und YOU_PHASE=v2): Rangliste 390, Jahreswertung mit Podest, Kalender Monat
+// und Liste, Fokus in einer wischbaren Leiste, Baum mit Team-Etikett.
+test.describe("Bilder v2 (#1316)", () => {
+  test.skip(({ isMobile }) => Boolean(isMobile) || !SHOTS || PHASE !== "v2", "nur mit YOU_SHOTS und YOU_PHASE=v2");
+  const save = (name) => path.join(SHOTS, `${name}-v2.png`);
+
+  test("Bilder v2", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 390, height: 900 });
+    await mockTournament(page, fixture.league);
+    await page.goto(`/tournaments/${fixture.league.tournament.slug}/standings`);
+    await page.locator("tr[data-mine='true']").scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollBy(0, -200));
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: save("rangliste-390") });
+
+    for (const width of [390, 1440]) {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+      await page.setViewportSize({ width, height: 900 });
+      await mockSeason(page);
+      await page.goto("/seasons/2026");
+      await page.getByText("Top Teilnehmer").scrollIntoViewIfNeeded();
+      await page.waitForTimeout(600);
+      await page.screenshot({ path: save(`jahreswertung-${width}`), fullPage: true });
+    }
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockCalendar(page);
+    await page.goto("/calendar");
+    await page.getByTestId("calendar-view-month").click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: save("kalender-monat-1440") });
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.getByTestId("calendar-view-list").click();
+    await page.getByTestId("calendar-list").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: save("kalender-liste-390") });
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockEsports(page);
+    await page.goto("/esports");
+    const card = page.getByTestId("esports-game-g0");
+    await card.scrollIntoViewIfNeeded();
+    await card.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(400);
+    const strip = await page.getByTestId("esports-game-competitive").boundingBox();
+    await page.screenshot({ path: save("fokus-swipe-390"), clip: { x: 0, y: Math.max(0, strip.y - 30), width: 390, height: strip.height + 60 } });
+
+    for (const width of [390, 1440]) {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+      await page.setViewportSize({ width, height: 900 });
+      await mockTournament(page, teamFinished());
+      await page.goto(`/tournaments/${fixture.finished.tournament.slug}/bracket`);
+      const node = page.locator(".tls-bracket-node[data-mine='true']").first();
+      await node.scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, -150));
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: save(`turnierbaum-team-${width}`) });
+    }
+  });
+});
+
 // Vergleichsbilder für Fabian (nur mit YOU_SHOTS): je Motiv 390 und 1440 px.
 test.describe("Bilder vorher/nachher (#1316)", () => {
-  test.skip(({ isMobile }) => Boolean(isMobile) || !SHOTS, "nur mit YOU_SHOTS");
+  test.skip(({ isMobile }) => Boolean(isMobile) || !SHOTS || PHASE === "v2", "nur mit YOU_SHOTS");
 
   const save = (motiv, width) => path.join(SHOTS, `${motiv}-${PHASE}-${width}.png`);
 
