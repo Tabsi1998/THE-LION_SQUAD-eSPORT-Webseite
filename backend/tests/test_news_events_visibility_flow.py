@@ -12,6 +12,7 @@ TestEvents::test_cu_cannot_create_event; aus test_phase4_documents.py: test_anon
 """
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -20,6 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
+from services.news_publish import vienna_today  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -34,11 +36,15 @@ async def flow(tmp_path, monkeypatch):
 
 async def news(flow, slug: str, *, visibility: str = "public", category: str = "club", published: bool = True,
                pinned: bool = False, published_at: str = "2026-10-01T10:00:00+00:00") -> None:
-    await flow.db.news_posts.insert_one({
+    row = {
         "id": new_id(), "slug": slug, "title": f"Beitrag {slug}", "content": "Text", "category": category,
         "visibility": visibility, "published": published, "pinned": pinned, "published_at": published_at,
         "created_at": published_at,
-    })
+    }
+    if pinned:
+        # Angeheftet mit Ende relativ zu heute (#1263): Altbestand ohne Ende liefe ab dem 05.12.2026 ab (#2474).
+        row["pinned_until"] = (vienna_today() + timedelta(days=7)).isoformat()
+    await flow.db.news_posts.insert_one(row)
 
 
 async def event(flow, slug: str, *, status: str = "scheduled", visibility: str = "public", event_type: str = "general",
