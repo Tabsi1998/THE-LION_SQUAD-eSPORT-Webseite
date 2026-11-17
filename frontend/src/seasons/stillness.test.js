@@ -104,3 +104,15 @@ test("Abmelden (clearDecoPause aus dem Start-Teil) vergisst auch die bekannten S
   noteOwnMatches([{ id: "m-1", status: "in_progress" }], "match");
   expect(ownMatchesPaused()).toBe(false);
 });
+
+test("Abmelden räumt auch den Wecker des Sicherheitsablaufs ab", () => {
+  vi.useFakeTimers();
+  try {
+    noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard");
+    expect(vi.getTimerCount()).toBe(1);
+    clearDecoPause();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});

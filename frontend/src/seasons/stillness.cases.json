@@ -59,17 +59,19 @@
     }
   ],
   "expiry": {
-    "_hinweis": "Sicherheitsablauf: die Pause endet spätestens max_minutes nach der letzten Meldung eines eigenen Spiels, auch ohne neues Laden. Eine fremde Matchseite verlängert nichts.",
+    "_hinweis": "Sicherheitsablauf: die Pause endet spätestens max_minutes nach der letzten Meldung eines eigenen Spiels, auch ohne neues Laden. Dabei verfallen auch die gemerkten Spiele - eine spätere Matchseite oder Warteschlange weckt das alte läuft nicht wieder. Eine fremde Matchseite verlängert nichts.",
     "max_minutes": 180,
     "steps": [
       { "at": 0, "source": "dashboard", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
       { "at": 179, "paused": true },
       { "at": 181, "paused": false },
-      { "at": 200, "source": "match", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+      { "at": 200, "source": "match", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": false },
+      { "at": 205, "source": "queue", "matches": [{ "match_id": "m-2", "state": "queued" }], "paused": false },
+      { "at": 210, "source": "dashboard", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
       { "at": 250, "source": "match", "matches": [{ "id": "m-9", "status": "in_progress" }], "paused": true },
-      { "at": 379, "paused": true },
-      { "at": 381, "paused": false },
-      { "at": 390, "source": "dashboard", "matches": [{ "id": "m-1", "status": "completed" }], "paused": false }
+      { "at": 389, "paused": true },
+      { "at": 391, "paused": false },
+      { "at": 400, "source": "dashboard", "matches": [{ "id": "m-1", "status": "completed" }], "paused": false }
     ]
   }
 }

@@ -38,6 +38,20 @@ let heldGeneration = decoPauseGeneration;
 // Der Wecker des Sicherheitsablaufs: endet die Pause ohne neue Meldung, erfahren es Bühne und Fußzeile von selbst.
 let alarm = 0;
 
+/** Vergessen: die gemerkten Spiele und der Wecker - beim Abmelden und wenn der Sicherheitsablauf greift. */
+function forget() {
+  held = new Map();
+  clearTimeout(alarm);
+  alarm = 0;
+  heldGeneration = decoPauseGeneration;
+}
+
+// Abmelden ruft im Start-Teil nur clearDecoPause (SeasonContext.jsx) - der Zähler springt, bevor die Pause endet. Dieser
+// Zuhörer räumt dann Spiele und Wecker ab, ohne dass diese Datei in den Start-Teil muss.
+subscribeDecoPause(() => {
+  if (heldGeneration !== decoPauseGeneration) forget();
+});
+
 /**
  * Was eine Quelle über eigene Spiele weiß. `dashboard`: alle offenen eigenen Spiele - ersetzt den ganzen Stand.
  * `queue`: eigene Spiele eines Turniers aus der Warteschlange (`scope`: das Turnier) - ergänzt; ein Spiel, das aus
@@ -47,10 +61,7 @@ let alarm = 0;
  */
 export function noteOwnMatches(matches, source = "dashboard", { scope = null } = {}) {
   if (source === "dashboard" && !Array.isArray(matches)) return;
-  if (heldGeneration !== decoPauseGeneration) {
-    held = new Map();
-    heldGeneration = decoPauseGeneration;
-  }
+  if (heldGeneration !== decoPauseGeneration) forget();
   const rows = Array.isArray(matches) ? matches : [];
   const next = source === "dashboard" ? new Map() : new Map(held);
   if (source === "queue" && scope) {
@@ -71,15 +82,17 @@ export function noteOwnMatches(matches, source = "dashboard", { scope = null } =
   const live = [...held.values()].some((entry) => entry.live);
   clearTimeout(alarm);
   setDecoPause(live);
-  alarm = live ? setTimeout(() => setDecoPause(false), PAUSE_MAX_MS) : 0;
+  // Greift der Sicherheitsablauf, verfallen auch die gemerkten Spiele - eine spätere Meldung weckt das alte „läuft“ nicht.
+  alarm = live ? setTimeout(() => {
+    forget();
+    setDecoPause(false);
+  }, PAUSE_MAX_MS) : 0;
 }
 
 /** Abmelden oder eine andere Person: der Stand gehört nicht mehr dazu. */
 export function clearOwnMatches() {
-  held = new Map();
-  clearTimeout(alarm);
   clearDecoPause();
-  heldGeneration = decoPauseGeneration;
+  forget();
 }
 
 export function ownMatchesPaused() {
