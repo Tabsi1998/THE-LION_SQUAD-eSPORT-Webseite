@@ -18,6 +18,10 @@ vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => vi.fn(async
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/pages/public/EventLivePage", () => ({ EventLiveBoard: () => null }));
 
+// Die Frage nach Browser-Benachrichtigungen (#1208): hier nur, wann die Seite sie stellt.
+const offerMock = vi.fn(async () => null);
+vi.mock("@/lib/webPush", async (importOriginal) => ({ ...(await importOriginal()), offerWebPush: (...args) => offerMock(...args) }));
+
 const EventDetailPage = (await import("./EventDetailPage")).default;
 
 beforeEach(() => {
@@ -25,6 +29,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-10T10:00:00Z"));
   apiMock.get.mockReset();
   apiMock.post.mockReset();
+  offerMock.mockClear();
 });
 afterEach(() => vi.useRealTimers());
 
@@ -79,4 +84,21 @@ test("vom Turnier mit Event-Pflicht gekommen: das Turnier ist vorausgewählt, da
   expect(await screen.findByTestId("play-along-check-t1")).toBeChecked();
   fireEvent.click(screen.getByTestId("play-along-skip"));
   expect(await screen.findByTestId("tournament-page")).toBeInTheDocument();
+});
+
+test("Benachrichtigungen (#1208): die Frage kommt erst, wenn „Spielst du auch mit?“ zu ist - nie dahinter", async () => {
+  renderPage(EVENT);
+  await registerForEvent();
+  expect(await screen.findByTestId("play-along-sheet")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/calendar/hint"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(offerMock).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("play-along-skip"));
+  await waitFor(() => expect(offerMock).toHaveBeenCalledTimes(1));
+});
+
+test("Benachrichtigungen (#1208): ohne zweiten Schritt kommt die Frage gleich nach der Anmeldung", async () => {
+  renderPage({ ...EVENT, tournaments: [] });
+  await registerForEvent();
+  await waitFor(() => expect(offerMock).toHaveBeenCalledTimes(1));
 });
