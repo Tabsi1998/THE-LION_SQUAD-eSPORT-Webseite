@@ -2339,6 +2339,10 @@ html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
 }
 .tls-card:focus-visible {
   transform: translateY(calc(-5px * var(--tls-motion-on)));
+  /* Wie .tls-btn: der alte 3-px-Ring aus App.css würde die Winkel verdecken; der durchsichtige Rahmen hält den Fokus im
+     Kontrast-Modus sichtbar. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
 /* Fokus mit der Tastatur (#1316): die Ecken-Klammern 5 px außerhalb der Karte (styles/system.css, --tls-corners) - als
    ::after, damit das Live-Licht (.tls-live-frame::before) daneben weiterläuft. In wischbaren Leisten (.tls-swipe) sitzen

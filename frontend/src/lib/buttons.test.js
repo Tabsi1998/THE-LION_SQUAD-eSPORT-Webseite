@@ -24,6 +24,8 @@ test("die fünf Arten haben je ihren Stil, Fokus ist für alle sichtbar, Hover n
   expect(rule(".tls-btn--honor")).toMatch(/background-color: var\(--tls-gold\)/);
   expect(rule(".tls-btn--honor")).toMatch(/color: #1A1400/);
   expect(rule(".tls-btn:focus-visible")).toMatch(/outline: 2px solid/);
+  // Karten zeigen beim Fokus die Ecken (#1316) - ohne den 3-px-Ring aus App.css, der sie verdecken würde.
+  expect(rule(".tls-card:focus-visible")).toMatch(/outline: 2px solid transparent;/);
   const hover = css.slice(css.indexOf(".tls-btn--primary:hover"), css.indexOf(".tls-btn:hover:not(:disabled) .lucide-arrow-right"));
   for (const variant of ["primary", "secondary", "quiet", "danger", "honor"]) expect(hover).toContain(`.tls-btn--${variant}:hover:not(:disabled)`);
   // Der goldene Lichtlauf hängt wie der blaue an „Bewegung reduzieren“.
