@@ -44,7 +44,8 @@ const WON = { key: "won", label: "S", title: "Siege", wide: true };
 const DRAWN = { key: "drawn", label: "U", title: "Unentschieden", wide: true };
 const LOST = { key: "lost", label: "N", title: "Niederlagen", wide: true };
 const DIFF = { key: "score_diff", label: "Diff", title: "Differenz", format: (value) => formatDiff(value) };
-const FORM = { key: "form", label: "Form", title: "Die letzten fünf Spiele" };
+// Am Handy ohne Form (#2498): Name und Punkte brauchen den Platz - TV und Druck zeigen sie ohnehin nicht.
+const FORM = { key: "form", label: "Form", title: "Die letzten fünf Spiele", wide: true };
 const POINTS = { key: "points", label: "Pkt", title: "Punkte", strong: true };
 
 /**
