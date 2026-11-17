@@ -118,30 +118,53 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays, err
       {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Spielwochen konnten nicht geladen werden: {error}</p>}
       <div className={staffel ? "" : "mp-weeks-scroll tls-swipe"}>
         <ol className={staffel ? "mp-weeks mp-weeks--stack" : "mp-weeks"}>
-          {weeks.map((week) => (
-            <li key={week.number} className="mp-week" data-testid={`mp-week-${week.number}`} data-current={matchdays?.current === week.number ? "true" : undefined}>
-              <h4 className="mp-week__title">
+          {weeks.map((week) => {
+            const current = matchdays?.current === week.number;
+            const title = (
+              <>
                 Spielwoche {week.number}
-                <span>{day(week.starts_at)}–{day(week.ends_at)}{matchdays?.current === week.number ? " · läuft" : ""}</span>
-              </h4>
-              <p className="mp-week__deadline">Frist {dayTime(week.ends_at)}</p>
-              <ul className="mp-week__list">
-                {(week.matches || []).map((entry) => {
-                  const match = byId.get(entry.match_id) || {};
-                  const done = DONE.has(String(match.status || ""));
-                  return (
-                    <li key={entry.match_id} className="mp-remote" data-tone={done ? "done" : entry.schedule_source || "open"}>
-                      <span className="mp-remote__names">{namesOf(match, registrations, findIn).join(" – ")}</span>
-                      <span className="mp-remote__state">
-                        {done ? "gespielt" : entry.scheduled_at ? `${sources[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : entry.schedule_hint || "noch kein Termin"}
-                      </span>
-                      {match.id ? <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} touch={staffel} /> : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          ))}
+                <span>{day(week.starts_at)}–{day(week.ends_at)}{current ? " · läuft" : ""}</span>
+              </>
+            );
+            const body = (
+              <>
+                <p className="mp-week__deadline">Frist {dayTime(week.ends_at)}</p>
+                <ul className="mp-week__list">
+                  {(week.matches || []).map((entry) => {
+                    const match = byId.get(entry.match_id) || {};
+                    const done = DONE.has(String(match.status || ""));
+                    return (
+                      <li key={entry.match_id} className="mp-remote" data-tone={done ? "done" : entry.schedule_source || "open"}>
+                        <span className="mp-remote__names">{namesOf(match, registrations, findIn).join(" – ")}</span>
+                        <span className="mp-remote__state">
+                          {done ? "gespielt" : entry.scheduled_at ? `${sources[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : entry.schedule_hint || "noch kein Termin"}
+                        </span>
+                        {match.id ? <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} touch={staffel} /> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            );
+            // Staffel-Seite: Eine ganz gespielte Woche klappt zu - offen bleibt, was noch einen Termin braucht.
+            const played = staffel && !current && (week.matches || []).length > 0
+              && week.matches.every((entry) => DONE.has(String(byId.get(entry.match_id)?.status || "")));
+            return (
+              <li key={week.number} className="mp-week" data-testid={`mp-week-${week.number}`} data-current={current ? "true" : undefined} data-played={played ? "true" : undefined}>
+                {played ? (
+                  <details className="mp-week__fold">
+                    <summary className="mp-week__title mp-week__summary">{title}<span className="mp-week__done">alle gespielt</span></summary>
+                    {body}
+                  </details>
+                ) : (
+                  <>
+                    <h4 className="mp-week__title">{title}</h4>
+                    {body}
+                  </>
+                )}
+              </li>
+            );
+          })}
           {!weeks.length && <li className="mp-week mp-week--empty">{tournament?.title ? "Noch keine Spielwochen - sie entstehen mit dem Spielplan." : ""}</li>}
         </ol>
       </div>

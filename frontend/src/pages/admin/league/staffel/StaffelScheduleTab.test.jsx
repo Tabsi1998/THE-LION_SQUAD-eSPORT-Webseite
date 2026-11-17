@@ -65,7 +65,10 @@ test("Spielwochen mit Frist und Herkunft des Termins in Liga-Wörtern, CSV und P
   expect(week).toHaveTextContent("läuft");
   expect(week).toHaveTextContent("von der Liga-Leitung");
   expect(week).not.toHaveTextContent("Turnierleitung");
-  expect(screen.getByTestId("mp-week-2")).toHaveTextContent("gespielt");
+  expect(screen.getByTestId("mp-week-2")).toHaveTextContent("alle gespielt");
+  // Ganz gespielte Wochen klappen zu, die laufende bleibt offen.
+  expect(screen.getByTestId("mp-week-2")).toHaveAttribute("data-played", "true");
+  expect(week).not.toHaveAttribute("data-played");
   expect(screen.getByTestId("staffel-csv-matchplan")).toHaveAttribute("href", "http://test.local/api/tournaments/t1/match-plan.csv");
   expect(screen.getByTestId("staffel-pdf-matches")).toHaveAttribute("href", "http://test.local/api/exports/tournaments/t1/matches.pdf");
   expect(screen.getByTestId("staffel-season-dates")).toHaveAttribute("href", "/admin/leagues/seasons/s1#termine");

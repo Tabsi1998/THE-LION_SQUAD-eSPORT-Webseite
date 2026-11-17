@@ -73,7 +73,7 @@ function BeforeStartTools({ tournament, matches, onReload }) {
           <RefreshCw className="h-4 w-4" aria-hidden="true" /> Vorschau neu mischen
         </button>
       ) : null}
-      {league ? <DrawControls tournamentId={tournament.id} stage={league} matches={matches} onChanged={() => { onReload?.(); loadStages(); }} /> : null}
+      {league ? <DrawControls tournamentId={tournament.id} stage={league} matches={matches} touch onChanged={() => { onReload?.(); loadStages(); }} /> : null}
     </section>
   );
 }
