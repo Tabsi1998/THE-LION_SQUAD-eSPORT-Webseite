@@ -79,8 +79,10 @@ export function noteOwnMatches(matches: unknown, source: MatchSource = "dashboar
   alarm = paused ? setTimeout(expire, PAUSE_MAX_MS) : null;
 }
 
+// Greift der Sicherheitsablauf, verfallen auch die gemerkten Spiele - eine spätere Meldung weckt das alte „läuft“ nicht.
 function expire() {
   alarm = null;
+  held = new Map();
   if (!paused) return;
   paused = false;
   emit();
