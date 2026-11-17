@@ -83,6 +83,10 @@ describe("Rückfrage und Meldung beim Live-Schalten (#2262)", () => {
     expect(statusDoneText("paused", staffel("live"))).toBe("Status: Pausiert");
     expect(statusDoneText("completed", staffel("live"))).toBe("Status: Beendet");
     expect(statusDoneText("cancelled", staffel("live"))).toBe("Status: Abgesagt");
+    // Nie ein rohes „Status: draft“ - vor dem Start heißt es „Vor dem Start“, sonst das Wort der Turnierliste.
+    expect(statusDoneText("draft", staffel("live"))).toBe("Status: Vor dem Start");
+    expect(statusDoneText("registration_closed", staffel("live"))).toBe("Status: Vor dem Start");
+    expect(statusDoneText("irgendwas", staffel("live"))).toBe("Status geändert");
   });
 });
 

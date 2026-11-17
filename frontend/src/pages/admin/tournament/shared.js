@@ -443,7 +443,9 @@ export function liveCheckWords(report, tournament) {
 export function statusDoneText(status, tournament) {
   if (tournament?.league_context) {
     if (status === "live") return BEFORE_LIVE.has(tournament.status) ? "Liga gestartet" : "Spielbetrieb läuft weiter";
-    return `Status: ${STAFFEL_STATUS_WORDS[status] || status}`;
+    // Nie ein rohes „Status: draft“: vor dem Start „Vor dem Start“, sonst das Wort der Turnierliste.
+    const word = STAFFEL_STATUS_WORDS[status] || (BEFORE_LIVE.has(status) ? "Vor dem Start" : TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1]);
+    return word ? `Status: ${word}` : "Status geändert";
   }
   return `Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`;
 }
