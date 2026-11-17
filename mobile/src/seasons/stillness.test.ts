@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { screenClass, stillScreen } from "./intensity";
-import { clearOwnMatches, clearStillHolds, decoPaused, holdsDeco, noteOwnMatches, ownMatchesPaused, setStillHold, stillHeld, subscribeOwnMatches } from "./matchPause";
+import { PAUSE_MAX_MS, clearOwnMatches, clearStillHolds, decoPaused, holdsDeco, noteOwnMatches, ownMatchesPaused, setStillHold, stillHeld, subscribeOwnMatches } from "./matchPause";
 
 // Turniertag (#1169): Turnierbaum, Matchseite (mit der Aufruf-Karte) und Turnierleitung bleiben ganz ohne Deko; ist
 // das eigene Spiel aufgerufen oder läuft es, pausiert die Deko überall bis zum Ergebnis. Dieselben Fälle prüft die
@@ -11,6 +11,7 @@ type Cases = {
   pages: { name: string; web: string; app: string | null; still: boolean }[];
   holds: { name: string; matches: Match[]; paused: boolean }[];
   flows: { name: string; steps: { source: "dashboard" | "queue" | "match"; matches: Match[]; paused: boolean }[] }[];
+  expiry: { max_minutes: number; steps: { at: number; source?: "dashboard" | "queue" | "match"; matches?: Match[]; paused: boolean }[] };
 };
 const CASES: Cases = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../frontend/src/seasons/stillness.cases.json"), "utf8"));
 
@@ -66,4 +67,37 @@ test("Der Baum-Reiter hält die Bühne still, solange er offen ist - nur stille 
   expect(stillHeld()).toBe(false);
   setStillHold("detail-1", "TournamentDetail", true);
   expect(stillHeld()).toBe(false);
+});
+
+test("Sicherheitsablauf: die Pause endet spätestens nach max_minutes ohne neue Meldung", () => {
+  jest.useFakeTimers({ now: new Date("2026-11-07T10:00:00Z") });
+  try {
+    const { max_minutes: max, steps } = CASES.expiry;
+    expect(PAUSE_MAX_MS).toBe(max * 60 * 1000);
+    let clock = 0;
+    steps.forEach(({ at, source, matches, paused }) => {
+      jest.advanceTimersByTime((at - clock) * 60 * 1000);
+      clock = at;
+      if (source) noteOwnMatches(matches, source);
+      expect(ownMatchesPaused()).toBe(paused);
+    });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("der einzelne Zeitgeber meldet das Ende der Pause, auch ohne dass jemand fragt", () => {
+  jest.useFakeTimers();
+  try {
+    const seen: boolean[] = [];
+    const off = subscribeOwnMatches(() => seen.push(ownMatchesPaused()));
+    noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard");
+    jest.advanceTimersByTime(PAUSE_MAX_MS - 1000);
+    expect(seen).toEqual([true]);
+    jest.advanceTimersByTime(2000);
+    expect(seen).toEqual([true, false]);
+    off();
+  } finally {
+    jest.useRealTimers();
+  }
 });

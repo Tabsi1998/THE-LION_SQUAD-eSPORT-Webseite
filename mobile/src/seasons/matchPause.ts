@@ -11,6 +11,12 @@ import { stillScreen } from "./intensity";
 type OwnMatch = { id?: unknown; match_id?: unknown; status?: unknown; state?: unknown; live_state?: unknown } | null | undefined;
 export type MatchSource = "dashboard" | "queue" | "match";
 
+/**
+ * Sicherheitsablauf (wie im Web): Spätestens so lange nach der letzten Meldung endet die Pause, auch wenn kein Screen
+ * mehr lädt - ein vergessenes „läuft“ hält die Deko nicht den ganzen Abend an. Kein Nachfragen, nur ein Wecker.
+ */
+export const PAUSE_MAX_MS = 3 * 60 * 60 * 1000;
+
 // Wie „läuft“ in der Warteschlange (services/match_scheduler.py): gespielt wird, bis das Ergebnis da ist.
 const RUNNING = new Set(["in_progress", "running", "waiting_result"]);
 const LIVE_STATES = new Set(["running", "called"]);
@@ -34,6 +40,8 @@ const idOf = (match: unknown) => (match && typeof match === "object" ? String((m
 let held = new Map<string, boolean>();
 const stillHolds = new Set<string>();
 let paused = false;
+// Der Wecker des Sicherheitsablaufs: endet die Pause ohne neue Meldung, erfährt es die Bühne von selbst.
+let alarm: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -51,22 +59,37 @@ function update(next: Map<string, boolean>) {
 /**
  * Was eine Quelle über eigene Spiele weiß. `dashboard`: alle offenen eigenen Spiele - ersetzt den ganzen Stand.
  * `queue`: eigene Spiele aus der Warteschlange - ergänzt. `match`: ein Spiel der Matchseite - die sehen auch
- * Zuschauer, deshalb ändert sie nur Spiele, die schon als eigene bekannt sind (etwa „Ergebnis da“).
+ * Zuschauer, deshalb ändert sie nur Spiele, die schon als eigene bekannt sind (etwa „Ergebnis da“); eine fremde
+ * Matchseite ist keine Meldung und verlängert auch den Sicherheitsablauf nicht.
  */
 export function noteOwnMatches(matches: unknown, source: MatchSource = "dashboard") {
   if (source === "dashboard" && !Array.isArray(matches)) return;
   const rows: unknown[] = Array.isArray(matches) ? matches : [];
   const next = source === "dashboard" ? new Map<string, boolean>() : new Map(held);
+  let touched = source !== "match";
   rows.forEach((match) => {
     const id = idOf(match);
     if (!id || (source === "match" && !next.has(id))) return;
+    touched = true;
     next.set(id, holdsDeco(match));
   });
+  if (!touched) return;
   update(next);
+  if (alarm) clearTimeout(alarm);
+  alarm = paused ? setTimeout(expire, PAUSE_MAX_MS) : null;
+}
+
+function expire() {
+  alarm = null;
+  if (!paused) return;
+  paused = false;
+  emit();
 }
 
 /** Abmelden oder eine andere Person: der Stand gehört nicht mehr dazu. */
 export function clearOwnMatches() {
+  if (alarm) clearTimeout(alarm);
+  alarm = null;
   update(new Map());
 }
 
