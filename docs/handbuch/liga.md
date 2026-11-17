@@ -469,11 +469,14 @@ Ergebnisse** steht je Spielwoche jedes Spiel mit Stand, Ergebnis und Hinweisen z
 auf der Matchseite (**Zum Spiel**). Hier gibt es **Ergebnis eintragen** bzw. **korrigieren** und **Beide nicht erschienen** (**Ergebnisse
 korrigieren**, im eigenen Spiel trägt eine zweite Person ein). Der Reiter **Tabelle** zeigt die Tabelle mit Zonen, **PDF Tabelle** und den
 Gleichstand-Entscheid (3.5). Der Reiter **Protokoll** zeigt das Protokoll der Season nur für diese Staffel (3.0), lesen darf jede
-Zuständigkeit. Im Reiter **Einstellungen** stehen **Titel und Auftritt** (Titel, Beschreibung, Banner, Partner, Stream; **Liga verwalten**),
-**Aus der Season** und der **Map-Pool** nur zum Ansehen (geändert wird in der Season), **Zugangslinks** und **Sponsor je Spielwoche**
-(**Liga verwalten**), **TV-Ansicht öffnen** (Spieltage, Tabelle, Live-Spiele, am Ende der Meister), alte **Helfer**-Einsätze nur zum Nachlesen
-(neue Helfer gibt es in Staffeln nicht) und die **Werkzeuge**: **Staffel sperren** bzw. **Entsperren** nach dem Ende (**Liga verwalten**),
-**Staffel löschen** nur vor dem Start mit Grund (**Season konfigurieren**). Im **Überblick** steht bei **Offen in dieser Staffel** die Zahl
+Zuständigkeit. Der Reiter **Einstellungen** hat Unterreiter (am Handy seitlich wischen): **Auftritt** mit Titel, Beschreibung, Banner,
+Partner und Stream (**Liga verwalten**; lädt die Staffel zwischendurch neu, bleiben deine Eingaben stehen und ein Hinweis bietet
+**Neuen Stand laden** an), **Aus der Season** mit den Vorgaben und dem Map-Pool nur zum Ansehen (geändert wird in der Season),
+**Links und Sponsor** mit Zugangslinks und Sponsor je Spielwoche (nur mit **Liga verwalten**), **TV und Helfer** mit **TV-Ansicht
+öffnen** (Spieltage, Tabelle, Live-Spiele, am Ende der Meister) und den alten Helfer-Einsätzen nur zum Nachlesen (neue Helfer gibt es
+in Staffeln nicht) sowie **Werkzeuge**: **Staffel sperren** bzw. **Entsperren** nach dem Ende (**Liga verwalten**), **Staffel löschen**
+nur vor dem Start mit Grund (**Season konfigurieren**). Jeder Unterreiter hat eine eigene Adresse (`#darstellung`, `#vorgaben`,
+`#links`, `#helfer`, `#werkzeuge`). Im **Überblick** steht bei **Offen in dieser Staffel** die Zahl
 der Aufgaben aus dem Leitstand; der Link öffnet den Leitstand gleich gefiltert. Nach dem Ende zeigt der Überblick dort auch die
 **Rückmeldungen der Teams** (Umfrage nach dem Ende, ohne Namen; **Liga verwalten**). Bis zur Umstellung bleibt auch die Turnierverwaltung
 nutzbar, die Schritte unten gelten unverändert. Knöpfe
