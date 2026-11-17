@@ -1,0 +1,77 @@
+{
+  "_hinweis": "Turniertag (#1169): welche Seiten ganz ohne Saison-Deko bleiben und wann das eigene Spiel die Deko überall pausiert. Dieselben Fälle prüfen frontend/src/seasons/stillness.test.js und mobile/src/seasons/stillness.test.ts - ändert eine Seite die Regel, wird der Test der anderen rot.",
+  "pages": [
+    { "name": "Turnierbaum", "web": "/tournaments/herbst-cup/bracket", "app": "TournamentBracket", "still": true },
+    { "name": "Matchseite mit Aufruf-Karte", "web": "/matches/m-1", "app": "MatchDetail", "still": true },
+    { "name": "Turnierleitung mit Cockpit", "web": "/tournaments/herbst-cup/leitung", "app": "TournamentLead", "still": true },
+    { "name": "Einlass der Turnierleitung", "web": "/events/lan-2026/leitung", "app": null, "still": true },
+    { "name": "Verwaltung", "web": "/admin/tournaments", "app": "Admin", "still": true },
+    { "name": "Startseite", "web": "/", "app": "Dashboard", "still": false },
+    { "name": "Turnierliste", "web": "/tournaments", "app": "TournamentList", "still": false },
+    { "name": "Turnierseite", "web": "/tournaments/herbst-cup", "app": "TournamentDetail", "still": false },
+    { "name": "Spielplan", "web": "/tournaments/herbst-cup/matches", "app": "TournamentDetail", "still": false },
+    { "name": "News", "web": "/news", "app": "NewsList", "still": false },
+    { "name": "Event", "web": "/events/lan-2026", "app": "EventDetail", "still": false }
+  ],
+  "holds": [
+    { "name": "nichts offen", "matches": [], "paused": false },
+    { "name": "geplant", "matches": [{ "id": "m-1", "status": "scheduled" }], "paused": false },
+    { "name": "bereit, noch nicht aufgerufen", "matches": [{ "id": "m-1", "status": "ready", "live_state": null }], "paused": false },
+    { "name": "Einzel läuft", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+    { "name": "wartet auf das Ergebnis", "matches": [{ "id": "m-1", "status": "waiting_result" }], "paused": true },
+    { "name": "aufgerufen (Startseite)", "matches": [{ "id": "m-1", "status": "ready", "live_state": "called" }], "paused": true },
+    { "name": "Team läuft (Startseite)", "matches": [{ "id": "m-1", "status": "scheduled", "live_state": "running" }], "paused": true },
+    { "name": "aufgerufen (Warteschlange)", "matches": [{ "match_id": "m-1", "state": "called" }], "paused": true },
+    { "name": "Durchgang läuft (Warteschlange)", "matches": [{ "match_id": "m-1", "state": "running", "heat": true }], "paused": true },
+    { "name": "wartet an der Station", "matches": [{ "match_id": "m-1", "state": "queued" }], "paused": false },
+    { "name": "Ergebnis da", "matches": [{ "id": "m-1", "status": "completed", "live_state": "running" }], "paused": false },
+    { "name": "Einspruch", "matches": [{ "id": "m-1", "status": "disputed" }], "paused": false },
+    { "name": "eins von zweien läuft", "matches": [{ "id": "m-1", "status": "scheduled" }, { "id": "m-2", "status": "in_progress" }], "paused": true }
+  ],
+  "flows": [
+    {
+      "name": "Startseite meldet das laufende Spiel, die Matchseite das Ergebnis",
+      "steps": [
+        { "source": "dashboard", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+        { "source": "match", "matches": [{ "id": "m-1", "status": "completed" }], "paused": false }
+      ]
+    },
+    {
+      "name": "Aufruf aus der Warteschlange, danach läuft es, dann kommt das Ergebnis",
+      "steps": [
+        { "source": "queue", "matches": [{ "match_id": "m-1", "state": "called" }], "paused": true },
+        { "source": "match", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+        { "source": "dashboard", "matches": [], "paused": false }
+      ]
+    },
+    {
+      "name": "Die Matchseite fremder Spiele pausiert nichts",
+      "steps": [
+        { "source": "match", "matches": [{ "id": "m-9", "status": "in_progress" }], "paused": false }
+      ]
+    },
+    {
+      "name": "Die Startseite ersetzt den ganzen Stand",
+      "steps": [
+        { "source": "dashboard", "matches": [{ "id": "m-1", "status": "ready", "live_state": "called" }, { "id": "m-2", "status": "scheduled" }], "paused": true },
+        { "source": "dashboard", "matches": [{ "id": "m-2", "status": "scheduled" }], "paused": false }
+      ]
+    }
+  ],
+  "expiry": {
+    "_hinweis": "Sicherheitsablauf: die Pause endet spätestens max_minutes nach der letzten Meldung eines eigenen Spiels, auch ohne neues Laden. Dabei verfallen auch die gemerkten Spiele - eine spätere Matchseite oder Warteschlange weckt das alte läuft nicht wieder. Eine fremde Matchseite verlängert nichts.",
+    "max_minutes": 180,
+    "steps": [
+      { "at": 0, "source": "dashboard", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+      { "at": 179, "paused": true },
+      { "at": 181, "paused": false },
+      { "at": 200, "source": "match", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": false },
+      { "at": 205, "source": "queue", "matches": [{ "match_id": "m-2", "state": "queued" }], "paused": false },
+      { "at": 210, "source": "dashboard", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+      { "at": 250, "source": "match", "matches": [{ "id": "m-9", "status": "in_progress" }], "paused": true },
+      { "at": 389, "paused": true },
+      { "at": 391, "paused": false },
+      { "at": 400, "source": "dashboard", "matches": [{ "id": "m-1", "status": "completed" }], "paused": false }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useSeason } from "./SeasonContext";
 import { isQuietPath, useSeasonModules } from "./SeasonStage";
+import { useDecoPaused } from "./decoPause";
 import { SoundToggle } from "./SoundToggle";
 
 // Drei Plätze im Layout (#634, #852): das Widget neben dem Logo (klickbar, mit Tastatur erreichbar), die Deko im Footer
@@ -10,7 +11,9 @@ import { SoundToggle } from "./SoundToggle";
 function useMountedSeasons() {
   const { seasons, ready, preview } = useSeason();
   const location = useLocation();
-  const active = ready && (preview || !isQuietPath(location.pathname)) ? seasons.filter((season) => season.effective !== "off") : [];
+  // Wie die Bühne: still auf stillen Seiten und solange das eigene Spiel aufgerufen ist oder läuft (#1169).
+  const paused = useDecoPaused();
+  const active = ready && (preview || (!isQuietPath(location.pathname) && !paused)) ? seasons.filter((season) => season.effective !== "off") : [];
   const modules = useSeasonModules(active);
   return active.filter((season) => modules[season.key]).map((season) => ({ season, module: modules[season.key] }));
 }

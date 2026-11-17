@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 
 // Spieler-Sicht (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“ - auf der Turnierseite die eigenen Spiele,
 // auf der Matchseite genau dieses Spiel.
@@ -126,4 +126,34 @@ test("abgelaufene Sitzung (401 bei /me): die Zeile fällt weg, der Takt endet", 
   await act(async () => { await live.load(); });
   expect(screen.queryByTestId("live-queue-status")).toBeNull();
   expect(live.options).toMatchObject({ pollMs: 0, fallbackMs: 0 });
+});
+
+test("Turniertag (#1169): ein eigenes aufgerufenes Spiel pausiert die Saison-Deko - die Matchseite fremder Spiele nicht", async () => {
+  const { clearOwnMatches, ownMatchesPaused } = await import("@/seasons/matchPause");
+  clearOwnMatches();
+  apiMock.get.mockResolvedValue({ data: { applies: true, matches: { m1: { ...NEXT, state: "called" } } } });
+  const { unmount } = render(<LiveQueueStatus tournamentId="t1" matchId="m1" />);
+  await screen.findByTestId("live-queue-status");
+  expect(ownMatchesPaused()).toBe(false);
+  unmount();
+
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [{ ...NEXT, state: "called" }] } });
+  render(<LiveQueueStatus tournamentId="t1" />);
+  await screen.findByTestId("live-queue-status");
+  await waitFor(() => expect(ownMatchesPaused()).toBe(true));
+  clearOwnMatches();
+});
+
+test("Turniertag (#1169): fällt das eigene Spiel aus der Warteschlange dieses Turniers, endet die Pause", async () => {
+  const { clearOwnMatches, ownMatchesPaused } = await import("@/seasons/matchPause");
+  clearOwnMatches();
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [{ ...NEXT, state: "running" }] } });
+  render(<LiveQueueStatus tournamentId="t1" />);
+  await screen.findByTestId("live-queue-status");
+  await waitFor(() => expect(ownMatchesPaused()).toBe(true));
+  // Das Ergebnis ist da: beim nächsten Laden steht nur noch das nächste Spiel in der Warteschlange.
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [{ ...NEXT, match_id: "m2", state: "queued" }] } });
+  await act(async () => { await live.load(); });
+  await waitFor(() => expect(ownMatchesPaused()).toBe(false));
+  clearOwnMatches();
 });
