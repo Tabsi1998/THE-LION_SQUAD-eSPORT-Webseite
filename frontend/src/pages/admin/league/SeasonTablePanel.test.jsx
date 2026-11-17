@@ -102,7 +102,10 @@ test("der Season-Reiter Tabelle führt je Staffel zur Staffel-Seite - ohne eigen
   render(<MemoryRouter><SeasonTableLinks divisions={DIVISIONS} /></MemoryRouter>);
   expect(screen.getByTestId("season-table-open-t1")).toHaveAttribute("href", "/admin/leagues/staffeln/t1#tabelle");
   expect(screen.getByTestId("season-table-open-t1")).toHaveTextContent("Liga 1 · Staffel A");
-  expect(screen.getByTestId("season-table-open-t2")).toHaveAttribute("href", "/admin/leagues/staffeln/t2#tabelle");
+  // Vor dem Start gibt es noch keine Tabelle - kein Weg auf eine leere Seite.
+  expect(screen.queryByTestId("season-table-open-t2")).toBeNull();
+  expect(screen.getByTestId("season-table-none-t2")).toHaveTextContent("Liga 1 · Staffel B");
+  expect(screen.getByTestId("season-table-none-t2")).toHaveTextContent("noch keine Tabelle");
   expect(screen.queryByTestId("season-tie-decide-1")).toBeNull();
   expect(apiMock.get).not.toHaveBeenCalled();
 });

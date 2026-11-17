@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { StandingsTable, ZoneLegend } from "@/components/tls/tournament/StandingsTable";
 import { byMaps, hidesDraws, tiebreakOrder } from "@/lib/leagueTable";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
+import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
 import { viennaDateTime } from "@/lib/vienna";
 import { ConflictReasonField, CONFLICT_REASON_MIN, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 
@@ -268,7 +269,14 @@ export function SeasonTableLinks({ divisions = [] }) {
     <FormSection title="Tabellen der Staffeln" testId="season-table-links"
       hint="Tabelle, Zonen und Gleichstand-Entscheid stehen auf der Seite jeder Staffel.">
       <ul className="divide-y divide-white/5 rounded-sm border border-white/10">
-        {staffeln.map((staffel) => (
+        {staffeln.map((staffel) => (staffelBeforeStart(staffel) ? (
+          // Vor dem Start gibt es noch keine Tabelle - kein Weg auf eine leere Seite.
+          <li key={staffel.tournament_id} className="flex min-h-[44px] items-center justify-between gap-3 px-3 text-sm text-white/70"
+            data-testid={`season-table-none-${staffel.tournament_id}`}>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{staffel.label}</span>
+            <span className="shrink-0 text-xs text-white/60">noch keine Tabelle</span>
+          </li>
+        ) : (
           <li key={staffel.tournament_id}>
             <Link to={staffelAdminUrl(staffel.tournament_id, "tabelle")} data-testid={`season-table-open-${staffel.tournament_id}`}
               className="flex min-h-[44px] items-center justify-between gap-3 px-3 text-sm font-semibold text-white/85 hover:bg-white/5 hover:text-white">
@@ -276,7 +284,7 @@ export function SeasonTableLinks({ divisions = [] }) {
               <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Tabelle öffnen <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></span>
             </Link>
           </li>
-        ))}
+        )))}
       </ul>
     </FormSection>
   );
