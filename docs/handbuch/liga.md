@@ -468,7 +468,15 @@ mischen** und **Spieltage neu auslosen** (**Season konfigurieren**), dazu immer 
 Ergebnisse** steht je Spielwoche jedes Spiel mit Stand, Ergebnis und Hinweisen zu Check-in, Veto, Vorfall und Verfahren; bedient wird das
 auf der Matchseite (**Zum Spiel**). Hier gibt es **Ergebnis eintragen** bzw. **korrigieren** und **Beide nicht erschienen** (**Ergebnisse
 korrigieren**, im eigenen Spiel trägt eine zweite Person ein). Der Reiter **Tabelle** zeigt die Tabelle mit Zonen, **PDF Tabelle** und den
-Gleichstand-Entscheid (3.5). Bis zur Umstellung bleibt auch die Turnierverwaltung nutzbar, die Schritte unten gelten unverändert. Knöpfe
+Gleichstand-Entscheid (3.5). Der Reiter **Protokoll** zeigt das Protokoll der Season nur für diese Staffel (3.0), lesen darf jede
+Zuständigkeit. Im Reiter **Einstellungen** stehen **Titel und Auftritt** (Titel, Beschreibung, Banner, Partner, Stream; **Liga verwalten**),
+**Aus der Season** und der **Map-Pool** nur zum Ansehen (geändert wird in der Season), **Zugangslinks** und **Sponsor je Spielwoche**
+(**Liga verwalten**), **TV-Ansicht öffnen** (Spieltage, Tabelle, Live-Spiele, am Ende der Meister), alte **Helfer**-Einsätze nur zum Nachlesen
+(neue Helfer gibt es in Staffeln nicht) und die **Werkzeuge**: **Staffel sperren** bzw. **Entsperren** nach dem Ende (**Liga verwalten**),
+**Staffel löschen** nur vor dem Start mit Grund (**Season konfigurieren**). Im **Überblick** steht bei **Offen in dieser Staffel** die Zahl
+der Aufgaben aus dem Leitstand; der Link öffnet den Leitstand gleich gefiltert. Nach dem Ende zeigt der Überblick dort auch die
+**Rückmeldungen der Teams** (Umfrage nach dem Ende, ohne Namen; **Liga verwalten**). Bis zur Umstellung bleibt auch die Turnierverwaltung
+nutzbar, die Schritte unten gelten unverändert. Knöpfe
 gibt es nur mit der passenden Zuständigkeit: Zuteilen, Entfernen, Austritt und Disqualifizieren mit **Teams freigeben**, Status und **Liga
 starten** mit **Liga verwalten** (das gilt jetzt auch in der Turnierverwaltung).
 
@@ -1038,7 +1046,14 @@ nie über den Einspruch). Ist nichts offen, steht **Alles erledigt**.
 </tr></table>
 
 **Protokoll der Season:** unter den Aufgaben, neueste zuerst, 25 Einträge je Seite (**Neuer** / **Älter**). Es nennt, was wer wann
-getan hat – nie Begründungen, Nachrichtentexte oder Namen aus den Fällen. Lesen darf jede Zuständigkeit der Liga.
+getan hat – nie Begründungen, Nachrichtentexte oder Namen aus den Fällen. Lesen darf jede Zuständigkeit der Liga. Dazu gehören auch
+die Schritte an den Staffeln: **Staffel · Liga gestartet**, pausiert, fortgesetzt, beendet, abgesagt, **Darstellung geändert**,
+**gesperrt**/**entsperrt**, **Co-Team · ausgetreten**/**disqualifiziert**, **Vorschau neu gemischt** und **Spieltage neu ausgelost**.
+Eine Wiederaufnahme nach einer Strafe sieht nur, wer „Strafen“ hat.
+
+**Staffel-Filter:** Über **Offen in dieser Staffel** auf der Staffel-Seite (2.5) öffnet der Leitstand nur die Aufgaben und das
+Protokoll dieser Staffel. Oben steht dann **Nur Liga 1 · Staffel A**, dazu wie viele Aufgaben der ganzen Season (Anmeldungen,
+Transfers, Regelwerk) ausgeblendet sind; **Alle Staffeln** hebt den Filter auf.
 
 **Rundnachricht** (Knopf oben, mit „Liga verwalten“ oder „Season konfigurieren“): Empfänger sind **Captains und Vertreter** (Vorgabe;
 ohne beide die Leitung des Hauptteams) oder **alle Spieler**, wahlweise der ganzen Season, einer Liga N oder einer Staffel. Bevor du
