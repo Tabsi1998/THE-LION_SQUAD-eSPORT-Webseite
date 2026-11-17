@@ -181,3 +181,46 @@ test.describe("Liga: Leitstand der Season", () => {
     await busy.close();
   });
 });
+
+// Staffel-Filter (#2262): Der Link „Offen in dieser Staffel“ der Staffel-Seite öffnet den Leitstand mit `?staffel=` - nur deren Aufgaben
+// und Protokoll, sichtbar gefiltert und mit „Alle Staffeln“ aufhebbar.
+const STAFFEL_OF = { "incidents:m4": "t1", "overdue:m1": "t1", "overdue:m2": "t2", "procedures:p1": "t1", "sanctions:x:provisional": "t1", "applications:a1": null };
+const SCOPED_DESK = { ...DESK, groups: DESK.groups.map((group) => ({ ...group, items: group.items.map((row) => ({ ...row, staffel_id: STAFFEL_OF[row.id] ?? null })) })) };
+
+test.describe("Liga: Leitstand mit Staffel-Filter", () => {
+  test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`nur Aufgaben und Protokoll der Staffel, aufhebbar, bei ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const logAsked = [];
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.pathname.endsWith("/desk/log")) logAsked.push(url.searchParams.get("staffel"));
+      });
+      await mockServer(page, { desk: SCOPED_DESK });
+      await page.goto("/admin/leagues/seasons/s1?staffel=t1#leitstand");
+      await expect(page.getByTestId("desk-staffel-filter-label")).toHaveText("Liga 1 · Staffel A");
+      await expect(page.getByTestId("desk-total")).toHaveText("4");
+      await expect(page.getByTestId("desk-item-overdue:m1")).toBeVisible();
+      await expect(page.getByTestId("desk-item-overdue:m2")).toHaveCount(0);
+      await expect(page.getByTestId("desk-item-applications:a1")).toHaveCount(0);
+      await expect(page.getByTestId("desk-staffel-filter-hidden")).toContainText("1 Aufgabe der ganzen Season ist ausgeblendet.");
+      await expect(page.getByRole("heading", { name: "Protokoll · Liga 1 · Staffel A" })).toBeVisible();
+      expect(logAsked).toContain("t1");
+      const clear = await page.getByTestId("desk-staffel-filter-clear").boundingBox();
+      expect(clear.height).toBeGreaterThanOrEqual(44);
+      await noSideScroll(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      if (process.env.E2E_SCREENS_DIR) {
+        await page.screenshot({ path: path.join(process.env.E2E_SCREENS_DIR, `2262c-leitstand-filter-${width}.png`), animations: "disabled", fullPage: width === 390 });
+      }
+
+      await page.getByTestId("desk-staffel-filter-clear").click();
+      await expect(page).toHaveURL(/\/admin\/leagues\/seasons\/s1#leitstand$/);
+      await expect(page.getByTestId("desk-total")).toHaveText("6");
+      await expect(page.getByTestId("desk-staffel-filter")).toHaveCount(0);
+    });
+  }
+});
