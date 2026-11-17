@@ -29,6 +29,7 @@ DEFAULT_COOLDOWN_SECONDS = {
     "crown_gained": 6 * 60 * 60,
     "crown_changed": 6 * 60 * 60,
     "crown_lost": 6 * 60 * 60,
+    "crown_onyx": 6 * 60 * 60,
 }
 NO_COOLDOWN_KINDS = {
     "direct_message",

@@ -72,7 +72,7 @@ ACTION_LABELS = {
 }
 # Aufrufe dürfen den Rechner wecken; Erfolge und Vereinsnews nicht.
 HIGH_URGENCY_KINDS = {"match_call", "match_station", "match_reminder", "tournament_checkin", "team_presence_nudge"}
-LOW_URGENCY_KINDS = {"achievement", "level", "prestige", "crown_gained", "crown_changed", "crown_lost", "year_review"}
+LOW_URGENCY_KINDS = {"achievement", "level", "prestige", "crown_gained", "crown_changed", "crown_lost", "crown_onyx", "year_review"}
 
 
 def _b64url_decode(value: str) -> bytes:
