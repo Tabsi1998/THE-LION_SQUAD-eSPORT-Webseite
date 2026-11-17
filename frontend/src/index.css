@@ -3843,3 +3843,16 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-dates-row { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; animation-delay: calc(min(var(--tls-row-i, 0), 8) * 30ms); }
 .tls-guide-step { transition: color var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-mid) var(--tls-ease); }
 .tls-guide-step[data-done="true"] .tls-guide-step__mark { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; }
+
+/* Ecken-Klammern für „du“ (#1316) an Stellen mit eigenem Schatten: Die Rangliste behält ihre leichte Fläche aus
+   [data-mine] und verliert nur den Rahmen - die Winkel ersetzen ihn. Karten behalten beim Anheben ihren Schein und
+   dazu die Fläche. */
+.tls-standing-row.tls-you { box-shadow: none; }
+.tls-card.tls-you:not(.tls-card--own):focus-visible {
+  box-shadow: var(--tls-you-fill), 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
+}
+@media (hover: hover) {
+  .tls-card.tls-you:not(.tls-card--own):hover {
+    box-shadow: var(--tls-you-fill), 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
+  }
+}

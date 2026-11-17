@@ -57,3 +57,49 @@
   --tls-surface-2: #18181C;
   --tls-surface-3: #1F1F24;
 }
+
+/* Ecken-Klammern (#1316): das Zeichen für „das bist du“ - und dieselben Winkel als Tastatur-Fokus an Knöpfen und Karten
+   (index.css, .tls-btn und .tls-card). Vorbild sind die Social-Logos im Footer (.tls-social): vier Winkel in Cyan,
+   11 px lang, 2 px stark, 5 px außerhalb der Kante. Bei „du“ kommt eine leichte cyane Fläche (8 %) dazu und immer das
+   Etikett „Du“ (.tls-you-tag oder das Etikett der Stelle), damit es auch ohne Farbe verständlich ist. Kein Schein, keine
+   Bewegung. Die Fläche ist ein Schatten nach innen: Er liegt über dem eigenen Hintergrund der Stelle, folgt ihren
+   runden Ecken und lässt Verläufe stehen.
+   Zeilen in Tabellen und Listen tragen die Winkel an der Kante (tls-you--inset): Sie liegen in wischbaren Rahmen, 5 px
+   außen würden dort abgeschnitten oder die Fläche seitlich verschieben. Um ein rundes Bild ohne Fläche: tls-you--plain.
+   Sonst trägt nichts die Winkel - TV-Seiten zeigen kein „du“, Bühnen-Bilder und Level-Rahmen bleiben ohne. */
+:root {
+  --tls-corner-len: 11px;
+  --tls-corner-width: 2px;
+  --tls-corner-out: 5px;
+  --tls-you-fill: inset 0 0 0 100vmax rgb(var(--tls-brand-rgb) / 0.08);
+  /* Acht Verläufe, je Ecke ein waagrechter und ein senkrechter Strich. */
+  --tls-corners:
+    linear-gradient(var(--tls-brand) 0 0) top left / var(--tls-corner-len) var(--tls-corner-width) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) top left / var(--tls-corner-width) var(--tls-corner-len) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) top right / var(--tls-corner-len) var(--tls-corner-width) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) top right / var(--tls-corner-width) var(--tls-corner-len) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) bottom left / var(--tls-corner-len) var(--tls-corner-width) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) bottom left / var(--tls-corner-width) var(--tls-corner-len) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) bottom right / var(--tls-corner-len) var(--tls-corner-width) no-repeat,
+    linear-gradient(var(--tls-brand) 0 0) bottom right / var(--tls-corner-width) var(--tls-corner-len) no-repeat;
+}
+/* Die Winkel hängen an der Stelle selbst. Ohne Gewicht (:where), damit `absolute`, `fixed` oder `sticky` an derselben
+   Stelle weiter gelten. */
+:where(.tls-you), :where(.tls-btn), :where(.tls-card) { position: relative; }
+.tls-you { box-shadow: var(--tls-you-fill); }
+.tls-you--inset { --tls-corner-out: 0px; }
+.tls-you--plain { box-shadow: none; }
+.tls-you::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tls-corner-out));
+  z-index: 1;
+  pointer-events: none;
+  background: var(--tls-corners);
+}
+/* Etikett „Du“: Cyan auf leichter cyaner Fläche, klein und in Großbuchstaben (AA: scripts/check-contrast.js). */
+.tls-you-tag {
+  flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; line-height: 1.4; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
+}
