@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services.competition_read import load_match_reports, load_matches_by_query
+from services.competition_read import load_match_call_fields, load_match_reports, load_matches_by_query
 from services.match_audience import acting_registration_ids as acting_ids_for
 from services.station_labels import attach_station_info
 from services.league_scope import NOT_LEAGUE
@@ -90,6 +90,21 @@ async def _matches_for_query(db, query: dict, per_collection_limit: int = 240) -
     return await load_matches_by_query(db, query, per_store_limit=per_collection_limit)
 
 
+# Wie die Warteschlange (services/match_scheduler.py): läuft bis zum Ergebnis, aufgerufen mit Station und offenem Spiel.
+LIVE_RUNNING_STATUSES = {"in_progress", "running", "waiting_result"}
+LIVE_CALL_STATUSES = {"pending", "preview", "ready", "scheduled"}
+
+
+def live_state(match: dict) -> str | None:
+    """``running``, ``called`` oder ``None`` - Website und App pausieren damit die Saison-Deko (#1169)."""
+    status = str(match.get("status") or "")
+    if status in LIVE_RUNNING_STATUSES or (match.get("started_at") and status in LIVE_CALL_STATUSES):
+        return "running"
+    if match.get("called_at") and match.get("station_id") and status in LIVE_CALL_STATUSES:
+        return "called"
+    return None
+
+
 def _registration_label(registration: dict | None, team_map: dict[str, dict]) -> str:
     if not registration:
         return ""
@@ -165,6 +180,8 @@ async def compact_match_overviews(
     from services.team_history import teams_by_id
     team_map = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "tag": 1})
 
+    # Aufgerufen und gestartet (#1169) stehen nicht in der allgemeinen Spielform - eine schmale Abfrage nach Kennung.
+    call_rows = await load_match_call_fields(db, [match.get("id") for match in matches])
     tournament_map = {row["id"]: row for row in tournaments}
     registration_map = {row["id"]: row for row in registrations}
     summaries = []
@@ -198,6 +215,8 @@ async def compact_match_overviews(
             "station_label": match.get("station_label") or match.get("station_name") or (match.get("station") or {}).get("name"),
             # Station im Klartext (#1220): „Station A · Switch 2“ - Website und App zeigen diesen Text.
             "station_text": match.get("station_text"),
+            # Aufgerufen oder läuft (#1169): solange pausiert die Saison-Deko in Website und App.
+            "live_state": live_state({**match, **call_rows.get(match.get("id") or "", {})}),
             "participant_names": participant_names,
             "opponent_name": ", ".join(opponent_names),
             "participant_count": len(participant_ids),

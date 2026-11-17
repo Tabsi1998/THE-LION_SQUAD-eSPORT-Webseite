@@ -11,7 +11,10 @@ const RULES = [
   { test: (p) => p === "/" || p === "/home", cls: "lively" },
   { test: (p) => /^\/(events|news|gallery|galerie)\/?$/.test(p), cls: "lively" },
   { test: (p) => /^\/(admin|display|setup|consent)(\/|$)/.test(p), cls: "quiet" },
-  { test: (p) => /^\/tournaments\/[^/]+\/(bracket|matches|standings)/.test(p), cls: "calm" },
+  // Turniertag (#1169): Turnierbaum, Matchseite (mit der Aufruf-Karte) und die Turnierleitung (mit Cockpit und Einlass)
+  // bleiben ganz ohne Deko - wer dort schaut, spielt gleich oder leitet. Spielplan und Tabelle bleiben ruhig.
+  { test: (p) => /^\/(matches\/[^/]+|tournaments\/[^/]+\/(bracket|leitung)|events\/[^/]+\/leitung)(\/|$)/.test(p), cls: "quiet" },
+  { test: (p) => /^\/tournaments\/[^/]+\/(matches|standings)/.test(p), cls: "calm" },
   { test: (p) => /^\/(fastlap|f1)(\/|$)/.test(p), cls: "calm" },
   // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
   { test: (p) => /^\/advent(\/|$)/.test(p), cls: "calm" },

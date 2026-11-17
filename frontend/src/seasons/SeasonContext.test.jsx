@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -131,4 +131,31 @@ test("Serveruhr (Silvester, #741): der Abstand zur Geräteuhr kommt aus `now` de
   render(<MemoryRouter><SeasonProvider><Clock /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("offset").textContent).toBe("120000|2026-12-31T23:59:00.200+01:00"));
   spy.mockRestore();
+});
+
+// Turniertag (#1169): Abmelden oder ein anderes Konto - die Pause wegen eines eigenen Spiels gehört nicht mehr dazu.
+test("Abmelden beendet die Pause der Saison-Deko", async () => {
+  const { noteOwnMatches, ownMatchesPaused } = await import("./matchPause");
+  apiMock.get.mockResolvedValue({ data: PAYLOAD });
+  authState.user = { id: "u1", username: "anna" };
+  const view = render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
+  act(() => noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard"));
+  expect(ownMatchesPaused()).toBe(true);
+  authState.user = null;
+  view.rerender(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
+  await waitFor(() => expect(ownMatchesPaused()).toBe(false));
+});
+
+test("Gegenprobe: neue Daten derselben Person lassen die Pause stehen", async () => {
+  const { clearOwnMatches, noteOwnMatches, ownMatchesPaused } = await import("./matchPause");
+  apiMock.get.mockResolvedValue({ data: PAYLOAD });
+  authState.user = { id: "u1", username: "anna" };
+  const view = render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
+  act(() => noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard"));
+  authState.user = { id: "u1", username: "anna", seasonal_decorations: "on" };
+  view.rerender(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
+  expect(ownMatchesPaused()).toBe(true);
+  act(() => clearOwnMatches());
 });

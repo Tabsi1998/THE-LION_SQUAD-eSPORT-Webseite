@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { serverOffset } from "./clock";
+import { clearDecoPause } from "./decoPause";
 import { PREVIEW_STORAGE_KEY, previewTokenFor, readPreviewToken } from "./preview";
 
 export { PREVIEW_STORAGE_KEY, previewTokenFor, readPreviewToken };
@@ -57,6 +58,10 @@ export function SeasonProvider({ children, channel = "web" }) {
   const [previewToken, setPreviewToken] = useState(() => readPreviewToken()?.token || null);
   const timer = useRef(0);
   const location = useLocation();
+
+  // Turniertag (#1169): Die eigenen Spiele gehören zur angemeldeten Person - meldet sie sich ab oder wechselt das Konto,
+  // endet die Pause der Deko (wie in der App, SeasonProvider.tsx).
+  useEffect(() => clearDecoPause, [user?.id]);
 
   // Abstand der Serveruhr (Silvester, #741): Countdown und Show laufen nach dem Server, nicht nach der Geräteuhr.
   const [offset, setOffset] = useState(0);

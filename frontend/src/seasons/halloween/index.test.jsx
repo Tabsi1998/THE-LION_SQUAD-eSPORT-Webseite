@@ -83,7 +83,8 @@ test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere 
   expect(lively.every((layout) => layout.rappel.first >= 5 && layout.rappel.first <= 12)).toBe(true);
   expect(calm.every((layout) => !layout.rappel && layout.spiders.length === 0 && layout.hangingBats <= 1 && layout.flock[1] === 0 && !layout.scares)).toBe(true);
   const home = pageLayout("/", "normal");
-  const bracket = pageLayout("/tournaments/cup/bracket", "normal");
+  // Die Tabelle steht für die ruhigen Turnierseiten - der Baum ist seit #1169 still (stillness.test.js).
+  const bracket = pageLayout("/tournaments/cup/standings", "normal");
   expect(home.caps.cls).toBe("lively");
   expect(bracket.caps.cls).toBe("calm");
   expect(bracket.hangingBats).toBeLessThanOrEqual(1);
