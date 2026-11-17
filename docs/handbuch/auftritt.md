@@ -229,6 +229,7 @@ Menü**, am PC und am Tablet quer **ganz unten in der Fußzeile** – je Gerät 
 - **Pause überall:** Ist dein eigenes Spiel aufgerufen oder läuft es – allein, im Team oder im Durchgang –, macht die
   Deko auf allen Seiten Pause. Sobald das Ergebnis da ist, kommt sie zurück. Den Stand kennen Startseite (Dashboard),
   „Mein nächstes Spiel“ auf der Turnierseite und die Matchseite; die Pause wechselt, sobald eine davon neu lädt.
+  Spätestens drei Stunden nach der letzten Meldung endet die Pause von selbst, und beim Abmelden sofort.
 
 <img src="../assets/jahreszeiten/deko-schalter-handy-menue.png" alt="Handy-Menü als Gast, unten die Zeile Saison-Deko mit an, dezent und aus" width="240">
 
