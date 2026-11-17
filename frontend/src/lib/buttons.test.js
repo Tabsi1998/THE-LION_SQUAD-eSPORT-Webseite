@@ -40,14 +40,17 @@ test("Fokus: Ecken-Klammern an Knöpfen und Karten, dazu ein durchsichtiger Rahm
   expect(root).toMatch(/--tls-corner-len: 11px;/);
   expect(root).toMatch(/--tls-corner-width: 2px;/);
   expect(root).toMatch(/--tls-corner-out: 5px;/);
-  expect(root.match(/linear-gradient\(var\(--tls-brand\) 0 0\)/g)).toHaveLength(8);
-  for (const corner of ["top left", "top right", "bottom left", "bottom right"]) expect(root.split(corner).length - 1).toBe(2);
+  const corners = root.slice(root.indexOf("--tls-corners:"));
+  expect(corners.match(/linear-gradient\(var\(--tls-brand\) 0 0\)/g)).toHaveLength(8);
+  for (const corner of ["top left", "top right", "bottom left", "bottom right"]) expect(corners.split(corner).length - 1).toBe(2);
 
   expect(rule(".tls-btn:focus-visible")).toMatch(/outline: 2px solid transparent;/);
   expect(rule(".tls-btn:focus-visible")).toMatch(/box-shadow: none;/);
   expect(rule(".tls-btn:focus-visible")).not.toMatch(/#FFFFFF/);
-  for (const host of [".tls-btn", ".tls-card"]) {
-    const corners = rule(`${host}:focus-visible::before`);
+  // Knopf über ::before; Karte über ::after, damit das Live-Licht (.tls-live-frame::before) daneben weiterläuft.
+  expect(rule(".tls-card:focus-visible::before")).toBe("");
+  for (const pseudo of [".tls-btn:focus-visible::before", ".tls-card:focus-visible::after"]) {
+    const corners = rule(pseudo);
     expect(corners).toMatch(/content: "";/);
     expect(corners).toMatch(/position: absolute;/);
     expect(corners).toMatch(/inset: calc\(-1 \* var\(--tls-corner-out\)\);/);
@@ -58,6 +61,8 @@ test("Fokus: Ecken-Klammern an Knöpfen und Karten, dazu ein durchsichtiger Rahm
   }
   // Die Winkel brauchen eine Stelle mit Lage - ohne Gewicht, damit `absolute` oder `fixed` am Knopf weiter gelten.
   expect(system).toMatch(/:where\(\.tls-you\), :where\(\.tls-btn\), :where\(\.tls-card\) \{ position: relative; \}/);
+  // In wischbaren Leisten sitzen die Winkel an der Kante - die Leiste schneidet oben und unten ab.
+  expect(css).toMatch(/\n\.tls-swipe :is\(\.tls-btn, \.tls-card\) \{ --tls-corner-out: 0px; \}/);
   // Alle anderen Stellen behalten den Ring, aber auch dort mit durchsichtigem Rahmen statt `outline: none`.
   expect(css).toMatch(/\n:focus-visible \{ outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 2px var\(--tls-cyan\); \}/);
 });
