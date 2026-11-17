@@ -72,6 +72,8 @@
   --tls-corner-width: 2px;
   --tls-corner-out: 5px;
   --tls-you-fill: inset 0 0 0 100vmax rgb(var(--tls-brand-rgb) / 0.08);
+  --tls-you-tint: linear-gradient(rgb(var(--tls-brand-rgb) / 0.08) 0 0);
+  --tls-corner-bar: linear-gradient(var(--tls-brand) 0 0);
   /* Acht Verläufe, je Ecke ein waagrechter und ein senkrechter Strich. */
   --tls-corners:
     linear-gradient(var(--tls-brand) 0 0) top left / var(--tls-corner-len) var(--tls-corner-width) no-repeat,
@@ -97,9 +99,48 @@
   pointer-events: none;
   background: var(--tls-corners);
 }
-/* Etikett „Du“: Cyan auf leichter cyaner Fläche, klein und in Großbuchstaben (AA: scripts/check-contrast.js). */
+/* Zeilen einer Tabelle: Ein <tr> ist nicht in jedem Browser Bezugsrahmen für ein ::after (WebKit), und Zellen mit
+   eigener Fläche (Sticky-Spalten) decken alles zu, was an der Zeile hängt. Darum tragen hier die Zellen das Zeichen als
+   Hintergrundbild, ohne Lage: jede Zelle die Fläche, die erste die linken Winkel, die letzte sichtbare die rechten. Am
+   Handy ist das die letzte Zelle ohne `hidden` (Spalten mit `hidden sm:table-cell`). Das `table` vorne schlägt die
+   Fläche einer Sticky-Spalte (z. B. .staffel-standings), deren Farbe bleibt. */
+tr.tls-you { box-shadow: none; }
+tr.tls-you::after { content: none; }
+table tr.tls-you > :nth-child(n) {
+  background-image: var(--tls-you-tint);
+  background-position: 0 0;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+table tr.tls-you > :first-child {
+  background-image: var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-you-tint);
+  background-position: top left, top left, bottom left, bottom left, 0 0;
+  background-size: var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len),
+    var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len), 100% 100%;
+}
+table tr.tls-you > :last-child {
+  background-image: var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-you-tint);
+  background-position: top right, top right, bottom right, bottom right, 0 0;
+  background-size: var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len),
+    var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len), 100% 100%;
+}
+@media (max-width: 639px) {
+  table tr.tls-you > :not(.hidden):not(:has(~ :not(.hidden))) {
+    background-image: var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-you-tint);
+    background-position: top right, top right, bottom right, bottom right, 0 0;
+    background-size: var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len),
+      var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len), 100% 100%;
+  }
+}
+/* Kontrast-Modus von Windows: Verläufe und Schatten fallen weg - ein Rahmen in der Systemfarbe hält „du“ sichtbar,
+   nicht nur am Wort. */
+@media (forced-colors: active) {
+  .tls-you { outline: 2px solid CanvasText; outline-offset: -2px; }
+}
+/* Etikett „Du“ (AA: scripts/check-contrast.js): eine Pille in gemischter Schreibung - so verwechselt es niemand mit den
+   eckigen Initialen-Kästchen in Baum und Listen („DU“ für „Der unglaublich …“). */
 .tls-you-tag {
-  flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
-  font-size: 10px; font-weight: 700; line-height: 1.4; letter-spacing: 0.08em; text-transform: uppercase;
+  flex: none; display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; line-height: 1.35; letter-spacing: 0.02em; text-transform: none;
   color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
 }
