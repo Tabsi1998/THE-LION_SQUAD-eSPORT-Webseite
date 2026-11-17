@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-// Ecken-Klammern (#1316): In der Jahreswertung tragen nur deine Zeile (Tabelle am PC, Liste am Handy) und deine
-// Podest-Karte Ecken, Fläche und „Du“.
+// Ecken-Klammern (#1316): In der Jahreswertung tragen nur deine Zeile (Tabelle am PC, Liste am Handy) Ecken, Fläche
+// und „Du“; deine Podest-Karte nur das Etikett „Du“ - die Ecken stehen nicht doppelt.
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
@@ -32,7 +32,7 @@ beforeEach(() => {
   apiMock.get.mockReset();
 });
 
-test("nur deine Zeile, dein Eintrag am Handy und deine Podest-Karte tragen Ecken und „Du“", async () => {
+test("nur deine Zeile und dein Eintrag am Handy tragen Ecken, das Podest nur „Du“", async () => {
   authState = { user: { id: "u-me" } };
   renderPage();
   const own = await screen.findByTestId("season-row-u-me");
@@ -43,9 +43,13 @@ test("nur deine Zeile, dein Eintrag am Handy und deine Podest-Karte tragen Ecken
     expect(screen.getByTestId(`season-row-${id}`)).not.toHaveClass("tls-you");
     expect(screen.getByTestId(`season-item-${id}`)).not.toHaveClass("tls-you");
   }
-  // Tabelle, Liste und Podest: genau dreimal „du“.
-  expect(document.querySelectorAll(".tls-you")).toHaveLength(3);
+  // Ecken zweimal (Tabelle, Liste), das Etikett dreimal (dazu das Podest).
+  expect(document.querySelectorAll(".tls-you")).toHaveLength(2);
   expect(document.querySelectorAll(".tls-you-tag")).toHaveLength(3);
+  const podium = screen.getAllByText("Spieler").map((node) => node.closest("a")).find((link) => link && !link.closest("tr") && !link.closest("[data-testid^='season-item-']"));
+  expect(podium).toBeTruthy();
+  expect(podium).not.toHaveClass("tls-you");
+  expect(within(podium).getByText("Du")).toHaveClass("tls-you-tag");
 });
 
 test("ohne Anmeldung keine Ecken", async () => {

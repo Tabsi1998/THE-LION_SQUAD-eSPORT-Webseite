@@ -69,7 +69,7 @@ const TONE = {
 export default function SeasonPage() {
   const { slug } = useParams();
   const { user } = useAuth();
-  // Ecken-Klammern (#1316): deine Zeile der Gesamtwertung trägt Winkel, Fläche und „Du“.
+  // Ecken-Klammern (#1316): deine Zeile der Gesamtwertung trägt Winkel, Fläche und „Du“ (am Podest nur „Du“).
   const isMine = (row) => Boolean(user?.id) && row.user_id === user.id;
   const [data, setData] = useState(null);
   const season = data?.season;
@@ -305,7 +305,8 @@ function PodiumCard({ row, mine = false }) {
       </div>
     </>
   );
-  const className = `group border border-white/10 hover:border-[#FFD700]/50 bg-[#121212] rounded-sm p-5 transition${mine ? " tls-you" : ""}`;
+  // Die Ecken trägt deine Zeile der Tabelle bzw. Liste darunter; das Podest zeigt nur das Etikett „Du“ (#1316).
+  const className = "group border border-white/10 hover:border-[#FFD700]/50 bg-[#121212] rounded-sm p-5 transition";
   if (!row.username) return <div className={className}>{content}</div>;
   return (
     <Link to={`/u/${encodeURIComponent(row.username)}`} className={className}>
