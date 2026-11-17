@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.14 - 2026-11-17
+
+- Mobile: Eigene FAQ unter Einstellungen › Über die App – Suche, häufige Fragen und Bereiche mit Rollen-Filter. (#2449)
+- Mobile: Bereich „LionsAPP“ in der FAQ mit Push-Stufen, Ruhezeit, Kanälen, Aufruf-Ton, Passkey, App-Sperre, ohne Netz und Updates. (#2449)
+- Mobile: Fragen für Mitglieder, Helfer und Turnierleitung kommen nach Prüfung vom Server; Links auf /faq öffnen die FAQ der App. (#2449)
+- Mobile: Keine Frage nach Benachrichtigungen mehr direkt nach dem Login. (#1208)
+- Mobile: Nach der ersten Turnier- oder Event-Anmeldung erst die Erklärung „Sollen wir dich rufen, wenn du dran bist?“, dann Android. (#1208)
+- Mobile: Leiser Hinweis „Aufrufe sind aus – einschalten“ auf Turnier- und Event-Seiten und in den Einstellungen. (#1208)
+- Mobile: Zurückgezogene News-Beiträge und Alben zeigen einen Hinweis statt eines Ladefehlers. (#2164)
+- Mobile: Filter-Chips der Referenzen mit größerer Tippfläche, „Spielst du auch mit?“ ohne Gleiten bei reduzierter Bewegung. (#2449, #1208)
+
 ## 1.7.13 - 2026-11-16
 
 - Mobile: Benachrichtigungen in drei Stufen mit „Eigene Auswahl“ und je Thema Push, Nur App oder Aus. (#2444)
