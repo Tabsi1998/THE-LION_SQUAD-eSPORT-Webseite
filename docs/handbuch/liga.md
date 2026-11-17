@@ -1449,6 +1449,11 @@ nur für alle Teams auf diesem Platz; über das eigene Team entscheidet eine and
 korrigieren**. Ändert ein späteres Ergebnis den Gleichstand, gilt der Entscheid nicht mehr (Hinweis **Gilt nicht mehr**)
 und bleibt zur Nachvollziehbarkeit stehen; **Zurücknehmen** löscht ihn mit Grund.
 
+Gleichstände entscheidet die Leitung auf der Staffel-Seite. Ein geteilter Meisterplatz (oberste Liga) trägt dort das Kennzeichen
+**Meisterplatz**, ein geteilter Platz an der Grenze zu Auf- oder Abstieg **Grenze zu Auf- oder Abstieg**. Beim Meisterplatz ist **Wie wurde
+entschieden?** Pflicht. Was beim Abschluss noch blockiert (Meister, Zonengrenze), zeigt der Reiter **Abschluss** der Season mit derselben
+Pflicht zur Art (3.10). Ist die Staffel abgeschlossen, steht statt der Knöpfe der Hinweis, sie erst im Reiter **Abschluss** wieder zu öffnen.
+
 <img src="../assets/liga/liga-gleichstand-entscheid-handy.png" alt="Staffel-Seite am Handy, Reiter Tabelle, Feld Gleichstand: Platz 4 geteilt mit dem Knopf Reihenfolge festlegen, darunter ein älterer Entscheid mit Gilt nicht mehr und Zurücknehmen" width="300">
 
 **Austritt, Auflösung, Disqualifikation:** In der Teilnehmerliste der Staffel **Austritt eintragen** bzw.
