@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 import { isGuestUser } from "../live";
 import { serverOffset as offsetFrom } from "./newYear/countdown";
 import { useSignalSync } from "./signalSync";
+import { clearOwnMatches } from "./matchPause";
 
 // Jahreszeiten in der App (#636): dieselbe Quelle wie die Website (/seasonal/active, Kanal „app“),
 // alle zehn Minuten im Vordergrund nachgefragt, rund um Mitternacht am 31.12. alle 30 Sekunden.
@@ -105,6 +106,9 @@ const SeasonContext = createContext<SeasonContextValue>(EMPTY);
 export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const { user, refreshMe } = useAuth();
   const reducedMotion = useReduceMotion();
+  // Turniertag (#1169): Die eigenen Spiele gehören zur angemeldeten Person - meldet sie sich ab, ruht nichts mehr.
+  const ownerId = user?.id || null;
+  useEffect(() => clearOwnMatches, [ownerId]);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [stored, setStored] = useState<SeasonPreference>("on");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
