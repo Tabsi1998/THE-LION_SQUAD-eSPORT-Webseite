@@ -138,6 +138,17 @@ async def load_match_reports(db, match_ids: list[str]) -> dict[str, list[dict]]:
     return {row["id"]: list(row.get("reports") or []) for row in rows if row.get("id")}
 
 
+async def load_match_call_fields(db, match_ids: list[str]) -> dict[str, dict]:
+    """Aufgerufen und gestartet je Spiel (#1169) - stehen nicht in der allgemeinen Spielform. Die Startseite sagt damit,
+    ob das eigene Spiel aufgerufen ist oder läuft; Website und App pausieren dann die Saison-Deko."""
+    ids = sorted({match_id for match_id in match_ids if match_id})
+    if not ids:
+        return {}
+    rows = await db.matches_v2.find(
+        {"id": {"$in": ids}}, {"_id": 0, "id": 1, "called_at": 1, "started_at": 1}).to_list(len(ids) + 10)
+    return {row["id"]: row for row in rows if row.get("id")}
+
+
 async def count_matches_by_status(db, statuses: set[str]) -> int:
     """Count operational matches for dashboard surfaces."""
 

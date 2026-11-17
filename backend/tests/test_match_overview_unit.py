@@ -153,3 +153,22 @@ def test_own_overview_uses_same_contract_for_stage_matches():
     assert rows[0]["participant_names"] == ["Lion", "Opponent"]
     assert rows[0]["opponent_name"] == "Opponent"
     assert rows[0]["is_own_match"] is True
+
+
+def test_own_overview_says_called_or_running_for_the_season_pause():
+    # Turniertag (#1169): die Startseite sagt, ob das eigene Spiel aufgerufen ist oder läuft - dann pausiert die
+    # Saison-Deko in Website und App, bis das Ergebnis da ist.
+    db = FakeDb()
+    slots = [{"slot": 1, "registration_id": "r-own", "status": "filled"}, {"slot": 2, "registration_id": "r-other", "status": "filled"}]
+    db.matches_v2 = FakeCollection([
+        {"id": "m-called", "tournament_id": "t1", "status": "ready", "called_at": "2026-08-06T12:00:00+00:00", "station_id": "st-1", "slots": slots, "results": [], "advancement": []},
+        {"id": "m-kept", "tournament_id": "t1", "status": "ready", "station_id": "st-2", "slots": slots, "results": [], "advancement": []},
+        {"id": "m-old-call", "tournament_id": "t1", "status": "disputed", "called_at": "2026-08-06T11:00:00+00:00", "station_id": "st-3", "slots": slots, "results": [], "advancement": []},
+        {"id": "m-live", "tournament_id": "t1", "status": "in_progress", "slots": slots, "results": [], "advancement": []},
+        {"id": "m-started", "tournament_id": "t1", "status": "scheduled", "started_at": "2026-08-06T12:05:00+00:00", "slots": slots, "results": [], "advancement": []},
+    ])
+
+    rows, _registrations = asyncio.run(own_match_overviews(db, {"id": "u1", "role": "user"}))
+    states = {row["id"]: row["live_state"] for row in rows}
+
+    assert states == {"m-called": "called", "m-kept": None, "m-old-call": None, "m-live": "running", "m-started": "running"}
