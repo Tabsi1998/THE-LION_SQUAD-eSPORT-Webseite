@@ -37,6 +37,13 @@ test("lädt die Feier erst mit dem Ereignis und zeigt Krone und Text", async () 
   expect(screen.queryByTestId("crown-celebration-overlay")).toBeNull();
 });
 
+test("die Onyx-Krone ist erreicht, nicht erobert (#2501)", async () => {
+  render(<MemoryRouter><CrownCelebration /></MemoryRouter>);
+  celebrate({ id: "n3", variant: "onyx", body: "Du trägst jetzt die Onyx-Krone." });
+  expect(await screen.findByTestId("crown-celebration-title")).toHaveTextContent("ONYX-KRONE ERREICHT!");
+  expect(screen.getByTestId("crown-icon")).toHaveTextContent("onyx");
+});
+
 test("Escape schließt, ohne Text steht die Beschreibung der Krone", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><CrownCelebration /></MemoryRouter>);

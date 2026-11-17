@@ -10,7 +10,8 @@ vi.mock("@/lib/api", () => ({ api: apiMock }));
 const live = { reload: null };
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback) => { live.reload = callback; } }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "neonfalke" } }) }));
-vi.mock("@/components/tls/LevelAvatarFrame", () => ({ refreshCrowns: () => Promise.resolve({}) }));
+const crownState = vi.hoisted(() => ({ current: {} }));
+vi.mock("@/components/tls/LevelAvatarFrame", () => ({ refreshCrowns: () => Promise.resolve(crownState.current) }));
 const toastMock = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -40,7 +41,26 @@ async function freshToast() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  crownState.current = {};
+  localStorage.removeItem("tls-crowns-celebrated");
   apiMock.get.mockResolvedValue({ data: [OLD] });
+});
+
+test("„Onyx erreicht“ feiert die Onyx-Krone wie eine eroberte Krone (#2501)", async () => {
+  const ONYX = { id: "n-7", kind: "crown_onyx", title: "👑 Onyx erreicht!", body: "Du trägst jetzt die Onyx-Krone.", url: "/achievements",
+    meta: { variant: "onyx", prev: "gold", category: "achievements" }, read: false, created_at: "2026-10-14T10:00:00Z" };
+  crownState.current = { "u-1": "onyx" };
+  apiMock.get.mockResolvedValue({ data: [ONYX] });
+  const seen = [];
+  const listen = (event) => seen.push(event.detail);
+  window.addEventListener("tls-crown-celebration", listen);
+  try {
+    render(<MemoryRouter><NotificationBell /></MemoryRouter>);
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toMatchObject({ id: "n-7", variant: "onyx", body: "Du trägst jetzt die Onyx-Krone." });
+  } finally {
+    window.removeEventListener("tls-crown-celebration", listen);
+  }
 });
 
 test("„Öffnen“ führt ans Ziel und markiert gelesen", async () => {

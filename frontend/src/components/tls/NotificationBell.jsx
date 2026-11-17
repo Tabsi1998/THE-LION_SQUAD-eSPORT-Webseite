@@ -16,7 +16,9 @@ const TABS = [
   ["read", "Gelesen"],
 ];
 
-const CROWN_KINDS = new Set(["crown_gained", "crown_lost", "crown_changed"]);
+const CROWN_KINDS = new Set(["crown_gained", "crown_lost", "crown_changed", "crown_onyx"]);
+// Gefeiert wird, wer eine Krone erobert oder Onyx erreicht (#2501).
+const CELEBRATED_KINDS = new Set(["crown_gained", "crown_onyx"]);
 
 function handleCrownNotifications(rows, userId) {
   const crownRows = rows.filter((item) => !item.read && CROWN_KINDS.has(item.kind));
@@ -27,7 +29,7 @@ function handleCrownNotifications(rows, userId) {
   } catch {
     // Kein oder kaputter Speicher: dann gilt keine Krone als schon gefeiert (#937).
   }
-  const fresh = crownRows.filter((item) => item.kind === "crown_gained" && item.id && !seen.includes(item.id));
+  const fresh = crownRows.filter((item) => CELEBRATED_KINDS.has(item.kind) && item.id && !seen.includes(item.id));
   refreshCrowns().then((crowns) => {
     if (!fresh.length) return;
     const current = userId ? (crowns || {})[userId] : null;
