@@ -1,8 +1,8 @@
 // Staffel-Seite der Liga-Verwaltung (#2262) unter /admin/leagues/staffeln/<id>: eine Liga-Staffel bedienen, ohne in die
 // Turnierverwaltung zu wechseln. Reiter nach dem Muster der Season-Seite (lib/staffelTabs.js), per Sprungmarke ansteuerbar
 // (`#teilnehmer`, `#zuteilen`). Die Seite wächst in Paketen neben der alten Bedienung (Entscheidung Nr. 189): Paket A bringt
-// Überblick und Teilnehmer, Paket B Spielplan, Spiele und Ergebnisse sowie die Tabelle samt Gleichstand-Entscheid (Nr. 190); bis
-// Paket D bleibt die Turnierbearbeitung voll nutzbar, Ziele ohne eigenen Reiter führen noch dorthin.
+// Überblick und Teilnehmer, Paket B Spielplan, Spiele und Ergebnisse sowie die Tabelle samt Gleichstand-Entscheid (Nr. 190), Paket C
+// Protokoll und Einstellungen - damit ist die Seite vollständig. Bis Paket D bleibt die Turnierbearbeitung daneben voll nutzbar.
 //
 // Daten wie in der Turnierverwaltung: `GET /tournaments/{id}?include_draft=true` (Rechte als `league_capabilities` und `can_*`,
 // `league_links`, `league_season`), dazu Anmeldungen und Spiele. Knöpfe nur nach den Rechten des Servers - er prüft selbst noch einmal.
@@ -22,11 +22,13 @@ import { seasonAnchorUrl } from "@/lib/seasonTabs";
 import { STAFFEL_TABS, STAFFEL_TABS_READY, staffelTarget } from "@/lib/staffelTabs";
 import { isStaffel, staffelBeforeStart, staffelLabel } from "@/pages/admin/tournament/StaffelParts";
 import { useTournamentStatus } from "@/pages/admin/tournament/useTournamentStatus";
+import { SeasonLog } from "./SeasonDeskTab";
 import { StaffelTablePanel } from "./SeasonTablePanel";
 import { StaffelGamesTab } from "./staffel/StaffelGamesTab";
 import { StaffelOverviewTab } from "./staffel/StaffelOverviewTab";
 import { StaffelParticipantsTab } from "./staffel/StaffelParticipantsTab";
 import { StaffelScheduleTab } from "./staffel/StaffelScheduleTab";
+import { StaffelSettingsTab } from "./staffel/StaffelSettingsTab";
 import { StaffelStand } from "./staffel/StaffelStand";
 import { hasCapability, sanctionsByRegistration } from "./staffel/staffelPage";
 
@@ -200,6 +202,9 @@ function StaffelPage({ tournamentId }) {
       <StaffelTablePanel tournamentId={t.id} label={`Tabelle ${staffelLabel(t)}`} canDecide={hasCapability(t, "results")}
         pdfHref={`${API}/exports/tournaments/${encodeURIComponent(t.id)}/standings.pdf`} />
     ),
+    // Protokoll der Season auf diese Staffel gefiltert (Paket C): lesen jede Zuständigkeit, Strafen und Notausnahmen nur mit der passenden.
+    protokoll: () => <SeasonLog seasonId={t.league_context.season_id} staffelId={t.id} title="Protokoll der Staffel" sectionId="staffel-log" />,
+    einstellungen: () => <StaffelSettingsTab tournament={t} matches={matches} onReload={loadSafely} />,
   };
 
   return (

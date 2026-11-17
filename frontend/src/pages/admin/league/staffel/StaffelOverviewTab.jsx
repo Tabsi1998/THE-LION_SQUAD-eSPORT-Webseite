@@ -5,15 +5,19 @@
 //
 // Liga-Wörter statt Turnier-Status (Fabian zu #2262): Vor dem Start gibt es nur „Liga starten“ und „Staffel absagen“, kein
 // Auswahlfeld und kein „Entwurf“; danach bietet die Auswahl nur, was eine laufende Staffel braucht. „Liga starten“ steht nur einmal da.
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, ExternalLink, Zap } from "lucide-react";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
+import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { api } from "@/lib/api";
 import { countsAsMatch } from "@/lib/bracketGraph";
+import { seasonDeskUrl, staffelOpenCount } from "@/lib/leagueDesk";
 import { seasonAnchorUrl, staffelNeeds } from "@/lib/seasonTabs";
 import { staffelAdminUrl, staffelManageUrl } from "@/lib/staffelTabs";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
 import { primaryTournamentAction } from "@/pages/admin/tournament/shared";
+import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { PauseUntilControl } from "@/pages/admin/tournament/TvTournamentPanel";
 import { ACTIVE_STAFFEL_REGISTRATION, STAFFEL_RUNNING_STATUSES, STAFFEL_STATUS_WORDS, needsUrl, staffelStandText } from "./staffelPage";
 
@@ -141,19 +145,55 @@ function Needs({ tournament: base, teams }) {
   );
 }
 
+/**
+ * „Offen in dieser Staffel“: die Aufgaben des Leitstands mit dieser Staffel (`staffel_id`, #2262) - eine Zahl, keine Kopie der Liste.
+ * Lesen darf jede Zuständigkeit der Liga (wie der Leitstand selbst). `null` beim Laden, `{ failed }` nach einem Fehler.
+ */
+function useDeskCount(tournament) {
+  const seasonId = tournament.league_context?.season_id;
+  const [count, setCount] = useState(null);
+  const load = useCallback(() => {
+    if (!seasonId) return;
+    api.get(`/admin/leagues/seasons/${seasonId}/desk`)
+      .then(({ data }) => setCount(staffelOpenCount(data, tournament.id)))
+      .catch(() => setCount({ failed: true }));
+  }, [seasonId, tournament.id]);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["leagues", "matches", "tournaments"]);
+  return count;
+}
+
+function deskLine(count) {
+  if (!count) return "wird gezählt …";
+  if (count.failed) return "Zahl gerade nicht geladen – im Leitstand nachsehen";
+  if (!count.total) return "gerade nichts – im Leitstand der Season";
+  const own = count.mine === count.total ? "" : `, ${count.mine} davon für dich`;
+  return `${count.total === 1 ? "1 Aufgabe" : `${count.total} Aufgaben`}${own} – im Leitstand der Season`;
+}
+
 function Ways({ tournament }) {
   const links = tournament.league_links || {};
   const seasonId = tournament.league_context?.season_id;
   const seasonPath = links.season_admin_path || seasonAnchorUrl(seasonId);
-  const row = "flex min-h-[44px] min-w-0 items-center justify-between gap-3 px-3 text-sm font-semibold text-white/85 hover:bg-white/5 hover:text-white";
+  const count = useDeskCount(tournament);
+  const row = "flex min-h-[44px] min-w-0 items-center justify-between gap-3 px-3 py-1.5 text-sm font-semibold text-white/85 hover:bg-white/5 hover:text-white";
   const sub = "block text-xs font-normal text-white/60";
   return (
     <nav className={`${CARD} p-0`} aria-label="Wege von dieser Staffel" data-testid="staffel-ways">
       <ul className="divide-y divide-white/5">
         <li>
-          <Link to={seasonAnchorUrl(seasonId, "leitstand")} className={row} data-testid="staffel-desk-link">
-            <span className="min-w-0">Offen in dieser Staffel <span className={sub}>im Leitstand der Season</span></span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
+          <Link to={seasonDeskUrl(seasonId, tournament.id)} className={row} data-testid="staffel-desk-link">
+            <span className="min-w-0">
+              Offen in dieser Staffel
+              <span className={`${sub} ${count?.failed ? "text-warn" : ""}`} data-testid="staffel-desk-count" aria-live="polite">{deskLine(count)}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {count && !count.failed ? (
+                <span className={`inline-flex min-w-[1.75rem] justify-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${count.total ? "bg-warn/15 text-warn" : "bg-white/5 text-white/60"}`}
+                  data-testid="staffel-desk-total">{count.total}</span>
+              ) : null}
+              <ArrowRight className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" />
+            </span>
           </Link>
         </li>
         <li>
@@ -197,6 +237,21 @@ export function StaffelOverviewTab({ tournament, registrations, matches, onStatu
         <Numbers tournament={tournament} registrations={registrations} matches={matches} />
       </div>
       <Ways tournament={tournament} />
+      <Feedback tournament={tournament} />
     </div>
+  );
+}
+
+// Rückmeldungen (Nr. 192): Staffeln bekommen nach dem Ende dieselbe Umfrage wie Turniere (`services/feedback.py` schließt sie nicht
+// aus). Die Auswertung liest „Liga verwalten“ (`GET /admin/feedback/tournament/{id}`) - ohne das Recht fragt die Seite gar nicht erst.
+const FEEDBACK_STATUSES = new Set(["completed", "results_published", "archived"]);
+
+function Feedback({ tournament }) {
+  if (!tournament.can_edit_staffel || !FEEDBACK_STATUSES.has(tournament.status)) return null;
+  return (
+    <section className={CARD} aria-labelledby="staffel-feedback-title" data-testid="staffel-feedback">
+      <h2 id="staffel-feedback-title" className={EYEBROW}>Rückmeldungen der Teams</h2>
+      <div className="mt-3"><FeedbackReport kind="tournament" targetId={tournament.id} /></div>
+    </section>
   );
 }
