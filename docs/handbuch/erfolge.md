@@ -283,7 +283,13 @@ Jeder der zwölf Ränge hat einen **eigenen gezeichneten Rahmen** um das Profilb
 Signatur dazu, auf Wunsch ruhig und ohne Bewegung (Einstellung „weniger Bewegung“ des Geräts). Die **Kronen** (Gold, Silber, Bronze)
 tragen die drei Personen mit den meisten Erfolgspunkten – nur Konten mit **öffentlichem Profil** und eingeschaltetem „Erfolge
 öffentlich“ –; wer eine erobert oder verliert, bekommt eine Meldung, höchstens eine je Art in sechs Stunden. Wer „Erfolge
-öffentlich“ selbst ausschaltet, bekommt keine.
+öffentlich“ selbst ausschaltet, bekommt keine. Gesperrte, deaktivierte und gelöschte Konten tragen ebenfalls keine Krone
+und bekommen keine Meldung „Krone verloren“; die Krone geht an die Nächsten der sichtbaren Rangliste.
+
+Die **Onyx-Krone** trägt, wer 84.100 Erfolgspunkte erreicht hat (im Web „Level 30+“). Sie hängt nicht am Platz: Gold, Silber und
+Bronze gehen dann an die drei Besten ohne Onyx. Wer Onyx erreicht, bekommt einmal die Meldung „Onyx erreicht“, auch beim
+Aufstieg von einer Rangkrone – „Krone verloren“ kommt dabei nicht. Wer Onyx wieder verliert, etwa weil die Erfolge privat
+gestellt sind, bekommt keine Meldung, und beim Wiedergewinn kommt „Onyx erreicht“ nicht noch einmal.
 
 **Was XP bringt** (Auszug; Quelle: Programmwerte, „Deckel“ = höchstens so oft pro Tag):
 
