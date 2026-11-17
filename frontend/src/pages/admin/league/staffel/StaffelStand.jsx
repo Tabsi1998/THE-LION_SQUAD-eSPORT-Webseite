@@ -14,6 +14,8 @@ export function StaffelStand({ tournament }) {
   const tone = TONE[tournament?.status] || "bg-white/10 text-white/80 border-white/20";
   return (
     <span className={`inline-flex items-center gap-1 rounded-sm border px-2 py-[3px] text-[10px] font-bold uppercase tracking-wider ${tone}`}>
+      {/* Im Spielbetrieb derselbe Punkt wie das Abzeichen der Season - bei reduzierter Bewegung steht er still. */}
+      {tournament?.status === "live" ? <span className="h-1.5 w-1.5 rounded-full bg-current motion-safe:animate-pulse" aria-hidden="true" data-testid="staffel-stand-dot" /> : null}
       {staffelStandText(tournament)}
     </span>
   );
