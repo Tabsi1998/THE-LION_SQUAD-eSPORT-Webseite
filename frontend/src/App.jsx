@@ -70,12 +70,13 @@ function PlayerLegacyRedirect() {
 }
 
 // Turnierbaum-TV (#1110): mit Anzeige-Schlüssel im Link läuft er ohne Anmeldung - der Schlüssel erlaubt nur das
-// Anschauen dieses Turniers. Ohne Schlüssel bleibt es bei der Anmeldung der Turnierleitung.
+// Anschauen dieses Turniers. Ohne Schlüssel bleibt es bei der Anmeldung der Turnierleitung - und der Liga-Leitung für die TV-Ansicht
+// ihrer Staffeln (#2262, Nr. 194): Der Server lässt bei einer Staffel jede Liga-Zuständigkeit lesen, bei Turnieren nur die Turnierleitung.
 function BracketTvRoute({ station = false }) {
   const [params] = useSearchParams();
   const page = station ? <StationTVPage /> : <BracketTVPage />;
   if (params.get("key")) return page;
-  return <ProtectedRoute requireTournamentStaff>{page}</ProtectedRoute>;
+  return <ProtectedRoute requireTournamentStaff allowLeagueStaff={!station}>{page}</ProtectedRoute>;
 }
 
 import HomePage from "@/pages/public/HomePage";

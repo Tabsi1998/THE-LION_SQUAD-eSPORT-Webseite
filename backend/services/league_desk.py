@@ -73,12 +73,14 @@ def responsible_label(capabilities: tuple[str, ...]) -> str:
 
 def _item(kind: str, ref: str, *, title: str, text: str, url: str, action: str, due_at=None, since=None,
           assignee: dict | None = None, conflict: str | None = None, me_id: str | None = None, detail: dict | None = None,
-          others_decide: bool = False) -> dict:
+          others_decide: bool = False, staffel: str | None = None) -> dict:
     """Eine Aufgabe. ``mine``: Die Person kann sie selbst erledigen - nicht befangen und nicht von jemand anderem übernommen;
-    ``others_decide``: Hier entscheidet zuerst jemand anderes (Verschiebungen: die Gegenseite), die Leitung schaut nur hin."""
+    ``others_decide``: Hier entscheidet zuerst jemand anderes (Verschiebungen: die Gegenseite), die Leitung schaut nur hin.
+    ``staffel_id`` (#2262): die Staffel der Aufgabe - für „Offen in dieser Staffel“ und den Leitstand mit Staffel-Filter; ``None`` bei
+    Aufgaben der ganzen Season (Anmeldungen, Transfers, Regelwerk)."""
     assignee_id = (assignee or {}).get("user_id")
     return {
-        "id": f"{kind}:{ref}", "kind": kind, "title": title, "text": text, "url": url, "action": action,
+        "id": f"{kind}:{ref}", "kind": kind, "title": title, "text": text, "url": url, "action": action, "staffel_id": staffel or None,
         "due_at": due_at or None, "since": since or None,
         "assignee": ({"name": assignee.get("name") or "Liga-Leitung", "own": assignee_id == me_id} if assignee else None),
         "conflict": bool(conflict), "conflict_text": conflict,
@@ -141,7 +143,7 @@ async def _overdue(db, me, season, staffeln) -> list[dict]:
                        "kein Saisonabschluss.",
                   url=row["url"], action="Spiel öffnen", since=row.get("overdue_since"), due_at=None,
                   conflict=CONFLICT_DETAIL if row["match_id"] in involved else None, me_id=me.get("id"),
-                  detail={"scheduled_at": row.get("scheduled_at")}) for row in rows]
+                  detail={"scheduled_at": row.get("scheduled_at")}, staffel=row.get("tournament_id")) for row in rows]
 
 
 async def _lineups(db, me, season, staffeln) -> list[dict]:
@@ -160,7 +162,8 @@ async def _lineups(db, me, season, staffeln) -> list[dict]:
                   text=(f"{'Eine Seite hat' if len(match['lineups_missing']) == 1 else 'Beide Seiten haben'} die Teilnehmerliste nicht "
                         "nachgetragen. Das Ergebnis bleibt gültig – auf der Matchseite entscheiden und mit Grund eintragen."),
                   url=f"/matches/{match['id']}", action="Liste eintragen", since=match.get("lineup_overdue_at"),
-                  conflict=CONFLICT_DETAIL if match["id"] in involved else None, me_id=me.get("id")) for match in matches]
+                  conflict=CONFLICT_DETAIL if match["id"] in involved else None, me_id=me.get("id"),
+                  staffel=match["tournament_id"]) for match in matches]
 
 
 async def _no_show(db, me, season, staffeln) -> list[dict]:
@@ -172,7 +175,8 @@ async def _no_show(db, me, season, staffeln) -> list[dict]:
                   text=(f"{' und '.join(row.get('missing') or []) or 'Eine Seite'} nicht eingecheckt. Kampflos werten, Seite nachtragen oder "
                         "verlängern – gewertet wird nichts von selbst."),
                   url=row.get("lead_url") or row["url"], action="Entscheiden", due_at=row.get("due_at"),
-                  conflict=CONFLICT_DETAIL if row["match_id"] in involved else None, me_id=me.get("id")) for row in rows]
+                  conflict=CONFLICT_DETAIL if row["match_id"] in involved else None, me_id=me.get("id"),
+                  staffel=row.get("tournament_id")) for row in rows]
 
 
 async def _incidents(db, me, season, staffeln) -> list[dict]:
@@ -182,7 +186,7 @@ async def _incidents(db, me, season, staffeln) -> list[dict]:
     return [_item("incidents", row["match_id"], title=f"{row.get('title') or 'Staffel'} · {row['label']}",
                   text="", url=row["url"], action="Entscheiden" if row["code"] == "in_review" else "Spiel öffnen", since=row.get("since"),
                   conflict=CONFLICT_DETAIL if row.get("conflict") else None, me_id=me.get("id"),
-                  detail={"code": row["code"], "position": row.get("position")}) for row in rows]
+                  detail={"code": row["code"], "position": row.get("position")}, staffel=row.get("tournament_id")) for row in rows]
 
 
 async def _procedures(db, me, season, staffeln) -> list[dict]:
@@ -219,7 +223,7 @@ async def _procedures(db, me, season, staffeln) -> list[dict]:
                 "procedures", row["id"], title=f"{staffeln[match['tournament_id']].get('title') or 'Staffel'} · {_label(match)}",
                 text=text, url=f"/matches/{match['id']}#verfahren-{row['id']}", action="Zum Verfahren", due_at=due, since=row.get("at"),
                 assignee=({"user_id": assignee.get("user_id"), "name": names.get(assignee.get("user_id"))} if assignee else None),
-                conflict=conflict, me_id=me.get("id"), detail={"kind": row["kind"], "kind_label": kind}))
+                conflict=conflict, me_id=me.get("id"), detail={"kind": row["kind"], "kind_label": kind}, staffel=match["tournament_id"]))
     return items
 
 
@@ -242,12 +246,13 @@ async def _sanctions(db, me, season, staffeln) -> list[dict]:
             items.append(_item("sanctions", f"{doc['id']}:appeal", title=f"Einspruch · {row['kind_label']} · {target}",
                                text="Gegen die Strafe liegt ein Einspruch vor. Es entscheidet, wer sie nicht verhängt oder bestätigt hat.",
                                url=f"/admin/leagues/seasons/{season['id']}#strafen", action="Einspruch entscheiden",
-                               since=(doc.get("appeal") or {}).get("at"), conflict=conflict, me_id=me.get("id")))
+                               since=(doc.get("appeal") or {}).get("at"), conflict=conflict, me_id=me.get("id"),
+                               staffel=doc.get("tournament_id")))
         if doc.get("state") == sanctions.PROVISIONAL:
             items.append(_item("sanctions", f"{doc['id']}:provisional", title=f"Vorläufig · {row['kind_label']} · {target}",
                                text="Die Sperre gilt vorläufig. Bestätigen mit Zeitraum oder widerrufen.",
                                url=f"/admin/leagues/seasons/{season['id']}#strafen", action="Strafe prüfen", since=doc.get("created_at"),
-                               conflict=conflict, me_id=me.get("id")))
+                               conflict=conflict, me_id=me.get("id"), staffel=doc.get("tournament_id")))
     return items
 
 
@@ -302,7 +307,8 @@ async def _roster(db, me, season, staffeln) -> list[dict]:
         count = len(late)
         out.append(_item("roster", f"ids:{squad.get('registration_id')}", title=squad.get("display_name") or "Co-Team",
                          text=(f"{'Eine Spiel-ID wartet' if count == 1 else f'{count} Spiel-IDs warten'} nach dem Stichtag auf die Freigabe."),
-                         url=f"/admin/leagues/seasons/{season['id']}#kader", action="Freigeben", me_id=me.get("id")))
+                         url=f"/admin/leagues/seasons/{season['id']}#kader", action="Freigeben", me_id=me.get("id"),
+                         staffel=squad.get("tournament_id")))
     return out
 
 
@@ -328,7 +334,7 @@ async def _reschedule(db, me, season, staffeln) -> list[dict]:
                               "die Leitung legt den Termin nur fest, wenn sich die Seiten nicht einigen.",
                          url=f"/matches/{match['id']}", action="Spiel öffnen", due_at=match.get("scheduled_at"),
                          since=request.get("requested_at"), conflict=CONFLICT_DETAIL if match["id"] in involved else None,
-                         me_id=me.get("id"), others_decide=True, detail={"to_at": request.get("to_at")}))
+                         me_id=me.get("id"), others_decide=True, detail={"to_at": request.get("to_at")}, staffel=match["tournament_id"]))
     return out
 
 
@@ -400,6 +406,9 @@ LOG_GROUPS = {
     "league.division": "Liga N", "match.procedure": "Verfahren", "match.reschedule": "Verschiebung", "match.incident": "Vorfall",
     "match.result": "Ergebnis", "match.lineup": "Teilnehmerliste", "match.no_show": "Nicht erschienen", "match.checkin": "Check-in",
     "match.schedule": "Termin", "match.veto": "Veto", "match.dispute": "Streitfall",
+    # Was ein Austritt oder Ausschluss an den Spielen ändert (``tournament_events.AUDIT_ACTIONS``).
+    "match.walkover": "Kampflos gewertet", "match.forfeit": "Kampflos gewertet", "match.annulled": "Spiel annulliert",
+    "match.cancelled": "Spiel abgesagt", "match.slot_cleared": "Platz im Spiel geleert", "match.readvanced": "Spiel neu besetzt",
 }
 LOG_VERBS = {
     "create": "angelegt", "update": "geändert", "delete": "gelöscht", "accept": "angenommen", "reject": "abgelehnt",
@@ -408,11 +417,46 @@ LOG_VERBS = {
     "publish": "veröffentlicht", "draft": "Entwurf gespeichert", "submit": "eingereicht", "overdue": "Frist abgelaufen",
     "override": "Notausnahme", "send": "verschickt", "issue": "verhängt", "waitlist": "auf die Warteliste gesetzt",
     "review": "in Prüfung", "amend": "nachgetragen", "status": "Stand geändert", "sync": "Vorgaben übertragen",
+    "double": "beide nicht erschienen",
+}
+
+# Staffel-Aktionen auf dem Turnierweg (#2262, Entwurf 1.4 Nr. 5): Liga starten und jeder weitere Stand, Darstellung, Sperren,
+# Austritt und Ausschluss, Pause, Sponsor je Spielwoche, Vorschau und Auslosung. Nur diese - nicht jede ``tournament.*``-Zeile,
+# die ein Staffel-Turnier schreibt (Phasen anlegen, Läufe, Auswertungen gehören nicht ins Protokoll der Liga-Leitung).
+STAFFEL_LOG_ACTIONS = {
+    "tournament.status.change": "Staffel · Stand geändert",
+    "tournament.update": "Staffel · Darstellung geändert",
+    "tournament.lock": "Staffel · gesperrt",
+    "tournament.unlock": "Staffel · entsperrt",
+    "tournament.pause_until": "Staffel · Pause bis geändert",
+    "tournament.round_sponsors": "Staffel · Sponsor je Spielwoche geändert",
+    "tournament.structure.preview_rebuilt": "Spielplan · Vorschau neu gemischt",
+    "tournament.draw.redrawn": "Spielplan · Spieltage neu ausgelost",
+    "tournament.participant.withdrawn": "Co-Team · ausgetreten",
+    "tournament.participant.disqualified": "Co-Team · disqualifiziert",
+    "tournament.participant.reinstated": "Co-Team · wieder aufgenommen",
+}
+# Der neue Stand einer Staffel in Liga-Wörtern (wie ``STAFFEL_STATUS_WORDS`` im Web) - „Liga gestartet“ nur beim ersten Schritt live.
+STAFFEL_STATUS_LABELS = {
+    "paused": "Staffel · pausiert", "completed": "Staffel · beendet", "results_published": "Staffel · Ergebnisse veröffentlicht",
+    "archived": "Staffel · archiviert", "cancelled": "Staffel · abgesagt",
 }
 
 
-def log_label(action: str) -> str:
-    """„Strafe · bestätigt“ aus ``league.sanction.confirm`` - nie ein Text aus den Daten."""
+def _status_label(data: dict) -> str:
+    status, previous = data.get("status"), data.get("previous_status")
+    if status == "live":
+        return "Staffel · fortgesetzt" if previous == "paused" else "Staffel · Liga gestartet"
+    return STAFFEL_STATUS_LABELS.get(status, STAFFEL_LOG_ACTIONS["tournament.status.change"])
+
+
+def log_label(action: str, data: dict | None = None) -> str:
+    """„Strafe · bestätigt“ aus ``league.sanction.confirm`` - nie ein Text aus den Daten. Bei einem Statuswechsel der Staffel nennt
+    der neue Stand (ein fester Wert, kein freier Text) das Wort: „Staffel · Liga gestartet“, „Staffel · beendet“."""
+    if action == "tournament.status.change":
+        return _status_label(data if isinstance(data, dict) else {})
+    if action in STAFFEL_LOG_ACTIONS:
+        return STAFFEL_LOG_ACTIONS[action]
     parts = str(action or "").split(".")
     group = LOG_GROUPS.get(".".join(parts[:2]), "Liga")
     verb = LOG_VERBS.get(parts[-1]) if len(parts) > 2 else None
@@ -439,20 +483,29 @@ def _log_detail(row: dict, staffeln: dict[str, dict]) -> dict:
 
 LOG_PREFIXES = ("league", "match")
 # Was nicht jede Zuständigkeit im Protokoll sieht: Strafen nur „Strafen“, Notausnahmen bei Befangenheit nur „Liga verwalten“.
+# Die Wiederaufnahme nach dem Widerruf einer Disqualifikation verrät die Strafe - sie zählt mit zu „Strafen“.
 LOG_RESTRICTED = (
     ("sanctions", {"action": {"$regex": "^league\\.sanction\\."}}),
+    ("sanctions", {"action": "tournament.participant.reinstated"}),
     ("manage", {"action": "league.conflict.override"}),
 )
 
 
-def log_query(season_id: str, targets: list[str], capabilities=None) -> dict:
+def log_query(season_id: str, targets: list[str], capabilities=None, *, staffel_ids: list[str] | None = None,
+              staffel: str | None = None) -> dict:
     """Je Zweig ein Index (``target_id`` bzw. ``data.season_id``, je mit ``created_at``, ``database.AUDIT_INDEXES``) und ein Präfix mit
-    Anker ohne Alternation - so nutzt MongoDB für Zählen und Seite denselben Weg."""
+    Anker ohne Alternation bzw. eine feste Liste - so nutzt MongoDB für Zählen und Seite denselben Weg.
+
+    ``staffel_ids``: die Staffeln, deren Aktionen auf dem Turnierweg (``STAFFEL_LOG_ACTIONS``) mitzählen. ``staffel`` (#2262, Reiter
+    Protokoll der Staffel): nur Einträge dieser Staffel - ``targets`` ist dann nur sie, Einträge an der Season zählen, wenn sie die
+    Staffel in ``data.tournament_id`` nennen (Strafen, Nachmeldungen)."""
     branches = []
     for prefix in LOG_PREFIXES:
         action = {"$regex": f"^{prefix}\\."}
         branches.append({"target_id": {"$in": targets}, "action": action})
-        branches.append({"data.season_id": season_id, "action": action})
+        branches.append({"data.season_id": season_id, **({"data.tournament_id": staffel} if staffel else {}), "action": action})
+    if staffel_ids:
+        branches.append({"target_id": {"$in": list(staffel_ids)}, "action": {"$in": sorted(STAFFEL_LOG_ACTIONS)}})
     query: dict = {"$or": branches}
     if capabilities is not None:
         hidden = [condition for capability, condition in LOG_RESTRICTED if capability not in capabilities]
@@ -461,12 +514,20 @@ def log_query(season_id: str, targets: list[str], capabilities=None) -> dict:
     return query
 
 
-async def season_log(db, season: dict, page: int = 1, *, me: dict | None = None) -> dict:
-    """Das Protokoll der Season, neueste zuerst, seitenweise: Liga- und Spielaktionen der Season und ihrer Staffeln. Strafen und
-    Notausnahmen nur mit der passenden Zuständigkeit (``LOG_RESTRICTED``)."""
+class UnknownStaffel(Exception):
+    """Die Staffel im Filter gehört nicht zu dieser Season."""
+
+
+async def season_log(db, season: dict, page: int = 1, *, me: dict | None = None, staffel: str | None = None) -> dict:
+    """Das Protokoll der Season, neueste zuerst, seitenweise: Liga- und Spielaktionen der Season und ihrer Staffeln, dazu die
+    Staffel-Aktionen auf dem Turnierweg (``STAFFEL_LOG_ACTIONS``). ``staffel``: nur diese Staffel (Reiter Protokoll der Staffel-Seite,
+    Leitstand mit Staffel-Filter). Strafen und Notausnahmen nur mit der passenden Zuständigkeit (``LOG_RESTRICTED``)."""
     staffeln = await _staffeln(db, season["id"])
-    targets = [season["id"], *sorted(staffeln)]
-    query = log_query(season["id"], targets, await capabilities_of(db, me, season.get("league_id")))
+    if staffel and staffel not in staffeln:
+        raise UnknownStaffel(staffel)
+    ids = [staffel] if staffel else sorted(staffeln)
+    targets = ids if staffel else [season["id"], *ids]
+    query = log_query(season["id"], targets, await capabilities_of(db, me, season.get("league_id")), staffel_ids=ids, staffel=staffel)
     total = await db.audit_logs.count_documents(query)
     pages = max(1, -(-total // LOG_PAGE_SIZE))
     page = min(max(1, int(page or 1)), pages)
@@ -476,7 +537,7 @@ async def season_log(db, season: dict, page: int = 1, *, me: dict | None = None)
     names = {row["id"]: row.get("display_name") or row.get("username") or "Mitglied" for row in await db.users.find(
         {"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(actor_ids) + 1)} if actor_ids else {}
     return {
-        "items": [{"id": row.get("id"), "action": row.get("action"), "label": log_label(row.get("action")), "at": row.get("created_at"),
+        "items": [{"id": row.get("id"), "action": row.get("action"), "label": log_label(row.get("action"), row.get("data")), "at": row.get("created_at"),
                    "actor": names.get(row.get("actor_id") or "") if row.get("actor_id") else "Automatik",
                    **_log_detail(row, staffeln)} for row in rows],
         "page": page, "pages": pages, "total": total, "page_size": LOG_PAGE_SIZE,

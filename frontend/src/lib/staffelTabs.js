@@ -2,8 +2,7 @@
 // Turnierverwaltung (`?tab=`). Muster wie lib/seasonTabs.js: Reiter und Abschnitte per Sprungmarke (`#teilnehmer`, `#zuteilen`).
 // Jede Marke gehört zu genau einem Reiter - der Test prüft es.
 //
-// Die Seite entsteht in Paketen neben der alten Bedienung (Entscheidung Nr. 189): Alle sieben Reiter stehen hier, auf der Seite
-// erscheinen aber nur die fertigen (`STAFFEL_TABS_READY`). Ein Ziel, das es noch nicht gibt, führt in die Turnierverwaltung.
+// Die Seite entstand in Paketen neben der alten Bedienung (Entscheidung Nr. 189); seit Paket C stehen alle sieben Reiter auf ihr.
 
 export const STAFFEL_TABS = [
   { key: "ueberblick", label: "Überblick" },
@@ -15,9 +14,9 @@ export const STAFFEL_TABS = [
   { key: "einstellungen", label: "Einstellungen" },
 ];
 
-// Was schon auf der Seite steht: Paket A Überblick und Teilnehmer, Paket B Spielplan, Spiele und Tabelle. Protokoll und Einstellungen
-// kommen mit Paket C.
-export const STAFFEL_TABS_READY = new Set(["ueberblick", "teilnehmer", "spielplan", "spiele", "tabelle"]);
+// Was auf der Seite steht: seit Paket C alle sieben Reiter (Paket A Überblick und Teilnehmer, B Spielplan, Spiele und Tabelle,
+// C Protokoll und Einstellungen).
+export const STAFFEL_TABS_READY = new Set(STAFFEL_TABS.map((tab) => tab.key));
 
 // Abschnitte innerhalb der Reiter, per Sprungmarke erreichbar (Hinweise, Nachrichten des Servers, Handbuch).
 export const STAFFEL_SECTIONS = {
@@ -27,8 +26,27 @@ export const STAFFEL_SECTIONS = {
   ergebnisse: "spiele",
   gleichstand: "tabelle",
   darstellung: "einstellungen",
+  vorgaben: "einstellungen",
+  links: "einstellungen",
   helfer: "einstellungen",
+  werkzeuge: "einstellungen",
 };
+
+// Unterreiter der Einstellungen (Fix-Runde Paket C, #2249/#2267: Reiter statt langer Seiten). Jeder ist zugleich eine Sprungmarke
+// (`#vorgaben` öffnet „Aus der Season“), `manage`: nur mit „Liga verwalten“ zu sehen, sonst öffnet die Marke den ersten.
+export const STAFFEL_SETTINGS_TABS = [
+  { key: "darstellung", label: "Auftritt" },
+  { key: "vorgaben", label: "Aus der Season" },
+  { key: "links", label: "Links und Sponsor", manage: true },
+  { key: "helfer", label: "TV und Helfer" },
+  { key: "werkzeuge", label: "Werkzeuge" },
+];
+
+/** Der Unterreiter der Einstellungen zu einer Marke - leer oder unbekannt: der erste. */
+export function staffelSettingsTab(section) {
+  const key = String(section || "").replace(/^#/, "").trim().toLowerCase();
+  return STAFFEL_SETTINGS_TABS.some((tab) => tab.key === key) ? key : STAFFEL_SETTINGS_TABS[0].key;
+}
 
 // Die Reiter der Turnierverwaltung (`/admin/tournaments/<id>?tab=…`) und wohin sie auf der Staffel-Seite führen - für die
 // Weiterleitung alter Adressen (Paket D). Unbekannt oder leer: Überblick.
@@ -38,7 +56,7 @@ export const LEGACY_TAB_ANCHORS = {
   stages: "spiele",
   bracket: "tabelle",
   edit: "einstellungen",
-  maps: "einstellungen",
+  maps: "vorgaben",
   staff: "helfer",
   feedback: "ueberblick",
 };
@@ -75,9 +93,9 @@ export function legacyTabAnchor(tab) {
 }
 
 /**
- * Wohin ein Ziel zur Bedienung einer Staffel führt, solange die Seite in Paketen wächst: Steht der Reiter schon auf der
- * Staffel-Seite, dorthin - sonst noch in die Turnierverwaltung mit ihrem alten Reiter. ``legacyTab``: der Reiter der
- * Turnierverwaltung (leer = Überblick), ``anchor``: auf Wunsch ein genauerer Abschnitt der Staffel-Seite.
+ * Wohin ein Ziel zur Bedienung einer Staffel führt: an seinen Reiter bzw. Abschnitt auf der Staffel-Seite. ``legacyTab``: der alte
+ * Reiter der Turnierverwaltung (leer = Überblick), ``anchor``: auf Wunsch ein genauerer Abschnitt. Seit Paket C steht jedes Ziel auf
+ * der Staffel-Seite - in die Turnierverwaltung führt nur noch, was es dort nicht gibt (nichts mehr, Rückfall für alte Reiter).
  */
 export function staffelManageUrl(tournamentId, legacyTab = "", anchor = "") {
   const target = anchor || (legacyTab ? legacyTabAnchor(legacyTab) : FIRST);

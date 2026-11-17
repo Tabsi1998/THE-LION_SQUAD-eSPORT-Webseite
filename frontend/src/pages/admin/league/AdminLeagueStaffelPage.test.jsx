@@ -14,7 +14,11 @@ vi.mock("@/lib/api", () => ({
   formatRequestError: (_error, fallback) => fallback,
   resolveMediaUrl: (value) => value || "",
 }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+// Wer sich wie oft nachladen lässt (Ressourcen und Entprellung) - der Leitstand im Überblick höchstens alle 5 s.
+const invalidations = vi.hoisted(() => []);
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (_callback, resources, options) => { invalidations.push({ resources, options }); } }));
+// Das Formular der Darstellung fragt nach dem Bereich Finanzen (Abrechnung) - hier nie.
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: () => false }) }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div data-testid="admin-layout">{children}</div> }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 
@@ -40,6 +44,7 @@ function serve({ tournament = {}, registrations = SQUADS, matches = [], planning
   apiMock.get.mockImplementation((url) => {
     const path = String(url);
     if (path.includes("/planning-check")) return Promise.resolve({ data: planning });
+    if (["/games", "/partners", "/access-links", "/tournaments/t1/staff"].includes(path) || path.startsWith("/events") || path.startsWith("/sponsors")) return Promise.resolve({ data: [] });
     if (path.includes("/team-day/")) return Promise.resolve({ data: {} });
     if (path.includes("/registrations")) return failRegistrations ? Promise.reject(new Error("weg")) : Promise.resolve({ data: registrations });
     if (path.includes("/matches-v2")) return Promise.resolve({ data: matches });
@@ -76,7 +81,7 @@ beforeEach(() => {
   serve();
 });
 
-test("Kopf mit Brotkrumen Liga › Season › Liga 1 · Staffel A, Stand und nur die fertigen Reiter", async () => {
+test("Kopf mit Brotkrumen Liga › Season › Liga 1 · Staffel A, Stand und alle sieben Reiter", async () => {
   renderPage();
   expect(await screen.findByTestId("staffel-title")).toHaveTextContent("Liga 1 · Staffel A");
   const crumbs = screen.getByTestId("staffel-breadcrumbs");
@@ -85,7 +90,7 @@ test("Kopf mit Brotkrumen Liga › Season › Liga 1 · Staffel A, Stand und nur
   expect(crumbs).toHaveTextContent("Probe-Liga · Season 1");
   expect(screen.getByTestId("staffel-stand")).toBeInTheDocument();
   const tabs = within(screen.getByTestId("staffel-tabs")).getAllByRole("tab").map((tab) => tab.textContent);
-  expect(tabs).toEqual(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle"]);
+  expect(tabs).toEqual(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle", "Protokoll", "Einstellungen"]);
 });
 
 test("Überblick: Liga-Ablauf, was fehlt mit Weg auf diese Seite, Zahlen und die Wege zu Leitstand, Season und Ligaseite", async () => {
@@ -94,7 +99,7 @@ test("Überblick: Liga-Ablauf, was fehlt mit Weg auf diese Seite, Zahlen und die
   expect(await screen.findByTestId("tournament-flow-stepper")).toHaveTextContent("Liga-Ablauf");
   expect(screen.getByTestId("staffel-needs-assign")).toHaveAttribute("href", "/admin/leagues/staffeln/t1#zuteilen");
   expect(screen.getByTestId("staffel-numbers-teams")).toHaveTextContent("0 von 8");
-  expect(screen.getByTestId("staffel-desk-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1#leitstand");
+  expect(screen.getByTestId("staffel-desk-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1?staffel=t1#leitstand");
   expect(screen.getByTestId("staffel-season-open")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
   expect(screen.getByTestId("staffel-public-open")).toHaveAttribute("href", "/liga/probe-liga/season-1");
 });
@@ -304,6 +309,12 @@ test("das Wort „Entwurf“ kommt auf der Staffel-Seite nirgends vor", async ()
     await user.click(screen.getByTestId("staffel-tab-teilnehmer"));
     await screen.findByTestId("staffel-teams-count");
     expect(container.textContent).not.toMatch(/Entwurf/);
+    await user.click(screen.getByTestId("staffel-tab-einstellungen"));
+    const subTabs = within(await screen.findByTestId("staffel-settings-tabs")).getAllByRole("tab");
+    for (const tab of subTabs) {
+      await user.click(tab);
+      expect(container.textContent).not.toMatch(/Entwurf/);
+    }
     unmount();
   }
 });
@@ -390,4 +401,202 @@ test("Tabelle: den Gleichstand entscheidet nur, wer „Ergebnisse korrigieren“
     expect(screen.getByTestId("staffel-pdf-standings")).toHaveAttribute("href", "http://test.local/api/exports/tournaments/t1/standings.pdf");
     unmount();
   }
+});
+
+// ---------------------------------------------------------------- Paket C: Protokoll, Einstellungen, Leitstand-Zahl, Rückmeldungen
+
+/** Wie `serve`, dazu die Abrufe von Paket C; jeder Aufruf landet in `calls`, damit die Tests „ohne Recht kein Abruf“ prüfen können. */
+function serveC({ desk = { groups: [] }, staff = [], pool = null, log = null, ...rest } = {}) {
+  serve(rest);
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation((url, config) => {
+    const path = String(url);
+    if (path.endsWith("/desk")) return Promise.resolve({ data: desk });
+    if (path.endsWith("/desk/log")) return Promise.resolve({ data: log || { items: [], page: 1, pages: 1, total: 0 } });
+    if (path.endsWith("/tournaments/t1/staff")) return Promise.resolve({ data: staff });
+    if (path.startsWith("/map-pools/tournaments/")) return Promise.resolve({ data: pool || { tournament: null, stages: [] } });
+    if (path === "/access-links") return Promise.resolve({ data: [] });
+    if (path.startsWith("/admin/feedback/")) return Promise.resolve({ data: { count: 0, declined: 0, details: false, min_for_details: 3, distribution: {} } });
+    return base(url, config);
+  });
+}
+const requested = () => apiMock.get.mock.calls.map(([url]) => String(url));
+
+test("Überblick: „Offen in dieser Staffel“ zählt nur die Aufgaben dieser Staffel und führt mit Filter in den Leitstand", async () => {
+  serveC({ desk: { groups: [
+    { key: "overdue", items: [{ id: "a", staffel_id: "t1", mine: true }, { id: "b", staffel_id: "t2", mine: true }] },
+    { key: "procedures", items: [{ id: "c", staffel_id: "t1", mine: false }] },
+    { key: "applications", items: [{ id: "d", staffel_id: null, mine: true }] },
+  ] } });
+  renderPage();
+  expect(await screen.findByTestId("staffel-desk-total")).toHaveTextContent("2");
+  expect(screen.getByTestId("staffel-desk-count")).toHaveTextContent("2 Aufgaben, 1 davon für dich – im Leitstand der Season");
+  expect(screen.getByTestId("staffel-desk-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1?staffel=t1#leitstand");
+});
+
+test("Überblick: scheitert der Leitstand, steht das statt einer falschen Null", async () => {
+  serveC();
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation((url) => (String(url).endsWith("/desk") ? Promise.reject(new Error("weg")) : base(url)));
+  renderPage();
+  await waitFor(() => expect(screen.getByTestId("staffel-desk-count")).toHaveTextContent("Zahl gerade nicht geladen"));
+  expect(screen.queryByTestId("staffel-desk-total")).toBeNull();
+});
+
+test("Protokoll: das Protokoll der Season, gefiltert auf diese Staffel", async () => {
+  serveC({ log: { items: [{ id: "l1", label: "Staffel · Liga gestartet", at: "2026-11-12T18:00:00+00:00", actor: "Ligaleitung", staffel: "Staffel A", match_id: null }], page: 1, pages: 1, total: 1 } });
+  renderPage("#protokoll");
+  expect(await screen.findByTestId("desk-log-l1")).toHaveTextContent("Staffel · Liga gestartet");
+  expect(screen.getByRole("heading", { name: "Protokoll der Staffel" })).toBeInTheDocument();
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/desk/log", { params: { page: 1, staffel: "t1" } });
+});
+
+test("Einstellungen in Unterreitern: Auftritt, Aus der Season, Links und Sponsor, TV und Helfer, Werkzeuge - je eins zur Zeit", async () => {
+  const user = userEvent.setup();
+  serveC({ staff: [{ id: "h1", role: "referee", scope: "tournament", user: { display_name: "Alte Helferin" } }] });
+  renderPage("#einstellungen");
+  const tabs = within(await screen.findByTestId("staffel-settings-tabs")).getAllByRole("tab").map((tab) => tab.textContent);
+  expect(tabs).toEqual(["Auftritt", "Aus der Season", "Links und Sponsor", "TV und Helfer", "Werkzeuge"]);
+  // Auftritt: nur das Formular - „Aus der Season“ und „Vorschau neu mischen“ nicht noch einmal, genau ein Speichern-Weg.
+  expect(await screen.findByTestId("tr-edit-title")).toBeInTheDocument();
+  expect(screen.queryByTestId("tr-edit-season-values")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Speichern/ })).toHaveLength(1);
+  expect(screen.queryByTestId("tr-edit-event")).toBeNull();
+  expect(screen.getByTestId("tr-edit-format-label")).toHaveAttribute("placeholder", "z. B. Liga · Staffel A");
+  expect(requested()).not.toContain("/tournaments/t1/staff");
+
+  await user.click(screen.getByTestId("staffel-settings-tab-vorgaben"));
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/staffeln/t1#vorgaben");
+  expect(screen.getAllByTestId("tr-edit-season-values")).toHaveLength(1);
+  expect(await screen.findByTestId("staffel-map-pool-empty")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-map-pool-season")).toHaveAttribute("href", "/admin/leagues/seasons/s1#modi");
+  expect(screen.queryByTestId("tr-edit-title")).toBeNull();
+
+  await user.click(screen.getByTestId("staffel-settings-tab-links"));
+  expect(await screen.findByTestId("access-links-bare")).toBeInTheDocument();
+  // Keine Karte in der Karte und keine zweite Überschrift „Speziallinks“.
+  expect(screen.queryByText("Speziallinks")).toBeNull();
+  expect(screen.getByTestId("staffel-access-links")).toHaveTextContent("Gezielt Zugriff auf die Staffel geben, solange sie nicht öffentlich ist.");
+  expect(screen.getByTestId("staffel-round-sponsors-later")).toBeInTheDocument();
+
+  await user.click(screen.getByTestId("staffel-settings-tab-helfer"));
+  expect(screen.getByTestId("staffel-tv-open")).toHaveAttribute("href", "/display/bracket/t1");
+  expect(await screen.findByTestId("staffel-helper-h1")).toHaveTextContent("Alte Helferin");
+  expect(screen.getByTestId("staffel-helpers-note")).toHaveTextContent("nur zum Nachlesen");
+
+  await user.click(screen.getByTestId("staffel-settings-tab-werkzeuge"));
+  expect(screen.getByTestId("staffel-delete")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-tools-lock-later")).toBeInTheDocument();
+});
+
+test("Sprungmarken der Einstellungen öffnen ihren Unterreiter, eine unbekannte den ersten", async () => {
+  serveC();
+  for (const [hash, tab, testId] of [["#darstellung", "darstellung", "tr-edit-title"], ["#vorgaben", "vorgaben", "tr-edit-season-values"],
+    ["#links", "links", "staffel-access-links"], ["#helfer", "helfer", "staffel-helpers"], ["#werkzeuge", "werkzeuge", "staffel-tools"],
+    ["#einstellungen", "darstellung", "tr-edit-title"]]) {
+    const { unmount } = renderPage(hash);
+    expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    expect(screen.getByTestId("staffel-tab-einstellungen")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId(`staffel-settings-tab-${tab}`)).toHaveAttribute("aria-selected", "true");
+    unmount();
+  }
+});
+
+test("Sponsor je Spielwoche bleibt zu, solange nur Vorschau-Spiele da sind", async () => {
+  const preview = [1, 2].map((week) => ({ id: `p${week}`, stage_id: "st1", round: week, matchday_number: week, status: "scheduled", is_preview: true,
+    slots: [{ registration_id: "r1" }, { registration_id: "r2" }] }));
+  serveC({ matches: preview });
+  renderPage("#links");
+  expect(await screen.findByTestId("staffel-round-sponsors-later")).toBeInTheDocument();
+  expect(screen.queryByTestId("admin-tr-round-sponsors")).toBeNull();
+  expect(requested().some((url) => url.startsWith("/sponsors"))).toBe(false);
+});
+
+test("Einstellungen nur lesend: ohne „Liga verwalten“ kein Formular, kein Unterreiter Links und Sponsor - und keine Abrufe dafür", async () => {
+  const user = userEvent.setup();
+  serveC({ tournament: { status: "live", can_edit_staffel: false, league_capabilities: ["results"] } });
+  renderPage("#links");
+  expect(await screen.findByTestId("staffel-look-right")).toHaveTextContent("„Liga verwalten“");
+  expect(screen.queryByTestId("staffel-settings-tab-links")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-title")).toBeNull();
+  await user.click(screen.getByTestId("staffel-settings-tab-vorgaben"));
+  expect(screen.getByTestId("tr-edit-season-values")).toBeInTheDocument();
+  await user.click(screen.getByTestId("staffel-settings-tab-helfer"));
+  expect(screen.getByTestId("staffel-tv-open")).toBeInTheDocument();
+  expect(await screen.findByTestId("staffel-helpers-none")).toBeInTheDocument();
+  await user.click(screen.getByTestId("staffel-settings-tab-werkzeuge"));
+  expect(screen.getByTestId("staffel-tools-lock-right")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-tools-delete-right")).toBeInTheDocument();
+  expect(screen.queryByTestId("staffel-lock")).toBeNull();
+  expect(screen.queryByTestId("staffel-delete")).toBeNull();
+  expect(requested()).not.toContain("/access-links");
+  expect(requested().some((url) => url.startsWith("/sponsors"))).toBe(false);
+});
+
+test("Auftritt: ein neuer Stand nimmt ungespeicherte Eingaben nicht weg - Hinweis und Übernehmen nur auf Wunsch; ohne Eingaben still", async () => {
+  const user = userEvent.setup();
+  serveC();
+  const { StaffelSettingsTab } = await import("./staffel/StaffelSettingsTab");
+  const base = { ...STAFFEL, updated_at: "2026-11-16T10:00:00Z" };
+  const view = (tournament) => (
+    <ConfirmDialogProvider><MemoryRouter><StaffelSettingsTab tournament={tournament} section="darstellung" onSection={() => {}} /></MemoryRouter></ConfirmDialogProvider>
+  );
+  const { rerender } = render(view(base));
+  const title = await screen.findByTestId("tr-edit-title");
+  await user.clear(title);
+  await user.type(title, "Mein neuer Titel");
+  rerender(view({ ...base, title: "Fremd geändert", updated_at: "2026-11-16T10:05:00Z" }));
+  expect(await screen.findByTestId("staffel-look-stale")).toHaveTextContent("zwischendurch geändert");
+  expect(screen.getByTestId("tr-edit-title")).toHaveValue("Mein neuer Titel");
+  await user.click(screen.getByTestId("staffel-look-reload"));
+  await waitFor(() => expect(screen.getByTestId("tr-edit-title")).toHaveValue("Fremd geändert"));
+  expect(screen.queryByTestId("staffel-look-stale")).toBeNull();
+  // Ohne eigene Eingaben kommt der neue Stand still.
+  rerender(view({ ...base, title: "Noch einmal neu", updated_at: "2026-11-16T10:10:00Z" }));
+  await waitFor(() => expect(screen.getByTestId("tr-edit-title")).toHaveValue("Noch einmal neu"));
+  expect(screen.queryByTestId("staffel-look-stale")).toBeNull();
+});
+
+test("Werkzeuge: Sperren nach dem Ende mit Rückfrage in Liga-Wörtern, Löschen nach dem Start nicht mehr", async () => {
+  const user = userEvent.setup();
+  serveC({ tournament: { status: "completed" } });
+  renderPage("#werkzeuge");
+  await user.click(await screen.findByTestId("staffel-lock"));
+  const dialog = await screen.findByTestId("confirm-dialog");
+  expect(dialog).toHaveTextContent("Staffel sperren?");
+  await user.click(within(dialog).getByRole("button", { name: "Sperren" }));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/lock"));
+  expect(screen.queryByTestId("staffel-delete")).toBeNull();
+  expect(screen.getByTestId("staffel-tools-delete-later")).toBeInTheDocument();
+});
+
+test("Werkzeuge: Löschen vor dem Start mit Grund, danach zurück zu den Staffeln der Season", async () => {
+  const user = userEvent.setup();
+  serveC();
+  renderPage("#werkzeuge");
+  await user.click(await screen.findByTestId("staffel-delete"));
+  expect(await screen.findByTestId("league-delete-sheet")).toBeInTheDocument();
+});
+
+test("Rückmeldungen der Teams nach dem Ende im Überblick - nur mit „Liga verwalten“, sonst kein Abruf", async () => {
+  serveC({ tournament: { status: "completed" } });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("staffel-feedback")).toBeInTheDocument();
+  await waitFor(() => expect(requested()).toContain("/admin/feedback/tournament/t1"));
+  unmount();
+  vi.clearAllMocks();
+  serveC({ tournament: { status: "completed", can_edit_staffel: false, league_capabilities: ["results"] } });
+  renderPage();
+  await screen.findByTestId("staffel-desk-count");
+  expect(screen.queryByTestId("staffel-feedback")).toBeNull();
+  expect(requested().some((url) => url.startsWith("/admin/feedback/"))).toBe(false);
+});
+
+test("Überblick: der Leitstand wird höchstens alle 5 s nachgezählt, nicht bei jeder Meldung", async () => {
+  serveC();
+  invalidations.length = 0;
+  renderPage();
+  await screen.findByTestId("staffel-desk-count");
+  expect(invalidations.some((row) => row.options?.debounceMs === 5000 && row.resources?.includes("matches"))).toBe(true);
 });

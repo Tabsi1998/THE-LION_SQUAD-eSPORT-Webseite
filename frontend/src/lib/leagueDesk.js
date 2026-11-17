@@ -20,6 +20,24 @@ export function filterGroups(groups = [], filter = "all") {
   return groups.map((group) => ({ ...group, items: filter === "mine" ? (group.items || []).filter((item) => item.mine) : group.items || [] }));
 }
 
+/** Nur die Aufgaben einer Staffel (#2262, `staffel_id` vom Server) - ohne Kennung alle. Aufgaben der ganzen Season fallen dabei weg. */
+export function staffelGroups(groups = [], staffelId = "") {
+  if (!staffelId) return groups || [];
+  return (groups || []).map((group) => ({ ...group, items: (group.items || []).filter((item) => item.staffel_id === staffelId) }));
+}
+
+/** „Offen in dieser Staffel“: alle Aufgaben der Staffel und wie viele davon die Person selbst erledigen kann. */
+export function staffelOpenCount(desk, staffelId) {
+  const items = staffelGroups(desk?.groups, staffelId).flatMap((group) => group.items);
+  return { total: items.length, mine: items.filter((item) => item.mine).length };
+}
+
+/** Leitstand der Season, auf Wunsch mit Staffel-Filter: `/admin/leagues/seasons/<id>?staffel=<tid>#leitstand`. */
+export function seasonDeskUrl(seasonId, staffelId = "") {
+  const base = `/admin/leagues/seasons/${encodeURIComponent(seasonId || "")}`;
+  return `${base}${staffelId ? `?staffel=${encodeURIComponent(staffelId)}` : ""}#leitstand`;
+}
+
 /** „Frist: noch 2 Tage (Sa 14.11. 20:00)“, „seit Mo 09.11. 18:00“ oder nichts. */
 export function deskWhen(item, now = Date.now()) {
   if (item.due_at) {

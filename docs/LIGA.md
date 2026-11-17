@@ -722,7 +722,11 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `GET /api/admin/leagues/seasons/{id}/rewards` (F.4) | jede Zuständigkeit | – | – |
 | `PUT …/seasons/{id}/rewards` (F.4) | `season` | – | – |
 | PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
-| Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
+| Zugangslinks einer Staffel (`/api/access-links` mit Ziel Staffel, Personensuche `access_links` mit `context_id`, #2262) | `manage` – der Bereich `tournaments` gibt dort nichts und wird nicht gebraucht | – | – |
+| Auswertung der Rückmeldungen einer Staffel (`GET /api/admin/feedback/tournament/{tid}`, #2262) | `manage` | – | – |
+| `GET …/seasons/{id}/desk/log?staffel={tid}` (Protokoll der Staffel, #2262) | jede Zuständigkeit; Strafen und Wiederaufnahmen nur `sanctions`, Notausnahmen nur `manage` | – | – |
+| TV-Ansicht einer Staffel ohne Schlüssel (`/display/bracket/{tid}`) | jede Zuständigkeit | – | lesen |
+| TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
 | Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
 
 **Co-Teams in nicht beendeten Staffeln** (`PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}`): Kader, Captain, Vertreter, Status und

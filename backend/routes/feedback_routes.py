@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import get_current_user, require_area
@@ -51,6 +51,19 @@ async def feedback_overview(kind: Kind | None = None, _admin: dict = Depends(req
 
 
 @admin_router.get("/{kind}/{target_id}")
-async def feedback_summary(kind: Kind, target_id: str, _admin: dict = Depends(require_area("tournaments"))):
-    """Turniere und Events gehören zur Turnierleitung - dort steht der Reiter „Rückmeldungen“."""
-    return await feedback.summary(get_db(), kind, target_id)
+async def feedback_summary(kind: Kind, target_id: str, me: dict = Depends(get_current_user)):
+    """Turniere und Events gehören zur Turnierleitung - dort steht der Reiter „Rückmeldungen“. Eine Liga-Staffel bekommt dieselbe
+    Umfrage nach dem Ende; ihre Auswertung liest, wer in der Liga „Liga verwalten“ hat (#2262, Staffel-Seite) - der Bereich
+    Turniere gibt dort nichts (Nr. 79/80)."""
+    from services.permissions import area_refusal
+    from services.tournament_permissions import require_lead_for_staffel
+
+    db = get_db()
+    doc = await feedback.find_target(db, kind, target_id) if kind == "tournament" else None
+    if doc and isinstance(doc.get("league_context"), dict):
+        await require_lead_for_staffel(me, doc["id"])
+    else:
+        refusal = await area_refusal(me, ("tournaments",))
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
+    return await feedback.summary(db, kind, target_id)
