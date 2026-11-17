@@ -221,6 +221,15 @@ Wo der Schalter steht (nur solange eine Saison läuft): Angemeldete stellen die 
 Darstellung** ein, die Wahl gilt fürs Konto. Gäste finden ihn am Handy und am Tablet hochkant (bis 1023 px) **unten im
 Menü**, am PC und am Tablet quer **ganz unten in der Fußzeile** – je Gerät an genau einem Platz.
 
+**Am Turniertag bleibt es ruhig** (gilt in Website und App gleich):
+
+- **Immer ohne Deko:** der Turnierbaum, die Matchseite (mit der Aufruf-Karte „Du bist dran“), die Turnierleitung
+  (`/tournaments/<slug>/leitung` mit Cockpit, in der App „Turnierleitung“) und der Einlass (`/events/<slug>/leitung`).
+  Spielplan und Tabelle behalten ihre ruhige Deko.
+- **Pause überall:** Ist dein eigenes Spiel aufgerufen oder läuft es – allein, im Team oder im Durchgang –, macht die
+  Deko auf allen Seiten Pause. Sobald das Ergebnis da ist, kommt sie zurück. Den Stand kennen Startseite (Dashboard),
+  „Mein nächstes Spiel“ auf der Turnierseite und die Matchseite; die Pause wechselt, sobald eine davon neu lädt.
+
 <img src="../assets/jahreszeiten/deko-schalter-handy-menue.png" alt="Handy-Menü als Gast, unten die Zeile Saison-Deko mit an, dezent und aus" width="240">
 
 ### 3.6 Adventkalender
@@ -394,7 +403,8 @@ Sechs Monate. Danach fragt die Seite neu.
 
 **Kann ich die Deko für einzelne Seiten abschalten?**
 Nicht seitenweise. Ihr schaltet pro Saison an oder aus und wählt die Stärke. Jede Person kann sie außerdem für sich auf
-dezent oder aus stellen.
+dezent oder aus stellen. Turnierbaum, Matchseite und Turnierleitung sind immer ohne Deko, und solange das eigene Spiel
+aufgerufen ist oder läuft, pausiert sie überall (siehe 3.5).
 
 **Ich will den Adventkalender im nächsten Jahr wiederverwenden.**
 Im neuen Jahr beim Adventkalender **Aus <Vorjahr> übernehmen** wählen und danach die Türchen anpassen.
