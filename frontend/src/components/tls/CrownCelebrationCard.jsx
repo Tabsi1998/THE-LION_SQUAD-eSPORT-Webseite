@@ -14,6 +14,11 @@ const GLOWS = {
 const NAMES = { gold: "GOLD-KRONE", silver: "SILBER-KRONE", bronze: "BRONZE-KRONE", onyx: "ONYX-KRONE" };
 // Onyx erobert man niemandem ab, man erreicht sie mit den eigenen Punkten (#2501).
 const VERBS = { onyx: "ERREICHT!" };
+/** Die Zeile über der Überschrift (#2501): ein Wechsel nur, wenn vorher schon eine andere Krone getragen wurde. */
+function overline(event, variant) {
+  if (variant === "onyx") return "Höchste Krone";
+  return event?.prev ? "Kronen-Wechsel" : "Neue Krone";
+}
 const COLORS = ["#FFD700", "#29B6E8", "#FF3B30", "#00FF88", "#A855F7", "#FFFFFF", "#FF7A00"];
 
 function ConfettiRain() {
@@ -59,7 +64,9 @@ export default function CrownCelebrationCard({ event, onClose }) {
         <div className="tls-crown-celebration-crown">
           <CrownIcon variant={variant} />
         </div>
-        <div className="mt-6 text-[11px] font-bold uppercase tracking-[0.4em] text-[#29B6E8]">Kronen-Wechsel</div>
+        <div className="mt-6 text-[11px] font-bold uppercase tracking-[0.4em] text-[#29B6E8]" data-testid="crown-celebration-overline">
+          {overline(event, variant)}
+        </div>
         <h2 className="mt-2 font-heading text-4xl sm:text-5xl font-black uppercase text-white" data-testid="crown-celebration-title">
           {NAMES[variant] || "KRONE"} {VERBS[variant] || "EROBERT!"}
         </h2>

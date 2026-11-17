@@ -39,9 +39,20 @@ test("lädt die Feier erst mit dem Ereignis und zeigt Krone und Text", async () 
 
 test("die Onyx-Krone ist erreicht, nicht erobert (#2501)", async () => {
   render(<MemoryRouter><CrownCelebration /></MemoryRouter>);
-  celebrate({ id: "n3", variant: "onyx", body: "Du trägst jetzt die Onyx-Krone." });
+  celebrate({ id: "n3", kind: "crown_onyx", variant: "onyx", body: "Du trägst jetzt die Onyx-Krone." });
   expect(await screen.findByTestId("crown-celebration-title")).toHaveTextContent("ONYX-KRONE ERREICHT!");
   expect(screen.getByTestId("crown-icon")).toHaveTextContent("onyx");
+  expect(screen.getByTestId("crown-celebration-overline")).toHaveTextContent("Höchste Krone");
+});
+
+test("über der Überschrift steht, was passiert ist (#2501)", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><CrownCelebration /></MemoryRouter>);
+  celebrate({ id: "n4", kind: "crown_gained", variant: "bronze" });
+  expect(await screen.findByTestId("crown-celebration-overline")).toHaveTextContent("Neue Krone");
+  await user.click(screen.getByTestId("crown-celebration-close"));
+  celebrate({ id: "n5", kind: "crown_gained", variant: "gold", prev: "silver" });
+  expect(await screen.findByTestId("crown-celebration-overline")).toHaveTextContent("Kronen-Wechsel");
 });
 
 test("Escape schließt, ohne Text steht die Beschreibung der Krone", async () => {
