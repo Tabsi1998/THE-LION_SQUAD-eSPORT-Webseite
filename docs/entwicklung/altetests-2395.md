@@ -34,6 +34,8 @@ Kronen und Erfolge-Rangliste zählen nicht dieselben Personen: Die Rangliste lä
 weg (`services/achievement_visibility.py`, `leaderboard`), die Kronen nicht (`services/crown_events.py`,
 `_points_rows`). Ein gesperrtes Konto mit den meisten Punkten trägt so die Gold-Krone, steht aber auf keiner Rangliste;
 die Nummer 1 der Rangliste bekommt Silber. Nicht im Produktcode geändert (Auftrag: nur Tests), eigener Punkt.
+Behoben in #2492: Beide wählen die Konten über `ranked_users_query` (`services/achievement_visibility.py`) aus, belegt
+in `test_crown_ranked_accounts_flow.py`.
 
 ## Inventar
 
