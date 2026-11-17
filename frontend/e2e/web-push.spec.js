@@ -66,6 +66,7 @@ async function mockServer(page, { storage = {}, permission: startPermission = "d
     }
     if (path === "/settings/public") return json({ club_name: "THE LION SQUAD" });
     if (path === "/tournaments/probe-cup") return json({ ...TOURNAMENT, participant_count: seen.registered });
+    if (path === "/mobile/dashboard") return json(seen.dashboard || { me: { tournaments: [], events: [], matches: [], staff_matches: [], actions: [] } });
     if (path === `/tournaments/${TOURNAMENT.id}/register` && request.method() === "POST") {
       seen.registered += 1;
       return json({ id: "registration-push", user_id: ME.id, display_name: ME.display_name, status: "approved" });
@@ -172,7 +173,37 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await page.waitForTimeout(600);
       await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
       await off.click();
-      await expect(page).toHaveURL(/\/profile\?tab=notifications$/);
+      // Direkt zur Karte „Dieser Browser“, die erklärt, wie man es im Browser erlaubt.
+      await expect(page).toHaveURL(/\/profile\?tab=notifications#dieser-browser$/);
+      await expect(page.getByTestId("profile-browser-push")).toHaveAttribute("data-status", "denied");
+      await expect(page.getByTestId("profile-browser-push")).toBeInViewport();
+      if (SHOTS) {
+        await page.waitForTimeout(600);
+        await page.screenshot({ path: `${SHOTS}/1208-hinweis-ziel-v2-${width}.png` });
+      }
+    });
+
+    test("Team angemeldet: beim nächsten Öffnen der Übersicht die Frage mit „Dein Team ist angemeldet“ (#1208)", async ({ page }) => {
+      // Ausgangsstand von früher: dieser Browser kannte für das Konto noch keine Anmeldung.
+      const seen = await mockServer(page, { storage: { "tls-web-push-first-visit": "frueher", [`tls-web-push-seen:${ME.id}`]: JSON.stringify({ seen: [] }) } });
+      seen.dashboard = { me: { tournaments: [{ ...TOURNAMENT, id: "t-team", title: "Team-Cup", my_registration: { id: "r-team", team_id: "team-1", status: "approved" } }], events: [], matches: [], staff_matches: [], actions: [] } };
+      await page.goto("/dashboard");
+      const hint = page.getByTestId("web-push-hint");
+      await expect(hint).toBeVisible();
+      await expect(page.getByTestId("web-push-hint-eyebrow")).toHaveText("Dein Team ist angemeldet");
+      expect(await page.evaluate(() => window.__pushAsked)).toBe(0);
+      expect(await noSidewaysScroll(page)).toBe(true);
+      if (SHOTS) {
+        await page.waitForTimeout(700);
+        await page.screenshot({ path: `${SHOTS}/1208-erklaerung-team-v2-${width}.png` });
+      }
+      await page.getByTestId("web-push-hint-later").click();
+      await expect(hint).toHaveCount(0);
+      // Neu laden: dieselbe Anmeldung ist kein neuer Anlass.
+      const reloaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/mobile/dashboard");
+      await page.reload();
+      await reloaded;
+      await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
     });
 
     test("Einstellungen: Kanal Browser und „Dieser Browser“ anmelden", async ({ page }) => {
