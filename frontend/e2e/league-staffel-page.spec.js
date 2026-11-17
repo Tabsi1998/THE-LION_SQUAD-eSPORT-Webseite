@@ -320,7 +320,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.getByTestId(`staffel-week-${CURRENT}`)).toHaveAttribute("open", "");
     await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-1`)).toContainText("Veto läuft");
     await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-1`)).toContainText("2 Vorfälle offen");
-    await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-3`)).toContainText("Check-in vorbei · 1 von 2");
+    await expect(page.getByTestId(`staffel-game-chips-m${CURRENT}-3`)).toContainText("Check-in verpasst · 1 von 2");
     await expect(page.getByTestId(`staffel-game-state-m${CURRENT}-5`)).toContainText("In Klärung");
     // Woche 5 ist gespielt, ein Verfahren ist aber offen - sie bleibt aufgeklappt.
     await expect(page.getByTestId("staffel-week-5")).toHaveAttribute("open", "");

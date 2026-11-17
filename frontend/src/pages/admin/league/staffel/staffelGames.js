@@ -49,7 +49,8 @@ export function gameScore(match) {
 
 const CHECKIN = {
   open: (count) => ({ text: `Check-in ${count} von 2`, tone: "info" }),
-  closed: (count) => ({ text: `Check-in vorbei · ${count} von 2`, tone: "warn" }),
+  // `closed` (checkin_rules.state): Das Fenster ist um und mindestens eine Seite hat nicht eingecheckt - verpasst, nicht nur vorbei.
+  closed: (count) => ({ text: `Check-in verpasst · ${count} von 2`, tone: "warn" }),
   ready: () => ({ text: "Beide eingecheckt", tone: "ok" }),
   veto: () => ({ text: "Beide eingecheckt", tone: "ok" }),
 };
@@ -76,7 +77,7 @@ export function gameChips(match) {
 const WARN_KINDS = [
   { key: "procedures", count: (marks) => Number(marks.procedures) || 0, one: "Verfahren offen", many: "Verfahren offen" },
   { key: "incidents", count: (marks) => Number(marks.incidents) || 0, one: "Vorfall offen", many: "Vorfälle offen" },
-  { key: "checkin", count: (marks) => (marks.checkin === "closed" ? 1 : 0), one: "Check-in vorbei", many: "Check-ins vorbei" },
+  { key: "checkin", count: (marks) => (marks.checkin === "closed" ? 1 : 0), one: "Check-in verpasst", many: "Check-ins verpasst" },
   { key: "veto", count: (marks) => (marks.veto === "paused" ? 1 : 0), one: "Veto pausiert", many: "Vetos pausiert" },
 ];
 

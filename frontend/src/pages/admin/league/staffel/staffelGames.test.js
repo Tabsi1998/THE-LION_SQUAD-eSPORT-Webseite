@@ -56,7 +56,7 @@ describe("Chips aus league_marks", () => {
     expect(chips.map((chip) => [chip.key, chip.text, chip.tone])).toEqual([
       ["checkin", "Check-in 1 von 2", "info"], ["incidents", "2 Vorfälle offen", "warn"], ["procedures", "Verfahren offen", "warn"],
     ]);
-    expect(gameChips(game({ league_marks: { checkin: "closed", checked_in: 1 } }))[0]).toMatchObject({ text: "Check-in vorbei · 1 von 2", tone: "warn" });
+    expect(gameChips(game({ league_marks: { checkin: "closed", checked_in: 1 } }))[0]).toMatchObject({ text: "Check-in verpasst · 1 von 2", tone: "warn" });
     expect(gameChips(game({ league_marks: { checkin: "ready", checked_in: 2 } }))[0]).toMatchObject({ text: "Beide eingecheckt", tone: "ok" });
     expect(gameChips(game({ league_marks: { checkin: "veto", checked_in: 2 } })).map((chip) => chip.text)).toEqual(["Beide eingecheckt", "Veto steht an"]);
     expect(gameChips(game({ league_marks: { checkin: "running", veto: "running" } })).map((chip) => chip.text)).toEqual(["Veto läuft"]);
@@ -72,8 +72,8 @@ describe("offene Punkte im Kopf der Woche", () => {
     expect(weekWarnText([marks({ procedures: 1 }), marks({ procedures: 2 })])).toBe("3 Verfahren offen");
     expect(weekWarnText([marks({ incidents: 1 })])).toBe("1 Vorfall offen");
     expect(weekWarnText([marks({ incidents: 2 })])).toBe("2 Vorfälle offen");
-    expect(weekWarnText([marks({ checkin: "closed", checked_in: 1 })])).toBe("1 Check-in vorbei");
-    expect(weekWarnText([marks({ checkin: "closed" }), marks({ checkin: "closed" })])).toBe("2 Check-ins vorbei");
+    expect(weekWarnText([marks({ checkin: "closed", checked_in: 1 })])).toBe("1 Check-in verpasst");
+    expect(weekWarnText([marks({ checkin: "closed" }), marks({ checkin: "closed" })])).toBe("2 Check-ins verpasst");
     expect(weekWarnText([marks({ checkin: "running", veto: "paused" })])).toBe("1 Veto pausiert");
   });
   it("gemischt: „N offene Punkte“, ohne Warnung leer", () => {
