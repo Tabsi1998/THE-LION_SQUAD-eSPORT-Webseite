@@ -1,7 +1,8 @@
 import cases from "./stillness.cases.json";
-import { isStillPage, pageClass } from "./intensity";
+import { pageClass } from "./intensity";
 import { isQuietPath } from "./SeasonStage";
-import { clearOwnMatches, decoPaused, holdsDeco, noteOwnMatches, ownMatchesPaused, subscribeOwnMatches } from "./matchPause";
+import { clearDecoPause } from "./decoPause";
+import { PAUSE_MAX_MS, clearOwnMatches, decoPaused, holdsDeco, noteOwnMatches, ownMatchesPaused, subscribeOwnMatches } from "./matchPause";
 
 // Turniertag (#1169): Turnierbaum, Matchseite (mit der Aufruf-Karte) und Turnierleitung bleiben ganz ohne Deko; läuft
 // das eigene Spiel oder ist es aufgerufen, pausiert die Deko überall bis zum Ergebnis. Die App prüft dieselben Fälle
@@ -10,10 +11,9 @@ import { clearOwnMatches, decoPaused, holdsDeco, noteOwnMatches, ownMatchesPause
 afterEach(() => clearOwnMatches());
 
 test.each(cases.pages)("Seite: $name", ({ web, still }) => {
-  expect(isStillPage(web)).toBe(still);
+  expect(pageClass(web) === "quiet").toBe(still);
   // Still heißt: die Bühne bleibt leer wie in der Verwaltung, nicht bloß „ruhig“.
   expect(isQuietPath(web)).toBe(still);
-  if (still) expect(pageClass(web)).toBe("quiet");
 });
 
 test("Liste und Tabelle bleiben ruhig, nicht still - der Baum wird still", () => {
@@ -60,5 +60,47 @@ test("Warteschlange eines Turniers: fällt das eigene Spiel heraus (Ergebnis da)
   noteOwnMatches([], "queue", { scope: "t2" });
   expect(ownMatchesPaused()).toBe(true);
   noteOwnMatches([{ match_id: "m-2", state: "queued" }], "queue", { scope: "t1" });
+  expect(ownMatchesPaused()).toBe(false);
+});
+
+test("Sicherheitsablauf: die Pause endet spätestens nach max_minutes ohne neue Meldung", () => {
+  vi.useFakeTimers({ now: new Date("2026-11-07T10:00:00Z") });
+  try {
+    const { max_minutes: max, steps } = cases.expiry;
+    expect(PAUSE_MAX_MS).toBe(max * 60 * 1000);
+    let clock = 0;
+    steps.forEach(({ at, source, matches, paused }) => {
+      vi.advanceTimersByTime((at - clock) * 60 * 1000);
+      clock = at;
+      if (source) noteOwnMatches(matches, source);
+      expect(ownMatchesPaused()).toBe(paused);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("der einzelne Zeitgeber meldet das Ende der Pause, auch ohne dass jemand fragt", () => {
+  vi.useFakeTimers();
+  try {
+    const seen = [];
+    const off = subscribeOwnMatches(() => seen.push(ownMatchesPaused()));
+    noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard");
+    vi.advanceTimersByTime(PAUSE_MAX_MS - 1000);
+    expect(seen).toEqual([true]);
+    vi.advanceTimersByTime(2000);
+    expect(seen).toEqual([true, false]);
+    off();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Abmelden (clearDecoPause aus dem Start-Teil) vergisst auch die bekannten Spiele", () => {
+  noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard");
+  clearDecoPause();
+  expect(ownMatchesPaused()).toBe(false);
+  // Die Matchseite kennt das Spiel danach nicht mehr als eigenes - sie pausiert nichts.
+  noteOwnMatches([{ id: "m-1", status: "in_progress" }], "match");
   expect(ownMatchesPaused()).toBe(false);
 });

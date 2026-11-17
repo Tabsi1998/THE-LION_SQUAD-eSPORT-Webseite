@@ -1,10 +1,17 @@
-import { useSyncExternalStore } from "react";
+import { clearDecoPause, decoPauseActive, decoPauseGeneration, setDecoPause, subscribeDecoPause } from "./decoPause";
 
 // Turniertag (#1169): Ist das eigene Spiel aufgerufen oder läuft es (Einzel, Team, Durchgang), pausiert die Saison-Deko
 // auf allen Seiten, bis das Ergebnis da ist. Einen eigenen Abruf gibt es dafür nicht: die Seiten, die ohnehin laden,
 // melden hier, was sie wissen - die Startseite (`/mobile/dashboard`, alle offenen eigenen Spiele), die Warteschlange vor
-// Ort (`/live-queue/me`) und die Matchseite. Fragt gerade keine im Takt nach, gilt der Stand bis zum nächsten Laden.
+// Ort (`/live-queue/me`) und die Matchseite. Fragt gerade keine im Takt nach, gilt der Stand bis zum nächsten Laden,
+// höchstens aber PAUSE_MAX_MS. Nur diese Seiten laden die Datei - im Start-Bundle liegt nur decoPause.js.
 // Die App rechnet genauso (mobile/src/seasons/matchPause.ts); die Fälle stehen in stillness.cases.json.
+
+/**
+ * Sicherheitsablauf: Spätestens so lange nach der letzten Meldung endet die Pause, auch wenn keine Seite mehr lädt -
+ * ein vergessenes „läuft“ hält die Deko nicht den ganzen Abend an. Kein Nachfragen, nur ein Wecker.
+ */
+export const PAUSE_MAX_MS = 3 * 60 * 60 * 1000;
 
 // Wie „läuft“ in der Warteschlange (services/match_scheduler.py): gespielt wird, bis das Ergebnis da ist.
 const RUNNING = new Set(["in_progress", "running", "waiting_result"]);
@@ -25,26 +32,25 @@ export function decoPaused(matches) {
 
 const idOf = (match) => (match && typeof match === "object" ? String(match.id || match.match_id || "") : "");
 
+// Die bekannten eigenen Spiele: Kennung → { live, scope }. Nach dem Abmelden (neue `generation`) gelten sie nicht mehr.
 let held = new Map();
-let paused = false;
-const listeners = new Set();
-
-function update(next) {
-  held = next;
-  const now = [...held.values()].some((entry) => entry.live);
-  if (now === paused) return;
-  paused = now;
-  listeners.forEach((listener) => listener());
-}
+let heldGeneration = decoPauseGeneration;
+// Der Wecker des Sicherheitsablaufs: endet die Pause ohne neue Meldung, erfahren es Bühne und Fußzeile von selbst.
+let alarm = 0;
 
 /**
  * Was eine Quelle über eigene Spiele weiß. `dashboard`: alle offenen eigenen Spiele - ersetzt den ganzen Stand.
  * `queue`: eigene Spiele eines Turniers aus der Warteschlange (`scope`: das Turnier) - ergänzt; ein Spiel, das aus
  * der Warteschlange desselben Turniers verschwindet, hat sein Ergebnis. `match`: ein Spiel der Matchseite - die sehen
- * auch Zuschauer, deshalb ändert sie nur Spiele, die schon als eigene bekannt sind (etwa „Ergebnis da“).
+ * auch Zuschauer, deshalb ändert sie nur Spiele, die schon als eigene bekannt sind (etwa „Ergebnis da“); eine fremde
+ * Matchseite ist keine Meldung und verlängert auch den Sicherheitsablauf nicht.
  */
 export function noteOwnMatches(matches, source = "dashboard", { scope = null } = {}) {
   if (source === "dashboard" && !Array.isArray(matches)) return;
+  if (heldGeneration !== decoPauseGeneration) {
+    held = new Map();
+    heldGeneration = decoPauseGeneration;
+  }
   const rows = Array.isArray(matches) ? matches : [];
   const next = source === "dashboard" ? new Map() : new Map(held);
   if (source === "queue" && scope) {
@@ -53,31 +59,31 @@ export function noteOwnMatches(matches, source = "dashboard", { scope = null } =
       if (entry.scope === scope && !seen.has(id)) next.delete(id);
     });
   }
+  let touched = source !== "match";
   rows.forEach((match) => {
     const id = idOf(match);
     if (!id || (source === "match" && !next.has(id))) return;
+    touched = true;
     next.set(id, { live: holdsDeco(match), scope: source === "queue" ? scope : next.get(id)?.scope || null });
   });
-  update(next);
+  if (!touched) return;
+  held = next;
+  const live = [...held.values()].some((entry) => entry.live);
+  clearTimeout(alarm);
+  setDecoPause(live);
+  alarm = live ? setTimeout(() => setDecoPause(false), PAUSE_MAX_MS) : 0;
 }
 
 /** Abmelden oder eine andere Person: der Stand gehört nicht mehr dazu. */
 export function clearOwnMatches() {
-  update(new Map());
+  held = new Map();
+  clearTimeout(alarm);
+  clearDecoPause();
+  heldGeneration = decoPauseGeneration;
 }
 
 export function ownMatchesPaused() {
-  return paused;
+  return decoPauseActive();
 }
 
-export function subscribeOwnMatches(listener) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-/** Pausiert das eigene Spiel gerade die Deko? */
-export function useDecoPaused() {
-  return useSyncExternalStore(subscribeOwnMatches, ownMatchesPaused, () => false);
-}
+export const subscribeOwnMatches = subscribeDecoPause;

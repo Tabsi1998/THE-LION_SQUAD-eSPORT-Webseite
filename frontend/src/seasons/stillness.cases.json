@@ -57,5 +57,19 @@
         { "source": "dashboard", "matches": [{ "id": "m-2", "status": "scheduled" }], "paused": false }
       ]
     }
-  ]
+  ],
+  "expiry": {
+    "_hinweis": "Sicherheitsablauf: die Pause endet spätestens max_minutes nach der letzten Meldung eines eigenen Spiels, auch ohne neues Laden. Eine fremde Matchseite verlängert nichts.",
+    "max_minutes": 180,
+    "steps": [
+      { "at": 0, "source": "dashboard", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+      { "at": 179, "paused": true },
+      { "at": 181, "paused": false },
+      { "at": 200, "source": "match", "matches": [{ "id": "m-1", "status": "in_progress" }], "paused": true },
+      { "at": 250, "source": "match", "matches": [{ "id": "m-9", "status": "in_progress" }], "paused": true },
+      { "at": 379, "paused": true },
+      { "at": 381, "paused": false },
+      { "at": 390, "source": "dashboard", "matches": [{ "id": "m-1", "status": "completed" }], "paused": false }
+    ]
+  }
 }
