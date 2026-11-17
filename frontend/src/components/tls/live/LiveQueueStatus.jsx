@@ -36,10 +36,11 @@ export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, 
   const asks = status === "applies" || status === "unknown";
   useLiveRefresh(reload, ["tournaments", "matches-v2", "stations"], { fallbackMs: asks ? queuePollMs(30000, failures) : 0, pollMs: queuePollMs(asks ? 60000 : 0, failures), tournamentId, eventId });
   // Turniertag (#1169): die eigenen Spiele vor Ort - aufgerufen oder laufend pausiert die Saison-Deko überall.
+  // Fällt ein Spiel aus der Warteschlange dieses Turniers heraus, ist sein Ergebnis da - dann kommt die Deko zurück.
   const ownEntries = personal && view && !expired ? view.entries : null;
   useEffect(() => {
-    if (Array.isArray(ownEntries)) noteOwnMatches(ownEntries, "queue");
-  }, [ownEntries]);
+    if (Array.isArray(ownEntries)) noteOwnMatches(ownEntries, "queue", { scope: tournamentId ? `tournament:${tournamentId}` : null });
+  }, [ownEntries, tournamentId]);
 
   if (!entry || (hideCalled && entry.state === "called")) return null;
   const line = myQueueLine(entry, { personal });

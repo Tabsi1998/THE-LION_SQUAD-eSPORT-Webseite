@@ -52,3 +52,13 @@ test("Kaputte Antworten pausieren nichts", () => {
   noteOwnMatches([null, { status: "in_progress" }], "queue");
   expect(ownMatchesPaused()).toBe(false);
 });
+
+test("Warteschlange eines Turniers: fällt das eigene Spiel heraus (Ergebnis da), kommt die Deko zurück", () => {
+  noteOwnMatches([{ match_id: "m-1", state: "running" }], "queue", { scope: "t1" });
+  noteOwnMatches([{ match_id: "m-7", state: "called" }], "queue", { scope: "t2" });
+  expect(ownMatchesPaused()).toBe(true);
+  noteOwnMatches([], "queue", { scope: "t2" });
+  expect(ownMatchesPaused()).toBe(true);
+  noteOwnMatches([{ match_id: "m-2", state: "queued" }], "queue", { scope: "t1" });
+  expect(ownMatchesPaused()).toBe(false);
+});

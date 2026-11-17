@@ -31,7 +31,7 @@ const listeners = new Set();
 
 function update(next) {
   held = next;
-  const now = [...held.values()].some(Boolean);
+  const now = [...held.values()].some((entry) => entry.live);
   if (now === paused) return;
   paused = now;
   listeners.forEach((listener) => listener());
@@ -39,18 +39,25 @@ function update(next) {
 
 /**
  * Was eine Quelle über eigene Spiele weiß. `dashboard`: alle offenen eigenen Spiele - ersetzt den ganzen Stand.
- * `queue`: eigene Spiele eines Turniers aus der Warteschlange - ergänzt. `match`: ein Spiel der Matchseite - die sehen
+ * `queue`: eigene Spiele eines Turniers aus der Warteschlange (`scope`: das Turnier) - ergänzt; ein Spiel, das aus
+ * der Warteschlange desselben Turniers verschwindet, hat sein Ergebnis. `match`: ein Spiel der Matchseite - die sehen
  * auch Zuschauer, deshalb ändert sie nur Spiele, die schon als eigene bekannt sind (etwa „Ergebnis da“).
  */
-export function noteOwnMatches(matches, source = "dashboard") {
+export function noteOwnMatches(matches, source = "dashboard", { scope = null } = {}) {
+  if (source === "dashboard" && !Array.isArray(matches)) return;
   const rows = Array.isArray(matches) ? matches : [];
   const next = source === "dashboard" ? new Map() : new Map(held);
+  if (source === "queue" && scope) {
+    const seen = new Set(rows.map(idOf));
+    next.forEach((entry, id) => {
+      if (entry.scope === scope && !seen.has(id)) next.delete(id);
+    });
+  }
   rows.forEach((match) => {
     const id = idOf(match);
     if (!id || (source === "match" && !next.has(id))) return;
-    next.set(id, holdsDeco(match));
+    next.set(id, { live: holdsDeco(match), scope: source === "queue" ? scope : next.get(id)?.scope || null });
   });
-  if (source === "dashboard" && !Array.isArray(matches)) return;
   update(next);
 }
 
