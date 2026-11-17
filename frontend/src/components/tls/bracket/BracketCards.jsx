@@ -10,6 +10,7 @@ import { InlineMatchClock } from "@/components/tls/live/MatchClock";
 import { MOTION, motionAllowed } from "@/lib/motion";
 import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, slotDraw, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
+import { youLabel } from "@/lib/youLabel";
 import {
   DurationContext, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
 } from "./context";
@@ -239,7 +240,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
       <span className={`min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
-      {isMine ? <span className="tls-you-tag">Du</span> : null}
+      {isMine ? <span className="tls-you-tag">{youLabel(reg)}</span> : null}
       {walkover && isWinner ? <span className="tls-bracket-tag shrink-0">kampflos</span> : null}
       {podium ? <span className={`shrink-0 px-1 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span> : null}
       {heat ? (

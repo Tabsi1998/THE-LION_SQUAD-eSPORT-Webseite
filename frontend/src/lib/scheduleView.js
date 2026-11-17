@@ -4,6 +4,7 @@
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatBracketSection, formatScheduleGroupLabel, slotName, stationText } from "@/lib/tournamentLabels";
 import { isCancelled, isDone, isLive } from "@/lib/bracketGraph";
+import { youLabel } from "@/lib/youLabel";
 
 export const NO_STATION = "Ohne Station";
 const GROUP_SECTION = /^group_/i;
@@ -61,10 +62,13 @@ export function scheduleEntries(bracket) {
           score: done ? scoreOf(match.results, slot.registration_id) : null,
           winner: !!slot.registration_id && winners.has(slot.registration_id),
           mine: !!slot.registration_id && mineIds.has(slot.registration_id),
+          // „Du“ oder „Dein Team“ (#1316).
+          mineLabel: youLabel(reg),
         };
       });
       const station = stationText(match);
       const filled = sides.filter((side) => side.id).length;
+      const own = sides.find((side) => side.mine);
       return {
         id: match.id,
         match,
@@ -83,7 +87,8 @@ export function scheduleEntries(bracket) {
         sides,
         // Mehr als zwei Plätze (Lauf, FFA): „Lauf A · 4 Spieler“ statt „A gegen B gegen C gegen D“ (Abnahme #1593).
         heat: sides.length > 2 ? { name: `Lauf ${match.match_key || ""}`.trim(), count: heatCount(filled, sides.length) } : null,
-        mine: sides.some((side) => side.mine),
+        mine: Boolean(own),
+        mineLabel: own ? own.mineLabel : null,
       };
     })
     .sort((a, b) => a.round - b.round || a.order - b.order);

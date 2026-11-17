@@ -379,7 +379,7 @@ function ScheduleCard({ entry, resolved, changed = false }) {
             data-out={decided && !side.winner ? "1" : undefined}
           >
             <span className={`tls-sched-name min-w-0 flex-1 ${side.known ? "text-white" : "text-white/45 italic"} ${side.winner ? "font-semibold" : ""}`}>{side.label}</span>
-            {side.mine && <span className="tls-standing-me">Du</span>}
+            {side.mine && <span className="tls-standing-me">{side.mineLabel || "Du"}</span>}
             {side.score != null && <span className={`font-display text-base font-bold tabular-nums ${side.winner ? "text-white" : "text-white/55"}`}>{side.score}</span>}
             {index < sides.length - 1 && <span className="sr-only">{entry.heat ? ", " : " gegen "}</span>}
           </div>
@@ -444,7 +444,7 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
                       </span>
                     )}
                     <span className="flex min-w-0 items-center gap-2 text-[11px] text-white/45">
-                      {entry.mine ? <span className="tls-you-tag" data-testid={`schedule-you-${entry.match.id}`}>Du</span> : null}
+                      {entry.mine ? <span className="tls-you-tag" data-testid={`schedule-you-${entry.match.id}`}>{entry.mineLabel || "Du"}</span> : null}
                       <span className="truncate">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
                     </span>
                   </span>

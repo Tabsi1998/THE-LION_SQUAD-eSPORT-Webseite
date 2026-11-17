@@ -60,6 +60,7 @@ import { Podium } from "@/components/tls/podium/Podium";
 import { TournamentMapPools } from "@/components/tls/maps/TournamentMapPools";
 import { markPlacementShown, placementFor, placementShown } from "@/lib/placementMoment";
 import { ceremonyQueue } from "@/components/achievements/ceremony/queue";
+import { youLabel } from "@/lib/youLabel";
 
 // Eigener Stand je Turnier und Konto (#1047): ein Wechsel des Turniers oder ein echter Kontowechsel baut die Seite
 // neu auf - Chat-Entwurf und Anhänge gehen weg, späte Antworten laufen ins Leere. Das erste Laden der Anmeldung
@@ -561,7 +562,7 @@ function TournamentDetailView() {
                       <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
                       {r.team && <span className="text-white/45 text-xs truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
                       {/* Ecken-Klammern (#1316): deine Zeile mit Winkeln, Fläche und „Du“ - Cyan heißt „du“, Gold bleibt der Ehre. */}
-                      {mine && <span className="tls-you-tag" data-testid={`tournament-participant-me-${r.id}`}>Du</span>}
+                      {mine && <span className="tls-you-tag" data-testid={`tournament-participant-me-${r.id}`}>{youLabel(r)}</span>}
                     </div>
                     <StatusBadge status={r.status} />
                   </div>
