@@ -103,7 +103,7 @@ def can_decide(tournament: dict) -> bool:
 async def overview(db, tournament: dict, user: dict | None = None) -> dict:
     """Was die Verwaltung sieht. ``own_team`` je Gleichstand und Entscheid: gehört die Person zu einer der Seiten
     (Befangenheit wie beim Festlegen); ``superadmin``: nur der darf dann, als Notausnahme mit Grund."""
-    from services import league_final, league_final_read, league_permissions
+    from services import league_final_read, league_permissions, league_ties
 
     rows = await table_rows(db, tournament)
     open_ties, decisions = ties(rows), decisions_view(tournament, rows)
@@ -115,17 +115,17 @@ async def overview(db, tournament: dict, user: dict | None = None) -> dict:
            if league_permissions.belongs_to_side(user, row, teams.get(row.get("team_id") or ""))}
     for entry in (*open_ties, *decisions):
         entry["own_team"] = bool(own & set(entry["registration_ids"]))
-    # Staffel-Seite (#2262): Meister-Gleichstand und Zonengrenze wie im Abschluss (``league_final.classify_ties``) - beim Meister ist die
+    # Staffel-Seite (#2262): Meister-Gleichstand und Zonengrenze wie im Abschluss (``league_ties.classify_ties``) - beim Meister ist die
     # Art der Entscheidung Pflicht (N4, ``league_final.decides_champion``), sonst freiwillig.
-    decisive, zones = await league_final.tie_context(db, tournament)
-    kinds = {tie["rank"]: tie["kind"] for tie in league_final.classify_ties(rows, decisive=decisive, zones=zones)}
+    decisive, zones = await league_ties.tie_context(db, tournament)
+    kinds = {tie["rank"]: tie["kind"] for tie in league_ties.classify_ties(rows, decisive=decisive, zones=zones)}
     for entry in open_ties:
         entry["kind"] = kinds.get(entry["rank"], "other")
         entry["method_required"] = entry["kind"] == "champion"
     # ``closed`` (#2262): Der Endstand ist festgehalten - entschieden wird erst nach dem Wiederöffnen (die Routen sperren es ohnehin).
     return {"standings": rows, "ties": open_ties, "decisions": decisions, "can_decide": can_decide(tournament),
             "rules": public_rules(tournament), "superadmin": league_permissions.is_superadmin(user),
-            "closed": league_final_read.is_closed(tournament), "methods": league_final.METHODS}
+            "closed": league_final_read.is_closed(tournament), "methods": league_ties.METHODS}
 
 
 DECISION_METHODS = ("playoff", "lot", "lead")
