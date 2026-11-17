@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from database import get_db
 from services.achievement_visibility import ranked_users_query
+from services.log_safe import log_safe
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +150,7 @@ async def get_crowns(force: bool = False) -> dict[str, str]:
         if not await recount_silent(get_db()):
             await _persist_and_notify(rank_only)
     except Exception as e:
-        logger.warning(f"crown transition notify failed: {e}")
+        logger.warning("crown transition notify failed: %s", log_safe(e))
     _cache["at"] = now
     _cache["data"] = merged
     return merged
@@ -165,7 +166,7 @@ def schedule_crown_sync() -> None:
             await asyncio.sleep(2)
             await get_crowns(force=True)
         except Exception as e:
-            logger.debug(f"crown sync skipped: {e}")
+            logger.debug("crown sync skipped: %s", log_safe(e))
         finally:
             _sync_state["pending"] = False
 
