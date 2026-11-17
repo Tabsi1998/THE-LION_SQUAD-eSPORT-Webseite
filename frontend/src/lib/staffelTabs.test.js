@@ -48,7 +48,7 @@ test("alte Reiter der Turnierverwaltung haben ihr Ziel auf der Staffel-Seite", (
   expect(legacyTabAnchor("stages")).toBe("spiele");
   expect(legacyTabAnchor("bracket")).toBe("tabelle");
   expect(legacyTabAnchor("edit")).toBe("einstellungen");
-  expect(legacyTabAnchor("maps")).toBe("einstellungen");
+  expect(legacyTabAnchor("maps")).toBe("vorgaben");
   expect(legacyTabAnchor("staff")).toBe("helfer");
   expect(legacyTabAnchor("feedback")).toBe("ueberblick");
   expect(legacyTabAnchor("")).toBe("ueberblick");
@@ -68,7 +68,7 @@ test("jedes Ziel führt auf die Staffel-Seite, keins mehr in die Turnierverwaltu
   expect(staffelManageUrl("t-1", "bracket", "gleichstand")).toBe("/admin/leagues/staffeln/t-1#gleichstand");
   // Paket C: Einstellungen samt Darstellung und Helfer, Protokoll, Rückmeldungen im Überblick.
   expect(staffelManageUrl("t-1", "edit")).toBe("/admin/leagues/staffeln/t-1#einstellungen");
-  expect(staffelManageUrl("t-1", "maps")).toBe("/admin/leagues/staffeln/t-1#einstellungen");
+  expect(staffelManageUrl("t-1", "maps")).toBe("/admin/leagues/staffeln/t-1#vorgaben");
   expect(staffelManageUrl("t-1", "staff")).toBe("/admin/leagues/staffeln/t-1#helfer");
   expect(staffelManageUrl("t-1", "feedback")).toBe("/admin/leagues/staffeln/t-1");
   expect(staffelManageUrl("t-1", "edit", "darstellung")).toBe("/admin/leagues/staffeln/t-1#darstellung");

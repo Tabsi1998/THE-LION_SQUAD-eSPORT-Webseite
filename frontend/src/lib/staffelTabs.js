@@ -56,7 +56,7 @@ export const LEGACY_TAB_ANCHORS = {
   stages: "spiele",
   bracket: "tabelle",
   edit: "einstellungen",
-  maps: "einstellungen",
+  maps: "vorgaben",
   staff: "helfer",
   feedback: "ueberblick",
 };
