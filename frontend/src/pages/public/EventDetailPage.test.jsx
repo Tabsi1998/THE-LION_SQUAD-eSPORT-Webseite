@@ -449,3 +449,19 @@ test("Reiter „Live“: aus „Live verfolgen“ und über ?tab=live; nach dem 
   expect(screen.queryByTestId("event-tabs")).toBeNull();
   expect(screen.queryByTestId("live-board")).toBeNull();
 });
+
+test("Ecken-Klammern (#1316): deine Karte unter „Was läuft“ trägt Ecken und „Du“ - nie zweimal „Du“", async () => {
+  const first = renderPage(LAN);
+  const team = await screen.findByTestId("event-row-tournament-t2");
+  expect(team.querySelector("a")).toHaveClass("tls-card", "tls-you");
+  // „Du bist dabei“ sagt schon „Du“ - kein zweites Etikett.
+  expect(team.querySelector("[data-testid='event-row-you']")).toBeNull();
+  expect(screen.getByTestId("event-row-tournament-t1").querySelector("a")).not.toHaveClass("tls-you");
+  expect(screen.getByTestId("event-row-fastlap-f1").querySelector("a")).not.toHaveClass("tls-you");
+  first.unmount();
+
+  renderPage({ ...LAN, tournaments: LAN.tournaments.map((row) => (row.id === "t2" ? { ...row, my_status: { state: "approved", label: "Angemeldet" } } : row)) });
+  const again = await screen.findByTestId("event-row-tournament-t2");
+  expect(again.querySelector("[data-testid='event-row-you']")).toHaveTextContent(/^Du$/);
+  expect(document.querySelectorAll("[data-testid='event-row-you']")).toHaveLength(1);
+});

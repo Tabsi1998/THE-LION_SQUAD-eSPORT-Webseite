@@ -38,16 +38,9 @@ export function TeamCrest({ team, hex }) {
 }
 
 function YouCorners() {
-  // Ecken-Klammern (#1316): vier kleine Winkel um dein Gesicht - wie die Ecken der Social-Knöpfe im Footer.
-  const corner = "absolute w-2.5 h-2.5 border-[#29B6E8]";
-  return (
-    <span aria-hidden="true" className="pointer-events-none absolute -inset-1.5" data-testid="team-face-you">
-      <span className={`${corner} top-0 left-0 border-t-2 border-l-2`} />
-      <span className={`${corner} top-0 right-0 border-t-2 border-r-2`} />
-      <span className={`${corner} bottom-0 left-0 border-b-2 border-l-2`} />
-      <span className={`${corner} bottom-0 right-0 border-b-2 border-r-2`} />
-    </span>
-  );
+  // Ecken-Klammern (#1316): dieselben Winkel wie überall bei „du“ (tls-you, styles/system.css) - um das runde Bild ohne
+  // Fläche (tls-you--plain), 5 px außerhalb.
+  return <span aria-hidden="true" className="tls-you tls-you--plain pointer-events-none absolute inset-0" data-testid="team-face-you" />;
 }
 
 export function TeamFaces({ team, userId }) {
@@ -70,6 +63,7 @@ export function TeamFaces({ team, userId }) {
                 </span>
                 <span className="block w-full truncate text-[11px] font-bold text-white/85">{name}</span>
                 <span className={`block text-[10px] uppercase tracking-wider ${face.role === "player" ? "text-white/45" : "text-white/75"}`} data-testid={`team-face-role-${face.id}`}>{face.roleLabel}</span>
+                {mine ? <span className="tls-you-tag" data-testid={`team-face-you-tag-${face.id}`}>Du</span> : null}
               </Link>
             </li>
           );

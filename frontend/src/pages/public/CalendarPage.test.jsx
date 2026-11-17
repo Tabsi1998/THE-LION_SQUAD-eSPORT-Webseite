@@ -311,3 +311,26 @@ test("Kopieren bestätigt mit Haken", async () => {
   expect(screen.getByTestId("calendar-feed-copy").querySelector(".tls-copy-check")).not.toBeNull();
   expect(screen.getByText("Abo-Adresse kopiert")).toBeInTheDocument();
 });
+
+test("Ecken-Klammern (#1316): unter allen Terminen tragen nur deine Ecken, Fläche und „Du“ - in „Mein Kalender“ nicht", async () => {
+  respond(ITEMS, true);
+  await renderPage("Oktober 2099");
+  await userEvent.click(screen.getByTestId("calendar-day-2099-10-05"));
+  const day = screen.getByTestId("calendar-day-items");
+  const own = within(day).getByTestId("calendar-item-tournament-t-cup-anmeldeschluss");
+  expect(within(own).getByTestId("calendar-you-frame-tournament-t-cup-anmeldeschluss")).toHaveClass("tls-you");
+  expect(within(own).getByTestId("calendar-you-tournament-t-cup-anmeldeschluss")).toHaveTextContent(/^Du$/);
+  const other = within(day).getByTestId("calendar-item-event-e-fest");
+  expect(other.querySelector(".tls-you")).toBeNull();
+  expect(other).not.toHaveTextContent("Du");
+  expect(day.querySelectorAll(".tls-you")).toHaveLength(1);
+});
+
+test("Ecken-Klammern (#1316): „Mein Kalender“ zeigt den Stand als Plakette, ohne Ecken an jeder Zeile", async () => {
+  window.localStorage.setItem("tls_calendar_view", "list");
+  respondSignedIn(ITEMS, undefined, MINE);
+  renderMine();
+  const list = await screen.findByTestId("calendar-list");
+  expect(within(list).getByTestId("calendar-item-tournament-t-cup")).toBeInTheDocument();
+  expect(list.querySelectorAll(".tls-you, .tls-you-tag")).toHaveLength(0);
+});

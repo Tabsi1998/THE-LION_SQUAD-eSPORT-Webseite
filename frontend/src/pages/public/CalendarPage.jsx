@@ -387,8 +387,13 @@ function ItemRow({ item, withDate = false }) {
   const when = withDate ? spanLabel(item) : item.all_day ? "ganztägig" : timeLabel(item.start);
   // „Mein Kalender“ (#1788): der eigene Stand vom Server als Plakette; im Vereinskalender bleibt „Angemeldet“.
   const badge = ownBadge(item);
+  // Ecken-Klammern (#1316): dein Termin unter allen trägt Winkel, Fläche und „Du“ (eine Lage über der Zeile, die Zeile
+  // selbst bleibt, wie sie ist). In „Mein Kalender“ ist jeder Termin deiner (dort steht die Plakette) - Winkel an jeder
+  // Zeile sagten nichts mehr.
+  const you = Boolean(item.mine) && !badge;
   return (
-    <Link to={item.path} data-testid={`calendar-item-${item.kind}-${item.id}`} className="flex items-start gap-3 border border-white/5 bg-black/15 hover:border-[#9F7AEA]/50 rounded-sm px-3 py-2 transition min-w-0">
+    <Link to={item.path} data-testid={`calendar-item-${item.kind}-${item.id}`} className="relative flex items-start gap-3 border border-white/5 bg-black/15 hover:border-[#9F7AEA]/50 rounded-sm px-3 py-2 transition min-w-0">
+      {you ? <span aria-hidden="true" className="tls-you pointer-events-none absolute inset-0 rounded-sm" data-testid={`calendar-you-frame-${item.kind}-${item.id}`} /> : null}
       <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: KIND_COLORS[item.kind] }} />
       <span className="min-w-0 flex-1">
         <span className="block text-[10px] uppercase tracking-widest text-white/40 font-bold">
@@ -401,8 +406,9 @@ function ItemRow({ item, withDate = false }) {
             {item.phase?.label && item.kind !== "club" ? <span>{item.phase.label}</span> : null}
           </span>
         ) : (item.phase?.label || item.mine) && (
-          <span className="block text-xs text-white/50">
-            {item.phase?.label}{item.phase?.label && item.mine ? " · " : ""}{item.mine ? <span className="text-brand">Angemeldet</span> : null}
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/50">
+            {you ? <span className="tls-you-tag" data-testid={`calendar-you-${item.kind}-${item.id}`}>Du</span> : null}
+            <span>{item.phase?.label}{item.phase?.label && item.mine ? " · " : ""}{item.mine ? <span className="text-brand">Angemeldet</span> : null}</span>
           </span>
         )}
       </span>

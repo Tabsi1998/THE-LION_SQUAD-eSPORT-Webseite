@@ -227,3 +227,13 @@ test("Einladen-Suche: ein Fehler sagt das, statt „Keine passenden Benutzer“"
   expect(await screen.findByTestId("team-invite-search-error")).toHaveTextContent("Suche hat nicht geklappt");
   expect(screen.queryByText("Keine passenden Benutzer gefunden.")).toBeNull();
 });
+
+test("Ecken-Klammern (#1316): dein Gesicht trägt die Winkel ohne Fläche und das Etikett „Du“, die anderen nicht", () => {
+  render(<MemoryRouter><TeamHeader team={HEAD_TEAM} header={null} levelInfo={null} userId="u-3" /></MemoryRouter>);
+  const own = screen.getByTestId("team-face-u-3");
+  expect(within(own).getByTestId("team-face-you")).toHaveClass("tls-you", "tls-you--plain");
+  expect(within(own).getByTestId("team-face-you-tag-u-3")).toHaveTextContent(/^Du$/);
+  for (const id of ["u-cap", "u-co"]) {
+    expect(screen.getByTestId(`team-face-${id}`).querySelector(".tls-you, .tls-you-tag")).toBeNull();
+  }
+});

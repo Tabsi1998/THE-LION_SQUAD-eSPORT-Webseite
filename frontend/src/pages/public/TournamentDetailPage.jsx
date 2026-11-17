@@ -551,7 +551,7 @@ function TournamentDetailView() {
               {sortedRegs.map((r) => {
                 const mine = !!user && (r.user_id === user.id || r.is_mine);
                 return (
-                  <div key={r.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${mine ? "bg-[#FFD700]/5" : ""}`} data-testid={`tournament-participant-${r.id}`}>
+                  <div key={r.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${mine ? "tls-you tls-you--inset" : ""}`} data-testid={`tournament-participant-${r.id}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       {finalRank.size ? (
                         <span className="font-display font-bold text-white/80 w-7 tabular-nums" title="Endplatz" data-testid={`tournament-participant-rank-${r.id}`}>{finalRank.has(r.id) ? `${finalRank.get(r.id)}.` : "–"}</span>
@@ -560,7 +560,8 @@ function TournamentDetailView() {
                       )}
                       <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
                       {r.team && <span className="text-white/45 text-xs truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
-                      {mine && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/50 rounded-sm px-1.5 py-0.5" data-testid={`tournament-participant-me-${r.id}`}>du</span>}
+                      {/* Ecken-Klammern (#1316): deine Zeile mit Winkeln, Fläche und „Du“ - Cyan heißt „du“, Gold bleibt der Ehre. */}
+                      {mine && <span className="tls-you-tag" data-testid={`tournament-participant-me-${r.id}`}>Du</span>}
                     </div>
                     <StatusBadge status={r.status} />
                   </div>
