@@ -14,7 +14,7 @@ jest.mock("../navigation/rootNavigation", () => ({
   openDetail: jest.fn(),
 }));
 
-const { SeasonStage, SeasonWidgetSlot } = require("./SeasonStage");
+const { GREETING_WAIT_MS, SeasonStage, SeasonWidgetSlot } = require("./SeasonStage");
 const { clearOwnMatches, clearStillHolds, noteOwnMatches, setStillHold } = require("./matchPause");
 
 const halloween = () => ({ key: "halloween", label: "Halloween", phase: "deko", intensity: "normal", effective: "normal", channels: ["app"], texts: {}, data: {} });
@@ -97,4 +97,25 @@ test("auf stillen Screens wartet ein Gruß ebenfalls - Gegenprobe: auf dem Dashb
   mockRoute.name = "Dashboard";
   await render(<SeasonStage />);
   expect(screen.getByTestId("season-toast")).toHaveTextContent("Happy Halloween");
+});
+
+test("ein Gruß, der länger als eine Minute wartet, fällt weg - Gegenprobe: knapp darunter kommt er", async () => {
+  const now = jest.spyOn(Date, "now");
+  try {
+    for (const [waited, shown] of [[GREETING_WAIT_MS + 1000, false], [GREETING_WAIT_MS - 1000, true]] as const) {
+      (mockSeasonState.showToast as jest.Mock).mockClear();
+      now.mockReturnValue(1_000_000);
+      await render(<SeasonStage />);
+      await act(async () => noteOwnMatches([{ id: "m-1", status: "in_progress" }], "dashboard"));
+      mockSeasonState.toast = { id: 1, text: "Happy Halloween", ms: 4000 };
+      await screen.rerender(<SeasonStage />);
+      now.mockReturnValue(1_000_000 + waited);
+      await act(async () => noteOwnMatches([{ id: "m-1", status: "completed" }], "match"));
+      expect((mockSeasonState.showToast as jest.Mock).mock.calls.length > 0).toBe(shown);
+      mockSeasonState.toast = null;
+      await screen.unmount();
+    }
+  } finally {
+    now.mockRestore();
+  }
 });

@@ -96,6 +96,9 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
  */
 export const ROOM_SEASONS = new Set(["halloween", "christmas", "club_birthday", "carnival", "easter", "easter_hunt"]);
 
+/** So lange wartet ein Saison-Gruß in der Pause oder auf einem stillen Screen (#1169) - danach ist er überholt. */
+export const GREETING_WAIT_MS = 60 * 1000;
+
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
 export const SCREEN_SEASONS = new Set(["advent_calendar"]);
 
@@ -142,15 +145,16 @@ export function SeasonStage() {
   // sobald die Deko zurück ist. Meldungen mit `always` (neue Erfolge) stehen immer.
   const hidden = useDecoPaused() || stillScreen(screen);
   const toast = current && (current.always || !hidden) ? current : null;
-  const waiting = useRef<{ text: string; ms?: number } | null>(null);
+  // Wartet ein Gruß länger als GREETING_WAIT_MS, ist er überholt und fällt weg.
+  const waiting = useRef<{ text: string; ms?: number; at: number } | null>(null);
   useEffect(() => {
-    if (current && !current.always && hidden) waiting.current = { text: current.text, ms: current.ms };
+    if (current && !current.always && hidden) waiting.current = { text: current.text, ms: current.ms, at: Date.now() };
   }, [current, hidden]);
   useEffect(() => {
     if (hidden || !waiting.current) return;
     const held = waiting.current;
     waiting.current = null;
-    showToast(held.text, held.ms);
+    if (Date.now() - held.at <= GREETING_WAIT_MS) showToast(held.text, held.ms);
   }, [hidden, showToast]);
   const probing = mounted.some(({ season }) => ROOM_SEASONS.has(season.key));
   useEffect(() => {
