@@ -473,6 +473,58 @@ async def test_access_links_at_a_staffel_need_league_rights_too(flow):
 
 
 @pytest.mark.asyncio
+async def test_league_lead_without_the_tournament_area_handles_the_access_links_of_its_staffel(flow):
+    """#2262 (Entwurf 1.4 Nr. 3): An der Staffel zählt „Liga verwalten“ - die reine Liga-Leitung sieht, legt an und widerruft die
+    Zugangslinks ihrer Staffel. Andere Zuständigkeiten, normale Turniere und die Liste aller Links bleiben zu."""
+    w = await world(flow)
+    tid = w["tournament"]["id"]
+    body = {"target_type": "tournament", "target_id": tid, "grants": ["view"]}
+    flow.act_as(await holder(flow, w, "manage", name="Ligaleitung"))
+    made = await flow.post("/api/access-links", json=body)
+    assert made.status_code == 200, made.text
+    listed = await flow.get(f"/api/access-links?target_type=tournament&target_id={tid}")
+    assert listed.status_code == 200 and [row["id"] for row in listed.json()] == [made.json()["id"]]
+    cleaned = await flow.post(f"/api/access-links/cleanup?target_type=tournament&target_id={tid}")
+    assert cleaned.status_code == 200
+    plain = await flow.create_tournament(title="Probe-Cup")
+    foreign = await flow.post("/api/access-links", json={**body, "target_id": plain["id"]})
+    assert foreign.status_code == 403
+    everything = await flow.get("/api/access-links")
+    assert everything.status_code == 403, "die Liste aller Links bleibt beim Bereich Turniere"
+    revoked = await flow.delete(f"/api/access-links/{made.json()['id']}")
+    assert revoked.status_code == 200, revoked.text
+
+    flow.act_as(await holder(flow, w, "results", name="Ergebnisse"))
+    refused = [await flow.post("/api/access-links", json=body),
+               await flow.get(f"/api/access-links?target_type=tournament&target_id={tid}"),
+               await flow.delete(f"/api/access-links/{made.json()['id']}")]
+    assert [row.status_code for row in refused] == [403, 403, 403]
+
+
+@pytest.mark.asyncio
+async def test_feedback_of_a_staffel_is_read_with_league_rights_only(flow):
+    """#2262: Staffeln bekommen die Umfrage nach dem Ende wie jedes Turnier. Die Auswertung liest „Liga verwalten“ auf der
+    Staffel-Seite; der Bereich Turniere allein gibt dort nichts, bei normalen Turnieren bleibt er der Weg."""
+    w = await world(flow)
+    tid = w["tournament"]["id"]
+    plain = await flow.create_tournament(title="Probe-Cup")
+
+    async def status(user, target) -> int:
+        flow.act_as(user)
+        response = await flow.get(f"/api/admin/feedback/tournament/{target}")
+        return response.status_code
+
+    lead = await holder(flow, w, "manage", name="Ligaleitung")
+    results = await holder(flow, w, "results", name="Ergebnisse")
+    tournaments_only = await flow.add_user(role="tournament_admin", name="Nur Turniere")
+    assert await status(lead, tid) == 200
+    assert await status(lead, plain["id"]) == 403
+    assert await status(results, tid) == 403
+    assert await status(tournaments_only, tid) == 403
+    assert await status(tournaments_only, plain["id"]) == 200
+
+
+@pytest.mark.asyncio
 async def test_tv_keys_at_a_staffel_need_league_rights_too(flow):
     w = await world(flow)
     tid = w["tournament"]["id"]
