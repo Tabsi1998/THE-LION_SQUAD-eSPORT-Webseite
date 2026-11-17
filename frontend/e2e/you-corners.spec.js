@@ -251,6 +251,8 @@ test.describe("„du“ mit Ecken und Etikett (#1316)", () => {
       await expect(day.locator(".tls-you-tag")).toHaveCount(0);
       await expect(page.getByTestId("calendar-day-2026-12-11")).not.toHaveClass(/\btls-you\b/);
       await expect(page.getByTestId("calendar-legend-you")).toHaveClass(/\btls-you\b/);
+      // Kleines Zeichen: Winkel von 4 px - sonst sähe es aus wie ein Kästchen.
+      expect(await page.getByTestId("calendar-legend-you").evaluate((node) => getComputedStyle(node, "::after").backgroundSize)).toContain("4px 2px");
       expect(await sideScroll(page)).toBeLessThanOrEqual(1);
     });
   }
@@ -300,6 +302,8 @@ test.describe("Tastatur-Fokus mit Ecken (#1316)", () => {
     await page.keyboard.press("Tab");
     await expect(card).toBeFocused();
     expect(await corners(card, "::after")).toMatchObject({ layers: 8, inset: "0px" });
+    // Erst messen, wenn die Karte fertig angehoben ist (5 px).
+    await page.waitForTimeout(600);
     // Die Leiste schneidet an ihrer Innenkante - die Winkel liegen ganz innerhalb der Karte.
     const fits = await card.evaluate((node) => {
       const strip = node.closest(".tls-swipe").getBoundingClientRect();

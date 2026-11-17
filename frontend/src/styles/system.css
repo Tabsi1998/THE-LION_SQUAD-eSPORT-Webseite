@@ -67,7 +67,9 @@
    Zeilen in Tabellen und Listen tragen die Winkel an der Kante (tls-you--inset): Sie liegen in wischbaren Rahmen, 5 px
    außen würden dort abgeschnitten oder die Fläche seitlich verschieben. Um ein rundes Bild ohne Fläche: tls-you--plain.
    Sonst trägt nichts die Winkel - TV-Seiten zeigen kein „du“, Bühnen-Bilder und Level-Rahmen bleiben ohne. */
-:root {
+/* Die Maße stehen auch an jeder Stelle selbst (ohne Gewicht): So rechnet --tls-corners mit den Werten der Stelle, und
+   eine Stelle kann sie ändern - etwa das kleine Zeichen in der Legende des Kalenders (4 px). */
+:root, :where(.tls-you), :where(.tls-btn), :where(.tls-card) {
   --tls-corner-len: 11px;
   --tls-corner-width: 2px;
   --tls-corner-out: 5px;
