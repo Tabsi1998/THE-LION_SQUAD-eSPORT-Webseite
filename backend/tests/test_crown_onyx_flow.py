@@ -207,3 +207,26 @@ async def test_a_legacy_state_still_turns_gold_to_onyx_into_onyx_reached(flow):
     await crowns(flow)
     mail = await crown_mail(flow)
     assert (top["id"], "crown_onyx") in mail and (top["id"], "crown_lost") not in mail
+
+
+@pytest.mark.asyncio
+async def test_while_onyx_reached_is_sent_the_crowns_already_show_onyx(flow, monkeypatch):
+    """Die Glocke lädt die Kronen gleich nach dem Live-Hinweis - während Push und Discord noch laufen (#2501, S2)."""
+    from services import user_notifications
+
+    top, second, third, fourth = await four_players(flow)
+    await crowns(flow)  # die Kronen stehen frisch im Zwischenspeicher: Gold für ``top``
+    await award(flow, top, "probe_onyx")
+    original = user_notifications.create_user_notification
+    seen_during: list = []
+
+    async def spy(user_id, title, body="", url="", kind="general", meta=None):
+        if kind == "crown_onyx":
+            flow.act_as(None)
+            seen_during.append((await flow.get("/api/achievements/crowns")).json()["crowns"].get(user_id))
+        return await original(user_id, title, body, url=url, kind=kind, meta=meta)
+
+    monkeypatch.setattr(user_notifications, "create_user_notification", spy)
+    await crown_events.get_crowns(force=True)
+    assert seen_during == ["onyx"], "die Glocke sähe sonst noch Gold und feierte nicht"
+

@@ -171,6 +171,10 @@ async def get_crowns(force: bool = False) -> dict[str, str]:
         return _cache["data"]
     rows = await _points_rows()
     merged, rank_only = _split_crowns(rows)
+    # Erst den neuen Stand ablegen, dann melden (#2501): Die Glocke lädt die Kronen gleich nach dem Live-Hinweis, während Push
+    # und Discord noch laufen - sie muss dann schon die neue Krone sehen, sonst fällt die Feier aus.
+    _cache["at"] = now
+    _cache["data"] = merged
     try:
         # Stiller Modus der Neuberechnung (#2340): Kronenwechsel weder speichern noch melden - der Abschluss rechnet sie
         # einmal neu, dann erfährt nur, wer netto eine Krone gewonnen, gewechselt oder verloren hat.
@@ -179,8 +183,6 @@ async def get_crowns(force: bool = False) -> dict[str, str]:
             await _persist_and_notify(rank_only, {uid for uid, crown in merged.items() if crown == "onyx"})
     except Exception as e:
         logger.warning("crown transition notify failed: %s", log_safe(e))
-    _cache["at"] = now
-    _cache["data"] = merged
     return merged
 
 
