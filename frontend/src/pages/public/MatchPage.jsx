@@ -49,7 +49,7 @@ import { ProposalTimesEditor, ScheduleProposalList } from "@/components/tls/tour
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
-import { noteOwnMatches } from "@/seasons/matchPause";
+import { noteOwnMatches } from "@/lib/liveQueue";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",

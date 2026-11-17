@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
-import { isStillPage, pageClass } from "./intensity";
-import { useDecoPaused } from "./matchPause";
+import { pageClass } from "./intensity";
+import { useDecoPaused } from "./decoPause";
 import { readPreviewToken } from "./preview";
 import { useSeason } from "./SeasonContext";
 import { SEASON_MODULES, hasModule } from "./registry";
@@ -16,9 +16,12 @@ import "./seasons.css";
 
 export const QUIET_PATHS = ["/admin", "/display", "/print", "/setup", "/consent"];
 
-/** Bleibt die Bühne auf dieser Seite leer? Verwaltung, Display und Druck - und die stillen Seiten des Turniertags (#1169). */
+/**
+ * Bleibt die Bühne auf dieser Seite leer? Verwaltung, Display und Druck - und alle stillen Seiten (Klasse „quiet“), seit
+ * #1169 auch Turnierbaum, Matchseite und Turnierleitung. Die App: `stillScreen` in mobile/src/seasons/intensity.ts.
+ */
 export function isQuietPath(pathname) {
-  return QUIET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) || isStillPage(pathname);
+  return QUIET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) || pageClass(pathname) === "quiet";
 }
 
 /**

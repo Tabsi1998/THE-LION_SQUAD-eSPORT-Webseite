@@ -289,6 +289,6 @@ test("Turniertag (#1169): das Ergebnis des eigenen Spiels beendet die Pause der 
     participants: [NEON, LUNA],
   });
   await screen.findByTestId("match-headline");
-  expect(ownMatchesPaused()).toBe(false);
+  await waitFor(() => expect(ownMatchesPaused()).toBe(false));
   clearOwnMatches();
 });

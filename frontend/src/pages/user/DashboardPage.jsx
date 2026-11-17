@@ -17,7 +17,7 @@ import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
 import { dashboardRegistrationKeys, dashboardTeamKeys, noteWebPushRegistrations, offerWebPush } from "@/lib/webPush";
-import { noteOwnMatches } from "@/seasons/matchPause";
+import { noteOwnMatches } from "@/lib/liveQueue";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,

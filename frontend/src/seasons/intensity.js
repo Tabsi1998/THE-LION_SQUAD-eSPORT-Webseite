@@ -13,7 +13,7 @@ const RULES = [
   { test: (p) => /^\/(admin|display|setup|consent)(\/|$)/.test(p), cls: "quiet" },
   // Turniertag (#1169): Turnierbaum, Matchseite (mit der Aufruf-Karte) und die Turnierleitung (mit Cockpit und Einlass)
   // bleiben ganz ohne Deko - wer dort schaut, spielt gleich oder leitet. Spielplan und Tabelle bleiben ruhig.
-  { test: (p) => /^\/matches\/[^/]+(\/|$)/.test(p) || /^\/tournaments\/[^/]+\/(bracket|leitung)(\/|$)/.test(p) || /^\/events\/[^/]+\/leitung(\/|$)/.test(p), cls: "quiet" },
+  { test: (p) => /^\/(matches\/[^/]+|tournaments\/[^/]+\/(bracket|leitung)|events\/[^/]+\/leitung)(\/|$)/.test(p), cls: "quiet" },
   { test: (p) => /^\/tournaments\/[^/]+\/(matches|standings)/.test(p), cls: "calm" },
   { test: (p) => /^\/(fastlap|f1)(\/|$)/.test(p), cls: "calm" },
   // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
@@ -27,11 +27,6 @@ export function pageClass(pathname = "/") {
   const p = String(pathname || "/").replace(/\/+$/, "") || "/";
   for (const rule of RULES) if (rule.test(p)) return rule.cls;
   return "medium";
-}
-
-/** Still heißt ganz ohne Deko (#1169): die Bühne bleibt leer wie in der Verwaltung - die App: `stillScreen`. */
-export function isStillPage(pathname = "/") {
-  return pageClass(pathname) === "quiet";
 }
 
 /**

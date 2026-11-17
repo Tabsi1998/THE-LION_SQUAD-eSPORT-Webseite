@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useSeason } from "./SeasonContext";
 import { isQuietPath, useSeasonModules } from "./SeasonStage";
-import { useDecoPaused } from "./matchPause";
+import { useDecoPaused } from "./decoPause";
 import { SoundToggle } from "./SoundToggle";
 
 // Drei Plätze im Layout (#634, #852): das Widget neben dem Logo (klickbar, mit Tastatur erreichbar), die Deko im Footer

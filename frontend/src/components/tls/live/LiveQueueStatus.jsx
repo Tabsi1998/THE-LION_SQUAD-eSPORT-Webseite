@@ -3,8 +3,7 @@ import { BellRing, Clock, Radio } from "lucide-react";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useLiveQueue, useStaleExpired } from "@/hooks/useLiveQueue";
 import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
-import { QUEUE_GONE_STATUSES, QUEUE_ME_GONE_STATUSES, myQueueLine, queuePollMs } from "@/lib/liveQueue";
-import { noteOwnMatches } from "@/seasons/matchPause";
+import { QUEUE_GONE_STATUSES, QUEUE_ME_GONE_STATUSES, myQueueLine, noteOwnMatches, queuePollMs } from "@/lib/liveQueue";
 
 // Spieler-Sicht vor Ort (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“, „Läuft an Station 2“, „Du bist dran“.
 // Ohne `matchId` die eigenen Spiele (GET /tournaments/<id>/live-queue/me, angemeldet) - für die Turnierseite. Mit
