@@ -55,7 +55,7 @@ export type Capabilities = EffectClasses & HalloweenCapabilities & { season: str
 
 const LIVELY = new Set(["Dashboard", "NewsList", "Gallery", "GalleryAlbum", "SeasonPass"]);
 const CALM = new Set([
-  "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "MatchDetail", "FastLapDetail",
+  "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "FastLapDetail",
   // Seit #1143: Suche, Gewinne und „Profil bearbeiten“ wie die anderen Konto-Seiten ruhig.
   "TeamChat", "DirectThread", "Notifications", "Search", "Profile", "ProfileEdit", "MyMembership", "MyInvoices", "MyPrizes",
   "MemberCard", "MemberDocuments", "MyDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
@@ -64,7 +64,12 @@ const CALM = new Set([
   // FAQ (#2449): Lesen und Suchen - die Deko hält sich zurück wie bei den Konto-Seiten.
   "Faq",
 ]);
-const QUIET = new Set(["Consent", "Lock", "Boot", "Settings", "Admin"]);
+const QUIET = new Set([
+  "Consent", "Lock", "Boot", "Settings", "Admin",
+  // Turniertag (#1169): Matchseite (mit der Aufruf-Karte), Turnierleitung (mit Cockpit) und der Reiter „Baum“ der
+  // Turnierseite (`TournamentBracket`, hält die Bühne über useStillHold still) bleiben ganz ohne Deko - wie im Web.
+  "MatchDetail", "TournamentLead", "TournamentBracket",
+]);
 
 /** Klasse eines Screens: lebendig (Dashboard, News, Galerie), mittel (Details, Community, Verein), ruhig (Turniere, Chats, Formulare, Konto), still (Sperre, Einwilligung, Einstellungen). */
 export function screenClass(screen = "Dashboard"): ScreenClass {
@@ -73,6 +78,11 @@ export function screenClass(screen = "Dashboard"): ScreenClass {
   if (LIVELY.has(name)) return "lively";
   if (CALM.has(name)) return "calm";
   return "medium";
+}
+
+/** Still heißt ganz ohne Deko (#1169): die Bühne bleibt leer - im Web `isStillPage`. */
+export function stillScreen(screen = "Dashboard"): boolean {
+  return screenClass(screen) === "quiet";
 }
 
 // Effektklassen je Screen-Klasse bei normaler Stärke. `full` (Höhepunkt der Saison) hebt an, `subtle` senkt alles auf still.
