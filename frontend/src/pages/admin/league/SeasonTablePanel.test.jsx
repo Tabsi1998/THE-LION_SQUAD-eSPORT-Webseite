@@ -143,6 +143,37 @@ test("abgeschlossene Staffel: statt der Knöpfe der Satz zum Wiederöffnen (#226
   expect(screen.queryByTestId("season-decision-remove-d0")).toBeNull();
 });
 
+test("Meister-Gleichstand auf der Staffel-Seite: markiert, Art der Entscheidung Pflicht (#2262)", async () => {
+  const methods = { playoff: "Entscheidungsspiel", lot: "Los", lead: "Entscheid der Leitung" };
+  apiMock.get.mockResolvedValue({ data: { ...TABLE, methods, decisions: [],
+    ties: [{ ...TABLE.ties[0], kind: "champion", method_required: true }, { rank: 3, registration_ids: ["r3", "r4"], names: ["Eisbär", "Wüstenfuchs"], points: 0, kind: "zone", method_required: false }] } });
+  render(<StaffelTablePanel tournamentId="t1" label="Liga 1 · Staffel A" canDecide />);
+  expect(await screen.findByTestId("season-tie-kind-t1-1")).toHaveTextContent("Meisterplatz");
+  expect(screen.getByTestId("season-tie-kind-t1-3")).toHaveTextContent("Grenze zu Auf- oder Abstieg");
+
+  fireEvent.click(screen.getByTestId("season-tie-decide-1"));
+  const sheet = await screen.findByTestId("table-decision-sheet");
+  expect(within(sheet).getByTestId("table-decision-method")).toBeRequired();
+  expect(sheet).toHaveTextContent("Bitte wählen");
+  fireEvent.change(within(sheet).getByTestId("table-decision-reason"), { target: { value: "Entscheidungsspiel 2:1 gewonnen" } });
+  fireEvent.click(within(sheet).getByTestId("table-decision-save"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  fireEvent.change(within(sheet).getByTestId("table-decision-method"), { target: { value: "playoff" } });
+  fireEvent.click(within(sheet).getByTestId("table-decision-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/table-decision",
+    { registration_ids: ["r1", "r2"], reason: "Entscheidungsspiel 2:1 gewonnen", method: "playoff" }));
+});
+
+test("Gleichstand an der Zonengrenze: markiert, Art freiwillig", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...TABLE, decisions: [], methods: { playoff: "Entscheidungsspiel", lot: "Los", lead: "Entscheid der Leitung" },
+    ties: [{ ...TABLE.ties[0], kind: "zone", method_required: false }] } });
+  render(<StaffelTablePanel tournamentId="t1" canDecide />);
+  fireEvent.click(await screen.findByTestId("season-tie-decide-1"));
+  const sheet = await screen.findByTestId("table-decision-sheet");
+  expect(within(sheet).getByTestId("table-decision-method")).not.toBeRequired();
+  expect(sheet).toHaveTextContent("Keine Angabe");
+});
+
 function RulesHarness({ initial }) {
   const [form, setForm] = useState(tableRulesToForm(initial));
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));

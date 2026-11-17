@@ -8,6 +8,7 @@ import { FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { StandingsTable, ZoneLegend } from "@/components/tls/tournament/StandingsTable";
+import { methodOptions } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws, tiebreakOrder } from "@/lib/leagueTable";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
@@ -141,6 +142,9 @@ function RemoveSheet({ staffel, decision, override, onClose, onSaved }) {
 }
 
 
+// Gleichstände, die den Abschluss aufhalten (Server: `league_final.classify_ties`) - dieselben Fälle wie im Reiter „Abschluss“.
+const TIE_KINDS = { champion: "Meisterplatz", zone: "Grenze zu Auf- oder Abstieg" };
+
 function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
   const [sheet, setSheet] = useState(null);
   const staffel = { tournament_id: tournamentId, label };
@@ -170,6 +174,11 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
       ) : null}
       {ties.map((tie) => (
         <div key={tie.rank} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2" data-testid={`season-tie-${tournamentId}-${tie.rank}`}>
+          {TIE_KINDS[tie.kind] ? (
+            <span className="rounded-sm border border-warn/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-warn" data-testid={`season-tie-kind-${tournamentId}-${tie.rank}`}>
+              {TIE_KINDS[tie.kind]}
+            </span>
+          ) : null}
           <span className="min-w-0 text-sm text-white [overflow-wrap:anywhere]">Platz {tie.rank}: {tie.names.join(", ")}</span>
           <span className="text-xs text-white/60 tabular-nums">{tie.points} Punkte, nach allen Kriterien gleich</span>
           {decide && blocked(tie) ? <span className="ml-auto"><OwnTeamNote testId={`season-tie-own-${tie.rank}`} /></span> : null}
@@ -198,7 +207,11 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
           ))}
         </ul>
       ) : null}
-      {sheet?.kind === "order" ? <OrderSheet staffel={staffel} tie={sheet.tie} override={Boolean(sheet.tie.own_team)} onClose={() => setSheet(null)} onSaved={saved} /> : null}
+      {/* Meister-Gleichstand (#2262): Art der Entscheidung Pflicht wie im Abschluss - mit den Wörtern des Servers. */}
+      {sheet?.kind === "order" ? (
+        <OrderSheet staffel={staffel} tie={sheet.tie} override={Boolean(sheet.tie.own_team)} onClose={() => setSheet(null)} onSaved={saved}
+          methods={data.methods ? methodOptions(data.methods) : DECISION_METHODS} methodRequired={Boolean(sheet.tie.method_required)} />
+      ) : null}
       {sheet?.kind === "remove" ? <RemoveSheet staffel={staffel} decision={sheet.decision} override={Boolean(sheet.decision.own_team)} onClose={() => setSheet(null)} onSaved={saved} /> : null}
     </div>
   );
