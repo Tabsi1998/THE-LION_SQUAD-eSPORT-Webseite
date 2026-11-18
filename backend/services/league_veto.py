@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from models import new_id, now_utc
@@ -39,6 +40,10 @@ from services.checkin_rules import (
 from services.league_veto_rules import (
     DECIDER, DONE, DRAW, HOME, PAUSED, PRESET, ROLE_OF, RUNNING, SKIPPED, SYSTEM_KINDS, VetoProblem, veto_of,
 )
+from services.league_final_read import is_closed
+from services.league_veto_fit import BUSY, Misfit, staffel_mismatch, staffel_name, warnings_for
+from services.log_safe import log_safe
+from services.mutation_lock import MutationLockBusy, league_season_veto_resource, mutation_lock, tournament_write_resource
 
 logger = logging.getLogger("tls.league_veto")
 
@@ -62,46 +67,121 @@ HISTORY_LIMIT = 10
 
 # ---------------------------------------------------------------- Vorlage der Season
 
-async def store_template(db, season: dict, rules: dict, *, actor_id: str | None, via: str = SIDE) -> int:
-    """Die Vorlage der Season speichern und sofort auf ihre Staffeln legen - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen
-    nach dem Entsperren mit). Protokoll ``league.season.veto_rules`` mit altem und neuem Wert; ``via: "auto"`` beim Nachziehen (Nr. 108).
-    Gibt die Zahl der geänderten Staffeln zurück."""
+STAFFEL_WAIT_SECONDS = 5.0
+
+
+@dataclass
+class Stored:
+    """Was ``store_template`` an die Staffeln gegeben hat: die Zahl der geänderten und je Staffel, die ihre bisherige Vorlage behält, der
+    Satz dazu (Nr. 200) - für die Warnungen der Antwort."""
+    staffeln: int = 0
+    notes: list[str] = field(default_factory=list)
+
+
+async def store_template(db, season: dict, rules: dict, *, actor_id: str | None, via: str = SIDE) -> Stored:
+    """Die Vorlage der Season speichern und auf ihre Staffeln legen - die **eine Stelle** für Pool, Map entfernen, Serie und „Veto
+    speichern“. Protokoll ``league.season.veto_rules`` mit altem und neuem Wert; ``via: "auto"`` beim Nachziehen (Nr. 108).
+
+    Fabian Nr. 200 (#2528): Eine Staffel bekommt die Vorlage nur, wenn sie zu **ihrem eigenen** Best of, ihrer Modusfolge und ihrem Pool
+    passt (``staffel_mismatch``, ohne Ausnahme - auch eine Liga N mit eigenem Best of) - sonst behält sie ihre bisherige. ``notes`` fasst
+    die Gründe zusammen (``warnings_for``: ein Satz je Fall, höchstens drei Namen), für alle Wege gleich. Best of und Modusfolge kommen erst
+    mit „Übertragen“ an die Staffel (nach dem ersten Ergebnis gar nicht mehr); ohne diese Prüfung liefe dort jedes weitere Veto ins Leere.
+    Gesperrte und abgeschlossene Staffeln bleiben, wie sie sind (wie beim Übertragen).
+
+    Sperren: Der Aufrufer hält die Sperre der Vorlage (``template_lock``); je Staffel kommt die Turnier-Sperre dazu - dieselbe wie beim
+    Übertragen, so überschreibt keiner den anderen mit einem älteren Stand. Reihenfolge immer Vorlage → Turnier; wer eine Turnier-Sperre
+    hält, nimmt nie die Sperre der Vorlage (alle Aufrufer rufen ``follow_season`` erst nach ihren eigenen Sperren)."""
     before = season.get("veto_rules")
     now_iso = now_utc().isoformat()
     if before != rules:
         await db.league_seasons.update_one({"id": season["id"]}, {"$set": {"veto_rules": rules, "updated_at": now_iso}})
-    staffeln = await db.tournaments.update_many(
-        {"league_context.season_id": season["id"], "locked_at": None, "veto_rules": {"$ne": rules}},
-        {"$set": {"veto_rules": rules, "updated_at": now_iso}})
+    stored = Stored()
+    misfits: list[Misfit] = []
+    rows = await db.tournaments.find({"league_context.season_id": season["id"], "locked_at": None, "veto_rules": {"$ne": rules}},
+                                     {"_id": 0, "id": 1, "league_context": 1}).to_list(None)
+    for row in sorted(rows, key=lambda item: item["id"]):
+        tournament_id = row["id"]
+        try:
+            async with mutation_lock(db, tournament_write_resource(tournament_id), wait_seconds=STAFFEL_WAIT_SECONDS):
+                tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+                if not tournament or tournament.get("locked_at") or is_closed(tournament) or tournament.get("veto_rules") == rules:
+                    continue
+                misfit = await staffel_mismatch(db, tournament, rules, season)
+                if misfit:
+                    misfits.append(misfit)
+                    continue
+                await db.tournaments.update_one({"id": tournament_id}, {"$set": {"veto_rules": rules, "updated_at": now_iso}})
+                stored.staffeln += 1
+        except MutationLockBusy:
+            misfits.append(Misfit(BUSY, await staffel_name(db, row)))
+    stored.notes = warnings_for(misfits)
     if before != rules:
         await db.audit_logs.insert_one({
             "id": new_id(), "action": "league.season.veto_rules", "target_id": season["id"], "actor_id": actor_id,
-            "data": {"from": before, "to": rules, "staffeln": staffeln.modified_count, "via": via}, "created_at": now_iso})
-    return staffeln.modified_count
+            "data": {"from": before, "to": rules, "staffeln": stored.staffeln, "kept": len(misfits), "via": via},
+            "created_at": now_iso})
+    return stored
 
 
-async def follow_pool(db, season: dict, *, actor_id: str | None) -> dict | None:
-    """Fabian Nr. 108: Solange die Vorlage unberührt ist (Merker ``veto_rules.auto``), zieht sie nach, sobald der Pool der Season sich
-    ändert - neu vorgeschlagen aus Modusfolge, Pool und Best of und gespeichert wie von Hand. Ohne Merker (einmal von Hand gespeichert),
-    ohne Pool oder ohne Vorschlag passiert nichts. Gibt die geltende Vorlage zurück."""
+TEMPLATE_WAIT_SECONDS = 10.0
+TEMPLATE_BUSY_DETAIL = "Die Veto-Vorlage wird gerade geändert – bitte gleich noch einmal speichern."
+FOLLOW_BUSY_NOTE = "Die Veto-Vorlage konnte gerade nicht nachgezogen werden – bitte Pool oder Serie gleich noch einmal speichern."
+
+
+@dataclass
+class Followed:
+    """Was ``follow_season`` getan hat: die geltende Vorlage (``None``, wenn nichts nachzuziehen war) und die Sätze für die Warnungen der
+    Antwort - Staffeln, die ihre bisherige Vorlage behalten (Nr. 200), oder dass die Sperre belegt war."""
+    rules: dict | None = None
+    notes: list[str] = field(default_factory=list)
+
+
+def template_lock(db, season_id: str):
+    """Die Sperre der Vorlage (#2528): Nachziehen und „Veto speichern“ nacheinander. Kurz anstellen statt sofort abbrechen."""
+    return mutation_lock(db, league_season_veto_resource(season_id), wait_seconds=TEMPLATE_WAIT_SECONDS)
+
+
+async def follow_season(db, season_id: str, *, actor_id: str | None) -> Followed:
+    """Fabian Nr. 108 und Nr. 199: Solange die Vorlage unberührt ist (Merker ``veto_rules.auto``), zieht sie nach, sobald sich Pool,
+    „Modus je Map“ (``game_mode_order``) oder Best of der Season ändern - neu vorgeschlagen und gespeichert wie von Hand. Die eine Stelle
+    für alle Wege: Pool speichern, „Map aus dem Pool nehmen“, Pool entfernen und das Speichern der Season rufen sie nach ihrem Schreiben
+    auf - immer erst, wenn sie ihre eigenen Sperren wieder freigegeben haben.
+
+    Unter der Sperre der Vorlage liest sie Season und Pool **frisch** - nie den Stand, den der Aufrufer vor seinem Schreiben gelesen hat.
+    So passt die Vorlage am Ende zum letzten Stand, auch wenn Pool und Modusfolge kurz nacheinander gespeichert werden, und ein
+    gleichzeitiges „Veto speichern“ (dieselbe Sperre) wird nie überschrieben. Ohne Merker, ausgeschaltet, mit einem Pool eines anderen
+    Spiels oder ohne Vorschlag passiert nichts; ohne Pool gilt der Vorschlag wie beim Anlegen (Nr. 105: nur Wahlen und Decider). Ist die
+    Sperre länger belegt, bleibt die Vorlage, wie sie ist, und ``notes`` sagt es (``FOLLOW_BUSY_NOTE``)."""
+    try:
+        async with template_lock(db, season_id):
+            season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+            return await _follow(db, season, actor_id=actor_id) if season else Followed()
+    except MutationLockBusy:
+        logger.warning("[league_veto] Vorlage der Season %s nicht nachgezogen: Sperre belegt", log_safe(season_id))
+        return Followed(notes=[FOLLOW_BUSY_NOTE])
+
+
+async def _follow(db, season: dict, *, actor_id: str | None) -> Followed:
     raw = season.get("veto_rules")
     if not rules_mod.is_auto(raw) or not raw.get("enabled"):
-        return None
+        return Followed()
     try:
         rules = rules_mod.normalize(raw)
     except VetoProblem:
-        return None
+        return Followed()
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "game_id": 1}) or {}
-    pool = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
-    if not pool:
-        return None
+    current = await map_pools.current(db, "league_season", season["id"])
+    pool = map_pools.valid_for(current, league.get("game_id"))
+    if current and not pool:
+        return Followed()
     steps = rules_mod.propose(order=season.get("game_mode_order"), pool=pool, best_of=int(season.get("best_of") or 1))
     if not steps:
-        return None
+        return Followed()
     fresh = {**rules, "steps": steps, rules_mod.AUTO: True}
-    if fresh != raw:
-        await store_template(db, season, fresh, actor_id=actor_id, via=AUTO)
-    return fresh
+    if fresh == raw:
+        return Followed(fresh)
+    stored = await store_template(db, season, fresh, actor_id=actor_id, via=AUTO)
+    return Followed(fresh, stored.notes)
 
 
 # ---------------------------------------------------------------- Vorgabe der Woche (#2326)

@@ -5,7 +5,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const apiMock = { get: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { SeasonVetoRulesPanel } = await import("./SeasonVetoRulesPanel");
 
@@ -22,12 +23,12 @@ beforeEach(() => {
   apiMock.put.mockReset();
 });
 
-test("unberührte Vorlage folgt dem Pool: der Hinweis steht, nach dem ersten Speichern nicht mehr", async () => {
+test("unberührte Vorlage folgt Pool, Modus je Map und Best of: der Hinweis steht, nach dem ersten Speichern nicht mehr (#2528)", async () => {
   const saved = { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS };
   apiMock.get.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true, auto: true } });
   apiMock.put.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true, auto: false, staffeln_updated: 0 } });
   render(<SeasonVetoRulesPanel seasonId="s1" />);
-  expect(await screen.findByTestId("veto-rules-auto")).toHaveTextContent("folgt dem Map-Pool automatisch");
+  expect(await screen.findByTestId("veto-rules-auto")).toHaveTextContent("folgt automatisch dem Map-Pool, „Modus je Map“ und dem Best of");
   fireEvent.click(screen.getByTestId("veto-rules-save"));
   await waitFor(() => expect(screen.queryByTestId("veto-rules-auto")).toBeNull());
 });
@@ -110,4 +111,42 @@ test("neuer Stand der Season: eigene, noch nicht gespeicherte Schritte bleiben s
   // Die Prüfung rechnet schon mit der neuen Modusfolge, die eigene Eingabe bleibt.
   expect(await screen.findByTestId("veto-rules-problems")).toHaveTextContent("Modus je Map");
   expect(screen.getByTestId("veto-rules-seconds")).toHaveValue(45);
+});
+
+test("nach „Vorschlag“ stehen die Sätze des Servers nur noch als gespeicherter Stand, bis gespeichert ist (#2528)", async () => {
+  const saved = { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS };
+  const proposal = [
+    { kind: "pick", mode: "hp", team: "B", position: 1 }, { kind: "pick", mode: "hp", team: "A", position: 3 },
+    { kind: "ban", mode: "snd", team: "A", position: null }, { kind: "decider", mode: "snd", team: null, position: 2 },
+  ];
+  const stale = "Mit „jede Map nur einmal je Serie“ lässt sich die Vorlage mit diesem Pool nicht zu Ende spielen – bitte Sperren oder Pool anpassen.";
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/proposal") ? { steps: proposal, problems: [] }
+    : { ...STATE, veto_rules: saved, active: true, problems: [stale] } }));
+  apiMock.put.mockResolvedValue({ data: { ...STATE, veto_rules: { ...saved, steps: proposal }, active: true, problems: [], staffeln_updated: 1 } });
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  // Ohne Änderung im Formular: der Satz gehört zum Formular wie gewohnt.
+  expect(await screen.findByTestId("veto-rules-problems")).toHaveTextContent("jede Map nur einmal je Serie");
+  expect(screen.queryByTestId("veto-rules-saved-problems")).toBeNull();
+  fireEvent.click(screen.getByTestId("veto-rules-propose"));
+  // Der Vorschlag geht auf - der alte Satz steht nur noch gekennzeichnet beim gespeicherten Stand.
+  const savedBlock = await screen.findByTestId("veto-rules-saved-problems");
+  expect(savedBlock).toHaveTextContent("Gespeicherter Stand");
+  expect(savedBlock).toHaveTextContent("jede Map nur einmal je Serie");
+  expect(screen.queryByTestId("veto-rules-problems")).toBeNull();
+  expect(screen.getByTestId("veto-rules-ok")).toBeInTheDocument();
+  expect(screen.getByTestId("veto-rules-save")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("veto-rules-save"));
+  await waitFor(() => expect(screen.queryByTestId("veto-rules-saved-problems")).toBeNull());
+  expect(screen.queryByTestId("veto-rules-problems")).toBeNull();
+});
+
+test("Veto speichern: Staffeln, zu denen die Vorlage noch nicht passt, kommen als Warnung (#2528, Nr. 200)", async () => {
+  const saved = { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS };
+  const note = "Liga 1 · Staffel A spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage.";
+  apiMock.get.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true } });
+  apiMock.put.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true, staffeln_updated: 0, warnings: [note] } });
+  toastMock.warning.mockReset();
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("veto-rules-save"));
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith(note));
 });

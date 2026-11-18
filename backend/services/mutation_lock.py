@@ -74,6 +74,13 @@ def league_season_pool_resource(season_id: str) -> str:
     return f"league_season:{season_id}:map_pool"
 
 
+def league_season_veto_resource(season_id: str) -> str:
+    """Die Veto-Vorlage einer Liga-Season (#2528): das Nachziehen der unberührten Vorlage (Pool, Modusfolge, Best of) und „Veto
+    speichern“ nacheinander. Reihenfolge immer diese Sperre → Turnier-Sperren der Staffeln (``league_veto.store_template``); wer eine
+    Turnier-Sperre oder die Pool-Sperre hält, nimmt diese nie - die Aufrufer ziehen erst nach, wenn ihre eigenen Sperren frei sind."""
+    return f"league_season:{season_id}:veto"
+
+
 def game_equipment_resource(game_id: str) -> str:
     """Die Ausrüstungs-Bibliothek eines Spiels (#2287): Kategorien und Unterkategorien speichern, Einträge anlegen, ändern, verschieben,
     übernehmen und eine Sperrliste mit ganzer Klasse speichern nacheinander - nie verweist so etwas auf eine eben entfernte Unterkategorie.

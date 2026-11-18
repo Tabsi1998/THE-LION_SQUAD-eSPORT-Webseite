@@ -108,22 +108,25 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     await expect(page.getByTestId("result-rules-kontrolle")).toHaveCount(0);
     await shot(page, "season-reiter-spielbetrieb-1440.png");
 
-    // Veto (D.3): Neue Seasons haben es an (Nr. 105). Die Vorlage entstand beim Speichern des Pools; nach der neuen Modusfolge
-    // übernimmt die Leitung im selben Reiter den Vorschlag und speichert (Nr. 108: von selbst folgt die Vorlage nur dem Pool).
+    // Veto (D.3): Neue Seasons haben es an (Nr. 105). Die Vorlage entstand beim Speichern des Pools und ist der neuen Modusfolge schon
+    // gefolgt (Nr. 199, #2528) - ohne „Vorschlag“. Danach speichert die Leitung sie einmal von Hand (ab dann bleibt sie, Nr. 108).
     const veto = page.getByTestId("season-veto-rules");
     await veto.scrollIntoViewIfNeeded();
     // Der Kasten kennt nach dem Speichern von Pool und Serie deren Stand, ohne dass die Seite neu geladen wird (#2520).
     await expect(veto.getByTestId("veto-rules-steps")).toBeVisible();
-    await expect(veto.getByTestId("veto-rules-propose")).toBeEnabled();
-    await veto.getByTestId("veto-rules-propose").click();
-    // Bis zum Speichern stehen daneben die Sätze des Servers zum gespeicherten Stand - gesperrt ist das Speichern nur durch die Prüfung
-    // des Vorschlags selbst.
+    await expect(veto.getByTestId("veto-rules-auto")).toContainText("„Modus je Map“");
     await expect(veto.getByTestId("veto-step-0-sentence")).toContainText("Suchen & Zerstören");
+    await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
+    await expect(veto.getByTestId("veto-rules-problems")).toHaveCount(0);
+    const vetoRules = async () => (await ok(page, "GET", `/api/admin/leagues/seasons/${seasonId}/veto-rules`));
+    const followed = await vetoRules();
+    expect(followed.auto).toBe(true);
+    expect(followed.problems).toEqual([]);
+    expect(followed.game_mode_order).toEqual(["suchen", "stellung", "suchen"]);
     await expect(veto.getByTestId("veto-rules-save")).toBeEnabled();
     await veto.getByTestId("veto-rules-save").click();
     await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
     await expect(veto.getByTestId("veto-rules-error")).toHaveCount(0);
-    const vetoRules = async () => (await ok(page, "GET", `/api/admin/leagues/seasons/${seasonId}/veto-rules`));
     await expect.poll(async () => (await vetoRules()).auto, { timeout: 15_000 }).toBeFalsy();
     const savedVeto = await vetoRules();
     expect(savedVeto.active).toBe(true);
@@ -160,6 +163,8 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     const scope = `/api/admin/league-rules/league_season/${seasonId}`;
     const draft = await ok(page, "PUT", `${scope}/draft`, { title: "Regelwerk Reiter", body_md: "# Fairplay\n\nFair spielen. Erfunden.\n", annexes: [] });
     await ok(page, "POST", `${scope}/publish`, { revision: draft.revision, valid_from: viennaToday(), change_reason: "Fassung für die Abnahme", requires_consent: false });
+    // Der Weg zurück kennt die Season erst, wenn die Regelwerk-Seite geladen hat - vorher führt er zur Liga-Übersicht.
+    await expect(page.getByTestId("rules-back")).toHaveAttribute("href", new RegExp(`/admin/leagues/seasons/${seasonId}#regelwerk$`));
     await page.getByTestId("rules-back").click();
     await expect(page).toHaveURL(new RegExp(`/admin/leagues/seasons/${seasonId}#regelwerk$`));
     await expect(page.getByTestId("season-rules-state")).toContainText("Gültig: Version 1");

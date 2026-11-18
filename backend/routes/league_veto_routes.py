@@ -44,6 +44,7 @@ from services import game_maps, league_procedures, league_veto, league_veto_rule
 from services.access_links import touch_access_link, validate_access_link
 from services.checkin_rules import FlowProblem, filled, moment
 from services.league_permissions import ANY, require_league, require_no_conflict
+from services.mutation_lock import MutationLockBusy
 from services.rate_limit import enforce_rate_limit, get_client_ip
 from services.tournament_permissions import has_match_result_permission
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired, shown_on_event_tv
@@ -191,22 +192,32 @@ async def propose_veto_rules(season_id: str, _me: dict = Depends(require_any_cap
 @admin_router.put("/seasons/{season_id}/veto-rules")
 async def put_veto_rules(season_id: str, body: VetoRulesBody, me: dict = Depends(require_season)):
     db = get_db()
-    season = await _season(db, season_id)
-    context = await _season_context(db, season)
+    await _season(db, season_id)
     try:
         rules = league_veto_rules.normalize(body.model_dump())
     except league_veto_rules.VetoProblem as problem:
         _raise(problem)
-    problems = _problems(rules, context)
-    if problems:
-        raise HTTPException(status_code=422, detail=f"Die Vorlage passt noch nicht: {' '.join(problems)}")
-    # Von Hand gespeichert: ohne den Merker „unberührt“ (Nr. 108) - ab jetzt bleibt die Vorlage, auch wenn der Pool sich ändert.
-    # Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen nach dem Entsperren mit).
-    staffeln = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
+    # Dieselbe Sperre wie das Nachziehen (#2528): Ein gleichzeitiges Nachziehen überschreibt die eigene Vorlage nie, und geprüft wird
+    # gegen den Stand danach - Season und Pool erst unter der Sperre gelesen.
+    try:
+        async with league_veto.template_lock(db, season_id):
+            season = await _season(db, season_id)
+            context = await _season_context(db, season)
+            problems = _problems(rules, context)
+            if problems:
+                raise HTTPException(status_code=422, detail=f"Die Vorlage passt noch nicht: {' '.join(problems)}")
+            # Von Hand gespeichert: ohne den Merker „unberührt“ (Nr. 108) - ab jetzt bleibt die Vorlage, auch wenn sich Pool, Modusfolge
+            # oder Best of ändern (Nr. 199). Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen
+            # nach dem Entsperren mit).
+            stored = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=league_veto.TEMPLATE_BUSY_DETAIL) from None
     # Vorgabe der Woche (#2326): Mit der neuen Vorlage (etwa ohne den Schritt „Vorgabe“) kann ein wartendes Veto jetzt starten - beide
     # Seiten erfahren es. Es beginnt dadurch nicht.
     ready = await league_veto_sweep.announce_waiting(db, season_id)
-    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln, matches_ready=ready)
+    # Nr. 200: Staffeln, zu denen die Vorlage (noch) nicht passt, behalten ihre bisherige - die Warnungen nennen sie.
+    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=stored.staffeln, matches_ready=ready,
+                   warnings=stored.notes)
 
 
 # ---------------------------------------------------------------- Vorgabe der Woche (#2326)
