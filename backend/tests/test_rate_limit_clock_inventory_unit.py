@@ -18,7 +18,8 @@ HELPER = "still_rate_limit_clock"
 # Die 429 kommt hier nicht aus enforce_rate_limit - eine stehende Uhr der Drosselung änderte nichts.
 NOT_THE_BRAKE = {
     "test_discord_widget_flow.py": "die Discord-API (Fake) antwortet 429",
-    "test_easter_hunt_flow.py": "Mindestabstand zwischen zwei Funden über gespeicherte Zeitstempel (easter_hunt.MIN_GAP_SECONDS)",
+    "test_easter_hunt_flow.py::test_fund_einmal_nicht_zu_schnell_nur_mit_eigenem_frischem_schluessel":
+        "Mindestabstand zwischen zwei Funden über gespeicherte Zeitstempel (easter_hunt.MIN_GAP_SECONDS)",
     "test_event_lead_flow.py": "Sperre über die Zeit der letzten Nachricht (event_lead.send_message), kein Zählfenster",
     "test_fetch_ocr_model_unit.py": "HTTP 429 beim Laden des Modells, ein Fehler der Gegenseite",
     "test_helper_calls_flow.py": "ein Aufruf je Veranstaltung und Tag (helper_calls.send_call, called_today)",
@@ -26,7 +27,8 @@ NOT_THE_BRAKE = {
     "test_printful_client_unit.py": "die Printful-API (Fake) antwortet 429",
     "test_result_image_routes_flow.py::test_one_image_per_account_and_decoding_only_with_a_free_place":
         "ein Bild je Konto zugleich (BUSY_ACCOUNT), keine Zählung",
-    "test_shop_motif_pair_flow.py": "eine Paar-Verarbeitung je Prozess (shop_motifs.pair_semaphore)",
+    "test_shop_motif_pair_flow.py::test_one_upload_per_motif_and_one_pair_job_per_process":
+        "eine Paar-Verarbeitung je Prozess (shop_motifs.pair_semaphore)",
     "test_team_day_flow.py": "Anstupsen über die gespeicherte Zeit des letzten Anstupsens (team_day_routes)",
 }
 

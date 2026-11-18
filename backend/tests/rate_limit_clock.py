@@ -7,8 +7,8 @@ Lösung (riesiges Fenster, eingefrorene Uhr an einem festen Tag); dieser Helfer 
 
 - Die Uhr steht nur für ``services.rate_limit`` still. Alle anderen Module sehen die echte (oder in der Zeitreise-Probe
   die verstellte) Uhr.
-- Sie steht beim echten Jetzt, auf Sekunde 30 der laufenden Minute: mitten im laufenden Minutenfenster und damit in
-  jedem Fenster aus ganzen Minuten. ``Retry-After`` bleibt positiv, und die Ablaufzeit der Zähler liegt in der Zukunft
+- Sie steht beim echten Jetzt, auf Sekunde 30 der laufenden Minute, also innerhalb desselben Fensters wie das echte
+  Jetzt (alle Fenster sind ganze Minuten). Weil sie steht, wechselt das Fenster im Test nie. ``Retry-After`` bleibt positiv, und die Ablaufzeit der Zähler liegt in der Zukunft
   - echtes MongoDB räumt sie über den TTL-Index sonst mitten im Test ab (#2216).
 - Fenster und Zahl der erlaubten Aufrufe bleiben die echte Vorgabe; auch fest verdrahtete Fenster wirken so.
 - ``monkeypatch`` stellt die Uhr nach dem Test zurück.
