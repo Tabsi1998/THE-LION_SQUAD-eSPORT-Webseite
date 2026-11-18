@@ -176,14 +176,14 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
     const needs = (staffel, now, season = OPEN) => staffelNeeds({ ...STAFFEL, ...staffel }, { season, now: new Date(now) });
     expect(needs({}, "2026-11-02T10:00:00Z")).toEqual([{ code: "assign", text: "Teams zuteilen · 1 von 8", to: "/admin/leagues/seasons/s1#anmeldungen" }]);
     const noWindow = { ...OPEN, application_opens_at: null, application_closes_at: null };
-    expect(needs({ participant_count: 0 }, "2026-11-02T10:00:00Z", noWindow)[0]).toMatchObject({ code: "assign", to: "/admin/tournaments/t1?tab=participants" });
+    expect(needs({ participant_count: 0 }, "2026-11-02T10:00:00Z", noWindow)[0]).toMatchObject({ code: "assign", to: "/admin/leagues/staffeln/t1#zuteilen" });
     // Während der Anmeldung kommen noch Teams - danach fehlt der Start.
     expect(needs({ participant_count: 4 }, "2026-11-02T10:00:00Z")).toEqual([]);
-    expect(needs({ participant_count: 4 }, "2026-11-08T10:00:00Z")).toEqual([{ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: "/admin/tournaments/t1" }]);
+    expect(needs({ participant_count: 4 }, "2026-11-08T10:00:00Z")).toEqual([{ code: "start", text: "Spielplan noch nicht erzeugt – Liga starten", to: "/admin/leagues/staffeln/t1" }]);
     // Gestartet ohne feste Spiele - nur, wenn der Server es sagt.
     const active = { ...OPEN, status: "active" };
     expect(needs({ status: "live", participant_count: 4, league_plan: { fixed_matches: 0 } }, "2026-11-12T10:00:00Z", active)[0])
-      .toMatchObject({ code: "plan", to: "/admin/tournaments/t1?tab=matchplan" });
+      .toMatchObject({ code: "plan", to: "/admin/leagues/staffeln/t1#spielplan" });
     expect(needs({ status: "live", participant_count: 4, league_plan: { fixed_matches: 6 } }, "2026-11-12T10:00:00Z", active)).toEqual([]);
     expect(needs({ status: "live", participant_count: 4 }, "2026-11-12T10:00:00Z", active)).toEqual([]);
     expect(needs({ status: "cancelled", participant_count: 0 }, "2026-11-12T10:00:00Z")).toEqual([]);

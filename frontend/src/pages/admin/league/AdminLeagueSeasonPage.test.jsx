@@ -389,7 +389,9 @@ test("Ligen und Staffeln: Staffel mit Weg zur Turnierverwaltung, Vorgaben übert
   apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"],
     skipped: [{ group: "before_start", label: "Termine und Kalender", reason: "Die Staffel hat schon begonnen." }] }] } });
   renderPage("#ligen");
-  expect(await screen.findByTestId("staffel-manage-1-A")).toHaveAttribute("href", "/admin/tournaments/t1");
+  // Paket D (#2262): Die Zeile führt nur noch auf die Staffel-Seite - der Weg in die Turnierverwaltung ist weg.
+  expect(await screen.findByTestId("staffel-open-1-A")).toHaveAttribute("href", "/admin/leagues/staffeln/t1");
+  expect(screen.queryByTestId("staffel-manage-1-A")).toBeNull();
   // Staffel-Seite (#2262) zusätzlich - der Weg in die Turnierverwaltung bleibt bis Paket D.
   expect(screen.getByTestId("staffel-open-1-A")).toHaveAttribute("href", "/admin/leagues/staffeln/t1");
   expect(screen.getByTestId("staffel-1-A")).toHaveTextContent("3 von 8 Teams");
@@ -654,7 +656,7 @@ test("Zuständigkeit „Kader prüfen“: kein Formular, Liga N und Staffeln nur
   for (const id of ["division-edit-1", "division-delete-1", "staffel-add-1", "staffel-delete-1-A", "season-delete"]) {
     expect(screen.queryByTestId(id), id).toBeNull();
   }
-  expect(screen.getByTestId("staffel-manage-1-A")).toBeInTheDocument();
+  expect(screen.getByTestId("staffel-open-1-A")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("season-tab-anmeldung"));
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/roster"));
   expect(screen.queryByTestId("season-form-anmeldung")).toBeNull();
