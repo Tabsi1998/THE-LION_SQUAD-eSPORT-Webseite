@@ -977,7 +977,7 @@ async def _check_game_id_formats(db, user_id: str, game_ids: dict | None) -> Non
 # Privatsphäre gekümmert („Datenbewusst“).
 PRIVACY_SETTING_FIELDS = frozenset({
     "privacy_public_profile", "privacy_achievements_public", "privacy_season_finds_public",
-    "privacy_friends_see_registrations", "profile_visibility", "dm_privacy",
+    "privacy_friends_see_registrations", "privacy_members_see_internal", "profile_visibility", "dm_privacy",
 })
 
 

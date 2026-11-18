@@ -186,6 +186,9 @@ class UserUpdate(BaseModel):
     privacy_season_finds_public: Optional[bool] = None
     # Freunde beim Event (#1188): „Freunde sehen, wo ich angemeldet bin“ - Standard an, unter 14 Jahren aus.
     privacy_friends_see_registrations: Optional[bool] = None
+    # Vereinsinterne Erfolge (#2516): „Vereinsinterne Erfolge zeigen“ - Standard an; aus heißt: andere Mitglieder sehen
+    # bei dieser Person nur Öffentliches. Gäste sehen Internes nie (services/profile_visibility.py).
+    privacy_members_see_internal: Optional[bool] = None
     profile_visibility: Optional[Dict[str, VisibilityLevel]] = None  # field_name -> level
     dm_privacy: Optional[DirectMessagePrivacy] = None
     newsletter_consent: Optional[bool] = None
