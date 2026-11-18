@@ -269,7 +269,10 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           <button type="button" onClick={save} disabled={busy} className="tls-btn tls-btn--primary flex-1 min-h-[48px] px-4 py-3 rounded-sm text-sm uppercase tracking-wider font-bold disabled:opacity-50" data-testid="result-save">
             {busy ? "Speichert …" : correcting ? "Korrektur speichern" : "Ergebnis speichern"}
           </button>
-          <p className="w-full text-xs text-white/45">Danach 10 Sekunden „Rückgängig“ – erst dann rückt der Baum weiter und die Spieler bekommen Bescheid.</p>
+          {/* Liga-Wörter (Paket D, #2262): Ein Liga-Spiel hat keinen Baum - es zählt in der Tabelle, Bescheid bekommen die Teams. */}
+          <p className="w-full text-xs text-white/45" data-testid="result-undo-note">{league
+            ? "Danach 10 Sekunden „Rückgängig“ – erst dann zählt das Ergebnis in der Tabelle und die Teams bekommen Bescheid."
+            : "Danach 10 Sekunden „Rückgängig“ – erst dann rückt der Baum weiter und die Spieler bekommen Bescheid."}</p>
         </div>
       </div>
     </div>

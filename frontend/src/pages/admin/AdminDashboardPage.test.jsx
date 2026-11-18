@@ -166,3 +166,24 @@ test("die Kachel „Teams“ führt zur Teamverwaltung", async () => {
   expect(tile.closest("a")).toHaveAttribute("href", "/admin/teams");
   expect(screen.getByTestId("kpi-Spieler").closest("a")).toBeNull();
 });
+
+// Paket D (#2262): Streitfälle der Liga stehen getrennt und führen in den Leitstand ihrer Season - nicht in die Turnierliste.
+test("Liga-Streitfälle: eigene Aufgabe mit Weg in den Leitstand der Season, bei mehreren Seasons auf die Liga", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/dashboard" ? { ...DASHBOARD, league_disputes: { count: 2, season_id: "s1" } } : {} }));
+  authState.user = { id: "s", role: "superadmin", ...mfa };
+  const { unmount } = render(<MemoryRouter><AdminDashboardPage /></MemoryRouter>);
+  const task = await screen.findByTestId("dashboard-task-league-disputes");
+  expect(task).toHaveAttribute("href", "/admin/leagues/seasons/s1#leitstand");
+  expect(task).toHaveTextContent("2 offene Streitfälle");
+  expect(screen.getByTestId("dashboard-task-Ergebnis-Konflikte")).toHaveAttribute("href", "/admin/tournaments?status=live");
+  unmount();
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/dashboard" ? { ...DASHBOARD, league_disputes: { count: 3, season_id: null } } : {} }));
+  render(<MemoryRouter><AdminDashboardPage /></MemoryRouter>);
+  expect(await screen.findByTestId("dashboard-task-league-disputes")).toHaveAttribute("href", "/admin/leagues");
+});
+
+test("ohne Bereich Ligen keine Liga-Streitfälle", async () => {
+  await renderAs({ id: "l", role: "tournament_admin", ...mfa });
+  await screen.findByTestId("dashboard-tasks");
+  expect(screen.queryByTestId("dashboard-task-league-disputes")).toBeNull();
+});

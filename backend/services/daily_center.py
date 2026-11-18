@@ -10,7 +10,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from services import event_days
+from services.competition_read import count_matches_by_tournament
 from services.dolibarr_policy import CLUB_TZ
+from services.league_scope import league_tournament_ids
 
 SOON_HOURS = 24
 SPONSOR_WARNING_DAYS = 30
@@ -34,16 +36,44 @@ def _parse(value) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+async def _split_by_league(db, query: dict) -> tuple[int, dict]:
+    """Spiele ohne und mit Staffel (Paket D, #2262): die Zahl der Turnierspiele und ``{staffel_id: Zahl}`` für die Liga."""
+    counts = await count_matches_by_tournament(db, query)
+    staffeln = await league_tournament_ids(db, counts)
+    return (sum(count for tid, count in counts.items() if tid not in staffeln),
+            {tid: count for tid, count in counts.items() if tid in staffeln})
+
+
+async def count_without_staffeln(db, query: dict) -> int:
+    """Wie viele Spiele dieser Abfrage zu Turnieren gehören - Staffeln nicht. Die Kacheln der Turniere führen in die Turnierliste,
+    und die zeigt keine Staffeln mehr (Nr. 192)."""
+    count, _league = await _split_by_league(db, query)
+    return count
+
+
+async def dispute_counts(db) -> tuple[int, dict]:
+    """Streitfälle getrennt (Paket D, #2262): die der Turniere als Zahl, die der Liga als ``{"count", "season_id"}``. ``season_id``
+    steht nur, wenn alle in einer Season liegen - dann führt die Startseite in deren Leitstand, sonst auf die Liga."""
+    tournaments, league = await _split_by_league(db, {"status": "disputed"})
+    seasons = {
+        (row.get("league_context") or {}).get("season_id")
+        for row in await db.tournaments.find({"id": {"$in": sorted(league)}}, {"_id": 0, "league_context.season_id": 1}).to_list(None)
+    } if league else set()
+    seasons.discard(None)
+    return tournaments, {"count": sum(league.values()), "season_id": next(iter(seasons)) if len(seasons) == 1 else None}
+
+
 async def task_counts(db, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     soon = (now + timedelta(hours=SOON_HOURS)).isoformat()
     return {
-        # Gemeldet, noch nicht bestätigt - nur Konflikte standen bisher in der Zentrale.
-        "reported_results": await db.matches_v2.count_documents({"status": "waiting_result"}),
+        # Gemeldet, noch nicht bestätigt - nur Konflikte standen bisher in der Zentrale. Ohne Staffeln (Paket D, #2262): die Kachel
+        # führt in die Turnierliste, die Liga hat ihren Leitstand.
+        "reported_results": await count_without_staffeln(db, {"status": "waiting_result"}),
         "moderation_reports": await db.user_reports.count_documents({"status": "open"}),
         "contact_messages": await db.contact_messages.count_documents({"status": "new"}),
         # Vorschläge ohne Antwort, deren Frist in den nächsten 24 Stunden abläuft (oder schon abgelaufen ist).
-        "schedule_deadlines": await db.matches_v2.count_documents({"schedule_status": "proposed", "schedule_deadline_at": {"$lte": soon}}),
+        "schedule_deadlines": await count_without_staffeln(db, {"schedule_status": "proposed", "schedule_deadline_at": {"$lte": soon}}),
         # Prüffälle der Abrechnung (#321): Storno mit Beleg, Überzahlung, Abweichung - wartet auf Finanzen.
         "billing_cases": await db.billing_cases.count_documents({"status": "open"}),
         # Sponsoring läuft in den nächsten 30 Tagen aus (#405) - rechtzeitig verlängern oder verabschieden.

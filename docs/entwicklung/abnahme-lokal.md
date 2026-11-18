@@ -68,8 +68,8 @@ Spiel „Call of Duty“ (falls es fehlt) mit drei Modi und fünf erfundenen Tes
 „CoD-Liga“, Season 1 (Start an einem Dienstag mindestens acht Tage voraus, 10 Wochen, „Weihnachtspause“ in den
 Wochen 7 und 8, nur Hinrunde, Best of 3, Teamgröße 4, Modus je Map, Map-Pool, Regeltext-Platzhalter, Sichtbarkeit
 „Nur Turnierleitung“), Liga 1, Staffel A (Entwurf) und acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im
-Kader, Captain und Vertreter), zugeteilt. Den Spielplan erzeugt erst **Liga starten** in der Turnierverwaltung der
-Staffel – so lässt sich die [Checkliste vor dem Season-Start](../handbuch/liga.md#6-checkliste-vor-dem-season-start) am
+Kader, Captain und Vertreter), zugeteilt. Den Spielplan erzeugt erst **Liga starten** auf der Staffel-Seite
+(`/admin/leagues/staffeln/<id>`) – so lässt sich die [Checkliste vor dem Season-Start](../handbuch/liga.md#6-checkliste-vor-dem-season-start) am
 Stand durchspielen. Die Tage rechnet der Seed vom heutigen Tag aus, der Stand läuft also nicht aus (#2200).
 
 Mit `--schaufenster` kommt die öffentliche Season-Seite mit allem dazu (#2268): „Alpenliga“, Season 1 mit Modus-Symbolen und

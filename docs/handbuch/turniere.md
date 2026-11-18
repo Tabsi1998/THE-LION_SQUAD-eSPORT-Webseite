@@ -6,7 +6,12 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 **Wo im Admin:**
 
 - **Admin → eSports → Turniere** (`/admin/tournaments`) – Liste aller Turniere mit Suche, Status-Filter und CSV-Export; am Handy
-  eine Karte je Turnier mit Status, Teilnehmern, Regeln und Knöpfen (Liga-Zuständige sehen hier nur ihre Staffeln, siehe Handbuch Liga)
+  eine Karte je Turnier mit Status, Teilnehmern, Regeln und Knöpfen. **Liga-Staffeln stehen hier nicht** – sie haben ihre
+  Staffel-Seite unter **Liga** (Handbuch Liga, 2.5). Ein Turnier im Format „Jeder gegen jeden – Hin- und Rückrunde“ ist ein
+  gewöhnliches Turnier und steht hier. Wer nur die Liga leitet, sieht den Menüpunkt **Turniere** nicht und landet bei **Liga**.
+
+  <img src="../assets/turniere/turnierliste-ohne-staffeln-390.png" alt="Turnierliste am Handy: Karten je Turnier mit Status, Teilnehmern und Regeln, ohne Staffeln und ohne Filter Art" width="300">
+  <img src="../assets/turniere/turnierliste-ohne-staffeln-1440.png" alt="Turnierliste am PC: Tabelle mit drei Turnieren, Suche, Status-Filter, Zähler 3 / 3 sichtbar und CSV, ohne Liga-Staffeln" width="720">
 - **Admin → eSports → Turniere → Neues Turnier** (`/admin/tournaments/new`) – anlegen
 - **Admin → eSports → Turniere → Turnier öffnen** (`/admin/tournaments/<Turnier>`) – Reiter **Teilnehmer**,
   **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Maps** (nur mit Spiel, siehe 3.14), **Team**, **Rückmeldungen** (erst nach
@@ -843,6 +848,21 @@ ein Endstand). **Drucken** öffnet die Tabelle in der Druckansicht ([3.13](#313-
 
 Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter **Admin → eSports → Jahreswertung**.
 
+**Vereinsinterne Turniere im Profil** (#2516): Mit dem Ergebnis steht das Turnier in den **Referenzen** und als
+**Trophäe** im Profil der Teilnehmer, bei Team-Turnieren auch auf der Teamseite. Ist das Turnier nicht öffentlich
+(Sichtbarkeit Community, Vereinsmitglieder oder Intern bzw. ohne „Auf Public-Seiten sichtbar“), trägt der Eintrag das
+Etikett **Vereinsintern**. Wer was sieht, gilt in Web und App gleich:
+
+| Wer schaut | Sieht vereinsinterne Einträge |
+| --- | --- |
+| die Person selbst | immer, alle |
+| angemeldetes Vereinsmitglied (auch Vereinsverwaltung) | ja, solange die Person **Vereinsinterne Erfolge zeigen** anlässt – nur Turniere, die das Mitglied selbst öffnen dürfte (nicht „Intern“, nicht ohne „Auf Public-Seiten sichtbar“) |
+| angemeldet ohne Mitgliedschaft, Gast | nie, auch nicht mit dem Schalter |
+| Teamseite | das Team selbst alles, Vereinsmitglieder dazu die internen Team-Trophäen, alle anderen nur öffentliche |
+
+Den Schalter stellt jede Person selbst unter **Profil → Einstellungen → Privatsphäre** (ab Werk an). „So sehen dich
+andere“ im eigenen Profil zeigt die Sicht eines Gasts. Die Jahreswertung und die Ranglisten ändert das nicht.
+
 ### 3.11 Turniertag mit wenig Helfern
 
 - **Vor Ort** als Spielweise wählen: Ihr tragt Ergebnisse und Termine selbst ein, niemand muss Spieler hinterherrufen.
@@ -1093,7 +1113,7 @@ gewohnt. Den Rahmen legst du unter **Admin → eSports → Liga** an (nur Turnie
 5. **Staffel anlegen:** legt das Turnier als Entwurf mit allen Vorgaben an – ohne offene Anmeldung, ohne Discord, ohne
    Jahreswertung. Passt die Staffelgröße nicht in die Spielwochen (Season 1: acht Teams mit nur Hinrunde in acht
    Spielwochen), lehnt der Server ab und nennt die größte passende Staffel – die übrigen Teams kommen in eine zweite
-   Staffel. Über **Turnierverwaltung · Co-Teams zuteilen** geht es weiter in das Turnier.
+   Staffel. Über **Staffel öffnen** geht es weiter auf die Staffel-Seite (Handbuch Liga, 2.5).
 
 **Sichtbarkeit:** *Aus* (Vorgabe) zeigt nichts, *Nur Turnierleitung* nur euch, *Nur Mitglieder* und *Öffentlich* geben
 Liga und Staffel-Turniere frei – die Sichtbarkeit gilt schon beim Speichern für alle Staffeln. Ändert ihr später etwas

@@ -87,6 +87,14 @@ export function staffelAdminUrl(tournamentId, anchor = "") {
   return key && key !== FIRST ? `${base}#${key}` : base;
 }
 
+/** Sprungmarke einer Liga auf der Liga-Übersicht (`/admin/leagues#liga-<id>`) - für die Brotkrumen der Staffel-Seite (Paket D). */
+export const leagueAnchorId = (leagueId) => `liga-${leagueId || ""}`;
+
+/** Weg zu einer Liga in der Verwaltung: die Liga-Übersicht an der Stelle dieser Liga; ohne Kennung die Übersicht. */
+export function leagueAdminUrl(leagueId) {
+  return leagueId ? `/admin/leagues#${encodeURIComponent(leagueAnchorId(leagueId))}` : "/admin/leagues";
+}
+
 /** Die Marke auf der Staffel-Seite für einen alten Reiter der Turnierverwaltung (`?tab=matchplan` → `spielplan`). */
 export function legacyTabAnchor(tab) {
   return LEGACY_TAB_ANCHORS[clean(tab)] || FIRST;
@@ -94,12 +102,13 @@ export function legacyTabAnchor(tab) {
 
 /**
  * Wohin ein Ziel zur Bedienung einer Staffel führt: an seinen Reiter bzw. Abschnitt auf der Staffel-Seite. ``legacyTab``: der alte
- * Reiter der Turnierverwaltung (leer = Überblick), ``anchor``: auf Wunsch ein genauerer Abschnitt. Seit Paket C steht jedes Ziel auf
- * der Staffel-Seite - in die Turnierverwaltung führt nur noch, was es dort nicht gibt (nichts mehr, Rückfall für alte Reiter).
+ * Reiter der Turnierverwaltung (leer = Überblick), ``anchor``: auf Wunsch ein genauerer Abschnitt. Seit Paket D (#2262) führt nichts
+ * mehr in die Turnierverwaltung - eine unbekannte Marke öffnet den Überblick.
  */
 export function staffelManageUrl(tournamentId, legacyTab = "", anchor = "") {
   const target = anchor || (legacyTab ? legacyTabAnchor(legacyTab) : FIRST);
-  if (STAFFEL_TABS_READY.has(staffelTabOf(target))) return staffelAdminUrl(tournamentId, target);
-  const old = `/admin/tournaments/${encodeURIComponent(tournamentId || "")}`;
-  return legacyTab ? `${old}?tab=${encodeURIComponent(legacyTab)}` : old;
+  return staffelAdminUrl(tournamentId, staffelTabOf(target) ? target : FIRST);
 }
+
+/** Für „Was fehlt“ (`staffelNeeds`): Zuteilen führt zum Abschnitt „Co-Team zuteilen“, alles andere an seinen Reiter. */
+export const staffelNeedsUrl = (tournamentId) => (tab) => staffelManageUrl(tournamentId, tab, tab === "participants" ? "zuteilen" : "");

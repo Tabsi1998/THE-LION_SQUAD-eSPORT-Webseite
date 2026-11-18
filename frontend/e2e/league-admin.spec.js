@@ -79,7 +79,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.getByTestId("blocked-label-0")).toHaveValue("Weihnachtspause");
     await noSideScroll(page);
     await page.getByTestId("season-tab-ligen").click();
-    await expect(page.getByTestId("staffel-manage-1-B")).toHaveAttribute("href", "/admin/tournaments/t2");
+    // Paket D (#2262): Die Staffel öffnet ihre Staffel-Seite - ein Weg in die Turnierverwaltung steht nicht mehr da.
+    await expect(page.getByTestId("staffel-open-1-B")).toHaveAttribute("href", "/admin/leagues/staffeln/t2");
+    await expect(page.getByTestId("staffel-manage-1-B")).toHaveCount(0);
     await noSideScroll(page);
   });
 }

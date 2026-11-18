@@ -494,14 +494,16 @@ function BracketTv() {
     ? sponsorFor(sponsors, lowMoment.moment.sponsorIndex || 0)
     : onlyLow && active === "sponsor" && plan.moment ? sponsorFor(sponsors, playing.turn) : null;
   // Ein Bildschirm nur für Sponsor und Zahlen, aber gerade nichts davon: ein ruhiger Satz statt einer leeren Fläche.
+  // Liga-Wörter bei einer Staffel (Paket D, #2262): „Staffel entschieden“, „Zahlen zur Staffel“ - der Server sagt, was es ist.
+  const kindWords = data?.staffel ? { decided: "Staffel entschieden", stats: "Zahlen zur Staffel" } : { decided: "Turnier entschieden", stats: "Zahlen zum Turnier" };
   const lowEmpty = !onlyLow || lowMoment ? null
     : active === "sponsor" && !sponsorShown ? (settings.sponsor_moment ? "Gerade kein Sponsor für den TV" : "Sponsoren am TV sind ausgeschaltet")
-      : active === "stats" && !tiles.length ? (settings.stats ? "Noch keine Zahlen zum Turnier" : "Zahlen zum Turnier sind ausgeschaltet") : null;
+      : active === "stats" && !tiles.length ? (settings.stats ? `Noch keine ${kindWords.stats}` : `${kindWords.stats} sind ausgeschaltet`) : null;
   const subtitle = !t ? null
     : screen === "pause" ? (t.paused_until ? `Pause bis ${viennaTime(t.paused_until, { hour: "2-digit", minute: "2-digit" })}` : "Kurze Pause")
       : screen === "checkin" ? "Check-in"
         : screen === "registration" ? "Anmeldung offen"
-          : hasMatches || hasTable ? (parked ? "Turnier entschieden" : { tree: words.tree, [TABLE_SLIDE]: tableSections.length > 1 ? "Tabellen" : "Tabelle", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: "Zahlen zum Turnier" }[active] || words.tree) : null;
+          : hasMatches || hasTable ? (parked ? kindWords.decided : { tree: words.tree, [TABLE_SLIDE]: tableSections.length > 1 ? "Tabellen" : "Tabelle", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: kindWords.stats }[active] || words.tree) : null;
 
   return (
     <div className="tv-page" data-testid="bracket-tv" data-screen={screen} data-slide={screen === "playlist" ? active : undefined}>

@@ -88,6 +88,31 @@ test("Liga beendet: der Sieger kommt aus Platz 1 der Tabelle und steht in der Ko
   expect(screen.getByTestId("tv-standings-slide")).toHaveTextContent("Name");
 });
 
+test("Staffel beendet: Liga-Wörter statt „Turnier entschieden“ (#2262, Paket D)", async () => {
+  serve({
+    tournament: { id: "t1", slug: "liga", title: "Liga 1 · Staffel A", status: "completed", format: "league", team_mode: "team" },
+    staffel: true, registrations: REGS, stages: [], matches_v2: [], standings: STANDINGS,
+  });
+  renderTv("/display/bracket/t1?key=tv&playlist=tree-3");
+  const tv = await screen.findByTestId("bracket-tv");
+  await waitFor(() => expect(tv).toHaveAttribute("data-slide", "table"));
+  expect(tv).toHaveTextContent("Staffel entschieden");
+  expect(tv).not.toHaveTextContent("Turnier entschieden");
+});
+
+test("Staffel: Folie Zahlen heißt „Zahlen zur Staffel“ (#2262, Paket D)", async () => {
+  serve({
+    tournament: { id: "t1", slug: "liga", title: "Liga 1 · Staffel A", status: "live", format: "league", team_mode: "team" },
+    staffel: true, registrations: REGS, stages: [{ id: "s1", name: "Liga", number: 1, stage_type: "league" }],
+    matches_v2: [match("a", "r1", "r2")], standings: STANDINGS,
+  });
+  renderTv("/display/bracket/t1?key=tv&playlist=stats-3");
+  const tv = await screen.findByTestId("bracket-tv");
+  await waitFor(() => expect(tv).toHaveAttribute("data-slide", "stats"));
+  expect(tv).toHaveTextContent("zur Staffel");
+  expect(tv).not.toHaveTextContent("zum Turnier");
+});
+
 test("Gruppen: je Gruppe eine Tabelle mit Namen, ohne Gold", async () => {
   serve({
     tournament: { id: "t1", slug: "gruppen", title: "Gruppencup", status: "completed", format: "groups" },

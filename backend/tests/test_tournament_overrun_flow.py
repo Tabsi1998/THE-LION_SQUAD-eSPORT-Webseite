@@ -67,6 +67,20 @@ async def test_open_matches_keep_it_running_and_the_lead_sees_it(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_staffel_past_its_end_leads_the_league_to_the_staffel_page(flow):
+    # Paket D (#2262): Wer die Liga verwaltet, kommt auf die Staffel-Seite - die Turnierverwaltung zeigt keine Staffeln mehr.
+    staffel = await cup(flow)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {
+        "format": "league", "league_context": {"league_id": "l-1", "season_id": "s-1", "division_id": "d-1", "staffel": "A"}}})
+    await tournament_overrun.refresh(flow.db)
+    league_admin = await flow.add_user(name="Ligaleitung")
+    league_admin["areas"] = ["leagues"]
+    await flow.db.users.update_one({"id": league_admin["id"]}, {"$set": {"areas": ["leagues"]}})
+    flow.act_as(league_admin)
+    rows = (await flow.get("/api/users/me/duty")).json()["ended_live"]
+    assert [row["admin_url"] for row in rows if row["id"] == staffel["id"]] == [f"/admin/leagues/staffeln/{staffel['id']}"]
+
+@pytest.mark.asyncio
 async def test_all_done_shows_completed_but_never_switches_the_status(flow):
     tournament = await cup(flow)
     await tournament_overrun.refresh(flow.db)

@@ -28,9 +28,9 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { id: "s2", name: "Season 2" } });
 });
 
-function renderPage() {
+function renderPage(entry = "/admin/leagues") {
   return render(
-    <MemoryRouter initialEntries={["/admin/leagues"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/admin/leagues" element={<AdminLeaguesPage />} />
         <Route path="/admin/leagues/seasons/:seasonId" element={<p data-testid="season-page">Season-Seite</p>} />
@@ -190,4 +190,12 @@ test("„Liga verwalten“ ohne Bereich (#2203): bearbeiten und Zuständige lese
   expect(screen.getByTestId("league-edit-probe-shooter")).toBeInTheDocument();
   expect(screen.queryByTestId("league-delete-probe-shooter")).toBeNull();
   expect(screen.queryByTestId("league-staff-add")).toBeNull();
+});
+
+// Brotkrumen der Staffel-Seite (Paket D, #2262): `#liga-<id>` springt an die Liga und setzt den Fokus dorthin.
+test("die Sprungmarke einer Liga setzt den Fokus auf ihren Abschnitt", async () => {
+  renderPage("/admin/leagues#liga-l1");
+  const section = await screen.findByTestId("league-probe-shooter");
+  expect(section).toHaveAttribute("id", "liga-l1");
+  await waitFor(() => expect(document.activeElement).toBe(section));
 });

@@ -1,1 +1,7 @@
-{}
+{
+  "GHSA-FC5Q-39XC-VJPF": {
+    "module": "picomatch",
+    "reason": "Kein Fix verfügbar (alle Versionen bis 4.0.7 betroffen, Stand 18.11.2026). picomatch steckt nur in Werkzeugen für Bau und Test (jest, expo-cli, metro-config, tinyglobby über react-native), nicht im App-Bündel; die Muster kommen aus der eigenen Konfiguration, nicht von Nutzern. Kurz befristet, damit wir nach einem Fix sofort aktualisieren.",
+    "expires": "2027-01-31"
+  }
+}

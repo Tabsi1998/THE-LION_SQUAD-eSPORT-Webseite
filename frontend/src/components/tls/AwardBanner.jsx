@@ -3,6 +3,7 @@ import { Medal, Trophy, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { awardDay } from "@/lib/trophies";
 import { RewardArt } from "@/components/tls/rewards/RewardArt";
+import { InternalTag } from "@/components/tls/InternalTag";
 
 export { awardDay };
 
@@ -66,6 +67,7 @@ export function AwardBanner({ award, size = "md", action = null, linkTo = null }
             {reward ? <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 rounded-sm ${tone.border} ${tone.text}`}>{reward.kind_label}</span>
               : tone.label && <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 rounded-sm ${tone.border} ${tone.text}`}>{tone.label}</span>}
             {award.team?.name && <span className="text-[10px] font-bold uppercase tracking-widest text-white/60 inline-flex items-center gap-1"><Users className="w-3 h-3" /> {award.team.name}</span>}
+            {award.internal ? <InternalTag testId={`internal-tag-award-${award.id}`} /> : null}
           </div>
           <div className={`font-heading font-black uppercase break-words ${hero ? "text-2xl md:text-3xl" : "text-base"}`}>{reward ? reward.name : award.tournament?.title || "Turnier"}</div>
           <div className="text-xs text-white/60 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">

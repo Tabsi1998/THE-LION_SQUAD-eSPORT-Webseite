@@ -125,6 +125,20 @@ async def test_configured_services_appear_with_googles_limited_use_notice_and_th
     assert "<dt>ZVR-Zahl</dt><dd>123456789</dd>" in imprint_html and "Teststraße 1<br />6410 Testdorf" in imprint_html
 
 
+@pytest.mark.asyncio
+async def test_privacy_names_who_sees_club_internal_results(flow):
+    """#2516: der von Fabian freigegebene Satz steht wörtlich im Abschnitt „Öffentliche Profile“ - direkt nach dem Satz zur
+    Sichtbarkeit des Profils."""
+    await flow.db.settings.replace_one({"id": "branding"}, BRANDING, upsert=True)
+    privacy = (await flow.get("/api/settings/public/legal/privacy")).json()
+    text = blocks(privacy, "public-profiles")[0]["text"]
+    approved = ("Ergebnisse aus vereinsinternen Turnieren und Fast-Lap-Wertungen (Referenzen, Trophäen) sind nie öffentlich. Sie sehen nur die "
+                "Person selbst und angemeldete Vereinsmitglieder; unter Privatsphäre („Vereinsinterne Erfolge zeigen“) lässt sich das auch "
+                "für Mitglieder ausschalten.")
+    assert approved in text
+    assert text.index("im Profilbereich einschränken. ") + len("im Profilbereich einschränken. ") == text.index(approved)
+
+
 def test_inline_markup_allows_bold_and_safe_links_only():
     assert site_texts.inline_html("**fett** & [Kontakt](/contact) [Mail](mailto:a@b.c) [Web](https://x.y/) [böse](javascript:alert(1)) <b>") == (
         '<strong>fett</strong> &amp; <a href="/contact">Kontakt</a> <a href="mailto:a@b.c">Mail</a> <a href="https://x.y/">Web</a> '

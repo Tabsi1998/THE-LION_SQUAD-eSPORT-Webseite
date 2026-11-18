@@ -149,6 +149,15 @@ async def load_match_call_fields(db, match_ids: list[str]) -> dict[str, dict]:
     return {row["id"]: row for row in rows if row.get("id")}
 
 
+async def count_matches_by_tournament(db, query: dict) -> dict:
+    """Spiele je Turnier für die Zähler der Startseite (Paket D, #2262): ``{tournament_id: Zahl}`` - so lassen sich die Spiele der
+    Staffeln getrennt zählen, ohne jedes Spiel zu laden. Spiele ohne Turnier stehen unter ``None``."""
+    rows = await db.matches_v2.aggregate([
+        {"$match": query}, {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},
+    ]).to_list(None)
+    return {row.get("_id"): int(row.get("count") or 0) for row in rows}
+
+
 async def count_matches_by_status(db, statuses: set[str]) -> int:
     """Count operational matches for dashboard surfaces."""
 

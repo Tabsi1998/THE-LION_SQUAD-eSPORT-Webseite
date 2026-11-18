@@ -660,10 +660,14 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     await _hydrate_team(team)
     out = _team_response(team, user)
-    # Auszeichnungen (#230): Team-Banner und -Trophäen; Außenstehende sehen nur öffentliche Turniere.
+    # Auszeichnungen (#230): Team-Banner und -Trophäen; das Team selbst sieht alles, Vereinsmitglieder dazu Internes, das
+    # sie selbst sehen dürfen (#2516, dieselbe Regel wie im Profil), alle anderen nur öffentliche Turniere.
     from services.awards import awards_for_team
+    from services.profile_visibility import PUBLIC, SELF, members_scope
+    from services.visibility import sees_member_content
     insider = bool(user and (_is_member(team, user) or _can_manage(team, user) or _is_staff(user)))
-    out["awards"] = await awards_for_team(db, team_id, public_only=not insider)
+    scope = SELF if insider else (members_scope(user, member=True) if user and await sees_member_content(user) else PUBLIC)
+    out["awards"] = await awards_for_team(db, team_id, scope=scope)
     out["featured_award"] = next((award for award in out["awards"] if award["id"] == team.get("featured_award_id")), None)
     # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Teamleitung gewählt hat.
     out["featured_title"] = next((award for award in out["awards"] if award["id"] == team.get("featured_title_award_id")), None)

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ADMIN_AREAS, AREAS, GRANTABLE_AREAS, LEAGUE_CAPABILITIES, MFA_AREAS, ROLE_AREAS } from "@/lib/permissions";
+import { NO_LEAGUE_RIGHT } from "@/lib/leagueRights";
 
 // Eine Rechte-Liste, zwei Orte (#1353): `lib/permissions.js` spiegelt `backend/services/permissions.py`. Menü,
 // Seiten-Schutz und Knöpfe fragen das Web, der Server prüft selbst - laufen die Listen auseinander, zeigt das Web Knöpfe,
@@ -38,9 +39,11 @@ test("Die Liga hängt am Bereich Ligen, nicht an der Turnierleitung (#2203)", ()
   const app = readFileSync(path.join(repo, "frontend/src/App.jsx"), "utf8");
   expect(app).toMatch(/path="\/admin\/leagues" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
   expect(app).toMatch(/path="\/admin\/leagues\/seasons\/:seasonId" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
-  // Turnierliste (#2463): Liga-Zuständige und der Bereich Ligen kommen hinein - der Server zeigt ihnen nur ihre Staffeln.
+  // Turnierliste (Paket D, #2262, Nr. 192): ohne Staffeln - die reine Liga-Leitung kommt herein, die Seite leitet sie zur Liga, und sie
+  // sieht „Turniere“ nicht. Die Einzelseite behält den Zugang, damit alte Links einer Staffel auf die Staffel-Seite weiterleiten.
   expect(app).toMatch(/path="\/admin\/tournaments" element=\{<ProtectedRoute requireTournamentStaff allowLeagueStaff>/);
-  expect(layout).toMatch(/\{ to: "\/admin\/tournaments", label: "Turniere", icon: Trophy, areas: \["tournaments"\], staff: true, leagueStaff: true/);
+  expect(app).toMatch(/path="\/admin\/tournaments\/:id" element=\{<ProtectedRoute requireTournamentStaff allowLeagueStaff>/);
+  expect(layout).toMatch(/\{ to: "\/admin\/tournaments", label: "Turniere", icon: Trophy, areas: \["tournaments"\], staff: true, hint:/);
   // Eine Rolle bekommt den Bereich nur über `frozenset(AREAS)` - die Turnierleitung nicht.
   expect(ROLE_AREAS.tournament_admin).not.toContain("leagues");
   expect(ROLE_AREAS.superadmin).toContain("leagues");
@@ -81,4 +84,13 @@ test("Shop (#1706): Menüeintrag, Seiten-Schutz und alle Server-Routen verlangen
 test("Startseite der Verwaltung: der Server-Wächter verlangt genau die Verwaltungsbereiche des Webs", () => {
   const guard = block(auth, /def require_dashboard\(\):[\s\S]*?return require_area\(([^)]*)\)/);
   expect(strings(guard).sort()).toEqual([...ADMIN_AREAS].sort());
+});
+
+// Ein Satz, zwei Orte (Paket D, #2262): Ohne Liga-Recht sagt die Staffel-Seite denselben Satz wie der Server.
+test("„Kein Recht in dieser Liga“ wie im Server", () => {
+  const leagues = readFileSync(path.join(repo, "backend/services/league_permissions.py"), "utf8");
+  const literal = block(leagues, /^NO_LEAGUE_RIGHT = \(([\s\S]*?)\)\s*$/m);
+  const text = [...literal.matchAll(/"([^"]*)"/g)].map((match) => match[1]).join("");
+  expect(text.length).toBeGreaterThan(40);
+  expect(NO_LEAGUE_RIGHT).toBe(text);
 });

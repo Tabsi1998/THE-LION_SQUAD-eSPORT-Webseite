@@ -1,8 +1,8 @@
 // Eingang der Leitung (docs/LIGA.md, B.4, #2205): Anmeldungen der Season prüfen, annehmen, ablehnen mit Pflichtgrund, auf die Warteliste setzen und Liga N und Staffel zuteilen.
-// Rückt jemand nach, entscheidet die Leitung, nichts geschieht von selbst. Der Weg „Co-Team zuteilen“ in der Turnierverwaltung bleibt als Sonderweg.
+// Rückt jemand nach, entscheidet die Leitung, nichts geschieht von selbst. Der Weg „Co-Team zuteilen“ auf der Staffel-Seite bleibt als Sonderweg.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { FormSection } from "@/components/tls/AdminForm";
@@ -12,6 +12,7 @@ import { ApplicationStateBadge } from "@/components/tls/league/application/Leagu
 import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
 import { viennaDateTime } from "@/lib/vienna";
+import { staffelAdminUrl } from "@/lib/staffelTabs";
 
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
@@ -162,7 +163,8 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
       {row.assignment ? (
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/85">
           {row.assignment.label}{row.assignment.left ? " (nicht mehr dabei, der Platz ist frei)" : ""}
-          <Link to={`/admin/tournaments/${row.assignment.tournament_id}`} data-testid={`application-open-staffel-${row.id}`} className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">Turnierverwaltung <ExternalLink className="h-3 w-3" aria-hidden="true" /></Link>
+          {/* Paket D (#2262): auf die Teilnehmer der Staffel-Seite - nicht mehr in die Turnierverwaltung. */}
+          <Link to={staffelAdminUrl(row.assignment.tournament_id, "teilnehmer")} data-testid={`application-open-staffel-${row.id}`} className="inline-flex min-h-[44px] items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">Staffel öffnen <ArrowRight className="h-3 w-3" aria-hidden="true" /></Link>
         </p>
       ) : null}
       {row.auto_accepted ? <p className="mt-1 text-xs text-white/60" data-testid={`application-auto-${row.id}`}>Automatisch angenommen{row.decided_at ? ` ${when(row.decided_at)}` : ""}.</p> : null}

@@ -44,6 +44,7 @@ import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 import { RewardChip } from "@/components/tls/rewards/RewardChip";
 import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
+import { InternalTag } from "@/components/tls/InternalTag";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
@@ -1088,7 +1089,10 @@ function HighlightCard({ item }) {
       <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ backgroundColor: tone.color }} />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tone.color }}>{tone.label} · {referenceKindLabel(item.kind)}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tone.color }}>{tone.label} · {referenceKindLabel(item.kind)}</span>
+            {item.internal ? <InternalTag testId={`internal-tag-highlight-${item.id}`} /> : null}
+          </div>
           <div className="mt-1 font-heading text-lg font-black uppercase leading-tight break-words">{item.title || "Referenz"}</div>
           <div className="mt-1 text-xs text-white/50 flex flex-wrap gap-x-2 gap-y-0.5">
             {item.subtitle && <span className="break-words">{item.subtitle}</span>}
@@ -1300,6 +1304,7 @@ function ReferenceRow({ item, expanded = false }) {
             <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap || isSeason ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
             {isSeason && item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
             {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{showLapTime(item.time_str)}</span>}
+            {item.internal ? <InternalTag testId={`internal-tag-reference-${item.id}`} /> : null}
           </div>
           <div className="mt-1 font-heading text-base font-bold break-words">{item.title || "Referenz"}</div>
           <div className="text-xs text-white/50 mt-0.5 flex items-center gap-x-2 gap-y-1 flex-wrap">

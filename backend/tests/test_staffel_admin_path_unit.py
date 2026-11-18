@@ -22,3 +22,20 @@ def test_an_ordinary_tournament_and_a_staffel_without_id_get_no_path():
     assert staffel_admin_path({"id": "t-2"}) is None
     assert staffel_admin_path({"league_context": STAFFEL["league_context"]}) is None
     assert staffel_admin_path(None) is None
+
+
+def test_every_admin_link_of_the_server_leads_a_staffel_to_the_staffel_page():
+    # Paket D (#2262): Mein Dienst, „Läuft noch nach dem Ende“ und die Strafen nehmen diesen einen Weg.
+    from services.staffel_guard import tournament_admin_path
+
+    assert tournament_admin_path(STAFFEL) == "/admin/leagues/staffeln/t-1"
+    assert tournament_admin_path(STAFFEL, anchor="spiele", tab="stages") == "/admin/leagues/staffeln/t-1#spiele"
+
+
+def test_an_ordinary_tournament_keeps_the_tournament_admin():
+    from services.staffel_guard import tournament_admin_path
+
+    assert tournament_admin_path({"id": "t-2"}) == "/admin/tournaments/t-2"
+    assert tournament_admin_path({"id": "t-2"}, anchor="spiele", tab="stages") == "/admin/tournaments/t-2?tab=stages"
+    assert tournament_admin_path(None) is None
+    assert tournament_admin_path({"title": "ohne Kennung"}) is None

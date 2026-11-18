@@ -76,10 +76,10 @@ export const ADMIN_GROUPS = [
   {
     label: "eSports",
     items: [
-      // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht. Die Turnierliste
-      // auch für Liga-Zuständige und den Bereich Ligen (`leagueStaff`, #2463) - mit ihren Staffeln.
-      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true, leagueStaff: true, hint: "Einzelne Turniere – K.-o., Gruppen, Jeder gegen jeden" },
-      // Liga (docs/LIGA.md, #1622): Liga → Season → Liga N → Staffel; die Staffel selbst ist ein Turnier.
+      // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht. Staffeln stehen seit
+      // Paket D (#2262, Nr. 192) nur unter Liga - die reine Liga-Leitung sieht „Turniere“ nicht.
+      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true, hint: "Einzelne Turniere – K.-o., Gruppen, Jeder gegen jeden" },
+      // Liga (docs/LIGA.md, #1622): Liga → Season → Liga N → Staffel; jede Staffel hat ihre Staffel-Seite (#2262).
       { to: "/admin/leagues", label: "Liga", icon: Layers, areas: ["leagues"], leagueStaff: true, hint: "Vereinsliga – Seasons, Ligen, Staffeln" },
       // Events unter eSports (#2111, F6): sie brauchen den Bereich Turniere - Content-Leute sahen sie nie, Turnierleute
       // suchten sie hier.
