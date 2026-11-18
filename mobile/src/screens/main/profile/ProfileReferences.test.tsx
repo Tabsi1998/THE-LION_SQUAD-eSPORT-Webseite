@@ -132,3 +132,14 @@ test("mit Podest nur die vorhandenen Medaillen; ohne Einträge der leere Zustand
   expect(screen.getByText("leer")).toBeTruthy();
   expect(screen.queryByTestId("profile-references-head")).toBeNull();
 });
+
+test("vereinsintern (#2516): die eigene Zeile trägt das Etikett, eine öffentliche nicht - auch für Screenreader", async () => {
+  const internalCup: PersonalReferenceItem = { ...CUP, id: "tournament:verein", title: "Vereins-Cup", target_id: "vereins-cup", internal: true };
+  await render(<ProfileReferences personal={[CUP, internalCup]} club={null} username="mira" own onOpenSeason={jest.fn()} onOpenPersonal={jest.fn()} empty={null} />);
+  const row = screen.getByTestId("profile-reference-personal:tournament:verein");
+  expect(within(row).getByText("Vereinsintern")).toBeTruthy();
+  expect(row.props.accessibilityLabel).toContain("vereinsintern");
+  const open = screen.getByTestId("profile-reference-personal:tournament:cup");
+  expect(within(open).queryByText("Vereinsintern")).toBeNull();
+  expect(open.props.accessibilityLabel).not.toContain("vereinsintern");
+});

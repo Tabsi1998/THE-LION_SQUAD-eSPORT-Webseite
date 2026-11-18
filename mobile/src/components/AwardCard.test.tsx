@@ -31,3 +31,11 @@ test("Teilnahme-Banner mit Team, ohne Farbe und ohne Bilanz", async () => {
   expect(screen.getByText("Team Lions")).toBeTruthy();
   expect(screen.queryByTestId("award-record-a2")).toBeNull();
 });
+
+test("vereinsintern (#2516): das Etikett steht bei den Chips, öffentlich nicht", async () => {
+  await render(<AwardCard award={{ ...cup, internal: true }} />);
+  expect(screen.getByTestId("internal-tag-award-a1")).toHaveTextContent("Vereinsintern");
+  screen.unmount();
+  await render(<AwardCard award={cup} />);
+  expect(screen.queryByTestId("internal-tag-award-a1")).toBeNull();
+});

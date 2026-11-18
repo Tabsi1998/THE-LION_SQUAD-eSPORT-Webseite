@@ -165,3 +165,9 @@ test("Platz in der Gesamtwertung: Gesamtsieger nur bei Endstand mit ganzer Sicht
   await render(<LeagueOverallStanding rows={undefined} />);
   expect(screen.queryByTestId("league-overall")).toBeNull();
 });
+
+test("vereinsintern (#2516): eine interne Trophäe trägt das Etikett, an Profil und Team gleich", async () => {
+  await render(<TrophyCabinet awards={[{ ...cup("int", 1), internal: true }, cup("pub", 2)] as never} empty="leer" />);
+  expect(screen.getByTestId("internal-tag-trophy-int")).toHaveTextContent("Vereinsintern");
+  expect(screen.queryByTestId("internal-tag-trophy-pub")).toBeNull();
+});

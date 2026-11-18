@@ -9,6 +9,7 @@ import {
   trophyCount, trophyDate, trophyFacets, trophyHref, trophyKind, trophyName, type TrophyAward, type TrophyFilters,
 } from "../../lib/trophies";
 import { colors, radius, roles, surfaces } from "../../theme";
+import { InternalTag } from "../InternalTag";
 import { MediaImage } from "../MediaImage";
 import { Glow, Press, StaggerIn, staggerInDelay } from "../motion";
 import { Body, Muted } from "../Text";
@@ -105,6 +106,8 @@ function TrophyCard({ award, index, play, owner }: { award: TrophyAward; index: 
       <TrophyArt award={award} />
       <View style={styles.text}>
         <Text style={[styles.kind, { color }]}>{kindLabel(award)}</Text>
+        {/* Vereinsintern (#2516): Gäste sehen diese Trophäe nie - die Person, ihr Team und Vereinsmitglieder schon. */}
+        {award.internal ? <InternalTag testID={`internal-tag-trophy-${award.id}`} /> : null}
         <Body style={styles.name} numberOfLines={2} testID={`trophy-name-${award.id}`}>{name}</Body>
         {line ? <Muted style={styles.meta} numberOfLines={2} testID={`trophy-competition-${award.id}`}>{line}</Muted> : null}
         <View style={styles.facts}>
