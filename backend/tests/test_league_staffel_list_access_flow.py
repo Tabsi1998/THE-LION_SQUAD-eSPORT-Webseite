@@ -123,3 +123,20 @@ async def test_a_league_holder_changes_no_ordinary_tournament_and_no_foreign_sta
     assert response.status_code == 403
     assert await flow.db.tournaments.count_documents({"id": {"$in": [s["cup"], s["foreign"], s["draft_cup"]]}}) == 3
     assert await flow.db.tournaments.count_documents({"id": s["cup"], "status": "cancelled"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_web_tournament_list_shows_no_staffel_for_anyone(flow):
+    """Paket D (#2262, Nr. 192): Die Turnierliste der Verwaltung fragt mit ``league=exclude`` - die Turnierleitung sieht ihre Turniere,
+    der Bereich Ligen und Liga-Zuständige dort nichts. Ohne Angabe bleibt die Vorgabe ``include`` (die App ohne neuen Build)."""
+    s = await scene(flow)
+    lead = await flow.add_user(role="tournament_admin", name="Turnierleitung")
+    area = await flow.add_user(name="Bereich Ligen")
+    await flow.db.users.update_one({"id": area["id"]}, {"$set": {"areas": ["leagues"]}})
+    area["areas"] = ["leagues"]
+    for person, expected in ((lead, {s["cup"], s["draft_cup"]}), (area, set()), (await holder(flow, "manage"), set())):
+        flow.act_as(person)
+        response = await flow.get(MANAGED_LIST + "&league=exclude")
+        assert response.status_code == 200, response.text
+        assert {row["id"] for row in response.json()} == expected, person["display_name"]
+    assert await listed(flow, area) == {s["own"], s["foreign"]}, "ohne Angabe wie bisher"
