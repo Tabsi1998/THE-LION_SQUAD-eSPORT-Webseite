@@ -18,6 +18,7 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { loadOk, toastLoadFailed } from "@/lib/loadProblem";
+import { NO_LEAGUE_RIGHT } from "@/lib/permissions";
 import { seasonAnchorUrl } from "@/lib/seasonTabs";
 import { STAFFEL_TABS, STAFFEL_TABS_READY, leagueAdminUrl, staffelTarget } from "@/lib/staffelTabs";
 import { isStaffel, staffelBeforeStart, staffelLabel } from "@/pages/admin/tournament/StaffelParts";
@@ -32,9 +33,6 @@ import { StaffelSettingsTab } from "./staffel/StaffelSettingsTab";
 import { StaffelStand } from "./staffel/StaffelStand";
 import { hasCapability, sanctionsByRegistration } from "./staffel/staffelPage";
 
-// Satz des Servers ohne Liga-Recht (`league_permissions.NO_LEAGUE_RIGHT`) - die Seite zeigt ihn auch, wenn der Server die Staffel
-// liefert, aber keine Zuständigkeit nennt (etwa nur Bereich Turniere).
-const NO_LEAGUE_RIGHT = "Dafür fehlt dir das Recht in dieser Liga. Den Bereich „Ligen“ vergibt der Superadmin unter Admin → Alle Benutzer, Zuständige vergibt der Bereich „Ligen“ auf der Liga-Seite.";
 const TABS = STAFFEL_TABS.filter((tab) => STAFFEL_TABS_READY.has(tab.key));
 
 /** Rollt zu einem Abschnitt (`#zuteilen`), sobald er gezeichnet ist. */
