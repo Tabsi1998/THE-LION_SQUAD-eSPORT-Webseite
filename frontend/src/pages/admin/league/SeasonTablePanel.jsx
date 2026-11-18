@@ -258,10 +258,10 @@ export function StaffelTablePanel({ tournamentId, label = "Tabelle", canDecide =
             </a>
           ) : null}
         </div>
-        {/* Eigener Container wischt seitlich, die Seite nicht: Am Handy bekommt die Tabelle Platz für ganze Namen (index.css,
-            `.staffel-standings`), der volle Name steht zusätzlich im `title`. Öffentliche Tabellen bleiben, wie sie sind. */}
+        {/* Namen umbrechen, Form am Handy weg, voller Name im `title` - wie in allen Tabellen (StandingsTable, #2498).
+            Hier bleiben dazu # und Name beim seitlichen Wischen (große Schrift) stehen (index.css, `.staffel-standings`). */}
         <div className="staffel-standings min-w-0" data-testid="staffel-standings">
-          <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" hideDraws={hidesDraws(data.rules, rows)} mapPoints={byMaps(data.rules)} nameTitle />
+          <StandingsTable rows={rows} kind="team_league" label={label} mineLabel="Dein Team" hideDraws={hidesDraws(data.rules, rows)} mapPoints={byMaps(data.rules)} />
         </div>
         <ZoneLegend rows={rows} testId="staffel-table-zones" />
       </section>

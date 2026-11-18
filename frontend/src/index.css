@@ -382,13 +382,16 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   .tls-standing-row:hover { background-color: rgb(255 255 255 / 0.025); }
 }
 .tls-standing-row[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.28); }
-.tls-standing-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
-/* Staffel-Seite der Verwaltung (#2262): Am Handy wischt die Tabelle in ihrem Rahmen, statt Namen mitten im Wort zu brechen. */
-.staffel-standings .tls-standing-name { overflow-wrap: break-word; }
-/* Am Handy: ohne Spalte „Form“ passen Name und Pkt ohne Wischen; # und Name bleiben beim Wischen stehen (große Schrift). */
+/* Namen (#2498): Umbruch an Leerzeichen und Bindestrich (dazu nach Punkt und Unterstrich, StandingsTable nameParts);
+   lange Wörter ab zehn Buchstaben trennt der Browser mit Bindestrich (lang="de"). Mitten im Wort ohne Zeichen bricht
+   nur ein Wort, das allein breiter ist als die Spalte - `anywhere` statt `break-word`, damit so ein Wort die Tabelle
+   nicht breiter macht als den Bildschirm und die Punkte hinausschiebt. */
+.tls-standing-name { overflow-wrap: anywhere; -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 10 4 4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
+/* In der Rangliste steht der Name ganz da, statt nach zwei Zeilen abgeschnitten zu werden; Platz hat er, weil am Handy
+   S/U/N, Maps und Form wegfallen (lib/standingsTable `wide`). Verwaltung und öffentliche Seiten gleich. */
+.tls-standings .tls-standing-name { display: block; -webkit-line-clamp: none; overflow: visible; }
+/* Staffel-Seite der Verwaltung (#2262): # und Name bleiben beim seitlichen Wischen stehen (große Schrift). */
 @media (max-width: 639px) {
-  .staffel-standings [data-col="form"] { display: none; }
-  .staffel-standings .tls-standings > table { min-width: 340px; }
   .staffel-standings tr > :nth-child(-n+2) { position: sticky; left: 0; z-index: 1; background: var(--tls-surface-1); }
   .staffel-standings tr > :nth-child(2) { left: 3rem; }
 }

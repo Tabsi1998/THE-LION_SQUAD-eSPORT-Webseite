@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FORM_LETTERS, STANDING_COLUMNS, formLabel, rankMove, standingCell } from "@/lib/standingsTable";
 import { ZONE_LABELS, standingNotes, zoneLegend } from "@/lib/leagueTable";
@@ -6,10 +7,49 @@ import { ZoneMark } from "@/components/tls/league/ZoneMark";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
 // Pfeile zeigen den Weg seit dem vorigen Spieltag (vom Server), die eigene Zeile ist markiert. Sieg hell in Cyan,
-// Niederlage grau - Rot bleibt Live, Gold dem Podest (LSW-Farbregel). Am Handy fallen S/U/N weg, Form bleibt.
+// Niederlage grau - Rot bleibt Live, Gold dem Podest (LSW-Farbregel). Am Handy fallen S/U/N und die Form weg (#2498),
+// damit Name und Punkte nebeneinander Platz haben.
 
 export function standingKey(row) {
   return row.registration_id || row.id || row.display_name;
+}
+
+// Lange Namen (#2498): Nach Punkt, Unterstrich und Schrägstrich darf die Zeile umbrechen („xX_Nebelwolf_Xx.Rudel“),
+// sonst nur an Leerzeichen und Bindestrich (index.css, .tls-standing-name). Ein Kürzel wie „e.V.“ bleibt beisammen:
+// getrennt wird erst nach mindestens zwei Zeichen, nie am Anfang, am Ende oder neben einem Leerzeichen.
+const SOFT_BREAKS = new Set([".", "_", "/"]);
+
+export function nameParts(name) {
+  const text = String(name ?? "");
+  const parts = [];
+  let start = 0;
+  let run = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === " ") { run = 0; continue; }
+    if (SOFT_BREAKS.has(char) && run >= 2 && index < text.length - 1 && text[index + 1] !== " ") {
+      parts.push(text.slice(start, index + 1));
+      start = index + 1;
+      run = 0;
+      continue;
+    }
+    run += 1;
+  }
+  parts.push(text.slice(start));
+  return parts;
+}
+
+function StandingName({ name }) {
+  const parts = nameParts(name);
+  return (
+    // Der volle Name steht immer auch im title (#2498) - Verwaltung und öffentliche Seiten gleich.
+    <span className="tls-standing-name text-white font-medium" title={name}>
+      {parts.map((part, index) => (
+        // Die Teile stehen fest in dieser Reihenfolge - der Index ist hier der Schlüssel.
+        <Fragment key={index}>{index ? <wbr /> : null}{part}</Fragment>
+      ))}
+    </span>
+  );
 }
 
 function places(by) {
@@ -64,10 +104,10 @@ function Notes({ row }) {
  * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile; `nameLabel`: Kopf der Namensspalte („Team“
  * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable);
  * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit);
- * `championKey`: Schlüssel der Meister-Zeile (Liga, #2268) - nur sie trägt Gold. `nameTitle`: der volle Name als `title` an jeder Zeile
- * (Staffel-Seite der Verwaltung, #2262) - ohne Angabe bleibt die Zeile, wie sie ist.
+ * `championKey`: Schlüssel der Meister-Zeile (Liga, #2268) - nur sie trägt Gold. Der volle Name steht an jeder Zeile
+ * auch im `title` (#2262, #2498).
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null, nameTitle = false }) {
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null }) {
   const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league)
     .filter((column) => !(hideDraws && column.key === "drawn"))
     .map((column) => {
@@ -120,7 +160,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 </td>
                 <td className="px-2 py-2.5 align-middle min-w-0">
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="tls-standing-name text-white font-medium" title={nameTitle ? row.display_name || undefined : undefined}>{row.display_name || "Teilnehmer"}</span>
+                    <StandingName name={row.display_name || "Teilnehmer"} />
                     {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
                   <Notes row={row} />
