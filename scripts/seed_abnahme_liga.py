@@ -610,7 +610,12 @@ async def ensure_schaufenster(admin: Session, db, game: dict, maps: dict, squads
     league = next((row for row in listing["leagues"] if row.get("name") == SCHAUFENSTER_LEAGUE), None)
     if league and league.get("seasons"):
         season = league["seasons"][0]
-        return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]}}
+        # Mehrfach aufrufbar (#2520): auch dann die Staffeln nennen - die TV-Ansicht der Season-Spec öffnet die erste.
+        view = await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
+        divisions = sorted(view.get("divisions") or [], key=lambda row: row.get("level") or 0)
+        staffeln = [row["tournament_id"] for division in divisions for row in division.get("staffeln") or [] if row.get("tournament_id")]
+        return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]},
+                "staffeln": staffeln}
     game = await ensure_mode_look(admin, db, game)
     banner = await upload(admin, "alpenliga-banner.png", flat_png((1800, 600), (24, 74, 104), "ALPENLIGA", "Season 1 · Abnahme"))
     emblem = await upload(admin, "alpenliga-emblem.png", flat_png((512, 512), (41, 182, 232), "AL"))
