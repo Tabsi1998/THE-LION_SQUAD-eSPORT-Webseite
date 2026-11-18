@@ -35,19 +35,6 @@ async def flow(monkeypatch):
         await shutdown()
 
 
-@pytest.fixture
-def frozen_rate_limit_clock(monkeypatch):
-    """Alle Zählfenster der Rate-Limits bleiben während des Tests dieselben."""
-    import services.rate_limit as rate_limit
-
-    class FrozenClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return datetime(2026, 10, 14, 12, 0, 5, tzinfo=timezone.utc)
-
-    monkeypatch.setattr(rate_limit, "datetime", FrozenClock)
-
-
 async def mfa_account(flow) -> tuple[dict, str]:
     name = f"loewe-{new_id()[:6]}"
     user = await flow.add_user(name=name)
@@ -105,7 +92,7 @@ async def test_cancel_answers_the_same_whether_the_challenge_existed(flow):
 
 
 @pytest.mark.asyncio
-async def test_cancel_is_rate_limited(flow, frozen_rate_limit_clock):
+async def test_cancel_is_rate_limited(flow, still_rate_limit_clock):
     statuses = [(await cancel(flow, secrets.token_urlsafe(16))).status_code for _ in range(31)]
 
     assert statuses[:30] == [200] * 30
