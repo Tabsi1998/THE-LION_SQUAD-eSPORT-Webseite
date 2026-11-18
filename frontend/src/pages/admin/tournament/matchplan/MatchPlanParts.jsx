@@ -7,6 +7,7 @@ import { countOf } from "@/lib/schedulePlanText";
 import { motionTransition } from "@/lib/motion";
 import { formatDeviceType } from "@/lib/tournamentLabels";
 import { fromViennaInput, viennaDateTime, viennaInputValue, viennaTime } from "@/lib/vienna";
+import "./matchplan.css";
 
 // Bausteine der Matchplan-Seite (#1557). Sie zeigen nur an, was der Planer gerechnet hat oder am Turnier steht.
 

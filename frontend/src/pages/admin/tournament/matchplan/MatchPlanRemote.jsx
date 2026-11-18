@@ -3,6 +3,7 @@ import { countOf } from "@/lib/schedulePlanText";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { viennaDateTime, viennaTime } from "@/lib/vienna";
+import "./matchplan.css";
 
 // Online und Liga (#1557): keine Stationen, keine Zeitleiste je Station. Online zählen Fristen je Spiel, in der Liga
 // Spielwochen mit Frist. Die Fristen rechnet der Server (GET …/schedule/deadlines, …/matchdays) - hier wird nur gezeigt.
