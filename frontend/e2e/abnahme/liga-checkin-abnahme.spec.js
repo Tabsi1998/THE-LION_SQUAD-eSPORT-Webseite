@@ -3,11 +3,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession");
+const { playVeto } = require("./ligaVeto");
 
 // Liga-Check-in (#1652, docs/LIGA.md D.2) schreibend gegen den echten Server - ohne nachgestellte API. Stand aus
 // scripts/seed_abnahme_liga.py (Staffel „Liga-Probelauf“ im Entwurf, fünf Co-Teams). Die Leitung speichert den Check-in der Season,
 // veröffentlicht ein Regelwerk mit Zustimmungspflicht und startet die Staffel. Dann: Regelwerks-Sperre, zwei Captains checken in zwei
-// Browser-Kontexten ein (390 px), zu wenige Anwesende lehnt der Server ab, Start bei 1440 px genau einmal; am zweiten Spiel läuft das
+// Browser-Kontexten ein (390 px), zu wenige Anwesende lehnt der Server ab; mit beiden Seiten beginnt das Map-Veto (D.3, neue Seasons
+// haben es an, Nr. 105), erst danach ist das Spiel spielbereit; Start bei 1440 px genau einmal; am zweiten Spiel läuft das
 // Fenster ab - der Fristen-Job legt nur den Vorschlag an, die Leitung entscheidet in Mein Dienst und der Leitungsansicht. Keine
 // Konsolenfehler, keine Antwort 4xx/5xx im Browser, kein seitliches Scrollen.
 
@@ -165,6 +167,15 @@ test.describe("Abnahme: Liga-Check-in gegen den echten Server", () => {
     const theirs = (await (await away.page.request.get(`/api/matches/${play.id}/page`)).json()).checkin.roster.filter((row) => !row.blocked);
     for (const person of theirs.slice(0, 3)) await away.page.getByTestId(`checkin-roster-${person.id}`).check();
     await away.page.getByTestId("checkin-submit").click();
+    // Beide da: Der Check-in schrumpft auf eine Zeile, das Veto beginnt (D.3) - gestartet wird erst danach.
+    await expect(away.page.getByTestId("checkin-slim")).toContainText("Beide Seiten eingecheckt");
+    await expect(away.page.getByTestId("veto-headline")).toHaveText("Veto läuft");
+    await expect(away.page.getByTestId("checkin-start-button")).toHaveCount(0);
+    await expect(away.page.getByTestId("match-report-hint")).toContainText("Erst das Veto abschließen");
+    await playVeto({ [play.home]: home, [play.away]: away }, play.id);
+
+    await away.page.goto(`/matches/${play.id}`);
+    await expect(away.page.getByTestId("veto-headline")).toHaveText("Spielreihenfolge steht");
     await expect(away.page.getByTestId("checkin-headline")).toHaveText("Spielbereit");
     await expect(away.page.getByTestId("checkin-start-button")).toBeVisible();
     await noSideScroll(away.page);

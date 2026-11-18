@@ -101,10 +101,33 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     await expect(page.getByTestId("season-mode-order-hints")).toHaveCount(0);
     await page.getByTestId("season-save-spielbetrieb").click();
     await expect(page.getByText("Spielbetrieb gespeichert.").first()).toBeVisible();
-    expect(Object.keys(sent.at(-1)).sort()).toEqual(["best_of", "game_mode_order", "lineup_amend_hours", "map_repeat", "result_confirm_hours", "team_size"]);
+    // Dazu die Vorfälle und Pausen (D.5, #2364): Sie stehen im Reiter Spielbetrieb unter „Serie“ (TAB_PAYLOAD_KEYS).
+    expect(Object.keys(sent.at(-1)).sort()).toEqual(["best_of", "clarification_mode", "game_mode_order", "incident_answer_minutes",
+      "incident_quota_per_map", "lineup_amend_hours", "map_break_after", "map_break_minutes", "map_repeat", "result_confirm_hours", "team_size"]);
     await expect(page.getByTestId("result-rules-stellung")).toBeVisible();
     await expect(page.getByTestId("result-rules-kontrolle")).toHaveCount(0);
     await shot(page, "season-reiter-spielbetrieb-1440.png");
+
+    // Veto (D.3): Neue Seasons haben es an (Nr. 105). Die Vorlage entstand beim Speichern des Pools; nach der neuen Modusfolge
+    // übernimmt die Leitung im selben Reiter den Vorschlag und speichert (Nr. 108: von selbst folgt die Vorlage nur dem Pool).
+    const veto = page.getByTestId("season-veto-rules");
+    await veto.scrollIntoViewIfNeeded();
+    // Der Kasten kennt nach dem Speichern von Pool und Serie deren Stand, ohne dass die Seite neu geladen wird (#2520).
+    await expect(veto.getByTestId("veto-rules-steps")).toBeVisible();
+    await expect(veto.getByTestId("veto-rules-propose")).toBeEnabled();
+    await veto.getByTestId("veto-rules-propose").click();
+    // Bis zum Speichern stehen daneben die Sätze des Servers zum gespeicherten Stand - gesperrt ist das Speichern nur durch die Prüfung
+    // des Vorschlags selbst.
+    await expect(veto.getByTestId("veto-step-0-sentence")).toContainText("Suchen & Zerstören");
+    await expect(veto.getByTestId("veto-rules-save")).toBeEnabled();
+    await veto.getByTestId("veto-rules-save").click();
+    await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
+    await expect(veto.getByTestId("veto-rules-error")).toHaveCount(0);
+    const vetoRules = async () => (await ok(page, "GET", `/api/admin/leagues/seasons/${seasonId}/veto-rules`));
+    await expect.poll(async () => (await vetoRules()).auto, { timeout: 15_000 }).toBeFalsy();
+    const savedVeto = await vetoRules();
+    expect(savedVeto.active).toBe(true);
+    expect(savedVeto.problems).toEqual([]);
 
     // Termine: eine Sperrzeit eintragen, Rückfrage beim Wechsel, dann speichern.
     await page.getByTestId("season-tab-termine").click();

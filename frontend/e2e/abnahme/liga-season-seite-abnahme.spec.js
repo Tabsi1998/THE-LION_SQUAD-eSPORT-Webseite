@@ -107,7 +107,8 @@ test.describe("Abnahme: Season-Seite als Gast gegen den echten Server", () => {
       await expect(page.getByTestId("league-weekpanel-1").locator("[data-testid$='-contested']")).toHaveCount(1);
 
       await page.getByTestId("season-nav-teams").click();
-      await expect(page.locator("[data-testid^='season-team-']")).toHaveCount(8);
+      // Je Team ein Eintrag - die Rankingbanner darin (#2425) tragen Kennungen mit demselben Anfang.
+      await expect(page.locator("li[data-testid^='season-team-']")).toHaveCount(8);
       await expect(page.locator(".tls-season-team img").first()).toBeVisible();
       await noSideScroll(page);
 
