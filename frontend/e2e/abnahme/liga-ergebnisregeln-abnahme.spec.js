@@ -91,8 +91,10 @@ function reportBody(match, planned, map2) {
 async function startIfDraft(page) {
   await page.goto(`/admin/leagues/staffeln/${tid}`);
   const status = page.getByTestId("staffel-status-select");
-  await expect(status).toBeVisible();
-  if (await status.inputValue() !== "live") {
+  // Vor dem Start steht statt der Auswahl der Hinweis zum Start (Staffel-Seite, Reiter Überblick).
+  const draft = page.getByTestId("staffel-start-note");
+  await expect(status.or(draft)).toBeVisible();
+  if (await draft.isVisible()) {
     await expect(page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
     await page.getByTestId("staffel-primary-action").click();
     const anyway = page.getByRole("button", { name: "Trotzdem starten" });
