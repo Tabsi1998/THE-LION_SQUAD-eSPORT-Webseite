@@ -8,7 +8,15 @@ from models import REGISTRATION_LIMIT, GROUP_LIMIT
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placements_for_structure, standings_for_structure
 from services.league_scope import is_league_staffel, league_label
-from services.visibility import user_can_see
+from services.profile_visibility import (
+    PUBLIC,
+    SELF,
+    ProfileScope,
+    challenge_is_internal,
+    sees_challenge,
+    sees_tournament,
+    tournament_is_internal,
+)
 
 RESULT_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
 REFERENCE_REGISTRATION_STATUSES = {"approved", "checked_in"}
@@ -80,32 +88,28 @@ async def _team_ids_for_user(user_id: str) -> list[str]:
 
 
 async def _visible_tournament(tournament: dict | None) -> bool:
-    if not tournament:
-        return False
-    if tournament.get("status") == "draft" or tournament.get("is_public") is False:
-        return False
-    return await user_can_see(None, tournament.get("visibility") or "public")
+    """Öffentlich sichtbar, also für Gäste (Teilen, Weg, Bilanz) - die Regel steht in ``profile_visibility``."""
+    return await sees_tournament(PUBLIC, tournament)
 
 
 async def _visible_challenge(challenge: dict | None) -> bool:
-    if not challenge:
-        return False
-    if challenge.get("status") == "draft":
-        return False
-    return await user_can_see(None, challenge.get("visibility") or "public")
+    return await sees_challenge(PUBLIC, challenge)
 
 
-async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str, public_only: bool) -> dict | None:
+async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str, scope: ProfileScope | bool) -> dict | None:
+    """``scope``: wer schaut (#2516) - ``True``/``False`` wie früher ``public_only``."""
+    if isinstance(scope, bool):
+        scope = PUBLIC if scope else SELF
     db = get_db()
     from services.fastlap_standings import official_times
 
     times = await official_times(db, challenge_id, track_id)
-    if public_only:
+    if not scope.everything:
         challenge = await db.f1_challenges.find_one(
             {"id": challenge_id},
             {"_id": 0, "id": 1, "status": 1, "visibility": 1},
         )
-        if not await _visible_challenge(challenge):
+        if not await sees_challenge(scope, challenge):
             return None
     # Dieselbe Rangfolge wie die Tabelle (#1584): Gleichstand - die früher gefahrene Zeit vorn.
     from services.fastlap_standings import rank_laps
@@ -184,10 +188,16 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
     return None, participant_count
 
 
-async def personal_profile_references(user: dict, public_only: bool = False) -> dict:
-    """Build the personal reference timeline used by mobile and public profiles."""
+async def personal_profile_references(user: dict, public_only: bool = False, *, scope: ProfileScope | None = None) -> dict:
+    """Build the personal reference timeline used by mobile and public profiles.
+
+    ``scope`` (#2516, ``services/profile_visibility``): wer schaut - die Person selbst sieht alles, Vereinsmitglieder
+    dazu Internes, alle anderen nur Öffentliches. Ohne ``scope`` entscheidet ``public_only`` wie bisher. Jeder Eintrag
+    trägt ``internal``: ein Gast sähe ihn nicht."""
     if not user or not user.get("id"):
         return empty_profile_references()
+    if scope is None:
+        scope = PUBLIC if public_only else SELF
 
     db = get_db()
     user_id = user["id"]
@@ -209,13 +219,10 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "banner_url": 1, "game_name": 1, "visibility": 1, "is_public": 1,
          "league_context": 1},
     ).to_list(250)
-    if public_only:
-        extra_tournaments = {}
-        for row in extra_rows:
-            if await _visible_tournament(row):
-                extra_tournaments[row["id"]] = row
-    else:
-        extra_tournaments = {row["id"]: row for row in extra_rows}
+    extra_tournaments = {}
+    for row in extra_rows:
+        if await sees_tournament(scope, row):
+            extra_tournaments[row["id"]] = row
     for reg in regs:
         tournament = extra_tournaments.get(reg.get("tournament_id"))
         if not tournament:
@@ -237,12 +244,13 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
             "target_id": tournament.get("slug") or tournament.get("id"),
             "banner_url": tournament.get("banner_url"),
             "participant_count": participant_count,
+            "internal": await tournament_is_internal(tournament),
             # Liga (docs/LIGA.md): eine Staffel steht gekennzeichnet in der Liste („Liga · Staffel A“).
             **({"league_label": league_label(tournament)} if is_league_staffel(tournament) else {}),
         })
 
     lap_query = {"user_id": user_id, "is_invalid": {"$ne": True}}
-    if public_only:
+    if not scope.everything:
         lap_query["$or"] = [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}]
     my_laps = await db.f1_lap_times.find(
         lap_query,
@@ -262,13 +270,10 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
         {"id": {"$in": extra_challenge_ids}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "banner_url": 1, "visibility": 1},
     ).to_list(250)
-    if public_only:
-        extra_challenges = {}
-        for row in extra_challenge_rows:
-            if await _visible_challenge(row):
-                extra_challenges[row["id"]] = row
-    else:
-        extra_challenges = {row["id"]: row for row in extra_challenge_rows}
+    extra_challenges = {}
+    for row in extra_challenge_rows:
+        if await sees_challenge(scope, row):
+            extra_challenges[row["id"]] = row
     extra_tracks = {
         row["id"]: row
         for row in await db.f1_tracks.find(
@@ -280,10 +285,11 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
         if any(item.get("kind") == "fastlap" and str(item.get("id", "")).endswith(f"{challenge_id}:{track_id}") for item in items):
             continue
         challenge = extra_challenges.get(challenge_id)
-        if public_only and not challenge:
+        if not scope.everything and not challenge:
             continue
+        internal = await challenge_is_internal(challenge)
         challenge = challenge or {}
-        ranked = await _ranked_fastlap_entries(challenge_id, track_id, user_id, public_only)
+        ranked = await _ranked_fastlap_entries(challenge_id, track_id, user_id, scope)
         if not ranked:
             continue
         track = extra_tracks.get(track_id) or {}
@@ -301,6 +307,7 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
             "participant_count": ranked.get("participant_count"),
             "time_ms": ranked.get("effective_ms"),
             "time_str": ranked.get("time_str"),
+            "internal": internal,
         })
 
     season_rows = await db.seasons.find(
@@ -326,6 +333,8 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
                     "target_id": season.get("slug") or season.get("id"),
                     "banner_url": season.get("banner_url"),
                     "participant_count": len(standings),
+                    # Die Jahreswertung bleibt, wie sie ist (year_review) - sie ist nie intern.
+                    "internal": False,
                 })
                 break
 

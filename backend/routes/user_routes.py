@@ -789,7 +789,11 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
              "twitch_live_sessions": int(u.get("twitch_live_sessions_count") or 0),
              "twitch_stream_minutes": int(u.get("twitch_stream_minutes") or 0)}
     if public:
-        references = await personal_profile_references(u, public_only=True)
+        # Vereinsinterne Erfolge (#2516): die Person selbst sieht alles, Vereinsmitglieder dazu Internes (Schalter der
+        # Person), alle anderen nur Öffentliches - für Referenzen und Trophäen dieselbe Regel.
+        from services.profile_visibility import scope_for
+        profile_scope = await scope_for(viewer, u)
+        references = await personal_profile_references(u, scope=profile_scope)
         # Season-Historie (F.2, #1627): wo die Person eingesetzt war - Liga N, Platz, Meister; nur Seasons, die der Betrachter sieht.
         from routes.tournament_common import tournament_hidden_reason
         from services.league_history import for_player
@@ -797,9 +801,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         # Gesamtwertung über Seasons (F.5, #2215): Platz in der Spielerwertung je Zeitraum und Liga N.
         from services import league_overall as overall_service
         league_overall = await overall_service.for_player(db, user_id, viewer, hidden=tournament_hidden_reason)
-        # Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren, nur öffentliche.
+        # Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren - nach derselben Regel wie die Referenzen.
         from services.awards import awards_for_user
-        awards = await awards_for_user(db, user_id, public_only=True)
+        awards = await awards_for_user(db, user_id, scope=profile_scope)
         regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}).to_list(200)
         t_ids = list({r["tournament_id"] for r in regs})
         tournaments_raw = await db.tournaments.find(
@@ -914,7 +918,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
         # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Person gewählt hat.
         "featured_title": next((award for award in awards if award["id"] == u.get("featured_title_award_id")), None),
-        # Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur aus den öffentlichen Auszeichnungen oben - nie Ruhendes.
+        # Bis zu drei Embleme neben dem Namen (Nr. 34c, #2425): nur aus den Auszeichnungen oben, die dieser Betrachter sieht
+        # (#2516: für Gäste nur öffentliche) - nie Ruhendes.
         "featured_emblems": featured_emblems(awards, u.get(EMBLEM_FIELD)),
     }
 

@@ -23,6 +23,7 @@ from services.competition_standings import (
     standings_for_structure,
 )
 from services.league_scope import NOT_LEAGUE, is_league_staffel
+from services.profile_visibility import PUBLIC, SELF, ProfileScope
 from services.season_service import _active_season
 from services.visibility import user_can_see
 
@@ -299,9 +300,11 @@ async def backfill_awards(db) -> dict | None:
 
 # ---------------------------------------------------------------- Lesen
 
-async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = None) -> bool:
+async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = None, viewer: dict | None = None) -> bool:
     """Öffentlich sichtbar? Ein Liga-Eintrag (Meister, Belohnung - F.4) nur, wenn Gäste die Season sehen (``can_see_season``, nicht
-    archiviert) und die Staffel als Turnier sähen (Regel von ``tournament_hidden_reason`` für Gäste) - nach dem Stand von jetzt."""
+    archiviert) und die Staffel als Turnier sähen (Regel von ``tournament_hidden_reason`` für Gäste) - nach dem Stand von jetzt.
+
+    ``viewer`` (#2516): ein Vereinsmitglied im Profil einer anderen Person - dieselbe Regel mit dieser Person statt eines Gasts."""
     current = {key: value for key, value in (live or {}).items() if key in ("status", "visibility", "is_public")}
     tournament = {**(doc.get("tournament") or {}), **current}
     if tournament.get("status") == "draft" or tournament.get("is_public") is False:
@@ -310,21 +313,38 @@ async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = N
     if league and league.get("season_id") and seasons is not None:
         # Wie ``league_service.can_see_season`` für Gäste: nur „öffentlich“ (``members`` und ``admins`` brauchen eine Person).
         season = seasons.get(league["season_id"])
-        if not _public_season(season):
+        if not await _season_visible(season, viewer):
             return False
     overall = doc.get("overall") or None
     if overall:
         # Gesamtwertung (F.5): öffentlich nur, wenn Gäste jede Season der Fassung sehen - sonst verriete der Platz eine versteckte Season.
-        if seasons is None or not all(_public_season(seasons.get(season_id)) for season_id in overall.get("season_ids") or [None]):
+        if seasons is None:
             return False
-    return await user_can_see(None, tournament.get("visibility") or "public")
+        for season_id in overall.get("season_ids") or [None]:
+            if not await _season_visible(seasons.get(season_id), viewer):
+                return False
+    return await user_can_see(viewer, tournament.get("visibility") or "public")
 
 
 def _public_season(season: dict | None) -> bool:
     return bool(season) and season.get("status") != "archived" and season.get("visibility") == "public"
 
 
-async def _views(db, docs: list[dict], public_only: bool) -> list[dict]:
+async def _season_visible(season: dict | None, viewer: dict | None) -> bool:
+    if viewer is None:
+        return _public_season(season)
+    if not season or season.get("status") == "archived":
+        return False
+    from services.league_service import can_see_season
+
+    return await can_see_season(viewer, season)
+
+
+async def _views(db, docs: list[dict], public_only: bool = True, *, scope: ProfileScope | None = None) -> list[dict]:
+    """Die Auszeichnungen, die ``scope`` zeigt (#2516) - ohne ``scope`` entscheidet ``public_only``. Jede trägt ``internal``:
+    ein Gast sähe sie nicht."""
+    if scope is None:
+        scope = PUBLIC if public_only else SELF
     tournament_ids = list({doc["tournament_id"] for doc in docs})
     live = {row["id"]: row for row in await db.tournaments.find(
         {"id": {"$in": tournament_ids}}, {"_id": 0, "id": 1, "award_images": 1, "status": 1, "visibility": 1, "is_public": 1},
@@ -336,27 +356,29 @@ async def _views(db, docs: list[dict], public_only: bool) -> list[dict]:
     ).to_list(len(season_ids) + 1)} if season_ids else {}
     out = []
     for doc in docs:
-        if public_only and not await _visible(doc, live.get(doc["tournament_id"]), seasons):
+        current = live.get(doc["tournament_id"])
+        public = await _visible(doc, current, seasons)
+        if not scope.everything and not public and not (scope.viewer and await _visible(doc, current, seasons, scope.viewer)):
             continue
-        out.append(award_view(doc, (live.get(doc["tournament_id"]) or {}).get("award_images") or {}))
+        out.append({**award_view(doc, (current or {}).get("award_images") or {}), "internal": not public})
     out.sort(key=lambda row: (row.get("date") or "", row["id"]), reverse=True)
     return out
 
 
-async def awards_for_user(db, user_id: str, public_only: bool = True) -> list[dict]:
+async def awards_for_user(db, user_id: str, public_only: bool = True, *, scope: ProfileScope | None = None) -> list[dict]:
     """Eigene Einzelturniere und die Turniere der eigenen Teams."""
     team_ids = [row["team_id"] for row in await db.team_members.find({"user_id": user_id}, {"_id": 0, "team_id": 1}).to_list(200) if row.get("team_id")]
     # Liga-Titel (F.1, #1645) gehören den eingesetzten Spielern (``player_ids``), nicht jedem Mitglied des Hauptteams.
     query = {"$or": [{"user_id": user_id}, {"player_ids": user_id}]
              + ([{"team_id": {"$in": team_ids}, "league": None}] if team_ids else [])}
     docs = await db.tournament_awards.find(query, {"_id": 0}).to_list(500)
-    return await _views(db, [doc for doc in docs if not doc.get("suspended")], public_only)
+    return await _views(db, [doc for doc in docs if not doc.get("suspended")], public_only, scope=scope)
 
 
-async def awards_for_team(db, team_id: str, public_only: bool = True) -> list[dict]:
+async def awards_for_team(db, team_id: str, public_only: bool = True, *, scope: ProfileScope | None = None) -> list[dict]:
     docs = await db.tournament_awards.find({"team_id": team_id}, {"_id": 0}).to_list(500)
     # Ein ruhender Liga-Titel (Staffel wieder geöffnet, F.1) wird nicht gezeigt.
-    return await _views(db, [doc for doc in docs if not doc.get("suspended")], public_only)
+    return await _views(db, [doc for doc in docs if not doc.get("suspended")], public_only, scope=scope)
 
 
 async def featured_award(db, awards: list[dict], award_id: str | None) -> dict | None:

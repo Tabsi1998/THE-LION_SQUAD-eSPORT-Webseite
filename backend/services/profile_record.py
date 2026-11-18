@@ -8,7 +8,9 @@ gewerteten 1-gegen-1- bzw. Team-gegen-Team-Spielen. Bei Team-Turnieren zählt di
 
 Sichtbarkeit: Im eigenen Profil steht alles (auch Turniere nur für Mitglieder, alle Gegner mit Namen). Im
 öffentlichen Profil nur bei öffentlichem Profil, nur öffentliche Turniere und nur Gegner mit öffentlichem Profil
-bzw. öffentliche Teams - wer privat ist, fehlt in der Bilanz ganz und steht im Weg ohne Namen.
+bzw. öffentliche Teams - wer privat ist, fehlt in der Bilanz ganz und steht im Weg ohne Namen. Vereinsmitglieder sehen
+bei eingeschaltetem „Vereinsinterne Erfolge zeigen“ der Person dazu die internen Turniere, die sie selbst sehen dürfen
+(#2516, ``services/profile_visibility``) - Gegner aber weiter nur mit öffentlichem Profil.
 """
 from __future__ import annotations
 
@@ -20,8 +22,8 @@ from services.profile_references import (
     RESULT_TOURNAMENT_STATUSES,
     _team_ids_for_user,
     _tournament_rank_for_user,
-    _visible_tournament,
 )
+from services.profile_visibility import PUBLIC, SETTING, ProfileScope, sees_tournament
 from services.team_history import team_by_id, teams_by_id
 from services.tournament_path import DONE, _outcome, _slots, path_kind, tournament_path
 
@@ -31,7 +33,7 @@ RECORD_MIN_GAMES = 2
 
 async def owner_by_username(db, username: str) -> dict | None:
     user = await db.users.find_one({"username": username}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "privacy_public_profile": 1,
-                                                          "is_active": 1, "is_banned": 1})
+                                                          "is_active": 1, "is_banned": 1, SETTING: 1})
     if not user or user.get("is_active") is False or user.get("is_banned"):
         return None
     return user
@@ -51,14 +53,15 @@ async def _own_registrations(db, owner: dict, tournament_ids: list[str] | None =
     return await db.tournament_registrations.find(query, {"_id": 0}).to_list(2000)
 
 
-async def path_for(db, owner: dict, tournament_ref: str, *, public: bool) -> dict | None:
-    """Der Weg durch ein Turnier - None, wenn es ihn nicht gibt oder er nicht gezeigt werden darf."""
+async def path_for(db, owner: dict, tournament_ref: str, *, public: bool, scope: ProfileScope = PUBLIC) -> dict | None:
+    """Der Weg durch ein Turnier - None, wenn es ihn nicht gibt oder er nicht gezeigt werden darf. ``scope`` (#2516):
+    welche Turniere ein fremder Betrachter sieht - Vereinsmitglieder auch interne, wie in den Referenzen."""
     if public and not owner.get("privacy_public_profile"):
         return None
     tournament = await db.tournaments.find_one({"$or": [{"id": tournament_ref}, {"slug": tournament_ref}]}, {"_id": 0})
     if not tournament or tournament.get("status") not in RESULT_TOURNAMENT_STATUSES:
         return None
-    if public and not await _visible_tournament(tournament):
+    if public and not await sees_tournament(scope, tournament):
         return None
     regs = await _own_registrations(db, owner, [tournament["id"]])
     if not regs:
@@ -88,15 +91,15 @@ async def path_for(db, owner: dict, tournament_ref: str, *, public: bool) -> dic
     }
 
 
-async def record_for(db, owner: dict, *, public: bool) -> list[dict]:
-    """Die Bilanz gegen die häufigsten Gegner (Personen bzw. Teams)."""
+async def record_for(db, owner: dict, *, public: bool, scope: ProfileScope = PUBLIC) -> list[dict]:
+    """Die Bilanz gegen die häufigsten Gegner (Personen bzw. Teams) - aus den Turnieren, die ``scope`` zeigt (#2516)."""
     if public and not owner.get("privacy_public_profile"):
         return []
     regs = await _own_registrations(db, owner)
     tournaments = {t["id"]: t for t in await db.tournaments.find({"id": {"$in": sorted({r["tournament_id"] for r in regs})}, "status": {"$in": sorted(RESULT_TOURNAMENT_STATUSES)}},
                                                                  {"_id": 0}).to_list(2000)}
     if public:
-        tournaments = {tid: t for tid, t in tournaments.items() if await _visible_tournament(t)}
+        tournaments = {tid: t for tid, t in tournaments.items() if await sees_tournament(scope, t)}
     own = {reg["id"] for reg in regs if reg["tournament_id"] in tournaments}
     if not own:
         return []
