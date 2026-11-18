@@ -22,7 +22,7 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // die Zuständigkeit auch neben anderen Bereichen und einem Einsatz (#2230); der Turnier-Weg einer Staffel fragt keinen Bereich und
 // lässt Turnierleitung und Helfer ihren eigenen Weg gehen.
 
-export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false, allowSeriesCaptain = false, allowLeagueStaff = false }) {
+export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false, allowSeriesCaptain = false, allowLeagueStaff = false, leagueStaffTo = "" }) {
   const { user } = useAuth();
   const loc = useLocation();
   const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
@@ -56,6 +56,8 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     if (needsSecondFactor(user)) return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
     return children;
   }
+  // `leagueStaffTo` (Paket D, #2262): Die reine Liga-Leitung hat hier nichts verloren - sie landet auf ihrer Seite statt bei „kein Zugriff“.
+  if (leagueStaffTo && leagueStaffEntry) return <Navigate to={leagueStaffTo} replace />;
   if (wantedAreas.length && !hasArea(user, ...wantedAreas)) {
     return <Navigate to="/403" replace state={{ areas: wantedAreas, from: loc.pathname }} />;
   }

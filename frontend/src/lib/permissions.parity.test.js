@@ -38,9 +38,11 @@ test("Die Liga hängt am Bereich Ligen, nicht an der Turnierleitung (#2203)", ()
   const app = readFileSync(path.join(repo, "frontend/src/App.jsx"), "utf8");
   expect(app).toMatch(/path="\/admin\/leagues" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
   expect(app).toMatch(/path="\/admin\/leagues\/seasons\/:seasonId" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
-  // Turnierliste (#2463): Liga-Zuständige und der Bereich Ligen kommen hinein - der Server zeigt ihnen nur ihre Staffeln.
-  expect(app).toMatch(/path="\/admin\/tournaments" element=\{<ProtectedRoute requireTournamentStaff allowLeagueStaff>/);
-  expect(layout).toMatch(/\{ to: "\/admin\/tournaments", label: "Turniere", icon: Trophy, areas: \["tournaments"\], staff: true, leagueStaff: true/);
+  // Turnierliste (Paket D, #2262, Nr. 192): ohne Staffeln - die reine Liga-Leitung landet bei Liga und sieht „Turniere“ nicht. Die
+  // Einzelseite behält den Zugang, damit alte Links einer Staffel auf die Staffel-Seite weiterleiten.
+  expect(app).toMatch(/path="\/admin\/tournaments" element=\{<ProtectedRoute requireTournamentStaff leagueStaffTo="\/admin\/leagues">/);
+  expect(app).toMatch(/path="\/admin\/tournaments\/:id" element=\{<ProtectedRoute requireTournamentStaff allowLeagueStaff>/);
+  expect(layout).toMatch(/\{ to: "\/admin\/tournaments", label: "Turniere", icon: Trophy, areas: \["tournaments"\], staff: true, hint:/);
   // Eine Rolle bekommt den Bereich nur über `frozenset(AREAS)` - die Turnierleitung nicht.
   expect(ROLE_AREAS.tournament_admin).not.toContain("leagues");
   expect(ROLE_AREAS.superadmin).toContain("leagues");

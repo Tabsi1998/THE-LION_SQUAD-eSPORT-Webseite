@@ -256,19 +256,30 @@ test.each([
   else expect(screen.getByText(expected)).toBeInTheDocument();
 });
 
-// Turnierliste (#2463): dieselbe Tür wie der Turnier-Weg einer Staffel - Zuständige und der Bereich Ligen kommen hinein (der Server
-// zeigt ihnen nur ihre Staffeln), ohne Recht bleibt es „Kein Zugriff“; Redaktion oder Moderation allein öffnen sie nicht.
+// Turnierliste (Paket D, #2262, Nr. 192): Sie zeigt keine Staffeln mehr - die reine Liga-Leitung (Zuständige, Bereich Ligen) landet
+// bei Liga statt bei „Kein Zugriff“; die Liga-Seite prüft dort selbst Zwei-Faktor. Wer zusätzlich Turniere hat oder einen Einsatz,
+// kommt wie bisher hinein. Redaktion oder Moderation allein öffnen sie nicht.
 test.each([
-  ["Zuständig", { role: "player", has_league_staff: true, ...mfa }, "turniere"],
-  ["Freigabe Ligen", { role: "player", areas: ["leagues"], ...mfa }, "turniere"],
-  ["Zuständig ohne Zwei-Faktor", { role: "player", has_league_staff: true, mfa_enabled: false }, "mfa-setup"],
+  ["Zuständig", { role: "player", has_league_staff: true, ...mfa }, "liga"],
+  ["Freigabe Ligen", { role: "player", areas: ["leagues"], ...mfa }, "liga"],
+  ["Zuständig ohne Zwei-Faktor", { role: "player", has_league_staff: true, mfa_enabled: false }, "liga"],
+  ["Turnierleitung und zuständig", { ...LEAD_ON_DUTY, ...mfa }, "turniere"],
+  ["Helfer und zuständig", { ...HELPER_ON_DUTY, ...mfa }, "turniere"],
   ["Turnierleitung", { role: "tournament_admin", areas: ["tournaments", "moderation"], ...mfa }, "turniere"],
   ["Spieler", { role: "player", ...mfa }, "verboten"],
   ["Redaktion", { role: "player", areas: ["content"], ...mfa }, "verboten"],
   ["Moderation", { role: "moderator", areas: ["moderation"] }, "verboten"],
-])("Turnierliste (#2463): %s", (_name, user, expected) => {
+])("Turnierliste (#2262): %s", (_name, user, expected) => {
   authState.user = { id: "z", ...user };
-  renderAt("/admin/tournaments", <ProtectedRoute requireTournamentStaff allowLeagueStaff><div>turniere</div></ProtectedRoute>);
-  if (expected === "mfa-setup") expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
-  else expect(screen.getByText(expected)).toBeInTheDocument();
+  render(
+    <MemoryRouter initialEntries={["/admin/tournaments"]}>
+      <Routes>
+        <Route path="/admin/tournaments" element={<ProtectedRoute requireTournamentStaff leagueStaffTo="/admin/leagues"><div>turniere</div></ProtectedRoute>} />
+        <Route path="/admin/leagues" element={<div>liga</div>} />
+        <Route path="/403" element={<div>verboten</div>} />
+        <Route path="/profile" element={<MfaSetup />} />
+      </Routes>
+    </MemoryRouter>
+  );
+  expect(screen.getByText(expected)).toBeInTheDocument();
 });
