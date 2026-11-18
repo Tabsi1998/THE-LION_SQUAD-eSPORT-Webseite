@@ -419,6 +419,10 @@ test("Staffel anlegen und Liga 2 mit eigener Teamgröße anlegen", async () => {
   renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("staffel-add-1"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/divisions/d1/staffeln", {}));
+  // Liga-Wörter (Paket D, #2262): eine Staffel vor dem Start - kein „Liga-Turnier“, kein „Entwurf“.
+  const question = confirmMock.mock.calls.at(-1)[0];
+  expect(question.description).toMatch(/^Eine Staffel mit allen Vorgaben der Season \(.*\), noch vor dem Start\. Danach teilst du auf der Staffel-Seite die Co-Teams zu\.$/);
+  expect(question.description).not.toMatch(/Entwurf|Turnier/);
 
   fireEvent.click(screen.getByTestId("division-add"));
   const sheet = screen.getByTestId("division-sheet");

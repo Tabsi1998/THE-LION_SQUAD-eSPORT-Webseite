@@ -296,7 +296,8 @@ export default function AdminLeagueSeasonPage() {
   const createStaffel = async (division) => {
     const ok = await confirm({
       title: `Staffel in ${division.label} anlegen?`,
-      description: `Ein Liga-Turnier als Entwurf mit allen Vorgaben der Season (${settingsLine(division.settings)}). Danach teilst du auf der Staffel-Seite die Co-Teams zu.`,
+      // Liga-Wörter (Paket D, #2262): kein „Liga-Turnier“, kein „Entwurf“.
+      description: `Eine Staffel mit allen Vorgaben der Season (${settingsLine(division.settings)}), noch vor dem Start. Danach teilst du auf der Staffel-Seite die Co-Teams zu.`,
       confirmLabel: "Staffel anlegen",
     });
     if (!ok) return;
