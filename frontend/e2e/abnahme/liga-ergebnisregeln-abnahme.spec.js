@@ -87,17 +87,18 @@ function reportBody(match, planned, map2) {
   };
 }
 
-/** Die Staffel starten, wenn sie noch im Entwurf steht (frischer Seed) - wie in liga-veto-abnahme.spec.js. */
+/** Die Staffel auf ihrer Seite starten (Paket D, #2262), wenn sie noch im Entwurf steht (frischer Seed) - wie in liga-checkin-abnahme.spec.js. */
 async function startIfDraft(page) {
-  await page.goto(`/admin/tournaments/${tid}`);
-  const primary = page.getByTestId("admin-tr-primary-action");
-  await expect(primary).toBeVisible();
-  if ((await primary.textContent()).includes("Liga starten")) {
-    await primary.click();
+  await page.goto(`/admin/leagues/staffeln/${tid}`);
+  const status = page.getByTestId("staffel-status-select");
+  await expect(status).toBeVisible();
+  if (await status.inputValue() !== "live") {
+    await expect(page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
+    await page.getByTestId("staffel-primary-action").click();
     const anyway = page.getByRole("button", { name: "Trotzdem starten" });
     if (await anyway.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await anyway.click();
   }
-  await expect(page.getByTestId("admin-tr-status-select")).toHaveValue("live");
+  await expect(status).toHaveValue("live");
 }
 
 test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
