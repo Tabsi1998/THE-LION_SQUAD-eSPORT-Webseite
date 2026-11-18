@@ -101,7 +101,9 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     await expect(page.getByTestId("season-mode-order-hints")).toHaveCount(0);
     await page.getByTestId("season-save-spielbetrieb").click();
     await expect(page.getByText("Spielbetrieb gespeichert.").first()).toBeVisible();
-    expect(Object.keys(sent.at(-1)).sort()).toEqual(["best_of", "game_mode_order", "lineup_amend_hours", "map_repeat", "result_confirm_hours", "team_size"]);
+    // Dazu die Vorfälle und Pausen (D.5, #2364): Sie stehen im Reiter Spielbetrieb unter „Serie“ (TAB_PAYLOAD_KEYS).
+    expect(Object.keys(sent.at(-1)).sort()).toEqual(["best_of", "clarification_mode", "game_mode_order", "incident_answer_minutes",
+      "incident_quota_per_map", "lineup_amend_hours", "map_break_after", "map_break_minutes", "map_repeat", "result_confirm_hours", "team_size"]);
     await expect(page.getByTestId("result-rules-stellung")).toBeVisible();
     await expect(page.getByTestId("result-rules-kontrolle")).toHaveCount(0);
     await shot(page, "season-reiter-spielbetrieb-1440.png");
