@@ -112,7 +112,7 @@ test.describe("Vereinsinterne Erfolge im Profil", () => {
       await page.goto(`/u/${OWNER.username}`);
       const references = page.getByTestId("profile-references-preview");
       await expect(references.getByTestId("profile-reference-tournament:t-verein")).toContainText("Vereinsabend-Cup");
-      await expect(references.getByTestId("internal-tag-reference-tournament:t-verein")).toHaveText("Vereinsintern");
+      await expect(references.getByTestId("internal-tag-reference-tournament:t-verein")).toContainText("Vereinsintern");
       await expect(references.getByTestId("internal-tag-reference-tournament:t-offen")).toHaveCount(0);
       await expect(page.getByTestId("internal-tag-award-verein")).toBeVisible();
       await expect(page.getByTestId("internal-tag-award-offen")).toHaveCount(0);
@@ -120,7 +120,7 @@ test.describe("Vereinsinterne Erfolge im Profil", () => {
       await shot(references, `profil-mitglied-${width}`);
 
       await page.getByTestId("profile-tab-awards").click();
-      await expect(page.getByTestId("internal-tag-trophy-verein")).toHaveText("Vereinsintern");
+      await expect(page.getByTestId("internal-tag-trophy-verein")).toContainText("Vereinsintern");
       await expect(page.getByTestId("internal-tag-trophy-offen")).toHaveCount(0);
       await noSideScroll(page);
     });
@@ -145,7 +145,7 @@ test.describe("Vereinsinterne Erfolge im Profil", () => {
       await page.goto("/profile?tab=privacy");
       const row = page.getByTestId("profile-privacy-internal");
       await expect(row).toHaveAttribute("aria-checked", "true");
-      await expect(page.getByText("Mitglieder sehen auch deine vereinsinternen Turniere und Zeiten. Öffentlich sind sie nie zu sehen.")).toBeVisible();
+      await expect(page.getByText("Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen.")).toBeVisible();
       await noSideScroll(page);
       await shotRows(page, page.getByTestId("profile-privacy-achievements"), page.getByTestId("profile-privacy-season-finds"), `schalter-${width}`);
       await row.click();

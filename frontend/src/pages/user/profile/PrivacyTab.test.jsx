@@ -41,7 +41,7 @@ describe("PrivacyTab – Erfolge öffentlich", () => {
     const toggle = screen.getByTestId("profile-privacy-internal");
     expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText("Vereinsinterne Erfolge zeigen")).toBeInTheDocument();
-    expect(screen.getByText(/Mitglieder sehen auch deine vereinsinternen Turniere und Zeiten\. Öffentlich sind sie nie zu sehen\./)).toBeInTheDocument();
+    expect(screen.getByText("Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen.")).toBeInTheDocument();
     // Eingeordnet direkt nach „Erfolge öffentlich“, nicht unten angehängt.
     const switches = screen.getAllByRole("switch").map((node) => node.getAttribute("data-testid"));
     expect(switches.indexOf("profile-privacy-internal")).toBe(switches.indexOf("profile-privacy-achievements") + 1);
