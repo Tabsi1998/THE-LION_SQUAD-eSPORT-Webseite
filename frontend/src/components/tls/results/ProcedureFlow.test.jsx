@@ -73,6 +73,15 @@ describe("Problem melden, geführt", () => {
     expect(onSubmit.mock.calls[0][0].claimed.results).toEqual([{ registration_id: "reg-a", score: 1 }, { registration_id: "reg-b", score: 2 }]);
   });
 
+  it("„Stimmt nicht“ wählt „Falsches Ergebnis“ vor, auch wenn das Formular schon dasteht (#2520)", () => {
+    // Die Matchseite zeigt „Problem melden“ schon vor dem Klick; „Stimmt nicht“ setzt danach nur den Grund.
+    const { rerender } = render(<ProblemReportForm matchId="m1" guide={GUIDE} sides={SIDES} onSubmit={vi.fn()} initialCategory="" />);
+    expect(screen.getByTestId("match-dispute-reason-wrong_result")).toHaveAttribute("aria-pressed", "false");
+    rerender(<ProblemReportForm matchId="m1" guide={GUIDE} sides={SIDES} onSubmit={vi.fn()} initialCategory="wrong_result" />);
+    expect(screen.getByTestId("match-dispute-reason-wrong_result")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("procedure-claimed")).toBeInTheDocument();
+  });
+
   it("führt nach dem Einreichen zu den Nachweisen", async () => {
     const onDone = vi.fn();
     render(<ProblemReportForm matchId="m1" guide={GUIDE} sides={SIDES} onSubmit={vi.fn()} createdId="p1" onDone={onDone} />);

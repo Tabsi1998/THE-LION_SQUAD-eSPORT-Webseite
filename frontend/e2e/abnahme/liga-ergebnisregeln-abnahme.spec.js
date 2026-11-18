@@ -2,18 +2,20 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession");
+const { playVeto } = require("./ligaVeto");
 
 // Ergebnisregeln gegen den echten Server (docs/LIGA.md, C.3, #1617) - ohne nachgestellte API. Stand aus scripts/seed_abnahme_liga.py,
-// Staffel „Liga-Probelauf“ gestartet von liga-ablauf-abnahme.spec.js (vorher laufen lassen). Die Leitung stellt in der Season die
-// Regeln ein und überträgt sie; ein Captain meldet bei 390 und 1440 px: falscher Endstand abgelehnt (Server und Formular),
-// richtiger angenommen, die Gegenseite bestätigt ohne Punkte. Die Korrektur der Leitung prüft dieselbe Regel und übergeht sie nur
-// mit Grund. Erfundene Werte.
+// Staffel „Liga-Probelauf“: im Entwurf (frischer Seed wie im Nachtlauf) startet die Leitung sie selbst, nach liga-ablauf-abnahme.spec.js
+// läuft sie schon. Die Leitung stellt in der Season die Regeln ein und überträgt sie auf die laufende Staffel; ein Captain meldet bei
+// 390 und 1440 px nach Check-in und Map-Veto (D.2, D.3): falscher Endstand abgelehnt (Server und Formular), richtiger angenommen, die
+// Gegenseite bestätigt ohne Punkte. Die Korrektur der Leitung prüft dieselbe Regel und übergeht sie nur mit Grund. Erfundene Werte.
 
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const ablauf = state?.ablauf;
 const tid = ablauf?.tournament_id;
 const RULES = {
-  stellung: { kind: "score", target: 250, time_limit_minutes: 10, draw_allowed: false, overtime: false },
+  // Das Zeitlimit trägt die Leitung in Minuten ein („10“), gespeichert wird es in Sekunden (#2271).
+  stellung: { kind: "score", target: 250, time_limit_seconds: 600, draw_allowed: false, overtime: false },
   suchen: { kind: "rounds", target: 6, round_limit: 11, draw_allowed: false, overtime: false },
 };
 
@@ -53,8 +55,10 @@ async function post(page, url, data) {
   return page.request.post(url, { data, headers: csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {} });
 }
 
-/** Erst einchecken, dann melden (D.2, #1652): die Leitung legt den Termin auf gleich, jede Seite hakt ihre ersten Anwesenden an. */
-async function checkInBoth(lead, home, away, matchId) {
+/** Erst einchecken, dann das Veto, dann melden (D.2, D.3): die Leitung legt den Termin auf gleich, jede Seite hakt ihre ersten
+ * Anwesenden an, beide ziehen das Veto zu Ende. Antwort: die Maps laut Veto. */
+async function checkInBoth(lead, home, away, match) {
+  const matchId = match.id;
   const csrf = (await lead.page.context().cookies()).find((cookie) => cookie.name === "csrf_token")?.value || "";
   const moved = await lead.page.request.fetch(`/api/matches/${matchId}`, {
     method: "PATCH", headers: { "X-CSRF-Token": decodeURIComponent(csrf) },
@@ -66,18 +70,37 @@ async function checkInBoth(lead, home, away, matchId) {
     const done = await post(person.page, `/api/matches/${matchId}/checkin`, { present: roster.map((row) => row.id) });
     expect(done.status(), await done.text()).toBe(200);
   }
+  return playVeto({ [match.home]: home, [match.away]: away }, matchId);
 }
 
-function reportBody(match, map2) {
-  const [stellung, suchen] = [ablauf.pool.stellung[0], ablauf.pool.suchen[1]];
+/** Die Meldung über die API, mit Modus und Map laut Veto (der Server prüft sie dagegen, D.3). Map 1 Stellung, Map 2 Suchen. */
+function reportBody(match, planned, map2) {
+  const [first, second] = planned;
+  expect([first.mode, second.mode]).toEqual(["stellung", "suchen"]);
   return {
     results: [{ registration_id: match.home, rank: 1, score: 2 }, { registration_id: match.away, rank: 2, score: 0 }],
     lineup: [],
     games: [
-      { position: 1, mode: "stellung", map_id: stellung, winner_registration_id: match.home, scores: { [match.home]: 250, [match.away]: 180 } },
-      { position: 2, mode: "suchen", map_id: suchen, winner_registration_id: match.home, scores: { [match.home]: map2[0], [match.away]: map2[1] } },
+      { position: 1, mode: first.mode, map_id: first.map_id, winner_registration_id: match.home, scores: { [match.home]: 250, [match.away]: 180 } },
+      { position: 2, mode: second.mode, map_id: second.map_id, winner_registration_id: match.home, scores: { [match.home]: map2[0], [match.away]: map2[1] } },
     ],
   };
+}
+
+/** Die Staffel auf ihrer Seite starten (Paket D, #2262), wenn sie noch im Entwurf steht (frischer Seed) - wie in liga-checkin-abnahme.spec.js. */
+async function startIfDraft(page) {
+  await page.goto(`/admin/leagues/staffeln/${tid}`);
+  const status = page.getByTestId("staffel-status-select");
+  // Vor dem Start steht statt der Auswahl der Hinweis zum Start (Staffel-Seite, Reiter Überblick).
+  const draft = page.getByTestId("staffel-start-note");
+  await expect(status.or(draft)).toBeVisible();
+  if (await draft.isVisible()) {
+    await expect(page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
+    await page.getByTestId("staffel-primary-action").click();
+    const anyway = page.getByRole("button", { name: "Trotzdem starten" });
+    if (await anyway.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await anyway.click();
+  }
+  await expect(status).toHaveValue("live");
 }
 
 test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
@@ -88,6 +111,7 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
 
   test("Leitung: Regeln der Season einstellen und auf die laufende Staffel übertragen", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
+    await startIfDraft(lead.page);
     await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}#ergebnisregeln`);
     const panel = lead.page.getByTestId("season-result-rules");
     await expect(panel).toBeVisible();
@@ -96,7 +120,7 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
       await lead.page.getByTestId(`result-rules-${mode}-kind`).selectOption(rule.kind);
       await lead.page.getByTestId(`result-rules-${mode}-target`).fill(String(rule.target));
       if (rule.round_limit) await lead.page.getByTestId(`result-rules-${mode}-limit`).fill(String(rule.round_limit));
-      if (rule.time_limit_minutes) await lead.page.getByTestId(`result-rules-${mode}-time`).fill(String(rule.time_limit_minutes));
+      if (rule.time_limit_seconds) await lead.page.getByTestId(`result-rules-${mode}-time`).fill(String(rule.time_limit_seconds / 60));
     }
     await lead.page.getByTestId("result-rules-save").click();
     await expect(lead.page.getByTestId("season-sync-hint")).toBeVisible();
@@ -120,11 +144,11 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
       const match = await openMatch(lead.page, round);
       const home = await as(browser, testInfo, match.homeRole, viewport);
       const away = await as(browser, testInfo, match.awayRole, viewport);
-      await checkInBoth(lead, home, away, match.id);
+      const planned = await checkInBoth(lead, home, away, match);
 
       // Der Server ist maßgeblich: 7:5 bei höchstens 11 Runden lehnt er mit deutschem Satz ab, auch ohne Formular.
       await home.page.goto(`/matches/${match.id}`);
-      const refused = await post(home.page, `/api/matches/${match.id}/report`, reportBody(match, [7, 5]));
+      const refused = await post(home.page, `/api/matches/${match.id}/report`, reportBody(match, planned, [7, 5]));
       expect(refused.status()).toBe(422);
       expect((await refused.json()).detail).toBe("Map 2: höchstens 11 Runden – 7:5 sind 12.");
 
@@ -132,11 +156,11 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
       await home.page.goto(`/matches/${match.id}`);
       await expect(home.page.getByTestId("match-report-form")).toBeVisible();
       await expect(home.page.getByTestId("league-game-1-rule")).toHaveText("Gewertet: bis 250 Punkte · 10 Min.");
-      const maps = [ablauf.pool.stellung[0], ablauf.pool.suchen[1]];
       const scores = [["250", "180"], ["7", "5"]];
-      for (const [index, mapId] of maps.entries()) {
+      for (const [index, game] of planned.slice(0, 2).entries()) {
         const position = index + 1;
-        await home.page.getByTestId(`league-game-${position}-map-${mapId}`).click();
+        // Die Map steht laut Veto fest (D.3), eingetragen werden nur die Punkte.
+        await expect(home.page.getByTestId(`league-game-${position}-planned`)).toContainText(game.map_name);
         await home.page.getByTestId(`league-game-${position}-score-${match.home}`).fill(scores[index][0]);
         await home.page.getByTestId(`league-game-${position}-score-${match.away}`).fill(scores[index][1]);
       }
@@ -165,7 +189,7 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
 
       // Die Korrektur der Leitung prüft dieselbe Regel; übergehen darf die Liga-Leitung („Ergebnisse“) nur mit Grund.
       await lead.page.goto(`/matches/${match.id}`);
-      const correction = { ...reportBody(match, [7, 5]), reason: "Stand korrigiert" };
+      const correction = { ...reportBody(match, planned, [7, 5]), reason: "Stand korrigiert" };
       const checked = await post(lead.page, `/api/matches/${match.id}/result?force=true`, correction);
       expect(checked.status()).toBe(422);
       expect((await checked.json()).detail).toBe("Map 2: höchstens 11 Runden – 7:5 sind 12.");

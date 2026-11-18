@@ -209,11 +209,13 @@ test.describe("Abnahme: Selbstanmeldung gegen den echten Server", () => {
     const accepted = await as(browser, testInfo, "captain-6", SMALL);
     await accepted.page.goto(seasonUrl());
     const row = accepted.page.getByTestId(`league-application-row-${state.teams[6].squad_id}`);
-    await expect(row).toContainText("Angenommen");
+    // Das eigene Team liest „Angemeldet“ (mit Staffel), die Leitung im Eingang weiter „Angenommen“ (#2348, teamStateLabel).
+    await expect(row).toContainText("Angemeldet");
+    await expect(row).not.toContainText("Zuteilung folgt");
     await expect(row).toContainText("Liga 1 · Staffel A");
     await expect(accepted.page.getByTestId(`league-application-withdraw-${state.teams[6].squad_id}`)).toHaveCount(0);
     await accepted.page.goto(`/teams?team=${state.teams[6].team_id}`);
-    await expect(accepted.page.locator('[data-testid^="squad-application-"]').first()).toContainText("Angenommen");
+    await expect(accepted.page.locator('[data-testid^="squad-application-"]').first()).toContainText("Angemeldet");
     await noSideScroll(accepted.page);
     expect(accepted.problems).toEqual([]);
     await accepted.close();

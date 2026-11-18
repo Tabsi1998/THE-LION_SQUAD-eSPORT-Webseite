@@ -94,3 +94,23 @@ def test_consent_versions_follow_the_backend():
     for name in ("seed_abnahme_liga.py", "seed_liga_g1.py"):
         source = (SCRIPT.parent / name).read_text(encoding="utf-8")
         assert '"privacy_policy_version": "' not in source, name
+
+
+def test_the_showcase_names_its_staffeln_on_every_call():
+    # Mehrfach aufrufbar (#2520): Steht das Schaufenster schon, nennt die Stand-Datei trotzdem seine Staffeln - die TV-Ansicht
+    # der Season-Spec öffnet die erste.
+    import asyncio
+
+    class Admin:
+        async def call(self, method, url, **_kwargs):
+            if url == "/api/admin/leagues":
+                return {"leagues": [{"id": "l1", "slug": "alpenliga", "name": "Alpenliga",
+                                     "seasons": [{"id": "s1", "slug": "season-1", "number": 1}]}]}
+            assert url == "/api/admin/leagues/seasons/s1"
+            return {"season": {"id": "s1"}, "divisions": [
+                {"level": 1, "staffeln": [{"tournament_id": "t1", "staffel": "A"}]},
+                {"level": 2, "staffeln": [{"tournament_id": "t2", "staffel": "A"}]}]}
+
+    module = load()
+    shown = asyncio.run(module.ensure_schaufenster(Admin(), None, {}, {}, []))
+    assert shown == {"league": {"id": "l1", "slug": "alpenliga"}, "season": {"id": "s1", "slug": "season-1"}, "staffeln": ["t1", "t2"]}

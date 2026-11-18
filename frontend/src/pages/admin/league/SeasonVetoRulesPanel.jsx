@@ -1,7 +1,7 @@
 // Veto je Season (#1618, docs/LIGA.md D.3): an/aus, Team A (Heim oder Los), Zeit je Schritt und die Schrittfolge (Sperren, Wählen,
 // Decider je Modus mit Position in der Serie) - mit Prüfung live, Vorschlag aus Modusfolge und Pools und eigenem Speichern. Die Werte
 // gelten sofort für alle nicht gesperrten Staffeln der Season; ein laufendes Veto behält seinen Schnappschuss.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
@@ -74,22 +74,29 @@ function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemov
   );
 }
 
-export function SeasonVetoRulesPanel({ seasonId }) {
+/** `version`: ändert sich, wenn die Seite Pool oder Serie der Season neu geladen hat - dann liest der Kasten seinen Stand neu (#2520). */
+export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
   const [state, setState] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [proposing, setProposing] = useState(false);
   const [error, setError] = useState("");
+  // Der zuletzt vom Server gelesene Stand als Formular - weicht das Formular davon ab, hat die Leitung noch Ungespeichertes.
+  const loaded = useRef(null);
 
   useEffect(() => {
     let alive = true;
     api.get(`/admin/leagues/seasons/${seasonId}/veto-rules`).then(({ data }) => {
       if (!alive || !data?.defaults) return;
+      const fresh = toForm(data.veto_rules, data.defaults);
+      const before = loaded.current;
+      loaded.current = fresh;
       setState(data);
-      setForm(toForm(data.veto_rules, data.defaults));
+      // Modi, Pool, Best of und Modusfolge kommen immer neu; eigene, noch nicht gespeicherte Schritte bleiben stehen.
+      setForm((current) => (!current || !before || JSON.stringify(current) === JSON.stringify(before) ? fresh : current));
     }).catch((failure) => alive && setError(formatApiError(failure.response?.data?.detail) || "Veto konnte nicht geladen werden."));
     return () => { alive = false; };
-  }, [seasonId]);
+  }, [seasonId, version]);
 
   const modes = useMemo(() => state?.modes || [], [state]);
   const labelOf = (mode) => modes.find((row) => row.mode === mode)?.label || mode;
@@ -107,8 +114,10 @@ export function SeasonVetoRulesPanel({ seasonId }) {
     setError("");
     try {
       const { data } = await api.put(`/admin/leagues/seasons/${seasonId}/veto-rules`, vetoRulesPayload(form));
+      const fresh = toForm(data.veto_rules, data.defaults);
+      loaded.current = fresh;
       setState(data);
-      setForm(toForm(data.veto_rules, data.defaults));
+      setForm(fresh);
       toast.success(data.staffeln_updated ? `Veto gespeichert – gilt jetzt in ${data.staffeln_updated} Staffel${data.staffeln_updated === 1 ? "" : "n"}.` : "Veto gespeichert.");
     } catch (failure) {
       setError(formatApiError(failure.response?.data?.detail) || "Veto konnte nicht gespeichert werden.");

@@ -43,6 +43,10 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
   const [error, setError] = useState("");
   // Jede Eingabe nimmt die letzte Fehlermeldung weg - sie gilt für den Stand beim Absenden, nicht für den korrigierten.
   const set = (key, value) => { setError(""); setForm((current) => ({ ...current, [key]: value })); };
+  // „Stimmt nicht“ (Meldung der Gegenseite) setzt den Grund, während das Formular schon dasteht - wie im Formular ohne Führung (#2520).
+  useEffect(() => {
+    if (initialCategory) setForm((current) => ({ ...current, reasonKey: initialCategory }));
+  }, [initialCategory]);
   const reason = (guide.reasons || []).find((row) => row.key === form.reasonKey);
   const isResult = form.reasonKey === (guide.result_reason || "wrong_result");
   const wrapper = `space-y-4 ${separated ? "border-t border-white/10 pt-5" : ""}`;
