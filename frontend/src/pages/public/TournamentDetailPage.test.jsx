@@ -344,7 +344,12 @@ test("angemeldet im Check-in: Check-in ist die Hauptaktion, „Dein Stand“ zei
   expect(rows).toEqual(["tournament-participant-r3", "tournament-participant-r1", "tournament-participant-r2"]);
   expect(screen.getByTestId("tournament-participant-r1")).toHaveTextContent("#2");
   expect(screen.getByTestId("tournament-participant-r1")).toHaveTextContent("[NK] · 3 Spieler");
-  expect(screen.getByTestId("tournament-participant-me-r1")).toHaveTextContent("du");
+  // Ecken-Klammern (#1316): nur deine Zeile trägt Winkel, Fläche und das Etikett - hier eine Team-Anmeldung: „Dein Team“.
+  expect(screen.getByTestId("tournament-participant-me-r1")).toHaveTextContent(/^Dein Team$/);
+  expect(screen.getByTestId("tournament-participant-r1")).toHaveClass("tls-you");
+  expect(screen.getByTestId("tournament-participant-r2")).not.toHaveClass("tls-you");
+  expect(screen.getByTestId("tournament-participant-r3")).not.toHaveClass("tls-you");
+  expect(screen.queryByTestId("tournament-participant-me-r2")).toBeNull();
   expect(screen.getByTestId("tournament-format-tile")).toHaveAttribute("title", expect.stringContaining("Team"));
 });
 

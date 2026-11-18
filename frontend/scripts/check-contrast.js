@@ -36,6 +36,8 @@ const checks = [
   ...opacityText("Body-muted white/60", PALETTE.white, 0.6, 4.5),
   ...opacityText("Metadata white/45", PALETTE.white, 0.45, 3),
   ...opacityText("Decorative white/30", PALETTE.white, 0.3, 2),
+  // Etikett „Du“ (#1316): Cyan auf seiner Fläche (12 %) über der Fläche von „du“ (8 %) - auf jedem Grund AA.
+  ...youTag(),
 ];
 
 const results = checks.map((check) => {
@@ -69,6 +71,16 @@ function textOnDark(label, foreground, min) {
     { label: `${label} on surface`, foreground, background: PALETTE.surface, min },
     { label: `${label} on panel`, foreground, background: PALETTE.panel, min },
   ];
+}
+
+function youTag() {
+  const cyan = parseColor(PALETTE.cyan);
+  return [PALETTE.page, PALETTE.surface, PALETTE.panel].map((background) => ({
+    label: `Du-Etikett (Cyan auf Cyan 12 % über Cyan 8 %) on ${background}`,
+    foreground: PALETTE.cyan,
+    background: blend(cyan, 0.12, blend(cyan, 0.08, parseColor(background))),
+    min: 4.5,
+  }));
 }
 
 function opacityText(label, foreground, alpha, min) {

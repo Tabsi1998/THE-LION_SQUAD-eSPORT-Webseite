@@ -278,13 +278,16 @@ export default function F1DetailPage() {
                       const fresh = marks.fresh.has(key);
                       const record = fresh && marks.best?.userId === key;
                       const from = marks.fromMs.get(key);
+                      // Ecken-Klammern (#1316): deine Zeit trägt Winkel, Fläche und „Du“.
+                      const own = Boolean(user?.id) && (e.user_id === user.id || key === user.id);
                       return (
-                      <tr key={key} data-flip-key={key} data-testid={`f1-row-${e.rank}`} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""} ${record ? "tls-lap-row--record" : fresh ? "tls-lap-row--fresh" : ""}`}>
+                      <tr key={key} data-flip-key={key} data-testid={`f1-row-${e.rank}`} data-mine={own ? "true" : undefined} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""} ${record ? "tls-lap-row--record" : fresh ? "tls-lap-row--fresh" : ""}${own ? " tls-you tls-you--inset" : ""}`}>
                         <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
                         <td className="px-3 sm:px-4 py-3">
                           {/* Lange Namen (break-ui): die Zelle kürzt selbst, sonst schöbe ein Name die Zeit aus dem Bild. */}
                           <span className="flex items-center gap-2 min-w-0 max-w-[9.5rem] sm:max-w-[18rem]">
                             <span className="truncate" title={e.display_name}>{e.display_name}</span>
+                            {own && <span className="tls-you-tag" data-testid={`f1-you-${e.rank}`}>Du</span>}
                             {e.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-honor/80 border border-honor/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
                           </span>
                           {/* Am Handy stehen die Versuche unter dem Namen - Abstand, Versuche und Urkunde haben dort keine Spalte. */}
@@ -359,9 +362,14 @@ export default function F1DetailPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {championship.standings.map((s) => (
-                  <tr key={s.user_id} className={s.rank <= 3 ? "bg-[#FFD700]/5" : ""}>
+                  <tr key={s.user_id} data-testid={`f1-championship-row-${s.user_id}`} data-mine={user?.id && s.user_id === user.id ? "true" : undefined} className={`${s.rank <= 3 ? "bg-[#FFD700]/5" : ""}${user?.id && s.user_id === user.id ? " tls-you tls-you--inset" : ""}`}>
                     <td className={`px-4 py-3 font-display font-bold ${s.rank === 1 ? "text-[#FFD700]" : s.rank === 2 ? "text-white/80" : s.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{s.rank}</td>
-                    <td className="px-4 py-3 text-white">{s.display_name}</td>
+                    <td className="px-4 py-3 text-white">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="min-w-0 break-words">{s.display_name}</span>
+                        {user?.id && s.user_id === user.id ? <span className="tls-you-tag">Du</span> : null}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right">{s.wins}</td>
                     <td className="px-4 py-3 text-right">{s.races}</td>
                     <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{s.points}</td>
