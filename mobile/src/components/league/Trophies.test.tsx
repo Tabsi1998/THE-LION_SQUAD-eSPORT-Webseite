@@ -171,3 +171,12 @@ test("vereinsintern (#2516): eine interne Trophäe trägt das Etikett, an Profil
   expect(screen.getByTestId("internal-tag-trophy-int")).toHaveTextContent("Vereinsintern");
   expect(screen.queryByTestId("internal-tag-trophy-pub")).toBeNull();
 });
+
+test("vereinsintern (#2516): das Label der Karte nennt es dem Screenreader - mit und ohne Link", async () => {
+  const linked = { ...cup("int", 1), internal: true };
+  const plain = { ...cup("ohne", 2), internal: true, tournament: { id: "t-ohne", title: "Cup ohne" } };
+  await render(<TrophyCabinet awards={[linked, plain, cup("pub", 3)] as never} empty="leer" />);
+  expect(screen.getByTestId("trophy-open-int").props.accessibilityLabel).toBe("Cup int – 1. Platz – vereinsintern – zum Wettbewerb");
+  expect(screen.getByTestId("trophy-static-ohne").props.accessibilityLabel).toBe("Cup ohne – 2. Platz – vereinsintern");
+  expect(screen.getByTestId("trophy-open-pub").props.accessibilityLabel).toBe("Cup pub – 3. Platz – zum Wettbewerb");
+});
