@@ -49,6 +49,7 @@ import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
+import { useStillHold } from "../../seasons/matchPause";
 
 const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
 
@@ -145,6 +146,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   // Navigations-Container (Tests).
   const focusedRef = useRef(true);
   const [focused, setFocused] = useState(true);
+  // Turniertag (#1169): Der Reiter „Baum“ bleibt ganz ohne Saison-Deko, solange er offen und der Screen im Blick ist.
+  useStillHold(`bracket-${route.key || route.params.id}`, "TournamentBracket", tab === "bracket" && focused);
   useEffect(() => {
     let away = false;
     const offBlur = navigation.addListener?.("blur", () => { away = true; focusedRef.current = false; setFocused(false); });

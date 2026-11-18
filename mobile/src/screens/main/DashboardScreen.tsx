@@ -35,6 +35,7 @@ import type { AppStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { ClubEvent, DashboardAction, LiveStream, Match, MobileDashboardData, NewsPost, Tournament } from "../../types";
 import { Button } from "../../components/Button";
+import { noteOwnMatches } from "../../seasons/matchPause";
 
 // Was das Dashboard zeigt: eigene Matches, Turniere, Events, News, Streams und die Glocke.
 const DASHBOARD_LIVE_RESOURCES = ["tournaments", "matches", "events", "news", "streams", "notifications", "teams", "f1"];
@@ -115,6 +116,8 @@ export function DashboardScreen({ navigation, route }: Props) {
       const nextData = normalizeDashboard(response.data);
       nextData.me.matches = nextData.me.matches.filter((match: any) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
       setData(nextData);
+      // Turniertag (#1169): Läuft ein eigenes Spiel oder ist es aufgerufen, pausiert die Saison-Deko überall.
+      noteOwnMatches(nextData.me.matches, "dashboard");
       if (!isGuest) {
         // Neu angemeldet - etwa durchs Team (#1208): beim nächsten Öffnen die Frage nach Benachrichtigungen.
         void afterDashboard(user?.id, nextData.me);
