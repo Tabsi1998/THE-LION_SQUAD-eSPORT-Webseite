@@ -98,7 +98,8 @@ async def test_guest_and_outsider_never_see_internal(flow):
         assert not any(row["internal"] for row in profile["awards"])
     # Auch mit ausgeschaltetem Schalter ändert sich für Gäste nichts - und angeschaltet sehen sie trotzdem nichts.
     await flow.db.users.update_one({"id": owner["id"]}, {"$set": {profile_visibility.SETTING: True}})
-    assert tournament_refs((await public_profile(flow, owner, None))["references"]) == PUBLIC_TOURNAMENTS
+    guest = await public_profile(flow, owner, None)
+    assert tournament_refs(guest["references"]) == PUBLIC_TOURNAMENTS
 
 
 @pytest.mark.asyncio
@@ -155,7 +156,8 @@ async def test_tournament_path_and_record_follow_the_same_rule(flow):
     res = await flow.get(path)
     assert res.status_code == 200, res.text
     assert res.json()["public"] is True, "für Mitglieder ohne Namen privater Gegner"
-    assert (await flow.get(f"/api/profile/{owner['username']}/tournaments/t-leitung/path")).status_code == 404
+    res = await flow.get(f"/api/profile/{owner['username']}/tournaments/t-leitung/path")
+    assert res.status_code == 404, "Turniere der Vereinsverwaltung auch für Mitglieder nicht"
     for viewer in (None, outsider):
         flow.act_as(viewer)
         res = await flow.get(path)
@@ -209,3 +211,27 @@ async def test_the_switch_is_saved_on_the_account(flow):
     assert res.json().get(profile_visibility.SETTING) is False, "die Antwort trägt den neuen Stand"
     assert profile_visibility.members_see_internal({}) is True, "ohne Feld gilt an - keine Migration"
     assert profile_visibility.members_see_internal(stored) is False
+
+
+@pytest.mark.asyncio
+async def test_league_trophies_follow_the_season_visibility(flow):
+    """Liga-Titel (F.1/F.4): öffentlich nur aus Seasons, die Gäste sehen; Mitglieder sehen auch „Nur Mitglieder“, nie „Nur Liga-Leitung“."""
+    owner, member, outsider = await seed(flow)
+    for season_id, visibility in (("s-offen", "public"), ("s-verein", "members"), ("s-leitung", "admins")):
+        await flow.db.league_seasons.insert_one({"id": season_id, "league_id": "liga-1", "status": "active", "visibility": visibility})
+        await flow.db.tournament_awards.insert_one({
+            "id": f"aw-{season_id}", "tournament_id": f"st-{season_id}", "registration_id": f"rr-{season_id}", "player_ids": [owner["id"]],
+            "rank": 1, "kind": "trophy", "participants": 6, "matches": {"played": 5, "won": 5},
+            "tournament": {"id": f"st-{season_id}", "slug": f"st-{season_id}", "title": "Staffel A", "start_date": "2026-11-01T18:00:00+01:00",
+                           "visibility": "public", "is_public": True, "status": "results_published"},
+            "league": {"season_id": season_id, "title": "Meister", "division_label": "Liga 1", "staffel": "A", "display_name": "Probe"},
+        })
+    league = {"st-s-offen", "st-s-verein", "st-s-leitung"}
+    for viewer in (None, outsider):
+        guest = await public_profile(flow, owner, viewer)
+        assert award_ids(guest["awards"]) & league == {"st-s-offen"}
+    seen = await public_profile(flow, owner, member)
+    assert award_ids(seen["awards"]) & league == {"st-s-offen", "st-s-verein"}
+    assert internal_flags(seen["awards"], lambda row: row["tournament"]["id"])["st-s-verein"] is True
+    mine = await public_profile(flow, owner, owner)
+    assert award_ids(mine["awards"]) & league == league
