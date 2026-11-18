@@ -75,6 +75,8 @@ export function profileToForm(user) {
     privacy_public_profile: user.privacy_public_profile ?? true,
     // Erfolge II (#619): Standard an - fehlt das Feld, gilt „öffentlich“.
     privacy_achievements_public: user.privacy_achievements_public ?? true,
+    // Vereinsinterne Erfolge (#2516): Standard an - fehlt das Feld, sehen Mitglieder auch Internes (Gäste nie).
+    privacy_members_see_internal: user.privacy_members_see_internal ?? true,
     // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
     privacy_season_finds_public: user.privacy_season_finds_public ?? false,
     // Freunde beim Event (#1188): Standard an, mit Geburtsdatum unter 14 Jahren aus - der wirksame Stand wie am Server.

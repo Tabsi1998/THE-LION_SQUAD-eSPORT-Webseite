@@ -9,6 +9,7 @@ import {
 } from "@/lib/trophies";
 import { TrophyCup } from "@/components/tls/TrophyShelf";
 import { RewardArt } from "./RewardArt";
+import { InternalTag } from "@/components/tls/InternalTag";
 import "./rewards.css";
 
 // Reiter „Trophäen“ (#2425, Nr. 59) an Profil und Team: Turnier-Pokale und Liga-Belohnungen in einer Vitrine - Karten mit Bild, Name,
@@ -59,6 +60,8 @@ function TrophyCard({ award, index, play, owner }) {
     <>
       <span className="tls-trophy-card__art"><TrophyArt award={award} play={play} index={Math.min(index, STAGGER_CAP)} /></span>
       <span className="tls-reward-card__kind">{kindLabel(award)}</span>
+      {/* Vereinsintern (#2516): Gäste sehen diese Trophäe nie - die Person selbst, ihr Team und Vereinsmitglieder schon. */}
+      {award.internal ? <InternalTag testId={`internal-tag-trophy-${award.id}`} /> : null}
       <span className="tls-reward-card__name" data-testid={`trophy-name-${award.id}`}>{trophyName(award)}</span>
       {competitionLine(award) ? <span className="tls-reward-card__meta" data-testid={`trophy-competition-${award.id}`}>{competitionLine(award)}</span> : null}
       <span className="tls-trophy-card__place" data-testid={`trophy-place-${award.id}`}>{award.rank_label}</span>
@@ -72,7 +75,7 @@ function TrophyCard({ award, index, play, owner }) {
     <li className="tls-reward-card tls-trophy-card" data-metal={metalOf(award)} data-kind={kind} data-play={play || undefined}
       data-featured={featured || titled || emblemAt >= 0 ? "true" : undefined} style={{ "--tls-i": Math.min(index, STAGGER_CAP) }}
       data-testid={`trophy-card-${award.id}`}>
-      {href ? <Link to={href} className="tls-trophy-card__link" aria-label={`${trophyName(award)} – ${award.rank_label} – zum Wettbewerb`}>{body}</Link> : body}
+      {href ? <Link to={href} className="tls-trophy-card__link" aria-label={`${trophyName(award)} – ${award.rank_label}${award.internal ? " – vereinsintern" : ""} – zum Wettbewerb`}>{body}</Link> : body}
       {owner ? (
         <div className="tls-reward-card__actions">
           {owner.onFeature ? (
