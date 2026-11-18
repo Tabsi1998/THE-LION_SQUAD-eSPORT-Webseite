@@ -646,7 +646,7 @@ und die Vergabe der Zuständigen brauchen den Bereich. Vergabe mit Protokoll (`l
 Zuständigkeit. Ein Zuständiger braucht keinen Bereich; `/admin` führt ihn über „Mein Dienst“ zu seinen Ligen. Die Turnierliste der
 Verwaltung zeigt seit #2262 (Paket D, Nr. 192) keine Staffeln: Das Web fragt `GET /api/tournaments?managed=true&league=exclude`, die reine
 Liga-Leitung (Bereich oder Zuständigkeit, ohne Bereich Turniere und ohne Helfer-Einsatz) sieht den Menüpunkt „Turniere“ nicht, und
-`/admin/tournaments` leitet sie nach `/admin/leagues` (`ProtectedRoute leagueStaffTo`). Ohne `league` bleibt die Vorgabe `include` (die App
+`/admin/tournaments` leitet sie nach `/admin/leagues` (die nachgeladene Turnierliste selbst, damit das Start-Bündel gleich bleibt). Ohne `league` bleibt die Vorgabe `include` (die App
 ohne neuen Build); der Server gibt der Liga-Leitung dort weiter nur die Staffeln, die sie leitet (`StaffelAccess.covers`).
 `/admin/tournaments/<id>` behält den Zugang: Eine Staffel leitet dort nach dem ersten Abruf auf `/admin/leagues/staffeln/<id>` weiter
 (`?tab=` über `legacyTabAnchor`) und lädt sonst nichts.
