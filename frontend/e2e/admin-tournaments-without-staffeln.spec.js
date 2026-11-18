@@ -134,7 +134,16 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await mockServer(page, { user: LEAGUE_AREA });
     await page.goto("/admin/tournaments");
     await expect(page).toHaveURL(/\/admin\/leagues$/);
-    if (width < 1024) await page.getByTestId("admin-menu-open").click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Liga");
+    if (width < 1024) {
+      // Am Handy liegt das Menü in der Schublade - erst offen ist zu sehen, was darin steht.
+      await expect(async () => {
+        await page.getByTestId("admin-menu-open").click();
+        await expect(page.getByTestId("admin-menu-overlay")).toBeVisible({ timeout: 1000 });
+      }).toPass();      // Die Schublade gleitet herein - das Bild erst, wenn der Eintrag Liga ganz im Bild steht.
+      await expect(page.locator('aside a[href="/admin/leagues"]')).toBeInViewport({ ratio: 1 });
+      await page.waitForTimeout(400);
+    }
     await expect(page.locator('a[href="/admin/leagues"]:visible').first()).toBeVisible();
     await expect(page.locator('nav a[href="/admin/tournaments"]')).toHaveCount(0);
     await noSideScroll(page);

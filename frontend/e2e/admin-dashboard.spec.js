@@ -181,6 +181,9 @@ test.describe("admin dashboard layout", () => {
     test(`Liga-Streitfälle (${width} px): eigene Aufgabe mit Weg in den Leitstand, Turnier-Konflikte in die Turnierliste`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await mockDashboard(page, { busy: true, league: { count: 2, season_id: "s1" } });
+      // Was die Startseite sonst noch lädt - ohne Antwort stünde ein Ladehinweis im Bild.
+      await page.route("**/api/me/platform-links", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ links: [], available: {} }) }));
+      await page.route("**/api/users/me/duty", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ assignments: [], leagues: [], series: [], moderation: null, lead_today: [], ended_live: [] }) }));
       await page.goto("/admin");
       const tasks = page.getByTestId("dashboard-tasks");
       await expect(tasks.getByRole("heading", { name: /offene aufgaben · 3/i })).toBeVisible();
