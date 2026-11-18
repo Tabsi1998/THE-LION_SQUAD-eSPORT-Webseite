@@ -5,6 +5,7 @@ import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Swit
 import { AwardCard } from "../../components/AwardCard";
 import { Card } from "../../components/Card";
 import { HonourList, type Honour } from "../../components/Honours";
+import { InternalTag } from "../../components/InternalTag";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
 import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
@@ -639,7 +640,7 @@ function ProfileStreamCard({ profile, stream }: { profile: PublicProfilePayload;
 }
 
 function TournamentTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => void }) {
-  if (!items.length) return <EmptyState icon="calendar-outline" title="Keine Turniere" detail="Keine öffentliche Turnierhistorie sichtbar." />;
+  if (!items.length) return <EmptyState icon="calendar-outline" title="Keine Turniere" detail="Keine Turnierhistorie sichtbar." />;
   return (
     <View style={styles.list}>
       {items.map((item) => (
@@ -650,6 +651,8 @@ function TournamentTab({ items, onOpen }: { items: any[]; onOpen: (item: any) =>
                 <Muted>{item.game?.display_name || item.game?.name || item.game_name || "Turnier"}</Muted>
                 <Heading>{item.title}</Heading>
                 <Muted>{formatDate(item.start_date)} · {formatStatus(item.status || item.registration_status)}</Muted>
+                {/* Vereinsintern (#2531, Web #2521): eine Teilnahme, die Gäste nicht sehen. */}
+                {item.internal ? <View style={styles.internalTag}><InternalTag testID={`internal-tag-tournament-${item.id}`} /></View> : null}
               </View>
               <Rank rank={item.final_position} />
             </View>
@@ -661,7 +664,7 @@ function TournamentTab({ items, onOpen }: { items: any[]; onOpen: (item: any) =>
 }
 
 function FastLapTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => void }) {
-  if (!items.length) return <EmptyState icon="speedometer-outline" title="Keine Fast-Lap-Zeiten" detail="Keine öffentlichen Fast-Lap-Bestzeiten sichtbar." tone="gold" />;
+  if (!items.length) return <EmptyState icon="speedometer-outline" title="Keine Fast-Lap-Zeiten" detail="Keine Fast-Lap-Bestzeiten sichtbar." tone="gold" />;
   return (
     <View style={styles.list}>
       {items.map((item, index) => (
@@ -672,6 +675,8 @@ function FastLapTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => vo
                 <Muted>{item.challenge?.title || "Fast Lap"}</Muted>
                 <Heading>{[item.track?.name, item.track?.country].filter(Boolean).join(" · ") || "Strecke"}</Heading>
                 <Muted>{item.is_leader ? "Pole Position" : "Bestzeit"}</Muted>
+                {/* Vereinsintern (#2531, Web #2521): eine Bestzeit aus einer Challenge, die Gäste nicht sehen. */}
+                {item.internal ? <View style={styles.internalTag}><InternalTag testID={`internal-tag-fastlap-${item.challenge?.id || index}`} /></View> : null}
               </View>
               <Body style={[styles.time, item.is_leader && styles.gold]}>{showLapTime(item.time_str) || "-"}</Body>
             </View>
@@ -771,6 +776,7 @@ function membershipLabel(profile: PublicProfilePayload) {
 }
 
 const styles = StyleSheet.create({
+  internalTag: { marginTop: 4 },
   clubHint: {
     alignItems: "center",
     borderColor: "rgba(255,215,0,0.4)",
