@@ -223,7 +223,7 @@ export default function AdminLeaguesPage() {
 
       <div className="space-y-6">
         {leagues.map((league) => (
-          <section key={league.id} id={leagueAnchorId(league.id)} tabIndex={-1} className="scroll-mt-20 border border-white/10 rounded-sm bg-[#121212] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#29B6E8]/60" data-testid={`league-${league.slug}`} aria-label={league.name}>
+          <section key={league.id} id={leagueAnchorId(league.id)} tabIndex={-1} className="scroll-mt-24 border border-white/10 rounded-sm bg-[#121212] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#29B6E8]" data-testid={`league-${league.slug}`} aria-label={league.name}>
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3" style={accentStyle(league.accent_color)}>
               <LeagueEmblem src={league.emblem_url} size={40} testId={`league-emblem-${league.slug}`} />
               <div className="min-w-0 flex-1">
