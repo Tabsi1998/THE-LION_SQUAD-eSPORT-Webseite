@@ -1,6 +1,6 @@
 import {
-  LEGACY_TAB_ANCHORS, STAFFEL_SECTIONS, STAFFEL_SETTINGS_TABS, STAFFEL_TABS, STAFFEL_TABS_READY, legacyTabAnchor, staffelAdminUrl, staffelManageUrl,
-  staffelSettingsTab, staffelTabOf, staffelTarget,
+  LEGACY_TAB_ANCHORS, STAFFEL_SECTIONS, STAFFEL_SETTINGS_TABS, STAFFEL_TABS, STAFFEL_TABS_READY, leagueAdminUrl, legacyTabAnchor, staffelAdminUrl,
+  staffelManageUrl, staffelNeedsUrl, staffelSettingsTab, staffelTabOf, staffelTarget,
 } from "./staffelTabs";
 
 // Staffel-Seite (#2262): Jede Marke - Reiter, Abschnitt oder Ziel eines alten Reiters - gehört zu genau einem Reiter.
@@ -91,4 +91,14 @@ test("Unterreiter der Einstellungen: jede Marke genau einmal, jede öffnet ihren
   expect(staffelSettingsTab("")).toBe("darstellung");
   expect(staffelSettingsTab("gibtsnicht")).toBe("darstellung");
   expect(staffelManageUrl("t-1", "staff")).toBe("/admin/leagues/staffeln/t-1#helfer");
+});
+
+test("Paket D: Wege zur Liga und für „Was fehlt“ - nie in die Turnierverwaltung", () => {
+  expect(leagueAdminUrl("l1")).toBe("/admin/leagues#liga-l1");
+  expect(leagueAdminUrl("")).toBe("/admin/leagues");
+  const needs = staffelNeedsUrl("t-1");
+  expect(needs("participants")).toBe("/admin/leagues/staffeln/t-1#zuteilen");
+  expect(needs("matchplan")).toBe("/admin/leagues/staffeln/t-1#spielplan");
+  expect(needs("")).toBe("/admin/leagues/staffeln/t-1");
+  expect(staffelManageUrl("t-1", "", "gibtsnicht")).toBe("/admin/leagues/staffeln/t-1");
 });

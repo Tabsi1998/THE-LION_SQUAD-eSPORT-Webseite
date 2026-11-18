@@ -56,14 +56,15 @@ test.describe("Abnahme: Liga gegen den echten Server", () => {
       await noSideScroll(page);
       await shot(page, `liga-season-${width}.png`);
 
-      await page.getByTestId("staffel-manage-1-A").click();
-      await expect(page).toHaveURL(new RegExp(`/admin/tournaments/${state.staffel.tournament_id}`));
+      // Paket D (#2262): „Staffel öffnen“ führt auf die Staffel-Seite der Liga-Verwaltung.
+      await page.getByTestId("staffel-open-1-A").click();
+      await expect(page).toHaveURL(new RegExp(`/admin/leagues/staffeln/${state.staffel.tournament_id}$`));
       await expect(page.getByRole("heading", { level: 1 })).toContainText("Staffel A");
       if (state.staffel.status === "draft") {
         // Eine Staffel startet ohne Check-in (#2096) - der Knopf heißt „Liga starten“. Gedrückt wird er hier nicht.
-        await expect(page.getByTestId("admin-tr-primary-action")).toContainText("Liga starten");
+        await expect(page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
       }
-      await page.getByTestId("admin-tr-tab-participants").click();
+      await page.getByTestId("staffel-tab-teilnehmer").click();
       await expect(page.getByTestId("squad-assign-open")).toBeVisible();
       // Handy: Karten, Desktop: Tabelle - je Breite ist nur eine Fassung sichtbar.
       await expect(page.getByText(`${state.teams[0].name} · ${state.teams[0].squad_name}`).filter({ visible: true }).first()).toBeVisible();

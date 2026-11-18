@@ -8,6 +8,8 @@ const DUTY = {
   ended_live: [
     { id: "t1", title: "Herbst-Cup", end_date: "2026-10-31T22:00:00Z", open_matches: 0, admin_url: "/admin/tournaments/t1" },
     { id: "t2", title: "Langer Cup", end_date: "2026-10-31T22:00:00Z", open_matches: 3, admin_url: "/admin/tournaments/t2" },
+    // Eine Staffel (Paket D, #2262): „Staffel öffnen“ auf ihre Staffel-Seite.
+    { id: "t3", title: "Liga 1 · Staffel A", end_date: "2026-10-31T22:00:00Z", open_matches: 2, admin_url: "/admin/leagues/staffeln/t3", league: true },
   ],
   overdue_matches: [{ match_id: "m1", title: "Liga · Staffel A", label: "Spieltag 2", scheduled_at: "2026-11-01T19:00:00Z", url: "/matches/m1" }],
   rules_pending: [
@@ -40,6 +42,9 @@ test("zeigt alle Arten mit Satz und Weg", () => {
   expect(screen.getByTestId("duty-ended-open-t1")).toHaveTextContent("Beenden");
   expect(screen.getByTestId("duty-ended-open-t1")).toHaveAttribute("href", "/admin/tournaments/t1");
   expect(screen.getByTestId("duty-ended-t2")).toHaveTextContent("3 Spiele sind noch offen");
+  expect(screen.getByTestId("duty-ended-open-t2")).toHaveTextContent("Turnier öffnen");
+  expect(screen.getByTestId("duty-ended-open-t3")).toHaveTextContent("Staffel öffnen");
+  expect(screen.getByTestId("duty-ended-open-t3")).toHaveAttribute("href", "/admin/leagues/staffeln/t3");
   expect(screen.getByTestId("duty-overdue-m1")).toHaveTextContent("Überfällig: Spieltag 2");
   expect(screen.getByTestId("duty-overdue-m1")).toHaveTextContent("So 01.11. 20:00");
   expect(screen.getByTestId("duty-overdue-open-m1")).toHaveAttribute("href", "/matches/m1");

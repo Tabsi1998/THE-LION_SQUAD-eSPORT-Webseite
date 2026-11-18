@@ -71,7 +71,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
             <div className="mt-1 text-sm text-white/70">{endedLiveText(row)}</div>
           </div>
           <Link to={row.admin_url} data-testid={`duty-ended-open-${row.id}`} className={BUTTON}>
-            {Number(row.open_matches || 0) > 0 ? "Turnier öffnen" : "Beenden"} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+            {/* Eine Staffel (Paket D, #2262) führt auf ihre Staffel-Seite - dort heißt sie Staffel, nicht Turnier. */}
+            {Number(row.open_matches || 0) > 0 ? (row.league ? "Staffel öffnen" : "Turnier öffnen") : "Beenden"} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
           </Link>
         </li>
       ))}

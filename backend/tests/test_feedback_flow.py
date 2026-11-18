@@ -144,6 +144,21 @@ async def test_overview_shows_number_and_average_but_keeps_the_limit_of_three(fl
 
 
 @pytest.mark.asyncio
+async def test_the_tournament_overview_leaves_out_the_staffeln(flow):
+    """Paket D (#2262): Die Übersicht gehört dem Bereich Turniere - die Rückmeldungen einer Staffel stehen auf ihrer Staffel-Seite.
+    Auch Zahl und Gesamtschnitt rechnen sie nicht mit."""
+    cup = await flow.create_tournament(title="Herbst-Cup", status="results_published", start_date="2026-10-17T12:00:00+00:00")
+    staffel = await flow.create_tournament(title="Staffel A", status="completed", start_date="2026-10-18T12:00:00+00:00", format="league",
+                                           league_context={"league_id": "l-1", "season_id": "s-1", "division_id": "d-1", "staffel": "A"})
+    for target, stars in ((cup["id"], 4), (cup["id"], 4), (cup["id"], 4), (staffel["id"], 1), (staffel["id"], 1), (staffel["id"], 1)):
+        await flow.db.feedback_entries.insert_one({"id": new_id(), "kind": "tournament", "target_id": target, "stars": stars, "tags": [], "text": "", "day": "2026-10-21"})
+    flow.act_as(await flow.add_staff())
+    data = (await flow.get("/api/admin/feedback/overview")).json()
+    assert [row["title"] for row in data["items"]] == ["Herbst-Cup"]
+    assert data["total"] == 1 and data["summary"] == {"targets": 1, "answers": 3, "average": 4.0}
+
+
+@pytest.mark.asyncio
 async def test_admin_sees_no_names_and_details_only_from_three(flow, clock):
     cup, checked, played, absent, stranger = await setup_cup(flow)
     extra = []

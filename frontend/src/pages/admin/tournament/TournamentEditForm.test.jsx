@@ -11,6 +11,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true, usePrompt: () => async () => null }));
 
 const { TournamentEditForm } = await import("./TournamentEditForm");
+const { StaffelSeasonValues } = await import("./StaffelParts");
 
 const BASE = { id: "t-1", title: "Probe-Cup", status: "check_in", format: "single_elim", team_mode: "solo", start_date: "2026-10-31T17:00:00+00:00" };
 
@@ -82,8 +83,10 @@ test("Stream: Plattform und Kanal statt drei Wege, alter Verweis nur wenn befül
   expect(await screen.findByTestId("tr-edit-stream")).toHaveValue("https://example.org/stream");
 });
 
-test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fehlen", async () => {
-  renderStaffel();
+// Paket D (#2262): Nur noch die Staffel-Seite zeigt das Formular einer Staffel - „Aus der Season“ steht dort als eigener Abschnitt
+// (StaffelSeasonValues), das Formular selbst nur, was die Staffel ändern darf.
+test("Staffel: „Aus der Season“ nur lesend mit Weg zur Season", async () => {
+  render(<MemoryRouter><StaffelSeasonValues tournament={STAFFEL} /></MemoryRouter>);
   const values = await screen.findByTestId("tr-edit-season-values");
   expect(values).toHaveTextContent("Aus der Season");
   expect(screen.getByTestId("tr-edit-season-bo")).toHaveTextContent("Best of 3");
@@ -91,6 +94,12 @@ test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fe
   expect(screen.getByTestId("tr-edit-season-default-match")).toHaveTextContent("Sonntag · 20:00");
   expect(screen.getByTestId("tr-edit-season-rules")).toHaveTextContent("Fair spielen.");
   expect(within(values).getByRole("link", { name: "Season öffnen" })).toHaveAttribute("href", "/admin/leagues/seasons/s-1");
+});
+
+test("Staffel: Liga-fremde Felder fehlen, das Formular zeigt weder „Aus der Season“ noch „Vorschau neu mischen“", async () => {
+  renderStaffel();
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-season-values")).toBeNull();
   for (const testId of ["tr-edit-start", "tr-edit-reg-from", "tr-edit-checkin-from", "tr-edit-discord-registration", "tr-edit-auto-start",
     "tr-edit-discord-skip", "tr-edit-team-size", "tr-edit-max", "tr-edit-min", "tr-edit-bo", "tr-edit-season-weight", "tr-edit-advancement",
     "tr-edit-matchday-days", "tr-edit-matchday-time", "tr-edit-rules", "tr-edit-prizes", "tr-edit-create-prizes", "tr-edit-award-1",
@@ -100,26 +109,22 @@ test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fe
   for (const label of ["Turnierstruktur", "Teilnahme", "Spiel", "Sichtbarkeit", "Austragung", "Ergebniserfassung", "Terminplanung", "Seeding"]) {
     expect(screen.queryByLabelText(label)).toBeNull();
   }
-  expect(screen.getByTestId("tr-edit-staffel-remix")).toHaveTextContent("Vorschau neu mischen");
+  expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
+  expect(screen.getByText("Banner der Staffel")).toBeInTheDocument();
 });
 
 test("Staffel: die Antwortfrist auf Terminvorschläge kommt seit #2106 aus der Season - nur lesend", async () => {
   apiMock.patch.mockResolvedValue({ data: {} });
-  renderStaffel({ ...STAFFEL, match_schedule_response_hours: 24 });
+  const { unmount } = render(<MemoryRouter><StaffelSeasonValues tournament={{ ...STAFFEL, match_schedule_response_hours: 24 }} /></MemoryRouter>);
   expect(await screen.findByTestId("tr-edit-season-response")).toHaveTextContent("24 Std.");
+  unmount();
+  renderStaffel({ ...STAFFEL, match_schedule_response_hours: 24 });
+  await screen.findByTestId("tr-edit-title");
   expect(screen.queryByTestId("tr-edit-response-hours")).toBeNull();
   expect(screen.queryByTestId("tr-edit-staffel-matchdays")).toBeNull();
   fireEvent.change(screen.getByTestId("tr-edit-title"), { target: { value: "Staffel A (Probe)" } });
   fireEvent.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-s", { title: "Staffel A (Probe)" }));
-});
-
-test("Staffel-Seite (#2262): ohne „Aus der Season“ und ohne „Vorschau neu mischen“ - beides steht dort an eigener Stelle", async () => {
-  render(<MemoryRouter><TournamentEditForm tournament={STAFFEL} onSaved={() => {}} seasonValues={false} remix={false} /></MemoryRouter>);
-  await screen.findByTestId("tr-edit-title");
-  expect(screen.queryByTestId("tr-edit-season-values")).toBeNull();
-  expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
-  expect(screen.getByText("Banner der Staffel")).toBeInTheDocument();
 });
 
 test("Staffel: Liga-Wörter statt Turnier-Beispiel und kein Event-Satz - normale Turniere unverändert", async () => {
@@ -134,9 +139,9 @@ test("Staffel: Liga-Wörter statt Turnier-Beispiel und kein Event-Satz - normale
   expect(screen.getByTestId("tr-edit-event")).toHaveTextContent("Gehört zu keinem Event");
 });
 
-test("Staffel nach dem Start: kein Neu-Mischen mehr", async () => {
+test("Staffel nach dem Start: kein Neu-Mischen und kein „Struktur anwenden“", async () => {
   renderStaffel({ ...STAFFEL, status: "live" });
-  await screen.findByTestId("tr-edit-season-values");
+  await screen.findByTestId("tr-edit-title");
   expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
   expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
 });

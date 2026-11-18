@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from fastapi import HTTPException
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
+from services.league_scope import league_tournament_ids
 
 VIENNA = ZoneInfo("Europe/Vienna")
 KINDS = ("tournament", "event")
@@ -246,6 +247,10 @@ async def overview(db, *, kind: str | None = None) -> dict:
     rows = await db.feedback_entries.aggregate([
         {"$match": match}, {"$group": {"_id": {"kind": "$kind", "target_id": "$target_id"}, "count": {"$sum": 1}, "stars": {"$sum": "$stars"}, "day": {"$max": "$day"}}},
     ]).to_list(OVERVIEW_LIMIT * 4)
+    # Paket D (#2262): Die Übersicht gehört dem Bereich Turniere - Staffeln zeigen ihre Rückmeldungen auf der Staffel-Seite. Sie
+    # fallen auch aus Zahl und Gesamtschnitt.
+    staffeln = await league_tournament_ids(db, [row["_id"]["target_id"] for row in rows if row["_id"]["kind"] == "tournament"])
+    rows = [row for row in rows if not (row["_id"]["kind"] == "tournament" and row["_id"]["target_id"] in staffeln)]
     declined = {(row["_id"]["kind"], row["_id"]["target_id"]): int(row["n"]) for row in await db.feedback_receipts.aggregate([
         {"$match": {**match, "status": "declined"}}, {"$group": {"_id": {"kind": "$kind", "target_id": "$target_id"}, "n": {"$sum": 1}}},
     ]).to_list(OVERVIEW_LIMIT * 4)}

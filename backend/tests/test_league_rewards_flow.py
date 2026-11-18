@@ -737,7 +737,10 @@ async def test_the_tv_shows_the_podium_with_public_rewards_only_after_the_close_
     key = await tv_key(flow, staffel)
     await play_all(flow, staffel)
     # Vor dem Abschluss: kein Podest - der Sieger-Moment bleibt, wie er war.
-    assert (await tv_of(flow, staffel, key))["league_podium"] is None
+    tv = await tv_of(flow, staffel, key)
+    assert tv["league_podium"] is None
+    # Liga-Wörter am TV (Paket D, #2262): die Anzeige weiß, dass es eine Staffel ist.
+    assert tv["staffel"] is True
 
     flow.act_as(admin)
     await must_close(flow, staffel)

@@ -2,7 +2,7 @@
 // Season öffnet ihre eigene Seite mit Vorgaben, Sperrzeiten, Map-Pool, Liga N und Staffeln. Für den Bereich Ligen und
 // Zuständige (#2203): Der Server schickt je Liga `capabilities`, danach richten sich die Knöpfe; er prüft selbst noch einmal.
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ChevronRight, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -17,6 +17,7 @@ import { accentProblem, accentStyle } from "@/lib/leagueLook";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { LeagueStaffSheet } from "./LeagueStaffSheet";
+import { leagueAnchorId } from "@/lib/staffelTabs";
 import { AccentField, BannerField, EmblemField } from "./LeagueLookFields";
 import { toast } from "sonner";
 
@@ -27,7 +28,7 @@ const STEPS = [
   "Liga je Spiel anlegen",
   "Season mit Beginn anlegen, dann Vorgaben, Sperrzeiten, Map-Pool, Regeltext und Sichtbarkeit festlegen",
   "Liga 1 anlegen",
-  "Staffel anlegen und in der Turnierverwaltung der Staffel die Co-Teams zuteilen",
+  "Staffel anlegen und auf der Staffel-Seite die Co-Teams zuteilen",
 ];
 
 // Anlegen oder bearbeiten (#2106): Name, Beschreibung und Stand immer; das Spiel nur, solange keine Season eine Staffel
@@ -156,6 +157,16 @@ export default function AdminLeaguesPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["leagues"]);
+  // Aus den Brotkrumen der Staffel-Seite (Paket D, #2262): `#liga-<id>` springt nach dem Laden an die Liga und setzt den Fokus dorthin.
+  const { hash } = useLocation();
+  const loaded = Boolean(data);
+  useEffect(() => {
+    if (!loaded || !hash) return;
+    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (!target) return;
+    target.scrollIntoView?.({ block: "start" });
+    target.focus?.({ preventScroll: true });
+  }, [loaded, hash]);
 
   // „Archivieren statt löschen“ (#2106): der Stand der Liga, sonst bleibt alles.
   const archive = async (league) => {
@@ -181,7 +192,7 @@ export default function AdminLeaguesPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Liga</h1>
-          <p className="mt-2 text-sm text-white/60">Eine Staffel ist ein Turnier: Spielwochen, Termine, Ergebnisse und Tabelle laufen in der Turnierverwaltung. Hier legst du den Rahmen fest.</p>
+          <p className="mt-2 text-sm text-white/60">Jede Staffel hat ihre Staffel-Seite: Teilnehmer, Spielplan, Ergebnisse und Tabelle laufen dort. Hier legst du den Rahmen fest.</p>
         </div>
         {data && canCreate ? (
           <button type="button" onClick={() => setSheet({ kind: "league" })} disabled={!games.length} data-testid="league-add"
@@ -212,7 +223,7 @@ export default function AdminLeaguesPage() {
 
       <div className="space-y-6">
         {leagues.map((league) => (
-          <section key={league.id} className="border border-white/10 rounded-sm bg-[#121212]" data-testid={`league-${league.slug}`} aria-label={league.name}>
+          <section key={league.id} id={leagueAnchorId(league.id)} tabIndex={-1} className="scroll-mt-24 border border-white/10 rounded-sm bg-[#121212] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#29B6E8]" data-testid={`league-${league.slug}`} aria-label={league.name}>
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3" style={accentStyle(league.accent_color)}>
               <LeagueEmblem src={league.emblem_url} size={40} testId={`league-emblem-${league.slug}`} />
               <div className="min-w-0 flex-1">

@@ -191,12 +191,3 @@ test("fester Baum mit einer leeren neuen Phase: Generieren bleibt, die Vorschau 
   expect(screen.getByTestId("stage-generate-s1")).toBeInTheDocument();
 });
 
-// Liga-Staffel (#2109, S23): keine „Regeln dieser Phase“ (Vor Ort schaltete die Spielwochen ab), kein Stations-Hinweis.
-test("Staffel: keine Regeln je Phase, der Hinweis spricht von Spielwochen statt Stationen", () => {
-  const staffel = { league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, format: "league" };
-  panel({ canEditSettings: true, tournament: staffel, durationGame: GAME, onOpenMatchplan: () => {} });
-  expect(screen.queryByTestId("stage-rules-toggle-s1")).toBeNull();
-  const hint = screen.getByTestId("stages-matchplan-hint");
-  expect(hint).toHaveTextContent("Spielwochen");
-  expect(hint).not.toHaveTextContent("Station");
-});

@@ -187,3 +187,9 @@ test("Tastatur: Fokus im Fenster, Hintergrund gesperrt, Escape schließt", async
   await user.keyboard("{Escape}");
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+// Im Turnier bleibt der Satz, wie er war (Paket D, #2262, Liga-Wörter nur in der Liga).
+test("Turnierspiel: der Satz zum Rückgängig nennt weiter den Baum", () => {
+  render(<ResultWindow entry={DUEL} onClose={() => {}} onSaved={() => {}} />);
+  expect(screen.getByTestId("result-undo-note")).toHaveTextContent("erst dann rückt der Baum weiter");
+});

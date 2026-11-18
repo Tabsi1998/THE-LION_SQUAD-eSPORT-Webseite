@@ -24,7 +24,7 @@ import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, seedingModeOf, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
-import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
+import { isStaffel } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
 import { STREAM_ADDRESS_HINT, streamFormValues, streamPayload } from "@/lib/tournamentStream";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
@@ -32,10 +32,10 @@ import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMo
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
 
-// `seasonValues` und `remix` (#2262, Staffel-Seite): Dort steht „Aus der Season“ als eigener Abschnitt (für jede Zuständigkeit lesbar)
-// und „Vorschau neu mischen“ im Reiter Spielplan - das Formular zeigt dann beides nicht noch einmal.
+// Staffel-Modus (#2262): Nur die Staffel-Seite der Liga-Verwaltung zeigt das Formular für eine Staffel. „Aus der Season“ steht dort als
+// eigener Abschnitt und „Vorschau neu mischen“ im Reiter Spielplan - das Formular zeigt beides nicht noch einmal.
 // `onDirtyChange` (#2262): meldet, ob ungespeicherte Eingaben da sind - die Staffel-Seite übernimmt einen neuen Stand dann nicht still.
-export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false, seasonValues = true, remix = true, onDirtyChange }) {
+export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false, onDirtyChange }) {
   const dt = toDateTimeLocalInput;
   // Liga-Staffel (#2109): Season-Werte nur lesend in der Seitenleiste, Liga-fremde Felder fehlen ganz.
   const staffel = isStaffel(tournament);
@@ -309,12 +309,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   const sendBilling = canFinance && billingDirty;
   const hasFormChanges = hasPayloadChanges(dirtyPayload) || sendBilling;
   useEffect(() => { onDirtyChange?.(hasFormChanges); }, [hasFormChanges, onDirtyChange]);
-  // Staffel (#2109, S15): die Vorschau neu mischen mit der vorhandenen Phase - Struktur und Format gibt die Liga vor.
   // Ohne force (#2120, TA17): im laufenden Turnier fragt der Server mit Zahlen nach, echte Spiele ersetzt eine
   // Vorschau nie.
-  const rebuild = () => onRebuildFromFormat?.(staffel
-    ? { preview: true, force: true, keepStage: true }
-    : { preview: true, structure: structurePayload() });
+  const rebuild = () => onRebuildFromFormat?.({ preview: true, structure: structurePayload() });
   const save = async ({ rebuildPreview = false } = {}) => {
     try {
       const billingProblem = sendBilling ? billingFormError(billingForm) : "";
@@ -357,7 +354,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   return (
     <div className="min-w-0">
       <FormColumns
-        aside={staffel ? (seasonValues ? <StaffelSeasonValues tournament={tournament} games={games} /> : null) : (
+        aside={staffel ? null : (
           <FormSection title="Zeitplan und Anmeldung" hint="Anmeldung und Check-in wechseln zeitgesteuert; der Live-Start bleibt bei der Turnierleitung, solange unten nichts anderes gesetzt ist.">
             <TextField label="Start Event/Turnier" type="datetime-local" value={f.start_date} onChange={(v)=>set("start_date",v)} testId="tr-edit-start"/>
             <TextField label="Ende Event/Turnier" type="datetime-local" value={f.end_date} onChange={(v)=>set("end_date",v)} testId="tr-edit-end"/>
@@ -594,12 +591,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         </div>
       )}
       <FormActions onSubmitClick={() => save()} submitTestId="tr-edit-save" icon={null} hint={hasFormChanges ? "Ungespeicherte Änderungen" : undefined}>
-        {/* Staffel (#2109, S15): vor dem Start heißt es, was es tut - die Vorschau neu mischen; danach steht der Spielplan. */}
-        {staffel ? remix && staffelBeforeStart(tournament) && (
-          <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-staffel-remix" className="tls-btn tls-btn--secondary px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm">
-            Speichern & Vorschau neu mischen
-          </button>
-        ) : structureFixed ? (
+        {staffel ? null : structureFixed ? (
           // Der Baum steht (#2120, TA17): „Struktur anwenden“ ersetzte hier alle echten Spiele samt Ergebnissen.
           <span className="text-xs text-white/50 self-center" data-testid="tr-edit-structure-fixed">{FIXED_FIELD_HINT}</span>
         ) : rules.structureRebuild ? (

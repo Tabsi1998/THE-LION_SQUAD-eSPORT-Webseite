@@ -31,7 +31,7 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
   const capLine = lateCapLine(closes, start, form.late_registration_days, extension);
   return (
     <FormSection title="Selbstanmeldung" testId="season-application-settings" id={id} className="scroll-mt-24"
-      hint="Captains und Vertreter melden ihr Co-Team auf der Ligaseite an, die Leitung entscheidet oder die Season nimmt automatisch an. Ohne Beginn und Ende gibt es das nicht: Dann teilst du wie bisher in der Turnierverwaltung zu. Für die Anmeldung braucht es ein gültiges Regelwerk.">
+      hint="Captains und Vertreter melden ihr Co-Team auf der Ligaseite an, die Leitung entscheidet oder die Season nimmt automatisch an. Ohne Beginn und Ende gibt es das nicht: Dann teilst du auf der Staffel-Seite zu. Für die Anmeldung braucht es ein gültiges Regelwerk.">
       <FormGrid cols={2}>
         <TextField label="Anmeldung ab" type="datetime-local" value={form.application_opens} onChange={(value) => set("application_opens", value)} hint="Wiener Zeit" testId="season-form-application-opens" />
         <TextField label="Anmeldung bis" type="datetime-local" value={form.application_closes} onChange={(value) => set("application_closes", value)} hint="Wiener Zeit" testId="season-form-application-closes" />
@@ -65,7 +65,7 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
       <Toggle label="Warteliste" hint="Sind alle Startplätze vergeben, kommen Anmeldungen auf die Warteliste: Du setzt sie dorthin, mit „automatisch annehmen“ die Season. Ohne Warteliste endet die Anmeldung, sobald alle Plätze weg sind. Niemand rückt von selbst nach, über einen freien Platz entscheidest du."
         checked={form.application_waitlist} onChange={(value) => set("application_waitlist", value)} testId="season-form-application-waitlist" />
       <TextAreaField label="Regel zur Warteliste" rows={2} value={form.application_waitlist_note} onChange={(value) => set("application_waitlist_note", value)} hint="Steht öffentlich auf der Ligaseite, z. B. nach welcher Reihenfolge die Leitung entscheidet." testId="season-form-application-waitlist-note" />
-      <Toggle label="Zwei Co-Teams eines Hauptteams in derselben Staffel" hint="Vorgabe: Nein. Gilt auch fürs Zuteilen in der Turnierverwaltung. Ein Co-Team bleibt je Season in einer Staffel."
+      <Toggle label="Zwei Co-Teams eines Hauptteams in derselben Staffel" hint="Vorgabe: Nein. Gilt auch fürs Zuteilen auf der Staffel-Seite. Ein Co-Team bleibt je Season in einer Staffel."
         checked={form.sibling_squads_in_staffel} onChange={(value) => set("sibling_squads_in_staffel", value)} testId="season-form-sibling-squads" />
       <TextAreaField label="Hinweis zum Datenschutz" rows={3} value={form.application_privacy_text} onChange={(value) => set("application_privacy_text", value)}
         hint="Steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer: ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei." testId="season-form-application-privacy" />

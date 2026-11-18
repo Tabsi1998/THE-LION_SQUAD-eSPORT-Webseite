@@ -1,7 +1,6 @@
 // Kleine Helfer der Staffel-Seite (#2262), von Überblick und Teilnehmer gemeinsam genutzt.
 import { lateEntryText } from "@/lib/leagueTable";
 import { staffelStand } from "@/lib/seasonTabs";
-import { staffelManageUrl } from "@/lib/staffelTabs";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
 import { STAFFEL_STATUS_WORDS } from "@/pages/admin/tournament/shared";
 
@@ -11,8 +10,6 @@ export const ACTIVE_STAFFEL_REGISTRATION = new Set(["approved", "checked_in"]);
 /** Hat die Person dieses Liga-Recht in der Staffel (`league_capabilities` vom Server)? */
 export const hasCapability = (tournament, capability) => (tournament?.league_capabilities || []).includes(capability);
 
-/** Für „Was fehlt“ (`staffelNeeds`): Zuteilen führt zum Abschnitt „Co-Team zuteilen“, alles andere an seine Stelle. */
-export const needsUrl = (tournamentId) => (tab) => staffelManageUrl(tournamentId, tab, tab === "participants" ? "zuteilen" : "");
 
 // Liga-Wörter statt Turnier-Status (Fabian zu #2262: kein „Entwurf“ bei Staffeln) - an einer Stelle in tournament/shared.js, damit auch
 // die Meldungen nach dem Statuswechsel dieselben Wörter tragen. Vor dem Start gibt es keinen Status zum Wählen.
