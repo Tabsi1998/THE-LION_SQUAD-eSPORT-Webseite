@@ -46,11 +46,11 @@ test("über dem Ziel nur Warnung, über der Grenze Fehler", () => {
   assert.equal(judge(62_000, 63_000, undefined), "ok");
 });
 
-test("die echte PERFORMANCE_BUDGETS.md: JS-Grenze 305.000 mit Ziel 300.000, CSS-Grenze 63.000", () => {
+test("die echte PERFORMANCE_BUDGETS.md: JS-Grenze 305.000 mit Ziel 290.000, CSS-Grenze 60.500 (Fabian 18.11., #2511)", () => {
   const markdown = readFileSync(new URL("../PERFORMANCE_BUDGETS.md", import.meta.url), "utf8");
   assert.equal(parseBudgets(markdown)["startup-js-gzip"], 305000);
-  assert.equal(parseGoals(markdown)["startup-js-gzip"], 300000);
-  assert.equal(parseBudgets(markdown)["startup-css-gzip"], 63000);
+  assert.equal(parseGoals(markdown)["startup-js-gzip"], 290000);
+  assert.equal(parseBudgets(markdown)["startup-css-gzip"], 60500);
 });
 
 test("gzip mit fester Stufe ist reproduzierbar", () => {

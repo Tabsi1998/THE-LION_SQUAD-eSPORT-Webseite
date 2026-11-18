@@ -37,12 +37,12 @@ etwa 2–3 % über dem neuen Ist-Wert), damit Gewonnenes nicht still wieder verl
 
 | | Ist (18.11.2026, #2511) | Ziel (Warnung) | Grenze (Fehler) |
 | --- | --- | --- | --- |
-| Start-JS gzip | 287.419 Bytes | 300.000 Bytes | 305.000 Bytes |
-| Start-CSS gzip | 58.805 Bytes | – (siehe nächste Schritte) | 63.000 Bytes |
+| Start-JS gzip | 287.419 Bytes | 290.000 Bytes | 305.000 Bytes |
+| Start-CSS gzip | 58.805 Bytes | – (siehe nächste Schritte) | 60.500 Bytes |
 
-<!-- goal:startup-js-gzip 300000 -->
+<!-- goal:startup-js-gzip 290000 -->
 <!-- budget:startup-js-gzip 305000 -->
-<!-- budget:startup-css-gzip 63000 -->
+<!-- budget:startup-css-gzip 60500 -->
 
 - Neue Admin-, Editor-, Chart-, TV- oder Display-Features werden lazy geladen.
 - Tiptap, Charts, QR/Display und schwere Admin-Tabellen duerfen nicht unnoetig in den anonymen Public-Startpfad rutschen.
