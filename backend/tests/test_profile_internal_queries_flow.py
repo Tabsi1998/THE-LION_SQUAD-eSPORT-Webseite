@@ -1,8 +1,9 @@
-"""Vereinsinterne Erfolge (#2516): die Mitglieder-Ansicht eines Profils fragt nicht je Eintrag neu nach.
+"""Vereinsinterne Erfolge (#2516, #2521): die Mitglieder-Ansicht eines Profils fragt nicht je Eintrag neu nach.
 
 Die Sichtbarkeit wird je Aufruf einmal je Stufe, je Season und je Liga entschieden (wie ``visibility.filter_visible``), und die
 Anmeldungen für die Plätze der Referenzen kommen in einer Abfrage für alle Turniere. Gemessen wird die Zahl der Datenbank-Abfragen
-auf ``/api/users/public/{name}`` - mit 4 und mit 16 internen Turnieren muss sie gleich bleiben. Dazu höchstens ein Aufruf von
+auf ``/api/users/public/{name}`` - mit 4 und mit 16 internen Turnieren, Bestzeiten (je eine eigene Strecke) und Seasons der
+Liga-Historie muss sie gleich bleiben. Dazu höchstens ein Aufruf von
 ``areas_for`` bzw. ``capabilities_of`` je Stufe bzw. Liga statt einer je Eintrag. Nur erfundene Namen.
 """
 import pathlib
@@ -78,7 +79,30 @@ async def seed(flow, internal_count: int):
                            "visibility": "public", "is_public": True, "status": "results_published"},
             "league": {"season_id": "s-verein", "title": "Meister", "division_label": "Liga 1", "staffel": "A", "display_name": "Probe"},
         })
+    await seed_round_two(flow, owner, internal_count)
     return owner, member
+
+
+async def seed_round_two(flow, owner: dict, internal_count: int) -> None:
+    """#2521: je interner Eintrag eine Fast-Lap-Challenge „Nur Mitglieder“ mit eigener Strecke und eine Season „Nur Mitglieder“ mit
+    abgeschlossener Staffel (Liga-Historie) - nach den Trophäen angelegt, damit deren Zahl gleich bleibt."""
+    for n in range(internal_count):
+        cid = f"c-verein-{n}"
+        await flow.db.f1_challenges.insert_one({"id": cid, "slug": cid, "title": f"Hotlap {n}", "status": "active", "visibility": "members"})
+        await flow.db.f1_tracks.insert_one({"id": f"tr-{n}", "name": f"Strecke {n}", "challenge_id": cid})
+        await flow.db.f1_lap_times.insert_one({"id": f"lap-{n}", "challenge_id": cid, "track_id": f"tr-{n}", "user_id": owner["id"],
+                                               "time_ms": 80000 + n, "is_invalid": False, "created_at": "2026-09-02T18:00:00+00:00"})
+        season_id, staffel = f"s-hist-{n}", f"st-hist-{n}"
+        await flow.db.league_seasons.insert_one({"id": season_id, "league_id": "liga-1", "status": "completed", "visibility": "members",
+                                                 "name": f"Season {n}", "slug": season_id})
+        await flow.db.tournaments.insert_one({"id": staffel, "slug": staffel, "title": "Staffel A", "status": "completed",
+                                              "visibility": "members", "is_public": True, "format": "round_robin",
+                                              "league_context": {"season_id": season_id, "staffel": "A"}})
+        await flow.db.league_final_tables.insert_one({
+            "id": f"ft-{n}", "active": True, "season_id": season_id, "league_id": "liga-1", "tournament_id": staffel, "staffel": "A",
+            "player_ids": [owner["id"]], "participants": 4, "closed_at": f"2026-10-{n % 28 + 1:02d}T20:00:00+00:00",
+            "rows": [{"registration_id": f"rh-{n}", "rank": 1, "display_name": "Probe"}],
+            "sides": {f"rh-{n}": {"player_ids": [owner["id"]]}}})
 
 
 async def measure(flow, monkeypatch, internal_count: int) -> dict:
@@ -108,8 +132,14 @@ async def measure(flow, monkeypatch, internal_count: int) -> dict:
         database._db = plain
     assert res.status_code == 200, res.text
     body = res.json()
-    assert sum(1 for item in body["references"]["items"] if item["internal"]) == internal_count, "Mitglied sieht die Turniere „Nur Mitglieder“"
+    refs = body["references"]["items"]
+    assert sum(1 for item in refs if item["internal"] and item["kind"] == "tournament") == internal_count, "Mitglied sieht die Turniere „Nur Mitglieder“"
+    assert sum(1 for item in refs if item["internal"] and item["kind"] == "fastlap") == internal_count, "und die Fast Laps „Nur Mitglieder“"
     assert sum(1 for row in body["awards"] if row["internal"]) == 2 * internal_count, "dazu ihre Trophäen und die Liga-Titel"
+    # #2521: Teilnahmen, Bestzeiten und Liga-Historie nach derselben Regel - ebenso ohne Abfrage je Eintrag.
+    assert sum(1 for row in body["tournaments"] if row["internal"]) == internal_count, "Teilnahmen „Nur Mitglieder“"
+    assert sum(1 for row in body["f1_bests"] if row["internal"]) == internal_count, "Bestzeiten „Nur Mitglieder“"
+    assert sum(1 for row in body["league_history"] if row["internal"]) == internal_count, "Seasons „Nur Mitglieder“"
     return calls
 
 
