@@ -55,6 +55,11 @@ const LOG_ROWS = [
   { id: "l3", action: "league.application.accept", label: "Anmeldung · angenommen", at: inHours(-6), actor: "Leitung", staffel: null, match_id: null },
 ];
 
+const STAFFEL_LOG_ROWS = [
+  { id: "s1", action: "tournament.status.change", label: "Staffel · Liga gestartet", at: inHours(-2), actor: "Leitung", staffel: "Probe-Liga Season 1 · Liga 1 · Staffel A", match_id: null },
+  LOG_ROWS[1],
+];
+
 async function mockServer(page, { desk = DESK } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
@@ -77,6 +82,8 @@ async function mockServer(page, { desk = DESK } = {}) {
     }
     if (where === "/admin/leagues/seasons/s1/desk/log") {
       const pageNo = Number(new URL(request.url()).searchParams.get("page") || 1);
+      // Mit Staffel-Filter liefert der Server nur Einträge dieser Staffel - keine Rundnachricht an die Season, keine Anmeldung.
+      if (new URL(request.url()).searchParams.get("staffel")) return json({ items: STAFFEL_LOG_ROWS, page: 1, pages: 1, total: STAFFEL_LOG_ROWS.length, page_size: 25 })(route);
       return json({ items: pageNo === 1 ? LOG_ROWS : LOG_ROWS.slice(0, 1), page: pageNo, pages: 2, total: 28, page_size: 25 })(route);
     }
     const bodies = {
@@ -180,4 +187,51 @@ test.describe("Liga: Leitstand der Season", () => {
     await expect.poll(() => busy.getByTestId("desk-item-overdue:m1").evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
     await busy.close();
   });
+});
+
+// Staffel-Filter (#2262): Der Link „Offen in dieser Staffel“ der Staffel-Seite öffnet den Leitstand mit `?staffel=` - nur deren Aufgaben
+// und Protokoll, sichtbar gefiltert und mit „Alle Staffeln“ aufhebbar.
+const STAFFEL_OF = { "incidents:m4": "t1", "overdue:m1": "t1", "overdue:m2": "t2", "procedures:p1": "t1", "sanctions:x:provisional": "t1", "applications:a1": null };
+const SCOPED_DESK = { ...DESK, groups: DESK.groups.map((group) => ({ ...group, items: group.items.map((row) => ({ ...row, staffel_id: STAFFEL_OF[row.id] ?? null })) })) };
+
+test.describe("Liga: Leitstand mit Staffel-Filter", () => {
+  test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`nur Aufgaben und Protokoll der Staffel, aufhebbar, bei ${width} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const logAsked = [];
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.pathname.endsWith("/desk/log")) logAsked.push(url.searchParams.get("staffel"));
+      });
+      await mockServer(page, { desk: SCOPED_DESK });
+      await page.goto("/admin/leagues/seasons/s1?staffel=t1#leitstand");
+      await expect(page.getByTestId("desk-staffel-filter-label")).toHaveText("Liga 1 · Staffel A");
+      await expect(page.getByTestId("desk-total")).toHaveText("4");
+      await expect(page.getByTestId("desk-item-overdue:m1")).toBeVisible();
+      await expect(page.getByTestId("desk-item-overdue:m2")).toHaveCount(0);
+      await expect(page.getByTestId("desk-item-applications:a1")).toHaveCount(0);
+      await expect(page.getByTestId("desk-staffel-filter-hidden")).toContainText("1 Aufgabe der ganzen Season ist ausgeblendet.");
+      await expect(page.getByRole("heading", { name: "Protokoll · Liga 1 · Staffel A" })).toBeVisible();
+      await expect(page.getByTestId("desk-log-s1")).toContainText("Staffel · Liga gestartet");
+      await expect(page.getByTestId("desk-log-l1")).toHaveCount(0);
+      // Ausgeblendete Gruppen der ganzen Season stehen nicht unter „Ohne offene Aufgabe“.
+      await expect(page.getByTestId("desk-quiet")).not.toContainText("Anmeldungen");
+      expect(logAsked).toContain("t1");
+      const clear = await page.getByTestId("desk-staffel-filter-clear").boundingBox();
+      expect(clear.height).toBeGreaterThanOrEqual(44);
+      await noSideScroll(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      if (process.env.E2E_SCREENS_DIR) {
+        await page.screenshot({ path: path.join(process.env.E2E_SCREENS_DIR, `2262c-leitstand-filter-${width}-v2.png`), animations: "disabled", fullPage: width === 390 });
+      }
+
+      await page.getByTestId("desk-staffel-filter-clear").click();
+      await expect(page).toHaveURL(/\/admin\/leagues\/seasons\/s1#leitstand$/);
+      await expect(page.getByTestId("desk-total")).toHaveText("6");
+      await expect(page.getByTestId("desk-staffel-filter")).toHaveCount(0);
+    });
+  }
 });

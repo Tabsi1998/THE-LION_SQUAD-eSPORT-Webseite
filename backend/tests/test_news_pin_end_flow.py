@@ -56,7 +56,8 @@ def test_pin_holds_until_vienna_midnight_of_the_last_day():
 
 
 def test_pin_without_end_and_unpinned_posts():
-    assert pin_active({"pinned": True}) is True, "Altbestand ohne Ende bis zur Migration wie bisher"
+    # Mit fester Uhr: Altbestand ohne Ende gilt nur bis Stichtag + 14 Tage, danach nicht mehr (#2474, Ablauf unten).
+    assert pin_active({"pinned": True}, _at(PIN_RULE_SINCE)) is True, "Altbestand ohne Ende bis zur Migration wie bisher"
     assert pin_active({"pinned": False, "pinned_until": day(5)}) is False
     assert pin_active({}) is False
     assert default_pinned_until(datetime(2026, 10, 7, 23, 30, tzinfo=timezone.utc)) == "2026-10-22", "Wiener Tag, nicht UTC"

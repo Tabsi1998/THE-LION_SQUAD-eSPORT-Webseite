@@ -89,3 +89,16 @@ test("ohne Sponsor mit „TV / Anzeige“ sagt das Feld, was zu tun ist", async 
   render(<MemoryRouter><RoundSponsorsPanel tournament={{ id: "t1" }} matches={bracket.matches_v2} stages={bracket.stages} /></MemoryRouter>);
   expect(await screen.findByTestId("admin-tr-round-sponsors-none")).toHaveTextContent("TV / Anzeige");
 });
+
+test("Staffel-Seite (#2262): Sponsor je Spielwoche in Liga-Wörtern, ohne Weg zu „TV & Beamer“", async () => {
+  const user = userEvent.setup();
+  const bracket = singleElimination(4);
+  render(<MemoryRouter><RoundSponsorsPanel tournament={{ id: "t1" }} matches={bracket.matches_v2} stages={bracket.stages} league /></MemoryRouter>);
+  expect(await screen.findByTestId("admin-tr-round-sponsors-league")).toHaveTextContent("Spielwoche");
+  expect(screen.queryByRole("link", { name: /TV & Beamer/ })).toBeNull();
+  const [first] = await screen.findAllByRole("combobox");
+  await waitFor(() => expect(first).not.toBeDisabled());
+  await user.selectOptions(first, "sp1");
+  await user.click(screen.getByTestId("admin-tr-round-sponsors-save"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Spielwoche")));
+});

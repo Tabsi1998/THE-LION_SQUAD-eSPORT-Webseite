@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-// Staffel-Seite der Liga-Verwaltung (#2262, Pakete A und B) im echten Browser, Server nachgestellt: Kopf mit Brotkrumen, Reiter Überblick
+// Staffel-Seite der Liga-Verwaltung (#2262, Pakete A bis C) im echten Browser, Server nachgestellt: Kopf mit Brotkrumen, Reiter Überblick
 // und Teilnehmer, Co-Team zuteilen, Austritt, Rechte ohne Knöpfe; Spielplan, Spiele und Ergebnisse, Tabelle samt Gleichstand. Bei 390
 // und 1440 px ohne seitliches Scrollen, Tippflächen ab 44 px. Mit E2E_SCREENS_DIR legt der Test die Bilder je Reiter ab. Nur erfundene Namen.
 const path = require("node:path");
@@ -88,11 +88,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.goto("/admin/leagues/staffeln/t1");
     await expect(page.getByTestId("staffel-title")).toHaveText("Liga 1 · Staffel A");
     await expect(page.getByTestId("staffel-crumb-season")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
-    await expect(page.getByTestId("staffel-tabs").getByRole("tab")).toHaveText(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle"]);
+    await expect(page.getByTestId("staffel-tabs").getByRole("tab")).toHaveText(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle", "Protokoll", "Einstellungen"]);
     await expect(page.getByTestId("tournament-flow-stepper")).toContainText("Co-Teams zuteilen");
     await expect(page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
     await expect(page.getByTestId("staffel-numbers-teams")).toContainText("2 von 8");
-    await expect(page.getByTestId("staffel-desk-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1#leitstand");
+    await expect(page.getByTestId("staffel-desk-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1?staffel=t1#leitstand");
     await noSideScroll(page);
     await touchTargets(page, "staffel-panel-ueberblick");
 
@@ -426,3 +426,164 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       registration_ids: [first.registration_id, second.registration_id], reason: "Entscheidungsspiel 2:1 gewonnen", method: "playoff" });
   });
 }
+
+// ---------------------------------------------------------------- Paket C: Protokoll und Einstellungen
+
+const LONG_TITLE = "Probe-Liga der außergewöhnlich langen Vereinsnamen Season 1 · Liga 1 · Staffel A";
+const LOG_LABELS = ["Staffel · Liga gestartet", "Co-Team · ausgetreten", "Kampflos gewertet", "Verschiebung · beantragt", "Ergebnis · bestätigt",
+  "Staffel · Darstellung geändert", "Spielplan · Spieltage neu ausgelost"];
+
+/** Ein Protokoll mit `total` Einträgen, seitenweise wie der Server (25 je Seite); zählt die Abrufe samt Staffel-Filter. */
+function logServer(total) {
+  const asked = [];
+  const handler = (route) => {
+    const url = new URL(route.request().url());
+    const pageNo = Math.max(1, Number(url.searchParams.get("page") || 1));
+    asked.push({ page: pageNo, staffel: url.searchParams.get("staffel") });
+    const pages = Math.max(1, Math.ceil(total / 25));
+    const start = (Math.min(pageNo, pages) - 1) * 25;
+    const items = Array.from({ length: Math.max(0, Math.min(25, total - start)) }, (_, index) => {
+      const n = start + index;
+      return { id: `log-${n}`, action: "x", label: LOG_LABELS[n % LOG_LABELS.length], at: new Date(Date.UTC(2026, 10, 16, 20, 0) - n * 3600_000).toISOString(),
+        actor: n % 5 === 0 ? "Automatik" : "Ligaleitung mit einem wirklich sehr langen Anzeigenamen", staffel: "Liga 1 · Staffel A", match_id: n % 3 === 0 ? `m${n}` : null };
+    });
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ items, page: Math.min(pageNo, pages), pages, total, page_size: 25 }) });
+  };
+  return { asked, handler };
+}
+
+async function mockPackageC(page, { staffel = {}, logTotal = 500, staff = [], matches = [] } = {}) {
+  const calls = await mockServer(page, { staffel: { title: LONG_TITLE, ...staffel }, matches });
+  const json = (body) => (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
+  const log = logServer(logTotal);
+  await page.route(/\/api\/admin\/leagues\/seasons\/s1\/desk\/log(\?.*)?$/, log.handler);
+  await page.route(/\/api\/admin\/leagues\/seasons\/s1\/desk$/, json({ total: 3, mine: 2, groups: [
+    { key: "overdue", items: [{ id: "o1", staffel_id: "t1", mine: true }, { id: "o2", staffel_id: "t2", mine: true }] },
+    { key: "procedures", items: [{ id: "p1", staffel_id: "t1", mine: false }] },
+  ] }));
+  await page.route("**/api/tournaments/t1/staff", json(staff));
+  await page.route("**/api/map-pools/tournaments/t1", json({ game_id: "g1", stages: [], tournament: { origin: "tournament", modes: [
+    { mode: "stellung", label: "Stellung", maps: [{ map_id: "a", name: "Hafen" }, { map_id: "b", name: "Raffinerie mit sehr langem Kartennamen" }] },
+    { mode: "suchen", label: "Suchen und Zerstören", maps: [{ map_id: "c", name: "Bahnhof" }] },
+  ] } }));
+  await page.route("**/api/access-links**", json([]));
+  return { calls, log };
+}
+
+async function fullShot(page, name) {
+  const dir = process.env.E2E_SCREENS_DIR;
+  if (!dir) return;
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", fullPage: true, style: ".tls-bottom-nav { display: none !important; }" });
+}
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+  test(`Staffel-Seite (${width} px): Protokoll mit 500 Einträgen seitenweise, nur diese Staffel`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const { log } = await mockPackageC(page, { staffel: { status: "live" } });
+    await page.goto("/admin/leagues/staffeln/t1#protokoll");
+    await expect(page.getByTestId("staffel-tabs").getByRole("tab")).toHaveText(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle", "Protokoll", "Einstellungen"]);
+    const panel = page.getByTestId("staffel-panel-protokoll");
+    await expect(panel.getByTestId("desk-log-total")).toContainText("500 Einträge");
+    await expect(panel.locator('[data-testid^="desk-log-log-"]')).toHaveCount(25);
+    await expect(panel.getByTestId("desk-log-page")).toHaveText("Seite 1 von 20");
+    // Die Staffel steht nicht in jeder Zeile - es ist ihr eigenes Protokoll.
+    await expect(panel.getByTestId("desk-log-log-1")).not.toContainText("Staffel A");
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-panel-protokoll");
+    await shot(page, `2262c-protokoll-${width}`);
+    await panel.getByTestId("desk-log-older").click();
+    await expect(panel.getByTestId("desk-log-page")).toHaveText("Seite 2 von 20");
+    await expect(panel.getByTestId("desk-log-log-25")).toBeVisible();
+    expect(log.asked.every((row) => row.staffel === "t1")).toBe(true);
+    await noSideScroll(page);
+  });
+
+  test(`Staffel-Seite (${width} px): Einstellungen in Unterreitern, langer Titel, ohne Banner`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const problems = [];
+    page.on("response", (response) => { if (response.status() === 403) problems.push(`403 ${response.url()}`); });
+    const matches = [1, 2, 3].map((week) => ({ id: `m${week}`, stage_id: "st1", round: week, status: "scheduled", matchday_number: week,
+      slots: [{ registration_id: "r1" }, { registration_id: "r2" }] }));
+    await mockPackageC(page, { staffel: { status: "live", banner_url: "" }, matches,
+      staff: [{ id: "h1", role: "referee", scope: "tournament", user: { display_name: "Helferin aus dem Probelauf mit langem Namen" } }] });
+    await page.goto("/admin/leagues/staffeln/t1#einstellungen");
+    const panel = page.getByTestId("staffel-panel-einstellungen");
+    await expect(panel.getByTestId("staffel-settings-tabs").getByRole("tab")).toHaveText(["Auftritt", "Aus der Season", "Links und Sponsor", "TV und Helfer", "Werkzeuge"]);
+    await expect(panel.getByTestId("tr-edit-title")).toHaveValue(LONG_TITLE);
+    await expect(panel.getByTestId("tr-edit-season-values")).toHaveCount(0);
+    await noSideScroll(page);
+    await fullShot(page, `2262c-einstellungen-${width}-v2`);
+    // Je Unterreiter höchstens ein Speichern-Weg: das Formular hier, der Sponsor unter „Links und Sponsor“.
+    await expect(panel.getByRole("button", { name: /^Speichern$/ })).toHaveCount(1);
+
+    await panel.getByTestId("staffel-settings-tab-vorgaben").click();
+    await expect(page).toHaveURL(/#vorgaben$/);
+    await expect(panel.getByTestId("tr-edit-season-values")).toHaveCount(1);
+    await expect(panel.getByTestId("staffel-map-pool")).toContainText("Raffinerie mit sehr langem Kartennamen");
+    await panel.getByTestId("staffel-map-pool-toggle").click();
+    await expect(panel.getByTestId("staffel-map-pool-season")).toBeHidden();
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-settings-panel-vorgaben");
+
+    await panel.getByTestId("staffel-settings-tab-links").click();
+    await expect(panel.getByTestId("access-links-bare")).toBeVisible();
+    await expect(panel.getByText("Speziallinks", { exact: true })).toHaveCount(0);
+    await expect(panel.getByTestId("access-links-bare")).toContainText("Noch keine aktiven Zugangslinks.");
+    await expect(panel.getByTestId("admin-tr-round-sponsors-league")).toContainText("Spielwoche");
+    await noSideScroll(page);
+
+    await panel.getByTestId("staffel-settings-tab-helfer").click();
+    await expect(panel.getByTestId("staffel-tv-open")).toHaveAttribute("href", "/display/bracket/t1");
+    await expect(panel.getByTestId("staffel-helper-h1")).toContainText("Schiedsrichter");
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-settings-panel-helfer");
+
+    await panel.getByTestId("staffel-settings-tab-werkzeuge").click();
+    await expect(panel.getByTestId("staffel-tools-lock-later")).toBeVisible();
+    await expect(panel.getByTestId("staffel-tools-delete-later")).toBeVisible();
+    await noSideScroll(page);
+    await touchTargets(page, "staffel-settings-panel-werkzeuge");
+    expect(problems).toEqual([]);
+  });
+}
+
+test("Einstellungen: Sprungmarken öffnen ihren Unterreiter - #darstellung, #vorgaben, #helfer, #werkzeuge", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPackageC(page);
+  for (const [hash, testId] of [["helfer", "staffel-helpers"], ["darstellung", "staffel-look"], ["vorgaben", "staffel-map-pool"], ["werkzeuge", "staffel-tools"]]) {
+    await page.goto(`/admin/leagues/staffeln/t1?probe=${hash}#${hash}`);
+    await expect(page.getByTestId("staffel-tab-einstellungen")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId(`staffel-settings-tab-${hash}`)).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId(testId)).toBeVisible();
+    await expect(page.getByTestId("staffel-settings-tabs")).toBeInViewport();
+  }
+});
+
+test("Einstellungen nur lesend: ohne „Liga verwalten“ kein Formular, kein Unterreiter Links und Sponsor - keine 403", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const problems = [];
+  page.on("response", (response) => { if (response.status() === 403) problems.push(`403 ${response.url()}`); });
+  const requested = [];
+  page.on("request", (request) => requested.push(new URL(request.url()).pathname));
+  await mockPackageC(page, { staffel: { status: "live", league_capabilities: ["results"], can_edit_staffel: false, can_manage_participants: false, can_manage_structure: false } });
+  await page.goto("/admin/leagues/staffeln/t1#links");
+  await expect(page.getByTestId("staffel-look-right")).toBeVisible();
+  await expect(page.getByTestId("tr-edit-title")).toHaveCount(0);
+  await expect(page.getByTestId("staffel-settings-tab-links")).toHaveCount(0);
+  await page.getByTestId("staffel-settings-tab-werkzeuge").click();
+  await expect(page.getByTestId("staffel-tools-delete-right")).toBeVisible();
+  await page.getByTestId("staffel-settings-tab-helfer").click();
+  await expect(page.getByTestId("staffel-tv-open")).toBeVisible();
+  expect(requested.some((where) => where.startsWith("/api/access-links"))).toBe(false);
+  expect(problems).toEqual([]);
+});
+
+test("Überblick: „Offen in dieser Staffel“ zählt nur diese Staffel und führt mit Filter in den Leitstand", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPackageC(page);
+  await page.goto("/admin/leagues/staffeln/t1");
+  await expect(page.getByTestId("staffel-desk-total")).toHaveText("2");
+  await expect(page.getByTestId("staffel-desk-count")).toContainText("2 Aufgaben, 1 davon für dich");
+  await expect(page.getByTestId("staffel-desk-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1?staffel=t1#leitstand");
+});

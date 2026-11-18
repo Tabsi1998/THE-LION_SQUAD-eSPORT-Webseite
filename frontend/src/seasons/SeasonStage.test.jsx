@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Die Bühne (#634): ohne aktive Saison wird kein Modul geladen, im Admin bleibt sie leer, mit Saison
@@ -203,4 +203,34 @@ test("Vorschau des Wetters: die Ebene erfährt davon und zeichnet auch im Admin"
   render(<MemoryRouter initialEntries={["/admin/settings/jahreszeiten"]}><SeasonStage /></MemoryRouter>);
   expect(await screen.findByTestId("season-sky")).toBeInTheDocument();
   expect(weatherLayers).toHaveBeenLastCalledWith(expect.objectContaining({ preview: true, weather: expect.objectContaining({ demo: true }) }));
+});
+
+// Turniertag (#1169): Baum, Matchseite und Turnierleitung bleiben ganz ohne Deko - Bühne, Widget und Fußzeile.
+test.each(["/tournaments/cup/bracket", "/matches/m-1", "/tournaments/cup/leitung"])("%s bleibt ganz ohne Deko", async (path) => {
+  seasonState.seasons = [halloween()];
+  render(<MemoryRouter initialEntries={[path]}><SeasonStage /><SeasonWidgetSlot /><SeasonFooterSlot /></MemoryRouter>);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.queryByTestId("fake-corners")).toBeNull();
+  expect(screen.queryByTestId("fake-widget")).toBeNull();
+  expect(screen.queryByTestId("fake-footer")).toBeNull();
+  expect(document.documentElement.dataset.season).toBeUndefined();
+});
+
+test("eigenes Spiel aufgerufen oder laufend: Pause überall, nach dem Ergebnis kommt die Deko zurück", async () => {
+  const { noteOwnMatches, clearOwnMatches } = await import("./matchPause");
+  seasonState.seasons = [halloween()];
+  render(<MemoryRouter initialEntries={["/"]}><SeasonStage /><SeasonWidgetSlot /></MemoryRouter>);
+  expect(await screen.findByTestId("fake-corners")).toBeInTheDocument();
+  act(() => noteOwnMatches([{ id: "m-1", status: "ready", live_state: "called" }], "dashboard"));
+  expect(screen.queryByTestId("fake-corners")).toBeNull();
+  expect(screen.queryByTestId("fake-widget")).toBeNull();
+  act(() => noteOwnMatches([{ id: "m-1", status: "in_progress" }], "match"));
+  expect(screen.queryByTestId("fake-corners")).toBeNull();
+  act(() => noteOwnMatches([{ id: "m-1", status: "completed" }], "match"));
+  expect(await screen.findByTestId("fake-corners")).toBeInTheDocument();
+  expect(screen.getByTestId("fake-widget")).toBeInTheDocument();
+  // Gegenprobe: ein bloß geplantes eigenes Spiel pausiert nichts.
+  act(() => noteOwnMatches([{ id: "m-2", status: "scheduled" }], "dashboard"));
+  expect(screen.getByTestId("fake-corners")).toBeInTheDocument();
+  clearOwnMatches();
 });

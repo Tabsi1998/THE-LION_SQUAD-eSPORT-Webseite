@@ -51,6 +51,7 @@ import { VetoCard } from "../../components/league/VetoCard";
 import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
 import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
 import { useVetoPolling } from "../../lib/useVetoPolling";
+import { noteOwnMatches } from "../../seasons/matchPause";
 
 const MATCH_LIVE_RESOURCES = ["matches", "matches-v2", "tournaments"];
 
@@ -149,6 +150,13 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const { data, loading, error: loadError, problem, stale, reload, mutate } = useKeyedLoad(route.params.id, fetchMatch);
   const page = data?.page ?? null;
   const chat = data?.chat ?? NO_CHAT;
+  // Turniertag (#1169): Ist das ein eigenes Spiel (schon bekannt), sagt die Matchseite, ob es läuft, aufgerufen ist oder
+  // das Ergebnis da ist - dann kommt die Saison-Deko zurück. Fremde Spiele ändern nichts.
+  const pausedMatch = page?.match;
+  const pausedCall = Boolean(page?.call);
+  useEffect(() => {
+    if (pausedMatch?.id) noteOwnMatches([{ id: pausedMatch.id, status: pausedMatch.status, live_state: pausedCall ? "called" : null }], "match");
+  }, [pausedMatch?.id, pausedMatch?.status, pausedCall]);
   const notice = (stale ? problem : null) || data?.partProblem || null;
   // Aufruf (#1168): kommt er, während die Seite offen ist, dreimal kurz - im selben Moment wie die Aufruf-Karte. Beim
   // Öffnen bleibt es still (da hat die Benachrichtigung schon vibriert).

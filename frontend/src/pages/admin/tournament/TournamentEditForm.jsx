@@ -32,7 +32,10 @@ import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMo
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
 
-export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false }) {
+// `seasonValues` und `remix` (#2262, Staffel-Seite): Dort steht „Aus der Season“ als eigener Abschnitt (für jede Zuständigkeit lesbar)
+// und „Vorschau neu mischen“ im Reiter Spielplan - das Formular zeigt dann beides nicht noch einmal.
+// `onDirtyChange` (#2262): meldet, ob ungespeicherte Eingaben da sind - die Staffel-Seite übernimmt einen neuen Stand dann nicht still.
+export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false, seasonValues = true, remix = true, onDirtyChange }) {
   const dt = toDateTimeLocalInput;
   // Liga-Staffel (#2109): Season-Werte nur lesend in der Seitenleiste, Liga-fremde Felder fehlen ganz.
   const staffel = isStaffel(tournament);
@@ -305,6 +308,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   const dirtyPayload = buildDirtyPayload(normalizeTournamentPayload(f), normalizeTournamentPayload(formFromTournament()));
   const sendBilling = canFinance && billingDirty;
   const hasFormChanges = hasPayloadChanges(dirtyPayload) || sendBilling;
+  useEffect(() => { onDirtyChange?.(hasFormChanges); }, [hasFormChanges, onDirtyChange]);
   // Staffel (#2109, S15): die Vorschau neu mischen mit der vorhandenen Phase - Struktur und Format gibt die Liga vor.
   // Ohne force (#2120, TA17): im laufenden Turnier fragt der Server mit Zahlen nach, echte Spiele ersetzt eine
   // Vorschau nie.
@@ -335,7 +339,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       } else {
         onSaved();
       }
-    } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
+    } catch (e) { toast.error(formatRequestError(e, staffel ? "Die Staffel konnte nicht gespeichert werden." : "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
   };
   const prizesFinished = PRIZE_READY_STATUSES.has(tournament?.status);
   const createPrizePickups = async () => {
@@ -353,7 +357,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   return (
     <div className="min-w-0">
       <FormColumns
-        aside={staffel ? <StaffelSeasonValues tournament={tournament} games={games} /> : (
+        aside={staffel ? (seasonValues ? <StaffelSeasonValues tournament={tournament} games={games} /> : null) : (
           <FormSection title="Zeitplan und Anmeldung" hint="Anmeldung und Check-in wechseln zeitgesteuert; der Live-Start bleibt bei der Turnierleitung, solange unten nichts anderes gesetzt ist.">
             <TextField label="Start Event/Turnier" type="datetime-local" value={f.start_date} onChange={(v)=>set("start_date",v)} testId="tr-edit-start"/>
             <TextField label="Ende Event/Turnier" type="datetime-local" value={f.end_date} onChange={(v)=>set("end_date",v)} testId="tr-edit-end"/>
@@ -401,7 +405,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             {show && <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={f.discord_skip} onChange={(v)=>set("discord_skip",v)} accent="#5865F2" testId="tr-edit-discord-skip" />}
           </FormGrid>
           {/* Event als Klammer (#1371): verbunden wird nur im Event - hier steht nur, wozu das Turnier gehört. */}
-          <EventMembershipLine eventId={f.event_id} events={events} testId="tr-edit-event" />
+          {/* Eine Staffel gehört nie zu einem Event - der Satz „im Event unter Programm“ hätte dort keinen Weg. */}
+          {show || f.event_id ? <EventMembershipLine eventId={f.event_id} events={events} testId="tr-edit-event" /> : null}
         </FormSection>
 
         <FormSection title="Spielweise" hint={staffel
@@ -440,7 +445,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team melden Teamleitung oder Co-Leitung das Team an."}>
           <FormGrid cols={3}>
             {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={tournamentFormatOptions(tournament.format)} disabled={structureFixed} hint={fixedHint || <FormatHint format={f.format} testId="tr-edit-format-hint" />} testId="tr-edit-format" />}
-            <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
+            <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder={staffel ? "z. B. Liga · Staffel A" : "z.B. Gamers Heaven F1 Heat"} testId="tr-edit-format-label"/>
             {show && <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} disabled={structureFixed} testId="tr-edit-team-mode" />}
             {show && f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} disabled={structureFixed} testId="tr-edit-team-size"/>}
             {show && <TextField label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>}
@@ -522,7 +527,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         )}
 
         <FormSection title="Darstellung" collapsible>
-          <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" allowLibrary />
+          <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label={staffel ? "Banner der Staffel" : "Turnier-Banner"} testId="tr-edit-banner-upload" variant="wide" allowLibrary />
           {/* Auszeichnungen (#230): gestaltete Gewinnerbanner für Platz 1–3; ohne Bild bekommt der Platz die feste Vorlage aus Platz, Bilanz und Turnier.
               Staffeln haben kein Podest (docs/LIGA.md, Abschnitt 7) - der Saison-Meister folgt mit #1627. */}
           {show && (
@@ -585,12 +590,12 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       </FormColumns>
       {hasFormChanges && (
         <div className="mt-5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
-          Ungespeicherte Änderungen im Turnierformular.
+          {staffel ? "Ungespeicherte Änderungen an der Staffel." : "Ungespeicherte Änderungen im Turnierformular."}
         </div>
       )}
       <FormActions onSubmitClick={() => save()} submitTestId="tr-edit-save" icon={null} hint={hasFormChanges ? "Ungespeicherte Änderungen" : undefined}>
         {/* Staffel (#2109, S15): vor dem Start heißt es, was es tut - die Vorschau neu mischen; danach steht der Spielplan. */}
-        {staffel ? staffelBeforeStart(tournament) && (
+        {staffel ? remix && staffelBeforeStart(tournament) && (
           <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-staffel-remix" className="tls-btn tls-btn--secondary px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm">
             Speichern & Vorschau neu mischen
           </button>

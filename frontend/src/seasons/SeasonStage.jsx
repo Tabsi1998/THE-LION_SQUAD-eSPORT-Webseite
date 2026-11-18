@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { pageClass } from "./intensity";
+import { useDecoPaused } from "./decoPause";
 import { readPreviewToken } from "./preview";
 import { useSeason } from "./SeasonContext";
 import { SEASON_MODULES, hasModule } from "./registry";
@@ -15,8 +16,12 @@ import "./seasons.css";
 
 export const QUIET_PATHS = ["/admin", "/display", "/print", "/setup", "/consent"];
 
+/**
+ * Bleibt die Bühne auf dieser Seite leer? Verwaltung, Display und Druck - und alle stillen Seiten (Klasse „quiet“), seit
+ * #1169 auch Turnierbaum, Matchseite und Turnierleitung. Die App: `stillScreen` in mobile/src/seasons/intensity.ts.
+ */
 export function isQuietPath(pathname) {
-  return QUIET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  return QUIET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) || pageClass(pathname) === "quiet";
 }
 
 /**
@@ -128,8 +133,10 @@ function SkyCanvas({ layers }) {
 export function SeasonStage() {
   const { seasons, ready, reducedMotion, preview, weather } = useSeason();
   const location = useLocation();
-  // Im Admin bleibt die Bühne leer - außer bei der Vorschau, die soll dort sofort zu sehen sein.
-  const quiet = isQuietPath(location.pathname) && !preview;
+  // Im Admin bleibt die Bühne leer - außer bei der Vorschau, die soll dort sofort zu sehen sein. Ebenso, solange das
+  // eigene Spiel aufgerufen ist oder läuft (#1169): dann pausiert die Deko überall, bis das Ergebnis da ist.
+  const paused = useDecoPaused();
+  const quiet = (isQuietPath(location.pathname) || paused) && !preview;
   const active = quiet ? [] : seasons.filter((season) => season.effective !== "off");
   const modules = useSeasonModules(active);
   const mounted = active.filter((season) => modules[season.key]);

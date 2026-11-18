@@ -276,3 +276,19 @@ test("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
   await screen.findByTestId("match-headline");
   await waitFor(() => expect(liveOptions.tournamentId).toBe("t1"));
 });
+
+test("Turniertag (#1169): das Ergebnis des eigenen Spiels beendet die Pause der Saison-Deko", async () => {
+  const { clearOwnMatches, noteOwnMatches, ownMatchesPaused } = await import("@/seasons/matchPause");
+  noteOwnMatches([{ id: "m1", status: "in_progress" }], "dashboard");
+  expect(ownMatchesPaused()).toBe(true);
+  renderMatch({
+    ...BASE,
+    match: { id: "m1", match_key: "B", status: "completed", winner_id: "r2", round_name: "Halbfinale",
+      slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }],
+      results: [{ registration_id: "r1", rank: 2, score: 1 }, { registration_id: "r2", rank: 1, score: 3 }] },
+    participants: [NEON, LUNA],
+  });
+  await screen.findByTestId("match-headline");
+  await waitFor(() => expect(ownMatchesPaused()).toBe(false));
+  clearOwnMatches();
+});

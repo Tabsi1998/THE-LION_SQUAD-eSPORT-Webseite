@@ -13,7 +13,9 @@ test("ordnet Seiten ihren Klassen zu", () => {
   expect(pageClass("/community")).toBe("medium");
   expect(pageClass("/u/anna")).toBe("medium");
   expect(pageClass("/tournaments")).toBe("medium");
-  expect(pageClass("/tournaments/cup/bracket")).toBe("calm");
+  // Turniertag (#1169): Baum, Matchseite und Turnierleitung sind still - ganz ohne Deko (stillness.test.js).
+  expect(pageClass("/tournaments/cup/bracket")).toBe("quiet");
+  expect(pageClass("/tournaments/cup/matches")).toBe("calm");
   // Der Adventkalender (#641) ist selbst das Bild - die Deko rundherum hält sich zurück.
   expect(pageClass("/advent")).toBe("calm");
   expect(pageClass("/advent/")).toBe("calm");
@@ -31,7 +33,8 @@ test("ordnet Seiten ihren Klassen zu", () => {
 
 test("Startseite reicher als Bracket, jede Seite erkennbar, still bleibt still", () => {
   const home = capabilities("/", "normal");
-  const bracket = capabilities("/tournaments/cup/bracket", "normal");
+  // Die Tabelle steht für die ruhigen Turnierseiten - der Baum ist seit #1169 still.
+  const bracket = capabilities("/tournaments/cup/standings", "normal");
   const admin = capabilities("/admin/x", "normal");
   expect(home.cls).toBe("lively");
   expect(home.hangingBats).toBeGreaterThan(bracket.hangingBats);

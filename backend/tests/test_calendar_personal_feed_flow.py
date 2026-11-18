@@ -198,12 +198,17 @@ async def test_banned_inactive_and_deleted_accounts_lose_the_feed(flow):
 
 
 @pytest.mark.asyncio
-async def test_too_many_requests_are_braked(flow):
+async def test_too_many_requests_are_braked(flow, monkeypatch):
+    from routes import calendar_routes
+
+    limit, _ = calendar_feed_limit()
+    # Das Fenster ist fest an die Uhr gebunden (alle 10 Minuten ein neues) - lief der Test über einen Wechsel (etwa 07:20),
+    # kam der 21. Abruf wieder durch (#2474). 10**9 Sekunden reichen bis 2033 (wie #2458), die Zahl bleibt die echte.
+    monkeypatch.setattr(calendar_routes, "PERSONAL_PER_LINK", (limit, 10**9))
     paula = await flow.add_user(name="paula")
     flow.act_as(paula)
     path = (await flow.post("/api/calendar/personal")).json()["path"]
     flow.act_as(None)
-    limit, _ = calendar_feed_limit()
     codes = [(await flow.get(path)).status_code for _ in range(limit + 1)]
     assert codes[:limit] == [200] * limit
     assert codes[-1] == 429

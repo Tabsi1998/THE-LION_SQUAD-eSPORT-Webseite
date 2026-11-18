@@ -427,6 +427,7 @@ printf '%s|%s\n' "$before" "$after"
 
 CAPPED = """
 out="$1"
+: >"$out/calls"   # null Verlängerungen sind erlaubt (Höchstdauer vor dem ersten Schritt erreicht) - dann zählt wc 0
 source scripts/backup-target.sh
 backend_python() { echo renew >>"$out/calls"; }
 PAUSE_TOKEN=t-1

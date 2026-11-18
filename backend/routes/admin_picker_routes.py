@@ -59,6 +59,11 @@ async def _allowed(purpose: str, me: dict, context_id: str | None) -> bool:
 
         return await _has_f1_staff_permission(me, context_id, F1_RESULT_STAFF_ROLES)
     if purpose == "access_links":
+        # Zugangslinks einer Liga-Staffel (#2262): wie die Links selbst mit „Liga verwalten“ statt Bereich Turniere.
+        from services.tournament_permissions import has_tournament_staff_permission, is_staffel
+
+        if context_id and await is_staffel(context_id):
+            return await has_tournament_staff_permission(me, context_id, capability="manage")
         return is_tournament_lead(me) and not needs_mfa(me)
     if purpose == "board":
         return await user_has_area(me, "club", "system") and not needs_mfa(me)

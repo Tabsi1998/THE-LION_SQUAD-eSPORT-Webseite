@@ -223,6 +223,21 @@ test("Match-Karte mit Datum und Uhrzeit und Station im Klartext", async () => {
   expect(screen.getByText("LunaByte · Station 3 · Switch 2")).toBeTruthy();
 });
 
+// Turniertag (#1169): Das Dashboard sagt der Bühne, ob ein eigenes Spiel aufgerufen ist - dann pausiert die Deko überall.
+test("ein aufgerufenes eigenes Spiel pausiert die Saison-Deko, ein geplantes nicht", async () => {
+  const { clearOwnMatches, ownMatchesPaused } = require("../../seasons/matchPause");
+  clearOwnMatches();
+  const called = { id: "m-call", status: "ready", live_state: "called", tournament_title: "Mario Kart Cup", station_text: "Station 3 · Switch 2" };
+  dashboard = { ...dashboard, me: { tournaments: [], events: [], matches: [called], staff_matches: [], actions: [] } };
+  const first = await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(ownMatchesPaused()).toBe(true));
+  await first.unmount();
+  dashboard = { ...dashboard, me: { tournaments: [], events: [], matches: [{ ...called, live_state: null, status: "scheduled" }], staff_matches: [], actions: [] } };
+  await render(<DashboardScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(ownMatchesPaused()).toBe(false));
+  clearOwnMatches();
+});
+
 // Das Event als Klammer (#1182): auf „Start“ ist die LAN mit ihren Turnieren eine Karte, nicht drei.
 test("ein Event mit seinen Turnieren ist auf „Start“ eine Karte", async () => {
   const lan = { id: "e-lan", slug: "herbst-lan", title: "Herbst-LAN", name: "Herbst-LAN", start_date: "2030-03-10T08:00:00Z", status: "registration_open" };

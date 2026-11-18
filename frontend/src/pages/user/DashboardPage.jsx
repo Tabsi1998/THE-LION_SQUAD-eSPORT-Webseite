@@ -17,6 +17,7 @@ import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
 import { dashboardRegistrationKeys, dashboardTeamKeys, noteWebPushRegistrations, offerWebPush } from "@/lib/webPush";
+import { noteOwnMatches } from "@/lib/liveQueue";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -131,6 +132,8 @@ export default function DashboardPage() {
     if (home.status === "fulfilled") {
       const data = home.value.data && typeof home.value.data === "object" ? home.value.data : null;
       setDashboard(data);
+      // Turniertag (#1169): Läuft ein eigenes Spiel oder ist es aufgerufen, pausiert die Saison-Deko überall.
+      if (Array.isArray(data?.me?.matches)) noteOwnMatches(data.me.matches, "dashboard");
       // Neu angemeldet - etwa durchs Team (#1208): jetzt die Frage nach Browser-Benachrichtigungen. Die erste Übersicht
       // nach dem Login ist nur der Ausgangsstand.
       const reason = data ? noteWebPushRegistrations(userId, dashboardRegistrationKeys(data.me), { teamKeys: dashboardTeamKeys(data.me) }) : null;
