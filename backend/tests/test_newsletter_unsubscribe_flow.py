@@ -146,7 +146,7 @@ async def test_two_clicks_at_once_withdraw_and_log_only_once(flow):
 
 
 @pytest.mark.asyncio
-async def test_only_invalid_attempts_are_limited(flow):
+async def test_only_invalid_attempts_are_limited(flow, still_rate_limit_clock):
     from services.newsletter_unsubscribe import token_for
 
     paula = await reader(flow)

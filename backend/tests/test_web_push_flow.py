@@ -445,11 +445,11 @@ def test_schluessel_wird_nur_einmal_geladen(keys, monkeypatch):
     assert web_push.vapid_config().contact == "mailto:neu@example.test" and len(calls) == 2
 
 
-async def test_anmelden_ist_je_konto_begrenzt(flow, keys, monkeypatch):
+async def test_anmelden_ist_je_konto_begrenzt(flow, keys, still_rate_limit_clock):
     from routes import web_push_routes
 
-    # Festes Zeitfenster: fällt der Lauf über die Minutengrenze, beginnt mitten im Test ein neues - dann fehlt die 429.
-    monkeypatch.setattr(web_push_routes, "SUBSCRIBE_WINDOW_SECONDS", 10**9)
+    # Fällt der Lauf über die Minutengrenze, beginnt mitten im Test ein neues Fenster - dann fehlt die 429. Die Uhr der
+    # Drosselung steht deshalb still (#2512), das Fenster bleibt das echte.
     user = await flow.add_user()
     flow.act_as(user)
     headers = await login(flow, user)

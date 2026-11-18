@@ -230,7 +230,7 @@ async def test_not_spam_files_it_and_sends_the_mails(flow):
 
 
 @pytest.mark.asyncio
-async def test_limit_per_ip(flow):
+async def test_limit_per_ip(flow, still_rate_limit_clock):
     for index in range(5):
         response = await contact(flow, {**HUMAN, "email": f"p{index}@lionsquad-test.at"}, **form_fields("contact"))
         assert response.status_code == 200
@@ -243,7 +243,7 @@ async def test_limit_per_ip(flow):
 
 
 @pytest.mark.asyncio
-async def test_limit_per_email(flow):
+async def test_limit_per_email(flow, still_rate_limit_clock):
     await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"id": spam_guard.SETTINGS_ID, "limits": {
         "contact": {"ip_limit": 100, "ip_window_minutes": 15, "email_limit": 2, "email_window_minutes": 60}}}}, upsert=True)
     for _ in range(2):
@@ -377,7 +377,7 @@ async def test_resend_verification_with_honeypot_sends_nothing(flow):
 
 
 @pytest.mark.asyncio
-async def test_forgot_password_limit_per_email(flow):
+async def test_forgot_password_limit_per_email(flow, still_rate_limit_clock):
     user = await member(flow)
     for _ in range(5):
         assert (await flow.post("/api/auth/forgot-password", json={"email": user["email"]})).status_code == 200
@@ -643,7 +643,7 @@ async def test_scheduler_job_queues_the_digest(flow):
 
 
 @pytest.mark.asyncio
-async def test_app_registration_has_its_own_ip_limit(flow):
+async def test_app_registration_has_its_own_ip_limit(flow, still_rate_limit_clock):
     for index in range(3):
         body = {**REGISTRATION, "username": f"appspieler{index}", "email": f"app{index}@lionsquad-test.at"}
         assert (await flow.post("/api/auth/mobile/register", json=body)).status_code == 200
@@ -653,7 +653,7 @@ async def test_app_registration_has_its_own_ip_limit(flow):
 
 
 @pytest.mark.asyncio
-async def test_app_registration_has_a_global_limit(flow, monkeypatch):
+async def test_app_registration_has_a_global_limit(flow, monkeypatch, still_rate_limit_clock):
     await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"id": spam_guard.SETTINGS_ID, "app_register_ip_per_hour": 100,
                                                                               "app_register_global_per_hour": 2}}, upsert=True)
     from services import rate_limit

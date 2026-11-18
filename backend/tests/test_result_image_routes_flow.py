@@ -337,7 +337,7 @@ async def test_tables_without_times_are_refused(flow, fake_ocr):
 
 
 @pytest.mark.asyncio
-async def test_rate_limit_per_account(flow, fake_ocr, monkeypatch):
+async def test_rate_limit_per_account(flow, fake_ocr, monkeypatch, still_rate_limit_clock):
     ctx = await _setup(flow)
     monkeypatch.setattr(image_routes, "RATE_LIMIT", 2)
     for _ in range(2):

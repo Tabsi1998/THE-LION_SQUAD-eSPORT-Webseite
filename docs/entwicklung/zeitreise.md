@@ -28,6 +28,14 @@ pytestmark = pytest.mark.real_clock
 Sie laufen in der Probe nicht mit. Der Marker ist kein Ausweg für Tests, die nur feste Termine haben – die bekommen
 relative Termine oder eine feste Uhr.
 
+Tests, die über mehrere Aufrufe eine **429 aus der Drosselung** (`services.rate_limit.enforce_rate_limit`) erwarten,
+nehmen die Fixture `still_rate_limit_clock` (#2512). Die Drosselung zählt in Fenstern, die an der Uhr hängen; läuft ein
+Test über einen Fensterwechsel, beginnt die Zählung von vorn und die 429 bleibt aus. Die Fixture hält nur die Uhr der
+Drosselung an, mitten in der laufenden Minute; Fenster und Grenze bleiben die echten, alle anderen Module sehen die
+normale Uhr. Eigene Uhren oder riesige Fenster je Datei braucht es nicht mehr. Der Wächter
+`backend/tests/test_rate_limit_clock_inventory_unit.py` prüft das; eine 429 aus anderer Quelle (Fake einer fremden API,
+gespeicherte Zeitstempel) steht dort mit Grund auf der Ausnahmeliste.
+
 ## Wie die Probe funktioniert
 
 Alles hängt an der Umgebungsvariable `TLS_TEST_NOW` (ISO-Datum). Ohne sie ändert sich nichts.

@@ -147,7 +147,7 @@ async def test_list_masks_several_recipients_and_meta_keys(flow):
 
 
 @pytest.mark.asyncio
-async def test_reveal_is_rate_limited_per_person(flow, monkeypatch):
+async def test_reveal_is_rate_limited_per_person(flow, monkeypatch, still_rate_limit_clock):
     import routes.settings_routes as settings_routes
     monkeypatch.setattr(settings_routes, "REVEAL_LIMIT", 2)
     flow.act_as(await flow.add_user(role="club_admin", name="system"))

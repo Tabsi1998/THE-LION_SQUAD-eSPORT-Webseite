@@ -36,19 +36,6 @@ async def flow(monkeypatch):
         await shutdown()
 
 
-@pytest.fixture
-def frozen_rate_limit_clock(monkeypatch):
-    """Alle Zählfenster der Rate-Limits bleiben während des Tests dieselben."""
-    import services.rate_limit as rate_limit
-
-    class FrozenClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return datetime(2026, 10, 13, 12, 0, 5, tzinfo=timezone.utc)
-
-    monkeypatch.setattr(rate_limit, "datetime", FrozenClock)
-
-
 async def mfa_account(flow, codes=RECOVERY_CODES) -> tuple[dict, str]:
     user = await flow.add_user(name=f"loewe-{new_id()[:6]}")
     secret = generate_totp_secret()
@@ -182,7 +169,7 @@ async def test_simultaneous_wrong_codes_still_count_against_the_five_attempts(fl
 
 
 @pytest.mark.asyncio
-async def test_wrong_codes_are_limited_per_account_across_new_logins(flow, frozen_rate_limit_clock):
+async def test_wrong_codes_are_limited_per_account_across_new_logins(flow, still_rate_limit_clock):
     user, _ = await mfa_account(flow)
     other, _ = await mfa_account(flow)
 
@@ -197,7 +184,7 @@ async def test_wrong_codes_are_limited_per_account_across_new_logins(flow, froze
 
 
 @pytest.mark.asyncio
-async def test_successful_logins_do_not_use_up_the_account_limit(flow, frozen_rate_limit_clock):
+async def test_successful_logins_do_not_use_up_the_account_limit(flow, still_rate_limit_clock):
     codes = [f"ABCDEFGH{index:02d}" for index in range(12)]
     user, _ = await mfa_account(flow, codes)
 
@@ -207,7 +194,7 @@ async def test_successful_logins_do_not_use_up_the_account_limit(flow, frozen_ra
 
 
 @pytest.mark.asyncio
-async def test_simultaneous_wrong_codes_across_logins_stay_within_the_account_limit(flow, frozen_rate_limit_clock,
+async def test_simultaneous_wrong_codes_across_logins_stay_within_the_account_limit(flow, still_rate_limit_clock,
                                                                                     monkeypatch):
     import routes.auth_routes as auth_routes
 
@@ -226,7 +213,7 @@ async def test_simultaneous_wrong_codes_across_logins_stay_within_the_account_li
 
 
 @pytest.mark.asyncio
-async def test_the_account_limit_is_stored_without_the_account_id(flow, frozen_rate_limit_clock):
+async def test_the_account_limit_is_stored_without_the_account_id(flow, still_rate_limit_clock):
     user, _ = await mfa_account(flow)
 
     assert (await complete(flow, await login_ticket(flow, user), WRONG_CODE)).status_code == 401
