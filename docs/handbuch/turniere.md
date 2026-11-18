@@ -862,7 +862,9 @@ und die **Zahlen** oben im Profil (Turniere, Siege, Podium, Fast Laps). Wer was 
 | angemeldet ohne Mitgliedschaft, Gast | nie, auch nicht mit dem Schalter | nur Öffentliches – dieselben Werte wie ohne interne Turniere, kein Hinweis darauf |
 | Teamseite | das Team selbst alles, Vereinsmitglieder dazu die internen Team-Trophäen, alle anderen nur öffentliche | – |
 
-Eine Season „Nur Liga-Leitung“ sieht im Profil einer anderen Person auch die Liga-Leitung nicht, nur die Person selbst.
+Liga-Rechte zählen im Profil nicht: Eine Season „Nur Liga-Leitung“ oder „Aus“ sieht im Profil einer anderen Person auch die
+Liga-Leitung oder ein Admin nicht, nur die Person selbst; in der Liga-Verwaltung sehen sie weiter alles. Darf die Person ihre
+eigene Season nicht öffnen, steht sie in ihrem Profil ohne Link, nur als Text mit dem Etikett **Vereinsintern**.
 Den Schalter stellt jede Person selbst unter **Profil → Einstellungen → Privatsphäre** (ab Werk an). „So sehen dich
 andere“ im eigenen Profil zeigt die Sicht eines Gasts. Die Jahreswertung und die Ranglisten ändert das nicht. Die App
 zeigt dieselben Einträge und Zahlen; das Etikett an Teilnahmen, Bestzeiten und Seasons kommt dort mit einem App-Release.
