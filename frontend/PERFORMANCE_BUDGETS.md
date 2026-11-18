@@ -37,7 +37,7 @@ etwa 2–3 % über dem neuen Ist-Wert), damit Gewonnenes nicht still wieder verl
 
 | | Ist (18.11.2026, #2511) | Ziel (Warnung) | Grenze (Fehler) |
 | --- | --- | --- | --- |
-| Start-JS gzip | 287.442 Bytes | 300.000 Bytes | 305.000 Bytes |
+| Start-JS gzip | 287.419 Bytes | 300.000 Bytes | 305.000 Bytes |
 | Start-CSS gzip | 58.805 Bytes | – (siehe nächste Schritte) | 63.000 Bytes |
 
 <!-- goal:startup-js-gzip 300000 -->
@@ -76,9 +76,9 @@ Schon vorher bei Bedarf und unverändert: PDF-Betrachter (`pdfjs-dist`, `lib/pdf
 
 ### Messung 18.11.2026 (#2511)
 
-| | vorher (main 3946d18df) | nachher (nach main 5897fceee) |
+| | vorher (main 3946d18df) | nachher (nach main ad250ac29) |
 | --- | --- | --- |
-| Start-JS gzip (Stufe 9) | 300.025 Bytes in 48 Dateien | 287.442 Bytes in 48 Dateien |
+| Start-JS gzip (Stufe 9) | 300.025 Bytes in 48 Dateien | 287.419 Bytes in 48 Dateien |
 | Start-CSS gzip (Stufe 9) | 61.928 Bytes in 2 Dateien | 58.805 Bytes in 2 Dateien |
 
 Treiber: `PublicLayout` zog mit `motion` den vollen Satz von framer-motion in den Start, obwohl nur das Handy-Menü ein-
