@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, View } from "react-native";
 import { resolveMediaUrl } from "../lib/api";
 import { awardLines, awardTone, type Award } from "../lib/awards";
 import { colors, radius } from "../theme";
+import { InternalTag } from "./InternalTag";
 import { Body, Muted } from "./Text";
 
 /**
@@ -36,6 +37,7 @@ export function AwardCard({
             <Muted style={[styles.rank, { color: tone.color }]} testID={`award-rank-${award.id}`}>{award.rank_label}</Muted>
             {tone.label ? <Muted style={[styles.chip, { color: tone.color, borderColor: tone.color }]}>{tone.label}</Muted> : null}
             {award.team?.name ? <Muted style={styles.team}>{award.team.name}</Muted> : null}
+            {award.internal ? <InternalTag testID={`internal-tag-award-${award.id}`} /> : null}
           </View>
           <Body style={styles.title} numberOfLines={2}>{award.tournament?.title || "Turnier"}</Body>
           <Muted numberOfLines={2}>{awardLines(award).join(" · ")}</Muted>

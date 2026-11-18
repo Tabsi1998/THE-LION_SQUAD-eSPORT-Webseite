@@ -481,6 +481,8 @@ export type PersonalReferenceItem = {
   participant_count?: number | null;
   time_ms?: number | null;
   time_str?: string | null;
+  /** Vereinsintern (#2516): ein Gast sähe den Eintrag nicht - der Server setzt es, ältere Server lassen es weg. */
+  internal?: boolean | null;
 };
 
 export type PersonalReferenceData = {

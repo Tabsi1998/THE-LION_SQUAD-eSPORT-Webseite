@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import { Button } from "../../../components/Button";
+import { InternalTag } from "../../../components/InternalTag";
 import { Chevron, MedalMark, PathStrip, PlaceRing, Reveal, SectionLabel, ink, medalTone } from "../../../components/references/parts";
 import { Body, Muted } from "../../../components/Text";
 import type { MemberPlacements } from "../../../lib/memberPlacements";
@@ -134,13 +135,15 @@ function ChronicleRow({ row, open, onToggle, username, own, publicView, onOpenSe
   const season = row.season;
   const personal = row.personal;
   const showPath = row.source === "tournament" && Boolean(personal?.target_id) && Boolean(username);
+  // Vereinsintern (#2516): der Server kennzeichnet, was Gäste nicht sehen - im eigenen Profil wie bei anderen Mitgliedern.
+  const internal = Boolean(personal?.internal);
   return (
     <View style={styles.rowWrap}>
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={[row.placement ? `${row.placement}. Platz` : "", row.title, row.sub].filter(Boolean).join(", ")}
+        accessibilityLabel={[row.placement ? `${row.placement}. Platz` : "", row.title, row.sub, internal ? "vereinsintern" : ""].filter(Boolean).join(", ")}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
         testID={`profile-reference-${row.id}`}
       >
@@ -148,6 +151,7 @@ function ChronicleRow({ row, open, onToggle, username, own, publicView, onOpenSe
         <View style={styles.flex}>
           <Body style={styles.rowTitle}>{row.title}</Body>
           {row.sub ? <Muted style={styles.rowSub}>{row.sub}</Muted> : null}
+          {internal ? <View style={styles.tag}><InternalTag testID={`internal-tag-reference-${row.id}`} /></View> : null}
         </View>
         <Chevron open={open} />
       </Pressable>
@@ -226,6 +230,7 @@ const styles = StyleSheet.create({
   row: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 64, paddingHorizontal: 2, paddingVertical: 12 },
   rowTitle: { color: ink.text, fontSize: 15, fontWeight: "700", lineHeight: 20 },
   rowSub: { color: ink.muted, fontSize: 13 },
+  tag: { marginTop: 4 },
   detail: { gap: 10, paddingBottom: 16, paddingLeft: 52, paddingRight: 2 },
   hidden: { display: "none" },
   detailText: { color: ink.second, fontSize: 13 },
