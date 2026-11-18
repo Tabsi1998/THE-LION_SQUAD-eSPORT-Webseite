@@ -140,9 +140,11 @@ Challenge sehen darf, unabhängig vom Status. Zu einem Event gehört die Challen
 hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes hinzufügen**, seit #1371); im Formular steht nur
 „Gehört zu … – ändern im Event“. Das braucht auch die Hallen-Tafel am TV.
 
-**Im Profil** (#2516): Eine Zeit aus einer Challenge, die nicht öffentlich ist, steht unter den Referenzen mit dem Etikett
-**Vereinsintern**. Sie sehen nur die Person selbst und angemeldete Vereinsmitglieder, solange die Person „Vereinsinterne
-Erfolge zeigen“ anlässt ([Turniere](turniere.md) 3.10). Gäste sehen sie nie. Vereins-Referenzzeiten (3.6) stehen weiterhin nicht im Profil.
+**Im Profil** (#2516, #2521): Eine Zeit aus einer Challenge, die nicht öffentlich ist, steht unter den Referenzen und unter
+**Bestzeiten** mit dem Etikett **Vereinsintern**. Sie sehen nur die Person selbst und angemeldete Vereinsmitglieder, solange
+die Person „Vereinsinterne Erfolge zeigen“ anlässt ([Turniere](turniere.md) 3.10). Für sie zählt die Zeit auch bei **Fast
+Laps**, **Pole** und **Podium** oben im Profil mit. Gäste sehen sie nie, auch nicht in den Zahlen. Vereins-Referenzzeiten (3.6)
+stehen weiterhin nicht im Profil.
 
 **Automatisches Fast-Lap-Hinweisbanner anzeigen** (im Formular der Challenge): Solange die Einreichung offen ist oder
 die Challenge innerhalb eines Tages startet, läuft oben im Fast-Lap-Bereich der Website und in der App ein Banner. Ihn

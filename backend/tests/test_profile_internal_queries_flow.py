@@ -1,8 +1,9 @@
-"""Vereinsinterne Erfolge (#2516): die Mitglieder-Ansicht eines Profils fragt nicht je Eintrag neu nach.
+"""Vereinsinterne Erfolge (#2516, #2521): die Mitglieder-Ansicht eines Profils fragt nicht je Eintrag neu nach.
 
 Die Sichtbarkeit wird je Aufruf einmal je Stufe, je Season und je Liga entschieden (wie ``visibility.filter_visible``), und die
 Anmeldungen für die Plätze der Referenzen kommen in einer Abfrage für alle Turniere. Gemessen wird die Zahl der Datenbank-Abfragen
-auf ``/api/users/public/{name}`` - mit 4 und mit 16 internen Turnieren muss sie gleich bleiben. Dazu höchstens ein Aufruf von
+auf ``/api/users/public/{name}`` - mit 4 und mit 16 internen Turnieren, Bestzeiten (je eine eigene Strecke) und Seasons der
+Liga-Historie muss sie gleich bleiben. Dazu höchstens ein Aufruf von
 ``areas_for`` bzw. ``capabilities_of`` je Stufe bzw. Liga statt einer je Eintrag. Nur erfundene Namen.
 """
 import pathlib
@@ -78,7 +79,30 @@ async def seed(flow, internal_count: int):
                            "visibility": "public", "is_public": True, "status": "results_published"},
             "league": {"season_id": "s-verein", "title": "Meister", "division_label": "Liga 1", "staffel": "A", "display_name": "Probe"},
         })
+    await seed_round_two(flow, owner, internal_count)
     return owner, member
+
+
+async def seed_round_two(flow, owner: dict, internal_count: int) -> None:
+    """#2521: je interner Eintrag eine Fast-Lap-Challenge „Nur Mitglieder“ mit eigener Strecke und eine Season „Nur Mitglieder“ mit
+    abgeschlossener Staffel (Liga-Historie) - nach den Trophäen angelegt, damit deren Zahl gleich bleibt."""
+    for n in range(internal_count):
+        cid = f"c-verein-{n}"
+        await flow.db.f1_challenges.insert_one({"id": cid, "slug": cid, "title": f"Hotlap {n}", "status": "active", "visibility": "members"})
+        await flow.db.f1_tracks.insert_one({"id": f"tr-{n}", "name": f"Strecke {n}", "challenge_id": cid})
+        await flow.db.f1_lap_times.insert_one({"id": f"lap-{n}", "challenge_id": cid, "track_id": f"tr-{n}", "user_id": owner["id"],
+                                               "time_ms": 80000 + n, "is_invalid": False, "created_at": "2026-09-02T18:00:00+00:00"})
+        season_id, staffel = f"s-hist-{n}", f"st-hist-{n}"
+        await flow.db.league_seasons.insert_one({"id": season_id, "league_id": "liga-1", "status": "completed", "visibility": "members",
+                                                 "name": f"Season {n}", "slug": season_id})
+        await flow.db.tournaments.insert_one({"id": staffel, "slug": staffel, "title": "Staffel A", "status": "completed",
+                                              "visibility": "members", "is_public": True, "format": "round_robin",
+                                              "league_context": {"season_id": season_id, "staffel": "A"}})
+        await flow.db.league_final_tables.insert_one({
+            "id": f"ft-{n}", "active": True, "season_id": season_id, "league_id": "liga-1", "tournament_id": staffel, "staffel": "A",
+            "player_ids": [owner["id"]], "participants": 4, "closed_at": f"2026-10-{n % 28 + 1:02d}T20:00:00+00:00",
+            "rows": [{"registration_id": f"rh-{n}", "rank": 1, "display_name": "Probe"}],
+            "sides": {f"rh-{n}": {"player_ids": [owner["id"]]}}})
 
 
 async def measure(flow, monkeypatch, internal_count: int) -> dict:
@@ -108,8 +132,14 @@ async def measure(flow, monkeypatch, internal_count: int) -> dict:
         database._db = plain
     assert res.status_code == 200, res.text
     body = res.json()
-    assert sum(1 for item in body["references"]["items"] if item["internal"]) == internal_count, "Mitglied sieht die Turniere „Nur Mitglieder“"
+    refs = body["references"]["items"]
+    assert sum(1 for item in refs if item["internal"] and item["kind"] == "tournament") == internal_count, "Mitglied sieht die Turniere „Nur Mitglieder“"
+    assert sum(1 for item in refs if item["internal"] and item["kind"] == "fastlap") == internal_count, "und die Fast Laps „Nur Mitglieder“"
     assert sum(1 for row in body["awards"] if row["internal"]) == 2 * internal_count, "dazu ihre Trophäen und die Liga-Titel"
+    # #2521: Teilnahmen, Bestzeiten und Liga-Historie nach derselben Regel - ebenso ohne Abfrage je Eintrag.
+    assert sum(1 for row in body["tournaments"] if row["internal"]) == internal_count, "Teilnahmen „Nur Mitglieder“"
+    assert sum(1 for row in body["f1_bests"] if row["internal"]) == internal_count, "Bestzeiten „Nur Mitglieder“"
+    assert sum(1 for row in body["league_history"] if row["internal"]) == internal_count, "Seasons „Nur Mitglieder“"
     return calls
 
 
@@ -137,3 +167,60 @@ async def test_member_view_reads_do_not_grow_with_the_entries(monkeypatch):
     assert counts[0] == counts[1], f"Abfragen mit 4 bzw. 16 internen Turnieren: {counts}"
     # SELF und PUBLIC gelten prozessweit - ein Merker darin teilte Entscheidungen zwischen Betrachtern.
     assert SELF.memo == {} and PUBLIC.memo == {}
+
+
+# ---------------------------------------------------------------- Gesamtwertung (#2521)
+
+async def league_reads(seasons: int) -> dict:
+    """Liga mit ``seasons`` gespielten Seasons in einem Zeitraum der Gesamtwertung (echte Routen, Hilfen aus test_league_overall_flow);
+    ab Season 2 „Nur Mitglieder“. Gemessen wird das Profil von ``p-2-1`` für ein Mitglied und für die Person selbst - je einmal mit kaltem
+    und einmal mit warmem Zwischenspeicher der Endstände (``league_overall._extract``, 60 s)."""
+    import database
+    from services import league_overall
+    from test_league_overall_flow import ADMIN, add_season, configure, ok, played_staffel, setup
+
+    league_overall.forget_extracts()
+    flow, shutdown = make_flow()
+    try:
+        world = await setup(flow)
+        for index in range(seasons):
+            season = await add_season(flow, world)
+            await played_staffel(flow, world, season, 1, [1, 2, 3, 4])
+            if index:
+                flow.act_as(world["admin"])
+                ok(await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "members", "readiness_override_reason": "Testaufbau"}))
+        await configure(flow, world)
+        member = await flow.add_user(role="player", name="nachtfalke")
+        await flow.db.memberships.insert_one({"id": "m-liga", "user_id": member["id"], "member_status": "active"})
+        owner = await flow.db.users.find_one({"id": "p-2-1"}, {"_id": 0})
+        out = {}
+        for label, viewer in (("mitglied", member), ("selbst", owner)):
+            league_overall.forget_extracts()
+            for state in ("kalt", "warm"):
+                calls = {"reads": 0}
+                plain = database._db
+                database._db = CountingDb(plain, calls)
+                try:
+                    flow.act_as(viewer)
+                    res = await flow.get(f"/api/users/public/{owner['username']}")
+                finally:
+                    database._db = plain
+                assert res.status_code == 200, res.text
+                body = res.json()
+                assert sum(1 for row in body["league_history"] if row["internal"]) == seasons - 1, (label, "Seasons „Nur Mitglieder“")
+                assert body["league_overall"] and body["league_overall"][0]["internal"] is True, (label, "die Wertung zählt sie mit")
+                out[(label, state)] = calls["reads"]
+        return out
+    finally:
+        await shutdown()
+
+
+@pytest.mark.asyncio
+async def test_league_overall_reads_do_not_grow_with_seasons_while_the_cache_is_warm():
+    """Mitglied und Person selbst: Mit warmem Zwischenspeicher fragt das Profil bei 2 und bei 4 Seasons gleich oft. Kalt liest
+    ``league_overall._extract`` je Endstand (Anmeldungen, Teams, Spiele) - das wächst mit den Staffeln wie auf main (vor #2521) und wie
+    auf der Ligaseite; für Gäste ändert sich daran nichts."""
+    small, large = await league_reads(2), await league_reads(4)
+    for label in ("mitglied", "selbst"):
+        assert small[(label, "warm")] == large[(label, "warm")], (label, small, large)
+        assert large[(label, "kalt")] >= small[(label, "kalt")], (label, small, large)

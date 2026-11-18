@@ -18,3 +18,16 @@ test("Gegenprobe: Teilansicht ohne nicht öffentliche Seasons - kein Gesamtsiege
   expect(item).not.toHaveTextContent("Gesamtsieger");
   expect(item).toHaveTextContent("Endstand ohne nicht öffentliche Seasons");
 });
+
+test("vereinsintern (#2521): eine Wertung mit internen Seasons trägt das Etikett, eine öffentliche nicht", () => {
+  render(<MemoryRouter><LeagueOverallStanding rows={[row({ internal: true }), row({ level: 2, internal: false })]} /></MemoryRouter>);
+  expect(screen.getByTestId("league-overall-1")).toHaveTextContent("Vereinsintern");
+  expect(screen.getByTestId("league-overall-2")).not.toHaveTextContent("Vereinsintern");
+});
+
+test("Wertung nur aus Seasons, die die Person nicht öffnen darf (#2521): Text statt Link, mit Etikett", () => {
+  render(<MemoryRouter><LeagueOverallStanding rows={[row({ url: null, internal: true, complete: false, closed: false })]} /></MemoryRouter>);
+  expect(screen.queryByRole("link")).toBeNull();
+  expect(screen.getByTestId("league-overall-1")).toHaveTextContent("Probe-Liga · 2027");
+  expect(screen.getByTestId("league-overall-1-internal")).toHaveTextContent("Vereinsintern");
+});

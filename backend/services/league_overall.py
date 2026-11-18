@@ -124,25 +124,45 @@ async def _extract(db, final: dict) -> dict:
     return extract
 
 
-async def _sources(db, period: dict, *, viewer: dict | None, hidden, internal: bool) -> dict:
+async def _season_seen(season: dict, viewer: dict | None, scope) -> bool:
+    """Sieht die Person die Season? Mit ``scope`` (Profil, #2521) die Regel des Profils - je Season, Liga und Stufe einmal entschieden."""
+    if scope is not None:
+        from services.profile_visibility import sees_season
+
+        return await sees_season(scope, season)
+    from services.league_service import can_see_season
+
+    return season.get("status") != "archived" and await can_see_season(viewer, season)
+
+
+async def _tournament_hidden(db, tournament: dict, viewer: dict | None, hidden, scope) -> bool:
+    """Bleibt die Staffel verborgen? Mit ``scope`` (Profil, #2521) die Regel des Profils statt ``hidden`` - ohne Abfrage je Staffel."""
+    if scope is not None:
+        from services.profile_visibility import sees_listed_tournament
+
+        return not await sees_listed_tournament(scope, tournament)
+    return bool(hidden) and bool(await hidden(db, tournament, viewer))
+
+
+async def _sources(db, period: dict, *, viewer: dict | None, hidden, internal: bool, scope=None) -> dict:
     """Seasons, Staffeln und Endstände eines Zeitraums - für die Leitung alles, sonst nur, was die Person sieht."""
-    from services.league_service import can_see_season, division_label
+    from services.league_service import division_label
 
     season_ids = list(period.get("season_ids") or [])
     seasons = await db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}).to_list(len(season_ids) + 1)
     position = {season_id: index for index, season_id in enumerate(season_ids)}
     seasons.sort(key=lambda row: (row.get("number") if isinstance(row.get("number"), int) else 999, position.get(row["id"], 999)))
     if not internal:
-        seasons = [row for row in seasons if row.get("status") != "archived" and await can_see_season(viewer, row)]
+        seasons = [row for row in seasons if await _season_seen(row, viewer, scope)]
     ids = [row["id"] for row in seasons]
     finals = await db.league_final_tables.find({"season_id": {"$in": ids}, "active": True}, {"_id": 0}).to_list(500) if ids else []
     tournament_ids = sorted({row["tournament_id"] for row in finals})
     tournaments = {row["id"]: row for row in await db.tournaments.find(
         {"id": {"$in": tournament_ids}}, {"_id": 0, "creation_key": 0, "billing": 0}).to_list(len(tournament_ids) + 1)} if tournament_ids else {}
-    if not internal and hidden:
+    if not internal and (hidden or scope is not None):
         visible = {}
         for tid, tournament in tournaments.items():
-            if not await hidden(db, tournament, viewer):
+            if not await _tournament_hidden(db, tournament, viewer, hidden, scope):
                 visible[tid] = tournament
         tournaments = visible
     finals = [row for row in finals if row["tournament_id"] in tournaments and is_closed(tournaments[row["tournament_id"]])]
@@ -170,11 +190,11 @@ def season_head(season: dict, league: dict | None = None) -> dict:
 # ---------------------------------------------------------------- Rechnung
 
 async def compute(db, league: dict, period: dict, *, viewer: dict | None = None, hidden=None, internal: bool = False,
-                  settings: dict | None = None) -> dict:
+                  settings: dict | None = None, scope=None) -> dict:
     """Die laufende Gesamtwertung eines Zeitraums, je Liga N Co-Teams und Spieler. ``internal``: für die Leitung mit allen Seasons und
     Staffeln, sonst nur, was die Person sieht."""
     settings = settings or rules.settings_of(league)
-    source = await _sources(db, period, viewer=viewer, hidden=hidden, internal=internal)
+    source = await _sources(db, period, viewer=viewer, hidden=hidden, internal=internal, scope=scope)
     order = [row["id"] for row in source["seasons"]]
     position = {season_id: index for index, season_id in enumerate(order)}
     teams: dict[int, dict[str, dict]] = {}
@@ -237,26 +257,23 @@ def _filtered(rows: list[dict], allowed: set[str], allowed_tournaments: set[str]
     return out
 
 
-async def from_final(db, final: dict, *, viewer: dict | None, hidden, internal: bool) -> dict:
+async def from_final(db, final: dict, *, viewer: dict | None, hidden, internal: bool, scope=None) -> dict:
     """Eine abgeschlossene Wertung für die Person: die Fassung, ohne Seasons und Staffeln, die sie nicht sieht (Reihenfolge neu)."""
     settings = final.get("settings") or rules.settings_of({})
     seasons = list(final.get("seasons") or [])
     if internal:
         return {"teams": final.get("teams") or [], "players": final.get("players") or [], "seasons": seasons, "complete": True}
-    from services.league_service import can_see_season
-
     live = {row["id"]: row for row in await db.league_seasons.find(
         {"id": {"$in": [row["id"] for row in seasons]}}, {"_id": 0}).to_list(len(seasons) + 1)}
-    visible = [row for row in seasons if live.get(row["id"]) and live[row["id"]].get("status") != "archived"
-               and await can_see_season(viewer, live[row["id"]])]
+    visible = [row for row in seasons if live.get(row["id"]) and await _season_seen(live[row["id"]], viewer, scope)]
     allowed = {row["id"] for row in visible}
     tournament_ids = sorted({entry.get("tournament_id") for row in final.get("teams") or [] for entry in (row.get("seasons") or {}).values()
                              if entry.get("tournament_id")})
     allowed_tournaments = None
-    if hidden:
+    if hidden or scope is not None:
         allowed_tournaments = set()
         for tournament in await db.tournaments.find({"id": {"$in": tournament_ids}}, {"_id": 0}).to_list(len(tournament_ids) + 1):
-            if not await hidden(db, tournament, viewer):
+            if not await _tournament_hidden(db, tournament, viewer, hidden, scope):
                 allowed_tournaments.add(tournament["id"])
     order = [row["id"] for row in visible]
     decisions = list(final.get("decisions") or [])
@@ -416,15 +433,15 @@ async def season_block(league: dict | None, season: dict) -> dict | None:
 
 # ---------------------------------------------------------------- Profil und Teamseite
 
-async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hidden) -> tuple[dict[int, dict], list[dict]]:
+async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hidden, scope=None) -> tuple[dict[int, dict], list[dict]]:
     """Je Liga N die Zeilen, wie die Person sie sieht - abgeschlossen aus der Fassung, sonst gerechnet. Dazu die Seasons, die sie sieht."""
     out: dict[int, dict] = {}
-    live = await compute(db, league, period, viewer=viewer, hidden=hidden, internal=False)
+    live = await compute(db, league, period, viewer=viewer, hidden=hidden, internal=False, scope=scope)
     finals = {row["level"]: row for row in await db.league_overall_finals.find(
         {"period_id": period["id"], "active": True}, {"_id": 0}).to_list(50)}
     for level in sorted(set(live["levels"]) | set(finals)):
         if level in finals:
-            view = await from_final(db, finals[level], viewer=viewer, hidden=hidden, internal=False)
+            view = await from_final(db, finals[level], viewer=viewer, hidden=hidden, internal=False, scope=scope)
             out[level] = {"teams": view["teams"], "players": view["players"], "closed": True, "complete": view["complete"],
                           "label": (finals[level].get("title") or {}).get("division") or f"Liga {level}"}
         else:
@@ -492,17 +509,45 @@ async def for_team(db, team_id: str, viewer: dict | None, *, hidden=None) -> lis
     return out
 
 
-async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None) -> list[dict]:
-    """Platz in der Spielerwertung (Profil)."""
+async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scope=None) -> list[dict]:
+    """Platz in der Spielerwertung (Profil).
+
+    ``scope`` (#2521, ``services/profile_visibility``): wer schaut - die Person selbst alles, Vereinsmitglieder dazu Internes (Schalter
+    der Person), sonst nur, was Gäste sehen. Dann trägt jede Zeile ``internal``: Ein Gast sähe sie nicht oder nicht so - etwa mit
+    anderen Punkten, weil eine Season „Nur Mitglieder“ mitzählt. Der Link führt über die jüngste Season, deren Seite der Betrachter
+    öffnen darf - zählt nur die eigene Season „Aus“ oder „Nur Liga-Leitung“, gibt es keinen (``url: None``)."""
+    from services.profile_visibility import opens_season_page
+
     out = []
+    opens: dict = {}
     for league, period in await _periods_with(db, {"player_ids": user_id}):
-        levels, seasons = await _standing_rows(db, league, period, viewer, hidden)
-        url = url_for(league, seasons)
-        for level, data in levels.items():
-            for row in data["players"]:
-                if row["key"] == user_id:
-                    out.append(_entry(league, period, level, data, row, data["players"], url))
+        levels, seasons = await _standing_rows(db, league, period, viewer, hidden, scope)
+        if scope is not None and scope.mode != "public":
+            seasons = [row for row in seasons if await opens_season_page(viewer, row, opens)]
+        mine = _player_entries(league, period, levels, seasons, user_id)
+        guest = None
+        if scope is not None and scope.mode != "public":
+            # Die Gast-Sicht desselben Zeitraums zum Vergleich - ihre Endstände hat ``_extract`` eben schon gelesen (Zwischenspeicher).
+            from services.profile_visibility import PUBLIC
+
+            guest = _player_entries(league, period, *(await _standing_rows(db, league, period, None, None, PUBLIC)), user_id)
+        for level, entry in mine.items():
+            if scope is not None:
+                seen = entry if guest is None else guest.get(level)
+                entry["internal"] = seen is None or any(entry[key] != seen[key] for key in _COMPARED)
+            out.append(entry)
     return out
+
+
+# Was ein Gast an einer Zeile der Gesamtwertung im Profil sieht - weicht eines davon ab, zählt Internes mit (#2521).
+_COMPARED = ("place", "of", "points", "closed", "complete", "url")
+
+
+def _player_entries(league: dict, period: dict, levels: dict, seasons: list[dict], user_id: str) -> dict[int, dict]:
+    """Die Zeile der Person je Liga N, in der Reihenfolge der Ligen."""
+    url = url_for(league, seasons)
+    return {level: _entry(league, period, level, data, row, data["players"], url)
+            for level, data in levels.items() for row in data["players"] if row["key"] == user_id}
 
 
 # ---------------------------------------------------------------- Befangenheit und Sperrgründe
