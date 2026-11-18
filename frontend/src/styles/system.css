@@ -114,18 +114,14 @@ table tr.tls-you > :nth-child(n) {
   background-size: 100% 100%;
   background-repeat: no-repeat;
 }
-table tr.tls-you > :first-child {
+/* Erste und letzte Zelle teilen Bild und Maße (#2511, vorher zwei gleiche Blöcke); nur die Seite der Winkel wechselt. */
+table tr.tls-you > :is(:first-child, :last-child) {
   background-image: var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-you-tint);
-  background-position: top left, top left, bottom left, bottom left, 0 0;
   background-size: var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len),
     var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len), 100% 100%;
 }
-table tr.tls-you > :last-child {
-  background-image: var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-you-tint);
-  background-position: top right, top right, bottom right, bottom right, 0 0;
-  background-size: var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len),
-    var(--tls-corner-len) var(--tls-corner-width), var(--tls-corner-width) var(--tls-corner-len), 100% 100%;
-}
+table tr.tls-you > :first-child { background-position: top left, top left, bottom left, bottom left, 0 0; }
+table tr.tls-you > :last-child { background-position: top right, top right, bottom right, bottom right, 0 0; }
 @media (max-width: 639px) {
   table tr.tls-you > :not(.hidden):not(:has(~ :not(.hidden))) {
     background-image: var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-corner-bar), var(--tls-you-tint);
