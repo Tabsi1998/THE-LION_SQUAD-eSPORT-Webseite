@@ -848,6 +848,21 @@ ein Endstand). **Drucken** öffnet die Tabelle in der Druckansicht ([3.13](#313-
 
 Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter **Admin → eSports → Jahreswertung**.
 
+**Vereinsinterne Turniere im Profil** (#2516): Mit dem Ergebnis steht das Turnier in den **Referenzen** und als
+**Trophäe** im Profil der Teilnehmer, bei Team-Turnieren auch auf der Teamseite. Ist das Turnier nicht öffentlich
+(Sichtbarkeit Community, Vereinsmitglieder oder Intern bzw. ohne „Auf Public-Seiten sichtbar“), trägt der Eintrag das
+Etikett **Vereinsintern**. Wer was sieht, gilt in Web und App gleich:
+
+| Wer schaut | Sieht vereinsinterne Einträge |
+| --- | --- |
+| die Person selbst | immer, alle |
+| angemeldetes Vereinsmitglied (auch Vereinsverwaltung) | ja, solange die Person **Vereinsinterne Erfolge zeigen** anlässt – nur Turniere, die das Mitglied selbst öffnen dürfte (nicht „Intern“, nicht ohne „Auf Public-Seiten sichtbar“) |
+| angemeldet ohne Mitgliedschaft, Gast | nie, auch nicht mit dem Schalter |
+| Teamseite | das Team selbst alles, Vereinsmitglieder dazu die internen Team-Trophäen, alle anderen nur öffentliche |
+
+Den Schalter stellt jede Person selbst unter **Profil → Einstellungen → Privatsphäre** (ab Werk an). „So sehen dich
+andere“ im eigenen Profil zeigt die Sicht eines Gasts. Die Jahreswertung und die Ranglisten ändert das nicht.
+
 ### 3.11 Turniertag mit wenig Helfern
 
 - **Vor Ort** als Spielweise wählen: Ihr tragt Ergebnisse und Termine selbst ein, niemand muss Spieler hinterherrufen.
