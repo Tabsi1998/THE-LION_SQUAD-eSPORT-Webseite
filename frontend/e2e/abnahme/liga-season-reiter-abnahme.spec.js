@@ -116,8 +116,12 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     await expect(veto.getByTestId("veto-rules-steps")).toBeVisible();
     await expect(veto.getByTestId("veto-rules-propose")).toBeEnabled();
     await veto.getByTestId("veto-rules-propose").click();
-    await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
+    // Bis zum Speichern stehen daneben die Sätze des Servers zum gespeicherten Stand - gesperrt ist das Speichern nur durch die Prüfung
+    // des Vorschlags selbst.
+    await expect(veto.getByTestId("veto-step-0-sentence")).toContainText("Suchen & Zerstören");
+    await expect(veto.getByTestId("veto-rules-save")).toBeEnabled();
     await veto.getByTestId("veto-rules-save").click();
+    await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
     await expect(veto.getByTestId("veto-rules-error")).toHaveCount(0);
     const vetoRules = async () => (await ok(page, "GET", `/api/admin/leagues/seasons/${seasonId}/veto-rules`));
     await expect.poll(async () => (await vetoRules()).auto, { timeout: 15_000 }).toBeFalsy();
