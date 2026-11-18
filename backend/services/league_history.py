@@ -89,12 +89,21 @@ async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scop
     """Die Seasons einer Person: wo sie eingesetzt war (bzw. im Kader des Co-Teams, wenn es keine Aufstellung gab).
 
     ``scope`` (Profil, #2521): wer schaut - die Person selbst alles, Vereinsmitglieder dazu Internes (Schalter der Person), sonst nur,
-    was Gäste sehen. Dann trägt jede Zeile ``internal``: ein Gast sähe sie nicht."""
+    was Gäste sehen. Dann trägt jede Zeile ``internal``: ein Gast sähe sie nicht. Darf der Betrachter die Season-Seite nicht öffnen
+    (die eigene Season „Aus“ oder „Nur Liga-Leitung“), steht sie ohne Link da (``url: None``) - sonst führte er auf 404 bzw. 403."""
+    from services.profile_visibility import opens_season_page
+
     out = []
+    opens: dict = {}
     for final, season, league, internal in await _rows(db, {"player_ids": user_id}, viewer, hidden, scope):
         for registration_id, side in (final.get("sides") or {}).items():
             if user_id in (side.get("player_ids") or []):
                 entry = _entry(final, season, league, registration_id)
-                if entry:
-                    out.append({**entry, "internal": internal} if scope is not None else entry)
+                if not entry:
+                    continue
+                if scope is not None:
+                    entry["internal"] = internal
+                    if entry["url"] and scope.mode != "public" and not await opens_season_page(viewer, season, opens):
+                        entry["url"] = None
+                out.append(entry)
     return _order(out)

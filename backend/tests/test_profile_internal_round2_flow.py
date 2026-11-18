@@ -124,12 +124,12 @@ async def league_world(flow):
     return world, owner, member, outsider
 
 
-async def set_visibility(flow, world, visibility: str) -> None:
-    """Season 2 über die Verwaltung umstellen - die Staffeln ziehen mit (``league_service.STAFFEL_VISIBILITY``)."""
+async def set_visibility(flow, world, visibility: str, index: int = 1) -> None:
+    """Eine Season (Vorgabe: Season 2) über die Verwaltung umstellen - die Staffeln ziehen mit (``league_service.STAFFEL_VISIBILITY``)."""
     from test_league_overall_flow import ADMIN, ok
 
     flow.act_as(world["admin"])
-    ok(await flow.patch(f"{ADMIN}/seasons/{world['seasons'][1]['id']}", json={"visibility": visibility, "readiness_override_reason": "Testaufbau"}))
+    ok(await flow.patch(f"{ADMIN}/seasons/{world['seasons'][index]['id']}", json={"visibility": visibility, "readiness_override_reason": "Testaufbau"}))
     from services import league_overall
 
     league_overall.forget_extracts()
@@ -206,3 +206,60 @@ async def test_guest_league_answer_does_not_change_when_an_internal_season_exist
     without = await public_profile(flow, owner, None)
     for key in ("league_history", "league_overall", "stats"):
         assert with_internal[key] == without[key], key
+
+
+@pytest.mark.asyncio
+async def test_league_lead_and_admin_see_no_lead_only_season_in_another_profile(flow):
+    """Fabian, 18.11.: Eine Season der Liga-Leitung sieht im Profil nur die Person selbst - auch Liga-Leitung mit Mitgliedschaft und
+    Admins nicht. In der Liga-Verwaltung sehen sie weiter alles."""
+    world, owner, _member, _outsider = await league_world(flow)
+    await set_visibility(flow, world, "admins")
+    lead = await flow.add_user(role="player", name="ligaleitung")
+    await flow.db.memberships.insert_one({"id": "m-leitung", "user_id": lead["id"], "member_status": "active"})
+    await flow.db.league_staff.insert_one({"id": "ls-1", "league_id": world["league"]["id"], "user_id": lead["id"], "capabilities": ["manage"]})
+    for viewer in (lead, world["admin"]):
+        seen = await public_profile(flow, owner, viewer)
+        assert history_flags(seen, world) == {1: False}
+        assert seen["league_overall"][0]["internal"] is False
+    flow.act_as(lead)
+    assert (await flow.get(f"/api/admin/leagues/seasons/{world['seasons'][1]['id']}")).status_code == 200, "die Verwaltung zeigt sie weiter"
+
+
+@pytest.mark.asyncio
+async def test_own_season_the_person_cannot_open_stands_without_link(flow):
+    """Die eigene Season „Nur Liga-Leitung“ bzw. „Aus“ steht in der eigenen Historie - ohne Link, der Link führte auf 404/403."""
+    world, owner, _member, _outsider = await league_world(flow)
+    await set_visibility(flow, world, "admins")
+    mine = await public_profile(flow, owner, owner)
+    rows = {row["season_id"]: row for row in mine["league_history"]}
+    first, second = world["seasons"][0], world["seasons"][1]
+    assert rows[second["id"]]["url"] is None and rows[second["id"]]["internal"] is True
+    assert rows[first["id"]]["url"] == f"/liga/{world['league']['slug']}/{first['slug']}"
+    # Die Gesamtwertung verlinkt über die jüngste Season, die die Person öffnen darf.
+    assert mine["league_overall"][0]["url"] == f"/liga/{world['league']['slug']}/{first['slug']}/gesamtwertung"
+    assert mine["league_overall"][0]["internal"] is True
+
+    # Beide Seasons aus: alles steht noch da, aber ohne Link.
+    await set_visibility(flow, world, "off", index=0)
+    await set_visibility(flow, world, "off")
+    mine = await public_profile(flow, owner, owner)
+    assert {row["season_id"] for row in mine["league_history"]} == {first["id"], second["id"]}
+    assert all(row["url"] is None and row["internal"] for row in mine["league_history"])
+    assert mine["league_overall"][0]["url"] is None and mine["league_overall"][0]["internal"] is True
+
+
+@pytest.mark.asyncio
+async def test_draft_challenge_is_not_in_own_references_or_bests(flow):
+    """Eine Challenge im Entwurf ist unveröffentlicht: auch die Person selbst sieht sie weder unter Referenzen noch unter Bestzeiten."""
+    owner, _member, _outsider = await seed(flow)
+    await flow.db.f1_challenges.insert_one({"id": "c-entwurf", "slug": "c-entwurf", "title": "Hotlap Entwurf", "status": "draft",
+                                            "visibility": "public", "start_date": "2026-09-01T18:00:00+02:00"})
+    await flow.db.f1_tracks.insert_one({"id": "tr-c-entwurf", "name": "Teststrecke", "challenge_id": "c-entwurf"})
+    await flow.db.f1_lap_times.insert_one({"id": "lap-c-entwurf", "challenge_id": "c-entwurf", "track_id": "tr-c-entwurf", "user_id": owner["id"],
+                                           "time_ms": 81000, "is_invalid": False, "created_at": "2026-09-02T18:00:00+00:00"})
+    mine = await public_profile(flow, owner, owner)
+    assert {item["target_id"] for item in mine["references"]["items"] if item["kind"] == "fastlap"} == {"c-offen", "c-verein"}
+    assert set(lap_flags(mine)) == {"c-offen", "c-verein"}
+    flow.act_as(owner)
+    app_refs = (await flow.get("/api/mobile/profile/references")).json()
+    assert {item["target_id"] for item in app_refs["items"] if item["kind"] == "fastlap"} == {"c-offen", "c-verein"}, "die App ebenso"

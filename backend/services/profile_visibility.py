@@ -115,37 +115,47 @@ def public_season(season: dict | None) -> bool:
 
 async def sees_season(scope: ProfileScope, season: dict | None) -> bool:
     """Eine Liga-Season im Profil (Trophäen, Liga-Historie, Gesamtwertung - #2516, #2521): die Person selbst jede nicht archivierte,
-    Gäste ``public_season``, ein Mitglied nach ``league_service.can_see_season`` - je Season, Liga und Stufe einmal (``scope.memo``).
+    Gäste ``public_season``, ein Vereinsmitglied dazu „Nur Mitglieder“ - je Stufe einmal (``scope.memo``).
 
-    Eine **archivierte** Season zählt nie, für niemanden; ``can_see_season`` kennt den Status nicht. Hier ohne ``league_service``: das
-    zöge Discord, Mail und Routen in den Import-Graphen der Erfolge (tests/test_import_cycles_unit.py);
-    tests/test_season_rule_parity_flow.py hält beide Regeln gleich."""
+    **Liga-Rechte zählen hier nicht** (Fabian, 18.11.): Eine Season „Nur Liga-Leitung“ oder „Aus“ sieht im Profil nur die Person selbst,
+    auch Liga-Leitung und Admins nicht - in der Liga-Verwaltung sehen sie weiter alles. Das ist bewusst enger als
+    ``league_service.can_see_season`` (Season-Seite); ``opens_season_page`` bildet jene nach, nur für den Link. Eine **archivierte**
+    Season zählt nie. tests/test_season_rule_parity_flow.py prüft beide Regeln über alle Betrachter."""
     if not season or season.get("status") == "archived":
         return False
     if scope.everything:
         return True
-    if scope.viewer is None:
-        return public_season(season)
-    key = ("season", season.get("id"), season.get("league_id"), season.get("visibility"))
-    if key not in scope.memo:
-        scope.memo[key] = await _season_rule(scope, season)
-    return scope.memo[key]
-
-
-async def _season_rule(scope: ProfileScope, season: dict) -> bool:
     visibility = season.get("visibility") or "off"
     if visibility == "public":
         return True
-    if visibility not in ("members", "admins"):
+    if scope.viewer is None or visibility != "members":
+        return False
+    return await viewer_sees_level(scope, "members")
+
+
+async def opens_season_page(viewer: dict | None, season: dict | None, memo: dict) -> bool:
+    """Darf ``viewer`` die Season-Seite öffnen? Genau ``league_service.can_see_season`` (Liga-Rechte, „Nur Mitglieder“), hier ohne
+    ``league_service`` (Import-Graph der Erfolge, tests/test_import_cycles_unit.py) - je Liga und Stufe einmal in ``memo``. Das Profil
+    zeigt eine Season, die die Person nicht öffnen darf (ihre eigene „Aus“ oder „Nur Liga-Leitung“), ohne Link (#2521)."""
+    visibility = (season or {}).get("visibility") or "off"
+    if visibility == "public":
+        return True
+    if not season or not viewer or visibility not in ("members", "admins"):
         return False
     league_key = ("league", season.get("league_id"))
-    if league_key not in scope.memo:
+    if league_key not in memo:
         from services.league_permissions import ANY, can
 
-        scope.memo[league_key] = await can(scope.viewer, ANY, season.get("league_id"))
-    if scope.memo[league_key]:
+        memo[league_key] = await can(viewer, ANY, season.get("league_id"))
+    if memo[league_key]:
         return True
-    return visibility == "members" and await viewer_sees_level(scope, "members")
+    if visibility != "members":
+        return False
+    if ("level", "members") not in memo:
+        from services.visibility import user_can_see
+
+        memo[("level", "members")] = await user_can_see(viewer, "members")
+    return memo[("level", "members")]
 
 
 async def sees_listed_tournament(scope: ProfileScope, tournament: dict | None) -> bool:
@@ -155,6 +165,7 @@ async def sees_listed_tournament(scope: ProfileScope, tournament: dict | None) -
 
 
 async def sees_listed_challenge(scope: ProfileScope, challenge: dict | None) -> bool:
+    """Eine Fast-Lap-Challenge im Profil (Bestzeiten, Referenzen): ein Entwurf nie, auch nicht für die Person selbst (#2521)."""
     return bool(challenge) and challenge.get("status") != "draft" and await sees_challenge(scope, challenge)
 
 

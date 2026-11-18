@@ -514,10 +514,17 @@ async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scop
 
     ``scope`` (#2521, ``services/profile_visibility``): wer schaut - die Person selbst alles, Vereinsmitglieder dazu Internes (Schalter
     der Person), sonst nur, was Gäste sehen. Dann trägt jede Zeile ``internal``: Ein Gast sähe sie nicht oder nicht so - etwa mit
-    anderen Punkten, weil eine Season „Nur Mitglieder“ mitzählt."""
+    anderen Punkten, weil eine Season „Nur Mitglieder“ mitzählt. Der Link führt über die jüngste Season, deren Seite der Betrachter
+    öffnen darf - zählt nur die eigene Season „Aus“ oder „Nur Liga-Leitung“, gibt es keinen (``url: None``)."""
+    from services.profile_visibility import opens_season_page
+
     out = []
+    opens: dict = {}
     for league, period in await _periods_with(db, {"player_ids": user_id}):
-        mine = _player_entries(league, period, *(await _standing_rows(db, league, period, viewer, hidden, scope)), user_id)
+        levels, seasons = await _standing_rows(db, league, period, viewer, hidden, scope)
+        if scope is not None and scope.mode != "public":
+            seasons = [row for row in seasons if await opens_season_page(viewer, row, opens)]
+        mine = _player_entries(league, period, levels, seasons, user_id)
         guest = None
         if scope is not None and scope.mode != "public":
             # Die Gast-Sicht desselben Zeitraums zum Vergleich - ihre Endstände hat ``_extract`` eben schon gelesen (Zwischenspeicher).

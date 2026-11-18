@@ -167,3 +167,60 @@ async def test_member_view_reads_do_not_grow_with_the_entries(monkeypatch):
     assert counts[0] == counts[1], f"Abfragen mit 4 bzw. 16 internen Turnieren: {counts}"
     # SELF und PUBLIC gelten prozessweit - ein Merker darin teilte Entscheidungen zwischen Betrachtern.
     assert SELF.memo == {} and PUBLIC.memo == {}
+
+
+# ---------------------------------------------------------------- Gesamtwertung (#2521)
+
+async def league_reads(seasons: int) -> dict:
+    """Liga mit ``seasons`` gespielten Seasons in einem Zeitraum der Gesamtwertung (echte Routen, Hilfen aus test_league_overall_flow);
+    ab Season 2 „Nur Mitglieder“. Gemessen wird das Profil von ``p-2-1`` für ein Mitglied und für die Person selbst - je einmal mit kaltem
+    und einmal mit warmem Zwischenspeicher der Endstände (``league_overall._extract``, 60 s)."""
+    import database
+    from services import league_overall
+    from test_league_overall_flow import ADMIN, add_season, configure, ok, played_staffel, setup
+
+    league_overall.forget_extracts()
+    flow, shutdown = make_flow()
+    try:
+        world = await setup(flow)
+        for index in range(seasons):
+            season = await add_season(flow, world)
+            await played_staffel(flow, world, season, 1, [1, 2, 3, 4])
+            if index:
+                flow.act_as(world["admin"])
+                ok(await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "members", "readiness_override_reason": "Testaufbau"}))
+        await configure(flow, world)
+        member = await flow.add_user(role="player", name="nachtfalke")
+        await flow.db.memberships.insert_one({"id": "m-liga", "user_id": member["id"], "member_status": "active"})
+        owner = await flow.db.users.find_one({"id": "p-2-1"}, {"_id": 0})
+        out = {}
+        for label, viewer in (("mitglied", member), ("selbst", owner)):
+            league_overall.forget_extracts()
+            for state in ("kalt", "warm"):
+                calls = {"reads": 0}
+                plain = database._db
+                database._db = CountingDb(plain, calls)
+                try:
+                    flow.act_as(viewer)
+                    res = await flow.get(f"/api/users/public/{owner['username']}")
+                finally:
+                    database._db = plain
+                assert res.status_code == 200, res.text
+                body = res.json()
+                assert sum(1 for row in body["league_history"] if row["internal"]) == seasons - 1, (label, "Seasons „Nur Mitglieder“")
+                assert body["league_overall"] and body["league_overall"][0]["internal"] is True, (label, "die Wertung zählt sie mit")
+                out[(label, state)] = calls["reads"]
+        return out
+    finally:
+        await shutdown()
+
+
+@pytest.mark.asyncio
+async def test_league_overall_reads_do_not_grow_with_seasons_while_the_cache_is_warm():
+    """Mitglied und Person selbst: Mit warmem Zwischenspeicher fragt das Profil bei 2 und bei 4 Seasons gleich oft. Kalt liest
+    ``league_overall._extract`` je Endstand (Anmeldungen, Teams, Spiele) - das wächst mit den Staffeln wie auf main (vor #2521) und wie
+    auf der Ligaseite; für Gäste ändert sich daran nichts."""
+    small, large = await league_reads(2), await league_reads(4)
+    for label in ("mitglied", "selbst"):
+        assert small[(label, "warm")] == large[(label, "warm")], (label, small, large)
+        assert large[(label, "kalt")] >= small[(label, "kalt")], (label, small, large)
