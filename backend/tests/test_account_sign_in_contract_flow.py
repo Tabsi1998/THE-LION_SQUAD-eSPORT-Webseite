@@ -163,23 +163,9 @@ def per_address_limit() -> int:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("path", LOGIN_PATHS)
-async def test_sign_in_is_limited_per_address_before_any_password_check(flow, hash_checks, path, monkeypatch):
-    from datetime import datetime, timezone
-
-    from services import rate_limit
-
-    # Heute, nicht an einem festen Tag: Echtes MongoDB räumt die Zähler über ihren TTL-Index ab, ein Zähler aus der
-    # Vergangenheit verschwindet mitten im Test (#2216).
-    frozen = datetime.now(timezone.utc).replace(second=30, microsecond=0)
-
-    class Frozen(datetime):
-        """Die Uhr steht mitten in einem Fenster - sonst kippt der Test, wenn er über eine Minutengrenze läuft."""
-
-        @classmethod
-        def now(cls, tz=None):
-            return frozen
-
-    monkeypatch.setattr(rate_limit, "datetime", Frozen)
+async def test_sign_in_is_limited_per_address_before_any_password_check(flow, hash_checks, path, still_rate_limit_clock):
+    # Die Uhr der Drosselung steht mitten in einem Fenster, heute (#2216, #2512) - sonst kippt der Test, wenn er über
+    # eine Minutengrenze läuft.
     known = await account(flow)
     for number in range(per_address_limit()):
         response = await flow.post(path, json={"email": f"niemand-{number}@example.com", "password": WRONG})
@@ -222,7 +208,7 @@ async def change(flow, current: str):
 
 
 @pytest.mark.asyncio
-async def test_change_password_is_limited_per_account(flow):
+async def test_change_password_is_limited_per_account(flow, still_rate_limit_clock):
     user = await account(flow)
     other = await account(flow)
     flow.act_as(user)

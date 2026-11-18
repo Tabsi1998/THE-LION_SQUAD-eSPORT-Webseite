@@ -186,7 +186,7 @@ async def test_only_real_images_and_limited_size(flow, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_upload_is_rate_limited_per_account(flow, monkeypatch):
+async def test_upload_is_rate_limited_per_account(flow, monkeypatch, still_rate_limit_clock):
     ctx = await _setup(flow)
     monkeypatch.setattr(reference_original_routes, "RATE_LIMIT", 2)
     first = await _upload(flow, ctx, png())

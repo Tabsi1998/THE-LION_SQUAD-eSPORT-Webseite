@@ -218,7 +218,7 @@ async def test_a_hidden_season_or_an_unknown_team_has_no_rank_banner(flow):
 
 
 @pytest.mark.asyncio
-async def test_the_rank_banner_remembers_its_data_and_limits_calls_per_ip(flow, monkeypatch):
+async def test_the_rank_banner_remembers_its_data_and_limits_calls_per_ip(flow, monkeypatch, still_rate_limit_clock):
     """Review #2425: Ein Query-String geht am Zwischenspeicher vorbei - die Daten je Link werden trotzdem nur alle 30 Sekunden
     gerechnet (auch ein „gibt es nicht“), und je IP gibt es eine Grenze."""
     from services import league_rank_banner

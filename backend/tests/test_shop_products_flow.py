@@ -552,21 +552,14 @@ async def test_the_product_search_finds_the_printful_number_without_typing_it(fl
     assert len(fake.calls_to("getProducts")) == 1, "zwischengespeichert"
 
 
-def _one_window_for_the_whole_test(monkeypatch, name):
-    """Das Zeitfenster der Drosselung ist fest an die Uhr gebunden (``enforce_rate_limit``). Mit einer Stunde begann
-    mitten im Test ein neues Fenster, wenn er über einen Stundenwechsel lief - in der Zeitreise-Probe ab 11:52 kam
-    der Test um 12:00 an der Vorschau vorbei (#2474). ``10**9`` Sekunden reichen bis 2033 (wie #2458); die Zahl der Aufrufe
-    bleibt die echte Vorgabe."""
-    from routes import shop_product_routes
-
-    original = getattr(shop_product_routes, name)
-    monkeypatch.setattr(shop_product_routes, name, lambda: (original()[0], 10**9))
+# Das Zeitfenster der Drosselung ist fest an die Uhr gebunden (``enforce_rate_limit``): Lief ein Test über einen
+# Fensterwechsel, kam er in der Zeitreise-Probe um 12:00 an der Vorschau vorbei (#2474). Die Uhr der Drosselung steht
+# deshalb still (``still_rate_limit_clock``, #2512); Fenster und Zahl der Aufrufe bleiben die echte Vorgabe.
 
 
 @pytest.mark.asyncio
-async def test_the_draft_preview_is_rate_limited_per_account(flow, monkeypatch):
+async def test_the_draft_preview_is_rate_limited_per_account(flow, still_rate_limit_clock):
     """Codex, fünfte Runde: höchstens 60 Vorschauen je Minute und Konto (einstellbar), das 61. Mal 429."""
-    _one_window_for_the_whole_test(monkeypatch, "preview_limit")
     who = await people(flow)
     flow.act_as(who["finanzen"])
     body = {"placements": PLACEMENTS}
@@ -580,10 +573,9 @@ async def test_the_draft_preview_is_rate_limited_per_account(flow, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_the_name_sample_is_rate_limited_per_account(flow, monkeypatch):
+async def test_the_name_sample_is_rate_limited_per_account(flow, monkeypatch, still_rate_limit_clock):
     """#2142 (Review): Beispielnamen rendern kostet Rechenzeit - je Konto gedrosselt wie die Vorschau, darüber 429."""
     monkeypatch.setenv("SHOP_NAME_SAMPLE_LIMIT", "3")
-    _one_window_for_the_whole_test(monkeypatch, "sample_limit")
     who = await people(flow)
     flow.act_as(who["finanzen"])
     for _ in range(3):
