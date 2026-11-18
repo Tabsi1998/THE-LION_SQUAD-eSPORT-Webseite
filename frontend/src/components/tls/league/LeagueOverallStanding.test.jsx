@@ -18,3 +18,9 @@ test("Gegenprobe: Teilansicht ohne nicht öffentliche Seasons - kein Gesamtsiege
   expect(item).not.toHaveTextContent("Gesamtsieger");
   expect(item).toHaveTextContent("Endstand ohne nicht öffentliche Seasons");
 });
+
+test("vereinsintern (#2521): eine Wertung mit internen Seasons trägt das Etikett, eine öffentliche nicht", () => {
+  render(<MemoryRouter><LeagueOverallStanding rows={[row({ internal: true }), row({ level: 2, internal: false })]} /></MemoryRouter>);
+  expect(screen.getByTestId("league-overall-1")).toHaveTextContent("Vereinsintern");
+  expect(screen.getByTestId("league-overall-2")).not.toHaveTextContent("Vereinsintern");
+});

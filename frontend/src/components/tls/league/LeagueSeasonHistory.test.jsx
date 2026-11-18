@@ -25,3 +25,9 @@ test("je Season Liga, Platz, Meister und Aufstieg - ohne Einträge nichts", () =
   const { container } = render(<MemoryRouter><LeagueSeasonHistory rows={[]} testId="h" /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();
 });
+
+test("vereinsintern (#2521): eine Season, die Gäste nicht sehen, trägt das Etikett - eine öffentliche nicht", () => {
+  render(<MemoryRouter><LeagueSeasonHistory rows={[{ ...ROWS[0], internal: true }, { ...ROWS[1], internal: false }]} testId="h" /></MemoryRouter>);
+  expect(screen.getByTestId("h-s2")).toHaveTextContent("Vereinsintern");
+  expect(screen.getByTestId("h-s1")).not.toHaveTextContent("Vereinsintern");
+});

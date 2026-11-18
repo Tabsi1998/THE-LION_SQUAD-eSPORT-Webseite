@@ -20,12 +20,34 @@ const award = (id, title, rank, internal) => ({ id, kind: "trophy", rank, rank_l
 const PUBLIC_AWARD = award("offen", "Offen-Cup", 1, false);
 const INTERNAL_AWARD = award("verein", "Vereinsabend-Cup", 2, true);
 
+// Runde 2 (#2521): Teilnahmen ohne Ergebnis, Fast-Lap-Bestzeiten, Zahlen und Liga-Historie nach derselben Regel.
+const tour = (id, slug, title, internal) => ({ id, slug, title, status: "registration_open", start_date: "2026-12-04T18:00:00+01:00",
+  game: { name: "Rennspiel" }, final_position: null, internal });
+const PUBLIC_TOUR = tour("t-offen-2", "offener-abend", "Offener Abend", false);
+const INTERNAL_TOUR = tour("t-verein-2", "vereins-training", "Vereins-Training", true);
+const PUBLIC_LAP = { track: { name: "Spielberg", country: "AT" }, challenge: { id: "c-offen", slug: "offen-hotlap", title: "Offener Hotlap" },
+  time_ms: 65123, time_str: "1:05.123", is_leader: false, internal: false };
+const INTERNAL_LAP = { track: { name: "Monza", country: "IT" }, challenge: { id: "c-verein", slug: "vereins-hotlap", title: "Vereins-Hotlap" },
+  time_ms: 80500, time_str: "1:20.500", is_leader: true, internal: true };
+const season = (id, number, rank, internal) => ({ season_id: id, season_name: `Season ${number}`, season_number: number, league_name: "Probe-Liga",
+  url: null, division_label: "Liga 1", staffel: "A", display_name: "Neon Racing", rank, of: 6, points: 12, champion: rank === 1, zone: null, internal });
+const overall = (place, points, internal) => ({ league_name: "Probe-Liga", period_name: "Jahr 2026", division_label: "Liga 1", level: 1, place, of: 6,
+  points, closed: false, complete: false, url: null, internal });
+// Gast: nur Öffentliches, dieselben Zahlen wie ohne interne Einträge. Mitglied: das Interne zählt mit.
+const GUEST_STATS = { tournaments: 1, wins: 1, top3: 2, fast_laps: 1, pole_positions: 0 };
+const MEMBER_STATS = { tournaments: 3, wins: 1, top3: 4, fast_laps: 2, pole_positions: 1 };
+
 function profileFor(viewer, owner) {
   // Dieselbe Regel wie am Server: selbst alles, Mitglied bei Schalter an dazu Internes, sonst nur Öffentliches.
   const sees = Boolean(viewer && (viewer.id === owner.id || (viewer.is_club_member && owner.privacy_members_see_internal !== false)));
   const items = sees ? [INTERNAL_REF, PUBLIC_REF] : [PUBLIC_REF];
   return {
-    ...owner, created_at: "2025-03-01T10:00:00+00:00", stats: {}, teams: [], tournaments: [], f1_bests: [], league_history: [], league_overall: [],
+    ...owner, created_at: "2025-03-01T10:00:00+00:00", teams: [],
+    stats: sees ? MEMBER_STATS : GUEST_STATS,
+    tournaments: sees ? [INTERNAL_TOUR, PUBLIC_TOUR] : [PUBLIC_TOUR],
+    f1_bests: sees ? [PUBLIC_LAP, INTERNAL_LAP] : [PUBLIC_LAP],
+    league_history: sees ? [season("s-verein", 2, 1, true), season("s-offen", 1, 3, false)] : [season("s-offen", 1, 3, false)],
+    league_overall: [sees ? overall(1, 21, true) : overall(3, 9, false)],
     achievement_level: { level: 4, progress: 20 }, featured_award: null, featured_title: null, featured_emblems: [],
     awards: sees ? [INTERNAL_AWARD, PUBLIC_AWARD] : [PUBLIC_AWARD],
     references: { items, stats: { total: items.length, tournaments: items.length, fastlaps: 0, wins: 1, podiums: items.length } },
@@ -160,5 +182,77 @@ test.describe("Vereinsinterne Erfolge im Profil", () => {
       await expect(references.getByTestId("profile-reference-tournament:t-verein")).toHaveCount(0);
       await expect(page.getByText("Vereinsintern")).toHaveCount(0);
     });
+  }
+});
+
+// Ausschnitt von `first` bis `last` (beide sichtbar im selben Reiter) - für die Bilder der Runde 2.
+async function shotSpan(page, first, last, name) {
+  const dir = process.env.E2E_SCREENS_DIR;
+  if (!dir) return;
+  await first.scrollIntoViewIfNeeded();
+  const a = await first.boundingBox();
+  const b = await last.boundingBox();
+  const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+  const pad = 8;
+  const left = Math.max(0, Math.min(a.x, b.x) - pad);
+  const right = Math.max(a.x + a.width, b.x + b.width) + pad;
+  const top = Math.max(0, Math.min(a.y, b.y) - pad);
+  const bottom = Math.max(a.y + a.height, b.y + b.height) + pad;
+  await page.screenshot({ path: path.join(dir, `${name}.png`), fullPage: true, animations: "disabled", style: HIDE_CHROME,
+    clip: { x: left + scroll.x, y: top + scroll.y, width: right - left, height: bottom - top } });
+}
+
+test.describe("Vereinsintern, Runde 2: Teilnahmen, Bestzeiten, Zahlen und Liga (#2521)", () => {
+  test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    for (const [who, viewer] of [["mitglied", MEMBER], ["gast", null]]) {
+      test(`${who} bei ${width} px: Teilnahmen, Bestzeiten, Zahlen und Seasons nach derselben Regel`, async ({ page }) => {
+        const member = Boolean(viewer);
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        await page.setViewportSize({ width, height });
+        await mockServer(page, { viewer });
+        await page.goto(`/u/${OWNER.username}`);
+
+        // Zahlen: das Mitglied zählt das Interne mit, der Gast sieht die öffentlichen Werte.
+        const stats = member ? MEMBER_STATS : GUEST_STATS;
+        await expect(page.getByTestId("profile-stat-tournaments")).toContainText(String(stats.tournaments));
+        await expect(page.getByTestId("profile-stat-fastlaps")).toContainText(String(stats.fast_laps));
+        await expect(page.getByTestId("profile-stat-top3")).toContainText(String(stats.top3));
+
+        const history = page.getByTestId("profile-league-history");
+        await expect(history.getByTestId("profile-league-history-s-offen")).toContainText("Season 1");
+        await expect(history.getByTestId("profile-league-history-s-offen-internal")).toHaveCount(0);
+        const standing = page.getByTestId("profile-league-overall");
+        if (member) {
+          await expect(history.getByTestId("profile-league-history-s-verein-internal")).toContainText("Vereinsintern");
+          await expect(standing.getByTestId("profile-league-overall-1-internal")).toContainText("Vereinsintern");
+        } else {
+          await expect(history.getByTestId("profile-league-history-s-verein")).toHaveCount(0);
+          await expect(standing.getByTestId("profile-league-overall-1-internal")).toHaveCount(0);
+          await expect(page.getByText("Vereinsintern")).toHaveCount(0);
+        }
+        await noSideScroll(page);
+        await shotSpan(page, page.getByTestId("profile-stats"), standing, `profil-${who}-${width}-zahlen-liga`);
+
+        await page.getByTestId("profile-tab-references").click();
+        const tournaments = page.getByTestId("public-profile-tournaments");
+        const laps = page.getByTestId("public-profile-fastlaps");
+        await expect(tournaments.getByTestId("profile-tournament-offener-abend")).toContainText("Offener Abend");
+        await expect(tournaments.getByTestId("internal-tag-tournament-t-offen-2")).toHaveCount(0);
+        await expect(laps.getByTestId("profile-fastlap-offen-hotlap")).toContainText("Spielberg");
+        await expect(laps.getByTestId("internal-tag-fastlap-c-offen")).toHaveCount(0);
+        if (member) {
+          await expect(tournaments.getByTestId("internal-tag-tournament-t-verein-2")).toContainText("Vereinsintern");
+          await expect(laps.getByTestId("internal-tag-fastlap-c-verein")).toContainText("Vereinsintern");
+        } else {
+          await expect(tournaments.getByTestId("profile-tournament-vereins-training")).toHaveCount(0);
+          await expect(laps.getByTestId("profile-fastlap-vereins-hotlap")).toHaveCount(0);
+          await expect(page.getByText("Vereinsintern")).toHaveCount(0);
+        }
+        await noSideScroll(page);
+        await shotSpan(page, tournaments, laps, `profil-${who}-${width}-teilnahmen-bestzeiten`);
+      });
+    }
   }
 });

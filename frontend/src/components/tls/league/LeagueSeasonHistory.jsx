@@ -4,6 +4,7 @@
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Crown, Layers } from "lucide-react";
 import { ZONE_LABELS } from "@/lib/leagueTable";
+import { InternalTag } from "@/components/tls/InternalTag";
 
 const EXIT_TEXT = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
 
@@ -30,9 +31,13 @@ export function LeagueSeasonHistory({ rows, showTeam = false, testId = "league-s
           <li key={`${row.season_id}-${row.staffel}-${row.display_name}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3"
             data-testid={`${testId}-${row.season_id}`}>
             <div className="min-w-0 flex-1 basis-56">
-              <p className="font-semibold text-white [overflow-wrap:anywhere]">
-                {row.url ? <Link to={row.url} className="hover:text-[#29B6E8]">{row.league_name} · {row.season_name}</Link> : `${row.league_name} · ${row.season_name}`}
-              </p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">
+                  {row.url ? <Link to={row.url} className="hover:text-[#29B6E8]">{row.league_name} · {row.season_name}</Link> : `${row.league_name} · ${row.season_name}`}
+                </p>
+                {/* Vereinsintern (#2521): eine Season, die Gäste nicht sehen - nur im Spielerprofil, der Server setzt `internal`. */}
+                {row.internal ? <InternalTag testId={`${testId}-${row.season_id}-internal`} /> : null}
+              </div>
               <p className="text-xs text-white/60 [overflow-wrap:anywhere]">
                 {[row.division_label, row.staffel ? `Staffel ${row.staffel}` : "", showTeam ? row.display_name : ""].filter(Boolean).join(" · ")}
               </p>

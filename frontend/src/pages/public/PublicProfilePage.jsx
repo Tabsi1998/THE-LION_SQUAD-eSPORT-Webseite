@@ -946,9 +946,14 @@ export default function PublicProfilePage() {
                 <SectionTitle icon={Radio} color="#FFD700" kicker="Bestzeiten" title={`Fast Lap (${fastLaps.length})`} />
                 <div className="space-y-2">
                   {fastLaps.map((f, i) => (
-                    <div key={i} className={`flex items-center justify-between gap-3 px-4 py-3 border rounded-sm ${f.is_leader ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
+                    <div key={i} data-testid={`profile-fastlap-${f.challenge?.slug || f.challenge?.id || i}`}
+                      className={`flex items-center justify-between gap-3 px-4 py-3 border rounded-sm ${f.is_leader ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
                       <div className="min-w-0">
-                        <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
+                          {/* Vereinsintern (#2521): eine Bestzeit aus einer Challenge, die Gäste nicht sehen. */}
+                          {f.internal ? <InternalTag testId={`internal-tag-fastlap-${f.challenge?.id || i}`} /> : null}
+                        </div>
                         <div className="font-heading text-lg font-bold truncate">{f.track?.name || "—"}{f.track?.country ? ` · ${f.track.country}` : ""}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
@@ -1349,6 +1354,8 @@ function TournamentRow({ t, expanded = false }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={t.status} />
+          {/* Vereinsintern (#2521): eine Teilnahme, die Gäste nicht sehen. */}
+          {t.internal ? <InternalTag testId={`internal-tag-tournament-${t.id}`} /> : null}
           {t.final_position === 1 && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/40 px-1.5 py-0.5 rounded-sm">Sieger</span>}
           {t.final_position > 1 && t.final_position <= 3 && <span className="text-[10px] font-bold uppercase tracking-widest text-[#CD7F32] border border-[#CD7F32]/40 px-1.5 py-0.5 rounded-sm">Top 3</span>}
         </div>
