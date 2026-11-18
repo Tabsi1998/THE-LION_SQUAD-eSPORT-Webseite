@@ -128,3 +128,9 @@ test("vereinsintern (#2516): die Karte trägt das Etikett, öffentliche nicht - 
   expect(within(screen.getByTestId("trophy-card-cup")).getByText("Vereinsintern")).toBeInTheDocument();
   expect(within(screen.getByTestId("trophy-card-offen")).queryByText("Vereinsintern")).toBeNull();
 });
+
+test("vereinsintern (#2516): der Link der Karte nennt es auch dem Screenreader", () => {
+  render(<MemoryRouter><TrophyCabinet awards={[{ ...CUP, internal: true }, { ...CUP, id: "offen", internal: false }]} empty="-" animate={false} /></MemoryRouter>);
+  expect(within(screen.getByTestId("trophy-card-cup")).getByRole("link")).toHaveAttribute("aria-label", "Frühjahrs-Cup – 2. Platz – vereinsintern – zum Wettbewerb");
+  expect(within(screen.getByTestId("trophy-card-offen")).getByRole("link")).toHaveAttribute("aria-label", "Frühjahrs-Cup – 2. Platz – zum Wettbewerb");
+});

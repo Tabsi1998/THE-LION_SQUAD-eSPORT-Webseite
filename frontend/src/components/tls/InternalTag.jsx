@@ -13,7 +13,9 @@ export function InternalTag({ testId, className = "" }) {
       className={`inline-flex items-center gap-1 shrink-0 text-[10px] font-bold uppercase tracking-widest leading-none text-white/75 border border-white/20 bg-white/[0.04] px-1.5 py-1 rounded-sm ${className}`}
     >
       <Lock className="w-3 h-3" aria-hidden="true" />
-      Vereinsintern
+      <span>Vereinsintern</span>
+      {/* `title` liest nicht jeder Screenreader vor - die Erklärung steht deshalb auch als Text. */}
+      <span className="sr-only">{` – ${INTERNAL_HINT}`}</span>
     </span>
   );
 }

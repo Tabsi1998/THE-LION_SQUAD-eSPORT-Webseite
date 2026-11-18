@@ -75,7 +75,7 @@ function TrophyCard({ award, index, play, owner }) {
     <li className="tls-reward-card tls-trophy-card" data-metal={metalOf(award)} data-kind={kind} data-play={play || undefined}
       data-featured={featured || titled || emblemAt >= 0 ? "true" : undefined} style={{ "--tls-i": Math.min(index, STAGGER_CAP) }}
       data-testid={`trophy-card-${award.id}`}>
-      {href ? <Link to={href} className="tls-trophy-card__link" aria-label={`${trophyName(award)} – ${award.rank_label} – zum Wettbewerb`}>{body}</Link> : body}
+      {href ? <Link to={href} className="tls-trophy-card__link" aria-label={`${trophyName(award)} – ${award.rank_label}${award.internal ? " – vereinsintern" : ""} – zum Wettbewerb`}>{body}</Link> : body}
       {owner ? (
         <div className="tls-reward-card__actions">
           {owner.onFeature ? (
