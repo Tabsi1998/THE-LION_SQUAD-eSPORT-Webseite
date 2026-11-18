@@ -44,3 +44,10 @@ test("Sammelmeldung nach der Ruhezeit (#2444): eigenes Wort und erkannt", () => 
   expect(isQuietDigest({ kind: "direct_message" })).toBe(false);
   expect(isQuietDigest(null)).toBe(false);
 });
+
+test("Onyx erreicht heißt Krone wie die anderen Kronen-Meldungen (#2506)", () => {
+  expect(notificationKindLabel("crown_onyx")).toBe("Krone");
+  // Der Server schickt die Art mit dem Thema achievements - das Thema darf das Wort nicht überstimmen.
+  expect(notificationKindLabel("crown_onyx", { category: "achievements" })).toBe("Krone");
+  expect(notificationKindLabel("crown_gained", { category: "achievements" })).toBe("Krone");
+});

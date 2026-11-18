@@ -19,6 +19,8 @@ export type OverallStandingRow = {
   url?: string | null;
   /** Teamseite: der Name des Co-Teams. */
   name?: string | null;
+  /** Vereinsintern (#2521, #2531): Gäste sähen diese Wertung nicht oder nicht so - Etikett „Vereinsintern“. */
+  internal?: boolean;
 };
 
 export type OverallCell = {

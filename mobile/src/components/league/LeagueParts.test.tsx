@@ -1,11 +1,12 @@
 import React from "react";
 import { Alert } from "react-native";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { createCeremonyQueue } from "../../achievements/ceremony/queue";
 import { StandingsTables } from "../tournament/StandingsTables";
 import { standingsTables } from "../../lib/tournamentView";
 import { LeagueApplicationsCard } from "./LeagueApplicationsCard";
 import { LeagueSeasonCard } from "./LeagueSeasonCard";
+import { LeagueOverallStanding } from "./LeagueOverallStanding";
 import { LeagueSeasonHistory } from "./LeagueSeasonHistory";
 import { RewardChip } from "./RewardArt";
 import { TrophyCabinet } from "./TrophyCabinet";
@@ -230,4 +231,32 @@ test("Season der Staffel: Anmeldefenster mit wirksamem Ende und Weg zur Gesamtwe
   mockGet.mockClear();
   await render(<LeagueSeasonCard publicPath="/liga/../x" onOpenOverall={onOpenOverall} />);
   expect(mockGet).not.toHaveBeenCalled();
+});
+
+// Vereinsintern (#2531, Web #2521): Seasons und Gesamtwertung, die Gäste nicht sehen, tragen das Etikett - mit Screenreader-Text.
+// Eine Season, die der Betrachter nicht öffnen darf, kommt ohne `url` und steht als Text da, nicht als Link.
+test("Season-Historie: Etikett nur an internen Seasons, ohne url kein Link", async () => {
+  await render(<LeagueSeasonHistory rows={[
+    { season_id: "s-intern", league_name: "CoD-Liga", season_name: "Season 2", division_label: "Liga 1", rank: 2, of: 8, internal: true, url: null },
+    { season_id: "s-offen", league_name: "CoD-Liga", season_name: "Season 1", division_label: "Liga 1", rank: 3, of: 8, internal: false, url: "/liga/cod/s1" },
+  ]} />);
+  expect(screen.getByTestId("league-season-history-s-intern-internal")).toHaveTextContent("Vereinsintern");
+  expect(screen.getByTestId("league-season-history-s-intern-internal").props.accessibilityLabel).toMatch(/vereinsintern/i);
+  expect(screen.queryByTestId("league-season-history-s-offen-internal")).toBeNull();
+  // Nur die Season mit url ist ein Link.
+  expect(screen.getAllByRole("link")).toHaveLength(1);
+  expect(within(screen.getByTestId("league-season-history-s-intern")).queryByRole("link")).toBeNull();
+  expect(within(screen.getByTestId("league-season-history-s-intern")).getByText("CoD-Liga · Season 2")).toBeTruthy();
+});
+
+test("Gesamtwertung: Etikett nur an internen Zeilen, der Vorleser sagt „vereinsintern“, ohne url kein Link", async () => {
+  await render(<LeagueOverallStanding rows={[
+    { league_name: "CoD-Liga", period_name: "2026", level: 1, place: 2, of: 8, points: 30, closed: false, internal: true, url: null },
+    { league_name: "CoD-Liga", period_name: "2025", level: 2, place: 1, of: 6, points: 40, closed: false, internal: false, url: "/liga/cod/gesamt" },
+  ]} />);
+  expect(screen.getByTestId("league-overall-1-internal")).toHaveTextContent("Vereinsintern");
+  expect(screen.queryByTestId("league-overall-2-internal")).toBeNull();
+  expect(screen.getByLabelText(/^CoD-Liga · 2026\..*vereinsintern$/)).toBeTruthy();
+  expect(screen.queryByLabelText(/^CoD-Liga · 2025\..*vereinsintern/)).toBeNull();
+  expect(screen.getAllByRole("link")).toHaveLength(1);
 });

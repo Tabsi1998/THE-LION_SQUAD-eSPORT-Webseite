@@ -7,12 +7,15 @@ import { hasPlayer, matchStatusText, roundLabels, scheduleSections } from "../..
 import { colors, radius, roles, surfaces } from "../../theme";
 import { useReduceMotion } from "../FadeIn";
 import { SegmentedTabs } from "../SegmentedTabs";
+import { YouCorners, YouFill, YouTag } from "../YouFrame";
+import { youSpeech } from "../../lib/youLabel";
 import { LiveClock, clockDuration } from "./bracket/LiveClock";
 import { playersText } from "./bracket/LiveNow";
 import { breatheStyle } from "./bracket/motion";
 
 // Der Spielplan (#1563): nach Spieltag/Runde oder nach Station gruppiert, „Nur meine“ für die eigenen Spiele. Laufendes
-// mit rotem Punkt und Uhr, entfallene Spiele leise mit ihrem Grund. Antippen öffnet das Spiel.
+// mit rotem Punkt und Uhr, entfallene Spiele leise mit ihrem Grund. Antippen öffnet das Spiel. Dein Spiel trägt die
+// Ecken-Klammern und „Du“ bzw. „Dein Team“ (#1316, wie TournamentSchedulePage im Web).
 
 type Props = {
   matches: BracketMatch[];
@@ -20,10 +23,12 @@ type Props = {
   format?: string | null;
   nameOf: (registrationId: string) => string;
   mineId: string | null;
+  /** Etikett an deinem Spiel: „Du“ oder „Dein Team“ (lib/youLabel). */
+  mineLabel?: string;
   onOpen: (matchId: string) => void;
 };
 
-export function ScheduleList({ matches, stages, format, nameOf, mineId, onOpen }: Props) {
+export function ScheduleList({ matches, stages, format, nameOf, mineId, mineLabel = "Du", onOpen }: Props) {
   const reduce = useReduceMotion();
   const [by, setBy] = useState<"day" | "station">("day");
   const [onlyMine, setOnlyMine] = useState(false);
@@ -56,7 +61,7 @@ export function ScheduleList({ matches, stages, format, nameOf, mineId, onOpen }
             <Text style={styles.count}>{section.items.length}</Text>
           </View>
           {section.items.map((match) => (
-            <ScheduleRow key={match.id} match={match} round={by === "station" ? labels.get(match.id) || "" : ""} nameOf={nameOf} mine={hasPlayer(match, mineId)} reduce={reduce} onOpen={onOpen} />
+            <ScheduleRow key={match.id} match={match} round={by === "station" ? labels.get(match.id) || "" : ""} nameOf={nameOf} mine={hasPlayer(match, mineId)} mineLabel={mineLabel} reduce={reduce} onOpen={onOpen} />
           ))}
         </View>
       )) : <Text style={styles.hint}>{onlyMine ? "Für dich ist hier gerade kein Spiel." : "Noch keine Spiele veröffentlicht."}</Text>}
@@ -64,8 +69,8 @@ export function ScheduleList({ matches, stages, format, nameOf, mineId, onOpen }
   );
 }
 
-const ScheduleRow = React.memo(function ScheduleRow({ match, round, nameOf, mine, reduce, onOpen }: {
-  match: BracketMatch; round: string; nameOf: (id: string) => string; mine: boolean; reduce: boolean; onOpen: (id: string) => void;
+const ScheduleRow = React.memo(function ScheduleRow({ match, round, nameOf, mine, mineLabel, reduce, onOpen }: {
+  match: BracketMatch; round: string; nameOf: (id: string) => string; mine: boolean; mineLabel: string; reduce: boolean; onOpen: (id: string) => void;
 }) {
   const live = isLive(match);
   const cancelled = isCancelled(match);
@@ -76,11 +81,12 @@ const ScheduleRow = React.memo(function ScheduleRow({ match, round, nameOf, mine
   return (
     <Pressable
       onPress={() => onOpen(match.id)}
-      style={({ pressed }) => [styles.row, mine && styles.rowMine, live && styles.rowLive, cancelled && styles.rowQuiet, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.row, live && styles.rowLive, cancelled && styles.rowQuiet, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`${title}: ${playersText(match, nameOf)}, ${matchStatusText(match)}`}
+      accessibilityLabel={`${title}: ${playersText(match, nameOf)}${mine ? `, ${youSpeech(mineLabel)}` : ""}, ${matchStatusText(match)}`}
       testID={`schedule-row-${match.id}`}
     >
+      {mine ? <YouFill radius={radius.lg} /> : null}
       <View style={styles.key}>
         <Text style={styles.keyText} numberOfLines={1}>{title}</Text>
       </View>
@@ -89,7 +95,7 @@ const ScheduleRow = React.memo(function ScheduleRow({ match, round, nameOf, mine
         {meta ? <Text style={styles.meta} numberOfLines={1} maxFontSizeMultiplier={1.4}>{meta}</Text> : null}
       </View>
       <View style={styles.side}>
-        {mine ? <Text style={styles.du}>Du</Text> : null}
+        {mine ? <YouTag label={mineLabel} testID={`schedule-you-${match.id}`} style={styles.youTag} /> : null}
         {live ? (
           <View style={styles.liveRow}>
             <Animated.View style={[styles.liveDot, breatheStyle(reduce)]} />
@@ -100,6 +106,8 @@ const ScheduleRow = React.memo(function ScheduleRow({ match, round, nameOf, mine
           <Text style={[styles.status, cancelled && styles.statusQuiet]} numberOfLines={2}>{matchStatusText(match)}</Text>
         )}
       </View>
+      {/* Ecken-Klammern (#1316): 5 Punkte außen - die Zeilen stehen 6 Punkte auseinander, nichts wird abgeschnitten. */}
+      {mine ? <YouCorners /> : null}
     </Pressable>
   );
 });
@@ -117,7 +125,6 @@ const styles = StyleSheet.create({
   sectionLive: { color: roles.live },
   count: { color: roles.quiet, fontSize: 12, fontVariant: ["tabular-nums"], fontWeight: "800" },
   row: { alignItems: "center", backgroundColor: surfaces.s1, borderColor: colors.border, borderRadius: radius.lg, borderWidth: 1, flexDirection: "row", gap: 10, minHeight: 56, paddingHorizontal: 10, paddingVertical: 8 },
-  rowMine: { borderColor: "rgba(41,182,232,0.55)" },
   rowLive: { borderColor: "rgba(255,59,48,0.55)" },
   rowQuiet: { backgroundColor: "transparent", borderStyle: "dashed", opacity: 0.75 },
   pressed: { opacity: 0.72 },
@@ -128,7 +135,7 @@ const styles = StyleSheet.create({
   namesDone: { color: "rgba(255,255,255,0.75)" },
   meta: { color: roles.muted, fontSize: 12 },
   side: { alignItems: "flex-end", gap: 3, maxWidth: 120 },
-  du: { color: roles.brand, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  youTag: { alignSelf: "flex-end" },
   status: { color: roles.muted, fontSize: 12, fontWeight: "700", textAlign: "right" },
   statusQuiet: { color: roles.quiet, fontStyle: "italic" },
   liveRow: { alignItems: "center", flexDirection: "row", gap: 5 },

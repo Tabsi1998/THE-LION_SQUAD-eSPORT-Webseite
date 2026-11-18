@@ -64,6 +64,8 @@ const KIND_LABELS: Record<string, string> = {
   crown_gained: "Krone",
   crown_lost: "Krone",
   crown_changed: "Krone",
+  // „Onyx erreicht“ (#2501, #2506): die höchste Krone - Kanal lion_achievements, Ziel /achievements.
+  crown_onyx: "Krone",
   moderation: "Moderation",
   invoice_ready: "Rechnung",
   helper_call: "Helfer gesucht",

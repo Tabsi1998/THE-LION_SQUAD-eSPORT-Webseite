@@ -13,6 +13,7 @@ import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import { viennaDate } from "../../lib/vienna";
 import { openTab } from "../../navigation/rootNavigation";
+import { YouFrame, YouTag } from "../../components/YouFrame";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "SeasonPass">;
 
@@ -189,6 +190,7 @@ export function SeasonPassScreen({ navigation }: Props) {
               <RankRow
                 key={entry.user_id}
                 entry={entry}
+                mine={entry === ownEntry}
                 onPress={() => entry.username ? navigation.navigate("PublicProfile", { username: entry.username }) : undefined}
               />
             ))}
@@ -203,6 +205,7 @@ export function SeasonPassScreen({ navigation }: Props) {
               <RankRow
                 key={entry.user_id}
                 entry={entry}
+                mine={entry === ownEntry}
                 onPress={() => entry.username ? navigation.navigate("PublicProfile", { username: entry.username }) : undefined}
               />
             ))}
@@ -232,17 +235,21 @@ export function SeasonPassScreen({ navigation }: Props) {
 function RankRow({
   entry,
   highlight = false,
+  mine = false,
   onPress,
 }: {
   entry: JahreswertungEntry;
+  /** „Dein Rang“ oben: die Überschrift sagt schon „Dein“ - Ecken ohne Etikett. */
   highlight?: boolean;
+  /** Deine Zeile in Podium und Rangliste (#1316): Ecken-Klammern und „Du“. */
+  mine?: boolean;
   onPress?: () => void;
 }) {
   const rankColor = entry.rank === 1 ? colors.gold : entry.rank === 2 ? "#C0C0C0" : entry.rank === 3 ? "#CD7F32" : colors.muted;
   const rankIcon = entry.rank === 1 ? "trophy-outline" : entry.rank === 2 || entry.rank === 3 ? "medal-outline" : null;
 
   const content = (
-    <View style={[styles.rankRow, highlight && styles.rankRowHighlight]}>
+    <YouFrame active={highlight || mine} inset style={[styles.rankRow, (highlight || mine) && styles.rankRowHighlight]} testID={mine ? `season-pass-you-${entry.user_id}` : undefined}>
       <View style={styles.rankBadge}>
         {rankIcon ? (
           <Ionicons name={rankIcon} color={rankColor} size={22} />
@@ -251,9 +258,12 @@ function RankRow({
         )}
       </View>
       <View style={styles.rankInfo}>
-        <Body style={[styles.rankName, highlight && styles.rankNameHighlight]}>
-          {entry.display_name || entry.username || "Unbekannt"}
-        </Body>
+        <View style={styles.youLine}>
+          <Body style={[styles.rankName, styles.shrink, highlight && styles.rankNameHighlight]}>
+            {entry.display_name || entry.username || "Unbekannt"}
+          </Body>
+          {mine && !highlight ? <YouTag testID={`season-pass-you-tag-${entry.user_id}`} /> : null}
+        </View>
         {entry.username ? <Muted>@{entry.username}</Muted> : null}
         <Muted>{entryEvents(entry)} Wertungen · {entry.wins || 0} Siege · {entry.achievement_count || 0} Profil-Erfolge</Muted>
       </View>
@@ -263,7 +273,7 @@ function RankRow({
         </Body>
         <Muted style={styles.pointsLabel}>Pkt.</Muted>
       </View>
-    </View>
+    </YouFrame>
   );
 
   if (!onPress) return content;
@@ -399,8 +409,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingTop: 10,
   },
+  // Deine Zeile (#1316): die Fläche kommt von YouFrame - hier nur Luft für die Winkel an der Kante.
   rankRowHighlight: {
-    backgroundColor: "rgba(41,182,232,0.06)",
     borderRadius: radius.lg,
     borderTopWidth: 0,
     marginTop: 4,
@@ -424,6 +434,17 @@ const styles = StyleSheet.create({
   },
   rankNameHighlight: {
     color: colors.cyan,
+  },
+  youLine: {
+    alignItems: "center",
+    columnGap: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 2,
+  },
+  shrink: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   rankPoints: {
     alignItems: "flex-end",

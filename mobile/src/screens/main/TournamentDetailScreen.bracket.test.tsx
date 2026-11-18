@@ -475,3 +475,87 @@ describe("zusammengelegte Läufe (#2459)", () => {
     expect(screen.queryByText("2 Plätze frei")).toBeNull();
   });
 });
+
+// Ecken-Klammern (#1316, Web #2517): dein Match im Baum und im Spielplan, deine Zeile in Tabelle, Rangliste und Teilnehmerliste
+// tragen Winkel, Fläche und das Etikett „Du“ (bei einer Team-Anmeldung „Dein Team“) - nur für dich, nie für andere.
+describe("Ecken-Klammern für „du“ (#1316)", () => {
+  const cornersIn = (testID: string) => within(screen.getByTestId(testID)).queryAllByTestId("you-corners").length;
+  const mineMatchIds = (state: string, regId: string) => TREES[state].matches_v2
+    .filter((match: any) => (match.slots || []).some((slot: any) => slot.registration_id === regId)).map((match: any) => match.id).sort();
+
+  test("Baum: Winkel genau um deine Matches, Etikett in deiner Zeile - ohne Anmeldung nirgends", async () => {
+    const { mine } = serve("ffa16_round1", {}, "NeonFalke");
+    await open("Baum");
+    await screen.findByTestId("bracket-canvas");
+    const layerNodes = screen.getAllByTestId(/^bracket-you-(?!tag-|row-)/);
+    // Die Lage deckt die ganze Karte ab - ohne pointerEvents="none" finge sie jedes Antippen ab (Prüfung App-Paket).
+    layerNodes.forEach((node) => expect(node.props.pointerEvents).toBe("none"));
+    const layers = layerNodes.map((node) => String(node.props.testID).replace("bracket-you-", "")).sort();
+    expect(layers).toEqual(mineMatchIds("ffa16_round1", mine.id));
+    expect(screen.getAllByTestId(`bracket-you-row-${mine.id}`).length).toBe(layers.length);
+    // Die Karte eines anderen Laufs trägt nichts.
+    const other = screen.getByTestId(`bracket-card-${keyId("ffa16_round1", "B")}`);
+    expect(within(other).queryAllByTestId("you-fill")).toHaveLength(0);
+    expect(within(other).queryByText("Du")).toBeNull();
+    // Der Vorleser sagt „du“ an deiner Zeile.
+    expect(screen.getAllByLabelText(/^NeonFalke, du/).length).toBeGreaterThan(0);
+  });
+
+  test("Baum ohne eigene Anmeldung: keine Winkel, kein Etikett", async () => {
+    serve("ffa16_round1");
+    await open("Baum");
+    await screen.findByTestId("bracket-canvas");
+    expect(screen.queryAllByTestId(/^bracket-you-/)).toHaveLength(0);
+    expect(screen.queryAllByTestId("you-corners")).toHaveLength(0);
+  });
+
+  test("Spielplan: nur deine Spiele mit Winkeln und „Du“", async () => {
+    const { mine } = serve("league6", {}, "NeonFalke");
+    await open("Matches");
+    await screen.findByText("Spieltag 1");
+    const expected = mineMatchIds("league6", mine.id);
+    const tagged = screen.getAllByTestId(/^schedule-you-/).map((node) => String(node.props.testID).replace("schedule-you-", "")).sort();
+    expect(tagged).toEqual(expected);
+    for (const id of expected) expect(cornersIn(`schedule-row-${id}`)).toBe(1);
+    expect(screen.getAllByTestId("you-corners")).toHaveLength(expected.length);
+    expect(screen.getByTestId(`schedule-row-${expected[0]}`).props.accessibilityLabel).toMatch(/, du, /);
+  });
+
+  test("Tabelle: nur deine Zeile mit Winkeln an der Kante und „Du“", async () => {
+    const { mine } = serve("league6", {}, "NeonFalke");
+    await open("Tabelle");
+    expect(await screen.findByTestId(`standings-you-${mine.id}`)).toHaveTextContent("Du");
+    expect(screen.getAllByTestId(/^standings-you-/)).toHaveLength(1);
+    expect(screen.getAllByTestId("you-corners")).toHaveLength(1);
+    // An der Kante: die Tabelle schneidet ab, 5 Punkte außen wären weg.
+    expect(screen.getByTestId("you-corners")).toHaveStyle({ top: -0, left: -0 });
+    expect(screen.getByLabelText(/NeonFalke \(du\)/)).toBeTruthy();
+  });
+
+  test("Spieler: deine Anmeldung trägt Winkel und „Du“, sonst keine", async () => {
+    const { mine } = serve("league6", {}, "NeonFalke");
+    await open("Spieler");
+    expect(await screen.findByTestId(`tournament-participant-me-${mine.id}`)).toHaveTextContent(/^Du$/);
+    expect(cornersIn(`tournament-participant-${mine.id}`)).toBe(1);
+    expect(screen.getAllByTestId("you-corners")).toHaveLength(1);
+    expect(screen.getAllByTestId(/^tournament-participant-me-/)).toHaveLength(1);
+    expect(screen.getByTestId(`tournament-participant-${mine.id}`).props.accessibilityLabel).toMatch(/^NeonFalke, du, /);
+  });
+
+  test("Spieler: die Anmeldung deines Teams heißt „Dein Team“", async () => {
+    const { mine } = serve("league6", {}, "NeonFalke");
+    serve("league6", { my_registration: { id: mine.id, status: mine.status, user_id: "u-other", team_id: "team-9" } });
+    await open("Spieler");
+    expect(await screen.findByTestId(`tournament-participant-me-${mine.id}`)).toHaveTextContent(/^Dein Team$/);
+  });
+
+  test("Finale Rangliste (K.-o.): deine Platzierung mit Winkeln und „Du“", async () => {
+    const { mine } = serve("se6_done", { status: "completed" }, "NeonFalke");
+    await open("Tabelle");
+    const rank = TREES.se6_done.standings.findIndex((row: any) => row.registration_id === mine.id);
+    expect(rank).toBeGreaterThanOrEqual(0);
+    expect(await screen.findByTestId(`standing-you-${rank}`)).toHaveTextContent("Du");
+    expect(screen.getAllByTestId(/^standing-you-/)).toHaveLength(1);
+    expect(cornersIn(`standing-row-you-${rank}`)).toBe(1);
+  });
+});
