@@ -189,6 +189,13 @@
     "link": { "to": "/faq/gewinne-und-trophaeen#erfolg-teilen", "label": "Zur Anleitung" }
   },
   {
+    "id": "vereinsintern-wer-sieht",
+    "frage": "Wer sieht meine vereinsinternen Turniere und Zeiten?",
+    "antwort": "Du selbst und angemeldete Vereinsmitglieder, Gäste nie, auch nicht bei Trophäen, Liga-Seasons und den Zahlen im Profil. Interne Einträge tragen im Profil das Etikett Vereinsintern. Schaltest du unter Privatsphäre Vereinsinterne Erfolge zeigen aus, sehen Mitglieder nur Öffentliches.",
+    "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/profile?tab=privacy", "label": "Privatsphäre öffnen" }
+  },
+  {
     "id": "anonymisieren-was-passiert",
     "frage": "Was passiert, wenn ich mein Konto anonymisiere?",
     "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben. Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen.",
