@@ -237,6 +237,19 @@ def staffel_admin_path(tournament: dict | None, anchor: str = "") -> str | None:
     return f"{path}#{anchor}" if anchor else path
 
 
+def tournament_admin_path(tournament: dict | None, *, anchor: str = "", tab: str = "") -> str | None:
+    """Der Weg in die Verwaltung eines Turniers (Paket D, #2262): eine Staffel auf ihre Staffel-Seite (``anchor``), ein gewöhnliches
+    Turnier in die Turnierverwaltung (``tab``). ``None`` ohne Kennung. Jeder Link des Servers in die Verwaltung nimmt diesen Weg."""
+    staffel = staffel_admin_path(tournament, anchor)
+    if staffel:
+        return staffel
+    tournament_id = (tournament or {}).get("id")
+    if not tournament_id:
+        return None
+    path = f"/admin/tournaments/{tournament_id}"
+    return f"{path}?tab={tab}" if tab else path
+
+
 async def staffel_links(db, tournament: dict, *, with_admin_path: bool = True) -> dict | None:
     """Für den Kopf der Staffel-Verwaltung (S24, L-C1): „Liga 1 · Staffel A – Season öffnen · Ligaseite“."""
     if not is_league_staffel(tournament):

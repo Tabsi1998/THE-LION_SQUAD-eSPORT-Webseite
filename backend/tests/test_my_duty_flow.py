@@ -96,6 +96,18 @@ async def test_moderation_gets_only_the_report_counter(flow):
 
 
 @pytest.mark.asyncio
+async def test_an_old_helper_assignment_in_a_staffel_leads_to_the_staffel_page(flow):
+    # Paket D (#2262, Nr. 191): Alte Einsätze in einer Staffel stehen nur noch lesend auf der Staffel-Seite unter „TV und Helfer“.
+    helper = await flow.add_user(name="Helfer")
+    staffel = await flow.create_tournament(title="Staffel A", start_date=_at(0), format="league",
+                                           league_context={"league_id": "l-1", "season_id": "s-1", "division_id": "d-1", "staffel": "A"})
+    cup = await flow.create_tournament(title="Cup", start_date=_at(0))
+    await _assign(flow, helper, staffel, "referee")
+    await _assign(flow, helper, cup, "referee")
+    links = {row["title"]: row["admin_url"] for row in (await _duty(flow, helper))["assignments"]}
+    assert links == {"Staffel A": f"/admin/leagues/staffeln/{staffel['id']}#helfer", "Cup": f"/admin/tournaments/{cup['id']}"}
+
+@pytest.mark.asyncio
 async def test_player_without_duty_gets_an_empty_answer(flow):
     player = await flow.add_user(name="Spieler")
     await flow.create_tournament(title="Heute", start_date=_at(0))

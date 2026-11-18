@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 from services.daily_center import club_day_window
 from services.league_scope import NOT_LEAGUE
+from services.staffel_guard import tournament_admin_path
 from services.permissions import can_use_area, is_confirmed_tournament_lead, needs_mfa
 
 # Vorbei: dort gibt es für Helfer nichts mehr zu tun.
@@ -24,7 +25,8 @@ FINISHED_STATUSES = ("completed", "results_published", "archived", "cancelled")
 RUNNING_STATUSES = ("check_in", "checkin_open", "live", "paused")
 # Reihenfolge der Rollen in einer Zeile: die mit den meisten Rechten zuerst.
 ROLE_ORDER = ("organizer", "referee", "scorekeeper", "station_manager", "stream_operator")
-TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1}
+# ``league_context``: alte Einsätze in einer Staffel führen auf die Staffel-Seite (Paket D, #2262).
+TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "start_date": 1, "league_context": 1}
 
 
 def _iso(value) -> str | None:
@@ -75,7 +77,8 @@ def _tournament_row(tournament: dict, roles: list[str], window) -> dict:
         "roles": roles,
         # Live-Werkzeuge am Handy (#1156) - dort tragen Helfer ein; die Verwaltung bleibt zum Vorbereiten.
         "url": f"/tournaments/{ref}/leitung",
-        "admin_url": f"/admin/tournaments/{tournament['id']}",
+        # Eine Staffel (Nr. 191): alte Einsätze stehen nur lesend auf der Staffel-Seite unter „TV und Helfer“.
+        "admin_url": tournament_admin_path(tournament, anchor="helfer"),
     }
 
 
