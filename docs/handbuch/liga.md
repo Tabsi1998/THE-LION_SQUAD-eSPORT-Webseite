@@ -694,13 +694,20 @@ ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Pr
 ### 2.7d Veto: Maps vor dem Spiel sperren und wählen (Regelwerk § 6, Anlage B)
 
 Auf der Season-Seite im Reiter **Spielbetrieb** steht direkt unter **Serie** der Kasten **Veto** (Zuständigkeit „Season konfigurieren“),
-mit eigenem **Veto speichern**; er gilt sofort für alle Staffeln der Season, ein gerade laufendes Veto behält seinen Stand. Neue Seasons
+mit eigenem **Veto speichern**; er gilt sofort für alle Staffeln der Season, zu denen er passt, ein gerade laufendes Veto behält seinen
+Stand. Neue Seasons
 beginnen mit **Veto an**: Die Vorlage folgt automatisch dem Map-Pool, **Modus je Map** und dem **Best of** der Season (wie **Vorschlag
-aus Modusfolge und Pools**) – bei jedem Speichern des Pools, bei „Map aus dem Pool nehmen“ und beim Speichern einer neuen Modusfolge
+aus Modusfolge und Pools**) – bei jedem Speichern oder Entfernen des Pools, bei „Map aus dem Pool nehmen“ und beim Speichern einer neuen Modusfolge
 oder eines neuen Best of unter **Serie** –, bis ihr den Kasten das erste Mal speichert; der Kasten sagt das, solange es gilt. Danach
 bleibt die Vorlage, wie ihr sie gespeichert habt, und **Was fehlt noch?** im Überblick nennt, was mit Pool, Modusfolge oder Best of
 nicht mehr aufgeht. Spielt eine Liga N ein eigenes Best of, läuft dort kein Veto: Nach dem Speichern eines neuen Best of zeigt eine
 Warnung, welche Liga betroffen ist, **Was fehlt noch?** ebenso. Ein Veto, das an einem Spiel schon läuft, behält seinen Stand.
+**Eine Staffel bekommt die Vorlage nur, wenn sie zu ihr passt** – zu ihrem Best of, ihrer Modusfolge und ihrem Pool. Die kommen erst mit
+**Vorgaben auf Staffeln übertragen** an die Staffel, nach dem ersten Ergebnis gar nicht mehr. Bis dahin behält die Staffel ihre bisherige
+Vorlage, und eine Warnung sagt es, etwa „Liga 1 · Staffel A spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage.“ So läuft
+dort das Veto weiter wie bisher. Ohne Ergebnis heißt die Warnung „… bis zum Übertragen …“: Nach dem Übertragen passen Best of, Modusfolge
+und Vorlage wieder zusammen. Konnte die Vorlage gerade nicht nachgezogen werden (jemand anderes ändert sie im selben Moment), sagt eine
+Warnung, Pool oder Serie gleich noch einmal zu speichern.
 Drückt ihr **Vorschlag** oder ändert Schritte, stehen Meldungen zur alten, gespeicherten Vorlage nur noch klein darunter als
 **Gespeicherter Stand** – bis ihr **Veto speichern** drückt. Ältere
 Seasons ohne Kasten bleiben aus – dort tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b):

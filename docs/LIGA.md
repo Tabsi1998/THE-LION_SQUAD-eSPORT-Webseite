@@ -2400,20 +2400,43 @@ Verspätung zählt nur beim Check-in.
 
 **Einstellung `veto_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Gepflegt unter
 `GET|PUT /api/admin/leagues/seasons/{id}/veto-rules` (Zuständigkeit `season`, lesen jede Zuständigkeit); das Speichern schreibt sofort auf
-alle nicht gesperrten Staffeln der Season (eigene Gruppe `veto` beim Übertragen, wirkt wie `checkin`; `staffel_fields` beim Anlegen).
+die nicht gesperrten, nicht abgeschlossenen Staffeln der Season, **zu denen sie passt** (eigene Gruppe `veto` beim Übertragen;
+`staffel_fields` beim Anlegen).
+
+**Nur, wenn es zur Staffel passt (Fabian Nr. 200, #2528):** Eine Staffel bekommt eine Vorlage der Season nur, wenn sie zu **ihrem
+eigenen** Best of, ihrer Modusfolge und ihrem Pool passt – dieselbe Prüfung wie beim Check-in (`league_veto_rules.fits_problem` mit den
+Werten der Staffel, `league_veto.staffel_mismatch`). Sonst behält sie ihre bisherige Vorlage, und die Antwort nennt das in `warnings`
+(„Liga 1 · Staffel A spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage.“; ohne Ergebnis „… spielt bis zum Übertragen noch
+Best of 5 – die neue Veto-Vorlage geht dort mit „Vorgaben auf Staffeln übertragen“ mit.“). Grund: Best of und Modusfolge erreichen die
+Staffel nur über „Übertragen“, nach dem ersten Ergebnis gar nicht mehr (Gruppe `before_result`); eine Vorlage für ein anderes Best of
+ließe dort jedes weitere Veto `skipped` enden. Das gilt an **einer Stelle** für alle Wege – `league_veto.store_template` (Pool, Map
+entfernen, Pool entfernen, Serie, „Veto speichern“) – und beim Übertragen (`league_service._sync_veto`): Dort wird erst nach Feldern und
+Pool gegen die Werte **nach** dem Übertragen geprüft, mit der unter der Turnier-Sperre frisch gelesenen Vorlage der Season. Staffeln
+ohne Ergebnis bekommen Best of, Modusfolge und Vorlage so zusammen. Immer erlaubt: „aus“ oder eine Vorlage ohne Schritte, eine Staffel
+ohne Pool (dort läuft ohnehin kein Veto) und eine Liga N mit eigenem Best of (Nr. 106: Die Season-Vorlage geht wie bisher mit, dort läuft
+kein Veto, „Was fehlt noch?“ warnt). Gesperrte (`locked_at`) und abgeschlossene Staffeln (`final_table`) bleiben, wie sie sind.
+**Sperren:** `store_template` hält die Sperre der Vorlage und nimmt je Staffel die Turnier-Sperre (`tournament_write_resource`, 5 s
+Wartezeit; belegt: Warnung „… wird gerade bearbeitet – dort geht die neue Veto-Vorlage mit dem nächsten Übertragen mit.“). Reihenfolge
+immer Vorlage → Turnier; wer eine Turnier-Sperre hält (Übertragen, Map entfernen), nimmt die Sperre der Vorlage nie – alle Aufrufer rufen
+`follow_season` erst nach ihren eigenen Sperren. Das Protokoll `league.season.veto_rules` zählt `staffeln` (bekommen) und `kept`
+(behalten).
 Neue Seasons bekommen das Objekt mit `enabled: true` und der Vorlage aus `propose` (Modusfolge und Best of; ein Pool fehlt beim Anlegen
 noch, also nur Wahlen und Decider; Fabian Nr. 105) und dem Merker `auto: true` – **unberührt** (Nr. 108, Nr. 199): Solange er steht,
-schlägt `league_veto.follow_season` die Vorlage bei jeder Änderung des Season-Pools (`PUT …/map-pool`, „Map aus dem Pool nehmen“) und
+schlägt `league_veto.follow_season` die Vorlage bei jeder Änderung des Season-Pools (`PUT …/map-pool`, „Map aus dem Pool nehmen“,
+`DELETE …/map-pool`) und
 beim Speichern der Season mit neuer Modusfolge (`game_mode_order`) oder neuem `best_of` (`PATCH …/seasons/{id}`, #2528) neu vor und
-speichert sie wie von Hand (Season, Staffeln, Protokoll mit `via: "auto"`). Das ist die **eine Stelle** für alle drei Wege: Sie liest
+speichert sie wie von Hand (Season, passende Staffeln, Protokoll mit `via: "auto"`). Das ist die **eine Stelle** für alle Wege: Sie liest
 Season und Pool unter der Sperre der Vorlage (`league_season_veto_resource`, `league_season:{id}:veto`, 10 s Wartezeit) **frisch** –
-nie den Stand, den der Aufrufer vor seinem Schreiben gelesen hat. Werden Pool und Modusfolge kurz nacheinander oder gleichzeitig
-gespeichert, wartet das zweite Nachziehen und passt danach zum letzten Stand; `PUT …/veto-rules` nimmt dieselbe Sperre (belegt: 409
+nie den Stand, den der Aufrufer vor seinem Schreiben gelesen hat. Werden Pool und Modusfolge kurz nacheinander gespeichert und
+verschränken sich die beiden Nachziehen, wartet das zweite und passt danach zum letzten Stand. Ist die Sperre länger als 10 s belegt,
+zieht nichts nach und die Antwort warnt: „Die Veto-Vorlage konnte gerade nicht nachgezogen werden – bitte Pool oder Serie gleich noch
+einmal speichern.“; `PUT …/veto-rules` nimmt dieselbe Sperre (belegt: 409
 „Die Veto-Vorlage wird gerade geändert …“), ein gleichzeitiges Nachziehen überschreibt eine eigene Vorlage also nie. Ohne Pool gilt der
-Vorschlag wie beim Anlegen, ein Pool eines anderen Spiels lässt die Vorlage stehen. Folgt die Vorlage einem neuen Best of, das eine
+Vorschlag wie beim Anlegen (auch nach „Map-Pool entfernen“), ein Pool eines anderen Spiels lässt die Vorlage stehen. Die Antwort des
+`PATCH` trägt die nachgezogene Vorlage in `veto_rules`. Folgt die Vorlage einem neuen Best of, das eine
 aktive Liga N mit eigenem Best of nicht spielt, nennt die Antwort des `PATCH` das in `warnings` (derselbe Satz wie
 `veto_division_mismatch` in „Was fehlt noch?“, `league_readiness.veto_division_mismatches`). Ein schon begonnenes Veto am Spiel behält
-seinen Schnappschuss (`flow.veto.template`), nur Season und nicht gesperrte Staffeln bekommen die neue Vorlage. Das erste Speichern über
+seinen Schnappschuss (`flow.veto.template`), nur Season und passende Staffeln bekommen die neue Vorlage. Das erste Speichern über
 `PUT …/veto-rules` nimmt den Merker weg; ab dann bleibt die Vorlage, und `season_readiness` nennt mit `veto_invalid`, was mit Pool,
 Modusfolge oder Best of nicht aufgeht. `normalize` übergeht den
 Merker, die Antwort von `GET …/veto-rules` nennt ihn als `auto`. Bestehende Seasons ohne Feld bleiben aus, keine Migration. Pflicht im System, je Season abschaltbar (Nr. 21). Liga N weicht nicht ab
