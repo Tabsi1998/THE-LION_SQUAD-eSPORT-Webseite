@@ -328,7 +328,7 @@ async def test_screens_share_a_short_cached_answer_that_ends_with_each_change(fl
 
 
 @pytest.mark.asyncio
-async def test_a_generous_limit_per_address_and_per_key(flow, monkeypatch):
+async def test_a_generous_limit_per_address_and_per_key(flow, monkeypatch, still_rate_limit_clock):
     from routes import event_display_routes
 
     assert event_display_routes.RATE_LIMIT >= 300 and event_display_routes.CACHE_SECONDS <= 10, "großzügig und kurz"
