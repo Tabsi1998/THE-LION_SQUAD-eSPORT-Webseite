@@ -335,9 +335,18 @@ async def _season_visible(season: dict | None, viewer: dict | None) -> bool:
         return _public_season(season)
     if not season or season.get("status") == "archived":
         return False
-    from services.league_service import can_see_season
+    # Dieselbe Regel wie ``league_service.can_see_season`` - hier ohne ``league_service``: das zöge Discord, Mail und Routen
+    # in den Import-Graphen der Erfolge (tests/test_import_cycles_unit.py).
+    visibility = season.get("visibility") or "off"
+    if visibility == "public":
+        return True
+    if visibility not in ("members", "admins"):
+        return False
+    from services.league_permissions import ANY, can
 
-    return await can_see_season(viewer, season)
+    if await can(viewer, ANY, season.get("league_id")):
+        return True
+    return visibility == "members" and await user_can_see(viewer, "members")
 
 
 async def _views(db, docs: list[dict], public_only: bool = True, *, scope: ProfileScope | None = None) -> list[dict]:

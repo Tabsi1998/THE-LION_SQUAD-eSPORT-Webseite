@@ -23,7 +23,7 @@ from services.profile_references import (
     _team_ids_for_user,
     _tournament_rank_for_user,
 )
-from services.profile_visibility import PUBLIC, SETTING, ProfileScope, sees_tournament
+from services.profile_visibility import PUBLIC, ProfileScope, sees_tournament
 from services.team_history import team_by_id, teams_by_id
 from services.tournament_path import DONE, _outcome, _slots, path_kind, tournament_path
 
@@ -33,7 +33,7 @@ RECORD_MIN_GAMES = 2
 
 async def owner_by_username(db, username: str) -> dict | None:
     user = await db.users.find_one({"username": username}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "privacy_public_profile": 1,
-                                                          "is_active": 1, "is_banned": 1, SETTING: 1})
+                                                          "is_active": 1, "is_banned": 1, "privacy_members_see_internal": 1})
     if not user or user.get("is_active") is False or user.get("is_banned"):
         return None
     return user
