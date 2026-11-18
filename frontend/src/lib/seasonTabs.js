@@ -257,8 +257,6 @@ const STAND_LABEL = {
   vorbereitung: "Vorbereitung", anmeldung: "Anmeldung offen", einteilung: "Einteilung", spielbetrieb: "Spielbetrieb", abschluss: "Abgeschlossen",
 };
 
-/** Die Liga-Stände für den Status-Filter der Turnierliste - Wert `league:<phase>`. */
-export const STAFFEL_STAND_FILTERS = Object.entries(STAND_LABEL).map(([key, label]) => [`league:${key}`, `Liga: ${label}`]);
 
 /**
  * Der Stand einer Staffel aus ihrer Season (`staffel.league_season` vom Server oder `season` der Season-Seite): `{key, filter, label, note}`
@@ -281,17 +279,6 @@ export function staffelStand(staffel, { season = staffel?.league_season, now = n
   if (key === "spielbetrieb" && status === "paused") label = `${label} · pausiert`;
   const note = hidden ? "Die Season ist nicht veröffentlicht – Teams sehen die Anmeldung nicht." : waiting ? STEP_NOTE_WAITING : step.note;
   return { key, filter: `league:${key}`, label, note, hidden, live: key === "spielbetrieb" && status === "live" };
-}
-
-/**
- * Auf welche Werte des Status-Filters eine Zeile passt. Nur der Entwurf einer Staffel weicht dem Liga-Stand; Live, Pausiert, Beendet …
- * passen weiter auf ihren Status (Kacheln wie „?status=live“ zeigen laufende Staffeln mit), der Liga-Stand kommt dazu.
- */
-export function statusFilterKeys(tournament, now = new Date()) {
-  const status = tournament?.status || "unknown";
-  const stand = staffelStand(tournament, { now });
-  if (!stand) return [status];
-  return BEFORE_START.has(status) ? [stand.filter] : [status, stand.filter];
 }
 
 /**

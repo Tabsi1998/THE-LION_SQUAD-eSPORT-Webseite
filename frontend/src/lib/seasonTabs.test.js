@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { seasonPayload, seasonToForm } from "./league";
 import {
   SEASON_TABS, TAB_FIELDS, TAB_PAYLOAD_KEYS, changedPlaces, dirtyTabs, nicknameRepeatsLevel, orderPoolHints, readinessAnchor, rebaseForm, rulesNotice,
-  STAFFEL_STAND_FILTERS, seasonAnchorUrl, seasonPhases, seasonTarget, applicationEnd, staffelNeeds, staffelStand, statusFilterKeys, tabPayload,
+  seasonAnchorUrl, seasonPhases, seasonTarget, applicationEnd, staffelNeeds, staffelStand, tabPayload,
 } from "./seasonTabs";
 
 // Season-Seite mit Reitern (#2267): Adresse ↔ Reiter, Felder je Reiter, Speichern je Reiter, Ablaufleiste, Hinweise.
@@ -170,14 +170,6 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
     expect(stand({ status: "cancelled" }, "2026-11-02T10:00:00Z")).toBeNull();
     expect(stand({ status: "archived" }, "2026-11-02T10:00:00Z")).toBeNull();
     expect(staffelStand(STAFFEL)).toBeNull();
-    expect(statusFilterKeys({ id: "x", status: "draft" })).toEqual(["draft"]);
-    expect(statusFilterKeys({ ...STAFFEL, league_season: OPEN }, new Date("2026-11-02T10:00:00Z"))).toEqual(["league:anmeldung"]);
-    expect(statusFilterKeys({ ...STAFFEL, status: "archived", league_season: OPEN })).toEqual(["archived"]);
-  });
-
-  it("der Filter kennt jeden Stand", () => {
-    expect(STAFFEL_STAND_FILTERS.map(([value]) => value)).toEqual(["league:vorbereitung", "league:anmeldung", "league:einteilung", "league:spielbetrieb", "league:abschluss"]);
-    expect(STAFFEL_STAND_FILTERS[1][1]).toBe("Liga: Anmeldung offen");
   });
 
   it("was fehlt: Teams zuteilen mit dem Weg in den Eingang, ohne Anmeldefenster in die Teilnehmerliste", () => {
@@ -210,14 +202,6 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
     expect(needs({}, "2026-11-02T10:00:00Z", OPEN)[0].to).toBe("/admin/leagues/seasons/s1#anmeldungen");
   });
 
-  it("Filter: nur der Entwurf weicht dem Liga-Stand, Live, Pausiert und Beendet passen weiter auf ihren Status (Review #2453, 1)", () => {
-    const active = { ...OPEN, status: "active" };
-    expect(statusFilterKeys({ ...STAFFEL, status: "live", league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["live", "league:spielbetrieb"]);
-    expect(statusFilterKeys({ ...STAFFEL, status: "paused", league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["paused", "league:spielbetrieb"]);
-    expect(statusFilterKeys({ ...STAFFEL, status: "completed", league_season: active }, new Date("2027-02-01T10:00:00Z"))).toEqual(["completed", "league:abschluss"]);
-    expect(statusFilterKeys({ ...STAFFEL, status: "live" }, new Date("2026-11-12T10:00:00Z"))).toEqual(["live"]);
-  });
-
   it("Nachmeldefrist kürzer als das Fenster: Label und Phasengrenze nehmen das wirksame Ende (Review #2453, 2)", () => {
     // Fenster bis 30.11., Start 10.11., Frist 2 Tage: wirksam bis 11.11. 23:00 UTC = 12.11. 00:00 Wien.
     const late = { ...OPEN, application_closes_at: "2026-11-29T23:00:00+00:00", late_registration_days: 2 };
@@ -240,7 +224,6 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
     expect(stand({ participant_count: 4 }, "2026-11-12T10:00:00Z", active)).toMatchObject({ key: "einteilung", label: "Einteilung · Start fehlt", live: false });
     const needs = staffelNeeds({ ...STAFFEL, participant_count: 4 }, { season: active, now: new Date("2026-11-12T10:00:00Z") });
     expect(needs.map((row) => row.code)).toEqual(["start"]);
-    expect(statusFilterKeys({ ...STAFFEL, league_season: active }, new Date("2026-11-12T10:00:00Z"))).toEqual(["league:einteilung"]);
   });
 
   it("beendete oder archivierte Season: keine fehlenden Punkte für eine nie gestartete Staffel (Review #2453, 5b)", () => {

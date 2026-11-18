@@ -19,7 +19,7 @@ const OWN = { id: "t-own", slug: "eigenes", title: "Eigenes Turnier", status: "r
 
 test("ein Helfer sieht in der Verwaltung nur sein Turnier - die Seite fragt die Verwaltungsliste ab", async () => {
   apiMock.get.mockImplementation(async (url) => {
-    if (url === "/tournaments?include_drafts=true&managed=true&limit=500") return { data: [OWN] };
+    if (url === "/tournaments?include_drafts=true&managed=true&league=exclude&limit=500") return { data: [OWN] };
     return { data: [OWN, { ...OWN, id: "t-fremd", slug: "fremd", title: "Fremdes Turnier" }] };
   });
   render(
@@ -29,7 +29,7 @@ test("ein Helfer sieht in der Verwaltung nur sein Turnier - die Seite fragt die 
   );
   expect(await screen.findByText("Eigenes Turnier")).toBeInTheDocument();
   expect(screen.queryByText("Fremdes Turnier")).toBeNull();
-  expect(apiMock.get).toHaveBeenCalledWith("/tournaments?include_drafts=true&managed=true&limit=500");
+  expect(apiMock.get).toHaveBeenCalledWith("/tournaments?include_drafts=true&managed=true&league=exclude&limit=500");
 });
 
 test("globale Aktionen nur für die Turnierleitung mit Zwei-Faktor - nicht für Adminbereich plus Helfer-Einsatz", async () => {
@@ -50,98 +50,21 @@ test("globale Aktionen nur für die Turnierleitung mit Zwei-Faktor - nicht für 
 });
 
 // Liga-Staffeln (#2109, S26, L-D3): gekennzeichnet, filterbar, gestartet nicht löschbar, kein „Anmeldung öffnen“.
-const STAFFEL = { ...OWN, id: "t-staffel", slug: "liga-a", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft",
-  league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, league_label: "Liga · Staffel A" };
-
-test("Staffeln tragen ihr Kennzeichen und lassen sich filtern", async () => {
-  apiMock.get.mockResolvedValue({ data: [OWN, STAFFEL] });
+// Paket D (#2262, Nr. 192): Die Turnierliste fragt ohne Staffeln - die stehen in der Liga-Verwaltung. Es gibt keinen Filter „Art“,
+// keine Status-Gruppe „Liga-Staffeln“ und keinen Hinweis „Staffeln deiner Ligen“ mehr.
+test("die Liste fragt ohne Staffeln und hat weder Filter „Art“ noch eine Status-Gruppe „Liga-Staffeln“", async () => {
+  apiMock.get.mockResolvedValue({ data: [OWN] });
   authState.isTournamentLead = true;
   render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
-  expect(await screen.findByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeInTheDocument();
-  expect(screen.getByTestId("admin-tr-league-label-liga-a")).toHaveTextContent("Liga · Staffel A");
-  fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "league" } });
-  expect(screen.queryByText("Eigenes Turnier")).toBeNull();
-  expect(screen.getByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeInTheDocument();
-  fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "tournament" } });
-  expect(screen.getByText("Eigenes Turnier")).toBeInTheDocument();
-  expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
+  await screen.findByText("Eigenes Turnier");
+  expect(apiMock.get).toHaveBeenCalledWith("/tournaments?include_drafts=true&managed=true&league=exclude&limit=500");
+  expect(screen.queryByTestId("admin-tournament-kind-filter")).toBeNull();
+  const status = screen.getByTestId("admin-tournament-status-filter");
+  expect(status.querySelector("optgroup")).toBeNull();
+  expect(status).not.toHaveTextContent("Liga");
+  expect(screen.queryByTestId("admin-tournaments-league-scope")).toBeNull();
 });
 
-// Liga-Stand (#2453): Eine Staffel im Entwurf bei offener Anmeldung der Season zeigt „Anmeldung offen bis …“ statt „Entwurf“, dazu was ihr
-// fehlt mit Weg in den Eingang. Der Status-Filter kennt die Liga-Stände, „Entwurf“ meint nur noch Turniere.
-test("Staffeln zeigen den Stand ihrer Season, was fehlt, und der Status-Filter passt dazu", async () => {
-  const day = 24 * 60 * 60 * 1000;
-  const at = (offset) => new Date(Date.now() + offset).toISOString();
-  const open = { ...STAFFEL, participant_count: 1, max_participants: 8, league_plan: { fixed_matches: 0 },
-    league_season: { id: "s1", status: "draft", visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) } };
-  const running = { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live", participant_count: 8, league_plan: { fixed_matches: 28 },
-    league_season: { id: "s0", status: "active", visibility: "public", start_date: at(-20 * day) } };
-  const plain = { ...OWN, id: "t-draft", slug: "entwurf", title: "Entwurfs-Turnier", status: "draft" };
-  apiMock.get.mockResolvedValue({ data: [open, running, plain] });
-  authState.isTournamentLead = true;
-  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
-  await screen.findByText("Laufende Staffel");
-  expect(screen.getByTestId("admin-tr-stand-liga-a")).toHaveTextContent(/^Anmeldung offen bis /);
-  expect(within(screen.getByTestId("admin-tr-liga-a")).queryByText("ENTWURF")).toBeNull();
-  expect(screen.getByTestId("admin-tr-stand-liga-b")).toHaveTextContent("Spielbetrieb");
-  expect(within(screen.getByTestId("admin-tr-entwurf")).getByText("ENTWURF")).toBeInTheDocument();
-  const needs = screen.getByTestId("admin-tr-needs-liga-a");
-  expect(needs).toHaveTextContent("Teams zuteilen · 1 von 8");
-  expect(within(needs).getByRole("link")).toHaveAttribute("href", "/admin/leagues/seasons/s1#anmeldungen");
-  expect(screen.queryByTestId("admin-tr-needs-liga-b")).toBeNull();
-
-  const filter = screen.getByTestId("admin-tournament-status-filter");
-  expect(filter.querySelector("option[value='draft']")).toHaveTextContent("Entwurf (1)");
-  expect(filter.querySelector("option[value='league:anmeldung']")).toHaveTextContent("Liga: Anmeldung offen (1)");
-  expect(filter.querySelector("option[value='league:spielbetrieb']")).toHaveTextContent("Liga: Spielbetrieb (1)");
-  fireEvent.change(filter, { target: { value: "league:anmeldung" } });
-  expect(screen.getByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeInTheDocument();
-  expect(screen.queryByText("Entwurfs-Turnier")).toBeNull();
-  expect(screen.queryByText("Laufende Staffel")).toBeNull();
-  fireEvent.change(filter, { target: { value: "draft" } });
-  expect(screen.getByText("Entwurfs-Turnier")).toBeInTheDocument();
-  expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
-});
-
-// Review #2453 (1): Die Kacheln der Übersicht verlinken „?status=live“ - eine laufende Staffel gehört dazu, gezählt bei „Live“ und
-// bei „Liga: Spielbetrieb“. Nur der Entwurf einer Staffel weicht dem Liga-Stand.
-test("Filter „Live“ aus der Adresse zeigt auch die laufende Staffel", async () => {
-  const day = 24 * 60 * 60 * 1000;
-  const at = (offset) => new Date(Date.now() + offset).toISOString();
-  const running = { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live", participant_count: 8, league_plan: { fixed_matches: 28 },
-    league_season: { id: "s0", status: "active", visibility: "public", start_date: at(-20 * day) } };
-  const cup = { ...OWN, id: "t-cup", slug: "cup", title: "Laufender Cup", status: "live" };
-  apiMock.get.mockResolvedValue({ data: [running, cup, { ...OWN, title: "Offenes Turnier" }] });
-  authState.isTournamentLead = true;
-  render(<MemoryRouter initialEntries={["/admin/tournaments?status=live"]}><AdminTournamentsPage /></MemoryRouter>);
-  expect(await screen.findByText("Laufende Staffel")).toBeInTheDocument();
-  expect(screen.getByText("Laufender Cup")).toBeInTheDocument();
-  expect(screen.queryByText("Offenes Turnier")).toBeNull();
-  const filter = screen.getByTestId("admin-tournament-status-filter");
-  expect(filter.querySelector("option[value='live']")).toHaveTextContent("Live (2)");
-  expect(filter.querySelector("option[value='league:spielbetrieb']")).toHaveTextContent("Liga: Spielbetrieb (1)");
-  fireEvent.change(filter, { target: { value: "league:spielbetrieb" } });
-  expect(screen.getByText("Laufende Staffel")).toBeInTheDocument();
-  expect(screen.queryByText("Laufender Cup")).toBeNull();
-});
-
-// Review #2453 (4): Was fehlt, steht bei jeder Staffel mit Season-Angaben - der Server schickt sie nur mit dem Liga-Recht.
-test("„was fehlt“ hängt an den Season-Angaben, nicht an beiden Bereichen", async () => {
-  const day = 24 * 60 * 60 * 1000;
-  const at = (offset) => new Date(Date.now() + offset).toISOString();
-  const open = { ...STAFFEL, participant_count: 0, max_participants: 8,
-    league_season: { id: "s1", status: "draft", visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) } };
-  apiMock.get.mockResolvedValue({ data: [open, { ...STAFFEL, id: "t-bare", slug: "liga-c", title: "Staffel ohne Angaben" }] });
-  const before = { lead: authState.isTournamentLead, user: authState.user };
-  authState.isTournamentLead = false;
-  authState.user = { ...before.user, areas: ["leagues"] };
-  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
-  await screen.findByText("Staffel ohne Angaben");
-  expect(screen.getByTestId("admin-tr-needs-liga-a")).toHaveTextContent("Teams zuteilen · 0 von 8");
-  expect(screen.queryByTestId("admin-tr-needs-liga-c")).toBeNull();
-  authState.isTournamentLead = before.lead;
-  authState.user = before.user;
-});
 
 // Löschen nur für Entwürfe (#2111, TA18) - alles andere sagt man ab oder archiviert.
 test("ein Turnier lässt sich nur als Entwurf löschen", async () => {
@@ -151,16 +74,6 @@ test("ein Turnier lässt sich nur als Entwurf löschen", async () => {
   await screen.findByText("Offenes Turnier");
   expect(within(screen.getByTestId("admin-tr-eigenes")).getByTitle("Löschen")).toBeInTheDocument();
   expect(within(screen.getByTestId("admin-tr-offen")).queryByTitle("Löschen")).toBeNull();
-});
-
-test("eine Staffel: vor dem Start löschbar, danach nicht, und nie „Anmeldung öffnen“", async () => {
-  apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }] });
-  authState.isTournamentLead = true;
-  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
-  await screen.findByText("Laufende Staffel");
-  expect(within(screen.getByTestId("admin-tr-liga-a")).getByTitle("Löschen")).toBeInTheDocument();
-  expect(within(screen.getByTestId("admin-tr-liga-b")).queryByTitle("Löschen")).toBeNull();
-  expect(screen.queryByTitle("Anmeldung öffnen")).toBeNull();
 });
 
 // Turnierliste (#2111, TA21): dieselben Statuswörter wie im Kopf (mit „Check-in offen“), Archiv nur über den Filter,
@@ -196,29 +109,22 @@ function withScreen(narrow, run) {
   return Promise.resolve(run()).finally(() => { window.matchMedia = original; });
 }
 
-const OPEN_STAFFEL = () => {
-  const day = 24 * 60 * 60 * 1000;
-  const at = (offset) => new Date(Date.now() + offset).toISOString();
-  return { ...STAFFEL, participant_count: 1, max_participants: 8, league_plan: { fixed_matches: 0 }, game: { name: "Probe Shooter" }, format: "league",
-    league_season: { id: "s1", status: "draft", visibility: "public", application_opens_at: at(-day), application_closes_at: at(3 * day), start_date: at(9 * day) } };
-};
+const LEAGUE_CUP = () => ({ ...OWN, id: "t-liga", slug: "liga-cup", title: "Herbst-Liga (Turnier)", participant_count: 1, max_participants: 8,
+  game: { name: "Probe Shooter" }, format: "league" });
 
-test("unter 768 px: Karten mit Titel, Spiel, Format, Liga-Stand, was fehlt, Teilnehmern, Regeln und Aktionen", () => withScreen(true, async () => {
-  apiMock.get.mockResolvedValue({ data: [OPEN_STAFFEL(), { ...OWN, status: "draft", game: { name: "Probe Racer" }, format: "single_elim" }] });
+test("unter 768 px: Karten mit Titel, Spiel, Format, Status, Teilnehmern, Regeln und Aktionen", () => withScreen(true, async () => {
+  apiMock.get.mockResolvedValue({ data: [LEAGUE_CUP(), { ...OWN, status: "draft", game: { name: "Probe Racer" }, format: "single_elim" }] });
   authState.isTournamentLead = true;
   render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
   await screen.findByText("Eigenes Turnier");
   expect(screen.getByTestId("admin-tournament-cards")).toBeInTheDocument();
   expect(screen.queryByRole("table")).toBeNull();
-  const staffel = screen.getByTestId("admin-tr-liga-a");
-  expect(staffel.tagName).toBe("LI");
-  expect(staffel).toHaveTextContent("Probe-Liga Season 1 · Liga 1 · Staffel A");
-  expect(staffel).toHaveTextContent("Probe Shooter");
-  expect(within(staffel).getByTestId("admin-tr-league-label-liga-a")).toHaveTextContent("Liga · Staffel A");
-  expect(within(staffel).getByTestId("admin-tr-stand-liga-a")).toHaveTextContent(/^Anmeldung offen bis /);
-  expect(within(staffel).getByTestId("admin-tr-needs-liga-a")).toHaveTextContent("Teams zuteilen · 1 von 8");
-  expect(within(staffel).getByTestId("admin-tr-participants-liga-a")).toHaveTextContent("1/8");
-  expect(within(staffel).getByTestId("admin-tr-rules-liga-a")).toHaveTextContent(/Online/i);
+  const league = screen.getByTestId("admin-tr-liga-cup");
+  expect(league.tagName).toBe("LI");
+  expect(league).toHaveTextContent("Herbst-Liga (Turnier)");
+  expect(league).toHaveTextContent("Probe Shooter");
+  expect(within(league).getByTestId("admin-tr-participants-liga-cup")).toHaveTextContent("1/8");
+  expect(within(league).getByTestId("admin-tr-rules-liga-cup")).toHaveTextContent(/Online/i);
   const cup = screen.getByTestId("admin-tr-eigenes");
   expect(cup).toHaveTextContent("Probe Racer");
   expect(cup).toHaveTextContent("ENTWURF");
@@ -227,20 +133,20 @@ test("unter 768 px: Karten mit Titel, Spiel, Format, Liga-Stand, was fehlt, Teil
   expect(within(cup).getByRole("link", { name: /^Teilnehmer:/ })).toHaveAttribute("href", "/admin/tournaments/t-own?tab=participants");
   // Filter, Zähler und CSV wie bisher.
   expect(screen.getByText("2 / 2 sichtbar")).toBeInTheDocument();
-  fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "league" } });
+  fireEvent.change(screen.getByTestId("admin-tournament-status-filter"), { target: { value: "registration_open" } });
   expect(screen.queryByTestId("admin-tr-eigenes")).toBeNull();
   expect(screen.getByText("1 / 2 sichtbar")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /CSV/ })).toBeEnabled();
 }));
 
 test("ab 768 px bleibt die Tabelle, ohne Karten", () => withScreen(false, async () => {
-  apiMock.get.mockResolvedValue({ data: [OPEN_STAFFEL(), OWN] });
+  apiMock.get.mockResolvedValue({ data: [LEAGUE_CUP(), OWN] });
   authState.isTournamentLead = true;
   render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
   await screen.findByText("Eigenes Turnier");
   expect(screen.getByRole("table")).toBeInTheDocument();
   expect(screen.queryByTestId("admin-tournament-cards")).toBeNull();
-  expect(screen.getByTestId("admin-tr-liga-a").tagName).toBe("TR");
+  expect(screen.getByTestId("admin-tr-liga-cup").tagName).toBe("TR");
 }));
 
 test.each([[true, "Karte"], [false, "Tabelle"]])("Aktions-Symbole (%s → %s): feste Größe, 44-px-Tippfläche, Name zum Vorlesen", (narrow) => withScreen(narrow, async () => {
@@ -275,25 +181,6 @@ test("Überschrift: der Kopf bricht als Ganzes um, nicht das Wort „Turniere“
   expect(heading.className).toMatch(/\[overflow-wrap:normal\]/);
 });
 
-test("Liga-Zuständige ohne Turnierleitung: Hinweis auf die eigenen Staffeln, keine Knöpfe zum Anlegen, Ändern oder Löschen", async () => {
-  apiMock.get.mockResolvedValue({ data: [OPEN_STAFFEL()] });
-  const before = { lead: authState.isTournamentLead, user: authState.user };
-  authState.isTournamentLead = false;
-  authState.user = { role: "player", has_league_staff: true, mfa_enabled: true, auth_mfa_verified: true };
-  try {
-    render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
-    await screen.findByText("Probe-Liga Season 1 · Liga 1 · Staffel A");
-    expect(screen.getByTestId("admin-tournaments-league-scope")).toHaveTextContent("Staffeln deiner Ligen");
-    expect(screen.queryByTestId("admin-new-tournament")).toBeNull();
-    expect(screen.queryByTitle("Löschen")).toBeNull();
-    expect(screen.queryByTitle("Pause")).toBeNull();
-    expect(screen.getByRole("link", { name: /^Teilnehmer:/ })).toBeInTheDocument();
-  } finally {
-    authState.isTournamentLead = before.lead;
-    authState.user = before.user;
-  }
-});
-
 test("die Turnierleitung sieht keinen Hinweis auf eigene Staffeln", async () => {
   apiMock.get.mockResolvedValue({ data: [OWN] });
   authState.isTournamentLead = true;
@@ -302,14 +189,3 @@ test("die Turnierleitung sieht keinen Hinweis auf eigene Staffeln", async () => 
   expect(screen.queryByTestId("admin-tournaments-league-scope")).toBeNull();
 });
 
-test("eine Staffel: die Turnierleitung ohne Bereich Ligen bekommt keine Knöpfe zum Ändern (#2203)", async () => {
-  apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }, { ...OWN, status: "draft" }] });
-  authState.isTournamentLead = true;
-  const before = authState.user;
-  authState.user = { ...before, areas: ["tournaments"] };
-  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
-  await screen.findByText("Laufende Staffel");
-  expect(screen.getAllByTitle("Löschen")).toHaveLength(1);
-  expect(screen.queryByTitle("Pause")).toBeNull();
-  authState.user = before;
-});
