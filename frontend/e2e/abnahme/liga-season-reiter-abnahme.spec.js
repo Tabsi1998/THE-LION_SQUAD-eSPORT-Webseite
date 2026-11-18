@@ -108,6 +108,20 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     await expect(page.getByTestId("result-rules-kontrolle")).toHaveCount(0);
     await shot(page, "season-reiter-spielbetrieb-1440.png");
 
+    // Veto (D.3): Neue Seasons haben es an (Nr. 105). Die Vorlage entstand beim Speichern des Pools; nach der neuen Modusfolge
+    // übernimmt die Leitung im selben Reiter den Vorschlag und speichert (Nr. 108: von selbst folgt die Vorlage nur dem Pool).
+    const veto = page.getByTestId("season-veto-rules");
+    await veto.scrollIntoViewIfNeeded();
+    await veto.getByTestId("veto-rules-propose").click();
+    await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
+    await veto.getByTestId("veto-rules-save").click();
+    await expect(veto.getByTestId("veto-rules-error")).toHaveCount(0);
+    const vetoRules = async () => (await ok(page, "GET", `/api/admin/leagues/seasons/${seasonId}/veto-rules`));
+    await expect.poll(async () => (await vetoRules()).auto, { timeout: 15_000 }).toBeFalsy();
+    const savedVeto = await vetoRules();
+    expect(savedVeto.active).toBe(true);
+    expect(savedVeto.problems).toEqual([]);
+
     // Termine: eine Sperrzeit eintragen, Rückfrage beim Wechsel, dann speichern.
     await page.getByTestId("season-tab-termine").click();
     await page.getByTestId("season-form-weeks").fill("9");
