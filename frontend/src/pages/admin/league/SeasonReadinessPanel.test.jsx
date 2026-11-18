@@ -88,3 +88,17 @@ test("eine fertige Season heißt bereit, ohne Rechte gibt es kein Speichern der 
   expect(screen.getByTestId("season-readiness-clean")).toBeInTheDocument();
   expect(screen.queryByTestId("season-readiness-min-save")).toBeNull();
 });
+
+test("eine neu geladene Prüfung befüllt das Formular neu, eine Eingabe davor bleibt bis dahin stehen", async () => {
+  const requirements = (override) => [{ mode: "suchen", label: "Suchen", derived: 1, override, needed: override || 1, have: 1 }];
+  const readiness = (override) => ({ result: { ...UNREADY, requirements: requirements(override) }, reload: vi.fn() });
+  const { rerender } = render(<SeasonPoolMinimum seasonId="s1" readiness={readiness(null)} />);
+
+  // Direkt nach dem Laden getippt: Kein nachlaufendes Zurücksetzen überschreibt die Eingabe.
+  fireEvent.change(screen.getByTestId("season-readiness-min-suchen"), { target: { value: "4" } });
+  expect(screen.getByTestId("season-readiness-min-suchen")).toHaveValue(4);
+
+  // Neuer Stand vom Server: Das Formular zeigt ihn.
+  rerender(<SeasonPoolMinimum seasonId="s1" readiness={readiness(2)} />);
+  expect(screen.getByTestId("season-readiness-min-suchen")).toHaveValue(2);
+});
