@@ -343,8 +343,9 @@ export default function AdminLeagueSeasonPage() {
   const clearPool = async () => {
     if (!await confirm({ title: "Map-Pool entfernen?", description: "Ohne Pool kann in der Liga niemand mit Maps melden. Bestehende Staffeln verlieren ihre Kopie erst beim nächsten Übertragen – und nur, solange sie noch kein Ergebnis haben.", confirmLabel: "Entfernen" })) return false;
     try {
-      await api.delete(`/admin/leagues/seasons/${seasonId}/map-pool`);
+      const response = await api.delete(`/admin/leagues/seasons/${seasonId}/map-pool`);
       toast.success("Map-Pool entfernt.");
+      (response?.data?.warnings || []).forEach((text) => toast.warning(text));
       await reload();
       return true;
     } catch (err) {

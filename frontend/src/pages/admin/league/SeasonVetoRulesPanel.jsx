@@ -119,6 +119,8 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
       setState(data);
       setForm(fresh);
       toast.success(data.staffeln_updated ? `Veto gespeichert – gilt jetzt in ${data.staffeln_updated} Staffel${data.staffeln_updated === 1 ? "" : "n"}.` : "Veto gespeichert.");
+      // Nr. 200 (#2528): Staffeln, zu denen die Vorlage (noch) nicht passt, behalten ihre bisherige - der Server sagt welche.
+      (data.warnings || []).forEach((text) => toast.warning(text));
     } catch (failure) {
       setError(formatApiError(failure.response?.data?.detail) || "Veto konnte nicht gespeichert werden.");
     } finally {

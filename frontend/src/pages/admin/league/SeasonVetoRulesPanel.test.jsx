@@ -5,7 +5,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const apiMock = { get: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { SeasonVetoRulesPanel } = await import("./SeasonVetoRulesPanel");
 
@@ -137,4 +138,15 @@ test("nach „Vorschlag“ stehen die Sätze des Servers nur noch als gespeicher
   fireEvent.click(screen.getByTestId("veto-rules-save"));
   await waitFor(() => expect(screen.queryByTestId("veto-rules-saved-problems")).toBeNull());
   expect(screen.queryByTestId("veto-rules-problems")).toBeNull();
+});
+
+test("Veto speichern: Staffeln, zu denen die Vorlage noch nicht passt, kommen als Warnung (#2528, Nr. 200)", async () => {
+  const saved = { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS };
+  const note = "Liga 1 · Staffel A spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage.";
+  apiMock.get.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true } });
+  apiMock.put.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true, staffeln_updated: 0, warnings: [note] } });
+  toastMock.warning.mockReset();
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("veto-rules-save"));
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith(note));
 });
