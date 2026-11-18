@@ -269,7 +269,9 @@ führt nach `/admin`, und das öffnet die eigene Arbeit statt „Kein Zugriff“
 - **Helfer** landen auf **Mein Dienst** (`/admin/dienst`): ihre Turniere und Fast Laps, **heute zuerst**, je mit
   Uhrzeit, ihrer **Rolle** samt dem Satz, was sie darf, und dem Knopf **Turnierleitung öffnen** (die Ansicht `/tournaments/<Name>/leitung`, siehe
   [Turniere](turniere.md)) bzw. **Fast Lap öffnen**. **Vorbereiten** führt in die Turnierverwaltung,
-  bei einem alten Einsatz in einer Liga-Staffel auf deren Staffel-Seite (**Einstellungen → TV und Helfer**, nur lesend). Abgeschaltete
+  bei einem alten Einsatz in einer Liga-Staffel auf deren Staffel-Seite (**Einstellungen → TV und Helfer**, nur lesend). Solche
+  alten Staffel-Einsätze stehen nur bei Personen, die in dieser Liga ein Recht haben; sie zählen auch nicht als Turnier-Einsatz
+  (kein Menüpunkt „Turniere“ nur deswegen). Abgeschaltete
   Einsätze und Turniere, die vorbei sind, stehen nicht mehr da.
 - **Moderatoren** landen direkt bei den **Meldungen** (`/admin/moderation`). Unter „Mein Dienst“ steht die Zahl der
   offenen Meldungen.

@@ -2234,7 +2234,9 @@ ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.
 
 **Wege des Servers in die Verwaltung (#2262, Paket D):** `staffel_guard.tournament_admin_path(t, anchor=, tab=)` führt eine Staffel auf
 `/admin/leagues/staffeln/<id>` (mit Sprungmarke), ein Turnier auf `/admin/tournaments/<id>` (mit `?tab=`). Genutzt von Mein Dienst
-(Helfer-Einsatz → `#helfer`), `ended_live` und Admin → Strafen (Kampflos → `#spiele`). `league_links` trägt für die Verwaltung
+(Helfer-Einsatz → `#helfer`; eine Staffel-Zeile nur mit Lese-Recht in ihrer Liga, `league_permissions.can(user, READ, league_id)`,
+Fabian 18.11.), `ended_live` und Admin → Strafen (Kampflos → `#spiele`). `has_staff_assignment` im Profil zählt alte Einsätze in Staffeln nicht
+(`auth._tournament_assignment_outside_staffeln`). `league_links` trägt für die Verwaltung
 zusätzlich `league_id` (Brotkrumen). Die Startseite der Verwaltung (`GET /api/admin/dashboard`) zählt `open_disputes`,
 `active_tournaments`, `registration_open`, `total_tournaments` sowie in `daily_tasks` `reported_results` und `schedule_deadlines` ohne
 Staffeln (`daily_center.count_without_staffeln`, eine Aggregation je Turnier); für den Bereich Ligen kommt

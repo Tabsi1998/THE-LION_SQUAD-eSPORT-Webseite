@@ -147,6 +147,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.locator('a[href="/admin/leagues"]:visible').first()).toBeVisible();
     await expect(page.locator('nav a[href="/admin/tournaments"]')).toHaveCount(0);
     await noSideScroll(page);
+    // Seite und Schublade blenden ein - das Bild erst, wenn keine Animation mehr läuft (bei 1440 px war der Inhalt sonst fast schwarz).
+    await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running"));
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("opacity", "1");
     await shot(page, `menue-liga-leitung-${width}.png`);
   });
 }
