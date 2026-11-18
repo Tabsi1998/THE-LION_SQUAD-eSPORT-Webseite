@@ -25,6 +25,9 @@ Außerdem darf keine öffentliche Seite (alle unter `src/pages/public/` sowie di
 werden, Profil, Events und Turniere) diese Chunks statisch erreichen. Kleine Bibliotheken, die Editor bzw. Diagramme und
 anderer Code gemeinsam nutzen (clsx, use-sync-external-store), sammelt dafür die Gruppe `vendor-shared` in
 `vite.config.mjs` ein.
+Seiten-CSS, das nur nachgeladene Seiten brauchen, steht ebenfalls nicht im Start-CSS (`PAGE_ONLY_CSS`, #2511): Es liegt
+in einer eigenen Datei, die jede Datei mit diesen Klassen selbst importiert, und kommt so mit dem Chunk der Seite, bevor
+sie zeichnet. Bisher gilt das für den Matchplan der Verwaltung (`.mp-…`, `pages/admin/tournament/matchplan/matchplan.css`).
 
 **Ziel und Grenze:** Das *Ziel* ist der Wert, auf den wir hinarbeiten; liegt der Start darüber, meldet das Gate nur eine
 Warnung (in GitHub Actions als `::warning::`). Die *Grenze* ist hart: darüber schlägt der Build fehl. Der kleine Abstand
@@ -32,10 +35,10 @@ dazwischen fängt gewöhnliches Wachstum ab, ohne dass jede Kleinigkeit die CI r
 Baustein unbemerkt durch. Nach jedem Abspeck-Schritt werden Ist-Wert, Ziel und Grenze hier nachgezogen (die Grenze
 etwa 2–3 % über dem neuen Ist-Wert), damit Gewonnenes nicht still wieder verloren geht.
 
-| | Ist (15.11.2026, nach main 66bae9f7d) | Ziel (Warnung) | Grenze (Fehler) |
+| | Ist (18.11.2026, #2511) | Ziel (Warnung) | Grenze (Fehler) |
 | --- | --- | --- | --- |
-| Start-JS gzip | 297.364 Bytes | 300.000 Bytes | 305.000 Bytes |
-| Start-CSS gzip | 60.590 Bytes | – (siehe nächste Schritte) | 63.000 Bytes |
+| Start-JS gzip | 287.442 Bytes | 300.000 Bytes | 305.000 Bytes |
+| Start-CSS gzip | 58.805 Bytes | – (siehe nächste Schritte) | 63.000 Bytes |
 
 <!-- goal:startup-js-gzip 300000 -->
 <!-- budget:startup-js-gzip 305000 -->
@@ -71,12 +74,25 @@ Abzeichen und Motiven, Glocke, Kronen-Feier, Abstimmungs-Popup und die Karten �
 Schon vorher bei Bedarf und unverändert: PDF-Betrachter (`pdfjs-dist`, `lib/pdfViewer.js`), QR-Leser (`jsqr`,
 `QrScanner.jsx`), alle Saison-Inhalte (Advent, Halloween, Weihnachten … über `seasons/registry.js`) samt ihrem CSS.
 
+### Messung 18.11.2026 (#2511)
+
+| | vorher (main 3946d18df) | nachher (nach main 5897fceee) |
+| --- | --- | --- |
+| Start-JS gzip (Stufe 9) | 300.025 Bytes in 48 Dateien | 287.442 Bytes in 48 Dateien |
+| Start-CSS gzip (Stufe 9) | 61.928 Bytes in 2 Dateien | 58.805 Bytes in 2 Dateien |
+
+Treiber: `PublicLayout` zog mit `motion` den vollen Satz von framer-motion in den Start, obwohl nur das Handy-Menü ein-
+und ausblendet (jetzt `m` mit `LazyMotion` und `domAnimation`, −12,6 KB). Das CSS des Matchplans der Verwaltung
+(Turnier, Stationen, Spielwochen der Staffel-Seite) stand in `index.css` und liegt jetzt in `matchplan.css` (−3,1 KB).
+
 ### Bewusste Ausnahmen im Start
 
 Diese Teile stehen absichtlich im Start (gzip, gerundet):
 
 - `react-dom`/`react` (rund 67 KB): ohne geht nichts.
-- `framer-motion` (rund 40 KB in `proxy` und `single-value`): Kopfzeile, Menü und Seitenwechsel nutzen es.
+- `framer-motion` (rund 27 KB, seit #2511 nur der kleine Satz `domAnimation`): Das Handy-Menü nutzt `m` mit `LazyMotion`.
+  Ziehen und Layout-Bewegung (Projection, rund 12 KB) laden erst mit Seiten, die `motion` selbst importieren. Im Start
+  bitte kein volles `motion` - sonst kommen sie zurück.
 - `axios` samt `lib/api.js` (rund 24 KB): jede Seite lädt Daten darüber.
 - `react-router` (rund 14 KB) und `sonner` (rund 9 KB, Hinweise).
 - Startseite (`HomePage` mit ihren Abschnitten) und `PublicLayout`: bleiben im Start, damit `/` ohne zusätzliche Runde
@@ -86,11 +102,14 @@ Diese Teile stehen absichtlich im Start (gzip, gerundet):
 
 ### Mögliche nächste Schritte
 
-- `framer-motion` über `LazyMotion` und `m` statt `motion` (spart geschätzt 20–25 KB), Umbau vieler Komponenten.
 - Die Suche (`GlobalSearch`) erst beim Öffnen laden (rund 2,5 KB); dabei darf kein erster Tastendruck verloren gehen.
-- CSS: `src/index.css` (187 KB Quelle, rund 43 KB gzip) enthält viele Regeln einzelner Seiten (Liga, Podium, Platzierung,
-  Kronen …). Sie in die CSS-Dateien der Seiten zu verschieben, verkleinert den Start, ändert aber die Reihenfolge der
-  Regeln und braucht darum einen Vergleich der Optik je Seite. Tailwind liest Testdateien seit #936 nicht mehr mit.
+- CSS: `src/index.css` enthält weiter Regeln einzelner Seiten (Map-Veto live, Podium, Platzierung, Mitgliedskarte,
+  Kronen, Seltenheits-Rahmen …). Sie in die CSS-Dateien der Seiten zu verschieben, verkleinert den Start, ändert aber die
+  Reihenfolge der Regeln und braucht darum einen Vergleich der Optik je Seite. Vorsicht beim Map-Veto: `.tls-veto-card--live`
+  ergänzt Regeln aus dem nachgeladenen `maps.css` mit gleicher Gewichtung - nach dem Umzug hinge das Ergebnis von der
+  Ladereihenfolge ab. Tailwind liest Testdateien seit #936 nicht mehr mit.
+- Gleiche CSS-Blöcke zusammenzufassen spart gzip kaum etwas: gzip packt Wiederholungen ohnehin klein (#2511: die
+  Winkel-Blöcke in `styles/system.css` zusammengelegt, +14 Bytes).
 
 ## Bilder
 
