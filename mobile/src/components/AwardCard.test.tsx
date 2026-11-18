@@ -35,7 +35,7 @@ test("Teilnahme-Banner mit Team, ohne Farbe und ohne Bilanz", async () => {
 test("vereinsintern (#2516): das Etikett steht bei den Chips, öffentlich nicht", async () => {
   await render(<AwardCard award={{ ...cup, internal: true }} />);
   expect(screen.getByTestId("internal-tag-award-a1")).toHaveTextContent("Vereinsintern");
-  screen.unmount();
-  await render(<AwardCard award={cup} />);
+  // Neu zeichnen statt abbauen und neu aufbauen - ein unmount ohne await überschnitte sich mit dem nächsten act().
+  await screen.rerender(<AwardCard award={cup} />);
   expect(screen.queryByTestId("internal-tag-award-a1")).toBeNull();
 });
