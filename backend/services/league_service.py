@@ -1311,9 +1311,9 @@ async def _sync_veto(db, tournament: dict, season: dict, wanted: dict, *, applie
     if tournament.get("veto_rules") == rules:
         applied.append("veto")
         return
-    note = await league_veto_fit.staffel_mismatch(db, tournament, rules, season, transferring=True)
-    if note:
-        skipped.append({"group": "veto", "label": SYNC_GROUP_LABELS["veto"], "reason": note})
+    misfit = await league_veto_fit.staffel_mismatch(db, tournament, rules, season, transferring=True)
+    if misfit:
+        skipped.append({"group": "veto", "label": SYNC_GROUP_LABELS["veto"], "reason": league_veto_fit.warnings_for([misfit])[0]})
         return
     await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"veto_rules": rules, "updated_at": _now()}})
     applied.append("veto")

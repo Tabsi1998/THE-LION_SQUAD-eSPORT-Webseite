@@ -42,6 +42,7 @@ from services import league_pool_check
 from services import league_readiness
 from services import league_service as leagues
 from services import league_veto
+from services import league_veto_fit
 from services import league_veto_sweep
 from services import league_zones
 from services.league_permissions import (
@@ -434,7 +435,7 @@ async def _follow_veto(db, season_id: str, doc: dict, me: dict, warnings: list[s
     if not best_of_changed:
         return followed
     divisions = await league_pool_check.divisions_of(db, season_id)
-    warnings.extend(league_readiness.veto_division_mismatches(divisions, int(doc.get("best_of") or 1)))
+    warnings.extend(await league_veto_fit.division_veto_gaps(db, {**doc, "id": season_id}, divisions))
     return followed
 
 

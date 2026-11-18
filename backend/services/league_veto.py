@@ -41,7 +41,7 @@ from services.league_veto_rules import (
     DECIDER, DONE, DRAW, HOME, PAUSED, PRESET, ROLE_OF, RUNNING, SKIPPED, SYSTEM_KINDS, VetoProblem, veto_of,
 )
 from services.league_final_read import is_closed
-from services.league_veto_fit import staffel_mismatch, staffel_name
+from services.league_veto_fit import BUSY, Misfit, staffel_mismatch, staffel_name, warnings_for
 from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, league_season_veto_resource, mutation_lock, tournament_write_resource
 
@@ -83,7 +83,8 @@ async def store_template(db, season: dict, rules: dict, *, actor_id: str | None,
     speichern“. Protokoll ``league.season.veto_rules`` mit altem und neuem Wert; ``via: "auto"`` beim Nachziehen (Nr. 108).
 
     Fabian Nr. 200 (#2528): Eine Staffel bekommt die Vorlage nur, wenn sie zu **ihrem eigenen** Best of, ihrer Modusfolge und ihrem Pool
-    passt (``staffel_mismatch``) - sonst behält sie ihre bisherige, und der Satz dazu steht in ``notes``. Best of und Modusfolge kommen erst
+    passt (``staffel_mismatch``, ohne Ausnahme - auch eine Liga N mit eigenem Best of) - sonst behält sie ihre bisherige. ``notes`` fasst
+    die Gründe zusammen (``warnings_for``: ein Satz je Fall, höchstens drei Namen), für alle Wege gleich. Best of und Modusfolge kommen erst
     mit „Übertragen“ an die Staffel (nach dem ersten Ergebnis gar nicht mehr); ohne diese Prüfung liefe dort jedes weitere Veto ins Leere.
     Gesperrte und abgeschlossene Staffeln bleiben, wie sie sind (wie beim Übertragen).
 
@@ -95,6 +96,7 @@ async def store_template(db, season: dict, rules: dict, *, actor_id: str | None,
     if before != rules:
         await db.league_seasons.update_one({"id": season["id"]}, {"$set": {"veto_rules": rules, "updated_at": now_iso}})
     stored = Stored()
+    misfits: list[Misfit] = []
     rows = await db.tournaments.find({"league_context.season_id": season["id"], "locked_at": None, "veto_rules": {"$ne": rules}},
                                      {"_id": 0, "id": 1, "league_context": 1}).to_list(None)
     for row in sorted(rows, key=lambda item: item["id"]):
@@ -104,19 +106,19 @@ async def store_template(db, season: dict, rules: dict, *, actor_id: str | None,
                 tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
                 if not tournament or tournament.get("locked_at") or is_closed(tournament) or tournament.get("veto_rules") == rules:
                     continue
-                note = await staffel_mismatch(db, tournament, rules, season)
-                if note:
-                    stored.notes.append(note)
+                misfit = await staffel_mismatch(db, tournament, rules, season)
+                if misfit:
+                    misfits.append(misfit)
                     continue
                 await db.tournaments.update_one({"id": tournament_id}, {"$set": {"veto_rules": rules, "updated_at": now_iso}})
                 stored.staffeln += 1
         except MutationLockBusy:
-            name = await staffel_name(db, row)
-            stored.notes.append(f"{name} wird gerade bearbeitet – dort geht die neue Veto-Vorlage mit dem nächsten Übertragen mit.")
+            misfits.append(Misfit(BUSY, await staffel_name(db, row)))
+    stored.notes = warnings_for(misfits)
     if before != rules:
         await db.audit_logs.insert_one({
             "id": new_id(), "action": "league.season.veto_rules", "target_id": season["id"], "actor_id": actor_id,
-            "data": {"from": before, "to": rules, "staffeln": stored.staffeln, "kept": len(stored.notes), "via": via},
+            "data": {"from": before, "to": rules, "staffeln": stored.staffeln, "kept": len(misfits), "via": via},
             "created_at": now_iso})
     return stored
 

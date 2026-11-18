@@ -227,9 +227,10 @@ async def test_sync_before_the_start_applies_everything(flow):
     synced = await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
     assert synced.status_code == 200, synced.text
     result = synced.json()["staffeln"][0]
-    # Veto (Nr. 200, #2528): Die nachgezogene Vorlage für Best of 5 geht mit einer Map im Pool nicht auf - die Staffel behält ihre.
-    assert result["skipped"] == [{"group": "veto", "label": "Veto", "reason": "Liga 1 · Staffel A spielt weiter mit ihrer Modusfolge und "
-                                                                              "ihrem Map-Pool – dort bleibt die bisherige Veto-Vorlage."}]
+    # Veto (Nr. 200, #2528): Die nachgezogene Vorlage für Best of 5 geht schon mit dem Pool der Season (eine Map) nicht auf - die Staffel
+    # behält ihre, und der Satz verweist auf den Kasten Veto der Season.
+    assert result["skipped"] == [{"group": "veto", "label": "Veto", "reason": "Die Veto-Vorlage passt noch nicht zur Season (siehe Kasten "
+                                                                              "Veto) – die Staffeln behalten ihre bisherige."}]
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert (after["visibility"], after["is_public"], after["rules"]) == ("public", True, "Neu")
     assert after["best_of"] == 5 and after["matchday_weeks_total"] == 12 and after["default_match_time"] == "19:30"

@@ -998,10 +998,20 @@ async def test_the_season_template_is_checked_proposed_saved_and_transferred(flo
     ready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))
     warning = next(row for row in ready["warnings"] if row["code"] == "veto_division_mismatch")
     assert warning["text"].startswith("Liga 1 spielt Best of 3, die Veto-Vorlage belegt 5 Positionen")
-    # Übertragen in der eigenen Gruppe „veto“.
+    # Übertragen in der eigenen Gruppe „veto“ - nur, wenn die Vorlage zur Staffel passt (Nr. 200, #2528). Mit dem geschrumpften Pool geht
+    # sie schon in der Season nicht auf: Die Staffel behält, was sie hat (hier nichts), der Grund steht im Ergebnis.
     await flow.db.tournaments.update_one({"id": w["tid"]}, {"$unset": {"veto_rules": ""}})
-    synced = ok(await flow.post(f"{ADMIN}/seasons/{sid}/sync", json={}))
-    assert "veto" in str(synced) and (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["enabled"] is True
+    synced = ok(await flow.post(f"{ADMIN}/seasons/{sid}/sync", json={}))["staffeln"][0]
+    assert [row["reason"] for row in synced["skipped"] if row["group"] == "veto"] == [
+        "Die Veto-Vorlage passt noch nicht zur Season (siehe Kasten Veto) – die Staffeln behalten ihre bisherige."]
+    assert "veto_rules" not in await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1})
+    # Pool wieder voll, Liga 1 ohne eigenes Best of: Jetzt passt sie, und das Übertragen bringt sie mit.
+    ok(await flow.patch(f"{ADMIN}/divisions/{w['division']['id']}", json={"overrides": {}}))
+    full = {HP: ["Hafen", "Nebel", "Turm", "Glut"], SND: ["Nebel", "Turm", "Kai", "Werk"], CTL: ["Hafen", "Kai", "Ruine"]}
+    ok(await flow.put(f"{ADMIN}/seasons/{sid}/map-pool", json=pool_body(w, full)))
+    synced = ok(await flow.post(f"{ADMIN}/seasons/{sid}/sync", json={}))["staffeln"][0]
+    assert "veto" in synced["applied"]
+    assert (await flow.db.tournaments.find_one({"id": w["tid"]}, {"_id": 0, "veto_rules": 1}))["veto_rules"]["enabled"] is True
     rights = await flow.get(f"{ADMIN}/seasons/{sid}/veto-rules/proposal")
     assert rights.status_code == 200
     no_pool = await season_world(flow, pool={})

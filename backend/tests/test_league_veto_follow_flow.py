@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 from league_start_world import ok  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import league_veto, league_veto_rules, map_pools  # noqa: E402
+from services import league_veto, league_veto_fit, league_veto_rules, map_pools  # noqa: E402
 from services.mutation_lock import league_season_veto_resource, mutation_lock, tournament_write_resource  # noqa: E402
 from test_league_veto_flow import (  # noqa: E402
     ADMIN, ANLAGE_B, BO5_POOL, CTL, HP, ORDER, SND, both_in, pick, pool_body, season_world, step, stored_veto, tournament_of, veto_block,
@@ -39,9 +39,7 @@ BO3_STEPS = [
 FULL = {HP: ["Hafen", "Nebel", "Turm", "Glut"], SND: ["Nebel", "Turm", "Kai", "Werk"], CTL: ["Hafen", "Kai", "Ruine"]}
 SMALLER = {HP: ["Hafen", "Nebel", "Turm"], SND: ["Nebel", "Turm", "Kai"], CTL: ["Hafen", "Kai", "Ruine"]}
 STAFFEL = "Liga 1 · Staffel A"
-UNTIL_SYNC_ORDER = (f"{STAFFEL} spielt bis zum Übertragen noch mit ihrer Modusfolge und ihrem Map-Pool – die neue Veto-Vorlage geht dort "
-                    "mit „Vorgaben auf Staffeln übertragen“ mit.")
-UNTIL_SYNC_BO5 = f"{STAFFEL} spielt bis zum Übertragen noch Best of 5 – die neue Veto-Vorlage geht dort mit „Vorgaben auf Staffeln übertragen“ mit."
+UNTIL_SYNC_ONE = "Die neue Veto-Vorlage geht in Liga 1 · Staffel A mit „Vorgaben auf Staffeln übertragen“ mit."
 KEEPS_BO5 = f"{STAFFEL} spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage."
 
 
@@ -106,7 +104,7 @@ async def test_an_untouched_template_follows_a_new_mode_order_and_reaches_the_st
     saved = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"game_mode_order": NEW_ORDER}))
     assert "game_mode_order" in saved["changed"]
     assert saved["veto_rules"]["steps"] == NEW_ORDER_STEPS, "die Antwort zeigt die nachgezogene Vorlage"
-    assert saved["warnings"] == [UNTIL_SYNC_ORDER]
+    assert saved["warnings"] == [UNTIL_SYNC_ONE]
     after = await template(flow, sid)
     assert after["veto_rules"]["steps"] == NEW_ORDER_STEPS and after["problems"] == [] and after["auto"] is True
     assert after["game_mode_order"] == NEW_ORDER
@@ -134,7 +132,7 @@ async def test_an_untouched_template_follows_a_new_best_of(flow):
     sid = w["season"]["id"]
     assert (await template(flow, sid))["veto_rules"]["steps"] == ANLAGE_B
     saved = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 3}))
-    assert saved["warnings"] == [UNTIL_SYNC_BO5]
+    assert saved["warnings"] == [UNTIL_SYNC_ONE]
     after = await template(flow, sid)
     assert after["best_of"] == 3 and after["veto_rules"]["steps"] == BO3_STEPS and after["problems"] == [] and after["auto"] is True
     assert await staffel_steps(flow, w) == ANLAGE_B and await follows(flow, sid) == 2
@@ -220,7 +218,7 @@ async def test_saving_by_hand_also_only_reaches_staffeln_it_fits(flow):
     ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(team_a="draw")))
     ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"game_mode_order": NEW_ORDER}))
     saved = ok(await flow.put(f"{ADMIN}/seasons/{sid}/veto-rules", json=veto_rules(NEW_ORDER_STEPS)))
-    assert saved["staffeln_updated"] == 0 and saved["warnings"] == [UNTIL_SYNC_ORDER]
+    assert saved["staffeln_updated"] == 0 and saved["warnings"] == [UNTIL_SYNC_ONE]
     assert (await tournament_of_staffel(flow, w))["veto_rules"]["team_a"] == "draw"
     await sync(flow, sid)
     assert (await tournament_of_staffel(flow, w))["veto_rules"] == veto_rules(NEW_ORDER_STEPS)
@@ -246,29 +244,95 @@ async def test_a_switched_off_or_legacy_template_never_follows(flow):
 # ---------------------------------------------------------------- Liga N mit anderem Best of (Nr. 106)
 
 @pytest.mark.asyncio
-async def test_a_league_n_with_another_best_of_gets_no_veto_and_is_told(flow):
-    """Liga 1 spielt Best of 5, die Season wechselt auf Best of 3: Die Vorlage folgt der Season (drei Positionen), in Liga 1 läuft kein
-    Veto. Das Speichern meldet es als Warnung, „Was fehlt noch?“ ebenso - kein Problem, das das Veröffentlichen aufhält."""
+async def test_a_league_n_keeps_a_fitting_template_and_only_a_league_n_without_one_is_told(flow):
+    """Nr. 200 ohne Ausnahme (Fabian 18.11.): Liga 1 spielt Best of 5 (eigenes Best of), die Season wechselt auf Best of 3 - Liga 1
+    behält ihre passende Vorlage, dort läuft das Veto weiter, die Warnung sagt es; „dort läuft kein Veto“ kommt nicht. Nr. 106 bleibt:
+    Eine Liga N, deren Best of schon immer abwich (Liga 2), hat keine passende Vorlage - nur dort sagt „Was fehlt noch?“ „kein Veto“."""
     w = await season_world(flow)
     sid = w["season"]["id"]
     ok(await flow.patch(f"{ADMIN}/divisions/{w['division']['id']}", json={"overrides": {"best_of": 5}}))
     saved = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 3}))
     after = await template(flow, sid)
     assert after["veto_rules"]["steps"] == BO3_STEPS and after["problems"] == [] and after["auto"] is True
-    sentence = ("Liga 1 spielt Best of 5, die Veto-Vorlage belegt 3 Positionen – dort läuft kein Veto, die Maps werden beim Ergebnis "
-                "eingetragen.")
-    assert saved["warnings"] == [sentence], "Nr. 106 bleibt: keine zweite Warnung „bleibt die bisherige“"
+    assert saved["warnings"] == [KEEPS_BO5]
+    assert await staffel_steps(flow, w) == ANLAGE_B
     ready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))
-    assert not veto_codes(ready["problems"])
-    assert [row["text"] for row in ready["warnings"] if row["code"] == "veto_division_mismatch"] == [sentence]
-    # Am Spiel der Liga 1 (Best of 5) passt die Vorlage nicht - dort läuft kein Veto, die Maps kommen beim Ergebnis.
-    pool = await map_pools.current(flow.db, "league_season", sid)
-    assert league_veto_rules.fits_problem(after["veto_rules"], pool=pool, best_of=5, order=ORDER, repeat="other_mode")
-    # Zurück auf Best of 5: Vorlage wieder für fünf Maps, keine Warnung mehr.
+    assert not veto_codes(ready["problems"]) and not [row for row in ready["warnings"] if row["code"] == "veto_division_mismatch"]
+    # Liga 2 entsteht jetzt mit eigenem Best of 5 - ihre Staffel bekommt die Vorlage der Season (Best of 3), die passt dort nicht.
+    second = ok(await flow.post(f"{ADMIN}/seasons/{sid}/divisions", json={"overrides": {"best_of": 5}}))
+    ok(await flow.post(f"{ADMIN}/divisions/{second['id']}/staffeln", json={}))
+    gap = ("Liga 2 spielt Best of 5, die Veto-Vorlage belegt 3 Positionen – dort läuft kein Veto, die Maps werden beim Ergebnis "
+           "eingetragen.")
+    ready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))
+    assert [row["text"] for row in ready["warnings"] if row["code"] == "veto_division_mismatch"] == [gap]
+    # Zurück auf Best of 5: Liga 1 hatte die Vorlage schon, Liga 2 spielt selbst Best of 5 - sie passt dort sofort. Keine Warnung, keine
+    # Lücke mehr.
     back = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 5}))
     assert (await template(flow, sid))["veto_rules"]["steps"] == ANLAGE_B and back["warnings"] == []
     assert await staffel_steps(flow, w) == ANLAGE_B
-    assert not [row for row in ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))["warnings"] if row["code"] == "veto_division_mismatch"]
+    liga2 = await flow.db.tournaments.find_one({"league_context.division_id": second["id"]}, {"_id": 0, "veto_rules": 1})
+    assert liga2["veto_rules"]["steps"] == ANLAGE_B
+    ready = ok(await flow.get(f"{ADMIN}/seasons/{sid}/readiness"))
+    assert not [row for row in ready["warnings"] if row["code"] == "veto_division_mismatch"]
+
+
+@pytest.mark.asyncio
+async def test_a_league_n_with_its_own_best_of_and_a_result_keeps_its_veto(flow):
+    """Fabians Fall zu Nr. 200: Liga 1 hat ein eigenes Best of 5 und schon ein Ergebnis, die Season wechselt auf Best of 3. Liga 1 behält
+    ihre Vorlage, das nächste Spiel bekommt beim Check-in ein laufendes Veto; „Was fehlt noch?“ sagt kein „dort läuft kein Veto“."""
+    world = await veto_world(flow, rules={**veto_rules(), league_veto_rules.AUTO: True})
+    season_id = world["season_id"]
+    await flow.db.leagues.update_one({"id": "liga"}, {"$set": {"id": "liga", "game_id": "probe-shooter"}}, upsert=True)
+    division = {"id": "liga-1", "season_id": season_id, "league_id": "liga", "level": 1, "status": "active", "overrides": {"best_of": 5}}
+    await flow.db.league_divisions.update_one({"id": "liga-1"}, {"$set": division}, upsert=True)
+    await flow.db.league_seasons.insert_one({"id": season_id, "league_id": "liga", "best_of": 5, "game_mode_order": list(ORDER),
+                                             "veto_rules": {**veto_rules(), league_veto_rules.AUTO: True}})
+    await flow.db.map_pools.insert_one({"id": new_id(), "scope": "league_season", "scope_id": season_id, "version": 1,
+                                        "game_id": "probe-shooter", "modes": BO5_POOL, "created_at": now_utc().isoformat()})
+    await with_result(flow, world["tournament"]["id"])
+    await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"best_of": 3, "game_mode_order": [HP, SND, CTL]}})
+    followed = await league_veto.follow_season(flow.db, season_id, actor_id=None)
+    assert followed.notes == ["Liga 1 · Staffel A spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage."]
+    assert (await tournament_of(flow, world))["veto_rules"]["steps"] == ANLAGE_B
+    season = await flow.db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+    assert await league_veto_fit.division_veto_gaps(flow.db, season, [division]) == []
+    await both_in(flow, world)
+    veto = await stored_veto(flow, world)
+    assert veto["status"] == "running" and veto["template"]["steps"] == ANLAGE_B and veto["best_of"] == 5
+
+
+@pytest.mark.asyncio
+async def test_three_staffeln_are_named_in_one_sentence(flow):
+    """Zusammengefasst (Fabian 18.11.): drei Staffeln ohne Ergebnis - ein Satz „in 3 Staffeln“; mit Ergebnis ein Satz mit drei Namen."""
+    w = await season_world(flow, order=[])
+    sid = w["season"]["id"]
+    for _ in range(2):
+        ok(await flow.post(f"{ADMIN}/divisions/{w['division']['id']}/staffeln", json={}))
+    saved = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 3}))
+    assert saved["warnings"] == ["Die neue Veto-Vorlage geht in 3 Staffeln mit „Vorgaben auf Staffeln übertragen“ mit."]
+    ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 5}))
+    for row in await flow.db.tournaments.find({"league_context.season_id": sid}, {"_id": 0, "id": 1}).to_list(None):
+        await with_result(flow, row["id"])
+    saved = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 3}))
+    assert saved["warnings"] == ["Liga 1 · Staffel A, Liga 1 · Staffel B und Liga 1 · Staffel C spielen weiter Best of 5 – dort bleibt die "
+                                 "bisherige Veto-Vorlage."]
+
+
+@pytest.mark.asyncio
+async def test_a_new_pool_after_the_first_result_still_reaches_the_staffel_with_the_transfer(flow):
+    """K1: Nach dem ersten Ergebnis geht der Pool beim Übertragen trotzdem mit - eine Vorlage, die mit dem Pool der Season und dem Best
+    of der Staffel aufgeht, heißt „bis zum Übertragen“, nicht „bleibt“, und kommt mit dem Übertragen."""
+    w = await season_world(flow, pool=SMALLER)
+    sid = w["season"]["id"]
+    before = await staffel_steps(flow, w)
+    await with_result(flow, w["tid"])
+    saved = ok(await flow.put(f"{ADMIN}/seasons/{sid}/map-pool", json=pool_body(w, FULL)))
+    assert UNTIL_SYNC_ONE in saved["warnings"] and not [text for text in saved["warnings"] if "bleibt" in text]
+    fresh = (await template(flow, sid))["veto_rules"]["steps"]
+    assert fresh == ANLAGE_B != before and await staffel_steps(flow, w) == before
+    result = await sync(flow, sid)
+    assert "veto" in result["applied"] and not veto_skip(result)
+    assert await staffel_steps(flow, w) == fresh
 
 
 # ---------------------------------------------------------------- Pool entfernen, abgeschlossen, Sperren
@@ -280,7 +344,7 @@ async def test_clearing_the_pool_also_lets_the_template_follow(flow):
     w = await season_world(flow)
     sid = w["season"]["id"]
     cleared = ok(await flow.delete(f"{ADMIN}/seasons/{sid}/map-pool"))
-    assert cleared["warnings"] == [UNTIL_SYNC_ORDER]
+    assert cleared["warnings"] == [UNTIL_SYNC_ONE]
     after = await template(flow, sid)
     assert after["auto"] is True and after["veto_rules"]["steps"] == league_veto_rules.propose(order=ORDER, pool=None, best_of=5)
     assert await staffel_steps(flow, w) == ANLAGE_B
