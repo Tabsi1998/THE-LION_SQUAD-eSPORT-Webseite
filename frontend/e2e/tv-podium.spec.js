@@ -179,3 +179,18 @@ test.describe("TV-Podest beim Saisonabschluss (#2410)", () => {
     await expect(card).toContainText("Platz 2: Steinbock Gaming");
   });
 });
+
+// Liga-Wörter am TV (#2262, Paket D): Eine entschiedene Staffel heißt „Staffel entschieden“, nicht „Turnier entschieden“. Der Server
+// schickt dafür nur `staffel: true`. Bild in E2E_SCREENS_DIR, wenn gesetzt.
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+  test(`TV einer Staffel (${width} px): „Staffel entschieden“ statt „Turnier entschieden“`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.clock.install({ time: new Date("2026-11-15T20:00:00+01:00") });
+    await mockTvApi(page, { bracket: staffel("completed", { staffel: true }) });
+    await page.goto(TV);
+    const tv = page.getByTestId("bracket-tv");
+    await expect(tv).toContainText("Staffel entschieden", { timeout: 8000 });
+    await expect(tv).not.toContainText("Turnier entschieden");
+    if (process.env.E2E_SCREENS_DIR) await page.screenshot({ path: require("node:path").join(process.env.E2E_SCREENS_DIR, `tv-staffel-${width}.png`) });
+  });
+}

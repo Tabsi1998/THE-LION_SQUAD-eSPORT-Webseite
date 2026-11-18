@@ -84,6 +84,8 @@ const TOURNAMENT = {
   id: "t1", slug: "cod-liga-a", title: "CoD-Liga Season 1 · Liga 1 · Staffel A", format: "league", team_mode: "team", team_size: 4,
   status: "draft", game_id: "g1", league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
   can_use_staff_tools: true, can_manage_structure: true, can_manage_participants: true, can_manage: true, is_tournament_lead: true,
+  // Die Staffel-Seite (#2262) zeigt Knöpfe nur nach den Liga-Zuständigkeiten des Servers.
+  league_capabilities: ["applications", "manage", "matches", "results", "roster", "sanctions", "season"], can_edit_staffel: true,
 };
 
 // ---------------------------------------------------------------- Season-Seite
@@ -138,11 +140,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await page.setViewportSize({ width, height });
       await mock(page, (path) => {
         if (path === "/tournaments/t1/squad-candidates") return CANDIDATES;
-        if (path === "/tournaments/t1" || path === "/admin/tournaments/t1") return TOURNAMENT;
+        if (path === "/tournaments/t1") return TOURNAMENT;
         return undefined;
       }, ADMIN);
-      // Der Dialog steht für sich - geprüft wird er über die Turnierverwaltung der Staffel.
-      await page.goto("/admin/tournaments/t1");
+      // Der Dialog steht für sich - geprüft wird er auf der Staffel-Seite (Paket D, #2262: die Turnierverwaltung leitet dorthin).
+      await page.goto("/admin/leagues/staffeln/t1#zuteilen");
       await page.getByTestId("squad-assign-open").click();
       await page.getByTestId("squad-assign-dialog").locator('label[aria-label="Loewen"]').click();
       await expect(page.getByTestId("squad-assign-ids-s-a")).toContainText("TestloeweMila#1234567");

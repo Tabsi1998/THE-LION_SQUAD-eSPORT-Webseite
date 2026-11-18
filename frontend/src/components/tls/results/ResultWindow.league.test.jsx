@@ -125,3 +125,11 @@ test("ohne Maps: „Nicht erschienen“ über die gewohnten Eingaben, ohne Maps 
   fireEvent.click(screen.getByTestId("result-maps-on"));
   expect(screen.getByTestId("league-game-1")).toBeInTheDocument();
 });
+// Liga-Wörter (Paket D, #2262): Ein Liga-Spiel rückt keinen Baum weiter - es zählt in der Tabelle, Bescheid bekommen die Teams.
+test("Liga-Spiel: der Satz zum Rückgängig spricht von Tabelle und Teams", () => {
+  render(<ResultWindow entry={ENTRY} league={LEAGUE} onClose={() => {}} onSaved={vi.fn()} />);
+  const note = screen.getByTestId("result-undo-note");
+  expect(note).toHaveTextContent("zählt das Ergebnis in der Tabelle");
+  expect(note).toHaveTextContent("Teams bekommen Bescheid");
+  expect(note).not.toHaveTextContent("Baum");
+});

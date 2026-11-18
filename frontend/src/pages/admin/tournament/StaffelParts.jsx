@@ -1,8 +1,8 @@
-// Liga-Staffel in der Turnierverwaltung (#2109): eine Staffel ist ein Turnier mit `league_context`. Was die Season
-// vorgibt, steht hier nur zum Lesen - mit dem Hinweis „kommt aus der Season“ und dem Weg dorthin. Der Server lehnt
+// Liga-Staffel (#2109): eine Staffel ist ein Turnier mit `league_context`; bedient wird sie seit Paket D (#2262) nur auf der Staffel-Seite
+// der Liga-Verwaltung. Was die Season vorgibt, steht hier nur zum Lesen - mit dem Hinweis „kommt aus der Season“ und dem Weg dorthin. Der Server lehnt
 // Änderungen daran ohnehin ab (`services/staffel_guard.py`), sonst würde das nächste „Übertragen“ sie still überschreiben.
 import { Link } from "react-router-dom";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { staffelNeeds, staffelStand } from "@/lib/seasonTabs";
@@ -55,9 +55,6 @@ export function StaffelNeedsHint({ tournament, season, now, testId, className = 
   );
 }
 
-// Status einer Staffel (#2109, S1): keine Anmeldung, kein Check-in - „Liga starten“ macht den Spielplan fest.
-export const STAFFEL_STATUS_VALUES = new Set(["draft", "live", "paused", "completed", "results_published", "archived", "cancelled"]);
-
 // Vor dem Start ist der Spielplan eine Vorschau, die bei jeder Zuteilung neu gemischt wird (Handbuch liga.md 2.5).
 const PRE_START = new Set(["draft", "scheduled", "registration_open", "registration_closed", "check_in"]);
 export const staffelBeforeStart = (tournament) => PRE_START.has(tournament?.status || "draft");
@@ -70,31 +67,8 @@ export function staffelLabel(tournament) {
   return staffel ? `${head} · Staffel ${staffel}` : head;
 }
 
-/** Kopf der Staffel-Verwaltung (S24, L-C1): „Liga 1 · Staffel A – Season öffnen · Ligaseite“. */
-export function StaffelHeaderLine({ tournament }) {
-  if (!isStaffel(tournament)) return null;
-  const links = tournament.league_links || {};
-  const seasonPath = links.season_admin_path || `/admin/leagues/seasons/${tournament.league_context.season_id}`;
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-testid="staffel-header">
-      <span className="min-w-0">
-        <span className="font-bold text-white/85">{staffelLabel(tournament)}</span>
-        {links.season_name && <span className="text-white/45"> · {[links.league_name, links.season_name].filter(Boolean).join(" ")}</span>}
-      </span>
-      <span className="inline-flex items-center gap-3">
-        <Link to={seasonPath} data-testid="staffel-season-link" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white">Season öffnen</Link>
-        {links.public_path && (
-          <Link to={links.public_path} target="_blank" data-testid="staffel-public-link" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1">
-            Ligaseite <ExternalLink className="w-3 h-3" aria-hidden="true" />
-          </Link>
-        )}
-      </span>
-    </div>
-  );
-}
-
 /** „kommt aus der Season“ mit dem Weg zur Season. */
-export function SeasonSourceNote({ tournament, children = "Kommt aus der Season – dort ändern und übertragen.", testId }) {
+function SeasonSourceNote({ tournament, children = "Kommt aus der Season – dort ändern und übertragen.", testId }) {
   const seasonPath = tournament?.league_links?.season_admin_path
     || (tournament?.league_context?.season_id ? `/admin/leagues/seasons/${tournament.league_context.season_id}` : null);
   return (

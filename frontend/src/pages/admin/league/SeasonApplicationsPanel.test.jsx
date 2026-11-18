@@ -104,7 +104,9 @@ test("ein angenommener Antrag ohne Staffel wird zugeteilt, mit Staffel führt de
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/assign", { tournament_id: "t1" }));
 
   expect(screen.getByTestId("application-a2")).toHaveTextContent("Liga 1 · Staffel A");
-  expect(screen.getByTestId("application-open-staffel-a2")).toHaveAttribute("href", "/admin/tournaments/t1");
+  // Paket D (#2262): Die angenommene Anmeldung führt auf die Teilnehmer der Staffel-Seite.
+  expect(screen.getByTestId("application-open-staffel-a2")).toHaveAttribute("href", "/admin/leagues/staffeln/t1#teilnehmer");
+  expect(screen.getByTestId("application-open-staffel-a2")).toHaveTextContent("Staffel öffnen");
   expect(screen.queryByTestId("application-reject-open-a2")).toBeNull();
 });
 

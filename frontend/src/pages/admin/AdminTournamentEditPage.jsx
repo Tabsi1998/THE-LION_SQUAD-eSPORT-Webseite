@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
 import { placementMessage } from "@/lib/tournamentFillIn";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -29,7 +29,8 @@ import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
-import { STAFFEL_STATUS_VALUES, SeasonSourceNote, StaffelHeaderLine, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
+import { isStaffel } from "./tournament/StaffelParts";
+import { legacyTabAnchor, staffelAdminUrl } from "@/lib/staffelTabs";
 import { useTournamentStatus } from "./tournament/useTournamentStatus";
 
 export default function AdminTournamentEditPage() {
@@ -40,6 +41,8 @@ export default function AdminTournamentEditPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [t, setT] = useState(null);
+  // Paket D (#2262, Nr. 192): Eine Staffel gehört der Liga - die alte Adresse leitet auf ihre Staffel-Seite weiter.
+  const [staffelId, setStaffelId] = useState("");
   const [loadError, setLoadError] = useState("");
   const [regs, setRegs] = useState([]);
   // Team am Spieltag (#1192): Aufstellung und „da“ je Team beim Check-in.
@@ -88,6 +91,12 @@ export default function AdminTournamentEditPage() {
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/tournaments/${id}?include_draft=true`);
+    // Staffel (Paket D, #2262): nichts weiter laden und nichts von der Turnieransicht zeigen - Anmeldungen, Helfer und Teams
+    // verlangten Rechte, die die reine Liga-Leitung nicht hat (403 in der Konsole). Die Staffel-Seite lädt selbst.
+    if (isStaffel(data)) {
+      setStaffelId(data.id || id);
+      return;
+    }
     setT(data);
     const { data: r } = await api.get(`/tournaments/${id}/registrations`);
     setRegs(r);
@@ -116,8 +125,7 @@ export default function AdminTournamentEditPage() {
     const missing = (failure, what) => (failure?.response?.status === 403
       ? formatRequestError(failure, `Dafür fehlt dir das Recht: ${what}.`)
       : `${what} lassen sich gerade nicht laden.`);
-    // In einer Staffel (#2203) zählt das Liga-Recht, nicht der Bereich Turnierleitung.
-    if (isStaffel(data) ? data.can_edit_staffel : tournamentLead) {
+    if (tournamentLead) {
       try {
         const { data: s } = await api.get(`/tournaments/${id}/staff`);
         setStaff(s || []);
@@ -232,17 +240,15 @@ export default function AdminTournamentEditPage() {
       return false;
     }
   };
-  // `keepStage` (Liga-Staffel, #2109): ohne Struktur im Aufruf baut der Server mit der vorhandenen Phase neu - die
-  // Vorschau wird neu gemischt, Format und Einstellungen der Liga bleiben.
   // Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17): steht der Baum, lehnt der Server ab und sagt warum;
   // sonst fragt er mit der Zahl der Spiele nach, bevor er etwas ersetzt.
-  const rebuildFromFormat = async ({ preview = true, force = false, structure = null, keepStage = false } = {}) => {
+  const rebuildFromFormat = async ({ preview = true, force = false, structure = null } = {}) => {
     const data = await runConfirmed(async (confirmed) => {
       const params = new URLSearchParams();
       if (preview) params.set("preview", "true");
       if (force || confirmed) params.set("force", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
-      return (await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, keepStage ? undefined : (structure || {}))).data;
+      return (await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, structure || {})).data;
     }, {
       title: "Turnierbaum aus dem Format neu bauen?",
       // Ein eigenes Schema geht nie still verloren (#2046): der Server fragt, der Knopf sagt, was verloren geht.
@@ -250,9 +256,7 @@ export default function AdminTournamentEditPage() {
       failure: "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden.",
     });
     if (!data) return;
-    toast.success(keepStage
-      ? `Spielplan-Vorschau mit ${data.match_count} Spielen neu gemischt.`
-      : data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
+    toast.success(data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
     load();
   };
   const deleteParticipant = async (registration) => {
@@ -386,6 +390,8 @@ export default function AdminTournamentEditPage() {
     }
   };
 
+  // Alte Lesezeichen, Glocken-Einträge und Mail-Links (Paket D, #2262): `?tab=` führt an den passenden Reiter der Staffel-Seite.
+  if (staffelId) return <Navigate to={staffelAdminUrl(staffelId, legacyTabAnchor(searchParams.get("tab")))} replace />;
   if (!t) return (
     <AdminLayout>
       {loadError
@@ -399,10 +405,8 @@ export default function AdminTournamentEditPage() {
     const rights = matchRights(t, match);
     return { plan: rights.plan, results: resultsOpen && rights.results };
   };
-  // Liga-Staffel (#2109): nur, was die Liga braucht - Season-Werte lesend, keine Anmeldung, kein Check-in.
-  const staffel = isStaffel(t);
-  // „Liga verwalten“ an der Staffel (#2203): Der Bereich Turnierleitung gibt hier nichts - der Server sagt, was die Person darf.
-  const isTournamentLead = staffel ? Boolean(t.can_edit_staffel) : tournamentLead;
+  // Staffeln stehen seit Paket D (#2262) auf der Staffel-Seite der Liga-Verwaltung - hier nur noch Turniere.
+  const isTournamentLead = tournamentLead;
   const availableTabs = [
     ["participants", "Teilnehmer"],
     // Eine Liga hat keinen Baum (#2109, S16): der Reiter zeigt den Weg zu Tabelle und Spielplan.
@@ -448,20 +452,15 @@ export default function AdminTournamentEditPage() {
   const inFixedBracket = fixedRegistrationIds(matchesV2);
   const tournamentOver = FINISHED_STATUSES.has(t.status) || t.status === "cancelled";
   const swissUndo = t.format === "swiss" && !tournamentOver && !t.locked_at ? swissUndoInfo(matchesV2) : null;
-  // Check-in (#1161): ein Ort - der Reiter „Check-in“ der Turnierleitung; hier steht nur der Weg dorthin. Staffel (S18):
-  // kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des Co-Teams.
+  // Check-in (#1161): ein Ort - der Reiter „Check-in“ der Turnierleitung; hier steht nur der Weg dorthin.
   // Austritt und Disqualifikation gehen über ParticipantRemovalActions.
-  const checkInTools = Boolean(t.can_check_in) && !staffel;
+  const checkInTools = Boolean(t.can_check_in);
   // Setzplatz (#2111, TA15): bei „Manuell“ ordnet er die Vorschau - änderbar, bis der Baum steht (Ende des Check-ins).
-  const seedEditable = Boolean(t.can_manage_participants) && !staffel && !structureFixed && ["manual", "ranking"].includes(t.seeding_mode);
-  // Status und „Liga starten“ verlangt der Server in einer Staffel mit „Liga verwalten“ (#2262, Entwurf 1.4 Nr. 2) - „Season
-  // konfigurieren“ allein zeigte sonst Knöpfe, die mit 403 endeten. Im Turnier zählt die Strukturrolle wie bisher.
-  const canOperateTournament = staffel ? isTournamentLead : isTournamentLead || !!t.can_manage_structure;
-  const visibleStatusOptions = (isTournamentLead
+  const seedEditable = Boolean(t.can_manage_participants) && !structureFixed && ["manual", "ranking"].includes(t.seeding_mode);
+  const canOperateTournament = isTournamentLead || !!t.can_manage_structure;
+  const visibleStatusOptions = isTournamentLead
     ? TOURNAMENT_STATUS_OPTIONS
-    : TOURNAMENT_STATUS_OPTIONS.filter(([value]) => OPERATIONAL_STATUS_VALUES.has(value)))
-    // Staffel (S1): keine Anmeldung, kein Check-in - ein Check-in ließe sie ohne Teams und Spiele zurück.
-    .filter(([value]) => !staffel || STAFFEL_STATUS_VALUES.has(value));
+    : TOURNAMENT_STATUS_OPTIONS.filter(([value]) => OPERATIONAL_STATUS_VALUES.has(value));
   // Werkzeuge: braucht man gelegentlich, nicht bei jedem Blick auf die Seite.
   // "Zurücksetzen" steht bewusst zuletzt und rot, weil es den Baum verwirft.
   const canLockTournament = isTournamentLead && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
@@ -481,30 +480,22 @@ export default function AdminTournamentEditPage() {
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),
-    isTournamentLead && !staffel && ["results_published", "archived"].includes(t.status) && (
+    isTournamentLead && ["results_published", "archived"].includes(t.status) && (
       <button key="recheck" type="button" onClick={() => recheckResults()} data-testid="admin-tr-recheck-results" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Abschluss nachholen
       </button>
     ),
     // Nach dem Ende bleibt der Baum (#2120): daran hängen Platzierungen, Punkte und Gewinne.
-    t.can_manage_structure && !staffel && !FINISHED_STATUSES.has(t.status) && (
+    t.can_manage_structure && !FINISHED_STATUSES.has(t.status) && (
       <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
-      </button>
-    ),
-    // Staffel (S15): vor dem Start mischt sich die Vorschau neu; nach dem Start löschte „Zurücksetzen“ alle Spiele samt
-    // Ergebnissen - das gibt es für eine Staffel nicht.
-    t.can_manage_structure && staffel && staffelBeforeStart(t) && (
-      <button key="remix" type="button" onClick={() => rebuildFromFormat({ preview: true, force: true, keepStage: true })} data-testid="admin-tr-remix" className="tls-btn tls-btn--secondary px-3 py-2 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2">
-        <RefreshCw className="w-3.5 h-3.5" /> Vorschau neu mischen
       </button>
     ),
   ].filter(Boolean);
   const downloadActions = [
     { key: "participants", href: `${API}/exports/tournaments/${t.id}/participants.pdf`, label: "PDF Teilnehmer" },
-    // Staffel (S20): keine Anmeldung, kein Check-in.
-    !staffel && { key: "checkin", href: `${API}/exports/tournaments/${t.id}/checkin.pdf`, label: "PDF Check-in" },
-    !staffel && { key: "registration-qr", href: `${API}/exports/tournaments/${t.id}/registration-qr.pdf`, label: "PDF Anmeldung QR", highlight: true },
+    { key: "checkin", href: `${API}/exports/tournaments/${t.id}/checkin.pdf`, label: "PDF Check-in" },
+    { key: "registration-qr", href: `${API}/exports/tournaments/${t.id}/registration-qr.pdf`, label: "PDF Anmeldung QR", highlight: true },
     { key: "matches", href: `${API}/exports/tournaments/${t.id}/matches.pdf`, label: "PDF Spiele" },
     t.can_use_staff_tools && { key: "match-plan", href: `${API}/tournaments/${t.id}/match-plan.csv`, label: "CSV Matchplan" },
   ].filter(Boolean);
@@ -516,11 +507,8 @@ export default function AdminTournamentEditPage() {
           <div>
             <Link to="/admin/tournaments" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Turniere</Link>
             <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 break-words">{t.title}</h1>
-            {/* Staffel (S24, L-C1): woher sie kommt - Liga N, Staffel, Season öffnen, Ligaseite. */}
-            <StaffelHeaderLine tournament={t} />
             <div className="mt-2 flex items-center gap-3 flex-wrap">
-              {/* Staffel (#2453): der Stand der Season statt „Entwurf“ - ohne Season-Angaben der Status wie bisher. */}
-              {isStaffel(t) ? <StaffelStandBadge tournament={t} testId="admin-tr-stand" /> : <StatusBadge status={t.status} />}
+              <StatusBadge status={t.status} />
               {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
               <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
               <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
@@ -591,11 +579,9 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
-      {/* Liga-Staffeln (#2096) haben keine Vor-Ort-Anmeldung - die Co-Teams teilt die Turnierleitung zu. Online-Turniere
-          auch nicht (#2111, TA4): der QR-Code gilt für die Halle. */}
-      {isTournamentLead && !t.league_context && ONSITE_EVENT_MODES.has(t.event_mode) && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
-      {/* Staffel (S21): Zugangslinks nur zum Ansehen - angemeldet wird nicht, Co-Teams werden zugeteilt. */}
-      {tournamentLead && isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister={!staffel} collapsible /></div>}
+      {/* Online-Turniere haben keine Vor-Ort-Anmeldung (#2111, TA4): der QR-Code gilt für die Halle. */}
+      {isTournamentLead && ONSITE_EVENT_MODES.has(t.event_mode) && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
+      {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister collapsible /></div>}
 
       <TournamentFlowStepper
         tournament={t}
@@ -628,19 +614,16 @@ export default function AdminTournamentEditPage() {
           </div>
         )}
         {/* Liga (#1649): Co-Teams teilt die Turnierleitung von Hand zu - Hauptteam, dann Co-Team, mit allen Prüfungen. */}
-        {(staffel ? t.can_manage_participants : isTournamentLead) && canAssignSquads(t) && (
+        {isTournamentLead && canAssignSquads(t) && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-white/10 bg-[#121212] p-4">
-            {/* T9 (#2109): nur in einer Staffel sind Co-Teams die Teilnehmer; ein Turnier im Format Liga nimmt auch ganze Teams. */}
+            {/* T9 (#2109): ein Turnier im Format Liga nimmt auch ganze Teams - Co-Teams sind hier ein Angebot. */}
             <p className="min-w-0 flex-1 text-sm text-white/60" data-testid="admin-tr-squad-hint">
-              {staffel
-                ? "Teilnehmer dieser Liga sind Co-Teams. Captain und Vertreter vergibt die Teamleitung im Profil."
-                : "Optional: Co-Team zuteilen – Teams melden sich hier auch als ganzes Team an. Captain und Vertreter eines Co-Teams vergibt die Teamleitung im Profil."}
+              Optional: Co-Team zuteilen – Teams melden sich hier auch als ganzes Team an. Captain und Vertreter eines Co-Teams vergibt die Teamleitung im Profil.
             </p>
             <SquadAssignDialog tournament={t} onAssigned={load} />
           </div>
         )}
-        {/* Staffel (S19, L-D4): kein ganzes Hauptteam an den Co-Team-Prüfungen vorbei - nur „Co-Team zuteilen“. */}
-        {t.can_manage_participants && !staffel && (
+        {t.can_manage_participants && (
           <ParticipantAddForm
             form={participantForm}
             tournament={t}
@@ -653,7 +636,7 @@ export default function AdminTournamentEditPage() {
             onSubmit={addParticipant}
           />
         )}
-        <div className={`grid gap-3 ${staffel ? "lg:grid-cols-[minmax(0,1fr)_auto]" : "lg:grid-cols-[minmax(0,1fr)_16rem_auto]"}`}>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
             <input
@@ -664,20 +647,17 @@ export default function AdminTournamentEditPage() {
               placeholder="Name, Discord, E-Mail oder Team suchen"
             />
           </label>
-          {/* Staffel (S18): keine Warteliste, kein Check-in - ein Filter nach Anmeldestatus hat nichts zu filtern. */}
-          {!staffel && (
-            <select
-              value={participantStatusFilter}
-              onChange={(event) => setParticipantStatusFilter(event.target.value)}
-              data-testid="admin-reg-status-filter"
-              className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
-            >
-              <option value="">Alle Status ({regs.length})</option>
-              {REGISTRATION_STATUS_FILTER_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
-              ))}
-            </select>
-          )}
+          <select
+            value={participantStatusFilter}
+            onChange={(event) => setParticipantStatusFilter(event.target.value)}
+            data-testid="admin-reg-status-filter"
+            className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
+          >
+            <option value="">Alle Status ({regs.length})</option>
+            {REGISTRATION_STATUS_FILTER_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
+            ))}
+          </select>
           <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
             {filteredRegistrations.length} / {regs.length} sichtbar
           </div>
@@ -694,10 +674,10 @@ export default function AdminTournamentEditPage() {
                     <EventGateMark mark={r.event_gate} />
                     <LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} />
                   </div>
-                  <RegistrationBadge status={r.status} staffel={staffel} />
+                  <StatusBadge status={r.status} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {isTournamentLead && !staffel && (
+                  {isTournamentLead && (
                     <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-mobile-${r.id}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 text-xs rounded-sm">
                       <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                     </select>
@@ -734,7 +714,7 @@ export default function AdminTournamentEditPage() {
                 <tr key={r.id}>
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
                   <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /><LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} /></td>
-                  <td className="px-4 py-3"><RegistrationBadge status={r.status} staffel={staffel} /></td>
+                  <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   {seedEditable && (
                     <td className="px-4 py-3">
                       <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-${r.id}`} />
@@ -743,7 +723,7 @@ export default function AdminTournamentEditPage() {
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
-                      {isTournamentLead && !staffel && (
+                      {isTournamentLead && (
                         <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
                           <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                         </select>
@@ -807,13 +787,7 @@ export default function AdminTournamentEditPage() {
           onChanged={loadSafely}
         />
       )}
-      {/* Staffel (S22): den Pool pflegt die Season - jedes Übertragen ersetzt ihn, eine Änderung hier ginge verloren. */}
-      {activeTab === "maps" && staffel && (
-        <div className="mb-4 rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3" data-testid="staffel-maps-note">
-          <SeasonSourceNote tournament={t}>Den Map-Pool pflegt die Season – dort ändern und übertragen.</SeasonSourceNote>
-        </div>
-      )}
-      {activeTab === "maps" && <MapPoolPanel tournamentId={t.id} canEdit={Boolean(t.can_manage_structure) && !staffel} />}
+      {activeTab === "maps" && <MapPoolPanel tournamentId={t.id} canEdit={Boolean(t.can_manage_structure)} />}
       {activeTab === "edit" && isTournamentLead && (
         <TournamentEditForm
           key={t.updated_at || t.id}
@@ -901,15 +875,6 @@ function SeedField({ registration, onSave, testId }) {
       className="w-16 rounded-sm border border-white/10 bg-[#0A0A0A] px-2 py-1 text-xs text-white"
     />
   );
-}
-
-// Staffel (#2109, S18): ein Co-Team ist zugeteilt, nicht „angenommen“ oder „eingecheckt“ - Austritt und
-// Disqualifikation zeigt das gewohnte Schild.
-function RegistrationBadge({ status, staffel }) {
-  if (staffel && ["approved", "checked_in"].includes(status)) {
-    return <span data-testid="status-assigned" className="inline-flex items-center gap-1 font-bold uppercase tracking-wider border rounded-sm text-[10px] px-2 py-[3px] bg-ok/15 text-ok border-ok/50">Zugeteilt</span>;
-  }
-  return <StatusBadge status={status} />;
 }
 
 // Turnier nur mit Event-Anmeldung (#875): ob die Event-Anmeldung (noch) reicht - nur für die Turnierleitung.

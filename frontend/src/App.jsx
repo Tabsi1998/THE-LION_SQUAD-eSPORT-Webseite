@@ -415,6 +415,8 @@ function App() {
           <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/einlass" element={<ProtectedRoute requireArea="club"><AdminAdmissionPage /></ProtectedRoute>} />
           {/* Liga-Zuständige und der Bereich Ligen (#2463): die Liste zeigt ihnen nur ihre Staffeln - das filtert der Server. */}
+          {/* Paket D (#2262, Nr. 192): Die Turnierliste zeigt keine Staffeln - die reine Liga-Leitung kommt herein und die Seite leitet sie zur
+              Liga (so bleibt das Start-Bündel, wie es ist). Die Einzelseite leitet alte Links einer Staffel auf die Staffel-Seite. */}
           <Route path="/admin/tournaments" element={<ProtectedRoute requireTournamentStaff allowLeagueStaff><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentNewPage /></ProtectedRoute>} />
           <Route path="/admin/tournament-guide" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentGuidePage /></ProtectedRoute>} />

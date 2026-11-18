@@ -358,6 +358,28 @@ async def touch_session_activity(db, user_id: str, family_id: str, now: datetime
         logger.debug("last_active nicht aktualisiert", exc_info=True)
 
 
+# Mehr Einsätze hat niemand; die Grenze hält die Prüfung bei jeder Anfrage klein.
+STAFF_ASSIGNMENT_SCAN = 200
+
+
+async def _tournament_assignment_outside_staffeln(db, query: dict) -> bool:
+    """Ein Helfer-Einsatz in einem Turnier - alte Einsätze in einer Liga-Staffel zählen nicht (Paket D, #2262, Fabian 18.11.): Staffeln
+    stehen nicht in der Turnierliste, ein solcher Einsatz öffnete sonst „Turniere“ ohne Inhalt.
+
+    Ein Einsatz ohne Turnier (``tournament_id`` leer oder fehlend) zählt wie bisher. Ein Einsatz, dessen Turnier es nicht mehr gibt,
+    zählt nicht - dort gibt es nichts zu tun (``purge_tournament`` räumt solche Einsätze ohnehin mit ab)."""
+    # Die Zählung zuerst: Wer keinen Einsatz hat - fast alle -, kostet so genau eine Abfrage.
+    if not await db.tournament_staff_assignments.count_documents(query):
+        return False
+    rows = await db.tournament_staff_assignments.find(query, {"_id": 0, "tournament_id": 1}).to_list(STAFF_ASSIGNMENT_SCAN)
+    tournament_ids = {row.get("tournament_id") for row in rows}
+    if any(not tid for tid in tournament_ids):
+        return True
+    from services.league_scope import NOT_LEAGUE
+
+    return bool(await db.tournaments.find_one({"id": {"$in": sorted(tournament_ids)}, **NOT_LEAGUE}, {"_id": 0, "id": 1}))
+
+
 async def get_current_user(request: Request) -> dict:
     token = _extract_token(request)
     if not token:
@@ -431,7 +453,7 @@ async def get_current_user(request: Request) -> dict:
 
     assignment_query = {"user_id": user["id"], "is_active": {"$ne": False}}
     user["has_staff_assignment"] = bool(
-        await db.tournament_staff_assignments.count_documents(assignment_query)
+        await _tournament_assignment_outside_staffeln(db, assignment_query)
         or await db.f1_staff_assignments.count_documents(assignment_query)
     )
     user["is_tournament_staff"] = bool(is_tournament_lead(user) or user["has_staff_assignment"])

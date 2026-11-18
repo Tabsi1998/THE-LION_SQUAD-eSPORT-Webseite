@@ -114,7 +114,8 @@ async def test_the_admin_list_names_the_team_once(flow):
     assert row["ref_id"] == world["match"]["id"] and row["reason"] == NOTE
     assert row["team_name"] == "Loewen · Rudel A" and row["user_username"] is None
     assert row["issued_by_name"] == world["staff"]["display_name"]
-    assert row["admin_url"] == f"/admin/tournaments/{world['tournament']['id']}"
+    # Eine Staffel führt auf ihre Staffel-Seite, Reiter Spiele und Ergebnisse (Paket D, #2262) - nicht in die Turnierverwaltung.
+    assert row["admin_url"] == f"/admin/leagues/staffeln/{world['tournament']['id']}#spiele"
 
     # Nach einer Person gefiltert: was sie unter „Meine Strafen“ sieht.
     filtered = await flow.get(f"/api/admin/penalties?user_id={users['Mila']['id']}&kind=match_forfeit")
