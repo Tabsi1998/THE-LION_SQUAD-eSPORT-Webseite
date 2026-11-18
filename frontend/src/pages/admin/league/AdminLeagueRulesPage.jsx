@@ -383,13 +383,15 @@ export default function AdminLeagueRulesPage() {
     await load();
   });
 
-  // Zurück in den Reiter „Regelwerk und Sperrliste“ der Season (#2267).
-  const back = view?.season ? seasonAnchorUrl(view.season.id, "regelwerk") : "/admin/leagues";
+  // Zurück in den Reiter „Regelwerk und Sperrliste“ der Season (#2267) - die Season steht schon in der Adresse, der Weg stimmt also auch,
+  // solange die Seite noch lädt (#2528).
+  const seasonId = scope === "league_season" ? scopeId : view?.season?.id;
+  const back = seasonId ? seasonAnchorUrl(seasonId, "regelwerk") : "/admin/leagues";
   const canPublish = publish.change_reason.trim().length >= REASON_MIN && publish.valid_from && !busy && (!emptyVars.length || publish.confirm_empty);
   return (
     <AdminLayout>
       <Link to={back} data-testid="rules-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
-        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {view?.season ? view.season.name : "Liga"}
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {view?.season ? view.season.name : seasonId ? "Season" : "Liga"}
       </Link>
       {error ? <p role="alert" className="mt-6 text-sm text-warn">{error}</p> : null}
       {view ? (
