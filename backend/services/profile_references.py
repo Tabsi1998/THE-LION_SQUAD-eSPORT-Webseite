@@ -128,20 +128,53 @@ def _rank_from_rows(rows: list[dict], registration_id: str) -> int | None:
     return None
 
 
-async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: list[str]) -> tuple[int | None, int | None]:
-    db = get_db()
-    identity_filter = [{"user_id": user_id}]
+def _identity_filter(user_id: str, team_ids: list[str]) -> list[dict]:
+    identity_filter: list[dict] = [{"user_id": user_id}]
     if team_ids:
         identity_filter.append({"team_id": {"$in": team_ids}})
-    reg_query = {"tournament_id": tournament_id, "$or": identity_filter}
-    my_regs = await db.tournament_registrations.find(reg_query, {"_id": 0}).to_list(20)
+    return identity_filter
+
+
+async def _registrations_for_ranks(tournament_ids: list[str], user_id: str, team_ids: list[str]) -> dict[str, tuple[list[dict], list[dict]]]:
+    """Die Anmeldungen, die ``_tournament_rank_for_user`` braucht - für alle Turniere einer Referenzliste in zwei Abfragen statt
+    zwei je Turnier (#2516). Je Turnier: (eigene Anmeldungen, höchstens 20; gewertete Anmeldungen, höchstens ``REGISTRATION_LIMIT``)
+    - dieselben Grenzen und dieselbe Reihenfolge wie die Einzelabfragen."""
+    if not tournament_ids:
+        return {}
+    db = get_db()
+    own: dict[str, list[dict]] = {tid: [] for tid in tournament_ids}
+    for reg in await db.tournament_registrations.find(
+            {"tournament_id": {"$in": tournament_ids}, "$or": _identity_filter(user_id, team_ids)}, {"_id": 0}).to_list(None):
+        rows = own.setdefault(reg.get("tournament_id"), [])
+        if len(rows) < 20:
+            rows.append(reg)
+    counted: dict[str, list[dict]] = {tid: [] for tid in tournament_ids}
+    for reg in await db.tournament_registrations.find(
+            {"tournament_id": {"$in": tournament_ids}, "status": {"$in": list(REFERENCE_REGISTRATION_STATUSES)}}, {"_id": 0}).to_list(None):
+        rows = counted.setdefault(reg.get("tournament_id"), [])
+        if len(rows) < REGISTRATION_LIMIT:
+            rows.append(reg)
+    return {tid: (own.get(tid) or [], counted.get(tid) or []) for tid in tournament_ids}
+
+
+async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: list[str], *,
+                                    prefetched: tuple[list[dict], list[dict]] | None = None) -> tuple[int | None, int | None]:
+    """Platz und Feldgröße der Person in einem Turnier. ``prefetched``: die Anmeldungen aus ``_registrations_for_ranks``."""
+    db = get_db()
+    if prefetched is not None:
+        my_regs, regs = prefetched
+    else:
+        reg_query = {"tournament_id": tournament_id, "$or": _identity_filter(user_id, team_ids)}
+        my_regs = await db.tournament_registrations.find(reg_query, {"_id": 0}).to_list(20)
+        regs = []
     if not my_regs:
         return None, None
 
-    regs = await db.tournament_registrations.find(
-        {"tournament_id": tournament_id, "status": {"$in": list(REFERENCE_REGISTRATION_STATUSES)}},
-        {"_id": 0},
-    ).to_list(REGISTRATION_LIMIT)
+    if prefetched is None:
+        regs = await db.tournament_registrations.find(
+            {"tournament_id": tournament_id, "status": {"$in": list(REFERENCE_REGISTRATION_STATUSES)}},
+            {"_id": 0},
+        ).to_list(REGISTRATION_LIMIT)
     participant_count = len(regs) or None
     reg_ids = [reg.get("id") for reg in my_regs if reg.get("id")]
     if not reg_ids:
@@ -223,6 +256,7 @@ async def personal_profile_references(user: dict, public_only: bool = False, *, 
     for row in extra_rows:
         if await sees_tournament(scope, row):
             extra_tournaments[row["id"]] = row
+    rank_registrations = await _registrations_for_ranks(list(extra_tournaments), user_id, team_ids)
     for reg in regs:
         tournament = extra_tournaments.get(reg.get("tournament_id"))
         if not tournament:
@@ -231,7 +265,8 @@ async def personal_profile_references(user: dict, public_only: bool = False, *, 
         if any(item.get("kind") == "tournament" and item.get("target_id") in {tournament.get("slug"), tournament.get("id")} for item in items):
             continue
         seen_keys.add(key)
-        rank, participant_count = await _tournament_rank_for_user(tournament["id"], user_id, team_ids)
+        rank, participant_count = await _tournament_rank_for_user(tournament["id"], user_id, team_ids,
+                                                                  prefetched=rank_registrations.get(tournament["id"]))
         items.append({
             "id": key,
             "kind": "tournament",

@@ -17,7 +17,7 @@ Ohne gespeichertes Feld gilt der Schalter als an - keine Migration.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 SETTING = "privacy_members_see_internal"
 
@@ -25,10 +25,15 @@ SETTING = "privacy_members_see_internal"
 @dataclass(frozen=True)
 class ProfileScope:
     """Was ein Betrachter im Profil sieht: ``self`` alles, ``members`` dazu Internes, das er selbst sehen darf,
-    ``public`` nur Öffentliches. ``viewer`` nur bei ``members`` - für die Sichtbarkeitsstufen des einzelnen Eintrags."""
+    ``public`` nur Öffentliches. ``viewer`` nur bei ``members`` - für die Sichtbarkeitsstufen des einzelnen Eintrags.
+
+    ``memo``: je Aufruf einmal je Sichtbarkeitsstufe, Season bzw. Liga entschieden (wie ``visibility.filter_visible``) - die
+    Bereiche einer Person brauchen Datenbank-Abfragen, und vierzig interne Turniere sollen sie nicht vierzigmal stellen. Je
+    Anfrage ein neuer Scope (``scope_for``); ``SELF`` und ``PUBLIC`` fragen nie nach einer Person und merken sich nichts."""
 
     mode: str
     viewer: dict | None = None
+    memo: dict = field(default_factory=dict, compare=False, hash=False, repr=False)
 
     @property
     def everything(self) -> bool:
@@ -56,8 +61,30 @@ async def scope_for(viewer: dict | None, owner: dict | None) -> ProfileScope:
     from services.visibility import sees_member_content
 
     if await sees_member_content(viewer):
-        return ProfileScope("members", viewer)
+        return members_scope(viewer, member=True)
     return PUBLIC
+
+
+def members_scope(viewer: dict, *, member: bool | None = None) -> ProfileScope:
+    """Ein neuer Scope für ein Mitglied - ``member=True``, wenn ``sees_member_content`` schon entschieden ist: Die Stufe
+    „members“ ist genau diese Frage und wird dann nicht noch einmal gestellt."""
+    scope = ProfileScope("members", viewer)
+    if member is not None:
+        scope.memo[("level", "members")] = member
+    return scope
+
+
+async def viewer_sees_level(scope: ProfileScope, visibility: str | None) -> bool:
+    """``user_can_see`` des Betrachters für eine Stufe - je Scope einmal je Stufe."""
+    from services.visibility import user_can_see
+
+    level = visibility or "public"
+    if scope.viewer is None:
+        return await user_can_see(None, level)  # ohne Person keine Abfrage
+    key = ("level", level)
+    if key not in scope.memo:
+        scope.memo[key] = await user_can_see(scope.viewer, level)
+    return scope.memo[key]
 
 
 async def sees_tournament(scope: ProfileScope, tournament: dict | None) -> bool:
@@ -68,9 +95,7 @@ async def sees_tournament(scope: ProfileScope, tournament: dict | None) -> bool:
         return True
     if tournament.get("status") == "draft" or tournament.get("is_public") is False:
         return False
-    from services.visibility import user_can_see
-
-    return await user_can_see(scope.viewer, tournament.get("visibility") or "public")
+    return await viewer_sees_level(scope, tournament.get("visibility"))
 
 
 async def sees_challenge(scope: ProfileScope, challenge: dict | None) -> bool:
@@ -80,9 +105,7 @@ async def sees_challenge(scope: ProfileScope, challenge: dict | None) -> bool:
         return True
     if challenge.get("status") == "draft":
         return False
-    from services.visibility import user_can_see
-
-    return await user_can_see(scope.viewer, challenge.get("visibility") or "public")
+    return await viewer_sees_level(scope, challenge.get("visibility"))
 
 
 async def tournament_is_internal(tournament: dict | None) -> bool:
