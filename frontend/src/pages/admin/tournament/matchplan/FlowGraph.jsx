@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { flowLayout, relatedOf } from "@/lib/matchFlow";
 import { formatBracketSection } from "@/lib/tournamentLabels";
 import { viennaTime } from "@/lib/vienna";
+import "./matchplan.css";
 
 // „Wer wartet auf wen“ (#1557): die Abhängigkeiten als Ablauf von links nach rechts. Durchgezogen kommt weiter,
 // gestrichelt fällt ins Loser Bracket; ein Spiel, dessen Spieler noch nicht feststehen (Prognose), hat einen

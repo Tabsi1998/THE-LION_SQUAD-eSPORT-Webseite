@@ -93,6 +93,25 @@ export function startupVideoProblems(manifest, indexHtml = "", entryKey = "index
   return problems;
 }
 
+// Seiten-CSS, das nur nachgeladene Seiten brauchen, steht nicht im Start-CSS (#2511): Es liegt in einer eigenen Datei,
+// die die Bausteine der Seite importieren, und kommt mit deren Chunk - vor dem ersten Zeichnen, also ohne Sprung.
+// Je Eintrag ein Selektor, der in keiner Start-CSS-Datei vorkommen darf.
+export const PAGE_ONLY_CSS = [
+  { pattern: /\.mp(?:-[\w-]+)?(?=[\s{,:.[>+~)])/, label: "Matchplan und Spielwochen der Verwaltung (pages/admin/tournament/matchplan/matchplan.css)" },
+];
+
+/** Start-CSS-Dateien ([{ file, text }]), in denen Seiten-CSS aus PAGE_ONLY_CSS steht. */
+export function pageCssProblems(cssFiles, rules = PAGE_ONLY_CSS) {
+  const problems = [];
+  for (const { file, text } of cssFiles) {
+    for (const { pattern, label } of rules) {
+      const hit = String(text).match(pattern);
+      if (hit) problems.push(`${file} enthält "${hit[0]}" - ${label} gehört an die Seite, nicht in den Start.`);
+    }
+  }
+  return problems;
+}
+
 /** Harte Grenzen ("<!-- budget:... -->", darüber schlägt das Gate fehl). */
 export function parseBudgets(markdown) {
   return parseMarkers(markdown, "budget");
@@ -172,6 +191,9 @@ function main() {
   const routeProblems = heavyRouteProblems(manifest);
   for (const problem of routeProblems) failures.push(problem);
   if (!routeProblems.length) console.log("Öffentliche Seiten: keine lädt Editor, Diagramme, PDF oder QR statisch mit – ok");
+  const cssProblems = pageCssProblems(css.map((file) => ({ file, text: readFileSync(path.join(distDir, file), "utf8") })));
+  for (const problem of cssProblems) failures.push(problem);
+  if (!cssProblems.length) console.log("Seiten-CSS: nichts davon im Start-CSS – ok");
   const checks = [
     ["startup-js-gzip", "Start-JS", jsGzip],
     ["startup-css-gzip", "Start-CSS", cssGzip],
