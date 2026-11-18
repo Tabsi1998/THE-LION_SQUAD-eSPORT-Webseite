@@ -14,6 +14,7 @@ from services.profile_visibility import (
     ProfileScope,
     challenge_is_internal,
     sees_challenge,
+    sees_listed_challenge,
     sees_tournament,
     tournament_is_internal,
 )
@@ -96,19 +97,26 @@ async def _visible_challenge(challenge: dict | None) -> bool:
     return await sees_challenge(PUBLIC, challenge)
 
 
-async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str, scope: ProfileScope | bool) -> dict | None:
-    """``scope``: wer schaut (#2516) - ``True``/``False`` wie früher ``public_only``."""
+_NOT_LOADED = object()
+
+
+async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str, scope: ProfileScope | bool, *,
+                                  times: list[dict] | None = None, challenge=_NOT_LOADED) -> dict | None:
+    """``scope``: wer schaut (#2516) - ``True``/``False`` wie früher ``public_only``. ``times`` und ``challenge``: schon geladen
+    (#2521, ``_official_times_by_pair``) - dann keine Abfrage je Strecke."""
     if isinstance(scope, bool):
         scope = PUBLIC if scope else SELF
     db = get_db()
     from services.fastlap_standings import official_times
 
-    times = await official_times(db, challenge_id, track_id)
+    if times is None:
+        times = await official_times(db, challenge_id, track_id)
     if not scope.everything:
-        challenge = await db.f1_challenges.find_one(
-            {"id": challenge_id},
-            {"_id": 0, "id": 1, "status": 1, "visibility": 1},
-        )
+        if challenge is _NOT_LOADED:
+            challenge = await db.f1_challenges.find_one(
+                {"id": challenge_id},
+                {"_id": 0, "id": 1, "status": 1, "visibility": 1},
+            )
         if not await sees_challenge(scope, challenge):
             return None
     # Dieselbe Rangfolge wie die Tabelle (#1584): Gleichstand - die früher gefahrene Zeit vorn.
@@ -119,6 +127,23 @@ async def _ranked_fastlap_entries(challenge_id: str, track_id: str, user_id: str
         if row.get("user_id") == user_id:
             return {**row, "participant_count": len(ranked), "time_str": _time_str(row.get("effective_ms"))}
     return None
+
+
+async def _official_times_by_pair(db, pairs: list[tuple[str, str]]) -> dict[tuple[str, str], list[dict]]:
+    """Die gewerteten Zeiten mehrerer Strecken in einer Abfrage (#2521) - je Paar (Challenge, Strecke) dieselben wie ``official_times``."""
+    if not pairs:
+        return {}
+    from services.fastlap_standings import load_laps, official_query
+
+    wanted = set(pairs)
+    out: dict[tuple[str, str], list[dict]] = {pair: [] for pair in pairs}
+    query = official_query({"challenge_id": {"$in": sorted({pair[0] for pair in pairs})},
+                            "track_id": {"$in": sorted({pair[1] for pair in pairs})}})
+    for lap in await load_laps(db, query):
+        pair = (lap.get("challenge_id"), lap.get("track_id"))
+        if pair in wanted:
+            out[pair].append(lap)
+    return out
 
 
 def _rank_from_rows(rows: list[dict], registration_id: str) -> int | None:
@@ -306,8 +331,11 @@ async def personal_profile_references(user: dict, public_only: bool = False, *, 
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "banner_url": 1, "visibility": 1},
     ).to_list(250)
     extra_challenges = {}
+    # Eine Challenge im Entwurf ist unveröffentlicht und gehört nicht ins Profil - auch nicht für die Person selbst (#2521), wie unter
+    # Bestzeiten (``sees_listed_challenge``).
+    drafts = {row["id"] for row in extra_challenge_rows if row.get("status") == "draft"}
     for row in extra_challenge_rows:
-        if await sees_challenge(scope, row):
+        if await sees_listed_challenge(scope, row):
             extra_challenges[row["id"]] = row
     extra_tracks = {
         row["id"]: row
@@ -316,15 +344,17 @@ async def personal_profile_references(user: dict, public_only: bool = False, *, 
             {"_id": 0, "id": 1, "name": 1, "challenge_id": 1},
         ).to_list(250)
     }
-    for challenge_id, track_id in lap_pairs[:30]:
-        if any(item.get("kind") == "fastlap" and str(item.get("id", "")).endswith(f"{challenge_id}:{track_id}") for item in items):
-            continue
+    open_pairs = [(challenge_id, track_id) for challenge_id, track_id in lap_pairs[:30]
+                  if challenge_id not in drafts and (scope.everything or challenge_id in extra_challenges)
+                  and not any(item.get("kind") == "fastlap" and str(item.get("id", "")).endswith(f"{challenge_id}:{track_id}") for item in items)]
+    # Alle Zeiten dieser Strecken in einer Abfrage (#2521) - mit internen Fast Laps für Mitglieder wüchse das Profil sonst je Strecke.
+    times_by_pair = await _official_times_by_pair(db, open_pairs)
+    for challenge_id, track_id in open_pairs:
         challenge = extra_challenges.get(challenge_id)
-        if not scope.everything and not challenge:
-            continue
         internal = await challenge_is_internal(challenge)
+        ranked = await _ranked_fastlap_entries(challenge_id, track_id, user_id, scope, times=times_by_pair.get((challenge_id, track_id), []),
+                                               challenge=challenge)
         challenge = challenge or {}
-        ranked = await _ranked_fastlap_entries(challenge_id, track_id, user_id, scope)
         if not ranked:
             continue
         track = extra_tracks.get(track_id) or {}

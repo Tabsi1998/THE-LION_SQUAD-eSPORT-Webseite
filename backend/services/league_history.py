@@ -12,8 +12,11 @@ from services import league_zones
 LIMIT = 100
 
 
-async def _rows(db, query: dict, user: dict | None, hidden=None) -> list[dict]:
+async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> list[tuple[dict, dict, dict, bool]]:
+    """(Endstand, Season, Liga, intern) je sichtbarer Staffel. ``scope`` (Profil, #2521, ``services/profile_visibility``): die Regel des
+    Profils statt ``user`` und ``hidden`` - je Season, Liga und Stufe einmal entschieden. Intern ist, was ein Gast nicht sähe."""
     from services.league_service import can_see_season
+    from services.profile_visibility import PUBLIC, public_season, sees_listed_tournament, sees_season
 
     finals = await db.league_final_tables.find({"active": True, **query}, {"_id": 0}).sort("closed_at", -1).to_list(LIMIT)
     season_ids = sorted({row.get("season_id") for row in finals if row.get("season_id")})
@@ -30,13 +33,23 @@ async def _rows(db, query: dict, user: dict | None, hidden=None) -> list[dict]:
         if not season:
             continue
         if season["id"] not in visible:
-            visible[season["id"]] = season.get("status") != "archived" and await can_see_season(user, season)
+            visible[season["id"]] = (await sees_season(scope, season) if scope is not None
+                                     else season.get("status") != "archived" and await can_see_season(user, season))
         if not visible[season["id"]]:
             continue
         tournament = tournaments.get(final.get("tournament_id") or "")
-        if not tournament or (hidden and await hidden(db, tournament, user)):
+        if scope is not None:
+            if not await sees_listed_tournament(scope, tournament):
+                continue
+        elif not tournament or (hidden and await hidden(db, tournament, user)):
             continue
-        out.append((final, season, leagues.get(season.get("league_id") or "") or {}))
+        # Intern heißt: ein Gast sähe die Zeile nicht. Zwei Schritte statt eines Ausdrucks mit ``await`` - CodeQL hielt
+        # ``internal`` sonst für womöglich nicht gesetzt (py/uninitialized-local-variable, Fehlalarm).
+        guest_sees = public_season(season)
+        if guest_sees:
+            guest_sees = await sees_listed_tournament(PUBLIC, tournament)
+        internal = not guest_sees
+        out.append((final, season, leagues.get(season.get("league_id") or "") or {}, internal))
     return out
 
 
@@ -68,7 +81,7 @@ def _order(rows: list[dict]) -> list[dict]:
 async def for_team(db, team_id: str, user: dict | None, *, hidden=None) -> list[dict]:
     """Die Seasons eines Hauptteams - je Co-Team und Staffel eine Zeile."""
     out = []
-    for final, season, league in await _rows(db, {"team_ids": team_id}, user, hidden):
+    for final, season, league, _internal in await _rows(db, {"team_ids": team_id}, user, hidden):
         for registration_id, side in (final.get("sides") or {}).items():
             if side.get("team_id") == team_id:
                 entry = _entry(final, season, league, registration_id)
@@ -77,13 +90,25 @@ async def for_team(db, team_id: str, user: dict | None, *, hidden=None) -> list[
     return _order(out)
 
 
-async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None) -> list[dict]:
-    """Die Seasons einer Person: wo sie eingesetzt war (bzw. im Kader des Co-Teams, wenn es keine Aufstellung gab)."""
+async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scope=None) -> list[dict]:
+    """Die Seasons einer Person: wo sie eingesetzt war (bzw. im Kader des Co-Teams, wenn es keine Aufstellung gab).
+
+    ``scope`` (Profil, #2521): wer schaut - die Person selbst alles, Vereinsmitglieder dazu Internes (Schalter der Person), sonst nur,
+    was Gäste sehen. Dann trägt jede Zeile ``internal``: ein Gast sähe sie nicht. Darf der Betrachter die Season-Seite nicht öffnen
+    (die eigene Season „Aus“ oder „Nur Liga-Leitung“), steht sie ohne Link da (``url: None``) - sonst führte er auf 404 bzw. 403."""
+    from services.profile_visibility import opens_season_page
+
     out = []
-    for final, season, league in await _rows(db, {"player_ids": user_id}, viewer, hidden):
+    opens: dict = {}
+    for final, season, league, internal in await _rows(db, {"player_ids": user_id}, viewer, hidden, scope):
         for registration_id, side in (final.get("sides") or {}).items():
             if user_id in (side.get("player_ids") or []):
                 entry = _entry(final, season, league, registration_id)
-                if entry:
-                    out.append(entry)
+                if not entry:
+                    continue
+                if scope is not None:
+                    entry["internal"] = internal
+                    if entry["url"] and scope.mode != "public" and not await opens_season_page(viewer, season, opens):
+                        entry["url"] = None
+                out.append(entry)
     return _order(out)

@@ -3,6 +3,7 @@
 import { Link } from "react-router-dom";
 import { Lock, Trophy } from "lucide-react";
 import { pointsWord } from "@/lib/leagueOverall";
+import { InternalTag } from "@/components/tls/InternalTag";
 
 export function LeagueOverallStanding({ rows, showTeam = false, testId = "league-overall" }) {
   if (!rows?.length) return null;
@@ -17,9 +18,13 @@ export function LeagueOverallStanding({ rows, showTeam = false, testId = "league
           return (
             <li key={`${title}-${row.level}-${row.name || ""}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3" data-testid={`${testId}-${row.level}`}>
               <div className="min-w-0 flex-1 basis-56">
-                <p className="font-semibold text-white [overflow-wrap:anywhere] hyphens-auto">
-                  {row.url ? <Link to={row.url} className="hover:text-[#29B6E8]">{title}</Link> : title}
-                </p>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="min-w-0 font-semibold text-white [overflow-wrap:anywhere] hyphens-auto">
+                    {row.url ? <Link to={row.url} className="hover:text-[#29B6E8]">{title}</Link> : title}
+                  </p>
+                  {/* Vereinsintern (#2521): Gäste sähen diese Wertung nicht oder nicht so - eine Season „Nur Mitglieder“ zählt mit. */}
+                  {row.internal ? <InternalTag testId={`${testId}-${row.level}-internal`} /> : null}
+                </div>
                 <p className="text-xs text-white/60 [overflow-wrap:anywhere] hyphens-auto">
                   {[row.division_label, showTeam ? row.name : "", row.closed ? (row.complete ? "Endstand" : "Endstand ohne nicht öffentliche Seasons") : "laufend"].filter(Boolean).join(" · ")}
                 </p>

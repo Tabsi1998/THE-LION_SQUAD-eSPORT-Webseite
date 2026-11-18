@@ -108,6 +108,67 @@ async def sees_challenge(scope: ProfileScope, challenge: dict | None) -> bool:
     return await viewer_sees_level(scope, challenge.get("visibility"))
 
 
+def public_season(season: dict | None) -> bool:
+    """Sieht ein Gast die Season? Wie ``league_service.can_see_season`` ohne Person, dazu nie archiviert."""
+    return bool(season) and season.get("status") != "archived" and season.get("visibility") == "public"
+
+
+async def sees_season(scope: ProfileScope, season: dict | None) -> bool:
+    """Eine Liga-Season im Profil (Trophäen, Liga-Historie, Gesamtwertung - #2516, #2521): die Person selbst jede nicht archivierte,
+    Gäste ``public_season``, ein Vereinsmitglied dazu „Nur Mitglieder“ - je Stufe einmal (``scope.memo``).
+
+    **Liga-Rechte zählen hier nicht** (Fabian, 18.11.): Eine Season „Nur Liga-Leitung“ oder „Aus“ sieht im Profil nur die Person selbst,
+    auch Liga-Leitung und Admins nicht - in der Liga-Verwaltung sehen sie weiter alles. Das ist bewusst enger als
+    ``league_service.can_see_season`` (Season-Seite); ``opens_season_page`` bildet jene nach, nur für den Link. Eine **archivierte**
+    Season zählt nie. tests/test_season_rule_parity_flow.py prüft beide Regeln über alle Betrachter."""
+    if not season or season.get("status") == "archived":
+        return False
+    if scope.everything:
+        return True
+    visibility = season.get("visibility") or "off"
+    if visibility == "public":
+        return True
+    if scope.viewer is None or visibility != "members":
+        return False
+    return await viewer_sees_level(scope, "members")
+
+
+async def opens_season_page(viewer: dict | None, season: dict | None, memo: dict) -> bool:
+    """Darf ``viewer`` die Season-Seite öffnen? Genau ``league_service.can_see_season`` (Liga-Rechte, „Nur Mitglieder“), hier ohne
+    ``league_service`` (Import-Graph der Erfolge, tests/test_import_cycles_unit.py) - je Liga und Stufe einmal in ``memo``. Das Profil
+    zeigt eine Season, die die Person nicht öffnen darf (ihre eigene „Aus“ oder „Nur Liga-Leitung“), ohne Link (#2521)."""
+    visibility = (season or {}).get("visibility") or "off"
+    if visibility == "public":
+        return True
+    if not season or not viewer or visibility not in ("members", "admins"):
+        return False
+    league_key = ("league", season.get("league_id"))
+    if league_key not in memo:
+        from services.league_permissions import ANY, can
+
+        memo[league_key] = await can(viewer, ANY, season.get("league_id"))
+    if memo[league_key]:
+        return True
+    if visibility != "members":
+        return False
+    if ("level", "members") not in memo:
+        from services.visibility import user_can_see
+
+        memo[("level", "members")] = await user_can_see(viewer, "members")
+    return memo[("level", "members")]
+
+
+async def sees_listed_tournament(scope: ProfileScope, tournament: dict | None) -> bool:
+    """Ein Turnier in einer Liste des Profils (Teilnahmen, Liga-Staffeln - #2521): wie ``sees_tournament``, aber ein Entwurf nie, auch
+    nicht für die Person selbst - er ist nicht intern, sondern noch nicht veröffentlicht."""
+    return bool(tournament) and tournament.get("status") != "draft" and await sees_tournament(scope, tournament)
+
+
+async def sees_listed_challenge(scope: ProfileScope, challenge: dict | None) -> bool:
+    """Eine Fast-Lap-Challenge im Profil (Bestzeiten, Referenzen): ein Entwurf nie, auch nicht für die Person selbst (#2521)."""
+    return bool(challenge) and challenge.get("status") != "draft" and await sees_challenge(scope, challenge)
+
+
 async def tournament_is_internal(tournament: dict | None) -> bool:
     return not await sees_tournament(PUBLIC, tournament)
 
