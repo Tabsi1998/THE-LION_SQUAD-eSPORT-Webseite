@@ -27,7 +27,7 @@ const STEPS = [
   "Liga je Spiel anlegen",
   "Season mit Beginn anlegen, dann Vorgaben, Sperrzeiten, Map-Pool, Regeltext und Sichtbarkeit festlegen",
   "Liga 1 anlegen",
-  "Staffel anlegen und in der Turnierverwaltung der Staffel die Co-Teams zuteilen",
+  "Staffel anlegen und auf der Staffel-Seite die Co-Teams zuteilen",
 ];
 
 // Anlegen oder bearbeiten (#2106): Name, Beschreibung und Stand immer; das Spiel nur, solange keine Season eine Staffel
@@ -181,7 +181,7 @@ export default function AdminLeaguesPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Liga</h1>
-          <p className="mt-2 text-sm text-white/60">Eine Staffel ist ein Turnier: Spielwochen, Termine, Ergebnisse und Tabelle laufen in der Turnierverwaltung. Hier legst du den Rahmen fest.</p>
+          <p className="mt-2 text-sm text-white/60">Jede Staffel hat ihre Staffel-Seite: Teilnehmer, Spielplan, Ergebnisse und Tabelle laufen dort. Hier legst du den Rahmen fest.</p>
         </div>
         {data && canCreate ? (
           <button type="button" onClick={() => setSheet({ kind: "league" })} disabled={!games.length} data-testid="league-add"
