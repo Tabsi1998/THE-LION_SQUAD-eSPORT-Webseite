@@ -3,12 +3,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession");
+const { playVeto } = require("./ligaVeto");
 
 // Der Liga-Ablauf schreibend gegen den echten Server (#2200) - ohne nachgestellte API. Stand aus
 // scripts/seed_abnahme_liga.py: eigene „Liga-Probelauf“ mit Staffel A im Entwurf, fünf Co-Teams zugeteilt. Die Turnierleitung
 // teilt das sechste zu und startet; danach bei 390 und 1440 px je ein eigenes Spiel: Terminvorschlag und Annahme durch zwei
-// Captains, Check-in beider Seiten (D.2, #1652 - ohne ihn kein Meldeformular), Melden mit Maps und Aufstellung, Bestätigen,
-// Tabelle und Ligaseite; dann Einspruch und Korrektur der Leitung. Die
+// Captains, Check-in beider Seiten (D.2, #1652 - ohne ihn kein Meldeformular), danach das Map-Veto (D.3, #1618 - neue Seasons haben
+// es an, Nr. 105; bis die Spielreihenfolge steht ebenfalls kein Meldeformular), Melden mit den Maps laut Veto und Aufstellung,
+// Bestätigen, Tabelle und Ligaseite; dann Einspruch und Korrektur der Leitung. Die
 // Zeit-Jobs (Standardtermin, Erinnerung, 48-Stunden-Automatik) stößt die Spec gezielt für diese Staffel an, der Stand lässt sie
 // sonst aus. Keine Konsolenfehler, keine Antwort 4xx/5xx, kein seitliches Scrollen.
 
@@ -105,13 +107,27 @@ async function timeNow(lead, matchId) {
   expect(moved.status(), await moved.text()).toBe(200);
 }
 
-/** Melden im Web: je Map die erste Map aus dem Pool und der Sieger, dann einmal die Teilnehmerliste der eigenen Seite (#2204). */
-async function report(page, matchId, winner, maps) {
+/** Erst einchecken, dann das Veto (D.3): Bis die Spielreihenfolge steht, sagt die Seite das statt des Formulars. Antwort: die Maps laut Veto. */
+async function checkInAndVeto(home, away, match) {
+  await checkIn(home, match.id);
+  await checkIn(away, match.id);
+  await home.page.goto(`/matches/${match.id}`);
+  await expect(home.page.getByTestId("match-report-hint")).toContainText("Erst das Veto abschließen");
+  await expect(home.page.getByTestId("match-report-form")).toHaveCount(0);
+  return playVeto({ [match.home]: home, [match.away]: away }, match.id);
+}
+
+/** Melden im Web: je Map steht die Map laut Veto fest, dazu der Sieger, dann einmal die Teilnehmerliste der eigenen Seite (#2204). */
+async function report(page, matchId, winner, planned) {
   await page.goto(`/matches/${matchId}`);
   await expect(page.getByTestId("match-report-form")).toBeVisible();
-  for (const [index, mapId] of maps.entries()) {
+  for (const [index, game] of planned.slice(0, 2).entries()) {
     const position = index + 1;
-    await page.getByTestId(`league-game-${position}-map-${mapId}`).click();
+    // Modus und Map der Position stehen laut Veto fest (D.3) - keine Auswahl im Formular.
+    const fixed = page.getByTestId(`league-game-${position}-planned`);
+    await expect(fixed).toContainText(game.map_name);
+    await expect(fixed).toContainText("laut Veto");
+    await expect(page.locator(`[data-testid^="league-game-${position}-map-"]`)).toHaveCount(0);
     // Punkte je Map sind in neuen Seasons Pflicht (C.3, #1617): Sieger 6, Gegenseite 2 - den Sieger ergeben die Punkte.
     // Ohne Punktefelder wird er angetippt.
     const scores = page.locator(`[data-testid^="league-game-${position}-score-"]`);
@@ -128,8 +144,6 @@ async function report(page, matchId, winner, maps) {
   await page.getByTestId("match-report-submit").click();
   await expect(page.getByTestId("match-report-state")).toHaveAttribute("data-status", "waiting");
 }
-
-const MAPS_OF_SERIES = () => [ablauf.pool.stellung[0], ablauf.pool.suchen[1]];
 
 test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
   test.skip(!ENABLED, "nur für die lokale Abnahme (ABNAHME=1, siehe docs/entwicklung/abnahme-lokal.md)");
@@ -205,11 +219,11 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       await home.page.goto(`/matches/${match.id}`);
       await expect(home.page.getByTestId("match-report-hint")).toContainText("noch nicht eingecheckt");
       await expect(home.page.getByTestId("match-report-form")).toHaveCount(0);
-      await checkIn(home, match.id);
-      await checkIn(away, match.id);
+      // Beide da: jetzt läuft das Veto (D.3); bis die Spielreihenfolge steht, gibt es noch kein Formular.
+      const planned = await checkInAndVeto(home, away, match);
 
-      // Melden mit Maps und Teilnehmerliste, die Gegenseite bestätigt mit ihrer Liste.
-      await report(home.page, match.id, match.home, MAPS_OF_SERIES());
+      // Melden mit den Maps laut Veto und Teilnehmerliste, die Gegenseite bestätigt mit ihrer Liste.
+      await report(home.page, match.id, match.home, planned);
       await shot(home.page, `ablauf-gemeldet-${width}.png`);
       await away.page.goto(`/matches/${match.id}`);
       await expect(away.page.getByTestId("match-report-state")).toHaveAttribute("data-status", "confirm");
@@ -246,14 +260,17 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       const home = await as(browser, testInfo, match.homeRole, viewport);
       const away = await as(browser, testInfo, match.awayRole, viewport);
 
-      // Termin auf gleich, beide checken ein (#1652); die Heimseite meldet 2:0, die Gegenseite sagt „Stimmt nicht“.
+      // Termin auf gleich, beide checken ein (#1652), Veto (D.3); die Heimseite meldet 2:0, die Gegenseite sagt „Stimmt nicht“.
       await timeNow(lead, match.id);
-      await checkIn(home, match.id);
-      await checkIn(away, match.id);
-      await report(home.page, match.id, match.home, MAPS_OF_SERIES());
+      const planned = await checkInAndVeto(home, away, match);
+      await report(home.page, match.id, match.home, planned);
       await away.page.goto(`/matches/${match.id}`);
       await away.page.getByTestId("match-report-wrong").click();
       await expect(away.page.getByTestId("match-dispute-reason-wrong_result")).toHaveAttribute("aria-pressed", "true");
+      // Beim falschen Ergebnis gehört das Ergebnis aus eigener Sicht dazu (E.2, #1619) - die Felder folgen den Seiten der Matchseite.
+      const order = (await (await away.page.request.get(`/api/matches/${match.id}/page`)).json()).league.sides.map((side) => side.registration_id);
+      await away.page.getByTestId(`procedure-claimed-${order.indexOf(match.away)}`).fill("2");
+      await away.page.getByTestId(`procedure-claimed-${order.indexOf(match.home)}`).fill("0");
       await away.page.getByTestId("match-dispute-input").fill("Wir haben beide Maps gewonnen, laut Aufzeichnung 2:0 für uns.");
       await noSideScroll(away.page);
       await away.page.getByTestId("match-dispute-btn").click();
@@ -269,9 +286,9 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       await lead.page.getByTestId("match-staff-result-open").click();
       const form = lead.page.getByTestId("result-window");
       await expect(form).toHaveAttribute("data-kind", "maps");
-      for (const [index, mapId] of MAPS_OF_SERIES().entries()) {
+      for (const [index, game] of planned.slice(0, 2).entries()) {
         const position = index + 1;
-        await form.getByTestId(`league-game-${position}-map-${mapId}`).click();
+        await form.getByTestId(`league-game-${position}-map-${game.map_id}`).click();
         // Neuer Sieger über die Punkte (C.3, #1617): die Punkte der Meldung tauschen.
         await form.getByTestId(`league-game-${position}-score-${match.away}`).fill("6");
         await form.getByTestId(`league-game-${position}-score-${match.home}`).fill("2");
@@ -300,7 +317,7 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       await lead.page.getByTestId("match-staff-result-open").click();
       await form.getByTestId(`league-game-1-score-${match.home}`).fill("6");
       await form.getByTestId(`league-game-1-score-${match.away}`).fill("2");
-      await form.getByTestId(`league-game-3-map-${ablauf.pool.kontrolle[0]}`).click();
+      await form.getByTestId(`league-game-3-map-${planned[2].map_id}`).click();
       await form.getByTestId(`league-game-3-score-${match.away}`).fill("6");
       await form.getByTestId(`league-game-3-score-${match.home}`).fill("2");
       await expect(form.getByTestId("result-sentence")).toContainText("2:1");
@@ -335,9 +352,8 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
     const home = await as(browser, testInfo, match.homeRole, viewport);
     const away = await as(browser, testInfo, match.awayRole, viewport);
     await timeNow(lead, match.id);
-    await checkIn(home, match.id);
-    await checkIn(away, match.id);
-    await report(home.page, match.id, match.home, MAPS_OF_SERIES());
+    const planned = await checkInAndVeto(home, away, match);
+    await report(home.page, match.id, match.home, planned);
 
     expect(runJob("match_deadlines", 47).confirmed).toBe(0);
     expect(runJob("match_deadlines", 49).confirmed).toBe(1);
