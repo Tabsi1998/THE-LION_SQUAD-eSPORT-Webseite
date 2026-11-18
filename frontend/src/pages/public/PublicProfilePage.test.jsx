@@ -159,6 +159,32 @@ test("Bilanz gegen Gegner in der Übersicht, Turnierweg zum Aufklappen in den Re
   expect(screen.getByTestId("tournament-path-ref-win")).toHaveTextContent("2:0 gegen Lena");
 });
 
+test("vereinsinterne Erfolge (#2516): Referenz, Highlight und Trophäe tragen „Vereinsintern“, Öffentliches nicht", async () => {
+  const internalAward = { id: "aw-int", kind: "trophy", rank: 1, rank_label: "1. Platz", internal: true, participants: 8, record: "",
+    tournament: { id: "t-int", slug: "vereins-cup", title: "Vereins-Cup" }, game: null, season: null, team: null, image_url: null, date: "2026-03-01" };
+  const publicAward = { ...internalAward, id: "aw-pub", internal: false, tournament: { id: "t-pub", slug: "offen-cup", title: "Offen-Cup" } };
+  const items = PROFILE.references.items.map((item) => ({ ...item, internal: item.id === "ref-third" }));
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: { ...PROFILE, awards: [internalAward, publicAward], references: { ...PROFILE.references, items } } };
+    if (url === "/achievements/user/u1") return { data: ACHIEVEMENTS };
+    return { data: [] };
+  });
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(within(screen.getByTestId("profile-highlight-ref-third")).getByText("Vereinsintern")).toBeInTheDocument();
+  expect(within(screen.getByTestId("profile-highlight-ref-win")).queryByText("Vereinsintern")).toBeNull();
+  expect(within(screen.getByTestId("award-aw-int")).getByText("Vereinsintern")).toBeInTheDocument();
+  expect(within(screen.getByTestId("award-aw-pub")).queryByText("Vereinsintern")).toBeNull();
+  fireEvent.click(screen.getByTestId("profile-tab-references"));
+  const list = screen.getByTestId("public-profile-references");
+  expect(list.querySelectorAll("[data-testid^='profile-reference-']")).toHaveLength(3);
+  expect(within(screen.getByTestId("profile-reference-ref-third")).getByText("Vereinsintern")).toBeInTheDocument();
+  expect(within(screen.getByTestId("profile-reference-ref-win")).queryByText("Vereinsintern")).toBeNull();
+  fireEvent.click(screen.getByTestId("profile-tab-awards"));
+  expect(within(screen.getByTestId("trophy-card-aw-int")).getByText("Vereinsintern")).toBeInTheDocument();
+  expect(within(screen.getByTestId("trophy-card-aw-pub")).queryByText("Vereinsintern")).toBeNull();
+});
+
 test("läuft der Stream, steht der Player oben in der Übersicht (ohne Zustimmung der Hinweis)", async () => {
   mockApi({ live: [{ twitch_login: "paula_racing", title: "Quali-Runden", viewer_count: 12 }] });
   renderPage();
