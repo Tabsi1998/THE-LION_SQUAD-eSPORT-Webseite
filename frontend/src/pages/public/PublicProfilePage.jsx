@@ -949,8 +949,9 @@ export default function PublicProfilePage() {
                     <div key={i} data-testid={`profile-fastlap-${f.challenge?.slug || f.challenge?.id || i}`}
                       className={`flex items-center justify-between gap-3 px-4 py-3 border rounded-sm ${f.is_leader ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
+                        {/* Umbrechen statt abschneiden: am Handy rutscht das Etikett unter den Titel (#2521). */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                          <div className="min-w-0 max-w-full text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
                           {/* Vereinsintern (#2521): eine Bestzeit aus einer Challenge, die Gäste nicht sehen. */}
                           {f.internal ? <InternalTag testId={`internal-tag-fastlap-${f.challenge?.id || i}`} /> : null}
                         </div>
