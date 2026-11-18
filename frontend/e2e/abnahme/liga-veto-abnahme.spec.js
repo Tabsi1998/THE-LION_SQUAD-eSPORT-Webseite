@@ -81,12 +81,13 @@ test.describe("Abnahme: Liga-Veto gegen den echten Server", () => {
     const rules = await readRules();
     expect(rules.problems).toEqual([]);
 
-    await lead.page.goto(`/admin/tournaments/${tid}`);
-    await expect(lead.page.getByTestId("admin-tr-primary-action")).toContainText("Liga starten");
-    await lead.page.getByTestId("admin-tr-primary-action").click();
+    // Paket D (#2262): Gestartet wird auf der Staffel-Seite.
+    await lead.page.goto(`/admin/leagues/staffeln/${tid}`);
+    await expect(lead.page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
+    await lead.page.getByTestId("staffel-primary-action").click();
     const anyway = lead.page.getByRole("button", { name: "Trotzdem starten" });
     if (await anyway.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await anyway.click();
-    await expect(lead.page.getByTestId("admin-tr-status-select")).toHaveValue("live");
+    await expect(lead.page.getByTestId("staffel-status-select")).toHaveValue("live");
 
     const rows = await (await lead.page.request.get(`/api/tournaments/${tid}/matches-v2`)).json();
     const match = (Array.isArray(rows) ? rows : rows.matches)

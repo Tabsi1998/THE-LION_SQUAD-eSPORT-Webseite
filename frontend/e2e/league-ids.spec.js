@@ -138,11 +138,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await page.setViewportSize({ width, height });
       await mock(page, (path) => {
         if (path === "/tournaments/t1/squad-candidates") return CANDIDATES;
-        if (path === "/tournaments/t1" || path === "/admin/tournaments/t1") return TOURNAMENT;
+        if (path === "/tournaments/t1") return TOURNAMENT;
         return undefined;
       }, ADMIN);
-      // Der Dialog steht für sich - geprüft wird er über die Turnierverwaltung der Staffel.
-      await page.goto("/admin/tournaments/t1");
+      // Der Dialog steht für sich - geprüft wird er auf der Staffel-Seite (Paket D, #2262: die Turnierverwaltung leitet dorthin).
+      await page.goto("/admin/leagues/staffeln/t1#zuteilen");
       await page.getByTestId("squad-assign-open").click();
       await page.getByTestId("squad-assign-dialog").locator('label[aria-label="Loewen"]').click();
       await expect(page.getByTestId("squad-assign-ids-s-a")).toContainText("TestloeweMila#1234567");
