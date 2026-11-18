@@ -22,12 +22,12 @@ beforeEach(() => {
   apiMock.put.mockReset();
 });
 
-test("unberührte Vorlage folgt dem Pool: der Hinweis steht, nach dem ersten Speichern nicht mehr", async () => {
+test("unberührte Vorlage folgt Pool, Modus je Map und Best of: der Hinweis steht, nach dem ersten Speichern nicht mehr (#2528)", async () => {
   const saved = { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS };
   apiMock.get.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true, auto: true } });
   apiMock.put.mockResolvedValue({ data: { ...STATE, veto_rules: saved, active: true, auto: false, staffeln_updated: 0 } });
   render(<SeasonVetoRulesPanel seasonId="s1" />);
-  expect(await screen.findByTestId("veto-rules-auto")).toHaveTextContent("folgt dem Map-Pool automatisch");
+  expect(await screen.findByTestId("veto-rules-auto")).toHaveTextContent("folgt automatisch dem Map-Pool, „Modus je Map“ und dem Best of");
   fireEvent.click(screen.getByTestId("veto-rules-save"));
   await waitFor(() => expect(screen.queryByTestId("veto-rules-auto")).toBeNull());
 });

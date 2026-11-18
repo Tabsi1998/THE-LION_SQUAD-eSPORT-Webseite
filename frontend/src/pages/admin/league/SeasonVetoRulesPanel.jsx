@@ -158,7 +158,7 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
       ) : null}
       {state?.auto ? (
         <p className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/70" data-testid="veto-rules-auto">
-          Diese Vorlage folgt dem Map-Pool automatisch (Vorschlag aus Modusfolge und Pools), bis ihr hier das erste Mal speichert – danach bleibt sie, wie ihr sie gespeichert habt.
+          Diese Vorlage folgt automatisch dem Map-Pool, „Modus je Map“ und dem Best of der Season (Vorschlag), bis ihr hier das erste Mal speichert – danach bleibt sie, wie ihr sie gespeichert habt.
         </p>
       ) : null}
       <Toggle label="Veto in dieser Season" checked={form.enabled} onChange={(value) => set("enabled", value)}
