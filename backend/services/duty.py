@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from services.daily_center import club_day_window
-from services.league_scope import NOT_LEAGUE
+from services.league_scope import NOT_LEAGUE, is_league_staffel
 from services.staffel_guard import tournament_admin_path
 from services.permissions import can_use_area, is_confirmed_tournament_lead, needs_mfa
 
@@ -112,8 +112,15 @@ async def helper_rows(db, user: dict, now: datetime | None = None) -> list[dict]
 
     rows: list[dict] = []
     if by_tournament:
+        from services.league_permissions import READ, can
+
         query = {"id": {"$in": sorted(by_tournament)}, "status": {"$nin": list(FINISHED_STATUSES)}}
         async for tournament in db.tournaments.find(query, TOURNAMENT_FIELDS):
+            # Alte Einsätze in einer Staffel (Paket D, #2262, Nr. 191, Fabian 18.11.): Sie stehen nur lesend auf der Staffel-Seite, und
+            # die öffnet nur, wer in dieser Liga ein Recht hat. Ohne Recht keine Zeile - sonst führte „Vorbereiten“ auf „Kein Zugriff“.
+            league_id = (tournament.get("league_context") or {}).get("league_id") if is_league_staffel(tournament) else None
+            if is_league_staffel(tournament) and not await can(user, READ, league_id, db=db):
+                continue
             rows.append(_tournament_row(tournament, _roles(by_tournament[tournament["id"]]), window))
     if by_challenge:
         query = {"id": {"$in": sorted(by_challenge)}, "status": {"$nin": list(FINISHED_STATUSES)}}

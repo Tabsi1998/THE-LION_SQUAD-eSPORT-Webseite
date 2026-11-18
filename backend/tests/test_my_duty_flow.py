@@ -96,14 +96,25 @@ async def test_moderation_gets_only_the_report_counter(flow):
 
 
 @pytest.mark.asyncio
-async def test_an_old_helper_assignment_in_a_staffel_leads_to_the_staffel_page(flow):
-    # Paket D (#2262, Nr. 191): Alte Einsätze in einer Staffel stehen nur noch lesend auf der Staffel-Seite unter „TV und Helfer“.
+async def test_an_old_helper_assignment_in_a_staffel_shows_only_with_a_league_right(flow):
+    # Paket D (#2262, Nr. 191, Fabian 18.11.): Alte Einsätze in einer Staffel stehen nur noch lesend auf der Staffel-Seite unter „TV und
+    # Helfer“ - und die öffnet nur, wer in dieser Liga ein Recht hat. Ohne Recht keine Zeile und kein Link (sonst endete „Vorbereiten“
+    # auf „Kein Zugriff“).
     helper = await flow.add_user(name="Helfer")
     staffel = await flow.create_tournament(title="Staffel A", start_date=_at(0), format="league",
                                            league_context={"league_id": "l-1", "season_id": "s-1", "division_id": "d-1", "staffel": "A"})
     cup = await flow.create_tournament(title="Cup", start_date=_at(0))
     await _assign(flow, helper, staffel, "referee")
     await _assign(flow, helper, cup, "referee")
+    links = {row["title"]: row["admin_url"] for row in (await _duty(flow, helper))["assignments"]}
+    assert links == {"Cup": f"/admin/tournaments/{cup['id']}"}
+
+    # Zuständig in einer anderen Liga: weiterhin nicht.
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "l-2", "user_id": helper["id"], "capabilities": ["results"]})
+    assert {row["title"] for row in (await _duty(flow, helper))["assignments"]} == {"Cup"}
+
+    # Zuständig in dieser Liga (irgendeine Zuständigkeit reicht zum Lesen): Zeile und Weg auf die Staffel-Seite.
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": "l-1", "user_id": helper["id"], "capabilities": ["roster"]})
     links = {row["title"]: row["admin_url"] for row in (await _duty(flow, helper))["assignments"]}
     assert links == {"Staffel A": f"/admin/leagues/staffeln/{staffel['id']}#helfer", "Cup": f"/admin/tournaments/{cup['id']}"}
 
