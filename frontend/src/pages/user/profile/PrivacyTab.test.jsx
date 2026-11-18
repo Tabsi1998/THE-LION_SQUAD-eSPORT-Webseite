@@ -31,8 +31,30 @@ describe("PrivacyTab – Erfolge öffentlich", () => {
   it("zeigt den gespeicherten Wert und den Hinweis bei privatem Profil", () => {
     renderTab({ privacy_achievements_public: false, privacy_public_profile: false });
     expect(screen.getByTestId("profile-privacy-achievements")).toHaveAttribute("aria-checked", "false");
-    // Der Hinweis steht an beiden Schaltern, die am öffentlichen Profil hängen (Erfolge, Saison-Fundstücke).
-    expect(screen.getAllByText("Wirkt erst, sobald das Profil öffentlich ist.")).toHaveLength(2);
+    // Der Hinweis steht an den drei Schaltern, die am öffentlichen Profil hängen (Erfolge, vereinsinterne Erfolge #2516,
+    // Saison-Fundstücke).
+    expect(screen.getAllByText("Wirkt erst, sobald das Profil öffentlich ist.")).toHaveLength(3);
+  });
+
+  it("Vereinsinterne Erfolge zeigen (#2516): ohne Wert an, mit Erklärung, steht bei den Erfolgen", () => {
+    const set = renderTab();
+    const toggle = screen.getByTestId("profile-privacy-internal");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Vereinsinterne Erfolge zeigen")).toBeInTheDocument();
+    expect(screen.getByText("Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen.")).toBeInTheDocument();
+    // Eingeordnet direkt nach „Erfolge öffentlich“, nicht unten angehängt.
+    const switches = screen.getAllByRole("switch").map((node) => node.getAttribute("data-testid"));
+    expect(switches.indexOf("profile-privacy-internal")).toBe(switches.indexOf("profile-privacy-achievements") + 1);
+    fireEvent.click(toggle);
+    expect(set).toHaveBeenCalledWith("privacy_members_see_internal", false);
+  });
+
+  it("Vereinsinterne Erfolge zeigen: ein gespeichertes Aus bleibt aus und schaltet wieder an", () => {
+    const set = renderTab({ privacy_members_see_internal: false });
+    const toggle = screen.getByTestId("profile-privacy-internal");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    expect(set).toHaveBeenCalledWith("privacy_members_see_internal", true);
   });
 
   it("Saison-Fundstücke öffentlich (#678): Vorgabe aus, Umschalten speichert", () => {

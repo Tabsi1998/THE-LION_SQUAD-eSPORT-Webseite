@@ -36,6 +36,16 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
         testId="profile-privacy-achievements"
       />
 
+      {/* Vereinsinterne Erfolge (#2516): bei den Erfolgen eingeordnet - Gäste sehen Internes nie, auch nicht hiermit. */}
+      <SwitchRow
+        label="Vereinsinterne Erfolge zeigen"
+        description="Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen."
+        hint={publicProfile ? null : "Wirkt erst, sobald das Profil öffentlich ist."}
+        checked={form.privacy_members_see_internal !== false}
+        onCheckedChange={(checked) => set("privacy_members_see_internal", checked)}
+        testId="profile-privacy-internal"
+      />
+
       <SwitchRow
         label="Saison-Fundstücke öffentlich"
         description="Wenn aktiv, zeigt dein öffentliches Profil, was du über die Jahreszeiten gesammelt hast – nur die Summen je Saison, nie wann. Wenn aus, siehst nur du sie."

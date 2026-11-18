@@ -240,6 +240,10 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         section("public-profiles", "Öffentliche Profile, Ranglisten und Achievements",
                 p("Nutzerprofile, Ranglisten, Turnierergebnisse und Achievements können öffentlich sichtbar sein, soweit dies für Community- und "
                   "Wettbewerbsfunktionen vorgesehen ist. Nutzer können die Sichtbarkeit ihres öffentlichen Profils im Profilbereich einschränken. "
+                  # Vereinsinterne Erfolge (#2516, Wortlaut von Fabian freigegeben am 18.11.2026).
+                  "Ergebnisse aus vereinsinternen Turnieren und Fast-Lap-Wertungen (Referenzen, Trophäen) sind nie öffentlich. Sie sehen nur "
+                  "die Person selbst und angemeldete Vereinsmitglieder; unter Privatsphäre („Vereinsinterne Erfolge zeigen“) lässt sich das "
+                  "auch für Mitglieder ausschalten. "
                   "Negative oder geheime Fun-/Negative-Achievements werden erst nach Freischaltung im Profil angezeigt."),
                 # Zähler hinter den Erfolgen (#616, #678): was gezählt wird, wer es sieht, wann es weg ist.
                 p("Damit Erfolge freigeschaltet werden können, zählen Website und LionsAPP mit, wenn du angemeldet bist: gelesene News, "
