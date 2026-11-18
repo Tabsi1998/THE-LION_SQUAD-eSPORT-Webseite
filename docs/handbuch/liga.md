@@ -1687,7 +1687,11 @@ Aufstieg“ bzw. „gegen den Abstieg“). Vor dem ersten Ergebnis
 gibt es keine Zonen. Stehen zwei Teams an einer Zonengrenze in allem gleich, verlangt der Abschluss **Platz entscheiden** (3.10).
 
 **Season-Historie:** Team- und Spielerprofil zeigen unter **Seasons** je abgeschlossene Staffel Liga, Platz, Meister und Auf-
-oder Abstieg – aus dem Endstand, nur für Seasons, die die Person sehen darf.
+oder Abstieg – aus dem Endstand, nur für Seasons, die die Person sehen darf. Im **Spielerprofil** gilt dieselbe Regel wie für
+vereinsinterne Turniere (#2521, [Turniere](turniere.md) 3.10): Eine Season „Nur Mitglieder“ sehen dort die Person selbst und
+angemeldete Vereinsmitglieder, solange die Person „Vereinsinterne Erfolge zeigen“ anlässt, mit dem Etikett **Vereinsintern**;
+eine Season „Nur Liga-Leitung“ nur die Person selbst. Gäste und Nicht-Mitglieder sehen nur öffentliche Seasons. Für die
+Gesamtwertung im Spielerprofil gilt das ebenso; zählt eine solche Season mit, trägt der Platz das Etikett.
 
 ### 3.12 Belohnungen
 

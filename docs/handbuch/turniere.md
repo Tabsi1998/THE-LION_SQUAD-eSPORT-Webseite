@@ -848,20 +848,24 @@ ein Endstand). **Drucken** öffnet die Tabelle in der Druckansicht ([3.13](#313-
 
 Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter **Admin → eSports → Jahreswertung**.
 
-**Vereinsinterne Turniere im Profil** (#2516): Mit dem Ergebnis steht das Turnier in den **Referenzen** und als
-**Trophäe** im Profil der Teilnehmer, bei Team-Turnieren auch auf der Teamseite. Ist das Turnier nicht öffentlich
-(Sichtbarkeit Community, Vereinsmitglieder oder Intern bzw. ohne „Auf Public-Seiten sichtbar“), trägt der Eintrag das
-Etikett **Vereinsintern**. Wer was sieht, gilt in Web und App gleich:
+**Vereinsinterne Turniere im Profil** (#2516, #2521): Mit dem Ergebnis steht das Turnier in den **Referenzen** und als
+**Trophäe** im Profil der Teilnehmer, bei Team-Turnieren auch auf der Teamseite; ohne Ergebnis unter **Weitere
+Teilnahmen**. Ist das Turnier nicht öffentlich (Sichtbarkeit Community, Vereinsmitglieder oder Intern bzw. ohne „Auf
+Public-Seiten sichtbar“), trägt der Eintrag das Etikett **Vereinsintern**. Dieselbe Regel gilt für die
+**Fast-Lap-Bestzeiten** ([Fast Lap](fastlap.md)), die **Seasons** und die **Gesamtwertung** der Liga ([Liga](liga.md) 3.11 und 3.13)
+und die **Zahlen** oben im Profil (Turniere, Siege, Podium, Fast Laps). Wer was sieht:
 
-| Wer schaut | Sieht vereinsinterne Einträge |
-| --- | --- |
-| die Person selbst | immer, alle |
-| angemeldetes Vereinsmitglied (auch Vereinsverwaltung) | ja, solange die Person **Vereinsinterne Erfolge zeigen** anlässt – nur Turniere, die das Mitglied selbst öffnen dürfte (nicht „Intern“, nicht ohne „Auf Public-Seiten sichtbar“) |
-| angemeldet ohne Mitgliedschaft, Gast | nie, auch nicht mit dem Schalter |
-| Teamseite | das Team selbst alles, Vereinsmitglieder dazu die internen Team-Trophäen, alle anderen nur öffentliche |
+| Wer schaut | Sieht vereinsinterne Einträge | Zahlen im Profil |
+| --- | --- | --- |
+| die Person selbst | immer, alle | zählen alles mit |
+| angemeldetes Vereinsmitglied (auch Vereinsverwaltung) | ja, solange die Person **Vereinsinterne Erfolge zeigen** anlässt – nur Turniere, die das Mitglied selbst öffnen dürfte (nicht „Intern“, nicht ohne „Auf Public-Seiten sichtbar“), nur Seasons „Öffentlich“ oder „Nur Mitglieder“ | zählen das Interne mit, das es sieht |
+| angemeldet ohne Mitgliedschaft, Gast | nie, auch nicht mit dem Schalter | nur Öffentliches – dieselben Werte wie ohne interne Turniere, kein Hinweis darauf |
+| Teamseite | das Team selbst alles, Vereinsmitglieder dazu die internen Team-Trophäen, alle anderen nur öffentliche | – |
 
+Eine Season „Nur Liga-Leitung“ sieht im Profil einer anderen Person auch die Liga-Leitung nicht, nur die Person selbst.
 Den Schalter stellt jede Person selbst unter **Profil → Einstellungen → Privatsphäre** (ab Werk an). „So sehen dich
-andere“ im eigenen Profil zeigt die Sicht eines Gasts. Die Jahreswertung und die Ranglisten ändert das nicht.
+andere“ im eigenen Profil zeigt die Sicht eines Gasts. Die Jahreswertung und die Ranglisten ändert das nicht. Die App
+zeigt dieselben Einträge und Zahlen; das Etikett an Teilnahmen, Bestzeiten und Seasons kommt dort mit einem App-Release.
 
 ### 3.11 Turniertag mit wenig Helfern
 
