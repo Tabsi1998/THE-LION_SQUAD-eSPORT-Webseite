@@ -37,8 +37,6 @@ const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
 // Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht. Phasen anlegen, umbauen und löschen
 // stand hier hinter einem Modus, den kein Aufrufer setzte (#2111, TA8) - das ist weg; Phasen entstehen aus dem Format.
 export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, tournament = null, durationGame = null, bracketFixed = false }) {
-  // Liga-Staffel (#2109, S23): „Regeln dieser Phase“ gibt es nicht - eine Phase „Vor Ort“ schaltete die Spielwochen ab.
-  const staffel = Boolean(tournament?.league_context);
   // Stationen gibt es nur vor Ort und hybrid (#2111, T7) - online plant der Matchplan Termine und Fristen.
   const onsite = ["local", "hybrid"].includes(tournament?.event_mode);
   const durationContext = useMemo(() => ({
@@ -51,12 +49,9 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
     <div className="space-y-5">
       {/* Der Matchplan ersetzt die alte Matchplanung je Karte (Praxis nach #1589): hier Phasen, Spiele und Ergebnisse. */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70 border border-white/10 bg-[#0A0A0A] rounded-sm px-4 py-3" data-testid="stages-matchplan-hint">
-        {/* Staffel (#2109, S23): online in Spielwochen - Stationen gibt es dort nicht. */}
-        <span>{staffel
-          ? "Den Spielplan mit Spielwochen und Terminen siehst du im Matchplan – vor dem Start als Vorschau."
-          : onsite
-            ? "Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“."
-            : "Termine und Fristen siehst du im Matchplan – je Spiel „ändern“."}</span>
+        <span>{onsite
+          ? "Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“."
+          : "Termine und Fristen siehst du im Matchplan – je Spiel „ändern“."}</span>
         {onOpenMatchplan && (
           <button type="button" onClick={onOpenMatchplan} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zum Matchplan</button>
         )}
@@ -73,7 +68,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             stations={stations}
             canManageStructure={canManageStructure}
             rightsForMatch={rightsForMatch}
-            canEditRules={canEditSettings && !staffel}
+            canEditRules={canEditSettings}
             bracketFixed={bracketFixed}
             onChanged={onChanged}
           />
