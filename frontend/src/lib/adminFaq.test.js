@@ -36,7 +36,7 @@ test("die Suche findet über Frage, Antwort und Weg - alle Wörter müssen passe
 
 // Paket D (#2262): Wer eine Staffel sucht, findet den Weg über Liga - nicht über die Turnierliste.
 test("die Frage nach der Staffel führt auf die Liga und nennt die Staffel-Seite", () => {
-  const question = filterFaq("Staffel bedienen")[0].questions.find((row) => row.key === "staffel");
+  const question = filterFaq("Staffel bediene")[0].questions.find((row) => row.key === "staffel");
   expect(question.to).toBe("/admin/leagues");
   expect(question.a).toContain("Staffel öffnen");
   expect(question.a).not.toMatch(/Turnierverwaltung/);
