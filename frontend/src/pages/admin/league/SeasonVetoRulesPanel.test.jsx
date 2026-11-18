@@ -111,3 +111,30 @@ test("neuer Stand der Season: eigene, noch nicht gespeicherte Schritte bleiben s
   expect(await screen.findByTestId("veto-rules-problems")).toHaveTextContent("Modus je Map");
   expect(screen.getByTestId("veto-rules-seconds")).toHaveValue(45);
 });
+
+test("nach „Vorschlag“ stehen die Sätze des Servers nur noch als gespeicherter Stand, bis gespeichert ist (#2528)", async () => {
+  const saved = { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS };
+  const proposal = [
+    { kind: "pick", mode: "hp", team: "B", position: 1 }, { kind: "pick", mode: "hp", team: "A", position: 3 },
+    { kind: "ban", mode: "snd", team: "A", position: null }, { kind: "decider", mode: "snd", team: null, position: 2 },
+  ];
+  const stale = "Mit „jede Map nur einmal je Serie“ lässt sich die Vorlage mit diesem Pool nicht zu Ende spielen – bitte Sperren oder Pool anpassen.";
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/proposal") ? { steps: proposal, problems: [] }
+    : { ...STATE, veto_rules: saved, active: true, problems: [stale] } }));
+  apiMock.put.mockResolvedValue({ data: { ...STATE, veto_rules: { ...saved, steps: proposal }, active: true, problems: [], staffeln_updated: 1 } });
+  render(<SeasonVetoRulesPanel seasonId="s1" />);
+  // Ohne Änderung im Formular: der Satz gehört zum Formular wie gewohnt.
+  expect(await screen.findByTestId("veto-rules-problems")).toHaveTextContent("jede Map nur einmal je Serie");
+  expect(screen.queryByTestId("veto-rules-saved-problems")).toBeNull();
+  fireEvent.click(screen.getByTestId("veto-rules-propose"));
+  // Der Vorschlag geht auf - der alte Satz steht nur noch gekennzeichnet beim gespeicherten Stand.
+  const savedBlock = await screen.findByTestId("veto-rules-saved-problems");
+  expect(savedBlock).toHaveTextContent("Gespeicherter Stand");
+  expect(savedBlock).toHaveTextContent("jede Map nur einmal je Serie");
+  expect(screen.queryByTestId("veto-rules-problems")).toBeNull();
+  expect(screen.getByTestId("veto-rules-ok")).toBeInTheDocument();
+  expect(screen.getByTestId("veto-rules-save")).toBeEnabled();
+  fireEvent.click(screen.getByTestId("veto-rules-save"));
+  await waitFor(() => expect(screen.queryByTestId("veto-rules-saved-problems")).toBeNull());
+  expect(screen.queryByTestId("veto-rules-problems")).toBeNull();
+});

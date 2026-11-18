@@ -138,7 +138,12 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
       setProposing(false);
     }
   };
+  // Die Sätze des Servers gelten dem gespeicherten Stand. Weicht das Formular davon ab (etwa nach „Vorschlag“), gehören sie nicht mehr
+  // zu dem, was hier steht - dann stehen sie gekennzeichnet als „Gespeicherter Stand“ darunter, bis gespeichert ist (#2528).
   const serverProblems = (state?.problems || []).filter((text) => !problems.includes(text));
+  const edited = Boolean(loaded.current) && JSON.stringify(form) !== JSON.stringify(loaded.current);
+  const formProblems = edited ? problems : [...problems, ...serverProblems];
+  const savedProblems = edited && state?.veto_rules?.enabled ? serverProblems : [];
   const bestOf = state?.best_of || 1;
   // Die Modi mit „Vorgabe der Woche“ im gespeicherten Stand - nur für sie lässt sich je Spielwoche eine Map wählen.
   const savedPresets = presetModes(state?.veto_rules?.steps);
@@ -201,12 +206,20 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
           </ol>
         ) : <p className="text-sm text-white/55" data-testid="veto-rules-empty">Noch keine Schritte – „Vorschlag aus Modusfolge und Pools“ baut eine passende Folge.</p>}
       </div>
-      {form.enabled && (problems.length || serverProblems.length) ? (
+      {form.enabled && formProblems.length ? (
         <ul className="space-y-1 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="veto-rules-problems" aria-live="polite">
-          {[...problems, ...serverProblems].map((text) => <li key={text}>{text}</li>)}
+          {formProblems.map((text) => <li key={text}>{text}</li>)}
         </ul>
       ) : form.enabled && form.steps.length ? (
         <p className="text-xs text-ok" data-testid="veto-rules-ok">Die Vorlage geht mit dem Pool auf.</p>
+      ) : null}
+      {savedProblems.length ? (
+        <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/60" data-testid="veto-rules-saved-problems">
+          <p className="font-bold text-white/70">Gespeicherter Stand – gilt, bis ihr „Veto speichern“ drückt:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {savedProblems.map((text) => <li key={text}>{text}</li>)}
+          </ul>
+        </div>
       ) : null}
       {error ? <p className="text-sm text-warn" role="alert" data-testid="veto-rules-error">{error}</p> : null}
       <button type="button" onClick={save} disabled={saving || (form.enabled && problems.length > 0)} data-testid="veto-rules-save"
