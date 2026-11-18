@@ -84,3 +84,30 @@ test("ein Fehler des Servers steht beim Kasten, Probleme des gespeicherten Stand
   fireEvent.click(screen.getByTestId("veto-rules-save"));
   expect(await screen.findByTestId("veto-rules-error")).toHaveTextContent("Die Vorlage passt noch nicht");
 });
+
+test("neuer Stand der Season (Pool oder Serie gespeichert): der Kasten lädt neu, ohne die Seite neu zu laden (#2520)", async () => {
+  // Erst ohne Pool: keine Modi, keine Schritte, der Vorschlag ist gesperrt.
+  apiMock.get.mockResolvedValueOnce({ data: { ...STATE, modes: [], veto_rules: { ...DEFAULTS, enabled: true }, active: true, auto: true } });
+  const { rerender } = render(<SeasonVetoRulesPanel seasonId="s1" version="v1" />);
+  expect(await screen.findByTestId("veto-rules-empty")).toBeInTheDocument();
+  expect(screen.getByTestId("veto-rules-propose")).toBeDisabled();
+  // Pool gespeichert: Der Server hat die Vorlage vorgeschlagen (Nr. 108) - der Kasten zeigt sie und kennt die Modi.
+  apiMock.get.mockResolvedValueOnce({ data: { ...STATE, veto_rules: { ...DEFAULTS, enabled: true, steps: STEPS }, active: true, auto: true } });
+  rerender(<SeasonVetoRulesPanel seasonId="s1" version="v2" />);
+  await waitFor(() => expect(screen.getByTestId("veto-rules-steps").children).toHaveLength(4));
+  expect(screen.getByTestId("veto-rules-propose")).toBeEnabled();
+  expect(apiMock.get).toHaveBeenCalledTimes(2);
+});
+
+test("neuer Stand der Season: eigene, noch nicht gespeicherte Schritte bleiben stehen (#2520)", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: { ...STATE, veto_rules: { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS }, active: true } });
+  const { rerender } = render(<SeasonVetoRulesPanel seasonId="s1" version="v1" />);
+  expect(await screen.findByTestId("veto-rules-seconds")).toHaveValue(60);
+  fireEvent.change(screen.getByTestId("veto-rules-seconds"), { target: { value: "45" } });
+  apiMock.get.mockResolvedValueOnce({ data: { ...STATE, game_mode_order: ["snd", "hp", "snd"], veto_rules: { enabled: true, team_a: "home", step_seconds: 60, steps: STEPS }, active: true } });
+  rerender(<SeasonVetoRulesPanel seasonId="s1" version="v2" />);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
+  // Die Prüfung rechnet schon mit der neuen Modusfolge, die eigene Eingabe bleibt.
+  expect(await screen.findByTestId("veto-rules-problems")).toHaveTextContent("Modus je Map");
+  expect(screen.getByTestId("veto-rules-seconds")).toHaveValue(45);
+});

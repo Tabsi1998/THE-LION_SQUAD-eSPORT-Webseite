@@ -141,7 +141,7 @@ export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness,
           </FormSection>
           {/* Veto (D.3, #1618): eigener Kasten mit eigenem Speichern, direkt nach Best of und „Modus je Map“, auf die sich die Vorlage bezieht. */}
           <div id="veto" className="scroll-mt-24">
-            <SeasonVetoRulesPanel seasonId={seasonId} />
+            <SeasonVetoRulesPanel seasonId={seasonId} version={`${data.season?.updated_at || ""}-${data.map_pool?.version ?? 0}`} />
           </div>
           {/* Vorfälle (D.5, #1619): was im laufenden Spiel gilt - steht darum vor „Nach dem Spiel“. */}
           <FormSection title="Vorfälle und Pausen" id="vorfaelle" className="scroll-mt-24" testId="season-incidents"
