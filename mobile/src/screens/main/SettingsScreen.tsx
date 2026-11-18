@@ -311,7 +311,7 @@ function AccountSettings() {
           {/* Wie im Web (#2516): bei den Erfolgen eingeordnet - Gäste sehen Internes nie, auch nicht hiermit. */}
           <Toggle
             label="Vereinsinterne Erfolge zeigen"
-            detail={`Mitglieder sehen auch deine vereinsinternen Turniere und Zeiten. Öffentlich sind sie nie zu sehen.${form.privacy_public_profile ? "" : " Wirkt erst, sobald das Profil öffentlich ist."}`}
+            detail={`Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen.${form.privacy_public_profile ? "" : " Wirkt erst, sobald das Profil öffentlich ist."}`}
             value={form.privacy_members_see_internal !== false}
             onValueChange={(v) => change("privacy_members_see_internal", v)}
             testID="settings-toggle-members-internal"

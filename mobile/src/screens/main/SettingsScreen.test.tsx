@@ -279,7 +279,7 @@ test("Vereinsinterne Erfolge zeigen (#2516): ohne Feld an, direkt nach Erfolge �
   await renderSettings();
   const toggle = screen.getByTestId("settings-toggle-members-internal");
   expect(screen.getByLabelText("Vereinsinterne Erfolge zeigen").props.value).toBe(true);
-  expect(screen.getByText(/Mitglieder sehen auch deine vereinsinternen Turniere und Zeiten\. Öffentlich sind sie nie zu sehen\./)).toBeTruthy();
+  expect(screen.getByText(/Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen\. Öffentlich sind sie nie zu sehen\./)).toBeTruthy();
   const labels = within(screen.getByTestId("settings-group-privacy")).getAllByRole("switch").map((node) => String(node.props.accessibilityLabel));
   expect(labels.indexOf("Vereinsinterne Erfolge zeigen")).toBe(labels.indexOf("Erfolge öffentlich") + 1);
   expect(toggle).toHaveStyle({ borderTopWidth: 1 });
