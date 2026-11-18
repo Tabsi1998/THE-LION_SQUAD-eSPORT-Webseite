@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ADMIN_AREAS, AREAS, GRANTABLE_AREAS, LEAGUE_CAPABILITIES, MFA_AREAS, NO_LEAGUE_RIGHT, ROLE_AREAS } from "@/lib/permissions";
+import { ADMIN_AREAS, AREAS, GRANTABLE_AREAS, LEAGUE_CAPABILITIES, MFA_AREAS, ROLE_AREAS } from "@/lib/permissions";
+import { NO_LEAGUE_RIGHT } from "@/lib/leagueRights";
 
 // Eine Rechte-Liste, zwei Orte (#1353): `lib/permissions.js` spiegelt `backend/services/permissions.py`. Menü,
 // Seiten-Schutz und Knöpfe fragen das Web, der Server prüft selbst - laufen die Listen auseinander, zeigt das Web Knöpfe,
@@ -38,9 +39,9 @@ test("Die Liga hängt am Bereich Ligen, nicht an der Turnierleitung (#2203)", ()
   const app = readFileSync(path.join(repo, "frontend/src/App.jsx"), "utf8");
   expect(app).toMatch(/path="\/admin\/leagues" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
   expect(app).toMatch(/path="\/admin\/leagues\/seasons\/:seasonId" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
-  // Turnierliste (Paket D, #2262, Nr. 192): ohne Staffeln - die reine Liga-Leitung landet bei Liga und sieht „Turniere“ nicht. Die
-  // Einzelseite behält den Zugang, damit alte Links einer Staffel auf die Staffel-Seite weiterleiten.
-  expect(app).toMatch(/path="\/admin\/tournaments" element=\{<ProtectedRoute requireTournamentStaff leagueStaffTo="\/admin\/leagues">/);
+  // Turnierliste (Paket D, #2262, Nr. 192): ohne Staffeln - die reine Liga-Leitung kommt herein, die Seite leitet sie zur Liga, und sie
+  // sieht „Turniere“ nicht. Die Einzelseite behält den Zugang, damit alte Links einer Staffel auf die Staffel-Seite weiterleiten.
+  expect(app).toMatch(/path="\/admin\/tournaments" element=\{<ProtectedRoute requireTournamentStaff allowLeagueStaff>/);
   expect(app).toMatch(/path="\/admin\/tournaments\/:id" element=\{<ProtectedRoute requireTournamentStaff allowLeagueStaff>/);
   expect(layout).toMatch(/\{ to: "\/admin\/tournaments", label: "Turniere", icon: Trophy, areas: \["tournaments"\], staff: true, hint:/);
   // Eine Rolle bekommt den Bereich nur über `frozenset(AREAS)` - die Turnierleitung nicht.

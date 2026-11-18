@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminDenied } from "@/components/tls/AdminDenied";
@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause, Search, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { hasArea, hasLeagueStaff } from "@/lib/permissions";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useNarrowScreen } from "@/hooks/useNarrowScreen";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -44,7 +45,17 @@ const LIST_LIMIT = 500;
 // den Status in der Turnierverwaltung.
 const canDelete = (tournament) => tournament.status === "draft";
 
+// Die reine Liga-Leitung (Paket D, #2262, Nr. 192): Bereich Ligen oder Zuständige einer Liga, ohne Bereich Turniere und ohne Helfer-Einsatz -
+// dieselbe Tür wie `leagueStaffEntry` in ProtectedRoute. Die Turnierliste hat für sie nichts mehr, sie landet bei Liga.
+const onlyLeagueLead = (user) => Boolean(user) && (hasLeagueStaff(user) || hasArea(user, "leagues")) && !hasArea(user, "tournaments") && !user.has_staff_assignment;
+
 export default function AdminTournamentsPage() {
+  const { user } = useAuth();
+  if (onlyLeagueLead(user)) return <Navigate to="/admin/leagues" replace />;
+  return <TournamentList />;
+}
+
+function TournamentList() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
   const { isTournamentLead } = useAuth();
   // Handy (#2463): unter 768 px Karten statt der Tabelle zum Wischen - nur eine Form steht im DOM.

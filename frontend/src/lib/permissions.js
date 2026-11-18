@@ -114,10 +114,6 @@ export function hasSeriesCaptain(user) {
 
 /** Zuständig in einer Liga (#2203) - der Server setzt `has_league_staff`. Öffnet „Mein Dienst“ und die Liga-Seiten; die Seiten
  * verlangen Zwei-Faktor, die Routen prüfen jede Liga und jede Zuständigkeit einzeln. */
-// Satz des Servers ohne Liga-Recht (`league_permissions.NO_LEAGUE_RIGHT`, Paket D #2262): an einer Stelle im Web - die Staffel-Seite zeigt
-// ihn auch, wenn der Server die Staffel liefert, aber keine Zuständigkeit. Der Paritätstest vergleicht ihn mit dem Server.
-export const NO_LEAGUE_RIGHT = "Dafür fehlt dir das Recht in dieser Liga. Den Bereich „Ligen“ vergibt der Superadmin unter Admin → Alle Benutzer, Zuständige vergibt der Bereich „Ligen“ auf der Liga-Seite.";
-
 export function hasLeagueStaff(user) {
   return Boolean(user?.has_league_staff);
 }

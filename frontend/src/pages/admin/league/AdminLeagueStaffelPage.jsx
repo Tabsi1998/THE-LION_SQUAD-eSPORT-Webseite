@@ -18,7 +18,7 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { loadOk, toastLoadFailed } from "@/lib/loadProblem";
-import { NO_LEAGUE_RIGHT } from "@/lib/permissions";
+import { NO_LEAGUE_RIGHT } from "@/lib/leagueRights";
 import { seasonAnchorUrl } from "@/lib/seasonTabs";
 import { STAFFEL_TABS, STAFFEL_TABS_READY, leagueAdminUrl, staffelTarget } from "@/lib/staffelTabs";
 import { isStaffel, staffelBeforeStart, staffelLabel } from "@/pages/admin/tournament/StaffelParts";

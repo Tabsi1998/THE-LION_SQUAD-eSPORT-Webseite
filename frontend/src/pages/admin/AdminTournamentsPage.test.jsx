@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Verwaltungsliste der Turniere (#1028): die Seite fragt die Liste „zum Verwalten“ ab - der Server gibt der
 // Turnierleitung alle Turniere, einem Helfer nur das Turnier seines Einsatzes. Kein fremdes Turnier mit Knöpfen,
@@ -189,3 +189,36 @@ test("die Turnierleitung sieht keinen Hinweis auf eigene Staffeln", async () => 
   expect(screen.queryByTestId("admin-tournaments-league-scope")).toBeNull();
 });
 
+
+// Paket D (#2262, Nr. 192): Die reine Liga-Leitung landet bei Liga - ohne die Liste abzufragen. Mit Turnieren oder Helfer-Einsatz bleibt sie.
+test.each([
+  ["Bereich Ligen", { role: "player", areas: ["leagues"], mfa_enabled: true, auth_mfa_verified: true }, true],
+  ["Zuständig in einer Liga", { role: "player", areas: [], has_league_staff: true, mfa_enabled: true, auth_mfa_verified: true }, true],
+  ["Zuständig mit Helfer-Einsatz", { role: "player", areas: [], has_league_staff: true, has_staff_assignment: true, is_tournament_staff: true }, false],
+  ["Turnierleitung und Ligen", { role: "tournament_admin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true }, false],
+])("%s: Weiterleitung zur Liga = %s", async (_name, user, redirected) => {
+  const before = { lead: authState.isTournamentLead, user: authState.user };
+  apiMock.get.mockReset();
+  apiMock.get.mockResolvedValue({ data: [OWN] });
+  authState.isTournamentLead = user.role === "tournament_admin";
+  authState.user = user;
+  try {
+    render(
+      <MemoryRouter initialEntries={["/admin/tournaments"]}>
+        <Routes>
+          <Route path="/admin/tournaments" element={<AdminTournamentsPage />} />
+          <Route path="/admin/leagues" element={<p data-testid="leagues-page">Liga</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    if (redirected) {
+      expect(await screen.findByTestId("leagues-page")).toBeInTheDocument();
+      expect(apiMock.get).not.toHaveBeenCalled();
+    } else {
+      expect(await screen.findByText("Eigenes Turnier")).toBeInTheDocument();
+    }
+  } finally {
+    authState.isTournamentLead = before.lead;
+    authState.user = before.user;
+  }
+});
