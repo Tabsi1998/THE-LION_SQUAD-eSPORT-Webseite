@@ -257,7 +257,7 @@ async def test_an_svg_address_is_refused_outside_logo_fields(flow):
 
 
 @pytest.mark.asyncio
-async def test_too_expensive_svg_gets_422_and_svg_uploads_are_limited_per_account(flow, monkeypatch):
+async def test_too_expensive_svg_gets_422_and_svg_uploads_are_limited_per_account(flow, monkeypatch, still_rate_limit_clock):
     await admin(flow)
     monkeypatch.setattr(svg_safe, "RASTER_TIMEOUT_SECONDS", 1.5)
     heavy = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">'

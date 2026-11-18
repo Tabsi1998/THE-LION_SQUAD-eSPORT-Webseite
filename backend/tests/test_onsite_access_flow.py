@@ -347,7 +347,7 @@ async def test_online_tournaments_have_no_on_site_access_unless_switched_on(flow
 
 
 @pytest.mark.asyncio
-async def test_guessing_tokens_is_rate_limited(flow):
+async def test_guessing_tokens_is_rate_limited(flow, still_rate_limit_clock):
     await members_tournament(flow)
     flow.act_as(None)
     codes = [(await redeem(flow, f"falsch-{index:040d}")).status_code for index in range(25)]

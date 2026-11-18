@@ -41,16 +41,8 @@ async def flow(monkeypatch):
 
 
 @pytest.fixture
-def fast_and_frozen(monkeypatch):
-    """Jede Prüfung scheitert sofort (kein bcrypt), und die Uhr der Bremse steht mitten in einem Fenster."""
-    from services import rate_limit
-
-    class Frozen(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return datetime(2026, 10, 14, 12, 0, 30, tzinfo=timezone.utc)
-
-    monkeypatch.setattr(rate_limit, "datetime", Frozen)
+def fast_and_frozen(monkeypatch, still_rate_limit_clock):
+    """Jede Prüfung scheitert sofort (kein bcrypt), und die Uhr der Bremse steht mitten in einem Fenster (#2512)."""
     monkeypatch.setattr(bcrypt, "checkpw", lambda _candidate, _stored: False)
 
 

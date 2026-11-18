@@ -289,24 +289,8 @@ async def test_error_groups_can_be_resolved_several_at_once(flow):
     assert (await flow.post("/api/admin/ops/errors/resolve", json={"fingerprints": []})).status_code == 422
 
 
-def _still_rate_limit_clock(monkeypatch):
-    """Die Drosselung zählt je Kalenderminute; lief der Test über einen Minutenwechsel, kam der vierte Lauf wieder durch
-    (#2474). Für die Zählung steht die Uhr deshalb still - beim echten Jetzt, damit Ablaufzeiten der Zähler stimmen."""
-    from services import rate_limit
-
-    real = rate_limit.datetime
-    frozen = real.now(rate_limit.timezone.utc)
-
-    class StillClock(real):
-        @classmethod
-        def now(cls, tz=None):
-            return frozen.astimezone(tz) if tz else frozen.replace(tzinfo=None)
-
-    monkeypatch.setattr(rate_limit, "datetime", StillClock)
-
-
 @pytest.mark.asyncio
-async def test_run_checks_now_is_rate_limited(flow, monkeypatch):
+async def test_run_checks_now_is_rate_limited(flow, monkeypatch, still_rate_limit_clock):
     """„Jetzt neu prüfen“: sofort, aber höchstens drei Läufe je Minute und Person - der vierte bekommt 429."""
     from services import ops_checks
 
@@ -316,7 +300,6 @@ async def test_run_checks_now_is_rate_limited(flow, monkeypatch):
     import routes.admin_routes as admin_routes
 
     monkeypatch.setattr(admin_routes, "run_checks", quick)
-    _still_rate_limit_clock(monkeypatch)
     flow.act_as(await flow.add_user(role="superadmin"))
     statuses = []
     for _ in range(ops_checks.RUN_NOW_LIMIT_PER_MINUTE + 1):

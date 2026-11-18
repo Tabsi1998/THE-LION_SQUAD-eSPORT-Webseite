@@ -181,7 +181,7 @@ async def test_errors_carry_fixed_sentences_without_internals(flow, fake):
 
 
 @pytest.mark.asyncio
-async def test_send_and_delete_are_braked_per_account(flow, fake, monkeypatch):
+async def test_send_and_delete_are_braked_per_account(flow, fake, monkeypatch, still_rate_limit_clock):
     monkeypatch.setenv("SHOP_TEST_DRAFT_SEND_LIMIT", "1")
     await shop_ready(flow)
     product, variant = await product_and_variant(flow)
