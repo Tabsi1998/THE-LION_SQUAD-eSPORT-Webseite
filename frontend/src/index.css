@@ -186,7 +186,7 @@ html { scrollbar-color: #2C2C33 var(--tls-surface-0); }
   background: linear-gradient(180deg, var(--tls-surface-2) 0%, var(--tls-surface-1) 100%);
   transition: opacity var(--tls-motion-mid) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease), box-shadow var(--tls-motion-mid) var(--tls-ease);
 }
-.tls-bracket-node.is-mine { box-shadow: 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.45); }
+/* Dein Match (is-mine) trägt seit #1316 die Ecken-Klammern (tls-you, styles/system.css) statt eines Leuchtrands. */
 .tls-bracket-node--line { border: 1px dashed rgb(255 255 255 / 0.12); border-radius: 6px; background: transparent; }
 .tls-bracket-node--fate { opacity: 0.7; }
 .tls-bracket-head {
@@ -463,7 +463,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 @media (hover: hover) and (pointer: fine) {
   .tls-sched-line:hover { background-color: rgb(255 255 255 / 0.035); }
 }
-.tls-sched-line[data-mine="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); }
+/* Dein Spiel (data-mine) trägt seit #1316 Ecken, Fläche und „Du“ (tls-you tls-you--inset, styles/system.css). */
 .tls-sched-line[data-tone="live"] { box-shadow: inset 0 0 0 1px rgb(var(--tls-live-rgb) / 0.4); }
 .tls-sched-line[data-tone="done"] .tls-sched-name { color: rgb(255 255 255 / 0.6); }
 .tls-sched-line__time { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 14px; font-weight: 700; color: rgb(255 255 255 / 0.8); }
@@ -1420,8 +1420,10 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   }
 }
 
-/* focus ring */
-:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--tls-cyan); }
+/* focus ring - Knöpfe und Karten tragen statt des Rings die Ecken-Klammern (#1316, unten bei .tls-btn und .tls-card).
+   Der durchsichtige Rahmen bleibt überall: Im Kontrast-Modus von Windows (forced-colors) fällt der Schatten weg, der
+   Rahmen bekommt dort die Systemfarbe - sonst wäre der Fokus weg. */
+:focus-visible { outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 2px var(--tls-cyan); }
 
 .input {
   width: 100%;
@@ -2340,7 +2342,25 @@ html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
 }
 .tls-card:focus-visible {
   transform: translateY(calc(-5px * var(--tls-motion-on)));
+  /* Wie .tls-btn: der alte 3-px-Ring aus App.css würde die Winkel verdecken; der durchsichtige Rahmen hält den Fokus im
+     Kontrast-Modus sichtbar. */
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
+/* Fokus mit der Tastatur (#1316): die Ecken-Klammern 5 px außerhalb der Karte (styles/system.css, --tls-corners) - als
+   ::after, damit das Live-Licht (.tls-live-frame::before) daneben weiterläuft. In wischbaren Leisten (.tls-swipe) sitzen
+   die Winkel an der Kante, sonst schnitte die Leiste sie oben und unten ab (Regel am Ende der Datei). Eine
+   Karte, die ihr Bild abschneidet (overflow-hidden), schneidet beim Fokus erst 6 px außerhalb ab - sonst wären die
+   Winkel weg. Browser ohne overflow-clip-margin zeigen den Fokus dann über Rand und Anheben. */
+.tls-card:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tls-corner-out));
+  z-index: 1;
+  pointer-events: none;
+  background: var(--tls-corners);
+}
+.tls-card.overflow-hidden:focus-visible { overflow: clip; overflow-clip-margin: calc(var(--tls-corner-out) + 1px); }
 .tls-card:not(.tls-card--own):focus-visible {
   border-color: rgba(var(--tls-card-accent), 0.55);
   box-shadow: 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
@@ -3034,9 +3054,21 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   background-repeat: no-repeat;
   background-position: 150% 0;
 }
+/* Fokus mit der Tastatur (#1316): die Ecken-Klammern 5 px außerhalb des Knopfs (styles/system.css, --tls-corners)
+   statt eines weißen Rahmens; kein Ring dazu. Der Rahmen bleibt durchsichtig da - im Kontrast-Modus von Windows wird
+   er in der Systemfarbe sichtbar, Verläufe und Schatten fallen dort weg. */
 .tls-btn:focus-visible {
-  outline: 2px solid #FFFFFF;
+  outline: 2px solid transparent;
   outline-offset: 2px;
+  box-shadow: none;
+}
+.tls-btn:focus-visible::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--tls-corner-out));
+  z-index: 1;
+  pointer-events: none;
+  background: var(--tls-corners);
 }
 .tls-btn--secondary {
   background-color: transparent;
@@ -3846,3 +3878,24 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-dates-row { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; animation-delay: calc(min(var(--tls-row-i, 0), 8) * 30ms); }
 .tls-guide-step { transition: color var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-mid) var(--tls-ease); }
 .tls-guide-step[data-done="true"] .tls-guide-step__mark { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; }
+
+/* Ecken-Klammern für „du“ (#1316) an Stellen mit eigenem Schatten: Die Rangliste behält ihre leichte Fläche aus
+   [data-mine] und verliert nur den Rahmen - die Winkel ersetzen ihn. Karten behalten beim Anheben ihren Schein und
+   dazu die Fläche. */
+.tls-standing-row.tls-you { box-shadow: none; background-color: transparent; }
+/* Die Marke an der Zeile („Du“, „Dein Team“, „Verein“) sieht aus wie das Etikett „Du“ (.tls-you-tag): eine Pille in
+   gemischter Schreibung, nie wie ein Initialen-Kästchen. */
+.tls-standing-me { border-radius: 999px; padding: 1px 7px; font-size: 11px; line-height: 1.35; letter-spacing: 0.02em; text-transform: none; }
+/* Wischbare Leisten schneiden oben und unten ab: Fokus-Winkel an Knöpfen und Karten sitzen dort an der Kante. Eine
+   Karte hebt sich beim Fokus und Drüberfahren um 5 px - Leisten mit Karten haben darum oben 6 px Luft (fest, kein
+   Sprung beim Fokus), sonst schnitte die Leiste die oberen Winkel und die Kante der Karte ab. */
+.tls-swipe :is(.tls-btn, .tls-card) { --tls-corner-out: 0px; }
+.tls-swipe:has(.tls-card) { padding-top: 6px; }
+.tls-card.tls-you:not(.tls-card--own):focus-visible {
+  box-shadow: var(--tls-you-fill), 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
+}
+@media (hover: hover) {
+  .tls-card.tls-you:not(.tls-card--own):hover {
+    box-shadow: var(--tls-you-fill), 0 22px 44px -26px rgba(var(--tls-card-accent), 0.65);
+  }
+}

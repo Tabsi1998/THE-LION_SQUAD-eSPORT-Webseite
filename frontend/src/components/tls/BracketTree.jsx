@@ -118,7 +118,8 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   const finished = FINISHED_TOURNAMENT.has(String(data?.tournament?.status || ""));
   const podiumMap = useMemo(() => buildPodiumMap(matches_v2, stages), [matches_v2, stages]);
   const regMap = useMemo(() => new Map(registrations.map((reg) => [reg.id, reg])), [registrations]);
-  const mine = mineId || registrations.find((reg) => reg?.is_mine)?.id || null;
+  // TV-Seiten zeigen kein „du“ (#1316): Die Anzeige-Antwort kann für eine angemeldete Leitung `is_mine` tragen.
+  const mine = isTv ? null : mineId || registrations.find((reg) => reg?.is_mine)?.id || null;
   const finder = useMemo(() => finderFor(matches_v2), [matches_v2]);
   const edges = useMemo(() => {
     const real = bracketEdges(matches_v2);

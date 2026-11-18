@@ -96,10 +96,16 @@ export function SeasonReadinessPanel({ readiness, visibility = "off", overrideRe
 /** Mindestgröße im Map-Pool je Modus (C.2) mit eigenem Speichern - im Reiter Spielbetrieb unter dem Pool. */
 export function SeasonPoolMinimum({ seasonId, readiness, canEdit = true, onSaved, testId = "season-readiness" }) {
   const { result, reload } = readiness;
-  const [form, setForm] = useState({});
   const [busy, setBusy] = useState(false);
   const requirements = result?.requirements;
-  useEffect(() => { setForm(minMapsForm(requirements || [])); }, [requirements]);
+  // Das Formular gehört zu genau einem Stand der Prüfung: Neu geladen heißt neu befüllt. Ohne Effekt, damit eine
+  // Eingabe direkt nach dem Laden nicht von einem nachlaufenden Zurücksetzen überschrieben wird.
+  const [draft, setDraft] = useState({ for: null, form: {} });
+  const form = draft.for === requirements ? draft.form : minMapsForm(requirements || []);
+  const setForm = (update) => setDraft((current) => {
+    const base = current.for === requirements ? current.form : minMapsForm(requirements || []);
+    return { for: requirements, form: typeof update === "function" ? update(base) : update };
+  });
   if (!requirements?.length) return null;
 
   const saveMinimum = async () => {

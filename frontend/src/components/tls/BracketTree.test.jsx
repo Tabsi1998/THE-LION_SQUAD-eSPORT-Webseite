@@ -39,7 +39,7 @@ describe("isTableFormat", () => {
 
 // Turnierbaum (#399): Verbindungslinien je Runde, leere Setzplätze, Durchgang-Karten ohne
 // „Platz“ vor dem Spiel, Runde für Runde am Handy, „Dein nächstes Spiel“ für Angemeldete.
-const { render, screen, act } = await import("@testing-library/react");
+const { render, screen, act, within } = await import("@testing-library/react");
 const userEvent = (await import("@testing-library/user-event")).default;
 const { BracketTree, nextMatchFor } = await import("./BracketTree");
 
@@ -134,6 +134,21 @@ describe("BracketTree", () => {
     expect(screen.getByTestId("bracket-next-match")).toHaveTextContent("Dein nächstes Spiel");
     expect(screen.getByTestId("bracket-next-match")).toHaveTextContent("gegen RyuUu");
     expect(screen.getByTestId("bracket-match-v2-m2")).toHaveAttribute("data-mine", "true");
+  });
+
+  it("Ecken-Klammern (#1316): nur dein Match trägt Ecken und „Du“, statt zu leuchten - auf dem TV kein „du“", () => {
+    const data = knockout();
+    const { unmount } = render(<BracketTree data={data} mineId="r3" />);
+    const own = screen.getByTestId("bracket-match-v2-m2");
+    expect(own).toHaveClass("tls-you");
+    expect(within(own).getByText("Du")).toHaveClass("tls-you-tag");
+    for (const id of ["m1", "m3"]) expect(screen.getByTestId(`bracket-match-v2-${id}`)).not.toHaveClass("tls-you");
+    expect(document.querySelectorAll(".tls-you")).toHaveLength(1);
+    unmount();
+    // Auf dem TV zählt `is_mine` aus der Anzeige-Antwort nicht.
+    render(<BracketTree data={{ ...data, registrations: data.registrations.map((reg) => (reg.id === "r3" ? { ...reg, is_mine: true } : reg)) }} viewMode="tv" />);
+    expect(document.querySelectorAll(".tls-you, [data-mine='true']")).toHaveLength(0);
+    expect(screen.queryByTestId("bracket-next-match")).toBeNull();
   });
 
   it("vorgeplant im Vorschau-Baum: „Dein nächstes Spiel“ und Runden-Kopf sagen „voraussichtlich“ (Fabian live 14.10.)", () => {

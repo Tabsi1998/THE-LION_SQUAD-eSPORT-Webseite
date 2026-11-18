@@ -614,11 +614,14 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
 
 // Eine Zeile „Was läuft“ (#1183): links Tag und Uhrzeit, dann Titel mit Spielart, rechts der eigene Stand - oder „Anmelden“,
 // solange die Anmeldung offen ist, sonst der Zustand. Die ganze Zeile führt auf das Turnier bzw. die Fast Lap.
+// Steht im eigenen Stand schon „Du …“ („Du bist dabei“), bleibt das Etikett weg (#1316) - nie zweimal „Du“.
+const saysYou = (label) => String(label || "").trim().toLowerCase().startsWith("du ");
+
 function WhatsOnRow({ row, accessToken }) {
   const Icon = row.kind === "fastlap" ? Flag : Trophy;
   return (
     <li data-testid={`event-row-${row.kind}-${row.id}`}>
-      <Link to={`${row.path}${row.accessLink ? accessSuffix(accessToken) : ""}`} className="tls-card flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] px-3 py-3 min-w-0">
+      <Link to={`${row.path}${row.accessLink ? accessSuffix(accessToken) : ""}`} className={`tls-card flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] px-3 py-3 min-w-0 ${row.mine ? "tls-you" : ""}`}>
         <span className="w-16 shrink-0 text-center">
           {row.dayLabel ? <span className="block text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">{row.dayLabel}</span> : null}
           <span className="block text-sm font-bold tabular-nums text-white/85">{row.timeLabel || "–"}</span>
@@ -626,7 +629,11 @@ function WhatsOnRow({ row, accessToken }) {
         <Icon className={`w-4 h-4 shrink-0 ${row.kind === "fastlap" ? "text-[#2DD4BF]" : "text-[#29B6E8]"}`} aria-hidden="true" />
         <span className="min-w-0 flex-1">
           <span className="tls-card__title block font-heading font-bold leading-tight break-words">{row.title}</span>
-          <span className="block text-xs text-white/55 truncate">{[row.mode, row.detail].filter(Boolean).join(" · ")}</span>
+          {/* Ecken-Klammern (#1316): deine Karte trägt Winkel, Fläche und „Du“. */}
+          <span className="flex min-w-0 items-center gap-2 text-xs text-white/55">
+            {row.mine && !saysYou(row.mine.label) ? <span className="tls-you-tag" data-testid="event-row-you">Du</span> : null}
+            <span className="truncate">{[row.mode, row.detail].filter(Boolean).join(" · ")}</span>
+          </span>
         </span>
         <span className="shrink-0">
           {row.mine ? (

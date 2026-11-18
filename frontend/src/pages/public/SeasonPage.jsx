@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -67,6 +68,9 @@ const TONE = {
 
 export default function SeasonPage() {
   const { slug } = useParams();
+  const { user } = useAuth();
+  // Ecken-Klammern (#1316): deine Zeile der Gesamtwertung trägt Winkel, Fläche und „Du“ (am Podest nur „Du“).
+  const isMine = (row) => Boolean(user?.id) && row.user_id === user.id;
   const [data, setData] = useState(null);
   const season = data?.season;
   const seoDescription = seoTextPreview(season?.description, "Jahreswertung von THE LION SQUAD eSports mit Turnieren, Fast-Lap-Challenges und Community-Punkten.");
@@ -146,7 +150,7 @@ export default function SeasonPage() {
               <div className="text-xs text-white/45">{totalRatings} Wertungen</div>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
-              {topThree.map((row) => <PodiumCard key={row.user_id} row={row} />)}
+              {topThree.map((row) => <PodiumCard key={row.user_id} row={row} mine={isMine(row)} />)}
             </div>
           </section>
         )}
@@ -162,10 +166,10 @@ export default function SeasonPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(
-                  <tr key={r.user_id} className={r.rank<=3 ? "bg-[#FFD700]/5" : ""}>
+                  <tr key={r.user_id} data-testid={`season-row-${r.user_id}`} data-mine={isMine(r) ? "true" : undefined} className={`${r.rank<=3 ? "bg-[#FFD700]/5" : ""}${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
                     <td className={`px-4 py-3 font-display font-bold ${rankColor(r.rank)}`}>{r.rank}</td>
                     <td className="px-4 py-3">
-                      <PlayerIdentity row={r} />
+                      <PlayerIdentity row={r} mine={isMine(r)} />
                     </td>
                     <td className="px-4 py-3">
                       <SourceBreakdown row={r} />
@@ -185,9 +189,9 @@ export default function SeasonPage() {
           </div>
           <div className="md:hidden divide-y divide-white/5">
             {standings.map((r) => (
-              <div key={r.user_id} className="p-4 flex items-center gap-3">
+              <div key={r.user_id} data-testid={`season-item-${r.user_id}`} className={`p-4 flex items-center gap-3${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
                 <div className={`font-display text-2xl font-black w-10 ${rankColor(r.rank)}`}>#{r.rank}</div>
-                <PlayerIdentity row={r} />
+                <PlayerIdentity row={r} mine={isMine(r)} />
                 <div className="ml-auto text-right">
                   <div className="font-display text-2xl font-black text-[#29B6E8]">{formatPoints(r.points)}</div>
                   <div className="text-[10px] uppercase tracking-widest text-white/40">{r.events_count} Wertungen · {r.wins} Siege</div>
@@ -247,14 +251,17 @@ function OverviewCard({ icon: Icon, label, value, text, tone }) {
   );
 }
 
-function PlayerIdentity({ row }) {
+function PlayerIdentity({ row, mine = false }) {
   return (
     <div className="flex items-center gap-3 min-w-0">
       <div className="w-10 h-10 rounded-sm border border-white/10 bg-[#0A0A0A] overflow-hidden shrink-0 flex items-center justify-center">
         {row.avatar_url ? <img src={resolveMediaUrl(row.avatar_url)} alt="" className="w-full h-full object-cover" /> : <Users className="w-4 h-4 text-white/25" />}
       </div>
       <div className="min-w-0">
-        <div className="font-bold truncate">{row.display_name}</div>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-bold truncate">{row.display_name}</span>
+          {mine ? <span className="tls-you-tag">Du</span> : null}
+        </div>
         {row.username && <div className="text-xs text-white/40 truncate">@{row.username}</div>}
       </div>
     </div>
@@ -281,7 +288,7 @@ function SourceBreakdown({ row }) {
   );
 }
 
-function PodiumCard({ row }) {
+function PodiumCard({ row, mine = false }) {
   const content = (
     <>
       <div className="flex items-center justify-between gap-4">
@@ -289,7 +296,7 @@ function PodiumCard({ row }) {
         <Trophy className={`w-7 h-7 ${rankColor(row.rank)}`} />
       </div>
       <div className="mt-5">
-        <PlayerIdentity row={row} />
+        <PlayerIdentity row={row} mine={mine} />
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
         <MiniStat label="Jahr" value={formatPoints(row.points)} />
@@ -298,6 +305,7 @@ function PodiumCard({ row }) {
       </div>
     </>
   );
+  // Die Ecken trägt deine Zeile der Tabelle bzw. Liste darunter; das Podest zeigt nur das Etikett „Du“ (#1316).
   const className = "group border border-white/10 hover:border-[#FFD700]/50 bg-[#121212] rounded-sm p-5 transition";
   if (!row.username) return <div className={className}>{content}</div>;
   return (

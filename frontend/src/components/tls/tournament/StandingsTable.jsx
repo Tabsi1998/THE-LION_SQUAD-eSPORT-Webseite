@@ -117,6 +117,8 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
       return column;
     });
   const span = columns.length + 2 + (certificateHref ? 1 : 0);
+  // Ecken-Klammern (#1316) nur für „du“ und dein Team - die Marke „Verein“ (Rennserien, TeamLeague) ist kein „du“.
+  const markYou = mineLabel !== "Verein";
   return (
     // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
@@ -147,7 +149,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 data-mine={row.is_mine ? "true" : undefined}
                 data-champion={championKey && key === championKey ? "true" : undefined}
                 data-zone={ZONE_LABELS[row.zone] ? row.zone : undefined}
-                className={`tls-standing-row ${isChanged ? "tls-changed-row" : ""}`}
+                className={`tls-standing-row ${isChanged ? "tls-changed-row" : ""}${row.is_mine && markYou ? " tls-you tls-you--inset" : ""}`}
               >
                 <td className="tls-standing-rank pl-3 sm:pl-4 pr-1 py-2.5 align-middle">
                   <span className="flex items-center gap-1.5">
