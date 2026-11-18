@@ -5,6 +5,7 @@ import { historyMovement, historyPlace, historyWhere, type LeagueHistoryRow } fr
 import { openLink } from "../../lib/openLink";
 import { colors, roles } from "../../theme";
 import { Card } from "../Card";
+import { InternalTag } from "../InternalTag";
 import { StaggerIn } from "../motion";
 import { Body, Heading, Muted } from "../Text";
 
@@ -27,11 +28,16 @@ export function LeagueSeasonHistory({ rows, showTeam = false, testID = "league-s
           return (
             <View key={`${row.season_id}-${row.staffel}-${row.display_name}`} style={styles.row} testID={`${testID}-${row.season_id}`}>
               <View style={styles.main}>
-                {row.url ? (
-                  <Pressable onPress={() => { openLink(row.url); }} accessibilityRole="link" hitSlop={6}>
-                    <Body style={[styles.title, styles.link]} numberOfLines={2}>{title}</Body>
-                  </Pressable>
-                ) : <Body style={styles.title} numberOfLines={2}>{title}</Body>}
+                <View style={styles.titleLine}>
+                  {/* Ohne url (#2521) darf der Betrachter die Season nicht öffnen - dann steht sie als Text da, nicht als Link. */}
+                  {row.url ? (
+                    <Pressable onPress={() => { openLink(row.url); }} accessibilityRole="link" hitSlop={6} style={styles.shrink}>
+                      <Body style={[styles.title, styles.link]} numberOfLines={2}>{title}</Body>
+                    </Pressable>
+                  ) : <Body style={[styles.title, styles.shrink]} numberOfLines={2}>{title}</Body>}
+                  {/* Vereinsintern (#2531, Web #2521): eine Season, die Gäste nicht sehen - der Server setzt `internal`. */}
+                  {row.internal ? <InternalTag testID={`${testID}-${row.season_id}-internal`} /> : null}
+                </View>
                 <Muted style={styles.small} numberOfLines={2}>{historyWhere(row, showTeam)}</Muted>
               </View>
               <View style={styles.facts}>
@@ -63,6 +69,8 @@ const styles = StyleSheet.create({
   list: { gap: 0 },
   row: { borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 10 },
   main: { flexBasis: 180, flexGrow: 1, minWidth: 0 },
+  titleLine: { alignItems: "center", columnGap: 8, flexDirection: "row", flexWrap: "wrap", rowGap: 4 },
+  shrink: { flexShrink: 1, minWidth: 0 },
   title: { fontWeight: "800" },
   link: { color: roles.brand },
   small: { fontSize: 12 },

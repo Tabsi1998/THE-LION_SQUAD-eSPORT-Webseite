@@ -186,8 +186,11 @@ export type LeagueHistoryRow = {
   champion?: boolean;
   zone?: string | null;
   exit?: string | null;
+  /** Ohne Link (#2521): die Season darf der Betrachter nicht öffnen - sie steht als Text da. */
   url?: string | null;
   tournament_id?: string | null;
+  /** Vereinsintern (#2521, #2531): Gäste sähen diese Season nicht - Etikett „Vereinsintern“. */
+  internal?: boolean;
 };
 
 const EXIT_TEXT: Record<string, string> = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
