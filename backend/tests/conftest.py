@@ -6,6 +6,7 @@ from datetime import datetime
 import flow_mongo
 import mongomock_to_list
 import pytest
+import rate_limit_clock
 import shard_plan
 import zeitreise
 
@@ -123,3 +124,11 @@ def printful_rate_window():
     if module is not None:
         module._RATE_WINDOWS.clear()
     yield
+
+
+@pytest.fixture
+def still_rate_limit_clock(monkeypatch):
+    """Die Uhr der Drosselung steht für diesen Test still (#2512) - für jeden Test, der über mehrere Aufrufe eine 429 aus
+    ``enforce_rate_limit`` erwartet. Sonst kippt er, wenn er über einen Fensterwechsel läuft. Fenster und Grenze bleiben
+    die echten; Einzelheiten in ``rate_limit_clock.py``, der Wächter ist ``test_rate_limit_clock_inventory_unit.py``."""
+    return rate_limit_clock.hold_still(monkeypatch)

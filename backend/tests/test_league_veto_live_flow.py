@@ -183,7 +183,7 @@ async def test_spectators_only_see_a_visible_staffel_and_the_display_key_opens_i
 
 
 @pytest.mark.asyncio
-async def test_spectator_polls_are_limited_per_address_and_per_key(flow, monkeypatch):
+async def test_spectator_polls_are_limited_per_address_and_per_key(flow, monkeypatch, still_rate_limit_clock):
     world = await started_world(flow)
     token = await tv_key(flow, world)
     monkeypatch.setattr(league_veto_routes, "SPECTATOR_RATE_LIMIT", 3)
