@@ -14,6 +14,7 @@ from services.profile_visibility import (
     ProfileScope,
     challenge_is_internal,
     sees_challenge,
+    sees_listed_challenge,
     sees_tournament,
     tournament_is_internal,
 )
@@ -330,8 +331,11 @@ async def personal_profile_references(user: dict, public_only: bool = False, *, 
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "banner_url": 1, "visibility": 1},
     ).to_list(250)
     extra_challenges = {}
+    # Eine Challenge im Entwurf ist unveröffentlicht und gehört nicht ins Profil - auch nicht für die Person selbst (#2521), wie unter
+    # Bestzeiten (``sees_listed_challenge``).
+    drafts = {row["id"] for row in extra_challenge_rows if row.get("status") == "draft"}
     for row in extra_challenge_rows:
-        if await sees_challenge(scope, row):
+        if await sees_listed_challenge(scope, row):
             extra_challenges[row["id"]] = row
     extra_tracks = {
         row["id"]: row
@@ -341,7 +345,7 @@ async def personal_profile_references(user: dict, public_only: bool = False, *, 
         ).to_list(250)
     }
     open_pairs = [(challenge_id, track_id) for challenge_id, track_id in lap_pairs[:30]
-                  if (scope.everything or challenge_id in extra_challenges)
+                  if challenge_id not in drafts and (scope.everything or challenge_id in extra_challenges)
                   and not any(item.get("kind") == "fastlap" and str(item.get("id", "")).endswith(f"{challenge_id}:{track_id}") for item in items)]
     # Alle Zeiten dieser Strecken in einer Abfrage (#2521) - mit internen Fast Laps für Mitglieder wüchse das Profil sonst je Strecke.
     times_by_pair = await _official_times_by_pair(db, open_pairs)
