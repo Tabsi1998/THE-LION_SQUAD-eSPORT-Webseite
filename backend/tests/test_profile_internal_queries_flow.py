@@ -123,12 +123,17 @@ async def test_member_view_asks_once_per_level_and_league_not_per_entry(flow, mo
 
 @pytest.mark.asyncio
 async def test_member_view_reads_do_not_grow_with_the_entries(monkeypatch):
+    # Je Messung ein eigener MonkeyPatch: ``monkeypatch.undo()`` höbe auch die autouse-Patches der conftest auf.
+    from services.profile_visibility import PUBLIC, SELF
+
     counts = []
     for internal_count in (4, 16):
         instance, shutdown = make_flow()
         try:
-            counts.append((await measure(instance, monkeypatch, internal_count))["reads"])
+            with pytest.MonkeyPatch.context() as patch:
+                counts.append((await measure(instance, patch, internal_count))["reads"])
         finally:
             await shutdown()
-            monkeypatch.undo()
     assert counts[0] == counts[1], f"Abfragen mit 4 bzw. 16 internen Turnieren: {counts}"
+    # SELF und PUBLIC gelten prozessweit - ein Merker darin teilte Entscheidungen zwischen Betrachtern.
+    assert SELF.memo == {} and PUBLIC.memo == {}
