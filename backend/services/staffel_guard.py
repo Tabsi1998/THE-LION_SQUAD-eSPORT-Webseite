@@ -274,6 +274,9 @@ async def staffel_links(db, tournament: dict, *, with_admin_path: bool = True) -
     }
     # Der Weg in die Verwaltung der Season nur für die, die verwalten (Review #2109); Namen und Ligaseite sind
     # öffentlich.
+    # Die Kennung der Liga für die Brotkrumen der Staffel-Seite (Paket D, #2262) - wie die Wege in die Verwaltung nur für sie.
+    if with_admin_path and context.get("league_id"):
+        links["league_id"] = context["league_id"]
     if with_admin_path and context.get("season_id"):
         links["season_admin_path"] = f"/admin/leagues/seasons/{context['season_id']}"
     if with_admin_path and tournament.get("id"):

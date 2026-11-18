@@ -87,6 +87,14 @@ export function staffelAdminUrl(tournamentId, anchor = "") {
   return key && key !== FIRST ? `${base}#${key}` : base;
 }
 
+/** Sprungmarke einer Liga auf der Liga-Übersicht (`/admin/leagues#liga-<id>`) - für die Brotkrumen der Staffel-Seite (Paket D). */
+export const leagueAnchorId = (leagueId) => `liga-${leagueId || ""}`;
+
+/** Weg zu einer Liga in der Verwaltung: die Liga-Übersicht an der Stelle dieser Liga; ohne Kennung die Übersicht. */
+export function leagueAdminUrl(leagueId) {
+  return leagueId ? `/admin/leagues#${encodeURIComponent(leagueAnchorId(leagueId))}` : "/admin/leagues";
+}
+
 /** Die Marke auf der Staffel-Seite für einen alten Reiter der Turnierverwaltung (`?tab=matchplan` → `spielplan`). */
 export function legacyTabAnchor(tab) {
   return LEGACY_TAB_ANCHORS[clean(tab)] || FIRST;

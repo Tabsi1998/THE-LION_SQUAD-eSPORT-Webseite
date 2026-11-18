@@ -598,6 +598,7 @@ async def test_the_staffel_page_links_back_to_its_season(flow):
     view = (await flow.get(f"/api/tournaments/{staffel['id']}?include_draft=true")).json()
     assert view["league_links"] == {
         "league_name": "Probe-Liga", "season_name": "Season 1", "division_label": "Liga 1", "staffel": "A",
+        "league_id": league["id"],
         "season_admin_path": f"/admin/leagues/seasons/{season['id']}",
         "staffel_admin_path": f"/admin/leagues/staffeln/{staffel['id']}",
         "public_path": f"/liga/{league['slug']}/{season['slug']}",

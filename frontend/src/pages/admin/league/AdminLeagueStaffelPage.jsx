@@ -2,7 +2,7 @@
 // Turnierverwaltung zu wechseln. Reiter nach dem Muster der Season-Seite (lib/staffelTabs.js), per Sprungmarke ansteuerbar
 // (`#teilnehmer`, `#zuteilen`). Die Seite wächst in Paketen neben der alten Bedienung (Entscheidung Nr. 189): Paket A bringt
 // Überblick und Teilnehmer, Paket B Spielplan, Spiele und Ergebnisse sowie die Tabelle samt Gleichstand-Entscheid (Nr. 190), Paket C
-// Protokoll und Einstellungen - damit ist die Seite vollständig. Bis Paket D bleibt die Turnierbearbeitung daneben voll nutzbar.
+// Protokoll und Einstellungen - damit ist die Seite vollständig. Seit Paket D leitet die alte Turnierbearbeitung einer Staffel hierher.
 //
 // Daten wie in der Turnierverwaltung: `GET /tournaments/{id}?include_draft=true` (Rechte als `league_capabilities` und `can_*`,
 // `league_links`, `league_season`), dazu Anmeldungen und Spiele. Knöpfe nur nach den Rechten des Servers - er prüft selbst noch einmal.
@@ -19,7 +19,7 @@ import { useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { loadOk, toastLoadFailed } from "@/lib/loadProblem";
 import { seasonAnchorUrl } from "@/lib/seasonTabs";
-import { STAFFEL_TABS, STAFFEL_TABS_READY, staffelTarget } from "@/lib/staffelTabs";
+import { STAFFEL_TABS, STAFFEL_TABS_READY, leagueAdminUrl, staffelTarget } from "@/lib/staffelTabs";
 import { isStaffel, staffelBeforeStart, staffelLabel } from "@/pages/admin/tournament/StaffelParts";
 import { useTournamentStatus } from "@/pages/admin/tournament/useTournamentStatus";
 import { SeasonLog } from "./SeasonDeskTab";
@@ -49,14 +49,21 @@ function useScrollToSection(section, ready) {
 function Breadcrumbs({ tournament }) {
   const links = tournament.league_links || {};
   const seasonPath = links.season_admin_path || seasonAnchorUrl(tournament.league_context?.season_id);
-  const season = [links.league_name, links.season_name].filter(Boolean).join(" · ") || "Season";
+  // Die Liga als eigene Stufe (Paket D, #2262): der Server schickt ihre Kennung mit, der Weg führt an ihre Stelle der Liga-Übersicht.
+  const leagueId = links.league_id || tournament.league_context?.league_id;
   const crumb = "inline-flex min-h-[44px] items-center hover:text-[#29B6E8] [overflow-wrap:anywhere]";
   return (
     <nav aria-label="Brotkrumen" data-testid="staffel-breadcrumbs">
       <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs font-bold uppercase tracking-wider text-white/60">
         <li><Link to="/admin/leagues" className={crumb} data-testid="staffel-crumb-leagues">Liga</Link></li>
+        {links.league_name ? (
+          <>
+            <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
+            <li className="min-w-0"><Link to={leagueAdminUrl(leagueId)} className={crumb} data-testid="staffel-crumb-league">{links.league_name}</Link></li>
+          </>
+        ) : null}
         <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
-        <li className="min-w-0"><Link to={seasonPath} className={crumb} data-testid="staffel-crumb-season">{season}</Link></li>
+        <li className="min-w-0"><Link to={seasonPath} className={crumb} data-testid="staffel-crumb-season">{links.season_name || "Season"}</Link></li>
         {/* Am Handy steht die Staffel gleich darunter als Überschrift - die letzte Stufe nur ab 640 px. */}
         <li aria-hidden="true" className="hidden sm:block"><ChevronRight className="h-3.5 w-3.5" /></li>
         <li className="hidden min-w-0 text-white/75 sm:block [overflow-wrap:anywhere]" aria-current="page">{staffelLabel(tournament)}</li>
