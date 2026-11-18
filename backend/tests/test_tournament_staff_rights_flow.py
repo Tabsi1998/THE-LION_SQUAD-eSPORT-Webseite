@@ -156,8 +156,11 @@ async def test_the_management_list_shows_a_helper_only_his_tournament(flow):
     assert {own_id, other_id} <= {t["id"] for t in confirmed.json()}
 
 
-async def _profile(monkeypatch, account: dict, tournament_assignments: int = 0, fast_lap_assignments: int = 0) -> dict:
+async def _profile(monkeypatch, account: dict, tournament_assignments: int = 0, fast_lap_assignments: int = 0,
+                   staffel_assignments: int = 0) -> dict:
     """Das Auth-Profil (/auth/me) aus get_current_user - mit einer Datenbank, die nur die Zählungen kennt."""
+    staffel_ids = [f"staffel-{index}" for index in range(staffel_assignments)]
+    tournament_ids = [f"turnier-{index}" for index in range(tournament_assignments)] + staffel_ids
     from datetime import datetime, timedelta, timezone
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
@@ -169,7 +172,11 @@ async def _profile(monkeypatch, account: dict, tournament_assignments: int = 0, 
     db = SimpleNamespace(
         users=SimpleNamespace(find_one=AsyncMock(return_value={"is_active": True, **account})),
         memberships=SimpleNamespace(find_one=AsyncMock(return_value=None)),
-        tournament_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=tournament_assignments)),
+        tournament_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=len(tournament_ids)),
+                                                     distinct=AsyncMock(return_value=list(tournament_ids))),
+        # Nur gewöhnliche Turniere zählen als Einsatz (Paket D, #2262) - Staffeln liefert die Abfrage ohne Liga nicht zurück.
+        tournaments=SimpleNamespace(find_one=AsyncMock(return_value={"id": next(iter(set(tournament_ids) - set(staffel_ids)))}
+                                                       if set(tournament_ids) - set(staffel_ids) else None)),
         f1_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=fast_lap_assignments)),
         auth_sessions=SimpleNamespace(find_one=AsyncMock(return_value=session), update_one=AsyncMock()),
     )
@@ -191,6 +198,16 @@ async def test_the_profile_shows_the_helper_assignment_apart_from_the_lead(monke
     assert (lead_and_helper["is_tournament_staff"], lead_and_helper["has_staff_assignment"]) == (True, True)
     assert (fast_lap_helper["is_tournament_staff"], fast_lap_helper["has_staff_assignment"]) == (True, True)
     assert (nobody["is_tournament_staff"], nobody["has_staff_assignment"]) == (False, False)
+
+
+@pytest.mark.asyncio
+async def test_an_old_assignment_in_a_staffel_is_no_tournament_assignment(monkeypatch):
+    # Paket D (#2262, Fabian 18.11.): Alte Einsätze in Staffeln zählen nicht mehr als Turnier-Einsatz - sonst sähe eine Liga-Leitung
+    # mit altem Einsatz weiter „Turniere“, aber eine Liste ohne ihre Staffeln. Mit einem Turnier daneben bleibt der Einsatz.
+    only_staffel = await _profile(monkeypatch, {"id": "helfer", "role": "player"}, staffel_assignments=1)
+    staffel_and_cup = await _profile(monkeypatch, {"id": "helfer", "role": "player"}, tournament_assignments=1, staffel_assignments=1)
+    assert (only_staffel["is_tournament_staff"], only_staffel["has_staff_assignment"]) == (False, False)
+    assert (staffel_and_cup["is_tournament_staff"], staffel_and_cup["has_staff_assignment"]) == (True, True)
 
 
 @pytest.mark.asyncio
