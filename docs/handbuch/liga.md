@@ -707,7 +707,7 @@ läuft, behält seinen Stand.
 **Eine Staffel bekommt die Vorlage nur, wenn sie zu ihr passt** – zu ihrem Best of, ihrer Modusfolge und ihrem Pool. Die kommen erst mit
 **Vorgaben auf Staffeln übertragen** an die Staffel, nach dem ersten Ergebnis gar nicht mehr. Bis dahin behält die Staffel ihre bisherige
 Vorlage, und eine Warnung sagt es – zusammengefasst, ein Satz je Fall mit höchstens drei Staffeln und „und 2 weitere“:
-- „Die neue Veto-Vorlage geht in 8 Staffeln mit „Vorgaben auf Staffeln übertragen“ mit.“ – nach dem Übertragen passt sie (bei einer
+- „In 8 Staffeln gilt die neue Veto-Vorlage erst nach „Vorgaben auf Staffeln übertragen“.“ – nach dem Übertragen passt sie (bei einer
   Staffel steht ihr Name da). Der Map-Pool geht dabei immer mit, auch nach dem ersten Ergebnis.
 - „Liga 1 · Staffel A und Liga 1 · Staffel B spielen weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage.“ – sie passt dort auch
   nach dem Übertragen nicht (nach dem ersten Ergebnis bleiben Best of und Modusfolge). So läuft dort das Veto weiter wie bisher.

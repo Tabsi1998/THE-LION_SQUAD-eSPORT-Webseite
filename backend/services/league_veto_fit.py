@@ -9,12 +9,13 @@ Best of, ihrer Modusfolge und ihrem Pool passt. Die Warnungen fasst ``warnings_f
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from services import league_games, league_veto_rules as rules_mod, map_pools
 from services.bracket_fill_in import has_started, is_auto_bye
 
-SEASON, UNTIL_SYNC, KEEPS, BUSY = "season", "until_sync", "keeps", "busy"
+SEASON, UNTIL_SYNC, KEEPS, BUSY, QUIET = "season", "until_sync", "keeps", "busy", "quiet"
 SEASON_MISFIT = "Die Veto-Vorlage passt noch nicht zur Season (siehe Kasten Veto) – die Staffeln behalten ihre bisherige."
 OWN_ORDER_AND_POOL = "mit ihrer Modusfolge und ihrem Map-Pool"
 NAMES_SHOWN = 3
@@ -104,12 +105,20 @@ async def staffel_mismatch(db, tournament: dict, rules: dict, season: dict, *, t
         if after_pool is None or fits(rules, after_pool, after):
             return Misfit(UNTIL_SYNC, name)
     best_of = int(after.get("best_of") or 1)
-    return Misfit(KEEPS, name, f"Best of {best_of}" if best_of != s_best_of else OWN_ORDER_AND_POOL)
+    reason = f"Best of {best_of}" if best_of != s_best_of else OWN_ORDER_AND_POOL
+    # Läuft dort ohnehin kein Veto (etwa eine Liga N, deren Best of schon immer abwich - Nr. 106), behält die Staffel ihre Vorlage still:
+    # „bleibt die bisherige“ klänge nach einem laufenden Veto, und „Was fehlt noch?“ nennt die Lücke schon (Prüfung #2528).
+    return Misfit(QUIET if not await staffel_runs_veto(db, tournament) else KEEPS, name, reason)
+
+
+def _natural(name: str) -> list:
+    """Sortierschlüssel mit Zahlen als Zahlen: „Liga 3“ vor „Liga 10“."""
+    return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", name)]
 
 
 def _names(names: list[str]) -> str:
     """„A“, „A und B“, „A, B und C“ - ab vier „A, B, C und 2 weitere“ (höchstens drei Namen)."""
-    names = sorted(names)
+    names = sorted(names, key=_natural)
     if len(names) > NAMES_SHOWN:
         rest = len(names) - NAMES_SHOWN
         return f"{', '.join(names[:NAMES_SHOWN])} und {'eine weitere' if rest == 1 else f'{rest} weitere'}"
@@ -125,7 +134,7 @@ def warnings_for(misfits: list[Misfit]) -> list[str]:
     until = [row.name for row in misfits if row.kind == UNTIL_SYNC]
     if until:
         where = until[0] if len(until) == 1 else f"{len(until)} Staffeln"
-        out.append(f"Die neue Veto-Vorlage geht in {where} mit „Vorgaben auf Staffeln übertragen“ mit.")
+        out.append(f"In {where} gilt die neue Veto-Vorlage erst nach „Vorgaben auf Staffeln übertragen“.")
     reasons: dict[str, list[str]] = {}
     for row in misfits:
         if row.kind == KEEPS:
@@ -135,8 +144,8 @@ def warnings_for(misfits: list[Misfit]) -> list[str]:
                    "Veto-Vorlage.")
     busy = [row.name for row in misfits if row.kind == BUSY]
     if busy:
-        out.append(f"{_names(busy)} {'wird' if len(busy) == 1 else 'werden'} gerade bearbeitet – dort geht die neue Veto-Vorlage mit dem "
-                   "nächsten Übertragen mit.")
+        out.append(f"{_names(busy)} {'wird' if len(busy) == 1 else 'werden'} gerade bearbeitet – dort gilt die neue Veto-Vorlage erst nach "
+                   "dem nächsten Übertragen.")
     return out
 
 

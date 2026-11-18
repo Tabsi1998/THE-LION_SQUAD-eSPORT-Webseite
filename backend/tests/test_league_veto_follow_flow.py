@@ -39,7 +39,7 @@ BO3_STEPS = [
 FULL = {HP: ["Hafen", "Nebel", "Turm", "Glut"], SND: ["Nebel", "Turm", "Kai", "Werk"], CTL: ["Hafen", "Kai", "Ruine"]}
 SMALLER = {HP: ["Hafen", "Nebel", "Turm"], SND: ["Nebel", "Turm", "Kai"], CTL: ["Hafen", "Kai", "Ruine"]}
 STAFFEL = "Liga 1 · Staffel A"
-UNTIL_SYNC_ONE = "Die neue Veto-Vorlage geht in Liga 1 · Staffel A mit „Vorgaben auf Staffeln übertragen“ mit."
+UNTIL_SYNC_ONE = "In Liga 1 · Staffel A gilt die neue Veto-Vorlage erst nach „Vorgaben auf Staffeln übertragen“."
 KEEPS_BO5 = f"{STAFFEL} spielt weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage."
 
 
@@ -309,7 +309,7 @@ async def test_three_staffeln_are_named_in_one_sentence(flow):
     for _ in range(2):
         ok(await flow.post(f"{ADMIN}/divisions/{w['division']['id']}/staffeln", json={}))
     saved = ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 3}))
-    assert saved["warnings"] == ["Die neue Veto-Vorlage geht in 3 Staffeln mit „Vorgaben auf Staffeln übertragen“ mit."]
+    assert saved["warnings"] == ["In 3 Staffeln gilt die neue Veto-Vorlage erst nach „Vorgaben auf Staffeln übertragen“."]
     ok(await flow.patch(f"{ADMIN}/seasons/{sid}", json={"best_of": 5}))
     for row in await flow.db.tournaments.find({"league_context.season_id": sid}, {"_id": 0, "id": 1}).to_list(None):
         await with_result(flow, row["id"])
@@ -373,7 +373,7 @@ async def test_a_staffel_being_edited_is_told_and_gets_it_with_the_transfer(flow
     monkeypatch.setattr(league_veto, "STAFFEL_WAIT_SECONDS", 0.2)
     async with mutation_lock(flow.db, tournament_write_resource(w["tid"]), wait_seconds=1, lease_seconds=30, retry_seconds=0.05):
         saved = ok(await flow.put(f"{ADMIN}/seasons/{sid}/map-pool", json=pool_body(w, FULL)))
-    assert f"{STAFFEL} wird gerade bearbeitet – dort geht die neue Veto-Vorlage mit dem nächsten Übertragen mit." in saved["warnings"]
+    assert f"{STAFFEL} wird gerade bearbeitet – dort gilt die neue Veto-Vorlage erst nach dem nächsten Übertragen." in saved["warnings"]
     assert (await template(flow, sid))["veto_rules"]["steps"] == ANLAGE_B
     assert await staffel_steps(flow, w) != ANLAGE_B
     await sync(flow, sid)

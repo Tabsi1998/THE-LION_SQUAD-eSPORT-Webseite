@@ -2411,8 +2411,8 @@ nennt das in `warnings`. Die Sätze sind **zusammengefasst** (`league_veto_fit.w
 - passt schon zur Season nicht (`template_problems` mit Pool, Best of und Modusfolge der Season): „Die Veto-Vorlage passt noch nicht zur
   Season (siehe Kasten Veto) – die Staffeln behalten ihre bisherige.“
 - passt nach dem Übertragen – mit dem Pool der Season (der geht immer mit, auch nach dem ersten Ergebnis; ohne Season-Pool fällt der der
-  Staffel vor dem ersten Ergebnis weg) und, ohne Ergebnis, Best of und Modusfolge der Season bzw. ihrer Liga N: ein Satz für alle, „Die
-  neue Veto-Vorlage geht in 8 Staffeln mit „Vorgaben auf Staffeln übertragen“ mit.“, bei einer Staffel mit Namen;
+  Staffel vor dem ersten Ergebnis weg) und, ohne Ergebnis, Best of und Modusfolge der Season bzw. ihrer Liga N: ein Satz für alle, „In
+  8 Staffeln gilt die neue Veto-Vorlage erst nach „Vorgaben auf Staffeln übertragen“.“, bei einer Staffel mit Namen;
 - passt auch dann nicht: je Grund ein Satz mit höchstens drei Namen, „Liga 1 · Staffel A, Liga 1 · Staffel B, Liga 1 · Staffel C und
   2 weitere spielen weiter Best of 5 – dort bleibt die bisherige Veto-Vorlage.“ (bei gleichem Best of „… mit ihrer Modusfolge und ihrem
   Map-Pool …“);
@@ -2428,7 +2428,7 @@ Staffel ohne Pool (dort läuft ohnehin kein Veto). **Liga N:** Eine Liga N mit e
 Vorlage, wenn die Season ein anderes Best of bekommt. Nr. 106 bleibt erfüllt: Eine Liga N, deren Best of schon immer abwich, hatte nie eine
 passende Vorlage, dort läuft weiter kein Veto. Gesperrte (`locked_at`) und abgeschlossene Staffeln (`final_table`) bleiben, wie sie sind.
 **Sperren:** `store_template` hält die Sperre der Vorlage und nimmt je Staffel die Turnier-Sperre (`tournament_write_resource`, 5 s
-Wartezeit; belegt: Warnung „… wird gerade bearbeitet – dort geht die neue Veto-Vorlage mit dem nächsten Übertragen mit.“). Reihenfolge
+Wartezeit; belegt: Warnung „… wird gerade bearbeitet – dort gilt die neue Veto-Vorlage erst nach dem nächsten Übertragen.“). Reihenfolge
 immer Vorlage → Turnier; wer eine Turnier-Sperre hält (Übertragen, Map entfernen), nimmt die Sperre der Vorlage nie – alle Aufrufer rufen
 `follow_season` erst nach ihren eigenen Sperren. Das Protokoll `league.season.veto_rules` zählt `staffeln` (bekommen) und `kept`
 (behalten).
