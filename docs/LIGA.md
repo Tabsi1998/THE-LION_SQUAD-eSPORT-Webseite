@@ -2402,10 +2402,20 @@ Verspätung zählt nur beim Check-in.
 `GET|PUT /api/admin/leagues/seasons/{id}/veto-rules` (Zuständigkeit `season`, lesen jede Zuständigkeit); das Speichern schreibt sofort auf
 alle nicht gesperrten Staffeln der Season (eigene Gruppe `veto` beim Übertragen, wirkt wie `checkin`; `staffel_fields` beim Anlegen).
 Neue Seasons bekommen das Objekt mit `enabled: true` und der Vorlage aus `propose` (Modusfolge und Best of; ein Pool fehlt beim Anlegen
-noch, also nur Wahlen und Decider; Fabian Nr. 105) und dem Merker `auto: true` – **unberührt** (Nr. 108): Solange er steht, schlägt
-`league_veto.follow_pool` die Vorlage bei jeder Änderung des Season-Pools (`PUT …/map-pool`, „Map aus dem Pool nehmen“) neu vor und
-speichert sie wie von Hand (Season, Staffeln, Protokoll mit `via: "auto"`). Das erste Speichern über `PUT …/veto-rules` nimmt den Merker
-weg; ab dann bleibt die Vorlage, und `season_readiness` nennt mit `veto_invalid`, was mit dem Pool nicht aufgeht. `normalize` übergeht den
+noch, also nur Wahlen und Decider; Fabian Nr. 105) und dem Merker `auto: true` – **unberührt** (Nr. 108, Nr. 199): Solange er steht,
+schlägt `league_veto.follow_season` die Vorlage bei jeder Änderung des Season-Pools (`PUT …/map-pool`, „Map aus dem Pool nehmen“) und
+beim Speichern der Season mit neuer Modusfolge (`game_mode_order`) oder neuem `best_of` (`PATCH …/seasons/{id}`, #2528) neu vor und
+speichert sie wie von Hand (Season, Staffeln, Protokoll mit `via: "auto"`). Das ist die **eine Stelle** für alle drei Wege: Sie liest
+Season und Pool unter der Sperre der Vorlage (`league_season_veto_resource`, `league_season:{id}:veto`, 10 s Wartezeit) **frisch** –
+nie den Stand, den der Aufrufer vor seinem Schreiben gelesen hat. Werden Pool und Modusfolge kurz nacheinander oder gleichzeitig
+gespeichert, wartet das zweite Nachziehen und passt danach zum letzten Stand; `PUT …/veto-rules` nimmt dieselbe Sperre (belegt: 409
+„Die Veto-Vorlage wird gerade geändert …“), ein gleichzeitiges Nachziehen überschreibt eine eigene Vorlage also nie. Ohne Pool gilt der
+Vorschlag wie beim Anlegen, ein Pool eines anderen Spiels lässt die Vorlage stehen. Folgt die Vorlage einem neuen Best of, das eine
+aktive Liga N mit eigenem Best of nicht spielt, nennt die Antwort des `PATCH` das in `warnings` (derselbe Satz wie
+`veto_division_mismatch` in „Was fehlt noch?“, `league_readiness.veto_division_mismatches`). Ein schon begonnenes Veto am Spiel behält
+seinen Schnappschuss (`flow.veto.template`), nur Season und nicht gesperrte Staffeln bekommen die neue Vorlage. Das erste Speichern über
+`PUT …/veto-rules` nimmt den Merker weg; ab dann bleibt die Vorlage, und `season_readiness` nennt mit `veto_invalid`, was mit Pool,
+Modusfolge oder Best of nicht aufgeht. `normalize` übergeht den
 Merker, die Antwort von `GET …/veto-rules` nennt ihn als `auto`. Bestehende Seasons ohne Feld bleiben aus, keine Migration. Pflicht im System, je Season abschaltbar (Nr. 21). Liga N weicht nicht ab
 (kein `overrides`-Eintrag; mit anderem Best of läuft dort kein Veto, Warnung – Nr. 106). Protokoll `league.season.veto_rules` mit altem und
 neuem Wert.
@@ -2683,7 +2693,10 @@ Eingriffe als Leitung (`veto_lead`: Vorgang und Zeit). Kontolöschung (`match_fl
 Best of und „Modus je Map“ darüber): an/aus, Team A = Heim oder Los, Zeit je Schritt, Schrittliste (hinzufügen, nach oben/unten, löschen)
 mit Prüfung live (`frontend/src/lib/leagueVeto.js`, dieselben Sätze wie der Server für Positionen und Poolgrößen; die Suche bei `never`
 und der Abgleich mit dem gespeicherten Pool kommen vom Server), Knopf **„Vorschlag aus Modusfolge und Pools“**, eigener Knopf
-**„Veto speichern“**. „Was fehlt noch?“ springt bei `veto_invalid` an den Kasten, bei `veto_without_checkin` zum Check-in.
+**„Veto speichern“**. „Was fehlt noch?“ springt bei `veto_invalid` an den Kasten, bei `veto_without_checkin` zum Check-in. Die Sätze
+des Servers (`problems`) gelten dem gespeicherten Stand: Weicht das Formular davon ab (nach „Vorschlag“ oder einer eigenen Änderung),
+stehen sie nicht mehr bei den Meldungen des Formulars, sondern gekennzeichnet als **„Gespeicherter Stand – gilt, bis ihr ‚Veto
+speichern‘ drückt“** darunter (`veto-rules-saved-problems`, #2528).
 Die Art **„Vorgabe“** (`preset`) steht in der Auswahl neben Sperren, Wählen und Decider – ohne Team („Liga-Leitung“), mit Position.
 Enthält die gespeicherte Vorlage sie, steht **im selben Kasten** der Block **„Vorgabe der Woche“**
 (`pages/admin/league/SeasonVetoPresets.jsx`, #2326): je Spielwoche eine Zeile mit den Tagen der Woche und je Modus einer Auswahl aus dem

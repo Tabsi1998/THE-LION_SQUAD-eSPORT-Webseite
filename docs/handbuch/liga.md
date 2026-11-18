@@ -695,9 +695,14 @@ ist PlayStation.“ Wer keine Plattform angibt, bekommt „Plattform fehlt im Pr
 
 Auf der Season-Seite im Reiter **Spielbetrieb** steht direkt unter **Serie** der Kasten **Veto** (Zuständigkeit „Season konfigurieren“),
 mit eigenem **Veto speichern**; er gilt sofort für alle Staffeln der Season, ein gerade laufendes Veto behält seinen Stand. Neue Seasons
-beginnen mit **Veto an**: Die Vorlage folgt dem Map-Pool automatisch (wie **Vorschlag aus Modusfolge und Pools**) – bei jedem Speichern
-des Pools und bei „Map aus dem Pool nehmen“ –, bis ihr den Kasten das erste Mal speichert; der Kasten sagt das, solange es gilt. Danach
-bleibt die Vorlage, wie ihr sie gespeichert habt, und **Was fehlt noch?** im Überblick nennt, was mit dem Pool nicht mehr aufgeht. Ältere
+beginnen mit **Veto an**: Die Vorlage folgt automatisch dem Map-Pool, **Modus je Map** und dem **Best of** der Season (wie **Vorschlag
+aus Modusfolge und Pools**) – bei jedem Speichern des Pools, bei „Map aus dem Pool nehmen“ und beim Speichern einer neuen Modusfolge
+oder eines neuen Best of unter **Serie** –, bis ihr den Kasten das erste Mal speichert; der Kasten sagt das, solange es gilt. Danach
+bleibt die Vorlage, wie ihr sie gespeichert habt, und **Was fehlt noch?** im Überblick nennt, was mit Pool, Modusfolge oder Best of
+nicht mehr aufgeht. Spielt eine Liga N ein eigenes Best of, läuft dort kein Veto: Nach dem Speichern eines neuen Best of zeigt eine
+Warnung, welche Liga betroffen ist, **Was fehlt noch?** ebenso. Ein Veto, das an einem Spiel schon läuft, behält seinen Stand.
+Drückt ihr **Vorschlag** oder ändert Schritte, stehen Meldungen zur alten, gespeicherten Vorlage nur noch klein darunter als
+**Gespeicherter Stand** – bis ihr **Veto speichern** drückt. Ältere
 Seasons ohne Kasten bleiben aus – dort tragen die Teams die Maps wie bisher beim Ergebnis ein. Das Veto braucht den **Check-in** (2.7b):
 Es beginnt, sobald beide Seiten eingecheckt sind, Map 1 folgt direkt danach.
 
