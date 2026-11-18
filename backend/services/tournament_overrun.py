@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from models import now_utc
+from services import staffel_guard
 from services.public_phase import parse_dt
 
 # Offen heißt: noch zu spielen oder zu entscheiden.
@@ -109,6 +110,7 @@ async def ended_live_rows(db, user: dict, *, now: datetime | None = None) -> lis
         rows.append({
             "id": tournament["id"], "title": tournament.get("title") or "Turnier", "slug": tournament.get("slug"),
             "end_date": tournament.get("end_date"), "open_matches": open_matches, "league": is_league_staffel(tournament),
-            "admin_url": f"/admin/tournaments/{tournament['id']}",
+            # Eine Staffel auf ihre Staffel-Seite (Paket D, #2262), der Stand steht dort im Überblick.
+            "admin_url": staffel_guard.tournament_admin_path(tournament),
         })
     return sorted(rows, key=lambda row: str(row.get("end_date") or ""))

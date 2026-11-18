@@ -11,8 +11,9 @@ Season selbst ein, den Starttermin legt der Obmann fest. Für die Captains der C
 - **Admin → eSports → Spiele → Zahnrad** (`/admin/games/<Spiel>`) – die Spielseite: Reiter **Modi** (etwa Stellung, Suchen & Zerstören)
   und Reiter **Maps** (`#maps`) – Map-Bibliothek als Tabelle Map × Modus mit Bildern
 - **Admin → eSports → Liga** (`/admin/leagues`) – Liga, Season, Liga 1, 2 …, Staffel A, B …
-- **Turnierverwaltung der Staffel** (`/admin/tournaments/<Staffel>`, aus der Season über **Turnierverwaltung · Co-Teams
-  zuteilen**) – Co-Teams zuteilen, starten, Spiele, Ergebnisse
+- **Staffel-Seite** (`/admin/leagues/staffeln/<Staffel>`, aus der Season über **Ligen und Staffeln → Staffel öffnen**) – Co-Teams
+  zuteilen, starten, Spielplan, Spiele und Ergebnisse, Tabelle, Protokoll, Einstellungen (2.5). Alte Adressen
+  `/admin/tournaments/<Staffel>` leiten dorthin weiter; die Turnierliste zeigt keine Staffeln.
 - **Ligaseite** (`/liga/<liga>/<season>`, etwa `/liga/call-of-duty/season-1`) – was Mitglieder und Gäste sehen, mit den Unterseiten
   **Spieltage** und **Teams** (siehe [2.12](#212-die-ligaseite-übersicht-spieltage-teams))
 
@@ -109,11 +110,13 @@ automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nu
 
 - Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
 - Zuständige finden ihre Ligen unter **Admin → Mein Dienst → Meine Ligen** und im Menü unter **Liga**. Sie sehen nur ihre Ligen und nur die Knöpfe ihrer Zuständigkeiten. Das gilt auch für Turnierleitung und Helfer, die zugleich zuständig sind.
-- Unter **Admin → eSports → Turniere** stehen für Zuständige und den Bereich **Ligen** die Staffeln, die sie leiten: Zuständige sehen die Staffeln ihrer Ligen, der Bereich alle. Gewöhnliche Turniere stehen dort nicht, und Knöpfe der Turnierleitung (Neues Turnier, Anmeldung öffnen) gibt es nicht.
+- **Turniere** sehen Zuständige und der Bereich **Ligen** im Menü nicht mehr: Die Turnierliste zeigt keine Staffeln, jede Staffel hat ihre Staffel-Seite unter **Liga** (2.5). Wer `/admin/tournaments` öffnet, landet bei **Liga**. Wer zusätzlich den Bereich Turniere oder einen Helfer-Einsatz hat, sieht **Turniere** wie bisher – dort stehen dann nur Turniere.
+
+<img src="../assets/liga/menue-liga-leitung-390.png" alt="Admin-Menü am Handy für den Bereich Ligen: nur Dashboard und Liga, kein Eintrag Turniere" width="300">
 - **Bilder:** Zuständige ohne Admin-Medien laden Emblem, Banner und Gewinnbilder als eigene Bilder hoch (kein SVG), die Mediathek zeigt ihnen nur diese.
 - Vergeben und entfernen darf nur der Bereich **Ligen**. Liga anlegen und löschen auch.
 - **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Reiter **Anmeldung und Kader** → **Kader und Spiel-IDs** → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
-- **Helfer** am Turnier (Organisation, Schiedsrichter, Ergebnisdienst, Station) lesen in einer Staffel nur noch. Ergebnisse tragen dort nur Zuständige und der Bereich Ligen ein.
+- **Helfer** am Turnier (Organisation, Schiedsrichter, Ergebnisdienst, Station) lesen in einer Staffel nur noch. Ergebnisse tragen dort nur Zuständige und der Bereich Ligen ein. Alte Helfer-Einsätze in einer Staffel stehen in **Mein Dienst** nur bei Personen mit einem Recht in dieser Liga, sonst gar nicht, und sie zählen nicht als Turnier-Einsatz.
 
 **Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
 keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen und setzt keinen Termin direkt. Die Matchseite und der Matchplan sagen es, der
@@ -457,8 +460,9 @@ Unter jedem Co-Team, das in einer Staffel spielt, zeigt **Spielberechtigung** di
 
 ### 2.5 Co-Teams zuteilen
 
-**Neu: die Staffel-Seite.** Im Reiter **Ligen und Staffeln** steht bei jeder Staffel zusätzlich **Staffel öffnen**. Die Seite gehört zur
-Liga-Verwaltung: Oben stehen die Brotkrumen **Liga › Season › Liga 1 · Staffel A** und der Stand. Im Reiter **Überblick** findest du den
+**Die Staffel-Seite.** Im Reiter **Ligen und Staffeln** führt bei jeder Staffel **Staffel öffnen** auf ihre Seite. Sie gehört zur
+Liga-Verwaltung: Oben stehen die Brotkrumen **Liga › Probe-Liga › Season 1 › Liga 1 · Staffel A** (die Liga springt auf der
+Liga-Übersicht an ihre Stelle) und der Stand. Im Reiter **Überblick** findest du den
 Liga-Ablauf, was noch fehlt, **Liga starten** bzw. den Status (mit denselben Rückfragen wie bisher), die Zahlen und die Wege zu Leitstand,
 Season und Ligaseite. Im Reiter **Teilnehmer** stehen die Co-Teams mit **Co-Team zuteilen**, **Entfernen**, **Austritt**,
 **Disqualifizieren**, **Kader** (mit „1 gesperrt“, „1 wartet auf Freigabe“ oder „1 ohne gültige ID“), aktiven Strafen und „Nachgemeldet ab
@@ -478,12 +482,26 @@ in Staffeln nicht) sowie **Werkzeuge**: **Staffel sperren** bzw. **Entsperren** 
 nur vor dem Start mit Grund (**Season konfigurieren**). Jeder Unterreiter hat eine eigene Adresse (`#darstellung`, `#vorgaben`,
 `#links`, `#helfer`, `#werkzeuge`). Im **Überblick** steht bei **Offen in dieser Staffel** die Zahl
 der Aufgaben aus dem Leitstand; der Link öffnet den Leitstand gleich gefiltert. Nach dem Ende zeigt der Überblick dort auch die
-**Rückmeldungen der Teams** (Umfrage nach dem Ende, ohne Namen; **Liga verwalten**). Bis zur Umstellung bleibt auch die Turnierverwaltung
-nutzbar, die Schritte unten gelten unverändert. Knöpfe
-gibt es nur mit der passenden Zuständigkeit: Zuteilen, Entfernen, Austritt und Disqualifizieren mit **Teams freigeben**, Status und **Liga
-starten** mit **Liga verwalten** (das gilt jetzt auch in der Turnierverwaltung).
+**Rückmeldungen der Teams** (Umfrage nach dem Ende, ohne Namen; **Liga verwalten**). Knöpfe gibt es nur mit der passenden
+Zuständigkeit: Zuteilen, Entfernen, Austritt und Disqualifizieren mit **Teams freigeben**, Status und **Liga starten** mit **Liga
+verwalten**.
 
-1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
+**Alte Links:** Die Turnierverwaltung zeigt keine Staffeln mehr. Lesezeichen, Glocken-Einträge und Links auf
+`/admin/tournaments/<Staffel>` leiten auf die Staffel-Seite weiter, ein alter Reiter landet an seiner Stelle (`?tab=participants` →
+Teilnehmer, `?tab=matchplan` → Spielplan, `?tab=stages` → Spiele und Ergebnisse, `?tab=bracket` → Tabelle, `?tab=edit` →
+Einstellungen, `?tab=maps` → Aus der Season, `?tab=staff` → TV und Helfer). Auch **Mein Dienst**, **Läuft noch nach dem Ende**,
+**Admin → Strafen** und **Was fehlt** führen direkt auf die Staffel-Seite.
+
+<img src="../assets/liga/staffel-weiterleitung-390.png" alt="Staffel-Seite am Handy nach einem alten Link mit ?tab=participants: Brotkrumen Liga, Probe-Liga, Season 1, darunter Liga 1 · Staffel A, der Reiter Teilnehmer ist offen" width="300">
+<img src="../assets/liga/staffel-weiterleitung-1440.png" alt="Dieselbe Staffel-Seite am PC: Brotkrumen mit eigener Stufe für die Liga, Reiter Teilnehmer mit Co-Team zuteilen und der Liste der Co-Teams" width="720">
+
+**TV-Ansicht einer Staffel** (**Einstellungen → TV und Helfer → TV-Ansicht öffnen**): Liga-Wörter auch am Bildschirm – eine
+entschiedene Staffel heißt „Staffel entschieden“, die Folie mit den Zahlen „Zahlen zur Staffel“.
+
+<img src="../assets/liga/tv-staffel-1440.png" alt="TV-Ansicht einer beendeten Staffel: Kopf Probe-Liga Season 3 Liga 1 Staffel A mit Staffel entschieden, Spieltage mit Ergebnissen, rechts der Champion" width="720">
+<img src="../assets/liga/tv-staffel-390.png" alt="Dieselbe TV-Ansicht schmal: Kopf mit Staffel entschieden über den Spieltagen" width="300">
+
+1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Staffel öffnen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
 3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein oder zu groß, Team schon in der Staffel, Staffel voll, jemand steht schon in einem anderen Co-Team der Season …). Fehlende Geburtsdaten, ein zu junges Mitglied, eine andere Plattform oder zu wenige Spielberechtigte stehen nur als Hinweis da: Zuteilen geht, gesperrt wird beim Check-in (3.9).
 4. Bei jedem Co-Team steht je Spieler die **Spiel-ID** (Haken) bzw. **keine ID** (gelb), darunter „Ohne gültige
@@ -519,7 +537,7 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 - **Verlängern:** **Mit Grund verlängern** → neues Ende (höchstens bis **Anmeldung bis**) und Grund (mindestens 5 Zeichen) →
   **Verlängern**. Der Grund steht im Protokoll. **Verlängerung zurücknehmen** geht auch nur mit Grund.
 - **Spiele nachtragen:** Teilst du ein Co-Team einer Staffel zu, deren Spielplan schon fest ist, legt das Zuteilen noch keine Spiele an.
-  Das Team steht im Reiter **Anmeldung und Kader** unter **Nachmeldungen** (auch nach dem Sonderweg über die Turnierverwaltung).
+  Das Team steht im Reiter **Anmeldung und Kader** unter **Nachmeldungen** (auch nach dem Sonderweg **Co-Team zuteilen**).
   **Spiele nachtragen** zeigt die Vorschau: je Paarung Woche, Heim und Gast, warum die Woche frei ist und den Standardtermin. Darunter
   steht, was entfällt („Gegen X kein Spiel mehr möglich.“). **… Spiele anlegen** legt sie an, beide Seiten bekommen eine Nachricht.
 - **Regeln dahinter:** Das Team spielt nur in Wochen, die noch nicht begonnen haben. Nachholspiele für vergangene Wochen gibt es nicht.
@@ -568,30 +586,28 @@ Teilst du ein Co-Team mit offener Anmeldung über 2.5 direkt zu, gilt die Anmeld
 
 ### 2.6 Spielplan und Start
 
-Oben in der Turnierverwaltung der Staffel: **Liga starten**. Damit wird der Spielplan fest (etwa acht Teams: sieben Spieltage
+Auf der Staffel-Seite im Reiter **Überblick**: **Liga starten**. Damit wird der Spielplan fest (etwa acht Teams: sieben Spieltage
 zu je vier Spielen, Heimrecht ausgeglichen, gesperrte Wochen werden übersprungen) und die Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen und melden. Mit der ersten Staffel springt
 die Season von *Entwurf* auf *Läuft*, ein von Hand gesetzter Stand bleibt.
 
 - Kein **Turnier-Check-in** und keine Turnier-Anmeldung – die Co-Teams sind zugeteilt. Eingecheckt wird je Spiel auf der
-  Matchseite (2.7b, 3.1b), angemeldet über die Season (2.5a). Die Status-Auswahl oben
-  bietet für eine Staffel nur Entwurf, Live, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt.
-- Den Spielplan vor dem Start ansehen: Reiter **Matchplan** (Vorschau mit Spielwochen) bzw. **Spiele**. Der Reiter
-  **Tabelle** führt zur Tabelle und zum Spielplan auf der öffentlichen Seite. Neu mischen: **Werkzeuge → Vorschau neu
-  mischen** – nur vor dem Start; danach steht der Spielplan.
+  Matchseite (2.7b, 3.1b), angemeldet über die Season (2.5a). Vor dem Start gibt es nur **Liga starten** und **Staffel
+  absagen**, danach bietet die Auswahl Spielbetrieb, Pausiert, Beendet und Abgesagt.
+- Den Spielplan vor dem Start ansehen: Reiter **Spielplan** (Vorschau mit Spielwochen) bzw. **Spiele und Ergebnisse**. Neu
+  mischen: Reiter **Spielplan** → **Vorschau neu mischen** – nur vor dem Start; danach steht der Spielplan.
 
-Die Turnierverwaltung einer Staffel zeigt nur, was die Liga braucht. Oben steht, wohin sie gehört („Liga 1 · Staffel
-A“) mit **Season öffnen** und **Ligaseite**. Im Reiter **Bearbeiten** stehen die Werte der Season (Spiel, Start und
+Die Staffel-Seite zeigt nur, was die Liga braucht. Oben stehen die Brotkrumen, im **Überblick** die Wege zu Season und
+Ligaseite. Unter **Einstellungen → Aus der Season** stehen die Werte der Season (Spiel, Start und
 Ende, Spielwoche, Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Antwortfrist auf
 Terminvorschläge, Sichtbarkeit, Regeltext) nur zum Lesen unter **Aus der Season** – ändern in der Season, dann
 **Vorgaben übertragen** (2.7). Auch den Map-Pool pflegt die Season. Anmeldung, Check-in, Discord, Preise, Jahreswertung,
-Setzliste und Weiterkommen gibt es in der Staffel nicht. Änderbar bleiben Titel, Beschreibung, Banner, Partner und
-Streaming. Die Antwortfrist ändert sich nur noch über die Season (oder Liga N) und **Vorgaben übertragen** – auch bei
+Setzliste und Weiterkommen gibt es in der Staffel nicht. Änderbar bleiben unter **Einstellungen → Auftritt** Titel,
+Beschreibung, Banner, Partner und Streaming. Die Antwortfrist ändert sich nur noch über die Season (oder Liga N) und **Vorgaben übertragen** – auch bei
 älteren Seasons: dort ist das Feld leer und jede Staffel behält ihre bisherige Frist, bis du in der Season einen Wert
 einträgst und überträgst.
 
-Eine Staffel lässt sich nur **vor dem Start** löschen – in der Turnierliste oder auf der Season-Seite (2.9). Danach
-bleibt sie: Status **Abgesagt** oder **Archiviert**. In der Turnierliste tragen Staffeln das Kennzeichen „Liga ·
-Staffel A“; der Filter **Nur Liga-Staffeln** zeigt nur sie.
+Eine Staffel lässt sich nur **vor dem Start** löschen – auf der Staffel-Seite unter **Einstellungen → Werkzeuge** oder auf der
+Season-Seite (2.9). Danach bleibt sie: Status **Abgesagt** oder **Archiviert**. In der Turnierliste stehen keine Staffeln.
 
 ### 2.7 Vorgaben später ändern und übertragen
 
@@ -848,9 +864,9 @@ Eine Season lässt sich nur als **Entwurf** löschen. Eine Liga löschen heißt:
 Staffeln darunter.
 
 **Staffel löschen:** auf der Season-Seite im Reiter **Ligen und Staffeln** der Papierkorb in der Zeile der Staffel – nur im **Entwurf** und vor dem
-festen Spielplan, wie in der Turnierverwaltung. Zugeteilte Co-Teams werden dabei aus der Staffel genommen (das Blatt
-sagt, wie viele); Grund eintragen → **Endgültig löschen**. Nach dem Start: Status **Abgesagt** oder **Archiviert** in
-der Turnierverwaltung.
+festen Spielplan, wie auf der Staffel-Seite. Zugeteilte Co-Teams werden dabei aus der Staffel genommen (das Blatt
+sagt, wie viele); Grund eintragen → **Endgültig löschen**. Nach dem Start: Status **Abgesagt** im **Überblick** der Staffel-Seite;
+archiviert wird über den Abschluss der Season.
 
 ### 2.10 Gestaltung: Emblem, Banner, Farbe und Gewinne
 
@@ -868,8 +884,8 @@ Gestaltung wirkt beim **Speichern sofort**, ohne „Vorgaben übertragen“.
 Season-Seite zeigt das geerbte zur Vorschau.
 
 **Wo das Banner noch auftaucht:** in der **Link-Vorschau** (Teilen in WhatsApp, Discord …) einer öffentlichen Season
-und bei den **Staffeln** – die App zeigt eine Staffel als Turnier mit ihrem Banner. Hat eine Staffel in der
-Turnierverwaltung ein eigenes Banner bekommen, bleibt das stehen.
+und bei den **Staffeln** – die App zeigt eine Staffel als Turnier mit ihrem Banner. Hat eine Staffel auf ihrer
+Staffel-Seite (**Einstellungen → Auftritt**) ein eigenes Banner bekommen, bleibt das stehen.
 
 **Gewinne sind reine Anzeige:** Staffeln zählen weiter nicht für XP, Pokale oder die Jahreswertung.
 
@@ -1127,7 +1143,8 @@ Gilt für alle Turniere: Steht ein Turnier nach seinem eingetragenen Ende noch a
 (und die Startseite der Verwaltung) unter **Braucht deine Entscheidung**: „Läuft laut Stand noch, Ende war am … – beenden?“.
 Sind noch Spiele offen, zeigt die öffentliche Seite weiter **Läuft**; sind alle fertig, zeigt sie **Beendet**, und ihr stellt
 auf „Beendet“ bzw. „Ergebnisse veröffentlichen“ – erst dann gelten Gewinne und Saisonpunkte. Umgestellt wird nie von
-selbst. Die Turnierliste zeigt denselben Hinweis neben dem Stand.
+selbst. Die Turnierliste zeigt denselben Hinweis neben dem Stand; bei einer Staffel führt der Hinweis in **Mein Dienst** auf die
+Staffel-Seite.
 
 ### 3.1b Check-in und Start (Regelwerk § 8)
 
@@ -1428,7 +1445,7 @@ begründet ihr von Hand. Verwarnungen der Community-Moderation (Chat, Verhalten)
 
 ### 3.5 Tabelle und Ligaseite
 
-Die Tabelle steht auf der Ligaseite je Staffel (und in der Turnierverwaltung): Punkte, Spiele, Differenz, Form der
+Die Tabelle steht auf der Ligaseite je Staffel (und auf der Staffel-Seite im Reiter **Tabelle**): Punkte, Spiele, Differenz, Form der
 letzten fünf Spiele, Bewegung seit dem letzten Spieltag. Darunter die Spielwochen mit Pause und Reserve, jedes Spiel
 mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen. Website, App, TV, Druck und Ergebnis-PDF zeigen dieselbe
 Reihenfolge.

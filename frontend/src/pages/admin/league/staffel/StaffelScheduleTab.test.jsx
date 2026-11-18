@@ -85,6 +85,9 @@ test("Termin setzen mit „Spiele betreuen“: PATCH auf das Spiel, danach neu l
   await user.click(toggle);
   const editor = await screen.findByTestId("mp-editor");
   expect(within(editor).queryByLabelText("Station")).toBeNull();
+  // Liga-Wörter (Paket D, #2262): Kein „Planer“ wie im Turnier - ohne Termin gilt wieder die Regel der Spielwoche.
+  expect(within(editor).getByTestId("mp-editor-empty-hint")).toHaveTextContent("Regel der Spielwoche");
+  expect(editor).not.toHaveTextContent("Planer");
   await user.click(within(editor).getByRole("button", { name: "Speichern" }));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/matches/m1", expect.objectContaining({ duration_minutes: null })));
   await waitFor(() => expect(onReload).toHaveBeenCalled());

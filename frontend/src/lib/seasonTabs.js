@@ -5,6 +5,7 @@
 import { seasonPayload } from "@/lib/league";
 import { effectiveCloses } from "@/lib/leagueApplications";
 import { dayNoon, viennaDate, viennaDateTime, viennaDay } from "@/lib/vienna";
+import { staffelNeedsUrl } from "@/lib/staffelTabs";
 
 export const SEASON_TABS = [
   { key: "ueberblick", label: "Überblick" },
@@ -257,8 +258,6 @@ const STAND_LABEL = {
   vorbereitung: "Vorbereitung", anmeldung: "Anmeldung offen", einteilung: "Einteilung", spielbetrieb: "Spielbetrieb", abschluss: "Abgeschlossen",
 };
 
-/** Die Liga-Stände für den Status-Filter der Turnierliste - Wert `league:<phase>`. */
-export const STAFFEL_STAND_FILTERS = Object.entries(STAND_LABEL).map(([key, label]) => [`league:${key}`, `Liga: ${label}`]);
 
 /**
  * Der Stand einer Staffel aus ihrer Season (`staffel.league_season` vom Server oder `season` der Season-Seite): `{key, filter, label, note}`
@@ -284,28 +283,16 @@ export function staffelStand(staffel, { season = staffel?.league_season, now = n
 }
 
 /**
- * Auf welche Werte des Status-Filters eine Zeile passt. Nur der Entwurf einer Staffel weicht dem Liga-Stand; Live, Pausiert, Beendet …
- * passen weiter auf ihren Status (Kacheln wie „?status=live“ zeigen laufende Staffeln mit), der Liga-Stand kommt dazu.
- */
-export function statusFilterKeys(tournament, now = new Date()) {
-  const status = tournament?.status || "unknown";
-  const stand = staffelStand(tournament, { now });
-  if (!stand) return [status];
-  return BEFORE_START.has(status) ? [stand.filter] : [status, stand.filter];
-}
-
-/**
  * Was der Staffel noch fehlt, mit dem Weg dorthin: `[{code, text, to}]`. Zuteilen läuft mit Anmeldefenster über den Eingang der Season,
- * sonst über „Co-Team zuteilen“ in der Turnierverwaltung; den Spielplan macht „Liga starten“ in der Staffel fest. Ohne ``league_plan``
+ * sonst über „Co-Team zuteilen“ auf der Staffel-Seite; den Spielplan macht „Liga starten“ in der Staffel fest. Ohne ``league_plan``
  * (Season-Seite) fragt niemand nach festen Spielen. Eine beendete oder archivierte Season braucht nichts mehr.
- * ``manageUrl(tab)``: wohin ein Ziel in der Bedienung der Staffel führt (Reiter der Turnierverwaltung, leer = Kopf) - die Staffel-Seite
- * der Liga-Verwaltung (#2262) nennt ihre eigenen Reiter. Ohne Angabe wie bisher die Turnierverwaltung.
+ * ``manageUrl(tab)``: wohin ein Ziel in der Bedienung der Staffel führt (alter Reiter, leer = Überblick). Ohne Angabe die Staffel-Seite
+ * der Liga-Verwaltung (Paket D, #2262) - Season-Überblick, Ligen und Staffeln und die Staffel-Seite selbst nehmen denselben Weg.
  */
 export function staffelNeeds(staffel, { season = staffel?.league_season, now = new Date(), manageUrl = null } = {}) {
   const status = staffel?.status || "draft";
   if (!staffel?.league_context || OWN_STAFFEL_STATUS.has(status) || CLOSED_SEASON.has(season?.status)) return [];
-  const manage = `/admin/tournaments/${encodeURIComponent(staffel.id || staffel.tournament_id || "")}`;
-  const toManage = manageUrl || ((tab) => (tab ? `${manage}?tab=${tab}` : manage));
+  const toManage = manageUrl || staffelNeedsUrl(staffel.id || staffel.tournament_id || "");
   const seasonId = staffel.league_context.season_id;
   const stand = staffelStand(staffel, { season, now });
   const needs = [];

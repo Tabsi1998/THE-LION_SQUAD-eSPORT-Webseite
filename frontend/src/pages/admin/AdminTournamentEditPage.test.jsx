@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Diese Seite ist mit ueber 2000 Zeilen die groesste im Frontend und schreibt
@@ -298,8 +298,7 @@ function renderPageWithFormat(format) {
       return Promise.resolve({ data: { ...TOURNAMENT, format } });
     }
     return Promise.resolve(routeFor(path));
-  });
-  return renderPage();
+  });  return renderPage();
 }
 
 async function applyStructure(user) {
@@ -867,21 +866,6 @@ test("Check-in nur in der Turnierleitung: kein Abhaken hier, ein Link zum Reiter
   expect(screen.getByTestId("admin-tr-download-checkin")).toBeInTheDocument();
 });
 
-// Liga-Staffel (#2096): keine Vor-Ort-Anmeldung über QR, der Startknopf heißt „Liga starten“.
-test("eine Liga-Staffel zeigt keine Vor-Ort-Anmeldung und startet mit „Liga starten“", async () => {
-  // „Liga starten“ verlangt in der Staffel „Liga verwalten“ (#2262) - der Server schickt es als ``can_edit_staffel``.
-  const staffel = { ...TOURNAMENT, status: "draft", format: "league", team_mode: "team", can_edit_staffel: true,
-    league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" } };
-  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).includes("/onsite-access") ? { data: {} }
-    : String(url).match(/\/tournaments\/t-1(\?|$)/) ? { data: staffel } : routeFor(String(url))));
-  renderPage();
-  await screen.findByRole("heading", { name: "Winter Cup 2026" });
-
-  expect(screen.getByTestId("admin-tr-primary-action")).toHaveTextContent("Liga starten");
-  expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.includes("/onsite-access"))).toBe(false);
-  expect(screen.queryByTestId("onsite-access-panel")).toBeNull();
-});
-
 // Die Vor-Ort-Anmeldung per QR gibt es nur vor Ort und hybrid (#2111, TA4) - ein Online-Turnier fragt sie nicht ab.
 test("ein Turnier vor Ort fragt die Vor-Ort-Anmeldung weiter ab, ein Online-Turnier nicht", async () => {
   const onsiteCalls = () => apiMock.get.mock.calls.map(([url]) => String(url)).filter((url) => url.includes("/onsite-access"));
@@ -906,6 +890,55 @@ const STAFFEL = { ...TOURNAMENT, can_edit_staffel: true, title: "Probe-Liga Seas
   league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A",
     season_admin_path: "/admin/leagues/seasons/s1", public_path: "/liga/probe-liga/season-1" } };
 
+// Paket D (#2262, Nr. 192): Staffeln stehen auf der Staffel-Seite der Liga-Verwaltung. Die alte Adresse leitet dorthin weiter -
+// alte Lesezeichen, Glocken-Einträge und Mail-Links gehen weiter, `?tab=` landet am passenden Reiter.
+function renderRedirect(entry) {
+  return render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={[entry]}>
+        <Routes>
+          <Route path="/admin/tournaments/:id" element={<AdminTournamentEditPage />} />
+          <Route path="/admin/leagues/staffeln/:tournamentId" element={<StaffelTarget />} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+}
+
+function StaffelTarget() {
+  const location = useLocation();
+  return <div data-testid="staffel-target">{`${location.pathname}${location.hash}`}</div>;
+}
+
+test.each([
+  ["/admin/tournaments/t-1", "/admin/leagues/staffeln/t-1"],
+  ["/admin/tournaments/t-1?tab=participants", "/admin/leagues/staffeln/t-1#teilnehmer"],
+  ["/admin/tournaments/t-1?tab=matchplan", "/admin/leagues/staffeln/t-1#spielplan"],
+  ["/admin/tournaments/t-1?tab=stages", "/admin/leagues/staffeln/t-1#spiele"],
+  ["/admin/tournaments/t-1?tab=bracket", "/admin/leagues/staffeln/t-1#tabelle"],
+  ["/admin/tournaments/t-1?tab=maps", "/admin/leagues/staffeln/t-1#vorgaben"],
+  ["/admin/tournaments/t-1?tab=staff", "/admin/leagues/staffeln/t-1#helfer"],
+  ["/admin/tournaments/t-1?tab=unbekannt", "/admin/leagues/staffeln/t-1"],
+])("Staffel: %s leitet auf %s", async (entry, target) => {
+  serveStaffel();
+  renderRedirect(entry);
+  expect(await screen.findByTestId("staffel-target")).toHaveTextContent(target);
+});
+
+test("Staffel: die Weiterleitung lädt nur die Staffel - keine Anmeldungen, Helfer oder Teams, also keine 403", async () => {
+  serveStaffel();
+  renderRedirect("/admin/tournaments/t-1?tab=participants");
+  await screen.findByTestId("staffel-target");
+  expect(apiMock.get.mock.calls.map(([url]) => String(url))).toEqual(["/tournaments/t-1?include_draft=true"]);
+  expect(screen.queryByRole("heading", { name: STAFFEL.title })).toBeNull();
+});
+
+test("ein gewöhnliches Turnier bleibt in der Turnierverwaltung", async () => {
+  renderRedirect("/admin/tournaments/t-1?tab=matchplan");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.queryByTestId("staffel-target")).toBeNull();
+});
+
 function serveStaffel(overrides = {}, registrations = []) {
   apiMock.get.mockImplementation((url) => {
     const path = String(url);
@@ -915,23 +948,7 @@ function serveStaffel(overrides = {}, registrations = []) {
     if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...STAFFEL, ...overrides } });
     return Promise.resolve(routeFor(path));
   });
-  return renderPage();
 }
-
-test("Staffel: Kopf mit „Liga 1 · Staffel A“, Season öffnen und Ligaseite", async () => {
-  serveStaffel();
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect(screen.getByTestId("staffel-header")).toHaveTextContent("Liga 1 · Staffel A");
-  expect(screen.getByTestId("staffel-season-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
-  expect(screen.getByTestId("staffel-public-link")).toHaveAttribute("href", "/liga/probe-liga/season-1");
-});
-
-test("Staffel: der Status kennt weder Anmeldung noch Check-in", async () => {
-  serveStaffel();
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  const values = [...screen.getByTestId("admin-tr-status-select").querySelectorAll("option")].map((option) => option.value);
-  expect(values).toEqual(["draft", "live", "paused", "completed", "results_published", "archived", "cancelled"]);
-});
 
 test("ein gewöhnliches Turnier behält alle Status", async () => {
   renderPage();
@@ -939,19 +956,6 @@ test("ein gewöhnliches Turnier behält alle Status", async () => {
   const values = [...screen.getByTestId("admin-tr-status-select").querySelectorAll("option")].map((option) => option.value);
   expect(values).toContain("check_in");
   expect(values).toContain("registration_open");
-});
-
-test("Staffel: Teilnehmer nur als Co-Teams - kein Hinzufügen, kein Check-in, Status „Zugeteilt“", async () => {
-  serveStaffel({}, [{ id: "r-1", status: "approved", display_name: "Probeteam · Rudel", team_id: "tm-1", squad_id: "sq-1" }]);
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  await screen.findAllByText("Probeteam · Rudel");
-  expect(screen.getByText(/Teilnehmer dieser Liga sind Co-Teams/)).toBeInTheDocument();
-  expect(screen.queryByTestId("participant-add-submit")).toBeNull();
-  expect(screen.queryByTestId("admin-reg-status-filter")).toBeNull();
-  expect(screen.queryByTestId("admin-reg-status-r-1")).toBeNull();
-  expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Nicht erschienen" })).toBeNull();
-  expect(screen.getAllByTestId("status-assigned")[0]).toHaveTextContent("Zugeteilt");
 });
 
 test("Format Liga ohne Staffel: Co-Teams sind nur eine Möglichkeit", async () => {
@@ -968,31 +972,6 @@ test("Format Liga ohne Staffel: Co-Teams sind nur eine Möglichkeit", async () =
   expect(screen.getByTestId("admin-tr-tab-bracket")).toHaveTextContent("Tabelle");
 });
 
-test("Staffel vor dem Start: Vorschau neu mischen statt Zurücksetzen, keine Check-in-Downloads, Reiter Tabelle", async () => {
-  serveStaffel();
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
-  expect(screen.getByTestId("admin-tr-remix")).toHaveTextContent("Vorschau neu mischen");
-  expect(screen.queryByTestId("admin-tr-download-checkin")).toBeNull();
-  expect(screen.queryByTestId("admin-tr-download-registration-qr")).toBeNull();
-  expect(screen.getByTestId("admin-tr-download-matches")).toBeInTheDocument();
-  expect(screen.getByTestId("admin-tr-tab-bracket")).toHaveTextContent("Tabelle");
-});
-
-test("Staffel live: weder Zurücksetzen noch Neu mischen", async () => {
-  serveStaffel({ status: "live" });
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
-  expect(screen.queryByTestId("admin-tr-remix")).toBeNull();
-});
-
-test("Staffel: der Map-Pool steht nur lesend da, gepflegt in der Season", async () => {
-  const user = userEvent.setup();
-  serveStaffel();
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  await user.click(screen.getByTestId("admin-tr-tab-maps"));
-  expect(await screen.findByTestId("staffel-maps-note")).toHaveTextContent("Den Map-Pool pflegt die Season");
-});
 // Folgenschwere Aktionen (#2120): Rückfragen mit Zahlen, keine Vorschau über echten Spielen, Absage mit Grund.
 const FIXED_MATCHES = [
   { id: "m-1", stage_id: "s-1", status: "completed", round: 1, results: [{ registration_id: "r-1", rank: 1 }], slots: [{ registration_id: "r-1" }, { registration_id: "r-2" }] },
@@ -1322,44 +1301,6 @@ test("Ausgeschiedene haben keine Check-in-Knöpfe", async () => {
   await screen.findAllByText("Max Muster");
   expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Nicht erschienen" })).toBeNull();
-});
-
-// Bereich Ligen und Zuständige (#2203): In einer Staffel zählt, was der Server für diese Person schickt - nicht der Bereich Turnierleitung.
-test("Staffel: die Turnierleitung allein bekommt weder Bearbeiten noch Team noch Zugangslinks", async () => {
-  serveStaffel({ can_edit_staffel: false, can_manage_structure: false, can_manage_participants: false });
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect(screen.queryByTestId("admin-tr-tab-edit")).toBeNull();
-  expect(screen.queryByTestId("admin-tr-tab-staff")).toBeNull();
-  expect(screen.queryByTestId("admin-tr-status-select")).toBeNull();
-});
-
-// Rechte wie der Server (#2262, Entwurf 1.4 Nr. 1–2): Status und „Liga starten“ nur mit „Liga verwalten“, Austritt und
-// Disqualifizieren nur mit „Teams freigeben“ - „Season konfigurieren“ allein zeigt keinen Knopf, der mit 403 endet.
-test("Staffel: „Season konfigurieren“ allein zeigt weder Status noch „Liga starten“", async () => {
-  serveStaffel({ can_edit_staffel: false, can_manage_structure: true });
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect(screen.queryByTestId("admin-tr-status-select")).toBeNull();
-  expect(screen.queryByTestId("admin-tr-primary-action")).toBeNull();
-});
-
-test("Staffel: mit „Liga verwalten“ stehen Status und „Liga starten“ da", async () => {
-  serveStaffel({ can_edit_staffel: true, can_manage_structure: false });
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect(screen.getByTestId("admin-tr-status-select")).toBeInTheDocument();
-  expect(screen.getByTestId("admin-tr-primary-action")).toHaveTextContent("Liga starten");
-});
-
-test("Staffel live: Austritt und Disqualifizieren nach „Teams freigeben“, nicht nach „Season konfigurieren“", async () => {
-  const squad = [{ id: "r-1", status: "approved", display_name: "Probeteam · Rudel", team_id: "tm-1", squad_id: "sq-1" }];
-  serveStaffel({ status: "live", can_manage_structure: true, can_manage_participants: false }, squad);
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  await screen.findAllByText("Probeteam · Rudel");
-  expect(screen.queryByTestId("admin-reg-withdraw-r-1")).toBeNull();
-  cleanup();
-  serveStaffel({ status: "live", can_manage_structure: false, can_manage_participants: true }, squad);
-  await screen.findByRole("heading", { name: STAFFEL.title });
-  expect((await screen.findAllByTestId("admin-reg-withdraw-r-1")).length).toBeGreaterThan(0);
-  expect(screen.getAllByTestId("admin-reg-disqualify-r-1").length).toBeGreaterThan(0);
 });
 
 test("Turnier unverändert: die Strukturrolle zeigt Status und Austritt", async () => {

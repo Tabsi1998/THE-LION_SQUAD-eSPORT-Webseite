@@ -19,7 +19,7 @@ import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
 import { primaryTournamentAction } from "@/pages/admin/tournament/shared";
 import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { PauseUntilControl } from "@/pages/admin/tournament/TvTournamentPanel";
-import { ACTIVE_STAFFEL_REGISTRATION, STAFFEL_RUNNING_STATUSES, STAFFEL_STATUS_WORDS, needsUrl, staffelStandText } from "./staffelPage";
+import { ACTIVE_STAFFEL_REGISTRATION, STAFFEL_RUNNING_STATUSES, STAFFEL_STATUS_WORDS, staffelStandText } from "./staffelPage";
 
 const DONE = new Set(["completed", "forfeit"]);
 const CARD = "min-w-0 rounded-sm border border-white/10 bg-[#121212] p-4";
@@ -117,7 +117,7 @@ function Needs({ tournament: base, teams }) {
   // ``teams``: zugeteilte Co-Teams aus der Liste dieser Seite - frischer als der Zähler am Turnier.
   const tournament = { ...base, participant_count: teams };
   const here = staffelAdminUrl(tournament.id);
-  const needs = staffelNeeds(tournament, { manageUrl: needsUrl(tournament.id) })
+  const needs = staffelNeeds(tournament)
     .filter((need) => !(need.code === "start" && tournament.can_edit_staffel));
   return (
     <section className={CARD} aria-labelledby="staffel-needs-title" data-testid="staffel-needs-card">

@@ -263,8 +263,11 @@ def _with_table(payload: dict, full: dict) -> dict:
 async def _with_league_podium(db, t: dict, payload: dict) -> dict:
     """Saisonabschluss einer Liga-Staffel (#2410): das Podest mit den öffentlichen Belohnungen für den Sieger-Moment - sonst ``None``."""
     from services.league_rewards import tv_podium
+    from services.league_scope import is_league_staffel
 
     payload["league_podium"] = await tv_podium(db, t)
+    # Liga-Wörter am TV (Paket D, #2262): „Staffel entschieden“ statt „Turnier entschieden“ - nur wahr oder falsch, keine Kennungen.
+    payload["staffel"] = is_league_staffel(t)
     return payload
 
 

@@ -139,9 +139,10 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
 
   test("Turnierleitung: Co-Team zuteilen, Liga starten, der Plan steht", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
-    await lead.page.goto(`/admin/tournaments/${tid}`);
+    // Paket D (#2262): Die alte Adresse leitet auf die Staffel-Seite, `?tab=participants` auf den Reiter Teilnehmer.
+    await lead.page.goto(`/admin/tournaments/${tid}?tab=participants`);
+    await expect(lead.page).toHaveURL(new RegExp(`/admin/leagues/staffeln/${tid}#teilnehmer$`));
     await expect(lead.page.getByRole("heading", { level: 1 })).toContainText("Staffel A");
-    await lead.page.getByTestId("admin-tr-tab-participants").click();
 
     // Zuteilen - oder schon zugeteilt, wenn ein abgebrochener Lauf bis hierher kam.
     const spare = state.teams[ablauf.assigned];
@@ -156,9 +157,12 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
     await noSideScroll(lead.page);
     await shot(lead.page, "ablauf-zugeteilt-1440.png");
 
-    await expect(lead.page.getByTestId("admin-tr-primary-action")).toContainText("Liga starten");
-    await lead.page.getByTestId("admin-tr-primary-action").click();
-    await expect(lead.page.getByTestId("admin-tr-status-select")).toHaveValue("live");
+    await lead.page.getByTestId("staffel-tab-ueberblick").click();
+    await expect(lead.page.getByTestId("staffel-primary-action")).toContainText("Liga starten");
+    await lead.page.getByTestId("staffel-primary-action").click();
+    const anyway = lead.page.getByRole("button", { name: "Trotzdem starten" });
+    if (await anyway.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false)) await anyway.click();
+    await expect(lead.page.getByTestId("staffel-status-select")).toHaveValue("live");
 
     // Sechs Teams, nur Hinrunde: 15 Spiele in fünf Runden, nichts doppelt.
     const rows = await (await lead.page.request.get(`/api/tournaments/${tid}/matches-v2`)).json();

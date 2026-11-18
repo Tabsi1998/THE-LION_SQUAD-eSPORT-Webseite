@@ -131,9 +131,11 @@ test.describe("Abnahme: Spielmodi gegen den echten Server", () => {
       expect(fresh.body.detail).toContain("inaktiv");
       await noSideScroll(page);
 
-      // 6. Die Staffel zeigt ihn weiter - in der Verwaltung mit „(inaktiv)“, öffentlich auf der Ligaseite.
+      // 6. Die Staffel zeigt ihn weiter - in der Verwaltung unter „Aus der Season“, öffentlich auf der Ligaseite. Paket D (#2262): die
+      // alte Adresse mit `?tab=maps` leitet dorthin (`#vorgaben`).
       await page.goto(`/admin/tournaments/${anmeldung.tournament_id}?tab=maps`);
-      await expect(page.getByTestId(`tournament-pool-mode-${key}`)).toContainText(`${label} (inaktiv)`);
+      await expect(page).toHaveURL(new RegExp(`/admin/leagues/staffeln/${anmeldung.tournament_id}#vorgaben$`));
+      await expect(page.getByTestId("staffel-map-pool")).toContainText(label);
       await noSideScroll(page);
       await shot(page, `spielmodi-staffel-${width}.png`);
       const guest = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: { width, height }, locale: "de-AT" });

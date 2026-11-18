@@ -176,18 +176,23 @@ async def dashboard(me: dict = Depends(require_dashboard())):
     (nicht „0“). Der Wächter verlangt schon die bestätigte Zwei-Faktor-Anmeldung, daher reichen hier die Bereiche."""
     from services.permissions import areas_for
     db = get_db()
+    from services.daily_center import dispute_counts
+    from services.league_scope import without_league
     held = await areas_for(me, db)
     out: dict = {}
+    # Streitfälle getrennt (Paket D, #2262): die der Turniere führen in die Turnierliste, die der Liga in den Leitstand.
+    tournament_disputes, league_disputes = await dispute_counts(db) if {"tournaments", "leagues"} & set(held) else (0, None)
 
     if "tournaments" in held:
+        # Turniere ohne Staffeln (Nr. 192): die Zahlen passen zur Turnierliste. „Spiele heute“ zählt weiter alle Spiele des Tages.
         out.update({
             "team_count": await db.teams.count_documents({}),
-            "active_tournaments": await db.tournaments.count_documents({"status": {"$in": ["live", "check_in"]}}),
-            "registration_open": await db.tournaments.count_documents({"status": "registration_open"}),
+            "active_tournaments": await db.tournaments.count_documents(without_league({"status": {"$in": ["live", "check_in"]}})),
+            "registration_open": await db.tournaments.count_documents(without_league({"status": "registration_open"})),
             "today_matches": await count_matches_by_status(db, {"ready", "in_progress"}),
-            "open_disputes": await count_matches_by_status(db, {"disputed"}),
+            "open_disputes": tournament_disputes,
             "active_f1": await db.f1_challenges.count_documents({"status": "live"}),
-            "total_tournaments": await db.tournaments.count_documents({}),
+            "total_tournaments": await db.tournaments.count_documents(without_league()),
             "total_f1_challenges": await db.f1_challenges.count_documents({}),
             "total_events": await db.events.count_documents({}),
             "prize_pickups": {
@@ -203,6 +208,8 @@ async def dashboard(me: dict = Depends(require_dashboard())):
         except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
             logger.warning("daily center today failed", exc_info=True)
             out["today"] = []
+    if "leagues" in held:
+        out["league_disputes"] = league_disputes
     if "club" in held:
         out["player_count"] = await db.users.count_documents({"is_active": True})
         out["membership_applications"] = {"pending": await db.membership_applications.count_documents({"status": "pending"})}

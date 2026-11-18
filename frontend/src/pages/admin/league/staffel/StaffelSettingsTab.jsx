@@ -265,7 +265,7 @@ function Look({ tournament, onReload }) {
           </button>
         </div>
       ) : null}
-      <TournamentEditForm key={shown.updated_at || shown.id} tournament={shown} seasonValues={false} remix={false} onDirtyChange={setDirty}
+      <TournamentEditForm key={shown.updated_at || shown.id} tournament={shown} onDirtyChange={setDirty}
         onSaved={() => { setSavedPending(true); onReload?.(); }} />
     </Section>
   );

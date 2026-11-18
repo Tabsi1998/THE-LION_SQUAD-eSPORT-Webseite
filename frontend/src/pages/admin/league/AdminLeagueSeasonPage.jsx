@@ -8,7 +8,7 @@
 // Ergebnisregeln, Terminregeln, Sperrliste, Anmeldungen, Kader) bleiben nach dem ersten Besuch ihres Reiters geladen - ein Wechsel
 // verliert auch dort nichts.
 //
-// Eine Staffel ist ein Turnier - angelegt wird es hier, die Co-Teams teilt die Turnierverwaltung der Staffel zu. Änderungen an der Season
+// Eine Staffel ist ein Turnier - angelegt wird es hier, die Co-Teams teilt die Staffel-Seite zu (#2262). Änderungen an der Season
 // gelten für bestehende Staffeln erst nach „Vorgaben auf Staffeln übertragen“.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -296,7 +296,8 @@ export default function AdminLeagueSeasonPage() {
   const createStaffel = async (division) => {
     const ok = await confirm({
       title: `Staffel in ${division.label} anlegen?`,
-      description: `Ein Liga-Turnier als Entwurf mit allen Vorgaben der Season (${settingsLine(division.settings)}). Danach teilst du in der Turnierverwaltung der Staffel die Co-Teams zu.`,
+      // Liga-Wörter (Paket D, #2262): kein „Liga-Turnier“, kein „Entwurf“.
+      description: `Eine Staffel mit allen Vorgaben der Season (${settingsLine(division.settings)}), noch vor dem Start. Danach teilst du auf der Staffel-Seite die Co-Teams zu.`,
       confirmLabel: "Staffel anlegen",
     });
     if (!ok) return;

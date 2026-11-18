@@ -29,7 +29,7 @@ const ALL = ["applications", "manage", "matches", "results", "roster", "sanction
 const STAFFEL = {
   id: "t1", slug: "probe-a", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft", format: "league", team_mode: "team",
   min_participants: 2, max_participants: 8, league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
-  league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A",
+  league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A", league_id: "l1",
     season_admin_path: "/admin/leagues/seasons/s1", public_path: "/liga/probe-liga/season-1", staffel_admin_path: "/admin/leagues/staffeln/t1" },
   can_edit_staffel: true, can_manage_participants: true, can_manage_structure: true, league_capabilities: ALL,
 };
@@ -81,13 +81,16 @@ beforeEach(() => {
   serve();
 });
 
-test("Kopf mit Brotkrumen Liga › Season › Liga 1 · Staffel A, Stand und alle sieben Reiter", async () => {
+test("Kopf mit Brotkrumen Liga › Probe-Liga › Season 1 › Liga 1 · Staffel A, Stand und alle sieben Reiter", async () => {
   renderPage();
   expect(await screen.findByTestId("staffel-title")).toHaveTextContent("Liga 1 · Staffel A");
   const crumbs = screen.getByTestId("staffel-breadcrumbs");
   expect(within(crumbs).getByTestId("staffel-crumb-leagues")).toHaveAttribute("href", "/admin/leagues");
+  // Paket D (#2262): die Liga als eigene Stufe mit Weg an ihre Stelle der Liga-Übersicht.
+  expect(within(crumbs).getByTestId("staffel-crumb-league")).toHaveAttribute("href", "/admin/leagues#liga-l1");
+  expect(within(crumbs).getByTestId("staffel-crumb-league")).toHaveTextContent("Probe-Liga");
   expect(within(crumbs).getByTestId("staffel-crumb-season")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
-  expect(crumbs).toHaveTextContent("Probe-Liga · Season 1");
+  expect(within(crumbs).getByTestId("staffel-crumb-season")).toHaveTextContent("Season 1");
   expect(screen.getByTestId("staffel-stand")).toBeInTheDocument();
   const tabs = within(screen.getByTestId("staffel-tabs")).getAllByRole("tab").map((tab) => tab.textContent);
   expect(tabs).toEqual(["Überblick", "Teilnehmer", "Spielplan", "Spiele und Ergebnisse", "Tabelle", "Protokoll", "Einstellungen"]);

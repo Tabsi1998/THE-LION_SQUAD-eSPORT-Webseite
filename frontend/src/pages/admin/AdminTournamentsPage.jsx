@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminDenied } from "@/components/tls/AdminDenied";
@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause, Search, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { canUseArea, hasArea, hasLeagueStaff } from "@/lib/permissions";
+import { hasArea, hasLeagueStaff } from "@/lib/permissions";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useNarrowScreen } from "@/hooks/useNarrowScreen";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -18,8 +18,6 @@ import { effectiveRuleModes } from "@/lib/tournamentRulePresets";
 import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { StaffelNeedsHint, StaffelStandBadge, isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
-import { STAFFEL_STAND_FILTERS, staffelStand, statusFilterKeys } from "@/lib/seasonTabs";
 import { endText, liveAfterEnd } from "@/lib/endedLive";
 
 const EVENT_MODE_LABELS = {
@@ -38,50 +36,42 @@ const SCHEDULE_MODE_LABELS = {
   player_proposal: "Termin: Vorschlag",
 };
 // Dieselben Statuswörter wie im Kopf der Turnierseite (#2111, TA21) - mit „Check-in offen“. „Alle“ heißt ohne Archiv;
-// archivierte Turniere zeigt der Filter „Archiviert“.
-// Liga-Staffeln (#2453) filtern nach dem Stand ihrer Season („Liga: Anmeldung offen“) - so wie sie in der Liste stehen. „Entwurf“
-// meint damit nur noch Turniere; abgesagte und archivierte Staffeln behalten ihren Status.
-const TOURNAMENT_STATUS_GROUPS = [["Turniere", TOURNAMENT_STATUS_OPTIONS], ["Liga-Staffeln", STAFFEL_STAND_FILTERS]];
+// archivierte Turniere zeigt der Filter „Archiviert“. Staffeln stehen seit Paket D (#2262, Nr. 192) nur in der Liga-Verwaltung.
 const statusLabel = (status) => TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status || "—";
-const rowStatusLabel = (tournament, now) => staffelStand(tournament, { now })?.label || statusLabel(tournament.status);
 // Die Verwaltungsliste fragt bis zu so viele Turniere ab (der Server liefert höchstens 500) - steht die Liste voll, sagt
 // die Seite es, statt still abzuschneiden.
 const LIST_LIMIT = 500;
-// Liga-Staffeln (#2109, S26): eigene Art in der Liste - leicht zu verwechseln, wenn sie zwischen den Turnieren stehen.
-const KIND_FILTERS = [
-  ["", "Turniere und Liga-Staffeln"],
-  ["tournament", "Nur Turniere"],
-  ["league", "Nur Liga-Staffeln"],
-];
-// Löschen einer Staffel nur vor dem Start (L-D3) - der Server prüft dazu, ob schon ein fester Spielplan steht. Ein
-// Turnier nur als Entwurf (#2111, TA18); der Server prüft dazu, dass es keine Ergebnisse hat. Sonst: absagen oder
-// archivieren - über den Status in der Turnierverwaltung.
-const canDelete = (tournament) => (isStaffel(tournament) ? staffelBeforeStart(tournament) : tournament.status === "draft");
+// Löschen nur als Entwurf (#2111, TA18); der Server prüft dazu, dass es keine Ergebnisse hat. Sonst: absagen oder archivieren - über
+// den Status in der Turnierverwaltung.
+const canDelete = (tournament) => tournament.status === "draft";
+
+// Die reine Liga-Leitung (Paket D, #2262, Nr. 192): Bereich Ligen oder Zuständige einer Liga, ohne Bereich Turniere und ohne Helfer-Einsatz -
+// dieselbe Tür wie `leagueStaffEntry` in ProtectedRoute. Die Turnierliste hat für sie nichts mehr, sie landet bei Liga.
+const onlyLeagueLead = (user) => Boolean(user) && (hasLeagueStaff(user) || hasArea(user, "leagues")) && !hasArea(user, "tournaments") && !user.has_staff_assignment;
 
 export default function AdminTournamentsPage() {
+  const { user } = useAuth();
+  if (onlyLeagueLead(user)) return <Navigate to="/admin/leagues" replace />;
+  return <TournamentList />;
+}
+
+function TournamentList() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead, user } = useAuth();
-  // Staffeln (#2203): Status und Löschen hier nur mit dem Bereich Ligen - die Turnierleitung allein leitet sie nicht.
-  const leadsRow = (t) => isTournamentLead && (!isStaffel(t) || canUseArea(user, "leagues"));
-  // Liga-Zuständige und der Bereich Ligen ohne Turnierleitung und Einsatz (#2463): Der Server gibt ihnen nur ihre Staffeln - die Seite sagt es.
-  const leagueScope = !hasArea(user, "tournaments") && !user?.is_tournament_staff && (hasLeagueStaff(user) || hasArea(user, "leagues"));
+  const { isTournamentLead } = useAuth();
   // Handy (#2463): unter 768 px Karten statt der Tabelle zum Wischen - nur eine Form steht im DOM.
   const narrow = useNarrowScreen();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
-  // Ein Zeitpunkt je geladener Liste (#2453): Liga-Stand, Zähler und Filter rechnen mit demselben „jetzt“.
-  const [now, setNow] = useState(() => new Date());
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
-  const [kindFilter, setKindFilter] = useState("");
   const confirm = useConfirm();
   const [denied, setDenied] = useState("");
   const load = useCallback(async () => {
-    // Verwaltungsliste (#1028): die Turnierleitung bekommt alle Turniere, Helfer nur die ihres Einsatzes.
+    // Verwaltungsliste (#1028): die Turnierleitung bekommt alle Turniere, Helfer nur die ihres Einsatzes. Ohne Staffeln
+    // (`league=exclude`, Paket D #2262, Nr. 192) - die stehen in der Liga-Verwaltung; Zähler, Suche und CSV kennen sie nicht.
     try {
-      const { data } = await api.get(`/tournaments?include_drafts=true&managed=true&limit=${LIST_LIMIT}`);
+      const { data } = await api.get(`/tournaments?include_drafts=true&managed=true&league=exclude&limit=${LIST_LIMIT}`);
       setList(data);
-      setNow(new Date());
       setDenied("");
     } catch (error) {
       // Verweigert der Server die Liste, steht der Grund da - nicht „Keine Turniere“ (#1353).
@@ -127,12 +117,7 @@ export default function AdminTournamentsPage() {
   };
 
   const del = async (tournament) => {
-    if (!await confirm(isStaffel(tournament) ? {
-      title: "Staffel löschen?",
-      description: "Die Staffel wird dauerhaft gelöscht und verschwindet aus ihrer Season – mit den zugeteilten Co-Teams und der Spielplan-Vorschau. Das geht nur vor dem Start.",
-      confirmLabel: "Löschen",
-      tone: "danger",
-    } : {
+    if (!await confirm({
       title: "Entwurf löschen?",
       description: "Das Turnier wird dauerhaft gelöscht – mit Anmeldungen, Vorschau, Gruppen, Map-Pool und Chat. Das lässt sich nicht zurücknehmen. Ein Turnier mit Ergebnissen sagst du stattdessen ab oder archivierst es.",
       confirmLabel: "Löschen",
@@ -147,18 +132,16 @@ export default function AdminTournamentsPage() {
     }
   };
   const statusCounts = useMemo(() => list.reduce((acc, tournament) => {
-    // Eine laufende Staffel zählt bei „Live“ und bei „Liga: Spielbetrieb“ (#2453).
-    for (const key of statusFilterKeys(tournament, now)) acc[key] = (acc[key] || 0) + 1;
+    const key = tournament.status || "unknown";
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
-  }, {}), [list, now]);
+  }, {}), [list]);
   const sortedList = useMemo(() => sortByNearestDate(list), [list]);
   const filteredList = useMemo(() => {
     const q = normalizeSearch(query);
     return sortedList.filter((tournament) => {
-      if (statusFilter && !statusFilterKeys(tournament, now).includes(statusFilter)) return false;
+      if (statusFilter && tournament.status !== statusFilter) return false;
       if (!statusFilter && tournament.status === "archived") return false;
-      if (kindFilter === "league" && !isStaffel(tournament)) return false;
-      if (kindFilter === "tournament" && isStaffel(tournament)) return false;
       if (!q) return true;
       const haystack = normalizeSearch([
         tournament.title,
@@ -169,13 +152,12 @@ export default function AdminTournamentsPage() {
         // Deutsche Formatnamen (#2111, TA21): „K.-o.“ findet ein K.-o.-Turnier, nicht nur „single_elim“.
         formatTournamentDisplay(tournament),
         formatTournamentFormat(tournament.format),
-        tournament.league_label,
         tournament.game?.name,
         gameLabel(tournament.game),
       ].filter(Boolean).join(" "));
       return haystack.includes(q);
     });
-  }, [kindFilter, now, query, sortedList, statusFilter]);
+  }, [query, sortedList, statusFilter]);
 
   const exportCsv = () => {
     downloadCsv(
@@ -186,7 +168,7 @@ export default function AdminTournamentsPage() {
         tournament.slug,
         gameLabel(tournament.game),
         formatTournamentDisplay(tournament),
-        rowStatusLabel(tournament, now),
+        statusLabel(tournament.status),
         formatAdminDate(tournament.start_date),
         tournament.participant_count,
         tournament.max_participants,
@@ -201,9 +183,6 @@ export default function AdminTournamentsPage() {
         <div className="min-w-0">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase [overflow-wrap:normal]">Turniere</h1>
-          {leagueScope ? (
-            <p className="mt-1 text-sm text-white/55" data-testid="admin-tournaments-league-scope">Hier stehen die Staffeln deiner Ligen.</p>
-          ) : null}
         </div>
         {isTournamentLead && (
           <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
@@ -211,7 +190,7 @@ export default function AdminTournamentsPage() {
           </Link>
         )}
       </div>
-      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_14rem_14rem_auto_auto]">
+      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_14rem_auto_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
             <input
@@ -229,20 +208,7 @@ export default function AdminTournamentsPage() {
           className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
         >
           <option value="">Alle außer Archiv ({list.length - (statusCounts.archived || 0)})</option>
-          {TOURNAMENT_STATUS_GROUPS.map(([group, options]) => (
-            <optgroup key={group} label={group}>
-              {options.map(([value, label]) => <option key={value} value={value}>{label} ({statusCounts[value] || 0})</option>)}
-            </optgroup>
-          ))}
-        </select>
-        <select
-          value={kindFilter}
-          onChange={(event) => setKindFilter(event.target.value)}
-          data-testid="admin-tournament-kind-filter"
-          aria-label="Art"
-          className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
-        >
-          {KIND_FILTERS.map(([value, label]) => <option key={value || "all"} value={value}>{label}</option>)}
+          {TOURNAMENT_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label} ({statusCounts[value] || 0})</option>)}
         </select>
         <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
           {filteredList.length} / {list.length} sichtbar
@@ -268,7 +234,6 @@ export default function AdminTournamentsPage() {
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
-                  <LeagueLabel tournament={t} className="mt-1.5 flex w-fit" />
                   <div className="mt-1 text-xs text-white/55">{[gameLabel(t.game), formatTournamentDisplay(t)].filter(Boolean).join(" · ") || "—"}</div>
                 </div>
                 <div className="shrink-0 text-right" data-testid={`admin-tr-participants-${t.slug}`}>
@@ -277,19 +242,19 @@ export default function AdminTournamentsPage() {
                 </div>
               </div>
               <div className="mt-3">
-                <StatusCell tournament={t} now={now} leads={leadsRow(t)} needsClassName="mt-1" endedClassName="mt-1 block" />
+                <StatusCell tournament={t} leads={isTournamentLead} endedClassName="mt-1 block" />
               </div>
               <div className="mt-2" data-testid={`admin-tr-rules-${t.slug}`}>
                 <RulePills tournament={t} compact />
               </div>
               <div className="mt-2 -mb-2 -mr-2 flex items-center justify-end gap-1 border-t border-white/5 pt-1">
-                <RowActions tournament={t} isTournamentLead={isTournamentLead} leads={leadsRow(t)} onStatus={setStatus} onDelete={del} />
+                <RowActions tournament={t} isTournamentLead={isTournamentLead} onStatus={setStatus} onDelete={del} />
               </div>
             </li>
           ))}
           {filteredList.length === 0 && (
             <li className={denied ? "" : "rounded-sm border border-white/10 bg-[#121212] py-10 text-center text-white/40"}>
-              {denied ? <AdminDenied text={denied} /> : list.length === 0 ? (leagueScope ? "Keine Staffeln" : "Keine Turniere") : (leagueScope ? "Keine Staffeln für diesen Filter" : "Keine Turniere für diesen Filter")}
+              {denied ? <AdminDenied text={denied} /> : list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}
             </li>
           )}
         </ul>
@@ -314,7 +279,6 @@ export default function AdminTournamentsPage() {
               <tr key={t.id} data-testid={`admin-tr-${t.slug}`}>
                 <td className="px-4 py-3">
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
-                  <LeagueLabel tournament={t} className="ml-2 inline-flex align-middle" />
                   <div className="mt-1 xl:hidden"><RulePills tournament={t} compact /></div>
                 </td>
                 <td className="px-4 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
@@ -323,12 +287,12 @@ export default function AdminTournamentsPage() {
                   <RulePills tournament={t} />
                 </td>
                 <td className="px-4 py-3">
-                  <StatusCell tournament={t} now={now} leads={leadsRow(t)} needsClassName="mt-1 max-w-[14rem]" endedClassName="mt-1 block max-w-[14rem]" />
+                  <StatusCell tournament={t} leads={isTournamentLead} endedClassName="mt-1 block max-w-[14rem]" />
                 </td>
                 <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <RowActions tournament={t} isTournamentLead={isTournamentLead} leads={leadsRow(t)} onStatus={setStatus} onDelete={del} />
+                    <RowActions tournament={t} isTournamentLead={isTournamentLead} onStatus={setStatus} onDelete={del} />
                   </div>
                 </td>
               </tr>
@@ -336,7 +300,7 @@ export default function AdminTournamentsPage() {
             {filteredList.length === 0 && (
               <tr>
                 <td colSpan="7" className={denied ? "p-4" : "text-center py-10 text-white/40"}>
-                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? (leagueScope ? "Keine Staffeln" : "Keine Turniere") : (leagueScope ? "Keine Staffeln für diesen Filter" : "Keine Turniere für diesen Filter")}
+                  {denied ? <AdminDenied text={denied} /> : list.length === 0 ? "Keine Turniere" : "Keine Turniere für diesen Filter"}
                 </td>
               </tr>
             )}
@@ -349,27 +313,10 @@ export default function AdminTournamentsPage() {
   );
 }
 
-// Kennzeichen „Liga · Staffel A“ (#2109, S26) - der Server liefert es mit.
-function LeagueLabel({ tournament: t, className = "" }) {
-  if (!isStaffel(t)) return null;
-  return (
-    <span data-testid={`admin-tr-league-label-${t.slug}`} className={`${className} rounded-sm border border-[#29B6E8]/35 bg-[#29B6E8]/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]`}>
-      {t.league_label || `Liga · Staffel ${t.league_context.staffel || ""}`.trim()}
-    </span>
-  );
-}
-
-function StatusCell({ tournament: t, now, leads, needsClassName, endedClassName }) {
+function StatusCell({ tournament: t, leads, endedClassName }) {
   return (
     <>
-      {/* Liga-Staffel (#2453): der Stand der Season statt „Entwurf“, darunter was ihr noch fehlt - mit Weg dorthin. */}
-      {isStaffel(t) ? (
-        <>
-          <StaffelStandBadge tournament={t} now={now} testId={`admin-tr-stand-${t.slug}`} />
-          {/* Was fehlt, sieht, wer die Staffel als Liga leitet - der Server schickt dann die Season-Angaben mit. */}
-          {"league_season" in t ? <StaffelNeedsHint tournament={t} now={now} testId={`admin-tr-needs-${t.slug}`} className={needsClassName} /> : null}
-        </>
-      ) : <StatusBadge status={t.status} />}
+      <StatusBadge status={t.status} />
       {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
       {leads && liveAfterEnd(t) ? (
         <Link to={`/admin/tournaments/${t.id}`} data-testid={`admin-tr-ended-live-${t.slug}`} title={`Ende war am ${endText(t.end_date)}`}
@@ -385,24 +332,23 @@ function StatusCell({ tournament: t, now, leads, needsClassName, endedClassName 
 const ACTION_CLASS = "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm transition-colors";
 const ACTION_ICON = "h-4 w-4 shrink-0";
 
-function RowActions({ tournament: t, isTournamentLead, leads, onStatus, onDelete }) {
+function RowActions({ tournament: t, isTournamentLead, onStatus, onDelete }) {
   return (
     <>
       <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" aria-label={`Teilnehmer: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#29B6E8]`}>
         <Users className={ACTION_ICON} aria-hidden="true" />
       </Link>
-      {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
-      {isTournamentLead && t.status === "draft" && !isStaffel(t) ? (
+      {isTournamentLead && t.status === "draft" ? (
         <button type="button" onClick={() => onStatus(t.id, "registration_open")} title="Anmeldung öffnen" aria-label={`Anmeldung öffnen: ${t.title}`} className={`${ACTION_CLASS} hover:text-ok`}>
           <Play className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}
-      {leads && t.status === "live" ? (
+      {isTournamentLead && t.status === "live" ? (
         <button type="button" onClick={() => onStatus(t.id, "paused")} title="Pause" aria-label={`Pause: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FFD700]`}>
           <Pause className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}
-      {leads && canDelete(t) ? (
+      {isTournamentLead && canDelete(t) ? (
         <button type="button" onClick={() => onDelete(t)} title="Löschen" aria-label={`Löschen: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FF3B30]`}>
           <Trash2 className={ACTION_ICON} aria-hidden="true" />
         </button>

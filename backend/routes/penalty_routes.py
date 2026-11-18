@@ -18,7 +18,7 @@ from typing import Optional
 
 from database import get_db
 from auth import get_current_user, require_admin
-from services import league_sanctions
+from services import league_sanctions, staffel_guard
 from services.competition_penalties import load_forfeit_penalties
 from services.match_audience import team_penalty_registrations
 
@@ -49,7 +49,7 @@ async def _forfeit_rows(db, forfeits: list[dict], team_names: dict[str, str]) ->
     """Kampflos-Wertungen als Zeilen. ``team_names``: Anmeldung → Name - diese Wertungen sind Teamstrafen eines Co-Teams."""
     tour_ids = list({item["tournament_id"] for item in forfeits if item.get("tournament_id")})
     tours = {t["id"]: t for t in await db.tournaments.find(
-        {"id": {"$in": tour_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1}).to_list(len(tour_ids) + 10)}
+        {"id": {"$in": tour_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "league_context": 1}).to_list(len(tour_ids) + 10)}
     rows = []
     for item in forfeits:
         t = tours.get(item.get("tournament_id"), {})
@@ -67,7 +67,8 @@ async def _forfeit_rows(db, forfeits: list[dict], team_names: dict[str, str]) ->
             "ref_id": item.get("match_id"),
             "tournament_id": item.get("tournament_id"),
             "match_source": item.get("source"),
-            "admin_url": f"/admin/tournaments/{item.get('tournament_id')}" if item.get("tournament_id") else "",
+            # Eine Staffel auf ihre Staffel-Seite, Reiter Spiele und Ergebnisse (Paket D, #2262).
+            "admin_url": staffel_guard.tournament_admin_path(t or {"id": item.get("tournament_id")}, anchor="spiele") or "",
             **({"team_penalty": True, "team_name": team_name} if team_name else {}),
         })
     return rows
