@@ -68,7 +68,9 @@ test.describe("Rangliste (#1562, #1179)", () => {
   test("Liga: Form, Differenz und Pfeile seit dem vorigen Spieltag", async ({ page }) => {
     await mock(page, fixture.league, { user: PLAYER });
     await page.goto(`/tournaments/${fixture.league.tournament.slug}/standings`);
-    await expect(page.getByRole("columnheader", { name: "Form" })).toBeVisible();
+    // Am Handy fällt die Form weg - Name und Punkte brauchen den Platz (#2498).
+    if (test.info().project.name === "mobile") await expect(page.getByRole("columnheader", { name: "Form" })).toBeHidden();
+    else await expect(page.getByRole("columnheader", { name: "Form" })).toBeVisible();
     const moved = fixture.league.standings.filter((row) => row.previous_rank != null && row.previous_rank !== row.rank);
     await expect(page.locator("[data-testid^='standing-move-']")).toHaveCount(moved.length);
     await noSideScroll(page);

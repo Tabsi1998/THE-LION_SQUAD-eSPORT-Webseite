@@ -161,3 +161,27 @@ test("Referenzzeiten: ein Satz statt Kasten, nur wenn Mitglieder außer Wertung 
   expect(screen.queryByTestId("f1-reference-note")).toBeNull();
   expect(screen.queryByText(/Referenzzeiten sind separat/)).toBeNull();
 });
+
+test("Ecken-Klammern (#1316): deine Zeit und deine Zeile der Gesamtwertung tragen Ecken und „Du“ - nur deine", async () => {
+  authState = { user: { id: "u-me" }, isTournamentLead: false };
+  mockApi(challengeWith({ is_championship: true }));
+  renderPage();
+  const own = await screen.findByTestId("f1-row-2");
+  expect(own).toHaveClass("tls-you", "tls-you--inset");
+  expect(screen.getByTestId("f1-you-2")).toHaveTextContent(/^Du$/);
+  for (const rank of [1, 5]) {
+    expect(screen.getByTestId(`f1-row-${rank}`)).not.toHaveClass("tls-you");
+    expect(screen.queryByTestId(`f1-you-${rank}`)).toBeNull();
+  }
+  fireEvent.click(screen.getByTestId("f1-tab-championship"));
+  const standing = await screen.findByTestId("f1-championship-row-u-me");
+  expect(standing).toHaveClass("tls-you");
+  expect(standing).toHaveTextContent("Du");
+});
+
+test("Ecken-Klammern (#1316): ohne Anmeldung trägt keine Zeile Ecken", async () => {
+  mockApi(challengeWith());
+  renderPage();
+  expect(await screen.findByTestId("f1-row-2")).toBeInTheDocument();
+  expect(document.querySelectorAll(".tls-you, .tls-you-tag")).toHaveLength(0);
+});

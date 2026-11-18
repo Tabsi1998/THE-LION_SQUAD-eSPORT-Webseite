@@ -7,11 +7,12 @@ import path from "node:path";
 
 const root = path.resolve(__dirname, "../..");
 const css = readFileSync(path.join(root, "src/index.css"), "utf8").replace(/\r\n/g, "\n");
+const system = readFileSync(path.join(root, "src/styles/system.css"), "utf8").replace(/\r\n/g, "\n");
 
-function rule(selector) {
-  const start = css.indexOf(`${selector} {`);
+function rule(selector, source = css) {
+  const start = source.indexOf(`${selector} {`);
   if (start < 0) return "";
-  return css.slice(start, css.indexOf("}", start));
+  return source.slice(start, source.indexOf("}", start));
 }
 
 test("die fünf Arten haben je ihren Stil, Fokus ist für alle sichtbar, Hover nur mit Maus", () => {
@@ -23,12 +24,51 @@ test("die fünf Arten haben je ihren Stil, Fokus ist für alle sichtbar, Hover n
   expect(rule(".tls-btn--honor")).toMatch(/background-color: var\(--tls-gold\)/);
   expect(rule(".tls-btn--honor")).toMatch(/color: #1A1400/);
   expect(rule(".tls-btn:focus-visible")).toMatch(/outline: 2px solid/);
+  // Karten zeigen beim Fokus die Ecken (#1316) - ohne den 3-px-Ring aus App.css, der sie verdecken würde.
+  expect(rule(".tls-card:focus-visible")).toMatch(/outline: 2px solid transparent;/);
   const hover = css.slice(css.indexOf(".tls-btn--primary:hover"), css.indexOf(".tls-btn:hover:not(:disabled) .lucide-arrow-right"));
   for (const variant of ["primary", "secondary", "quiet", "danger", "honor"]) expect(hover).toContain(`.tls-btn--${variant}:hover:not(:disabled)`);
   // Der goldene Lichtlauf hängt wie der blaue an „Bewegung reduzieren“.
   expect(hover).toMatch(/\.tls-btn--honor:hover:not\(:disabled\) \{[^}]*calc\(150% - 200% \* var\(--tls-motion-on\)\)/);
   // Lichtlauf und Pfeil hängen an „Bewegung reduzieren“.
   expect(css).toMatch(/\.tls-btn:hover:not\(:disabled\) \.lucide-arrow-right \{\s*transform: translateX\(calc\(3px \* var\(--tls-motion-on\)\)\)/);
+});
+
+// Fokus mit der Tastatur (#1316): Knöpfe und Karten tragen die Ecken-Klammern aus styles/system.css - vier Winkel in
+// Cyan, 11 px lang, 2 px stark, 5 px außerhalb - statt eines weißen Rahmens oder Rings. Der Rahmen bleibt da, aber
+// durchsichtig: Im Kontrast-Modus von Windows bekommt er die Systemfarbe, Verläufe und Schatten fallen dort weg.
+test("Fokus: Ecken-Klammern an Knöpfen und Karten, dazu ein durchsichtiger Rahmen für den Kontrast-Modus", () => {
+  const root = rule(":root, :where(.tls-you), :where(.tls-btn), :where(.tls-card)", system.slice(system.indexOf("/* Ecken-Klammern (#1316)")));
+  expect(root).toMatch(/--tls-corner-len: 11px;/);
+  expect(root).toMatch(/--tls-corner-width: 2px;/);
+  expect(root).toMatch(/--tls-corner-out: 5px;/);
+  const corners = root.slice(root.indexOf("--tls-corners:"));
+  expect(corners.match(/linear-gradient\(var\(--tls-brand\) 0 0\)/g)).toHaveLength(8);
+  for (const corner of ["top left", "top right", "bottom left", "bottom right"]) expect(corners.split(corner).length - 1).toBe(2);
+
+  expect(rule(".tls-btn:focus-visible")).toMatch(/outline: 2px solid transparent;/);
+  expect(rule(".tls-btn:focus-visible")).toMatch(/box-shadow: none;/);
+  expect(rule(".tls-btn:focus-visible")).not.toMatch(/#FFFFFF/);
+  // Knopf über ::before; Karte über ::after, damit das Live-Licht (.tls-live-frame::before) daneben weiterläuft.
+  expect(rule(".tls-card:focus-visible::before")).toBe("");
+  for (const pseudo of [".tls-btn:focus-visible::before", ".tls-card:focus-visible::after"]) {
+    const corners = rule(pseudo);
+    expect(corners).toMatch(/content: "";/);
+    expect(corners).toMatch(/position: absolute;/);
+    expect(corners).toMatch(/inset: calc\(-1 \* var\(--tls-corner-out\)\);/);
+    expect(corners).toMatch(/pointer-events: none;/);
+    expect(corners).toMatch(/background: var\(--tls-corners\);/);
+    // Keine Bewegung, kein Schein an den Winkeln.
+    expect(corners).not.toMatch(/animation|transition|box-shadow|filter/);
+  }
+  // Die Winkel brauchen eine Stelle mit Lage - ohne Gewicht, damit `absolute` oder `fixed` am Knopf weiter gelten.
+  expect(system).toMatch(/:where\(\.tls-you\), :where\(\.tls-btn\), :where\(\.tls-card\) \{ position: relative; \}/);
+  // In wischbaren Leisten sitzen die Winkel an der Kante - die Leiste schneidet oben und unten ab.
+  expect(css).toMatch(/\n\.tls-swipe :is\(\.tls-btn, \.tls-card\) \{ --tls-corner-out: 0px; \}/);
+  // Karten heben sich um 5 px - Leisten mit Karten haben oben 6 px Luft, fest (kein Sprung beim Fokus).
+  expect(css).toMatch(/\n\.tls-swipe:has\(\.tls-card\) \{ padding-top: 6px; \}/);
+  // Alle anderen Stellen behalten den Ring, aber auch dort mit durchsichtigem Rahmen statt `outline: none`.
+  expect(css).toMatch(/\n:focus-visible \{ outline: 2px solid transparent; outline-offset: 2px; box-shadow: 0 0 0 2px var\(--tls-cyan\); \}/);
 });
 
 // Wächter: Ein Knopf (button, Link, a) mit eigener Farbe oder eigenem Rahmen ohne .tls-btn fällt auf. Umschalter mit
