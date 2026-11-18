@@ -430,9 +430,14 @@ async def test_season_history_on_team_and_player(flow):
     squad = await flow.db.team_squads.find_one({"id": winner["squad_id"]}, {"_id": 0})
     player = await flow.db.users.find_one({"id": squad["member_ids"][0]}, {"_id": 0})
     await flow.db.users.update_one({"id": player["id"]}, {"$set": {"privacy_public_profile": True}})
+    # Die Season steht auf „Nur Liga-Leitung“: Im Profil einer anderen Person sieht sie auch die Leitung nicht (#2521, dieselbe Regel wie
+    # bei Referenzen und Trophäen) - die Person selbst schon, gekennzeichnet als vereinsintern.
+    assert ok(await flow.get(f"/api/users/public/{player['username']}"))["league_history"] == []
+    flow.act_as(player)
     profile = ok(await flow.get(f"/api/users/public/{player['username']}"))
     assert [(row["season_name"], row["division_label"], row["rank"], row["champion"]) for row in profile["league_history"]] == [
         ("Season 1", "Liga 1", 1, True)]
+    assert profile["league_history"][0]["internal"] is True
     # Gegenprobe: Wer nicht im Kader war, hat keine Season.
     outsider = await flow.add_user(name="Zaungast")
     await flow.db.users.update_one({"id": outsider["id"]}, {"$set": {"privacy_public_profile": True}})

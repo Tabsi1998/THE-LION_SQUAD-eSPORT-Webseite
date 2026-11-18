@@ -17,7 +17,6 @@ from services.membership_service import get_membership, derived_user_type, is_ac
 from services import xp
 from services.levels import level_view
 from services.profile_references import personal_profile_references
-from services.visibility import user_can_see
 from services.achievement_visibility import sees_hidden_achievements
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
@@ -246,22 +245,6 @@ async def _merged_quiet_hours(db, user_id: str, sent: dict | None) -> dict:
     if problem:
         raise HTTPException(status_code=422, detail=problem)
     return {"enabled": bool(merged["enabled"]), "start": merged["start"], "end": merged["end"]}
-
-
-async def _is_public_tournament(tournament: dict | None) -> bool:
-    if not tournament:
-        return False
-    if tournament.get("status") == "draft" or tournament.get("is_public") is False:
-        return False
-    return await user_can_see(None, tournament.get("visibility") or "public")
-
-
-async def _is_public_challenge(challenge: dict | None) -> bool:
-    if not challenge:
-        return False
-    if challenge.get("status") == "draft":
-        return False
-    return await user_can_see(None, challenge.get("visibility") or "public")
 
 
 async def _attach_membership(user: dict) -> dict:
@@ -789,18 +772,18 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
              "twitch_live_sessions": int(u.get("twitch_live_sessions_count") or 0),
              "twitch_stream_minutes": int(u.get("twitch_stream_minutes") or 0)}
     if public:
-        # Vereinsinterne Erfolge (#2516): die Person selbst sieht alles, Vereinsmitglieder dazu Internes (Schalter der
-        # Person), alle anderen nur Öffentliches - für Referenzen und Trophäen dieselbe Regel.
-        from services.profile_visibility import scope_for
+        # Vereinsinterne Erfolge (#2516, #2521): die Person selbst sieht alles, Vereinsmitglieder dazu Internes (Schalter der
+        # Person), alle anderen nur Öffentliches - für Referenzen, Trophäen, Teilnahmen, Bestzeiten, Zahlen und Liga dieselbe Regel.
+        # Ein Scope je Anfrage: sein Merker entscheidet jede Stufe, Season und Liga einmal, nicht je Eintrag.
+        from services.profile_visibility import PUBLIC, scope_for, sees_listed_challenge, sees_listed_tournament
         profile_scope = await scope_for(viewer, u)
         references = await personal_profile_references(u, scope=profile_scope)
         # Season-Historie (F.2, #1627): wo die Person eingesetzt war - Liga N, Platz, Meister; nur Seasons, die der Betrachter sieht.
-        from routes.tournament_common import tournament_hidden_reason
         from services.league_history import for_player
-        league_history = await for_player(db, user_id, viewer, hidden=tournament_hidden_reason)
+        league_history = await for_player(db, user_id, viewer, scope=profile_scope)
         # Gesamtwertung über Seasons (F.5, #2215): Platz in der Spielerwertung je Zeitraum und Liga N.
         from services import league_overall as overall_service
-        league_overall = await overall_service.for_player(db, user_id, viewer, hidden=tournament_hidden_reason)
+        league_overall = await overall_service.for_player(db, user_id, viewer, scope=profile_scope)
         # Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren - nach derselben Regel wie die Referenzen.
         from services.awards import awards_for_user
         awards = await awards_for_user(db, user_id, scope=profile_scope)
@@ -810,7 +793,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
             {"id": {"$in": t_ids}}, {"_id": 0, "title": 1, "slug": 1, "game_id": 1, "format": 1,
              "status": 1, "start_date": 1, "id": 1, "visibility": 1, "is_public": 1,
              "league_context": 1}).to_list(200)
-        t_map = {t["id"]: t for t in tournaments_raw if await _is_public_tournament(t)}
+        t_map = {t["id"]: t for t in tournaments_raw if await sees_listed_tournament(profile_scope, t)}
         game_ids = list({t.get("game_id") for t in t_map.values() if t.get("game_id")})
         games = await db.games.find(
             {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "kind": 1, "parent_game_id": 1, "short_name": 1}).to_list(200)
@@ -841,6 +824,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
                 "game": g_map.get(t.get("game_id")),
                 "final_position": final_pos, "registration_status": r.get("status"),
                 **({"league_label": league_label(t)} if is_league_staffel(t) else {}),
+                "internal": not await sees_listed_tournament(PUBLIC, t),
             })
             if is_league_staffel(t):
                 continue  # Liga (docs/LIGA.md): gelistet und gekennzeichnet, aber nicht bei Turnieren/Siegen/Top 3
@@ -857,7 +841,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         from routes.f1_routes import _ms_to_time_str
         # Bestzeit je Strecke und Pole aus der einen Rangfunktion (#1584): nur gewertete Zeiten (keine ungültigen, keine
         # Vereins-Referenz), Strafe eingerechnet, bei Gleichstand liegt die früher gefahrene Zeit vorn.
-        from services.fastlap_standings import official_query, official_times, rank_laps
+        from services.fastlap_standings import load_laps, official_query, rank_laps
         all_laps = await db.f1_lap_times.find(
             official_query({"user_id": user_id}),
             {"_id": 0, "track_id": 1, "challenge_id": 1}).to_list(2000)
@@ -866,18 +850,25 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
             {"id": {"$in": c_ids_f1_all}},
             {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "visibility": 1},
         ).to_list(200)
-        chall_docs = {c["id"]: c for c in challenges_raw if await _is_public_challenge(c)}
+        chall_docs = {c["id"]: c for c in challenges_raw if await sees_listed_challenge(profile_scope, c)}
         all_laps = [lap for lap in all_laps if lap.get("challenge_id") in chall_docs]
         stats["fast_laps"] = len(all_laps)
         track_challenge = {lap["track_id"]: lap["challenge_id"] for lap in all_laps if lap.get("track_id")}
         track_docs = {t["id"]: t for t in await db.f1_tracks.find(
             {"id": {"$in": list(track_challenge.keys())}},
             {"_id": 0, "id": 1, "name": 1, "country": 1}).to_list(200)}
+        # Alle gewerteten Zeiten dieser Strecken in einer Abfrage (#2521) statt einer je Strecke - mit internen Bestzeiten für Mitglieder
+        # wüchse die Seite sonst mit jeder Strecke. Dieselben Zeiten wie ``official_times`` je Strecke.
+        times_by_track: dict[tuple[str, str], list[dict]] = {}
+        if track_challenge:
+            for lap in await load_laps(db, official_query({"challenge_id": {"$in": sorted(set(track_challenge.values()))},
+                                                           "track_id": {"$in": sorted(track_challenge)}})):
+                times_by_track.setdefault((lap.get("challenge_id"), lap.get("track_id")), []).append(lap)
         for tid, cid in track_challenge.items():
             tr = track_docs.get(tid)
             if not tr:
                 continue
-            ranked = rank_laps(await official_times(db, cid, tid))
+            ranked = rank_laps(times_by_track.get((cid, tid), []))
             own = next((row for row in ranked if row["user_id"] == user_id), None)
             if not own:
                 continue
@@ -892,6 +883,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
                 "time_ms": own["effective_ms"],
                 "time_str": _ms_to_time_str(own["effective_ms"]),
                 "is_leader": is_p1,
+                "internal": not await sees_listed_challenge(PUBLIC, chall_docs.get(cid)),
             })
         f1_bests.sort(key=lambda x: x["time_ms"])
         # Teams

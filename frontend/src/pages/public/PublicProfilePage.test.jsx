@@ -185,6 +185,32 @@ test("vereinsinterne Erfolge (#2516): Referenz, Highlight und Trophäe tragen �
   expect(within(screen.getByTestId("trophy-card-aw-pub")).queryByText("Vereinsintern")).toBeNull();
 });
 
+test("vereinsintern (#2521): Teilnahme, Bestzeit und Liga-Historie tragen „Vereinsintern“, Öffentliches nicht", async () => {
+  const tournaments = [
+    { ...PROFILE.tournaments[1], internal: false },
+    { id: "tour3", slug: "vereins-abend", title: "Vereinsabend", status: "registration_open", start_date: "2026-09-01", game: null, final_position: null, internal: true },
+  ];
+  const f1Bests = [
+    { ...PROFILE.f1_bests[0], challenge: { id: "c-pub", slug: "f1-hotlap", title: "F1 Hotlap" }, internal: false },
+    { track: { name: "Monza", country: "IT" }, challenge: { id: "c-int", slug: "vereins-hotlap", title: "Vereins-Hotlap" }, time_str: "1:20.500", is_leader: true, internal: true },
+  ];
+  const history = [{ season_id: "s-int", season_name: "Season 2", league_name: "Probe-Liga", url: null, division_label: "Liga 1", staffel: "A",
+    display_name: "Loewen", rank: 1, of: 4, champion: true, zone: null, internal: true }];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: { ...PROFILE, tournaments, f1_bests: f1Bests, league_history: history } };
+    if (url === "/achievements/user/u1") return { data: ACHIEVEMENTS };
+    return { data: [] };
+  });
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.getByTestId("profile-league-history-s-int")).toHaveTextContent("Vereinsintern");
+  fireEvent.click(screen.getByTestId("profile-tab-references"));
+  expect(within(screen.getByTestId("profile-tournament-vereins-abend")).getByText("Vereinsintern")).toBeInTheDocument();
+  expect(within(screen.getByTestId("profile-tournament-summer-cup")).queryByText("Vereinsintern")).toBeNull();
+  expect(within(screen.getByTestId("profile-fastlap-vereins-hotlap")).getByText("Vereinsintern")).toBeInTheDocument();
+  expect(within(screen.getByTestId("profile-fastlap-f1-hotlap")).queryByText("Vereinsintern")).toBeNull();
+});
+
 test("läuft der Stream, steht der Player oben in der Übersicht (ohne Zustimmung der Hinweis)", async () => {
   mockApi({ live: [{ twitch_login: "paula_racing", title: "Quali-Runden", viewer_count: 12 }] });
   renderPage();
