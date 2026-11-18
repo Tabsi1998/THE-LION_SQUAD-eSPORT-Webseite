@@ -5,6 +5,8 @@ import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View
 import { Button } from "../../components/Button";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { Card } from "../../components/Card";
+import { YouCorners, YouFill, YouTag } from "../../components/YouFrame";
+import { saysYou } from "../../lib/youLabel";
 import { ContentCard } from "../../components/ContentCard";
 import { EventRecapCard } from "../../components/EventRecapCard";
 import { FormInput } from "../../components/FormInput";
@@ -577,12 +579,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 style={({ pressed }) => [styles.row, pressed && styles.pressed]}
                 testID={`event-row-${row.kind}-${row.id}`}
               >
+                {/* Ecken-Klammern (#1316): dein Turnier bzw. deine Fast Lap - „Du“ nur, wenn der Stand es nicht schon sagt. */}
+                {row.mine ? <YouFill radius={8} /> : null}
                 <View style={styles.rowWhen}>
                   {row.dayLabel ? <Muted style={styles.rowDay}>{row.dayLabel}</Muted> : null}
                   <Body style={styles.strong}>{row.timeLabel || "–"}</Body>
                 </View>
                 <View style={styles.flex}>
                   <Body style={styles.strong} numberOfLines={2}>{row.title}</Body>
+                  {row.mine && !saysYou(row.mine.label) ? <YouTag testID="event-row-you" style={styles.youTag} /> : null}
                   <Muted numberOfLines={1}>{[row.mode, row.detail].filter(Boolean).join(" · ")}</Muted>
                 </View>
                 {row.mine ? (
@@ -592,6 +597,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 ) : (
                   <StatusBadge phase={row.phase} status={row.status} />
                 )}
+                {row.mine ? <YouCorners /> : null}
               </Pressable>
             ))}
           </Card>
@@ -824,6 +830,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",
+  },
+  youTag: {
+    alignSelf: "flex-start",
   },
   rowMine: {
     color: colors.cyan,

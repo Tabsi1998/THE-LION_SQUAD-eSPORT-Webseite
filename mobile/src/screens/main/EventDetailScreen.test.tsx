@@ -377,3 +377,25 @@ test("Benachrichtigungen (#1208): die Frage kommt nach der Anmeldung - mit Turni
   await fireEvent.press(await screen.findByTestId("event-register-submit"));
   await waitFor(() => expect(mockAfterOwn).toHaveBeenCalledWith("u-1", "e:e1", expect.any(Promise)));
 });
+
+// Ecken-Klammern (#1316, Web: EventDetailPage): dein Turnier bzw. deine Fast Lap im Event trägt Winkel und Fläche - „Du“
+// steht nur, wenn der eigene Stand es nicht schon sagt („Du bist dabei“).
+test("Was läuft beim Event: Ecken nur an deinen Zeilen, „Du“ nur ohne „Du …“ im Stand", async () => {
+  mockGet.mockResolvedValue({ data: {
+    ...EVENT, visibility: "public", offer: null, start_date: "2099-10-24T16:00:00Z", end_date: "2099-10-24T21:00:00Z",
+    tournaments: [
+      { id: "t1", slug: "mk", title: "Mario Kart", team_mode: "solo", start_date: "2099-10-24T17:00:00Z", status: "registration_open", public_phase: { state: "registration_open" } },
+      { id: "t2", slug: "rl", title: "Rocket League", team_mode: "team", start_date: "2099-10-24T18:00:00Z", status: "registration_open", public_phase: { state: "registration_open" },
+        my_status: { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } },
+      { id: "t3", slug: "fc", title: "FC 26", team_mode: "solo", start_date: "2099-10-24T19:00:00Z", status: "registration_open", public_phase: { state: "registration_open" },
+        my_status: { state: "waitlist", label: "Warteliste", team_name: null } },
+    ],
+  } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-whatson")).toBeTruthy());
+  const corners = (id: string) => within(screen.getByTestId(`event-row-tournament-${id}`)).queryAllByTestId("you-corners").length;
+  expect([corners("t1"), corners("t2"), corners("t3")]).toEqual([0, 1, 1]);
+  expect(within(screen.getByTestId("event-row-tournament-t2")).queryByTestId("event-row-you")).toBeNull();
+  expect(within(screen.getByTestId("event-row-tournament-t3")).getByTestId("event-row-you")).toHaveTextContent("Du");
+  expect(screen.getAllByTestId("event-row-you")).toHaveLength(1);
+});
