@@ -22,6 +22,7 @@ import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../.
 import { attemptsText, entryRowKeys } from "../../lib/fastLapAttempts";
 import { parseLapTime, plausibilityText, showLapTime } from "../../lib/laptime";
 import { Button } from "../../components/Button";
+import { YouCorners, YouFill, YouTag } from "../../components/YouFrame";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { idSegment } from "../../lib/apiIds";
@@ -420,7 +421,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           <Heading>Leaderboard</Heading>
           {error ? <Muted style={styles.error}>{error}</Muted> : null}
           {leaderboard?.entries?.length ? (
-            leaderboard.entries.map((entry, index) => <EntryRow key={rowKeys[index]} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} />)
+            leaderboard.entries.map((entry, index) => <EntryRow key={rowKeys[index]} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} own={isOwnEntry(entry, user?.id)} />)
           ) : (
             <EmptyState title="Noch keine Zeiten" detail="Sobald Zeiten eingetragen sind, stehen sie hier pro Strecke." />
           )}
@@ -437,10 +438,17 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   );
 }
 
+/** Deine Zeit (#1316, wie F1DetailPage im Web): über die Konto-Kennung - Gäste ohne Konto sind nie „du“. */
+export function isOwnEntry(entry: Pick<F1LeaderboardEntry, "user_id" | "participant_id">, userId?: string | null): boolean {
+  return Boolean(userId) && (entry.user_id === userId || entry.participant_id === userId);
+}
+
 // Zeiten zählen beim Öffnen und bei jedem Streckenwechsel hoch, je Zeile versetzt (#1969); beim Nachladen nicht neu.
-function EntryRow({ entry, maxAttempts, index = 0, playKey = "", reference = false }: { entry: F1LeaderboardEntry; maxAttempts?: number | null; index?: number; playKey?: string; reference?: boolean }) {
+// Deine Zeit trägt die Ecken-Klammern (5 Punkte außen, die Liste hat Luft) und das Etikett „Du“ (#1316).
+function EntryRow({ entry, maxAttempts, index = 0, playKey = "", reference = false, own = false }: { entry: F1LeaderboardEntry; maxAttempts?: number | null; index?: number; playKey?: string; reference?: boolean; own?: boolean }) {
   return (
-    <Card style={[styles.entry, reference && styles.referenceEntry]}>
+    <Card style={[styles.entry, reference && styles.referenceEntry]} testID={own ? `fastlap-entry-you-${entry.rank ?? index}` : undefined}>
+      {own ? <YouFill radius={radius.lg} /> : null}
       <View style={styles.rankBox}>
         {Number(entry.rank || 0) <= 3 && entry.rank ? (
           <Ionicons name="medal-outline" color={colors.gold} size={20} />
@@ -448,13 +456,17 @@ function EntryRow({ entry, maxAttempts, index = 0, playKey = "", reference = fal
         <Body style={[styles.rank, Number(entry.rank || 0) <= 3 && entry.rank ? styles.gold : null]}>{entry.rank ? `#${entry.rank}` : "-"}</Body>
       </View>
       <View style={styles.entryText}>
-        <Body style={styles.strong}>{entry.display_name || entry.username || "Fahrer"}</Body>
+        <View style={styles.youLine}>
+          <Body style={[styles.strong, styles.shrink]}>{entry.display_name || entry.username || "Fahrer"}</Body>
+          {own ? <YouTag testID={`fastlap-you-${entry.rank ?? index}`} /> : null}
+        </View>
         <Muted>{entry.is_guest ? "Gast · " : ""}{attemptsText(entry.attempts, maxAttempts)}{entry.penalty_seconds ? ` · +${entry.penalty_seconds}s Penalty` : ""}</Muted>
       </View>
       <View style={styles.timeBox}>
         <CountUp value={showLapTime(entry.time_str) || "-"} playKey={playKey} delay={countDelay(index)} play={countsUp(index)} style={styles.time} />
         {entry.gap_str ? <CountUp value={showLapTime(entry.gap_str)} playKey={playKey} delay={countDelay(index)} play={countsUp(index)} variant="muted" /> : null}
       </View>
+      {own ? <YouCorners /> : null}
     </Card>
   );
 }
@@ -742,6 +754,17 @@ const styles = StyleSheet.create({
   entryText: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
+  },
+  youLine: {
+    alignItems: "center",
+    columnGap: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 2,
+  },
+  shrink: {
+    flexShrink: 1,
     minWidth: 0,
   },
   timeBox: {

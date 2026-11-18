@@ -5,6 +5,7 @@ import { isOverallWinner, pointsWord, standingState, type OverallStandingRow } f
 import { openLink } from "../../lib/openLink";
 import { colors, roles } from "../../theme";
 import { Card } from "../Card";
+import { InternalTag } from "../InternalTag";
 import { Glow, Press, StaggerIn, staggerInDelay } from "../motion";
 import { Body, Heading, Muted } from "../Text";
 
@@ -42,11 +43,16 @@ export function LeagueOverallStanding({ rows, showTeam = false, testID = "league
               <Text style={styles.points}>{pointsWord(row.points)}</Text>
             </View>
           );
-          const label = `${title}. ${detail}. Platz ${row.place} von ${row.of}, ${pointsWord(row.points)}${winner ? ", Gesamtsieger" : ""}`;
+          // Die Zeile spricht als Ganzes - das Etikett „Vereinsintern“ gehört deshalb in ihren Vorlesetext (#2531).
+          const label = `${title}. ${detail}. Platz ${row.place} von ${row.of}, ${pointsWord(row.points)}${winner ? ", Gesamtsieger" : ""}${row.internal ? ", vereinsintern" : ""}`;
           const body = (
             <>
               <View style={styles.main}>
-                <Body style={[styles.title, row.url ? styles.link : null]} numberOfLines={2}>{title}</Body>
+                <View style={styles.titleLine}>
+                  <Body style={[styles.title, styles.shrink, row.url ? styles.link : null]} numberOfLines={2}>{title}</Body>
+                  {/* Vereinsintern (#2531, Web #2521): Gäste sähen diese Wertung nicht oder nicht so. */}
+                  {row.internal ? <InternalTag testID={`${testID}-${row.level ?? index}-internal`} /> : null}
+                </View>
                 <Muted style={styles.small} numberOfLines={2} testID={`${testID}-state-${index}`}>{detail}</Muted>
               </View>
               {facts}
@@ -76,6 +82,8 @@ const styles = StyleSheet.create({
   rowWrap: { borderTopColor: colors.border, borderTopWidth: 1 },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8, minHeight: 48, paddingVertical: 10 },
   main: { flexBasis: 180, flexGrow: 1, minWidth: 0 },
+  titleLine: { alignItems: "center", columnGap: 8, flexDirection: "row", flexWrap: "wrap", rowGap: 4 },
+  shrink: { flexShrink: 1, minWidth: 0 },
   title: { fontWeight: "800" },
   link: { color: roles.brand },
   small: { fontSize: 12 },

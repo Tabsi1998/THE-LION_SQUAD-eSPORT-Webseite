@@ -49,6 +49,8 @@ import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
+import { youLabel, youSpeech } from "../../lib/youLabel";
+import { YouFrame, YouTag } from "../../components/YouFrame";
 import { useStillHold } from "../../seasons/matchPause";
 
 const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
@@ -171,9 +173,12 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const myTeamIds = useMemo(() => new Set(myTeams.map((team) => team.id).filter(Boolean)), [myTeams]);
   const ownRegistration = useMemo(() => {
     if (tournament?.my_registration?.id) return tournament.my_registration;
-    return registrations.find((registration) => registration.is_mine || registration.user_id === user?.id || (registration.team_id && myTeamIds.has(registration.team_id)));
+    return registrations.find((registration) => registration.is_mine || (Boolean(user?.id) && registration.user_id === user?.id) || (registration.team_id && myTeamIds.has(registration.team_id)));
   }, [myTeamIds, registrations, tournament?.my_registration, user?.id]);
   const registered = Boolean(ownRegistration?.id && !["cancelled", "rejected", "no_show"].includes(String(ownRegistration.status || "")));
+  // Ecken-Klammern (#1316): das Etikett an deiner Stelle - „Du“, bei einer Team-Anmeldung „Dein Team“ (wie im Web).
+  const mineId = ownRegistration?.id || null;
+  const mineLabel = youLabel(ownRegistration);
   // Ausgeschieden (#1553): Austritt oder Disqualifikation über die Turnierleitung - ein klarer Satz statt „angemeldet“.
   const ownOut = ["withdrawn", "disqualified"].includes(String(ownRegistration?.status || ""));
   const registration = useMemo(() => getRegistrationState(tournament, "Anmeldung"), [tournament]);
@@ -574,7 +579,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 <Card style={styles.card}>
                   <Heading>Finale Rangliste</Heading>
                   {finalStandings.length ? finalStandings.slice(0, 6).map((standing, index) => (
-                    <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} />
+                    <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} mineId={mineId} mineLabel={mineLabel} />
                   )) : <Muted>Finale Platzierungen wurden noch nicht veröffentlicht.</Muted>}
                   {finalStandings.length > 6 ? <Button label="Komplette Rangliste anzeigen" variant="secondary" onPress={() => setTab("standings")} /> : null}
                 </Card>
@@ -602,7 +607,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             // Gruppen, Liga, Swiss (#1563): eine Tabelle statt Baum-Spalten, der Spielplan einen Tipp weiter.
             <Card style={styles.card}>
               <Heading>Tabelle</Heading>
-              <StandingsTables tables={tables} empty="Die Tabelle steht, sobald Ergebnisse da sind." finalNote={tableNote} />
+              <StandingsTables tables={tables} empty="Die Tabelle steht, sobald Ergebnisse da sind." finalNote={tableNote} mineLabel={mineLabel} />
               {allMatches.length ? <Button label="Zum Spielplan" variant="secondary" onPress={() => { tabRef.current = "matches"; setTab("matches"); }} /> : null}
             </Card>
           ) : (
@@ -616,7 +621,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                   advancement={tournament}
                   nameOf={nameOf}
                   statusOf={statusOf}
-                  mineId={ownRegistration?.id || null}
+                  mineId={mineId}
+                  mineLabel={mineLabel}
                   plan={plan}
                   crowned={crowned}
                   finished={isFinished || String(tournament.status || "") === "cancelled"}
@@ -631,7 +637,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           <Card style={styles.card}>
             <Heading>{isFinished ? "Match-Historie" : "Spielplan"}</Heading>
             {allMatches.length ? (
-              <ScheduleList matches={allMatches} stages={stages} format={tournament.format} nameOf={nameOf} mineId={ownRegistration?.id || null} onOpen={openMatch} />
+              <ScheduleList matches={allMatches} stages={stages} format={tournament.format} nameOf={nameOf} mineId={mineId} mineLabel={mineLabel} onOpen={openMatch} />
             ) : <Muted>Noch keine Matches veröffentlicht.</Muted>}
           </Card>
         ) : null}
@@ -639,8 +645,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         {tab === "standings" ? (
           <Card style={styles.card}>
             <Heading>{isFinished ? "Finale Rangliste" : "Rangliste"}</Heading>
-            {kind === "table" ? <StandingsTables tables={tables} empty="Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind." finalNote={tableNote} /> : finalStandings.length ? finalStandings.map((standing, index) => (
-              <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} />
+            {kind === "table" ? <StandingsTables tables={tables} empty="Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind." finalNote={tableNote} mineLabel={mineLabel} /> : finalStandings.length ? finalStandings.map((standing, index) => (
+              <StandingRow key={`${standing.registration_id || standing.name || standing.display_name || index}`} standing={standing} index={index} mineId={mineId} mineLabel={mineLabel} />
             )) : <Muted>Rangliste wird angezeigt, sobald Ergebnisse vorhanden sind.</Muted>}
           </Card>
         ) : null}
@@ -648,18 +654,26 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         {tab === "participants" ? (
           <Card style={styles.card}>
             <Heading>Teilnehmer</Heading>
-            {registrations.length ? registrations.map((registration) => (
-              <View key={registration.id} style={styles.row}>
+            {registrations.length ? registrations.map((registration) => {
+              // Ecken-Klammern (#1316): deine Anmeldung (oder die deines Teams) - an der Kante, mit „Du“ bzw. „Dein Team“.
+              const mine = Boolean(mineId) && registration.id === mineId;
+              return (
+              <YouFrame key={registration.id} active={mine} inset style={[styles.row, mine && styles.youRow]} testID={`tournament-participant-${registration.id}`}
+                accessible={mine} accessibilityLabel={mine ? `${participantLabel(registration)}, ${youSpeech(mineLabel)}, ${formatStatus(registration.status || registration.registration_type || "registered")}` : undefined}>
                 <View style={styles.avatar}>
                   <Body style={styles.avatarText}>{participantLabel(registration).slice(0, 1).toUpperCase()}</Body>
                 </View>
                 <View style={styles.rowMain}>
-                  <Body style={styles.rowTitle}>{participantLabel(registration)}</Body>
+                  <View style={styles.youLine}>
+                    <Body style={[styles.rowTitle, styles.shrink]}>{participantLabel(registration)}</Body>
+                    {mine ? <YouTag label={mineLabel} testID={`tournament-participant-me-${registration.id}`} /> : null}
+                  </View>
                   <Muted>{formatStatus(registration.status || registration.registration_type || "registered")}</Muted>
                 </View>
                 {registration.seed ? <Pill label={`Seed ${registration.seed}`} /> : null}
-              </View>
-            )) : (
+              </YouFrame>
+              );
+            }) : (
               <View style={styles.wrap}>
                 {tournament.participants?.length ? tournament.participants?.map((name) => <Pill key={name} label={name} />) : <Muted>Aktuell sind {tournament.participant_count || 0} Teilnehmer registriert.</Muted>}
               </View>
@@ -773,19 +787,25 @@ function CompletedTournamentSummary({
   );
 }
 
-function StandingRow({ standing, index }: { standing: any; index: number }) {
+function StandingRow({ standing, index, mineId = null, mineLabel = "Du" }: { standing: any; index: number; mineId?: string | null; mineLabel?: string }) {
   const rank = standingRank(standing, index + 1);
+  // Ecken-Klammern (#1316): deine Platzierung - an der Kante, mit „Du“ bzw. „Dein Team“.
+  const mine = Boolean(standing?.is_mine) || (Boolean(mineId) && standing?.registration_id === mineId);
   return (
-    <View style={[styles.row, rank <= 3 && styles.placementRow]}>
+    <YouFrame active={mine} inset style={[styles.row, rank <= 3 && styles.placementRow, mine && styles.youRow]} testID={mine ? `standing-row-you-${index}` : undefined}
+      accessible={mine} accessibilityLabel={mine ? `Platz ${rank}: ${standingName(standing)}, ${youSpeech(mineLabel)}. ${standingSummary(standing)}` : undefined}>
       <Body style={[styles.rank, rank === 1 && styles.rankFirst, rank === 2 && styles.rankSecond, rank === 3 && styles.rankThird]}>
         #{rank}
       </Body>
       <View style={styles.rowMain}>
-        <Body style={styles.rowTitle}>{standingName(standing)}</Body>
+        <View style={styles.youLine}>
+          <Body style={[styles.rowTitle, styles.shrink]}>{standingName(standing)}</Body>
+          {mine ? <YouTag label={mineLabel} testID={`standing-you-${index}`} /> : null}
+        </View>
         <Muted>{standingSummary(standing)}</Muted>
       </View>
       {rank <= 3 ? <Pill label={placementLabel(rank)} accent={rank === 1 ? "cyan" : undefined} /> : null}
-    </View>
+    </YouFrame>
   );
 }
 
@@ -1101,6 +1121,22 @@ const styles = StyleSheet.create({
   rowMain: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
+  },
+  // Deine Zeile (#1316): etwas Luft, damit die Winkel an der Kante nicht auf Bild und Text liegen.
+  youRow: {
+    paddingBottom: 10,
+    paddingHorizontal: 8,
+  },
+  youLine: {
+    alignItems: "center",
+    columnGap: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 2,
+  },
+  shrink: {
+    flexShrink: 1,
     minWidth: 0,
   },
   rowTitle: {

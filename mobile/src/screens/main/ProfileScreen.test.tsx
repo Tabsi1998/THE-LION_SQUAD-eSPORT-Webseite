@@ -363,3 +363,46 @@ describe("Vereinsprofil im Profil", () => {
     expect(screen.getByText("Community")).toBeTruthy();
   });
 });
+
+// Vereinsintern im fremden Profil (#2531, Web #2521): Teilnahmen und Fast-Lap-Bestzeiten, die Gäste nicht sehen, tragen das Etikett -
+// nur die Einträge mit `internal: true`, mit Screenreader-Text. Die Leertexte stimmen auch für Mitglieder (kein „öffentlich“).
+describe("Vereinsintern im fremden Profil (#2531)", () => {
+  const openReferences = async () => {
+    await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
+    await waitFor(() => expect(screen.getByText("Referenzen")).toBeTruthy());
+    await fireEvent.press(screen.getByText("Referenzen"));
+  };
+
+  test("Etikett nur an internen Teilnahmen und Bestzeiten", async () => {
+    mockPublic.kiwiExtra = {
+      tournaments: [
+        { id: "t-intern", title: "Vereinscup", status: "completed", internal: true },
+        { id: "t-offen", title: "Open Cup", status: "completed", internal: false },
+        { id: "t-alt", title: "Alter Server", status: "completed" },
+      ],
+      f1_bests: [
+        { challenge: { id: "c-intern", title: "Hot Lap intern" }, track: { id: "tr1", name: "Monza" }, time_str: "1:20.000", internal: true },
+        { challenge: { id: "c-offen", title: "Hot Lap offen" }, track: { id: "tr2", name: "Spa" }, time_str: "1:45.000", internal: false },
+      ],
+    };
+    await openReferences();
+    await waitFor(() => expect(screen.getByText("Vereinscup")).toBeTruthy());
+    expect(screen.getByTestId("internal-tag-tournament-t-intern")).toHaveTextContent("Vereinsintern");
+    expect(screen.queryByTestId("internal-tag-tournament-t-offen")).toBeNull();
+    expect(screen.queryByTestId("internal-tag-tournament-t-alt")).toBeNull();
+    expect(screen.getByTestId("internal-tag-fastlap-c-intern")).toHaveTextContent("Vereinsintern");
+    expect(screen.queryByTestId("internal-tag-fastlap-c-offen")).toBeNull();
+    expect(screen.getAllByLabelText(/vereinsintern/i)).toHaveLength(2);
+  });
+
+  test("Leertext ohne „öffentlich“ - er stimmt auch für Vereinsmitglieder", async () => {
+    mockPublic.kiwiExtra = {
+      tournaments: [],
+      f1_bests: [{ challenge: { id: "c1", title: "Hot Lap" }, track: { id: "tr1", name: "Monza" }, time_str: "1:20.000", internal: true }],
+    };
+    await openReferences();
+    await waitFor(() => expect(screen.getByText("Keine Turniere")).toBeTruthy());
+    expect(screen.getByText("Keine Turnierhistorie sichtbar.")).toBeTruthy();
+    expect(screen.queryByText(/Keine öffentliche Turnierhistorie/)).toBeNull();
+  });
+});

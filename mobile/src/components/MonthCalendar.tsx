@@ -5,9 +5,11 @@ import { Body, Muted } from "./Text";
 import { colors, kindColors, radius } from "../theme";
 import { WEEKDAY_LABELS, itemsByDay, monthLabel, monthMatrix, splitSpans, weekBars, type CalendarItem, type CalendarKind } from "../lib/calendar";
 import { viennaDay } from "../lib/vienna";
+import { YouCorners, YouFill } from "./YouFrame";
 
-// Monatsansicht (#216): Punkte je Tag in der Farbe der Art, ein Ring um Tage mit eigener
-// Anmeldung. Der Tag antippen zeigt seine Termine darunter - das macht der Aufrufer.
+// Monatsansicht (#216): Punkte je Tag in der Farbe der Art, Ecken-Klammern um Tage mit eigener
+// Anmeldung (#1316, an der Kante - die Tage stehen 2 Punkte auseinander). Der Tag antippen zeigt seine Termine
+// darunter - das macht der Aufrufer.
 // Seit #1271 wie im Web: „Heute“ springt in den aktuellen Monat, Mehrtägiges ist ein Balken über seine Tage.
 
 // Farben je Art (#1151, #1305) kommen aus dem Thema - dieselben wie auf den Karten und im Web (Event Violett, Turnier Cyan,
@@ -66,15 +68,17 @@ export function MonthCalendar({ year, month, items, selected, onSelect, onShift,
                     key={cell.key}
                     onPress={() => onSelect(cell.key)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${cell.day}. ${monthLabel(cell.date.getFullYear(), cell.date.getMonth())}${dayItems.length ? `, ${dayItems.length} Termine` : ""}`}
+                    accessibilityLabel={`${cell.day}. ${monthLabel(cell.date.getFullYear(), cell.date.getMonth())}${dayItems.length ? `, ${dayItems.length} Termine` : ""}${mine ? ", angemeldet" : ""}`}
                     accessibilityState={{ selected: isSelected }}
-                    style={[styles.cell, isSelected && styles.cellSelected, mine && styles.cellMine]}
+                    style={[styles.cell, isSelected && styles.cellSelected]}
                     testID={`calendar-day-${cell.key}`}
                   >
+                    {mine ? <YouFill radius={radius.lg} /> : null}
                     <Body style={[styles.dayText, !cell.inMonth && styles.dayMuted, cell.key === todayKey && styles.dayToday]}>{cell.day}</Body>
                     <View style={styles.dots}>
                       {kinds.slice(0, 3).map((kind) => <View key={kind} style={[styles.dot, { backgroundColor: KIND_COLORS[kind] }]} testID={`calendar-dot-${cell.key}-${kind}`} />)}
                     </View>
+                    {mine ? <YouCorners out={0} testID={`calendar-you-${cell.key}`} /> : null}
                   </Pressable>
                 );
               })}
@@ -117,7 +121,8 @@ export function MonthCalendar({ year, month, items, selected, onSelect, onShift,
           </View>
         ))}
         <View style={styles.legendItem}>
-          <View style={[styles.legendRing]} />
+          {/* Das kleine Ecken-Zeichen (#1316, wie die Legende im Web: Winkel 4 Punkte lang). */}
+          <View style={styles.legendYou}><YouCorners out={0} len={4} testID="calendar-legend-you" /></View>
           <Muted>angemeldet</Muted>
         </View>
       </View>
@@ -217,9 +222,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(41,182,232,0.15)",
     borderColor: colors.cyan,
   },
-  cellMine: {
-    borderColor: colors.gold,
-  },
   dayText: {
     fontSize: 13,
     fontWeight: "700",
@@ -254,11 +256,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 5,
   },
-  legendRing: {
-    borderColor: colors.gold,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    height: 10,
-    width: 10,
+  legendYou: {
+    height: 12,
+    width: 12,
   },
 });

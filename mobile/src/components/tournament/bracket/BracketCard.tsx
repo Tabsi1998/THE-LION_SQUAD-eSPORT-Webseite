@@ -6,11 +6,14 @@ import { HEAD_H, LINE_H, META_H, nameLines, SINGLE_H, type CardModel, type CardR
 import type { CardLift, RowMotion } from "../../../lib/bracketMotion";
 import { colors, radius, roles, surfaces } from "../../../theme";
 import { LiveClock } from "./LiveClock";
+import { YouCorners, YouFill, YouTag } from "../../YouFrame";
+import { youSpeech } from "../../../lib/youLabel";
 import { CountUp, Flash, PopIn, PressScale, SpringIn } from "./BracketMotion";
 import { breatheStyle, crownStyle, liftStyle } from "./motion";
 
 // Eine Karte im Turnierbaum (#1563): ruhig wie im Web (#1561). Kopf mit Kürzel und Stand (läuft: roter Punkt, Station,
-// Uhr), Zeilen mit Name und Ergebnis - Sieger hell, Verlierer leise, „Du“ in Cyan, ausgefallen durchgestrichen. Ein Name
+// Uhr), Zeilen mit Name und Ergebnis - Sieger hell, Verlierer leise, ausgefallen durchgestrichen. Dein Match trägt die
+// Ecken-Klammern statt Leuchten, deine Zeile das Etikett „Du“ bzw. „Dein Team“ (#1316, YouFrame). Ein Name
 // ist ein Knopf: Antippen zeigt seinen Weg (leichtes Eindrücken). Feste Höhen (bracketCards) - die Linien enden genau an
 // der Zeile. Neuer Stand: wer weiterkommt, federt in seine Zeile und leuchtet kurz auf; ein frisches Ergebnis zählt hoch,
 // Platzziffern poppen nacheinander (BracketMotion).
@@ -38,20 +41,32 @@ type Props = {
   reduce: boolean;
   onOpen: (matchId: string) => void;
   onToggle: (registrationId: string) => void;
+  /** Etikett an deiner Zeile (#1316). */
+  youLabel?: string;
 };
 
-function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, reduce, onOpen, onToggle }: Props) {
+function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, reduce, onOpen, onToggle, youLabel = "Du" }: Props) {
   const frame = [
     styles.card,
     { left: x, top: y, width: w, height: model.height, opacity: dim ? 0.35 : 1 },
     // Dein Weg (#1177): der Rest tritt zurück - eine kurze Überblendung, bei „Bewegung reduzieren“ sofort.
     { transitionProperty: "opacity" as const, transitionDuration: reduce ? 1 : 150 },
-    model.mine && styles.mine,
     model.drawState === "ready" && styles.drawReady,
     live && styles.live,
     model.kind === "fate" && styles.fate,
     motion?.lift ? liftStyle(motion.lift.delay, reduce) : null,
   ];
+  // Ecken-Klammern (#1316): Die Karte schneidet ab (overflow) - die Winkel liegen deshalb als eigene Lage genau über ihr,
+  // 5 Punkte außen, mit derselben Lage, Deckkraft und Anhebung. Die leichte Fläche liegt in der Karte.
+  const corners = model.mine ? (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.cornerLayer, { left: x, top: y, width: w, height: model.height, opacity: dim ? 0.35 : 1 }, { transitionProperty: "opacity" as const, transitionDuration: reduce ? 1 : 150 }, motion?.lift ? liftStyle(motion.lift.delay, reduce) : null]}
+      testID={`bracket-you-${model.id}`}
+    >
+      <YouCorners />
+    </Animated.View>
+  ) : null;
   if (model.kind === "fate" || model.kind === "bye") {
     const line = model.line;
     const own = Boolean(line?.registrationId) && line?.registrationId === selected;
@@ -61,7 +76,7 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
         <Text style={[styles.singleText, model.kind === "bye" && styles.byeName, own && styles.nameSelected]} numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE}>
           {line?.text}
         </Text>
-        {model.mine ? <Text style={styles.du} maxFontSizeMultiplier={FONT_SCALE}>Du</Text> : null}
+        {model.mine ? <YouTag label={youLabel} testID={`bracket-you-tag-${model.id}`} /> : null}
       </>
     );
     // Entfällt oder zusammengelegt (neu): die Zeile kommt ruhig herein, die alte Karte ist dann leise.
@@ -69,18 +84,24 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
       ? <SpringIn key={`fate-${motion.key}`} delay={0} reduce={reduce} style={styles.single}>{body}</SpringIn>
       : <View style={styles.single}>{body}</View>;
     return (
+      <>
       <Animated.View style={frame} testID={`bracket-card-${model.id}`}>
+        {model.mine ? <YouFill /> : null}
         {model.kind === "bye" && line?.registrationId ? (
-          <PressScale onPress={() => onToggle(line.registrationId as string)} accessibilityRole="button" accessibilityLabel={`${line.tag}: ${line.text}. Weg zeigen`} style={styles.fill} hitSlop={4}>
+          <PressScale onPress={() => onToggle(line.registrationId as string)} accessibilityRole="button" accessibilityLabel={`${line.tag}: ${line.text}${model.mine ? `, ${youSpeech(youLabel)}` : ""}. Weg zeigen`} style={styles.fill} hitSlop={4}>
             {content}
           </PressScale>
         ) : content}
       </Animated.View>
+      {corners}
+      </>
     );
   }
 
   return (
+    <>
     <Animated.View style={frame} testID={`bracket-card-${model.id}`}>
+      {model.mine ? <YouFill /> : null}
       {motion?.result || motion?.walkover ? <Flash key={`flash-${motion.key}`} reduce={reduce} color={RESULT_GLOW} /> : null}
       {motion?.lift ? (
         <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`bracket-lift-${model.id}`}>
@@ -103,7 +124,7 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
       {model.empty ? <Text style={[styles.lineText, styles.quietLine]} maxFontSizeMultiplier={FONT_SCALE}>noch leer</Text> : null}
       {model.rows.map((row, index) => (
         <React.Fragment key={row.key}>
-          <Row row={row} height={model.rowHeight} heat={model.kind === "heat"} walkover={model.walkover} selected={selected} motion={row.registrationId ? motion?.rows?.get(row.registrationId) : undefined} pop={Boolean(motion?.result)} popDelay={index * 70} planKey={motion?.key || ""} reduce={reduce} onToggle={onToggle} />
+          <Row row={row} youLabel={youLabel} height={model.rowHeight} heat={model.kind === "heat"} walkover={model.walkover} selected={selected} motion={row.registrationId ? motion?.rows?.get(row.registrationId) : undefined} pop={Boolean(motion?.result)} popDelay={index * 70} planKey={motion?.key || ""} reduce={reduce} onToggle={onToggle} />
           {index === model.cutAfter ? (
             <View style={styles.cut}>
               <Text style={styles.cutText} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{model.text.cut}</Text>
@@ -114,11 +135,13 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
       {model.kind === "heat" && model.freeLine ? <Text style={[styles.lineText, styles.quietLine]} maxFontSizeMultiplier={FONT_SCALE} testID={`bracket-heat-free-${model.id}`}>{model.freeLine}</Text> : null}
       {model.kind === "heat" && model.cutAfter >= 0 && model.text.rest ? <Text style={styles.lineText} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{model.text.rest}</Text> : null}
     </Animated.View>
+    {corners}
+    </>
   );
 }
 
-function Row({ row, height, heat, walkover, selected, motion, pop, popDelay, planKey, reduce, onToggle }: {
-  row: CardRow; height: number; heat: boolean; walkover: boolean; selected: string | null; motion?: RowMotion; pop: boolean; popDelay: number; planKey: string; reduce: boolean;
+function Row({ row, youLabel, height, heat, walkover, selected, motion, pop, popDelay, planKey, reduce, onToggle }: {
+  row: CardRow; youLabel: string; height: number; heat: boolean; walkover: boolean; selected: string | null; motion?: RowMotion; pop: boolean; popDelay: number; planKey: string; reduce: boolean;
   onToggle: (registrationId: string) => void;
 }) {
   const tall = height > 40;
@@ -144,7 +167,7 @@ function Row({ row, height, heat, walkover, selected, motion, pop, popDelay, pla
   const parts = (
     <>
       <Text style={nameStyle} numberOfLines={nameLines(row.label, tall)} ellipsizeMode="tail" maxFontSizeMultiplier={FONT_SCALE}>{row.label || "—"}</Text>
-      {row.mine ? <Text style={styles.du} maxFontSizeMultiplier={FONT_SCALE}>Du</Text> : null}
+      {row.mine ? <YouTag label={youLabel} testID={`bracket-you-row-${row.registrationId || row.key}`} /> : null}
       {walkover && row.winner && !heat ? <Text style={styles.tag} maxFontSizeMultiplier={FONT_SCALE}>kampflos</Text> : null}
       {result}
     </>
@@ -160,7 +183,7 @@ function Row({ row, height, heat, walkover, selected, motion, pop, popDelay, pla
       onPress={() => onToggle(row.registrationId as string)}
       accessibilityRole="button"
       accessibilityState={{ selected: row.registrationId === selected }}
-      accessibilityLabel={`${row.label}${row.result ? `, ${row.result}` : ""}. Weg zeigen`}
+      accessibilityLabel={`${row.label}${row.mine ? `, ${youSpeech(youLabel)}` : ""}${row.result ? `, ${row.result}` : ""}. Weg zeigen`}
       hitSlop={{ top: 6, bottom: 6 }}
       innerStyle={[styles.row, { height }]}
     >
@@ -200,7 +223,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "absolute",
   },
-  mine: { borderColor: "rgba(41,182,232,0.6)" },
+  cornerLayer: { position: "absolute" },
   drawReady: { borderColor: "rgba(255,215,0,0.5)" },
   live: { borderColor: "rgba(255,59,48,0.6)" },
   fate: { backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.12)", borderStyle: "dashed" },
@@ -233,7 +256,6 @@ const styles = StyleSheet.create({
   nameEmpty: { color: "rgba(255,255,255,0.25)" },
   nameOut: { color: roles.quiet, textDecorationLine: "line-through" },
   nameSelected: { color: roles.honor },
-  du: { color: roles.brand, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
   tag: { borderColor: "rgba(255,159,67,0.5)", borderRadius: radius.sm, borderWidth: 1, color: roles.warn, fontSize: 9, fontWeight: "900", paddingHorizontal: 4, paddingVertical: 1 },
   result: { color: roles.quiet, fontSize: 14, fontVariant: ["tabular-nums"], fontWeight: "900", minWidth: 22, textAlign: "right" },
   resultWinner: { color: roles.brand },

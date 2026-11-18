@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { TeamDetailScreen } from "./TeamDetailScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
@@ -143,6 +143,11 @@ test("Kopf: Name, Kürzel, Spiel und Level; Gesichter Kapitän zuerst, du mit Ec
   expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("CO-KAPITÄN");
   expect(screen.getByTestId("team-face-role-u-1")).toHaveTextContent("SPIELER");
   expect(screen.getAllByTestId("team-face-you")).toHaveLength(1);
+  // Ecken-Klammern (#1316): Winkel und Etikett „Du“ nur an deinem Gesicht (Paula, u-1), wie im Web (TeamHeader).
+  expect(within(screen.getByTestId("team-face-u-1")).getByTestId("team-face-you")).toBeTruthy();
+  expect(screen.getAllByTestId(/^team-face-you-tag-/).map((node) => node.props.testID)).toEqual(["team-face-you-tag-u-1"]);
+  expect(screen.getByTestId("team-face-you-tag-u-1")).toHaveTextContent("Du");
+  expect(screen.getByTestId("team-face-you")).toHaveStyle({ top: -5, left: -5 });
   await fireEvent.press(screen.getByTestId("team-face-u-co"));
   expect(navigate).toHaveBeenCalledWith("PublicProfile", { username: "pixelpanther" });
   expect(screen.queryByTestId("team-manage-members")).toBeNull();

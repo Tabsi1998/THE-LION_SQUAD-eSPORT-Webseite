@@ -7,6 +7,7 @@ import { MediaImage } from "../MediaImage";
 import { Body, Muted } from "../Text";
 import { faceTone, teamColorHex } from "../../lib/teamColors";
 import { initials, orderedFaces } from "../../lib/teamPage";
+import { YouCorners, YouTag } from "../YouFrame";
 import { colors, radius } from "../../theme";
 import type { Team } from "../../types";
 
@@ -90,26 +91,17 @@ export function TeamHeader({ team, header, level, crown, userId, onOpenProfile, 
                     style={[styles.avatar, !face.avatar_url && { backgroundColor: faceTone(name) }]}
                     fallback={<Body style={styles.avatarText}>{initials(name)}</Body>}
                   />
-                  {mine ? <YouCorners /> : null}
+                  {/* Ecken-Klammern (#1316): um das runde Bild ohne Fläche, 5 Punkte außen - die Leiste hat 10 Punkte Luft. */}
+                  {mine ? <YouCorners testID="team-face-you" /> : null}
                 </View>
                 <Muted style={styles.faceName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>{name}</Muted>
                 <Muted style={[styles.faceRole, face.role !== "player" && styles.faceRoleLead]} testID={`team-face-role-${face.id}`}>{face.roleLabel.toUpperCase()}</Muted>
+                {mine ? <YouTag testID={`team-face-you-tag-${face.id}`} /> : null}
               </Pressable>
             );
           })}
         </ScrollView>
       ) : null}
-    </View>
-  );
-}
-
-function YouCorners() {
-  return (
-    <View pointerEvents="none" style={styles.corners} testID="team-face-you">
-      <View style={[styles.corner, styles.cornerTL]} />
-      <View style={[styles.corner, styles.cornerTR]} />
-      <View style={[styles.corner, styles.cornerBL]} />
-      <View style={[styles.corner, styles.cornerBR]} />
     </View>
   );
 }
@@ -137,10 +129,4 @@ const styles = StyleSheet.create({
   faceName: { color: colors.white, fontSize: 11, fontWeight: "800" },
   faceRole: { fontSize: 10, fontWeight: "800" },
   faceRoleLead: { color: "rgba(255,255,255,0.8)" },
-  corners: { bottom: -6, left: -6, position: "absolute", right: -6, top: -6 },
-  corner: { borderColor: colors.cyan, height: 10, position: "absolute", width: 10 },
-  cornerTL: { borderLeftWidth: 2, borderTopWidth: 2, left: 0, top: 0 },
-  cornerTR: { borderRightWidth: 2, borderTopWidth: 2, right: 0, top: 0 },
-  cornerBL: { borderBottomWidth: 2, borderLeftWidth: 2, bottom: 0, left: 0 },
-  cornerBR: { borderBottomWidth: 2, borderRightWidth: 2, bottom: 0, right: 0 },
 });

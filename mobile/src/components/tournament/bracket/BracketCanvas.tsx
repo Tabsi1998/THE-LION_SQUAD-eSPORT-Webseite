@@ -14,6 +14,7 @@ import { viennaTime } from "../../../lib/vienna";
 import { colors, radius, roles, surfaces } from "../../../theme";
 import { Button } from "../../Button";
 import { BracketCard, TrophyCard } from "./BracketCard";
+import { YOU_CORNER } from "../../YouFrame";
 import { DrawNotice } from "./DrawNotice";
 import { clockDuration } from "./LiveClock";
 import { LiveNow } from "./LiveNow";
@@ -36,6 +37,8 @@ type Props = {
   nameOf: (registrationId: string) => string;
   statusOf: (registrationId: string) => string;
   mineId: string | null;
+  /** Etikett an deinem Match: „Du“ oder „Dein Team“ (#1316, lib/youLabel). */
+  mineLabel?: string;
   plan: MotionPlan | null;
   crowned: boolean;
   /** Das Turnier ist zu Ende (#2459): Lauf-Karten zeigen dann keine freien Plätze mehr. */
@@ -61,7 +64,7 @@ function edgesFor(matches: BracketMatch[]): BracketEdge[] {
   return [...bySection.values()].flatMap((rounds) => orderEdges([...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([, list]) => [...list].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)))));
 }
 
-export function BracketCanvas({ matches: rawMatches, stages, format, advancement, nameOf, statusOf, mineId, plan, crowned, finished = false, onOpenMatch }: Props) {
+export function BracketCanvas({ matches: rawMatches, stages, format, advancement, nameOf, statusOf, mineId, mineLabel = "Du", plan, crowned, finished = false, onOpenMatch }: Props) {
   const reduce = useReduceMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const toggle = useCallback((registrationId: string) => setSelected((current) => (current === registrationId ? null : registrationId)), []);
@@ -148,6 +151,7 @@ export function BracketCanvas({ matches: rawMatches, stages, format, advancement
             championName={champion ? nameOf(champion) : null}
             crowned={crowned && Boolean(group.finalId)}
             finalId={group.finalId}
+            mineLabel={mineLabel}
             onOpen={onOpenMatch}
             onToggle={toggle}
           />
@@ -157,7 +161,7 @@ export function BracketCanvas({ matches: rawMatches, stages, format, advancement
   );
 }
 
-function Canvas({ layout, matches, models, labels, path, selected, plan, reduce, champion, championName, crowned, finalId, onOpen, onToggle }: {
+function Canvas({ layout, matches, models, labels, path, selected, plan, reduce, champion, championName, crowned, finalId, mineLabel, onOpen, onToggle }: {
   layout: BracketLayout;
   matches: BracketMatch[];
   models: Map<string, CardModel>;
@@ -170,6 +174,7 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
   championName: string | null;
   crowned: boolean;
   finalId: string | null;
+  mineLabel: string;
   onOpen: (matchId: string) => void;
   onToggle: (registrationId: string) => void;
 }) {
@@ -259,6 +264,7 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
               selected={selected}
               motion={motion}
               reduce={reduce}
+              youLabel={mineLabel}
               onOpen={onOpen}
               onToggle={onToggle}
             />
@@ -286,7 +292,8 @@ const styles = StyleSheet.create({
   wrap: { gap: 12 },
   stage: { gap: 8 },
   stageTitle: { color: colors.white, fontSize: 15, fontWeight: "900" },
-  scroll: { paddingBottom: 4, paddingRight: 18 },
+  // Links 6 Punkte Luft (#1316): die Ecken-Klammern deines Matches stehen 5 Punkte außen - auch in der ersten Spalte.
+  scroll: { paddingBottom: 4, paddingLeft: YOU_CORNER.out + 1, paddingRight: 18 },
   hint: { color: roles.muted, fontSize: 12 },
   pathRow: { alignItems: "flex-start" },
   pathBar: {
