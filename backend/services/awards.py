@@ -23,7 +23,7 @@ from services.competition_standings import (
     standings_for_structure,
 )
 from services.league_scope import NOT_LEAGUE, is_league_staffel
-from services.profile_visibility import PUBLIC, SELF, ProfileScope, viewer_sees_level
+from services.profile_visibility import PUBLIC, SELF, ProfileScope, public_season, sees_season, viewer_sees_level
 from services.season_service import _active_season
 from services.visibility import user_can_see
 
@@ -330,41 +330,12 @@ async def _visible(doc: dict, live: dict | None = None, seasons: dict | None = N
     return await viewer_sees_level(viewer_scope, tournament.get("visibility"))
 
 
-def _public_season(season: dict | None) -> bool:
-    return bool(season) and season.get("status") != "archived" and season.get("visibility") == "public"
-
-
 async def _season_visible(season: dict | None, scope: ProfileScope | None) -> bool:
-    """Sieht der Betrachter von ``scope`` die Season? Ohne Person (Gast) ``_public_season``.
-
-    Dieselbe Regel wie ``league_service.can_see_season`` - mit einer Ausnahme: Eine **archivierte** Season zählt hier nie, auch
-    nicht für Mitglieder oder die Liga-Leitung (wie bei Gästen, ``_public_season``); ``can_see_season`` kennt den Status nicht.
-    Hier ohne ``league_service``: das zöge Discord, Mail und Routen in den Import-Graphen der Erfolge
-    (tests/test_import_cycles_unit.py); tests/test_season_rule_parity_flow.py hält beide Regeln gleich."""
+    """Sieht der Betrachter von ``scope`` die Season? Ohne Person (Gast) ``public_season``. Die Regel steht seit #2521 in
+    ``profile_visibility.sees_season`` - Liga-Historie und Gesamtwertung im Profil nutzen sie mit."""
     if scope is None or scope.viewer is None:
-        return _public_season(season)
-    if not season or season.get("status") == "archived":
-        return False
-    key = ("season", season.get("id"), season.get("league_id"), season.get("visibility"))
-    if key not in scope.memo:
-        scope.memo[key] = await _season_rule(season, scope)
-    return scope.memo[key]
-
-
-async def _season_rule(season: dict, scope: ProfileScope) -> bool:
-    visibility = season.get("visibility") or "off"
-    if visibility == "public":
-        return True
-    if visibility not in ("members", "admins"):
-        return False
-    league_key = ("league", season.get("league_id"))
-    if league_key not in scope.memo:
-        from services.league_permissions import ANY, can
-
-        scope.memo[league_key] = await can(scope.viewer, ANY, season.get("league_id"))
-    if scope.memo[league_key]:
-        return True
-    return visibility == "members" and await viewer_sees_level(scope, "members")
+        return public_season(season)
+    return await sees_season(scope, season)
 
 
 async def _views(db, docs: list[dict], public_only: bool = True, *, scope: ProfileScope | None = None) -> list[dict]:

@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 from services import awards, league_service  # noqa: E402
-from services.profile_visibility import members_scope  # noqa: E402
+from services.profile_visibility import PUBLIC, SELF, members_scope, sees_season  # noqa: E402
 
 VISIBILITIES = ("public", "members", "admins", "off", None)
 STATUSES = ("active", "completed", "archived")
@@ -48,5 +48,10 @@ async def test_season_rule_matches_can_see_season_except_archived(flow):
         scope = members_scope(viewer) if viewer else None
         got = await awards._season_visible(season, scope)
         assert got == expected, (label, visibility, status, league_id)
+        # Liga-Historie und Gesamtwertung im Profil (#2521) nutzen dieselbe Regel direkt - Gäste über ``PUBLIC``.
+        direct = await sees_season(members_scope(viewer) if viewer else PUBLIC, season)
+        assert direct == expected, ("sees_season", label, visibility, status, league_id)
+        # Die Person selbst sieht jede Season, die nicht archiviert ist.
+        assert await sees_season(SELF, season) is (status != "archived")
         checked += 1
     assert checked == len(viewers) * len(VISIBILITIES) * len(STATUSES) * len(LEAGUES)
