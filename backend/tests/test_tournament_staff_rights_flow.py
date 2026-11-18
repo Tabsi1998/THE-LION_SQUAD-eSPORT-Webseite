@@ -173,7 +173,8 @@ async def _profile(monkeypatch, account: dict, tournament_assignments: int = 0, 
         users=SimpleNamespace(find_one=AsyncMock(return_value={"is_active": True, **account})),
         memberships=SimpleNamespace(find_one=AsyncMock(return_value=None)),
         tournament_staff_assignments=SimpleNamespace(count_documents=AsyncMock(return_value=len(tournament_ids)),
-                                                     distinct=AsyncMock(return_value=list(tournament_ids))),
+                                                     find=lambda *_a, **_k: SimpleNamespace(to_list=AsyncMock(
+                                                         return_value=[{"tournament_id": tid} for tid in tournament_ids]))),
         # Nur gewöhnliche Turniere zählen als Einsatz (Paket D, #2262) - Staffeln liefert die Abfrage ohne Liga nicht zurück.
         tournaments=SimpleNamespace(find_one=AsyncMock(return_value={"id": next(iter(set(tournament_ids) - set(staffel_ids)))}
                                                        if set(tournament_ids) - set(staffel_ids) else None)),
@@ -242,3 +243,35 @@ async def test_the_fast_lap_management_list_follows_the_same_rule(flow):
     confirmed = await flow.get("/api/f1/challenges", params=managed)
     assert unconfirmed.json() == [], "ohne Zwei-Faktor nichts zu verwalten"
     assert ids(confirmed) == {"fl-eigen", "fl-fremd", "fl-fremd-entwurf"}
+
+
+@pytest.mark.asyncio
+async def test_which_assignments_count_as_a_tournament_assignment_with_real_data(flow):
+    # Paket D (#2262): dieselbe Regel mit echten Daten statt Zählungen - Staffel zählt nicht, ein Turnier daneben schon, ein Einsatz
+    # ohne Turnier (leer oder Feld fehlt) zählt wie bisher, ein inaktiver oder verwaister Einsatz (Turnier gelöscht) nicht.
+    from auth import _tournament_assignment_outside_staffeln
+
+    cup = await flow.create_tournament()
+    staffel = await flow.create_tournament()
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"league_context": {"league_id": "liga-1", "season_id": "s1"}}})
+    cases = {
+        "nur-staffel": [{"tournament_id": staffel["id"]}],
+        "staffel-und-turnier": [{"tournament_id": staffel["id"]}, {"tournament_id": cup["id"]}],
+        "nur-turnier": [{"tournament_id": cup["id"]}],
+        "ohne-turnier": [{"tournament_id": None}],
+        "feld-fehlt": [{}],
+        "inaktiv": [{"tournament_id": cup["id"], "is_active": False}],
+        "verwaist": [{"tournament_id": "geloescht"}],
+        "ohne-einsatz": [],
+    }
+    for user_id, rows in cases.items():
+        for index, row in enumerate(rows):
+            await flow.db.tournament_staff_assignments.insert_one({"id": f"{user_id}-{index}", "user_id": user_id, "role": "organizer", **row})
+    seen = {
+        user_id: await _tournament_assignment_outside_staffeln(flow.db, {"user_id": user_id, "is_active": {"$ne": False}})
+        for user_id in cases
+    }
+    assert seen == {
+        "nur-staffel": False, "staffel-und-turnier": True, "nur-turnier": True, "ohne-turnier": True,
+        "feld-fehlt": True, "inaktiv": False, "verwaist": False, "ohne-einsatz": False,
+    }
