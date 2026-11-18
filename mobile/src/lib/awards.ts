@@ -16,6 +16,8 @@ export type Award = {
   team?: { id?: string; name?: string | null; tag?: string | null } | null;
   image_url?: string | null;
   date?: string | null;
+  /** Vereinsintern (#2516): aus einem Turnier, das Gäste nicht sehen - der Server setzt es, ältere Server lassen es weg. */
+  internal?: boolean | null;
 };
 
 export type AwardTone = { color: string; label: string };

@@ -9,6 +9,7 @@ import {
   trophyCount, trophyDate, trophyFacets, trophyHref, trophyKind, trophyName, type TrophyAward, type TrophyFilters,
 } from "../../lib/trophies";
 import { colors, radius, roles, surfaces } from "../../theme";
+import { InternalTag } from "../InternalTag";
 import { MediaImage } from "../MediaImage";
 import { Glow, Press, StaggerIn, staggerInDelay } from "../motion";
 import { Body, Muted } from "../Text";
@@ -100,11 +101,15 @@ function TrophyCard({ award, index, play, owner }: { award: TrophyAward; index: 
   const chosen = featured || titled || emblemAt >= 0;
   const line = competitionLine(award);
   const delay = staggerInDelay(index);
+  // Vereinsintern (#2516): das Etikett steckt im Kartentext - der Screenreader liest aber das Label der ganzen Karte.
+  const placeLabel = `${name} – ${award.rank_label || kindLabel(award)}${award.internal ? " – vereinsintern" : ""}`;
   const body = (
     <>
       <TrophyArt award={award} />
       <View style={styles.text}>
         <Text style={[styles.kind, { color }]}>{kindLabel(award)}</Text>
+        {/* Vereinsintern (#2516): Gäste sehen diese Trophäe nie - die Person, ihr Team und Vereinsmitglieder schon. */}
+        {award.internal ? <InternalTag testID={`internal-tag-trophy-${award.id}`} /> : null}
         <Body style={styles.name} numberOfLines={2} testID={`trophy-name-${award.id}`}>{name}</Body>
         {line ? <Muted style={styles.meta} numberOfLines={2} testID={`trophy-competition-${award.id}`}>{line}</Muted> : null}
         <View style={styles.facts}>
@@ -124,11 +129,11 @@ function TrophyCard({ award, index, play, owner }: { award: TrophyAward; index: 
   return (
     <View style={[styles.card, chosen && styles.cardChosen]} testID={`trophy-card-${award.id}`}>
       {href ? (
-        <Press onPress={() => { openLink(href); }} style={styles.cardLink} accessibilityRole="link" accessibilityLabel={`${name} – ${award.rank_label || kindLabel(award)} – zum Wettbewerb`}
+        <Press onPress={() => { openLink(href); }} style={styles.cardLink} accessibilityRole="link" accessibilityLabel={`${placeLabel} – zum Wettbewerb`}
           testID={`trophy-open-${award.id}`}>
           {body}
         </Press>
-      ) : <View style={styles.cardLink} accessible accessibilityLabel={`${name} – ${award.rank_label || kindLabel(award)}`}>{body}</View>}
+      ) : <View style={styles.cardLink} accessible accessibilityLabel={placeLabel} testID={`trophy-static-${award.id}`}>{body}</View>}
       {owner && (owner.onFeature || (owner.onTitle && kind === "title" && award.reward) || (owner.onEmblems && fitsEmblem(award))) ? (
         <View style={styles.actions}>
           {owner.onFeature ? (
