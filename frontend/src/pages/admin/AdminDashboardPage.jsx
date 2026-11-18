@@ -14,6 +14,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet, Star } from "lucide-react";
 import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
+import { seasonAnchorUrl } from "@/lib/seasonTabs";
 
 function StatusDot({ ok }) {
   const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
@@ -121,6 +122,10 @@ export default function AdminDashboardPage() {
   const financeAttention = data?.finance_attention || null;
   const financeFirst = firstAttention(financeAttention);
   const today = Array.isArray(data?.today) ? data.today : [];
+  // Streitfälle der Liga getrennt (Paket D, #2262): Die der Turniere führen in die Turnierliste, die der Liga in den Leitstand ihrer
+  // Season (Gruppe „Verfahren“) - liegen sie in mehreren Seasons, auf die Liga. Nur für den Bereich Ligen.
+  const leagueDisputes = data?.league_disputes || null;
+  const leagueDisputeCount = Number(leagueDisputes?.count || 0);
   const taskItems = [
     {
       label: "Setup prüfen",
@@ -138,6 +143,14 @@ export default function AdminDashboardPage() {
       icon: AlertTriangle,
       tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
     },
+    ...(leagueDisputes ? [{
+      label: "Liga-Streitfälle",
+      detail: `${countWord(leagueDisputeCount, "offener Streitfall", "offene Streitfälle")} – im Leitstand unter „Verfahren“`,
+      to: leagueDisputes.season_id ? seasonAnchorUrl(leagueDisputes.season_id, "leitstand") : "/admin/leagues",
+      icon: AlertTriangle,
+      tone: leagueDisputeCount > 0 ? "#FF3B30" : "#00FF88",
+      key: "league-disputes",
+    }] : []),
     {
       label: "Gemeldete Ergebnisse",
       detail: `${reportedResults} ${reportedResults === 1 ? "wartet" : "warten"} auf Bestätigung`,
@@ -284,6 +297,7 @@ export default function AdminDashboardPage() {
   const taskIsActive = (item) => {
     if (item.key === "reported-results") return reportedResults > 0;
     if (item.key === "schedule-deadlines") return scheduleDeadlines > 0;
+    if (item.key === "league-disputes") return leagueDisputeCount > 0;
     // Aufgaben des Kassiers (#992): Prüffälle und Belege, die hängen.
     if (item.key === "billing-cases") return billingCases > 0;
     if (item.key === "finance-attention") return Boolean(financeFirst) || Number(financeAttention?.overdue || 0) > 0;

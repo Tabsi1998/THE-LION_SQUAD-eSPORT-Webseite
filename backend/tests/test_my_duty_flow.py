@@ -142,6 +142,8 @@ async def _with_areas(flow, areas, role="user"):
 TOURNAMENT_KEYS = {"team_count", "active_tournaments", "registration_open", "today_matches", "open_disputes", "active_f1",
                    "total_tournaments", "total_f1_challenges", "total_events", "prize_pickups", "tournament_registrations", "today"}
 CLUB_KEYS = {"player_count", "membership_applications"}
+# Streitfälle der Liga getrennt von denen der Turniere (Paket D, #2262) - nur für den Bereich Ligen.
+LEAGUE_KEYS = {"league_disputes"}
 SYSTEM_KEYS = {"ops", "mobile_push", "client_logs", "discord_broken", "recent_audit_logs"}
 # Letzte Adminaktionen: ganz für System, „was wann“ für Turnierleitung, Redaktion und Vereinsverwaltung, nichts für den Kassier.
 ALL_TASKS = {"reported_results", "schedule_deadlines", "moderation_reports", "contact_messages", "billing_cases", "sponsors_expiring"}
@@ -156,10 +158,11 @@ async def test_dashboard_gives_each_area_only_its_own_blocks(flow):
         ("Kassier", await _with_areas(flow, ["finance"]), {"daily_tasks", "finance_attention"}, {"billing_cases"}),
         ("Redaktion", await _with_areas(flow, ["content"]), {"daily_tasks", "recent_audit_logs"}, {"sponsors_expiring"}),
         ("Kassier und Redaktion", await _with_areas(flow, ["finance", "content"]), {"daily_tasks", "finance_attention", "recent_audit_logs"}, {"billing_cases", "sponsors_expiring"}),
-        ("Club-Admin (System)", await flow.add_user(role="club_admin"), {"daily_tasks", "finance_attention", *TOURNAMENT_KEYS, *CLUB_KEYS, *SYSTEM_KEYS}, ALL_TASKS),
+        ("Club-Admin (System)", await flow.add_user(role="club_admin"), {"daily_tasks", "finance_attention", *TOURNAMENT_KEYS, *LEAGUE_KEYS, *CLUB_KEYS, *SYSTEM_KEYS}, ALL_TASKS),
         ("Turnierleitung", await flow.add_user(role="tournament_admin"), {"daily_tasks", "recent_audit_logs", *TOURNAMENT_KEYS},
          {"reported_results", "schedule_deadlines", "moderation_reports"}),
-        ("Superadmin", await flow.add_user(role="superadmin"), {"daily_tasks", "finance_attention", *TOURNAMENT_KEYS, *CLUB_KEYS, *SYSTEM_KEYS}, ALL_TASKS),
+        ("Bereich Ligen", await _with_areas(flow, ["leagues"]), {"daily_tasks", *LEAGUE_KEYS}, set()),
+        ("Superadmin", await flow.add_user(role="superadmin"), {"daily_tasks", "finance_attention", *TOURNAMENT_KEYS, *LEAGUE_KEYS, *CLUB_KEYS, *SYSTEM_KEYS}, ALL_TASKS),
     ]
     for name, person, keys, tasks in cases:
         flow.act_as(person)

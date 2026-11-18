@@ -64,3 +64,43 @@ async def test_counts_and_today_list(flow):
     flow.act_as(admin)
     dashboard = (await flow.get("/api/admin/dashboard")).json()
     assert dashboard["daily_tasks"]["reported_results"] == 1 and len(dashboard["today"]) == 5
+
+
+STAFFEL_CONTEXT = {"league_id": "l-1", "season_id": "s-1", "division_id": "d-1", "staffel": "A"}
+
+
+@pytest.mark.asyncio
+async def test_the_tournament_tiles_count_without_staffeln_and_league_disputes_stand_apart(flow):
+    """Paket D (#2262): Die Kacheln der Turniere führen in die Turnierliste - die zeigt keine Staffeln mehr, also zählen sie dort auch
+    nicht. Streitfälle der Liga stehen getrennt und führen in den Leitstand ihrer Season (bei mehreren Seasons auf die Liga)."""
+    now = now_utc()
+    await flow.db.tournaments.insert_one({"id": "t1", "slug": "cup", "title": "Herbst-Cup", "status": "live", "is_public": True})
+    await flow.db.tournaments.insert_one({"id": "s1", "slug": "staffel-a", "title": "Staffel A", "status": "live", "format": "league",
+                                          "is_public": True, "league_context": STAFFEL_CONTEXT})
+    soon = (now + timedelta(hours=3)).isoformat()
+    for match_id, tid, fields in (("m1", "t1", {"status": "disputed"}), ("m2", "s1", {"status": "disputed"}), ("m3", "s1", {"status": "disputed"}),
+                                  ("m4", "s1", {"status": "waiting_result"}), ("m5", "t1", {"status": "waiting_result"}),
+                                  ("m6", "s1", {"status": "pending", "schedule_status": "proposed", "schedule_deadline_at": soon})):
+        await flow.db.matches_v2.insert_one({"id": match_id, "tournament_id": tid, **fields})
+
+    counts = await task_counts(flow.db, now)
+    assert counts["reported_results"] == 1 and counts["schedule_deadlines"] == 0
+
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    data = (await flow.get("/api/admin/dashboard")).json()
+    assert data["open_disputes"] == 1 and data["active_tournaments"] == 1 and data["total_tournaments"] == 1
+    assert "league_disputes" not in data, "die Turnierleitung allein leitet keine Liga (#2203)"
+
+    league = await flow.add_user(name="Ligaleitung")
+    league["areas"] = ["leagues"]
+    await flow.db.users.update_one({"id": league["id"]}, {"$set": {"areas": ["leagues"]}})
+    flow.act_as(league)
+    data = (await flow.get("/api/admin/dashboard")).json()
+    assert data["league_disputes"] == {"count": 2, "season_id": "s-1"}
+    assert "open_disputes" not in data
+
+    # Streitfälle in zwei Seasons: kein einzelner Leitstand - der Weg führt auf die Liga.
+    await flow.db.tournaments.insert_one({"id": "s2", "slug": "staffel-b", "title": "Staffel B", "status": "live", "format": "league",
+                                          "league_context": {**STAFFEL_CONTEXT, "season_id": "s-2", "staffel": "B"}})
+    await flow.db.matches_v2.insert_one({"id": "m7", "tournament_id": "s2", "status": "disputed"})
+    assert (await flow.get("/api/admin/dashboard")).json()["league_disputes"] == {"count": 3, "season_id": None}
