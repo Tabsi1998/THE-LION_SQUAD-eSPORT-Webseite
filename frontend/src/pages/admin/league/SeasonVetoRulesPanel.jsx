@@ -45,8 +45,8 @@ function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemov
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] px-2 py-1.5" data-testid={`veto-step-${index}`}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="w-7 shrink-0 text-xs font-bold tabular-nums text-[#29B6E8]">{number}.</span>
-        <select aria-label={`Schritt ${number}: Art`} className={`${FIELD} w-[7.5rem] shrink-0`} value={step.kind} data-testid={`veto-step-${index}-kind`}
+        <span className="w-5 shrink-0 text-xs font-bold tabular-nums text-[#29B6E8] sm:w-7">{number}.</span>
+        <select aria-label={`Schritt ${number}: Art`} className={`${FIELD} w-[6.5rem] shrink-0 sm:w-[7.5rem]`} value={step.kind} data-testid={`veto-step-${index}-kind`}
           onChange={(event) => set({ kind: event.target.value, team: isSystemKind(event.target.value) ? null : step.team || "A", position: event.target.value === "ban" ? "" : step.position })}>
           {KIND_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
