@@ -284,10 +284,15 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       const rowsBefore = await (await lead.page.request.get(`/api/tournaments/${tid}/standings`)).json();
       const before = (id) => rowsBefore.find((row) => row.registration_id === id);
 
-      // Die Leitung entscheidet: 2:0 für die Gäste.
+      // Die Leitung entscheidet: 2:0 für die Gäste. Über das Verfahren nur mit Begründung (E.2, Nr. 146) - „Ergebnis ändern“ an der
+      // Karte öffnet das Ergebnis-Fenster, die Begründung ist dort der Grund.
       await lead.page.goto(`/matches/${match.id}`);
       await expect(lead.page.getByTestId("match-in-dispute")).toBeVisible();
-      await lead.page.getByTestId("match-staff-result-open").click();
+      const decision = lead.page.locator('[data-testid^="procedure-lead-"]');
+      await expect(decision).toHaveCount(1);
+      await expect(decision.locator('[data-testid^="procedure-change-"]')).toBeDisabled();
+      await decision.locator('[data-testid^="procedure-note-"]').fill("Laut Aufzeichnung gingen beide Maps an die Gäste.");
+      await decision.locator('[data-testid^="procedure-change-"]').click();
       const form = lead.page.getByTestId("result-window");
       await expect(form).toHaveAttribute("data-kind", "maps");
       for (const [index, game] of planned.slice(0, 2).entries()) {
