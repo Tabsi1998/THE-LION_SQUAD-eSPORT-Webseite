@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Pin } from "lucide-react";
 import { dropConflicts, NO_STATION, snapMinutes, timeScale, timeTicks } from "@/lib/matchTimeline";
 import { viennaTime } from "@/lib/vienna";
+import "./matchplan.css";
 
 // Zeitleiste je Station (#1557): Balken je Spiel, Länge = Dauer, Farbe = Abschnitt, Zustand über Rollen (läuft Rot,
 // erledigt grau, Konflikt Orange, fest mit Nadel). Ziehen legt ein Spiel auf eine andere Zeit oder Station - als festen

@@ -20,6 +20,7 @@ import { DelayBanner, MatchEditor, OrderList, PlanNotice, PlanPreview, PlanSetti
 import { LeagueWeeks, OnlineRounds } from "./MatchPlanRemote";
 import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 import { LiveStaleNote } from "@/components/tls/live/LiveStaleNote";
+import "./matchplan.css";
 
 // Matchplan-Seite (#1557) - das Werkzeug der Turnierleitung am Turniertag. Oben die Einstellungen, darunter „Wer wartet
 // auf wen“, die Zeitleiste je Station und die Reihenfolge. Gerechnet wird nur im Planer (services/match_scheduler.py):

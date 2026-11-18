@@ -24,6 +24,7 @@ import { buildTimeline } from "@/lib/matchTimeline";
 import { moveMatch } from "@/lib/schedulePlan";
 import { StationTimeline } from "./tournament/matchplan/StationTimeline";
 import { StationAgenda } from "./tournament/matchplan/MatchPlanParts";
+import "./tournament/matchplan/matchplan.css";
 
 const DEVICES = [
   ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"], ["ps5", "PS5"], ["xbox", "Xbox"],
