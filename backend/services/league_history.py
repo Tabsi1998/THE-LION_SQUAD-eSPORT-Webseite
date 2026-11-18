@@ -43,7 +43,12 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
                 continue
         elif not tournament or (hidden and await hidden(db, tournament, user)):
             continue
-        internal = not (public_season(season) and await sees_listed_tournament(PUBLIC, tournament))
+        # Intern heißt: ein Gast sähe die Zeile nicht. Zwei Schritte statt eines Ausdrucks mit ``await`` - CodeQL hielt
+        # ``internal`` sonst für womöglich nicht gesetzt (py/uninitialized-local-variable, Fehlalarm).
+        guest_sees = public_season(season)
+        if guest_sees:
+            guest_sees = await sees_listed_tournament(PUBLIC, tournament)
+        internal = not guest_sees
         out.append((final, season, leagues.get(season.get("league_id") or "") or {}, internal))
     return out
 
