@@ -26,12 +26,11 @@ from services import (game_maps, game_modes, game_usage, league_games, league_lo
                       league_result_rules, loadout_bans, map_pools, pricing, staffel_guard)
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
-from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
 from services.league_final_read import is_closed
 from services.league_scope import ONLY_LEAGUE
-from services import checkin_rules, league_protest_settings, league_reminder_rules, league_reward_rules, league_veto_rules
+from services import checkin_rules, league_protest_settings, league_reminder_rules, league_reward_rules, league_veto_fit, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.league_schedule import public_rules as schedule_public_rules
 from services.log_safe import log_safe
@@ -1202,10 +1201,7 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -
 # ---------------------------------------------------------------- Vorgaben übertragen
 
 async def _has_result(db, tournament_id: str) -> bool:
-    rows = await db.matches_v2.find({"tournament_id": tournament_id},
-                                    {"_id": 0, "status": 1, "started_at": 1, "reports": 1, "pending_result": 1,
-                                     "result_meta": 1}).to_list(None)
-    return any(has_started(row) and not is_auto_bye(row) for row in rows)
+    return await league_veto_fit.has_result(db, tournament_id)
 
 
 def _pool_maps(pool: dict | None) -> list:
@@ -1310,14 +1306,12 @@ async def _sync_veto(db, tournament: dict, season: dict, wanted: dict, *, applie
     ersten Ergebnis bleiben sie, und die Staffel behält ihre bisherige Vorlage (sonst liefe dort jedes weitere Veto ins Leere).
     Die Vorlage wird unter der Turnier-Sperre frisch gelesen: Hat sie sich seit dem Lesen der Season geändert (Nachziehen), gilt die
     neue - ``store_template`` nimmt dieselbe Sperre."""
-    from services import league_veto
-
     fresh = (await db.league_seasons.find_one({"id": season["id"]}, {"_id": 0, "veto_rules": 1}) or {}).get("veto_rules")
     rules = copy.deepcopy(fresh) if isinstance(fresh, dict) else wanted
     if tournament.get("veto_rules") == rules:
         applied.append("veto")
         return
-    note = await league_veto.staffel_mismatch(db, tournament, rules, season, transferring=True)
+    note = await league_veto_fit.staffel_mismatch(db, tournament, rules, season, transferring=True)
     if note:
         skipped.append({"group": "veto", "label": SYNC_GROUP_LABELS["veto"], "reason": note})
         return
