@@ -75,6 +75,8 @@ function settingsForm(user: Record<string, any> | null | undefined) {
   return {
     privacy_public_profile: u.privacy_public_profile ?? true,
     privacy_achievements_public: u.privacy_achievements_public ?? true,
+    // Vereinsinterne Erfolge (#2516): Standard an - ohne Feld sehen Mitglieder auch Internes (Gäste nie).
+    privacy_members_see_internal: u.privacy_members_see_internal ?? true,
     show_twitch_embed: Boolean(u.show_twitch_embed),
     // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
     privacy_season_finds_public: u.privacy_season_finds_public ?? false,
@@ -305,6 +307,14 @@ function AccountSettings() {
             value={form.privacy_achievements_public !== false}
             onValueChange={(v) => change("privacy_achievements_public", v)}
             testID="settings-toggle-achievements-public"
+          />
+          {/* Wie im Web (#2516): bei den Erfolgen eingeordnet - Gäste sehen Internes nie, auch nicht hiermit. */}
+          <Toggle
+            label="Vereinsinterne Erfolge zeigen"
+            detail={`Mitglieder sehen auch deine vereinsinternen Turniere und Zeiten. Öffentlich sind sie nie zu sehen.${form.privacy_public_profile ? "" : " Wirkt erst, sobald das Profil öffentlich ist."}`}
+            value={form.privacy_members_see_internal !== false}
+            onValueChange={(v) => change("privacy_members_see_internal", v)}
+            testID="settings-toggle-members-internal"
           />
           <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => change("show_twitch_embed", v)} />
           <Toggle label="Saison-Fundstücke öffentlich" detail="Dein öffentliches Profil zeigt, was du über die Jahreszeiten gesammelt hast – nur die Summen, nie wann." value={form.privacy_season_finds_public === true} onValueChange={(v) => change("privacy_season_finds_public", v)} />

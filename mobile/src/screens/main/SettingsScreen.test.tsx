@@ -1,7 +1,7 @@
 import React from "react";
 import { NavigationContext } from "@react-navigation/native";
 import { AppState } from "react-native";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { GUEST_SETTINGS_GROUPS, SETTINGS_GROUPS, SettingsScreen } from "./SettingsScreen";
 
 // Einstellungen an einem Ort (#1146): eine Seite mit Gruppen in fester Reihenfolge - Darstellung, Benachrichtigungen,
@@ -274,6 +274,31 @@ test("Kontowechsel: eine späte Antwort der Vorgaben des alten Kontos wird verwo
 });
 
 // Nach Codex-Prüfung: geht die App in den Hintergrund, wartet ein Schalter nicht mehr auf seinen Zeitpunkt.
+test("Vereinsinterne Erfolge zeigen (#2516): ohne Feld an, direkt nach Erfolge öffentlich, speichert das Feld", async () => {
+  jest.useFakeTimers();
+  await renderSettings();
+  const toggle = screen.getByTestId("settings-toggle-members-internal");
+  expect(screen.getByLabelText("Vereinsinterne Erfolge zeigen").props.value).toBe(true);
+  expect(screen.getByText(/Mitglieder sehen auch deine vereinsinternen Turniere und Zeiten\. Öffentlich sind sie nie zu sehen\./)).toBeTruthy();
+  const labels = within(screen.getByTestId("settings-group-privacy")).getAllByRole("switch").map((node) => String(node.props.accessibilityLabel));
+  expect(labels.indexOf("Vereinsinterne Erfolge zeigen")).toBe(labels.indexOf("Erfolge öffentlich") + 1);
+  expect(toggle).toHaveStyle({ borderTopWidth: 1 });
+  await fireEvent(screen.getByLabelText("Vereinsinterne Erfolge zeigen"), "valueChange", false);
+  await act(async () => {
+    jest.advanceTimersByTime(800);
+  });
+  jest.useRealTimers();
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+  const [, payload] = mockPatch.mock.calls[0] as unknown as [string, Record<string, unknown>];
+  expect(payload.privacy_members_see_internal).toBe(false);
+});
+
+test("Vereinsinterne Erfolge zeigen: ein gespeichertes Aus bleibt aus", async () => {
+  mockUser.value = { ...(mockUser.value || {}), privacy_members_see_internal: false };
+  await renderSettings();
+  expect(screen.getByLabelText("Vereinsinterne Erfolge zeigen").props.value).toBe(false);
+});
+
 test("App geht in den Hintergrund: ein wartender Schalter speichert sofort", async () => {
   jest.useFakeTimers();
   const handlers: Array<(state: string) => void> = [];
