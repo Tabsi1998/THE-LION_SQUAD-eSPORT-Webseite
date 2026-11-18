@@ -39,7 +39,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
       {/* Vereinsinterne Erfolge (#2516): bei den Erfolgen eingeordnet - Gäste sehen Internes nie, auch nicht hiermit. */}
       <SwitchRow
         label="Vereinsinterne Erfolge zeigen"
-        description="Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen."
+        description="Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten, Trophäen und Liga-Seasons. Öffentlich sind sie nie zu sehen."
         hint={publicProfile ? null : "Wirkt erst, sobald das Profil öffentlich ist."}
         checked={form.privacy_members_see_internal !== false}
         onCheckedChange={(checked) => set("privacy_members_see_internal", checked)}

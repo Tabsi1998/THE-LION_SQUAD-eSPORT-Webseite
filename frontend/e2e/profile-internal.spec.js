@@ -167,7 +167,7 @@ test.describe("Vereinsinterne Erfolge im Profil", () => {
       await page.goto("/profile?tab=privacy");
       const row = page.getByTestId("profile-privacy-internal");
       await expect(row).toHaveAttribute("aria-checked", "true");
-      await expect(page.getByText("Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten und Trophäen. Öffentlich sind sie nie zu sehen.")).toBeVisible();
+      await expect(page.getByText("Mitglieder sehen auch deine vereinsinternen Turniere, Zeiten, Trophäen und Liga-Seasons. Öffentlich sind sie nie zu sehen.")).toBeVisible();
       await noSideScroll(page);
       await shotRows(page, page.getByTestId("profile-privacy-achievements"), page.getByTestId("profile-privacy-season-finds"), `schalter-${width}`);
       await row.click();
