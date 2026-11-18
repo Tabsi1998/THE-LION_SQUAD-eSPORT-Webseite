@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const path = require("node:path");
 
 async function mockAdminSession(page) {
   await page.addInitScript(() => {
@@ -60,7 +61,7 @@ async function mockAdminSession(page) {
  * `busy: false` ist der ruhige Betrieb - nichts offen. `busy: true` stellt
  * genau zwei echte Aufgaben scharf: Einsprüche und Mitgliedsanträge.
  */
-async function mockDashboard(page, { busy = false } = {}) {
+async function mockDashboard(page, { busy = false, league = null } = {}) {
   await page.route("**/api/setup/status", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -85,6 +86,8 @@ async function mockDashboard(page, { busy = false } = {}) {
         mobile_push: { active_tokens: 12, ticket_errors: 0, receipt_errors: 0 },
         client_logs: { open: 0, critical_open: 0, high_open: 0 },
         recent_audit_logs: [],
+        // Streitfälle der Liga (Paket D, #2262) schickt der Server nur dem Bereich Ligen.
+        ...(league ? { league_disputes: league } : {}),
       }),
     });
   });
@@ -172,4 +175,25 @@ test.describe("admin dashboard layout", () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
+
+  // Paket D (#2262): Streitfälle der Liga stehen getrennt von denen der Turniere und führen in den Leitstand ihrer Season.
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`Liga-Streitfälle (${width} px): eigene Aufgabe mit Weg in den Leitstand, Turnier-Konflikte in die Turnierliste`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await mockDashboard(page, { busy: true, league: { count: 2, season_id: "s1" } });
+      await page.goto("/admin");
+      const tasks = page.getByTestId("dashboard-tasks");
+      await expect(tasks.getByRole("heading", { name: /offene aufgaben · 3/i })).toBeVisible();
+      const league = page.getByTestId("dashboard-task-league-disputes");
+      await expect(league).toHaveAttribute("href", "/admin/leagues/seasons/s1#leitstand");
+      await expect(league).toContainText("2 offene Streitfälle");
+      await expect(page.getByTestId("dashboard-task-Ergebnis-Konflikte")).toHaveAttribute("href", "/admin/tournaments?status=live");
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+      if (process.env.E2E_SCREENS_DIR) {
+        await tasks.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(process.env.E2E_SCREENS_DIR, `startseite-streitfaelle-${width}.png`), fullPage: false });
+      }
+    });
+  }
 });
