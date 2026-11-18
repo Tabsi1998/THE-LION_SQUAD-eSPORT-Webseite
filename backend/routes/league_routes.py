@@ -409,11 +409,28 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
         reset_scope_cache()
         await _audit(db, "league.staffel.sync", me, season_id,
                      {"season_id": season_id, "visibility": doc.get("visibility"), "staffeln": visibility_applied})
+    if {"game_mode_order", "best_of"} & set(changed):
+        await _follow_veto(db, season_id, doc, me, warnings if "best_of" in changed else None)
     staffeln = await db.tournaments.count_documents({"league_context.season_id": season_id, **ONLY_LEAGUE})
     # Alle übrigen Werte tragen die Staffeln selbst: sie wirken erst über „Vorgaben auf Staffeln übertragen“.
     needs_sync = bool(set(changed) & leagues.STAFFEL_SOURCE_FIELDS)
     return {**doc, "changed": changed, "staffeln_to_sync": staffeln if needs_sync else 0,
             "visibility_applied": visibility_applied, "warnings": warnings}
+
+
+async def _follow_veto(db, season_id: str, doc: dict, me: dict, warnings: list[str] | None) -> None:
+    """Veto (D.3, Nr. 199, #2528): Neue Modusfolge oder neues Best of - eine nie von Hand gespeicherte Vorlage zieht nach, an derselben
+    Stelle wie beim Pool. Folgt sie einem neuen Best of, das eine Liga N nicht spielt, sagt es die Warnung gleich (``warnings`` nur bei
+    neuem Best of; Nr. 106: dort kein Veto)."""
+    followed = await league_veto.follow_season(db, season_id, actor_id=me.get("id"))
+    if not followed:
+        return
+    # Vorgabe der Woche (#2326): Passt ein wartendes Veto mit der nachgezogenen Vorlage jetzt, erfahren es die Seiten.
+    await league_veto_sweep.announce_waiting(db, season_id)
+    if warnings is None:
+        return
+    divisions = await league_pool_check.divisions_of(db, season_id)
+    warnings.extend(league_readiness.veto_division_mismatches(divisions, int(doc.get("best_of") or 1)))
 
 
 @admin_router.get("/seasons/{season_id}/delete-plan")
@@ -453,7 +470,7 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
         raise HTTPException(status_code=409, detail=POOL_BUSY) from None
     await _audit(db, "league.season.map_pool.save", me, season_id, {"version": doc["version"], "pool_id": doc["id"]})
     # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem neuen Pool nach.
-    await league_veto.follow_pool(db, season, actor_id=me.get("id"))
+    await league_veto.follow_season(db, season_id, actor_id=me.get("id"))
     # Vorgabe der Woche (#2326): Geht mit dem neuen Pool (oder der nachgezogenen Vorlage) ein wartendes Veto auf, erfahren es die Seiten.
     await league_veto_sweep.announce_waiting(db, season_id)
     # Mindestgröße je Modus (#2207): nur Warnung - die Prüfung vor der Veröffentlichung nennt es als Problem.
@@ -520,7 +537,7 @@ async def admin_season_pool_remove_map(season_id: str, body: LeagueMapRemove,
         "staffeln": [{"tournament_id": entry["tournament_id"], "applied": entry["applied"]} for entry in results]})
     if created:
         # Veto (D.3, Nr. 108): eine nie von Hand gespeicherte Vorlage zieht mit dem kleineren Pool nach.
-        await league_veto.follow_pool(db, fresh, actor_id=me.get("id"))
+        await league_veto.follow_season(db, season_id, actor_id=me.get("id"))
     # Vorgabe der Woche (#2326): Der neue Pool steht schon an den Staffeln - passt ein wartendes Veto jetzt, erfahren es die Seiten.
     await league_veto_sweep.announce_waiting(db, season_id)
     divisions = await league_pool_check.divisions_of(db, season_id)

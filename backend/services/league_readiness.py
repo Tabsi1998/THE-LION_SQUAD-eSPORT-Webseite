@@ -130,12 +130,19 @@ def _veto_items(season: dict, divisions: list[dict], pool: dict | None, game: di
     if not isinstance(season.get("checkin_rules"), dict):
         out.append(("problem", _item("veto_without_checkin", "Das Veto braucht den Check-in – bitte den Kasten „Check-in vor dem Spiel“ "
                                                             "einmal speichern.")))
+    out.extend(("warning", _item("veto_division_mismatch", text)) for text in veto_division_mismatches(divisions, best_of))
+    return out
+
+
+def veto_division_mismatches(divisions: list[dict], best_of: int) -> list[str]:
+    """Nr. 106: Je aktiver Liga N mit eigenem, anderem Best of der Satz „dort läuft kein Veto“ - für „Was fehlt noch?“ und die Warnung
+    beim Speichern der Season, wenn die unberührte Vorlage einem neuen Best of folgt (#2528)."""
+    out = []
     for division in sorted(divisions, key=lambda row: int(row.get("level") or 0)):
         own = (division.get("overrides") or {}).get("best_of")
         if (division.get("status") or "active") == "active" and own and int(own) != best_of:
-            out.append(("warning", _item("veto_division_mismatch", f"Liga {division.get('level')} spielt Best of {int(own)}, die Veto-Vorlage "
-                                                                   f"belegt {best_of} Positionen – dort läuft kein Veto, die Maps werden beim "
-                                                                   "Ergebnis eingetragen.")))
+            out.append(f"Liga {division.get('level')} spielt Best of {int(own)}, die Veto-Vorlage belegt {best_of} Positionen – dort läuft "
+                       "kein Veto, die Maps werden beim Ergebnis eingetragen.")
     return out
 
 

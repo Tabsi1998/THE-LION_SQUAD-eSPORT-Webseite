@@ -39,6 +39,8 @@ from services.checkin_rules import (
 from services.league_veto_rules import (
     DECIDER, DONE, DRAW, HOME, PAUSED, PRESET, ROLE_OF, RUNNING, SKIPPED, SYSTEM_KINDS, VetoProblem, veto_of,
 )
+from services.log_safe import log_safe
+from services.mutation_lock import MutationLockBusy, league_season_veto_resource, mutation_lock
 
 logger = logging.getLogger("tls.league_veto")
 
@@ -80,10 +82,36 @@ async def store_template(db, season: dict, rules: dict, *, actor_id: str | None,
     return staffeln.modified_count
 
 
-async def follow_pool(db, season: dict, *, actor_id: str | None) -> dict | None:
-    """Fabian Nr. 108: Solange die Vorlage unberührt ist (Merker ``veto_rules.auto``), zieht sie nach, sobald der Pool der Season sich
-    ändert - neu vorgeschlagen aus Modusfolge, Pool und Best of und gespeichert wie von Hand. Ohne Merker (einmal von Hand gespeichert),
-    ohne Pool oder ohne Vorschlag passiert nichts. Gibt die geltende Vorlage zurück."""
+TEMPLATE_WAIT_SECONDS = 10.0
+TEMPLATE_BUSY_DETAIL = "Die Veto-Vorlage wird gerade geändert – bitte gleich noch einmal speichern."
+
+
+def template_lock(db, season_id: str):
+    """Die Sperre der Vorlage (#2528): Nachziehen und „Veto speichern“ nacheinander. Kurz anstellen statt sofort abbrechen."""
+    return mutation_lock(db, league_season_veto_resource(season_id), wait_seconds=TEMPLATE_WAIT_SECONDS)
+
+
+async def follow_season(db, season_id: str, *, actor_id: str | None) -> dict | None:
+    """Fabian Nr. 108 und Nr. 199: Solange die Vorlage unberührt ist (Merker ``veto_rules.auto``), zieht sie nach, sobald sich Pool,
+    „Modus je Map“ (``game_mode_order``) oder Best of der Season ändern - neu vorgeschlagen und gespeichert wie von Hand. Die eine Stelle
+    für alle drei: Pool speichern, „Map aus dem Pool nehmen“ und das Speichern der Season rufen sie nach ihrem Schreiben auf.
+
+    Unter der Sperre der Vorlage liest sie Season und Pool **frisch** - nie den Stand, den der Aufrufer vor seinem Schreiben gelesen hat.
+    So passt die Vorlage am Ende zum letzten Stand, auch wenn Pool und Modusfolge kurz nacheinander gespeichert werden, und ein
+    gleichzeitiges „Veto speichern“ (dieselbe Sperre) wird nie überschrieben. Ohne Merker, ausgeschaltet, mit einem Pool eines anderen
+    Spiels oder ohne Vorschlag passiert nichts; ohne Pool gilt der Vorschlag wie beim Anlegen (Nr. 105: nur Wahlen und Decider). Ist die
+    Sperre länger belegt, bleibt die Vorlage, wie sie ist (der Kasten und „Was fehlt noch?“ nennen dann, was nicht passt).
+    Gibt die geltende Vorlage zurück."""
+    try:
+        async with template_lock(db, season_id):
+            season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+            return await _follow(db, season, actor_id=actor_id) if season else None
+    except MutationLockBusy:
+        logger.warning("[league_veto] Vorlage der Season %s nicht nachgezogen: Sperre belegt", log_safe(season_id))
+        return None
+
+
+async def _follow(db, season: dict, *, actor_id: str | None) -> dict | None:
     raw = season.get("veto_rules")
     if not rules_mod.is_auto(raw) or not raw.get("enabled"):
         return None
@@ -92,8 +120,9 @@ async def follow_pool(db, season: dict, *, actor_id: str | None) -> dict | None:
     except VetoProblem:
         return None
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "game_id": 1}) or {}
-    pool = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
-    if not pool:
+    current = await map_pools.current(db, "league_season", season["id"])
+    pool = map_pools.valid_for(current, league.get("game_id"))
+    if current and not pool:
         return None
     steps = rules_mod.propose(order=season.get("game_mode_order"), pool=pool, best_of=int(season.get("best_of") or 1))
     if not steps:

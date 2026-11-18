@@ -47,7 +47,8 @@ def defaults() -> dict:
 
 
 # Merker „unberührt“ (Fabian Nr. 108): neue Seasons tragen ihn, das erste Speichern von Hand nimmt ihn weg. Solange er steht, zieht die
-# Vorlage beim Speichern des Pools nach (``league_veto.follow_pool``). ``normalize`` übergeht ihn - er ist kein Teil der Vorlage.
+# Vorlage beim Speichern von Pool, Modusfolge oder Best of nach (``league_veto.follow_season``, Nr. 199). ``normalize`` übergeht ihn - er
+# ist kein Teil der Vorlage.
 AUTO = "auto"
 
 
