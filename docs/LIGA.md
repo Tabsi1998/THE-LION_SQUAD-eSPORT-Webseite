@@ -269,7 +269,7 @@ wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Team
 `result_confirm_hours_league`, `lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
 beim Zuteilen dort.
 
-**In der Staffel nur lesend (#2109):** Die Turnierverwaltung einer Staffel zeigt die Season-Werte (Spiel, Start/Ende,
+**In der Staffel nur lesend (#2109):** Die Staffel-Seite (#2262, **Einstellungen → Aus der Season**) zeigt die Season-Werte (Spiel, Start/Ende,
 Spielwoche und Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Sichtbarkeit, Regeltext, Map-Pool)
 nur zum Lesen mit „kommt aus der Season“ und einem Link zur Season; was es in der Liga nicht gibt (Anmeldung, Check-in,
 Discord, Preise, Jahreswertung, Seeding, Weiterkommen, Vor Ort), fehlt. `update_tournament` lehnt Änderungen daran ab
@@ -495,9 +495,9 @@ gemeinsam, damit das Heimrecht fair bleibt.
   ab: `lib/seasonTabs.js` `staffelStand` ruft die Ablaufleiste `seasonPhases` mit dieser einen Staffel auf („Vorbereitung“,
   „Anmeldung offen bis …“, „Einteilung“, „Spielbetrieb“, „Abgeschlossen“; abgesagt und archiviert bleiben Status). `staffelNeeds`
   nennt, was fehlt („Teams zuteilen“ → Eingang `#anmeldungen` bzw. ohne Fenster die Teilnehmerliste, „Spielplan noch nicht erzeugt –
-  Liga starten“ nach der Anmeldung, „Spielplan noch nicht erzeugt“ gestartet ohne feste Spiele). Der Status-Filter der Turnierliste
-  kennt zusätzlich `league:<phase>`; nur der Entwurf einer Staffel weicht dem Liga-Stand, Live, Pausiert und Beendet passen weiter
-  auf ihren Status (`statusFilterKeys`, Kacheln mit `?status=live`). Turnierliste, Kopf der Staffel-Verwaltung und Reiter „Ligen und Staffeln“ zeigen den Stand;
+  Liga starten“ nach der Anmeldung, „Spielplan noch nicht erzeugt“ gestartet ohne feste Spiele); ohne `manageUrl` führen die Ziele auf
+  die Staffel-Seite (`staffelNeedsUrl`, #2262 Paket D). Die Turnierliste zeigt seit Paket D keine Staffeln (`league=exclude`), ihr
+  Liga-Filter `league:<phase>` und `statusFilterKeys` sind entfallen. Staffel-Seite und Reiter „Ligen und Staffeln“ zeigen den Stand;
   öffentlich erscheint eine Staffel im Entwurf ohnehin nicht, die App zeigt Turnierleitungen weiter den rohen Status.
 
 | `league_seasons.visibility` | Ligaseite | Staffel-Turniere (`visibility`, `is_public`) |
@@ -644,8 +644,12 @@ Regeln: Wer den Bereich hat, darf alle Ligen. Zuständige haben nur ihre Liga un
 und die Vergabe der Zuständigen brauchen den Bereich. Vergabe mit Protokoll (`league.staff.grant`, `league.staff.update`,
 `league.staff.revoke`) und Meldung an die Person (`rights_change`). Ohne bestätigte Zwei-Faktor-Anmeldung gilt weder Bereich noch
 Zuständigkeit. Ein Zuständiger braucht keinen Bereich; `/admin` führt ihn über „Mein Dienst“ zu seinen Ligen. Die Turnierliste der
-Verwaltung (`/admin/tournaments`, `GET /api/tournaments?managed=true`) öffnen Bereich und Zuständige auch ohne Turnierleitung (#2463);
-der Server gibt ihnen dort nur die Staffeln, die sie leiten (`StaffelAccess.covers`), keine gewöhnlichen Turniere.
+Verwaltung zeigt seit #2262 (Paket D, Nr. 192) keine Staffeln: Das Web fragt `GET /api/tournaments?managed=true&league=exclude`, die reine
+Liga-Leitung (Bereich oder Zuständigkeit, ohne Bereich Turniere und ohne Helfer-Einsatz) sieht den Menüpunkt „Turniere“ nicht, und
+`/admin/tournaments` leitet sie nach `/admin/leagues` (`ProtectedRoute leagueStaffTo`). Ohne `league` bleibt die Vorgabe `include` (die App
+ohne neuen Build); der Server gibt der Liga-Leitung dort weiter nur die Staffeln, die sie leitet (`StaffelAccess.covers`).
+`/admin/tournaments/<id>` behält den Zugang: Eine Staffel leitet dort nach dem ersten Abruf auf `/admin/leagues/staffeln/<id>` weiter
+(`?tab=` über `legacyTabAnchor`) und lädt sonst nichts.
 
 **Befangenheit** (`league_permissions.conflict_of_interest(db, user, match, decided_by=None)`): Befangen ist, wer zu einer Seite des
 Spiels gehört: Kader des Co-Teams, Captain, Vertreter, Hauptteam-Leitung, Person der Anmeldung, oder wer in einer Aufstellung des
@@ -1140,7 +1144,7 @@ entschiedenes Spiel hat. Scheitert die Erinnerung beim Einreichen, bleibt der An
 
 Captain oder Vertreter melden ein vorhandenes Co-Team auf der Ligaseite für eine Season an. Die Leitung nimmt an, lehnt ab oder setzt auf die Warteliste und
 teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Zeile. Logik in `services/league_applications.py`, Routen in `routes/league_application_routes.py`.
-**Ohne Anmeldefenster an der Season gibt es keine Selbstanmeldung**, und alles bleibt wie vorher. Das Zuteilen in der Turnierverwaltung bleibt als Sonderweg.
+**Ohne Anmeldefenster an der Season gibt es keine Selbstanmeldung**, und alles bleibt wie vorher. Das Zuteilen auf der Staffel-Seite („Co-Team zuteilen“) bleibt als Sonderweg.
 Mit `application_auto_accept` (#2348, Entscheidung Nr. 126) entscheidet die Season beim Einreichen selbst, siehe **Automatisch annehmen** unten.
 
 **Einstellungen an `league_seasons`** (Zuständigkeit `season`, alle optional; wirken sofort, kein Übertragen):
@@ -1299,7 +1303,7 @@ mindestens fünf Zeichen. `until` muss nach dem regulären Ende der Frist, in de
 für mehr zuerst das Fenster verlängern). `until: null` nimmt die Verlängerung zurück, auch mit Grund. Protokoll `league.season.late_extension`
 `{season_id, before, after, reason}`. Antwort `{season, late_registration}`.
 
-**Markierung beim Zuteilen:** `squad_registration.build_registration` (Eingang, Sonderweg der Turnierverwaltung) prüft, ob die Staffel feste
+**Markierung beim Zuteilen:** `squad_registration.build_registration` (Eingang, Sonderweg „Co-Team zuteilen“ der Staffel-Seite) prüft, ob die Staffel feste
 Liga-Spiele hat (nicht `is_preview`). Dann trägt die neue Anmeldung `late_entry`:
 
 | Feld | Bedeutung |
@@ -2227,6 +2231,15 @@ der Stand `live` ist, das Ende vorbei und noch offene Spiele da sind; sonst fäl
 Leitung sieht in Mein Dienst (`ended_live[]`: `{id, title, end_date, open_matches, admin_url, league}`) und in der Turnierliste den Hinweis
 „Läuft laut Stand noch, Ende war am … – beenden?“ mit Weg in die Verwaltung. Umgestellt wird nie automatisch. Turnierleitung sieht Turniere
 ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.
+
+**Wege des Servers in die Verwaltung (#2262, Paket D):** `staffel_guard.tournament_admin_path(t, anchor=, tab=)` führt eine Staffel auf
+`/admin/leagues/staffeln/<id>` (mit Sprungmarke), ein Turnier auf `/admin/tournaments/<id>` (mit `?tab=`). Genutzt von Mein Dienst
+(Helfer-Einsatz → `#helfer`), `ended_live` und Admin → Strafen (Kampflos → `#spiele`). `league_links` trägt für die Verwaltung
+zusätzlich `league_id` (Brotkrumen). Die Startseite der Verwaltung (`GET /api/admin/dashboard`) zählt `open_disputes`,
+`active_tournaments`, `registration_open`, `total_tournaments` sowie in `daily_tasks` `reported_results` und `schedule_deadlines` ohne
+Staffeln (`daily_center.count_without_staffeln`, eine Aggregation je Turnier); für den Bereich Ligen kommt
+`league_disputes: {count, season_id}` dazu (`season_id` nur, wenn alle in einer Season liegen). `GET /api/admin/feedback/overview` lässt
+Staffeln weg. Die TV-Antwort `GET /api/tournaments/{id}/bracket/display` trägt `staffel: true|false` für die Liga-Wörter am TV.
 
 ### D.2 Check-in und Start (#1652)
 
@@ -4064,7 +4077,7 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Rahmen | Neue Season aus der Vorgängerin, Auf- und Abstieg, Zonen | abgenommen (Sz. 18) | F.2 #2397 | #1627 |
 | Rahmen | Sportlicher Auf- und Abstieg als Regel je Spiel, Solo-Ligen | fehlend | – | #1627 |
 | Rahmen | Unterbesetzte Divisionen zusammenlegen | fehlend | – | #1628 |
-| Rahmen | Eigene Staffel-Seite in der Liga-Verwaltung | fehlend (Staffeln laufen über die Turnierverwaltung) | – | #2262 |
+| Rahmen | Eigene Staffel-Seite in der Liga-Verwaltung, Turnierliste ohne Staffeln | getestet (Pakete A–D) | #2497, #2505, #2508, Paket D | #2262 |
 | Rahmen | Erweiterbarkeit: Edition je Season, Partien ohne Maps, Playoffs, freier Name je Liga N | fehlend (Prüfbericht vorhanden: [liga/erweiterbarkeit.md](liga/erweiterbarkeit.md)) | F.3 #2399 | #2400, #2401, #2404, #2405 |
 | Anmeldung | Selbstanmeldung mit Co-Team | abgenommen (Sz. 3) | B.4 #2244 | #1623 |
 | Anmeldung | Anmeldefenster, Startplätze, Warteliste | abgenommen (Sz. 3, 4: letzter Platz bei gleichzeitiger Annahme); Warteliste getestet | B.4 #2244 | #1623 |

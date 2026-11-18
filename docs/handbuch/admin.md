@@ -110,12 +110,18 @@ die Zwei-Faktor-Anmeldung bestätigt ist (Moderation ausgenommen).
 | **Verein** | Vereinsdaten (Vereinsverwaltung: Stammdaten und Kontakt; System: auch Rechtstexte) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
 | **Mitglieder** | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Einlass (Versammlung), Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung, System) |
 | **Finanzen** | Finanzübersicht (Finanzen) |
-| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Liga, Events, Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen, Rückmeldungen (Turnierleitung) · Teams (Turnierleitung, Vereinsverwaltung) · Game-Server (System) |
+| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Liga (Bereich Ligen und Zuständige einer Liga) · Events, Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen, Rückmeldungen (Turnierleitung) · Teams (Turnierleitung, Vereinsverwaltung) · Game-Server (System) |
 | **Content** | News, Medien, Navigation, Erfolge, Sticker (Redaktion) · Galerie, Adventkalender, Ostereiersuche (Redaktion, Vereinsverwaltung) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
 | **Verbindungen** | Alle Verbindungen, dazu eine Seite je Dienst (System) |
 | **E-Mail** | Newsletter, Mail-Queue, E-Mail-Vorlagen (System) |
 | **Auftritt** | Branding, Socials, SEO & Analytics, Jahreszeiten (System) |
 | **System** | Betrieb & Logs, Status, Push-Tests, App-Versionen, Zugang, Einrichtung & FAQ (System) · Moderation (Moderation) |
+
+**Nur Liga:** Wer nur die Liga leitet (Bereich **Ligen** oder zuständig in einer Liga, ohne Turnierleitung und ohne Helfer-Einsatz),
+sieht unter eSports nur **Liga**. Die Turnierliste zeigt keine Liga-Staffeln mehr; `/admin/tournaments` führt diese Personen zur Liga.
+Staffeln bedient ihr auf der Staffel-Seite ([Liga-Handbuch, 2.5](liga.md#25-co-teams-zuteilen)).
+
+<img src="../assets/verwaltung/menue-liga-leitung-1440.png" alt="Liga-Übersicht am PC für den Bereich Ligen: im Menü links nur Dashboard und Liga, kein Eintrag Turniere" width="720">
 
 Gut zu wissen:
 
@@ -164,7 +170,7 @@ Von oben nach unten:
 | **Deine Einsätze** | Nur, wenn du zusätzlich als Helfer eingetragen bist: deine Turniere wie unter „Mein Dienst“ (3.7) |
 | **Statusleiste** | Nur mit System: Datenbank, Mail / SMTP, Discord, Scheduler, Mail-Queue, Push-Tokens mit grünem, gelbem oder rotem Punkt; ein Klick führt zur Seite dahinter |
 | **Plattform-Setup** | Nur mit System, und nur wenn die Grundeinrichtung noch nicht vollständig ist: Fortschritt in Prozent und was fehlt |
-| **Tageszentrale – Offene Aufgaben** | Nur, wo wirklich etwas wartet (Ergebnis-Konflikte, gemeldete Ergebnisse, Terminvorschläge, Moderation, Kontaktanfragen, Mitgliedsanträge, Turnier-Anmeldungen, Gewinne und mehr). Steht nichts an, heißt es „Nichts offen.“ |
+| **Tageszentrale – Offene Aufgaben** | Nur, wo wirklich etwas wartet (Ergebnis-Konflikte, Liga-Streitfälle, gemeldete Ergebnisse, Terminvorschläge, Moderation, Kontaktanfragen, Mitgliedsanträge, Turnier-Anmeldungen, Gewinne und mehr). Steht nichts an, heißt es „Nichts offen.“ |
 | **Termine heute** | Matches, Check-ins und Events des Tages |
 | **Weitere Werkzeuge** | Aufklappbar: Links zu Seiten, bei denen gerade nichts ansteht |
 | **Schnellzugriff** | Nur mit Turnierleitung: **+ Turnier**, **+ Fast-Lap-Challenge**, **Events**, **Stationen** |
@@ -172,6 +178,14 @@ Von oben nach unten:
 | **Wachstum** | Logins, neue Konten, Konten gesamt und neue Vereinsmitglieder (aus der Mitgliedschaft) der letzten 30 Tage – nur Vereinsverwaltung und System |
 | **Einstellungen-Zentrale** | Kacheln zu Login, Konten verknüpfen, Branding, E-Mail, Discord, Twitch, Socials und mehr – je Kachel nur mit dem passenden Bereich (fast alles System) |
 | **Letzte Adminaktionen** | Die letzten acht Einträge; **Alle Logs** öffnet Betrieb & Logs |
+
+**Turniere und Liga getrennt:** **Ergebnis-Konflikte**, **Gemeldete Ergebnisse**, **Terminvorschläge**, **Aktive Turniere** und
+**Anmeldung offen** zählen nur Turniere – ihre Wege führen in die Turnierliste, und dort stehen keine Staffeln. Streitfälle der Liga
+stehen für den Bereich **Ligen** als eigene Aufgabe **Liga-Streitfälle**: Der Weg führt in den **Leitstand** der Season (Gruppe
+„Verfahren“), liegen sie in mehreren Seasons, auf die Liga-Übersicht.
+
+<img src="../assets/verwaltung/startseite-liga-streitfaelle-390.png" alt="Startseite am Handy: Offene Aufgaben mit Ergebnis-Konflikte, Liga-Streitfälle (2 offene Streitfälle – im Leitstand unter Verfahren) und Mitgliedsanträge" width="300">
+<img src="../assets/verwaltung/startseite-liga-streitfaelle-1440.png" alt="Startseite am PC: Tageszentrale mit drei offenen Aufgaben, darunter Liga-Streitfälle neben Ergebnis-Konflikte" width="720">
 
 Die Zahlen laden von selbst nach (regelmäßig von selbst) und mit dem Knopf oben rechts (zeigt die Uhrzeit der letzten
 Aktualisierung).
@@ -254,7 +268,8 @@ führt nach `/admin`, und das öffnet die eigene Arbeit statt „Kein Zugriff“
 
 - **Helfer** landen auf **Mein Dienst** (`/admin/dienst`): ihre Turniere und Fast Laps, **heute zuerst**, je mit
   Uhrzeit, ihrer **Rolle** samt dem Satz, was sie darf, und dem Knopf **Turnierleitung öffnen** (die Ansicht `/tournaments/<Name>/leitung`, siehe
-  [Turniere](turniere.md)) bzw. **Fast Lap öffnen**. **Vorbereiten** führt in die Turnierverwaltung. Abgeschaltete
+  [Turniere](turniere.md)) bzw. **Fast Lap öffnen**. **Vorbereiten** führt in die Turnierverwaltung,
+  bei einem alten Einsatz in einer Liga-Staffel auf deren Staffel-Seite (**Einstellungen → TV und Helfer**, nur lesend). Abgeschaltete
   Einsätze und Turniere, die vorbei sind, stehen nicht mehr da.
 - **Moderatoren** landen direkt bei den **Meldungen** (`/admin/moderation`). Unter „Mein Dienst“ steht die Zahl der
   offenen Meldungen.
