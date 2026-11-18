@@ -16,6 +16,9 @@ import { DrawControls } from "@/pages/admin/tournament/DrawControls";
 import { guardDetail } from "@/pages/admin/tournament/shared";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
 import { MatchEditor } from "@/pages/admin/tournament/matchplan/MatchPlanParts";
+
+// Ein leerer Start (Paket D, #2262): Dann gilt wieder, was die Spielwoche vorgibt - kein „Planer“ wie im Turnier.
+const LEAGUE_EMPTY_HINT = "Leer: Es gilt wieder die Regel der Spielwoche – vereinbart, Heimrecht oder Standardzeit.";
 import { LeagueWeeks } from "@/pages/admin/tournament/matchplan/MatchPlanRemote";
 
 const BUTTON = "tls-btn inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 text-xs font-bold uppercase tracking-wider";
@@ -125,7 +128,7 @@ export function StaffelScheduleTab({ tournament, registrations = [], matches = [
   };
   const editor = (match, close) => (
     <MatchEditor item={{ id: match.id, key: match.match_key || "Spiel" }} match={byId.get(match.id) || match} stations={[]} stage={null}
-      tournament={tournament} game={null} onSave={save} onClose={close} withStation={false} />
+      tournament={tournament} game={null} onSave={save} onClose={close} withStation={false} emptyHint={LEAGUE_EMPTY_HINT} />
   );
 
   return (
