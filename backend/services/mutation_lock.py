@@ -76,7 +76,8 @@ def league_season_pool_resource(season_id: str) -> str:
 
 def league_season_veto_resource(season_id: str) -> str:
     """Die Veto-Vorlage einer Liga-Season (#2528): das Nachziehen der unberührten Vorlage (Pool, Modusfolge, Best of) und „Veto
-    speichern“ nacheinander. Wird zuletzt genommen - wer sie hält, nimmt keine andere Sperre mehr."""
+    speichern“ nacheinander. Reihenfolge immer diese Sperre → Turnier-Sperren der Staffeln (``league_veto.store_template``); wer eine
+    Turnier-Sperre oder die Pool-Sperre hält, nimmt diese nie - die Aufrufer ziehen erst nach, wenn ihre eigenen Sperren frei sind."""
     return f"league_season:{season_id}:veto"
 
 

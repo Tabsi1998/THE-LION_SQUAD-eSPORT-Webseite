@@ -209,13 +209,15 @@ async def put_veto_rules(season_id: str, body: VetoRulesBody, me: dict = Depends
             # Von Hand gespeichert: ohne den Merker „unberührt“ (Nr. 108) - ab jetzt bleibt die Vorlage, auch wenn sich Pool, Modusfolge
             # oder Best of ändern (Nr. 199). Sofort auf die Staffeln - gesperrte bleiben, wie sie sind (dort nimmt es das Übertragen
             # nach dem Entsperren mit).
-            staffeln = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
+            stored = await league_veto.store_template(db, season, rules, actor_id=me.get("id"))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=league_veto.TEMPLATE_BUSY_DETAIL) from None
     # Vorgabe der Woche (#2326): Mit der neuen Vorlage (etwa ohne den Schritt „Vorgabe“) kann ein wartendes Veto jetzt starten - beide
     # Seiten erfahren es. Es beginnt dadurch nicht.
     ready = await league_veto_sweep.announce_waiting(db, season_id)
-    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=staffeln, matches_ready=ready)
+    # Nr. 200: Staffeln, zu denen die Vorlage (noch) nicht passt, behalten ihre bisherige - die Warnungen nennen sie.
+    return _answer({**season, "veto_rules": rules}, rules, context, staffeln_updated=stored.staffeln, matches_ready=ready,
+                   warnings=stored.notes)
 
 
 # ---------------------------------------------------------------- Vorgabe der Woche (#2326)

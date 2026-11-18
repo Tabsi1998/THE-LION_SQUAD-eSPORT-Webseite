@@ -484,7 +484,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "schedule": ("schedule_rules",),
     # Check-in (#1652, D.2): ebenso eine eigene Gruppe, gilt für die nächsten Spiele.
     "checkin": ("checkin_rules",),
-    # Veto (#1618, D.3): ebenso - ein laufendes Veto behält seinen Schnappschuss der Vorlage.
+    # Veto (#1618, D.3): ebenso - ein laufendes Veto behält seinen Schnappschuss der Vorlage; geschrieben wird sie nur, wenn sie zur
+    # Staffel nach dem Übertragen passt (Nr. 200, ``_sync_veto``).
     "veto": ("veto_rules",),
     # Proteste (#1619, E.2): ebenso - jedes Verfahren behält seine gespeicherten Fristen, neue Werte gelten für neue Fälle.
     "protests": league_protest_settings.FIELDS,
@@ -1245,11 +1246,15 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     has_result = await _has_result(db, tournament["id"])
     # Abgeschlossen (F.1, #1645): wie gesperrt - Fristen, Regeln und Wertung bleiben, sonst öffnet eine neue Frist Verfahren wieder.
     closed = is_closed(tournament)
+    veto_wanted = None
     for group, keys in SYNC_GROUPS.items():
         if not any(key in wanted for key in keys):
             continue  # eine ältere Season ohne Antwortfrist: die Staffel behält ihre
         if group != "always" and (locked or closed):
             skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": LOCKED_REASON if locked else CLOSED_REASON})
+            continue
+        if group == "veto":
+            veto_wanted = wanted["veto_rules"]  # erst nach Feldern und Pool geprüft (Nr. 200, ``_sync_veto``)
             continue
         if group == "before_start" and started:
             skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group],
@@ -1293,8 +1298,32 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     # Sperrliste (#2218): wie der Map-Pool - eine neue Liste geht immer, Spiele mit festgehaltener Version behalten ihre.
     await loadout_bans.sync_staffel(db, tournament, season, user, locked=locked, has_result=has_result, applied=applied,
                                     skipped=skipped, changed=changed)
+    if veto_wanted is not None:
+        await _sync_veto(db, {**tournament, **updates}, season, veto_wanted, applied=applied, skipped=skipped, changed=changed)
     await _note_mode_order(db, tournament, updates, skipped)
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
+
+
+async def _sync_veto(db, tournament: dict, season: dict, wanted: dict, *, applied: list, skipped: list, changed: list) -> None:
+    """Veto (D.3, Fabian Nr. 200, #2528): Die Vorlage der Season geht nur auf die Staffel, wenn sie zu deren Werten **nach** dem
+    Übertragen passt - Best of, Modusfolge, Pool. Ohne Ergebnis kommen Best of und Modusfolge gerade mit, die Vorlage passt dann; nach dem
+    ersten Ergebnis bleiben sie, und die Staffel behält ihre bisherige Vorlage (sonst liefe dort jedes weitere Veto ins Leere).
+    Die Vorlage wird unter der Turnier-Sperre frisch gelesen: Hat sie sich seit dem Lesen der Season geändert (Nachziehen), gilt die
+    neue - ``store_template`` nimmt dieselbe Sperre."""
+    from services import league_veto
+
+    fresh = (await db.league_seasons.find_one({"id": season["id"]}, {"_id": 0, "veto_rules": 1}) or {}).get("veto_rules")
+    rules = copy.deepcopy(fresh) if isinstance(fresh, dict) else wanted
+    if tournament.get("veto_rules") == rules:
+        applied.append("veto")
+        return
+    note = await league_veto.staffel_mismatch(db, tournament, rules, season, transferring=True)
+    if note:
+        skipped.append({"group": "veto", "label": SYNC_GROUP_LABELS["veto"], "reason": note})
+        return
+    await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"veto_rules": rules, "updated_at": _now()}})
+    applied.append("veto")
+    changed.append("veto_rules")
 
 
 async def transfer_pool(db, tournament: dict, season: dict, user: dict, *, pool: dict, locked: bool, applied: list,

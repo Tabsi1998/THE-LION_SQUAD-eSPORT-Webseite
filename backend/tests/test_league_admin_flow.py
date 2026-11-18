@@ -227,7 +227,9 @@ async def test_sync_before_the_start_applies_everything(flow):
     synced = await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
     assert synced.status_code == 200, synced.text
     result = synced.json()["staffeln"][0]
-    assert result["skipped"] == []
+    # Veto (Nr. 200, #2528): Die nachgezogene Vorlage für Best of 5 geht mit einer Map im Pool nicht auf - die Staffel behält ihre.
+    assert result["skipped"] == [{"group": "veto", "label": "Veto", "reason": "Liga 1 · Staffel A spielt weiter mit ihrer Modusfolge und "
+                                                                              "ihrem Map-Pool – dort bleibt die bisherige Veto-Vorlage."}]
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert (after["visibility"], after["is_public"], after["rules"]) == ("public", True, "Neu")
     assert after["best_of"] == 5 and after["matchday_weeks_total"] == 12 and after["default_match_time"] == "19:30"
@@ -249,7 +251,8 @@ async def test_sync_keeps_the_calendar_after_the_start_and_the_scoring_after_the
         "visibility": "members", "readiness_override_reason": "Testaufbau ohne Prüfung", "rules_text": "Später", "best_of": 5, "weeks_total": 12})
     result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"][0]
 
-    assert sorted(item["group"] for item in result["skipped"]) == ["before_result", "before_start"]
+    # Veto (Nr. 200, #2528): Best of 5 kommt nach dem ersten Ergebnis nicht mehr an - die Staffel behält die Vorlage für Best of 3.
+    assert sorted(item["group"] for item in result["skipped"]) == ["before_result", "before_start", "veto"]
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert (after["visibility"], after["is_public"], after["rules"]) == ("members", True, "Später")
     assert after["best_of"] == 3 and after["matchday_weeks_total"] == 10

@@ -223,7 +223,10 @@ async def test_free_mode_choice_counts_pairs_or_maps(flow):
     assert (await save_pool(flow, w, {"stellung": ["Hafenkante", "Turmblick"], "suchen": ["Hafenkante"]}))["warnings"] == [
         "Für eine Serie mit 5 Maps braucht der Pool mindestens 5 Maps (über alle Modi gezählt), hat 3."]
     ok(await flow.patch(f"{ADMIN}/seasons/{w['season']['id']}", json={"map_repeat": "always"}))
-    assert (await save_pool(flow, w, {"stellung": ["Hafenkante"]}))["warnings"] == []
+    # Keine Pool-Warnung mehr; dazu nur der Hinweis zur Veto-Vorlage (Nr. 200, #2528): Die Staffel hat ihre Pool-Kopie bis zum Übertragen.
+    assert (await save_pool(flow, w, {"stellung": ["Hafenkante"]}))["warnings"] == [
+        "Liga 1 · Staffel A spielt bis zum Übertragen noch mit ihrer Modusfolge und ihrem Map-Pool – die neue Veto-Vorlage geht dort mit "
+        "„Vorgaben auf Staffeln übertragen“ mit."]
 
 
 @pytest.mark.asyncio
