@@ -106,6 +106,8 @@ test.describe("Abnahme: Tabelle der Liga-Staffel gegen den echten Server", () =>
     await tie.getByRole("button", { name: "Reihenfolge festlegen" }).click();
     const sheet = lead.page.getByTestId("table-decision-sheet");
     await sheet.getByTestId("table-decision-down-0").click();
+    // Meisterplatz (#2262, Paket B, Nr. 194): Die Art der Entscheidung ist Pflicht.
+    await sheet.getByTestId("table-decision-method").selectOption("lead");
     await sheet.getByTestId("table-decision-reason").fill(REASON);
     await sheet.getByTestId("table-decision-save").click();
     await expect(panel.getByText("Gilt", { exact: true })).toBeVisible();
