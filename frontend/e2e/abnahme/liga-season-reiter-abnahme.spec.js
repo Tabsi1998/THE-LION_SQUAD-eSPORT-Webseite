@@ -112,6 +112,9 @@ test.describe("Abnahme: Season von null über die Reiter einrichten", () => {
     // übernimmt die Leitung im selben Reiter den Vorschlag und speichert (Nr. 108: von selbst folgt die Vorlage nur dem Pool).
     const veto = page.getByTestId("season-veto-rules");
     await veto.scrollIntoViewIfNeeded();
+    // Der Kasten kennt nach dem Speichern von Pool und Serie deren Stand, ohne dass die Seite neu geladen wird (#2520).
+    await expect(veto.getByTestId("veto-rules-steps")).toBeVisible();
+    await expect(veto.getByTestId("veto-rules-propose")).toBeEnabled();
     await veto.getByTestId("veto-rules-propose").click();
     await expect(veto.getByTestId("veto-rules-ok")).toBeVisible();
     await veto.getByTestId("veto-rules-save").click();
