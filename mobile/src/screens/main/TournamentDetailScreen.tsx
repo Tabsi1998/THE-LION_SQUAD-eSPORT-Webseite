@@ -173,7 +173,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const myTeamIds = useMemo(() => new Set(myTeams.map((team) => team.id).filter(Boolean)), [myTeams]);
   const ownRegistration = useMemo(() => {
     if (tournament?.my_registration?.id) return tournament.my_registration;
-    return registrations.find((registration) => registration.is_mine || registration.user_id === user?.id || (registration.team_id && myTeamIds.has(registration.team_id)));
+    return registrations.find((registration) => registration.is_mine || (Boolean(user?.id) && registration.user_id === user?.id) || (registration.team_id && myTeamIds.has(registration.team_id)));
   }, [myTeamIds, registrations, tournament?.my_registration, user?.id]);
   const registered = Boolean(ownRegistration?.id && !["cancelled", "rejected", "no_show"].includes(String(ownRegistration.status || "")));
   // Ecken-Klammern (#1316): das Etikett an deiner Stelle - „Du“, bei einer Team-Anmeldung „Dein Team“ (wie im Web).

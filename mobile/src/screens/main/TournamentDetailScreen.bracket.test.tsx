@@ -487,7 +487,10 @@ describe("Ecken-Klammern für „du“ (#1316)", () => {
     const { mine } = serve("ffa16_round1", {}, "NeonFalke");
     await open("Baum");
     await screen.findByTestId("bracket-canvas");
-    const layers = screen.getAllByTestId(/^bracket-you-(?!tag-|row-)/).map((node) => String(node.props.testID).replace("bracket-you-", "")).sort();
+    const layerNodes = screen.getAllByTestId(/^bracket-you-(?!tag-|row-)/);
+    // Die Lage deckt die ganze Karte ab - ohne pointerEvents="none" finge sie jedes Antippen ab (Prüfung App-Paket).
+    layerNodes.forEach((node) => expect(node.props.pointerEvents).toBe("none"));
+    const layers = layerNodes.map((node) => String(node.props.testID).replace("bracket-you-", "")).sort();
     expect(layers).toEqual(mineMatchIds("ffa16_round1", mine.id));
     expect(screen.getAllByTestId(`bracket-you-row-${mine.id}`).length).toBe(layers.length);
     // Die Karte eines anderen Laufs trägt nichts.
