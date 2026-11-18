@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  FORBIDDEN_STARTUP_CHUNKS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, judge, parseBudgets, parseGoals, startupVideoProblems,
+  FORBIDDEN_STARTUP_CHUNKS, PAGE_ONLY_CSS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, judge, pageCssProblems, parseBudgets, parseGoals,
+  startupVideoProblems,
 } from "./check-bundle-budget.mjs";
 
 const manifest = {
@@ -131,4 +132,20 @@ test("ein Video am Start oder im index.html fällt auf", () => {
   assert.equal(startupVideoProblems(manifest, "<link rel=\"preload\" href=\"/assets/a.MP4\" as=\"video\">").length, 1);
   // Das Web-App-Manifest ist kein Video.
   assert.deepEqual(startupVideoProblems(manifest, "<link rel=\"manifest\" href=\"/api/manifest.webmanifest\" />"), []);
+});
+
+// Seiten-CSS (#2511): Der Matchplan der Verwaltung kommt mit seiner Seite, nicht mit dem Start.
+test("Matchplan-CSS im Start-CSS fällt auf, auch verschachtelt und in @media", () => {
+  for (const text of [".tls-btn{color:red}.mp-card__head{display:flex}", "@media (min-width:768px){.mp-card{padding:18px 20px}}",
+    ".mp{display:grid}", ".mp-week__fold[open] .mp-week__summary{margin:0}", ":is(.mp-bar,.x){opacity:1}"]) {
+    const problems = pageCssProblems([{ file: "assets/index-a.css", text }]);
+    assert.equal(problems.length, 1, text);
+    assert.match(problems[0], /assets\/index-a\.css enthält "\.mp/);
+  }
+});
+
+test("ähnliche Namen und Videos sind kein Matchplan-CSS", () => {
+  const text = ".bump{x:1}.tls-mp-x{y:1}.amp-card{z:1}.mpx{a:1}.mp4-note{b:1}.x{background:url(/a.mp4)}";
+  assert.deepEqual(pageCssProblems([{ file: "assets/index-a.css", text }]), []);
+  assert.ok(PAGE_ONLY_CSS.every((rule) => rule.pattern instanceof RegExp && rule.label));
 });
