@@ -191,7 +191,7 @@
   {
     "id": "vereinsintern-wer-sieht",
     "frage": "Wer sieht meine vereinsinternen Turniere und Zeiten?",
-    "antwort": "Du selbst und angemeldete Vereinsmitglieder, Gäste nie, auch nicht bei Trophäen, Liga-Seasons und den Zahlen im Profil. Interne Einträge tragen im Profil das Etikett Vereinsintern. Schaltest du unter Privatsphäre Vereinsinterne Erfolge zeigen aus, sehen Mitglieder nur Öffentliches.",
+    "antwort": "Du selbst und angemeldete Vereinsmitglieder, Gäste und angemeldete Nicht-Mitglieder nie, auch nicht bei Trophäen, Liga-Seasons und den Zahlen im Profil. Interne Einträge sind im Profil als Vereinsintern gekennzeichnet. Schaltest du unter Privatsphäre Vereinsinterne Erfolge zeigen aus, sehen Mitglieder nur Öffentliches.",
     "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
     "link": { "to": "/profile?tab=privacy", "label": "Privatsphäre öffnen" }
   },
