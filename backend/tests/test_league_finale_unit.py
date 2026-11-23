@@ -81,3 +81,20 @@ def test_step_unit_next_and_end():
     assert finale.clamp_step(5, 2) == 2
     assert finale.clamp_step(-1, 2) == 0
     assert finale.clamp_step("x", 2) == 0
+
+
+def test_pages_unit_tv_at_most_eight_rows_per_column_rest_counted():
+    """Nr. 235: Am TV höchstens 8 Zeilen je Spalte (links Aufstieg, rechts Abstieg und Ausscheiden), der Rest als Zahl je Spalte.
+    Ohne Grenze (Discord) kommen alle."""
+    rows = [row(f"u{i}", i + 1, "promotion") for i in range(10)]
+    rows += [row(f"d{i}", 20 + i, "relegation") for i in range(12)] + [row("x", 40, "out")]
+    finals = [{"division_id": "d2", "staffel": "A", "rows": rows}]
+    assert finale.TV_COLUMN_ROWS == 8
+    page = finale.build_pages(DIVISIONS, finals, column_max=finale.TV_COLUMN_ROWS)[0]
+    up = [item["registration_id"] for item in page["rows"] if item["move"] == "up"]
+    down = [item["registration_id"] for item in page["rows"] if item["move"] in ("down", "out")]
+    assert up == [f"u{i}" for i in range(8)]
+    assert down == [f"d{i}" for i in range(8)]
+    assert (page["more_up"], page["more_down"], page["more"]) == (2, 5, 7)
+    everything = finale.build_pages(DIVISIONS, finals)[0]
+    assert len(everything["rows"]) == 23 and everything["more"] == 0

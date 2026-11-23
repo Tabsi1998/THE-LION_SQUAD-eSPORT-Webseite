@@ -166,3 +166,33 @@ def test_text_unit_season_end_without_movers_and_several_champions():
     assert "Meister Staffel A: **Probe Nord**\nMeister Staffel B: **Probe Süd**" in message["description"]
     assert message["fields"] == [{"name": "Auf- und Abstieg", "value": "In dieser Season steigt niemand auf oder ab.", "inline": False}]
     assert message["buttons"] == []
+
+
+def test_text_unit_season_end_stays_under_6000_characters_per_embed():
+    """Discord nimmt je Embed höchstens 6000 Zeichen (Titel, Text, alle Felder) - darüber fallen ganze Liga N weg, mit Hinweis."""
+    name = "Probe-Mannschaft mit einem wirklich sehr langen Namen"
+    pages = [{"label": f"Liga {level}", "more": 0,
+              "rows": [{"name": f"{name} {level}-{i}", "move": "down", "target": f"Liga {level + 1}", "staffel": "A"} for i in range(30)]}
+             for level in range(1, 21)]
+    message = digest.season_end_message({"league": "Probe-Liga", "season": "Season 1", "champions": [{"name": "Probe Nord", "staffel": None}],
+                                         "pages": pages, "url": "/liga/probe-liga/season-1"})
+    total = len(message["title"]) + len(message["description"]) + sum(len(f["name"]) + len(f["value"]) for f in message["fields"])
+    assert total <= 6000
+    assert message["fields"][0]["name"] == "Liga 1"
+    assert message["fields"][-1] == {"name": "Weitere Ligen", "value": f"… und {20 - (len(message['fields']) - 1)} weitere Liga N auf der Season-Seite",
+                                     "inline": False}
+
+
+@pytest.mark.parametrize("result, again", [
+    ({"ok": False, "reason": "bot_offline"}, True),
+    ({"ok": False, "reason": "unknown_channel"}, True),
+    ({"ok": False, "reason": "forbidden"}, True),
+    ({"ok": False, "reason": "http", "error": "Discord 400: Invalid Form Body"}, True),
+    ({"ok": False, "reason": "http", "error": "Discord 503: Service Unavailable"}, False),
+    ({"ok": False, "reason": "error", "error": "TimeoutError: "}, False),
+    ({"ok": False}, False),
+])
+def test_retry_unit_only_when_surely_nothing_went_out(result, again):
+    """Wiederholt wird nur, wenn sicher nichts hinausging - nach einem unklaren Fehler (Zeitüberschreitung, 5xx) kann die Meldung
+    schon im Kanal stehen; dann bleibt der Merker und die Leitung sieht den Hinweis."""
+    assert digest.retryable(result) is again
