@@ -90,10 +90,12 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:prueftor": "playwright test -c playwright.prueftor.config.js",
     "audit:high": "node --test --test-reporter=dot ../scripts/dependency-audit-gate.test.mjs && node scripts/audit-high.js",
     "audit:public": "node scripts/audit-public-content.js",
     "check:bundle": "node --test --test-reporter=dot scripts/check-bundle-budget.test.mjs && node scripts/check-bundle-budget.mjs",
-    "check:contrast": "node scripts/check-contrast.js"
+    "check:contrast": "node scripts/check-contrast.js",
+    "check:motion": "node scripts/check-motion-rules.mjs"
   },
   "browserslist": {
     "production": [
