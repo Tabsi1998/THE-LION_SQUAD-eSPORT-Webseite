@@ -459,6 +459,15 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             {show && <TextField label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>}
             {show && <TextField label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>}
           </FormGrid>
+          {/* Schweizer System (#1559): Abschlussregel, nächste Runde automatisch, Reihenfolge bei Punktgleichheit - direkt beim
+              Format, nicht in den erweiterten Optionen: Das sind die Regeln des Formats. */}
+          {show && f.format === "swiss" && (
+            <SwissSettingsFields value={f.swiss_settings || swissForm(null)} onChange={(v)=>set("swiss_settings",v)} participants={f.max_participants} testPrefix="tr-edit-swiss" />
+          )}
+          {/* Gruppenphase und Jeder gegen jeden (#1559): Reihenfolge bei Punktgleichheit - eine Staffel nimmt die ihrer Season. */}
+          {show && usesTableTiebreakers(f.format) && (
+            <TableTiebreakField value={f.table_tiebreakers || [...TABLE_BEFORE]} onChange={(v)=>set("table_tiebreakers",v)} testPrefix="tr-edit-table" />
+          )}
           <FormSection title="Erweiterte Spieloptionen" collapsible plain>
             <FormGrid cols={3}>
               {show && <SelectInput label="Setzliste" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} testId="tr-edit-seeding" />}
@@ -505,14 +514,6 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             )}
             {HEAT_REBUILD_FORMATS.has(f.format) && (
               <SelectInput label="Läufe umbauen" value={f.heat_rebuild_mode} onChange={(v)=>set("heat_rebuild_mode",v)} options={HEAT_REBUILD_OPTIONS} hint={HEAT_REBUILD_HINT} testId="tr-edit-heat-rebuild" />
-            )}
-            {/* Schweizer System (#1559): Abschlussregel, nächste Runde automatisch, Reihenfolge bei Punktgleichheit. */}
-            {show && f.format === "swiss" && (
-              <SwissSettingsFields value={f.swiss_settings || swissForm(null)} onChange={(v)=>set("swiss_settings",v)} participants={f.max_participants} testPrefix="tr-edit-swiss" />
-            )}
-            {/* Gruppenphase und Jeder gegen jeden (#1559): Reihenfolge bei Punktgleichheit - eine Staffel nimmt die ihrer Season. */}
-            {show && usesTableTiebreakers(f.format) && (
-              <TableTiebreakField value={f.table_tiebreakers || [...TABLE_BEFORE]} onChange={(v)=>set("table_tiebreakers",v)} testPrefix="tr-edit-table" />
             )}
           </FormSection>
           {CUSTOM_BRACKET_FORMATS.has(f.format) && (

@@ -9,9 +9,10 @@ import {
   recommendedSwissRounds,
 } from "@/lib/tournamentTableSettings";
 
+// Die Auswahl nennt die Regel kurz (am Handy schneidet die Liste lange Einträge ab) - was sie heißt, steht darunter.
 const END_RULE_HINTS = {
-  rounds: "Nach der letzten Runde ist Schluss. Mehr Runden gehen jederzeit: Zahl erhöhen, dann „Schweizer Runde“.",
-  wins_losses: "Wer weiter oder raus ist, wird nicht mehr gepaart. Ein Freilos zählt als Sieg.",
+  rounds: "Nach der letzten Runde ist Schluss, die Besten kommen weiter. Mehr Runden gehen jederzeit: Zahl erhöhen, dann „Schweizer Runde“.",
+  wins_losses: "Zum Beispiel 3 Siege weiter, 3 Niederlagen raus. Wer weiter oder raus ist, wird nicht mehr gepaart; ein Freilos zählt als Sieg.",
   manual: "Es gibt Runden, solange die Turnierleitung welche startet.",
 };
 

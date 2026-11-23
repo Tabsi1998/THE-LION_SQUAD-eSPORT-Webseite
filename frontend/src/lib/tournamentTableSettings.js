@@ -4,9 +4,9 @@
 
 /** Abschlussregel des Schweizer Systems (Server: graph_swiss.END_RULES). */
 export const SWISS_END_RULE_OPTIONS = [
-  ["rounds", "Feste Rundenzahl – die Besten kommen weiter"],
-  ["wins_losses", "Siege und Niederlagen – z. B. 3 Siege weiter, 3 Niederlagen raus"],
-  ["manual", "Kein festes Ende – die Turnierleitung hört auf"],
+  ["rounds", "Feste Rundenzahl"],
+  ["wins_losses", "Siege und Niederlagen"],
+  ["manual", "Kein festes Ende"],
 ];
 
 /** Reihenfolge bei Punktgleichheit im Schweizer System (Server: graph_swiss.TIEBREAKERS). */
