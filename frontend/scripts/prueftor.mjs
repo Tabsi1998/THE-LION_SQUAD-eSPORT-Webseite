@@ -70,6 +70,24 @@ export function parseExceptions(body) {
 // Farbcodes in Fehlermeldungen von Playwright (ESC [ … m) - das Steuerzeichen nicht wörtlich in der Regex.
 const ANSI_COLOR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
+/**
+ * Kurzform einer Fehlermeldung: der erste Fund aus dem Vergleich („+   "…"“, so stehen die Funde in toEqual([])),
+ * sonst die erste Zeile.
+ */
+export function firstFinding(message) {
+  const lines = String(message).replace(ANSI_COLOR, "").split("\n");
+  const hit = lines.find((line) => line.trimStart().startsWith("+ ") && line.includes('"'));
+  if (hit) {
+    const text = hit.trim().slice(1).trim().replace(/,$/, "");
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+  return lines.find((line) => line.trim()) || "";
+}
+
 /** Tests aus JSON-Berichten von Playwright: [{ file, title, status, error }], status expected|unexpected|flaky|skipped. */
 export function collectPlaywright(reports) {
   const tests = [];
@@ -78,12 +96,12 @@ export function collectPlaywright(reports) {
       for (const test of spec.tests || []) {
         const results = test.results || [];
         const last = results[results.length - 1] || {};
-        const error = (last.error && (last.error.message || last.error.value)) || "";
+        const error = firstFinding((last.error && (last.error.message || last.error.value)) || "");
         tests.push({
           file: path.basename(spec.file || suite.file || ""),
           title: [...titles, spec.title].join(" › "),
           status: test.status || (spec.ok ? "expected" : "unexpected"),
-          error: String(error).replace(ANSI_COLOR, "").split("\n").find((part) => part.trim()) || "",
+          error,
         });
       }
     }
@@ -169,7 +187,10 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
   const motionDetails = [...motionBrowser.failed];
   if (bewegung) {
     for (const item of bewegung.fresh || []) {
-      motionDetails.push(`${item.file} – ${item.rule}: ${item.count} statt höchstens ${item.allowed} (${item.findings.slice(0, 5).map((finding) => `Zeile ${finding.line}: ${finding.detail}`).join("; ")})`);
+      // Geänderte Zeilen stehen vorn (check-motion-rules.mjs --diff-base); ohne Diff die ersten fünf Funde.
+      const changed = item.findings.filter((finding) => finding.geaendert);
+      const shown = (changed.length ? changed : item.findings).slice(0, 5);
+      motionDetails.push(`${item.file} – ${item.rule}: ${item.count} statt höchstens ${item.allowed} (${shown.map((finding) => `Zeile ${finding.line}${finding.geaendert ? " (geändert)" : ""}: ${finding.detail}`).join("; ")})`);
     }
     for (const problem of bewegung.allowlistProblems || []) motionDetails.push(`Ausnahmeliste: ${problem}`);
   } else motionDetails.push(missing("Bewegungs-Prüfung"));

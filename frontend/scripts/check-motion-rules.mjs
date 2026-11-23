@@ -22,8 +22,10 @@
 //   node scripts/check-motion-rules.mjs                         prüfen (Exit 1 bei neuen Verstößen)
 //   node scripts/check-motion-rules.mjs --report out.json       zusätzlich Ergebnis als JSON (Prüftor)
 //   node scripts/check-motion-rules.mjs --base-allowlist a.json meldet, wenn die Ausnahmeliste gegenüber a.json wächst
+//   node scripts/check-motion-rules.mjs --diff-base origin/main  Funde auf geänderten Zeilen markieren und zuerst nennen
 //   node scripts/check-motion-rules.mjs --tighten               Ausnahmeliste auf den Ist-Stand senken (nie erhöhen)
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -405,6 +407,35 @@ export function tightened(allowlist, findingsByFile) {
   return { ...allowlist, ausnahmen };
 }
 
+/** Geänderte Zeilen je Datei aus `git diff -U0 --relative`: { "src/x.css": Set(Zeilen) }. */
+export function parseDiffLines(diff) {
+  const lines = {};
+  let file = null;
+  for (const line of String(diff).split("\n")) {
+    if (line.startsWith("+++ ")) {
+      const target = line.slice(4).trim();
+      file = target === "/dev/null" ? null : target.replace(/^b\//, "");
+      continue;
+    }
+    if (!file || !line.startsWith("@@")) continue;
+    const plus = line.split(" ").find((part) => part.startsWith("+"));
+    if (!plus) continue;
+    const [start, count = "1"] = plus.slice(1).split(",");
+    lines[file] ??= new Set();
+    for (let offset = 0; offset < Number(count); offset += 1) lines[file].add(Number(start) + offset);
+  }
+  return lines;
+}
+
+/** Funde auf geänderten Zeilen markieren und nach vorn stellen - die neuen stehen dann zuerst im Kommentar. */
+export function markChanged(fresh, changedLines) {
+  return fresh.map((item) => {
+    const changed = changedLines[item.file] || new Set();
+    const findings = item.findings.map((finding) => ({ ...finding, geaendert: changed.has(finding.line) }));
+    return { ...item, findings: [...findings.filter((f) => f.geaendert), ...findings.filter((f) => !f.geaendert)] };
+  });
+}
+
 function argValue(name) {
   const index = process.argv.indexOf(name);
   return index > 0 ? process.argv[index + 1] : undefined;
@@ -415,6 +446,15 @@ function main() {
   const findings = scanTree();
   const listProblems = allowlistProblems(allowlist);
   const result = compare(findings, allowlist);
+  const diffBase = argValue("--diff-base");
+  if (diffBase) {
+    try {
+      const diff = execFileSync("git", ["diff", "-U0", "--no-color", "--relative", diffBase, "--", "src"], { cwd: FRONTEND, encoding: "utf8" });
+      result.fresh = markChanged(result.fresh, parseDiffLines(diff));
+    } catch {
+      console.log(`Diff gegen ${diffBase} nicht lesbar - Funde ohne Markierung der geänderten Zeilen.`);
+    }
+  }
   const baseFile = argValue("--base-allowlist");
   const grown = baseFile && existsSync(baseFile) ? allowlistGrowth(allowlist, JSON.parse(readFileSync(baseFile, "utf8"))) : [];
 
@@ -427,7 +467,12 @@ function main() {
   console.log(`Bewegungsregeln (#1660): ${result.total} Funde, davon ${result.allowedTotal} als Bestand erlaubt.`);
   for (const item of result.fresh) {
     console.log(`NEU ${item.file} - ${RULES[item.rule]}: ${item.count} statt höchstens ${item.allowed}`);
-    for (const finding of item.findings) console.log(`    Zeile ${finding.line}: ${finding.detail}`);
+    // Mit --diff-base nur die geänderten Zeilen, sonst alle Funde der Datei (welcher neu ist, weiß dann nur der Diff).
+    const changed = item.findings.filter((finding) => finding.geaendert);
+    for (const finding of changed.length ? changed : item.findings) {
+      console.log(`    Zeile ${finding.line}${finding.geaendert ? " (geändert)" : ""}: ${finding.detail}`);
+    }
+    if (changed.length && changed.length < item.findings.length) console.log(`    … und ${item.findings.length - changed.length} bestehende`);
   }
   for (const problem of listProblems) console.log(`AUSNAHMELISTE ${problem}`);
   for (const item of grown) console.log(`ERWEITERT ${item.file} - ${item.rule}: ${item.before} -> ${item.after} (${item.grund})`);

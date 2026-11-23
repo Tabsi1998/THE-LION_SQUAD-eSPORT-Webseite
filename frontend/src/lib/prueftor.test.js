@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  CHECKS, MARKER, checkForTest, collectPlaywright, evaluate, knownGrowth, parseExceptions, raisedBudgets, renderComment,
+  CHECKS, MARKER, checkForTest, collectPlaywright, evaluate, firstFinding, knownGrowth, parseExceptions, raisedBudgets, renderComment,
   safeText, withoutHtmlComments,
 } from "../../scripts/prueftor.mjs";
 import bekannt from "../../e2e/prueftor-bekannt.js";
@@ -68,6 +68,12 @@ describe("Prüftor: Auswertung", () => {
     expect(collectPlaywright([report])).toEqual([
       { file: "prueftor-a11y.spec.js", title: "Prüftor › Startseite: Tastatur", status: "unexpected", error: "expect(received).toEqual" },
     ]);
+  });
+
+  it("nennt aus einer Fehlermeldung den ersten Fund statt der Vergleichszeile", () => {
+    const message = 'Error: expect(received).toEqual(expected)\n\n- Expected  - 0\n+ Received  + 1\n\n- Array []\n+ Array [\n+   "390 px: color-contrast: footer a – 3.1:1",\n+ ]';
+    expect(firstFinding(message)).toBe("390 px: color-contrast: footer a – 3.1:1");
+    expect(firstFinding("Test timeout of 60000ms exceeded.")).toBe("Test timeout of 60000ms exceeded.");
   });
 
   it("alles da und grün: Tor grün", () => {

@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  allowlistGrowth, allowlistProblems, compare, countFindings, cssDeclarations, scanCss, scanJs, scanTree,
-  tightened, transitionProperties,
+  allowlistGrowth, allowlistProblems, compare, countFindings, cssDeclarations, markChanged, parseDiffLines, scanCss, scanJs,
+  scanTree, tightened, transitionProperties,
 } from "../../scripts/check-motion-rules.mjs";
 
 // Bewegungsregeln (#1660, Entscheidung 15.10.2026): nur transform/opacity animieren, „Bewegung reduzieren“ beachten,
@@ -122,6 +122,18 @@ describe("Bewegungsregeln: Ausnahmeliste", () => {
   it("verlangt Regel, Zahl und Begründung", () => {
     expect(allowlistProblems({ ausnahmen: { "src/a.css": { "token-duration": { anzahl: 2, grund } } } })).toEqual([]);
     expect(allowlistProblems({ ausnahmen: { "src/a.css": { foo: { anzahl: 0, grund: "kurz" } } } })).toHaveLength(3);
+  });
+
+  it("liest geänderte Zeilen aus dem Diff und nennt deren Funde zuerst", () => {
+    const diff = [
+      "diff --git a/src/a.css b/src/a.css", "--- a/src/a.css", "+++ b/src/a.css", "@@ -10,0 +11,2 @@ .x {", "+a", "+b",
+      "@@ -40 +42 @@", "-c", "+d", "diff --git a/src/gone.css b/src/gone.css", "--- a/src/gone.css", "+++ /dev/null", "@@ -1,3 +0,0 @@",
+    ].join("\n");
+    expect(parseDiffLines(diff)).toEqual({ "src/a.css": new Set([11, 12, 42]) });
+    const fresh = [{ file: "src/a.css", rule: "token-duration", count: 2, allowed: 1, findings: [{ rule: "token-duration", line: 2 }, { rule: "token-duration", line: 12 }] }];
+    expect(markChanged(fresh, parseDiffLines(diff))[0].findings).toEqual([
+      { rule: "token-duration", line: 12, geaendert: true }, { rule: "token-duration", line: 2, geaendert: false },
+    ]);
   });
 
   it("erkennt eine gewachsene Liste gegenüber main und senkt nur, nie hinauf", () => {
