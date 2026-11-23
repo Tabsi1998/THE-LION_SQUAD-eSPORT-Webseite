@@ -11,6 +11,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from services import bracket_image  # noqa: E402
 
+
+def pixels(image):
+    """Alle Pixel - `getdata` entfällt mit Pillow 14 (2027-10-15), `get_flattened_data` ersetzt es (ab Pillow 12)."""
+    return getattr(image, "get_flattened_data", image.getdata)()
+
 PITCH = bracket_image.BOX_H + bracket_image.GAP_Y
 REGS = [{"id": f"r{i}", "display_name": name} for i, name in enumerate(["Paula", "Leon", "Mia", "Otto"], start=1)]
 STAGES = [{"id": "s1", "number": 1, "name": "Playoffs", "stage_type": "single_elimination"}]
@@ -62,10 +67,10 @@ def test_the_image_is_a_real_png_with_the_winner_in_gold():
     assert image.format == "PNG" and image.size[0] == bracket_image.MIN_WIDTH
     expected_height = bracket_image.HEADER_H + bracket_image.SECTION_LABEL_H + bracket_image.ROUND_LABEL_H + 2 * PITCH + bracket_image.MARGIN + bracket_image.MARGIN // 2
     assert image.size[1] == expected_height
-    gold = sum(1 for pixel in image.convert("RGB").getdata() if pixel[0] > 240 and 200 < pixel[1] < 225 and pixel[2] < 40)
+    gold = sum(1 for pixel in pixels(image.convert("RGB")) if pixel[0] > 240 and 200 < pixel[1] < 225 and pixel[2] < 40)
     assert gold > 50, "Sieger und Titel des Endstands in Gold"
     live = bracket_image.render({"title": "Sommer-Cup"}, four_player_bracket(), STAGES, REGS)
-    cyan = sum(1 for pixel in Image.open(io.BytesIO(live)).convert("RGB").getdata() if pixel[0] < 60 and 170 < pixel[1] < 195 and pixel[2] > 220)
+    cyan = sum(1 for pixel in pixels(Image.open(io.BytesIO(live)).convert("RGB")) if pixel[0] < 60 and 170 < pixel[1] < 195 and pixel[2] > 220)
     assert cyan > 50, "die laufende Partie hat einen cyanen Rahmen"
 
 
@@ -86,7 +91,7 @@ def test_the_signature_knows_earlier_rounds_too():
 
 def _warn_pixels(data: bytes) -> int:
     red, green, blue = bracket_image.COLORS["warn"]
-    return sum(1 for pixel in Image.open(io.BytesIO(data)).convert("RGB").getdata()
+    return sum(1 for pixel in pixels(Image.open(io.BytesIO(data)).convert("RGB"))
                if abs(pixel[0] - red) < 20 and abs(pixel[1] - green) < 20 and abs(pixel[2] - blue) < 20)
 
 
