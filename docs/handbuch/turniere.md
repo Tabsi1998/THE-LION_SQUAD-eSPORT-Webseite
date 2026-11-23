@@ -153,8 +153,8 @@ Platzierung).
 | **Doppel-K.-o.** (früher „Double Elimination“) | Eine Niederlage ist nicht das Aus (Loser Bracket) |
 | **Jeder gegen jeden – einfach** | Kleines Feld, alle spielen einmal gegeneinander, die Tabelle entscheidet |
 | **Jeder gegen jeden – Hin- und Rückrunde** (früher „Liga“) | Über Wochen mit Spieltagen, jeder spielt zweimal gegen jeden. Unter dem Format steht der Weg zur Vereinsliga mit Seasons und Staffeln (**Admin → eSports → Liga**, 3.15) – die ist etwas anderes |
-| **Schweizer System** | Viele Teilnehmer, kein fester Baum; die Runden entstehen einzeln aus den Ergebnissen |
-| **Gruppenphase** | Teilnehmer in Gruppen, jeder spielt mehrere Partien. Eine K.-o.-Runde danach gibt es im selben Turnier noch nicht – die Besten spielen sie als eigenes Turnier |
+| **Schweizer System** | Viele Teilnehmer, kein fester Baum; die Runden entstehen einzeln aus den Ergebnissen. Abschluss, „Nächste Runde automatisch“ und die Reihenfolge bei Punktgleichheit stellt ihr ein |
+| **Gruppenphase** | Teilnehmer in Gruppen, jeder spielt mehrere Partien, das Heimrecht ist je Gruppe fair verteilt. Die Reihenfolge bei Punktgleichheit (auch direkter Vergleich) stellt ihr ein. Eine K.-o.-Runde danach gibt es im selben Turnier noch nicht – die Besten spielen sie als eigenes Turnier |
 | **Mehrspieler frei** | Alle gleichzeitig in einer Lobby, **ein** Spiel mit allen, gewertet nach Platzierung. Turniere im früheren „Überlebensmodus“ (verhielt sich genauso) heißen jetzt auch so |
 | **Freier Turnierbaum** und **Mehrspieler freier Turnierbaum** | Ihr schreibt den Baum selbst (Schema); im Mehrspieler-Baum gibt es Läufe über mehrere Ebenen |
 | **Zeitfahren**, **Rennserie** | Beim Anlegen **nicht mehr zur Wahl**: es entstehen keine Spiele und es gibt keine Zeiteingabe. Zeitfahren laufen über [Fast Lap](fastlap.md), Rennserien über **Serien**. Bestehende Turniere behalten ihr Format, mit diesem Hinweis darunter |
@@ -167,14 +167,39 @@ Ablauf-Leiste über der Turnierverwaltung nennt den Schritt je Format („Spielp
 Zu den Besonderheiten:
 
 - **Schweizer System:** Es gibt keine Vorschau. Teilnehmer bestätigen, dann oben im Turnier **Schweizer Runde**
-  klicken – jede Runde einzeln. Die Runde startet das Turnier nicht: nach Runde 1 wie gewohnt **Turnier starten** (mit
+  klicken. Die Runde startet das Turnier nicht: nach Runde 1 wie gewohnt **Turnier starten** (mit
   Check-in-Ende und Planungsprüfung). Eine falsch erzeugte Runde nimmt **Runde N zurücknehmen** (neben **Schweizer
   Runde**) wieder heraus, solange keines ihrer Spiele aufgerufen, gestartet oder gewertet ist und keines an einer
-  Station hängt; ein Freilos zählt nicht.
+  Station hängt; ein Freilos zählt nicht. Neu erzeugt, hat die Runde wieder dieselben Paarungen.
+
+  Unter **Bearbeiten → Struktur** (beim Anlegen: **Spieloptionen**) steht der Kasten **Schweizer System**:
+
+  | Einstellung | Was sie tut |
+  | --- | --- |
+  | **Abschluss** | **Feste Rundenzahl**: nach der letzten Runde ist Schluss. **Runden** leer heißt nach der Größe des Felds (8 Teilnehmer 3, 9 bis 16 4, 17 bis 32 5); mit **So viele kommen weiter** zeigt die Tabelle die Besten danach als „Weiter“. **Siege und Niederlagen**: wer die eingestellten Siege hat, ist weiter, wer die Niederlagen hat, raus (Vorgabe 3 und 3) – beide werden nicht mehr gepaart, ein Freilos zählt als Sieg. **Kein festes Ende**: es gibt Runden, solange ihr welche startet |
+  | **Nächste Runde automatisch** | Sobald das letzte Spiel einer Runde gewertet ist (auch kampflos oder durch einen Austritt), wird die nächste gepaart. Nur im laufenden Turnier; Runde 1 startet ihr immer selbst. Aus: jede Runde per **Schweizer Runde** |
+  | **Bei Punktgleichheit** | Reihenfolge durch Anklicken: **Median-Buchholz** (Punkte der Gegner ohne den besten und den schlechtesten), **Buchholz** (Punkte aller Gegner), **Direkter Vergleich** (zählt nur, wenn sich alle Punktgleichen getroffen haben), **Mehr Siege**. Ohne Kriterium teilen sich Punktgleiche den Platz |
+
+  ![Kasten „Schweizer System“ im Abschnitt Struktur](bilder/turnier-schweizer-einstellungen.png)
+
+  Gepaart wird nach Punkten: ähnlich Starke treffen sich, bei ungerader Zahl setzt jemand aus, der noch nicht
+  ausgesetzt hat. Niemand spielt zweimal gegen denselben Gegner, solange es eine Runde ohne Wiederholung gibt.
+  Über den Reitern steht der Stand, etwa „Runde 2 von 5 läuft · die nächste Runde entsteht automatisch“. Ist die
+  Abschlussregel erfüllt, steht dort „Schweizer System abgeschlossen“ und der Knopf **Schweizer Runde** fehlt – mehr
+  Runden gibt es, wenn ihr die Rundenzahl erhöht. Neue Turniere starten mit fester Rundenzahl, automatischer Runde und
+  Median-Buchholz zuerst; ein Turnier von früher läuft weiter wie bisher, bis ihr etwas ändert.
 - **Gruppenphase:** Oben **Gruppen generieren**, die Zahl der Gruppen eintippen (Vorschlag 4). Im Reiter **Gruppen**
   stehen sie. Der Status bleibt dabei, gestartet wird mit **Turnier starten**. Gibt es schon feste Gruppenspiele, fragt
   die Seite vorher nach und nennt die Zahl („12 Spiele, davon 3 begonnen oder gewertet“) – neue Gruppen löschen sie
-  samt Ergebnissen. Nach dem Ende und bei gesperrtem Turnier gibt es keine neuen Gruppen.
+  samt Ergebnissen. Nach dem Ende und bei gesperrtem Turnier gibt es keine neuen Gruppen. Das **Heimrecht** (wer im
+  Spiel zuerst steht) ist je Gruppe fair verteilt: jeder hat höchstens ein Heimspiel mehr oder weniger als
+  Auswärtsspiele – auch bei **Jeder gegen jeden – einfach**. Das gilt für neu erzeugte Spiele.
+- **Gleichstand in Gruppen und bei Jeder gegen jeden:** Unter **Bearbeiten → Struktur** steht **Bei Punktgleichheit in
+  der Tabelle**. Ihr klickt die Kriterien in der gewünschten Reihenfolge an: **Direkter Vergleich**, **Differenz**,
+  **Mehr erzielt**, **Mehr Siege**. Der direkte Vergleich rechnet wie in der Liga: nur die Spiele der Punktgleichen
+  untereinander, bei drei und mehr als kleine Tabelle, und erst, wenn diese Spiele alle gespielt sind. Neue Turniere
+  starten mit dem direkten Vergleich an erster Stelle; ein Turnier von früher bleibt bei „Mehr Siege, dann Differenz“,
+  bis ihr etwas ändert. Eine Liga-Staffel nimmt die Regeln ihrer Season (3.15).
 - **Jeder gegen jeden und Gruppen (online oder hybrid):** Unter **Bearbeiten → Spielweise** erscheint der Kasten **Spielwochen**:
   **Spieltag dauert (Tage)**, **Standardtag**, **Standarduhrzeit** (Wiener Zeit) und **Antwortfrist (Stunden)**. Ein
   Spieltag ist ein Zeitraum. Beide Seiten dürfen Termine vorschlagen, was die Gegenseite annimmt, gilt, sonst greift
@@ -259,6 +284,8 @@ dem Hinweis, ihn auszuschalten. Vor Ort startet ihr selbst.
 | **Weiterkommen** | K.-o., Doppel-K.-o. und freie Bäume; bei Jeder gegen jeden – Hin- und Rückrunde stattdessen **Spieltage auslosen** (Reihenfolge und Heimrecht) |
 | **Best of** | nicht bei Zeitfahren und Rennserie; bei Mehrspieler heißt es **Runden je Lauf** und zählt für die geplante Dauer |
 | **Mindestpause** | vor Ort und hybrid (nur der Stationsplaner hält sie ein) |
+| **Schweizer System** (Abschluss, nächste Runde automatisch, Punktgleichheit) | nur Schweizer System |
+| **Bei Punktgleichheit in der Tabelle** | Gruppenphase und Jeder gegen jeden (beide) – nicht in einer Liga-Staffel |
 | **Preise Siegerrunde/Verliererrunde** | nur Doppel-K.-o. |
 | **Vor-Ort-Anmeldung über QR** | vor Ort und hybrid |
 
@@ -830,8 +857,16 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    Platzes, je Person einmal.
 
 Die **Rangliste** zeigt bei Liga, Jeder gegen jeden und Schweizer System Spiele, Siege/Unentschieden/Niederlagen,
-Differenz (beim Schweizer System Buchholz), die Form der letzten fünf Spiele und Pfeile, wie sich der Platz seit dem
-vorigen Spieltag geändert hat. Bei der Gruppenphase steht je Gruppe eine eigene Tabelle. Im **K.-o.** stehen Siege,
+Differenz (beim Schweizer System Buchholz, mit Median-Buchholz dazu die Spalte **MBHZ**), die Form der letzten fünf
+Spiele und Pfeile, wie sich der Platz seit dem vorigen Spieltag geändert hat. Bei der Gruppenphase steht je Gruppe eine
+eigene Tabelle. Unter der Tabelle steht die **Reihenfolge bei Punktgleichheit** („Punkte → Direkter Vergleich →
+Differenz“), beim Schweizer System dazu die Abschlussregel und was Buchholz heißt. Hat ein Kriterium zwei
+Punktgleiche getrennt, steht es klein unter dem Namen; im Schweizer System steht dort auch **Weiter** oder
+**Ausgeschieden**. TV, Druck und Ergebnis-PDF zeigen dieselben Spalten und Marken.
+
+![Rangliste mit Reihenfolge bei Punktgleichheit](bilder/turnier-tabelle-gleichstand.png)
+
+Im **K.-o.** stehen Siege,
 Niederlagen und unter **Erreicht** die Runde aus dem Baum – etwa „Halbfinale“, „Loser Runde 4“ oder „Grand Final“, bei
 mehreren Phasen mit der Phase davor (Punkte gibt es dort nicht). Bei **Läufen (FFA)** stehen Spiele, Siege, der Platz im
 Schnitt und die Punkte. Die Namensspalte heißt bei Team-Turnieren „Team“. Die eigene Zeile ist markiert, bei
