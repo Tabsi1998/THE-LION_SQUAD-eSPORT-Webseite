@@ -888,17 +888,27 @@ Unter den Erinnerungen steht im Reiter **Termine** der Kasten **Discord** (Zust�
 
 | Meldung | Wann | Inhalt |
 | --- | --- | --- |
-| **Spieltag-Zusammenfassung** | je Staffel, sobald alle Spiele des Spieltags gewertet oder abgesagt sind. Fehlen Ergebnisse, wartet sie bis **Warten auf Ergebnisse** (Vorgabe 48 Stunden) nach dem Ende der Spielwoche und kommt dann mit „x Spiele offen“ – außer **Nach der Wartezeit trotzdem melden** ist aus | Liga, Season, Liga N (bei mehreren Staffeln mit Staffel), jedes Spiel mit Ergebnis, kampflos, abgesagt oder offen, darunter der **Tabellenausschnitt** (Vorgabe 5 Plätze, 0 = ohne Tabelle) und der Knopf **Zur Ligaseite** |
-| **Saisonende-Meldung** | einmal, sobald alle Staffeln abgeschlossen sind (3.10) | Meister, je Liga N die Auf- und Absteiger mit Ziel-Liga, Knopf **Zur Season** |
+| **Spieltag-Zusammenfassung** | je Staffel, sobald alle Spiele des Spieltags gewertet oder abgesagt sind. Fehlen Ergebnisse, wartet sie bis **Warten auf Ergebnisse (Stunden nach Ende der Spielwoche)** (Vorgabe 48 Stunden) nach dem Ende der Spielwoche und kommt dann mit „x Spiele offen“ – außer **Nach der Wartezeit trotzdem melden** ist aus | Liga, Season, Liga N (bei mehreren Staffeln mit Staffel), jedes Spiel mit Ergebnis, kampflos, abgesagt oder offen, darunter der **Tabellenausschnitt** (Vorgabe 5 Plätze, 0 = ohne Tabelle) und der Knopf **Zur Ligaseite** |
+| **Saisonende-Meldung** | einmal, sobald alle Staffeln abgeschlossen sind (3.10) | Meister, je Liga N die Auf- und Absteiger mit Ziel-Liga (auch über Staffeln hinweg, etwa der beste Zweite), Knopf **Zur Season**. Sehr viele Ligen: Was nicht mehr in die Meldung passt, steht als „… und N weitere Liga N auf der Season-Seite“ |
 
-- **Kanal:** einer für beide Meldungen, aus der Liste des Hauptservers. Ist der Bot offline, steht stattdessen ein Feld für die
-  Kanal-ID. Ohne Kanal lässt sich nichts einschalten; einen anderen Kanal als Ersatz gibt es nicht.
+- **Kanal nur aus der freigegebenen Liste:** einer für beide Meldungen. Zur Wahl stehen nur die öffentlichen Kanäle, die unter
+  **Verbindungen → Discord → Reiter „Meldungen“ → Kanäle je Zweck** eingetragen sind (Community, News, Events und Turniere), je mit
+  ihrem Zweck – nie ein privater Kanal (Vorstand, Betrieb, Test, Mitglieder) und keine frei eingetippte Kanal-ID. Ist noch keiner
+  freigegeben, zeigt der Kasten den Weg dorthin. Ohne Kanal lässt sich nichts einschalten; einen anderen Kanal als Ersatz gibt es
+  nicht. Fällt der gespeicherte Kanal später aus der Liste, geht nichts mehr hinaus und der Kasten sagt es.
 - **Nur öffentliche Seasons:** Steht die Sichtbarkeit (2.8) nicht auf **Öffentlich**, geht nichts hinaus – der Kasten sagt das.
   Gezeigt wird nur, was Gäste auf der Ligaseite sehen.
-- **Ab dem laufenden Spieltag:** Wer die Zusammenfassung später einschaltet, bekommt keine alten Spieltage auf einmal.
-- **Nie doppelt:** Jede Meldung geht genau einmal hinaus, auch wenn der Job doppelt läuft. Klappt das Senden nicht (Bot offline),
-  versucht er es nach 30 Minuten noch zweimal. Ein Wiederöffnen und neues Abschließen schickt keine zweite Saisonende-Meldung.
-- Die neue Season aus dem Vorgänger (3.11) übernimmt die Einstellung.
+- **Ab dem laufenden Spieltag:** Wer die Zusammenfassung später einschaltet, bekommt keine alten Spieltage auf einmal – auch
+  dann nicht, wenn eine Staffel keine Spielwoche hat (dann zählt das letzte Ergebnis des Spieltags).
+- **Nie doppelt:** Jede Meldung geht genau einmal hinaus, auch wenn der Job doppelt läuft. Ging sicher nichts hinaus (Bot offline,
+  Kanal unbekannt, keine Rechte), versucht er es nach 30 Minuten noch zweimal. Meldet Discord erst nach dem Senden einen Fehler
+  (Zeitüberschreitung, Störung bei Discord), kann die Nachricht schon im Kanal stehen: Dann versucht er es **nicht** noch einmal.
+  Solche Meldungen und aufgegebene stehen im Kasten unter **Meldungen, die du prüfen solltest** – bitte im Kanal nachsehen. Ein
+  Wiederöffnen und neues Abschließen schickt keine zweite Saisonende-Meldung.
+- Die neue Season aus dem Vorgänger (3.11) übernimmt die Einstellung samt „an“ und Kanal (Nr. 236). Ist der Kanal dann nicht mehr
+  freigegeben, geht nichts hinaus, bis du einen freigegebenen wählst.
+
+<img src="../assets/liga/liga-season-discord-pc.png" alt="Kasten Discord im Reiter Termine: Spieltag-Zusammenfassung und Saisonende-Meldung an, Kanal Events und Turniere · Liga › #liga-ergebnisse, darunter zwei Meldungen zum Prüfen" width="820">
 
 ### 2.8 Sichtbarkeit
 
@@ -1769,8 +1779,17 @@ der Ligaseite sichtbar; erst der Stand **Archiviert** blendet sie aus.
 **5. Saisonfinale am TV.** Unter den Staffeln steht der Kasten **Saisonfinale am TV**. Nach dem Sieger-Moment zeigt
 **Weiter** am Turnierbaum-TV jeder abgeschlossenen Staffel der Season die **Auf- und Absteiger je Liga N** – erst Liga 1, mit
 jedem weiteren **Weiter** die nächste. **Ende** bringt das gewohnte Bild zurück (Tabelle bzw. Sieger). Der Kasten sagt, was der TV
-gerade zeigt („Der TV zeigt Liga 2 (2 von 3)“). Recht: **Spiele betreuen**. Nur bei öffentlichen Seasons; steigt niemand auf
-oder ab, gibt es nichts zu zeigen. Mehr in [TV & Beamer](tv.md). Die Saisonende-Meldung im Discord steht unter 2.7g.
+gerade zeigt („Der TV zeigt Liga 2 (2 von 3)“). Recht: **Spiele betreuen** (Weiter und Ende bleiben hier, Nr. 233). Nur bei
+öffentlichen Seasons; steigt niemand auf oder ab, gibt es nichts zu zeigen. Mehr in [TV & Beamer](tv.md). Die Saisonende-Meldung
+im Discord steht unter 2.7g.
+
+- **Zwei Fenster:** Hat jemand in einem anderen Fenster schon weitergeschaltet, springt **Weiter** nicht eine Liga N weiter, sondern
+  der Kasten lädt den aktuellen Stand und sagt es. Erst das nächste **Weiter** schaltet.
+- **Wieder öffnen:** Öffnest du eine Staffel wieder, verschwindet der Schritt von allen TVs der Season. Nach dem erneuten Abschluss
+  kommt er erst mit dem nächsten **Weiter** – nie ein alter Stand.
+- **Über Staffeln hinweg:** Steigt etwa der beste Zweite aus mehreren Staffeln auf (3.11), steht er am TV und im Discord mit.
+
+<img src="../assets/liga/liga-season-tv-finale-pc.png" alt="Kasten Saisonfinale am TV im Reiter Abschluss: Der TV zeigt Liga 1 (1 von 3), Hinweis, dass ein anderes Fenster schon weitergeschaltet hat, Knöpfe Weiter und Ende" width="820">
 
 ### 3.11 Neue Season aus der Vorgänger-Season
 

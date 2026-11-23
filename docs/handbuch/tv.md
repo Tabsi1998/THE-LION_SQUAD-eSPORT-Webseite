@@ -175,9 +175,15 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
   (links, grün, Pfeil hinauf) und wer absteigt oder ausscheidet (rechts, Pfeil hinunter), mit Platz und Ziel-Liga. Die Zeilen
   gleiten nacheinander auf ihren Platz – Aufsteiger von unten, Absteiger von oben –, danach kommt die Ziel-Liga, zuletzt die Linie
   unter dem Titel. Jedes weitere **Weiter** zeigt die nächste Liga N, **Ende** das gewohnte Bild. Solange der Schritt steht, wartet
-  die Wiedergabeliste. Nur bei öffentlichen Seasons; mit **Bewegung aus** steht das Bild sofort.
+  die Wiedergabeliste und die Kopfleiste zeigt **Saisonfinale** mit Liga und Season statt der eigenen Staffel. Nur bei öffentlichen
+  Seasons; mit **Bewegung aus** steht das Bild sofort.
+  **Viele Teams:** Je Spalte stehen höchstens **8 Zeilen**, der Rest darunter als „und N weitere“ (Nr. 235). Alles bleibt über der
+  Fußleiste, kein Name wird kleiner als die Mindestgröße für TV-Namen; lange Namen und lange Ziel-Ligen brechen um, statt
+  abgeschnitten zu werden.
 
-  <img src="../assets/tv/tv-saisonfinale-1920.png" alt="TV bei 1920 Pixeln: Saisonfinale Liga 2, links Aufstieg mit zwei Teams und Ziel Liga 1, rechts Abstieg mit Ziel Liga 3 und ein Team, das ausscheidet" width="820">
+  <img src="../assets/tv/tv-saisonfinale-1920.png" alt="TV bei 1920 Pixeln: Kopfleiste Saisonfinale, Liga 2, links Aufstieg mit zwei Teams und Ziel Liga 1, rechts Abstieg mit Ziel Liga 3 und ein Team, das ausscheidet" width="820">
+
+  <img src="../assets/tv/tv-saisonfinale-12-kandidaten-1920.png" alt="TV bei 1920 Pixeln: Saisonfinale Liga 2 mit je acht Zeilen in Aufstieg und Abstieg, darunter jeweils und 4 weitere" width="820">
 
 **Pause bis:** Setzt ihr ein Turnier unter **Admin → eSports → Turniere → Turnier öffnen** auf **Pausiert**, erscheint
 darunter das Feld **Pause bis**. Uhrzeit wählen, **Speichern**, und der TV zeigt „Weiter um …“ mit Countdown. **Ohne
