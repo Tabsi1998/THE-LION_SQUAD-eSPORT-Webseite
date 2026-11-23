@@ -54,6 +54,7 @@ Verstöße einer Regel hat als erlaubt. Wer aufräumt, senkt die Liste:
 ```bash
 cd frontend
 node scripts/check-motion-rules.mjs            # prüfen
+node scripts/check-motion-rules.mjs --diff-base origin/main   # neue Funde (geänderte Zeilen) zuerst nennen
 node scripts/check-motion-rules.mjs --tighten  # Ausnahmeliste auf den Ist-Stand senken (erhöht nie)
 ```
 
