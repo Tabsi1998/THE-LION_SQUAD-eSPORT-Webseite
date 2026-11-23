@@ -248,7 +248,7 @@ export function Division({ division, leagueSlug, seasonSlug, hash, topLevel, ord
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-3">
         <div className="flex min-w-0 items-center gap-3">
           {/* Liga-Abzeichen (#1638) vor dem Namen - der Name steht daneben als Überschrift, das Wappen bleibt ohne eigenen Text. */}
-          <LeagueBadge badge={{ level: division.level, nickname: division.nickname }} size="card" label={false} testId={`league-division-badge-${division.level}`} />
+          <LeagueBadge badge={{ level: division.level, nickname: division.nickname }} size="card" label={false} decorative testId={`league-division-badge-${division.level}`} />
           <h2 id={`liga-${division.level}`} className="font-heading text-2xl md:text-3xl font-black uppercase [overflow-wrap:anywhere]">{division.label}</h2>
         </div>
         {tabbed ? (

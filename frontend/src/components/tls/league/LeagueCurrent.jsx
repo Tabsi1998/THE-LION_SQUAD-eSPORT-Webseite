@@ -16,7 +16,7 @@ function Row({ row, index, nameOf, testId }) {
   const id = `${testId}-${row.registration_id}`;
   return (
     <Link to={row.link} className="tls-league-now__row" data-testid={id}>
-      <LeagueBadge badge={row.badge} size="card" label={false} index={index} testId={`${id}-badge`} />
+      <LeagueBadge badge={row.badge} size="card" label={false} decorative index={index} testId={`${id}-badge`} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] [overflow-wrap:anywhere]" data-testid={`${id}-label`}>

@@ -68,9 +68,10 @@ function Shield({ tier, id }) {
 /**
  * Das Abzeichen. `badge`: `{level, nickname, champion}` vom Server. `size`: "list" (Zeilen), "card" (Karten, Tabellenkopf), "hero".
  * `label`: den Text „Liga N · Beiname“ daneben zeigen (sonst trägt das Wappen ihn als Bildbeschreibung). `play`: beim ersten
- * Sichtbarwerden einmal bewegen; `index` staffelt mehrere.
+ * Sichtbarwerden einmal bewegen; `index` staffelt mehrere. `decorative`: Steht „Liga N · Beiname“ schon als Text daneben (Karte,
+ * Tabellenkopf), schweigt das Wappen für Screenreader - sonst hörte man es doppelt (Review #1638).
  */
-export function LeagueBadge({ badge, size = "card", label = true, play = true, index = 0, className = "", testId }) {
+export function LeagueBadge({ badge, size = "card", label = true, decorative = false, play = true, index = 0, className = "", testId }) {
   const rawId = useId();
   const id = `lb${rawId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [ref, state] = useFirstSight(play);
@@ -82,8 +83,9 @@ export function LeagueBadge({ badge, size = "card", label = true, play = true, i
   const nickname = String(badge.nickname || "").trim();
   return (
     <span ref={ref} className={`tls-lbadge tls-lbadge--${size} ${className}`.trim()} data-tier={tier} data-metal={metalKey}
-      data-play={state} style={{ "--tls-i": Math.min(index, STAGGER_MAX) }} data-testid={testId} title={label ? undefined : badgeAria(badge)}>
-      <span className="tls-lbadge__art" role={label ? undefined : "img"} aria-label={label ? undefined : badgeAria(badge)}
+      data-play={state} style={{ "--tls-i": Math.min(index, STAGGER_MAX) }} data-testid={testId} title={label ? undefined : badgeAria(badge)}
+      aria-hidden={decorative && !label ? "true" : undefined}>
+      <span className="tls-lbadge__art" role={label || decorative ? undefined : "img"} aria-label={label || decorative ? undefined : badgeAria(badge)}
         aria-hidden={label ? "true" : undefined} data-testid={testId ? `${testId}-art` : undefined}>
         <svg viewBox="0 0 64 80" className="tls-lbadge__svg" aria-hidden="true" focusable="false">
           <defs>
