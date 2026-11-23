@@ -59,7 +59,10 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
   const span = width - GUTTER - 56;
   const x = (index) => GUTTER + 28 + (line.seasons.length > 1 ? (index * span) / (line.seasons.length - 1) : span / 2);
   const y = (value) => TOP + (value - (first - 1)) * BAND + 6;
+  // Höchstens vier Linien - die besten Co-Teams (seasonLine sortiert); die übrigen nennt ein Satz darunter (Fabian 23.11.).
   const series = line.series.slice(0, COLORS.length);
+  const more = line.series.length - series.length;
+  const moreText = more > 0 ? `und ${more} ${more === 1 ? "weiteres Co-Team" : "weitere Co-Teams"}` : "";
   return (
     <section data-testid={testId} aria-labelledby={`${testId}-title`}>
       <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 font-heading text-2xl font-bold uppercase">
@@ -68,7 +71,7 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
       <div ref={ref} className="tls-season-line" data-play={state}>
         <div ref={boxRef} className="tls-swipe">
           <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="tls-season-line__svg" role="img"
-            aria-label={`Saisonverlauf: ${summary(line, byTeam)}`} data-testid={`${testId}-svg`}>
+            aria-label={`Saisonverlauf: ${summary({ ...line, series }, byTeam)}${moreText ? `. ${moreText}` : ""}`} data-testid={`${testId}-svg`}>
             {bands.map((level, at) => (
               <g key={level}>
                 <rect className="tls-season-line__band" data-even={at % 2 === 0 ? "true" : "false"} x="0" y={TOP + at * BAND} width={width} height={BAND} />
@@ -99,6 +102,7 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
             ))}
           </ul>
         ) : null}
+        {moreText ? <p className="tls-season-line__more" data-testid={`${testId}-more`}>{moreText}</p> : null}
       </div>
     </section>
   );

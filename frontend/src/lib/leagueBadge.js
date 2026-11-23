@@ -86,9 +86,12 @@ export function seasonLine(rows, { byTeam = false } = {}) {
       champion: Boolean(row.champion), zone: row.zone || null, season: order.get(key).name, team: row.display_name || "",
     });
   }
+  // Die besten zuerst (Fabian 23.11.): höchste aktuelle Liga N, dann bester Platz - beides aus der letzten Season des Co-Teams; bei
+  // Gleichstand die jüngere Season, dann der Name. Die Teamseite zeigt davon die ersten vier.
+  const latest = (row) => row.points[row.points.length - 1];
   const series = [...groups.entries()]
     .map(([name, points]) => ({ name, points: [...points.values()].sort((a, b) => a.index - b.index) }))
-    .sort((a, b) => Math.min(...a.points.map((p) => p.value)) - Math.min(...b.points.map((p) => p.value)) || a.name.localeCompare(b.name));
+    .sort((a, b) => latest(a).value - latest(b).value || latest(b).index - latest(a).index || a.name.localeCompare(b.name));
   const levels = [...new Set(usable.map((row) => Number(row.badge.level)))].sort((a, b) => a - b);
   return { seasons, levels, series };
 }
