@@ -38,6 +38,25 @@ def status_note(registration: dict | None, tournament: dict | None = None, *, in
     return STATUS_NOTES.get((registration or {}).get("status") or "")
 
 
+async def account_names(db, registrations) -> dict[str, str]:
+    """Der Name aus dem Konto je Solo-Anmeldung ohne eigenen Namen (#1629, Review #1638) - eine Abfrage für alle, keine ohne Bedarf."""
+    lacking = {row["id"]: row["user_id"] for row in registrations or ()
+               if row.get("id") and row.get("user_id") and not row.get("team_id")
+               and not (row.get("display_name") or row.get("team_name") or row.get("squad_name"))}
+    if not lacking:
+        return {}
+    wanted = sorted(set(lacking.values()))
+    users = {row["id"]: row for row in await db.users.find(
+        {"id": {"$in": wanted}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(wanted) + 1)}
+    out = {}
+    for registration_id, user_id in lacking.items():
+        user = users.get(user_id) or {}
+        name = user.get("display_name") or user.get("username")
+        if name:
+            out[registration_id] = name
+    return out
+
+
 def badge(division: dict | None, *, champion: bool = False) -> dict | None:
     """Was das Liga-Abzeichen braucht: ``{level, nickname, champion}`` - ``None`` ohne Liga N."""
     level = (division or {}).get("level")
@@ -90,7 +109,9 @@ async def live_places(db, tournaments: list[dict], registration_ids) -> dict[str
     for row in divisions:
         if row.get("status") != "archived" and isinstance(row.get("level"), int):
             levels.setdefault(row.get("season_id"), []).append(row["level"])
-    names = {row["id"]: row.get("display_name") or row.get("team_name") or row.get("squad_name") or "Team" for row in registrations if row.get("id")}
+    accounts = await account_names(db, registrations)
+    names = {row["id"]: row.get("display_name") or row.get("team_name") or row.get("squad_name") or accounts.get(row["id"]) or "Team"
+             for row in registrations if row.get("id")}
     out: dict[str, dict] = {}
     for tid in ids:
         tournament = staffeln[tid]
@@ -187,6 +208,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
             guest_sees = await sees_listed_tournament(PUBLIC, tournament)
         shown.append((registration, tournament, season, league, division, not guest_sees))
     places = await live_places(db, [row[1] for row in shown], [row[0]["id"] for row in shown])
+    accounts = await account_names(db, [row[0] for row in shown])
     out = []
     for registration, tournament, season, league, division, internal in shown:
         page_exists = league.get("status") == "active" and season.get("status") != "archived"
@@ -196,7 +218,8 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
         out.append({
             "registration_id": registration["id"],
             "squad_name": registration.get("squad_name") or squad_names.get(registration.get("squad_id")),
-            "display_name": registration.get("display_name") or registration.get("team_name"),
+            # Solo-Liga ohne eigenen Namen: der Name aus dem Konto statt einer leeren Zeile (Review #1638).
+            "display_name": registration.get("display_name") or registration.get("team_name") or accounts.get(registration["id"]),
             "team_id": registration.get("team_id"),
             "league": {"name": league.get("name"), "slug": league.get("slug")},
             "season": {"name": season.get("name"), "slug": season.get("slug")},
