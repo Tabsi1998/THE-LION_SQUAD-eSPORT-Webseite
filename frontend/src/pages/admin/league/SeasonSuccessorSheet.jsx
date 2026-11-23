@@ -3,7 +3,7 @@
 // Anlegen ist auf dem Server einmalig: Ein Doppelklick findet die schon angelegte Season.
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowUp, CircleAlert, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
@@ -25,6 +25,18 @@ function TeamRow({ team }) {
         <span className="block text-xs text-white/55">{MOVEMENT_TEXT[team.movement]} · {teamFrom(team)}</span>
       </span>
     </li>
+  );
+}
+
+/** Platzprüfung einer Liga N (#1627): Passen die Teams in die Staffeln, die es bisher gab? Der Satz kommt vom Server. */
+function SeatLine({ capacity, level }) {
+  if (!capacity?.text) return null;
+  const Icon = capacity.fits ? CircleCheck : CircleAlert;
+  return (
+    <p className={`mt-2 flex gap-2 text-xs [overflow-wrap:anywhere] ${capacity.fits ? "text-white/65" : "text-warn"}`} data-testid={`successor-seats-${level}`} data-fits={capacity.fits ? "yes" : "no"}>
+      <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${capacity.fits ? "text-ok" : ""}`} aria-hidden="true" />
+      <span><span className="sr-only">{capacity.fits ? "Passt: " : "Passt nicht: "}</span>{capacity.text}</span>
+    </p>
   );
 }
 
@@ -101,11 +113,18 @@ export function SeasonSuccessorSheet({ season, onClose, onCreated }) {
           <section aria-labelledby="successor-teams" className="space-y-3">
             <h3 id="successor-teams" className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Teams in der neuen Season ({data.carried})</h3>
             <p className="text-xs text-white/55">Auf- und Abstieg ergeben sich aus dem Endstand. Die Teams sind automatisch dabei und bekommen eine Nachricht; wer nicht will, meldet sich bis zum Start ab.</p>
+            {data.capacity_hints?.length ? (
+              <div className="space-y-1 rounded-sm border border-warn/40 p-3 text-sm" role="status" data-testid="successor-capacity">
+                <p className="flex gap-2 font-semibold text-warn"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span>Platzprüfung: Nicht jede Liga kommt mit ihren bisherigen Staffeln aus.</span></p>
+                <p className="text-xs text-white/70">Anlegen geht trotzdem. Lege in der neuen Season die fehlenden Staffeln an oder erhöhe die Staffelgröße, bevor du zuteilst oder auslost.</p>
+              </div>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-2">
               {data.divisions.map((division) => (
                 <div key={division.level} className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`successor-division-${division.level}`}>
                   <h4 className="font-bold text-white [overflow-wrap:anywhere]">{division.label}</h4>
                   <p className="text-xs text-white/50">{division.zones_label}</p>
+                  <SeatLine capacity={division.capacity} level={division.level} />
                   {division.teams.length ? (
                     <ul className="mt-2 divide-y divide-white/5">{division.teams.map((team) => <TeamRow key={team.squad_id} team={team} />)}</ul>
                   ) : <p className="mt-2 text-xs text-white/50">Noch kein Team.</p>}

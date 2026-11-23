@@ -695,6 +695,35 @@ test("Neue Season aus …: Vorschau mit Teams, Anlegen mit Beginn, danach die ne
   expect(await screen.findByRole("heading", { name: /Season 2/ })).toBeInTheDocument();
 });
 
+test("Neue Season aus …: Platzprüfung je Liga - Hinweis statt stiller Überfüllung, Anlegen geht trotzdem (#1627)", async () => {
+  const text = "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher gab es 1 Staffel - es fehlt 1.";
+  const fits = "4 Co-Teams, höchstens 8 je Staffel: 1 Staffel mit 4 Teams.";
+  extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, capacity_hints: [`Liga 1: ${text}`], divisions: [
+    { ...SUCCESSOR.divisions[0], capacity: { teams: 5, staffeln_before: 1, cap: 4, needed: 2, sizes: [3, 2], fits: false, text } },
+    { level: 2, label: "Liga 2", zones_label: "1 Aufsteiger · unterste Liga: kein Abstieg", teams: [], capacity: { teams: 4, staffeln_before: 1, cap: 8, needed: 1, sizes: [4], fits: true, text: fits } }] } };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  expect(await within(sheet).findByTestId("successor-capacity")).toHaveTextContent("Nicht jede Liga kommt mit ihren bisherigen Staffeln aus.");
+  expect(within(sheet).getByTestId("successor-seats-1")).toHaveTextContent(`Passt nicht: ${text}`);
+  expect(within(sheet).getByTestId("successor-seats-1")).toHaveAttribute("data-fits", "no");
+  // Gegenprobe: Liga 2 passt und warnt nicht.
+  expect(within(sheet).getByTestId("successor-seats-2")).toHaveTextContent(`Passt: ${fits}`);
+  expect(within(sheet).getByTestId("successor-seats-2")).toHaveAttribute("data-fits", "yes");
+  fireEvent.change(within(sheet).getByTestId("successor-start"), { target: { value: "2027-01-05" } });
+  expect(within(sheet).getByTestId("successor-create")).toBeEnabled();
+});
+
+test("Neue Season aus …: ohne Platzprüfung vom Server (älterer Stand) bleibt die Vorschau, wie sie war", async () => {
+  extra = { "/admin/leagues/seasons/s1/successor": SUCCESSOR };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  await within(sheet).findByTestId("successor-team-q2");
+  expect(within(sheet).queryByTestId("successor-capacity")).toBeNull();
+  expect(within(sheet).queryByTestId("successor-seats-1")).toBeNull();
+});
+
 test("Neue Season aus …: nicht abgeschlossen - der Grund statt des Knopfs", async () => {
   extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, can_create: false, problems: ["Die Season ist noch nicht abgeschlossen."] } };
   renderPage();
