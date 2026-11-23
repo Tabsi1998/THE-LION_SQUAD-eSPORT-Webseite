@@ -99,6 +99,16 @@ def _filled(match: dict) -> list[str]:
     return [slot["registration_id"] for slot in (match.get("slots") or []) if slot.get("registration_id")]
 
 
+def winner_ids(results: list[dict] | None) -> list[str]:
+    """Wer ein Spiel gewonnen hat: alle auf dem besten Platz. Einer ist ein Sieg, mehrere sind ein Unentschieden, keiner
+    heißt: noch kein Ergebnis. Es zählen alle Einträge des Spiels - auch von jemandem, der nicht mehr im Feld ist."""
+    ranked = [entry for entry in results or [] if entry.get("registration_id")]
+    if not ranked:
+        return []
+    best_rank = min(entry.get("rank") or 999 for entry in ranked)
+    return [entry["registration_id"] for entry in ranked if (entry.get("rank") or 999) == best_rank]
+
+
 def scores_and_history(participants: list[str], matches: list[dict]) -> tuple[dict[str, float], dict[str, set]]:
     """Points so far and who already played whom.
 
@@ -126,16 +136,11 @@ def scores_and_history(participants: list[str], matches: list[dict]) -> tuple[di
             if item in opponents:
                 opponents[item].update(other for other in present if other != item)
 
-        # Wer gewonnen hat, entscheidet sich an allen Einträgen des Spiels - nicht nur an denen, die noch im Feld sind.
-        ranked = [entry for entry in match.get("results") or [] if entry.get("registration_id")]
-        if not ranked:
-            continue
-        best_rank = min(entry.get("rank") or 999 for entry in ranked)
-        winners = [entry for entry in ranked if (entry.get("rank") or 999) == best_rank]
+        winners = winner_ids(match.get("results"))
         points = WIN_POINTS if len(winners) == 1 else DRAW_POINTS
-        for entry in winners:
-            if entry["registration_id"] in scores:
-                scores[entry["registration_id"]] += points
+        for winner in winners:
+            if winner in scores:
+                scores[winner] += points
     return scores, opponents
 
 
@@ -153,16 +158,12 @@ def records(participants: list[str], matches: list[dict]) -> dict[str, dict]:
                 out[present[0]]["won"] += 1
                 out[present[0]]["byes"] += 1
             continue
-        ranked = [entry for entry in match.get("results") or [] if entry.get("registration_id")]
-        if not ranked:
-            continue
-        best_rank = min(entry.get("rank") or 999 for entry in ranked)
-        winners = [entry for entry in ranked if (entry.get("rank") or 999) == best_rank]
-        for entry in ranked:
-            row = out.get(entry["registration_id"])
+        winners = winner_ids(match.get("results"))
+        for entry in match.get("results") or []:
+            row = out.get(entry.get("registration_id"))
             if row is None:
                 continue
-            if entry in winners:
+            if entry["registration_id"] in winners:
                 row["won" if len(winners) == 1 else "drawn"] += 1
             else:
                 row["lost"] += 1

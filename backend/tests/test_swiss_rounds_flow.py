@@ -380,6 +380,63 @@ async def test_a_result_taken_back_inside_a_running_round_removes_nothing(flow):
     assert len(await round_matches(flow, tournament, 1)) == 3
 
 
+# ---------------------------------------------------------------- Korrektur, wenn die nächste Runde schon steht
+
+async def correct(flow, match, winner, loser, **extra):
+    return await flow.post(f"/api/matches/{match['id']}/result?force=true", json={
+        "results": ranking(winner, loser), "reason": "Seiten vertauscht eingetragen", **extra})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hold", [False, True])
+async def test_a_correction_says_when_the_next_round_was_paired_from_the_old_result(flow, hold):
+    """Runde 2 steht schon. Dreht eine Korrektur in Runde 1 den Sieger um, bleibt Runde 2, wie sie ist - die Leitung
+    erfährt es mit der Antwort, auch wenn das Ergebnis erst bereitliegt („Rückgängig“-Frist)."""
+    _staff, tournament, _regs = await swiss(flow, 4, auto_next_round=True)
+    assert (await next_round(flow, tournament)).status_code == 200
+    await play_round(flow, tournament, 1)
+    assert len(await round_matches(flow, tournament, 2)) == 2
+    match = (await round_matches(flow, tournament, 1))[0]
+    first, second = (slot["registration_id"] for slot in match["slots"])
+
+    corrected = await correct(flow, match, second, first, **({"hold": True} if hold else {}))
+
+    assert corrected.status_code == 200, corrected.text
+    notice = corrected.json()["notice"]
+    assert "Runde 2" in notice and "alten Ergebnis" in notice
+
+
+@pytest.mark.asyncio
+async def test_a_correction_that_keeps_the_winner_says_nothing(flow):
+    """Nur der Stand ändert sich, der Sieger bleibt: Die Punkte sind dieselben, die Paarung von Runde 2 stimmt weiter."""
+    _staff, tournament, _regs = await swiss(flow, 4, auto_next_round=True)
+    assert (await next_round(flow, tournament)).status_code == 200
+    await play_round(flow, tournament, 1)
+    match = (await round_matches(flow, tournament, 1))[0]
+    first, second = (slot["registration_id"] for slot in match["slots"])
+
+    corrected = await flow.post(f"/api/matches/{match['id']}/result?force=true", json={
+        "results": [{"registration_id": first, "rank": 1, "score": 3}, {"registration_id": second, "rank": 2, "score": 1}],
+        "reason": "Stand falsch eingetragen"})
+
+    assert corrected.status_code == 200, corrected.text
+    assert not corrected.json().get("notice")
+
+
+@pytest.mark.asyncio
+async def test_a_correction_in_the_latest_round_says_nothing(flow):
+    _staff, tournament, _regs = await swiss(flow, 4)
+    assert (await next_round(flow, tournament)).status_code == 200
+    await play_round(flow, tournament, 1)
+    match = (await round_matches(flow, tournament, 1))[0]
+    first, second = (slot["registration_id"] for slot in match["slots"])
+
+    corrected = await correct(flow, match, second, first)
+
+    assert corrected.status_code == 200, corrected.text
+    assert not corrected.json().get("notice")
+
+
 def test_the_model_and_the_calculation_know_the_same_values():
     from typing import get_args
 

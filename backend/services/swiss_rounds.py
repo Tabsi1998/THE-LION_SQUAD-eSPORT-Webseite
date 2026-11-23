@@ -25,6 +25,7 @@ from services.graph_swiss import (
     swiss_round_documents,
     swiss_settings,
     swiss_state,
+    winner_ids,
 )
 from services.log_safe import log_safe
 
@@ -82,6 +83,21 @@ async def round_untouched(db, round_matches: list[dict]) -> bool:
     if await db.match_reports_v2.count_documents({"match_id": {"$in": match_ids}}):
         return False
     return not await db.stations.count_documents({"current_match_id": {"$in": match_ids}})
+
+
+def stale_pairing_notice(match: dict, stage_matches: list[dict], results: list[dict] | None) -> str | None:
+    """Korrektur in einer Runde, nach der die nächste schon steht: Deren Paarung kam aus dem alten Ergebnis und ändert
+    sich nicht von selbst. Der Satz für die Turnierleitung - oder ``None``, wenn es keine spätere Runde gibt oder die
+    Korrektur den Ausgang nicht dreht (gleicher Sieger, gleiche Punkte: die Paarung stimmt weiter)."""
+    if match.get("stage_type") != "swiss" or not match.get("results"):
+        return None
+    own_round = int(match.get("round") or 0)
+    later = [int(row.get("round") or 0) for row in stage_matches
+             if int(row.get("round") or 0) > own_round and not row.get("is_preview")]
+    if not later or sorted(winner_ids(match.get("results"))) == sorted(winner_ids(results)):
+        return None
+    return (f"Runde {min(later)} ist schon gepaart – nach dem alten Ergebnis. Die Paarung ändert sich nicht von selbst. "
+            "Hat dort noch niemand gespielt, kannst du die Runde zurücknehmen und neu erzeugen.")
 
 
 def overview(tournament: dict, registrations: list[dict], matches: list[dict]) -> dict:

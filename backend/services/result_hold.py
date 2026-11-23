@@ -167,8 +167,11 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
     held_match = {**match, "pending_result": hold}
     # Folgespiele, die diese Korrektur zurücksetzen würde (#1035) - die Oberfläche kann es vor Ablauf nennen.
     reset_ids = [row["id"] for row in trial.get("reset_matches") or []]
+    # Schweizer System (#1559): Steht die nächste Runde schon, erfährt die Leitung, dass ihre Paarung vom alten Ergebnis kommt.
+    from services.swiss_rounds import stale_pairing_notice
+    notice = stale_pairing_notice(match, stage_matches, trial.get("results")) if force else None
     return {"ok": True, "held": True, "hold": hold_view(held_match, actor_id), "reset_match_ids": reset_ids,
-            "idempotent_replay": False}
+            "idempotent_replay": False, **({"notice": notice} if notice else {})}
 
 
 async def _audit(db, action: str, match: dict, actor_id: str | None, data: dict) -> None:
