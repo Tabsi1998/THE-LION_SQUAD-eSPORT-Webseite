@@ -9,6 +9,10 @@ die neue Season (``league_successor``) lesen dieselbe Rechnung.
 - **Je Staffel** gelten die Zahlen (zwei Staffeln einer Liga N mit je einem Aufsteiger: zwei Aufsteiger).
 - **Tabellenende** (Nr. 43, 159): Ausgeschiedene und Disqualifizierte stehen für die Zonen immer hinten, auch wenn die Regel ``half``
   sie rechnerisch vorn lässt. Sie steigen nie auf, belegen zuerst die Abstiegsplätze und fallen aus der Liga heraus (``out``).
+- **Zielregel über Staffeln hinweg** (#1627, Entscheidung 23.11.): ``promote_best`` - zusätzlich zu den festen Aufsteigern jeder Staffel
+  steigen die N besten Nächstplatzierten aller Staffeln der Liga N auf („die zwei besten Zweiten“); ``relegate_worst`` spiegelbildlich für
+  den Platz vor der Abstiegszone. Fehlen die Felder, gilt nichts davon. Hier steht nur, wer je Staffel Kandidat ist
+  (``cross_candidates``); verglichen und entschieden wird in ``league_cross_zones`` - erst wenn alle Staffeln abgeschlossen sind.
 - **Relegation** ist vorbereitet: Die Plätze stehen farbig in der Tabelle, eine Wirkung auf die neue Season haben sie noch nicht -
   die Teams bleiben in ihrer Liga N (``MOVES``).
 """
@@ -21,6 +25,9 @@ RELEGATION = "relegation"
 OUT = "out"
 
 FIELDS = ("promote", "relegate", "playoff_promote", "playoff_relegate")
+# Plätze über alle Staffeln der Liga N hinweg (#1627): nur gesetzt, wenn größer 0 - sonst sieht ``zones`` aus wie vorher.
+PROMOTE_BEST, RELEGATE_WORST = "promote_best", "relegate_worst"
+CROSS_FIELDS = (PROMOTE_BEST, RELEGATE_WORST)
 DEFAULTS = {"promote": 1, "relegate": 1, "playoff_promote": 0, "playoff_relegate": 0}
 FIELD_MAX = 10
 LABELS = {
@@ -50,20 +57,28 @@ def _count(value, fallback: int) -> int:
     return max(0, min(FIELD_MAX, number))
 
 
+def _cross(raw: dict | None) -> dict:
+    """Die Zielregel über Staffeln hinweg - nur, was größer 0 ist."""
+    found = {key: _count((raw or {}).get(key), 0) for key in CROSS_FIELDS}
+    return {key: value for key, value in found.items() if value}
+
+
 def settings_of(division: dict | None) -> dict:
     """Die eingestellten Zonen einer Liga N - fehlt ein Wert, gilt die Vorgabe 1/1 ohne Relegation."""
     raw = (division or {}).get("zones") or {}
-    return {key: _count(raw.get(key), DEFAULTS[key]) for key in FIELDS}
+    return {**{key: _count(raw.get(key), DEFAULTS[key]) for key in FIELDS}, **_cross(raw)}
 
 
 def clean(raw: dict | None, staffel_size: int | None) -> dict:
     """Die Eingabe der Leitung geprüft: ganze Zahlen 0–10, zusammen nicht mehr als Teams in einer Staffel (sonst überschneiden sich die
     Zonen). Fehlende Werte nehmen die Vorgabe."""
     out = {key: _count((raw or {}).get(key), DEFAULTS[key]) for key in FIELDS}
+    cross = _cross(raw)
     size = int(staffel_size or 0)
-    if size and sum(out.values()) > size:
+    # Der Vergleich über Staffeln hinweg braucht je Seite einen eigenen Platz: den nach den Aufsteigern bzw. vor den Absteigern.
+    if size and sum(out.values()) + len(cross) > size:
         raise ZoneProblem(OVERLAP.format(size=size))
-    return out
+    return {**out, **cross}
 
 
 def effective(division: dict | None, levels: list[int]) -> dict:
@@ -75,8 +90,10 @@ def effective(division: dict | None, levels: list[int]) -> dict:
     bottom = not known or level is None or level >= known[-1]
     if top:
         zones["promote"] = zones["playoff_promote"] = 0
+        zones.pop(PROMOTE_BEST, None)
     if bottom:
         zones["relegate"] = zones["playoff_relegate"] = 0
+        zones.pop(RELEGATE_WORST, None)
     return {**zones, "top": top, "bottom": bottom}
 
 
@@ -127,6 +144,26 @@ def assign(rows: list[dict], zones: dict | None) -> dict[str, str | None]:
     return out
 
 
+def cross_candidates(rows: list[dict], zones: dict | None) -> dict[str, dict | None]:
+    """Wen diese Staffel in den Vergleich über Staffeln hinweg schickt (#1627): für ``promote_best`` das Team auf dem Platz gleich nach
+    den festen Aufsteigern, für ``relegate_worst`` das auf dem Platz gleich vor den festen Absteigern. ``None``, wo die Regel nicht gilt,
+    der Platz schon in der anderen Zone liegt oder dort ein Ausgeschiedener steht (Nr. 43: Sie belegen zuerst die Abstiegsplätze und
+    steigen nie auf)."""
+    out: dict[str, dict | None] = {PROMOTE_BEST: None, RELEGATE_WORST: None}
+    if not zones or not started(rows):
+        return out
+    order = ordered(rows)
+    size = len(order)
+    up, down = zones.get("promote") or 0, zones.get("relegate") or 0
+    upper = up if zones.get(PROMOTE_BEST) and up < size - down and not order[up].get("exit") else None
+    if upper is not None:
+        out[PROMOTE_BEST] = order[upper]
+    lower = size - down - 1
+    if zones.get(RELEGATE_WORST) and up <= lower < size and lower != upper and not order[lower].get("exit"):
+        out[RELEGATE_WORST] = order[lower]
+    return out
+
+
 def mark(rows: list[dict], zones: dict | None) -> list[dict]:
     """Schreibt ``zone`` an jede Zeile (auch ``None``) - erst mit dem ersten gewerteten Spiel."""
     found = assign(rows, zones) if zones and started(rows) else {}
@@ -140,7 +177,11 @@ def boundary_ties(rows: list[dict], zones: dict | None) -> list[dict]:
     Zonen. Liegen alle gleich Platzierten in derselben Zone (auch bei Zonen, die sich überlappen), ist nichts zu entscheiden."""
     if not zones or not started(rows):
         return []
-    found = assign(rows, zones)
+    found = dict(assign(rows, zones))
+    # Wer in den Vergleich über Staffeln hinweg geht (#1627), muss in seiner Staffel feststehen: Der Platz zählt wie eine Zonengrenze.
+    for kind, row in cross_candidates(rows, zones).items():
+        if row and row.get("registration_id"):
+            found[row["registration_id"]] = f"cross:{kind}"
     groups: dict[int, list[dict]] = {}
     for row in ordered(rows):
         if not row.get("exit") and _rank(row) and row.get("registration_id"):
@@ -165,6 +206,9 @@ def summary(zones: dict | None) -> str:
         parts.append(f"{zones['promote']} Aufsteiger")
     else:
         parts.append("kein Aufstieg")
+    if zones.get(PROMOTE_BEST):
+        count = zones[PROMOTE_BEST]
+        parts.append(f"dazu {count} {'bester Nächstplatzierter' if count == 1 else 'beste Nächstplatzierte'} über alle Staffeln")
     if zones.get("playoff_promote"):
         parts.append(f"{zones['playoff_promote']} Relegation oben")
     if zones.get("playoff_relegate"):
@@ -175,6 +219,9 @@ def summary(zones: dict | None) -> str:
         parts.append(f"{zones['relegate']} Absteiger")
     else:
         parts.append("kein Abstieg")
+    if zones.get(RELEGATE_WORST):
+        count = zones[RELEGATE_WORST]
+        parts.append(f"dazu {count} {'schlechtester Platz' if count == 1 else 'schlechteste Plätze'} vor dem Abstieg über alle Staffeln")
     return " · ".join(parts)
 
 

@@ -2895,6 +2895,10 @@ class LeagueDivisionZones(BaseModel):
     relegate: Optional[int] = Field(default=None, ge=0, le=10)
     playoff_promote: Optional[int] = Field(default=None, ge=0, le=10)
     playoff_relegate: Optional[int] = Field(default=None, ge=0, le=10)
+    # Zielregel über Staffeln hinweg (#1627): die N besten Nächstplatzierten aller Staffeln steigen zusätzlich auf, spiegelbildlich
+    # beim Abstieg. Fehlt bzw. 0: nur die festen Plätze je Staffel, wie bisher.
+    promote_best: Optional[int] = Field(default=None, ge=0, le=10)
+    relegate_worst: Optional[int] = Field(default=None, ge=0, le=10)
 
 
 class LeagueDivisionCreate(BaseModel):
