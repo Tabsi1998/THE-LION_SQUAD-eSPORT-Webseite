@@ -4,8 +4,11 @@ Jeder PR mit sichtbaren Änderungen muss das Prüftor bestehen (#1660). **Rot he
 gibt es nur mit Begründung im PR-Text.
 
 „Sichtbar“ heißt: Der PR berührt den Bereich `frontend` laut
-[`scripts/ci-changed-areas.py`](../../scripts/ci-changed-areas.py) – also alles unter `frontend/`, Compose- und
-Env-Vorlagen sowie Änderungen an `.github/`.
+[`scripts/ci-changed-areas.py`](../../scripts/ci-changed-areas.py) – also alles unter `frontend/` außer
+Markdown, Compose- und Env-Vorlagen sowie Änderungen an `.github/`. Markdown zählt sonst nur zur Linkprüfung;
+`frontend/PERFORMANCE_BUDGETS.md` ist die Ausnahme, weil das Tor seine Grenzen daraus liest
+(`PRUEFTOR_MARKDOWN`) – wer nur eine Grenze anhebt, läuft trotzdem durchs Tor. Die übrigen Listen des Tors
+(`motion-rules-allowlist.json`, `e2e/prueftor-bekannt.json`) liegen unter `frontend/` und zählen ohnehin dazu.
 
 ## Was geprüft wird
 
