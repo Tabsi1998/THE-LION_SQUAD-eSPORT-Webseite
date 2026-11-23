@@ -512,3 +512,18 @@ async def test_assigning_by_hand_while_applying_never_doubles_a_team(flow):
     squads = [row["squad_id"] for row in regs]
     assert len(squads) == len(set(squads)) and w["teams"][0]["squad"]["id"] in squads
     assert set(await assignments(flow, w)) == set(squads)
+
+
+@pytest.mark.asyncio
+async def test_a_new_draw_after_an_applied_one_keeps_the_old_log(flow):
+    """Kommt nach dem Zuteilen noch ein Co-Team dazu, lost die Leitung noch einmal: Der Verlauf des ersten Loses bleibt stehen."""
+    w = await world(flow, teams=4)
+    draw = await drawn(flow, w)
+    ok(await flow.post(draws_url(w, w["division"], "apply"), json={"fingerprint": draw["fingerprint"], "confirm": True}))
+    for name in ("TeamSpaetEins", "TeamSpaetZwei"):
+        late = await add_team(flow, w, name)
+        ok(await decide(flow, w, await submitted(flow, w, late), "accept"))
+    second = ok(await flow.post(draws_url(w, w["division"]), json={}))["draw"]
+    assert second["number"] == 2 and second["status"] == "draft" and len(placement(second)) == 2
+    assert [step["action"] for step in second["log"]] == ["create", "apply", "create"]
+    assert [step.get("number") for step in second["log"]] == [1, None, 2]

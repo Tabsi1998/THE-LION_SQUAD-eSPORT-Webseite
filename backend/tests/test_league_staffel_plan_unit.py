@@ -167,3 +167,25 @@ def test_draw_with_siblings_allowed_keeps_a_squad_out_of_a_staffel_it_left():
               {"id": "tid-B", "staffel": "B", "capacity": 8, "team_ids": [], "seats": 0}]
     for seed in "abcdef":
         assert plan.draw(entries(4), groups, seed, siblings_allowed=True)["placements"]["s01"] == "tid-B"
+
+
+def test_draw_finds_the_solution_when_siblings_block_the_smallest_staffel():
+    """Drei Staffeln mit je zwei Teams, zwei Nachzügler, deren Hauptteams beide schon in Staffel A stehen: Sie gehen nach B und C.
+    Früher lagen die freien Plätze vor der Geschwister-Regel fest (A und B) - das Los meldete „keine Verteilung“, obwohl es eine gibt."""
+    groups = staffeln(3, seats={"A": ["lions", "wolves"], "B": ["t1", "t2"], "C": ["t3", "t4"]})
+    rows = [{"key": "lions-b", "team_id": "lions"}, {"key": "wolves-b", "team_id": "wolves"}]
+    for seed in "abcdef":
+        found = plan.draw(rows, groups, seed)
+        assert sorted(found["placements"].values()) == ["tid-B", "tid-C"]
+        assert sorted(sizes_of(found, groups).values()) == [2, 3, 3]
+
+
+def test_draw_still_refuses_an_unbalanced_way_out():
+    # Zwei Staffeln, das Hauptteam der zwei Nachzügler steht in beiden nicht - aber beide Nachzügler sind Geschwister: je eine Staffel.
+    groups = staffeln(2, seats={"A": ["t1"], "B": ["t2"]})
+    found = plan.draw([{"key": "x-a", "team_id": "x"}, {"key": "x-b", "team_id": "x"}], groups, "s")
+    assert sorted(found["placements"].values()) == ["tid-A", "tid-B"]
+    # Gegenprobe: Ginge es nur, indem eine Staffel zwei mehr hat als die andere, sagt das Los es, statt still schief zu verteilen.
+    lopsided = staffeln(2, seats={"A": ["x"], "B": []})
+    with pytest.raises(plan.DrawProblem):
+        plan.draw([{"key": "x-b", "team_id": "x"}, {"key": "x-c", "team_id": "x"}], lopsided, "s")

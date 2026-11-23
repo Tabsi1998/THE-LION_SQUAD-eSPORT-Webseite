@@ -304,8 +304,9 @@ async def create(db, league: dict, season: dict, division_id: str, body: dict, a
         replaces = bool(old and old.get("status") == DRAFT)
         number = int((old or {}).get("number") or 0) + 1 if old else 1
         action = "redraw" if replaces else "create"
+        # Der Verlauf bleibt (auch der eines schon übernommenen Loses): Ein neues Los für Nachzügler hängt sich an.
         draft.update({"id": new_id(), "number": number, "created_by": actor.get("id"), "created_at": _now(),
-                      "log": [*((old or {}).get("log") or [] if replaces else []),
+                      "log": [*((old or {}).get("log") or []),
                               _step(action, actor, number=number, stale=True if replaces else None, conflict_reason=override)]})
         await _save(db, division, draft)
         await _audit(db, action, season, division, actor, override, draw_id=draft["id"], seed=draft["seed"], number=number,

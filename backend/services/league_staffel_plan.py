@@ -7,7 +7,9 @@ Folge-Season (``league_successor``) und später die Playoff-Staffeln (#2404) rec
   aktiven Wochen hergeben (``league_rounds.max_teams_for``). Daraus die Zahl der Staffeln und ihre Größen - Unterschied höchstens 1.
 - **Los** (``draw``): Die Reihenfolge kommt aus dem Seed - je Co-Team der SHA-256 aus Seed und Kennung, sortiert. Kein Zufallsgenerator,
   kein Zustand: gleiche Eingabe und gleicher Seed ergeben auf jedem Rechner dasselbe. Verteilt wird in dieser Reihenfolge reihum auf die
-  Staffel mit den meisten freien Plätzen; Hauptteams mit mehreren Co-Teams zuerst, damit Geschwister sicher getrennt stehen.
+  gerade kleinste Staffel; Hauptteams mit mehreren Co-Teams zuerst, damit Geschwister sicher getrennt stehen. Welche Staffel einen der
+  letzten Plätze bekommt, liegt nicht vorher fest: Ist die kleinste für ein Co-Team gesperrt (Geschwister), nimmt es die nächste - solange
+  am Ende keine Staffel mehr als ein Team größer ist, als sie sein müsste.
 - **Was nicht geht, wird gesagt** (``DrawProblem``): zu wenige Plätze, mehr Geschwister als Staffeln. Nichts wird still gelockert.
 """
 from __future__ import annotations
@@ -18,7 +20,7 @@ import json
 from services.league_rounds import max_teams_for
 
 # Die Fassung der Rechnung: Ändert sich die Verteilung bei gleicher Eingabe, zählt sie hoch - ein altes Los bleibt damit erkennbar.
-POLICY = 1
+POLICY = 2
 MIN_TEAMS = 2
 SEARCH_LIMIT = 50_000
 
@@ -118,19 +120,19 @@ def draw_order(entries: list[dict], seed: str) -> list[str]:
     return [row["key"] for row in sorted(_entries(entries), key=lambda row: hashlib.sha256(f"{seed}:{row['key']}".encode("utf-8")).hexdigest())]
 
 
-def _slots(groups: list[dict], teams: int) -> dict[str, int]:
-    """Freie Plätze je Staffel für ``teams`` neue Co-Teams: immer die kleinste Staffel zuerst - so gleicht das Los auch aus, was schon steht."""
-    size = {row["id"]: row["seats"] for row in groups}
-    slots = {row["id"]: 0 for row in groups}
-    for _ in range(teams):
-        free = [row for row in groups if size[row["id"]] < row["capacity"]]
-        if not free:
-            total = sum(max(row["capacity"] - row["seats"], 0) for row in groups)
-            raise DrawProblem(NO_SEATS.format(teams=teams, free=total, count=_staffeln(len(groups))))
-        target = min(free, key=lambda row: size[row["id"]])
-        size[target["id"]] += 1
-        slots[target["id"]] += 1
-    return slots
+def _bounds(groups: list[dict], teams: int) -> tuple[dict[str, int], dict[str, int]]:
+    """Wie groß jede Staffel nach dem Los mindestens und höchstens ist, damit es ausgeglichen bleibt: Der „Wasserstand“ ist die kleinste
+    Größe, bis zu der aufgefüllt alle ``teams`` Platz finden. Jede Staffel endet höchstens dort und mindestens eins darunter (begrenzt
+    durch ihre Plätze und das, was schon steht). Welche Staffel den Stand erreicht, bleibt offen - das entscheidet die Verteilung."""
+    total = sum(max(row["capacity"] - row["seats"], 0) for row in groups)
+    if teams > total:
+        raise DrawProblem(NO_SEATS.format(teams=teams, free=total, count=_staffeln(len(groups))))
+    level = min(row["seats"] for row in groups)
+    while sum(max(min(row["capacity"], level) - row["seats"], 0) for row in groups) < teams:
+        level += 1
+    lower = {row["id"]: max(row["seats"], min(row["capacity"], level - 1)) for row in groups}
+    upper = {row["id"]: max(row["seats"], min(row["capacity"], level)) for row in groups}
+    return lower, upper
 
 
 def draw(entries: list[dict], staffeln: list[dict], seed: str, *, siblings_allowed: bool = False) -> dict:
@@ -145,7 +147,8 @@ def draw(entries: list[dict], staffeln: list[dict], seed: str, *, siblings_allow
         raise DrawProblem(NO_STAFFELN)
     order = draw_order(rows, seed)
     position = {key: index for index, key in enumerate(order)}
-    slots = _slots(groups, len(rows))
+    lower, upper = _bounds(groups, len(rows))
+    size = {row["id"]: row["seats"] for row in groups}
     # Mit erlaubten Geschwistern zählt jedes Co-Team für sich: ``team_ids`` der Staffeln sind dann Co-Team-Kennungen (wer dort schon stand).
     blocked = {row["id"]: set(row["team_ids"]) for row in groups}
     by_team: dict[str, list[str]] = {}
@@ -153,7 +156,7 @@ def draw(entries: list[dict], staffeln: list[dict], seed: str, *, siblings_allow
         by_team.setdefault(row["key"] if siblings_allowed else row["team_id"], []).append(row["key"])
     team_of = {row["key"]: (row["key"] if siblings_allowed else row["team_id"]) for row in rows}
     crowded = sorted(team for team, keys in by_team.items()
-                     if len(keys) > len([row for row in groups if slots[row["id"]] and team not in blocked[row["id"]]]))
+                     if len(keys) > len([row for row in groups if upper[row["id"]] > row["seats"] and team not in blocked[row["id"]]]))
     if crowded:
         raise DrawProblem(TOO_MANY_SIBLINGS, team_ids=crowded)
     # Hauptteams mit den meisten Co-Teams zuerst (sie haben die wenigste Wahl), darin und danach in Los-Reihenfolge.
@@ -162,6 +165,10 @@ def draw(entries: list[dict], staffeln: list[dict], seed: str, *, siblings_allow
     budget = [SEARCH_LIMIT]
 
     def place(index: int) -> bool:
+        # Was noch fehlt, damit jede Staffel ihre Mindestgröße erreicht, muss mit den übrigen Co-Teams zu schaffen sein.
+        missing = sum(max(lower[row["id"]] - size[row["id"]], 0) for row in groups)
+        if missing > len(queue) - index:
+            return False
         if index == len(queue):
             return True
         budget[0] -= 1
@@ -169,22 +176,22 @@ def draw(entries: list[dict], staffeln: list[dict], seed: str, *, siblings_allow
             return False
         key = queue[index]
         team = team_of[key]
-        for target in sorted((row for row in groups if slots[row["id"]] and team not in blocked[row["id"]]),
-                             key=lambda row: -slots[row["id"]]):
-            slots[target["id"]] -= 1
+        # Die gerade kleinste Staffel zuerst (bei Gleichstand A vor B) - so gleicht das Los auch aus, was schon steht.
+        for target in sorted((row for row in groups if size[row["id"]] < upper[row["id"]] and team not in blocked[row["id"]]),
+                             key=lambda row: size[row["id"]]):
+            size[target["id"]] += 1
             blocked[target["id"]].add(team)
             placements[key] = target["id"]
             if place(index + 1):
                 return True
-            slots[target["id"]] += 1
+            size[target["id"]] -= 1
             blocked[target["id"]].discard(team)
             del placements[key]
         return False
 
     if not place(0):
         raise DrawProblem(NO_SOLUTION)
-    sizes = {row["id"]: row["seats"] + len([key for key, target in placements.items() if target == row["id"]]) for row in groups}
-    return {"placements": {key: placements[key] for key in order}, "order": order, "sizes": sizes}
+    return {"placements": {key: placements[key] for key in order}, "order": order, "sizes": dict(size)}
 
 
 def swap(entries: list[dict], staffeln: list[dict], placements: dict[str, str], key_a: str, key_b: str, *,
