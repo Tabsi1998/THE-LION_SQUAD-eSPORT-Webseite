@@ -105,7 +105,6 @@
   border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212;
   transition: border-color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
 }
-.tls-league-now__row[data-champion="true"] { border-color: rgb(255 215 0 / 0.35); }
 @media (hover: hover) and (pointer: fine) {
   a.tls-league-now__row:hover { border-color: rgb(41 182 232 / 0.45); transform: translateY(calc(-1px * var(--tls-motion-on))); }
 }
