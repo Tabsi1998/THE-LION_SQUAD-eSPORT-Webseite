@@ -20,7 +20,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
-from services import league_final, league_zones, loadout_bans, map_pools, squad_registration
+from services import league_final, league_staffel_plan, league_zones, loadout_bans, map_pools, squad_registration
 from services import league_service as leagues
 from services.league_final_read import active_final, is_closed
 from services.league_scope import ONLY_LEAGUE
@@ -101,6 +101,17 @@ def _zone_map(final: dict, division: dict | None, levels: list[int]) -> dict[str
     return league_zones.assign(rows, zones)
 
 
+def capacity(season: dict, division: dict, teams: int, staffeln_before: int) -> dict:
+    """Platzprüfung einer Liga N der neuen Season (#1627): Passen die Teams, die nach Auf- und Abstieg dort ankommen, in so viele
+    Staffeln, wie es bisher gab? Gerechnet mit der Staffelgröße der Liga N und den Wochen der Season (Sperrzeiten setzt die neue Season
+    neu, darum ohne sie). Ein Hinweis, keine Sperre: Die Staffeln der neuen Season legt die Leitung an."""
+    settings = leagues.effective_settings(season, division)
+    found = league_staffel_plan.suggest(teams, max_size=settings.get("max_staffel_size"), active_weeks=season.get("weeks_total"),
+                                        legs=season.get("round_robin_legs") or 1, have=staffeln_before, have_word="Bisher gab es")
+    return {"teams": teams, "staffeln_before": staffeln_before, "cap": found["cap"], "cap_by": found["cap_by"], "needed": found["needed"],
+            "sizes": found["sizes"], "fits": found["fits"], "text": found["text"]}
+
+
 async def plan(db, season: dict) -> dict:
     """Die Vorschau: ob es geht (``problems``), die aktiven Liga N mit ihren Teams nach Auf- und Abstieg (``divisions``) und wer
     herausfällt (``dropped``). Liest nur."""
@@ -176,8 +187,11 @@ async def plan(db, season: dict) -> dict:
         zones = league_zones.effective(division, levels)
         teams_here = [row for row in carried if row["target_level"] == division["level"]]
         teams_here.sort(key=lambda row: (row["from_level"] or 0, str(row.get("from_staffel") or ""), int(row.get("rank") or 0)))
+        before = len([row for row in tournaments if row["league_context"].get("division_id") == division["id"]])
         out_divisions.append({"level": division["level"], "label": division_label(division), "zones": zones,
-                              "zones_label": league_zones.summary(zones), "teams": teams_here})
+                              "zones_label": league_zones.summary(zones), "teams": teams_here,
+                              # Platzprüfung (#1627): Bei mehreren Staffeln je Liga N kommen mehr Teams an, als eine Staffel fasst.
+                              "capacity": capacity(season, division, len(teams_here), before)})
     # Die Fassung des Endstands, aus der gerechnet wurde (Nachrichten nach „Übernahme neu berechnen“ tragen sie im Schlüssel).
     stamp = hashlib.sha1("|".join(sorted(finals)).encode("utf-8")).hexdigest()[:12] if finals else ""
     return {"problems": problems, "divisions": out_divisions, "dropped": dropped, "carried": len(carried), "stamp": stamp}
@@ -223,6 +237,8 @@ async def preview(db, season: dict) -> dict:
         "loadout_bans": {"version": bans.get("version")} if bans else None,
         "rules": await _rules_source(db, league, season),
         "divisions": found["divisions"],
+        # Platzprüfung (#1627): je Liga N, die mit ihrer bisherigen Staffelzahl nicht auskommt, ein Satz - Hinweis statt stiller Überfüllung.
+        "capacity_hints": [f"{row['label']}: {row['capacity']['text']}" for row in found["divisions"] if not row["capacity"]["fits"]],
         "dropped": found["dropped"],
         "carried": found["carried"],
         "relegation_note": "Relegationsplätze sind vorbereitet: Sie stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.",
@@ -318,7 +334,8 @@ async def _copy_divisions(db, season: dict, doc: dict, actor: dict) -> dict[int,
     for row in rows:
         if row.get("level") in have:
             continue
-        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at")}
+        # Das Los der alten Season (#1623, ``draw``) gehört zu ihren Staffeln und geht nicht mit.
+        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at", "draw")}
         copy.update({"id": new_id(), "season_id": doc["id"], "league_id": doc["league_id"], "status": "active",
                      "created_at": now, "created_by": actor.get("id"), "updated_at": now})
         try:

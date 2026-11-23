@@ -483,6 +483,48 @@ async def test_archived_middle_division_and_several_staffeln_of_unequal_size(flo
     assert preview["carried"] == 4 + 4 + 3 + 4 + 4
 
 
+# ---------------------------------------------------------------- Platzprüfung bei mehreren Staffeln (#1627)
+
+@pytest.mark.asyncio
+async def test_preview_checks_the_seats_of_every_division(flow):
+    """Liga 2 hat zwei Staffeln mit je einem Aufsteiger: Zwei kommen nach oben, nur einer geht hinunter. Liga 1 hätte fünf Teams für eine
+    Staffel mit vier Plätzen - die Vorschau sagt es, statt die Liga still zu überfüllen."""
+    world = await build(flow, levels=2, extra={2: [4]})
+    await close_all(flow, world)
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/seasons/{world['season']['id']}", json={"max_staffel_size": 4}))
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
+    top, low = (row["capacity"] for row in preview["divisions"])
+    assert (top["teams"], top["staffeln_before"], top["cap"], top["needed"], top["sizes"], top["fits"]) == (5, 1, 4, 2, [3, 2], False)
+    assert "5 Co-Teams" in top["text"] and "2 Staffeln" in top["text"] and "Bisher gab es 1 Staffel" in top["text"]
+    # Gegenprobe: Liga 2 behält sieben Teams für zwei Staffeln - das passt.
+    assert (low["teams"], low["staffeln_before"], low["needed"], low["sizes"], low["fits"]) == (7, 2, 2, [4, 3], True)
+    assert preview["capacity_hints"] == [f"Liga 1: {top['text']}"]
+    # Ein Hinweis, keine Sperre: Anlegen geht, die Leitung legt die zweite Staffel an.
+    assert preview["can_create"] is True
+
+
+@pytest.mark.asyncio
+async def test_preview_without_overfill_has_no_seat_hint(flow):
+    world = await build(flow, levels=2)
+    await close_all(flow, world)
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
+    assert preview["capacity_hints"] == []
+    assert [row["capacity"]["fits"] for row in preview["divisions"]] == [True, True]
+    assert [row["capacity"]["teams"] for row in preview["divisions"]] == [4, 4]
+
+
+@pytest.mark.asyncio
+async def test_the_draw_of_the_old_season_does_not_come_over(flow):
+    world = await build(flow, levels=1)
+    await close_all(flow, world)
+    await flow.db.league_divisions.update_one({"id": world["divisions"][0]["id"]}, {"$set": {"draw": {"id": "alt", "status": "applied", "seed": "abc"}}})
+    season = await new_season(flow, world)
+    copy = await flow.db.league_divisions.find_one({"season_id": season["id"]}, {"_id": 0})
+    assert "draw" not in copy and copy["level"] == 1
+
+
 # ---------------------------------------------------------------- Übernahme neu berechnen (Nr. 162)
 
 async def second_lead(flow, world: dict) -> dict:
