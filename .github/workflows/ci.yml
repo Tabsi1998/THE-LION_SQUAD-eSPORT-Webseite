@@ -403,6 +403,10 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
+    env:
+      # Barrierefreiheit, Layout-Sprung und Bewegung laufen im Job „Prüftor“ gegen das gebaute dist (#1660), hier
+      # nicht noch einmal (e2e/prueftor-specs.js). Gilt für Plan und Lauf, so bleibt die Verteilung stimmig.
+      E2E_OHNE_PRUEFTOR: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -480,6 +484,195 @@ jobs:
             frontend/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Prüftor (#1660): Barrierefreiheit (axe, Tastatur, Namen, 200 %), Kontrast, Bundle-Budget, Ladezeit der Startseite am
+  # Handy und Bewegungsregeln in einem Job - für jeden PR mit sichtbaren Änderungen (Bereich frontend). Rot heißt nicht
+  # mergen; eine Ausnahme steht mit Begründung im PR-Text (docs/entwicklung/prueftor.md). Läuft neben „Frontend“: Der
+  # Bau dauert Sekunden und ist billiger als dist als Artefakt hin- und herzuschieben; Yarn- und Browser-Cache sind
+  # dieselben wie in den anderen Jobs. Dieser Job führt Code aus dem PR aus und hat deshalb nur Leserechte; den
+  # Kommentar schreibt „Prüftor-Kommentar“ (ohne Checkout) aus dem Ergebnis-Artefakt.
+  prueftor:
+    name: Prüftor
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # PR-Text frisch lesen: Eine nachgetragene Ausnahme gilt nach „Re-run“, ohne neuen Push.
+      pull-requests: read
+      # Letztes Ergebnis von main als Artefakt laden (Vergleich im Kommentar).
+      actions: read
+    env:
+      REPO: ${{ github.repository }}
+      EVENT_NAME: ${{ github.event_name }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+      - name: Restore browser and its system packages from the cache
+        # Derselbe Cache wie in den Browser-Teilen.
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: playwright-ubuntu-24.04-${{ hashFiles('frontend/yarn.lock') }}
+          restore-keys: playwright-ubuntu-24.04-
+      - name: Install Playwright browser
+        working-directory: frontend
+        timeout-minutes: 10
+        # Wie in den Browser-Teilen: kurze Zeitlimits für apt, je Versuch höchstens 3 Minuten, bis zu drei Versuche.
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Languages "none";\n' \
+            | sudo tee /etc/apt/apt.conf.d/99-tls-timeouts > /dev/null
+          if compgen -G "$HOME/apt-debs/*.deb" > /dev/null; then
+            sudo cp "$HOME"/apt-debs/*.deb /var/cache/apt/archives/
+          fi
+          for attempt in 1 2 3; do
+            if timeout --kill-after=15 180 npx playwright install --with-deps chromium; then exit 0; fi
+            echo "::warning::Browser-Installation hing oder brach ab (Versuch $attempt von 3)"
+            sudo pkill -9 -f '/usr/lib/apt/methods|apt-get' || true
+            sleep 10
+          done
+          exit 1
+      - name: Load the comparison data from main
+        # Ausnahmelisten und Grenzen von main (wurden sie gelockert?) und das letzte Tor-Ergebnis von main. Fehlt
+        # etwas, steht im Kommentar „noch kein Ergebnis von main“ - das Tor selbst hängt davon nicht ab.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          out="$RUNNER_TEMP/prueftor"
+          mkdir -p "$out/basis"
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$BASE_SHA" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            git show "$BASE_SHA:frontend/motion-rules-allowlist.json" > "$out/basis-allowlist.json" 2>/dev/null || rm -f "$out/basis-allowlist.json"
+            git show "$BASE_SHA:frontend/PERFORMANCE_BUDGETS.md" > "$out/basis-budgets.md" 2>/dev/null || rm -f "$out/basis-budgets.md"
+            git show "$BASE_SHA:frontend/e2e/prueftor-bekannt.json" > "$out/basis-bekannt.json" 2>/dev/null || rm -f "$out/basis-bekannt.json"
+            gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""' > "$out/pr-text.md"
+          fi
+          # Nur ein Artefakt, das ein Lauf auf main dieses Repos erzeugt hat (nicht aus einem Fork-Zweig namens main).
+          id=$(gh api "repos/$REPO/actions/artifacts?name=prueftor-main&per_page=30" --jq \
+            '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "main" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty' || true)
+          if [ -n "$id" ] && gh api "repos/$REPO/actions/artifacts/$id/zip" > "$out/main.zip"; then
+            unzip -o -q "$out/main.zip" -d "$out/basis" || true
+          fi
+          ls -la "$out" "$out/basis"
+      - name: Motion rules and palette contrast (static)
+        # Das Urteil fällt in „Summarize“ - hier nur messen. Fehlt ein Bericht (Skript abgestürzt), ist die Prüfung rot.
+        working-directory: frontend
+        run: |
+          out="$RUNNER_TEMP/prueftor"
+          node scripts/check-motion-rules.mjs --report "$out/bewegung.json" --base-allowlist "$out/basis-allowlist.json" || true
+          node scripts/check-contrast.js --report "$out/kontrast.json" > /dev/null || true
+      - name: Build frontend
+        id: build
+        working-directory: frontend
+        run: yarn build
+      - name: Startup bundle budget
+        if: steps.build.outcome == 'success'
+        working-directory: frontend
+        run: node scripts/check-bundle-budget.mjs --report "$RUNNER_TEMP/prueftor/bundle.json" || true
+      - name: Accessibility, contrast and motion in the browser (built dist)
+        if: steps.build.outcome == 'success'
+        working-directory: frontend
+        run: PRUEFTOR_REPORT="$RUNNER_TEMP/prueftor/browser.json" npx playwright test -c playwright.prueftor.config.js --project=chromium || true
+      - name: Load time of the home page on a phone (built dist, one worker)
+        if: steps.build.outcome == 'success'
+        working-directory: frontend
+        run: |
+          PRUEFTOR_REPORT="$RUNNER_TEMP/prueftor/ladezeit-browser.json" PRUEFTOR_LADEZEIT_OUT="$RUNNER_TEMP/prueftor/ladezeit.json" \
+            npx playwright test -c playwright.prueftor.config.js --project=ladezeit --workers=1 || true
+      - name: Summarize the gate
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: |
+          out="$RUNNER_TEMP/prueftor"
+          set +e
+          node scripts/prueftor.mjs \
+            --bundle "$out/bundle.json" --kontrast "$out/kontrast.json" --bewegung "$out/bewegung.json" \
+            --ladezeit "$out/ladezeit.json" --playwright "$out/browser.json" --playwright "$out/ladezeit-browser.json" \
+            --pr-text "$out/pr-text.md" --basis "$out/basis/ergebnis.json" --budgets-basis "$out/basis-budgets.md" \
+            --bekannt-basis "$out/basis-bekannt.json" \
+            --sha "$HEAD_SHA" --lauf "$RUN_URL" --out-json "$out/ergebnis.json" --out-md "$out/kommentar.md"
+          code=$?
+          cat "$out/kommentar.md" >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+      - name: Upload the gate result for the PR comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: prueftor-ergebnis
+          path: |
+            ${{ runner.temp }}/prueftor/ergebnis.json
+            ${{ runner.temp }}/prueftor/kommentar.md
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload the gate result of main for later comparisons
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: prueftor-main
+          path: ${{ runner.temp }}/prueftor/ergebnis.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload gate diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: prueftor-diagnose
+          path: frontend/test-results/prueftor/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Der eine Kommentar des Prüftors im PR (#1660): angelegt beim ersten Lauf, danach nur aktualisiert. Kein Checkout,
+  # kein Code aus dem PR - der Job liest nur das Ergebnis-Artefakt (Markdown, wird als Text gepostet). Bei PRs aus
+  # Forks bekommt der Token ohnehin kein Schreibrecht; dort steht das Ergebnis nur in der Zusammenfassung des Laufs.
+  prueftor-kommentar:
+    name: Prüftor-Kommentar
+    needs: prueftor
+    if: >-
+      ${{ !cancelled() && github.event_name == 'pull_request' && needs.prueftor.result != 'skipped'
+      && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: prueftor-ergebnis
+          path: prueftor
+      - name: Create or update the gate comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          test -s prueftor/kommentar.md
+          head -n1 prueftor/kommentar.md | grep -qx '<!-- prueftor:1660 -->'
+          id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- prueftor:1660 -->"))) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F body=@prueftor/kommentar.md > /dev/null
+            echo "Kommentar $id aktualisiert."
+          else
+            gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" -F body=@prueftor/kommentar.md > /dev/null
+            echo "Kommentar angelegt."
+          fi
 
   mobile:
     name: Mobile App
@@ -587,8 +780,9 @@ jobs:
   # "failure", sobald einer seiner Teile rot ist.
   ci-result:
     name: CI-Ergebnis
+    # Das Prüftor (#1660) zählt mit: rot heißt nicht mergen. Der Kommentar-Job nicht - er meldet nur.
     needs: [changes, backend-checks, backend, backend-coverage, backend-mongo, frontend, frontend-unit, frontend-coverage, frontend-e2e,
-      mobile, container-smoke]
+      prueftor, mobile, container-smoke]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
