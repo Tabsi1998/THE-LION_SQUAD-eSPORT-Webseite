@@ -136,6 +136,8 @@ a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E
 .tls-season-line__point { transform-box: fill-box; transform-origin: center; }
 .tls-season-line__point[data-champion="true"] circle { fill: var(--tls-honor); stroke: var(--tls-honor); }
 .tls-season-line__rank { font-size: 10px; font-weight: 800; fill: #fff; font-variant-numeric: tabular-nums; }
+/* Rückzug (Fabian 23.11.): grauer Punkt mit „ausgetreten“, ohne Platz. */
+.tls-season-line__exit { font-size: 10px; font-weight: 700; fill: rgb(255 255 255 / 0.55); }
 .tls-season-line__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; font-size: 12px; color: rgb(255 255 255 / 0.7); }
 /* Lange Co-Team-Namen brechen um, statt rechts an der Fläche abgeschnitten zu werden (Review #1638). */
 .tls-season-line__legend li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
