@@ -549,12 +549,12 @@ def test_the_clock_change_is_found_without_fold_inside_the_module(monkeypatch):
 
 @pytest.mark.parametrize("start, end", [("22:00", "07:00"), ("00:00", "02:30"), ("02:30", "04:00"), ("23:00", "02:15"),
                                         ("02:15", "02:45"), ("01:30", "02:00"), ("02:59", "02:00"), ("21:00", "03:00"),
-                                        ("03:00", "02:30")])
-@pytest.mark.parametrize("night", ["2026-03-28T20:00:00", "2026-10-24T20:00:00"])
+                                        ("03:00", "02:30"), ("02:30", "02:15"), ("02:45", "02:30")])
+@pytest.mark.parametrize("night", ["2026-03-28T20:00:00", "2026-10-24T20:00:00", "2027-03-27T20:00:00", "2027-10-30T20:00:00",
+                                   "2028-03-25T20:00:00", "2028-10-28T20:00:00", "2029-03-24T20:00:00", "2029-10-27T20:00:00"])
 def test_every_minute_of_the_clock_change_nights_ends_when_the_wall_clock_leaves_the_window(start, end, night):
-    """#2514, Minute für Minute: Still genau dann, wenn die Wiener Wanduhr im Fenster steht. Das Ende ist der erste Moment, in
-    dem sie es verlässt - auch wenn sie dabei springt -, oder das Ende der Lücke, in der die Endzeit liegt (02:59–02:00 im
-    März: Ende um 03:00 MESZ, ab da beginnt die nächste Ruhezeit). Alle stillen Minuten davor nennen dasselbe Ende."""
+    """#2514, Minute für Minute: Still genau dann, wenn die Wiener Wanduhr im Fenster steht. Ende = erster Moment, in dem die
+    Wanduhr das Fenster verlässt - auch wenn sie dabei springt. Alle stillen Minuten davor nennen dasselbe Ende."""
     from datetime import timedelta
 
     user = {"quiet_hours": {"enabled": True, "start": start, "end": end}}
@@ -565,10 +565,6 @@ def test_every_minute_of_the_clock_change_nights_ends_when_the_wall_clock_leaves
         minute = local.hour * 60 + local.minute
         return first <= minute < last if first < last else (minute >= first or minute < last)
 
-    def jumps(moment):  # Wanduhr springt: mehr oder weniger als eine Minute seit der Minute davor (ohne ``fold``)
-        local = moment.astimezone(quiet_hours_rules.VIENNA).replace(tzinfo=None)
-        return local - (moment - timedelta(minutes=1)).astimezone(quiet_hours_rules.VIENNA).replace(tzinfo=None) != timedelta(minutes=1)
-
     now, previous = _utc(night), None
     for _minute in range(12 * 60):
         until = quiet_hours_rules.quiet_until(user, now)
@@ -578,7 +574,7 @@ def test_every_minute_of_the_clock_change_nights_ends_when_the_wall_clock_leaves
             assert until == previous, (now, until, previous)
         if until is not None:
             assert until > now and inside(until - timedelta(minutes=1)), (now, until)
-            assert not inside(until) or jumps(until), (now, until)
+            assert not inside(until), (now, until)
         previous = until
         now += timedelta(minutes=1)
 
