@@ -1,0 +1,945 @@
+{
+  "beschreibung": "Bewegungsregeln (#1660): erlaubte Bestandsverstöße je Datei und Regel. Neue Einträge oder höhere Zahlen nur mit Begründung hier UND im PR-Text (Zeile „Prüftor-Ausnahme bewegung: …“). Senken: node scripts/check-motion-rules.mjs --tighten. Regeln und Ablauf: docs/entwicklung/prueftor.md",
+  "ausnahmen": {
+    "src/App.css": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/advent/AdventCalendarDialog.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/advent/DoorDialog.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/advent/advent-calendar.css": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 9,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 12,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/achievements/badge.css": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 9,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/achievements/ceremony/Ceremony.jsx": {
+      "token-duration": {
+        "anzahl": 7,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/achievements/ceremony/ceremony.css": {
+      "token-duration": {
+        "anzahl": 8,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/achievements/ceremony/motions.jsx": {
+      "token-duration": {
+        "anzahl": 19,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 8,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/AccountLevel.jsx": {
+      "layout-property": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/AchievementGroups.jsx": {
+      "layout-property": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 5,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/AdminLayout.jsx": {
+      "layout-property": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      }
+    },
+    "src/components/tls/CookieConsent.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      }
+    },
+    "src/components/tls/DiscordNow.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/HomeLeaguePromo.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/ImageUpload.jsx": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/LiveStreamSlider.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/NotificationBell.jsx": {
+      "token-duration": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/PageTransition.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/SeasonPassWidget.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/SponsorTicker.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/StatusBadge.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/StreamEmbed.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tls/TournamentFlowStepper.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/UploadProgressPanel.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/fastlap/FastLapQueuePanel.jsx": {
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/league/public/overall.css": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/motion/CountUp.jsx": {
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/references/references.css": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/rewards/rewards.css": {
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/series/racingLeague.css": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/series/referenceSeries.css": {
+      "token-duration": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/series/teamLeague.css": {
+      "token-duration": {
+        "anzahl": 5,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/tls/tournament/RegistrationSheet.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/tls/tournament/TournamentLiveStreams.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/tv/tv.css": {
+      "layout-property": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): TV-Anzeige mit eigenem Bewegungsschalter (TvScreen); animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 29,
+        "grund": "Bestand vor dem Prüftor (#1660): TV-Anzeige mit eigenem Bewegungsschalter (TvScreen); Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 32,
+        "grund": "Bestand vor dem Prüftor (#1660): TV-Anzeige mit eigenem Bewegungsschalter (TvScreen); feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 5,
+        "grund": "Bestand vor dem Prüftor (#1660): TV-Anzeige mit eigenem Bewegungsschalter (TvScreen); feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/ui/accordion.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/ui/alert-dialog.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/ui/context-menu.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/dialog.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/ui/dropdown-menu.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/hover-card.jsx": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/input-otp.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/ui/menubar.jsx": {
+      "reduced-motion": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/navigation-menu.jsx": {
+      "reduced-motion": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/components/ui/popover.jsx": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/progress.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      }
+    },
+    "src/components/ui/select.jsx": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/sheet.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/components/ui/skeleton.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/tabs.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      }
+    },
+    "src/components/ui/toast.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/components/ui/tooltip.jsx": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): shadcn/ui-Baustein, unverändert übernommen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/hilfe/FaqClip.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/index.css": {
+      "layout-property": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 10,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 78,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 54,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/lib/countUp.js": {
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/lib/motion.js": {
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/admin/AdminGameServersPage.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/admin/AdminMobilePushPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/admin/AdminNewsEditPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/AdminOpsPage.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/admin/AdminPrizesPage.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      }
+    },
+    "src/pages/admin/AdminShopDesignsPage.jsx": {
+      "token-duration": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/AdminShopGamertagPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/AdminShopPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/AdminShopProductsPage.jsx": {
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/AdminShopTestDraftPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/ShopLayoutStep.jsx": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 10,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/admin/ShopTabs.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/admin/league/AdminLeagueOverallPage.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/admin/league/SeasonBroadcastSheet.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/admin/league/SeasonRewardsTab.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/admin/settings/TwitchTab.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/admin/tournament/StaffelParts.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Verwaltung; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/display/F1TVPage.jsx": {
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/public/AboutPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/AchievementSharePage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/AchievementsShowcasePage.jsx": {
+      "layout-property": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/public/EventsPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/FaqPage.jsx": {
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/HomePage.jsx": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/MembersDirectoryPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/RegisterPage.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/ResultSharePage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/TeamsPage.jsx": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/TournamentsPage.jsx": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/public/team/TeamInviteSheet.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/user/ProfilePage.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/user/profile/NotificationsTab.jsx": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      }
+    },
+    "src/pages/user/profile/SwitchRow.jsx": {
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      }
+    },
+    "src/pages/user/profile/notifications.css": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 14,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 12,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/pages/user/profile/season-finds.css": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 10,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 10,
+        "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/advent/advent.css": {
+      "reduced-motion": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 5,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 7,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/adventCalendar/advent-calendar-widget.css": {
+      "token-duration": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/birthday/birthday.css": {
+      "reduced-motion": {
+        "anzahl": 5,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 7,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/carnival/carnival.css": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 5,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/christmas/christmas.css": {
+      "reduced-motion": {
+        "anzahl": 6,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 7,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 12,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/easter/easter.css": {
+      "token-duration": {
+        "anzahl": 9,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 10,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/easterHunt/easter-hunt.css": {
+      "reduced-motion": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 12,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 12,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/halloween/halloween.css": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "reduced-motion": {
+        "anzahl": 40,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 59,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 61,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/mascot/mascot.css": {
+      "token-duration": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/newYear/newyear.css": {
+      "reduced-motion": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 8,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 8,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/nikolaus/nikolaus.css": {
+      "reduced-motion": {
+        "anzahl": 4,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 9,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 9,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/seasons.css": {
+      "layout-property": {
+        "anzahl": 1,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; animiert eine Layout-Eigenschaft (Breite, Höhe, Lage oder transition-all). Umbau auf transform/opacity steht aus, das Verhalten bleibt bis dahin gleich."
+      },
+      "token-duration": {
+        "anzahl": 3,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 2,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    },
+    "src/seasons/snow/snow.css": {
+      "reduced-motion": {
+        "anzahl": 7,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
+      },
+      "token-duration": {
+        "anzahl": 16,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
+      },
+      "token-easing": {
+        "anzahl": 16,
+        "grund": "Bestand vor dem Prüftor (#1660): Saison-Deko mit eigenen, langen Endlos-Läufen; feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
+      }
+    }
+  }
+}
