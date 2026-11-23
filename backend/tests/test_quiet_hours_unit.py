@@ -508,6 +508,77 @@ def test_the_second_pass_does_not_depend_on_fold_surviving_the_conversion():
     assert until > now
 
 
+def test_an_end_in_the_spring_gap_ends_with_the_gap():
+    """#2514: 29.03.2026 springt die Uhr um 02:00 MEZ auf 03:00 MESZ. Fenster 00:00–02:30: 02:30 gibt es nicht - die Ruhezeit
+    endet mit der Lücke um 03:00 MESZ (01:00 UTC), nicht erst um 03:30 MESZ."""
+    user = {"quiet_hours": {"enabled": True, "start": "00:00", "end": "02:30"}}
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-03-28T23:00:00")) == _utc("2026-03-29T01:00:00")  # 00:00 MEZ
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-03-29T00:59:00")) == _utc("2026-03-29T01:00:00")  # 01:59 MEZ
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-03-29T01:00:00")) is None                         # 03:00 MESZ
+    # Dasselbe in der Märznacht 2027 (28.03.).
+    assert quiet_hours_rules.quiet_until(user, _utc("2027-03-27T23:30:00")) == _utc("2027-03-28T01:00:00")
+
+
+def test_a_start_at_half_past_two_in_the_fall_back_night_begins_in_the_first_pass():
+    """#2514: 25.10.2026 läuft 02:00–02:59 zweimal. Fenster 02:30–04:00: Die Ruhezeit beginnt im ersten Durchlauf um 02:30 MESZ.
+    Springt die Uhr um 03:00 MESZ auf 02:00 MEZ zurück, liegt sie vor dem Beginn - die Ruhezeit läuft nicht durch die zweiten
+    02:00–02:29 bis 04:00 MEZ weiter, sondern endet mit dem Sprung (01:00 UTC)."""
+    user = {"quiet_hours": {"enabled": True, "start": "02:30", "end": "04:00"}}
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-10-25T00:29:00")) is None                         # 02:29 MESZ
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-10-25T00:30:00")) == _utc("2026-10-25T01:00:00")  # 02:30 MESZ
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-10-25T00:59:00")) == _utc("2026-10-25T01:00:00")  # 02:59 MESZ
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-10-25T01:15:00")) is None                         # 02:15 MEZ
+    # Ab 02:30 MEZ zeigt die Wanduhr wieder das Fenster - bis zur eingestellten Endzeit 04:00 MEZ (03:00 UTC).
+    assert quiet_hours_rules.quiet_until(user, _utc("2026-10-25T01:30:00")) == _utc("2026-10-25T03:00:00")
+    # Ohne ``fold`` (Zeitreise-Probe) gilt dasselbe.
+    assert quiet_hours_rules.quiet_until(user, _ForgetfulClock(2026, 10, 25, 0, 45, tzinfo=timezone.utc)) == _utc("2026-10-25T01:00:00")
+    # Dasselbe in der Oktobernacht 2027 (31.10.).
+    assert quiet_hours_rules.quiet_until(user, _utc("2027-10-31T00:30:00")) == _utc("2027-10-31T01:00:00")
+
+
+def test_the_clock_change_is_found_without_fold_inside_the_module(monkeypatch):
+    """#2514: freezegun ersetzt auch das ``datetime`` im Modul. Die Suche nach der Umstellung darf dann nicht an
+    ``utcoffset()`` hängen - in der doppelten Stunde gäbe es ohne ``fold`` die Sommerzeit, und die Umstellung käme eine
+    Stunde zu spät (02:30–04:00 liefe wieder bis 04:00 MEZ)."""
+    monkeypatch.setattr(quiet_hours_rules, "datetime", _ForgetfulClock)
+    fall = {"quiet_hours": {"enabled": True, "start": "02:30", "end": "04:00"}}
+    assert quiet_hours_rules.quiet_until(fall, _utc("2026-10-25T00:30:00")) == _utc("2026-10-25T01:00:00")
+    spring = {"quiet_hours": {"enabled": True, "start": "00:00", "end": "02:30"}}
+    assert quiet_hours_rules.quiet_until(spring, _utc("2026-03-28T23:00:00")) == _utc("2026-03-29T01:00:00")
+
+
+@pytest.mark.parametrize("start, end", [("22:00", "07:00"), ("00:00", "02:30"), ("02:30", "04:00"), ("23:00", "02:15"),
+                                        ("02:15", "02:45"), ("01:30", "02:00"), ("02:59", "02:00"), ("21:00", "03:00"),
+                                        ("03:00", "02:30"), ("02:30", "02:15"), ("02:45", "02:30")])
+@pytest.mark.parametrize("night", ["2026-03-28T20:00:00", "2026-10-24T20:00:00", "2027-03-27T20:00:00", "2027-10-30T20:00:00",
+                                   "2028-03-25T20:00:00", "2028-10-28T20:00:00", "2029-03-24T20:00:00", "2029-10-27T20:00:00"])
+def test_every_minute_of_the_clock_change_nights_ends_when_the_wall_clock_leaves_the_window(start, end, night):
+    """#2514, Minute für Minute: Still genau dann, wenn die Wiener Wanduhr im Fenster steht. Ende = erster Moment, in dem die
+    Wanduhr das Fenster verlässt - auch wenn sie dabei springt. Alle stillen Minuten davor nennen dasselbe Ende."""
+    from datetime import timedelta
+
+    user = {"quiet_hours": {"enabled": True, "start": start, "end": end}}
+    first, last = quiet_hours_rules.parse_time(start), quiet_hours_rules.parse_time(end)
+
+    def inside(moment):
+        local = moment.astimezone(quiet_hours_rules.VIENNA)
+        minute = local.hour * 60 + local.minute
+        return first <= minute < last if first < last else (minute >= first or minute < last)
+
+    now, previous = _utc(night), None
+    for _minute in range(12 * 60):
+        until = quiet_hours_rules.quiet_until(user, now)
+        assert (until is not None) == inside(now), now
+        # Bis zum genannten Ende bleibt es still - mit demselben Ende.
+        if previous is not None and now < previous:
+            assert until == previous, (now, until, previous)
+        if until is not None:
+            assert until > now and inside(until - timedelta(minutes=1)), (now, until)
+            assert not inside(until), (now, until)
+        previous = until
+        now += timedelta(minutes=1)
+
+
 def test_display_and_effect_use_the_same_fallback():
     """Nur ``enabled`` gespeichert (alter Teil-PATCH): Anzeige 22–7, und genau dann wird auch zurückgehalten."""
     user = {"quiet_hours": {"enabled": True}}
