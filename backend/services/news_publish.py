@@ -23,6 +23,7 @@ INTERNAL_NEWS_FIELDS = frozenset({
     "newsletter_sent_at", "newsletter_sent_count", "newsletter_sent_by", "newsletter_skipped_reason", "newsletter_checked_at",
     "news_mention_notified_user_ids", "news_mentions_processed_at",
     "discord_checked_at", "discord_outcome", "members_notified_at", "members_notified_count",
+    "app_push_notified_at", "app_push_count", "app_push_skipped_reason",
 })
 
 

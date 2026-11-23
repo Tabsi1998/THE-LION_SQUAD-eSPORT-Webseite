@@ -236,6 +236,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "crown_onyx": "achievements",
     "level": "achievements",
     "news_mention": "news_events",
+    # Öffentliche News „nur App“ (#1532): Push an alle App-Nutzer mit Zustimmung für „News & Events“.
+    "news_app": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",
     "news_board": "club_internal",

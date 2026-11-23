@@ -807,6 +807,11 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
         update["author_name"] = _actor_name(author)
     fields = _changed_fields(existing, update)
     stamp = now_utc().isoformat()
+    # App-Push nur beim Veröffentlichen (#1532): Wird ein schon öffentlicher Beitrag erst danach auf „nur App“ gestellt,
+    # geht kein Push hinaus.
+    if ("channels" in update and update["channels"] != news_channels.clean_channels(news_channels.post_channels(existing))
+            and existing.get("published") and _published_now(existing) and not existing.get("app_push_notified_at")):
+        update.update({"app_push_notified_at": stamp, "app_push_count": 0, "app_push_skipped_reason": "channel_changed"})
     update["updated_at"] = stamp
     update["updated_by"] = me["id"]
     update["updated_by_name"] = _actor_name(me)

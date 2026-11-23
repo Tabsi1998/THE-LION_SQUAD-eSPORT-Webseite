@@ -533,10 +533,15 @@ async def _safe_billing_sync():
 
 async def _safe_member_announcements():
     try:
-        from services.member_announcements import notify_due
+        from services.member_announcements import notify_app_news, notify_due
         res = await notify_due()
         if res.get("items"):
             logger.info(f"[scheduler] member_announcements {res}")
+        # Öffentliche News „nur App“ (#1532): App-Push an alle mit Zustimmung - einmal je Beitrag.
+        from database import get_db
+        app_news = await notify_app_news(get_db())
+        if app_news.get("items"):
+            logger.info(f"[scheduler] member_announcements app_news {app_news}")
     except Exception as exc:
         _log_task_failure("member_announcements", exc)
 
