@@ -100,7 +100,22 @@ export function bottomCover(doc, win) {
   return 0;
 }
 
-function pageHeight(doc) {
+/**
+ * Wo die Seite endet (Seitenkoordinaten): das Ende des Inhalts ohne die Ebene der Eier und ohne klebende Leisten. Ein
+ * Ei, das beim Laden weiter unten lag (die Seite war kurz länger, die Schrift noch nicht da), hielte scrollHeight
+ * sonst hoch - dann gälte die Ecke unter der Leiste unten als sichtbar (#1314). Ohne Layout (Tests ohne Rechtecke)
+ * wie bisher scrollHeight.
+ */
+function pageHeight(doc, win) {
+  const scrollY = (win && win.scrollY) || 0;
+  let bottom = 0;
+  for (const child of Array.from((doc.body && doc.body.children) || [])) {
+    if (child.matches(EGG_LAYER) || typeof child.getBoundingClientRect !== "function") continue;
+    if (win && typeof win.getComputedStyle === "function" && win.getComputedStyle(child).position === "fixed") continue;
+    const rect = child.getBoundingClientRect();
+    if (rect && rect.height > 0) bottom = Math.max(bottom, rect.bottom + scrollY);
+  }
+  if (bottom > 0) return bottom;
   const root = doc.documentElement;
   return Math.max(root ? root.scrollHeight : 0, doc.body ? doc.body.scrollHeight : 0);
 }
@@ -204,7 +219,7 @@ function contextFor({ doc, win, probe, taken }) {
     taken,
     scroll: { x: (win && win.scrollX) || 0, y: (win && win.scrollY) || 0 },
     cover: bottomCover(doc, win),
-    height: pageHeight(doc),
+    height: pageHeight(doc, win),
     blockers(element) {
       if (!cache.has(element)) cache.set(element, blockersOf(element, doc));
       return cache.get(element);
