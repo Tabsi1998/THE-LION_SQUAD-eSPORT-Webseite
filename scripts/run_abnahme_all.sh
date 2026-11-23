@@ -18,6 +18,7 @@
 #   ABNAHME_RESULTS   Ergebnisse je Spec, runs.tsv und summary.md (Vorgabe .local-testing/abnahme/nacht-<Projekt>)
 #   ABNAHME_SHOTS     Bilder der Specs, je Spec ein Unterordner (optional)
 #   ABNAHME_SPECS     nur diese Specs, durch Leerzeichen getrennt (z. B. "tv-abnahme matchplan-abnahme")
+#   COMPOSE_BAKE      Vorgabe false: ohne Bake bauen (lokal brach `up` sonst mit „failed to execute bake“ ab, #2529)
 #   PYTHON            Python 3.11 für Seed und Bericht (Vorgabe python3)
 #   ABNAHME_PYTHON    Python mit Pillow für die Testbilder von serien-ergebnis-bild-abnahme (Vorgabe python)
 set -euo pipefail
@@ -36,6 +37,8 @@ fi
 export FRONTEND_PORT="${FRONTEND_PORT:-24500}"
 export BACKEND_PORT="${BACKEND_PORT:-29501}"
 WEB_URL="http://127.0.0.1:${FRONTEND_PORT}"
+# Ohne Bake bauen (#2529): Docker Compose baut sonst über „bake“, und das brach am eigenen Rechner mit „failed to execute bake“ ab.
+export COMPOSE_BAKE="${COMPOSE_BAKE:-false}"
 export FRONTEND_URL="$WEB_URL" PUBLIC_BACKEND_URL="$WEB_URL" CORS_ORIGINS="$WEB_URL"
 STATE="${ABNAHME_STATE:-$ROOT/.local-testing/abnahme/state-${ABNAHME_PROJECT}.json}"
 STATE_FASTLAP="${STATE%.json}-fastlap.json"
@@ -76,9 +79,26 @@ cmd_down() {
   compose down --volumes --remove-orphans
 }
 
+# Specs, die das Schaufenster der Season-Seite nennen (#2268), bekommen den Liga-Seed mit --schaufenster (#2529).
+SCHAUFENSTER="seed_abnahme_liga.py --schaufenster"
+
 # Alle Abnahme-Specs, alphabetisch - neue kommen von selbst dazu. Die README-Bilder sind keine Abnahme (eigener
-# Workflow), sie bleiben draußen.
+# Workflow), sie bleiben draußen. Die Specs mit Schaufenster laufen zuletzt: Ihr Seed gibt den Modi des Spiels Symbol und
+# Ergebnisregel, und das bleibt - modus-symbol-abnahme erwartet bei den Seed-Modi noch den Platzhalter (#2529).
 list_specs() {
+  all_specs | schaufenster_last
+}
+
+schaufenster_last() {
+  local spec rest=() last=()
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    if grep -qF -- "$SCHAUFENSTER" "$spec"; then last+=("$spec"); else rest+=("$spec"); fi
+  done
+  printf '%s\n' ${rest[@]+"${rest[@]}"} ${last[@]+"${last[@]}"}
+}
+
+all_specs() {
   if [ -n "${ABNAHME_SPECS:-}" ]; then
     for name in $ABNAHME_SPECS; do
       name="${name%.spec.js}"
@@ -94,7 +114,7 @@ list_specs() {
 }
 
 cmd_run() {
-  local specs spec name out seed state seed_rc spec_rc started seeded finished last_minute=""
+  local specs spec name out seed seed_args state seed_rc spec_rc started seeded finished last_minute=""
   specs="$(list_specs)"
   mkdir -p "$RESULTS"
   : > "$RESULTS/runs.tsv"
@@ -105,12 +125,14 @@ cmd_run() {
     mkdir -p "$out"
     # Fast Lap und Liga haben ihren eigenen Seed und eigene Konten - und deshalb je eine eigene Stand-Datei (die
     # gespeicherten Sitzungen hängen am Namen der Stand-Datei).
+    seed_args=()
     if grep -q 'seed_abnahme_fastlap.py' "$spec"; then
       seed="seed_abnahme_fastlap.py"
       state="$STATE_FASTLAP"
     elif grep -q 'seed_abnahme_liga.py' "$spec"; then
       seed="seed_abnahme_liga.py"
       state="$STATE_LIGA"
+      if grep -qF -- "$SCHAUFENSTER" "$spec"; then seed_args=(--schaufenster); fi
     else
       seed="seed_abnahme.py"
       state="$STATE"
@@ -121,11 +143,11 @@ cmd_run() {
     # ENDE des vorigen Seeds: sein Zeitstempel kann auch in der Minute nach dem Start entstehen (erster Nachtlauf
     # 19.10.: Start um :58, Stempel in der nächsten Minute, der folgende Seed bekam dessen Turnier).
     while [ "$(date -u +%Y%m%d%H%M)" = "$last_minute" ]; do sleep 2; done
-    group "$name (Seed: $seed)"
+    group "$name (Seed: $seed${seed_args[*]:+ ${seed_args[*]}})"
     started=$(date +%s)
     set +e
     # Die Zeile mit dem Stand (Zugänge) bleibt in der Stand-Datei und erscheint weder im Log noch im Artefakt.
-    ABNAHME_STATE="$state" "$PYTHON" "$ROOT/scripts/$seed" 2>&1 | grep -v '^ABNAHME-STATE ' > "$out/seed.log"
+    ABNAHME_STATE="$state" "$PYTHON" "$ROOT/scripts/$seed" ${seed_args[@]+"${seed_args[@]}"} 2>&1 | grep -v '^ABNAHME-STATE ' > "$out/seed.log"
     seed_rc=${PIPESTATUS[0]}
     last_minute="$(date -u +%Y%m%d%H%M)"
     set -e
