@@ -1,0 +1,305 @@
+{
+  "beschreibung": "Prüftor (#1660): bekannte Funde bei Barrierefreiheit (a11y, tastatur) und Kontrast aus der Zeit vor dem Tor, je Seite und Element mit Begründung. Neue Einträge nur mit Begründung im PR-Text (Prüftor-Ausnahme a11y bzw. kontrast). Behobene Funde hier streichen. Ablauf: docs/entwicklung/prueftor.md",
+  "funde": [
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: .md\\:flex-row > span",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: .md\\:justify-end > button[type=\"button\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: .py-5.md\\:flex-row.lg\\:px-8 > span",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: .whitespace-nowrap",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[aria-label=\"Events\"] > .text-\\[9px\\].leading-none.tracking-wider",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[aria-label=\"Profil\"] > .text-\\[9px\\].leading-none.tracking-wider",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[aria-label=\"Start\"] > .text-\\[9px\\].leading-none.tracking-wider",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"bottom-nav-community\"] > .text-\\[9px\\].leading-none.tracking-wider",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"bottom-nav-verein\"] > .text-\\[9px\\].leading-none.tracking-wider",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"footer-imprint\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"footer-privacy\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"footer-whatsnew\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "*",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[href$=\"terms\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: .md\\:justify-end > .hover\\:text-\\[\\#29B6E8\\].transition[type=\"button\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-about\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-account\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-appearance\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-notifications\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-privacy\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-security\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: label[for=\"profile-ceremony-volume\"] > .tracking-widest.text-white\\/45.text-\\[11px\\]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
+      "ziel": "color-contrast: span[data-testid=\"profile-ceremony-volume-value\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Dashboard",
+      "art": "kontrast",
+      "ziel": "color-contrast: .p-3",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: .text-right",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-about\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-account\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-appearance\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-notifications\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-privacy\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: div[data-testid=\"settings-group-security\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: label:nth-child(1) > .text-white\\/45.mt-1\\.5",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: p[data-testid=\"profile-avatar-hint\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Einstellungen",
+      "art": "kontrast",
+      "ziel": "color-contrast: p[data-testid=\"profile-banner-hint\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Events",
+      "art": "a11y",
+      "ziel": "select-name: select",
+      "grund": "Bestand vor dem Prüftor (#1660): axe meldet „select-name“. Behebung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Events",
+      "art": "kontrast",
+      "ziel": "color-contrast: .text-white\\/40 > span",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "FAQ",
+      "art": "kontrast",
+      "ziel": "color-contrast: .md\\:justify-end > .transition[type=\"button\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Match",
+      "art": "kontrast",
+      "ziel": "color-contrast: .max-h-\\[28rem\\] > .text-white\\/40.text-sm",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Match",
+      "art": "kontrast",
+      "ziel": "color-contrast: .mt-5.space-y-3 > .text-white\\/40.text-sm",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Match",
+      "art": "kontrast",
+      "ziel": "color-contrast: span[data-testid=\"match-key\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Mitglied werden",
+      "art": "a11y",
+      "ziel": "link-in-text-block: .hover\\:underline.text-\\[\\#29B6E8\\][href$=\"#beitrag\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): axe meldet „link-in-text-block“. Behebung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Mitglied werden",
+      "art": "a11y",
+      "ziel": "link-in-text-block: a[href$=\"board#statuten\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): axe meldet „link-in-text-block“. Behebung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Mitglied werden",
+      "art": "kontrast",
+      "ziel": "color-contrast: .tls-steps__item[data-state=\"open\"]:nth-child(2) > .tls-steps__label > .tls-steps__name",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Mitglied werden",
+      "art": "kontrast",
+      "ziel": "color-contrast: .tls-steps__item[data-state=\"open\"]:nth-child(3) > .tls-steps__label > .tls-steps__name",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Mitglied werden",
+      "art": "kontrast",
+      "ziel": "color-contrast: .tls-steps__item[data-state=\"open\"]:nth-child(4) > .tls-steps__label > .tls-steps__name",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "News",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"news-card-rueckblick\"] > .p-5.flex-1.flex-col > .pt-3.gap-3.justify-between > .text-white\\/35.text-\\[10px\\].tracking-widest",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "News",
+      "art": "kontrast",
+      "ziel": "color-contrast: a[data-testid=\"news-card-winter-cup\"] > .p-5.flex-1.flex-col > .pt-3.gap-3.justify-between > .text-white\\/35.text-\\[10px\\].tracking-widest",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Startseite",
+      "art": "kontrast",
+      "ziel": "color-contrast: .text-\\[10px\\].tracking-widest.text-white\\/40",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Startseite",
+      "art": "kontrast",
+      "ziel": "color-contrast: .text-white\\/40.mt-2.text-\\[11px\\]",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Turnier",
+      "art": "kontrast",
+      "ziel": "color-contrast: .block:nth-child(2)",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Turnier",
+      "art": "kontrast",
+      "ziel": "color-contrast: .flex-wrap.justify-between.gap-3 > .text-white\\/40.text-xs",
+      "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    }
+  ]
+}
