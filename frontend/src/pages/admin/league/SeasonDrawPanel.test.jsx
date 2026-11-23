@@ -137,6 +137,17 @@ test("steht das eigene Team im Los, gibt es keine Knöpfe - der Superadmin schic
     { fingerprint: "fp1", confirm: true, conflict_reason: "Niemand sonst erreichbar" }));
 });
 
+test("nach einem abgebrochenen Zuteilen: wer schon steht, tauscht nicht mehr, der Knopf zählt nur die übrigen", async () => {
+  const partial = { ...DRAW, staffeln: [{ ...DRAW.staffeln[0], teams: [{ ...DRAW.staffeln[0].teams[0], done: true }, DRAW.staffeln[0].teams[1]] }, DRAW.staffeln[1]] };
+  apiMock.get.mockResolvedValue({ data: body({ ...DIVISION, draw: partial }) });
+  render(<SeasonDrawPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("draw-open-1"));
+  expect(await screen.findByTestId("draw-team-s1")).toHaveTextContent("schon zugeteilt");
+  expect(screen.queryByTestId("draw-swap-open-s1")).toBeNull();
+  expect(screen.getByTestId("draw-swap-open-s2")).toBeInTheDocument();
+  expect(screen.getByTestId("draw-apply")).toHaveTextContent("3 Co-Teams zuteilen");
+});
+
 test("ein übernommenes Los lässt sich nachlesen, aber nicht mehr ändern", async () => {
   const applied = { ...DRAW, status: "applied", applied_at: AT, log: [...DRAW.log, { action: "apply", at: AT, by_name: "Probe Leitung" }],
     swaps: [{ a: "s1", b: "s4", a_name: "Probe Rot · Eins", b_name: "Probe Gelb · Eins", reason: "Terminwunsch", at: AT, by_name: "Probe Leitung" }] };

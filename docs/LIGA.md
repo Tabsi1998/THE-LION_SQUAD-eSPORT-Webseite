@@ -1337,7 +1337,8 @@ Season-Sperre - dieselbe Reihenfolge wie das Zuteilen. Erst werden alle Co-Teams
 über `league_applications._place` die Anmeldung und die Zuteilung, mit `assignment.draw_id` (Übernommene tragen weiter `carried`).
 Danach wie nach jedem Zuteilen: Vorschau der Staffel, Spiel-IDs der Season, Protokoll `league.application.assign` (`data.draw_id`),
 Nachricht an Captain und Vertreter. **Abbruch dazwischen:** Der Entwurf bleibt gültig - was er schon zuteilte, zählt beim Prüfen der
-Eingabe wieder als wartend -, der nächste Versuch setzt nur die übrigen, niemand bekommt eine zweite Nachricht. Nach dem Übernehmen
+Eingabe wieder als wartend -, der nächste Versuch setzt nur die übrigen, niemand bekommt eine zweite Nachricht. Wer schon steht, tauscht
+nicht mehr (409), und ein neues Los rechnet vom wirklichen Stand: Die schon Zugeteilten bleiben, verteilt werden die übrigen. Nach dem Übernehmen
 bleibt das Los zum Nachlesen stehen; ändern geht dann nur über die Teilnehmerliste der Staffel. Ein späteres Los derselben Liga N
 (etwa für Nachzügler vor dem Start) zählt weiter (`number`).
 

@@ -716,7 +716,8 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
-    return {**doc, "warnings": warnings}
+    # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
+    return {**{key: value for key, value in doc.items() if key != "draw"}, "warnings": warnings}
 
 
 @admin_router.get("/divisions/{division_id}/delete-plan")

@@ -145,6 +145,19 @@ async def test_the_draw_fills_up_around_seated_teams(flow):
     assert w["teams"][0]["squad"]["id"] not in placement(draw)  # wer schon zugeteilt ist, wird nicht gelost
 
 
+@pytest.mark.asyncio
+async def test_the_draw_stays_out_of_the_season_page_and_the_division_answer(flow):
+    """Das Los trägt Teamnamen und wer was getan hat: Es steht nur unter ``…/draws`` (Zuständigkeit „Anmeldungen“)."""
+    w = await world(flow)
+    await drawn(flow, w)
+    page = ok(await flow.get(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}"))
+    assert all("draw" not in row for row in page["divisions"])
+    saved = ok(await flow.patch(f"{ADMIN_LEAGUES}/divisions/{w['division']['id']}", json={"nickname": "Elite"}))
+    assert "draw" not in saved and saved["nickname"] == "Elite"
+    # Gegenprobe: Gespeichert ist es weiter, das Bearbeiten der Liga N nimmt es nicht weg.
+    assert (await division_view(flow, w))["draw"]["status"] == "draft"
+
+
 # ---------------------------------------------------------------- Wiederholen und Tausch
 
 @pytest.mark.asyncio
@@ -175,6 +188,29 @@ async def test_a_changed_input_makes_the_draw_stale_and_a_new_one_needs_no_reaso
     fresh = ok(await flow.post(draws_url(w, w["division"]), json={}))
     assert fresh["replay"] is False and fresh["draw"]["number"] == 2 and fresh["draw"]["stale"] is False
     assert late["squad"]["id"] in placement(fresh["draw"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["rejected", "assigned_by_hand", "staffel_smaller"])
+async def test_a_draw_on_changed_ground_is_not_applied(flow, change):
+    """Fällt ein Co-Team weg, steht eines schon von Hand in einer Staffel oder ändert sich eine Staffel, gilt das Los nicht mehr -
+    auch wenn jedes übrige Co-Team für sich noch zuteilbar wäre."""
+    w = await world(flow, teams=5)
+    draw = await drawn(flow, w)
+    first = w["applications"][0]
+    if change == "rejected":
+        ok(await decide(flow, w, first, "reject", reason="Team hat abgesagt"))
+    elif change == "assigned_by_hand":
+        ok(await decide(flow, w, first, "assign", tournament_id=w["tids"][0]))
+    else:
+        await flow.db.tournaments.update_one({"id": w["tids"][1]}, {"$set": {"max_participants": 4}})
+    before = await flow.db.tournament_registrations.count_documents({"tournament_id": {"$in": w["tids"]}})
+    assert (await division_view(flow, w))["draw"]["stale"] is True
+    refused = await flow.post(draws_url(w, w["division"], "apply"), json={"fingerprint": draw["fingerprint"], "confirm": True})
+    assert refused.status_code == 409 and "neu auslosen" in refused.json()["detail"]
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": {"$in": w["tids"]}}) == before
+    swap = await flow.post(draws_url(w, w["division"], "swap"), json={"squad_id": "x", "other_squad_id": "y", "reason": REASON})
+    assert swap.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -285,6 +321,45 @@ async def test_applying_resumes_after_an_abort(flow, monkeypatch):
     assert await flow.db.tournament_registrations.count_documents({"tournament_id": {"$in": w["tids"]}}) == 5
     for side in w["teams"]:
         assert await flow.db.notifications.count_documents({"user_id": side["captain"]["id"], "meta.reason": "league_application_assigned"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_after_an_abort_seated_teams_stay_where_they_are(flow, monkeypatch):
+    """Nach einem abgebrochenen Übernehmen steht ein Teil schon in seiner Staffel: Diese Co-Teams tauschen nicht mehr, und ein neues Los
+    verteilt nur die übrigen um sie herum."""
+    w = await world(flow, teams=6)
+    draw = await drawn(flow, w)
+    real = applications._place
+    calls = {"count": 0}
+
+    async def broken(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 3:
+            raise RuntimeError("Abbruch mitten im Übernehmen")
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(applications, "_place", broken)
+    league, season = await leagues.get_league(flow.db, w["league"]["id"]), await leagues.get_season(flow.db, w["season"]["id"])
+    with pytest.raises(RuntimeError):
+        await league_draw.apply(flow.db, league, season, w["division"]["id"], {"fingerprint": draw["fingerprint"], "confirm": True}, w["lead"],
+                                refresh_previews=no_preview)
+    monkeypatch.setattr(applications, "_place", real)
+    seated = await assignments(flow, w)
+    assert len(seated) == 2
+    view = (await division_view(flow, w))["draw"]
+    teams = {team["squad_id"]: (staffel["tournament_id"], team["done"]) for staffel in view["staffeln"] for team in staffel["teams"]}
+    assert {squad for squad, (_tid, done) in teams.items() if done} == set(seated)
+    fixed = next(iter(seated))
+    partner = next(squad for squad, (tid, done) in teams.items() if not done and tid != teams[fixed][0])
+    refused = await flow.post(draws_url(w, w["division"], "swap"), json={"squad_id": fixed, "other_squad_id": partner, "reason": REASON})
+    assert refused.status_code == 409 and "schon zugeteilt" in refused.json()["detail"]
+    again = ok(await flow.post(draws_url(w, w["division"], "redraw"), json={"reason": "Nach dem Abbruch neu verteilen"}))["draw"]
+    assert again["stale"] is False and set(placement(again)) == {side["squad"]["id"] for side in w["teams"]} - set(seated)
+    assert sorted(staffel["size"] for staffel in again["staffeln"]) == [3, 3]
+    ok(await flow.post(draws_url(w, w["division"], "apply"), json={"fingerprint": again["fingerprint"], "confirm": True}))
+    final = await assignments(flow, w)
+    assert len(final) == 6 and all(final[squad] == seated[squad] for squad in seated)
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": {"$in": w["tids"]}}) == 6
 
 
 @pytest.mark.asyncio

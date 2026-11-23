@@ -60,6 +60,7 @@ OWN_TEAM_SUPERADMIN = ("Im Los steht dein eigenes Team. Als Superadmin geht es n
 NOT_READY = "Übernehmen geht noch nicht: {problems}"
 OTHER_STAFFEL = "hat schon eine angefangene Zuteilung in einer anderen Staffel – bitte im Eingang einzeln zuteilen"
 SIBLINGS_NAMED = " Betroffen: {names}."
+SWAP_SEATED = "{name} ist schon zugeteilt und tauscht nicht mehr. Die übrigen Co-Teams lassen sich weiter tauschen."
 
 
 def _reason(raw) -> str:
@@ -335,7 +336,8 @@ async def redraw(db, league: dict, season: dict, division_id: str, body: dict, a
         if not stale and len(reason) < REASON_MIN:
             raise LeagueProblem(REASON_NEEDED, 422)
         seed = secrets.token_hex(8)
-        draft = await _run(db, ctx, division, _state(ctx, division) if stale else state, seed)
+        # Immer vom wirklichen Stand: Was ein abgebrochenes Übernehmen schon zuteilte, steht fest und wird nicht noch einmal gelost.
+        draft = await _run(db, ctx, division, _state(ctx, division), seed)
         number = int(old.get("number") or 0) + 1
         draft.update({"id": new_id(), "number": number, "created_by": actor.get("id"), "created_at": _now(),
                       "log": [*(old.get("log") or []), _step("redraw", actor, number=number, reason=reason or None, stale=True if stale else None,
@@ -356,6 +358,9 @@ async def swap(db, league: dict, season: dict, division_id: str, body: dict, act
         if len(reason) < REASON_MIN:
             raise LeagueProblem(REASON_NEEDED, 422)
         left, right = str(body.get("squad_id") or ""), str(body.get("other_squad_id") or "")
+        seated = next((row for row in state["waiting"] if row["id"] in state["done"] and row["squad_id"] in (left, right)), None)
+        if seated:
+            raise LeagueProblem(SWAP_SEATED.format(name=seated.get("display_name") or "Das Co-Team"), 409)
         entries = [{"key": row["squad_id"], "team_id": row["team_id"]} for row in draft.get("entries") or []]
         try:
             plan.swap(entries, draft.get("staffeln") or [], _placements(draft), left, right, siblings_allowed=ctx["siblings"])

@@ -46,8 +46,10 @@ function StaffelCard({ staffel, canSwap, onSwap, active }) {
             <span className="min-w-0 flex-1 py-1 text-sm font-semibold text-white [overflow-wrap:anywhere]">
               {team.display_name}
               {team.swapped ? <span className="ml-2 rounded-sm bg-white/5 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-white/60">getauscht</span> : null}
+              {/* Nach einem abgebrochenen Zuteilen steht ein Teil schon fest: Diese Co-Teams tauschen nicht mehr. */}
+              {canSwap && team.done ? <span className="ml-2 text-xs font-normal text-white/55">· schon zugeteilt</span> : null}
             </span>
-            {canSwap ? (
+            {canSwap && !team.done ? (
               <button type="button" onClick={() => onSwap(team)} aria-pressed={active === team.squad_id} aria-label={`${team.display_name} tauschen`}
                 className={`tls-btn tls-btn--quiet inline-flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-sm ${active === team.squad_id ? "text-[#29B6E8]" : ""}`}
                 data-testid={`draw-swap-open-${team.squad_id}`}>
