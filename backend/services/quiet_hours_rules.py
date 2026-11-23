@@ -102,8 +102,8 @@ def _offset(moment: datetime) -> timedelta:
 def _clock_change(after: datetime, before: datetime) -> datetime | None:
     """Der Moment (UTC), in dem die Wiener Uhr zwischen ``after`` und ``before`` umgestellt wird - ``None`` ohne Umstellung.
 
-    Beide liegen auf vollen Minuten und weniger als einen Tag auseinander, also höchstens eine Umstellung: minutengenau durch
-    Halbieren gesucht."""
+    Beide liegen auf vollen Minuten, dazwischen höchstens eine Umstellung (die nächste ist Monate entfernt): minutengenau
+    durch Halbieren gesucht."""
     offset = _offset(after)
     if _offset(before) == offset:
         return None
@@ -120,9 +120,10 @@ def _clock_change(after: datetime, before: datetime) -> datetime | None:
 def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | None:
     """Liegt ``now`` in der Ruhezeit, das Ende dieser Ruhezeit (UTC) - sonst ``None``.
 
-    Gerechnet wird in Wiener Wanduhrzeit: 22:00 bis 7:00 bleibt 22:00 bis 7:00, auch in der Nacht der Zeitumstellung. Liegt
-    das Ende in der Lücke der Vorstellung, endet die Ruhezeit mit der Lücke; springt die Uhr bei der Rückstellung vor den
-    Beginn zurück, endet sie mit dem Sprung (#2514)."""
+    Gerechnet wird in Wiener Wanduhrzeit: Still ist es genau dann, wenn die Wanduhr im Fenster steht, und das Ende ist der
+    erste Moment, in dem sie es verlässt - auch in den Nächten der Zeitumstellung, wenn sie dabei springt (#2514). 22:00 bis
+    7:00 bleibt so 22:00 bis 7:00; 00:00–02:30 endet im März mit der Lücke um 03:00 MESZ; ab 02:30 im Oktober endet die
+    Ruhezeit mit dem Rücksprung von 02:59 MESZ auf 02:00 MEZ."""
     found = window(user)
     if not found:
         return None
@@ -144,11 +145,15 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
             break
     else:
         return None
-    # Eine Umstellung bis dahin beendet die Ruhezeit, wenn das Ende in ihrer Lücke liegt (00:00–02:30 im März: 03:00 statt
-    # 03:30 MESZ) oder die Uhr danach außerhalb des Fensters steht (ab 02:30 im Oktober: 02:59 MESZ springt auf 02:00 MEZ).
-    # Gesucht ab der vollen Minute (Umstellungen liegen auf vollen Minuten); ``_offset`` braucht dafür kein ``fold``.
+    # Eine Umstellung bis dahin: Steht die Uhr danach außerhalb des Fensters, endet die Ruhezeit mit ihr (00:00–02:30 im März:
+    # 03:00 statt 03:30 MESZ; ab 02:30 im Oktober: 02:59 MESZ springt auf 02:00 MEZ). Gesucht ab der vollen Minute
+    # (Umstellungen liegen auf vollen Minuten); ``_offset`` braucht dafür kein ``fold``.
     whole_minute = datetime(moment.year, moment.month, moment.day, moment.hour, moment.minute, tzinfo=timezone.utc)
     switch = _clock_change(whole_minute, until)
-    if switch is not None and (_wall_minute(until) != end or not _inside(_wall_minute(switch), start, end)):
+    if switch is None:
+        return until
+    if not _inside(_wall_minute(switch), start, end):
         return switch
-    return until
+    # Die Uhr steht nach dem Sprung noch im Fenster: ab da neu gerechnet (danach keine Umstellung mehr, also eine Stufe tief).
+    # So erreicht 02:30–02:15 im Oktober das Ende im wiederholten Durchlauf um 02:15 MEZ, nicht erst am nächsten Tag.
+    return quiet_until(user, switch)
