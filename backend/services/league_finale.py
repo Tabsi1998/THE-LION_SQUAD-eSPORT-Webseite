@@ -19,8 +19,20 @@ UP, DOWN, OUT = "up", "down", "out"
 MOVE_OF_ZONE = {"promotion": UP, "relegation": DOWN, "out": OUT}
 MOVE_ORDER = (UP, DOWN, OUT)
 ACTIONS = ("next", "end")
-# Zeilen je Liga N am TV: Bei mehr als 12 wird es aus der Distanz unlesbar - die Leitung kann dann die Liga N auf der Ligaseite zeigen.
-MAX_ROWS = 12
+# Zeilen je Spalte am TV (Nr. 235): links Aufstieg, rechts Abstieg und Ausscheiden, je höchstens 8 - der Rest als „und N weitere“.
+# Mehr wird aus der Distanz unlesbar und rutscht unter die Fußleiste. Discord bekommt alle (dort kürzt das Feld ganze Zeilen).
+TV_COLUMN_ROWS = 8
+COLUMN_OF_MOVE = {UP: UP, DOWN: DOWN, OUT: DOWN}
+STALE_STEP = "Der TV-Schritt wurde inzwischen in einem anderen Fenster weitergeschaltet. Der aktuelle Stand ist geladen."
+
+
+class FinaleConflict(ValueError):
+    """„Weiter“ aus einem Fenster mit altem Stand (zwei Leitungs-Tabs) - 409, damit der TV keine Liga N überspringt."""
+
+    def __init__(self, message: str = STALE_STEP):
+        super().__init__(message)
+        self.detail = message
+        self.status_code = 409
 STAFFEL_LIMIT = 200
 
 
@@ -193,11 +205,14 @@ async def control_state(db, season: dict) -> dict:
             "closed": len(staffeln), "reason": reason}
 
 
-async def control(db, season: dict, action: str, actor: dict | None) -> dict:
-    """„Weiter“ bzw. „Ende“ - an allen abgeschlossenen Staffeln der Season zugleich; danach laden ihre TVs sofort nach."""
+async def control(db, season: dict, action: str, actor: dict | None, from_step: int | None = None) -> dict:
+    """„Weiter“ bzw. „Ende“ - an allen abgeschlossenen Staffeln der Season zugleich; danach laden ihre TVs sofort nach. ``from_step``:
+    der Stand, den das Fenster der Leitung zeigt - weicht er bei „Weiter“ ab (ein zweiter Tab hat schon geschaltet), gibt es 409."""
     from services.change_events import publish_api_change
 
     state = await control_state(db, season)
+    if action == "next" and from_step is not None and clamp_step(from_step, state["count"]) != state["step"]:
+        raise FinaleConflict()
     step = 0 if action == "end" or state["reason"] else next_step(state["step"], state["count"])
     now = now_utc().isoformat()
     staffeln = await closed_staffeln(db, season["id"])

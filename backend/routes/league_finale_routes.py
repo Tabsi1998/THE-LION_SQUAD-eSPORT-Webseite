@@ -3,7 +3,8 @@
 - ``GET  /api/admin/leagues/seasons/{season_id}/tv-finale``: der Schritt „Auf- und Absteiger“ am TV - welche Liga N gerade dran ist,
   welche es gibt und warum der TV gegebenenfalls nichts zeigt. Jede Zuständigkeit der Liga.
 - ``POST /api/admin/leagues/seasons/{season_id}/tv-finale``: ``{"action": "next"}`` (Weiter: nächste Liga N) oder ``"end"`` (Ende:
-  zurück zum gewohnten Bild) - Zuständigkeit „Spiele betreuen“. Gilt für alle TVs der abgeschlossenen Staffeln der Season.
+  zurück zum gewohnten Bild) - Zuständigkeit „Spiele betreuen“. Gilt für alle TVs der abgeschlossenen Staffeln der Season. Mit
+  ``from_step`` (der Stand im Fenster der Leitung) gibt „Weiter“ 409, wenn ein anderes Fenster schon geschaltet hat.
 - ``GET|PUT /api/admin/leagues/seasons/{season_id}/discord``: Spieltag-Zusammenfassung und Saisonende-Meldung an/aus, Kanal, Wartezeit
   und Tabellenausschnitt - lesen jede Zuständigkeit, ändern „Season konfigurieren“. Dazu die Textkanäle des Hauptservers zur Wahl.
 
@@ -32,6 +33,7 @@ class FinaleBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action: Literal["next", "end"]
+    from_step: Optional[int] = None
 
 
 class DigestBody(BaseModel):
@@ -61,7 +63,10 @@ async def get_tv_finale(season_id: str, _me: dict = Depends(require_any)):
 @admin_router.post("/seasons/{season_id}/tv-finale")
 async def post_tv_finale(season_id: str, body: FinaleBody, me: dict = Depends(require_matches)):
     db = get_db()
-    return await league_finale.control(db, await _season(db, season_id), body.action, me)
+    try:
+        return await league_finale.control(db, await _season(db, season_id), body.action, me, body.from_step)
+    except league_finale.FinaleConflict as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
 
 
 async def _channels() -> dict:
