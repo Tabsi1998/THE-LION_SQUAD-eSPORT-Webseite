@@ -374,6 +374,13 @@ export function formatTournamentFormat(value?: string | null) {
   return TOURNAMENT_FORMAT_BY_KEY[normalizeKey(raw)] || humanizeStatus(raw);
 }
 
+// Wie TEAM_MODE_LABELS im Web (frontend/src/lib/tournamentLabels.js, Nachzug #2173): Einzelspieler oder Team.
+export function formatTeamMode(value?: string | null) {
+  if (!value || value === "solo") return "Einzelspieler";
+  if (["team", "duo", "squad"].includes(value)) return "Team";
+  return value.replace(/_/g, " ");
+}
+
 /**
  * Der Formatname eines Turniers wie `formatTournamentDisplay` im Web: ein eigener Name zuerst, eine Liga-Staffel heißt
  * „Liga“ (der lange Name gilt nur für Turniere, #2111 F1), sonst der Name des Formats.

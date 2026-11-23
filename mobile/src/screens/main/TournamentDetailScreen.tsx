@@ -13,7 +13,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { checkInLine } from "../../lib/checkInTimes";
-import { formatDate, formatDateTime, formatStatus, formatTournamentDisplay, formatWhen } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus, formatTeamMode, formatTournamentDisplay, formatWhen } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
 import { countsAsMatch, type BracketMatch } from "../../lib/bracketGraph";
@@ -469,7 +469,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                   </Muted>
                 ) : null}
                 {isTeamTournament && canSelfRegister && !manageableTeams.length ? (
-                  <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
+                  <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Teamleitung oder Co-Leitung verwalten darfst.</Muted>
                 ) : null}
                 {tournament.offer ? (
                   <View style={styles.feeBox} testID="tournament-offer">
@@ -898,13 +898,6 @@ function matchIncludesRegistration(match: any, registrationId: string) {
   return Boolean((match.slots || []).some((slot: any) => slot.registration_id === registrationId));
 }
 
-function formatTeamMode(value?: string | null) {
-  if (!value || value === "solo") return "Solo";
-  if (value === "team") return "Team";
-  if (value === "duo") return "Duo";
-  if (value === "squad") return "Squad";
-  return value.replace(/_/g, " ");
-}
 
 function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
   return (

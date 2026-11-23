@@ -94,7 +94,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   // Teilen oben rechts (#1154): die Adresse der Website - in der App öffnet sie diesen Screen, sonst die Website.
   const share = useMemo(() => (team ? () => { void sharePage({ kind: "team", id: String(team.id), title: team.tag ? `${team.name} [${team.tag}]` : team.name, detail: "Team" }); } : null), [team]);
   useShareHeader(navigation, share);
-  // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für Kapitäne.
+  // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für die Teamleitung.
   const inviteToken = route.params.invite || "";
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -160,7 +160,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const leadsTeam = Boolean(user && team && (team.leader_id === user.id || team.co_leader_ids?.includes(user.id)));
   // Was die Person am Team darf, sagt der Server (team_routes.py, #1350, #1479): `can_manage` (bearbeiten, Squads),
   // `can_remove_members` und `can_dissolve` - mit denselben Regeln wie die Aktionen, für Admin-Rollen also nur mit
-  // bestätigter Zwei-Faktor-Anmeldung. Kapitän und Co-Kapitän brauchen sie für ihr eigenes Team nicht. Moderatoren
+  // bestätigter Zwei-Faktor-Anmeldung. Teamleitung und Co-Leitung brauchen sie für ihr eigenes Team nicht. Moderatoren
   // moderieren und sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe.
   const isLeader = Boolean(user && team?.leader_id === user.id);
   const canManage = Boolean(user && team && (team.can_manage || leadsTeam));
@@ -178,7 +178,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const stats = useMemo(() => ({
     members: team?.member_count ?? team?.member_ids?.length ?? members.length,
     squads: team?.squad_count ?? squads.length,
-    role: isLeader ? "Kapitän" : leadsTeam ? "Co-Kapitän" : isMember ? "Spieler" : canManage ? "Verwaltung" : "Besucher",
+    role: isLeader ? "Teamleitung" : leadsTeam ? "Co-Leitung" : isMember ? "Mitglied" : canManage ? "Verwaltung" : "Besucher",
   }), [canManage, isLeader, isMember, leadsTeam, members.length, squads.length, team?.member_count, team?.member_ids?.length, team?.squad_count]);
 
   const openProfile = useCallback((username?: string | null) => {
@@ -255,14 +255,14 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
   const setRole = useCallback((member: TeamMember, role: "member" | "co_leader") => {
     if (!team) return;
-    showActionResult(() => api.post(`/teams/${team.id}/members/${member.id}/role`, { role }), role === "co_leader" ? "Ist jetzt Co-Kapitän." : "Ist wieder Spieler.");
+    showActionResult(() => api.post(`/teams/${team.id}/members/${member.id}/role`, { role }), role === "co_leader" ? "Ist jetzt Co-Leitung." : "Ist wieder Mitglied.");
   }, [showActionResult, team]);
 
   const transferLeader = useCallback((member: TeamMember) => {
     if (!team) return;
-    Alert.alert("Kapitän übergeben?", `${member.display_name || member.username || "Dieses Mitglied"} wird Kapitän. Du bist danach Co-Kapitän.`, [
+    Alert.alert("Teamleitung übergeben?", `${member.display_name || member.username || "Dieses Mitglied"} übernimmt die Teamleitung. Du gehörst danach zur Co-Leitung.`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Übergeben", onPress: () => showActionResult(() => api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: member.id }), "Kapitän übergeben.") },
+      { text: "Übergeben", onPress: () => showActionResult(() => api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: member.id }), "Teamleitung übergeben.") },
     ]);
   }, [showActionResult, team]);
 
@@ -305,14 +305,14 @@ export function TeamDetailScreen({ navigation, route }: Props) {
       if (squadForm.id) await api.patch(`/teams/${team.id}/squads/${squadForm.id}`, payload);
       else await api.post(`/teams/${team.id}/squads`, payload);
       setSquadForm(null);
-    }, "Squad gespeichert.");
+    }, "Co-Team gespeichert.");
   }, [canManage, showActionResult, squadForm, team]);
 
   const deleteSquad = useCallback((squad: TeamSquad) => {
     if (!team || !squad.id) return;
-    Alert.alert("Squad löschen?", `"${squad.name}" wird entfernt.`, [
+    Alert.alert("Co-Team löschen?", `Co-Team „${squad.name}“ wirklich löschen?`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Löschen", style: "destructive", onPress: () => showActionResult(() => api.delete(`/teams/${team.id}/squads/${squad.id}`), "Squad gelöscht.") },
+      { text: "Löschen", style: "destructive", onPress: () => showActionResult(() => api.delete(`/teams/${team.id}/squads/${squad.id}`), "Co-Team gelöscht.") },
     ]);
   }, [showActionResult, team]);
 
@@ -417,7 +417,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
             <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
             <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
-            {/* Logo und Banner vom Handy (#1153) - nur für Kapitän und Co-Kapitän; gespeichert wird sofort. */}
+            {/* Logo und Banner vom Handy (#1153) - nur für Teamleitung und Co-Leitung; gespeichert wird sofort. */}
             <ImagePickField label="Logo" shape="square" value={teamForm.logo_url} onUploaded={(url) => saveTeamImage("logo_url", url)} fallback={<Body style={styles.logoInitials}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>} testID="team-logo" />
             <ImagePickField label="Banner" shape="banner" value={teamForm.banner_url} onUploaded={(url) => saveTeamImage("banner_url", url)} testID="team-banner" />
             <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
@@ -508,8 +508,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         {!isMember && user && !isGuestUser(user) ? (
           <Card style={styles.card}>
             <Heading>Team beitreten</Heading>
-            <Muted>Wenn du einen Join-Code vom Team erhalten hast, kannst du hier direkt beitreten.</Muted>
-            <Field label="Join-Code" value={joinCode} onChangeText={setJoinCode} />
+            <Muted>Wenn du einen Beitrittscode vom Team erhalten hast, kannst du hier direkt beitreten.</Muted>
+            <Field label="Beitrittscode" value={joinCode} onChangeText={setJoinCode} />
             <Button label="Beitreten" disabled={busy || !joinCode.trim()} onPress={join} />
           </Card>
         ) : null}
@@ -538,12 +538,12 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
         <Card style={styles.card}>
           <View style={styles.cardTop}>
-            <Heading>Squads</Heading>
-            {canManage ? <Button compact variant="secondary" icon="add" label="Neu" accessibilityLabel="Neuer Squad" onPress={() => startSquadEdit()} /> : null}
+            <Heading>Co-Teams</Heading>
+            {canManage ? <Button compact variant="secondary" icon="add" label="Neu" accessibilityLabel="Neues Co-Team" onPress={() => startSquadEdit()} /> : null}
           </View>
           {squadForm ? (
             <View style={styles.squadForm}>
-              <Field label="Squad-Name" value={squadForm.name} onChangeText={(value) => setSquadForm((current) => current && { ...current, name: value })} />
+              <Field label="Name" value={squadForm.name} onChangeText={(value) => setSquadForm((current) => current && { ...current, name: value })} />
               <Field label="Beschreibung" value={squadForm.description} multiline onChangeText={(value) => setSquadForm((current) => current && { ...current, description: value })} />
               <Field label="Spiel / Game-ID" value={squadForm.game_id} onChangeText={(value) => setSquadForm((current) => current && { ...current, game_id: value })} />
               <View style={styles.wrap}>
@@ -573,13 +573,13 @@ export function TeamDetailScreen({ navigation, route }: Props) {
               </View>
               <View style={styles.actionGrid}>
                 <Button label="Abbrechen" variant="secondary" onPress={() => setSquadForm(null)} />
-                <Button label={busy ? "Speichert ..." : "Squad speichern"} disabled={busy || !squadForm.name.trim()} onPress={saveSquad} />
+                <Button label={busy ? "Speichert ..." : "Co-Team speichern"} disabled={busy || !squadForm.name.trim()} onPress={saveSquad} />
               </View>
             </View>
           ) : null}
           {squads.length ? squads.map((squad) => (
             <SquadRow key={squad.id || squad.name} canManage={canManage} onDelete={deleteSquad} onEdit={startSquadEdit} squad={squad} />
-          )) : <Muted>Keine Squads hinterlegt.</Muted>}
+          )) : <Muted>Noch keine Co-Teams für dieses Team.</Muted>}
         </Card>
 
         {/* Liga (#2173): Anmeldestatus der eigenen Co-Teams, die Season-Historie, der Platz in der Gesamtwertung (F.5) und die
@@ -665,10 +665,10 @@ function MemberRow({
         {canRole || canKick ? (
           <View style={styles.memberActions}>
             {canRole ? (
-              <Button compact variant="secondary" label={role === "co_leader" ? "Spieler" : "Co-Kapitän"} accessibilityLabel={role === "co_leader" ? "Zum Spieler machen" : "Zum Co-Kapitän machen"} disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} />
+              <Button compact variant="secondary" label={role === "co_leader" ? "Mitglied" : "Co-Leitung"} accessibilityLabel={role === "co_leader" ? "Zum Mitglied machen" : "Zur Co-Leitung machen"} disabled={busy} onPress={() => onRole(member, role === "co_leader" ? "member" : "co_leader")} />
             ) : null}
             {canRole ? (
-              <Button compact variant="secondary" label="Kapitän" accessibilityLabel="Zum Kapitän machen" disabled={busy} onPress={() => onTransfer(member)} />
+              <Button compact variant="secondary" label="Teamleitung" accessibilityLabel="Zur Teamleitung machen" disabled={busy} onPress={() => onTransfer(member)} />
             ) : null}
             {canKick ? (
               <Button compact variant="danger" label="Entfernen" accessibilityLabel="Aus dem Team entfernen" disabled={busy} onPress={() => onKick(member)} />
@@ -698,7 +698,7 @@ function SquadRow({ canManage, onDelete, onEdit, squad }: { canManage: boolean; 
       {canManage ? (
         <View style={styles.squadActions}>
           <Button compact variant="quiet" label="Bearbeiten" onPress={() => onEdit(squad)} />
-          {squad.id ? <Button compact variant="danger" label="Löschen" accessibilityLabel="Squad löschen" onPress={() => onDelete(squad)} /> : null}
+          {squad.id ? <Button compact variant="danger" label="Löschen" accessibilityLabel="Co-Team löschen" onPress={() => onDelete(squad)} /> : null}
         </View>
       ) : null}
     </View>

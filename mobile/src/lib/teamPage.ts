@@ -51,7 +51,8 @@ export function upcomingLine(row?: TeamUpcoming | null): string {
 
 // Wappen-Kopf (#1347): Rollen in Alltagsworten unter den Gesichtern - wie im Web.
 export type TeamRole = "captain" | "co_captain" | "player";
-export const ROLE_LABELS: Record<TeamRole, string> = { captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" };
+// Begriffe wie im Web (#2128 TM1/TM2, Nachzug #2173): Teamleitung, Co-Leitung, Mitglied - die Schlüssel bleiben.
+export const ROLE_LABELS: Record<TeamRole, string> = { captain: "Teamleitung", co_captain: "Co-Leitung", player: "Mitglied" };
 
 type FaceTeam = { leader_id?: string | null; co_leader_ids?: string[] | null; members?: Array<{ id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null }> | null };
 

@@ -7,6 +7,7 @@ import {
   formatMembershipType,
   formatNewsCategory,
   formatRole,
+  formatTeamMode,
   formatTournamentDisplay,
   formatTournamentFormat,
   formatWhen,
@@ -164,4 +165,14 @@ test("formatWhen: heute, morgen, Wochentag mit Monat, Jahr nur außerhalb des la
 test("Ausgeschieden (#1553): ausgetreten und disqualifiziert auf Deutsch wie im Web (tournamentLabels.js)", () => {
   expect(formatStatus("withdrawn")).toBe("Ausgetreten");
   expect(formatStatus("disqualified")).toBe("Disqualifiziert");
+});
+
+// Nachzug #2173: der Teammodus heißt wie TEAM_MODE_LABELS im Web - kein „Squad“ oder „Duo“ mehr.
+test("Teammodus wie im Web: Einzelspieler oder Team", () => {
+  expect(formatTeamMode("solo")).toBe("Einzelspieler");
+  expect(formatTeamMode(null)).toBe("Einzelspieler");
+  expect(formatTeamMode("squad")).toBe("Team");
+  expect(formatTeamMode("duo")).toBe("Team");
+  expect(formatTeamMode("team")).toBe("Team");
+  expect(formatTeamMode("mixed_mode")).toBe("mixed mode");
 });

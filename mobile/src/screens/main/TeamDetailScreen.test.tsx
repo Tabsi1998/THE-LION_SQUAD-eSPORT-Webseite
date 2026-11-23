@@ -140,9 +140,9 @@ test("Kopf: Name, Kürzel, Spiel und Level; Gesichter Kapitän zuerst, du mit Ec
   expect(screen.getByTestId("team-header-line")).toHaveTextContent("LRK·Rocket League·Level 9");
   const faces = screen.getAllByTestId(/^team-face-u-/).map((node) => node.props.testID);
   expect(faces).toEqual(["team-face-u-cap", "team-face-u-co", "team-face-u-1"]);
-  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("KAPITÄN");
-  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("CO-KAPITÄN");
-  expect(screen.getByTestId("team-face-role-u-1")).toHaveTextContent("SPIELER");
+  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("TEAMLEITUNG");
+  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("CO-LEITUNG");
+  expect(screen.getByTestId("team-face-role-u-1")).toHaveTextContent("MITGLIED");
   expect(screen.getAllByTestId("team-face-you")).toHaveLength(1);
   // Ecken-Klammern (#1316): Winkel und Etikett „Du“ nur an deinem Gesicht (Paula, u-1), wie im Web (TeamHeader).
   expect(within(screen.getByTestId("team-face-u-1")).getByTestId("team-face-you")).toBeTruthy();

@@ -8,8 +8,8 @@ import { api, errorMessage } from "../../lib/api";
 import { idSegment, isValidId } from "../../lib/apiIds";
 import { colors, radius } from "../../theme";
 
-// Einladungs-Link (#1191): Kapitäne zeigen den QR-Code oder teilen den Link; wer ihn öffnet, landet im Team und tippt
-// nur noch „Beitreten“. Neu erzeugen macht den alten Link ungültig. Der Join-Code bleibt als Rückfall.
+// Einladungs-Link (#1191): Teamleitung und Co-Leitung zeigen den QR-Code oder teilen den Link; wer ihn öffnet, landet im Team und tippt
+// nur noch „Beitreten“. Neu erzeugen macht den alten Link ungültig. Der Beitrittscode bleibt als Rückfall.
 // Die Team-Kennung geht nur als ein geprüfter Pfadteil in die API (#1512).
 
 type InviteLink = { url: string; token: string; created_at?: string | null };
@@ -79,7 +79,7 @@ export function TeamInviteCard({ teamId, teamName, joinCode }: { teamId: string;
       <Button label={busy ? "Erzeuge …" : "Neuen Link erzeugen"} variant="secondary" onPress={renew} disabled={!link || busy} testID="team-invite-renew" />
       {joinCode ? (
         <View style={styles.joinCode} testID="team-join-code">
-          <Muted>Rückfall: Join-Code</Muted>
+          <Muted>Rückfall: Beitrittscode</Muted>
           <Body style={styles.code}>{joinCode}</Body>
         </View>
       ) : null}
@@ -117,7 +117,7 @@ export function TeamJoinInvite({ teamId, token, signedIn, onSignIn, onJoined }: 
     return (
       <Card style={styles.card} testID="team-join-invalid">
         <Body style={styles.bold}>Dieser Einladungs-Link gilt nicht mehr</Body>
-        <Muted>Frag im Team nach einem neuen Link – oder gib den Join-Code unter „Team beitreten“ ein.</Muted>
+        <Muted>Frag im Team nach einem neuen Link – oder gib den Beitrittscode unter „Team beitreten“ ein.</Muted>
       </Card>
     );
   }

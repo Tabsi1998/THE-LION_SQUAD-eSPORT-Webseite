@@ -45,7 +45,7 @@ export function EmptyState({
   tone?: EmptyTone;
   /** Der nächste Schritt - genau ein wichtiger Knopf. */
   action?: StateAction | null;
-  /** Ein zweiter, leiser Weg (etwa „Join-Code eingeben“). */
+  /** Ein zweiter, leiser Weg (etwa „Beitrittscode eingeben“). */
   secondaryAction?: StateAction | null;
   testID?: string;
 }) {
