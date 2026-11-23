@@ -48,6 +48,8 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { playMoment } from "../../lib/tournamentHaptics";
 import { CheckinCard } from "../../components/league/CheckinCard";
 import { VetoCard } from "../../components/league/VetoCard";
+import { LeagueReportCard, type LeagueReportSend } from "../../components/league/LeagueReportCard";
+import { sidesInSlotOrder, type LeagueBlock } from "../../lib/leagueGames";
 import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
 import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
 import { useVetoPolling } from "../../lib/useVetoPolling";
@@ -110,6 +112,9 @@ type MatchPage = {
   schedule_mode?: "fixed_by_staff" | "player_proposal" | "hybrid" | string;
   stage?: { name?: string; title?: string; stage_type?: string; match_type?: string; settings?: Record<string, unknown> } | null;
   tournament?: Tournament | null;
+  // Liga-Staffel (#2173, docs/LIGA.md C.3): Maps, Pool, Veto-Reihenfolge, Kader und Regeln fürs Melden mit Maps. Ältere Server
+  // schicken den Block nicht - dann meldet die App wie bisher ohne Maps.
+  league?: LeagueBlock | null;
 };
 
 // Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
@@ -307,6 +312,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const flow = flowBadge(page?.checkin);
   // Erst einchecken, dann melden (D.2): Der Server schickt den Satz, solange Melden noch nicht geht - er steht statt des Formulars.
   const reportHint = canPlayerReportResult ? page?.report_hint || null : null;
+  // Liga mit Maps (C.3): die Seiten in der Reihenfolge der Plätze, wie im Web (sidesInSlotOrder).
+  const league = useMemo(() => (page?.league?.sides?.length ? sidesInSlotOrder(page.league, page.match) : null), [page?.league, page?.match]);
 
   const propose = useCallback(async () => {
     // Datum und Uhrzeit zum Antippen (#1139) - als Wiener Uhr gewählt, als Zeitpunkt an den Server.
@@ -396,7 +403,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, []);
 
   // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
-  const submitReport = useCallback(async (payload: ReportPayload) => {
+  const submitReport = useCallback(async (payload: ReportPayload | LeagueReportSend) => {
     if (!canPlayerReportResult || busy) return false;
     setBusy(true);
     setError("");
@@ -579,6 +586,15 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="time-outline" color={colors.cyan} size={20} />
                 <Body style={styles.flex}>{reportHint}</Body>
               </View>
+            ) : (canPlayerReportResult || showReportReadOnly) && league ? (
+              <LeagueReportCard
+                league={league}
+                readOnly={!canPlayerReportResult}
+                onWrongResult={() => setProblemCategory("wrong_result")}
+                state={page.report_state || null}
+                busy={busy}
+                onReport={submitReport}
+              />
             ) : canPlayerReportResult || showReportReadOnly ? (
               <MatchReportCard
                 readOnly={!canPlayerReportResult}
