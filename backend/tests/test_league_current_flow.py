@@ -358,31 +358,40 @@ async def test_long_team_history_does_not_push_running_leagues_out_of_the_profil
 
 
 @pytest.mark.asyncio
-async def test_hidden_participant_list_hides_the_registration_state_from_outsiders(flow):
-    """``show_participants: false``: „Warteliste“ bzw. „Anmeldung offen“ sieht nur, wer dazugehört - Teamseite: das Team, Profil: die
-    Person selbst. Gegenprobe: mit sichtbarer Liste sehen es alle."""
+async def test_hidden_participant_list_hides_open_registrations_from_outsiders(flow):
+    """``show_participants: false``: Eine Anmeldung auf der Warteliste bzw. noch offen gibt es für Außenstehende gar nicht - wie in der
+    Teilnehmerliste; sonst stünde dort „Noch ohne Ergebnis“, als spielte das Team schon. Teamseite: Team und Staff sehen „Warteliste“,
+    Profil: die Person selbst. Gegenproben: Eine zugelassene Anmeldung bleibt trotz verborgener Liste sichtbar, mit sichtbarer Liste sehen
+    alle die Warteliste."""
     world = await two_levels(flow)
     await flow.db.tournament_registrations.update_one({"id": world["extra"]}, {"$set": {"status": "waitlist"}})
-    await flow.db.tournaments.update_one({"id": world["upper"]["id"]}, {"$set": {"show_participants": False}})
+    for tournament in (world["upper"], world["lower"]):
+        await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"show_participants": False}})
     owner = await flow.db.users.find_one({"id": PERSON}, {"_id": 0})
     outsider = await flow.add_user(role="player", name="sturmvogel")
+    staff = await flow.add_user(role="club_admin", name="leitstelle")
+    approved = f"{world['lower']['id']}-reg-1"
 
-    async def team_note(viewer):
+    async def team_rows(viewer):
         flow.act_as(viewer)
-        rows = {row["registration_id"]: row for row in ok(await flow.get("/api/teams/team-1/overview"))["league"]}
-        return rows[world["extra"]]["status_note"]
+        return {row["registration_id"]: row for row in ok(await flow.get("/api/teams/team-1/overview"))["league"]}
 
-    async def profile_note(viewer):
-        return {row["registration_id"]: row for row in (await profile(flow, viewer))["league_current"]}[world["extra"]]["status_note"]
+    async def profile_rows(viewer):
+        return {row["registration_id"]: row for row in (await profile(flow, viewer))["league_current"]}
 
-    assert await team_note(None) is None, "Gast: Liste verborgen, kein Stand"
-    assert await team_note(outsider) is None
-    assert await team_note(owner) == "Warteliste", "das Team selbst sieht den Stand"
-    assert await profile_note(None) is None
-    assert await profile_note(owner) == "Warteliste", "die Person selbst sieht den Stand"
+    for label, viewer in (("Gast", None), ("Nicht-Mitglied", outsider)):
+        rows = await team_rows(viewer)
+        assert world["extra"] not in rows, f"{label}: keine Zeile auf der Teamseite"
+        assert approved in rows, f"{label}: die zugelassene Anmeldung bleibt"
+        rows = await profile_rows(viewer)
+        assert world["extra"] not in rows, f"{label}: keine Zeile im Profil"
+        assert approved in rows
+    assert (await team_rows(owner))[world["extra"]]["status_note"] == "Warteliste", "das Team sieht den Stand"
+    assert (await team_rows(staff))[world["extra"]]["status_note"] == "Warteliste", "der Staff sieht den Stand"
+    assert (await profile_rows(owner))[world["extra"]]["status_note"] == "Warteliste", "die Person selbst sieht den Stand"
     await flow.db.tournaments.update_one({"id": world["upper"]["id"]}, {"$set": {"show_participants": True}})
-    assert await team_note(None) == "Warteliste"
-    assert await profile_note(None) == "Warteliste"
+    assert (await team_rows(None))[world["extra"]]["status_note"] == "Warteliste"
+    assert (await profile_rows(None))[world["extra"]]["status_note"] == "Warteliste"
 
 
 @pytest.mark.asyncio

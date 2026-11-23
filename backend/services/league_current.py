@@ -30,12 +30,15 @@ RUNNING_LIMIT = 2000
 STATUS_NOTES = {"pending": "Anmeldung offen", "waitlist": "Warteliste"}
 
 
-def status_note(registration: dict | None, tournament: dict | None = None, *, insider: bool = True) -> str | None:
-    """„Anmeldung offen“ bzw. „Warteliste“ - verbirgt die Staffel ihre Teilnehmerliste (``show_participants: false``), sieht den Stand
-    nur, wer dazugehört (``insider``: die Person selbst bzw. das Team), wie die Teilnehmerliste selbst (Review #1638)."""
-    if (tournament or {}).get("show_participants") is False and not insider:
-        return None
+def status_note(registration: dict | None) -> str | None:
     return STATUS_NOTES.get((registration or {}).get("status") or "")
+
+
+def hidden_from_outsiders(registration: dict | None, tournament: dict | None) -> bool:
+    """Verbirgt die Staffel ihre Teilnehmerliste (``show_participants: false``), gibt es eine offene bzw. Wartelisten-Anmeldung für
+    Außenstehende gar nicht - wie in der Teilnehmerliste selbst (``tournament_registration_routes.list_registrations``). Sonst stünde dort
+    „Noch ohne Ergebnis“, als spielte das Team schon (Review #1638). Wer dazugehört, entscheidet der Aufrufer."""
+    return (tournament or {}).get("show_participants") is False and (registration or {}).get("status") in STATUS_NOTES
 
 
 async def account_names(db, registrations) -> dict[str, str]:
@@ -203,6 +206,9 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
             continue
         if not await sees_season(scope, season) or not await sees_listed_tournament(scope, tournament):
             continue
+        # Verborgene Teilnehmerliste: eine offene bzw. Wartelisten-Anmeldung sieht im Profil nur die Person selbst (Review #1638).
+        if not scope.everything and hidden_from_outsiders(registration, tournament):
+            continue
         guest_sees = public_season(season)
         if guest_sees:
             guest_sees = await sees_listed_tournament(PUBLIC, tournament)
@@ -229,7 +235,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
             "link": (f"/liga/{league['slug']}/{season['slug']}#staffel-{anchor}" if opens_page
                      else f"/tournaments/{anchor}"),
             "internal": internal,
-            "status_note": status_note(registration, tournament, insider=scope.everything),
+            "status_note": status_note(registration),
             **(places.get(registration["id"]) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
     return sort_rows(out)

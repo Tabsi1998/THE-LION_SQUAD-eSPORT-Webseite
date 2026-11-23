@@ -270,11 +270,15 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
         {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
     # Platz von N, Zone und nächstes Spiel (#1630): dieselbe Rechnung wie die Tabelle, für alle Staffeln auf einmal - die ganzen
     # Staffel-Dokumente (Tabellenregeln, Entscheide) in einer Abfrage.
-    from services.league_current import badge, live_places, sort_rows, status_note
+    from services.league_current import badge, hidden_from_outsiders, live_places, sort_rows, status_note
 
     staffel_ids = sorted({tournament["id"] for _reg, tournament in rows})
     full = await db.tournaments.find({"id": {"$in": staffel_ids}}, {"_id": 0}).to_list(len(staffel_ids) + 1)
     full_by_id = {row["id"]: row for row in full}
+    # Verborgene Teilnehmerliste: eine offene bzw. Wartelisten-Anmeldung sehen nur Team und Staff (Review #1638).
+    rows = [(reg, tournament) for reg, tournament in rows if insider or not hidden_from_outsiders(reg, full_by_id.get(tournament["id"]))]
+    if not rows:
+        return []
     places = await live_places(db, full, [reg.get("id") for reg, _tournament in rows if reg.get("id")])
     out = []
     for reg, tournament in rows:
@@ -304,8 +308,7 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "emblem_url": (season.get("emblem_url") or league.get("emblem_url") or None),
             "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
             "link": link,
-            # Verborgene Teilnehmerliste: den Stand der Anmeldung sieht nur das Team selbst (Review #1638).
-            "status_note": status_note(reg, full_by_id.get(tournament["id"]), insider=insider),
+            "status_note": status_note(reg),
             # Co-Team-Kennung: Der Saisonverlauf stellt die Co-Teams, die gerade spielen, zuerst (Review #1638).
             "squad_id": reg.get("squad_id"),
             **(places.get(reg.get("id")) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
