@@ -39,6 +39,7 @@ es gibt keinen eigenen Container und nichts in der `.env`.
 | **Bracket im Discord** | Das Bracket eines laufenden Turniers, angeheftet und nach jedem Ergebnis aktualisiert | automatisch im Turnier-Thread | an |
 | **Einbettungen, die sich aktualisieren** | Je eine angeheftete Nachricht: Rangliste, Nächste Events, Erfolg der Woche | Reiter „Einbettungen & Termine“ | aus |
 | **Stream-Meldungen** | Je Stream eine Meldung mit Vorschaubild, sobald jemand aus dem Verein live geht; am Ende gelöscht – so zeigt der Kanal, wer gerade live ist | Reiter „Einbettungen & Termine“ | aus |
+| **Liga: Spieltag und Saisonende** | Je Staffel eine Zusammenfassung nach jedem Spieltag (Ergebnisse, Tabellenausschnitt), am Ende der Season Meister, Auf- und Absteiger mit Link – je Season ein Kanal, nur öffentliche Seasons, nie doppelt | Liga-Verwaltung: Season → Reiter „Termine“ → Discord ([Liga, 2.7g](liga.md#27g-discord-meldungen)) | aus |
 | **Gestaltung** | Aussehen der Stream-Meldungen und Einbettungen frei gestalten – mit Live-Vorschau | Reiter „Gestaltung“ | Standard-Design |
 | **Discord-Termine** | Jedes öffentliche Event und Turnier als Discord-Event mit „Interessiert“-Knopf | Reiter „Einbettungen & Termine“ | aus |
 | **Willkommensnachricht** | Wer neu auf den Server kommt, bekommt eine Direktnachricht mit „Anmelden“ und „Konto verknüpfen“ | Reiter „Willkommen“ | aus |

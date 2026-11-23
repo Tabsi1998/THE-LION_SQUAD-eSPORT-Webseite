@@ -816,6 +816,25 @@ einstellbar.
 
 <img src="../assets/liga/liga-season-erinnerungen-pc.png" alt="Kasten Erinnerungen im Reiter Termine: Schalter für Spiel steht an mit 24 Stunden und 60 Minuten, Termin noch offen bei 50 Prozent der Spielwoche und spätestens 24 Stunden vor dem Standardtermin, Ergebnis fehlt, Map-Veto wartet mit 20 und 5 Sekunden, darunter Zusätzlich per Discord" width="820">
 
+### 2.7g Discord-Meldungen
+
+Unter den Erinnerungen steht im Reiter **Termine** der Kasten **Discord** (Zuständigkeit „Season konfigurieren“) mit eigenem
+**Discord speichern**. Er schickt Meldungen in einen Kanal des Vereins-Discords. **Ohne Einstellung ist alles aus.**
+
+| Meldung | Wann | Inhalt |
+| --- | --- | --- |
+| **Spieltag-Zusammenfassung** | je Staffel, sobald alle Spiele des Spieltags gewertet oder abgesagt sind. Fehlen Ergebnisse, wartet sie bis **Warten auf Ergebnisse** (Vorgabe 48 Stunden) nach dem Ende der Spielwoche und kommt dann mit „x Spiele offen“ – außer **Nach der Wartezeit trotzdem melden** ist aus | Liga, Season, Liga N (bei mehreren Staffeln mit Staffel), jedes Spiel mit Ergebnis, kampflos, abgesagt oder offen, darunter der **Tabellenausschnitt** (Vorgabe 5 Plätze, 0 = ohne Tabelle) und der Knopf **Zur Ligaseite** |
+| **Saisonende-Meldung** | einmal, sobald alle Staffeln abgeschlossen sind (3.10) | Meister, je Liga N die Auf- und Absteiger mit Ziel-Liga, Knopf **Zur Season** |
+
+- **Kanal:** einer für beide Meldungen, aus der Liste des Hauptservers. Ist der Bot offline, steht stattdessen ein Feld für die
+  Kanal-ID. Ohne Kanal lässt sich nichts einschalten; einen anderen Kanal als Ersatz gibt es nicht.
+- **Nur öffentliche Seasons:** Steht die Sichtbarkeit (2.8) nicht auf **Öffentlich**, geht nichts hinaus – der Kasten sagt das.
+  Gezeigt wird nur, was Gäste auf der Ligaseite sehen.
+- **Ab dem laufenden Spieltag:** Wer die Zusammenfassung später einschaltet, bekommt keine alten Spieltage auf einmal.
+- **Nie doppelt:** Jede Meldung geht genau einmal hinaus, auch wenn der Job doppelt läuft. Klappt das Senden nicht (Bot offline),
+  versucht er es nach 30 Minuten noch zweimal. Ein Wiederöffnen und neues Abschließen schickt keine zweite Saisonende-Meldung.
+- Die neue Season aus dem Vorgänger (3.11) übernimmt die Einstellung.
+
 ### 2.8 Sichtbarkeit
 
 | Einstellung | Ligaseite und Menüpunkt „Liga“ | Staffel-Turnier |
@@ -1660,6 +1679,12 @@ Fassung nur als Notausnahme mit eigenem Grund.
 
 **Auf- und Abstieg** ergeben sich aus dem Endstand nach den Zonen der Liga (3.11). Die abgeschlossene Season bleibt auf
 der Ligaseite sichtbar; erst der Stand **Archiviert** blendet sie aus.
+
+**5. Saisonfinale am TV.** Unter den Staffeln steht der Kasten **Saisonfinale am TV**. Nach dem Sieger-Moment zeigt
+**Weiter** am Turnierbaum-TV jeder abgeschlossenen Staffel der Season die **Auf- und Absteiger je Liga N** – erst Liga 1, mit
+jedem weiteren **Weiter** die nächste. **Ende** bringt das gewohnte Bild zurück (Tabelle bzw. Sieger). Der Kasten sagt, was der TV
+gerade zeigt („Der TV zeigt Liga 2 (2 von 3)“). Recht: **Spiele betreuen**. Nur bei öffentlichen Seasons; steigt niemand auf
+oder ab, gibt es nichts zu zeigen. Mehr in [TV & Beamer](tv.md). Die Saisonende-Meldung im Discord steht unter 2.7g.
 
 ### 3.11 Neue Season aus der Vorgänger-Season
 

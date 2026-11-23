@@ -467,7 +467,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
 | Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
 | Solo-Ligen (`participant_kind="solo"`) | #1629 |
-| Discord-Meldungen der Liga (Spieltag, Saisonende) | eigenes Folgepaket |
+| Discord-Meldungen der Liga (Spieltag, Saisonende) | #1642 (F.6) |
 | Map-Pool je Liga N, Statistik je Map/Spieler | später |
 
 ## 10. Sichtbarkeit, Schalter, Migration
@@ -4108,6 +4108,45 @@ Endstände von vor F.2 ohne `sides` lesen das Co-Team aus der Anmeldung. Keine M
 
 **Nicht in F.5:** eigene Belohnungen je Liga N (eine Zusammenstellung gilt für alle Stufen), Nachricht an die Captains beim Abschluss der
 Gesamtwertung (Belohnungen schicken ihre eigene), TV und die App (`mobile/`, Liste in #2173).
+
+### F.6 Saisonfinale am TV und Liga im Discord (#1641, #1642)
+
+**TV (#1641):** Nach dem Sieger-Moment (#2410) ein Schritt „Auf- und Absteiger je Liga N“ am Turnierbaum-TV, gesteuert von der Leitung.
+`services/league_finale.py`:
+
+- `build_pages(divisions, finals)`: je aktiver Liga N (nach Stufe) die Zeilen der geltenden Endstände mit `zone` `promotion` (`up`),
+  `relegation` (`down`) und `out` - Relegationsplätze haben keine Wirkung (`league_zones.MOVES`) und fehlen. Ziel ist die benachbarte
+  Liga N nach Stufe. Je Seite höchstens 12 Zeilen (`more`), Liga N ohne Bewegung fallen weg.
+- Stand je Staffel-Turnier `tournaments.tv_finale = {step, updated_at}` (0 aus, 1..n Seite je Liga N) - bewusst nicht an der Season,
+  weil F.2 Season-Felder in die Folge-Season kopiert. Wer geschaltet hat, steht nur im Protokoll `league.season.tv_finale`.
+- `GET|POST /api/admin/leagues/seasons/{id}/tv-finale` (`{action: "next"|"end"}`): lesen jede Zuständigkeit, schalten `matches`.
+  „Weiter“ bleibt auf der letzten Seite stehen. Geschaltet werden alle abgeschlossenen Staffeln zugleich; danach je Staffel ein
+  Nachlade-Ereignis (`publish_api_change`), damit die TVs sofort folgen.
+- `GET /api/tournaments/{tid}/bracket/display` trägt `league_finale = {step, count, league, season, pages}` - nur bei abgeschlossener
+  Staffel, die Gäste sehen (`guest_sees_staffel`, wie `awards._visible`), in einer Season mit `public_season`. Interne und
+  Leitungs-Seasons nie, auch nicht mit Anzeige-Schlüssel.
+- Frontend: `lib/tvFinale.js`, `components/tv/TvFinaleMovers.jsx` (tv.css „Saisonfinale“), `BracketTVPage` pausiert die
+  Wiedergabeliste, solange der Schritt steht. Verwaltung: `SeasonTvFinaleControl` im Reiter „Abschluss“ (`#tv-finale`).
+
+**Discord (#1642):** `services/league_discord.py`, Job `league_discord` (alle 15 Minuten, `_single_replica`).
+
+- Einstellung `league_seasons.discord_digest`: `matchday`, `season_end` (Vorgabe aus), `channel_id` (Pflicht, sobald etwas an ist; kein
+  Rückfall), `wait_hours` (48, 0-336), `late` (an), `table_rows` (5, 0-20), `matchday_since` (gesetzt beim Einschalten). Die Folge-Season
+  übernimmt sie (F.2). `GET|PUT /api/admin/leagues/seasons/{id}/discord`: lesen jede Zuständigkeit (mit den Textkanälen des Hauptservers),
+  ändern `season`; Protokoll `league.season.discord_digest`. Verwaltung: `SeasonDiscordPanel` im Reiter „Termine“ (`#discord`).
+- **Spieltag fertig** (`matchday_due`): alle Spiele gewertet oder abgesagt (`SETTLED`), sonst mit `late` ab Ende der Spielwoche plus
+  `wait_hours` mit „x Spiele offen“; ohne ein Ergebnis nie. Spieltage, deren Meldefrist vor `matchday_since` endete, gehen nicht hinaus.
+- **Saisonende**: Season `completed` (`league_final._season_follows`), Meister aus den Endständen, Auf- und Absteiger aus `build_pages`,
+  Link `/liga/{liga}/{season}`.
+- Nur öffentliche Seasons (`public_season`) und Staffeln, die Gäste sehen; Discord bzw. Bot aus: nichts gesendet, nichts belegt.
+- **Doppelversand:** `league_discord_posts` mit eindeutigem `dedupe_key` (`matchday:{tid}:{n}`, `season_end:{season_id}`). Vor dem Senden
+  belegt der Job den Schlüssel per Upsert; nur wer ihn belegt, sendet. Fehlschlag: `status: failed`, höchstens drei Versuche, frühestens
+  nach 30 Minuten. Ein Eintrag `sending` (Lauf abgebrochen) bleibt - lieber keine als zwei Meldungen.
+- Texte (`matchday_message`, `season_end_message`): kurz, deutsch, Markdown in Namen entschärft, lange Listen verlieren ganze Zeilen
+  („… und x weitere“), nie einen halben Namen.
+
+**Nicht in F.6:** Rückblick-Seite (#1640 - die Meldung verlinkt bis dahin die Season-Seite), Liga-Abzeichen statt „Liga N“ (#1638),
+Meldung auf Spielservern (nur ein Kanal, gewählt aus dem Hauptserver), eine Korrektur-Meldung nach Wiederöffnen, die App.
 
 ## 13. Feature-Matrix (Stand G.3, 15.11.2026)
 

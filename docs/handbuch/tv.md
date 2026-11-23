@@ -170,6 +170,14 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
   nacheinander auf (3, 2, 1), die Belohnungen heben sich und glänzen, zuletzt kommt der Meister; danach parkt er wie sonst in
   der Ecke. Am TV stehen nur Belohnungen, die Gäste sehen dürfen (Season und Staffel öffentlich) und die nicht ruhen. Ohne
   Belohnung auf Platz 1 bis 3 bleibt die Siegerkarte wie bisher. Mit **Bewegung aus** steht das Podest sofort.
+- **Saisonfinale: Auf- und Absteiger.** Nach dem Sieger-Moment drückt die Liga-Leitung im Admin unter **Ligen → Season → Reiter
+  Abschluss → Saisonfinale am TV** auf **Weiter**: Der TV jeder abgeschlossenen Staffel der Season zeigt je Liga N, wer aufsteigt
+  (links, grün, Pfeil hinauf) und wer absteigt oder ausscheidet (rechts, Pfeil hinunter), mit Platz und Ziel-Liga. Die Zeilen
+  gleiten nacheinander auf ihren Platz – Aufsteiger von unten, Absteiger von oben –, danach kommt die Ziel-Liga, zuletzt die Linie
+  unter dem Titel. Jedes weitere **Weiter** zeigt die nächste Liga N, **Ende** das gewohnte Bild. Solange der Schritt steht, wartet
+  die Wiedergabeliste. Nur bei öffentlichen Seasons; mit **Bewegung aus** steht das Bild sofort.
+
+  <img src="../assets/tv/tv-saisonfinale-1920.png" alt="TV bei 1920 Pixeln: Saisonfinale Liga 2, links Aufstieg mit zwei Teams und Ziel Liga 1, rechts Abstieg mit Ziel Liga 3 und ein Team, das ausscheidet" width="820">
 
 **Pause bis:** Setzt ihr ein Turnier unter **Admin → eSports → Turniere → Turnier öffnen** auf **Pausiert**, erscheint
 darunter das Feld **Pause bis**. Uhrzeit wählen, **Speichern**, und der TV zeigt „Weiter um …“ mit Countdown. **Ohne
