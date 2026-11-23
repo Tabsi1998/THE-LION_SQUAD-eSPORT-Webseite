@@ -268,6 +268,13 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
     divisions = {row["id"]: row for row in await db.league_divisions.find(
         {"id": {"$in": sorted({c.get("division_id") for c in contexts if c.get("division_id")})}},
         {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
+    # Platz von N, Zone und nächstes Spiel (#1630): dieselbe Rechnung wie die Tabelle, für alle Staffeln auf einmal - die ganzen
+    # Staffel-Dokumente (Tabellenregeln, Entscheide) in einer Abfrage.
+    from services.league_current import badge, live_places, sort_rows
+
+    staffel_ids = sorted({tournament["id"] for _reg, tournament in rows})
+    full = await db.tournaments.find({"id": {"$in": staffel_ids}}, {"_id": 0}).to_list(len(staffel_ids) + 1)
+    places = await live_places(db, full, [reg.get("id") for reg, _tournament in rows if reg.get("id")])
     out = []
     for reg, tournament in rows:
         context = tournament["league_context"]
@@ -289,12 +296,17 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "league": {"name": league.get("name"), "slug": league.get("slug")},
             "season": {"name": season.get("name"), "slug": season.get("slug")},
             "staffel_label": f"{division_label(division)} · Staffel {staffel}",
+            "division_label": division_label(division), "staffel": staffel,
+            # Liga-Abzeichen (#1638): Liga N und Beiname - die Stufe zeigt sich am Wappen.
+            "badge": badge(division),
             # Emblem der Season bzw. Liga (#2107), klein vor der Staffel - ohne steht das Liga-Zeichen.
             "emblem_url": (season.get("emblem_url") or league.get("emblem_url") or None),
             "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
             "link": link,
+            **(places.get(reg.get("id")) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
-    return sorted(out, key=lambda row: (row["league"]["name"] or "", row["staffel_label"]))
+    # Beste Liga N oben (#1630, aus #1644), dann Liga, Season und Co-Team.
+    return sort_rows(out)
 
 
 # ------------------------------------------------------------------ Beitrittscode
