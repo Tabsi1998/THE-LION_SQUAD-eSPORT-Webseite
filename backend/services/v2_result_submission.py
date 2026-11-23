@@ -439,6 +439,10 @@ async def submit_v2_result(
     # Folgeläufe erwarten; der Aufrufer hält die Turnier-Schreibsperre.
     from services.heat_rebuild import evaluate_after_write
     await evaluate_after_write(db, match.get("tournament_id"), actor_id=actor_id, trigger="result")
+    # Schweizer System (#1559): war das das letzte Spiel der Runde, entsteht mit „nächste Runde automatisch“ die nächste -
+    # unter derselben Schreibsperre, also nie doppelt.
+    from services.swiss_rounds import advance_after_write
+    await advance_after_write(db, match.get("tournament_id"), actor_id=actor_id)
     return {
         "ok": True,
         "match": updated,
