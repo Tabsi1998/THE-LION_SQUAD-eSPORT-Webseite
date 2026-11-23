@@ -140,6 +140,8 @@ Uhr des Servers.
 - Discord: Öffentliche News gehen über den Bot in den Kanal, den ihr unter Verbindungen → Discord gewählt habt
   ([Discord](discord.md)). Alles Nicht-Öffentliche geht nie in einen öffentlichen Kanal.
 - **Nur App** geht weder als Newsletter noch nach Discord hinaus – beide führen zur Website, die den Beitrag nicht zeigt.
+  Ist der Beitrag öffentlich (oder „Nur registrierte Community“), steht in der Box **App-Push**: Beim Veröffentlichen geht
+  ein Push an alle App-Nutzer, die „News & Events“ per Push bekommen wollen – danach „App-Push gesendet am … an …“.
 
 #### News nur in der App oder nur auf der Website
 
@@ -152,6 +154,7 @@ App) – oder lasst einen Beitrag aus der App heraus.
 | Google, Sitemap, Link-Vorschau mit Titel und Bild | ja | nein | ja |
 | News-Liste, Startseite und Suche der App | ja | ja | nein |
 | Newsletter-Mail, Discord-Meldung | ja | nein | ja |
+| App-Push an alle App-Nutzer mit Zustimmung für „News & Events“ (nur öffentlich bzw. Community) | nein | ja, einmal beim Veröffentlichen | nein |
 | Meldung an Mitglieder bzw. Vorstand und Erwähnungen | App-Push, Browser, Glocke | nur App-Push und Postfach der App | Browser und Glocke, kein App-Push |
 
 - **Link zu „Nur App“ auf der Website:** Wer die Adresse im Browser öffnet (etwa weil jemand den Beitrag aus der App geteilt
@@ -161,8 +164,14 @@ App) – oder lasst einen Beitrag aus der App heraus.
   sich der Beitrag trotzdem – sonst landeten Newsletter- und Discord-Links bei „nicht gefunden“. In Listen der App steht er nie.
 - Die **Vorschau** der Redaktion zeigt einen „Nur App“-Beitrag auch auf der Website, mit dem Band **„Nur in der App“**.
 - Alte Beiträge gelten als **Website und App**; es ändert sich nichts, solange ihr die Auswahl nicht umstellt.
-- Öffentliche News schicken heute keinen App-Push an alle – auch nicht bei „Nur App“. Gemeldet werden wie bisher nur
-  Mitglieder- und Vorstands-News und Erwähnungen.
+- **App-Push bei „Nur App“:** genau einmal, wenn der Beitrag erscheint (auch zum geplanten Termin), nur an Personen mit
+  App und Push-Zustimmung für „News & Events“; die Ruhezeit gilt wie bei allen Meldungen. Erneutes Speichern, Zurückziehen
+  und wieder Veröffentlichen schicken keinen zweiten Push. Wird ein schon öffentlicher Beitrag erst später auf „Nur App“
+  gestellt, geht kein Push hinaus. Mitglieder- und Vorstands-News „Nur App“ gehen wie bisher nur an Mitglieder bzw. Vorstand.
+- „Alle gelesen“ und „Gelesene löschen“ in der Glocke der Website lassen Meldungen, die nur in der App stehen, unberührt –
+  und umgekehrt.
+- **Adventkalender:** Ein Türchen mit einer News „Nur App“ zeigt auf der Website nur seinen Text, in der App die News –
+  und umgekehrt. Im Editor steht beim Beitrag „Nur App“ bzw. „Nur Website“.
 
 <img src="../assets/news/news-kanal-editor.png" alt="News-Editor: unter Sichtbarkeit die Auswahl „Wo erscheint der Beitrag?“ mit Hinweis, was „Nur App“ bewirkt" width="360">
 
