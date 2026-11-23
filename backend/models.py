@@ -1761,6 +1761,8 @@ NewsCategory = Literal[
     "video",  # YouTube-Videos des Vereinskanals (#578)
 ]
 NewsVisibility = Literal["public", "community", "members", "internal"]
+# Wo die News erscheint (#1532): Website, App oder beides. Ohne Feld gilt beides (services/news_channels.py).
+NewsChannel = Literal["web", "app"]
 
 
 class NewsCreate(BaseModel):
@@ -1773,6 +1775,7 @@ class NewsCreate(BaseModel):
     video_url: Optional[str] = None
     category: NewsCategory = "club"
     visibility: NewsVisibility = "public"
+    channels: List[NewsChannel] = Field(default_factory=lambda: ["web", "app"], min_length=1, max_length=2)
     published: bool = True
     published_at: Optional[datetime] = None
     # „Jetzt veröffentlichen“ (#2122): den Zeitpunkt setzt der Server, nicht die Uhr des Browsers.
@@ -1800,6 +1803,7 @@ class NewsUpdate(BaseModel):
     video_url: Optional[str] = None
     category: Optional[NewsCategory] = None
     visibility: Optional[NewsVisibility] = None
+    channels: Optional[List[NewsChannel]] = Field(default=None, min_length=1, max_length=2)
     published: Optional[bool] = None
     published_at: Optional[datetime] = None
     publish_now: Optional[bool] = None

@@ -94,6 +94,7 @@ PUSH_CHANNELS = {
     # Vereinsintern, News, Mitgliedschaft, Rechnungen, Helferdienste.
     "news_member": "lion_club",
     "news_board": "lion_club",
+    "news_app": "lion_club",   # Öffentliche News nur für die App (#1532)
     "ballot_open": "lion_club",
     "membership_update": "lion_club",
     "membership_invited": "lion_club",

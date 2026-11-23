@@ -3,12 +3,13 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { toastLoadFailed } from "@/lib/loadProblem";
 import { newsCategoryLabel, newsVisibilityLabel } from "@/lib/newsCategories";
+import { newsChannelBadge, newsChannelLabel } from "@/lib/newsChannels";
 import { newsPublicationState } from "@/lib/newsPublication";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Download, Plus, Pin, RotateCcw, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
+import { Download, Globe, Plus, Pin, RotateCcw, Smartphone, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { pinState } from "@/lib/newsPin";
 
@@ -18,7 +19,7 @@ function csvCell(value) {
 }
 
 export function exportNewsCsv(rows) {
-  const header = ["Titel", "Adresse", "Kategorie", "Sichtbarkeit", "Status", "Datum"];
+  const header = ["Titel", "Adresse", "Kategorie", "Sichtbarkeit", "Status", "Datum", "Kanal"];
   const lines = rows.map((item) => [
     item.title,
     item.slug ? `/news/${item.slug}` : "",
@@ -26,6 +27,7 @@ export function exportNewsCsv(rows) {
     newsVisibilityLabel(item.visibility),
     item.status_label,
     item.date_label,
+    newsChannelLabel(item.channels),
   ].map(csvCell).join(";"));
   const blob = new Blob([[header.map(csvCell).join(";"), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -207,6 +209,7 @@ export default function AdminNewsPage() {
                 {filteredList.map((n) => {
                   const state = publicationState(n);
                   const pin = pinState(n);
+                  const channel = newsChannelBadge(n);
                   return (
                   <tr key={n.id}>
                     <td className="px-4 py-3">
@@ -223,7 +226,19 @@ export default function AdminNewsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{newsCategoryLabel(n.category)}</td>
-                    <td className="px-4 py-3 text-xs text-white/65" data-testid={`news-visibility-${n.id}`}>{newsVisibilityLabel(n.visibility)}</td>
+                    <td className="px-4 py-3 text-xs text-white/65">
+                      <div data-testid={`news-visibility-${n.id}`}>{newsVisibilityLabel(n.visibility)}</div>
+                      {/* Kanal (#1532): ein Schild nur, wenn der Beitrag nicht auf Website und App erscheint. */}
+                      {channel && (
+                        <span
+                          data-testid={`news-channel-${n.id}`}
+                          className={`mt-1 inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${channel.key === "app" ? "border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/20 bg-white/5 text-white/70"}`}
+                        >
+                          {channel.key === "app" ? <Smartphone className="w-3 h-3" aria-hidden="true" /> : <Globe className="w-3 h-3" aria-hidden="true" />}
+                          {channel.label}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs">
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
                       {state.detail && <div className="mt-0.5 text-[11px] normal-case text-white/45">{state.detail}</div>}

@@ -229,12 +229,17 @@ def _link(door: dict) -> dict | None:
     return {"url": door["link_url"], "label": door.get("link_label") or "Mehr dazu"} if door.get("link_url") else None
 
 
-async def _news_card(db, ref: str, viewer: dict | None) -> dict | None:
+async def _news_card(db, ref: str, viewer: dict | None, channel: str | None = None) -> dict | None:
+    from services.news_channels import in_channel
     from services.news_publish import published_now as _published_now
     from services.visibility import user_can_see
 
-    post = await db.news_posts.find_one({"id": ref}, {"_id": 0, "id": 1, "slug": 1, "title": 1, "excerpt": 1, "banner_url": 1, "published": 1, "published_at": 1, "visibility": 1})
+    post = await db.news_posts.find_one({"id": ref}, {"_id": 0, "id": 1, "slug": 1, "title": 1, "excerpt": 1, "banner_url": 1, "published": 1, "published_at": 1, "visibility": 1,
+                                                      "channels": 1})
     if not post or post.get("published") is False or not _published_now(post) or not await user_can_see(viewer, post.get("visibility") or "public"):
+        return None
+    # Kanal (#1532): das Türchen der Website zeigt keine News nur für die App, das der App keine nur für die Website.
+    if channel and not in_channel(post, channel):
         return None
     return {"title": post.get("title"), "excerpt": post.get("excerpt") or "", "image_url": post.get("banner_url"), "url": f"/news/{post.get('slug') or post['id']}", "date": post.get("published_at")}
 
@@ -260,7 +265,8 @@ def default_content(day: int) -> dict:
     return {"kind": "text", "title": f"Türchen {day}", "body": DEFAULT_BODY, "media_url": None, "link": None, "fallback": True}
 
 
-async def content_for(db, door: dict | None, day: int, viewer: dict | None = None, now: datetime | None = None) -> dict:
+async def content_for(db, door: dict | None, day: int, viewer: dict | None = None, now: datetime | None = None,
+                      channel: str | None = None) -> dict:
     """Der Inhalt, wie ihn diese Person sieht - nie mit der richtigen Quiz-Antwort, nie mit fremden Namen."""
     if not door:
         return default_content(day)
@@ -285,7 +291,7 @@ async def content_for(db, door: dict | None, day: int, viewer: dict | None = Non
             content["body"] = content["body"] or DEFAULT_BODY
     elif kind in ("news", "event", "member_spotlight"):
         if kind == "news":
-            card = await _news_card(db, door.get("ref_id"), viewer)
+            card = await _news_card(db, door.get("ref_id"), viewer, channel)
         elif kind == "event":
             card = await _event_card(db, door.get("ref_id"), viewer)
         else:
@@ -324,7 +330,7 @@ def parse_days(value: str | None) -> set[int]:
 
 
 async def calendar_view(db, viewer: dict | None, now: datetime | None = None, guest_opened: set[int] | None = None,
-                        year: int | None = None, record: bool = True, placeholder: bool = False) -> dict:
+                        year: int | None = None, record: bool = True, placeholder: bool = False, channel: str | None = None) -> dict:
     """Der Kalender, wie ihn die Person jetzt sieht. ``year`` und ``record=False`` sind die Vorschau der Verwaltung:
     ein bestimmtes Jahr zu einer gewählten Zeit, ohne dass etwas gezählt wird. ``placeholder`` (#963): ein Jahr ohne
     Türchen zeigt in der Vorschau trotzdem alle 24 - mit dem Inhalt, den ein leeres Türchen hätte."""
@@ -349,7 +355,7 @@ async def calendar_view(db, viewer: dict | None, now: datetime | None = None, gu
         item = {"day": day, "opens_at": opens_at(year, day).isoformat(), "seed": door_seed(year, day),
                 "state": "locked" if not available else ("opened" if day in shown else "available")}
         if item["state"] == "opened":
-            item["content"] = await content_for(db, doors.get(day), day, viewer, now)
+            item["content"] = await content_for(db, doors.get(day), day, viewer, now, channel)
             if item["content"].get("quiz") is not None:
                 item["content"]["quiz"]["done"] = bool((opened.get(day) or {}).get("quiz_done"))
             if day in opened:
@@ -433,7 +439,7 @@ async def _require_open_door(db, day: int, now: datetime | None) -> tuple[dict, 
     return state, doors
 
 
-async def open_door(db, viewer: dict | None, day: int, now: datetime | None = None) -> dict:
+async def open_door(db, viewer: dict | None, day: int, now: datetime | None = None, channel: str | None = None) -> dict:
     """Ein Türchen öffnen. Angemeldet zählt es einmal je Person, Jahr und Tag; Gäste sehen nur den Inhalt."""
     state, doors = await _require_open_door(db, day, now)
     year = state["year"]
@@ -451,7 +457,7 @@ async def open_door(db, viewer: dict | None, day: int, now: datetime | None = No
         if first:
             newly = await _count_for_achievements(user_id)
     await db[VIEWS].update_one({"year": year, "day": day}, {"$inc": {"count": 1}, "$setOnInsert": {"year": year, "day": day}}, upsert=True)
-    content = await content_for(db, doors.get(day), day, viewer, state["now"])
+    content = await content_for(db, doors.get(day), day, viewer, state["now"], channel)
     opening = (await db[OPENINGS].find_one({"user_id": user_id, "year": year, "day": day}, {"_id": 0}) if user_id else None) or {}
     if content.get("quiz") is not None:
         content["quiz"]["done"] = bool(opening.get("quiz_done"))
@@ -690,8 +696,13 @@ async def editor_options(db) -> dict:
 
     visibility = {"members": "nur Mitglieder", "community": "nur angemeldet", "internal": "nur intern"}
     news = []
-    for row in await db.news_posts.find({}, {"_id": 0, "id": 1, "title": 1, "published": 1, "published_at": 1, "visibility": 1}).sort([("published_at", -1), ("created_at", -1)]).to_list(120):
-        hints = [_day_text(row.get("published_at")), "Entwurf" if row.get("published") is False else "", visibility.get(row.get("visibility") or "public", "")]
+    from services.news_channels import only_channel
+
+    channel_hint = {"app": "Nur App", "web": "Nur Website"}
+    for row in await db.news_posts.find({}, {"_id": 0, "id": 1, "title": 1, "published": 1, "published_at": 1, "visibility": 1, "channels": 1}).sort([("published_at", -1), ("created_at", -1)]).to_list(120):
+        # Kanal (#1532): „Nur App“ bzw. „Nur Website“ steht als Zusatz - das Türchen zeigt die News nur dort.
+        hints = [_day_text(row.get("published_at")), "Entwurf" if row.get("published") is False else "", visibility.get(row.get("visibility") or "public", ""),
+                 channel_hint.get(only_channel(row) or "", "")]
         news.append({"id": row["id"], "label": row.get("title") or "Ohne Titel", "hint": " · ".join(hint for hint in hints if hint)})
     events = []
     for row in await db.events.find({"status": {"$nin": ["archived", "cancelled"]}}, {"_id": 0, "id": 1, "name": 1, "status": 1, "start_date": 1, "visibility": 1}).sort("start_date", -1).to_list(120):

@@ -22,6 +22,7 @@ import { viennaDateTime } from "@/lib/vienna";
 import { PIN_DEFAULT_DAYS, defaultPinUntil, pinBaseDay, pinUntilText } from "@/lib/newsPin";
 import { fromViennaInput } from "@/lib/vienna";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
+import { NEWS_CHANNEL_OPTIONS, channelChoice, channelHint, channelsFromChoice } from "@/lib/newsChannels";
 import { toast } from "sonner";
 import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
 
@@ -94,6 +95,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
     video_url: source.video_url || "",
     category: source.category || "club",
     visibility: source.visibility || "public",
+    // Wo der Beitrag erscheint (#1532): alte Beiträge ohne Feld gelten als Website und App.
+    channels: channelsFromChoice(channelChoice(source.channels)),
     // Neu ist ein Entwurf (#2122 NW1) - veröffentlicht wird bewusst über „Wann erscheint der Beitrag?“.
     published: source.published ?? false,
     // Eine abgelaufene Anheftung (#1263) gilt nicht mehr - der Haken ist dann aus, neues Anheften schlägt 14 Tage vor.
@@ -206,7 +209,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
   // nach bestem Wissen; fehlt ein Recht oder geht ein Abruf schief, steht der allgemeine Satz da.
   const askBeforePublishing = async () => {
     const [audience, discord] = await Promise.allSettled([
-      api.get("/settings/newsletter/audience", { params: { kind: "news", visibility: form.visibility } }),
+      appOnly ? Promise.resolve(null) : api.get("/settings/newsletter/audience", { params: { kind: "news", visibility: form.visibility } }),
       api.post("/settings/discord/preview", { kind: "news", item: { ...form, discord_skip: !!form.discord_skip } }, { skipInvalidation: true }),
     ]);
     const when = mode === "scheduled" ? new Date(scheduleAt) : null;
@@ -214,6 +217,9 @@ function NewsForm({ post, meta, onDone, onReload }) {
       mode,
       whenText: when && !Number.isNaN(when.getTime()) ? viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" }) : "",
       audience: audience.status === "fulfilled" && audience.value?.data && typeof audience.value.data === "object" ? audience.value.data : null,
+      appOnly,
+      // Öffentlich und nur App (#1532): ein App-Push an alle mit Zustimmung - nur, wenn er noch nicht hinausging.
+      appPush: appOnly && ["public", "community"].includes(form.visibility) && !post.app_push_notified_at,
       sentAt: post.newsletter_sent_at || "",
       sentText: post.newsletter_sent_at ? viennaDateTime(post.newsletter_sent_at, { dateStyle: "medium" }) : "",
       discord: discord.status === "fulfilled" && typeof discord.value?.data?.would_send === "boolean" ? discord.value.data.would_send : null,
@@ -272,16 +278,19 @@ function NewsForm({ post, meta, onDone, onReload }) {
     setSaving(false);
   };
 
+  const channel = channelChoice(form.channels);
+  const appOnly = channel === "app";
   const selectedUsers = mentionedUserIds.map((id) => knownUsers[id]).filter(Boolean);
   const userMatches = userHits.filter((user) => !mentionedUserIds.includes(user.id)).slice(0, 8);
   const plannedDate = mode === "scheduled" && scheduleAt ? new Date(scheduleAt) : null;
   const plannedDetail = plannedDate && !Number.isNaN(plannedDate.getTime())
-    ? (plannedDate.getTime() > Date.now() ? `Erscheint ${formatTimeUntil(plannedDate)} von selbst – mit Newsletter und Discord.` : "Dieser Termin liegt in der Vergangenheit.")
+    ? (plannedDate.getTime() > Date.now() ? `Erscheint ${formatTimeUntil(plannedDate)} von selbst – ${appOnly ? "nur in der App." : "mit Newsletter und Discord."}` : "Dieser Termin liegt in der Vergangenheit.")
     : "Wann soll der Beitrag erscheinen?";
   const willPublish = mode !== "draft";
   const origin = typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at";
   const publicPath = form.slug ? `/news/${form.slug}` : "";
-  const seoIsIndexable = Boolean(willPublish && form.visibility === "public");
+  // „Nur App“ (#1532) steht auf der Website nicht - und damit auch nicht bei Google.
+  const seoIsIndexable = Boolean(willPublish && form.visibility === "public" && !appOnly);
   const seoFallback = {
     title: form.title || "News-Beitrag",
     description: form.excerpt || "Kurzbeschreibung fehlt noch.",
@@ -300,7 +309,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
     { label: "Kurzbeschreibung", done: Boolean(form.excerpt.trim()), description: form.excerpt.trim() ? "Kurzbeschreibung vorhanden." : "Hilft in der News-Liste, bei Google und beim Teilen." },
     { label: "Bild", done: Boolean(form.banner_url), description: form.banner_url ? "Bild für Liste und Teilen vorhanden." : "Ein eigenes Bild statt des Standardbilds wählen." },
     { label: "Text", done: Boolean(form.content.trim()), description: form.content.trim() ? "Beitragstext vorhanden." : "Der Text fehlt noch." },
-    { label: "Sichtbarkeit", done: Boolean(form.visibility && willPublish), description: seoIsIndexable ? "Öffentlich – Suchmaschinen dürfen ihn finden." : "Entwurf oder nicht öffentlich – Suchmaschinen finden ihn nicht." },
+    { label: "Sichtbarkeit", done: Boolean(form.visibility && willPublish), description: seoIsIndexable ? "Öffentlich – Suchmaschinen dürfen ihn finden." : appOnly ? "Nur in der App – Suchmaschinen finden ihn nicht." : "Entwurf oder nicht öffentlich – Suchmaschinen finden ihn nicht." },
     { label: "Verknüpfungen", done: linkedContentCount > 0 || hasEmbedToken, tone: linkedContentCount > 0 || hasEmbedToken ? undefined : "note", description: linkedContentCount > 0 || hasEmbedToken ? `${linkedContentCount || 1} Verknüpfung(en) erkannt.` : "Optional: Turnier, Event, Fast Lap oder Personen verknüpfen." },
     { label: "Google und Teilen", done: Boolean(form.slug && form.excerpt && form.banner_url), description: "Titel, Kurzbeschreibung und Bild prüfen – so erscheint der Beitrag bei Google und beim Teilen." },
     { label: "Newsletter/Discord", done: newsletterDone, tone: newsletterDone ? undefined : "note", description: newsletterDone ? "Newsletter wurde bereits versendet." : "Steht im Kasten „Verteilen“ – mit Empfängerzahl und „Jetzt senden“." },
@@ -334,7 +343,9 @@ function NewsForm({ post, meta, onDone, onReload }) {
           <FormSection title="Veröffentlichung">
             <SelectField label="Kategorie" value={form.category} onChange={(v) => set("category", v)} options={meta.categories || []} testId="news-category" />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="news-visibility" />
-            <PublishChoice mode={mode} initialMode={initialMode} onChange={setMode} withdrawInstead={withdrawInstead} />
+            {/* Kanal (#1532): unabhängig von der Sichtbarkeit - beides gilt zusammen. */}
+            <SelectField label="Wo erscheint der Beitrag?" value={channel} onChange={(v) => set("channels", channelsFromChoice(v))} options={NEWS_CHANNEL_OPTIONS} hint={channelHint(channel)} testId="news-channels" />
+            <PublishChoice mode={mode} initialMode={initialMode} onChange={setMode} withdrawInstead={withdrawInstead} appOnly={appOnly} />
             {mode === "scheduled" && (
               <TextField label="Termin" type="datetime-local" value={scheduleAt} onChange={setScheduleAt} testId="news-published-at" required hint={plannedDetail} />
             )}
@@ -350,10 +361,11 @@ function NewsForm({ post, meta, onDone, onReload }) {
               </>
             )}
           </FormSection>
-          <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility}>
+          <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility} appOnly={appOnly}
+            appPush={post.app_push_notified_at ? { sent_at: post.app_push_notified_at, count: post.app_push_count, skipped: post.app_push_skipped_reason } : null}>
             <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           </DistributeBox>
-          <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
+          <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} appOnly={appOnly} />
           {!isNew && (
             <FormSection title="Autor und Verlauf" testId="news-history-section">
               <PersonPicker purpose="news_author" value={author} onChange={setAuthor} label="Autor" placeholder="Name tippen …" hint="Steht auf der News-Seite unter „Von“." testId="news-author" />
@@ -473,7 +485,7 @@ const PUBLISH_CHOICES = {
   now: (initialMode) => (initialMode === "now"
     ? ["Veröffentlicht", "Für alle sichtbar, die die Sichtbarkeit erlaubt."]
     : ["Jetzt veröffentlichen", "Erscheint beim Speichern – vorher kommt eine Rückfrage, was hinausgeht."]),
-  scheduled: () => ["Geplant", "Erscheint zum Termin von selbst – mit Newsletter und Discord."],
+  scheduled: (_initialMode, _withdrawInstead, appOnly) => ["Geplant", appOnly ? "Erscheint zum Termin von selbst – nur in der App." : "Erscheint zum Termin von selbst – mit Newsletter und Discord."],
 };
 
 export const WITHDRAW_QUESTION = (title) => ({
@@ -482,12 +494,12 @@ export const WITHDRAW_QUESTION = (title) => ({
   confirmLabel: "Zurückziehen",
 });
 
-export function PublishChoice({ mode, initialMode, onChange, withdrawInstead = false }) {
+export function PublishChoice({ mode, initialMode, onChange, withdrawInstead = false, appOnly = false }) {
   return (
     <fieldset className="space-y-1.5" data-testid="news-publish-choice">
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wann erscheint der Beitrag?</legend>
       {PUBLISH_MODES.map((key) => {
-        const [label, hint] = PUBLISH_CHOICES[key](initialMode, withdrawInstead);
+        const [label, hint] = PUBLISH_CHOICES[key](initialMode, withdrawInstead, appOnly);
         const active = mode === key;
         return (
           <label key={key} className={`flex items-start gap-3 rounded-sm border px-3 py-2.5 cursor-pointer transition-colors duration-150 ${active ? "border-[#29B6E8]/60 bg-[#29B6E8]/[0.07]" : "border-white/10 hover:border-white/25"}`}>
