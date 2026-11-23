@@ -37,8 +37,8 @@ test("eigene Teams mit Chat, weitere darunter, keine Squads bei 0", async () => 
   expect(screen.getByText("Weitere Teams")).toBeTruthy();
   expect(screen.getAllByText("Lions")).toHaveLength(1);
   expect(screen.getByText("12 Mitglieder")).toBeTruthy();
-  expect(screen.getByText("3 Mitglieder · 2 Squads")).toBeTruthy();
-  expect(screen.queryByText("0 Squads")).toBeNull();
+  expect(screen.getByText("3 Mitglieder · 2 Co-Teams")).toBeTruthy();
+  expect(screen.queryByText("0 Co-Teams")).toBeNull();
   // Eine letzte Chat-Nachricht schickt der Server nicht (#1296) - dort steht die Beschreibung des Teams.
   expect(screen.getByText("Rocket League am Freitag")).toBeTruthy();
 
@@ -56,7 +56,7 @@ test("ohne Teams erklärt die Seite, wie man in ein Team kommt", async () => {
   await render(<TeamsSection navigation={navigation} />);
 
   await waitFor(() => expect(screen.getByText("Noch kein Team")).toBeTruthy());
-  expect(screen.getByText(/Einladung oder einen Join-Code/)).toBeTruthy();
+  expect(screen.getByText(/Einladung oder einen Beitrittscode/)).toBeTruthy();
   expect(screen.queryByText("Mitglieder")).toBeNull();
 });
 

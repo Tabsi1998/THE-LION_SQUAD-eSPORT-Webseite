@@ -19,6 +19,7 @@ import { api, errorMessage } from "../../lib/api";
 import { invalidateCache } from "../../lib/cache";
 import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
+import { useSingleFlight } from "../../lib/useSingleFlight";
 import {
   continuesMessageGroup,
   formatChatTime,
@@ -48,6 +49,11 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { playMoment } from "../../lib/tournamentHaptics";
 import { CheckinCard } from "../../components/league/CheckinCard";
 import { VetoCard } from "../../components/league/VetoCard";
+import { LeagueReportCard, type LeagueReportSend } from "../../components/league/LeagueReportCard";
+import { IncidentPanel, MapStateNotes, type IncidentLeague } from "../../components/league/IncidentPanel";
+import { AppealForm, ProcedureCard, ProcedureGuidedForm } from "../../components/league/ProcedurePanel";
+import type { Procedure, ProcedureGuide, ProcedurePayload } from "../../lib/leagueProcedures";
+import { sidesInSlotOrder } from "../../lib/leagueGames";
 import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
 import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
 import { useVetoPolling } from "../../lib/useVetoPolling";
@@ -68,7 +74,8 @@ type MatchParticipant = {
 
 type ScheduleProposal = {
   actor_registration_id?: string | null;
-  id: string;
+  // Unbeteiligte bekommen Vorschläge nur mit Termin, Stand und Seite - ohne Kennung (#2201).
+  id?: string;
   actor?: { username?: string; display_name?: string | null } | null;
   note?: string | null;
   scheduled_at?: string | null;
@@ -109,6 +116,9 @@ type MatchPage = {
   schedule_mode?: "fixed_by_staff" | "player_proposal" | "hybrid" | string;
   stage?: { name?: string; title?: string; stage_type?: string; match_type?: string; settings?: Record<string, unknown> } | null;
   tournament?: Tournament | null;
+  // Liga-Staffel (#2173, docs/LIGA.md C.3): Maps, Pool, Veto-Reihenfolge, Kader und Regeln fürs Melden mit Maps. Ältere Server
+  // schicken den Block nicht - dann meldet die App wie bisher ohne Maps.
+  league?: (IncidentLeague & { procedure_form?: ProcedureGuide | null; procedures?: Procedure[] | null; contested?: boolean | null }) | null;
 };
 
 // Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
@@ -299,13 +309,21 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
-  const canDispute = Boolean(page?.can_dispute);
+  // Liga-Verfahren (E.2): Mit `procedure_form` wird „Problem melden“ geführt (Art, Grund, Pflichtangaben, Nachweise). Nach dem
+  // Einreichen bleibt das Formular für die Nachweise offen, auch wenn der Server `open` schon zurücknimmt (wie im Web).
+  const procedureForm = page?.league?.procedure_form || null;
+  const procedures = page?.league?.procedures || [];
+  const [procedureStep, setProcedureStep] = useState<string | null>(null);
+  const canDispute = Boolean(procedureForm ? (page?.can_dispute && procedureForm.open) || procedureStep : page?.can_dispute);
   const hasResultActions = Boolean(canPlayerReportResult || showReportReadOnly || canSubmitV2Result || canDispute);
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
   // Matchablauf (#2173): der Stand des Liga-Check-ins als Schild im Kopf - ohne Regeln an der Staffel nichts.
   const flow = flowBadge(page?.checkin);
   // Erst einchecken, dann melden (D.2): Der Server schickt den Satz, solange Melden noch nicht geht - er steht statt des Formulars.
   const reportHint = canPlayerReportResult ? page?.report_hint || null : null;
+  // Liga mit Maps (C.3): die Seiten in der Reihenfolge der Plätze, wie im Web (sidesInSlotOrder).
+  // Wie im Web (`data.league`): der Block entscheidet, nicht die Zahl der Seiten - fehlen sie, sagt ein Satz es statt des alten Formulars.
+  const league = useMemo(() => (page?.league ? sidesInSlotOrder(page.league, page.match) : null), [page?.league, page?.match]);
 
   const propose = useCallback(async () => {
     // Datum und Uhrzeit zum Antippen (#1139) - als Wiener Uhr gewählt, als Zeitpunkt an den Server.
@@ -328,7 +346,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, [busy, load, proposalAt, proposalNote, route.params.id]);
 
   const decide = useCallback(async (proposal: ScheduleProposal, action: "accept" | "counter" | "decline") => {
-    if (busy) return;
+    if (busy || !proposal.id) return;
     const payload: { action: string; note?: string | null; scheduled_at?: string } = { action, note: decisionNote.trim() || null };
     if (action === "counter") {
       const scheduledAt = wallToIso(counterAt || viennaWall(proposal.scheduled_at));
@@ -395,62 +413,75 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, []);
 
   // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
-  const submitReport = useCallback(async (payload: ReportPayload) => {
+  // Gegen Doppeltippen (#2173): eine Aktion zur Zeit - `busy` greift erst nach dem nächsten Zeichnen.
+  const once = useSingleFlight();
+  const submitReport = useCallback(async (payload: ReportPayload | LeagueReportSend) => {
     if (!canPlayerReportResult || busy) return false;
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    try {
-      const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${idSegment(route.params.id)}/report`, payload);
-      playMoment("result");
-      await refreshAfterResult();
-      setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
-      return true;
-    } catch (err) {
-      setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, canPlayerReportResult, refreshAfterResult, route.params.id]);
+    const done = await once(async () => {
+      setBusy(true);
+      setError("");
+      setSuccess("");
+      try {
+        const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${idSegment(route.params.id)}/report`, payload);
+        playMoment("result");
+        await refreshAfterResult();
+        setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
+        return true;
+      } catch (err) {
+        setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
+        // Ein veralteter Stand (409, die Gegenseite hat inzwischen gemeldet) ist meist der Grund - gleich frisch laden.
+        void load({ preserveDrafts: true });
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    });
+    return Boolean(done);
+  }, [busy, canPlayerReportResult, load, once, refreshAfterResult, route.params.id]);
 
   const resultUndo = useResultUndo(() => { void refreshAfterResult(); });
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
-  const submitDispute = useCallback(async (payload: ProblemPayload) => {
+  const submitDispute = useCallback(async (payload: ProblemPayload | ProcedurePayload) => {
     if (busy || !page?.can_dispute) return false;
-    setBusy(true);
-    setError("");
-    try {
-      await api.post(`/matches/${idSegment(route.params.id)}/dispute`, payload);
-      await load({ preserveDrafts: false });
-      setSuccess("Gemeldet. Die Turnierleitung schaut es sich an.");
-      return true;
-    } catch (err) {
-      setError(errorMessage(err, "Problem konnte nicht gemeldet werden."));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, load, page?.can_dispute, route.params.id]);
+    return Boolean(await once(async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const { data: answer } = await api.post<{ procedure_id?: string | null }>(`/matches/${idSegment(route.params.id)}/dispute`, payload);
+        // Liga (E.2): Mit der Kennung des Verfahrens folgt gleich der Schritt „Nachweise“.
+        if (answer?.procedure_id) setProcedureStep(answer.procedure_id);
+        await load({ preserveDrafts: false });
+        setSuccess(answer?.procedure_id ? "Eingereicht. Die Liga-Leitung schaut es sich an." : "Gemeldet. Die Turnierleitung schaut es sich an.");
+        return true;
+      } catch (err) {
+        setError(errorMessage(err, "Problem konnte nicht gemeldet werden."));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    }));
+  }, [busy, load, once, page?.can_dispute, route.params.id]);
 
   // Liga-Spieltag (#2173): ein Weg für Einchecken, Start, Veto-Zug und „Bereit“ - Fehler und Erfolg stehen oben wie überall.
   const runLeague = useCallback(async (task: () => Promise<string | void>, fallback: string) => {
     if (busy) return;
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    try {
-      const done = await task();
-      if (done) setSuccess(done);
-    } catch (err) {
-      setError(errorMessage(err, fallback));
-      // Ein veralteter Stand (409) ist meist der Grund - gleich frisch laden.
-      void load({ preserveDrafts: true });
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, load]);
+    await once(async () => {
+      setBusy(true);
+      setError("");
+      setSuccess("");
+      try {
+        const done = await task();
+        if (done) setSuccess(done);
+      } catch (err) {
+        setError(errorMessage(err, fallback));
+        // Ein veralteter Stand (409) ist meist der Grund - gleich frisch laden.
+        void load({ preserveDrafts: true });
+      } finally {
+        setBusy(false);
+      }
+    });
+  }, [busy, load, once]);
   const reloadLeague = useCallback(async () => {
     await invalidateCache(`/matches/${route.params.id}`);
     await load({ preserveDrafts: true });
@@ -550,6 +581,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
+        {/* Vorfälle (D.5): öffentlich nur „in Klärung“ bzw. „zählt nicht“ je Map - wie im Web unter dem Ergebnis. */}
+        {league ? <MapStateNotes league={league} /> : null}
+
         {page.call ? <MatchCallCard call={page.call} /> : null}
 
         {/* Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt. */}
@@ -566,7 +600,30 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         {page.in_dispute ? (
           <View style={styles.disputeNotice} testID="match-in-dispute">
             <Ionicons name="alert-circle-outline" color={colors.live} size={20} />
-            <Body style={styles.flex}>In Klärung – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.</Body>
+            <Body style={styles.flex}>{page.league ? "In Klärung – zu diesem Spiel wurde ein Problem gemeldet. Die Liga-Leitung prüft und entscheidet." : "In Klärung – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet."}</Body>
+          </View>
+        ) : null}
+
+        {/* Liga-Verfahren (E.2): öffentlich nur „in Klärung“ - Beteiligte sehen Stand, Fristen und Entscheidung. */}
+        {page.league?.contested && !page.in_dispute ? (
+          <View style={styles.disputeNotice} testID="match-contested">
+            <Ionicons name="scale-outline" color={colors.gold} size={20} />
+            <Body style={styles.flex}>In Klärung – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.</Body>
+          </View>
+        ) : null}
+        {/* Einspruch gegen eine Wertung kampflos oder eine Korrektur (Nr. 41, 45) - gegen einen Protestentscheid steht er an dessen Karte. */}
+        {procedureForm?.appealable ? (
+          <Card style={styles.card} testID="match-appealable">
+            <Body>{procedureForm.appealable.type === "forfeit" ? "Dieses Spiel wurde kampflos gewertet." : "Das Ergebnis dieses Spiels wurde von der Liga-Leitung korrigiert."} Seid ihr nicht einverstanden, könnt ihr einmal Einspruch einlegen.</Body>
+            <AppealForm matchId={idSegment(route.params.id)} against={procedureForm.appealable} until={procedureForm.appealable.until} onChanged={reloadLeague} testID="match-appeal" />
+          </Card>
+        ) : null}
+        {procedures.length ? (
+          <View style={styles.stack} testID="match-procedures" accessibilityLabel="Verfahren zu diesem Spiel">
+            {procedures.map((procedure) => (
+              <ProcedureCard key={procedure.id} matchId={idSegment(route.params.id)} procedure={procedure} onChanged={reloadLeague}
+                sideNames={Object.fromEntries((league?.sides || []).map((side) => [side.registration_id, side.name || ""]))} />
+            ))}
           </View>
         ) : null}
 
@@ -578,6 +635,20 @@ export function MatchDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="time-outline" color={colors.cyan} size={20} />
                 <Body style={styles.flex}>{reportHint}</Body>
               </View>
+            ) : (canPlayerReportResult || showReportReadOnly) && league && !league.sides?.length ? (
+              <View style={styles.reportHint} testID="league-report-no-sides">
+                <Ionicons name="time-outline" color={colors.cyan} size={20} />
+                <Body style={styles.flex}>Für dieses Liga-Spiel stehen noch nicht beide Co-Teams fest. Melden geht, sobald beide eingetragen sind.</Body>
+              </View>
+            ) : (canPlayerReportResult || showReportReadOnly) && league ? (
+              <LeagueReportCard
+                league={league}
+                readOnly={!canPlayerReportResult}
+                onWrongResult={() => setProblemCategory("wrong_result")}
+                state={page.report_state || null}
+                busy={busy}
+                onReport={submitReport}
+              />
             ) : canPlayerReportResult || showReportReadOnly ? (
               <MatchReportCard
                 readOnly={!canPlayerReportResult}
@@ -600,10 +671,19 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             {canStaffSubmitResult && page.result_entry?.hold ? (
               <Muted style={styles.textCyan} testID="match-staff-result-held">{page.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${page.result_entry.hold.actor_name || "Die Turnierleitung"} trägt gerade das Ergebnis ein.`}</Muted>
             ) : null}
-            {canDispute ? (
+            {canDispute && procedureForm ? (
+              <ProcedureGuidedForm matchId={idSegment(route.params.id)} guide={procedureForm} busy={busy} initialReason={problemCategory}
+                sides={(league?.sides || []).map((side) => ({ id: side.registration_id, name: side.name || "" }))}
+                createdId={procedureStep} onSubmit={submitDispute} onDone={() => setProcedureStep(null)} />
+            ) : canDispute ? (
               <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} initialCategory={problemCategory} />
             ) : null}
           </Card>
+        ) : null}
+
+        {/* Vorfälle im Spiel (D.5, #1619): melden, antworten, Nachweise - nur Beteiligte und Leitung bekommen den Block. */}
+        {league?.incident_info ? (
+          <IncidentPanel league={league} matchId={idSegment(route.params.id)} busy={busy} run={runLeague} onChanged={reloadLeague} />
         ) : null}
 
         {showScheduleCard ? (
@@ -623,11 +703,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )}
           {pendingProposals.length ? (
             <View style={styles.stack}>
-              {pendingProposals.map((proposal) => (
-                <View key={proposal.id} style={styles.proposal}>
+              {pendingProposals.map((proposal, index) => (
+                <View key={proposal.id || `proposal-${index}`} style={styles.proposal}>
                   <Body style={styles.strong}>{formatWhen(proposal.scheduled_at, { fallback: "ohne Zeit" })}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
-                  {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
+                  {canManageSchedule && proposal.id && canDecideScheduleProposal(page, proposal) ? (
                     <>
                       <View style={styles.buttonRow}>
                         <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />

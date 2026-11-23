@@ -120,7 +120,7 @@ export function TeamsSection({ navigation }: Props) {
               <View style={styles.stats}>
                 <Stat icon="shield-outline" label="Teams" value={statTeams.length} />
                 <Stat icon="people-outline" label="Mitglieder" value={memberTotal} tone="gold" />
-                {squadTotal > 0 ? <Stat icon="layers-outline" label="Squads" value={squadTotal} /> : null}
+                {squadTotal > 0 ? <Stat icon="layers-outline" label="Co-Teams" value={squadTotal} /> : null}
               </View>
             ) : null}
 
@@ -143,7 +143,7 @@ export function TeamsSection({ navigation }: Props) {
           <EmptyState
             icon="people-outline"
             title="Noch kein Team"
-            detail="Einem Team trittst du über eine Einladung oder einen Join-Code bei - oder du gründest selbst eins."
+            detail="Einem Team trittst du über eine Einladung oder einen Beitrittscode bei - oder du gründest selbst eins."
             action={{ label: "Team gründen", onPress: () => { openLink(`${WEB_BASE_URL}/teams`); }, testID: "teams-empty-create" }}
             testID="teams-empty"
           />
