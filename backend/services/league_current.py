@@ -88,10 +88,11 @@ def _next_match(matches: list[dict], registration_id: str, names: dict[str, str]
             "opponent": names.get(other) if other else None, "link": f"/matches/{match.get('id')}"}
 
 
-async def live_places(db, tournaments: list[dict], registration_ids) -> dict[str, dict]:
+async def live_places(db, tournaments: list[dict], registration_ids, *, accounts: dict | None = None) -> dict[str, dict]:
     """Je Anmeldung aus ``registration_ids`` ``{rank, of, zone, zone_label, next_match}`` in ihrer laufenden Staffel.
 
-    ``tournaments``: die ganzen Staffel-Dokumente (Tabellenregeln, Entscheide, Abzüge). Feste Zahl an Abfragen für alle Staffeln."""
+    ``tournaments``: die ganzen Staffel-Dokumente (Tabellenregeln, Entscheide, Abzüge). Feste Zahl an Abfragen für alle Staffeln.
+    ``accounts``: wird mit den Kontonamen der Solo-Anmeldungen ohne eigenen Namen gefüllt - der Aufrufer fragt sie nicht noch einmal ab."""
     from routes.tournament_view_routes import _standing_rows
     from services.competition_read import CompetitionReadModel
 
@@ -112,8 +113,10 @@ async def live_places(db, tournaments: list[dict], registration_ids) -> dict[str
     for row in divisions:
         if row.get("status") != "archived" and isinstance(row.get("level"), int):
             levels.setdefault(row.get("season_id"), []).append(row["level"])
-    accounts = await account_names(db, registrations)
-    names = {row["id"]: row.get("display_name") or row.get("team_name") or row.get("squad_name") or accounts.get(row["id"]) or "Team"
+    found = await account_names(db, registrations)
+    if accounts is not None:
+        accounts.update(found)
+    names = {row["id"]: row.get("display_name") or row.get("team_name") or row.get("squad_name") or found.get(row["id"]) or "Team"
              for row in registrations if row.get("id")}
     out: dict[str, dict] = {}
     for tid in ids:
@@ -213,8 +216,8 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
         if guest_sees:
             guest_sees = await sees_listed_tournament(PUBLIC, tournament)
         shown.append((registration, tournament, season, league, division, not guest_sees))
-    places = await live_places(db, [row[1] for row in shown], [row[0]["id"] for row in shown])
-    accounts = await account_names(db, [row[0] for row in shown])
+    accounts: dict[str, str] = {}
+    places = await live_places(db, [row[1] for row in shown], [row[0]["id"] for row in shown], accounts=accounts)
     out = []
     for registration, tournament, season, league, division, internal in shown:
         page_exists = league.get("status") == "active" and season.get("status") != "archived"
