@@ -3,9 +3,9 @@ aiosmtplib==5.1.3
 bcrypt==5.0.0
 cryptography==50.0.2
 defusedxml==0.7.1
-email-validator==2.3.0
+email-validator==2.4.0
 dnspython==2.9.2
-fastapi==0.162.7
+fastapi==0.165.0
 google-auth==2.62.2
 aiohttp==3.14.5
 discord.py==2.7.1
@@ -15,14 +15,14 @@ motor==3.7.1
 # Bildprüfung (#415): NudeNet (ONNX) samt Laufzeit - kein Bild verlässt den Server
 nudenet==3.4.2
 onnxruntime==1.32.0
-opencv-python-headless==5.0.0.93
+opencv-python-headless==5.1.0.95
 pillow==13.0.0
 pillow-heif==1.8.1
-pydantic==2.14.3
+pydantic==2.14.4
 PyJWT==2.15.1
-pymongo==4.20.0
+pymongo==4.20.1
 python-dotenv==1.2.4
-python-multipart==0.0.33
+python-multipart==0.0.34
 # Zweiter Leser für Ergebnis-Bilder (#2018): RapidOCR (Apache-2.0) über onnxruntime, das Modell PP-OCRv6 small
 # (Apache-2.0) lädt das Dockerfile. Abhängigkeiten von RapidOCR fest: omegaconf, shapely (BSD-3-Clause), pyclipper,
 # colorlog, six, PyYAML (MIT), tqdm (MPL-2.0/MIT).
@@ -37,7 +37,7 @@ tqdm==4.70.1
 rawpy==0.28.0
 reportlab==4.5.1
 requests==2.34.2
-resend==2.53.2
+resend==2.55.0
 # SVG-Logos (#1952): PNG-Fassung ohne Systembibliothek (resvg-py MIT, resvg Apache-2.0 OR MIT)
 resvg-py==0.5.0
 starlette==1.10.0
