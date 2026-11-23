@@ -103,6 +103,11 @@ def scores_and_history(participants: list[str], matches: list[dict]) -> tuple[di
 
     Only decided matches count. A pending round must not influence the next
     pairing, otherwise a half-entered round would scramble the field.
+
+    Für jeden aus ``participants`` zählt jedes entschiedene Spiel - auch gegen jemanden, der nicht (mehr) im Feld steht,
+    weil er schon weiter, ausgeschieden oder abgemeldet ist (#1559). Sonst fehlten bei „Siege/Niederlagen“ genau die
+    Siege gegen Ausgeschiedene, und ein 2-1 traf auf ein 1-2. Die Punkte sind damit dieselben wie in ``records``:
+    Siege plus halbe Unentschieden.
     """
     scores: dict[str, float] = {item: 0.0 for item in participants}
     opponents: dict[str, set] = {item: set() for item in participants}
@@ -116,31 +121,27 @@ def scores_and_history(participants: list[str], matches: list[dict]) -> tuple[di
             if present[0] in scores:
                 scores[present[0]] += WIN_POINTS
             continue
-        taking_part = [item for item in present if item in scores]
-        if len(taking_part) < 2:
-            continue
-        for item in taking_part:
-            opponents[item].update(other for other in taking_part if other != item)
+        for item in present:
+            if item in opponents:
+                opponents[item].update(other for other in present if other != item)
 
-        results = match.get("results") or []
-        ranked = sorted(
-            (entry for entry in results if entry.get("registration_id") in scores),
-            key=lambda entry: entry.get("rank") or 999,
-        )
+        # Wer gewonnen hat, entscheidet sich an allen Einträgen des Spiels - nicht nur an denen, die noch im Feld sind.
+        ranked = [entry for entry in match.get("results") or [] if entry.get("registration_id")]
         if not ranked:
             continue
-        best_rank = ranked[0].get("rank")
-        winners = [entry for entry in ranked if entry.get("rank") == best_rank]
+        best_rank = min(entry.get("rank") or 999 for entry in ranked)
+        winners = [entry for entry in ranked if (entry.get("rank") or 999) == best_rank]
         points = WIN_POINTS if len(winners) == 1 else DRAW_POINTS
         for entry in winners:
-            scores[entry["registration_id"]] += points
+            if entry["registration_id"] in scores:
+                scores[entry["registration_id"]] += points
     return scores, opponents
 
 
 def records(participants: list[str], matches: list[dict]) -> dict[str, dict]:
     """Siege, Niederlagen, Unentschieden und Freilose je Teilnehmer - die Bilanz für „3 Siege weiter, 3 Niederlagen
-    raus“. Ein Freilos zählt als Sieg. Anders als ``scores_and_history`` zählt hier jedes entschiedene Spiel, auch
-    gegen jemanden, der inzwischen ausgeschieden ist."""
+    raus“. Ein Freilos zählt als Sieg. Wie in ``scores_and_history`` zählt jedes entschiedene Spiel, auch gegen
+    jemanden, der inzwischen ausgeschieden ist."""
     out = {item: {"won": 0, "lost": 0, "drawn": 0, "byes": 0} for item in participants}
     for match in matches:
         if match.get("status") not in DECIDED_STATUSES:

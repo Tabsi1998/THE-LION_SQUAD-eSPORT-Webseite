@@ -390,3 +390,47 @@ def test_a_bye_counts_as_a_win_towards_advancing():
 
 def test_nothing_is_complete_before_the_first_round():
     assert swiss_state(wins_losses(), ["a"], [])["complete"] is False
+
+
+# ---------------------------------------------------------------- Gepaart wird nach der ganzen Bilanz
+
+def test_a_win_against_someone_who_no_longer_plays_still_counts_for_the_pairing():
+    """x ist schon weiter, y schon raus - beide stehen nicht mehr im Feld. Der Sieg gegen sie bleibt ein Sieg, die
+    Niederlage gegen sie bringt keinen Punkt, und das Unentschieden gegen sie zählt halb."""
+    played = [decided(1, "a", "y"), decided(1, "x", "b"), drawn(2, "c", "x"), decided(2, "a", "c")]
+
+    scores, opponents = scores_and_history(["a", "b", "c"], played)
+
+    assert scores == {"a": 2.0, "b": 0.0, "c": 0.5}
+    assert opponents["a"] == {"y", "c"}
+
+
+def test_points_for_the_pairing_match_the_record():
+    """Dieselbe Geschichte, zwei Rechnungen: die Punkte der Paarung sind Siege plus halbe Unentschieden der Bilanz."""
+    rng = random.Random(7)
+    players = field(10)
+    matches: list[dict] = []
+    for round_number in range(1, 6):
+        play_round(players, matches, round_number, seed=round_number, rng=rng)
+
+    still_playing = players[::2]
+    scores, _ = scores_and_history(still_playing, matches)
+    record = records(still_playing, matches)
+
+    assert scores == {player: record[player]["won"] + 0.5 * record[player]["drawn"] for player in still_playing}
+
+
+def test_only_the_active_are_paired_but_by_all_their_results():
+    """Siege/Niederlagen: p1 und p2 haben zweimal gewonnen, p3 und p4 zweimal verloren - alles gegen Leute, die schon
+    weiter oder raus sind. Vorher zählte davon nichts, alle vier galten als punktgleich und wurden gelost."""
+    regs = registrations("p1", "p2", "p3", "p4", "w1", "w2", "l1", "l2")
+    played = [decided(1, "p1", "l1"), decided(1, "p2", "l2"), decided(1, "w1", "p3"), decided(1, "w2", "p4"),
+              decided(2, "p1", "l2"), decided(2, "p2", "l1"), decided(2, "w1", "p4"), decided(2, "w2", "p3")]
+
+    for stage_number in range(20):
+        documents = swiss_round_documents(
+            TOURNAMENT, {**STAGE, "id": f"stage-{stage_number}"}, regs, played, round_number=3,
+            participants=["p1", "p2", "p3", "p4"])
+        pairs = sorted(tuple(sorted(slot["registration_id"] for slot in document["slots"])) for document in documents)
+
+        assert pairs == [("p1", "p2"), ("p3", "p4")], f"Phase {stage_number}"
