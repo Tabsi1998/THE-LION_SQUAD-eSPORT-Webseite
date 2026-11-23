@@ -242,9 +242,9 @@ function ResultRow({ match }) {
     <Link to={match.publicUrl} className="block border border-white/10 bg-black/20 rounded-sm p-3 hover:border-[#29B6E8]/40 transition">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">{match.tournament?.title || "Turnier"}</div>
-          <div className="mt-1 font-heading font-bold uppercase line-clamp-2">{match.labels.join(" vs. ") || match.groupLabel}</div>
-          {match.resultText && <div className="mt-1 text-xs text-[#00FF88] line-clamp-2">{match.resultText}</div>}
+          <div className="tls-wrap text-[10px] uppercase tracking-widest text-white/35">{match.tournament?.title || "Turnier"}</div>
+          <div className="tls-wrap mt-1 font-heading font-bold uppercase">{match.labels.join(" vs. ") || match.groupLabel}</div>
+          {match.resultText && <div className="tls-wrap mt-1 text-xs text-[#00FF88]">{match.resultText}</div>}
         </div>
         <span className="text-[10px] uppercase tracking-widest font-bold text-white/45">{formatMatchStatus(match.status)}</span>
       </div>
@@ -264,7 +264,7 @@ function ActivityRow({ item, accessToken }) {
       </div>
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-widest text-white/35">{isFastLap ? "Fast Lap" : "Turnier"}</div>
-        <div className="font-heading font-bold uppercase truncate">{item.title || item.name}</div>
+        <div className="tls-wrap font-heading font-bold uppercase">{item.title || item.name}</div>
       </div>
     </Link>
   );
@@ -276,8 +276,9 @@ function StationRow({ station }) {
   return (
     <div className="flex items-center justify-between gap-3 border border-white/10 bg-black/20 rounded-sm p-3">
       <div className="min-w-0">
-        <div className="font-heading font-bold uppercase truncate">{station.name || station.label || station.id}</div>
-        <div className="text-xs text-white/40 truncate">{station.notes || station.device_type || "Station"}</div>
+        <div className="tls-wrap font-heading font-bold uppercase">{station.name || station.label || station.id}</div>
+        {/* Notizen sind Vorschau-Text (#1314): eine Zeile, der volle Text im title. */}
+        <div className="text-xs text-white/40 truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
       </div>
       <span className={`shrink-0 rounded-sm border px-2 py-1 text-[10px] uppercase tracking-widest font-bold ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
         {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
