@@ -14,6 +14,7 @@ import "./leagueBadge.css";
 // Die Metalle (Cyan, Gold für den Meister) stehen als --tls-lbadge-light/-base/-dark in leagueBadge.css - Gold über die Rolle
 // --tls-honor, wie REWARD_METALS (RewardArt) bzw. METALS.gold (TrophyShelf).
 const paint = (part) => `var(--tls-lbadge-${part})`;
+const SEP = " · ";
 const SHIELD = "M10 20h44v24c0 17-10 27-22 33C20 71 10 61 10 44z";
 const FIELD = "M15.5 25.5h33v18.5c0 12.6-7.4 20.4-16.5 25.4-9.1-5-16.5-12.8-16.5-25.4z";
 const RIM = "M13 23h38v21c0 15-9 24-19 29.6C22 68 13 59 13 44z";
@@ -116,8 +117,9 @@ export function LeagueBadge({ badge, size = "card", label = true, play = true, i
       {label ? (
         <span className="tls-lbadge__text" data-testid={testId ? `${testId}-label` : undefined} title={text}>
           <span className="tls-lbadge__level">Liga {number}</span>
-          {nickname ? <span className="tls-lbadge__nick"><span className="tls-lbadge__dot"> · </span>{nickname}</span> : null}
-          {badge.champion ? <span className="tls-lbadge__champion">{size === "list" ? <span className="sr-only">, Season-Meister</span> : " · Meister"}</span> : null}
+          {/* Feste Leerzeichen um den Punkt: Am Rand eines Flex-Elements fiele ein normales Leerzeichen weg. */}
+          {nickname ? <span className="tls-lbadge__nick"><span className="tls-lbadge__dot">{SEP}</span>{nickname}</span> : null}
+          {badge.champion ? <span className="tls-lbadge__champion">{size === "list" ? <span className="sr-only">, Season-Meister</span> : size === "hero" ? "Meister" : `${SEP}Meister`}</span> : null}
         </span>
       ) : null}
     </span>

@@ -70,6 +70,13 @@ async function shot(target, name) {
   await target.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", style: HIDE_CHROME });
 }
 
+// Die Linie wartet unsichtbar, bis sie ins Bild kommt - dann einmal einblenden lassen.
+async function seeLine(page, line) {
+  await line.scrollIntoViewIfNeeded();
+  await expect(line.locator(".tls-season-line")).toHaveAttribute("data-play", /run|done/);
+  await page.waitForTimeout(1600);
+}
+
 // Zwei Abschnitte untereinander in einem Bild.
 async function shotSpan(page, first, last, name) {
   const dir = process.env.E2E_SCREENS_DIR;
@@ -124,7 +131,8 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       await expect(block.getByTestId("profile-league-current-b-zone")).toContainText("Aufstieg");
       await expect(block.getByTestId("profile-league-current-c-place")).toHaveText("Noch ohne Ergebnis · 7 Teams");
       await expect(block.getByTestId("profile-league-current-a-next")).toContainText("gegen Sturmfalken · Falken Rot");
-      // Beim ersten Erscheinen spielt die Bewegung einmal, danach Ruhe.
+      // Beim ersten Erscheinen spielt die Bewegung einmal, danach Ruhe - vorher wartet das Wappen unsichtbar.
+      await block.scrollIntoViewIfNeeded();
       await expect(block.getByTestId("profile-league-current-a-badge")).toHaveAttribute("data-play", /run|done/);
       const line = page.getByTestId("profile-season-line");
       await expect(line.getByRole("img")).toHaveAttribute("aria-label", /Season 1: Liga 3, Platz 1 von 6; Season 2: Liga 2, Platz 2 von 6; Season 3: Liga 1, Platz 1 von 6, Meister/);
@@ -132,7 +140,7 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       await expect(page.getByTestId("profile-league-history-s3-badge")).toHaveAttribute("data-metal", "gold");
       await expect(page.getByTestId("profile-league-history-s2-badge")).toHaveAttribute("data-metal", "cyan");
       await noSideScroll(page);
-      await page.waitForTimeout(1800);
+      await seeLine(page, line);
       await shotSpan(page, block, line, `profil-aktuelle-ligen-${width}`);
     });
 
@@ -149,7 +157,7 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       await expect(line.getByTestId("team-season-line-legend")).toContainText("Nordlicht · Nordlicht B");
       await expect(page.getByTestId("team-league-history")).toBeVisible();
       await noSideScroll(page);
-      await page.waitForTimeout(1800);
+      await seeLine(page, line);
       await shotSpan(page, block, line, `teamseite-liga-${width}`);
     });
   }

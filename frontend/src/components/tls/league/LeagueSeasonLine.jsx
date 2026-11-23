@@ -2,6 +2,7 @@
 // - ein Aufstieg hebt die Linie, auch wenn der Platz in der höheren Liga N schlechter ist. Liga N steht als Band, der Platz am Punkt,
 // der Meister in Gold. Profil: eine Linie für die Person; Teamseite: je Co-Team eine. Quelle ist die Season-Historie (Endstände), unter
 // zwei Seasons zeigt der Baustein nichts. Eigenes SVG ohne Diagramm-Bibliothek - die bleibt aus öffentlichen Seiten draußen (#936).
+import { useEffect, useRef, useState } from "react";
 import { TrendingUp } from "lucide-react";
 import { seasonLine } from "@/lib/leagueBadge";
 import { useFirstSight } from "@/components/tls/league/LeagueBadge";
@@ -13,7 +14,25 @@ const GUTTER = 58;
 const BAND = 52;
 const TOP = 16;
 const BOTTOM = 24;
-const STEP = 92;
+// Mindestabstand zweier Seasons - reicht die Breite nicht, wischt man die Linie seitlich.
+const STEP = 64;
+const FALLBACK_WIDTH = 640;
+
+/** Die Breite der Fläche in Pixeln: Das SVG zeichnet 1:1, Schrift und Punkte bleiben an jeder Breite gleich groß. */
+function useWidth() {
+  const ref = useRef(null);
+  const [width, setWidth] = useState(FALLBACK_WIDTH);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === "undefined") return undefined;
+    const update = () => setWidth(Math.round(node.clientWidth) || FALLBACK_WIDTH);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width];
+}
 
 function clip(text, max) {
   const value = String(text || "");
@@ -30,11 +49,12 @@ function summary(line, byTeam) {
 export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season-line" }) {
   const line = seasonLine(rows, { byTeam });
   const [ref, state] = useFirstSight(Boolean(line));
+  const [boxRef, box] = useWidth();
   if (!line) return null;
   const first = line.levels[0];
   const last = line.levels[line.levels.length - 1];
   const bands = Array.from({ length: last - first + 1 }, (_, at) => first + at);
-  const width = Math.max(300, Math.min(760, GUTTER + 28 + (line.seasons.length - 1) * STEP + 28));
+  const width = Math.max(box, GUTTER + 56 + (line.seasons.length - 1) * STEP);
   const height = TOP + bands.length * BAND + BOTTOM;
   const span = width - GUTTER - 56;
   const x = (index) => GUTTER + 28 + (line.seasons.length > 1 ? (index * span) / (line.seasons.length - 1) : span / 2);
@@ -46,8 +66,8 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
         <TrendingUp className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> Saisonverlauf
       </h2>
       <div ref={ref} className="tls-season-line" data-play={state}>
-        <div className="tls-swipe">
-          <svg viewBox={`0 0 ${width} ${height}`} className="tls-season-line__svg" style={{ minWidth: Math.round(width * 0.82) }} role="img"
+        <div ref={boxRef} className="tls-swipe">
+          <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="tls-season-line__svg" role="img"
             aria-label={`Saisonverlauf: ${summary(line, byTeam)}`} data-testid={`${testId}-svg`}>
             {bands.map((level, at) => (
               <g key={level}>
