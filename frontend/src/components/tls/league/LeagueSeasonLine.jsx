@@ -31,6 +31,8 @@ const LABEL_GAP = 11;
 // Eine Beschriftung (Grundlinie `spot`, Schrift 10 px: etwa 9 px darüber, 2 px darunter) trifft einen Kreis (Radius bis 6 px plus Rand
 // und 1 px Luft), wenn ihre Grundlinie zwischen 9 px über und 16 px unter seiner Mitte liegt (Review #1638: „6.“ lag auf Kreisen).
 const hitsCircle = (spot, cy) => spot > cy - 9 && spot < cy + 16;
+// Seitlicher Abstand mehrerer Rückzüge in derselben Season und Liga N - sonst lägen die Punkte genau übereinander.
+const EXIT_SHIFT = 11;
 // Ohne Messung (erster Zeichenschritt, Tests) die kleinste nötige Breite - nie breiter als die Fläche (Review #1638: bei 320 px wuchs
 // die Spalte sonst auf die Startbreite mit, und die Messung bestätigte sie).
 const FALLBACK_WIDTH = 0;
@@ -115,8 +117,18 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
   const span = width - GUTTER - 2 * pad;
   const x = (index) => GUTTER + pad + (line.seasons.length > 1 ? (index * span) / (line.seasons.length - 1) : span / 2);
   const y = (value) => TOP + (value - (first - 1)) * BAND + 6;
-  // Ein Rückzug steht mitten im Band seiner Liga N.
+  // Ein Rückzug steht mitten im Band seiner Liga N; mehrere in derselben Season und Liga N nebeneinander (Review #1638).
   const yOf = (point) => (point.exit ? y(point.level - 0.5) : y(point.value));
+  const exitGroups = new Map();
+  line.series.forEach((row, at) => row.points.forEach((point) => {
+    if (!point.exit) return;
+    const key = `${point.index}-${point.level}`;
+    exitGroups.set(key, [...(exitGroups.get(key) || []), at]);
+  }));
+  const shiftOf = (at, point) => {
+    const group = exitGroups.get(`${point.index}-${point.level}`) || [at];
+    return (group.indexOf(at) - (group.length - 1) / 2) * EXIT_SHIFT;
+  };
   // Höchstens vier Linien - die besten Co-Teams (seasonLine sortiert); die übrigen nennt ein Satz darunter (Fabian 23.11.).
   const series = line.series;
   // Wo eine Beschriftung am Punkt steht (Review #1638): zuerst über dem Punkt, stößt sie dort an eine schon gesetzte derselben Season
@@ -138,7 +150,14 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
     placed.set(point.index, [...taken, spot]);
     spots.set(`${at}-${point.index}`, spot);
   };
-  series.forEach((row, at) => row.points.forEach((point) => (point.exit ? place(at, point) : null)));
+  // Mehrere Rückzüge mit demselben Grund in derselben Season und Liga N stehen nebeneinander - eine Beschriftung gilt für alle.
+  const exitLabeled = new Set();
+  series.forEach((row, at) => row.points.forEach((point) => {
+    const key = `${point.index}-${point.level}-${point.exit}`;
+    if (!point.exit || exitLabeled.has(key)) return;
+    exitLabeled.add(key);
+    place(at, point);
+  }));
   series.forEach((row, at) => row.points.forEach((point, index) => {
     if (point.exit) return;
     const before = row.points[index - 1];
@@ -185,7 +204,9 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
                   <g key={`${row.name}-${point.index}`} className="tls-season-line__point" data-exit={point.exit} style={{ "--tls-i": Math.min(index, 8) }}
                     data-testid={`${testId}-exit-${at}-${point.index}`}>
                     <title>{`${point.season}: ${exitLabel(point.exit)}`}</title>
-                    <circle cx={x(point.index)} cy={yOf(point)} r="4.5" fill="#0A0A0A" stroke={EXIT_COLOR} strokeWidth="2" strokeDasharray="2 2" />
+                    {/* Grauer Punkt, der Rand in der Farbe der Linie - so erkennt man das Co-Team auch bei zwei Rückzügen nebeneinander. */}
+                    <circle cx={x(point.index) + shiftOf(at, point)} cy={yOf(point)} r="4.5" fill={EXIT_COLOR} stroke={COLORS[at]} strokeWidth="2"
+                      strokeDasharray="2 2" data-testid={`${testId}-exit-dot-${at}-${point.index}`} />
                     {spot !== undefined ? (
                       <text className="tls-season-line__exit" x={x(point.index)} y={spot} textAnchor="middle" data-measure="exit">{exitLabel(point.exit)}</text>
                     ) : null}
