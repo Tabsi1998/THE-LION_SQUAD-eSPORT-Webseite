@@ -1,6 +1,6 @@
 import type { ClubEvent, F1Challenge, Tournament } from "../types";
 import { eventOfferSummary } from "./eventPrice";
-import { formatTournamentFormat, formatWhen } from "./format";
+import { formatTournamentDisplay, formatWhen } from "./format";
 import { viennaDay, viennaTime } from "./vienna";
 
 // Die Event-Seite als Startpunkt (#1183), Kopf mit Bild (#1273) und Fakten-Kasten (#1346) - dieselbe Rechnung und dieselbe
@@ -133,7 +133,7 @@ export function whatsOnRows(event: EventWithItems | null | undefined): WhatsOnRo
       dayLabel: multi && item.event_day ? `Tag ${item.event_day.index}` : "",
       timeLabel: multi ? weekdayClock(item.start_date) : clock(item.start_date),
       mode: kind === "fastlap" ? "Bestzeit fahren" : team ? "Team" : "Einzel",
-      detail: kind === "tournament" ? [item.game?.display_name || item.game?.name || item.game_name, item.format ? (item.format_label || formatTournamentFormat(item.format)) : ""].filter(Boolean).join(" · ") : "",
+      detail: kind === "tournament" ? [item.game?.display_name || item.game?.name || item.game_name, item.format ? formatTournamentDisplay(item) : ""].filter(Boolean).join(" · ") : "",
       mine: mine ? { label: mine.label, team: mine.team_name || null } : null,
       action: !mine && kind === "tournament" && state === "registration_open" ? "register" : null,
       phase: item.public_phase || null,

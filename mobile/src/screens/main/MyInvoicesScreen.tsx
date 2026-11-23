@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { InvoiceList } from "../../components/InvoiceList";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
@@ -8,7 +8,9 @@ import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import { INVOICE_QUESTION_URL } from "../../lib/contactLinks";
 import { formatDateTime } from "../../lib/format";
+import { openLink } from "../../lib/openLink";
 import { emptyText, filterInvoices, payHint, sourceFilters, STATE_FILTERS, type SourceFilter, type StateFilter } from "../../lib/invoices";
 import { formatMoney } from "../../lib/memberArea";
 import { openInvoice, type Invoice, type InvoiceList as InvoiceListData } from "../../lib/memberDocuments";
@@ -112,6 +114,10 @@ export function MyInvoicesScreen({ route }: Props) {
               )}
             </View>
             {hint ? <Muted testID="invoices-pay-hint">{hint}</Muted> : null}
+            {/* Frage zu einer Rechnung (#2131 FI13): das Kontaktformular mit dem Thema Rechnung - wie im Web. */}
+            <Pressable onPress={() => { void openLink(INVOICE_QUESTION_URL); }} accessibilityRole="link" hitSlop={8} testID="invoices-question">
+              <Muted style={styles.questionLink}>Frage zu einer Rechnung? Schreib dem Kassier.</Muted>
+            </Pressable>
           </>
         )}
       </ScrollView>
@@ -120,6 +126,12 @@ export function MyInvoicesScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  questionLink: {
+    color: colors.cyan,
+    fontWeight: "800",
+    minHeight: 44,
+    paddingVertical: 12,
+  },
   content: {
     gap: 12,
     padding: 16,

@@ -21,7 +21,7 @@ import {
   LIST_MODE_KEY, buildCards, childSummary, listMode, mineState, ownLabel, playLabel,
   type GroupCard, type GroupFilter, type GroupKind, type GroupRow, type ListMode, type MineMap,
 } from "../../lib/eventGroups";
-import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/format";
+import { formatEventType, formatTournamentDisplay, placeParts } from "../../lib/format";
 import { isInternal } from "../../lib/memberArea";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
@@ -84,7 +84,7 @@ function toHub(kind: GroupKind, raw: AnyDoc, own: string | null = null): HubItem
     return {
       kind: "tournament", id: tournament.slug || tournament.id, title: tournament.title, date: tournament.start_date, endDate: tournament.end_date,
       status: tournament.status, phase: tournament.public_phase?.label, image: tournament.banner_url || tournament.game?.cover_url || tournament.game?.logo_url, own, raw: tournament,
-      detail: [tournament.game?.display_name || tournament.game?.name || tournament.game_name, tournament.format_label || formatTournamentFormat(tournament.format)].filter(Boolean).join(" · "),
+      detail: [tournament.game?.display_name || tournament.game?.name || tournament.game_name, formatTournamentDisplay(tournament)].filter(Boolean).join(" · "),
     };
   }
   const challenge = raw as F1Challenge;

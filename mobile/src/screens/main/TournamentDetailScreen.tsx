@@ -13,7 +13,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { checkInLine } from "../../lib/checkInTimes";
-import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, formatWhen } from "../../lib/format";
+import { formatDate, formatDateTime, formatStatus, formatTeamMode, formatTournamentDisplay, formatWhen } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
 import { countsAsMatch, type BracketMatch } from "../../lib/bracketGraph";
@@ -414,7 +414,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             {/* Liga-Staffel (Folge #2453): der Stand der Season statt „Entwurf“ - ohne Liga-Recht vor dem Start neutral. */}
             <StatusBadge phase={staffelBadgePhase(tournament) || tournament.public_phase} status={tournament.status} />
             <Pill label={formatDate(tournament.start_date)} />
-            <Pill label={tournament.format_label || formatTournamentFormat(tournament.format) || "Format offen"} />
+            <Pill label={formatTournamentDisplay(tournament) || "Format offen"} />
             <Pill label={`${tournament.participant_count ?? tournament.participants?.length ?? registrations.length ?? 0}${tournament.max_participants ? `/${tournament.max_participants}` : ""} Teilnehmer`} />
           </View>
         </View>
@@ -469,7 +469,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                   </Muted>
                 ) : null}
                 {isTeamTournament && canSelfRegister && !manageableTeams.length ? (
-                  <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
+                  <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Teamleitung oder Co-Leitung verwalten darfst.</Muted>
                 ) : null}
                 {tournament.offer ? (
                   <View style={styles.feeBox} testID="tournament-offer">
@@ -538,7 +538,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
               {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
               <AddToCalendarButton item={tournament.start_date && !tournamentIsOver(tournament) ? {
                 id: tournament.id, kind: "tournament", title: tournament.title, start: tournament.start_date, end: tournament.end_date,
-                location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentFormat(tournament.format)].filter(Boolean).join(" · ") || null,
+                location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentDisplay(tournament)].filter(Boolean).join(" · ") || null,
                 url: tournament.slug ? `https://lionsquad.at/tournaments/${tournament.slug}` : null,
               } : null} />
               {/* Aufrufe abgelehnt (#1208): eine leise Zeile statt eines Dialogs bei jedem Öffnen. */}
@@ -898,13 +898,6 @@ function matchIncludesRegistration(match: any, registrationId: string) {
   return Boolean((match.slots || []).some((slot: any) => slot.registration_id === registrationId));
 }
 
-function formatTeamMode(value?: string | null) {
-  if (!value || value === "solo") return "Solo";
-  if (value === "team") return "Team";
-  if (value === "duo") return "Duo";
-  if (value === "squad") return "Squad";
-  return value.replace(/_/g, " ");
-}
 
 function Stat({ label, value, tone = "cyan" }: { label: string; value: string; tone?: "cyan" | "gold" }) {
   return (

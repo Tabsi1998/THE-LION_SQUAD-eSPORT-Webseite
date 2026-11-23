@@ -87,3 +87,15 @@ test("ein unbekannter Beleg aus dem Link öffnet nichts", async () => {
   await waitFor(() => expect(screen.getByTestId("invoice-d-501")).toBeTruthy());
   expect(mockOpenInvoice).not.toHaveBeenCalled();
 });
+
+// Frage zur Rechnung (#2131 FI13, Nachzug #2173): ein Weg zum Kassier mit dem Thema Rechnung.
+test("Frage zur Rechnung öffnet das Kontaktformular mit dem Thema Rechnung", async () => {
+  const { Linking } = jest.requireActual<typeof import("react-native")>("react-native");
+  const opened = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  await render(<MyInvoicesScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("invoices-question")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("invoices-question"));
+  await waitFor(() => expect(opened).toHaveBeenCalled());
+  expect(new URL(String(opened.mock.calls[0][0])).searchParams.get("topic")).toBe("invoice");
+  opened.mockRestore();
+});
