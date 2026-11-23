@@ -301,16 +301,20 @@ def own_best_lap(summary: dict, user_id: str) -> dict | None:
 
 # ---------------------------------------------------------------- Bericht und Fotos
 
-async def report_for(db, event: dict, user: dict | None) -> dict | None:
-    """Der Bericht: die neueste veröffentlichte News zum Event mit Kategorie „Rückblick“, die die Person sehen darf."""
+async def report_for(db, event: dict, user: dict | None, channel: str | None = None) -> dict | None:
+    """Der Bericht: die neueste veröffentlichte News zum Event mit Kategorie „Rückblick“, die die Person sehen darf - mit
+    Kanal (#1532) nur eine, die auf dieser Seite (Website oder App) erscheint."""
+    from services.news_channels import in_channel
+
     now = datetime.now(timezone.utc)
     posts = await db.news_posts.find(
         {"linked_event_ids": event["id"], "published": True, "category": "recap"},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "published_at": 1, "created_at": 1, "visibility": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "published_at": 1, "created_at": 1, "visibility": 1,
+         "channels": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(10)
     for post in posts:
         published = _instant(post.get("published_at"))
-        if published and published > now:
+        if (published and published > now) or (channel and not in_channel(post, channel)):
             continue
         if await user_can_see(user, post.get("visibility") or "public"):
             return {key: post.get(key) for key in ("id", "title", "slug", "excerpt", "banner_url", "published_at")}
@@ -342,7 +346,7 @@ def _tournament_people(table: dict) -> set[str]:
     return people
 
 
-async def build(db, event: dict, user: dict | None, now: datetime | None = None) -> dict:
+async def build(db, event: dict, user: dict | None, now: datetime | None = None, channel: str | None = None) -> dict:
     """Der Rückblick, wie die Person ihn sehen darf - vor dem Ende nur ``available: false``."""
     now = now or datetime.now(timezone.utc)
     if not is_over(event, now):
@@ -390,7 +394,7 @@ async def build(db, event: dict, user: dict | None, now: datetime | None = None)
             "fastlaps": len(over_challenges),
             "photos": await photo_count(db, event, user),
         },
-        "report": await report_for(db, event, user),
+        "report": await report_for(db, event, user, channel),
         "mine": None,
     }
     if user:

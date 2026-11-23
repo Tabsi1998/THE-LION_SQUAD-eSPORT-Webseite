@@ -97,3 +97,36 @@ test("die Liste nennt das Ende der Anheftung", async () => {
   expect(screen.getByTestId("news-pin-n2")).toHaveTextContent("Anpinnen abgelaufen (bis 05.01.2020)");
   expect(screen.queryByTestId("news-pin-n3")).toBeNull();
 });
+
+// Kanal (#1532): ein kleines Schild nur bei „Nur App“ oder „Nur Website“ - alte News ohne Feld gelten als beides.
+test("Schild für den Kanal in der Liste und Spalte in der CSV", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/admin/news") return { data: [
+      { ...POSTS[0] },
+      { id: "n2", title: "App-Update", slug: "app-update", category: "club", visibility: "public", published: true, channels: ["app"] },
+      { id: "n3", title: "Nur Web", slug: "nur-web", category: "club", visibility: "public", published: true, channels: ["web"] },
+    ] };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminNewsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("news-channel-n2")).toHaveTextContent("Nur App");
+  expect(screen.getByTestId("news-channel-n3")).toHaveTextContent("Nur Website");
+  expect(screen.queryByTestId("news-channel-n1")).toBeNull();
+
+  let written = "";
+  const OriginalBlob = globalThis.Blob;
+  globalThis.Blob = class { constructor(parts) { written = parts.join(""); } };
+  globalThis.URL.createObjectURL = vi.fn(() => "blob:x");
+  globalThis.URL.revokeObjectURL = vi.fn();
+  const click = vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  try {
+    exportNewsCsv([{ ...POSTS[0], status_label: "Veröffentlicht", date_label: "01.08.2026" }, { id: "n2", title: "App-Update", channels: ["app"] }]);
+  } finally {
+    globalThis.Blob = OriginalBlob;
+    click.mockRestore();
+  }
+  expect(written).toContain("Status;Datum;Kanal");
+  expect(written).toContain("01.08.2026;Website und App");
+  expect(written).toContain("App-Update;;;Öffentlich;;;Nur App");
+});

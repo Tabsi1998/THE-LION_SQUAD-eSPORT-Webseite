@@ -697,11 +697,11 @@ class VoteBody(BaseModel):
 
 
 @router.get("/area-summary")
-async def member_area_summary(user: dict = Depends(require_club_member())):
+async def member_area_summary(request: Request, user: dict = Depends(require_club_member())):
     """Was im Mitgliederbereich offen ist (#1257) - für die Sprungleiste und die Kacheln auf „Verein“ (Web und App)."""
-    from services import member_area
+    from services import member_area, news_channels
 
-    return await member_area.summary(get_db(), user)
+    return await member_area.summary(get_db(), user, channel=news_channels.request_channel(request))
 
 
 @router.get("/me/meetings")

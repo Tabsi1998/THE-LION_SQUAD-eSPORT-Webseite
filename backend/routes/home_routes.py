@@ -20,6 +20,7 @@ from models import now_utc
 from services import founding
 from services.visibility import user_can_see
 from services.news_cards import attach_result_winners
+from services.news_channels import filter_channel
 from services.news_publish import public_news
 from services import event_days
 from services.event_public import public_competition, public_event
@@ -289,6 +290,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
     news = await db.news_posts.find(
         {"published": True}, {"_id": 0},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(200)
+    # Die Startseite der Website (#1532): News „nur App“ stehen hier nie - auch nicht als Aufmacher oder in der Zahl.
+    news = filter_channel(news, "web")
     visible_news = []
     for n in news:
         published_at = _parse_dt(n.get("published_at") or n.get("created_at"))

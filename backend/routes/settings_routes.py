@@ -1485,6 +1485,7 @@ async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(get_cu
         "not_published": "Der Beitrag ist noch nicht veröffentlicht – der Newsletter geht beim Veröffentlichen von selbst hinaus.",
         "not_announced": "Das Event ist noch ein Entwurf – der Newsletter geht beim Ankündigen von selbst hinaus.",
         "internal_visibility": "„Nur intern“ geht nicht als Newsletter hinaus – die Vereinsverwaltung bekommt eine Meldung.",
+        "app_only": "„Nur App“ geht nicht als Newsletter hinaus – die Mail führt zur Website, die den Beitrag nicht zeigt.",
     }
     if result.get("reason") in blocked:
         raise HTTPException(409, blocked[result["reason"]])

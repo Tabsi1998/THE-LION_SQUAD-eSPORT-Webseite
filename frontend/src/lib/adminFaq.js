@@ -100,7 +100,7 @@ export const FAQ_TOPICS = [
     key: "content",
     label: "Inhalte und Auftritt",
     questions: [
-      { key: "news", q: "Wie veröffentliche ich eine News?", a: "Content → News → „Neuer Beitrag“: Titel, Text, Bild, Sichtbarkeit (öffentlich oder nur Mitglieder). Öffentliche News gehen über den Discord-Bot auch in den gewählten Kanal.", to: "/admin/news/new", label: "Content → News → Neu" },
+      { key: "news", q: "Wie veröffentliche ich eine News?", a: "Content → News → „Neuer Beitrag“: Titel, Text, Bild, Sichtbarkeit (öffentlich oder nur Mitglieder) und wo der Beitrag erscheint (Website und App, nur App oder nur Website). Öffentliche News gehen über den Discord-Bot auch in den gewählten Kanal – „Nur App“ nicht.", to: "/admin/news/new", label: "Content → News → Neu" },
       { key: "events", q: "Wie lege ich ein Event mit Programm an?", a: "eSports → Events → „Neues Event“: Ort, Zeit, Programmpunkte, Turniere und Fast-Lap-Challenges ins Programm nehmen.", to: "/admin/events/new", label: "eSports → Events → Neu" },
       { key: "galerie", q: "Wie stelle ich Fotos in die Galerie?", a: "Content → Galerie: Album anlegen, Bilder hochladen, sichtbar schalten. Content → Medien zeigt alle hochgeladenen Dateien.", to: "/admin/gallery", label: "Content → Galerie" },
       { key: "branding", q: "Wo ändere ich Logo, Farben, Favicon und die Hinweisleiste?", a: "Auftritt → Branding: Logos (hell/dunkel), Akzentfarbe, Favicon aus dem Logo erzeugen, Hinweisleisten.", to: "/admin/settings/branding", label: "Auftritt → Branding" },
