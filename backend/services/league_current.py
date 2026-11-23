@@ -22,6 +22,8 @@ FINISHED_MATCH_STATUSES = frozenset({"completed", "forfeit", "cancelled"})
 LIMIT = 50
 REGISTRATION_LIMIT = 4000
 MATCH_LIMIT = 8000
+# Laufende Liga-Staffeln insgesamt - die Anmeldungen einer Person werden zuerst darauf eingeschränkt (Review #1638).
+RUNNING_LIMIT = 2000
 
 
 # Noch nicht fest in der Staffel (#1630): statt „Noch ohne Ergebnis“ steht der Stand der Anmeldung.
@@ -131,8 +133,16 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
     if team_ids:
         # Ohne Co-Team spielt das Hauptteam - dann zählt die Mitgliedschaft im Team.
         ways.append({"team_id": {"$in": team_ids}, "squad_id": {"$in": [None, ""]}})
+    # Nur Anmeldungen in laufenden Liga-Staffeln, neueste zuerst (Review #1638): Bei langer Teamgeschichte schnitt die Grenze sonst
+    # ungeordnet ab, und laufende Ligen konnten fehlen.
+    running = [row["id"] for row in await db.tournaments.find(
+        {"league_context": {"$ne": None}, "status": {"$nin": list(CLOSED_TOURNAMENT_STATUSES)}}, {"_id": 0, "id": 1}).to_list(RUNNING_LIMIT)
+        if row.get("id")]
+    if not running:
+        return []
     registrations = await db.tournament_registrations.find(
-        {"$or": ways, "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}}, {"_id": 0}).to_list(LIMIT * 4)
+        {"$or": ways, "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}, "tournament_id": {"$in": running}}, {"_id": 0}).sort(
+        "created_at", -1).to_list(LIMIT * 4)
     tournament_ids = sorted({row.get("tournament_id") for row in registrations if row.get("tournament_id")})
     if not tournament_ids:
         return []
