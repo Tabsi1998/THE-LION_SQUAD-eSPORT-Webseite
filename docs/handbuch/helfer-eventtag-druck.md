@@ -55,7 +55,7 @@ nachsehen, dann **Trotzdem speichern**.
 ## 4. Einlass
 
 1. QR-Code am Aushang scannen lassen → **Mitspielen** → **Verbindlich anmelden**.
-2. **Check-in** macht die Turnierleitung (Reiter **Teilnehmer**).
+2. **Check-in** macht die Turnierleitung (**Turnierleitung** → Reiter **Check-in** → **Da**).
 
 **Wenn** ein Foto des QR-Codes herumgeht: **dann** der Turnierleitung sagen. Sie macht einen **Neuen Code**.
 

@@ -247,7 +247,7 @@ export default function NewsDetailPage() {
                     <Link key={item.key} to={item.to} className="flex items-center gap-3 min-w-0 overflow-hidden border border-white/10 hover:border-white/30 p-2.5 rounded-sm">
                       <item.icon className="w-4 h-4 shrink-0" style={{ color: item.color }} />
                       <div className="min-w-0">
-                        <div className="font-bold text-sm truncate">{item.title}</div>
+                        <div className="tls-wrap font-bold text-sm">{item.title}</div>
                         {item.sub && <div className="text-xs text-white/50">{item.sub}</div>}
                       </div>
                     </Link>
@@ -266,8 +266,8 @@ export default function NewsDetailPage() {
                         {user.avatar_url ? <SizedImage src={user.avatar_url} size={36} alt="" className="w-full h-full" /> : <Users className="w-4 h-4 text-white/35" />}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-bold truncate">{user.display_name || user.username}</span>
-                        <span className="block text-xs text-white/45 truncate">@{user.username}</span>
+                        <span className="tls-wrap block text-sm font-bold">{user.display_name || user.username}</span>
+                        <span className="tls-wrap block text-xs text-white/45">@{user.username}</span>
                       </span>
                     </Link>
                   ))}
@@ -288,7 +288,7 @@ export default function NewsDetailPage() {
                         {item.banner_url ? <SizedImage src={item.banner_url} width={64} height={48} alt="" className="w-full h-full" /> : <NewsTextCard news={item} size="thumb" />}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-bold leading-snug line-clamp-2 group-hover:text-[#29B6E8] transition">{item.title}</span>
+                        <span className="tls-wrap block text-sm font-bold leading-snug group-hover:text-[#29B6E8] transition">{item.title}</span>
                         <span className="block text-[11px] text-white/45 mt-0.5">{formatDate(item.published_at || item.created_at, "medium")}</span>
                       </span>
                     </Link>

@@ -154,7 +154,7 @@ function NewsCard({ n }) {
           {VIcon && <VIcon className="w-3 h-3 text-honor" />}
           <span className="text-white/45 ml-auto normal-case tracking-normal">{formatAgo(n.published_at || n.created_at)}</span>
         </div>
-        <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 text-lg tls-card__title`}>
+        <h3 className="tls-wrap mt-2 font-heading font-black leading-tight text-lg tls-card__title">
           {n.title}
         </h3>
         {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}

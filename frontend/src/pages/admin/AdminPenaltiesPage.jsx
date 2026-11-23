@@ -155,7 +155,7 @@ function Row({ p, onTakeBack }) {
         </div>
         <div className="min-w-0">
           {p.user_username ? (
-            <Link to={`/u/${encodeURIComponent(p.user_username)}`} className="font-bold hover:text-[#29B6E8] truncate block">
+            <Link to={`/u/${encodeURIComponent(p.user_username)}`} className="font-bold hover:text-[#29B6E8] tls-wrap block">
               {p.user_display_name || p.user_username}
             </Link>
           ) : (

@@ -81,7 +81,7 @@ export default function ProductSearch({ disabled, current, onPick }) {
                   {row.image ? <img src={row.image} alt="" referrerPolicy="no-referrer" loading="lazy" className="max-w-full max-h-full object-contain" /> : null}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm truncate">{row.name}</div>
+                  <div className="font-bold text-sm tls-wrap">{row.name}</div>
                   <div className="text-xs text-white/55">
                     Nr. <span className="tabular-nums">{row.id}</span>{row.techniques.length ? ` · ${techniqueList(row.techniques)}` : ""} · {row.colors} Farben · {row.sizes} Größen
                     {row.is_discontinued ? <span className="text-warn"> · eingestellt</span> : null}

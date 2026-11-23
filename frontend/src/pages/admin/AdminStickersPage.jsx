@@ -206,7 +206,7 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, 
           </form>
         ) : (
           <div className="min-w-0">
-            <div className="font-heading text-lg font-bold truncate">{pack.name}</div>
+            <div className="font-heading text-lg font-bold tls-wrap">{pack.name}</div>
             <div className="text-[10px] uppercase tracking-widest text-white/45">
               {pack.stickers.length} Sticker
               {!pack.active && <span className="ml-2 font-bold text-[#FF6B61]">Nicht im Chat</span>}

@@ -112,8 +112,8 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
         <div className="flex items-center gap-3 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
           <PersonAvatar person={value} />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold truncate">{value.name}</div>
-            {value.context && <div className="text-[11px] text-white/50 truncate">{value.context}</div>}
+            <div className="text-sm font-semibold tls-wrap">{value.name}</div>
+            {value.context && <div className="text-[11px] text-white/50 tls-wrap">{value.context}</div>}
           </div>
           {!disabled && (
             <button type="button" onClick={() => onChange?.(null)} aria-label="Andere Person wählen" data-testid={`${testId}-clear`} className="p-1 text-white/50 hover:text-white">
@@ -165,8 +165,8 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
             >
               <PersonAvatar person={person} size="w-7 h-7" />
               <span className="min-w-0">
-                <span className="block text-sm font-semibold truncate">{person.name}</span>
-                {person.context && <span className="block text-[11px] text-white/45 truncate">{person.context}</span>}
+                <span className="block text-sm font-semibold tls-wrap">{person.name}</span>
+                {person.context && <span className="block text-[11px] text-white/45 tls-wrap">{person.context}</span>}
               </span>
             </button>
           ))}

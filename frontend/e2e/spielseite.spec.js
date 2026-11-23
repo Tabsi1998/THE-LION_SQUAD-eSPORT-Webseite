@@ -70,10 +70,14 @@ async function mockServer(page) {
   await page.route("**/api/games/g9", json({ id: "g9", name: "Neues Probe-Spiel", slug: "neues-probe-spiel", kind: "standalone", match_modes: [], player_id_fields: [] }));
   await page.route("**/api/games/g1/usage", json({ total: 4, text: "1 Liga, 3 Maps", counts: {},
     modes: { stellung: { in_use: true }, snd: { in_use: true }, kontrolle: { in_use: false } }, id_fields: { probe_id: 2 } }));
-  await page.route("**/api/games/g1/maps", json({ game: { id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", modes: MODES }, maps: MAPS, limit: 200, default_pool: null }));
+  // Wie der Server: Ein gespeichertes Häkchen steht in der nächsten Abfrage (der Reiter fragt nach verworfenen Antworten neu, #2529).
+  let maps = structuredClone(MAPS);
+  await page.route("**/api/games/g1/maps", (route) => json({ game: { id: "g1", name: "Probe Shooter", slug: "probe-shooter", kind: "standalone", modes: MODES }, maps, limit: 200, default_pool: null })(route));
   await page.route("**/api/games/g1/maps/kupfer", (route) => {
-    calls.mapPatch.push(route.request().postDataJSON());
-    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...MAPS[3], ...route.request().postDataJSON(), affected_seasons: [], warning: null }) });
+    const body = route.request().postDataJSON();
+    calls.mapPatch.push(body);
+    maps = maps.map((row) => (row.id === "kupfer" ? { ...row, ...body } : row));
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...MAPS[3], ...body, affected_seasons: [], warning: null }) });
   });
   return calls;
 }

@@ -80,14 +80,16 @@ export function UserMenu() {
         className={`inline-flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 text-xs font-bold uppercase tracking-wider border rounded-sm transition ${open ? "border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/80 hover:border-[#29B6E8]/40 hover:text-[#29B6E8]"}`}
       >
         <Avatar user={user} />
-        <span className="max-w-[10rem] truncate lg:hidden min-[1440px]:inline">{name}</span>
+        {/* Im Kopf bleibt der eigene Name einzeilig (#1314: die Kopfzeile behält ihre Höhe) - ganz steht er im title, im
+            aria-label und im geöffneten Menü. */}
+        <span className="max-w-[10rem] truncate lg:hidden min-[1440px]:inline" title={name}>{name}</span>
         <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
         <div role="menu" data-testid="nav-user-menu" className="absolute right-0 top-full mt-2 w-60 border border-white/10 bg-[#0F0F10] rounded-sm shadow-2xl shadow-black/70 overflow-hidden z-[70]">
           <div className="px-3 py-2.5 border-b border-white/10">
-            <div className="font-bold text-sm text-white truncate">{name}</div>
-            <div className="text-[11px] text-white/45 truncate">@{user.username}</div>
+            <div className="tls-wrap font-bold text-sm text-white" data-testid="nav-user-menu-name">{name}</div>
+            <div className="tls-wrap text-[11px] text-white/45">@{user.username}</div>
           </div>
           {userMenuEntries({ username: user.username }).map((entry) => (
             <Link key={entry.key} to={entry.to} role="menuitem" onClick={close} data-testid={userMenuTestId(entry.key)} className={itemClass}>

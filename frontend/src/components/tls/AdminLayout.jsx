@@ -573,7 +573,7 @@ export function AdminLayout({ children }) {
                 data-testid={`admin-nav-group-${RECENT_GROUP}`}
                 className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-quiet hover:text-white/80 transition-colors"
               >
-                <span className="truncate">{RECENT_GROUP}</span>
+                <span className="tls-wrap">{RECENT_GROUP}</span>
                 <span className="flex items-center gap-1.5 shrink-0">
                   {!groupIsOpen(RECENT_GROUP) && <span className="tabular-nums tracking-normal text-quiet">{recentItems.length}</span>}
                   <ChevronDown className={`w-3 h-3 transition-transform ${groupIsOpen(RECENT_GROUP) ? "" : "-rotate-90"}`} />
@@ -592,7 +592,7 @@ export function AdminLayout({ children }) {
                       className="flex items-center gap-3 px-3 py-2 rounded-sm text-sm font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-all"
                     >
                       <it.icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{it.label}</span>
+                      <span className="tls-wrap">{it.label}</span>
                     </Link>
                   ))}
                 </div>
@@ -610,7 +610,7 @@ export function AdminLayout({ children }) {
                   data-testid={`admin-nav-group-${group.label}`}
                   className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-quiet hover:text-white/80 transition-colors"
                 >
-                  <span className="truncate">{group.label}</span>
+                  <span className="tls-wrap">{group.label}</span>
                   <span className="flex items-center gap-1.5 shrink-0">
                     {!open && <span className="tabular-nums tracking-normal text-quiet">{group.items.length}</span>}
                     {group.label === activeGroup && !open && <span className="w-1.5 h-1.5 rounded-full bg-[#29B6E8]" />}
@@ -636,7 +636,7 @@ export function AdminLayout({ children }) {
                       >
                         <it.icon className="w-4 h-4 shrink-0" />
                         <span className="min-w-0">
-                          <span className="block truncate">{it.label}</span>
+                          <span className="block tls-wrap">{it.label}</span>
                           {/* Untertitel nur in der Suche (#2111, N1): welche „Saison“ gemeint ist. */}
                           {searchQuery && it.hint ? <span className="block truncate text-[10px] font-normal text-quiet" data-testid={`admin-nav-hint-${it.to.split("/").pop()}`}>{it.hint}</span> : null}
                         </span>
@@ -671,7 +671,7 @@ export function AdminLayout({ children }) {
           </Link>
           <div className="px-3 pt-2 flex items-center justify-between">
             <div className="text-xs min-w-0">
-              <div className="text-white font-semibold truncate max-w-[130px]">{user?.display_name || user?.username}</div>
+              <div className="text-white font-semibold tls-wrap max-w-[130px]">{user?.display_name || user?.username}</div>
               <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest">{roleLabel(user?.role)}</div>
             </div>
             <button

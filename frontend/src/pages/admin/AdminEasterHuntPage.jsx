@@ -60,7 +60,7 @@ function EggCard({ egg, index, view, locked, onChange, onPreview }) {
       <div className="mb-3 flex items-center gap-3">
         <EggShape pattern={egg.pattern} size={22} />
         <span className="font-bold">Ei {egg.egg_no ?? index + 1}</span>
-        <span className="min-w-0 flex-1 truncate text-xs text-white/50">{egg.channel === "app" ? "App" : "Website"} · {routes[egg.route] || egg.route}</span>
+        <span className="min-w-0 flex-1 tls-wrap text-xs text-white/50">{egg.channel === "app" ? "App" : "Website"} · {routes[egg.route] || egg.route}</span>
         <span className="text-xs tabular-nums text-white/60">{egg.found ? `${egg.found}× gefunden` : "noch nicht gefunden"}</span>
         {egg.channel === "web" && onPreview ? (
           <button type="button" onClick={() => onPreview(egg)} className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75 hover:border-white/30" title="Das Ei auf der Seite ansehen (Vorschau, zählt nicht)" data-testid={`easter-admin-view-${egg.egg_no ?? index + 1}`}>

@@ -116,7 +116,7 @@ export default function VereinPage() {
                 {internal.map((post) => (
                   <Link key={post.id} to={`/news/${post.slug || post.id}`} className="flex items-center gap-3 min-h-11 text-sm hover:text-[#FFD700]">
                     <Newspaper className="w-4 h-4 text-[#FFD700] shrink-0" />
-                    <span className="flex-1 min-w-0 truncate font-bold">{post.title}</span>
+                    <span className="tls-wrap flex-1 font-bold">{post.title}</span>
                     <span className="text-xs text-white/45 shrink-0">{newsDate(post)}</span>
                   </Link>
                 ))}
@@ -150,7 +150,7 @@ export default function VereinPage() {
                   {publicNews.map((post) => (
                     <Link key={post.id} to={`/news/${post.slug || post.id}`} className="flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/45 transition">
                       <span className="min-w-0 flex-1">
-                        <span className="block font-heading font-bold uppercase text-sm truncate">{post.title}</span>
+                        <span className="tls-wrap block font-heading font-bold uppercase text-sm">{post.title}</span>
                         <span className="block text-xs text-white/45">{newsDate(post)}</span>
                       </span>
                       <ChevronRight className="w-4 h-4 text-white/35 shrink-0" />
@@ -163,11 +163,14 @@ export default function VereinPage() {
             <section className="min-w-0" data-testid="verein-gallery">
               <SectionHead icon={ImageIcon} title="Galerie" to="/galerie" testId="verein-gallery-all" />
               {albums.length ? (
-                <div className="grid grid-cols-3 gap-2">
+                // Der Album-Titel steht unter dem Bild und darf umbrechen (#1314) - auf dem Bild endete er mit „…“.
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {albums.map((album) => (
-                    <Link key={album.id} to={`/galerie/${album.slug}`} className="aspect-video rounded-sm overflow-hidden border border-white/10 bg-[#0A0A0A] relative group" aria-label={album.title}>
-                      {album.cover_url ? <img src={resolveMediaUrl(album.cover_url)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition" /> : <span className="flex h-full items-center justify-center"><ImageIcon className="w-6 h-6 text-white/15" /></span>}
-                      <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase truncate">{album.title}</span>
+                    <Link key={album.id} to={`/galerie/${album.slug}`} className="group min-w-0 rounded-sm overflow-hidden border border-white/10 bg-[#0A0A0A] hover:border-[#29B6E8]/45 transition" data-testid={`verein-album-${album.id}`}>
+                      <span className="block aspect-video overflow-hidden">
+                        {album.cover_url ? <img src={resolveMediaUrl(album.cover_url)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition" /> : <span className="flex h-full items-center justify-center"><ImageIcon className="w-6 h-6 text-white/15" /></span>}
+                      </span>
+                      <span className="tls-wrap block px-2 py-1.5 text-[10px] font-bold uppercase leading-snug">{album.title}</span>
                     </Link>
                   ))}
                 </div>
@@ -193,7 +196,7 @@ export default function VereinPage() {
                 <div className="space-y-2">
                   {references.map((ref) => (
                     <Link key={ref.id} to={referenceHref(ref)} data-testid={`verein-reference-${ref.id}`} className="flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/45 transition">
-                      <span className="min-w-0 flex-1 font-bold text-sm truncate">{ref.title || ref.name}</span>
+                      <span className="tls-wrap flex-1 font-bold text-sm">{ref.title || ref.name}</span>
                       <ChevronRight className="w-4 h-4 text-white/35 shrink-0" />
                     </Link>
                   ))}
