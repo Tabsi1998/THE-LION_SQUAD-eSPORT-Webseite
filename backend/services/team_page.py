@@ -270,7 +270,7 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
         {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
     # Platz von N, Zone und nächstes Spiel (#1630): dieselbe Rechnung wie die Tabelle, für alle Staffeln auf einmal - die ganzen
     # Staffel-Dokumente (Tabellenregeln, Entscheide) in einer Abfrage.
-    from services.league_current import badge, live_places, sort_rows
+    from services.league_current import badge, live_places, sort_rows, status_note
 
     staffel_ids = sorted({tournament["id"] for _reg, tournament in rows})
     full = await db.tournaments.find({"id": {"$in": staffel_ids}}, {"_id": 0}).to_list(len(staffel_ids) + 1)
@@ -303,6 +303,7 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "emblem_url": (season.get("emblem_url") or league.get("emblem_url") or None),
             "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
             "link": link,
+            "status_note": status_note(reg),
             **(places.get(reg.get("id")) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
     # Beste Liga N oben (#1630, aus #1644), dann Liga, Season und Co-Team.

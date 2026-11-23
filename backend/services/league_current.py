@@ -24,6 +24,14 @@ REGISTRATION_LIMIT = 4000
 MATCH_LIMIT = 8000
 
 
+# Noch nicht fest in der Staffel (#1630): statt „Noch ohne Ergebnis“ steht der Stand der Anmeldung.
+STATUS_NOTES = {"pending": "Anmeldung offen", "waitlist": "Warteliste"}
+
+
+def status_note(registration: dict | None) -> str | None:
+    return STATUS_NOTES.get((registration or {}).get("status") or "")
+
+
 def badge(division: dict | None, *, champion: bool = False) -> dict | None:
     """Was das Liga-Abzeichen braucht: ``{level, nickname, champion}`` - ``None`` ohne Liga N."""
     level = (division or {}).get("level")
@@ -91,12 +99,14 @@ async def live_places(db, tournaments: list[dict], registration_ids) -> dict[str
                                      stages=[row for row in stages if row.get("tournament_id") == tid])
         rows = await _standing_rows(db, tournament, None, False, read_model=model, regs=own, own_ids=set(), live=True, users={}, zones=zones)
         counted = [row for row in rows if not row.get("exit")]
+        # Plätze gibt es ab dem ersten gewerteten Spiel der Staffel - für die ganze Tabelle, wie die Tabelle selbst (``league_zones.started``):
+        # Ein Team mit Freilos steht dann schon auf seinem Platz, auch ohne eigenes Spiel.
+        begun = league_zones.started(rows)
         for registration_id in wanted.intersection(row.get("id") for row in own):
             row = next((item for item in rows if item.get("registration_id") == registration_id), None) or {}
-            played = int(row.get("played") or 0) > 0
-            zone = row.get("zone") if played else None
+            zone = row.get("zone") if begun else None
             out[registration_id] = {
-                "rank": int(row["rank"]) if played and row.get("rank") else None, "of": len(counted) or None,
+                "rank": int(row["rank"]) if begun and row.get("rank") else None, "of": len(counted) or None,
                 "zone": zone, "zone_label": league_zones.LABELS.get(zone or ""),
                 "next_match": _next_match(tournament_matches, registration_id, names),
             }
@@ -108,11 +118,16 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
     from services.league_service import division_label
     from services.profile_visibility import PUBLIC, opens_season_page, public_season, sees_listed_tournament, sees_season
 
-    squads = await db.team_squads.find({"member_ids": user_id, "status": {"$ne": "archived"}}, {"_id": 0, "id": 1, "team_id": 1, "name": 1}).to_list(LIMIT)
+    # Wessen Liga ist es? Wer im Kader des Co-Teams steht oder es als Captain bzw. Vertreter führt - nicht, wer es nur angemeldet hat
+    # (``user_id`` einer Team-Anmeldung ist die anmeldende Person): Das Profil zeigt, wo die Person spielt bzw. Verantwortung trägt; alle
+    # Co-Teams eines Teams stehen auf der Teamseite. ``user_id`` zählt nur bei einer Anmeldung ohne Team (Solo, #1629).
+    squads = await db.team_squads.find(
+        {"$or": [{"member_ids": user_id}, {"captain_id": user_id}, {"vice_captain_id": user_id}], "status": {"$ne": "archived"}},
+        {"_id": 0, "id": 1, "team_id": 1, "name": 1}).to_list(LIMIT)
     teams = await db.teams.find({"member_ids": user_id}, {"_id": 0, "id": 1, "name": 1}).to_list(LIMIT)
     squad_ids = [row["id"] for row in squads if row.get("id")]
     team_ids = [row["id"] for row in teams if row.get("id")]
-    ways = [{"squad_id": {"$in": squad_ids}}, {"user_id": user_id}]
+    ways = [{"squad_id": {"$in": squad_ids}}, {"user_id": user_id, "team_id": {"$in": [None, ""]}}]
     if team_ids:
         # Ohne Co-Team spielt das Hauptteam - dann zählt die Mitgliedschaft im Team.
         ways.append({"team_id": {"$in": team_ids}, "squad_id": {"$in": [None, ""]}})
@@ -137,6 +152,9 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
     divisions = {row["id"]: row for row in await db.league_divisions.find(
         {"id": {"$in": division_ids}}, {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(len(division_ids) + 1)}
     squad_names = {row["id"]: row.get("name") for row in squads}
+    # Ein privates Team (``is_public: false``) und seine Co-Teams zeigt das Profil nur der Person selbst - die Teamseite antwortet allen
+    # anderen mit 404, dann stehen hier auch Co-Team, Platz und nächstes Spiel nicht (Datenschutz, wie die Team-Kachel im Profil).
+    private = await private_team_ids(db, [row.get("team_id") for row in registrations]) if not scope.everything else set()
     shown: list[tuple[dict, dict, dict, dict, dict, bool]] = []
     opens: dict = {}
     for registration in registrations:
@@ -146,7 +164,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
         if season:
             league = leagues.get(season.get("league_id") or "")
         division = divisions.get(context.get("division_id") or "")
-        if not season or not league or not division:
+        if not season or not league or not division or registration.get("team_id") in private:
             continue
         if not await sees_season(scope, season) or not await sees_listed_tournament(scope, tournament):
             continue
@@ -174,9 +192,18 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
             "link": (f"/liga/{league['slug']}/{season['slug']}#staffel-{anchor}" if opens_page
                      else f"/tournaments/{anchor}"),
             "internal": internal,
+            "status_note": status_note(registration),
             **(places.get(registration["id"]) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
     return sort_rows(out)
+
+
+async def private_team_ids(db, team_ids) -> set[str]:
+    """Welche dieser Teams sind privat (``is_public: false``)? Eine Abfrage für alle."""
+    wanted = sorted({team_id for team_id in team_ids if team_id})
+    if not wanted:
+        return set()
+    return {row["id"] for row in await db.teams.find({"id": {"$in": wanted}, "is_public": False}, {"_id": 0, "id": 1}).to_list(len(wanted) + 1)}
 
 
 def sort_rows(rows: list[dict]) -> list[dict]:
