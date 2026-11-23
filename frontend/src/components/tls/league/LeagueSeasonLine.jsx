@@ -16,6 +16,8 @@ const TOP = 16;
 const BOTTOM = 24;
 // Mindestabstand zweier Seasons - reicht die Breite nicht, wischt man die Linie seitlich.
 const STEP = 64;
+// Mindestabstand zweier Platz-Zahlen übereinander (Schrift 10 px).
+const LABEL_GAP = 11;
 // Ohne Messung (erster Zeichenschritt, Tests) die kleinste nötige Breite - nie breiter als die Fläche (Review #1638: bei 320 px wuchs
 // die Spalte sonst auf die Startbreite mit, und die Messung bestätigte sie).
 const FALLBACK_WIDTH = 0;
@@ -63,6 +65,22 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
   const y = (value) => TOP + (value - (first - 1)) * BAND + 6;
   // Höchstens vier Linien - die besten Co-Teams (seasonLine sortiert); die übrigen nennt ein Satz darunter (Fabian 23.11.).
   const series = line.series;
+  // Wo der Platz steht (Review #1638): nur am Anfang, am Ende und bei einem Wechsel; zuerst über dem Punkt, stößt er dort an eine schon
+  // gesetzte Zahl derselben Season, darunter - und passt auch das nicht (oder rutschte er in die Season-Zeile), bleibt er weg. Die besten
+  // Co-Teams kommen zuerst dran; der Platz steht für alle in der Bildbeschreibung.
+  const bottom = TOP + bands.length * BAND;
+  const placed = new Map();
+  const labels = new Map();
+  series.forEach((row, at) => row.points.forEach((point, index) => {
+    const before = row.points[index - 1];
+    if (before && index !== row.points.length - 1 && before.rank === point.rank && before.level === point.level) return;
+    const taken = placed.get(point.index) || [];
+    const free = (spot) => spot > TOP - 4 && spot < bottom && taken.every((other) => Math.abs(other - spot) >= LABEL_GAP);
+    const spot = [y(point.value) - 10, y(point.value) + 17].find(free);
+    if (spot === undefined) return;
+    placed.set(point.index, [...taken, spot]);
+    labels.set(`${at}-${point.index}`, spot);
+  }));
   const more = line.hidden;
   const moreText = more > 0 ? `und ${more} ${more === 1 ? "weiteres Co-Team" : "weitere Co-Teams"}` : "";
   return (
@@ -91,17 +109,15 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
                 points={row.points.map((point) => `${x(point.index)},${y(point.value)}`).join(" ")} />
             ))}
             {series.map((row, at) => row.points.map((point, index) => {
-              // Platz nur beim ersten und letzten Punkt und bei einem Wechsel - und je Linie versetzt (über bzw. unter dem Punkt), damit sich
-              // die Zahlen mehrerer Co-Teams in derselben Liga N nicht überdecken.
-              const before = row.points[index - 1];
-              const labelled = !before || index === row.points.length - 1 || before.rank !== point.rank || before.level !== point.level;
+              // Die Platz-Zahl steht, wo `labels` Platz gefunden hat (siehe oben) - sonst nur in der Bildbeschreibung.
+              const spot = labels.get(`${at}-${point.index}`);
               return (
                 <g key={`${row.name}-${point.index}`} className="tls-season-line__point" style={{ "--tls-i": Math.min(index, 8) }}
                   data-testid={`${testId}-point-${at}-${point.index}`} data-champion={point.champion ? "true" : undefined}>
                   <circle cx={x(point.index)} cy={y(point.value)} r={point.champion ? 6 : 5} fill="#0A0A0A"
                     stroke={COLORS[at]} strokeWidth="2.5" />
-                  {labelled ? (
-                    <text className="tls-season-line__rank" x={x(point.index)} y={y(point.value) + (at % 2 === 0 ? -10 : 17)} textAnchor="middle"
+                  {spot !== undefined ? (
+                    <text className="tls-season-line__rank" x={x(point.index)} y={spot} textAnchor="middle"
                       data-testid={`${testId}-rank-${at}-${point.index}`}>{point.rank}.</text>
                   ) : null}
                 </g>

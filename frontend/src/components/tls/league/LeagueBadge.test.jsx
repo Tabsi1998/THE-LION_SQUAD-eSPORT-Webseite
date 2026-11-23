@@ -178,7 +178,7 @@ describe("Review #1638: Saisonlinie lesbar und per Tastatur erreichbar", () => {
   const point = (name, number, level, rank) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
     rank, of: 6, badge: { level }, display_name: name });
 
-  it("beschriftet den Platz nur am Anfang, am Ende und bei einem Wechsel - je Linie versetzt", () => {
+  it("beschriftet den Platz nur am Anfang, am Ende und bei einem Wechsel, ohne Überdecken", () => {
     const rows = [1, 2, 3, 4].map((number) => point("Kader A", number, 2, number === 3 ? 2 : 1))
       .concat([1, 2, 3, 4].map((number) => point("Kader B", number, 2, 3)));
     render(<LeagueSeasonLine rows={rows} byTeam testId="l" />);
@@ -187,9 +187,19 @@ describe("Review #1638: Saisonlinie lesbar und per Tastatur erreichbar", () => {
     expect(screen.getByTestId("l-rank-0-2")).toHaveTextContent("2.");
     expect(screen.getByTestId("l-rank-0-3")).toBeInTheDocument();
     expect(screen.queryByTestId("l-rank-1-1")).toBeNull();
+    const first = Number(screen.getByTestId("l-rank-0-0").getAttribute("y"));
+    const second = Number(screen.getByTestId("l-rank-1-0").getAttribute("y"));
+    expect(Math.abs(first - second)).toBeGreaterThanOrEqual(11);
+  });
+
+  it("überdeckt nie: auf demselben Punkt über, dann unter dem Punkt, ein drittes bleibt ohne Zahl", () => {
+    const same = ["Kader A", "Kader B", "Kader C"].flatMap((name) => [1, 2].map((number) => point(name, number, 2, 3)));
+    render(<LeagueSeasonLine rows={same} byTeam testId="l" />);
     const above = Number(screen.getByTestId("l-rank-0-0").getAttribute("y"));
     const below = Number(screen.getByTestId("l-rank-1-0").getAttribute("y"));
-    expect(below).toBeGreaterThan(above + 20);
+    expect(below - above).toBeGreaterThanOrEqual(11);
+    expect(screen.queryByTestId("l-rank-2-0")).toBeNull();
+    expect(screen.getByRole("img", { name: /Kader C – Season 1: Liga 2, Platz 3/ })).toBeInTheDocument();
   });
 
   it("die Wischfläche ist per Tastatur erreichbar und benannt", () => {
