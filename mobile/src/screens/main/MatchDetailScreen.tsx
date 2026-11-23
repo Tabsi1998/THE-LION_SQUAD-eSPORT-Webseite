@@ -68,7 +68,8 @@ type MatchParticipant = {
 
 type ScheduleProposal = {
   actor_registration_id?: string | null;
-  id: string;
+  // Unbeteiligte bekommen Vorschläge nur mit Termin, Stand und Seite - ohne Kennung (#2201).
+  id?: string;
   actor?: { username?: string; display_name?: string | null } | null;
   note?: string | null;
   scheduled_at?: string | null;
@@ -328,7 +329,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, [busy, load, proposalAt, proposalNote, route.params.id]);
 
   const decide = useCallback(async (proposal: ScheduleProposal, action: "accept" | "counter" | "decline") => {
-    if (busy) return;
+    if (busy || !proposal.id) return;
     const payload: { action: string; note?: string | null; scheduled_at?: string } = { action, note: decisionNote.trim() || null };
     if (action === "counter") {
       const scheduledAt = wallToIso(counterAt || viennaWall(proposal.scheduled_at));
@@ -623,11 +624,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )}
           {pendingProposals.length ? (
             <View style={styles.stack}>
-              {pendingProposals.map((proposal) => (
-                <View key={proposal.id} style={styles.proposal}>
+              {pendingProposals.map((proposal, index) => (
+                <View key={proposal.id || `proposal-${index}`} style={styles.proposal}>
                   <Body style={styles.strong}>{formatWhen(proposal.scheduled_at, { fallback: "ohne Zeit" })}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
-                  {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (
+                  {canManageSchedule && proposal.id && canDecideScheduleProposal(page, proposal) ? (
                     <>
                       <View style={styles.buttonRow}>
                         <Button label="Annehmen" onPress={() => decide(proposal, "accept")} disabled={busy} />
