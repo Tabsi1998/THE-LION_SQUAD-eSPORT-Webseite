@@ -124,7 +124,8 @@ a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E
 
 /* Saisonverlauf als Linie (#1630): Liga N als Bänder, je Season ein Punkt; Meister in Gold. Die Linie blendet einmal ein, die
    Punkte folgen gestaffelt - nur Deckkraft und Skalierung. */
-.tls-season-line { overflow: hidden; border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212; padding: 12px 12px 6px; }
+/* contain: Die Breite der Linie hängt nie am Inhalt - sonst schob das SVG die Spalte der Teamseite über den Bildschirm (Review #1638). */
+.tls-season-line { contain: inline-size; min-width: 0; overflow: hidden; border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212; padding: 12px 12px 6px; }
 .tls-season-line__svg { display: block; max-width: none; overflow: visible; }
 .tls-season-line__band { fill: rgb(255 255 255 / 0.025); }
 .tls-season-line__band[data-even="true"] { fill: rgb(41 182 232 / 0.05); }

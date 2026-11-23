@@ -16,7 +16,9 @@ const TOP = 16;
 const BOTTOM = 24;
 // Mindestabstand zweier Seasons - reicht die Breite nicht, wischt man die Linie seitlich.
 const STEP = 64;
-const FALLBACK_WIDTH = 640;
+// Ohne Messung (erster Zeichenschritt, Tests) die kleinste nötige Breite - nie breiter als die Fläche (Review #1638: bei 320 px wuchs
+// die Spalte sonst auf die Startbreite mit, und die Messung bestätigte sie).
+const FALLBACK_WIDTH = 0;
 
 /** Die Breite der Fläche in Pixeln: Das SVG zeichnet 1:1, Schrift und Punkte bleiben an jeder Breite gleich groß. */
 function useWidth() {
@@ -47,7 +49,7 @@ function summary(line, byTeam) {
 }
 
 export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season-line" }) {
-  const line = seasonLine(rows, { byTeam });
+  const line = seasonLine(rows, { byTeam, limit: COLORS.length });
   const [ref, state] = useFirstSight(Boolean(line));
   const [boxRef, box] = useWidth();
   if (!line) return null;
@@ -60,8 +62,8 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
   const x = (index) => GUTTER + 28 + (line.seasons.length > 1 ? (index * span) / (line.seasons.length - 1) : span / 2);
   const y = (value) => TOP + (value - (first - 1)) * BAND + 6;
   // Höchstens vier Linien - die besten Co-Teams (seasonLine sortiert); die übrigen nennt ein Satz darunter (Fabian 23.11.).
-  const series = line.series.slice(0, COLORS.length);
-  const more = line.series.length - series.length;
+  const series = line.series;
+  const more = line.hidden;
   const moreText = more > 0 ? `und ${more} ${more === 1 ? "weiteres Co-Team" : "weitere Co-Teams"}` : "";
   return (
     <section data-testid={testId} aria-labelledby={`${testId}-title`}>
@@ -69,7 +71,10 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
         <TrendingUp className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> Saisonverlauf
       </h2>
       <div ref={ref} className="tls-season-line" data-play={state}>
-        <div ref={boxRef} className="tls-swipe">
+        {/* Per Tastatur erreichbar: Ist die Linie breiter als die Fläche, scrollen die Pfeiltasten seitlich. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
+        <div ref={boxRef} role="region" aria-label="Saisonverlauf, seitlich scrollbar" tabIndex={0}
+          className="tls-swipe rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
           <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="tls-season-line__svg" role="img"
             aria-label={`Saisonverlauf: ${summary({ ...line, series }, byTeam)}${moreText ? `. ${moreText}` : ""}`} data-testid={`${testId}-svg`}>
             {bands.map((level, at) => (
@@ -85,14 +90,23 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
               <polyline key={`line-${row.name}`} className="tls-season-line__path" stroke={COLORS[at]} strokeDasharray={DASHES[at]}
                 points={row.points.map((point) => `${x(point.index)},${y(point.value)}`).join(" ")} />
             ))}
-            {series.map((row, at) => row.points.map((point, index) => (
-              <g key={`${row.name}-${point.index}`} className="tls-season-line__point" style={{ "--tls-i": Math.min(index, 8) }}
-                data-testid={`${testId}-point-${at}-${point.index}`} data-champion={point.champion ? "true" : undefined}>
-                <circle cx={x(point.index)} cy={y(point.value)} r={point.champion ? 6 : 5} fill="#0A0A0A"
-                  stroke={COLORS[at]} strokeWidth="2.5" />
-                <text className="tls-season-line__rank" x={x(point.index)} y={y(point.value) - 10} textAnchor="middle">{point.rank}.</text>
-              </g>
-            )))}
+            {series.map((row, at) => row.points.map((point, index) => {
+              // Platz nur beim ersten und letzten Punkt und bei einem Wechsel - und je Linie versetzt (über bzw. unter dem Punkt), damit sich
+              // die Zahlen mehrerer Co-Teams in derselben Liga N nicht überdecken.
+              const before = row.points[index - 1];
+              const labelled = !before || index === row.points.length - 1 || before.rank !== point.rank || before.level !== point.level;
+              return (
+                <g key={`${row.name}-${point.index}`} className="tls-season-line__point" style={{ "--tls-i": Math.min(index, 8) }}
+                  data-testid={`${testId}-point-${at}-${point.index}`} data-champion={point.champion ? "true" : undefined}>
+                  <circle cx={x(point.index)} cy={y(point.value)} r={point.champion ? 6 : 5} fill="#0A0A0A"
+                    stroke={COLORS[at]} strokeWidth="2.5" />
+                  {labelled ? (
+                    <text className="tls-season-line__rank" x={x(point.index)} y={y(point.value) + (at % 2 === 0 ? -10 : 17)} textAnchor="middle"
+                      data-testid={`${testId}-rank-${at}-${point.index}`}>{point.rank}.</text>
+                  ) : null}
+                </g>
+              );
+            }))}
           </svg>
         </div>
         {byTeam && series.length > 1 ? (

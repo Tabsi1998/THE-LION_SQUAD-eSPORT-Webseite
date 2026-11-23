@@ -28,9 +28,10 @@ export function badgeAria(badge) {
   return label && badge?.champion ? `${label}, Season-Meister` : label;
 }
 
-/** „Platz 3 von 8“ - einen Platz gibt es erst mit dem ersten gewerteten Spiel. */
+/** „Platz 3 von 8“ - einen Platz gibt es erst mit dem ersten gewerteten Spiel; auf der Warteliste bzw. vor der Zulassung der Stand. */
 export function currentPlace(row) {
   if (row?.rank) return row.of ? `Platz ${row.rank} von ${row.of}` : `Platz ${row.rank}`;
+  if (row?.status_note) return row.status_note;
   return row?.of ? `Noch ohne Ergebnis · ${row.of} Teams` : "Noch ohne Ergebnis";
 }
 
@@ -62,9 +63,10 @@ function seasonKey(row) {
 /**
  * Saisonverlauf aus der Season-Historie: `{seasons: [{key, name}], levels: [1, 2], series: [{name, points: [{index, value, rank, of,
  * level, champion, zone, season}]}]}` - Seasons nach Abschlusszeit. `byTeam`: je Co-Team eine Linie (Teamseite); sonst eine Linie für
- * die Person, je Season der beste Eintrag. Unter zwei Seasons gibt es keine Linie (`null`).
+ * die Person, je Season der beste Eintrag. `limit`: höchstens so viele Linien, die besten zuerst; `hidden` zählt den Rest. Seasons und
+ * Liga-Bänder kommen nur aus den gezeigten Linien. Unter zwei Seasons gibt es keine Linie (`null`).
  */
-export function seasonLine(rows, { byTeam = false } = {}) {
+export function seasonLine(rows, { byTeam = false, limit = 0 } = {}) {
   const usable = (rows || []).filter((row) => ladderValue(row) !== null);
   const order = new Map();
   [...usable].sort((a, b) => String(a.closed_at || "").localeCompare(String(b.closed_at || ""))).forEach((row) => {
@@ -92,6 +94,11 @@ export function seasonLine(rows, { byTeam = false } = {}) {
   const series = [...groups.entries()]
     .map(([name, points]) => ({ name, points: [...points.values()].sort((a, b) => a.index - b.index) }))
     .sort((a, b) => latest(a).value - latest(b).value || latest(b).index - latest(a).index || a.name.localeCompare(b.name));
-  const levels = [...new Set(usable.map((row) => Number(row.badge.level)))].sort((a, b) => a - b);
-  return { seasons, levels, series };
+  const shown = limit > 0 ? series.slice(0, limit) : series;
+  const used = [...new Set(shown.flatMap((row) => row.points.map((point) => point.index)))].sort((a, b) => a - b);
+  if (used.length < 2) return null;
+  const remap = new Map(used.map((old, at) => [old, at]));
+  const visible = shown.map((row) => ({ ...row, points: row.points.map((point) => ({ ...point, index: remap.get(point.index) })) }));
+  const levels = [...new Set(visible.flatMap((row) => row.points.map((point) => point.level)))].sort((a, b) => a - b);
+  return { seasons: used.map((at) => seasons[at]), levels, series: visible, hidden: series.length - shown.length };
 }
