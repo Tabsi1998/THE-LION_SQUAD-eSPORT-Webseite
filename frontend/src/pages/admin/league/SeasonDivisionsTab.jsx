@@ -23,8 +23,10 @@ import { toast } from "sonner";
 const asStaffel = (staffel, season) => ({ ...staffel, id: staffel.tournament_id, league_context: { season_id: season?.id, staffel: staffel.staffel } });
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
+// Nr. 231: Sobald eine Staffel der Season abgeschlossen ist, stehen ihre Ligen fest - Auf- und Abstieg rechnen mit ihnen.
+export const DIVISIONS_LOCKED_HINT = "Gesperrt: In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht erst, wenn alle abgeschlossenen Staffeln im Reiter „Abschluss“ wieder geöffnet sind.";
 
-export function DivisionSheet({ division, season, nextLevel, onClose, onSaved }) {
+export function DivisionSheet({ division, season, nextLevel, divisionsLocked = false, onClose, onSaved }) {
   const [nickname, setNickname] = useState(division?.nickname || "");
   const [status, setStatus] = useState(division?.status || "active");
   const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
@@ -72,8 +74,8 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
         </p>
       ) : null}
       {division ? (
-        <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS}
-          hint="Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten." testId="division-status" />
+        <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS} disabled={divisionsLocked}
+          hint={divisionsLocked ? DIVISIONS_LOCKED_HINT : "Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten."} testId="division-status" />
       ) : null}
       <p className="text-xs text-white/55">Leer lassen heißt: wie die Season. Nur was diese Liga anders macht, eintragen.</p>
       <FormGrid>
@@ -143,7 +145,7 @@ function ZoneFields({ zones, onChange, effective, level, staffelCount = 0, cross
           </p>
           {crossLocked ? (
             <p className="text-xs text-warn" data-testid="zones-cross-locked">
-              Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn sie im Reiter „Abschluss“ wieder geöffnet ist.
+              Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.
             </p>
           ) : null}
           <FormGrid cols={2}>
@@ -195,12 +197,13 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
             <p className="mt-0.5 text-xs text-white/50">Liga 1, 2 … sind die Stufen der Season. In jeder entstehen Staffeln – je Staffel ein Liga-Turnier mit den Vorgaben der Season.</p>
           </div>
           {canSeason ? (
-            <button type="button" onClick={onAddDivision} data-testid="division-add"
-              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+            <button type="button" onClick={onAddDivision} disabled={Boolean(data.divisions_locked)} data-testid="division-add"
+              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
               <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga {(data.divisions.at(-1)?.level || 0) + 1} anlegen
             </button>
           ) : null}
         </div>
+        {canSeason && data.divisions_locked ? <p className="text-xs text-warn" data-testid="divisions-locked">{DIVISIONS_LOCKED_HINT}</p> : null}
         {!data.divisions.length ? <p className="text-sm text-white/55">Noch keine Liga. Lege Liga 1 an – darin entstehen die Staffeln.</p> : null}
         {data.divisions.map((division) => (
           <div key={division.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0" data-testid={`division-${division.level}`}>
@@ -224,7 +227,8 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                   <button type="button" className={ICON_BUTTON} onClick={() => onEditDivision(division)} aria-label={`${division.label} bearbeiten`} data-testid={`division-edit-${division.level}`}>
                     <Pencil className="w-4 h-4" aria-hidden="true" />
                   </button>
-                  <button type="button" className={ICON_DANGER} onClick={() => onDelete({ kind: "division", target: division, name: division.label })}
+                  <button type="button" className={`${ICON_DANGER} disabled:opacity-40 disabled:hover:text-white/50`} disabled={Boolean(data.divisions_locked)}
+                    onClick={() => onDelete({ kind: "division", target: division, name: division.label })}
                     aria-label={`${division.label} löschen`} data-testid={`division-delete-${division.level}`}>
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>

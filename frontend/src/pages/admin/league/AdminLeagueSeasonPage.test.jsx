@@ -787,11 +787,36 @@ test("Zonen über Staffeln hinweg sind gesperrt, sobald eine Staffel der Liga ab
   renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("division-edit-1"));
   const sheet = screen.getByTestId("division-sheet");
-  expect(within(sheet).getByTestId("zones-cross-locked")).toHaveTextContent("Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen.");
+  expect(within(sheet).getByTestId("zones-cross-locked")).toHaveTextContent(
+    "Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.");
   expect(within(sheet).getByTestId("zones-promote-best")).toBeDisabled();
   expect(within(sheet).getByTestId("zones-relegate-worst")).toBeDisabled();
   // Gegenprobe: Die Zonen je Staffel bleiben änderbar.
   expect(within(sheet).getByTestId("zones-promote")).toBeEnabled();
+});
+
+test("Ligen stehen fest, sobald eine Staffel der Season abgeschlossen ist: anlegen, archivieren und löschen sind gesperrt, mit Hinweis (Nr. 231)", async () => {
+  body = { ...BODY, divisions_locked: true };
+  renderPage("#ligen");
+  expect(await screen.findByTestId("divisions-locked")).toHaveTextContent(
+    "Gesperrt: In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht erst, wenn alle abgeschlossenen Staffeln im Reiter „Abschluss“ wieder geöffnet sind.");
+  expect(screen.getByTestId("division-add")).toBeDisabled();
+  expect(screen.getByTestId("division-delete-1")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("division-status")).toBeDisabled();
+  // Gegenprobe: Was die Stufen nicht verändert, bleibt bedienbar.
+  expect(within(sheet).getByTestId("division-nickname")).toBeEnabled();
+  expect(within(sheet).getByTestId("zones-promote")).toBeEnabled();
+});
+
+test("ohne abgeschlossene Staffel sind Ligen frei: kein Hinweis, Knöpfe bedienbar (Nr. 231)", async () => {
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-add")).toBeEnabled();
+  expect(screen.getByTestId("division-delete-1")).toBeEnabled();
+  expect(screen.queryByTestId("divisions-locked")).toBeNull();
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  expect(within(screen.getByTestId("division-sheet")).getByTestId("division-status")).toBeEnabled();
 });
 
 test("Neue Season aus …: wer über den Vergleich der Staffeln aufsteigt, steht so da (#1627)", async () => {
