@@ -40,6 +40,9 @@ describe("Turnierformat, Rolle, Mitgliedschaft", () => {
     expect(formatTournamentDisplay({ format: "league", format_label: "Eigene Liga" })).toBe("Eigene Liga");
     expect(formatTournamentDisplay({ format: "single_elim" })).toBe("K.-o.");
     expect(formatTournamentDisplay(null)).toBe("");
+    // Zweite Quelle wie im Web (tournamentLabels.js): `format_display_name`.
+    expect(formatTournamentDisplay({ format: "league", format_display_name: "Sommerliga" })).toBe("Sommerliga");
+    expect(formatTournamentDisplay({ format: "league", format_label: null, format_display_name: "Sommerliga", league_context: {} })).toBe("Sommerliga");
   });
 
   test("Nutzerarten und Rollen als Begriff", () => {

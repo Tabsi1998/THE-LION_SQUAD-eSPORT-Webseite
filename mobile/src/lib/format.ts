@@ -385,9 +385,9 @@ export function formatTeamMode(value?: string | null) {
  * Der Formatname eines Turniers wie `formatTournamentDisplay` im Web: ein eigener Name zuerst, eine Liga-Staffel heißt
  * „Liga“ (der lange Name gilt nur für Turniere, #2111 F1), sonst der Name des Formats.
  */
-export function formatTournamentDisplay(tournament?: { format?: string | null; format_label?: string | null; league_context?: unknown } | null) {
+export function formatTournamentDisplay(tournament?: { format?: string | null; format_label?: string | null; format_display_name?: string | null; league_context?: unknown } | null) {
   if (!tournament) return "";
-  const custom = String(tournament.format_label || "").trim();
+  const custom = String(tournament.format_label || tournament.format_display_name || "").trim();
   if (custom) return custom;
   if (tournament.league_context) return "Liga";
   return formatTournamentFormat(tournament.format);
