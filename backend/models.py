@@ -2859,6 +2859,8 @@ class LeagueSeasonFields(LeagueLookFields):
     application_privacy_text: Optional[str] = Field(default=None, max_length=2000)
     entry_policy: Optional[Literal["all", "members"]] = None
     sibling_squads_in_staffel: Optional[bool] = None
+    # Neue Co-Teams starten in der untersten Liga N (#1623): höher nur mit Grund. Fehlt das Feld, teilt die Leitung frei zu.
+    new_squads_lowest_division: Optional[bool] = None
     # Anmeldungen automatisch annehmen (#2348): Vorgabe aus, dann prüft die Leitung jede Anmeldung.
     application_auto_accept: Optional[bool] = None
     # Nachmeldefrist (#2422, Nr. 184): Tage nach dem Season-Start, leer = Vorgabe 14.
@@ -2941,6 +2943,10 @@ class LeagueDivisionZones(BaseModel):
     relegate: Optional[int] = Field(default=None, ge=0, le=10)
     playoff_promote: Optional[int] = Field(default=None, ge=0, le=10)
     playoff_relegate: Optional[int] = Field(default=None, ge=0, le=10)
+    # Zielregel über Staffeln hinweg (#1627): die N besten Nächstplatzierten aller Staffeln steigen zusätzlich auf, spiegelbildlich
+    # beim Abstieg. Fehlt bzw. 0: nur die festen Plätze je Staffel, wie bisher.
+    promote_best: Optional[int] = Field(default=None, ge=0, le=10)
+    relegate_worst: Optional[int] = Field(default=None, ge=0, le=10)
 
 
 class LeagueDivisionCreate(BaseModel):
@@ -3004,6 +3010,19 @@ class LeagueApplicationSubmit(BaseModel):
     accept_privacy: bool = False
 
 
+class LeagueDrawRequest(BaseModel):
+    """Los auf mehrere Staffeln einer Liga N (#1623): Auslosen, neu auslosen, Tausch, Verwerfen, Übernehmen. Was Pflicht ist, prüft der Dienst."""
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+    squad_id: Optional[str] = Field(default=None, max_length=64)
+    other_squad_id: Optional[str] = Field(default=None, max_length=64)
+    fingerprint: Optional[str] = Field(default=None, max_length=64)
+    confirm: Optional[bool] = None
+    # Notausnahme des Superadmins, wenn sein eigenes Team im Los steht (Nr. 73).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class LeagueApplicationDecision(BaseModel):
     """Entscheidung der Leitung über einen Antrag (#2205). Was davon Pflicht ist, prüft der Liga-Service."""
     model_config = ConfigDict(extra="forbid")
@@ -3012,5 +3031,5 @@ class LeagueApplicationDecision(BaseModel):
     tournament_id: Optional[str] = Field(default=None, max_length=64)
     # Notausnahme des Superadmins beim eigenen Team (#2245): Pflicht ab fünf Zeichen, sonst nicht gebraucht.
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
-    # Übernommenes Co-Team (F.2, #1627) in eine Staffel einer anderen Liga N: Pflichtgrund.
+    # Übernommenes Co-Team (F.2, #1627) in eine andere Liga N, neues Co-Team in eine höhere als die unterste (#1623): Pflichtgrund.
     deviation_reason: Optional[str] = Field(default=None, max_length=500)

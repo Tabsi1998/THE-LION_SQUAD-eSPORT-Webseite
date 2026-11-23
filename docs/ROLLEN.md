@@ -392,6 +392,7 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   ablehnen, Warteliste und Zuteilen liegen beim Bereich Ligen und bei der Zuständigkeit „Teams freigeben“ (`applications`), beim eigenen Team bei einer zweiten Person
   (Befangenheit, oben). Der Kader sieht den Stand, nicht den Grund einer Ablehnung.
   Das Zuteilen oben bleibt als Sonderweg; nimmt es einen offenen Antrag des eigenen Teams an, gilt dieselbe Befangenheit. Eine Season kann zwei Co-Teams eines Hauptteams in derselben Staffel erlauben (`sibling_squads_in_staffel`, Vorgabe Nein).
+  Das Los auf mehrere Staffeln einer Liga N (`…/seasons/{id}/draws`, #1623) liegt bei derselben Zuständigkeit; steht ein eigenes Team im Los, lost, tauscht und übernimmt eine zweite Person (Superadmin als Notausnahme mit Grund).
 - **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`,
   `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
 Spielberechtigung (#2204): Die Zuständigkeit „Kader prüfen“ (`roster`) hebt auch die Wartezeit auf (`POST …/roster/{uid}/waive-wait`, Pflichtgrund, `league.roster.wait_waive`) und entscheidet Transfers

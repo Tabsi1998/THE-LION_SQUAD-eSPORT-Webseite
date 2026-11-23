@@ -695,6 +695,35 @@ test("Neue Season aus …: Vorschau mit Teams, Anlegen mit Beginn, danach die ne
   expect(await screen.findByRole("heading", { name: /Season 2/ })).toBeInTheDocument();
 });
 
+test("Neue Season aus …: Platzprüfung je Liga - Hinweis statt stiller Überfüllung, Anlegen geht trotzdem (#1627)", async () => {
+  const text = "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher gab es 1 Staffel – es fehlt 1.";
+  const fits = "4 Co-Teams, höchstens 8 je Staffel: 1 Staffel mit 4 Teams.";
+  extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, capacity_hints: [`Liga 1: ${text}`], divisions: [
+    { ...SUCCESSOR.divisions[0], capacity: { teams: 5, staffeln_before: 1, cap: 4, needed: 2, sizes: [3, 2], fits: false, text } },
+    { level: 2, label: "Liga 2", zones_label: "1 Aufsteiger · unterste Liga: kein Abstieg", teams: [], capacity: { teams: 4, staffeln_before: 1, cap: 8, needed: 1, sizes: [4], fits: true, text: fits } }] } };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  expect(await within(sheet).findByTestId("successor-capacity")).toHaveTextContent("Nicht jede Liga kommt mit ihren bisherigen Staffeln aus.");
+  expect(within(sheet).getByTestId("successor-seats-1")).toHaveTextContent(`Passt nicht: ${text}`);
+  expect(within(sheet).getByTestId("successor-seats-1")).toHaveAttribute("data-fits", "no");
+  // Gegenprobe: Liga 2 passt und warnt nicht.
+  expect(within(sheet).getByTestId("successor-seats-2")).toHaveTextContent(`Passt: ${fits}`);
+  expect(within(sheet).getByTestId("successor-seats-2")).toHaveAttribute("data-fits", "yes");
+  fireEvent.change(within(sheet).getByTestId("successor-start"), { target: { value: "2027-01-05" } });
+  expect(within(sheet).getByTestId("successor-create")).toBeEnabled();
+});
+
+test("Neue Season aus …: ohne Platzprüfung vom Server (älterer Stand) bleibt die Vorschau, wie sie war", async () => {
+  extra = { "/admin/leagues/seasons/s1/successor": SUCCESSOR };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  await within(sheet).findByTestId("successor-team-q2");
+  expect(within(sheet).queryByTestId("successor-capacity")).toBeNull();
+  expect(within(sheet).queryByTestId("successor-seats-1")).toBeNull();
+});
+
 test("Neue Season aus …: nicht abgeschlossen - der Grund statt des Knopfs", async () => {
   extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, can_create: false, problems: ["Die Season ist noch nicht abgeschlossen."] } };
   renderPage();
@@ -717,6 +746,88 @@ test("Zonen je Liga N (F.2): Satz an der Liga, Ändern schickt nur geänderte Zo
   fireEvent.click(within(sheet).getByTestId("division-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", expect.objectContaining({
     zones: { promote: 1, relegate: 2, playoff_promote: 0, playoff_relegate: 0 } })));
+});
+
+test("Zonen über Staffeln hinweg (#1627): Felder im Liga-Blatt, der Satz an der Liga, gespeichert nur was gesetzt ist", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 3, max_participants: 8 }, { tournament_id: "t2", staffel: "B", status: "draft", participant_count: 3, max_participants: 8 }], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1 },
+    zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1, top: false, bottom: false } }] };
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-zones-1")).toHaveTextContent("1 Aufsteiger · dazu 1 bester Nächstplatzierter über alle Staffeln · 1 Absteiger");
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("zones-promote-best")).toHaveValue(1);
+  expect(within(sheet).getByTestId("zones-relegate-worst")).toHaveValue(null);
+  fireEvent.change(within(sheet).getByTestId("zones-promote-best"), { target: { value: "2" } });
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", expect.objectContaining({
+    zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 2 } })));
+});
+
+test("Zonen über Staffeln hinweg stehen nur dort, wo sie gelten: nicht bei einer Staffel, nicht nach oben in der obersten Liga (#1627)", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0 },
+    zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, top: false, bottom: false } }] };
+  const { unmount } = renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  expect(within(screen.getByTestId("division-sheet")).queryByTestId("zones-cross")).toBeNull();
+  unmount();
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 3, max_participants: 8 }, { tournament_id: "t2", staffel: "B", status: "draft", participant_count: 3, max_participants: 8 }], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0 },
+    zones_effective: { promote: 0, relegate: 1, playoff_promote: 0, playoff_relegate: 0, top: true, bottom: false } }] };
+  renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).queryByTestId("zones-promote-best")).toBeNull();
+  expect(within(sheet).getByTestId("zones-relegate-worst")).toBeEnabled();
+});
+
+test("Zonen über Staffeln hinweg sind gesperrt, sobald eine Staffel der Liga abgeschlossen ist - mit Hinweis (#1627, Nr. 228)", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 3, max_participants: 8 }, { tournament_id: "t2", staffel: "B", status: "draft", participant_count: 3, max_participants: 8 }], zones_cross_locked: true,
+    zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1 },
+    zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1, top: false, bottom: false } }] };
+  renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("zones-cross-locked")).toHaveTextContent(
+    "Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.");
+  expect(within(sheet).getByTestId("zones-promote-best")).toBeDisabled();
+  expect(within(sheet).getByTestId("zones-relegate-worst")).toBeDisabled();
+  // Gegenprobe: Die Zonen je Staffel bleiben änderbar.
+  expect(within(sheet).getByTestId("zones-promote")).toBeEnabled();
+});
+
+test("Ligen stehen fest, sobald eine Staffel der Season abgeschlossen ist: anlegen, archivieren und löschen sind gesperrt, mit Hinweis (Nr. 231)", async () => {
+  body = { ...BODY, divisions_locked: true };
+  renderPage("#ligen");
+  expect(await screen.findByTestId("divisions-locked")).toHaveTextContent(
+    "Gesperrt: In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht erst, wenn alle abgeschlossenen Staffeln im Reiter „Abschluss“ wieder geöffnet sind.");
+  expect(screen.getByTestId("division-add")).toBeDisabled();
+  expect(screen.getByTestId("division-delete-1")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("division-status")).toBeDisabled();
+  // Gegenprobe: Was die Stufen nicht verändert, bleibt bedienbar.
+  expect(within(sheet).getByTestId("division-nickname")).toBeEnabled();
+  expect(within(sheet).getByTestId("zones-promote")).toBeEnabled();
+});
+
+test("ohne abgeschlossene Staffel sind Ligen frei: kein Hinweis, Knöpfe bedienbar (Nr. 231)", async () => {
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-add")).toBeEnabled();
+  expect(screen.getByTestId("division-delete-1")).toBeEnabled();
+  expect(screen.queryByTestId("divisions-locked")).toBeNull();
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  expect(within(screen.getByTestId("division-sheet")).getByTestId("division-status")).toBeEnabled();
+});
+
+test("Neue Season aus …: wer über den Vergleich der Staffeln aufsteigt, steht so da (#1627)", async () => {
+  extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, divisions: [{ ...SUCCESSOR.divisions[0], teams: [
+    ...SUCCESSOR.divisions[0].teams, { squad_id: "q3", display_name: "Dohlen · Eins", movement: "up", zone_cross: true, from_label: "Liga 2", from_staffel: "B", rank: 2 }] }] } };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  expect(await within(sheet).findByTestId("successor-team-q3")).toHaveTextContent("Aufstieg als bester Nächstplatzierter · Liga 2 · Staffel B, Platz 2");
+  // Gegenprobe: der feste Aufsteiger heißt weiter nur „Aufstieg“.
+  expect(within(sheet).getByTestId("successor-team-q2")).toHaveTextContent("Aufstieg · Liga 2 · Staffel A, Platz 1");
 });
 
 // Sprungmarke (F.1, aus main): Schiebt Nachgeladenes den Abschnitt weg, rollt die Seite nach - bis die Lage still steht; rollt die Person selbst, hört es auf.

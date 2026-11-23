@@ -28,7 +28,15 @@ async def frozen_rows(db, tournament: dict | None) -> list[dict] | None:
     if not is_league_staffel(tournament):
         return None
     final = await active_final(db, tournament["id"])
-    return copy.deepcopy(final.get("rows") or []) if final else None
+    if not final:
+        return None
+    rows = copy.deepcopy(final.get("rows") or [])
+    # Plätze über Staffeln hinweg (#1627): Die Zone steht erst fest, wenn alle Staffeln der Liga N abgeschlossen sind - darum beim
+    # Lesen aus den Endständen, nicht im Endstand selbst. Ob es die Regel gibt, sagt der Endstand (``zones``, Nr. 228): ohne sie
+    # kostet das keine Abfrage.
+    from services import league_cross_zones
+
+    return await league_cross_zones.overlay(db, final, rows)
 
 
 async def closed_refusal(db, tournament_id: str | None) -> str | None:

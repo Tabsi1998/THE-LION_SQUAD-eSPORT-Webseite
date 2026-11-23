@@ -187,17 +187,25 @@ export function zonesLine(zones) {
   const parts = [];
   if (zones.top) parts.push("oberste Liga: kein Aufstieg");
   else parts.push(zones.promote ? `${zones.promote} Aufsteiger` : "kein Aufstieg");
+  // Plätze über Staffeln hinweg (#1627): die N besten Nächstplatzierten aller Staffeln, spiegelbildlich vor dem Abstieg.
+  if (zones.promote_best) parts.push(`dazu ${zones.promote_best} ${zones.promote_best === 1 ? "bester Nächstplatzierter" : "beste Nächstplatzierte"} über alle Staffeln`);
   if (zones.playoff_promote) parts.push(`${zones.playoff_promote} Relegation oben`);
   if (zones.playoff_relegate) parts.push(`${zones.playoff_relegate} Relegation unten`);
   if (zones.bottom) parts.push("unterste Liga: kein Abstieg");
   else parts.push(zones.relegate ? `${zones.relegate} Absteiger` : "kein Abstieg");
+  if (zones.relegate_worst) parts.push(`dazu ${zones.relegate_worst} ${zones.relegate_worst === 1 ? "schlechtester Platz" : "schlechteste Plätze"} vor dem Abstieg über alle Staffeln`);
   return parts.join(" · ");
 }
+
+// Zielregel über Staffeln hinweg (#1627): zusätzliche Plätze über alle Staffeln der Liga - fehlen sie, gilt nichts davon.
+export const ZONE_CROSS_FIELDS = ["promote_best", "relegate_worst"];
 
 /** Die Zonen einer Liga N als Formularwerte (Texte für Zahlenfelder) - fehlt ein Wert, gilt 1/1 ohne Relegation. */
 export function zonesToForm(zones) {
   const value = (key, fallback) => String(zones?.[key] ?? fallback);
-  return { promote: value("promote", 1), relegate: value("relegate", 1), playoff_promote: value("playoff_promote", 0), playoff_relegate: value("playoff_relegate", 0) };
+  // Plätze über Staffeln hinweg (#1627) stehen nur im Formular, wenn die Liga sie gesetzt hat - sonst bleibt es, wie es war.
+  const cross = Object.fromEntries(ZONE_CROSS_FIELDS.filter((key) => Number(zones?.[key]) > 0).map((key) => [key, String(zones[key])]));
+  return { promote: value("promote", 1), relegate: value("relegate", 1), playoff_promote: value("playoff_promote", 0), playoff_relegate: value("playoff_relegate", 0), ...cross };
 }
 
 /** Formular → ``zones`` für den Server: ganze Zahlen 0–10, leer heißt Vorgabe. */
@@ -206,5 +214,6 @@ export function zonesPayload(form) {
     const parsed = Number.parseInt(String(text ?? "").trim(), 10);
     return Number.isFinite(parsed) ? Math.min(10, Math.max(0, parsed)) : fallback;
   };
-  return { promote: number(form.promote, 1), relegate: number(form.relegate, 1), playoff_promote: number(form.playoff_promote, 0), playoff_relegate: number(form.playoff_relegate, 0) };
+  const cross = Object.fromEntries(ZONE_CROSS_FIELDS.map((key) => [key, number(form[key], 0)]).filter(([, count]) => count > 0));
+  return { promote: number(form.promote, 1), relegate: number(form.relegate, 1), playoff_promote: number(form.playoff_promote, 0), playoff_relegate: number(form.playoff_relegate, 0), ...cross };
 }

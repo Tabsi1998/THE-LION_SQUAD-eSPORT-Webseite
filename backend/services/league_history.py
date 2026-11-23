@@ -7,7 +7,7 @@ Quelle ist allein der geltende Endstand (``league_final_tables``, ``active``) - 
 """
 from __future__ import annotations
 
-from services import league_zones
+from services import league_cross_zones, league_zones
 from services.league_current import badge
 
 LIMIT = 100
@@ -33,6 +33,8 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
         {"id": {"$in": division_ids}}, {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(len(division_ids) + 1)} if division_ids else {}
     visible: dict[str, bool] = {}
     out = []
+    # Plätze über Staffeln hinweg (#1627): Die Zone steht nicht im Endstand, sondern ergibt sich aus allen Endständen der Liga N.
+    await league_cross_zones.overlay_finals(db, finals)
     for final in finals:
         season = seasons.get(final.get("season_id") or "")
         if not season:

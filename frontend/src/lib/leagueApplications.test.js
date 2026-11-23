@@ -119,6 +119,7 @@ describe("Formular der Season", () => {
     expect(payload.application_slots).toBeNull();
     expect(payload.application_waitlist).toBe(true);
     expect(payload.sibling_squads_in_staffel).toBe(false);
+    expect(payload.new_squads_lowest_division).toBe(false);
     expect(payload.application_privacy_text).toBeNull();
   });
 

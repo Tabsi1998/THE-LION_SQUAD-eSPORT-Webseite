@@ -90,6 +90,9 @@ SEASON_RULE_DEFAULTS: dict = {
     "application_waitlist": True,
     # Anmeldungen automatisch annehmen (#2348): aus = die Leitung prüft jede Anmeldung. Fehlt das Feld (ältere Seasons), gilt dasselbe.
     "application_auto_accept": False,
+    # Neue Co-Teams starten in der untersten Liga N (#1623, Entscheidung 15.10.): Der Eingang bietet sie zuerst an, höher nur mit Grund.
+    # Fehlt das Feld (ältere Seasons), gilt nichts - die Leitung teilt frei zu wie bisher.
+    "new_squads_lowest_division": True,
 }
 # Selbstanmeldung (#2205): Leer heißt: gibt es nicht - darum dürfen die Felder auch wieder leer werden.
 APPLICATION_TIMES = ("application_opens_at", "application_closes_at")
@@ -884,7 +887,60 @@ def _zones(raw: dict | None, season: dict, overrides: dict | None) -> dict:
         raise LeagueProblem(problem.message, problem.status) from None
 
 
+ZONES_CROSS_LOCKED = ("Die Plätze über alle Staffeln lassen sich nicht mehr ändern: In dieser Liga ist schon eine Staffel abgeschlossen. "
+                      "Erst alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder öffnen, dann ändern.")
+# Nr. 231: Auf- und Abstieg rechnen mit den Liga N, die es beim Abschluss gab (oberste ohne Aufstieg, unterste ohne Abstieg, Ziel-Liga).
+DIVISIONS_LOCKED = ("In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht dann nicht mehr: "
+                    "Auf- und Abstieg rechnen mit den Ligen, die es beim Abschluss gab. Erst alle abgeschlossenen Staffeln im Reiter "
+                    "„Abschluss“ wieder öffnen.")
+SEASON_BUSY = "In dieser Season wird gerade eine Staffel abgeschlossen oder eine Liga geändert. Bitte erneut versuchen."
+
+
+async def divisions_locked(db, season_id: str | None) -> bool:
+    """Ist in dieser Season schon eine Staffel abgeschlossen (Nr. 231)? Dann stehen ihre Liga N fest."""
+    if not season_id:
+        return False
+    return bool(await db.tournaments.find_one({"league_context.season_id": season_id, "final_table": {"$type": "object"}, **ONLY_LEAGUE},
+                                              {"_id": 0, "id": 1}))
+
+
+def _season_lock(db, season_id: str):
+    """Die Season-Sperre für alles, was die Liga N einer Season verändert (Nr. 232) - dieselbe, die der Abschluss einer Staffel hält."""
+    return mutation_lock(db, league_season_resource(season_id))
+
+
+async def cross_zones_locked(db, division_ids: list[str]) -> set[str]:
+    """Die Liga N, in denen schon eine Staffel abgeschlossen ist (#1627, Nr. 228): Dort sind ``promote_best`` und ``relegate_worst`` gesperrt -
+    der Vergleich über Staffeln hinweg rechnet mit dem Stand des ersten Abschlusses."""
+    if not division_ids:
+        return set()
+    rows = await db.tournaments.find({"league_context.division_id": {"$in": division_ids}, "final_table": {"$type": "object"}, **ONLY_LEAGUE},
+                                     {"_id": 0, "league_context.division_id": 1}).to_list(500)
+    return {row["league_context"]["division_id"] for row in rows}
+
+
+async def _cross_zones_lock(db, division: dict, wanted: dict) -> None:
+    from services import league_zones
+
+    before = league_zones.settings_of(division)
+    if all((before.get(key) or 0) == (wanted.get(key) or 0) for key in league_zones.CROSS_FIELDS):
+        return
+    if await cross_zones_locked(db, [division["id"]]):
+        raise LeagueProblem(ZONES_CROSS_LOCKED, 422)
+
+
 async def create_division(db, season: dict, body: dict, user: dict, *, warnings: list | None = None) -> dict:
+    """Legt eine Liga N an - unter der Season-Sperre (Nr. 232) und nur, solange keine Staffel der Season abgeschlossen ist (Nr. 231)."""
+    try:
+        async with _season_lock(db, season["id"]):
+            if await divisions_locked(db, season["id"]):
+                raise LeagueProblem(DIVISIONS_LOCKED, 422)
+            return await _create_division(db, season, body, user, warnings=warnings)
+    except MutationLockBusy:
+        raise LeagueProblem(SEASON_BUSY, 409) from None
+
+
+async def _create_division(db, season: dict, body: dict, user: dict, *, warnings: list | None = None) -> dict:
     level = body.get("level")
     if level is None:
         newest = await db.league_divisions.find_one({"season_id": season["id"]}, {"_id": 0, "level": 1},
@@ -912,7 +968,21 @@ async def create_division(db, season: dict, body: dict, user: dict, *, warnings:
 
 
 async def update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
+    """Ändert eine Liga N - unter der Season-Sperre (Nr. 232): Die Prüfungen „schon eine Staffel abgeschlossen?“ (Plätze über Staffeln
+    hinweg, Nr. 228; archivieren, Nr. 231) und der Abschluss einer Staffel kommen sich so nicht in die Quere."""
+    try:
+        async with _season_lock(db, division["season_id"]):
+            fresh = await db.league_divisions.find_one({"id": division["id"]}, {"_id": 0}) or division
+            return await _update_division(db, fresh, body, warnings=warnings)
+    except MutationLockBusy:
+        raise LeagueProblem(SEASON_BUSY, 409) from None
+
+
+async def _update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
     season = await get_season(db, division["season_id"])
+    # Archivieren oder zurückholen verändert die Stufen der Season (Nr. 231): nicht mehr, sobald eine Staffel abgeschlossen ist.
+    if body.get("status") and body["status"] != (division.get("status") or "active") and await divisions_locked(db, division["season_id"]):
+        raise LeagueProblem(DIVISIONS_LOCKED, 422)
     updates: dict = {}
     if "nickname" in body:
         updates["nickname"] = _text(body.get("nickname"))
@@ -925,6 +995,7 @@ async def update_division(db, division: dict, body: dict, *, warnings: list | No
         # Auf- und Abstieg (F.2): auch eine kleinere Staffelgröße darf die gespeicherten Zonen nicht überschneiden lassen.
         updates["zones"] = _zones(body.get("zones") if body.get("zones") is not None else division.get("zones"), season,
                                   updates.get("overrides", division.get("overrides")))
+        await _cross_zones_lock(db, division, updates["zones"])
     updates.update(await _look(db, body, (league_look.PRIZES,)))
     if "overrides" in updates or "status" in updates:
         await _division_order_check(db, season, {**division, **updates}, division, warnings)
@@ -1061,8 +1132,13 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
             # Regelwerk (#1646): Die Sperren halten bis zum letzten Löschen. Reihenfolge: Turnier, Liga, Season.
             if kind == "league":
                 await locks.enter_async_context(mutation_lock(db, league_resource(target["id"])))
-            for season_id in sorted(season_ids):
+            # Eine einzelne Liga N löschen verändert die Stufen ihrer Season (Nr. 231, 232): unter deren Sperre, und nicht mehr,
+            # sobald dort eine Staffel abgeschlossen ist.
+            own_season = {target.get("season_id")} if kind == "division" and target.get("season_id") else set()
+            for season_id in sorted(season_ids | own_season):
                 await locks.enter_async_context(mutation_lock(db, league_season_resource(season_id)))
+            if kind == "division" and await divisions_locked(db, target.get("season_id")):
+                raise LeagueProblem(DIVISIONS_LOCKED, 422)
             fresh = await deletion_plan(db, kind, target)
             if not fresh["deletable"]:
                 raise LeagueProblem(blocked_message(fresh), 409)
