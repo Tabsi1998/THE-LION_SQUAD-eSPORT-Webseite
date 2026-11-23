@@ -337,3 +337,23 @@ test("das Ergebnis des eigenen Spiels beendet die Pause der Saison-Deko", async 
   await waitFor(() => expect(ownMatchesPaused()).toBe(false));
   clearOwnMatches();
 });
+
+// Nachzug aus #2201 (#2173): Unbeteiligte bekommen Terminvorschläge ohne `id` - die Liste zeigt sie trotzdem, ohne
+// Schlüssel-Warnung von React.
+test("Terminvorschläge ohne Kennung (Unbeteiligte): beide stehen da, keine Schlüssel-Warnung", async () => {
+  const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  try {
+    answer({ ...PAGE, can_act: false, can_player_report_result: false, can_report_score: false, report_state: null,
+      schedule_proposals: [
+        { scheduled_at: "2026-05-21T18:00:00Z", status: "pending", note: "abends" },
+        { scheduled_at: "2026-05-22T18:00:00Z", status: "pending", note: "später" },
+      ] });
+    await render(<MatchDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByText(/abends/)).toBeTruthy());
+    expect(screen.getByText(/später/)).toBeTruthy();
+    const keyWarnings = errors.mock.calls.filter((call) => String(call[0]).includes("unique \"key\""));
+    expect(keyWarnings).toEqual([]);
+  } finally {
+    errors.mockRestore();
+  }
+});

@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
+import { Alert } from "react-native";
 import { TeamDetailScreen } from "./TeamDetailScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
@@ -139,9 +140,9 @@ test("Kopf: Name, Kürzel, Spiel und Level; Gesichter Kapitän zuerst, du mit Ec
   expect(screen.getByTestId("team-header-line")).toHaveTextContent("LRK·Rocket League·Level 9");
   const faces = screen.getAllByTestId(/^team-face-u-/).map((node) => node.props.testID);
   expect(faces).toEqual(["team-face-u-cap", "team-face-u-co", "team-face-u-1"]);
-  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("KAPITÄN");
-  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("CO-KAPITÄN");
-  expect(screen.getByTestId("team-face-role-u-1")).toHaveTextContent("SPIELER");
+  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("TEAMLEITUNG");
+  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("CO-LEITUNG");
+  expect(screen.getByTestId("team-face-role-u-1")).toHaveTextContent("MITGLIED");
   expect(screen.getAllByTestId("team-face-you")).toHaveLength(1);
   // Ecken-Klammern (#1316): Winkel und Etikett „Du“ nur an deinem Gesicht (Paula, u-1), wie im Web (TeamHeader).
   expect(within(screen.getByTestId("team-face-u-1")).getByTestId("team-face-you")).toBeTruthy();
@@ -175,15 +176,16 @@ test("Auflösen nur unten beim Bearbeiten und nur mit dem richtigen Teamnamen", 
   const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
   api.delete = mockDelete;
   serve({ ...CREW, name: "Lions Rocket", can_manage: true }, {
-    "/teams/t1/dissolve-preview": { member_count: 3, chat_messages: 2, withdraw: [{ title: "Herbst-Cup" }], blocked: [], can_dissolve: true },
+    "/teams/t1/dissolve-preview": { member_count: 3, chat_messages: 2, withdraw: [{ title: "Herbst-Cup" }], blocked: [], can_dissolve: true, restore_days: 30 },
   });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
   await render(<TeamDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
   expect(screen.queryByText("Team bearbeiten")).toBeNull();
   await fireEvent.press(screen.getByTestId("team-edit-open"));
   await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent(
-    "Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 2 Nachrichten wird gelöscht und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben.",
+    "Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 2 Nachrichten ist nicht mehr erreichbar und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben. 30 Tage lang lässt sich das Team wiederherstellen (zurückgezogene Anmeldungen bleiben zurückgezogen), danach ist es endgültig weg.",
   ));
   await fireEvent.changeText(screen.getByTestId("team-dissolve-name"), "Lions");
   await fireEvent.press(screen.getByTestId("team-dissolve-submit"));
@@ -192,6 +194,8 @@ test("Auflösen nur unten beim Bearbeiten und nur mit dem richtigen Teamnamen", 
   await fireEvent.press(screen.getByTestId("team-dissolve-submit"));
   await waitFor(() => expect(mockDelete).toHaveBeenCalledWith("/teams/t1", { params: { confirm: "lions rocket" } }));
   await waitFor(() => expect(goBack).toHaveBeenCalled());
+  expect(alert).toHaveBeenCalledWith("Team aufgelöst", "Lions Rocket ist aufgelöst und lässt sich 30 Tage lang wiederherstellen.");
+  alert.mockRestore();
 });
 
 test("Co-Kapitän bearbeitet, löst aber nicht auf", async () => {
@@ -328,4 +332,72 @@ test("Squads beim Nachladen nicht da: die bisherigen bleiben stehen (#1000)", as
   });
   await waitFor(() => expect(screen.getByTestId("team-partial-load")).toBeTruthy());
   expect(screen.getAllByText("Rocket Squad").length).toBeGreaterThan(0);
+});
+
+// Team-Grenzen (#2128 TM11, Nachzug #2173): Name 2-60, Kürzel 2-8 wie im Server - der Knopf geht erst, wenn beides passt.
+test("Team bearbeiten: Kürzel unter 2 Zeichen sperrt Speichern mit Satz, gültig geht es raus", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, can_manage: true });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "l");
+  expect(screen.getByTestId("team-fields-problem")).toHaveTextContent("Kürzel: 2 bis 8 Zeichen.");
+  await fireEvent.press(screen.getByText("Team speichern"));
+  expect(mockPatch).not.toHaveBeenCalled();
+  await fireEvent.changeText(screen.getByTestId("team-name-input"), "L");
+  expect(screen.getByTestId("team-fields-problem")).toHaveTextContent("Name: 2 bis 60 Zeichen.");
+  await fireEvent.changeText(screen.getByTestId("team-name-input"), "Lions Rakete");
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "lrk2");
+  expect(screen.queryByTestId("team-fields-problem")).toBeNull();
+  await fireEvent.press(screen.getByText("Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ name: "Lions Rakete", tag: "LRK2" })));
+});
+
+// Spiel im Co-Team (#2128 TM3, Nachzug #2173): Auswahl aus /games statt Freitext; ein alter Freitext wird nicht als Kennung geschickt.
+test("Co-Team: Spiel aus /games antippen, archivierte fehlen, der alte Freitext geht nicht als Kennung raus", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, can_manage: true }, {
+    "/teams/t1/squads": [{ id: "s1", name: "Rocket Crew", game: "Rocket League (alt)", member_ids: [], status: "active" }],
+    "/games": [{ id: "g-rl", name: "Rocket League" }, { id: "g-old", name: "Altspiel", status: "archived" }],
+  });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getAllByText("Rocket Crew").length).toBeGreaterThan(0));
+  await fireEvent.press(screen.getByTestId("team-squad-edit-s1"));
+  await waitFor(() => expect(screen.getByTestId("team-squad-game-g-rl")).toBeTruthy());
+  expect(screen.queryByTestId("team-squad-game-g-old")).toBeNull();
+  expect(screen.getByTestId("team-squad-game-hint")).toHaveTextContent("Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.");
+  await fireEvent.press(screen.getByText("Co-Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1/squads/s1", expect.objectContaining({ game_id: null })));
+  await fireEvent.press(screen.getByTestId("team-squad-edit-s1"));
+  await waitFor(() => expect(screen.getByTestId("team-squad-game-g-rl")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-squad-game-g-rl"));
+  await fireEvent.press(screen.getByText("Co-Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenLastCalledWith("/teams/t1/squads/s1", expect.objectContaining({ game_id: "g-rl" })));
+});
+
+// Muss-Punkt der Prüfung (#2173): Ein Team mit älterem 1-Zeichen-Kürzel kann weiter Beschreibung, Farbe oder Discord speichern.
+test("Team mit älterem Kürzel unter der Grenze: unverändert speichert es, ein neues zu kurzes nicht", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, tag: "L", can_manage: true });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  expect(screen.queryByTestId("team-fields-problem")).toBeNull();
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "M");
+  expect(screen.getByTestId("team-fields-problem")).toHaveTextContent("Kürzel: 2 bis 8 Zeichen.");
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "L");
+  expect(screen.queryByTestId("team-fields-problem")).toBeNull();
+  await fireEvent.press(screen.getByTestId("team-color-green"));
+  await fireEvent.press(screen.getByText("Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ tag: "L", color: "green" })));
 });
