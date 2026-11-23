@@ -94,3 +94,25 @@ describe("Saisonverlauf an der Teamseite: die besten Co-Teams zuerst (#1630, Fab
     expect(line.series.map((series) => series.name)).toEqual(["Jetzt Liga 1 vorn", "Jetzt Liga 1", "Früher oben"]);
   });
 });
+
+describe("Review #1638: Statushinweis und nur gezeigte Linien", () => {
+  it("nennt Warteliste bzw. offene Anmeldung statt „Noch ohne Ergebnis“", () => {
+    expect(currentPlace({ rank: null, of: 6, status_note: "Warteliste" })).toBe("Warteliste");
+    expect(currentPlace({ rank: null, of: 6, status_note: "Anmeldung offen" })).toBe("Anmeldung offen");
+    expect(currentPlace({ rank: 2, of: 6, status_note: "Warteliste" })).toBe("Platz 2 von 6");
+  });
+
+  const row = (team, number, level, rank) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
+    rank, of: 6, badge: { level }, display_name: team });
+
+  it("nimmt Seasons und Liga-Bänder nur aus den gezeigten Linien und zählt den Rest", () => {
+    const rows = [row("Kader A", 1, 1, 1), row("Kader A", 2, 1, 1), row("Kader B", 1, 2, 1), row("Kader B", 2, 2, 2),
+      row("Kader Z", 1, 5, 6), row("Kader Z", 2, 5, 6), row("Kader Z", 3, 5, 6)];
+    const line = seasonLine(rows, { byTeam: true, limit: 2 });
+    expect(line.series.map((series) => series.name)).toEqual(["Kader A", "Kader B"]);
+    expect(line.hidden).toBe(1);
+    expect(line.levels).toEqual([1, 2]);
+    expect(line.seasons.map((season) => season.name)).toEqual(["Season 1", "Season 2"]);
+    expect(seasonLine(rows, { byTeam: true }).levels).toEqual([1, 2, 5]);
+  });
+});

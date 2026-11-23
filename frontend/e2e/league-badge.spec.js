@@ -61,6 +61,25 @@ async function mockServer(page, { reduce = false } = {}) {
   await page.route("**/api/teams/team-1/overview", json({ upcoming: [], recent: [], league: TEAM_LEAGUE }));
 }
 
+// Review #1638: Schneidet ein Elternteil ab, merkt noSideScroll nichts - darum je Element prüfen, dass nichts außerhalb einer Wischfläche
+// (.tls-swipe) rechts über den Bildschirm hinausragt.
+async function nothingOffRight(page, testIds) {
+  const off = await page.evaluate((ids) => {
+    const out = [];
+    for (const id of ids) {
+      const root = document.querySelector(`[data-testid="${id}"]`);
+      if (!root) continue;
+      for (const node of [root, ...root.querySelectorAll("*")]) {
+        if (node.parentElement && node.parentElement.closest(".tls-swipe")) continue;
+        const box = node.getBoundingClientRect();
+        if (box.width > 0 && box.right > window.innerWidth + 1) out.push(`${id}: ${node.tagName} ${Math.round(box.right)} > ${window.innerWidth}`);
+      }
+    }
+    return out.slice(0, 6);
+  }, testIds);
+  expect(off).toEqual([]);
+}
+
 async function noSideScroll(page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
@@ -98,7 +117,7 @@ async function shotSpan(page, first, last, name) {
 test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
   test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
 
-  for (const [width, height] of [[390, 844], [1440, 900]]) {
+  for (const [width, height] of [[320, 640], [390, 844], [1440, 900]]) {
     test(`Abzeichen bei ${width} px: Stufen, Größen, Meister und langer Beiname`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await mockServer(page, { reduce: true });
@@ -125,7 +144,7 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       }));
       expect(colors).toEqual({ nick: "rgb(41, 182, 232)", champion: "rgb(255, 215, 0)" });
       await noSideScroll(page);
-      await shot(gallery, `liga-abzeichen-${width}`);
+      if (width !== 320) await shot(gallery, `liga-abzeichen-${width}`);
     });
 
     test(`Profil bei ${width} px: Aktuelle Ligen mit Abzeichen, Platz, Zone, nächstem Spiel und Saisonverlauf`, async ({ page }) => {
@@ -151,7 +170,8 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       await expect(page.getByTestId("profile-league-history-s2-badge")).toHaveAttribute("data-metal", "cyan");
       await noSideScroll(page);
       await seeLine(page, line);
-      await shotSpan(page, block, line, `profil-aktuelle-ligen-${width}`);
+      await nothingOffRight(page, ["profile-league-current", "profile-season-line", "profile-league-history"]);
+      if (width !== 320) await shotSpan(page, block, line, `profil-aktuelle-ligen-${width}`);
     });
 
     test(`Teamseite bei ${width} px: Co-Teams nach Liga N, je Co-Team eine Linie`, async ({ page }) => {
@@ -170,6 +190,7 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       await expect(page.getByTestId("team-league-history")).toBeVisible();
       await noSideScroll(page);
       await seeLine(page, line);
+      await nothingOffRight(page, ["team-league", "team-season-line", "team-league-history"]);
       await shotSpan(page, block, line, `teamseite-liga-${width}`);
     });
   }
