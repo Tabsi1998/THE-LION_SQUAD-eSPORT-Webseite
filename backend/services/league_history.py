@@ -107,9 +107,17 @@ async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scop
 
     out = []
     opens: dict = {}
-    for final, season, league, internal, division in await _rows(db, {"player_ids": user_id}, viewer, hidden, scope):
+    found = await _rows(db, {"player_ids": user_id}, viewer, hidden, scope)
+    # Ein privates Team (``is_public: false``) zeigt das Profil nur der Person selbst - wie „Aktuelle Ligen“ (#1630) und die Teamseite (404).
+    private: set[str] = set()
+    if scope is not None and not scope.everything:
+        from services.league_current import private_team_ids
+
+        private = await private_team_ids(db, [side.get("team_id") for final, *_rest in found for side in (final.get("sides") or {}).values()
+                                              if user_id in (side.get("player_ids") or [])])
+    for final, season, league, internal, division in found:
         for registration_id, side in (final.get("sides") or {}).items():
-            if user_id in (side.get("player_ids") or []):
+            if user_id in (side.get("player_ids") or []) and side.get("team_id") not in private:
                 entry = _entry(final, season, league, registration_id, division)
                 if not entry:
                     continue
