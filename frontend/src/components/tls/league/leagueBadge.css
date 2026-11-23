@@ -138,6 +138,8 @@ a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E
 .tls-season-line__point[data-champion="true"] circle { fill: var(--tls-honor); stroke: var(--tls-honor); }
 .tls-season-line__rank { font-size: 10px; font-weight: 800; fill: #fff; font-variant-numeric: tabular-nums; }
 .tls-season-line__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; font-size: 12px; color: rgb(255 255 255 / 0.7); }
+/* Lange Co-Team-Namen brechen um, statt rechts an der Fläche abgeschnitten zu werden (Review #1638). */
+.tls-season-line__legend li { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .tls-season-line__more { margin-top: 4px; font-size: 12px; color: rgb(255 255 255 / 0.6); }
 .tls-season-line__swatch { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
 .tls-season-line[data-play="wait"] .tls-season-line__path, .tls-season-line[data-play="wait"] .tls-season-line__point { opacity: 0; }
