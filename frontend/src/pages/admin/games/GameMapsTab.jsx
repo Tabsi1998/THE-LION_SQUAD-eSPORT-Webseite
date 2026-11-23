@@ -166,27 +166,35 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
   const [busy, setBusy] = useState(() => new Set());
   const confirm = useConfirm();
   // Häkchen unterwegs und ein Zähler, der bei jedem Start und Ende eines Häkchens weiterspringt (#2529): Eine Abfrage, die vorher oder
-  // währenddessen losging, kennt das Häkchen nicht - ihre Antwort fällt weg, statt es zurückzunehmen (`missed`). Nach dem letzten
-  // Häkchen holt `toggle` sie nach.
+  // währenddessen losging, kennt das Häkchen nicht - ihre Antwort fällt weg, statt es zurückzunehmen. Ist kein Häkchen mehr unterwegs,
+  // fragt sie gleich neu; sonst merkt sie es sich (`missed`), und das letzte Häkchen holt es nach.
   const pending = useRef(0);
   const edits = useRef(0);
   const missed = useRef(false);
 
   const load = useCallback(async () => {
-    const seen = edits.current;
-    const stale = () => {
-      if (pending.current === 0 && seen === edits.current) return false;
-      missed.current = true;
-      return true;
-    };
-    try {
-      const { data: body } = await api.get(`/games/${gameId}/maps`);
-      if (stale()) return;
-      setData(body);
-      setMissing("");
-    } catch (err) {
-      if (stale()) return;
-      setMissing(formatApiError(err.response?.data?.detail));
+    for (;;) {
+      const seen = edits.current;
+      let body = null;
+      let problem = "";
+      try {
+        ({ data: body } = await api.get(`/games/${gameId}/maps`));
+      } catch (err) {
+        problem = formatApiError(err.response?.data?.detail);
+      }
+      if (pending.current > 0) {
+        missed.current = true;
+        return;
+      }
+      if (seen !== edits.current) continue;
+      missed.current = false;
+      if (body) {
+        setData(body);
+        setMissing("");
+      } else {
+        setMissing(problem);
+      }
+      return;
     }
   }, [gameId]);
   useEffect(() => { load(); }, [load, reloadKey]);
@@ -227,8 +235,14 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
     }
     pending.current -= 1;
     edits.current += 1;
-    if (failed) toast.error(formatApiError(failed.response?.data?.detail));
-    else toast.success(`${item.name}: ${on ? "in" : "nicht mehr in"} ${mode.label} freigegeben.`);
+    if (failed) {
+      // Abgelehnt: sofort wieder der Stand von vor dem Klick - bevor die Zeile frei wird, sonst schickte das nächste Häkchen den
+      // abgelehnten Modus mit. Den Stand des Servers holt das Nachladen unten.
+      setData((current) => ({ ...current, maps: current.maps.map((row) => (row.id === item.id ? { ...row, modes: item.modes } : row)) }));
+      toast.error(formatApiError(failed.response?.data?.detail));
+    } else {
+      toast.success(`${item.name}: ${on ? "in" : "nicht mehr in"} ${mode.label} freigegeben.`);
+    }
     setBusy((current) => {
       const rest = new Set(current);
       rest.delete(item.id);

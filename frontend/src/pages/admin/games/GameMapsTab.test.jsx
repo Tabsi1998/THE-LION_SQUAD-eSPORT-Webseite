@@ -124,6 +124,53 @@ test("eine Abfrage von vor dem Häkchen nimmt es nicht zurück - das zweite Häk
   expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1/maps/nebel", { modes: ["stellung", "snd"] });
 });
 
+// Fix-Runde #2529: Nach einer Ablehnung steht sofort wieder der Stand von vor dem Klick - nicht erst, wenn das Nachladen antwortet.
+// Sonst schickte ein schneller Klick auf einen anderen Modus derselben Map den abgelehnten mit.
+test("abgelehnt: die Zeile steht sofort wieder wie vorher, das nächste Häkchen schickt den abgelehnten Modus nicht mit", async () => {
+  renderTab();
+  const first = await screen.findByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" });
+  let answer;
+  apiMock.get.mockImplementationOnce(() => new Promise((resolve) => { answer = () => resolve({ data: BODY }); }));
+  apiMock.patch.mockRejectedValueOnce({ response: { data: { detail: "Der Modus ist archiviert." } } });
+  fireEvent.click(first);
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Der Modus ist archiviert."));
+  const other = screen.getByRole("checkbox", { name: "Nebelwerk in Suchen & Zerstören freigeben" });
+  await waitFor(() => expect(other).toBeEnabled());
+  expect(screen.getByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" })).not.toBeChecked();
+  fireEvent.click(other);
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1/maps/nebel", { modes: ["snd"] });
+  await act(async () => answer());
+});
+
+// Kommt die verworfene Antwort erst, wenn kein Häkchen mehr unterwegs ist, fragt die Seite selbst neu - sie wartet nicht auf ein
+// Live-Ereignis.
+test("eine verworfene Antwort nach dem letzten Häkchen fragt selbst neu", async () => {
+  let server = BODY.maps.map((row) => ({ ...row }));
+  apiMock.get.mockImplementation(async () => ({ data: { ...BODY, maps: server.map((row) => ({ ...row })) } }));
+  apiMock.patch.mockImplementation(async (url, body) => {
+    server = server.map((row) => (url.endsWith(`/${row.id}`) ? { ...row, ...body } : row));
+    return { data: {} };
+  });
+  renderTab();
+  const first = await screen.findByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" });
+  let answer;
+  apiMock.get.mockImplementationOnce(() => {
+    const before = { ...BODY, maps: server.map((row) => ({ ...row })) };
+    return new Promise((resolve) => { answer = () => resolve({ data: before }); });
+  });
+  act(() => { invalidation.reload(); });
+  fireEvent.click(first);
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Nebelwerk: in Stellung freigegeben."));
+  // Inzwischen ändert jemand anderes eine andere Map - die neue Abfrage zeigt es.
+  server = server.map((row) => (row.id === "hafen" ? { ...row, modes: ["stellung"] } : row));
+  const calls = apiMock.get.mock.calls.length;
+  await act(async () => answer());
+  await waitFor(() => expect(apiMock.get.mock.calls.length).toBe(calls + 1));
+  await waitFor(() => expect(screen.getByRole("checkbox", { name: "Hafenkante in Suchen & Zerstören freigeben" })).not.toBeChecked());
+  expect(screen.getByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" })).toBeChecked();
+});
+
 test("ein Modus, den das Spiel nicht mehr hat: keine Spalte, keine rohe Kennung, das Umschalten scheitert nicht daran", async () => {
   const maps = [{ ...BODY.maps[0], modes: ["stellung", "alter_modus"] }, { ...BODY.maps[1], modes: ["alter_modus"] }];
   apiMock.get.mockResolvedValue({ data: { ...BODY, maps } });
