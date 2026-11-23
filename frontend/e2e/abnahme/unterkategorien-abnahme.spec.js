@@ -145,6 +145,10 @@ test.describe("Abnahme: Unterkategorien und erlaubte Ausrüstung gegen den echte
     await expect(page.getByTestId(`equipment-sub-${subs.Sturmgewehr}`).getByTestId(`equipment-row-${rifleA.id}`)).toBeVisible();
     await page.getByTestId("equipment-move-cancel").click();
     await page.getByTestId("equipment-search").fill("");
+    // Ohne Suche sind die Kategorien zu (#2306) - „Alle aufklappen“ zeigt die ganze Bibliothek gruppiert.
+    await expect(page.getByTestId(`equipment-fold-${attachments.key}`)).toHaveAttribute("aria-expanded", "false");
+    await page.getByTestId("equipment-open-all").click();
+    await expect(page.getByTestId(`equipment-fold-${attachments.key}`)).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByTestId(`equipment-row-${sight.id}`)).toContainText("passt zu Sturmgewehr (Klasse)");
     await page.getByTestId(`equipment-group-${weapons.key}`).scrollIntoViewIfNeeded();
     await noSideScroll(page);
@@ -153,6 +157,8 @@ test.describe("Abnahme: Unterkategorien und erlaubte Ausrüstung gegen den echte
     // 2. Season: ganze Klasse Schrotflinte sperren, Sturm B nur in einem Modus, den Aufsatz an Sturm A.
     await page.goto(`/admin/leagues/seasons/${seasonId}#sperrliste`);
     const panel = page.getByTestId("season-bans");
+    // Die Kategorien der Sperrliste sind anfangs zu (#2306); der Schalter „Ganze Klasse sperren“ steht im Kopf der Klasse.
+    await panel.getByTestId("season-bans-open-all").click();
     await panel.getByTestId(`season-bans-class-${subs.Schrotflinte}-toggle`).check();
     await panel.getByTestId("season-bans-search").fill(stamp);
     await expect(panel.getByTestId(`season-bans-item-${rifleB.id}`)).toBeVisible();
@@ -172,11 +178,17 @@ test.describe("Abnahme: Unterkategorien und erlaubte Ausrüstung gegen den echte
     // 3. Regelwerk veröffentlichen: erlaubt ist Sturm A (ohne den Aufsatz), Sturm B außer in Stellung; Schrotflinte nicht erlaubt.
     const first = await publishWithBlock(page, seasonId, `Erlaubte Ausrüstung ${stamp}`);
     const data = first.frozen[seasonId].loadout_bans.data;
-    expect(data.layout).toBe(3);
+    // Fassung 5 (#2305): Waffen als Tabelle, die Aufsätze stehen an ihrer Waffe (#2299) statt in einer eigenen Liste mit „nicht an …“.
+    expect(data.layout).toBe(5);
     const sections = Object.fromEntries(data.categories.find((row) => row.label === weapons.label).sections.map((row) => [row.label, row]));
     expect(sections.Schrotflinte.state).toBe("banned");
     expect(sections.Schrotflinte.banned).toContain(SHOTGUN);
     expect(sections.Sturmgewehr.entries.find((row) => row.name === RIFLE_B).not_in).toEqual(["Stellung"]);
+    // Das Visier passt zur ganzen Klasse Sturmgewehr: an Sturm A gesperrt, an Sturm B erlaubt.
+    const fitted = (name) => sections.Sturmgewehr.entries.find((row) => row.name === name).attachments;
+    expect(fitted(RIFLE_A).banned).toContain(SIGHT);
+    expect(fitted(RIFLE_B).banned).not.toContain(SIGHT);
+    expect(fitted(RIFLE_B).groups.flatMap((group) => group.entries.map((entry) => entry.name))).toContain(SIGHT);
 
     // 4. Neue Schrotflinte: mitgesperrt - das Regelwerk will freigegeben werden, der Vorschlag nennt sie.
     await ok(page, "POST", base, { category: weapons.key, subcategory: subs.Schrotflinte, name: SHOTGUN_NEW });
@@ -203,7 +215,15 @@ test.describe("Abnahme: Unterkategorien und erlaubte Ausrüstung gegen den echte
       await page.goto(`/liga/${league.slug}/${season.slug}`);
       const block = page.getByTestId("league-allowed-equipment");
       await expect(block.getByTestId("allowed-entry").filter({ hasText: RIFLE_B })).toContainText("nicht in Stellung");
-      await expect(block.getByTestId("allowed-entry").filter({ hasText: SIGHT })).toContainText(`nicht an ${RIFLE_A}`);
+      // Aufsätze je Waffe (#2299): Das Visier steht nicht mehr als eigener Eintrag mit „nicht an …“, sondern unter seiner Waffe -
+      // an Sturm A unter „Gesperrt“, an Sturm B bei den erlaubten.
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: SIGHT })).toHaveCount(0);
+      for (const [rifle, allowed] of [[RIFLE_A, false], [RIFLE_B, true]]) {
+        await block.getByTestId("allowed-entry").filter({ hasText: rifle }).getByTestId("allowed-weapon-toggle").click();
+        const fitted = block.getByTestId("allowed-attachments").filter({ hasText: rifle });
+        await expect(fitted.getByTestId("allowed-attachment").filter({ hasText: SIGHT })).toHaveCount(allowed ? 1 : 0);
+        if (!allowed) await expect(fitted.getByTestId("allowed-attachments-banned")).toContainText(SIGHT);
+      }
       await expect(block.getByTestId("allowed-banned-names").first()).toContainText(SHOTGUN_NEW);
       await expect(block.getByTestId("allowed-entry").filter({ hasText: SHOTGUN })).toHaveCount(0);
       await block.getByTestId("allowed-entry").filter({ hasText: RIFLE_A }).first().scrollIntoViewIfNeeded();

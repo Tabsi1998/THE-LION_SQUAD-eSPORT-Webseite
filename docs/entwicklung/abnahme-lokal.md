@@ -27,6 +27,9 @@ ABNAHME_SOURCE=../lsw-pr docker compose -p lsw-abnahme --env-file .env.abnahme.e
 Der Ordner für `ABNAHME_SOURCE` sollte kein `frontend/node_modules` haben (frisch mit `git worktree add` angelegt):
 Docker nimmt sonst den ganzen Ordner mit ins Bild.
 
+Bricht `up --build` mit „failed to execute bake“ ab, ohne Bake bauen: `COMPOSE_BAKE=false` vor den Befehl setzen (PowerShell:
+`$env:COMPOSE_BAKE='false'`). `scripts/run_abnahme_all.sh` setzt das selbst (#2529).
+
 Fertig, wenn `http://127.0.0.1:23000/health` antwortet. Zeitgesteuerte Läufe (Mails, Erinnerungen, Statuswechsel,
 Discord) sind aus; was die Testdaten brauchen, stößt der Seed selbst an. Zwei Jobs laufen bewusst mit
 (`SCHEDULER_JOBS=result_holds,draw_show`, #1609): gehaltene Ergebnisse werden sicher veröffentlicht, und die
@@ -75,7 +78,8 @@ Stand durchspielen. Die Tage rechnet der Seed vom heutigen Tag aus, der Stand l�
 Mit `--schaufenster` kommt die öffentliche Season-Seite mit allem dazu (#2268): „Alpenliga“, Season 1 mit Modus-Symbolen und
 Ergebnisregeln, Map-Pool und Sperrliste mit Bildern, Regelwerk, Liga 1 und Liga 2 mit gestarteten Staffeln, Ergebnissen (Maps,
 kampflos, wiederholte Map, „in Klärung“), Banner, Emblem und Team-Logos – für `liga-season-seite-abnahme.spec.js`. Es setzt dafür
-Symbol und Regel an den Modi des Spiels und läuft darum nicht in der nächtlichen Abnahme.
+Symbol und Regel an den Modi des Spiels, und das bleibt: Danach zeigen die Seed-Modi nicht mehr den Platzhalter, den
+`modus-symbol-abnahme.spec.js` erwartet. Die nächtliche Abnahme lässt Specs mit Schaufenster darum zuletzt laufen (#2529).
 
 Für den schreibenden Ablauf kommt die eigene Liga „Liga-Probelauf“ dazu: eine öffentliche Season, Staffel A im Entwurf,
 fünf Co-Teams zugeteilt, das sechste teilt die Spec im Browser zu. Ist die Staffel schon gestartet, legt der nächste
@@ -227,8 +231,9 @@ Der Workflow [Nächtliche Abnahme](../../.github/workflows/nightly-abnahme.yml) 
 Wiener Sommerzeit, 02:23 Winterzeit) den Event-Abend auf GitHub durch (#1656): frischer Abnahme-Stand, dann **jede
 Abnahme-Spec der Reihe nach, vor jeder frisch geseedet**. Die Specs verbrauchen Testdaten (`advancement-modes` spielt
 die Show-Runde, die `tv-abnahme` danach noch braucht) - der Seed legt bei jedem Aufruf neue Turniere an. Specs, die
-`seed_abnahme_fastlap.py` bzw. `seed_abnahme_liga.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei. Neue Specs in `e2e/abnahme/` laufen
-von selbst mit, `readme-screenshots.spec.js` nicht (eigener Workflow).
+`seed_abnahme_fastlap.py` bzw. `seed_abnahme_liga.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei; tragen sie
+die Zeile `// abnahme:schaufenster`, seedet das Skript mit `--schaufenster` und lässt sie zuletzt laufen (es ändert die Modi des
+Spiels, siehe oben). Neue Specs in `e2e/abnahme/` laufen von selbst mit, `readme-screenshots.spec.js` nicht (eigener Workflow).
 
 - **Bericht:** im Lauf unter *Summary* - je Spec grün oder rot, Zahl der Tests, Dauer, bei Rot Testname und erste
   Fehlerzeile. Bilder, Playwright-Bericht und Traces liegen sieben Tage im Artefakt `abnahme-nacht`.
