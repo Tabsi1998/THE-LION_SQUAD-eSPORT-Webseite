@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.93.1 (23.11.2026)
+
+### Fehlerbehebungen
+
+* Ruhezeit endet in den Nächten der Zeitumstellung zur eingestellten Uhrzeit statt bis zu einer Stunde später (#2514)
+
 ## 1.93.0 (18.11.2026)
 
 ### Neu

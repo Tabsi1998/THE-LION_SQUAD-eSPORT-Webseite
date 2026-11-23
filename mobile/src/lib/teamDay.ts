@@ -35,7 +35,7 @@ export type TeamDay = {
 const NUMBER_WORDS: Record<number, string> = { 1: "eine Person", 2: "zwei", 3: "drei", 4: "vier", 5: "fünf", 6: "sechs" };
 
 export function starterLabel(member?: { role?: string } | null): string {
-  return member?.role === "captain" ? "Kapitän" : "Spielt";
+  return member?.role === "captain" ? "Teamleitung" : "Spielt";
 }
 
 export function lineupLabel(data?: Pick<TeamDay, "team_size" | "can_edit" | "lineup_set" | "lineup"> | null, chosenCount: number | null = null): string {

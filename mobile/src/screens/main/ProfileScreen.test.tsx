@@ -406,3 +406,12 @@ describe("Vereinsintern im fremden Profil (#2531)", () => {
     expect(screen.queryByText(/Keine öffentliche Turnierhistorie/)).toBeNull();
   });
 });
+
+// Nachzug aus #2125/#2126 (#2173): die bevorzugte Rolle steht im Setup wie im Web, die alte Konto-Rolle als Schild nicht mehr.
+test("fremdes Profil: bevorzugte Rolle im Gaming Setup, keine Konto-Rolle als Schild", async () => {
+  mockPublic.kiwiExtra = { role: "moderator", preferred_role: "Support" };
+  await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
+  await waitFor(() => expect(screen.getByText("KiwiKomet")).toBeTruthy());
+  expect(screen.getByText("Support")).toBeTruthy();
+  expect(screen.queryByText("Moderator")).toBeNull();
+});

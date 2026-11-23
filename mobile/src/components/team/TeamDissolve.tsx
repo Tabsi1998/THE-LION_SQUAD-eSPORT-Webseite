@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { Button } from "../Button";
 import { Body, Muted } from "../Text";
 import { api, errorMessage } from "../../lib/api";
@@ -32,6 +32,8 @@ export function TeamDissolve({ team, onDissolved }: { team: { id: string; name: 
     setError("");
     try {
       await api.delete(`/teams/${team.id}`, { params: { confirm: typed.trim() } });
+      // Wie der Hinweis im Web (#2128): aufgelöst ist nicht gelöscht - so lange lässt es sich wiederherstellen.
+      Alert.alert("Team aufgelöst", `${team.name} ist aufgelöst und lässt sich ${preview?.restore_days || 30} Tage lang wiederherstellen.`);
       onDissolved();
     } catch (err) {
       setError(errorMessage(err, "Auflösen hat nicht geklappt."));
@@ -43,7 +45,7 @@ export function TeamDissolve({ team, onDissolved }: { team: { id: string; name: 
   return (
     <View style={styles.box} testID="team-dissolve">
       <Body style={styles.title}>Team auflösen</Body>
-      <Muted testID="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat wird gelöscht."}</Muted>
+      <Muted testID="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat ist nicht mehr erreichbar."}</Muted>
       {blocked.length ? (
         <View style={styles.blocked} testID="team-dissolve-blocked">
           <Body style={styles.bold}>Gerade nicht möglich:</Body>
