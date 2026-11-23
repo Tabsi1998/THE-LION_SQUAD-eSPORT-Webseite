@@ -415,6 +415,10 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    Relegationsplätze. Die oberste Liga hat nie einen Aufstieg, die unterste nie einen Abstieg – das sagt der Satz unter der
    Liga („Auf- und Abstieg: oberste Liga: kein Aufstieg · 1 Absteiger“). Mehr Plätze als Teams in einer Staffel lehnt die Seite
    ab. Die Zonen stehen farbig in der Tabelle (siehe 3.11).
+   **Dazu über alle Staffeln dieser Liga** (nur für Ligen mit mehreren Staffeln): Mit **Beste Nächstplatzierte steigen auf** steigen
+   zusätzlich zu den Aufsteigern jeder Staffel die besten Teams auf dem Platz danach auf, etwa „Platz 1 jeder Staffel und die zwei
+   besten Zweiten“. **Schlechteste vor dem Abstieg steigen ab** ist das Gegenstück unten. Leer oder 0 heißt: nur die Plätze je
+   Staffel, wie bisher. Wer es wird, steht erst fest, wenn alle Staffeln der Liga abgeschlossen sind (3.10).
 2. In der Zeile von Liga 1 → **Staffel anlegen** → bestätigen. Es entsteht das Turnier „CoD-Liga Season 1 · Liga 1 ·
    Staffel A“ als **Entwurf** – ohne offene Anmeldung, ohne Discord, ohne Jahreswertung. Mehr als acht Teams? Eine
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
@@ -1673,7 +1677,21 @@ jede Zuständigkeit der Liga.
 | Laufende Fristen | abwarten – daneben steht, bis wann die Protest- oder Einspruchsfrist läuft |
 | Gleichstand auf Platz 1 | **Meister entscheiden** (nur in der obersten Liga) |
 | Gleichstand an der Grenze zu Auf- oder Abstieg | **Platz entscheiden** – zwei Teams stehen gleich, aber nur eines käme in die Zone (3.11) |
+| Gleichstand zwischen den Staffeln | weiter unten unter **Plätze über Staffeln hinweg** → **Gleichstand entscheiden** (siehe unten). Kommt nur bei der letzten offenen Staffel einer Liga |
 | Kein Meister | in der obersten Liga steht kein Team mehr in der Wertung – Anmeldungen prüfen |
+
+**Plätze über Staffeln hinweg:** Vergibt eine Liga mit mehreren Staffeln zusätzliche Auf- oder Abstiegsplätze über alle Staffeln
+(2.3), steht unter den Staffeln ein eigener Kasten je Liga. Er zeigt die Kandidaten – je Staffel das Team auf dem Platz nach den
+Aufsteigern bzw. vor den Absteigern – mit **Punkten je Spiel** und **Map-Differenz je Spiel**. Danach wird verglichen, in dieser
+Reihenfolge; so zählen auch verschieden große Staffeln gleich. Am Team steht „steigt auf“ bzw. „steigt ab“. Solange noch eine
+Staffel der Liga offen ist, ist das der **Stand von jetzt**: Keine Tabelle zeigt die Zone, bevor alle Staffeln abgeschlossen sind.
+Danach steht sie in der Tabelle, am TV, im PDF, in der App und in der Season-Historie.
+
+Stehen Teams an der Grenze nach beidem gleich, meldet der Kasten **Gleichstand**, und die letzte Staffel der Liga lässt sich nicht
+abschließen. **Gleichstand entscheiden** (Recht „Ergebnisse korrigieren“): die Teams anhaken, die den Platz bekommen, die Art
+wählen – **Entscheidungsspiel** oder **Entscheid der Leitung**, ein Los gibt es beim Auf- und Abstieg nicht – und den Grund
+eintragen. Über das eigene Team entscheidet eine andere Person. **Zurücknehmen** geht mit Grund; dann ist der Gleichstand wieder
+offen. Ändert sich nach einem Wiederöffnen, wer gleich steht, gilt ein alter Entscheid nicht mehr.
 
 Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf. Steht
 **Unvollständig** am Chip, ist ein Abschluss mittendrin abgebrochen: Die Staffel ist gesperrt, einen Endstand gibt es
@@ -1729,6 +1747,8 @@ alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
 - **Teams:** Pfeil hinauf = Aufstieg, hinunter = Abstieg, Strich = bleibt. Das ergibt sich ohne Bestätigung aus dem Endstand:
   oben die Aufsteiger, unten die Absteiger je Staffel. Ausgetretene und Disqualifizierte stehen hinten, belegen zuerst die
   Abstiegsplätze und sind **nicht dabei** (Liste unten). Ein Co-Team, das es nicht mehr gibt, fällt ebenfalls heraus.
+- **Über den Vergleich der Staffeln:** Wer als bester Nächstplatzierter aufsteigt (2.3, 3.10), steht mit „Aufstieg als bester
+  Nächstplatzierter“ da. Ist dort noch ein Gleichstand offen, nennt die Vorschau ihn, und Anlegen geht erst nach dem Entscheid.
 - **Platzprüfung:** Unter jeder Liga steht, ob ihre Teams in die Staffeln passen, die es bisher gab. Auf- und Abstieg zählen je
   Staffel: Zwei Staffeln in Liga 2 mit je einem Aufsteiger schicken zwei Teams nach oben, aus der einen Staffel in Liga 1 kommt nur
   eines herunter. Passt es nicht, steht dort zum Beispiel „5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher

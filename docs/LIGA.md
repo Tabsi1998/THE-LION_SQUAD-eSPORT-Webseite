@@ -87,6 +87,8 @@ Indizes: `id` eindeutig, (`league_id`, `number`) eindeutig, (`league_id`, `slug`
 | `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours`, dazu die Plattform `allowed_platforms`, `crossplay`, `input_device` (#2270, B.3) |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 | `prizes` | `[{place, text, image_url}]` | nein | eigene Gewinne (#2107); fehlt = die der Season |
+| `zones` | dict | nein | Auf- und Abstieg (F.2): `promote`, `relegate`, `playoff_promote`, `playoff_relegate` je Staffel, dazu optional `promote_best`, `relegate_worst` über alle Staffeln (#1627). Fehlt = 1/1 |
+| `zone_decisions` | dict | nein | Entscheide der Leitung bei Gleichstand über Staffeln hinweg (#1627, F.2), je `kind` einer. Geht nicht in die Folge-Season |
 | `draw` | dict | nein | Los auf mehrere Staffeln (#1623, B.4): Entwurf oder übernommenes Los dieser Liga N mit Seed, Eingabe, Ergebnis, Tauschen und Verlauf. Fehlt = nie gelost. Geht nicht in die Folge-Season und steht nicht in `GET …/seasons/{id}` |
 
 Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
@@ -230,7 +232,8 @@ Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_dead
 `match.no_show.cleared` (alter Vorschlag abgeräumt) (#2201) · `match.lineup.both_sides_kept` (Korrektur oder Nachtrag ließ
 Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen; #2202) · `league.season.late_extension` (Nachmeldefrist
 verlängert, mit Grund), `league.staffel.late_entry` (Spiele einer Nachmeldung angelegt; #2422) · `league.draw.create|redraw|swap|discard|apply`
-(Los auf mehrere Staffeln einer Liga N, #1623: Seed, Zählung, Grund; `apply` mit der ganzen Verteilung).
+(Los auf mehrere Staffeln einer Liga N, #1623: Seed, Zählung, Grund; `apply` mit der ganzen Verteilung) ·
+`league.zone.decision`, `league.zone.decision.clear` (Gleichstand über Staffeln hinweg entschieden bzw. zurückgenommen, #1627: Art, Grund, wer gewählt ist).
 
 ## 3. Einstellbar statt fest
 
@@ -724,6 +727,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Spiel: `GET` und `POST /proofs` als Leitung (#2360) | `results` oder `disputes` | ja, ohne Notausnahme: Befangene sind hier nie Leitung, sie sehen und handeln wie ein Mitglied ihrer Seite (Seitenregeln und Fristen gelten, MOSS der Gegenseite bleibt verborgen) | – |
 | `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
 | `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
+| `PUT …/divisions/{id}/zone-decision`, `DELETE …/zone-decision/{kind}` (Gleichstand über Staffeln hinweg, #1627) | `results` | ja, eigenes Team im Gleichstand | – |
 | `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
 | `GET /api/admin/leagues/seasons/{id}/closing`, `GET …/staffeln/{tid}/final-tables/{version}` (F.1) | jede Zuständigkeit | – | – |
 | `POST …/staffeln/{tid}/close`, `POST …/staffeln/{tid}/reopen` (F.1) | `season` | ja, eigenes Team in der Staffel | – |
@@ -3730,6 +3734,7 @@ nie, wer abgeschlossen hat.
 | `sanctions` | vorläufige Sperre oder offener Einspruch gegen eine Strafe der Staffel | `competition_sanctions` |
 | `deadlines` | laufende Protestfrist, Einspruchsfrist gegen Kampflos-Wertung, Korrektur, Protestentscheid oder Strafe | `match_disputes.league_window_of`, `appeal_until`, `league_sanctions.appeal_refusal` |
 | `champion_tie` | Gleichstand um den Meistertitel in der obersten Liga N ohne Entscheid (Nr. 156) | Tabelle |
+| `zone_cross_tie` | letzte offene Staffel der Liga N, und im Vergleich über Staffeln hinweg (#1627, F.2) steht die Grenze in einem Gleichstand ohne Entscheid | `league_cross_zones.resolve` |
 | `no_champion` | in der obersten Liga N steht kein Team mehr in der Wertung | Tabelle |
 | `incomplete_close` | Abschluss abgebrochen: Marke `final_table` am Turnier, aber keine aktive Fassung (nur Cockpit, Ausweg „Wieder öffnen“) | `league_final_tables` |
 
@@ -3798,7 +3803,7 @@ blendet sie wie bisher aus.
 **Cockpit** (`GET /api/admin/leagues/seasons/{id}/closing`, jede Zuständigkeit): `season`, `can_act`, `superadmin`,
 `methods`, `responsible` und je Staffel `closed`, `final`, `blockers`, `standings` (Vorschau bzw. Endstand), `table_rules`,
 `ties` (mit `own_team`), `can_decide`, `champion`, `champion_place`, `own_team`, `can_close`, `closed_by_me`, `can_reopen`,
-`history`. `GET …/staffeln/{tid}/final-tables/{version}` liefert eine Fassung mit ihrer Tabelle.
+`history`. Dazu `cross[]` und `cross_methods`: Plätze über Staffeln hinweg (#1627, F.2). `GET …/staffeln/{tid}/final-tables/{version}` liefert eine Fassung mit ihrer Tabelle.
 
 **Nicht in F.1:** Belohnungen und Banner (F.4, #2214), die App (#2173 - sie liest den Endstand schon über die Tabellen-Route, zeigt
 aber kein „Endstand“). Zonen und Folge-Season kamen mit F.2 (unten).
@@ -3811,7 +3816,8 @@ Entscheidungen Nr. 158 bis 161, dazu 11c, 34b, 43, 75. Zonen in `services/league
 im Liga-N-Blatt (`SeasonDivisionsTab.jsx`) und an jeder Tabelle (`StandingsTable.jsx`, `lib/leagueTable.js`).
 
 **Zonen** (`league_divisions.zones`, Nr. 158): `{promote, relegate, playoff_promote, playoff_relegate}`, ganze Zahlen 0–10, fehlt
-das Feld: 1/1 ohne Relegation. Je **Staffel** gezählt. Die oberste aktive Liga N hat nie Aufstieg, die unterste nie Abstieg
+das Feld: 1/1 ohne Relegation. Je **Staffel** gezählt. Dazu optional `promote_best` und `relegate_worst` über alle Staffeln der
+Liga N (#1627, siehe „Zielregel je Zone über Staffeln hinweg“ unten). Die oberste aktive Liga N hat nie Aufstieg, die unterste nie Abstieg
 (`effective`, auch wenn etwas anderes eingestellt ist). Zusammen mehr Plätze als `max_staffel_size` der Liga N: 422 „Die Zonen
 überschneiden sich“ - auch, wenn eine kleinere Staffelgröße gespeicherte Zonen überschneiden ließe. Gepflegt über `POST/PATCH
 …/divisions` (`zones`), die Verwaltung bekommt je Liga N `zones`, `zones_effective` und `zones_label`.
@@ -3864,10 +3870,53 @@ das Feld: 1/1 ohne Relegation. Je **Staffel** gezählt. Die oberste aktive Liga 
   Hinweis, keine Sperre:** Anlegen geht, die Staffeln der neuen Season legt die Leitung an. Dort prüft `GET …/draws` (B.4 „Los auf
   mehrere Staffeln“) dieselbe Rechnung gegen die Staffeln, die es wirklich gibt, und das Zuteilen lehnt eine volle Staffel wie immer
   ab - still überfüllt wird nichts.
-- **Zielregel je Zone bei mehreren Staffeln (#1627, noch offen):** Heute gilt je Staffel „die ersten N steigen auf, die letzten N
-  ab“ (`zones`). Eine Regel über Staffeln hinweg („die zwei besten Zweiten“) braucht einen Vergleich zwischen verschieden großen
-  Staffeln - das ist nicht entschieden und nicht gebaut. Der Vergleich gehört in dasselbe Blatt-Modul wie die Setzliste der Playoffs
-  (#2404, „unter gleich Platzierten“), damit beides gleich rechnet.
+- **Zielregel je Zone über Staffeln hinweg (#1627, Entscheidung 23.11.):** Hat eine Liga N mehrere Staffeln, kann sie zusätzlich zu
+  den festen Plätzen je Staffel Plätze über alle Staffeln vergeben - in denselben `zones`, zwei optionale Felder (0–10, fehlen sie
+  oder stehen sie auf 0, gilt nichts davon und `zones` sieht aus wie vorher):
+
+  | Feld | Bedeutung | Kandidat je Staffel |
+  | --- | --- | --- |
+  | `promote_best` | die N besten Nächstplatzierten aller Staffeln steigen zusätzlich auf („Platz 1 jeder Staffel und die zwei besten Zweiten“) | das Team auf dem Platz gleich nach den festen Aufsteigern |
+  | `relegate_worst` | spiegelbildlich: die N schlechtesten steigen zusätzlich ab | das Team auf dem Platz gleich vor den festen Absteigern |
+
+  Je Staffel gibt es also höchstens einen Kandidaten je Feld; mit N ≥ Staffeln gehen alle Kandidaten. Kein Kandidat ist ein
+  Ausgeschiedener (Nr. 43) und ein Platz, der schon in der anderen Zone liegt (`league_zones.cross_candidates`). Die oberste Liga N
+  hat kein `promote_best`, die unterste kein `relegate_worst` (`effective`). Die Zonen-Prüfung zählt je gesetztem Feld einen Platz
+  mit (422 „Die Zonen überschneiden sich“).
+  - **Vergleich** (`services/league_cross_rank.py`, Blatt-Modul): **Punkte je Spiel**, dann **Map-Differenz je Spiel**
+    (`score_diff`), gerechnet mit Brüchen - so zählen verschieden große Staffeln gleich, rohe Punkte nie. Danach stehen Teams
+    gleich. `ranked(rows, lot=…)` nimmt als optionalen letzten Schritt eine Funktion, die Gleiche ordnet: für die Setzliste der
+    Playoffs (#2404, Nr. 206). Beim Auf- und Abstieg gibt es diesen Schritt nicht (**kein Los**, Nr. 156).
+  - **Erst wenn alle Staffeln der Liga N abgeschlossen sind**, steht die Zone fest (`services/league_cross_zones.py`). Vorher trägt
+    keine Tabelle sie. Sie steht **nicht im Endstand**, sondern kommt beim Lesen aus den geltenden Endständen der Liga N dazu
+    (`league_final_read.frozen_rows`, `league_cross_zones.overlay`): Website, TV, Ergebnis-PDF und App lesen sie an der Zeile
+    (`zone` `promotion` bzw. `relegation`, dazu `zone_cross: true`), die Season-Historie ebenso. Ein Wiederöffnen nimmt sie von
+    selbst wieder weg. Ohne die Regel kostet das eine Abfrage je Tabelle.
+  - **Gleichstand an der Grenze:** Stehen an der Grenze Teams nach beiden Kriterien gleich und bekommt nur ein Teil den Platz,
+    sperrt das den Abschluss der **letzten** offenen Staffel der Liga N (Sperrgrund `zone_cross_tie`, „Gleichstand zwischen den
+    Staffeln“) wie `zone_tie`. Wer in den Vergleich geht, muss in seiner Staffel feststehen: Ein Gleichstand um den Kandidatenplatz
+    zählt dort wie eine Zonengrenze (`zone_tie`). Schließen zwei Staffeln gleichzeitig, hält derselbe Gleichstand das Anlegen der
+    neuen Season auf (`problems`, 409).
+  - **Entscheid der Leitung:** `PUT /api/admin/leagues/divisions/{division_id}/zone-decision` `{kind, registration_ids, method,
+    reason, conflict_reason?}` (Zuständigkeit `results`, unter der Season-Sperre). `kind`: `promote_best` oder `relegate_worst`;
+    `registration_ids`: genau so viele aus dem Gleichstand, wie noch Plätze offen sind (sonst 422); `method`: `playoff`
+    (Entscheidungsspiel) oder `lead` (Entscheid der Leitung) - `lot` wird abgelehnt (422 „… Ein Los gibt es beim Auf- und Abstieg
+    nicht.“); `reason` mindestens fünf Zeichen. Befangenheit wie beim Gleichstand in der Tabelle: nie über das eigene Team (403),
+    Superadmin als Notausnahme mit Grund (`league.conflict.override`, `action: "zone_decision"`). Gespeichert an
+    `league_divisions.zone_decisions.<kind>`: `{id, registration_ids, tied, method, reason, by, at}`. Der Entscheid gilt genau für
+    die Gruppe Gleicher, zu der er getroffen wurde (`tied`): Ändert sie sich - etwa nach Wiederöffnen und Korrektur -, ist er
+    hinfällig und der Gleichstand wieder offen. `DELETE …/zone-decision/{kind}` `{reason}` nimmt ihn zurück. Protokoll
+    `league.zone.decision` und `league.zone.decision.clear`. `zone_decisions` geht nicht in die Folge-Season und steht nicht in
+    `GET …/seasons/{id}`.
+  - **Cockpit** (`GET …/seasons/{id}/closing`): `cross[]` je Liga N mit der Regel - `{division_id, label, final, sides[]}`, je Seite
+    `{kind, label, count, zone, candidates[], tie, decision, own_team}`; Kandidaten in der Reihenfolge des Vergleichs mit `staffel`,
+    `rank`, `points_per_game`, `map_diff_per_game`, `chosen`, `tied`. `final: false` heißt Stand von jetzt (offene Staffeln mit
+    ihrer laufenden Tabelle). Dazu `cross_methods`. Oberfläche: `SeasonCrossZones.jsx`, `lib/leagueCrossZones.js`.
+  - **Neue Season:** Die Gewählten gehen eine Liga N weiter wie jeder Auf- bzw. Absteiger; in der Vorschau tragen sie
+    `zone_cross: true` („Aufstieg als bester Nächstplatzierter“), `carry_over.zone` ist `promotion` bzw. `relegation`. Die
+    Platzprüfung rechnet sie mit. `stamp` deckt auch die Entscheide - „Übernahme neu berechnen“ (Nr. 162) merkt einen neuen.
+  - **Mit Playoffs (#2404):** Der Vergleich ist die gemeinsame Stelle - die Setzliste „unter gleich Platzierten“ nutzt
+    `league_cross_rank.ranked` mit dem Los als letztem Schritt.
 - **Einmalig:** Teilindex `league_season_predecessor` (eindeutig auf `predecessor_id`) und die Sperre der Vorgänger-Season. Ein
   zweites Anlegen - auch gleichzeitig - antwortet mit der vorhandenen Season (`replay: true`) bzw. 409, nie mit einer zweiten.
   Brach das erste Anlegen nach der Season ab, ergänzt der nächste Aufruf die fehlenden Schritte (jeder sieht nach, was schon da
@@ -4225,7 +4274,7 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Rahmen | Season-Seite mit Reitern, geführte Einrichtung | getestet | #2279 | #2267 |
 | Rahmen | Neue Season aus der Vorgängerin, Auf- und Abstieg, Zonen | abgenommen (Sz. 18) | F.2 #2397 | #1627 |
 | Rahmen | Platzprüfung je Liga N in der Vorschau der neuen Season (mehrere Staffeln) | getestet | – | #1627 |
-| Rahmen | Zielregel je Zone über Staffeln hinweg („die zwei besten Zweiten“) | fehlend (Fachfrage offen: Vergleich zwischen Staffeln) | – | #1627 |
+| Rahmen | Zielregel je Zone über Staffeln hinweg („die zwei besten Zweiten“): Punkte je Spiel, Map-Differenz je Spiel, Entscheid der Leitung ohne Los; gilt erst nach Abschluss aller Staffeln | getestet | – | #1627 |
 | Rahmen | Sportlicher Auf- und Abstieg als Regel je Spiel, Solo-Ligen | fehlend | – | #1627 |
 | Rahmen | Unterbesetzte Divisionen zusammenlegen | fehlend | – | #1628 |
 | Rahmen | Eigene Staffel-Seite in der Liga-Verwaltung, Turnierliste ohne Staffeln | getestet (Pakete A–D) | #2497, #2505, #2508, Paket D | #2262 |
