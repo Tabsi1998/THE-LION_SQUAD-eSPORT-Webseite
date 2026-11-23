@@ -467,8 +467,13 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
         await unsettle_by_result(db, match["id"])
     removed: dict = {}
     if follow_up:
-        await db.matches_v2.delete_many({"id": {"$in": [row["id"] for row in follow_up]}})
-        removed = {"removed_round": min(int(row.get("round") or 0) for row in follow_up), "removed_matches": len(follow_up)}
+        from services.station_runtime import free_stations_of_deleted_matches
+
+        removed_ids = [row["id"] for row in follow_up]
+        await db.matches_v2.delete_many({"id": {"$in": removed_ids}})
+        # Die Runde war unberührt, also hängt keines ihrer Spiele an einer Station - freigegeben wird trotzdem (#2386).
+        await free_stations_of_deleted_matches(db, removed_ids)
+        removed ={"removed_round": min(int(row.get("round") or 0) for row in follow_up), "removed_matches": len(follow_up)}
     await _audit(db, "match.result.undo", match, actor_id, {
         "held": False, "report_id": meta.get("report_id"), "cleared_matches": cleared, **removed,
     })
