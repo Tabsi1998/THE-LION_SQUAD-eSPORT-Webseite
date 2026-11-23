@@ -1316,3 +1316,30 @@ test("Turnier unverändert: die Strukturrolle zeigt Status und Austritt", async 
   expect(screen.getByTestId("admin-tr-status-select")).toBeInTheDocument();
   expect((await screen.findAllByTestId("admin-reg-withdraw-r-1")).length).toBeGreaterThan(0);
 });
+
+// Schweizer System (#1559): der Stand kommt mit dem Baum vom Server - Runde X von Y, automatisch, abgeschlossen.
+function serveSwiss(swiss) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/bracket")) return Promise.resolve({ data: { rounds: [], swiss } });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, status: "live", format: "swiss" } });
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+test("Schweizer System: der Stand steht über den Reitern, die nächste Runde bleibt von Hand möglich", async () => {
+  serveSwiss({ end_rule: "rounds", rounds_played: 2, rounds_total: 5, round_open: true, complete: false, auto_next_round: true, advanced: 0, eliminated: 0, active: 8 });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(await screen.findByTestId("admin-tr-swiss-state")).toHaveTextContent("Runde 2 von 5 läuft · die nächste Runde entsteht automatisch");
+  expect(screen.getByTestId("admin-tr-swiss-next")).toBeInTheDocument();
+});
+
+test("Schweizer System abgeschlossen: kein Knopf für eine weitere Runde, der Stand sagt warum", async () => {
+  serveSwiss({ end_rule: "rounds", rounds_played: 5, rounds_total: 5, round_open: false, complete: true, auto_next_round: true, advanced: 0, eliminated: 0, active: 8 });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const state = await screen.findByTestId("admin-tr-swiss-state");
+  expect(state).toHaveTextContent("Schweizer System abgeschlossen: alle 5 Runden gespielt");
+  expect(state).toHaveAttribute("data-complete", "true");
+  expect(screen.queryByTestId("admin-tr-swiss-next")).toBeNull();
+});

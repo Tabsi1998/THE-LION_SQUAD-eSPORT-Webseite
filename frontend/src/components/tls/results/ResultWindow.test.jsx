@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 
 const apiMock = { get: vi.fn(), post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 
 const { ResultWindow } = await import("./ResultWindow");
 const { ResultUndoBar, useResultUndo } = await import("./ResultUndoBar");
@@ -87,6 +87,30 @@ test("Korrigieren braucht einen Grund und schickt force mit", async () => {
   expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/result?force=true", expect.objectContaining({ hold: true, reason: "Stand vertauscht" }));
 });
 
+test("Korrektur im Schweizer System (#1559): steht die nächste Runde schon, zeigt das Fenster den Hinweis des Servers", async () => {
+  const { toast } = await import("sonner");
+  const notice = "Runde 3 ist schon gepaart – nach dem alten Ergebnis. Die Paarung ändert sich nicht von selbst. Hat dort noch niemand gespielt, kannst du die Runde zurücknehmen und neu erzeugen.";
+  apiMock.post.mockResolvedValueOnce({ data: { held: true, hold: { id: "h2", undo_seconds: 10 }, notice } });
+  const done = { ...DUEL, has_result: true, result: [{ registration_id: "a", rank: 1, score: 2 }, { registration_id: "b", rank: 2, score: 1 }] };
+  const saved = vi.fn();
+  render(<ResultWindow entry={done} onClose={() => {}} onSaved={saved} />);
+  fireEvent.click(screen.getByTestId("result-score-b-plus"));
+  fireEvent.click(screen.getByTestId("result-score-b-plus"));
+  fireEvent.change(screen.getByTestId("result-reason"), { target: { value: "Stand vertauscht" } });
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(saved).toHaveBeenCalled();
+  expect(toast.warning).toHaveBeenCalledWith(notice, expect.objectContaining({ duration: 12000 }));
+});
+
+test("ohne Hinweis des Servers bleibt es beim Speichern still", async () => {
+  const { toast } = await import("sonner");
+  render(<ResultWindow entry={DUEL} onClose={() => {}} onSaved={() => {}} />);
+  fireEvent.click(screen.getByTestId("result-score-a-plus"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(apiMock.post).toHaveBeenCalled();
+  expect(toast.warning).not.toHaveBeenCalled();
+});
+
 function UndoHarness({ onDone }) {
   const undo = useResultUndo({ onDone });
   return (
@@ -116,6 +140,20 @@ test("Rückgängig: 10 Sekunden lang, danach ist die Leiste weg", async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("Rückgängig abgelehnt (#1559): der Satz des Servers steht in der Meldung, etwa wenn die nächste Schweizer Runde schon läuft", async () => {
+  const { toast } = await import("sonner");
+  const sentence = "Rückgängig geht nicht mehr: In Runde 3 hat schon ein Spiel begonnen oder steht an einer Station. Bitte das Ergebnis über „Korrigieren“ ändern.";
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: sentence } } });
+  const onDone = vi.fn();
+  render(<UndoHarness onDone={onDone} />);
+  fireEvent.click(screen.getByText("start"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-undo")); });
+  expect(toast.error).toHaveBeenCalledWith(sentence);
+  expect(toast.success).not.toHaveBeenCalled();
+  // Die Seite lädt neu - das Ergebnis steht ja noch.
+  expect(onDone).toHaveBeenCalledTimes(2);
 });
 
 test("inzwischen eingetragen (#2124): bei 409 fragt das Fenster „als Korrektur speichern?“ - dann mit Grund und force", async () => {

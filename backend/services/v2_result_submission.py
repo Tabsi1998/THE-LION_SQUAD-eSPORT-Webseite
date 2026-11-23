@@ -439,6 +439,12 @@ async def submit_v2_result(
     # Folgeläufe erwarten; der Aufrufer hält die Turnier-Schreibsperre.
     from services.heat_rebuild import evaluate_after_write
     await evaluate_after_write(db, match.get("tournament_id"), actor_id=actor_id, trigger="result")
+    # Schweizer System (#1559): war das das letzte Spiel der Runde, entsteht mit „nächste Runde automatisch“ die nächste -
+    # unter derselben Schreibsperre, also nie doppelt.
+    from services.swiss_rounds import advance_after_write, stale_pairing_notice
+    await advance_after_write(db, match.get("tournament_id"), actor_id=actor_id)
+    # Korrektur, wenn die nächste Schweizer Runde schon steht (#1559): Die Leitung erfährt, dass deren Paarung bleibt.
+    notice = stale_pairing_notice(match, stage_matches, application["results"]) if force else None
     return {
         "ok": True,
         "match": updated,
@@ -446,4 +452,5 @@ async def submit_v2_result(
         "report_id": report_id,
         "reset_match_ids": [row["id"] for row in reset_matches],
         "idempotent_replay": False,
+        **({"notice": notice} if notice else {}),
     }

@@ -10,6 +10,7 @@ import { ZoneMark } from "@/components/tls/league/ZoneMark";
 // Gold erst, wenn das Turnier beendet ist - vorher ist es ein Zwischenstand.
 
 const SPLIT_AFTER = 12;
+const SWISS_STATUS_WORDS = { advanced: "weiter", eliminated: "ausgeschieden", tied: "Gleichstand" };
 // Höhe in TV-Einheiten (--tv-u, 1 % der Bildhöhe): Platz der Folie zwischen Kopf- und Fußleiste, was Titel und
 // Tabellenkopf brauchen, und wie hoch eine Zeile höchstens wird - wenige Zeilen sollen nicht über das ganze Bild laufen.
 // Große Schrift macht auch Kopf- und Fußleiste höher - dann bleibt weniger Platz.
@@ -67,6 +68,8 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               <td className="tv-standings__name" data-tv-name="1">
                 {row.display_name || "Teilnehmer"}
                 {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
+                {/* Schweizer System (#1559): weiter oder raus nach der Abschlussregel - wie in der Webtabelle. */}
+                {SWISS_STATUS_WORDS[row.swiss_status] ? <span className="tv-standings__exit" data-testid={`tv-swiss-status-${row.registration_id}`}> · {SWISS_STATUS_WORDS[row.swiss_status]}</span> : null}
                 {/* Punktabzug (E.3): am TV nur die Höhe, nie der Grund. */}
                 {deductionText(row) ? <span className="tv-standings__exit" data-testid={`tv-deducted-${row.registration_id}`}> · {deductionText(row)}</span> : null}
                 {/* Angefochtenes Ergebnis (E.2, #1619): zählt vorläufig - am TV nur der Hinweis, nie Grund oder Seite. */}

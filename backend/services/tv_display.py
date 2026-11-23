@@ -272,6 +272,8 @@ def seat_summary(tournament: dict | None, registrations: list[dict] | None) -> d
 # Tabelle, nie Konto (user_id) oder Team-Kennung.
 STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "played", "won", "drawn", "lost",
                    "score_for", "score_against", "score_diff", "buchholz", "points", "form",
+                   # Schweizer System (#1559): Median-Buchholz als Spalte, „weiter“ und „raus“ nach der Abschlussregel.
+                   "median_buchholz", "swiss_status",
                    # Liga-Staffel (E.1, #1625): was den Gleichstand entschied, kampflos, Abzug, Ausscheiden.
                    "tiebreak", "forfeit_won", "forfeit_lost", "deducted_points", "exit",
                    # Angefochtene Ergebnisse (E.2, #1619): wie viele Spiele der Zeile „in Klärung“ sind - nur die Zahl.

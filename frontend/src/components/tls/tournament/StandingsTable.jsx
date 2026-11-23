@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FORM_LETTERS, STANDING_COLUMNS, formLabel, rankMove, standingCell } from "@/lib/standingsTable";
 import { ZONE_LABELS, standingNotes, zoneLegend } from "@/lib/leagueTable";
+import { swissStatusNote } from "@/lib/tournamentTableSettings";
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { ZoneMark } from "@/components/tls/league/ZoneMark";
 
@@ -83,9 +84,11 @@ function Form({ form }) {
 }
 
 // Liga-Staffel (E.1, #1625): unter dem Namen, was bei Punktgleichheit entschied, kampflos, Abzug und das Ausscheiden.
-// Gibt es die Felder nicht (andere Turniere), bleibt die Zeile wie bisher.
-function Notes({ row }) {
-  const notes = standingNotes(row);
+// Gibt es die Felder nicht (andere Turniere), bleibt die Zeile wie bisher. Turnier-Tabellen (#1559) nennen dieselbe Stelle
+// mit ihren eigenen Wörtern (`labels`), das Schweizer System dazu „Weiter“ und „Ausgeschieden“ nach der Abschlussregel.
+function Notes({ row, labels }) {
+  const swiss = swissStatusNote(row);
+  const notes = [...(swiss ? [swiss] : []), ...standingNotes(row, labels)];
   if (!notes.length) return null;
   return (
     <span className="tls-standing-notes" data-testid={`standing-notes-${row.registration_id}`}>
@@ -105,9 +108,10 @@ function Notes({ row }) {
  * bei Team-Turnieren, lib/standingsTable.nameHead); `hideDraws`: ohne Spalte „U“ (Season ohne Remis, lib/leagueTable);
  * `mapPoints`: Punkte nach gewonnenen Maps (#2312) - „S“ bleibt auch am Handy (erstes Kriterium bei Punktgleichheit);
  * `championKey`: Schlüssel der Meister-Zeile (Liga, #2268) - nur sie trägt Gold. Der volle Name steht an jeder Zeile
- * auch im `title` (#2262, #2498).
+ * auch im `title` (#2262, #2498). `tiebreakLabels` (#1559): die Wörter für „was bei Punktgleichheit entschied“ in
+ * Turnier-Tabellen - ohne Angabe die der Liga.
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null }) {
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name", hideDraws = false, mapPoints = false, championKey = null, tiebreakLabels = undefined }) {
   const columns = (STANDING_COLUMNS[kind] || STANDING_COLUMNS.league)
     .filter((column) => !(hideDraws && column.key === "drawn"))
     .map((column) => {
@@ -165,7 +169,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                     <StandingName name={row.display_name || "Teilnehmer"} />
                     {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
-                  <Notes row={row} />
+                  <Notes row={row} labels={tiebreakLabels} />
                 </td>
                 {columns.map((column) => (
                   <td key={column.key} data-col={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-display text-base font-bold text-white" : "text-white/70"}`}>
