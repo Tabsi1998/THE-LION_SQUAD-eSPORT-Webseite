@@ -1152,7 +1152,10 @@ async def system_status(me: dict = Depends(require_any_admin())):
 @router.get("/notifications")
 async def my_notifications(me: dict = Depends(get_current_user)):
     db = get_db()
-    notes = await db.notifications.find({"user_id": me["id"], "in_app_visible": {"$ne": False}}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    from services.news_channels import inbox_query
+
+    # Meldungen zu News nur für die App (#1532) stehen nicht in der Glocke der Website.
+    notes = await db.notifications.find({"user_id": me["id"], "in_app_visible": {"$ne": False}, **inbox_query("web")}, {"_id": 0}).sort("created_at", -1).to_list(50)
     return notes
 
 

@@ -77,6 +77,7 @@ async def recipients_for(db, visibility: str | None) -> set[str]:
 
 
 async def _notify(db, collection, item: dict, *, title: str, body: str, url: str, kind_base: str) -> dict:
+    from services.news_channels import notification_meta
     from services.user_notifications import create_user_notification
 
     visibility = item.get("visibility") or "public"
@@ -85,7 +86,9 @@ async def _notify(db, collection, item: dict, *, title: str, body: str, url: str
     for user_id in sorted(recipients):
         created = await create_user_notification(
             user_id, title, body, url=url, kind=f"{kind_base}_{KINDS.get(visibility, 'member')}",
-            meta={"category": "club_internal", "dedupe_key": f"{kind_base}:{item['id']}", "item_id": item["id"], "visibility": visibility},
+            # Kanal der News (#1532): „nur App“ ohne Browser und Discord, „nur Website“ ohne App-Push - Events haben keinen.
+            meta={"category": "club_internal", "dedupe_key": f"{kind_base}:{item['id']}", "item_id": item["id"], "visibility": visibility,
+                  **notification_meta(item)},
         )
         if created:
             sent += 1
