@@ -82,3 +82,18 @@ test("Nachmeldung (#2422): die Zeile sagt, ab welcher Woche das Team dabei ist",
   expect(await screen.findByTestId("tv-late-r-0-7")).toHaveTextContent("Nachgemeldet ab Woche 3");
   expect(screen.queryByTestId("tv-late-r-0-6")).toBeNull();
 });
+
+test("Schweizer System (#1559): Median-Buchholz als Spalte, „weiter“ und „ausgeschieden“ an der Zeile", async () => {
+  const row = (id, rank, extra) => ({ registration_id: id, display_name: `Spieler ${rank}`, rank, played: 3, won: 4 - rank, drawn: 0, lost: rank - 1,
+    buchholz: 5, median_buchholz: 2, points: 4 - rank, ...extra });
+  render(
+    <MemoryRouter initialEntries={["/display/bracket/t1"]}>
+      <TvScreen><TvStandingsSlide standings={[row("r1", 1, { swiss_status: "advanced" }), row("r2", 2), row("r3", 3, { swiss_status: "eliminated" })]} /></TvScreen>
+    </MemoryRouter>,
+  );
+  const slide = await screen.findByTestId("tv-standings-slide");
+  expect([...slide.querySelectorAll("thead th")].map((cell) => cell.textContent)).toEqual(["#", "Name", "Sp", "S", "U", "N", "MBHZ", "BHZ", "Pkt"]);
+  expect(screen.getByTestId("tv-swiss-status-r1")).toHaveTextContent("weiter");
+  expect(screen.getByTestId("tv-swiss-status-r3")).toHaveTextContent("ausgeschieden");
+  expect(screen.queryByTestId("tv-swiss-status-r2")).toBeNull();
+});

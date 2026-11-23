@@ -751,6 +751,10 @@ _STANDING_COLUMNS = {
                ("N", ("lost",), _pdf_number), ("Diff", ("score_diff",), _pdf_signed), ("Pkt", ("points",), _pdf_number)],
     "swiss": [("Sp", ("played",), _pdf_number), ("S", ("won",), _pdf_number), ("U", ("drawn",), _pdf_number),
               ("N", ("lost",), _pdf_number), ("BHZ", ("buchholz",), _pdf_number), ("Pkt", ("points",), _pdf_number)],
+    # Mit Median-Buchholz (#1559) - nur, wenn er bei Punktgleichheit zählt und die Zeilen ihn tragen.
+    "swiss_median": [("Sp", ("played",), _pdf_number), ("S", ("won",), _pdf_number), ("U", ("drawn",), _pdf_number),
+                     ("N", ("lost",), _pdf_number), ("MBHZ", ("median_buchholz",), _pdf_number),
+                     ("BHZ", ("buchholz",), _pdf_number), ("Pkt", ("points",), _pdf_number)],
     "ffa": [("Sp", ("played",), _pdf_number), ("Siege", ("won", "wins"), _pdf_number),
             ("Ø Platz", ("avg_rank",), _pdf_number), ("Punkte", ("points",), _pdf_number)],
     "knockout": [("Siege", ("won", "wins"), _pdf_number), ("Niederlagen", ("lost", "losses"), _pdf_number),
@@ -766,6 +770,8 @@ def _standings_kind(tournament: dict, rows: list[dict]) -> str:
 
     if any("score_diff" in row for row in rows):
         return "league"
+    if any("median_buchholz" in row for row in rows):
+        return "swiss_median"
     if any("buchholz" in row for row in rows):
         return "swiss"
     if (tournament or {}).get("format") in HEAT_FORMATS:
@@ -782,6 +788,8 @@ def _pdf_group_title(group: dict, index: int) -> str:
 
 
 _EXIT_SUFFIX = {"withdrawn": "ausgetreten", "disqualified": "disqualifiziert"}
+# Schweizer System (#1559): weiter oder raus nach der Abschlussregel - dieselben Wörter wie in der Webtabelle.
+_SWISS_STATUS_TEXT = {"advanced": "weiter", "eliminated": "ausgeschieden"}
 # Zonen für Auf- und Abstieg (F.2, #1627): dieselben Wörter und Farben wie in der Webtabelle (lib/leagueTable.js ZONE_LABELS).
 # Nie nur über die Farbe (#1648): die beiden Relegationen heißen verschieden - der Druck hat keine Pfeil-Schrift, das Wort trägt.
 _ZONE_TEXT = {"promotion": "Aufstieg", "playoff_promotion": "Relegation um den Aufstieg",
@@ -795,6 +803,8 @@ def _standing_name(row: dict) -> str:
     name = str(row.get("display_name") or "Teilnehmer")
     suffix = _EXIT_SUFFIX.get(((row.get("exit") or {}) if isinstance(row.get("exit"), dict) else {}).get("kind"))
     notes = [suffix] if suffix else []
+    if _SWISS_STATUS_TEXT.get(row.get("swiss_status") or ""):
+        notes.append(_SWISS_STATUS_TEXT[row["swiss_status"]])
     # Angefochtene Ergebnisse (E.2, #1619): wie in der Webtabelle - sie zählen vorläufig, die Zeile sagt es.
     contested = row.get("contested") if isinstance(row.get("contested"), int) and not isinstance(row.get("contested"), bool) else 0
     if contested > 0:

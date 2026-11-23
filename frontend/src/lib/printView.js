@@ -457,6 +457,8 @@ export const STANDINGS = { tableHead: 8, sectionHead: 9, row: 7 };
  * Website (lib/standingsTable), ohne die Form. `heats`: das Turnier spielt in Läufen (FFA).
  */
 const EXIT_SUFFIX = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
+// Schweizer System (#1559): weiter oder raus nach der Abschlussregel - dieselben Wörter wie Website, TV und PDF.
+const SWISS_STATUS_SUFFIX = { advanced: "weiter", eliminated: "ausgeschieden" };
 
 export function standingsSections(standings, { heats = false } = {}) {
   return standingSections(standings)
@@ -473,7 +475,7 @@ export function standingsSections(standings, { heats = false } = {}) {
           // Tabellenende der Liga-Staffel (E.1, #1625): wer ausschied, steht mit dem Grund da.
           // Punktabzug (E.3): steht wie auf der Website an der Zeile - die Höhe, nicht der Grund.
           // Nachmeldung (#2422): „Nachgemeldet ab Woche X“ wie auf der Website - erklärt die kleinere Spielzahl.
-          name: `${row.display_name || "Teilnehmer"}${EXIT_SUFFIX[row.exit?.kind] ? ` (${EXIT_SUFFIX[row.exit.kind]})` : ""}${deductionText(row) ? ` (${deductionText(row)})` : ""}${lateEntryText(row) ? ` (${lateEntryText(row)})` : ""}`,
+          name: `${row.display_name || "Teilnehmer"}${EXIT_SUFFIX[row.exit?.kind] ? ` (${EXIT_SUFFIX[row.exit.kind]})` : ""}${SWISS_STATUS_SUFFIX[row.swiss_status] ? ` (${SWISS_STATUS_SUFFIX[row.swiss_status]})` : ""}${deductionText(row) ? ` (${deductionText(row)})` : ""}${lateEntryText(row) ? ` (${lateEntryText(row)})` : ""}`,
           cells: columns.map((column) => String(standingCell(column, row))),
         })),
       };
