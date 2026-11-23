@@ -861,8 +861,10 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
         tables = {row["tournament_id"]: row["standings"] for row in staffeln if not row["closed"]}
         found = await league_cross_zones.resolve(db, division["id"], live={row["id"]: tables.get(row["id"]) or [] for row in mine if not is_closed(row)})
         if found:
-            cross.append(league_cross_zones.view(found, division_label(division),
-                                                 await league_cross_zones.own_ids(db, user, [row["id"] for row in mine])))
+            own: set[str] = set()
+            for row in mine:
+                own |= await own_registration_ids(db, user, row["id"])
+            cross.append(league_cross_zones.view(found, division_label(division), own))
     return {
         "cross": cross, "cross_methods": league_cross_zones.METHODS,
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from database import get_db
-from services import league_cross_zones, league_final
+from services import league_cross_decisions, league_cross_zones, league_final
 from services.change_events import publish_api_change
 from services.league_permissions import ANY, require_league
 from services.league_scope import ONLY_LEAGUE
@@ -139,7 +139,7 @@ async def admin_set_zone_decision(division_id: str, body: ZoneDecisionBody, me: 
     """Gleichstand an der Grenze des Vergleichs über Staffeln hinweg entscheiden - ``results``, mit Art und Grund, nie über das eigene
     Team (Befangenheit wie beim Gleichstand in der Tabelle)."""
     try:
-        decision = await league_cross_zones.decide(get_db(), division_id, body.model_dump(), me)
+        decision = await league_cross_decisions.decide(get_db(), division_id, body.model_dump(), me)
     except league_cross_zones.CrossProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
     return {"ok": True, "decision": {key: decision[key] for key in ("id", "registration_ids", "method", "reason", "at")}}
@@ -148,7 +148,7 @@ async def admin_set_zone_decision(division_id: str, body: ZoneDecisionBody, me: 
 @admin_router.delete("/divisions/{division_id}/zone-decision/{kind}")
 async def admin_clear_zone_decision(division_id: str, kind: str, body: ZoneDecisionClear, me: dict = Depends(require_zone_decision)):
     try:
-        await league_cross_zones.clear(get_db(), division_id, kind, body.reason, me)
+        await league_cross_decisions.clear(get_db(), division_id, kind, body.reason, me)
     except league_cross_zones.CrossProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
     return {"ok": True}

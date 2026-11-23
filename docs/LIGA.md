@@ -3891,15 +3891,17 @@ Liga N (#1627, siehe „Zielregel je Zone über Staffeln hinweg“ unten). Die o
   - **Erst wenn alle Staffeln der Liga N abgeschlossen sind**, steht die Zone fest (`services/league_cross_zones.py`). Vorher trägt
     keine Tabelle sie. Sie steht **nicht im Endstand**, sondern kommt beim Lesen aus den geltenden Endständen der Liga N dazu
     (`league_final_read.frozen_rows`, `league_cross_zones.overlay`): Website, TV, Ergebnis-PDF und App lesen sie an der Zeile
-    (`zone` `promotion` bzw. `relegation`, dazu `zone_cross: true`), die Season-Historie ebenso. Ein Wiederöffnen nimmt sie von
+    (`zone` `promotion` bzw. `relegation`, dazu `zone_cross: true`), die Season-Historie ebenso (`overlay_finals`: eine Abfrage
+    für alle Endstände, gerechnet wird nur für Liga N mit der Regel). Ein Wiederöffnen nimmt sie von
     selbst wieder weg. Ohne die Regel kostet das eine Abfrage je Tabelle.
   - **Gleichstand an der Grenze:** Stehen an der Grenze Teams nach beiden Kriterien gleich und bekommt nur ein Teil den Platz,
     sperrt das den Abschluss der **letzten** offenen Staffel der Liga N (Sperrgrund `zone_cross_tie`, „Gleichstand zwischen den
     Staffeln“) wie `zone_tie`. Wer in den Vergleich geht, muss in seiner Staffel feststehen: Ein Gleichstand um den Kandidatenplatz
     zählt dort wie eine Zonengrenze (`zone_tie`). Schließen zwei Staffeln gleichzeitig, hält derselbe Gleichstand das Anlegen der
     neuen Season auf (`problems`, 409).
-  - **Entscheid der Leitung:** `PUT /api/admin/leagues/divisions/{division_id}/zone-decision` `{kind, registration_ids, method,
-    reason, conflict_reason?}` (Zuständigkeit `results`, unter der Season-Sperre). `kind`: `promote_best` oder `relegate_worst`;
+  - **Entscheid der Leitung** (`services/league_cross_decisions.py`; das Lesen bleibt im Blatt-Modul `league_cross_zones`, damit
+    Tabellen-Route und Abschluss es ohne Import-Kreis nutzen): `PUT /api/admin/leagues/divisions/{division_id}/zone-decision`
+    `{kind, registration_ids, method, reason, conflict_reason?}` (Zuständigkeit `results`, unter der Season-Sperre). `kind`: `promote_best` oder `relegate_worst`;
     `registration_ids`: genau so viele aus dem Gleichstand, wie noch Plätze offen sind (sonst 422); `method`: `playoff`
     (Entscheidungsspiel) oder `lead` (Entscheid der Leitung) - `lot` wird abgelehnt (422 „… Ein Los gibt es beim Auf- und Abstieg
     nicht.“); `reason` mindestens fünf Zeichen. Befangenheit wie beim Gleichstand in der Tabelle: nie über das eigene Team (403),

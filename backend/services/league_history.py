@@ -29,9 +29,8 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
     visible: dict[str, bool] = {}
     out = []
     # Plätze über Staffeln hinweg (#1627): Die Zone steht nicht im Endstand, sondern ergibt sich aus allen Endständen der Liga N.
-    cross: dict = {}
+    await league_cross_zones.overlay_finals(db, finals)
     for final in finals:
-        await league_cross_zones.overlay(db, final, final.get("rows") or [], cross)
         season = seasons.get(final.get("season_id") or "")
         if not season:
             continue
