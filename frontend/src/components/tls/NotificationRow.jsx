@@ -62,7 +62,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
       {!bundle.read ? <span className="mt-1.5 w-2 h-2 rounded-full bg-[#29B6E8] shrink-0" aria-hidden="true" /> : null}
       {badge ? <Badge material={badge.material} level={badge.level} rank={badge.rank} art={badge.art} icon={badge.icon} size={compact ? "xs" : "sm"} className="shrink-0" title={badge.name} testId={`${testIdPrefix}-badge-${bundle.id}`} /> : null}
       <div className="min-w-0 flex-1">
-        <div className={`font-bold text-sm text-white ${compact ? "line-clamp-1" : "line-clamp-2"}`}>{bundle.title}</div>
+        <div className="tls-wrap font-bold text-sm text-white">{bundle.title}</div>
         {bundle.body ? (
           <div className="mt-0.5 text-xs text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
         ) : null}
