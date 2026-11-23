@@ -9,6 +9,10 @@ const { HANDY, PC, bild, bilder } = require("./anleitungBilder");
 // zugeschnitten); sie liegen danach in docs/assets/helfer/. „B. Simulator“ steht in helfer-anleitung-fastlap-abnahme
 // (eigener Seed). Läuft nur mit ABNAHME=1; Stand aus scripts/seed_abnahme.py (local_live, local_draft, onsite_members).
 
+// Nur die Knöpfe „Aufrufen“ in den Stationskacheln - der Kasten „Alle aufrufen“ über den Kacheln (#1162) heißt ebenfalls
+// live-call-…, trägt aber keine Station.
+const STATION_CALL = "[data-testid^='live-station-'] [data-testid^='live-call-']";
+
 const live = state?.tournaments?.local_live;
 const liveSlug = state?.slugs?.local_live || live;
 const members = state?.tournaments?.onsite_members;
@@ -65,7 +69,7 @@ test.describe("Abnahme: Helfer-Anleitung (Station, Einlass, Wenn etwas nicht pas
     await bilder(page, "a0-oeffnen", [head.getByText("Turnierleitung", { exact: true }), head.locator("h1"), page.getByRole("tablist", { name: "Turnierleitung" })]);
 
     // 1. „Als Nächstes“ an einer freien Station - „Aufrufen“.
-    const call = board.locator("[data-testid^='live-call-']").first();
+    const call = board.locator(STATION_CALL).first();
     await expect(call).toBeVisible();
     const stationId = (await call.getAttribute("data-testid")).replace("live-call-", "");
     const card = page.getByTestId(`live-station-${stationId}`);
