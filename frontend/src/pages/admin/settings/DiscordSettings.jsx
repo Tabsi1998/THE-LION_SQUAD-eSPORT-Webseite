@@ -198,8 +198,8 @@ export function DiscordSettings({ initialTab = "messages" }) {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="font-bold truncate">{entry.display_name || entry.username}</div>
-                    <div className="text-xs text-white/40 truncate">@{entry.username}{entry.discord_name ? ` · ${entry.discord_name}` : ""}</div>
+                    <div className="font-bold tls-wrap">{entry.display_name || entry.username}</div>
+                    <div className="text-xs text-white/40 tls-wrap">@{entry.username}{entry.discord_name ? ` · ${entry.discord_name}` : ""}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">

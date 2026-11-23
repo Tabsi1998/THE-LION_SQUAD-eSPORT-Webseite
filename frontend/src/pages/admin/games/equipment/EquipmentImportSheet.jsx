@@ -117,7 +117,7 @@ export function EquipmentImportSheet({ game, onClose, onDone, onDirtyChange }) {
               {groups.map((group) => (
                 <fieldset key={group.label} className="space-y-1">
                   <legend className="flex w-full items-center justify-between gap-2 pb-1 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
-                    <span className="truncate">{group.label}</span>
+                    <span className="tls-wrap">{group.label}</span>
                     <button type="button" onClick={() => toggleGroup(group.rows)} className="tls-btn tls-btn--quiet shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Alle</button>
                   </legend>
                   {group.rows.map((row) => (

@@ -95,8 +95,8 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
               <a key={stream.stream_id || stream.user_id} href={stream.stream_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
                 <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold truncate">{stream.display_name || stream.username || stream.twitch_login}</div>
-                  <div className="text-xs text-white/45 truncate">{stream.title || "Stream läuft"}{stream.game_name ? ` · ${stream.game_name}` : ""}</div>
+                  <div className="font-bold tls-wrap">{stream.display_name || stream.username || stream.twitch_login}</div>
+                  <div className="text-xs text-white/45 tls-wrap">{stream.title || "Stream läuft"}{stream.game_name ? ` · ${stream.game_name}` : ""}</div>
                 </div>
                 <span className="inline-flex items-center gap-1 text-xs text-white/60"><Eye className="w-3.5 h-3.5" /> {stream.viewer_count || 0}</span>
               </a>
@@ -117,8 +117,8 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
             {channels.map((channel) => (
               <div key={channel.user_id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 px-4 py-3" data-testid={`twitch-channel-${channel.username}`}>
                 <div className="min-w-0 sm:w-56">
-                  <div className="font-bold truncate">{channel.display_name || channel.username}</div>
-                  <div className="text-xs text-white/45 truncate">twitch.tv/{channel.twitch_login}{channel.is_live ? " · live" : ""}</div>
+                  <div className="font-bold tls-wrap">{channel.display_name || channel.username}</div>
+                  <div className="text-xs text-white/45 tls-wrap">twitch.tv/{channel.twitch_login}{channel.is_live ? " · live" : ""}</div>
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${channel.homepage_visible ? "text-[#00FF88]" : "text-[#FFD700]"}`}>
                   {channel.homepage_visible ? "Startseite" : "nicht sichtbar"}

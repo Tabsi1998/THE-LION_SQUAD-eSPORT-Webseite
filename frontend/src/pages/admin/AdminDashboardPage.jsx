@@ -389,7 +389,7 @@ export default function AdminDashboardPage() {
               </span>
               <StatusDot ok={c.ok} />
             </div>
-            <div className="mt-2 text-xs text-white/70 truncate">{c.detail}</div>
+            <div className="mt-2 text-xs text-white/70 tls-wrap">{c.detail}</div>
           </Link>
         ))}
       </div>
@@ -460,9 +460,9 @@ export default function AdminDashboardPage() {
                     {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
                   </span>
                   {may(item.url) ? (
-                    <Link to={item.url} className="min-w-0 flex-1 truncate text-white hover:text-[#29B6E8]">{item.title}</Link>
+                    <Link to={item.url} className="min-w-0 flex-1 tls-wrap text-white hover:text-[#29B6E8]">{item.title}</Link>
                   ) : (
-                    <span className="min-w-0 flex-1 truncate text-white">{item.title}</span>
+                    <span className="min-w-0 flex-1 tls-wrap text-white">{item.title}</span>
                   )}
                   {item.detail && <span className="text-xs text-white/40 shrink-0">{item.detail}</span>}
                 </li>
@@ -619,7 +619,7 @@ export default function AdminDashboardPage() {
                 {s.ok !== undefined ? <StatusDot ok={s.ok} /> : <span className="text-[#29B6E8] opacity-0 group-hover:opacity-100 transition">→</span>}
               </div>
               <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{s.label}</div>
-              <div className="mt-1 text-xs text-white/45 leading-relaxed truncate">{s.detail}</div>
+              <div className="mt-1 text-xs text-white/45 leading-relaxed tls-wrap">{s.detail}</div>
             </Link>
           ))}
         </div>
@@ -636,7 +636,7 @@ export default function AdminDashboardPage() {
         <div className="space-y-2 text-sm">
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
             <div key={i} className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
-              <span className="text-white/80 min-w-0 truncate">{l.action}</span>
+              <span className="text-white/80 tls-wrap">{l.action}</span>
               <span className="text-white/40 text-xs shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
             </div>
           ))}

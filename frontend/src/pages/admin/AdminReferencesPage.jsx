@@ -1010,7 +1010,7 @@ function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle, single =
           <label key={profile.id} className={`flex items-center gap-2 border rounded-sm px-3 py-2 text-sm cursor-pointer ${selected.has(profile.id) ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
             <input type={single ? "radio" : "checkbox"} checked={selected.has(profile.id)} onChange={() => onToggle(profile.id)} onClick={single && selected.has(profile.id) ? () => onToggle(profile.id) : undefined} data-testid={`${testIdPrefix}-member-${profile.id}`} className="accent-[#29B6E8]" />
             <span className="min-w-0">
-              <span className="block truncate font-semibold">{memberName(profile)}</span>
+              <span className="block tls-wrap font-semibold">{memberName(profile)}</span>
               {profile.is_active === false && <span className="block text-[10px] uppercase tracking-widest text-[#FFD700]">inaktiv</span>}
             </span>
           </label>
