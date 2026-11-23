@@ -10,7 +10,7 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
 import { fromViennaInput } from "@/lib/vienna";
-import { MOVEMENT_TEXT, rulesLine, teamFrom } from "@/lib/leagueSuccessor";
+import { movementText, rulesLine, teamFrom } from "@/lib/leagueSuccessor";
 
 const MOVE_ICON = { up: ArrowUp, down: ArrowDown, stay: Minus };
 const MOVE_CLASS = { up: "text-ok", down: "text-warn", stay: "text-white/45" };
@@ -22,7 +22,7 @@ function TeamRow({ team }) {
       <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${MOVE_CLASS[team.movement] || ""}`} aria-hidden="true" />
       <span className="min-w-0 flex-1">
         <span className="block font-semibold text-white [overflow-wrap:anywhere]">{team.display_name}</span>
-        <span className="block text-xs text-white/55">{MOVEMENT_TEXT[team.movement]} · {teamFrom(team)}</span>
+        <span className="block text-xs text-white/55">{movementText(team)} · {teamFrom(team)}</span>
       </span>
     </li>
   );

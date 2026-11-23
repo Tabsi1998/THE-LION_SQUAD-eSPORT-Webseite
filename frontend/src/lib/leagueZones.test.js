@@ -15,6 +15,17 @@ describe("Zonen für Auf- und Abstieg (F.2, #1627)", () => {
     expect(zonesLine(null)).toBe("");
   });
 
+  it("Plätze über Staffeln hinweg (#1627): nur da, wenn gesetzt - sonst sieht alles aus wie vorher", () => {
+    expect(zonesLine({ promote: 1, relegate: 1, promote_best: 2 })).toBe("1 Aufsteiger · dazu 2 beste Nächstplatzierte über alle Staffeln · 1 Absteiger");
+    expect(zonesLine({ promote: 1, relegate: 1, relegate_worst: 1 })).toBe("1 Aufsteiger · 1 Absteiger · dazu 1 schlechtester Platz vor dem Abstieg über alle Staffeln");
+    expect(zonesToForm({ promote: 1, relegate: 1, promote_best: 2 })).toEqual({ promote: "1", relegate: "1", playoff_promote: "0", playoff_relegate: "0", promote_best: "2" });
+    expect(zonesPayload({ promote: "1", relegate: "1", playoff_promote: "0", playoff_relegate: "0", promote_best: "2", relegate_worst: "" }))
+      .toEqual({ promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 2 });
+    // Gegenprobe: 0 heißt „gibt es nicht“ und geht nicht mit.
+    expect(zonesPayload({ promote: "1", relegate: "1", promote_best: "0" })).toEqual({ promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0 });
+    expect(zonesToForm({ promote: 1, relegate: 1, promote_best: 0 })).toEqual({ promote: "1", relegate: "1", playoff_promote: "0", playoff_relegate: "0" });
+  });
+
   it("macht aus dem Formular ganze Zahlen 0–10, leer heißt Vorgabe", () => {
     expect(zonesToForm(undefined)).toEqual({ promote: "1", relegate: "1", playoff_promote: "0", playoff_relegate: "0" });
     expect(zonesPayload({ promote: "2", relegate: "", playoff_promote: "15", playoff_relegate: "-3" }))

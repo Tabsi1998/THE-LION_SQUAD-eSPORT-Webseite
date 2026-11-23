@@ -748,6 +748,33 @@ test("Zonen je Liga N (F.2): Satz an der Liga, Ändern schickt nur geänderte Zo
     zones: { promote: 1, relegate: 2, playoff_promote: 0, playoff_relegate: 0 } })));
 });
 
+test("Zonen über Staffeln hinweg (#1627): Felder im Liga-Blatt, der Satz an der Liga, gespeichert nur was gesetzt ist", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1 },
+    zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1, top: false, bottom: false } }] };
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-zones-1")).toHaveTextContent("1 Aufsteiger · dazu 1 bester Nächstplatzierter über alle Staffeln · 1 Absteiger");
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("zones-promote-best")).toHaveValue(1);
+  expect(within(sheet).getByTestId("zones-relegate-worst")).toHaveValue(null);
+  fireEvent.change(within(sheet).getByTestId("zones-promote-best"), { target: { value: "2" } });
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", expect.objectContaining({
+    zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 2 } })));
+});
+
+test("Neue Season aus …: wer über den Vergleich der Staffeln aufsteigt, steht so da (#1627)", async () => {
+  extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, divisions: [{ ...SUCCESSOR.divisions[0], teams: [
+    ...SUCCESSOR.divisions[0].teams, { squad_id: "q3", display_name: "Dohlen · Eins", movement: "up", zone_cross: true, from_label: "Liga 2", from_staffel: "B", rank: 2 }] }] } };
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-successor"));
+  const sheet = await screen.findByTestId("successor-sheet");
+  expect(await within(sheet).findByTestId("successor-team-q3")).toHaveTextContent("Aufstieg als bester Nächstplatzierter · Liga 2 · Staffel B, Platz 2");
+  // Gegenprobe: der feste Aufsteiger heißt weiter nur „Aufstieg“.
+  expect(within(sheet).getByTestId("successor-team-q2")).toHaveTextContent("Aufstieg · Liga 2 · Staffel A, Platz 1");
+});
+
 // Sprungmarke (F.1, aus main): Schiebt Nachgeladenes den Abschnitt weg, rollt die Seite nach - bis die Lage still steht; rollt die Person selbst, hört es auf.
 function trackScroll(tops) {
   const calls = [];

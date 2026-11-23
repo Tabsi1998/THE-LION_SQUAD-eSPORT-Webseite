@@ -127,6 +127,18 @@ function ZoneFields({ zones, onChange, effective, level }) {
         <TextField label="Relegation unten (freiwillig)" type="number" min={0} max={10} value={zones.playoff_relegate} onChange={set("playoff_relegate")}
           testId="zones-playoff-relegate" />
       </FormGrid>
+      {/* Zielregel über Staffeln hinweg (#1627): nur sinnvoll, wenn diese Liga mehrere Staffeln hat. */}
+      <p className="pt-1 text-xs font-bold uppercase tracking-wider text-white/70">Dazu über alle Staffeln dieser Liga</p>
+      <p className="text-xs text-white/55">
+        Für Ligen mit mehreren Staffeln, etwa „Platz 1 jeder Staffel und die zwei besten Zweiten“. Verglichen wird nach Punkten je Spiel, dann nach Map-Differenz je Spiel;
+        bei Gleichstand entscheidet die Leitung, ohne Los. Fest steht es erst, wenn alle Staffeln der Liga abgeschlossen sind. Leer oder 0: nur die Plätze je Staffel.
+      </p>
+      <FormGrid cols={2}>
+        <TextField label="Beste Nächstplatzierte steigen auf" type="number" min={0} max={10} value={zones.promote_best ?? ""} onChange={set("promote_best")} placeholder="0"
+          hint="Die besten Teams auf dem Platz gleich nach den Aufsteigern." testId="zones-promote-best" />
+        <TextField label="Schlechteste vor dem Abstieg steigen ab" type="number" min={0} max={10} value={zones.relegate_worst ?? ""} onChange={set("relegate_worst")} placeholder="0"
+          hint="Die schlechtesten Teams auf dem Platz gleich vor den Absteigern." testId="zones-relegate-worst" />
+      </FormGrid>
     </fieldset>
   );
 }
