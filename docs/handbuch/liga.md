@@ -1728,18 +1728,23 @@ Glanz läuft einmal darüber; mit „Bewegung reduzieren“ steht alles still.
 Vertreter führt, die laufende Staffel (wer ein Co-Team nur angemeldet hat, sieht es dort nicht): Liga N mit
 Abzeichen, Staffel, **Platz von N**, Zone (Auf- oder Abstieg, Relegation) und das **nächste Spiel** mit Gegner und Termin (ohne
 Termin der Spieltag). Plätze gibt es ab dem ersten gewerteten Spiel der Staffel – vorher steht „Noch ohne Ergebnis“, auf der
-Warteliste bzw. vor der Zulassung „Warteliste“ bzw. „Anmeldung offen“. Die beste Liga N
-steht oben. Sichtbar nach derselben Regel wie die Season-Historie: Gäste und Nicht-Mitglieder nur öffentliche Seasons, Mitglieder
+Warteliste bzw. vor der Zulassung „Warteliste“ bzw. „Anmeldung offen“ – verbirgt die Staffel ihre Teilnehmerliste, sehen diesen
+Stand nur die Person selbst bzw. auf der Teamseite das Team und der Staff. Ein Co-Team, das sich zurückgezogen hat, steht hier nicht. Lange
+Namen brechen um und werden nie mit „…“ gekürzt. Die beste Liga N steht oben. Sichtbar nach derselben Regel wie die Season-Historie: Gäste und Nicht-Mitglieder nur öffentliche Seasons, Mitglieder
 bei eingeschaltetem „Vereinsinterne Erfolge zeigen“ auch Seasons „Nur Mitglieder“ mit dem Etikett **Vereinsintern**, die Person
 selbst alles. Ein **privates Team** und seine Co-Teams stehen in „Aktuelle Ligen“ und in der Season-Historie nur für die Person
-selbst – wie die Teamseite, die außer dem Team niemand öffnen kann. Die Teamseite zeigt im Abschnitt *Liga* dieselben Karten für alle Co-Teams des Teams, beste Liga N oben.
+selbst; die Teamseite eines privaten Teams öffnen das Team und der Staff des Vereins (dort gelten die Rechte des Teams). Die Teamseite zeigt im Abschnitt *Liga* dieselben Karten für alle Co-Teams des Teams, beste Liga N oben.
 
-<img src="../assets/liga/profil-aktuelle-ligen-390.png" alt="Spielerprofil am Handy: Aktuelle Ligen mit drei Co-Teams in Liga 1, 2 und 3, Platz, Aufstieg und nächstem Spiel, darunter der Saisonverlauf als Linie" width="300">
+<img src="../assets/liga/profil-aktuelle-ligen-390.png" alt="Spielerprofil am Handy: Aktuelle Ligen mit drei Co-Teams in Liga 1, 2 und 3, Platz, Aufstieg und nächstem Spiel, darunter der Saisonverlauf als Linie mit einem grauen Punkt „ausgetreten“ in Season 4" width="300">
 
 **Saisonverlauf:** Ab zwei abgeschlossenen Seasons zeigen Spielerprofil und Teamseite eine Linie: je Season ein Punkt, Liga N als
 Band, der Platz am Punkt, der Meister in Gold. Ein Aufstieg hebt die Linie, auch wenn der Platz in der höheren Liga N schlechter ist.
-Auf der Teamseite hat jedes Co-Team eine eigene Linie mit Legende – höchstens vier, die besten zuerst (aktuelle Liga N, dann Platz);
-gibt es mehr, steht darunter „und N weitere Co-Teams“.
+Auf der Teamseite hat jedes Co-Team eine eigene Linie mit Legende – höchstens vier, die besten zuerst: Co-Teams, die gerade in einer
+laufenden Staffel spielen, vor den übrigen, dann nach der Liga N und dem Platz der letzten Season; gibt es mehr, steht darunter
+„und N weitere Co-Teams“. Hat sich ein Co-Team in einer Season **zurückgezogen**, steht die Season trotzdem auf der Achse: ein grauer
+Punkt „ausgetreten“ (bzw. „disqualifiziert“) ohne Platz, die Linie ist dort unterbrochen. Season-Namen werden nie gekürzt – ein
+langer Name steht in zwei Zeilen („Herbst“ / „2026/27“), die Seasons rücken so weit auseinander, wie der längste Name braucht; den
+vollen Namen zeigt auch der Hinweis beim Darüberfahren. Reicht die Breite nicht (viele Seasons, Handy), wischt man die Linie seitlich.
 
 <img src="../assets/liga/teamseite-liga-1440.png" alt="Teamseite am PC: Abschnitt Liga mit drei Co-Teams nach Liga N sortiert, darunter der Saisonverlauf mit einer Linie je Co-Team" width="720">
 
