@@ -3906,15 +3906,28 @@ Liga N (#1627, siehe „Zielregel je Zone über Staffeln hinweg“ unten). Die o
     danach auf 0, bleibt die Zone; steht es höher, steigt niemand nachträglich auf. Die heutige Einstellung gilt nur für noch
     offene Staffeln (Vorschau im Cockpit, Sperrgrund beim letzten Abschluss). Damit beides dasselbe sagt, sind `promote_best` und
     `relegate_worst` ab dem ersten Abschluss einer Staffel der Liga N **gesperrt**: `PATCH …/divisions/{id}` mit einem anderen Wert
-    antwortet 422 („Die Plätze über alle Staffeln lassen sich nicht mehr ändern: …“), ändern geht erst nach dem Wiederöffnen (wie
-    Nr. 159). Die Zonen je Staffel bleiben änderbar wie bisher. `GET …/seasons/{id}` meldet je Liga N `zones_cross_locked`, das
+    antwortet 422 („Die Plätze über alle Staffeln lassen sich nicht mehr ändern: …“), ändern geht erst, wenn alle abgeschlossenen
+    Staffeln der Liga N wieder geöffnet sind (wie Nr. 159). Geprüft wird unter der Season-Sperre (Nr. 232). Die Zonen je Staffel bleiben änderbar wie bisher. `GET …/seasons/{id}` meldet je Liga N `zones_cross_locked`, das
     Liga-Blatt zeigt die Felder dann ausgegraut mit Hinweis - und überhaupt nur, wo sie gelten (mehrere Staffeln; `promote_best`
     nicht in der obersten, `relegate_worst` nicht in der untersten Liga N).
+  - **Liga N stehen ab dem ersten Abschluss fest (Nr. 231):** Welche Liga N die oberste und die unterste ist und wohin ein Team
+    geht, hängt an den aktiven Liga N der Season. Sobald in der Season eine Staffel abgeschlossen ist (`league_service.divisions_locked`),
+    antworten `POST …/seasons/{id}/divisions`, `PATCH …/divisions/{id}` mit einem anderen `status` und `DELETE …/divisions/{id}` mit
+    422 („In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht dann nicht mehr …“).
+    Erst wenn alle abgeschlossenen Staffeln wieder geöffnet sind, geht es wieder. Beiname, Abweichungen, Zonen je Staffel und Gewinne
+    bleiben änderbar. `GET …/seasons/{id}` meldet `divisions_locked`; die Verwaltung graut Knopf, Papierkorb und „Stand“ aus.
+  - **Season-Sperre beim Abschluss (Nr. 232):** `league_final.close` hält `league_season_resource` - dieselbe Sperre wie Anlegen,
+    Ändern und Löschen einer Liga N (`league_service.create_division`, `update_division`, `delete_tree` für eine Liga N) und der
+    Entscheid über Staffeln hinweg. Abschlüsse einer Season laufen damit nacheinander: Der zweite wartet kurz, sieht dann den ersten
+    (Sperrgrund `zone_cross_tie`) oder bekommt 409 „… Bitte erneut versuchen.“ - und die Zonen, die der Endstand festhält, ändern sich
+    nicht mitten im Abschluss. **Reihenfolge** überall: erst die Turnier-Sperre, dann die Season-Sperre (Zuteilen, Los, Nachmeldung,
+    Löschen: „Turnier, Liga, Season“); kein Weg nimmt die Season-Sperre und danach eine Turnier-Sperre. Alle Sperren sind befristete
+    Leases mit begrenzter Wartezeit - ein Warten ohne Ende gibt es nicht.
   - **Gleichstand an der Grenze:** Stehen an der Grenze Teams nach beiden Kriterien gleich und bekommt nur ein Teil den Platz,
     sperrt das den Abschluss der **letzten** offenen Staffel der Liga N (Sperrgrund `zone_cross_tie`, „Gleichstand zwischen den
     Staffeln“) wie `zone_tie`. Wer in den Vergleich geht, muss in seiner Staffel feststehen: Ein Gleichstand um den Kandidatenplatz
-    zählt dort wie eine Zonengrenze (`zone_tie`). Schließen zwei Staffeln gleichzeitig, hält derselbe Gleichstand das Anlegen der
-    neuen Season auf (`problems`, 409).
+    zählt dort wie eine Zonengrenze (`zone_tie`). Als Sicherheitsnetz hält derselbe Gleichstand auch das Anlegen der neuen Season
+    auf (`problems`, 409) - etwa wenn ein Entscheid nach dem letzten Abschluss zurückgenommen wurde.
   - **Entscheid der Leitung** (`services/league_cross_decisions.py`; das Lesen bleibt im Blatt-Modul `league_cross_zones`, damit
     Tabellen-Route und Abschluss es ohne Import-Kreis nutzen): `PUT /api/admin/leagues/divisions/{division_id}/zone-decision`
     `{kind, registration_ids, method, reason, conflict_reason?}` (Zuständigkeit `results`, unter der Season-Sperre). `kind`: `promote_best` oder `relegate_worst`;

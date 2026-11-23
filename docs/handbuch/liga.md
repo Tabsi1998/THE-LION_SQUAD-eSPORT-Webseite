@@ -422,8 +422,13 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    Gegenstück unten. In der obersten Liga gibt es das Feld nach oben nicht, in der untersten das nach unten nicht. Leer oder 0
    heißt: nur die Plätze je Staffel, wie bisher. Wer es wird, steht erst fest, wenn alle Staffeln der Liga abgeschlossen sind (3.10).
    **Gesperrt ab dem ersten Abschluss:** Sobald eine Staffel der Liga abgeschlossen ist, sind beide Felder ausgegraut, mit dem
-   Hinweis „Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen.“ Ändern geht erst, wenn sie im Reiter **Abschluss**
-   wieder geöffnet ist. So ändert eine spätere Einstellung nie eine abgeschlossene Season.
+   Hinweis „Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen.“ Ändern geht erst, wenn **alle abgeschlossenen
+   Staffeln dieser Liga** im Reiter **Abschluss** wieder geöffnet sind. So ändert eine spätere Einstellung nie eine abgeschlossene Season.
+   **Ligen stehen ab dem ersten Abschluss fest:** Sobald in der Season irgendeine Staffel abgeschlossen ist, lässt sich keine Liga
+   mehr anlegen, archivieren oder löschen – der Knopf **Liga N anlegen**, der Papierkorb und das Feld **Stand** sind ausgegraut,
+   darüber steht der Hinweis. Auf- und Abstieg rechnen mit den Ligen, die es beim Abschluss gab (welche die oberste und die unterste
+   ist, wohin es geht). Erst wenn alle abgeschlossenen Staffeln der Season wieder geöffnet sind, geht es wieder. Beiname, Abweichungen
+   und die Zonen je Staffel bleiben änderbar.
 2. In der Zeile von Liga 1 → **Staffel anlegen** → bestätigen. Es entsteht das Turnier „CoD-Liga Season 1 · Liga 1 ·
    Staffel A“ als **Entwurf** – ohne offene Anmeldung, ohne Discord, ohne Jahreswertung. Mehr als acht Teams? Eine
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
@@ -1701,6 +1706,10 @@ eintragen. Über das eigene Team entscheidet eine andere Person. Nach dem Entsch
 eigenen Team eine andere Person – der Knopf fehlt dann. Ein Entscheid gilt für genau diesen Gleichstand: dieselben Teams mit
 denselben Punkten und derselben Map-Differenz je Spiel. Ändert sich nach einem Wiederöffnen eines davon, gilt er nicht mehr, und
 du entscheidest neu. Du darfst schon entscheiden, bevor die letzte Staffel abgeschlossen ist.
+
+**Einer nach dem anderen:** Schließen zwei Personen im selben Moment zwei Staffeln derselben Season ab oder ändert jemand gerade
+eine Liga, bekommt die zweite den Satz „In dieser Season wird gerade eine andere Staffel abgeschlossen oder eine Liga geändert.
+Bitte erneut versuchen.“ Einfach noch einmal abschließen – der zweite Abschluss sieht dann den ersten.
 
 Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf. Steht
 **Unvollständig** am Chip, ist ein Abschluss mittendrin abgebrochen: Die Staffel ist gesperrt, einen Endstand gibt es
