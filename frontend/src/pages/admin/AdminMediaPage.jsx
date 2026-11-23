@@ -659,7 +659,7 @@ export default function AdminMediaPage() {
                     )}
                   </span>
                   <span className="block p-2">
-                    <span className="block text-[11px] font-mono text-white/70 truncate">{it.filename}</span>
+                    <span className="block text-[11px] font-mono text-white/70 truncate" title={it.filename}>{it.filename}</span>
                     <span id={`${infoId}-tags`} className="mt-1 flex flex-wrap gap-1">
                       <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
                       {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}

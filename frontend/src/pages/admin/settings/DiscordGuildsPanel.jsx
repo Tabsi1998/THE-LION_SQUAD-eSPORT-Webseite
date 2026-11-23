@@ -235,7 +235,7 @@ export function DiscordGuildsPanel() {
                   <GuildIcon guild={guild} />
                   <div className="min-w-0 flex-1">
                     <div className="font-bold inline-flex items-center gap-2 min-w-0">
-                      <span className="truncate">{guild.name}</span>
+                      <span className="tls-wrap">{guild.name}</span>
                       {guild.role === "main" && <Crown className="w-3.5 h-3.5 text-[#FFD700] shrink-0" aria-label="Hauptserver" />}
                     </div>
                     <div className="text-xs text-white/45" data-testid={`discord-guild-${guild.guild_id}-status`}>
@@ -275,7 +275,7 @@ export function DiscordGuildsPanel() {
                   <div className="flex items-center gap-2 min-w-0">
                     <Link2 className="w-3.5 h-3.5 text-white/40 shrink-0" />
                     {guild.invite_url
-                      ? <a href={guild.invite_url} target="_blank" rel="noreferrer" className="text-[#b8c0ff] hover:text-white truncate" data-testid={`discord-guild-${guild.guild_id}-invite-url`}>{guild.invite_url}</a>
+                      ? <a href={guild.invite_url} target="_blank" rel="noreferrer" className="text-[#b8c0ff] hover:text-white truncate" title={guild.invite_url} data-testid={`discord-guild-${guild.guild_id}-invite-url`}>{guild.invite_url}</a>
                       : <span className="text-white/40">Kein Einladungslink</span>}
                     {!guild.left_at && (
                       <button type="button" onClick={() => invite(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-invite`}

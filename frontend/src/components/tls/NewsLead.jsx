@@ -4,6 +4,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { newsCategoryColor } from "@/lib/categoryColors";
+import { isLongTitle } from "@/lib/longTitle";
 
 // Der Aufmacher (#1342, Fabians Variante A): eine News über die ganze Breite - links das Bild (16 : 9; 50 % am
 // Tablet, 55 % am PC), rechts Kategorie, Titel, Anriss und „Weiterlesen“. Der Text steht nie auf dem Bild. Am Handy
@@ -42,7 +43,8 @@ export function NewsLead({ news, testId, headingLevel = 2, priority = false, eye
           <span style={{ color }}>{newsCategoryLabel(news.category)}</span>
           {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
-        <Heading className="tls-card__title mt-3 font-heading text-2xl md:text-[1.7rem] xl:text-4xl font-black leading-[1.08] break-words line-clamp-4">
+        {/* Der Titel steht ganz da (#1314); ist er lang, eine Schriftstufe kleiner. */}
+        <Heading className={`tls-card__title tls-wrap mt-3 font-heading font-black leading-[1.08] ${isLongTitle(news.title) ? "text-xl md:text-2xl xl:text-3xl" : "text-2xl md:text-[1.7rem] xl:text-4xl"}`}>
           {news.title}
         </Heading>
         {news.excerpt && <p className="mt-4 text-white/70 text-sm md:text-base xl:text-lg leading-relaxed line-clamp-3">{news.excerpt}</p>}

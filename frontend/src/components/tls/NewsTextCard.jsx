@@ -21,6 +21,18 @@ const WINNER_SIZE = {
   md: "text-xl sm:text-2xl",
   lg: "text-2xl md:text-3xl xl:text-4xl",
 };
+// Lange Siegernamen (#1314) stehen ganz da statt mit „…“ - eine Stufe kleiner, damit Pokal, Name und Turnier auch am
+// schmalsten Handy (320 px) in die feste Fläche passen.
+const WINNER_SIZE_LONG = {
+  md: "text-base sm:text-xl",
+  lg: "text-xl md:text-2xl xl:text-3xl",
+};
+export const LONG_WINNER = 18;
+
+function winnerSize(winner, size) {
+  const sizes = String(winner || "").trim().length >= LONG_WINNER ? WINNER_SIZE_LONG : WINNER_SIZE;
+  return sizes[size] || sizes.md;
+}
 
 export function NewsTextCard({ news, size = "md", className = "" }) {
   const result = news?.result?.winner ? news.result : null;
@@ -44,18 +56,18 @@ export function NewsTextCard({ news, size = "md", className = "" }) {
         className={`tls-news-textcard__lion absolute pointer-events-none ${thumb ? "-right-[18%] -bottom-[30%] h-[130%] w-auto" : LION_PLACE} ${result ? "text-honor/10" : "text-white/[0.12]"}`}
       />
       {!thumb && (
-        <div className={`relative h-full flex flex-col justify-end ${pad} pr-[30%]`}>
+        <div className={`relative h-full flex flex-col justify-end ${pad} ${result ? "pr-[12%]" : "pr-[30%]"}`}>
           {result ? (
             <>
               <Trophy className={size === "lg" ? "w-9 h-9" : "w-7 h-7"} style={{ color: ROLE_COLORS.honor }} aria-hidden="true" />
               <div
                 data-testid="news-text-card-winner"
-                className={`mt-3 font-heading font-black leading-tight break-words line-clamp-2 ${WINNER_SIZE[size] || WINNER_SIZE.md}`}
+                className={`tls-wrap tls-wrap--name mt-3 font-heading font-black leading-tight ${winnerSize(result.winner, size)}`}
                 style={{ color: ROLE_COLORS.honor }}
               >
                 1. {result.winner}
               </div>
-              {result.tournament && <div className="mt-1 text-xs sm:text-sm font-semibold text-white/65 line-clamp-1">{result.tournament}</div>}
+              {result.tournament && <div className="tls-wrap mt-1 text-xs sm:text-sm font-semibold text-white/65">{result.tournament}</div>}
             </>
           ) : (
             <p className={`font-heading font-bold leading-snug text-white break-words line-clamp-4 ${SENTENCE_SIZE[size] || SENTENCE_SIZE.md}`}>

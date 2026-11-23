@@ -122,11 +122,11 @@ scannen lassen → **Mitspielen**.
 
 <sub>In der App: noch nicht – bitte Website nutzen.</sub>
 
-**2.** **Einchecken** macht die Turnierleitung (Reiter **Teilnehmer**, Knopf **Check-in**).
+**2.** **Einchecken** macht die Turnierleitung: Turnierseite → **Turnierleitung** → Reiter **Check-in** → **Da**.
 
 <table><tr><th>PC</th><th>Handy</th></tr><tr>
-<td><img src="../assets/helfer/c2-einchecken-pc.png" alt="Zeile eines Teilnehmers mit Knopf Check-in" width="420"></td>
-<td><img src="../assets/helfer/c2-einchecken-handy.png" alt="Teilnehmer-Karte mit Knopf Check-in" width="240"></td>
+<td><img src="../assets/helfer/c2-einchecken-pc.png" alt="Zeile im Reiter Check-in der Turnierleitung mit Knopf Da" width="420"></td>
+<td><img src="../assets/helfer/c2-einchecken-handy.png" alt="Zeile im Reiter Check-in am Handy mit Knopf Da" width="240"></td>
 </tr></table>
 
 <sub>In der App: noch nicht – bitte Website nutzen.</sub>

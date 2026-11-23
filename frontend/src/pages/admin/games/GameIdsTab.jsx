@@ -45,7 +45,7 @@ function IdFieldCard({ field, index, onChange, onLabel, onRemove, onPlatform, in
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 md:p-4 space-y-3" data-testid={`game-id-field-${index}`}>
       <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-sm font-semibold text-white">{String(field.label || "").trim() || String(field.key || "").trim() || `ID-Feld ${index + 1}`}</span>
+        <span className="tls-wrap text-sm font-semibold text-white">{String(field.label || "").trim() || String(field.key || "").trim() || `ID-Feld ${index + 1}`}</span>
         <button type="button" onClick={onRemove} aria-label={`ID-Feld ${index + 1} entfernen`} data-testid={`game-id-field-remove-${index}`}
           className="p-2 text-white/45 hover:text-live focus-visible:outline focus-visible:outline-1 focus-visible:outline-live rounded-sm">
           <Trash2 className="w-4 h-4" aria-hidden="true" />

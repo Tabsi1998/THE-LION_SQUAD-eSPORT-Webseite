@@ -142,7 +142,7 @@ function PersonAwards({ person, tick, onDone }) {
           <li key={row.tier_code} className="py-2" data-testid={`person-award-${row.tier_code}`}>
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold truncate">{row.tier_name} <MaterialChip tier={row} className="ml-1" /></div>
+                <div className="text-sm font-semibold tls-wrap">{row.tier_name} <MaterialChip tier={row} className="ml-1" /></div>
                 <div className="text-[11px] text-white/45">{row.group_name} · {formatWhen(row.earned_at)}{row.silent ? " · still" : ""}{row.is_negative ? " · negativ" : ""}{row.note ? ` · „${row.note}“` : ""}</div>
               </div>
               {revoking !== row.tier_code && (
@@ -262,7 +262,7 @@ function BulkAward({ catalog, board, onDone }) {
                 <ul className="max-h-48 overflow-y-auto divide-y divide-white/5">
                   {(preview.people || []).map((p) => (
                     <li key={p.id} className="py-1 flex justify-between gap-2">
-                      <span className="truncate">{personName(p)} <span className="text-white/35">@{p.username}</span></span>
+                      <span className="tls-wrap">{personName(p)} <span className="text-white/35">@{p.username}</span></span>
                       <span style={{ color: STATE_LABELS[p.state]?.[1] }}>{STATE_LABELS[p.state]?.[0]}</span>
                     </li>
                   ))}

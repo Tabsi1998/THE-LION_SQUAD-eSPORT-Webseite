@@ -64,9 +64,9 @@ export function TwitchClips() {
                 <span className="absolute bottom-2 right-2 rounded-sm bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">{durationText(clip.duration)}</span>
               </div>
               <div className="p-3">
-                <div className="font-bold text-white truncate">{clip.title}</div>
+                <div className="tls-wrap font-bold text-white">{clip.title}</div>
                 <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-white/45">
-                  <span className="truncate">{clip.creator_name ? `Clip von ${clip.creator_name}` : "Clip"}</span>
+                  <span className="tls-wrap">{clip.creator_name ? `Clip von ${clip.creator_name}` : "Clip"}</span>
                   <span className="inline-flex items-center gap-1 shrink-0"><Eye className="w-3 h-3" /> {(clip.view_count || 0).toLocaleString("de-DE")}</span>
                 </div>
               </div>

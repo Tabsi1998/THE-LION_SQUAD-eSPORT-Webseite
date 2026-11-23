@@ -30,7 +30,7 @@ export function UploadProgressPanel({ progress, className = "" }) {
             <Icon className={`h-4 w-4 ${done && !hasFailures ? "text-[#00FF88]" : hasFailures ? "text-[#FFD700]" : "text-[#29B6E8]"}`} />
             Upload
           </div>
-          <div className="mt-2 truncate font-heading text-lg font-black uppercase text-white">
+          <div className="tls-wrap mt-2 font-heading text-lg font-black uppercase text-white">
             {done ? "Upload abgeschlossen" : progress.currentName || "Medien werden hochgeladen"}
           </div>
           <div className="mt-1 text-xs text-white/45">

@@ -427,8 +427,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
                   >
                     <AtSign className="w-4 h-4 text-[#29B6E8] shrink-0" />
                     <span className="min-w-0">
-                      <span className="block truncate text-white">{userLabel(user)}</span>
-                      <span className="block truncate text-xs text-white/40">@{user.username}</span>
+                      <span className="block tls-wrap text-white">{userLabel(user)}</span>
+                      <span className="block tls-wrap text-xs text-white/40">@{user.username}</span>
                     </span>
                   </button>
                 ))}
@@ -549,7 +549,7 @@ function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Ic
           <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
             <input type="checkbox" checked={selected.includes(o[valueKey])} onChange={() => toggle(o[valueKey])} className="accent-[#29B6E8]" />
             {Icon && <Icon className="w-3 h-3 text-[#29B6E8] shrink-0" />}
-            <span className="truncate">{o[labelKey]}</span>
+            <span className="tls-wrap">{o[labelKey]}</span>
             {o.status === "draft" && <span className="shrink-0 rounded-sm border border-white/15 px-1.5 text-[10px] uppercase tracking-wider text-white/50" title="Besucher sehen die Karte erst, wenn es veröffentlicht ist.">Entwurf</span>}
           </label>
           {onEmbed && (

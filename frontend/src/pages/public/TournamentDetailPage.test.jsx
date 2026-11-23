@@ -486,6 +486,8 @@ test("schlanke Ansicht: Titel, Termin, Spiel, freie Plätze und „Mitspielen“
   expect(screen.getByTestId("onsite-start")).toHaveTextContent("31");
   expect(screen.getByTestId("onsite-register-btn")).toHaveTextContent("Mitspielen");
   expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/registrations", expect.anything());
+  // Hinweise (#1166) zeigt nur die volle Ansicht - und der Server gibt sie dem Vor-Ort-Gast nicht (403, #2529).
+  expect(apiMock.get.mock.calls.map(([path]) => path)).not.toContain("/tournaments/t1/notices");
   expect(screen.queryByTestId("tournament-bracket-link")).toBeNull();
 });
 

@@ -152,8 +152,8 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                     <div key={banner.id} className="border border-white/10 bg-black/20 rounded-sm p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-bold text-sm truncate">{banner.title || banner.text}</div>
-                          <div className="text-[11px] text-white/45 truncate">{banner.scope} · {banner.position} · Prio {banner.priority}</div>
+                          <div className="font-bold text-sm tls-wrap">{banner.title || banner.text}</div>
+                          <div className="text-[11px] text-white/45 tls-wrap">{banner.scope} · {banner.position} · Prio {banner.priority}</div>
                           <div className="mt-1 text-[11px] text-white/45">Views {banner.stats?.impressions || 0} · Klicks {banner.stats?.clicks || 0}</div>
                         </div>
                         <div className="flex gap-1 shrink-0">
