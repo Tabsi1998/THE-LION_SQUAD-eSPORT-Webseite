@@ -19,4 +19,12 @@ PR-Titel: Typ nach Conventional Commits, Rest auf Deutsch – daraus entstehen V
 - [ ] Doku angepasst, wo sich Verhalten ändert (`docs/…`, `mobile/CHANGELOG.md`)
 - [ ] Keine Geheimnisse, keine Daten von Mitgliedern, keine Screenshots mit Namen
 
+<!--
+Prüftor (#1660, docs/entwicklung/prueftor.md): Bei sichtbaren Änderungen prüft die CI Barrierefreiheit, Kontrast,
+Bundle, Ladezeit und Bewegungsregeln und schreibt das Ergebnis als einen Kommentar in den PR. Rot heißt nicht mergen.
+Nur mit gutem Grund eine Ausnahme: eine Zeile je Prüfung (a11y, kontrast, bundle, ladezeit, bewegung) AUSSERHALB
+dieses Kommentars, danach den Job „Prüftor“ neu starten. Beispiel:
+Prüftor-Ausnahme bewegung: Begründung, warum es hier nicht anders geht
+-->
+
 Closes #
