@@ -87,6 +87,7 @@ Indizes: `id` eindeutig, (`league_id`, `number`) eindeutig, (`league_id`, `slug`
 | `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours`, dazu die Plattform `allowed_platforms`, `crossplay`, `input_device` (#2270, B.3) |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 | `prizes` | `[{place, text, image_url}]` | nein | eigene Gewinne (#2107); fehlt = die der Season |
+| `draw` | dict | nein | Los auf mehrere Staffeln (#1623, B.4): Entwurf oder übernommenes Los dieser Liga N mit Seed, Eingabe, Ergebnis, Tauschen und Verlauf. Fehlt = nie gelost. Geht nicht in die Folge-Season und steht nicht in `GET …/seasons/{id}` |
 
 Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 
@@ -228,7 +229,8 @@ Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_dead
 (Season folgt dem Start der ersten Staffel), `match.plan.change` (Termin, Best of je Spiel mit `from`/`to`),
 `match.no_show.cleared` (alter Vorschlag abgeräumt) (#2201) · `match.lineup.both_sides_kept` (Korrektur oder Nachtrag ließ
 Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen; #2202) · `league.season.late_extension` (Nachmeldefrist
-verlängert, mit Grund), `league.staffel.late_entry` (Spiele einer Nachmeldung angelegt; #2422).
+verlängert, mit Grund), `league.staffel.late_entry` (Spiele einer Nachmeldung angelegt; #2422) · `league.draw.create|redraw|swap|discard|apply`
+(Los auf mehrere Staffeln einer Liga N, #1623: Seed, Zählung, Grund; `apply` mit der ganzen Verteilung).
 
 ## 3. Einstellbar statt fest
 
@@ -707,6 +709,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | ja, eigenes Team | – |
 | `GET …/seasons/{id}/late-entries`, `GET …/staffeln/{tid}/late-entries/{rid}` (Nachmeldung, #2422) | `applications` | – | – |
 | `POST …/staffeln/{tid}/late-entries/{rid}` (Spiele einer Nachmeldung anlegen, #2422) | `applications` | ja, eigenes Team (Nr. 187) | – |
+| `GET …/seasons/{id}/draws` (Los auf mehrere Staffeln, #1623) | `applications` | – | – |
+| `POST …/seasons/{id}/draws/{division_id}`, `/redraw`, `/swap`, `/discard`, `/apply` (#1623) | `applications` | ja, ein eigenes Team im Los | – |
 | `POST …/seasons/{id}/application-extension` (Nachmeldefrist verlängern, #2422) | `season` | – | – |
 | Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
 | Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
@@ -1158,6 +1162,7 @@ Mit `application_auto_accept` (#2348, Entscheidung Nr. 126) entscheidet die Seas
 | `application_waitlist_note` | str ≤ 500 | leer | kein Text | Eigener Satz zur Warteliste, steht öffentlich auf der Ligaseite |
 | `entry_policy` | `all` \| `members` | `all` | `all` | Zulassung. `members`: Jeder im Kader muss Mitglied sein (dieselbe Regel wie Sichtbarkeit „Nur Mitglieder“) |
 | `sibling_squads_in_staffel` | bool | `false` | `false` | Zwei Co-Teams eines Hauptteams in derselben Staffel. Ein Co-Team bleibt je Season in einer Staffel. Gilt auch fürs Zuteilen. Mit `true` lautet `identity_key` `<tid>:team:<team_id>:squad:<squad_id>` |
+| `new_squads_lowest_division` (#1623) | bool | `true` | `false` | Neue Co-Teams starten in der untersten aktiven Liga N (Entscheidung 15.10.). Annehmen mit Staffel und Zuteilen in eine andere Liga N antworten 422 („Neue Co-Teams starten in der untersten Liga (Liga N). …“), außer mit `deviation_reason` (mindestens fünf Zeichen; steht als `assignment.deviation_reason` und im Protokoll). Übernommene Co-Teams (F.2) folgen weiter ihrer `carry_over.division_id`. Mit nur einer Liga N ändert sich nichts. Der Sonderweg „Co-Team zuteilen“ der Staffel-Seite prüft das nicht (wie bei Übernommenen) |
 | `application_privacy_text` | str ≤ 2000 | leer | Platzhalter-Satz | Hinweis zum Datenschutz bei der Anmeldung. Den Wortlaut pflegt die Leitung, der Text steht mit im Antrag |
 | `application_auto_accept` (#2348) | bool | `false` | `false` | Anmeldungen automatisch annehmen. `null` lässt den Wert stehen. Kein Staffel-Feld, darum nicht in `SYNC_GROUPS`; Protokoll wie die übrigen Felder über `league.season.update` (`data.fields`), beim Umschalten dazu `league.season.auto_accept` mit `before` und `after` |
 
@@ -1252,9 +1257,9 @@ Das Einreichen mit automatischer Zuteilung und Ablehnen bzw. Warteliste einer au
 | `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403. Antwort mit `status`: `submitted`, mit `application_auto_accept` auch `accepted` (dann `staffel`, wenn zugeteilt) oder `waitlist` |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
-| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `auto_accepted`, `lead_team_auto`, `auto_problem`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
+| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `new_lowest` und `divisions[].lowest` (#1623), `items[]` (je Antrag `target_division_id` - die Liga N, deren Staffeln zuerst angeboten werden, `null` ohne Vorgabe -, `own_team`, `auto_accepted`, `lead_team_auto`, `auto_problem`, `history[].conflict_reason`, `history[].auto`, offene Punkte `warnings` und `shortfall`), `superadmin`, `stats`, `divisions[]` |
 | `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
-| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer angenommenen Anmeldung verlangt `reason` (422), auch wenn sie von Hand angenommen war |
+| `POST …/accept` (`{tournament_id?, conflict_reason?, deviation_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?, deviation_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404. `/waitlist` einer angenommenen Anmeldung verlangt `reason` (422), auch wenn sie von Hand angenommen war |
 
 **Befangenheit** (#2245, Entscheidung Nr. 73, Regel in Abschnitt B.1): Über die Anmeldung des eigenen Teams entscheidet eine zweite Person. Befangen sind Kader des Co-Teams,
 Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat, auch mit Zuständigkeit `applications` oder Bereich `leagues`. Prüfen, Annehmen, Ablehnen,
@@ -1274,6 +1279,80 @@ Hinweis „… ist automatisch angenommen …“ bzw. „… steht automatisch a
 
 **Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`. Mit #2348 dazu `.auto_accept` und `.auto_waitlist` sowie `league.season.auto_accept` (Umschalten, `before`/`after`)
 (`actor_id` `null`, `data.tournament_id` bei automatischer Zuteilung, `data.problem`, wenn die Staffel nicht ging); `.reject`, `.waitlist` und `.withdraw` einer automatischen Zuteilung tragen `data.registration_removed` und `data.tournament_id`.
+
+#### Los auf mehrere Staffeln einer Liga N (#1623)
+
+Hat eine Liga N mehrere Staffeln, verteilt ein Los die angenommenen Co-Teams ohne Staffel. Rechnung im Blatt-Modul
+`services/league_staffel_plan.py` (ohne Datenbank, auch für die Platzprüfung in F.2 und später für Playoff-Staffeln, #2404), Daten,
+Sperren und Protokoll in `services/league_draw.py`, Routen in `routes/league_draw_routes.py`. Oberfläche: Abschnitt „Staffeln auslosen“
+im Reiter „Anmeldung und Kader“ (`SeasonDrawPanel.jsx`, `lib/leagueDraw.js`, Sprungmarke `#auslosung`). **Ohne Los bleibt alles, wie
+es war:** Zuteilen im Eingang und auf der Staffel-Seite gehen unverändert.
+
+**Wer gelost wird** (`league_applications.target_division_id`): angenommene Anträge ohne Zuteilung, deren Liga N diese ist - bei
+Übernommenen (F.2) die neue Liga N (`carry_over.division_id`), sonst die unterste aktive Liga N. Wer schon in einer Staffel steht,
+bleibt dort; das Los füllt darum herum auf. Ein neues Co-Team in einer höheren Liga N teilt die Leitung vorher von Hand zu, mit Grund
+(`new_squads_lowest_division` oben).
+
+**Rechnung** (`league_staffel_plan.draw`, Fassung `POLICY` 1):
+
+- **Reihenfolge aus dem Seed:** je Co-Team der SHA-256 aus Seed und Co-Team-Kennung, aufsteigend sortiert. Kein Zufallsgenerator, kein
+  Zustand - gleiche Eingabe und gleicher Seed ergeben überall dasselbe. Den Seed zieht der Server (`secrets.token_hex(8)`).
+- **Größen:** Jeder neue Platz geht an die gerade kleinste Staffel (bei Gleichstand A vor B), begrenzt durch `max_participants`. Leere
+  Staffeln unterscheiden sich so um höchstens 1; stehen schon Teams in einer Staffel, gleicht das Los so weit aus, wie es geht.
+- **Geschwister:** Zwei Co-Teams eines Hauptteams kommen nie in dieselbe Staffel - auch nicht zu einem, das dort schon steht oder stand
+  (`identity_key`). Hauptteams mit den meisten Co-Teams werden zuerst gesetzt, eine Suche mit Rückschritt findet eine Verteilung, wenn
+  es eine gibt. Erlaubt die Season Geschwister (`sibling_squads_in_staffel`), zählt jedes Co-Team für sich.
+- **Was nicht geht, wird gesagt** (409, nichts wird gelockert): zu wenige freie Plätze („… Bitte eine weitere Staffel anlegen oder die
+  Staffelgröße erhöhen.“), mehr Co-Teams eines Hauptteams als Staffeln (mit dem Namen des Hauptteams), keine Verteilung möglich.
+- **Kein Los:** in einer Liga N mit nur einer Staffel (dort teilt der Eingang direkt zu), sobald eine Staffel der Liga N begonnen hat,
+  ihr Spielplan fest steht oder sie gesperrt ist (dann Zuteilen von Hand bzw. Nachmeldung). Beendete Staffeln zählen nicht. Staffeln
+  mit `league_context.kind` (Playoffs, Relegation, #2404) kommen nie ins Los.
+
+**Vorschlag der Staffelzahl** (`league_staffel_plan.suggest`, in `GET …/draws` je Liga N unter `suggestion`): Die größte Staffel ist
+das Kleinere aus „Teams je Staffel höchstens“ der Liga N und dem, was die aktiven Wochen hergeben (`league_rounds.max_teams_for`).
+Aus allen Co-Teams der Liga N (wartend und schon zugeteilt) ergeben sich `needed` Staffeln und ihre Größen `sizes` (Unterschied
+höchstens 1). `fits: false` mit dem Satz „… Es gibt 1 Staffel – es fehlt 1.“, wenn die vorhandenen nicht reichen - auch bei nur einer
+Staffel. Angelegt werden Staffeln weiter von Hand (Reiter „Ligen und Staffeln“).
+
+**Entwurf** (`league_divisions.draw`, optional): `{id, policy, seed, number, status: "draft"|"applied", input_hash, siblings_allowed,
+entries: [{application_id, squad_id, team_id, display_name}], staffeln: [{id, staffel, title, capacity, seats, team_ids,
+seated_names}], result: {squad_id: tournament_id}, swaps: [{a, b, reason, by, at}], log: [{action, by, at, number?, reason?, stale?,
+conflict_reason?}], created_by, created_at, applied_by?, applied_at?}`. `result` ist das Ergebnis aus dem Seed, die geltende
+Verteilung ist `result` mit den Tauschen darüber. `input_hash` deckt Co-Teams, Staffeln, ihre Plätze, wer dort steht und die
+Geschwister-Regel: Ändert sich etwas davon, ist der Entwurf **veraltet** (`stale`) und lässt sich nicht übernehmen. Das Feld geht
+nicht in die Folge-Season und steht nicht in `GET …/seasons/{id}`.
+
+| Route (alle `applications`) | Zweck |
+| --- | --- |
+| `GET /api/admin/leagues/seasons/{id}/draws` | Je aktiver Liga N: `waiting[]`, `staffeln[]`, `suggestion`, `problem`, `can_draw`, `own_team`, `draw` (Vorschau mit `staffeln[].teams[]`, `seed`, `number`, `stale`, `fingerprint`, `swaps[]`, `log[]`); dazu `superadmin`, `siblings_allowed` |
+| `POST …/draws/{division_id}` | **Auslosen.** Legt den Entwurf an. Gibt es einen zur selben Eingabe, kommt der zurück (`replay: true`) - neu laden und ein zweiter Klick würfeln nicht neu. Ein veralteter Entwurf wird ersetzt (`number` + 1) |
+| `POST …/draws/{division_id}/redraw` `{reason}` | **Neu auslosen** mit neuem Seed, `number` + 1. Grund Pflicht (mindestens fünf Zeichen, sonst 422), außer der Entwurf ist veraltet |
+| `POST …/draws/{division_id}/swap` `{squad_id, other_squad_id, reason}` | **Tausch** zweier geloster Co-Teams aus verschiedenen Staffeln. Grund Pflicht; die Geschwister-Regel wird neu geprüft (422), die Größen bleiben |
+| `POST …/draws/{division_id}/discard` `{reason}` | **Verwerfen.** Grund Pflicht, außer der Entwurf ist veraltet - sonst wäre Verwerfen und neu Auslosen ein Wiederholen ohne Grund |
+| `POST …/draws/{division_id}/apply` `{fingerprint, confirm: true}` | **Übernehmen.** Ohne `confirm` 422, anderer `fingerprint` 409 („… Vorschau neu laden“), veraltet 409 („… neu auslosen“), schon übernommen 409 |
+
+**Übernehmen** (`league_draw.apply`): zuerst die Turnier-Sperren aller Staffeln des Loses (nach Kennung sortiert), dann die
+Season-Sperre - dieselbe Reihenfolge wie das Zuteilen. Erst werden alle Co-Teams geprüft wie beim Zuteilen im Eingang (`check_squad`,
+`build_registration`); geht eines nicht, antwortet es 409 mit Namen und Grund, und nichts ist geschrieben. Dann entsteht je Co-Team
+über `league_applications._place` die Anmeldung und die Zuteilung, mit `assignment.draw_id` (Übernommene tragen weiter `carried`).
+Danach wie nach jedem Zuteilen: Vorschau der Staffel, Spiel-IDs der Season, Protokoll `league.application.assign` (`data.draw_id`),
+Nachricht an Captain und Vertreter. **Abbruch dazwischen:** Der Entwurf bleibt gültig - was er schon zuteilte, zählt beim Prüfen der
+Eingabe wieder als wartend -, der nächste Versuch setzt nur die übrigen, niemand bekommt eine zweite Nachricht. Nach dem Übernehmen
+bleibt das Los zum Nachlesen stehen; ändern geht dann nur über die Teilnehmerliste der Staffel. Ein späteres Los derselben Liga N
+(etwa für Nachzügler vor dem Start) zählt weiter (`number`).
+
+**Befangenheit** (Nr. 73): Gehört die Person zu einem Team im Los (`belongs_to_side`), antworten Auslosen, neu Auslosen, Tausch,
+Verwerfen und Übernehmen 403 („Im Los steht dein eigenes Team. …“). Der Superadmin geht als Notausnahme mit `conflict_reason` durch
+(`league.conflict.override`, `action: "draw_<schritt>"`). `GET …/draws` meldet `own_team` je Liga N.
+
+**Protokoll:** `league.draw.create`, `.redraw`, `.swap`, `.discard`, `.apply` mit `target_id` Season und `data.division_id`,
+`draw_id`, `seed`, `number`; `redraw` und `discard` mit `reason` bzw. `stale`, `swap` mit `squad_ids` und `reason`, `apply` mit der
+ganzen Verteilung (`placements`), `policy` und `input_hash`. Der Verlauf des Loses (`draw.log`) zeigt dasselbe in der Vorschau.
+
+**Öffentlich** ändert sich nichts: Die Ligaseite zeigt ein Co-Team wie bisher in seiner Staffel, sobald es zugeteilt ist. Seed und
+Protokoll sieht nur die Leitung.
+
+**Nicht hier:** Staffeln automatisch anlegen, Solo-Ligen (#1629), Zusammenlegen (#1628), Setzlisten für Playoffs (#2404).
 
 #### Nachmeldung nach dem Season-Start (#2422, Entscheidungen Nr. 180, 183–188)
 
@@ -3762,17 +3841,32 @@ das Feld: 1/1 ohne Relegation. Je **Staffel** gezählt. Die oberste aktive Liga 
 | Schritt | Verhalten |
 | --- | --- |
 | Voraussetzung | Jede Staffel, die zählt (wie F.1: Entwurf, abgesagt, archiviert nicht), ist abgeschlossen; mindestens eine aktive Liga N. Sonst `problems` in der Vorschau und 409 beim Anlegen |
-| Vorschau | `copied`, `dates_to_set`, `map_pool`, `loadout_bans`, `rules` (`kind`: `draft` eigenes Regelwerk wird Entwurf, `league` das der Liga gilt weiter, `none`), je Liga N `teams` mit `movement` (`up`, `down`, `stay`), `dropped` mit Grund, `successor` (schon angelegt), `relegation_note` |
+| Vorschau | `copied`, `dates_to_set`, `map_pool`, `loadout_bans`, `rules` (`kind`: `draft` eigenes Regelwerk wird Entwurf, `league` das der Liga gilt weiter, `none`), je Liga N `teams` mit `movement` (`up`, `down`, `stay`) und `capacity` (Platzprüfung, #1627), `capacity_hints`, `dropped` mit Grund, `successor` (schon angelegt), `relegation_note` |
 | Anlegen | `{start_date, name?, confirm: true}` (ohne `confirm` 422). Über `league_service.create_season` mit Nummer + 1, `status: "draft"`, `visibility: "off"`, `predecessor_id`, `predecessor` |
 | Übernommen | jedes Feld der Season außer `NOT_COPIED` (Kennung, Nummer, Name, Slug, Stand, Sichtbarkeit, Zeiten) und Feldern auf `_at`: also auch Ergebnis-, Termin-, Check-in-, Erinnerungs-, Veto- und Protest-Regeln, Vorgaben der Woche, Plätze und Warteliste |
 | Neu zu setzen | `start_date` (Pflicht), `blocked_periods`, `registration_deadline`, Anmeldefenster, `transfer_windows`, `roster_deadline` |
-| Liga N | die aktiven mit `level`, Beiname, `overrides`, `zones`, Gewinnen. Ziel eines Teams (`target_level`): erst die Stufe rechnen (±1 oder gleich), dann auf die nächste aktive Liga N abbilden; liegen zwei gleich nah, entscheidet die Richtung (ohne Bewegung die tiefere) - eine archivierte Liga verschiebt niemanden um zwei Stufen |
+| Liga N | die aktiven mit `level`, Beiname, `overrides`, `zones`, Gewinnen (ohne das Los der alten Season, `draw`). Ziel eines Teams (`target_level`): erst die Stufe rechnen (±1 oder gleich), dann auf die nächste aktive Liga N abbilden; liegen zwei gleich nah, entscheidet die Richtung (ohne Bewegung die tiefere) - eine archivierte Liga verschiebt niemanden um zwei Stufen |
 | Map-Pool, Sperrliste | die geltende Version als Version 1 der neuen Season (`copy_version`, Notiz „Übernommen aus …“) |
 | Regelwerk | eine eigene Fassung der Season wird Entwurf (`save_draft`) mit `carried_from: {season_id, season_name, version_id, label}`; die Verwaltung belegt beim Veröffentlichen „neu zustimmen“ vor |
 | Teams | je Co-Team ein `league_applications`-Eintrag `status: "accepted"` ohne Zuteilung mit `carry_over: {from_season_id, from_season_name, from_level, from_label, from_staffel, rank, zone, movement, division_id, division_level, division_label}`, `applied_by: null`, `history[0].carry_over: true` |
 | Nachricht | an Captain und Vertreter je Co-Team (`meta.reason` `league_successor`, `dedupe_key` `league-successor:<season>:<co-team>:<person>`, dazu Mail), Link `/teams`; solange die Season „Aus“ ist, nennt der Text nur „unter Teams“. Danach steht `carry_over.notified_at` am Antrag |
 | Protokoll | `league.season.successor` (Season, Vorgänger, Nummer) und `league.season.successor.teams` (Zahlen) |
 
+- **Platzprüfung bei mehreren Staffeln (#1627):** Auf- und Abstieg zählen je Staffel - zwei Staffeln unten mit je einem Aufsteiger
+  schicken zwei Teams nach oben, aus einer Staffel oben kommt nur eines herunter. Die Vorschau rechnet darum je Liga N der neuen
+  Season `capacity`: `{teams, staffeln_before, cap, cap_by, needed, sizes, fits, text}` (`league_successor.capacity`, Rechnung
+  `league_staffel_plan.suggest`). `teams`: wie viele dort ankommen. `staffeln_before`: abgeschlossene Staffeln dieser Liga N im
+  Vorgänger. `cap`: größte Staffel - das Kleinere aus „Teams je Staffel höchstens“ und dem, was `weeks_total` hergibt (`cap_by`
+  `setting` bzw. `weeks`; Sperrzeiten setzt die neue Season neu, darum ohne sie). `needed` und `sizes`: Staffeln und ihre Größen.
+  `fits: false`, wenn die bisherige Staffelzahl nicht reicht, mit dem Satz „5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und
+  2 Teams. Bisher gab es 1 Staffel – es fehlt 1.“; alle solchen Sätze stehen mit der Liga N davor unter `capacity_hints`. **Ein
+  Hinweis, keine Sperre:** Anlegen geht, die Staffeln der neuen Season legt die Leitung an. Dort prüft `GET …/draws` (B.4 „Los auf
+  mehrere Staffeln“) dieselbe Rechnung gegen die Staffeln, die es wirklich gibt, und das Zuteilen lehnt eine volle Staffel wie immer
+  ab - still überfüllt wird nichts.
+- **Zielregel je Zone bei mehreren Staffeln (#1627, noch offen):** Heute gilt je Staffel „die ersten N steigen auf, die letzten N
+  ab“ (`zones`). Eine Regel über Staffeln hinweg („die zwei besten Zweiten“) braucht einen Vergleich zwischen verschieden großen
+  Staffeln - das ist nicht entschieden und nicht gebaut. Der Vergleich gehört in dasselbe Blatt-Modul wie die Setzliste der Playoffs
+  (#2404, „unter gleich Platzierten“), damit beides gleich rechnet.
 - **Einmalig:** Teilindex `league_season_predecessor` (eindeutig auf `predecessor_id`) und die Sperre der Vorgänger-Season. Ein
   zweites Anlegen - auch gleichzeitig - antwortet mit der vorhandenen Season (`replay: true`) bzw. 409, nie mit einer zweiten.
   Brach das erste Anlegen nach der Season ab, ergänzt der nächste Aufruf die fehlenden Schritte (jeder sieht nach, was schon da
@@ -3791,7 +3885,9 @@ fester Spielplan steht und die Staffel vor Check-in und Start ist. Der Platz wir
 Leitung (B.4). Antworten an das Team tragen `carry_over` mit `withdraw_until`; `GET /api/me/league-applications` zeigt übernommene
 Anträge auch für eine noch nicht sichtbare Season (dann `url: null`). Der Eingang zeigt die Herkunft und bietet beim Zuteilen
 zuerst die Staffeln der neuen Liga N an. **Zuteilen** (`…/assign`) in eine Staffel einer anderen Liga N antwortet 422 mit Klartext,
-außer mit `deviation_reason` (mindestens fünf Zeichen; steht als `assignment.deviation_reason` und im Protokoll).
+außer mit `deviation_reason` (mindestens fünf Zeichen; steht als `assignment.deviation_reason` und im Protokoll). Für neue Co-Teams
+gilt dasselbe gegen die unterste Liga N, wenn die Season es so einstellt (`new_squads_lowest_division`, B.4). Hat die neue Liga N
+mehrere Staffeln, verteilt das Los (B.4 „Los auf mehrere Staffeln“).
 
 **Übernahme neu berechnen** (Entscheidung Nr. 162; `GET`/`POST /api/admin/leagues/seasons/{neue Season}/successor/recompute`,
 Zuständigkeit `manage`): Wurde der Endstand des Vorgängers nach dem Anlegen wieder geöffnet, korrigiert und neu abgeschlossen, rechnet
@@ -4127,6 +4223,8 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Rahmen | Season-Prüfung vor Veröffentlichung („Was fehlt noch?“) | abgenommen (Sz. 1) | C.2 #2257 | – |
 | Rahmen | Season-Seite mit Reitern, geführte Einrichtung | getestet | #2279 | #2267 |
 | Rahmen | Neue Season aus der Vorgängerin, Auf- und Abstieg, Zonen | abgenommen (Sz. 18) | F.2 #2397 | #1627 |
+| Rahmen | Platzprüfung je Liga N in der Vorschau der neuen Season (mehrere Staffeln) | getestet | – | #1627 |
+| Rahmen | Zielregel je Zone über Staffeln hinweg („die zwei besten Zweiten“) | fehlend (Fachfrage offen: Vergleich zwischen Staffeln) | – | #1627 |
 | Rahmen | Sportlicher Auf- und Abstieg als Regel je Spiel, Solo-Ligen | fehlend | – | #1627 |
 | Rahmen | Unterbesetzte Divisionen zusammenlegen | fehlend | – | #1628 |
 | Rahmen | Eigene Staffel-Seite in der Liga-Verwaltung, Turnierliste ohne Staffeln | getestet (Pakete A–D) | #2497, #2505, #2508, Paket D | #2262 |
@@ -4135,6 +4233,8 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Anmeldung | Anmeldefenster, Startplätze, Warteliste | abgenommen (Sz. 3, 4: letzter Platz bei gleichzeitiger Annahme); Warteliste getestet | B.4 #2244 | #1623 |
 | Anmeldung | Genehmigung, Ablehnung, Zuteilung, Eingang | abgenommen (Sz. 4) | B.4 #2244 | – |
 | Anmeldung | Zulassung je Season, zwei Co-Teams eines Hauptteams | getestet | B.4 #2244 | #1665 |
+| Anmeldung | Los auf mehrere Staffeln einer Liga N: Seed, Vorschau, Tausch mit Grund, Protokoll, Vorschlag der Staffelzahl | getestet | – | #1623 |
+| Anmeldung | Neue Co-Teams zuerst in die unterste Liga N, höher nur mit Grund | getestet | – | #1623 |
 | Anmeldung | Eigenes Team: zweite Person entscheidet | getestet | #2248 | #2245 |
 | Anmeldung | Anmeldung trotz fehlender Angaben, Sperre erst beim Check-in | getestet | #2320 | #2313 |
 | Anmeldung | Automatisch annehmen | getestet | #2355 | #2348 |
