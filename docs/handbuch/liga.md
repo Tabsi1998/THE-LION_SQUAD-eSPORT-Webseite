@@ -415,10 +415,15 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    Relegationsplätze. Die oberste Liga hat nie einen Aufstieg, die unterste nie einen Abstieg – das sagt der Satz unter der
    Liga („Auf- und Abstieg: oberste Liga: kein Aufstieg · 1 Absteiger“). Mehr Plätze als Teams in einer Staffel lehnt die Seite
    ab. Die Zonen stehen farbig in der Tabelle (siehe 3.11).
-   **Dazu über alle Staffeln dieser Liga** (nur für Ligen mit mehreren Staffeln): Mit **Beste Nächstplatzierte steigen auf** steigen
-   zusätzlich zu den Aufsteigern jeder Staffel die besten Teams auf dem Platz danach auf, etwa „Platz 1 jeder Staffel und die zwei
-   besten Zweiten“. **Schlechteste vor dem Abstieg steigen ab** ist das Gegenstück unten. Leer oder 0 heißt: nur die Plätze je
-   Staffel, wie bisher. Wer es wird, steht erst fest, wenn alle Staffeln der Liga abgeschlossen sind (3.10).
+   **Dazu über alle Staffeln dieser Liga** (die Felder stehen nur bei Ligen mit mehreren Staffeln): Mit **Beste Nächstplatzierte
+   steigen auf** steigen zusätzlich zu den Aufsteigern jeder Staffel die besten Teams auf dem Platz danach auf, etwa „Platz 1 jeder
+   Staffel und die zwei besten Zweiten“. Gibt es Relegationsplätze, ist der Platz **nach** ihnen gemeint: bei einem Aufsteiger und
+   einem Relegationsplatz also der Dritte – kein Team steht in zwei Zonen. **Schlechteste vor dem Abstieg steigen ab** ist das
+   Gegenstück unten. In der obersten Liga gibt es das Feld nach oben nicht, in der untersten das nach unten nicht. Leer oder 0
+   heißt: nur die Plätze je Staffel, wie bisher. Wer es wird, steht erst fest, wenn alle Staffeln der Liga abgeschlossen sind (3.10).
+   **Gesperrt ab dem ersten Abschluss:** Sobald eine Staffel der Liga abgeschlossen ist, sind beide Felder ausgegraut, mit dem
+   Hinweis „Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen.“ Ändern geht erst, wenn sie im Reiter **Abschluss**
+   wieder geöffnet ist. So ändert eine spätere Einstellung nie eine abgeschlossene Season.
 2. In der Zeile von Liga 1 → **Staffel anlegen** → bestätigen. Es entsteht das Turnier „CoD-Liga Season 1 · Liga 1 ·
    Staffel A“ als **Entwurf** – ohne offene Anmeldung, ohne Discord, ohne Jahreswertung. Mehr als acht Teams? Eine
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
@@ -632,7 +637,8 @@ mehr, nennt die Meldung Team und Grund, und niemand wird zugeteilt.
 **Veraltet:** Kommt nach dem Auslosen eine Anmeldung dazu, zieht jemand zurück oder ändert sich eine Staffel, steht „veraltet“ am Los.
 Es lässt sich dann nicht mehr zuteilen. **Neu auslosen** geht in diesem Fall ohne Grund.
 
-**Danach** bleibt das Los zum Nachlesen stehen (**Los ansehen**): Seed, Verteilung, Tausche und wer wann was getan hat. Ändern geht
+**Danach** bleibt das Los zum Nachlesen stehen (**Los ansehen**): Seed, Verteilung, Tausche und wer wann was getan hat. Lost du
+später noch einmal, etwa für Nachzügler, bleibt der Verlauf des ersten Loses im Protokoll stehen. Ändern geht
 dann nur noch über die Teilnehmerliste der Staffel. Nicht gelost wird, sobald eine Staffel der Liga begonnen hat oder ihr Spielplan
 steht: Dann teilst du von Hand zu (Nachmeldung, siehe 2.5a).
 
@@ -1681,8 +1687,8 @@ jede Zuständigkeit der Liga.
 | Kein Meister | in der obersten Liga steht kein Team mehr in der Wertung – Anmeldungen prüfen |
 
 **Plätze über Staffeln hinweg:** Vergibt eine Liga mit mehreren Staffeln zusätzliche Auf- oder Abstiegsplätze über alle Staffeln
-(2.3), steht unter den Staffeln ein eigener Kasten je Liga. Er zeigt die Kandidaten – je Staffel das Team auf dem Platz nach den
-Aufsteigern bzw. vor den Absteigern – mit **Punkten je Spiel** und **Map-Differenz je Spiel**. Danach wird verglichen, in dieser
+(2.3), steht unter den Staffeln ein eigener Kasten je Liga. Er zeigt die Kandidaten – je Staffel das Team auf dem ersten Platz
+nach Aufsteigern und Relegation bzw. auf dem letzten davor unten – mit **Punkten je Spiel** und **Map-Differenz je Spiel**. Danach wird verglichen, in dieser
 Reihenfolge; so zählen auch verschieden große Staffeln gleich. Am Team steht „steigt auf“ bzw. „steigt ab“. Solange noch eine
 Staffel der Liga offen ist, ist das der **Stand von jetzt**: Keine Tabelle zeigt die Zone, bevor alle Staffeln abgeschlossen sind.
 Danach steht sie in der Tabelle, am TV, im PDF, in der App und in der Season-Historie.
@@ -1690,8 +1696,11 @@ Danach steht sie in der Tabelle, am TV, im PDF, in der App und in der Season-His
 Stehen Teams an der Grenze nach beidem gleich, meldet der Kasten **Gleichstand**, und die letzte Staffel der Liga lässt sich nicht
 abschließen. **Gleichstand entscheiden** (Recht „Ergebnisse korrigieren“): die Teams anhaken, die den Platz bekommen, die Art
 wählen – **Entscheidungsspiel** oder **Entscheid der Leitung**, ein Los gibt es beim Auf- und Abstieg nicht – und den Grund
-eintragen. Über das eigene Team entscheidet eine andere Person. **Zurücknehmen** geht mit Grund; dann ist der Gleichstand wieder
-offen. Ändert sich nach einem Wiederöffnen, wer gleich steht, gilt ein alter Entscheid nicht mehr.
+eintragen. Über das eigene Team entscheidet eine andere Person. Nach dem Entscheid steht am gewählten Team „steigt auf“ bzw.
+„steigt ab“, am unterlegenen „bleibt“. **Zurücknehmen** geht mit Grund; dann ist der Gleichstand wieder offen. Auch das macht beim
+eigenen Team eine andere Person – der Knopf fehlt dann. Ein Entscheid gilt für genau diesen Gleichstand: dieselben Teams mit
+denselben Punkten und derselben Map-Differenz je Spiel. Ändert sich nach einem Wiederöffnen eines davon, gilt er nicht mehr, und
+du entscheidest neu. Du darfst schon entscheiden, bevor die letzte Staffel abgeschlossen ist.
 
 Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf. Steht
 **Unvollständig** am Chip, ist ein Abschluss mittendrin abgebrochen: Die Staffel ist gesperrt, einen Endstand gibt es

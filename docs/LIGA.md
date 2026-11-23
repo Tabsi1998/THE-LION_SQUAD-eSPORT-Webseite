@@ -1298,12 +1298,15 @@ es war:** Zuteilen im Eingang und auf der Staffel-Seite gehen unverändert.
 bleibt dort; das Los füllt darum herum auf. Ein neues Co-Team in einer höheren Liga N teilt die Leitung vorher von Hand zu, mit Grund
 (`new_squads_lowest_division` oben).
 
-**Rechnung** (`league_staffel_plan.draw`, Fassung `POLICY` 1):
+**Rechnung** (`league_staffel_plan.draw`, Fassung `POLICY` 2):
 
 - **Reihenfolge aus dem Seed:** je Co-Team der SHA-256 aus Seed und Co-Team-Kennung, aufsteigend sortiert. Kein Zufallsgenerator, kein
   Zustand - gleiche Eingabe und gleicher Seed ergeben überall dasselbe. Den Seed zieht der Server (`secrets.token_hex(8)`).
-- **Größen:** Jeder neue Platz geht an die gerade kleinste Staffel (bei Gleichstand A vor B), begrenzt durch `max_participants`. Leere
-  Staffeln unterscheiden sich so um höchstens 1; stehen schon Teams in einer Staffel, gleicht das Los so weit aus, wie es geht.
+- **Größen:** Jedes Co-Team geht an die gerade kleinste Staffel, in die es darf (bei Gleichstand A vor B), begrenzt durch
+  `max_participants`. Leere Staffeln unterscheiden sich so um höchstens 1; stehen schon Teams in einer Staffel, gleicht das Los so
+  weit aus, wie es geht. Fest liegt dabei nur der „Wasserstand“ (`_bounds`): Jede Staffel endet höchstens dort und mindestens eins
+  darunter. **Welche** Staffel einen der letzten Plätze bekommt, liegt nicht vor der Geschwister-Regel fest: Drei Staffeln mit je
+  zwei Teams und zwei Nachzügler, deren Hauptteams beide in A stehen, ergeben B und C - nicht „keine Verteilung“.
 - **Geschwister:** Zwei Co-Teams eines Hauptteams kommen nie in dieselbe Staffel - auch nicht zu einem, das dort schon steht oder stand
   (`identity_key`). Hauptteams mit den meisten Co-Teams werden zuerst gesetzt, eine Suche mit Rückschritt findet eine Verteilung, wenn
   es eine gibt. Erlaubt die Season Geschwister (`sibling_squads_in_staffel`), zählt jedes Co-Team für sich.
@@ -1345,7 +1348,8 @@ Nachricht an Captain und Vertreter. **Abbruch dazwischen:** Der Entwurf bleibt g
 Eingabe wieder als wartend -, der nächste Versuch setzt nur die übrigen, niemand bekommt eine zweite Nachricht. Wer schon steht, tauscht
 nicht mehr (409), und ein neues Los rechnet vom wirklichen Stand: Die schon Zugeteilten bleiben, verteilt werden die übrigen. Nach dem Übernehmen
 bleibt das Los zum Nachlesen stehen; ändern geht dann nur über die Teilnehmerliste der Staffel. Ein späteres Los derselben Liga N
-(etwa für Nachzügler vor dem Start) zählt weiter (`number`).
+(etwa für Nachzügler vor dem Start) zählt weiter (`number`) und hängt sich an den Verlauf an: `draw.log` des übernommenen Loses bleibt
+stehen (die letzten 50 Schritte).
 
 **Befangenheit** (Nr. 73): Gehört die Person zu einem Team im Los (`belongs_to_side`), antworten Auslosen, neu Auslosen, Tausch,
 Verwerfen und Übernehmen 403 („Im Los steht dein eigenes Team. …“). Der Superadmin geht als Notausnahme mit `conflict_reason` durch
@@ -3877,11 +3881,13 @@ Liga N (#1627, siehe „Zielregel je Zone über Staffeln hinweg“ unten). Die o
 
   | Feld | Bedeutung | Kandidat je Staffel |
   | --- | --- | --- |
-  | `promote_best` | die N besten Nächstplatzierten aller Staffeln steigen zusätzlich auf („Platz 1 jeder Staffel und die zwei besten Zweiten“) | das Team auf dem Platz gleich nach den festen Aufsteigern |
-  | `relegate_worst` | spiegelbildlich: die N schlechtesten steigen zusätzlich ab | das Team auf dem Platz gleich vor den festen Absteigern |
+  | `promote_best` | die N besten Nächstplatzierten aller Staffeln steigen zusätzlich auf („Platz 1 jeder Staffel und die zwei besten Zweiten“) | das Team auf dem ersten Platz nach den festen Aufsteigern **und** den Relegationsplätzen oben (Nr. 227) |
+  | `relegate_worst` | spiegelbildlich: die N schlechtesten steigen zusätzlich ab | das Team auf dem letzten Platz vor den Relegationsplätzen unten und den festen Absteigern |
 
-  Je Staffel gibt es also höchstens einen Kandidaten je Feld; mit N ≥ Staffeln gehen alle Kandidaten. Kein Kandidat ist ein
-  Ausgeschiedener (Nr. 43) und ein Platz, der schon in der anderen Zone liegt (`league_zones.cross_candidates`). Die oberste Liga N
+  Je Staffel gibt es also höchstens einen Kandidaten je Feld; mit N ≥ Staffeln gehen alle Kandidaten. **Kein Team steht je in zwei
+  Zonen** (Nr. 227): Mit einem Aufsteiger und einem Relegationsplatz oben ist der Dritte der Kandidat, der Zweite spielt die
+  Relegation. Kein Kandidat ist ein Ausgeschiedener (Nr. 43) und ein Platz, der schon in der anderen Hälfte liegt
+  (`league_zones.cross_candidates`). Die oberste Liga N
   hat kein `promote_best`, die unterste kein `relegate_worst` (`effective`). Die Zonen-Prüfung zählt je gesetztem Feld einen Platz
   mit (422 „Die Zonen überschneiden sich“).
   - **Vergleich** (`services/league_cross_rank.py`, Blatt-Modul): **Punkte je Spiel**, dann **Map-Differenz je Spiel**
@@ -3893,7 +3899,17 @@ Liga N (#1627, siehe „Zielregel je Zone über Staffeln hinweg“ unten). Die o
     (`league_final_read.frozen_rows`, `league_cross_zones.overlay`): Website, TV, Ergebnis-PDF und App lesen sie an der Zeile
     (`zone` `promotion` bzw. `relegation`, dazu `zone_cross: true`), die Season-Historie ebenso (`overlay_finals`: eine Abfrage
     für alle Endstände, gerechnet wird nur für Liga N mit der Regel). Ein Wiederöffnen nimmt sie von
-    selbst wieder weg. Ohne die Regel kostet das eine Abfrage je Tabelle.
+    selbst wieder weg. Ob es die Regel gibt, sagt der Endstand selbst (`zones`): Ohne sie kostet das keine Abfrage.
+  - **Aus dem gespeicherten Stand, gesperrt ab dem ersten Abschluss (Nr. 228):** Die Regel und die Zonen je Staffel kommen aus
+    `league_final_tables.zones` der abgeschlossenen Staffeln (`league_cross_zones.stored_rule`, `resolve`, `league_successor.plan`),
+    nie aus der heutigen Einstellung der Liga N - eine spätere Änderung ändert keine abgeschlossene Season: Steht `promote_best`
+    danach auf 0, bleibt die Zone; steht es höher, steigt niemand nachträglich auf. Die heutige Einstellung gilt nur für noch
+    offene Staffeln (Vorschau im Cockpit, Sperrgrund beim letzten Abschluss). Damit beides dasselbe sagt, sind `promote_best` und
+    `relegate_worst` ab dem ersten Abschluss einer Staffel der Liga N **gesperrt**: `PATCH …/divisions/{id}` mit einem anderen Wert
+    antwortet 422 („Die Plätze über alle Staffeln lassen sich nicht mehr ändern: …“), ändern geht erst nach dem Wiederöffnen (wie
+    Nr. 159). Die Zonen je Staffel bleiben änderbar wie bisher. `GET …/seasons/{id}` meldet je Liga N `zones_cross_locked`, das
+    Liga-Blatt zeigt die Felder dann ausgegraut mit Hinweis - und überhaupt nur, wo sie gelten (mehrere Staffeln; `promote_best`
+    nicht in der obersten, `relegate_worst` nicht in der untersten Liga N).
   - **Gleichstand an der Grenze:** Stehen an der Grenze Teams nach beiden Kriterien gleich und bekommt nur ein Teil den Platz,
     sperrt das den Abschluss der **letzten** offenen Staffel der Liga N (Sperrgrund `zone_cross_tie`, „Gleichstand zwischen den
     Staffeln“) wie `zone_tie`. Wer in den Vergleich geht, muss in seiner Staffel feststehen: Ein Gleichstand um den Kandidatenplatz
@@ -3906,14 +3922,20 @@ Liga N (#1627, siehe „Zielregel je Zone über Staffeln hinweg“ unten). Die o
     (Entscheidungsspiel) oder `lead` (Entscheid der Leitung) - `lot` wird abgelehnt (422 „… Ein Los gibt es beim Auf- und Abstieg
     nicht.“); `reason` mindestens fünf Zeichen. Befangenheit wie beim Gleichstand in der Tabelle: nie über das eigene Team (403),
     Superadmin als Notausnahme mit Grund (`league.conflict.override`, `action: "zone_decision"`). Gespeichert an
-    `league_divisions.zone_decisions.<kind>`: `{id, registration_ids, tied, method, reason, by, at}`. Der Entscheid gilt genau für
-    die Gruppe Gleicher, zu der er getroffen wurde (`tied`): Ändert sie sich - etwa nach Wiederöffnen und Korrektur -, ist er
-    hinfällig und der Gleichstand wieder offen. `DELETE …/zone-decision/{kind}` `{reason}` nimmt ihn zurück. Protokoll
+    `league_divisions.zone_decisions.<kind>`: `{id, registration_ids, tied, values, method, reason, by, at}`. Der Entscheid gilt
+    genau für den Gleichstand, zu dem er getroffen wurde (Nr. 229): dieselbe Gruppe Gleicher (`tied`) **und** dieselben Punkte und
+    dieselbe Map-Differenz je Spiel (`values`, als Brüche ohne Rundung, etwa `["2", "2/3"]`). Ändert sich eines davon - etwa nach
+    Wiederöffnen und Korrektur -, ist er hinfällig und der Gleichstand wieder offen. Ein Entscheid vor dem letzten Abschluss ist
+    erlaubt (mit der laufenden Tabelle der offenen Staffeln) und gilt unter derselben Bedingung weiter.
+    `DELETE …/zone-decision/{kind}` `{reason, conflict_reason?}` nimmt ihn zurück - unter der Season-Sperre und mit derselben
+    Befangenheit wie das Entscheiden: Wer zu einem Team des entschiedenen Gleichstands gehört, bekommt 403, der Superadmin geht als
+    Notausnahme mit Grund durch (`action: "zone_decision_clear"`). Protokoll
     `league.zone.decision` und `league.zone.decision.clear`. `zone_decisions` geht nicht in die Folge-Season und steht nicht in
     `GET …/seasons/{id}`.
   - **Cockpit** (`GET …/seasons/{id}/closing`): `cross[]` je Liga N mit der Regel - `{division_id, label, final, sides[]}`, je Seite
     `{kind, label, count, zone, candidates[], tie, decision, own_team}`; Kandidaten in der Reihenfolge des Vergleichs mit `staffel`,
-    `rank`, `points_per_game`, `map_diff_per_game`, `chosen`, `tied`. `final: false` heißt Stand von jetzt (offene Staffeln mit
+    `rank`, `points_per_game`, `map_diff_per_game`, `chosen`, `tied`, `passed` (im entschiedenen Gleichstand unterlegen: „bleibt“);
+    `own_team` gilt für den offenen wie für den entschiedenen Gleichstand. `final: false` heißt Stand von jetzt (offene Staffeln mit
     ihrer laufenden Tabelle). Dazu `cross_methods`. Oberfläche: `SeasonCrossZones.jsx`, `lib/leagueCrossZones.js`.
   - **Neue Season:** Die Gewählten gehen eine Liga N weiter wie jeder Auf- bzw. Absteiger; in der Vorschau tragen sie
     `zone_cross: true` („Aufstieg als bester Nächstplatzierter“), `carry_over.zone` ist `promotion` bzw. `relegation`. Die
