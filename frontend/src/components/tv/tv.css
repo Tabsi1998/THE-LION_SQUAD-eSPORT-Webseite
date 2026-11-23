@@ -1052,6 +1052,117 @@
 @keyframes tv-league-podium-crown { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.6)) scale(0.96); } }
 @keyframes tv-league-podium-light { 0% { opacity: 0; } 45% { opacity: 1; } 100% { opacity: 0.45; } }
 @keyframes tv-league-podium-glow { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0; } }
+/* ---------------------------------------------------------------- Saisonfinale: Auf- und Absteiger je Liga N (#1641)
+   Nach dem Sieger-Moment, gesteuert von der Leitung (Weiter, Ende). Links „Aufstieg“, rechts „Abstieg“ bzw. „Scheidet aus“; je Zeile
+   Pfeil, Team, Platz und die Ziel-Liga. Detail-Runde: Titel und Spaltenköpfe heben sich zuerst, dann gleiten die Zeilen gestaffelt auf
+   ihren Platz (Aufsteiger von unten, Absteiger von oben - die Richtung, in die es geht), die Ziel-Liga schiebt sich heran, der Pfeil
+   leuchtet kurz auf und bleibt leise an; zuletzt zeichnet sich die Linie unter dem Titel. Nur Verschieben und Deckkraft; „Bewegung
+   aus“ (Regel für .tv-screen oben) zeigt sofort das Endbild. Wann eine Zeile kommt: --tv-finale-at an der Zeile (TvFinaleMovers). */
+.tv-finale {
+  --tv-finale-up: var(--tls-ok-rgb, 0 255 136);
+  --tv-finale-down: var(--tls-warn-rgb, 255 176 32);
+  --tv-finale-unit: calc(var(--tv-u) * var(--tv-finale-row, 8));
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--tv-u) * 2.4);
+  height: 100%;
+  min-height: 0;
+  padding: calc(var(--tv-u) * 1.6) var(--tv-edge) 0;
+}
+.tv-finale__head { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: calc(var(--tv-u) * 0.6) calc(var(--tv-u) * 2.4);
+  padding-bottom: calc(var(--tv-u) * 1.4); animation: tv-rise var(--tls-motion-slow) var(--tls-ease) both; }
+.tv-finale__line { flex-basis: 100%; color: var(--tv-muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; overflow-wrap: anywhere; }
+.tv-finale__title { margin: 0; font-size: var(--tv-fs-title); line-height: 1.05; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
+.tv-finale__league { color: var(--tv-gold); }
+.tv-finale__what { color: var(--tv-text); }
+.tv-finale__dots { display: flex; gap: calc(var(--tv-u) * 0.8); margin: 0 0 0 auto; padding: 0; list-style: none; align-self: center; }
+.tv-finale__dot { width: calc(var(--tv-u) * 1.1); height: calc(var(--tv-u) * 1.1); border-radius: 999px; background: var(--tv-line-strong); }
+.tv-finale__dot[data-on] { background: var(--tv-gold); }
+/* Die Linie unter dem Titel zeichnet sich zuletzt - der ruhige Schluss. */
+.tv-finale__rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--tv-line-w) * 3);
+  background: linear-gradient(90deg, var(--tv-gold), rgb(255 215 0 / 0.15) 70%, transparent);
+  transform-origin: left center;
+  animation: tv-finale-draw calc(var(--tls-motion-slow) * 2) var(--tls-ease) var(--tv-finale-end, 1.4s) both;
+}
+.tv-finale__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--tv-u) * 4); min-height: 0; }
+.tv-finale[data-columns="1"] .tv-finale__cols { grid-template-columns: minmax(0, calc(var(--tv-u) * 110)); justify-content: center; }
+.tv-finale__col { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.2); min-width: 0; }
+.tv-finale__col-title { margin: 0; color: rgb(var(--tv-finale-up)); font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em;
+  animation: tv-rise var(--tls-motion-slow) var(--tls-ease) 0.15s both; }
+.tv-finale__col[data-col="down"] .tv-finale__col-title { color: rgb(var(--tv-finale-down)); }
+.tv-finale__rows { display: flex; flex-direction: column; gap: calc(var(--tv-finale-unit) * 0.16); margin: 0; padding: 0; list-style: none; }
+.tv-finale__row {
+  --tv-finale-rgb: var(--tv-finale-up);
+  --tv-finale-from: calc(var(--tv-u) * 3.2);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: calc(var(--tv-u) * 1.6);
+  min-height: var(--tv-finale-unit);
+  padding: calc(var(--tv-finale-unit) * 0.12) calc(var(--tv-u) * 1.8);
+  border: var(--tv-line-w) solid var(--tv-line);
+  border-left: calc(var(--tv-u) * 0.6) solid rgb(var(--tv-finale-rgb));
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgb(var(--tv-finale-rgb) / 0.12), var(--tv-card) 45%);
+  animation: tv-finale-glide calc(var(--tls-motion-slow) * 1.4) var(--tls-ease) var(--tv-finale-at, 0s) both;
+}
+.tv-finale__row[data-move="down"] { --tv-finale-rgb: var(--tv-finale-down); --tv-finale-from: calc(var(--tv-u) * -3.2); }
+.tv-finale__row[data-move="out"] { --tv-finale-rgb: 255 255 255; --tv-finale-from: calc(var(--tv-u) * -3.2); background: var(--tv-card); }
+.tv-finale__row[data-move="out"] .tv-finale__name { color: var(--tv-muted); }
+.tv-finale__sign {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(var(--tv-finale-unit) * 0.62);
+  height: calc(var(--tv-finale-unit) * 0.62);
+  border-radius: 999px;
+  color: rgb(var(--tv-finale-rgb));
+  background: rgb(var(--tv-finale-rgb) / 0.14);
+}
+.tv-finale__sign .tv-icon { width: 56%; height: 56%; }
+/* Der Pfeil leuchtet auf, wenn die Ziel-Liga kommt, und bleibt leise an (fester Schein, nur die Deckkraft wandert). */
+.tv-finale__sign::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 calc(var(--tv-u) * 2.4) calc(var(--tv-u) * 0.3) rgb(var(--tv-finale-rgb) / 0.55);
+  opacity: 0.35;
+  animation: tv-finale-light var(--tls-motion-glow) var(--tls-ease) var(--tv-finale-target-at, 0s) both;
+}
+.tv-finale__row[data-move="out"] .tv-finale__sign::after { content: none; }
+.tv-finale__who { display: flex; flex-direction: column; min-width: 0; }
+/* Namen brechen um, nie abgeschnitten; lange eine bzw. zwei Stufen kleiner (data-fit). */
+.tv-finale__name { font-size: min(var(--tv-fs-name), calc(var(--tv-finale-unit) * 0.4)); line-height: 1.1; font-weight: 800; overflow-wrap: anywhere; hyphens: auto; }
+.tv-finale__name[data-fit="small"] { font-size: min(calc(var(--tv-fs-name) * 0.84), calc(var(--tv-finale-unit) * 0.34)); }
+.tv-finale__name[data-fit="tiny"] { font-size: min(calc(var(--tv-fs-name) * 0.7), calc(var(--tv-finale-unit) * 0.3)); }
+.tv-finale__meta { color: var(--tv-muted); }
+.tv-finale__target {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--tv-u) * 0.6);
+  padding: calc(var(--tv-u) * 0.5) calc(var(--tv-u) * 1.2);
+  border: var(--tv-line-w) solid rgb(var(--tv-finale-rgb) / 0.6);
+  border-radius: 999px;
+  color: rgb(var(--tv-finale-rgb));
+  font-weight: 800;
+  white-space: nowrap;
+  animation: tv-finale-target var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-target-at, 0s) both;
+}
+.tv-finale__row[data-move="out"] .tv-finale__target { border-color: var(--tv-line-strong); color: var(--tv-muted); }
+.tv-finale__arrow { width: 1em; height: 1em; }
+.tv-finale__more { color: var(--tv-muted); text-align: center; }
+.tv-screen[data-tv-contrast="1"] .tv-finale__row { background: #000000; border-color: var(--tv-line-strong); }
+@keyframes tv-finale-glide { from { opacity: 0; transform: translateY(var(--tv-finale-from)); } }
+@keyframes tv-finale-target { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.6)); } }
+@keyframes tv-finale-light { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: 0.35; } }
+@keyframes tv-finale-draw { from { opacity: 0; transform: scaleX(0.04); } }
 .tv-confetti { position: absolute; inset: 0; z-index: 7; width: 100%; height: 100%; pointer-events: none; }
 @keyframes tv-fade-in { from { opacity: 0; } }
 @keyframes tv-rise { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.6)); } }

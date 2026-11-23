@@ -182,3 +182,56 @@ test("Liga: das Podest kommt bei gleichem Sieger nach - der Moment läuft genau 
     setStreamConnected(false);
   }
 });
+
+// Saisonfinale (#1641): Drückt die Leitung „Weiter“, kommt nach dem Sieger je Liga N der Schritt „Auf- und Absteiger“ - die
+// Wiedergabeliste wartet. „Weiter“ blättert zur nächsten Liga N, „Ende“ bringt das gewohnte Bild zurück.
+test("Liga: Auf- und Absteiger je Liga N mit Weiter und Ende", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  setStreamConnected(true);
+  const base = {
+    tournament: { id: "t1", slug: "liga", title: "Herbstliga", status: "completed", format: "league", team_mode: "team" },
+    registrations: REGS, stages: [{ id: "s1", name: "Liga", number: 1, stage_type: "league" }],
+    matches_v2: [match("a", "r1", "r2"), match("b", "r3", "r4")], standings: STANDINGS, league_podium: null, league_finale: null,
+  };
+  const pages = [
+    { label: "Liga 1", rows: [{ registration_id: "r2", name: "Steinbock", rank: 4, move: "down", target: "Liga 2", staffel: null }] },
+    { label: "Liga 2", rows: [{ registration_id: "x1", name: "Talwind", rank: 1, move: "up", target: "Liga 1", staffel: null }] },
+  ];
+  let current = base;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (String(url || "").startsWith("/tournaments/t1/bracket/display")) return { data: structuredClone(current) };
+    return { data: [] };
+  });
+  const change = async (next) => {
+    current = next;
+    await act(async () => { emitApiInvalidation({ resource: "tournaments" }); });
+  };
+  try {
+    renderTv("/display/bracket/t1?key=tv&playlist=tree-3");
+    const tv = await screen.findByTestId("bracket-tv");
+    await waitFor(() => expect(tv).toHaveAttribute("data-slide", "tree"));
+    expect(screen.queryByTestId("tv-finale")).toBeNull();
+
+    await change({ ...base, league_finale: { step: 1, count: 2, league: "Probe-Liga", season: "Season 3", pages } });
+    await waitFor(() => expect(tv).toHaveAttribute("data-slide", "finale"));
+    expect(screen.getByTestId("tv-finale-title")).toHaveTextContent("Liga 1");
+    expect(screen.getByTestId("tv-finale-row-r2")).toHaveAttribute("aria-label", "Steinbock steigt ab in Liga 2");
+    expect(screen.getByTestId("tv-main")).toHaveAttribute("data-paused", "1");
+    expect(tv).toHaveTextContent("Saisonfinale");
+    // Die Wiedergabeliste wartet - auch nach ihrer Zeit bleibt der Schritt stehen.
+    await act(async () => { vi.advanceTimersByTime(8000); });
+    expect(tv).toHaveAttribute("data-slide", "finale");
+
+    await change({ ...base, league_finale: { step: 2, count: 2, league: "Probe-Liga", season: "Season 3", pages } });
+    await waitFor(() => expect(screen.getByTestId("tv-finale-title")).toHaveTextContent("Liga 2"));
+    expect(screen.getByTestId("tv-finale-row-x1")).toBeInTheDocument();
+
+    await change({ ...base, league_finale: null });
+    await waitFor(() => expect(tv).not.toHaveAttribute("data-slide", "finale"));
+    expect(screen.queryByTestId("tv-finale")).toBeNull();
+    expect(screen.getByTestId("tv-main")).toHaveAttribute("data-paused", "0");
+  } finally {
+    setStreamConnected(false);
+  }
+});
