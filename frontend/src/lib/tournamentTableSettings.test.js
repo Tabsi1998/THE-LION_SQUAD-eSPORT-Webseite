@@ -141,6 +141,10 @@ describe("Zeile und Spalten", () => {
     expect(swissStatusNote({})).toBeNull();
   });
 
+  it("nennt den Gleichstand am letzten Platz, der weiterkommt, statt alle weiterzuschicken", () => {
+    expect(swissStatusNote({ swiss_status: "tied" })).toMatchObject({ key: "swiss", tone: "tiebreak", text: "Gleichstand an der Grenze" });
+  });
+
   it("zeigt Median-Buchholz als eigene Spalte, wenn die Zeilen ihn tragen", () => {
     expect(tableKind([{ buchholz: 3, points: 2 }])).toBe("swiss");
     expect(tableKind([{ buchholz: 3, median_buchholz: 1, points: 2 }])).toBe("swiss_median");

@@ -88,7 +88,7 @@ test("Schweizer System (#1559): Median-Buchholz als Spalte, „weiter“ und „
     buchholz: 5, median_buchholz: 2, points: 4 - rank, ...extra });
   render(
     <MemoryRouter initialEntries={["/display/bracket/t1"]}>
-      <TvScreen><TvStandingsSlide standings={[row("r1", 1, { swiss_status: "advanced" }), row("r2", 2), row("r3", 3, { swiss_status: "eliminated" })]} /></TvScreen>
+      <TvScreen><TvStandingsSlide standings={[row("r1", 1, { swiss_status: "advanced" }), row("r2", 2), row("r3", 3, { swiss_status: "eliminated" }), row("r4", 2, { swiss_status: "tied" })]} /></TvScreen>
     </MemoryRouter>,
   );
   const slide = await screen.findByTestId("tv-standings-slide");
@@ -96,4 +96,5 @@ test("Schweizer System (#1559): Median-Buchholz als Spalte, „weiter“ und „
   expect(screen.getByTestId("tv-swiss-status-r1")).toHaveTextContent("weiter");
   expect(screen.getByTestId("tv-swiss-status-r3")).toHaveTextContent("ausgeschieden");
   expect(screen.queryByTestId("tv-swiss-status-r2")).toBeNull();
+  expect(screen.getByTestId("tv-swiss-status-r4")).toHaveTextContent("Gleichstand");
 });

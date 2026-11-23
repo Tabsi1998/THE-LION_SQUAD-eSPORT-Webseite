@@ -187,9 +187,11 @@ export function swissStateText(swiss) {
   return parts.join(" · ");
 }
 
-/** Hinweis an einer Zeile der Schweizer Tabelle: weiter oder ausgeschieden nach der Abschlussregel - sonst `null`. */
+/** Hinweis an einer Zeile der Schweizer Tabelle: weiter oder ausgeschieden nach der Abschlussregel - sonst `null`.
+ *  `tied`: punktgleich am letzten Platz, der weiterkommt, und die Plätze reichen nicht für alle. */
 export function swissStatusNote(row) {
   if (row?.swiss_status === "advanced") return { key: "swiss", tone: "advance", text: "Weiter", title: "Nach der Abschlussregel weiter" };
+  if (row?.swiss_status === "tied") return { key: "swiss", tone: "tiebreak", text: "Gleichstand an der Grenze", title: "Punktgleich am letzten Platz, der weiterkommt – wer weiter ist, entscheidet die Turnierleitung" };
   if (row?.swiss_status === "eliminated") return { key: "swiss", tone: "exit", text: "Ausgeschieden", title: "Nach der Abschlussregel ausgeschieden" };
   return null;
 }

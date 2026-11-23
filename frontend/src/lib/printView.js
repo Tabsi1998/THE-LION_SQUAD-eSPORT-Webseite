@@ -458,7 +458,7 @@ export const STANDINGS = { tableHead: 8, sectionHead: 9, row: 7 };
  */
 const EXIT_SUFFIX = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
 // Schweizer System (#1559): weiter oder raus nach der Abschlussregel - dieselben Wörter wie Website, TV und PDF.
-const SWISS_STATUS_SUFFIX = { advanced: "weiter", eliminated: "ausgeschieden" };
+const SWISS_STATUS_SUFFIX = { advanced: "weiter", eliminated: "ausgeschieden", tied: "Gleichstand an der Grenze" };
 
 export function standingsSections(standings, { heats = false } = {}) {
   return standingSections(standings)

@@ -789,7 +789,7 @@ def _pdf_group_title(group: dict, index: int) -> str:
 
 _EXIT_SUFFIX = {"withdrawn": "ausgetreten", "disqualified": "disqualifiziert"}
 # Schweizer System (#1559): weiter oder raus nach der Abschlussregel - dieselben Wörter wie in der Webtabelle.
-_SWISS_STATUS_TEXT = {"advanced": "weiter", "eliminated": "ausgeschieden"}
+_SWISS_STATUS_TEXT = {"advanced": "weiter", "eliminated": "ausgeschieden", "tied": "Gleichstand an der Grenze"}
 # Zonen für Auf- und Abstieg (F.2, #1627): dieselben Wörter und Farben wie in der Webtabelle (lib/leagueTable.js ZONE_LABELS).
 # Nie nur über die Farbe (#1648): die beiden Relegationen heißen verschieden - der Druck hat keine Pfeil-Schrift, das Wort trägt.
 _ZONE_TEXT = {"promotion": "Aufstieg", "playoff_promotion": "Relegation um den Aufstieg",

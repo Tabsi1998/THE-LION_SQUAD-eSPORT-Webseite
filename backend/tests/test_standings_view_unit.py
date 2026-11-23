@@ -138,6 +138,15 @@ def test_the_swiss_pdf_shows_median_buchholz_and_who_advanced():
     assert table["rows"][1][1] == "Steinbock (ausgeschieden)"
 
 
+def test_the_swiss_pdf_names_a_tie_at_the_last_advancing_place():
+    rows = [{"rank": 2, "display_name": "Eisfuchs", "played": 3, "won": 2, "drawn": 0, "lost": 1, "buchholz": 4,
+             "median_buchholz": 1.5, "points": 2, "swiss_status": "tied"}]
+
+    [table] = _pdf_standings_tables({"format": "swiss"}, rows)
+
+    assert table["rows"][0][1] == "Eisfuchs (Gleichstand an der Grenze)"
+
+
 def test_the_tv_keeps_the_new_swiss_fields():
     from services.tv_display import display_standings
 

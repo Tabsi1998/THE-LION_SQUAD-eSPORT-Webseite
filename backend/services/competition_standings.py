@@ -747,8 +747,10 @@ def swiss_standings(matches: list[dict], registrations: list[dict], tournament: 
 
 def _mark_swiss_progress(rows: list[dict], matches: list[dict], registrations: list[dict], settings: dict) -> None:
     """``swiss_status`` je Zeile: ``advanced`` (weiter) oder ``eliminated`` (raus) nach der Abschlussregel. Mit fester
-    Rundenzahl sind die besten ``top_n`` weiter, sobald die letzte Runde gewertet ist. Wer nicht mehr teilnimmt
-    (ausgetreten, disqualifiziert), bekommt keine Marke."""
+    Rundenzahl sind die besten ``top_n`` weiter, sobald die letzte Runde gewertet ist. Teilen sich mehrere den letzten
+    Platz, der weiterkommt, und reichen die Plätze nicht für alle, sind sie ``tied`` („Gleichstand an der Grenze“) -
+    wer von ihnen weiter ist, entscheidet die Turnierleitung. Wer nicht mehr teilnimmt (ausgetreten, disqualifiziert),
+    bekommt keine Marke."""
     playing = {row["id"] for row in registrations
                if row.get("id") and (row.get("status") or "approved") in STANDING_REGISTRATION_STATUSES}
     rule = settings.get("end_rule")
@@ -762,9 +764,13 @@ def _mark_swiss_progress(rows: list[dict], matches: list[dict], registrations: l
                 row["swiss_status"] = "eliminated"
     elif rule == "rounds" and settings.get("top_n"):
         if swiss_state(settings, sorted(playing), [match for match in matches if not match.get("is_preview")])["complete"]:
-            for row in rows:
-                if row["registration_id"] in playing and row["rank"] <= settings["top_n"]:
-                    row["swiss_status"] = "advanced"
+            top_n = settings["top_n"]
+            inside = [row for row in rows if row["rank"] <= top_n]
+            # Mehr Zeilen als Plätze: Die Punktgleichen auf dem letzten dieser Ränge passen nicht alle hinein.
+            shared = max(row["rank"] for row in inside) if len(inside) > top_n else None
+            for row in inside:
+                if row["registration_id"] in playing:
+                    row["swiss_status"] = "tied" if row["rank"] == shared else "advanced"
 
 
 # Der Wettbewerbsrang (#1593) wohnt seit #1741 im gemeinsamen Rechenkern; der alte Name bleibt als Weiterleitung.

@@ -293,6 +293,28 @@ def test_the_top_n_advance_once_all_rounds_are_played():
     assert [row["registration_id"] for row in done if row.get("swiss_status") == "advanced"] == ["a", "c", "b", "e"]
 
 
+def test_a_tie_at_the_last_advancing_place_is_named_instead_of_advancing_everyone():
+    """Zwei kommen weiter, aber b, c und e teilen sich Platz 2 und nichts trennt sie. Sicher weiter ist nur a - die drei
+    stehen am „Gleichstand an der Grenze“. Vorher galten alle vier als weiter."""
+    settings = swiss(end_rule="rounds", rounds=3, top_n=2, tiebreakers=[])
+
+    done = by_id(swiss_standings(three_rounds(), regs(*EIGHT), settings))
+
+    assert done["a"]["swiss_status"] == "advanced"
+    assert [done[key]["swiss_status"] for key in "bce"] == ["tied", "tied", "tied"]
+    assert all("swiss_status" not in done[key] for key in "dfgh")
+
+
+def test_a_tie_inside_the_advancing_places_changes_nothing():
+    """Vier kommen weiter: a und die drei Punktgleichen auf Platz 2 - der Gleichstand liegt nicht an der Grenze."""
+    settings = swiss(end_rule="rounds", rounds=3, top_n=4, tiebreakers=[])
+
+    done = by_id(swiss_standings(three_rounds(), regs(*EIGHT), settings))
+
+    assert sorted(key for key, row in done.items() if row.get("swiss_status") == "advanced") == ["a", "b", "c", "e"]
+    assert not [key for key, row in done.items() if row.get("swiss_status") == "tied"]
+
+
 def test_someone_who_left_is_never_marked_as_advanced():
     settings = swiss(end_rule="rounds", rounds=3, top_n=4)
     registrations = regs(*EIGHT, c="withdrawn")

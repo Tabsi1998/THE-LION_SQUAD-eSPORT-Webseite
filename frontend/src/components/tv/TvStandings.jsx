@@ -10,7 +10,7 @@ import { ZoneMark } from "@/components/tls/league/ZoneMark";
 // Gold erst, wenn das Turnier beendet ist - vorher ist es ein Zwischenstand.
 
 const SPLIT_AFTER = 12;
-const SWISS_STATUS_WORDS = { advanced: "weiter", eliminated: "ausgeschieden" };
+const SWISS_STATUS_WORDS = { advanced: "weiter", eliminated: "ausgeschieden", tied: "Gleichstand" };
 // Höhe in TV-Einheiten (--tv-u, 1 % der Bildhöhe): Platz der Folie zwischen Kopf- und Fußleiste, was Titel und
 // Tabellenkopf brauchen, und wie hoch eine Zeile höchstens wird - wenige Zeilen sollen nicht über das ganze Bild laufen.
 // Große Schrift macht auch Kopf- und Fußleiste höher - dann bleibt weniger Platz.
