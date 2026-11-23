@@ -3822,6 +3822,15 @@ Teilindizes nur auf `active`): Liga, Season, Liga N, Staffel, Platz von wie viel
 `exit`. Nur Seasons, die die betrachtende Person sehen darf, ohne archivierte, und nur Staffeln, die sie als Turnier sähe
 (`tournament_hidden_reason`).
 
+**Liga-Abzeichen und aktuelle Ligen (#1638, #1630, `services/league_current.py`):** Jeder Eintrag der Historie, der Abschnitt „Liga“
+der Teamseite (`GET /api/teams/{id}/overview`, `league`) und das neue Feld `league_current` im öffentlichen Profil tragen
+`badge: {level, nickname, champion}` - Liga N aus der Liga N (`league_divisions.level`), Gold (`champion`) nur in der Historie für den
+Meister. `league_current` und `league` nennen je Co-Team in laufender Staffel `rank`, `of`, `zone`, `zone_label` und `next_match`
+(`{match_id, scheduled_at, matchday, opponent, link}`), beste Liga N zuerst. Platz und Zone kommen aus derselben Rechnung wie die
+Tabelle (`_standing_rows` mit vorgeladenen Personen und Zonen), für alle Staffeln mit fester Zahl an Abfragen; einen Platz gibt es erst
+mit dem ersten gewerteten Spiel. `league_current` folgt der Regel des Profils (`profile_visibility.scope_for`, `internal`). Die Web-Bausteine:
+`LeagueBadge`, `LeagueCurrent`, `LeagueSeasonLine` (`frontend/src/components/tls/league/`), Rechnung in `lib/leagueBadge.js`.
+
 **Relegation (Entscheidung im Paket):** nur vorbereitet - einstellbar und farbig, ohne Wirkung auf die neue Season. Ein
 Entscheidungsspiel über zwei Liga N hinweg braucht eine eigene Staffel und kommt als eigenes Paket.
 
