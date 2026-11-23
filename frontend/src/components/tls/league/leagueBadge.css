@@ -1,0 +1,155 @@
+/* Liga-Abzeichen (#1638, LeagueBadge.jsx): Wappen mit Zahl, daneben „Liga N · Beiname“. Drei Größen: Liste, Karte, Hero.
+   Detail-Runde der Bewegung - einmal beim ersten Sichtbarwerden, gestaffelt über --tls-i (60 ms):
+   1. Das Wappen hebt sich leise an (Deckkraft, kaum Weg, kaum Skalierung).
+   2. Liga 1: Die Krone setzt sich von oben auf, mit einem Hauch Nachgeben (1 px) - wie die Kronen des Löwen-Rangs.
+   3. Liga 1 und Meister: Der Glanz läuft einmal schräg über das Wappen.
+   4. Liga 1 und Meister: Die Kante leuchtet kurz auf (eine Schicht dahinter, nur Deckkraft).
+   Nur transform und opacity; Wege hängen an --tls-motion-on. „Bewegung reduzieren“ und Druck: alles steht still. */
+
+.tls-lbadge {
+  --tls-lbadge-rgb: 41 182 232;
+  --tls-lbadge-w: 40px;
+  display: inline-flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; vertical-align: middle;
+}
+.tls-lbadge { --tls-lbadge-light: #B8ECFF; --tls-lbadge-base: #29B6E8; --tls-lbadge-dark: #0E5C7A; }
+.tls-lbadge[data-metal="gold"] { --tls-lbadge-rgb: var(--tls-honor-rgb); --tls-lbadge-light: #FFF2A8; --tls-lbadge-base: var(--tls-honor); --tls-lbadge-dark: #8A6A12; }
+.tls-lbadge--list { --tls-lbadge-w: 22px; gap: 6px; }
+.tls-lbadge--hero { --tls-lbadge-w: 88px; gap: 16px; }
+
+.tls-lbadge__art {
+  position: relative; display: inline-block; flex: none; width: var(--tls-lbadge-w); height: calc(var(--tls-lbadge-w) * 1.25); line-height: 0;
+}
+.tls-lbadge__svg { position: relative; z-index: 1; width: 100%; height: 100%; overflow: visible; }
+/* Ruhige Tiefe statt Leuchten: ein weicher Schatten unter dem Wappen. */
+.tls-lbadge__svg { filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.55)); }
+.tls-lbadge__number { font-family: 'Unbounded', 'Arial Black', sans-serif; font-weight: 900; letter-spacing: -0.02em; }
+.tls-lbadge__shine { opacity: 0; }
+/* Schicht für das Aufleuchten der Kante - steht still unsichtbar. */
+.tls-lbadge__art::before {
+  content: ""; position: absolute; inset: 18% 4% 0; border-radius: 40% 40% 50% 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, rgb(var(--tls-lbadge-rgb) / 0.55), transparent);
+}
+
+.tls-lbadge__text {
+  display: inline-flex; flex-wrap: nowrap; align-items: baseline; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; font-size: 12px; line-height: 1.2;
+}
+.tls-lbadge__level { flex: none; }
+.tls-lbadge__nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: rgb(var(--tls-lbadge-rgb)); }
+.tls-lbadge[data-metal="cyan"] .tls-lbadge__nick { color: var(--tls-brand, #29B6E8); }
+.tls-lbadge__champion { flex: none; color: var(--tls-honor); }
+.tls-lbadge--list .tls-lbadge__text { font-size: 11px; letter-spacing: 0.06em; }
+/* Hero: der Beiname darf umbrechen (lange Beinamen), die Zahl steht groß im Wappen. */
+.tls-lbadge--hero .tls-lbadge__text {
+  flex-direction: column; align-items: flex-start; white-space: normal; overflow: visible; font-size: 15px; letter-spacing: 0.1em;
+}
+.tls-lbadge--hero .tls-lbadge__level { font-family: 'Unbounded', 'Arial Black', sans-serif; font-size: 22px; letter-spacing: 0.02em; }
+.tls-lbadge--hero .tls-lbadge__nick { overflow-wrap: anywhere; }
+.tls-lbadge--hero .tls-lbadge__dot { display: none; }
+
+/* Bis zum ersten Sichtbarwerden wartet das Wappen unsichtbar - sonst stünde es einen Augenblick da und spränge dann. */
+.tls-lbadge[data-play="wait"] .tls-lbadge__art { opacity: 0; }
+.tls-lbadge[data-play="run"] .tls-lbadge__art {
+  animation: tls-lbadge-lift var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms);
+}
+.tls-lbadge__crown { transform-box: fill-box; transform-origin: 50% 100%; }
+.tls-lbadge[data-play="wait"] .tls-lbadge__crown { opacity: 0; }
+.tls-lbadge[data-play="run"] .tls-lbadge__crown {
+  animation: tls-lbadge-crown calc(var(--tls-motion-slow) * 1.3) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms + var(--tls-motion-mid));
+}
+.tls-lbadge[data-play="run"] .tls-lbadge__shine {
+  animation: tls-lbadge-shine var(--tls-motion-glow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms + var(--tls-motion-slow) + var(--tls-motion-mid));
+}
+.tls-lbadge[data-play="run"][data-tier="top"] .tls-lbadge__art::before,
+.tls-lbadge[data-play="run"][data-metal="gold"] .tls-lbadge__art::before {
+  animation: tls-lbadge-glow var(--tls-motion-glow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms + var(--tls-motion-slow) * 1.6);
+}
+@keyframes tls-lbadge-lift {
+  0% { opacity: 0; transform: translateY(calc(4px * var(--tls-motion-on))) scale(calc(1 - 0.05 * var(--tls-motion-on))); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes tls-lbadge-crown {
+  0% { opacity: 0; transform: translateY(calc(-7px * var(--tls-motion-on))) rotate(calc(-4deg * var(--tls-motion-on))); }
+  65% { opacity: 1; transform: translateY(calc(1px * var(--tls-motion-on))); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes tls-lbadge-shine {
+  0% { opacity: 0; transform: translateX(0) skewX(-18deg); }
+  30% { opacity: 0.5; }
+  100% { opacity: 0; transform: translateX(96px) skewX(-18deg); }
+}
+@keyframes tls-lbadge-glow {
+  0% { opacity: 0; }
+  40% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media print {
+  .tls-lbadge[data-play] .tls-lbadge__art, .tls-lbadge[data-play] .tls-lbadge__crown { animation: none; opacity: 1; }
+  .tls-lbadge__shine, .tls-lbadge__art::before { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-lbadge[data-play] .tls-lbadge__art, .tls-lbadge[data-play] .tls-lbadge__crown { animation: none; opacity: 1; }
+  .tls-lbadge[data-play] .tls-lbadge__shine, .tls-lbadge[data-play] .tls-lbadge__art::before { animation: none; opacity: 0; }
+}
+
+/* Aktuelle Ligen (#1630): Profil und Teamseite - eine Karte je Co-Team. */
+.tls-league-now { display: grid; gap: 10px; }
+.tls-league-now__row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 14px; padding: 12px 14px;
+  border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212;
+  transition: border-color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-league-now__row[data-champion="true"] { border-color: rgb(255 215 0 / 0.35); }
+@media (hover: hover) and (pointer: fine) {
+  a.tls-league-now__row:hover { border-color: rgb(41 182 232 / 0.45); transform: translateY(calc(-1px * var(--tls-motion-on))); }
+}
+a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E8); outline-offset: 2px; }
+.tls-league-now__name { font-weight: 800; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tls-league-now__meta { margin-top: 2px; font-size: 12px; color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; }
+.tls-league-now__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tls-league-now__place { font-weight: 800; color: #fff; }
+.tls-league-now__zone { display: inline-flex; align-items: center; gap: 4px; color: rgb(255 255 255 / 0.78); font-weight: 700; }
+.tls-league-now__next { display: inline-flex; align-items: center; gap: 6px; color: rgb(255 255 255 / 0.72); min-width: 0; overflow-wrap: anywhere; }
+.tls-league-now__arrow { color: rgb(255 255 255 / 0.35); }
+/* Am Handy steht das Abzeichen oben links, der Text darunter läuft über die ganze Breite. */
+@media (max-width: 479px) {
+  .tls-league-now__row { grid-template-columns: auto minmax(0, 1fr); }
+  .tls-league-now__arrow { display: none; }
+}
+
+/* Saisonverlauf als Linie (#1630): Liga N als Bänder, je Season ein Punkt; Meister in Gold. Die Linie blendet einmal ein, die
+   Punkte folgen gestaffelt - nur Deckkraft und Skalierung. */
+.tls-season-line { overflow: hidden; border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212; padding: 12px 12px 6px; }
+.tls-season-line__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tls-season-line__band { fill: rgb(255 255 255 / 0.025); }
+.tls-season-line__band[data-even="true"] { fill: rgb(41 182 232 / 0.05); }
+.tls-season-line__level { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; fill: rgb(255 255 255 / 0.55); text-transform: uppercase; }
+.tls-season-line__season { font-size: 10px; font-weight: 700; fill: rgb(255 255 255 / 0.55); }
+.tls-season-line__path { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.tls-season-line__point { transform-box: fill-box; transform-origin: center; }
+.tls-season-line__point[data-champion="true"] circle { fill: var(--tls-honor); stroke: var(--tls-honor); }
+.tls-season-line__rank { font-size: 10px; font-weight: 800; fill: #fff; font-variant-numeric: tabular-nums; }
+.tls-season-line__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; font-size: 12px; color: rgb(255 255 255 / 0.7); }
+.tls-season-line__swatch { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+.tls-season-line[data-play="wait"] .tls-season-line__path, .tls-season-line[data-play="wait"] .tls-season-line__point { opacity: 0; }
+.tls-season-line[data-play="run"] .tls-season-line__path { animation: tls-season-line-in var(--tls-motion-glow) var(--tls-ease) both; }
+.tls-season-line[data-play="run"] .tls-season-line__point {
+  animation: tls-season-point-in var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-i, 0) * 60ms + var(--tls-motion-mid));
+}
+@keyframes tls-season-line-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tls-season-point-in {
+  0% { opacity: 0; transform: scale(calc(1 - 0.15 * var(--tls-motion-on))); }
+  100% { opacity: 1; transform: none; }
+}
+@media print {
+  .tls-season-line[data-play] .tls-season-line__path, .tls-season-line[data-play] .tls-season-line__point { animation: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-season-line[data-play] .tls-season-line__path, .tls-season-line[data-play] .tls-season-line__point { animation: none; opacity: 1; }
+}
