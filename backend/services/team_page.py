@@ -181,7 +181,7 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     games = await _game_names(db, (row.get("game_id") for row in visible.values()))
     events = await _event_names(db, (row.get("event_id") for row in visible.values()))
 
-    league = await _league_entries(db, registrations, visible, viewer)
+    league = await _league_entries(db, registrations, visible, viewer, insider=insider)
     in_league = {row["registration_id"] for row in league}
     upcoming = []
     for reg in registrations:
@@ -246,7 +246,7 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     return {"header": header, "upcoming": upcoming, "recent": recent, "league": league}
 
 
-async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None) -> list[dict]:
+async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None, *, insider: bool = False) -> list[dict]:
     """Abschnitt „Liga“ der Teamseite (P5, #1625): die Co-Teams des Teams und ihre Staffel, solange die Staffel läuft
     (Turnierstatus, nicht der Stand der Season - wie „Angemeldet für“). Der Link geht auf die Ligaseite, wenn die
     Person die Season sehen darf, sonst auf das Staffel-Turnier."""
@@ -274,6 +274,7 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
 
     staffel_ids = sorted({tournament["id"] for _reg, tournament in rows})
     full = await db.tournaments.find({"id": {"$in": staffel_ids}}, {"_id": 0}).to_list(len(staffel_ids) + 1)
+    full_by_id = {row["id"]: row for row in full}
     places = await live_places(db, full, [reg.get("id") for reg, _tournament in rows if reg.get("id")])
     out = []
     for reg, tournament in rows:
@@ -303,7 +304,8 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "emblem_url": (season.get("emblem_url") or league.get("emblem_url") or None),
             "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
             "link": link,
-            "status_note": status_note(reg),
+            # Verborgene Teilnehmerliste: den Stand der Anmeldung sieht nur das Team selbst (Review #1638).
+            "status_note": status_note(reg, full_by_id.get(tournament["id"]), insider=insider),
             **(places.get(reg.get("id")) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
     # Beste Liga N oben (#1630, aus #1644), dann Liga, Season und Co-Team.

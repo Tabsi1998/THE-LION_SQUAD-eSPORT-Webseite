@@ -30,7 +30,11 @@ RUNNING_LIMIT = 2000
 STATUS_NOTES = {"pending": "Anmeldung offen", "waitlist": "Warteliste"}
 
 
-def status_note(registration: dict | None) -> str | None:
+def status_note(registration: dict | None, tournament: dict | None = None, *, insider: bool = True) -> str | None:
+    """„Anmeldung offen“ bzw. „Warteliste“ - verbirgt die Staffel ihre Teilnehmerliste (``show_participants: false``), sieht den Stand
+    nur, wer dazugehört (``insider``: die Person selbst bzw. das Team), wie die Teilnehmerliste selbst (Review #1638)."""
+    if (tournament or {}).get("show_participants") is False and not insider:
+        return None
     return STATUS_NOTES.get((registration or {}).get("status") or "")
 
 
@@ -202,7 +206,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
             "link": (f"/liga/{league['slug']}/{season['slug']}#staffel-{anchor}" if opens_page
                      else f"/tournaments/{anchor}"),
             "internal": internal,
-            "status_note": status_note(registration),
+            "status_note": status_note(registration, tournament, insider=scope.everything),
             **(places.get(registration["id"]) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
     return sort_rows(out)
