@@ -38,12 +38,20 @@ test("ohne Bild: links die Text-Karte", () => {
   expect(screen.getByTestId("news-lead-media").querySelector("[data-testid='news-text-card']")).not.toBeNull();
 });
 
-test("langer Titel: normal geschrieben, bricht um und endet nach vier Zeilen", () => {
-  renderLead({ ...NEWS, title: "Ein sehr langer Titel ".repeat(12) });
+test("langer Titel: normal geschrieben, steht ganz da und kommt eine Stufe kleiner (#1314)", () => {
+  const long = "Ein sehr langer Titel ".repeat(12).trim();
+  renderLead({ ...NEWS, title: long });
   const title = screen.getByRole("heading");
-  expect(title.className).toContain("line-clamp-4");
-  expect(title.className).toContain("break-words");
+  expect(title).toHaveTextContent(long);
+  expect(title.className).not.toContain("line-clamp");
+  expect(title.className).toContain("tls-wrap");
+  expect(title.className).toContain("xl:text-3xl");
   expect(title.className).not.toContain("uppercase");
+});
+
+test("kurzer Titel: volle Größe", () => {
+  renderLead(NEWS);
+  expect(screen.getByRole("heading").className).toContain("xl:text-4xl");
 });
 
 test("eigene Kennung und Überschrift für die Startseite", () => {
