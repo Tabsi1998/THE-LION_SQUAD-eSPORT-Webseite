@@ -13,8 +13,9 @@
 //
 //   node scripts/check-bundle-budget.mjs          prüft und schlägt bei Überschreitung fehl
 //   node scripts/check-bundle-budget.mjs --json   gibt zusätzlich alle Dateien als JSON aus
+//   node scripts/check-bundle-budget.mjs --report out.json   schreibt das Ergebnis fürs Prüftor (#1660)
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -150,6 +151,20 @@ export function collectStartup(manifest, entryKey = "index.html") {
   return { js, css: [...css] };
 }
 
+/** Ergebnis für das Prüftor (#1660): Messwerte, Ziel, Grenze und Fehler. */
+export function budgetReport({ jsGzip, cssGzip, jsCount, budgets, goals, failures }) {
+  return {
+    ok: failures.length === 0,
+    jsGzip,
+    cssGzip,
+    jsCount,
+    budgetJs: budgets["startup-js-gzip"] ?? null,
+    budgetCss: budgets["startup-css-gzip"] ?? null,
+    goalJs: goals["startup-js-gzip"] ?? null,
+    failures,
+  };
+}
+
 export function gzipSize(buffer) {
   return gzipSync(buffer, { level: GZIP_LEVEL }).length;
 }
@@ -223,6 +238,11 @@ function main() {
   for (const item of largest) console.log(`  ${String(item.gzip).padStart(8)}  ${item.file}`);
   if (process.argv.includes("--json")) {
     console.log(JSON.stringify({ gzipLevel: GZIP_LEVEL, jsGzip, cssGzip, js: jsFiles, css: cssFiles }, null, 2));
+  }
+  // Prüftor (#1660): kurzes Ergebnis für den Kommentar im PR - auch, wenn das Budget überschritten ist.
+  const reportIndex = process.argv.indexOf("--report");
+  if (reportIndex > 0 && process.argv[reportIndex + 1]) {
+    writeFileSync(process.argv[reportIndex + 1], `${JSON.stringify(budgetReport({ jsGzip, cssGzip, jsCount: jsFiles.length, budgets, goals, failures }), null, 2)}\n`);
   }
 
   if (failures.length) {

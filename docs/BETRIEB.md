@@ -347,6 +347,8 @@ Bereinigung und Zeichnen sind ein gemeinsamer Baustein mit den Shop-Motiven (`ba
 Beschreibung in [SHOP.md](SHOP.md#motive-2069)). Für Druckgrößen dort zusätzlich: `SVG_PRINT_TIMEOUT_SECONDS` (30),
 `SVG_PRINT_MEMORY_MB` (1536), `SVG_MAX_RASTER_SIDE` (20000 px), `SVG_MAX_RASTER_MEGAPIXELS` (60).
 
+Beim Lesen eines Uploads legt FastAPI die Datei zuerst in `TMPDIR` ab (#2548). Im Backend-Container ist `/tmp` ein tmpfs mit nur 128 MB; `TMPDIR` zeigt deshalb auf das eigene Volume `upload_spool` (`/app/backend/spool`). Ohne das scheitert jedes Video über rund 128 MB mit „There was an error parsing the body“. Nach dem Einspielen legt `docker compose up -d --build backend` das Volume an. Die Dateien darin löscht FastAPI nach jedem Upload selbst.
+
 Cloudflare lässt je Anfrage höchstens 100 MB durch. Große Uploads laufen deshalb über eine Subdomain
 **ohne** Cloudflare-Proxy (graue Wolke), z. B. `upload.lionsquad.at`, die im Nginx Proxy Manager auf
 denselben Upstream zeigt, mit:

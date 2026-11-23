@@ -196,13 +196,22 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
       const problems = watch(page);
       const { league, season } = anmeldung;
       await page.goto(`/liga/${league.slug}/${season.slug}`);
-      // Erlaubte Ausrüstung (#2287, Nr. 99): Die Waffe ist nur in einem Modus gesperrt - erlaubt mit „nicht in …“, der Aufsatz „nicht an …“.
+      // Erlaubte Ausrüstung (#2287, Nr. 99): Die Waffe ist nur in einem Modus gesperrt - erlaubt mit „nicht in …“.
       const block = page.getByTestId("league-allowed-equipment");
       await expect(block).toContainText(WEAPON);
-      await expect(block.getByTestId("allowed-entry").filter({ hasText: WEAPON }).first()).toContainText("nicht in ");
+      const weaponTile = block.getByTestId("allowed-entry").filter({ hasText: WEAPON }).first();
+      await expect(weaponTile).toContainText("nicht in ");
       // Nr. 81 (Codex Runde 1): Das Visier passt nur zur Waffe und ist dort gesperrt - es ist nicht erlaubt; der Griff passt und ist es.
+      // Seit #2299/#2305 stehen Aufsätze nicht mehr als eigene Einträge, sondern unter ihrer Waffe: die Karte zählt sie, ein Tipp
+      // klappt die erlaubten je Slot auf, die gesperrten stehen darüber unter „Gesperrt: …“.
       await expect(block.getByTestId("allowed-entry").filter({ hasText: SCOPE })).toHaveCount(0);
-      await expect(block.getByTestId("allowed-entry").filter({ hasText: GRIP })).toHaveCount(1);
+      await expect(block.getByTestId("allowed-entry").filter({ hasText: GRIP })).toHaveCount(0);
+      await expect(weaponTile.getByTestId("allowed-weapon-summary")).toContainText("2 Aufsätze · 1 gesperrt");
+      await weaponTile.getByTestId("allowed-weapon-toggle").click();
+      const attachments = block.getByTestId("allowed-attachments").filter({ hasText: WEAPON });
+      await expect(attachments.getByTestId("allowed-attachment").filter({ hasText: GRIP })).toHaveCount(1);
+      await expect(attachments.getByTestId("allowed-attachment").filter({ hasText: SCOPE })).toHaveCount(0);
+      await expect(attachments.getByTestId("allowed-attachments-banned")).toContainText(SCOPE);
       await block.scrollIntoViewIfNeeded();
       await noSideScroll(page);
       await shot(page, `sperrliste-ligaseite-${width}-abnahme.png`);

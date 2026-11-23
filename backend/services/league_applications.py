@@ -89,6 +89,10 @@ CARRY_DEADLINE = "Abmelden ging bis zum Start der Season ({day}). Jetzt trägt d
 CARRY_OTHER_DIVISION = ("Das Co-Team ist aus der Vorgänger-Season in {label} übernommen. Eine Staffel einer anderen Liga geht nur mit Grund "
                         "(mindestens fünf Zeichen).")
 # Zurückstufen einer angenommenen Anmeldung (#2348): wie beim Ablehnen nur mit Grund, egal ob automatisch oder von Hand angenommen.
+# Neue Co-Teams starten in der untersten Liga N (#1623, Entscheidung 15.10.): je Season einstellbar, fehlt das Feld, gilt es nicht.
+NEW_LOWEST = "new_squads_lowest_division"
+NEW_OTHER_DIVISION = ("Neue Co-Teams starten in der untersten Liga ({label}). Eine Staffel einer höheren Liga geht nur mit Grund "
+                      f"(mindestens {REASON_MIN} Zeichen).")
 DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, das Team liest ihn."
 
 
@@ -664,7 +668,7 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
 
 
 async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
-                 conflict_reason: str | None = None) -> dict:
+                 conflict_reason: str | None = None, deviation_reason: str | None = None) -> dict:
     """Annehmen, mit ``tournament_id`` gleich zuteilen. Der letzte Platz geht unter der Season-Sperre nur einmal weg."""
     override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
@@ -678,6 +682,9 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
             if not left_over and (await seat_stats(db, fresh))["full"]:
                 raise LeagueProblem(SEATS_TAKEN, 409)
+            # Neue Co-Teams in die unterste Liga N (#1623): Wer beim Annehmen gleich eine höhere Staffel wählt, braucht den Grund.
+            deviation = (await division_deviation(db, fresh, application, await _load_staffel(db, fresh, tournament_id), deviation_reason)
+                         if tournament_id and not left_over else None)
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
                 raise LeagueProblem(SQUAD_GONE, 409)
@@ -687,8 +694,11 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
             now = now_utc().isoformat()
             fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over, override)
+            if deviation:
+                await db.league_applications.update_one({"id": done["id"]}, {"$set": {"assignment.deviation_reason": deviation}})
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews) if registration else []
-    await _audit_decision(db, "accept", done, actor, override, **({"tournament_id": tournament_id} if tournament_id else {}))
+    await _audit_decision(db, "accept", done, actor, override, **({"tournament_id": tournament_id} if tournament_id else {}),
+                          **({"deviation_reason": deviation} if deviation else {}))
     await _tell_status(db, league, season, done, ACCEPTED, squad=squad)
     return {**done, "ids_missing": ids_missing}
 
@@ -701,6 +711,36 @@ def carry_deviation(application: dict, tournament: dict, reason: str | None) -> 
     text = " ".join(str(reason or "").split())
     if len(text) < REASON_MIN:
         raise LeagueProblem(CARRY_OTHER_DIVISION.format(label=carry.get("division_label") or "ihrer Liga"), 422)
+    return text[:500]
+
+
+def target_division_id(application: dict, divisions: list[dict]) -> str | None:
+    """Die Liga N, in die ein angenommenes Co-Team gehört (#1623): bei Übernommenen (F.2) die neue Liga N, sonst die unterste aktive.
+    ``divisions``: die aktiven Liga N der Season, nach Stufe aufsteigend."""
+    carried = (application.get("carry_over") or {}).get("division_id")
+    if carried and any(row.get("id") == carried for row in divisions):
+        return carried
+    return divisions[-1]["id"] if divisions else None
+
+
+async def _active_divisions(db, season_id: str) -> list[dict]:
+    return await db.league_divisions.find({"season_id": season_id, "status": "active"},
+                                          {"_id": 0, "id": 1, "level": 1, "nickname": 1}).sort("level", 1).to_list(50)
+
+
+async def division_deviation(db, season: dict, application: dict, tournament: dict, reason: str | None) -> str | None:
+    """Darf dieses Co-Team in diese Staffel? Übernommene (F.2) in ihre neue Liga N; neue Co-Teams in die unterste aktive Liga N, wenn die
+    Season das so einstellt (``new_squads_lowest_division``, #1623). Eine andere Liga N nur mit Grund - er wird zurückgegeben und steht an
+    der Zuteilung und im Protokoll. Ohne die Einstellung gilt für neue Co-Teams nichts."""
+    carried = carry_deviation(application, tournament, reason)
+    if carried or (application.get("carry_over") or {}).get("division_id") or not season.get(NEW_LOWEST):
+        return carried
+    divisions = await _active_divisions(db, season["id"])
+    if not divisions or (tournament.get("league_context") or {}).get("division_id") == divisions[-1]["id"]:
+        return None
+    text = " ".join(str(reason or "").split())
+    if len(text) < REASON_MIN:
+        raise LeagueProblem(NEW_OTHER_DIVISION.format(label=league_service.division_label(divisions[-1])), 422)
     return text[:500]
 
 
@@ -720,7 +760,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
                 raise LeagueProblem(ASSIGNED_ALREADY, 409)
-            deviation = carry_deviation(application, await _load_staffel(db, fresh, tournament_id), deviation_reason)
+            deviation = await division_deviation(db, fresh, application, await _load_staffel(db, fresh, tournament_id), deviation_reason)
             # Der Kader kann sich seit dem Annehmen geändert haben: dieselbe Prüfung wie beim Einreichen, dazu die der Staffel.
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
@@ -1228,6 +1268,7 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
         people |= {step.get("by") for step in row.get("history") or []}
     names = await _names(db, people)
     gone = await _left_staffel(db, rows)
+    divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0}).sort("level", 1).to_list(50)
     # Befangenheit (#2245): dieselbe Regel wie beim Entscheiden, mit den Teams samt Co-Teams aus ``teams_by_id``.
     sides = {row["id"]: side_of(row) for row in rows}
     side_teams = await teams_by_id(db, sides.values())
@@ -1250,6 +1291,10 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
                                 if row.get("carry_over") and not row.get("applied_by") else names.get(row.get("applied_by")) or "Gelöschter User"),
             # Aus der Vorgänger-Season (F.2): woher, welche Liga N jetzt, bis wann Abmelden geht.
             "carry_over": ({**(row.get("carry_over") or {}), **(carry_view(row, season) or {})} if row.get("carry_over") else None),
+            # Die Liga N, deren Staffeln der Eingang zuerst anbietet (#1623): bei Übernommenen die neue, sonst - wenn die Season es so
+            # einstellt - die unterste aktive. ``None``: keine Vorgabe, alle Staffeln gleich.
+            "target_division_id": (target_division_id(row, divisions) if (row.get("carry_over") or {}).get("division_id") or season.get(NEW_LOWEST)
+                                   else None),
             "rules_version": (row.get("rule_consent") or {}).get("version"), "rules_at": (row.get("rule_consent") or {}).get("at"),
             "privacy_at": (row.get("privacy_consent") or {}).get("at"),
             "decided_at": row.get("decided_at"), "decided_by_name": names.get(row.get("decided_by")), "decision_reason": row.get("decision_reason"),
@@ -1268,7 +1313,6 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
                          "reason": step.get("reason"), "conflict_reason": step.get("conflict_reason"), "auto": bool(step.get("auto"))}
                         for step in row.get("history") or []],
         })
-    divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0}).sort("level", 1).to_list(50)
     staffeln = await league_service.staffeln_of(db, season["id"])
     return {
         "items": items,
@@ -1277,7 +1321,9 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
         "stats": await seat_stats(db, season),
         "configured": bool(window_state(season)),
         "window": window_state(season),
-        "divisions": [{"id": division["id"], "label": league_service.division_label(division),
+        # Neue Co-Teams starten in der untersten Liga N (#1623): Der Eingang bietet sie zuerst an, höher nur mit Grund.
+        "new_lowest": bool(season.get(NEW_LOWEST)),
+        "divisions": [{"id": division["id"], "label": league_service.division_label(division), "lowest": division["id"] == divisions[-1]["id"],
                        "staffeln": [league_service.staffel_summary(row) for row in staffeln if row["league_context"].get("division_id") == division["id"]]}
                       for division in divisions],
     }

@@ -103,7 +103,7 @@ export function RegistrationSheet({ busy, error, fields, teams, tournament, user
   // Voller Cup (#1941): Kopfzeile und Knopf sagen „Warteliste“ - bezahlt wird erst mit dem Nachrücken.
   const waitlist = waitlistLead(tournament);
   const lead = waitlist || (isTeamTournament
-    ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
+    ? "Wähle das Team aus, das du als Teamleitung oder Co-Leitung anmelden möchtest."
     : fields.length
       ? `${gameName} benötigt Spieler-IDs${sourceSlug && sourceSlug !== gameSlug ? ` aus ${tournament.game?.identity_game_name || "dem Hauptspiel"}` : ""}.`
       : `Du meldest dich als ${user?.display_name || user?.username || "du"} an.`);
@@ -178,12 +178,12 @@ export function RegistrationSheet({ busy, error, fields, teams, tournament, user
                   >
                     <View style={styles.flex}>
                       <Body style={styles.strong}>{team.tag ? `[${team.tag}] ${team.name}` : team.name}</Body>
-                      <Muted>{team.my_role === "co_leader" ? "Co-Leader" : team.my_role === "leader" ? "Leader" : team.can_manage ? "Verwaltbar" : "Team"}</Muted>
+                      <Muted>{team.my_role === "co_leader" ? "Co-Leitung" : team.my_role === "leader" ? "Teamleitung" : team.can_manage ? "Verwaltbar" : "Team"}</Muted>
                     </View>
                     <View style={[styles.radio, teamId === team.id && styles.radioActive]} />
                   </Pressable>
                 )) : (
-                  <Muted style={styles.errorText}>Du bist aktuell bei keinem Team als Leader oder Co-Leader eingetragen.</Muted>
+                  <Muted style={styles.errorText}>Du bist aktuell bei keinem Team als Teamleitung oder Co-Leitung eingetragen.</Muted>
                 )}
               </View>
             ) : null}

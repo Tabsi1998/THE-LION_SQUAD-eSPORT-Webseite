@@ -146,6 +146,8 @@ export function applicationToForm(season = {}) {
     application_privacy_text: season.application_privacy_text || "",
     entry_policy: season.entry_policy || "all",
     sibling_squads_in_staffel: Boolean(season.sibling_squads_in_staffel),
+    // Neue Co-Teams starten in der untersten Liga (#1623): Seasons von vorher tragen das Feld nicht - dann ist es aus.
+    new_squads_lowest_division: Boolean(season.new_squads_lowest_division),
     application_auto_accept: Boolean(season.application_auto_accept),
     // Nachmeldefrist (#2422): leer heißt Vorgabe (14 Tage nach dem Start).
     late_registration_days: text(season.late_registration_days),
@@ -168,6 +170,7 @@ export function applicationPayload(form) {
     application_privacy_text: clean(form.application_privacy_text),
     entry_policy: form.entry_policy || "all",
     sibling_squads_in_staffel: Boolean(form.sibling_squads_in_staffel),
+    new_squads_lowest_division: Boolean(form.new_squads_lowest_division),
     application_auto_accept: Boolean(form.application_auto_accept),
     late_registration_days: number(form.late_registration_days),
   };

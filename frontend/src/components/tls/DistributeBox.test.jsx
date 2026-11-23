@@ -41,3 +41,27 @@ test("„Nur intern“ hat keine Mail und darum keine Vorschau", async () => {
   expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Nur intern");
   expect(screen.queryByTestId("distribute-preview-toggle")).toBeNull();
 });
+
+test("„Nur App“ (#1532): kein Newsletter, kein Senden, keine Vorschau - auch vor dem ersten Speichern", async () => {
+  const { rerender } = render(<DistributeBox kind="news" itemId="n1" appOnly />);
+  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+  expect(screen.queryByTestId("distribute-send")).toBeNull();
+  expect(screen.queryByTestId("distribute-preview-toggle")).toBeNull();
+  rerender(<DistributeBox kind="news" visibility="public" appOnly />);
+  expect(await screen.findByTestId("distribute-audience-line")).toHaveTextContent("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/settings/newsletter/audience", expect.anything());
+});
+
+test("„Nur App“ öffentlich (#1532): die Box kündigt den App-Push an alle App-Nutzer an, danach den Stand", async () => {
+  const { rerender } = render(<DistributeBox kind="news" visibility="public" appOnly />);
+  expect(await screen.findByTestId("distribute-app-push")).toHaveTextContent("Beim Veröffentlichen geht ein App-Push an alle App-Nutzer mit Zustimmung für „News & Events“.");
+  rerender(<DistributeBox kind="news" visibility="members" appOnly />);
+  expect(screen.queryByTestId("distribute-app-push")).toBeNull();
+  rerender(<DistributeBox kind="news" visibility="public" />);
+  expect(screen.queryByTestId("distribute-app-push")).toBeNull();
+  rerender(<DistributeBox kind="news" visibility="community" appOnly appPush={{ sent_at: "2026-11-23T10:00:00Z", count: 12 }} />);
+  expect(screen.getByTestId("distribute-app-push")).toHaveTextContent("App-Push gesendet am");
+  expect(screen.getByTestId("distribute-app-push")).toHaveTextContent("an 12 Personen.");
+  rerender(<DistributeBox kind="news" visibility="public" appOnly appPush={{ sent_at: "2026-11-23T10:00:00Z", count: 0, skipped: "channel_changed" }} />);
+  expect(screen.getByTestId("distribute-app-push")).toHaveTextContent("Kein App-Push – der Beitrag war schon öffentlich, als er auf „Nur App“ gestellt wurde.");
+});

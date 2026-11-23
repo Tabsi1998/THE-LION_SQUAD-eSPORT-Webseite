@@ -128,6 +128,16 @@ img, video, canvas, svg {
   padding-block: 0.06em;
 }
 
+/* Nichts Wichtiges mit „…“ (#1314): Titel, Namen, Orte, Rollen und Daten brechen um statt abgeschnitten zu werden -
+   an Leerzeichen und Bindestrich, lange Wörter ab zehn Buchstaben trennt der Browser mit Bindestrich (lang="de" am
+   Dokument). Mitten im Wort ohne Zeichen bricht nur ein Wort, das allein breiter ist als sein Platz („xX_Nebelwolf_Xx“) -
+   `anywhere` statt `break-word`, damit es die Zeile nicht breiter macht als den Bildschirm (wie .tls-standing-name, #2498).
+   `min-width: 0`, damit der Text auch in Flex- und Grid-Zeilen schmaler werden darf. */
+.tls-wrap { min-width: 0; overflow-wrap: anywhere; -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 10 4 4; }
+/* Große Personennamen (Sieger auf der Textkarte): keine Silbentrennung im Namen („Fitz-gerald“), Umbruch nur an
+   Leerzeichen und am eigenen Bindestrich („Fitzgerald-“ / „Hinterberger“). */
+.tls-wrap--name { -webkit-hyphens: manual; hyphens: manual; }
+
 /* Selection */
 ::selection { background: var(--tls-cyan); color: #000; }
 
@@ -405,6 +415,8 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-standing-note { overflow-wrap: anywhere; }
 .tls-standing-note[data-tone="decision"], .tls-standing-note[data-tone="tiebreak"] { color: rgb(var(--tls-brand-rgb) / 0.9); }
 .tls-standing-note[data-tone="exit"] { color: rgb(var(--tls-warn-rgb)); font-weight: 600; }
+/* Schweizer System (#1559): „Weiter“ nach der Abschlussregel - Grün wie der Aufstieg in der Liga-Tabelle. */
+.tls-standing-note[data-tone="advance"] { color: rgb(var(--tls-ok-rgb)); font-weight: 600; }
 .tls-standing-note__reason { color: var(--tls-muted); }
 .tls-standing-row:has(.tls-standing-note[data-tone="exit"]) .tls-standing-name { color: rgb(255 255 255 / 0.6); }
 /* Zonen für Auf- und Abstieg (F.2, #1627): ein Strich links am Platz - Grün hinauf, Orange hinunter, Relegation heller.

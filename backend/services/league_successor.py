@@ -20,7 +20,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
-from services import league_final, league_zones, loadout_bans, map_pools, squad_registration
+from services import league_cross_zones, league_final, league_staffel_plan, league_zones, loadout_bans, map_pools, squad_registration
 from services import league_service as leagues
 from services.league_final_read import active_final, is_closed
 from services.league_scope import ONLY_LEAGUE
@@ -101,6 +101,17 @@ def _zone_map(final: dict, division: dict | None, levels: list[int]) -> dict[str
     return league_zones.assign(rows, zones)
 
 
+def capacity(season: dict, division: dict, teams: int, staffeln_before: int) -> dict:
+    """Platzprüfung einer Liga N der neuen Season (#1627): Passen die Teams, die nach Auf- und Abstieg dort ankommen, in so viele
+    Staffeln, wie es bisher gab? Gerechnet mit der Staffelgröße der Liga N und den Wochen der Season (Sperrzeiten setzt die neue Season
+    neu, darum ohne sie). Ein Hinweis, keine Sperre: Die Staffeln der neuen Season legt die Leitung an."""
+    settings = leagues.effective_settings(season, division)
+    found = league_staffel_plan.suggest(teams, max_size=settings.get("max_staffel_size"), active_weeks=season.get("weeks_total"),
+                                        legs=season.get("round_robin_legs") or 1, have=staffeln_before, have_word="Bisher gab es")
+    return {"teams": teams, "staffeln_before": staffeln_before, "cap": found["cap"], "cap_by": found["cap_by"], "needed": found["needed"],
+            "sizes": found["sizes"], "fits": found["fits"], "text": found["text"]}
+
+
 async def plan(db, season: dict) -> dict:
     """Die Vorschau: ob es geht (``problems``), die aktiven Liga N mit ihren Teams nach Auf- und Abstieg (``divisions``) und wer
     herausfällt (``dropped``). Liest nur."""
@@ -128,15 +139,34 @@ async def plan(db, season: dict) -> dict:
                                             {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
     tournaments.sort(key=lambda row: ((by_id.get(row["league_context"].get("division_id")) or {}).get("level") or 99,
                                       str(row["league_context"].get("staffel") or "")))
+    loaded = {row["id"]: await active_final(db, row["id"]) for row in tournaments} if levels else {}
+    # Plätze über Staffeln hinweg (#1627): je Liga N aus allen ihren Endständen - nur wenn die Season ganz abgeschlossen ist. Ein
+    # offener Gleichstand an der Grenze hält die neue Season auf, bis die Leitung entschieden hat.
+    crossed: dict[str, str] = {}
+    decided: list[str] = []
+    if levels and not problems:
+        for division in active:
+            mine = [row for row in tournaments if row["league_context"].get("division_id") == division["id"] and loaded.get(row["id"])]
+            # Aus dem gespeicherten Stand (Nr. 228): die Zonen, mit denen die Staffeln abgeschlossen wurden - nie die heutige Einstellung.
+            rule = league_cross_zones.stored_rule([loaded[row["id"]] for row in mine])
+            if not mine or not league_cross_zones.has_rule(rule):
+                continue
+            found = league_cross_zones.evaluate(rule, [{"tournament_id": row["id"], "staffel": row["league_context"].get("staffel"),
+                                                        "rows": loaded[row["id"]].get("rows") or [], "zones": loaded[row["id"]].get("zones")}
+                                                       for row in mine], division.get("zone_decisions"))
+            crossed.update(found["zones"])
+            decided += [str((division.get("zone_decisions") or {}).get(side["kind"], {}).get("id")) for side in found["sides"] if side["decision"]]
+            problems += [league_cross_zones.SUCCESSOR_TIE.format(label=division_label(division), names=" – ".join(tie["names"]))
+                         for tie in found["ties"]]
     for tournament in tournaments if levels else []:
-        final = await active_final(db, tournament["id"])
+        final = loaded.get(tournament["id"])
         if not final:
             continue
         finals.append(str(final.get("id")))
         context = tournament["league_context"]
         division = by_id.get(context.get("division_id")) or {}
         from_label = division_label(division) if division.get("level") is not None else "Liga"
-        zones = _zone_map(final, division, levels)
+        zones = {**_zone_map(final, division, levels), **{key: zone for key, zone in crossed.items()}}
         registrations = {row["id"]: row for row in await db.tournament_registrations.find(
             {"tournament_id": tournament["id"]}, {"_id": 0}).to_list(REGISTRATION_LIMIT)}
         squads = {row["id"]: row for row in await db.team_squads.find(
@@ -149,7 +179,9 @@ async def plan(db, season: dict) -> dict:
             entry = {"registration_id": row.get("registration_id"), "squad_id": registration.get("squad_id"),
                      "display_name": row.get("display_name") or registration.get("display_name") or "Team",
                      "from_level": division.get("level"), "from_label": from_label, "from_staffel": context.get("staffel"),
-                     "rank": row.get("rank"), "zone": zone, "zone_label": league_zones.LABELS.get(zone or "")}
+                     "rank": row.get("rank"), "zone": zone, "zone_label": league_zones.LABELS.get(zone or ""),
+                     # Über den Vergleich der Staffeln (#1627): „bester Nächstplatzierter“ bzw. spiegelbildlich beim Abstieg.
+                     **({"zone_cross": True} if row.get("registration_id") in crossed else {})}
             exit_kind = (row.get("exit") or {}).get("kind") if isinstance(row.get("exit"), dict) else None
             squad = squads.get(registration.get("squad_id") or "")
             if exit_kind or zone == league_zones.OUT:
@@ -176,10 +208,14 @@ async def plan(db, season: dict) -> dict:
         zones = league_zones.effective(division, levels)
         teams_here = [row for row in carried if row["target_level"] == division["level"]]
         teams_here.sort(key=lambda row: (row["from_level"] or 0, str(row.get("from_staffel") or ""), int(row.get("rank") or 0)))
+        before = len([row for row in tournaments if row["league_context"].get("division_id") == division["id"]])
         out_divisions.append({"level": division["level"], "label": division_label(division), "zones": zones,
-                              "zones_label": league_zones.summary(zones), "teams": teams_here})
+                              "zones_label": league_zones.summary(zones), "teams": teams_here,
+                              # Platzprüfung (#1627): Bei mehreren Staffeln je Liga N kommen mehr Teams an, als eine Staffel fasst.
+                              "capacity": capacity(season, division, len(teams_here), before)})
     # Die Fassung des Endstands, aus der gerechnet wurde (Nachrichten nach „Übernahme neu berechnen“ tragen sie im Schlüssel).
-    stamp = hashlib.sha1("|".join(sorted(finals)).encode("utf-8")).hexdigest()[:12] if finals else ""
+    # Mit den Entscheiden über Staffeln hinweg (#1627): Ein neuer Entscheid ändert, wer wohin geht - „Übernahme neu berechnen“ merkt es.
+    stamp = hashlib.sha1("|".join(sorted(finals) + sorted(decided)).encode("utf-8")).hexdigest()[:12] if finals else ""
     return {"problems": problems, "divisions": out_divisions, "dropped": dropped, "carried": len(carried), "stamp": stamp}
 
 
@@ -223,6 +259,8 @@ async def preview(db, season: dict) -> dict:
         "loadout_bans": {"version": bans.get("version")} if bans else None,
         "rules": await _rules_source(db, league, season),
         "divisions": found["divisions"],
+        # Platzprüfung (#1627): je Liga N, die mit ihrer bisherigen Staffelzahl nicht auskommt, ein Satz - Hinweis statt stiller Überfüllung.
+        "capacity_hints": [f"{row['label']}: {row['capacity']['text']}" for row in found["divisions"] if not row["capacity"]["fits"]],
         "dropped": found["dropped"],
         "carried": found["carried"],
         "relegation_note": "Relegationsplätze sind vorbereitet: Sie stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.",
@@ -318,7 +356,8 @@ async def _copy_divisions(db, season: dict, doc: dict, actor: dict) -> dict[int,
     for row in rows:
         if row.get("level") in have:
             continue
-        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at")}
+        # Das Los der alten Season (#1623, ``draw``) und ihre Entscheide über Staffeln hinweg (#1627) gehören zu ihr und gehen nicht mit.
+        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at", "draw", "zone_decisions")}
         copy.update({"id": new_id(), "season_id": doc["id"], "league_id": doc["league_id"], "status": "active",
                      "created_at": now, "created_by": actor.get("id"), "updated_at": now})
         try:

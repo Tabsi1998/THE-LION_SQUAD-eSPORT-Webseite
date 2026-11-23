@@ -129,8 +129,9 @@ export function lateEntryText(row) {
 const DECISION_METHOD_NOTES = { playoff: "Platz durch Entscheidungsspiel", lot: "Platz durch Losentscheid", lead: "Platz durch Entscheid der Leitung" };
 
 /** Hinweise an einer Zeile der Staffel-Tabelle: was den Platz entschied, kampflos, Abzug, Ausscheiden. Leer bei
- *  Tabellen ohne diese Felder (andere Turniere). */
-export function standingNotes(row) {
+ *  Tabellen ohne diese Felder (andere Turniere). `labels` (#1559): die Wörter für „was entschied“ - Turnier-Tabellen
+ *  nennen Differenz und Buchholz statt Maps (lib/tournamentTableSettings); ohne Angabe die der Liga. */
+export function standingNotes(row, labels = TIEBREAK_LABELS) {
   const notes = [];
   if (!row) return notes;
   if (row.exit?.kind) notes.push({ key: "exit", tone: "exit", text: EXIT_LABELS[row.exit.kind] || "Ausgeschieden" });
@@ -139,8 +140,8 @@ export function standingNotes(row) {
     // Wie entschieden wurde (F.1, Nr. 156) - ohne Angabe wie bisher „Entscheid der Leitung“.
     const text = DECISION_METHOD_NOTES[row.lead_decision?.method] || DECISION_METHOD_NOTES.lead;
     notes.push({ key: "tiebreak", tone: "decision", text, title: reason ? `Grund: ${reason}` : undefined, reason });
-  } else if (row.tiebreak && TIEBREAK_LABELS[row.tiebreak]) {
-    notes.push({ key: "tiebreak", tone: "tiebreak", text: TIEBREAK_LABELS[row.tiebreak], title: `Bei Punktgleichheit entschied: ${TIEBREAK_LABELS[row.tiebreak]}` });
+  } else if (row.tiebreak && labels[row.tiebreak]) {
+    notes.push({ key: "tiebreak", tone: "tiebreak", text: labels[row.tiebreak], title: `Bei Punktgleichheit entschied: ${labels[row.tiebreak]}` });
   }
   const won = Number(row.forfeit_won) || 0;
   const lost = Number(row.forfeit_lost) || 0;
@@ -186,17 +187,25 @@ export function zonesLine(zones) {
   const parts = [];
   if (zones.top) parts.push("oberste Liga: kein Aufstieg");
   else parts.push(zones.promote ? `${zones.promote} Aufsteiger` : "kein Aufstieg");
+  // Plätze über Staffeln hinweg (#1627): die N besten Nächstplatzierten aller Staffeln, spiegelbildlich vor dem Abstieg.
+  if (zones.promote_best) parts.push(`dazu ${zones.promote_best} ${zones.promote_best === 1 ? "bester Nächstplatzierter" : "beste Nächstplatzierte"} über alle Staffeln`);
   if (zones.playoff_promote) parts.push(`${zones.playoff_promote} Relegation oben`);
   if (zones.playoff_relegate) parts.push(`${zones.playoff_relegate} Relegation unten`);
   if (zones.bottom) parts.push("unterste Liga: kein Abstieg");
   else parts.push(zones.relegate ? `${zones.relegate} Absteiger` : "kein Abstieg");
+  if (zones.relegate_worst) parts.push(`dazu ${zones.relegate_worst} ${zones.relegate_worst === 1 ? "schlechtester Platz" : "schlechteste Plätze"} vor dem Abstieg über alle Staffeln`);
   return parts.join(" · ");
 }
+
+// Zielregel über Staffeln hinweg (#1627): zusätzliche Plätze über alle Staffeln der Liga - fehlen sie, gilt nichts davon.
+export const ZONE_CROSS_FIELDS = ["promote_best", "relegate_worst"];
 
 /** Die Zonen einer Liga N als Formularwerte (Texte für Zahlenfelder) - fehlt ein Wert, gilt 1/1 ohne Relegation. */
 export function zonesToForm(zones) {
   const value = (key, fallback) => String(zones?.[key] ?? fallback);
-  return { promote: value("promote", 1), relegate: value("relegate", 1), playoff_promote: value("playoff_promote", 0), playoff_relegate: value("playoff_relegate", 0) };
+  // Plätze über Staffeln hinweg (#1627) stehen nur im Formular, wenn die Liga sie gesetzt hat - sonst bleibt es, wie es war.
+  const cross = Object.fromEntries(ZONE_CROSS_FIELDS.filter((key) => Number(zones?.[key]) > 0).map((key) => [key, String(zones[key])]));
+  return { promote: value("promote", 1), relegate: value("relegate", 1), playoff_promote: value("playoff_promote", 0), playoff_relegate: value("playoff_relegate", 0), ...cross };
 }
 
 /** Formular → ``zones`` für den Server: ganze Zahlen 0–10, leer heißt Vorgabe. */
@@ -205,5 +214,6 @@ export function zonesPayload(form) {
     const parsed = Number.parseInt(String(text ?? "").trim(), 10);
     return Number.isFinite(parsed) ? Math.min(10, Math.max(0, parsed)) : fallback;
   };
-  return { promote: number(form.promote, 1), relegate: number(form.relegate, 1), playoff_promote: number(form.playoff_promote, 0), playoff_relegate: number(form.playoff_relegate, 0) };
+  const cross = Object.fromEntries(ZONE_CROSS_FIELDS.map((key) => [key, number(form[key], 0)]).filter(([, count]) => count > 0));
+  return { promote: number(form.promote, 1), relegate: number(form.relegate, 1), playoff_promote: number(form.playoff_promote, 0), playoff_relegate: number(form.playoff_relegate, 0), ...cross };
 }

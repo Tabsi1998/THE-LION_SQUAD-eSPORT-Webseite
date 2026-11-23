@@ -18,6 +18,9 @@ const STATE_FILE = process.env.ABNAHME_STATE || path.join(__dirname, "..", "..",
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const state = ENABLED && fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE, "utf8")) : null;
 const SIZES = { desktop: { width: 1440, height: 900 }, handy: { width: 375, height: 812 } };
+// Nur die Knöpfe „Aufrufen“ in den Stationskacheln - der Kasten „Alle aufrufen“ über den Kacheln (#1162) heißt ebenfalls
+// live-call-…, trägt aber keine Station.
+const STATION_CALL = "[data-testid^='live-station-'] [data-testid^='live-call-']";
 // Ein Ergebnis aus dem Ergebnis-Fenster liegt 10 Sekunden mit „Rückgängig“ bereit, dann gilt es.
 const HOLD_MS = 12_000;
 
@@ -206,8 +209,16 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await page.getByTestId("lead-tab-results").click();
     await enterResult(page, open);
     await page.reload();
+    // Vor Ort ist das Cockpit der Einstieg (#1653): Die Auslosung steht dort unter „Probleme“, ein Tipp führt zur Karte
+    // in „Braucht Aufmerksamkeit“ und setzt den Fokus darauf.
+    await expect(page.getByTestId("lead-tab-cockpit")).toHaveAttribute("aria-selected", "true");
+    const problem = page.getByTestId("cockpit-problem-draw-WB:2");
+    await expect(problem).toContainText("Auslosung bereit · 8 Namen");
+    await problem.click();
+    await expect(page.getByTestId("lead-tab-attention")).toHaveAttribute("aria-selected", "true");
     const card = page.getByTestId("lead-draw-WB:2");
     await expect(card).toBeVisible();
+    await expect(card).toBeFocused();
     await expect(card).toContainText("Auslosung bereit · 8 Namen");
     await expect(page.getByTestId("lead-draw-pot-WB:2").locator("li")).toHaveCount(8);
     await expect(page.getByTestId("lead-draw-countdown-WB:2")).toContainText(/automatisch in [1-6] Min\./);
@@ -269,7 +280,7 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     const nexts = board.locator("[data-testid^='live-next-']");
     await expect(board.locator("[data-testid^='live-station-']")).toHaveCount(4);
     // Zwei freie Stationen mit „Aufrufen“ für die bereiten Läufe; die beiden anderen sagen, worauf ihr Lauf wartet.
-    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(2);
+    await expect(board.locator(STATION_CALL)).toHaveCount(2);
     for (const key of readyKeys) await expect(nexts.filter({ hasText: `Durchgang ${key}` })).toHaveCount(1);
     for (const key of waitingKeys) await expect(nexts.filter({ hasText: `Durchgang ${key}` })).toContainText("wartet auf die Auslosung");
     await expect(board).not.toContainText("wartet auf die Vorspiele");
@@ -282,7 +293,7 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     // Für das Handbuch (docs/handbuch/turniere.md, Live vor Ort): die Stationen am PC und am Handy.
     await bilder(page, "stationen-auslosung", board);
     await page.setViewportSize(SIZES.desktop);
-    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(2);
+    await expect(board.locator(STATION_CALL)).toHaveCount(2);
     await shot(page, "show-stationen-waehrend-auslosung-1440.png");
 
     // Nach dem zweiten Los: vier bereite Läufe, vier Stationen, viermal „Aufrufen“ - keiner wartet hinter einem anderen.
@@ -292,13 +303,13 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await expect(page.getByTestId(`lead-draw-${group}`)).toHaveCount(0);
     await page.reload();
     await page.getByTestId("lead-tab-stations").click();
-    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(4);
+    await expect(board.locator(STATION_CALL)).toHaveCount(4);
     shown = await nextUp(page, tid);
     expect(shown.map((entry) => entry.match_key).sort()).toEqual([...readyKeys, ...waitingKeys].sort());
     expect(shown.every((entry) => entry.ready)).toBe(true);
     await shot(page, "show-stationen-nach-auslosung-375.png");
     await page.setViewportSize(SIZES.desktop);
-    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(4);
+    await expect(board.locator(STATION_CALL)).toHaveCount(4);
     await shot(page, "show-stationen-nach-auslosung-1440.png");
     expect(problems).toEqual([]);
   });

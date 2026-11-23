@@ -319,3 +319,18 @@ test("App geht in den Hintergrund: ein wartender Schalter speichert sofort", asy
   spy.mockRestore();
   jest.useRealTimers();
 });
+
+// „Fehler melden“ (#2131 KO9, Nachzug #2173): Kontaktformular mit Thema, Bildschirm und Version - auch für Gäste.
+test("Fehler melden öffnet das Kontaktformular mit Thema, Bildschirm und Version", async () => {
+  mockUser.value = null;
+  const { Linking } = jest.requireActual<typeof import("react-native")>("react-native");
+  const opened = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  await renderSettings();
+  await fireEvent.press(screen.getByTestId("settings-report-bug"));
+  await waitFor(() => expect(opened).toHaveBeenCalled());
+  const url = new URL(String(opened.mock.calls[0][0]));
+  expect(url.pathname).toBe("/contact");
+  expect(url.searchParams.get("topic")).toBe("report_bug");
+  expect(url.searchParams.get("from")).toBe("/app/einstellungen");
+  opened.mockRestore();
+});

@@ -27,6 +27,10 @@ WEB_FAQ = "frontend/src/hilfe/"
 # Gemeinsamer Auswerter der Paket-Audits (#1055): Website- und App-Job rufen ihn samt Selbsttest auf.
 AUDIT_GATE = {"scripts/dependency-audit-gate.cjs", "scripts/dependency-audit-gate.test.mjs"}
 
+# Markdown, aus dem das Prüftor Werte liest (Ziele und Grenzen, #1660). Seine übrigen Eingaben
+# (motion-rules-allowlist.json, e2e/prueftor-bekannt.json) liegen unter frontend/ und zählen ohnehin zum Frontend.
+PRUEFTOR_MARKDOWN = {"frontend/PERFORMANCE_BUDGETS.md"}
+
 # Dateien, die keinen Job brauchen. Der Geheimnis-Scan läuft trotzdem.
 NO_JOB = {".gitignore", "LICENSE", ".editorconfig"}
 
@@ -37,6 +41,9 @@ def areas_for(path: str) -> set[str]:
         return set(AREAS)
     if path in NO_JOB:
         return set()
+    # Markdown, das das Prüftor liest (#1660): Linkprüfung und Tor. Sonst ginge eine höhere Grenze ungeprüft durch.
+    if path in PRUEFTOR_MARKDOWN:
+        return {"backend", "frontend"}
     if path.endswith(".md"):
         return {"backend"}  # Linkprüfung der Dokumentation
 

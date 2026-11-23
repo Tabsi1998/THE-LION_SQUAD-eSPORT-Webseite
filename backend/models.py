@@ -1005,6 +1005,41 @@ BEST_OF_LIMIT = 99
 SEASON_WEIGHT_LIMIT = 10
 MIN_OVER_MAX = "Min. Teilnehmer darf nicht größer als Max. Teilnehmer sein."
 
+# Schweizer System und Tabellen (#1559). Dieselben Werte wie in ``services/graph_swiss.py`` (END_RULES, TIEBREAKERS) und
+# ``services/competition_standings.py`` (TOURNAMENT_TABLE_TIEBREAKERS) - ein Test hält sie beisammen.
+SwissEndRule = Literal["manual", "rounds", "wins_losses"]
+SwissTiebreaker = Literal["median_buchholz", "buchholz", "head_to_head", "wins"]
+TableTiebreaker = Literal["head_to_head", "score_diff", "score_for", "wins"]
+
+
+def _each_once(values):
+    """Eine Reihenfolge nennt jedes Kriterium höchstens einmal - das erste Vorkommen zählt."""
+    if not isinstance(values, (list, tuple)):
+        return values
+    seen = []
+    for value in values:
+        if value not in seen:
+            seen.append(value)
+    return seen
+
+
+class SwissSettings(BaseModel):
+    """Vorgaben für ein Turnier im Schweizer System (#1559) - alles einstellbar, ohne Feld läuft es wie vorher.
+
+    ``end_rule``: ``manual`` (kein festes Ende), ``rounds`` (nach ``rounds`` Runden ist Schluss, leer = nach der Größe des
+    Felds; die besten ``top_n`` kommen weiter) oder ``wins_losses`` (``wins_to_advance`` Siege weiter,
+    ``losses_to_exit`` Niederlagen raus). ``auto_next_round``: die nächste Runde entsteht mit dem letzten Ergebnis der
+    laufenden. ``tiebreakers``: Reihenfolge bei Punktgleichheit - zuerst zählen immer die Punkte."""
+    end_rule: SwissEndRule = "manual"
+    rounds: Optional[int] = Field(default=None, ge=1, le=30)
+    top_n: Optional[int] = Field(default=None, ge=1, le=PARTICIPANT_LIMIT)
+    wins_to_advance: int = Field(default=3, ge=1, le=20)
+    losses_to_exit: int = Field(default=3, ge=1, le=20)
+    auto_next_round: bool = False
+    tiebreakers: List[SwissTiebreaker] = Field(default_factory=lambda: ["buchholz", "wins"], max_length=8)
+
+    _tiebreakers_once = field_validator("tiebreakers", mode="before")(_each_once)
+
 
 class TournamentCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
@@ -1045,6 +1080,11 @@ class TournamentCreate(BaseModel):
     grand_final_mode: Literal["none", "single", "reset"] = "reset"
     # FFA-Läufe zusammenlegen (#1550, Entscheidung E13): Vorschlag für die Turnierleitung (Vorgabe) oder automatisch.
     heat_rebuild_mode: Literal["suggest", "auto"] = "suggest"
+    # Schweizer System (#1559): Abschlussregel, nächste Runde automatisch, Reihenfolge bei Punktgleichheit.
+    swiss_settings: Optional[SwissSettings] = None
+    # Gruppenphase und Jeder gegen jeden (#1559): Reihenfolge bei Punktgleichheit, auch mit direktem Vergleich wie in der
+    # Liga. Leer: wie bisher Siege, dann Differenz.
+    table_tiebreakers: Optional[List[TableTiebreaker]] = Field(default=None, max_length=8)
     # Leer: die Dauer kommt vom Spiel (Modus, #1554), sonst 30 Minuten - siehe services/match_duration.py.
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     # Puffer je Spiel (#1557): kommt auf die Dauer aus Spiel, Phase oder Turnier - siehe services/match_duration.py.
@@ -1101,6 +1141,7 @@ class TournamentCreate(BaseModel):
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
     _strip_title = field_validator("title", mode="before")(_strip_text)
+    _table_tiebreakers_once = field_validator("table_tiebreakers", mode="before")(_each_once)
 
     @model_validator(mode="after")
     def _min_not_over_max(self):
@@ -1150,6 +1191,8 @@ class TournamentUpdate(BaseModel):
     bronze_match: Optional[bool] = None
     grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     heat_rebuild_mode: Optional[Literal["suggest", "auto"]] = None
+    swiss_settings: Optional[SwissSettings] = None
+    table_tiebreakers: Optional[List[TableTiebreaker]] = Field(default=None, max_length=8)
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     match_buffer_minutes: Optional[int] = Field(default=None, ge=0, le=120)
     game_mode: Optional[str] = Field(default=None, max_length=40)
@@ -1189,6 +1232,7 @@ class TournamentUpdate(BaseModel):
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
     _strip_title = field_validator("title", mode="before")(_strip_text)
+    _table_tiebreakers_once = field_validator("table_tiebreakers", mode="before")(_each_once)
 
 
 class RegistrationCreate(BaseModel):
@@ -1717,6 +1761,8 @@ NewsCategory = Literal[
     "video",  # YouTube-Videos des Vereinskanals (#578)
 ]
 NewsVisibility = Literal["public", "community", "members", "internal"]
+# Wo die News erscheint (#1532): Website, App oder beides. Ohne Feld gilt beides (services/news_channels.py).
+NewsChannel = Literal["web", "app"]
 
 
 class NewsCreate(BaseModel):
@@ -1729,6 +1775,7 @@ class NewsCreate(BaseModel):
     video_url: Optional[str] = None
     category: NewsCategory = "club"
     visibility: NewsVisibility = "public"
+    channels: List[NewsChannel] = Field(default_factory=lambda: ["web", "app"], min_length=1, max_length=2)
     published: bool = True
     published_at: Optional[datetime] = None
     # „Jetzt veröffentlichen“ (#2122): den Zeitpunkt setzt der Server, nicht die Uhr des Browsers.
@@ -1756,6 +1803,7 @@ class NewsUpdate(BaseModel):
     video_url: Optional[str] = None
     category: Optional[NewsCategory] = None
     visibility: Optional[NewsVisibility] = None
+    channels: Optional[List[NewsChannel]] = Field(default=None, min_length=1, max_length=2)
     published: Optional[bool] = None
     published_at: Optional[datetime] = None
     publish_now: Optional[bool] = None
@@ -2811,6 +2859,8 @@ class LeagueSeasonFields(LeagueLookFields):
     application_privacy_text: Optional[str] = Field(default=None, max_length=2000)
     entry_policy: Optional[Literal["all", "members"]] = None
     sibling_squads_in_staffel: Optional[bool] = None
+    # Neue Co-Teams starten in der untersten Liga N (#1623): höher nur mit Grund. Fehlt das Feld, teilt die Leitung frei zu.
+    new_squads_lowest_division: Optional[bool] = None
     # Anmeldungen automatisch annehmen (#2348): Vorgabe aus, dann prüft die Leitung jede Anmeldung.
     application_auto_accept: Optional[bool] = None
     # Nachmeldefrist (#2422, Nr. 184): Tage nach dem Season-Start, leer = Vorgabe 14.
@@ -2893,6 +2943,10 @@ class LeagueDivisionZones(BaseModel):
     relegate: Optional[int] = Field(default=None, ge=0, le=10)
     playoff_promote: Optional[int] = Field(default=None, ge=0, le=10)
     playoff_relegate: Optional[int] = Field(default=None, ge=0, le=10)
+    # Zielregel über Staffeln hinweg (#1627): die N besten Nächstplatzierten aller Staffeln steigen zusätzlich auf, spiegelbildlich
+    # beim Abstieg. Fehlt bzw. 0: nur die festen Plätze je Staffel, wie bisher.
+    promote_best: Optional[int] = Field(default=None, ge=0, le=10)
+    relegate_worst: Optional[int] = Field(default=None, ge=0, le=10)
 
 
 class LeagueDivisionCreate(BaseModel):
@@ -2956,6 +3010,19 @@ class LeagueApplicationSubmit(BaseModel):
     accept_privacy: bool = False
 
 
+class LeagueDrawRequest(BaseModel):
+    """Los auf mehrere Staffeln einer Liga N (#1623): Auslosen, neu auslosen, Tausch, Verwerfen, Übernehmen. Was Pflicht ist, prüft der Dienst."""
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+    squad_id: Optional[str] = Field(default=None, max_length=64)
+    other_squad_id: Optional[str] = Field(default=None, max_length=64)
+    fingerprint: Optional[str] = Field(default=None, max_length=64)
+    confirm: Optional[bool] = None
+    # Notausnahme des Superadmins, wenn sein eigenes Team im Los steht (Nr. 73).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class LeagueApplicationDecision(BaseModel):
     """Entscheidung der Leitung über einen Antrag (#2205). Was davon Pflicht ist, prüft der Liga-Service."""
     model_config = ConfigDict(extra="forbid")
@@ -2964,5 +3031,5 @@ class LeagueApplicationDecision(BaseModel):
     tournament_id: Optional[str] = Field(default=None, max_length=64)
     # Notausnahme des Superadmins beim eigenen Team (#2245): Pflicht ab fünf Zeichen, sonst nicht gebraucht.
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
-    # Übernommenes Co-Team (F.2, #1627) in eine Staffel einer anderen Liga N: Pflichtgrund.
+    # Übernommenes Co-Team (F.2, #1627) in eine andere Liga N, neues Co-Team in eine höhere als die unterste (#1623): Pflichtgrund.
     deviation_reason: Optional[str] = Field(default=None, max_length=500)

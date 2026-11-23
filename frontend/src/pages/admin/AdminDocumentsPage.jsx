@@ -111,7 +111,7 @@ export default function AdminDocumentsPage() {
                     {d.pinned && <Pin className="w-3 h-3 shrink-0 text-honor" />}
                     <span className="break-words">{d.title}</span>
                   </div>
-                  <div className="text-[11px] text-white/50 truncate">{d.original_filename}</div>
+                  <div className="text-[11px] text-white/50 tls-wrap">{d.original_filename}</div>
                 </div>
                 <VisibilityBadge value={d.visibility} />
               </div>
@@ -146,7 +146,7 @@ export default function AdminDocumentsPage() {
                         {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
                         {d.title}
                       </div>
-                      <div className="text-[11px] text-white/50 truncate max-w-xs">{d.original_filename}</div>
+                      <div className="text-[11px] text-white/50 tls-wrap max-w-xs">{d.original_filename}</div>
                     </td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{CATEGORY_LABELS[d.category] || "Sonstiges"}</td>
                     <td className="px-4 py-3"><VisibilityBadge value={d.visibility} /></td>

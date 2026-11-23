@@ -57,15 +57,19 @@ function persons(count) {
 }
 
 /** Die Rückfrage vor dem Veröffentlichen: was hinausgeht und wann. */
-export function publishQuestion({ mode, whenText = "", audience = null, sentAt = "", sentText = "", discord = null }) {
+export function publishQuestion({ mode, whenText = "", audience = null, sentAt = "", sentText = "", discord = null, appOnly = false, appPush = false }) {
   const scheduled = mode === "scheduled";
   const lines = [];
-  if (sentAt) lines.push(`Der Newsletter ging schon${sentText ? ` am ${sentText}` : ""} hinaus – kein zweites Mal.`);
+  // „Nur App“ (#1532): die Mail führte zur Website, die den Beitrag nicht zeigt - also keine.
+  if (appOnly) lines.push("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+  else if (sentAt) lines.push(`Der Newsletter ging schon${sentText ? ` am ${sentText}` : ""} hinaus – kein zweites Mal.`);
   else if (audience?.internal) lines.push("Kein Newsletter – „Nur intern“ geht nicht per Mail hinaus.");
   else if (audience) lines.push(scheduled
     ? `Zum Termin geht der Newsletter an ${persons(audience.recipients)} mit Newsletter-Zustimmung (Stand jetzt).`
     : `Der Newsletter geht sofort an ${persons(audience.recipients)} mit Newsletter-Zustimmung.`);
   else lines.push(scheduled ? "Zum Termin geht der Newsletter an alle mit Newsletter-Zustimmung." : "Der Newsletter geht sofort an alle mit Newsletter-Zustimmung.");
+  // Öffentlich und „nur App“ (#1532): ein Push an alle App-Nutzer mit Zustimmung - einmal beim Veröffentlichen.
+  if (appPush) lines.push("Die App schickt einen Push an alle App-Nutzer mit Zustimmung für „News & Events“.");
   if (audience?.announcement && audience.visibility && audience.visibility !== "public" && audience.visibility !== "community") lines.push(audience.announcement);
   if (discord === true) lines.push(scheduled ? "Discord bekommt zum Termin eine Meldung." : "Discord bekommt eine Meldung.");
   if (discord === false) lines.push("Keine Meldung auf Discord.");

@@ -23,7 +23,7 @@ export function SeriesDutyList({ rows, testId = "duty-series" }) {
           <div className="mt-1 min-w-0 flex-1 md:mt-0">
             <div className="flex items-center gap-2 min-w-0">
               <ListOrdered className="w-4 h-4 shrink-0 text-white/45" aria-hidden="true" />
-              <span className="font-heading font-bold text-white truncate">{row.title || row.lineage_title}</span>
+              <span className="font-heading font-bold text-white tls-wrap">{row.title || row.lineage_title}</span>
               <span className="shrink-0 text-[10px] uppercase tracking-widest text-white/40">{KIND_LABELS[row.lineage_kind] || "Serie"}</span>
             </div>
             <div className="mt-1 text-sm text-white/60">

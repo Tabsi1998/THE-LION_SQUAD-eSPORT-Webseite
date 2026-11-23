@@ -19,6 +19,7 @@ export const SKIP_REASONS = {
   bot_off: "Der Bot ist aus – ohne Bot wird nichts gesendet (Verbindungen → Discord → „Bot verbinden“).",
   no_channel: "Für dieses Ziel ist kein Kanal gewählt (Verbindungen → Discord → Kanäle je Zweck).",
   too_old: "Schon länger veröffentlicht – Altes wird nicht nachträglich gemeldet.",
+  app_only: "„Nur App“ – der Link der Meldung führte zur Website, die den Beitrag nicht zeigt. Es wird nichts gesendet.",
 };
 const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere", members: "Mitglieder (privat)", board: "Vorstand (privat)" };
 // Discord-Termin (#570): warum keiner entsteht - Texte vom Server, hier nur der Rückfall.

@@ -192,7 +192,7 @@ export default function AdminMembershipApplicationsPage() {
             <li key={a.id} className="border border-white/10 bg-[#121212] rounded-sm p-3 space-y-2" data-testid={`app-card-${a.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{a.user_display_name || a.user_username}</div>
+                  <div className="font-semibold tls-wrap">{a.user_display_name || a.user_username}</div>
                   <div className="text-xs text-white/45">{wish(a)} · eingereicht {day(a.created_at)}</div>
                 </div>
                 <StateBadge state={state} testId={`app-card-state-${a.id}`} />

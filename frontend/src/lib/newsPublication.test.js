@@ -51,3 +51,14 @@ test("Stand in der Liste: zurückgezogen vor Entwurf vor geplant", () => {
   expect(newsPublicationState({ published: true, published_at: "2026-11-01T00:00:00Z" }, NOW).key).toBe("scheduled");
   expect(newsPublicationState({ published: true, published_at: "2026-10-01T00:00:00Z" }, NOW).key).toBe("published");
 });
+
+test("Rückfrage bei „nur App“ (#1532): kein Newsletter, auch wenn sonst Empfänger da wären", () => {
+  expect(publishQuestion({ mode: "now", appOnly: true, audience: { recipients: 40, visibility: "public" }, discord: false }).description)
+    .toBe("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus. Keine Meldung auf Discord.");
+  expect(publishQuestion({ mode: "scheduled", appOnly: true }).description).toBe("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+});
+
+test("Rückfrage bei „nur App“ und öffentlich (#1532): App-Push an alle App-Nutzer mit Zustimmung", () => {
+  expect(publishQuestion({ mode: "now", appOnly: true, appPush: true, discord: false }).description)
+    .toBe("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus. Die App schickt einen Push an alle App-Nutzer mit Zustimmung für „News & Events“. Keine Meldung auf Discord.");
+});

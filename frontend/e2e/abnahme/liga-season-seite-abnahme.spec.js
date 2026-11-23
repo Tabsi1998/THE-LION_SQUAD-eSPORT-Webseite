@@ -8,6 +8,8 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // Liga 2 mit je einer gestarteten Staffel, Spieltag 1 und 2 mit Ergebnissen (Maps, kampflos, wiederholte Map, „in Klärung“) und
 // Logos. Dazu die Season der Selbstanmeldung (nur eine Staffel im Entwurf): für Gäste der Platzhalter vor der Einteilung.
 // Bei 390 und 1440 px ohne seitliches Scrollen und ohne Konsolenfehler; die TV-Ansicht einer Staffel lädt.
+// Die Markierung darunter lässt scripts/run_abnahme_all.sh mit --schaufenster seeden und diese Spec zuletzt laufen (#2529).
+// abnahme:schaufenster
 
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 const WIDTHS = [[390, 844], [1440, 900]];

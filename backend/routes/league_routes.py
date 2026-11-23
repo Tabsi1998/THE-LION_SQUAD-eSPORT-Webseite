@@ -132,15 +132,19 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
     season = await _call(leagues.get_season(db, season_id))
     league = await _call(leagues.get_league(db, season["league_id"]))
     game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0}) if league.get("game_id") else None
-    divisions = await db.league_divisions.find({"season_id": season_id}, {"_id": 0}).sort("level", 1).to_list(50)
+    # Ohne das Los (#1623, ``draw``) und die Entscheide über Staffeln hinweg (#1627): Die liefern ``…/draws`` bzw. ``…/closing``.
+    divisions = await db.league_divisions.find({"season_id": season_id}, {"_id": 0, "draw": 0, "zone_decisions": 0}).sort("level", 1).to_list(50)
     staffeln = await leagues.staffeln_of(db, season_id)
     pool = await map_pools.current(db, "league_season", season_id)
     rows = []
     levels = sorted({row["level"] for row in divisions if row.get("status") != "archived" and isinstance(row.get("level"), int)})
+    # Plätze über Staffeln hinweg (#1627, Nr. 228): ab dem ersten Abschluss einer Staffel der Liga N gesperrt.
+    locked = await leagues.cross_zones_locked(db, [row["id"] for row in divisions])
     for division in divisions:
         settings = leagues.effective_settings(season, division)
         zones = league_zones.effective(division, levels)
         rows.append({
+            "zones_cross_locked": division["id"] in locked,
             **division, "label": leagues.division_label(division),
             # Auf- und Abstieg (F.2, #1627): eingestellt (``zones``) und was gilt (oberste ohne Aufstieg, unterste ohne Abstieg).
             "zones": league_zones.settings_of(division), "zones_effective": zones, "zones_label": league_zones.summary(zones),
@@ -151,6 +155,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         })
     return {
         "capabilities": sorted(await capabilities_of(db, me, league["id"])),
+        # Nr. 231: Sobald eine Staffel der Season abgeschlossen ist, lässt sich keine Liga N mehr anlegen, archivieren oder löschen.
+        "divisions_locked": bool(locked),
         "league": league, "season": season, "game": map_pools.game_summary(game),
         # Gestaltung (#2107): was die Ligaseite zeigt - für die Vorschau mit dem Erbe der Liga.
         "look": league_look.effective(league, season),
@@ -715,7 +721,8 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
-    return {**doc, "warnings": warnings}
+    # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
+    return {**{key: value for key, value in doc.items() if key not in ("draw", "zone_decisions")}, "warnings": warnings}
 
 
 @admin_router.get("/divisions/{division_id}/delete-plan")

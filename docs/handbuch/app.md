@@ -59,7 +59,9 @@ Die technische Seite (Bauen, Signieren, Hochladen in die Play Console) steht in 
 
 ### 2.2 Erstes Anmelden am Handy
 
-1. App öffnen: Die App startet **ohne Konto** auf der Startseite mit allem Öffentlichen (Turniere, Events, News).
+1. App öffnen: Die App startet **ohne Konto** auf der Startseite mit allem Öffentlichen (Turniere, Events, News). News, die die
+   Redaktion auf **Nur Website** gestellt hat, stehen nicht in der App; News **Nur App** gibt es nur hier
+   ([Inhalte](inhalte.md#news-nur-in-der-app-oder-nur-auf-der-website)).
 2. Beim ersten Start erscheint nach ein paar Sekunden einmal der Hinweis zum Anmelden. Sonst: Tab **Profil** → **Anmelden**.
 3. Mit **E-Mail und Passwort** anmelden, oder **Mit Passkey anmelden** (Fingerabdruck oder Gesicht). Hat die Person Zwei-Faktor eingerichtet, fragt die App nach
    dem **MFA- oder Wiederherstellungscode**.
@@ -86,6 +88,11 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Anmeldung zu Turnieren, Check-in, Ergebnis melden und bestätigen, Problem melden | im Turnier bzw. Match |
 | „Du bist dran“-Aufruf und Spielstart-Zähler | Push, Match |
 | Liga-Spieltag: Check-in mit Anwesenden, Map-Veto live (Sperren, Wählen, „Bereit zum Veto“), Spiel starten; der Stand steht als Schild im Kopf der Matchseite | Match |
+| Liga-Ergebnis mit Maps (#2173): je Map Modus und Map – nach dem Veto fest –, Punkte (der Sieger ergibt sich daraus), die Regel des Modus als Hinweis und die eigene Aufstellung bzw. „Wer hat gespielt?“; die Gegenseite bestätigt mit ihrer Aufstellung. Melden und bestätigen dürfen Captain und Vertreter | Match → Ergebnis melden |
+| Vorfälle im Spiel (#2173): Verbindungsabbruch, Rehost, Pause usw. Schritt für Schritt melden (Map, was passiert ist, Stand, Vorschlag), zustimmen oder mit Grund ablehnen, zurückziehen, Nachweise (Foto, Video-Link) anhängen; Countdown der Antwortzeit. Öffentlich steht nur „Map N ist in Klärung“ | Match → Vorfälle im Spiel |
+| Verfahren (#2173): „Problem melden“ führt in der Liga durch Beanstandung bzw. Protest (Grund, Ergebnis aus eurer Sicht, Pflichtfrage, Begründung, danach Nachweise); das eigene Verfahren ergänzen oder zurückziehen, als Gegenseite Stellung nehmen, Einspruch gegen Entscheid, Wertung kampflos oder Korrektur | Match |
+| Strafen der Liga gegen dich oder dein Co-Team mit Stand und Einspruch (#2173) | Profil → Nur für dich |
+| „Fehler melden“ mit Bildschirm und App-Version, „Frage zu einer Rechnung“ (#2173) – beides öffnet das Kontaktformular der Website mit dem passenden Thema | Einstellungen → Über die App, Fehlerseite der App; Meine Rechnungen |
 | Liga-Tabelle mit Zonen für Auf- und Abstieg, Endstand und Meister, „Nachgemeldet ab Woche X“ an nachgemeldeten Co-Teams | Turnier → Tabelle |
 | Anmeldefenster der Season mit dem wirksamen Ende (Nachmeldefrist) und der Weg zur Gesamtwertung | Turnier einer Liga-Staffel → Übersicht |
 | Gesamtwertung je Liga N: Co-Teams und Spieler, Punkte je Season zum Aufklappen, Staffelsieg, Streichergebnis, Gesamtsieger erst beim Endstand; PDF | Liga-Staffel, Profil oder Team → Gesamtwertung |
@@ -115,9 +122,10 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 - **Auskunft und Datenexport** („Meine Daten“) – die App öffnet dafür die Website.
 - **Bezahlen** – Zahlungslinks öffnen im Browser, bezahlt wird nicht in der App.
 - **In Teams:** Captain und Vertreter vergeben, Beitrittscode erneuern, öffentlich/privat schalten und ein aufgelöstes Team
-  wiederherstellen ([Teams](teams.md)). Das Spiel eines Co-Teams tippt die App noch von Hand ein; ein Name, den die Website nicht kennt, wird abgelehnt.
-- **In der Liga:** mit einem Co-Team anmelden, die Ligaseite, Vorfälle, Verfahren, Ergebnis mit Maps melden und alle Eingriffe der
-  Liga-Leitung (für eine Seite eintragen, Veto pausieren oder neu starten) – die App zeigt dafür einen Satz mit dem Weg ins Web
+  wiederherstellen ([Teams](teams.md)). Das Spiel eines Co-Teams wählst du in der App aus der Spieleliste wie im Web.
+- **In der Liga:** mit einem Co-Team anmelden, die Ligaseite, die Aufstellung nachtragen, die MOSS-Datei (ZIP) hochladen und alle
+  Eingriffe der Liga-Leitung (für eine Seite eintragen, Veto pausieren oder neu starten, Vorfälle entscheiden und die Serie
+  feststellen, Verfahren übernehmen und entscheiden) – die App zeigt dafür einen Satz mit dem Weg ins Web
   ([Liga für Captains](liga-captains.md)).
 - **In der Turnierleitung:** Check-in vor Ort, an den Stationen „Umlegen“, „Station räumen“, „Anderes Spiel aufrufen“ und
   „Alle freien Stationen aufrufen“ sowie beim Hinweis „Turnier gleich pausieren“ – dafür die Turnierleitung im Web öffnen.

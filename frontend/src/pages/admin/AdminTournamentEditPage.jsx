@@ -25,6 +25,7 @@ import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournament
 import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
+import { swissStateText } from "@/lib/tournamentTableSettings";
 import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, bracketFixed, fixedRegistrationIds, guardDetail, matchImpact, normalizeSearch, primaryTournamentAction, swissUndoInfo } from "./tournament/shared";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
@@ -530,7 +531,7 @@ export default function AdminTournamentEditPage() {
                 <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
               </button>
             )}
-            {isTournamentLead && t.format === "swiss" && !tournamentOver && (
+            {isTournamentLead && t.format === "swiss" && !tournamentOver && !bracket?.swiss?.complete && (
               <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Schweizer Runde</button>
             )}
             {isTournamentLead && swissUndo && (
@@ -552,6 +553,13 @@ export default function AdminTournamentEditPage() {
             )}
           </div>
         </div>
+
+        {/* Schweizer System (#1559): Runde X von Y, abgeschlossen, automatisch - der Stand kommt mit dem Baum vom Server. */}
+        {t.format === "swiss" && swissStateText(bracket?.swiss) && (
+          <p className="text-sm text-white/70" role="status" data-testid="admin-tr-swiss-state" data-complete={bracket.swiss.complete ? "true" : undefined}>
+            {swissStateText(bracket.swiss)}
+          </p>
+        )}
 
         {/* Läufe umbauen (#1550): der Vorschlag des Servers, solange er offen ist - über allen Reitern sichtbar. */}
         <HeatRebuildBar tournament={t} onDecided={load} />

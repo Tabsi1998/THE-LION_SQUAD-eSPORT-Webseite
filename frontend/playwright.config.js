@@ -1,4 +1,11 @@
 const { defineConfig, devices } = require("@playwright/test");
+const { LADEZEIT_SPEC, PRUEFTOR_SPECS } = require("./e2e/prueftor-specs");
+
+// Prüftor (#1660): Die Ladezeit misst nur gegen das gebaute dist (playwright.prueftor.config.js). Mit
+// E2E_OHNE_PRUEFTOR=1 (Browser-Teile der CI) fehlen auch die übrigen Tor-Tests - die laufen dort im Job „Prüftor“.
+const prueftorIgnore = process.env.E2E_OHNE_PRUEFTOR === "1"
+  ? PRUEFTOR_SPECS.map((spec) => `**/${spec.file}`)
+  : [`**/${LADEZEIT_SPEC}`];
 
 const localPort = process.env.E2E_PORT || "3000";
 const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${localPort}`;
@@ -7,7 +14,7 @@ module.exports = defineConfig({
   testDir: "./e2e",
   // Die Liga-Gesamtabnahme (#1632) braucht echtes Backend und MongoDB und läuft nachts in eigenem Workflow
   // (scripts/run_liga_g1.sh) - in den normalen Browser-Teilen der CI ist sie nicht einmal aufgelistet.
-  testIgnore: process.env.LIGA_ABNAHME === "1" ? [] : ["**/liga-abnahme/**"],
+  testIgnore: [...(process.env.LIGA_ABNAHME === "1" ? [] : ["**/liga-abnahme/**"]), ...prueftorIgnore],
   timeout: 45_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,

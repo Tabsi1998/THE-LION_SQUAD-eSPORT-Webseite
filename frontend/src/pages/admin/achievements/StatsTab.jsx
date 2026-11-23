@@ -62,7 +62,7 @@ export function StatsTab() {
             {data.top.map((row) => (
               <li key={row.id || row.user_id || row.rank} className="py-1.5 flex items-center gap-3 text-sm">
                 <span className="w-6 font-heading font-black tabular-nums" style={{ color: row.rank === 1 ? "#FFD700" : "rgba(255,255,255,0.5)" }}>{row.rank}</span>
-                <span className="flex-1 truncate">{personName(row)}</span>
+                <span className="flex-1 tls-wrap">{personName(row)}</span>
                 <span className="text-[11px] text-white/45 tabular-nums">{row.count} Erfolge · Level {row.level}</span>
                 <span className="font-bold tabular-nums text-[#FFD700]">{Number(row.points || 0).toLocaleString("de-DE")}</span>
               </li>

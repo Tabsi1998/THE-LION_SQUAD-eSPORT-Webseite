@@ -51,7 +51,8 @@ export function upcomingLine(row?: TeamUpcoming | null): string {
 
 // Wappen-Kopf (#1347): Rollen in Alltagsworten unter den Gesichtern - wie im Web.
 export type TeamRole = "captain" | "co_captain" | "player";
-export const ROLE_LABELS: Record<TeamRole, string> = { captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" };
+// Begriffe wie im Web (#2128 TM1/TM2, Nachzug #2173): Teamleitung, Co-Leitung, Mitglied - die Schlüssel bleiben.
+export const ROLE_LABELS: Record<TeamRole, string> = { captain: "Teamleitung", co_captain: "Co-Leitung", player: "Mitglied" };
 
 type FaceTeam = { leader_id?: string | null; co_leader_ids?: string[] | null; members?: Array<{ id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null }> | null };
 
@@ -80,13 +81,37 @@ export function initials(name?: string | null): string {
   return text.slice(0, 2).toUpperCase();
 }
 
-// Team auflösen (#1274): derselbe Satz wie im Web - Mitglieder, Chat und kommende Turnier-Anmeldungen.
+// Länge von Teamname und Kürzel (#2128, TM11) - dieselben Grenzen wie im Server (models.py) und im Web (teamPage.js).
+export const TEAM_NAME_MIN = 2;
+export const TEAM_NAME_MAX = 60;
+export const TEAM_TAG_MIN = 2;
+export const TEAM_TAG_MAX = 8;
+
+/**
+ * Was an Name oder Kürzel nicht passt - der Satz für die Seite, sonst `null`. Wie der Server (`_team_label`): Ein älterer, unveränderter
+ * Wert (`current`, getrimmt verglichen) bleibt gültig, auch außerhalb der Grenzen - geprüft wird nur, was sich ändert.
+ */
+export function teamFieldsProblem(name?: string | null, tag?: string | null, current?: { name?: string | null; tag?: string | null } | null): string | null {
+  const outside = (value: string | null | undefined, before: string | null | undefined, low: number, high: number) => {
+    const text = String(value || "").trim();
+    if (current && text === String(before || "").trim()) return false;
+    return text.length < low || text.length > high;
+  };
+  if (outside(name, current?.name, TEAM_NAME_MIN, TEAM_NAME_MAX)) return `Name: ${TEAM_NAME_MIN} bis ${TEAM_NAME_MAX} Zeichen.`;
+  if (outside(tag, current?.tag, TEAM_TAG_MIN, TEAM_TAG_MAX)) return `Kürzel: ${TEAM_TAG_MIN} bis ${TEAM_TAG_MAX} Zeichen.`;
+  return null;
+}
+
+// Team auflösen (#1274): derselbe Satz wie im Web - Mitglieder, Chat und kommende Turnier-Anmeldungen, dazu seit #2128
+// die Frist zum Wiederherstellen (frontend/src/lib/teamPage.js).
 export type DissolvePreview = {
   member_count?: number;
   chat_messages?: number;
   withdraw?: Array<{ registration_id?: string; tournament_id?: string; slug?: string | null; title: string }>;
   blocked?: Array<{ registration_id?: string; tournament_id?: string; slug?: string | null; title: string; reason?: string }>;
   can_dissolve?: boolean;
+  // Wie lange sich das Team wiederherstellen lässt (#2128) - ältere Server schicken es nicht.
+  restore_days?: number | null;
 };
 
 export function dissolveSentence(preview?: DissolvePreview | null): string {
@@ -95,13 +120,15 @@ export function dissolveSentence(preview?: DissolvePreview | null): string {
   const chat = Number(preview.chat_messages || 0);
   const parts = [
     members === 1 ? "Das Mitglied verliert das Team" : `Alle ${members} Mitglieder verlieren das Team`,
-    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} wird gelöscht` : "der Team-Chat wird gelöscht",
+    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} ist nicht mehr erreichbar` : "der Team-Chat ist nicht mehr erreichbar",
   ];
   const titles = (preview.withdraw || []).map((row) => `„${row.title}“`);
   if (titles.length === 1) parts.push(`die Anmeldung für ${titles[0]} wird zurückgezogen`);
   if (titles.length > 1) parts.push(`die Anmeldungen für ${titles.slice(0, -1).join(", ")} und ${titles[titles.length - 1]} werden zurückgezogen`);
   const last = parts.pop();
-  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.`;
+  const days = Number(preview.restore_days || 0);
+  const undo = days ? ` ${days} Tage lang lässt sich das Team wiederherstellen (zurückgezogene Anmeldungen bleiben zurückgezogen), danach ist es endgültig weg.` : "";
+  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.${undo}`;
 }
 
 export function sameTeamName(team: { name?: string | null } | null | undefined, typed?: string | null): boolean {

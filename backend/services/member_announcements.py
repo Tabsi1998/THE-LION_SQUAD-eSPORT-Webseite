@@ -77,6 +77,7 @@ async def recipients_for(db, visibility: str | None) -> set[str]:
 
 
 async def _notify(db, collection, item: dict, *, title: str, body: str, url: str, kind_base: str) -> dict:
+    from services.news_channels import notification_meta
     from services.user_notifications import create_user_notification
 
     visibility = item.get("visibility") or "public"
@@ -85,7 +86,9 @@ async def _notify(db, collection, item: dict, *, title: str, body: str, url: str
     for user_id in sorted(recipients):
         created = await create_user_notification(
             user_id, title, body, url=url, kind=f"{kind_base}_{KINDS.get(visibility, 'member')}",
-            meta={"category": "club_internal", "dedupe_key": f"{kind_base}:{item['id']}", "item_id": item["id"], "visibility": visibility},
+            # Kanal der News (#1532): „nur App“ ohne Browser und Discord, „nur Website“ ohne App-Push - Events haben keinen.
+            meta={"category": "club_internal", "dedupe_key": f"{kind_base}:{item['id']}", "item_id": item["id"], "visibility": visibility,
+                  **notification_meta(item)},
         )
         if created:
             sent += 1
@@ -93,8 +96,67 @@ async def _notify(db, collection, item: dict, *, title: str, body: str, url: str
     return {"visibility": visibility, "recipients": len(recipients), "sent": sent}
 
 
+# Öffentliche News „nur App“ (#1532, Fabian 23.11.): beim Veröffentlichen ein App-Push an alle App-Nutzer mit Zustimmung
+# für „News & Events“. Sichtbarkeit „Mitglieder“ und „intern“ gehen den Weg oben (Meldung an Berechtigte).
+APP_NEWS_VISIBILITIES = (None, "public", "community")
+
+
+async def app_push_user_ids(db) -> list[str]:
+    """Wer die App mit Push nutzt und „News & Events“ per Push bekommen will - ohne Zustimmung niemand, auch nicht still
+    ins Postfach."""
+    from services.notification_preferences import push_allowed
+
+    token_users = await db.mobile_push_tokens.distinct("user_id", {"enabled": {"$ne": False}})
+    if not token_users:
+        return []
+    users = await db.users.find(
+        {"id": {"$in": token_users}, "is_active": True, "is_banned": {"$ne": True}},
+        {"_id": 0, "id": 1, "notification_preferences": 1, "newsletter_consent": 1},
+    ).to_list(len(token_users))
+    return sorted(user["id"] for user in users if push_allowed(user, "news_app", "news_events"))
+
+
+async def notify_app_news(db, limit: int = 20) -> dict:
+    """Je öffentliche News „nur App“ genau einmal: der Beitrag wird zuerst als erledigt markiert (zwei Läufe gleichzeitig
+    schicken nichts doppelt), dann je Person eine Meldung mit eindeutigem Schlüssel - Ruhezeiten gelten wie überall."""
+    from services.news_channels import notification_meta, only_channel
+    from services.news_publish import published_now
+    from services.user_notifications import create_user_notification
+
+    now_iso = now_utc().isoformat()
+    cutoff = (now_utc() - timedelta(hours=MAX_AGE_HOURS)).isoformat()
+    posts = await db.news_posts.find(
+        {"published": True, "published_at": {"$lte": now_iso}, "channels": ["app"],
+         "visibility": {"$in": list(APP_NEWS_VISIBILITIES)}, "app_push_notified_at": {"$exists": False}}, {"_id": 0},
+    ).sort("published_at", 1).to_list(limit)
+    results = []
+    for post in posts:
+        if not published_now(post) or only_channel(post) != "app":
+            continue
+        claimed = await db.news_posts.update_one({"id": post["id"], "app_push_notified_at": {"$exists": False}},
+                                                 {"$set": {"app_push_notified_at": now_iso, "app_push_count": 0}})
+        if not claimed.modified_count:
+            continue
+        if str(post.get("published_at") or "") < cutoff:
+            continue
+        sent = 0
+        slug = post.get("slug") or post["id"]
+        for user_id in await app_push_user_ids(db):
+            created = await create_user_notification(
+                user_id, "Neu in der LionsAPP", str(post.get("title") or "News"), url=f"/news/{slug}", kind="news_app",
+                meta={"category": "news_events", "news_id": post["id"], "slug": post.get("slug"),
+                      "dedupe_key": f"news_app:{post['id']}", "unique_dedupe": True, **notification_meta(post)},
+            )
+            if created:
+                sent += 1
+        await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_count": sent}})
+        results.append({"news_id": post["id"], "sent": sent})
+    return {"items": len(results), "sent": sum(row["sent"] for row in results)}
+
+
 async def notify_due(limit: int = 50) -> dict:
-    """Veröffentlichte, noch nicht gemeldete interne News und Events."""
+    """Veröffentlichte, noch nicht gemeldete interne News und Events. Öffentliche News „nur App“ (#1532) meldet
+    ``notify_app_news`` im selben Minuten-Job."""
     from services.news_publish import published_now
 
     db = get_db()

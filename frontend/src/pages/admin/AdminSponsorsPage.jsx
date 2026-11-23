@@ -134,7 +134,7 @@ export default function AdminSponsorsPage() {
                 )}
                 <div className="min-w-0">
                   <div className={`text-[10px] uppercase tracking-widest font-bold ${TIER_COLORS[s.tier] || "text-white/60"}`}>{TIER_LABELS[s.tier] || s.tier || "—"}</div>
-                  <div className="font-heading text-lg font-bold truncate">{s.name}</div>
+                  <div className="font-heading text-lg font-bold tls-wrap">{s.name}</div>
                   <div className="flex gap-1 mt-1 flex-wrap">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
                       {STATUS_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
@@ -169,7 +169,7 @@ export default function AdminSponsorsPage() {
               </div>
             )}
             {s.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{s.description}</p>}
-            {s.link && <a href={s.link} target="_blank" rel="noreferrer" className="mt-3 block text-xs text-[#29B6E8] hover:underline truncate">{s.link}</a>}
+            {s.link && <a href={s.link} target="_blank" rel="noreferrer" className="mt-3 block text-xs text-[#29B6E8] hover:underline truncate" title={s.link}>{s.link}</a>}
           </div>
         ))}
         {list.length === 0 && <div className="col-span-full text-center py-16 text-white/40 font-display tracking-widest">NOCH KEINE SPONSOREN</div>}

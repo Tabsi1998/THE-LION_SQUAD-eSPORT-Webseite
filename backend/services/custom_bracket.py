@@ -516,6 +516,10 @@ def _auto_groups_schema(slot_count: int, group_count: int) -> str:
 
     Group play is fully known in advance - who meets whom does not depend on
     any result - so it fits the declarative schema without a dynamic generator.
+
+    Heimrecht (#1559): Die Kreismethode stellt den ersten Setzplatz einer Gruppe in jedem Spiel nach vorn. Darum werden
+    die Seiten je Gruppe fair verteilt (``balanced_home``, wie in der Liga mit einfacher Runde) - Paarungen und Spieltage
+    bleiben, jeder hat höchstens ein Heimspiel mehr oder weniger als Auswärtsspiele.
     """
     groups = distribute_into_groups(slot_count, group_count)
     # Eine einzige Gruppe ist keine Gruppenphase, sondern ein Round Robin. Sie
@@ -526,7 +530,7 @@ def _auto_groups_schema(slot_count: int, group_count: int) -> str:
     key_index = 0
     for number, seeds in enumerate(groups, start=1):
         lines.append(f"[{'round_robin' if single else group_section(number)}]")
-        for matchday, pairs in enumerate(_round_robin_rounds(seeds), start=1):
+        for matchday, pairs in enumerate(balanced_home(_round_robin_rounds(seeds)), start=1):
             lines.append(f"# Spieltag {matchday}")
             for left, right in pairs:
                 key = _match_key(key_index)

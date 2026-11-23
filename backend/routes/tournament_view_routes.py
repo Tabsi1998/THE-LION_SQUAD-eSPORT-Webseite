@@ -199,6 +199,11 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
     }
     if table is not None:
         payload["standings"] = table
+    if t.get("format") == "swiss":
+        # Stand des Schweizer Systems (#1559): Runde X von Y, abgeschlossen, automatisch - für Verwaltung und TV, nur Zahlen.
+        from services.swiss_rounds import overview as swiss_overview
+
+        payload["swiss"] = swiss_overview(t, raw_regs, read_model.stage_matches)
     return payload
 
 

@@ -479,6 +479,7 @@ export default function AdminLeagueSeasonPage() {
 
           {divisionSheet ? (
             <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} nextLevel={(data.divisions.at(-1)?.level || 0) + 1}
+              divisionsLocked={Boolean(data.divisions_locked)}
               onClose={() => setDivisionSheet(null)} onSaved={() => { setDivisionSheet(null); reload(); }} />
           ) : null}
           {recomputeOpen ? (

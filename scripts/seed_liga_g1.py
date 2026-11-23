@@ -246,7 +246,7 @@ LEGACY_UNSET = ["lineup_mode", "lineup_min_players", "min_age", "new_player_wait
                 "protest_hours", "statement_hours", "protest_target_hours", "protest_escalate_hours", "appeal_hours",
                 "moss_upload_hours", "evidence_keep_days", "contested_result_mode", "protest_reasons", "rewards", "reward_players",
                 "schedule_rules", "reminder_rules", "entry_policy", "sibling_squads_in_staffel", "application_waitlist",
-                "application_auto_accept"]
+                "application_auto_accept", "new_squads_lowest_division"]
 
 
 async def legacy_season(db, season_id: str | None) -> dict:

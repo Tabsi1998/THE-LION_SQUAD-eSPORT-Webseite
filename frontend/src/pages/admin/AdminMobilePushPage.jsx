@@ -213,15 +213,15 @@ export default function AdminMobilePushPage() {
                 <div className="flex items-start gap-3">
                   <Smartphone className={`w-5 h-5 mt-0.5 ${user.has_enabled_token ? "text-[#29B6E8]" : "text-white/25"}`} />
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold truncate">{userLabel(user)}</div>
-                    <div className="text-xs text-white/45 truncate">
+                    <div className="font-bold tls-wrap">{userLabel(user)}</div>
+                    <div className="text-xs text-white/45 tls-wrap">
                       @{user.username || "-"} · {activeDevices(user.enabled_token_count)}
                       {Number(user.disabled_token_count) > 0 ? <span className="text-white/50"> · {oldDevices(user.disabled_token_count)}</span> : null}
                     </div>
                     <div className="text-[11px] text-white/35 mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
                     {/* Rot nur bei einem Fehler an einem aktiven Gerät (#2467). */}
                     {user.active_error ? (
-                      <div className="text-[11px] text-[#FF6B61] mt-1 truncate" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
+                      <div className="text-[11px] text-[#FF6B61] mt-1 tls-wrap" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
                     ) : null}
                   </div>
                 </div>

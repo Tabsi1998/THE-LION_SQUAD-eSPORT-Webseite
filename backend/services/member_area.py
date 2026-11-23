@@ -67,16 +67,21 @@ def _is_new(value, now: datetime) -> bool:
     return bool(moment and now - timedelta(days=NEW_DAYS) <= moment <= now)
 
 
-async def _news_new(db, user: dict, now: datetime) -> int:
+async def _news_new(db, user: dict, now: datetime, channel: str | None = None) -> int:
+    from services.news_channels import in_channel
+
     count = 0
     async for post in db.news_posts.find({"published": True, "visibility": {"$in": ["members", "internal"]}},
-                                        {"_id": 0, "visibility": 1, "published_at": 1, "created_at": 1}):
+                                        {"_id": 0, "visibility": 1, "published_at": 1, "created_at": 1, "channels": 1}):
+        # Kanal (#1532): Website und App zählen nur die News, die bei ihnen erscheinen.
+        if channel and not in_channel(post, channel):
+            continue
         if _is_new(post.get("published_at") or post.get("created_at"), now) and await user_can_see(user, post.get("visibility")):
             count += 1
     return count
 
 
-async def summary(db, user: dict, *, now: datetime | None = None) -> dict:
+async def summary(db, user: dict, *, now: datetime | None = None, channel: str | None = None) -> dict:
     from routes.document_routes import club_documents_for
 
     now = now or now_utc()
@@ -90,6 +95,6 @@ async def summary(db, user: dict, *, now: datetime | None = None) -> dict:
     return {
         "meetings_open": meetings["open"] + meetings["ballots"], "ballots_open": meetings["ballots"], "next_meeting": meetings["next"],
         "helping_free": helping["free"], "helping_mine": helping["mine"],
-        "news_new": await _news_new(db, user, now),
+        "news_new": await _news_new(db, user, now, channel),
         "documents": len(documents), "documents_new": sum(1 for doc in documents if _is_new(doc.get("created_at"), now)),
     }

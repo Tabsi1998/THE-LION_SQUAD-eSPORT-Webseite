@@ -8,6 +8,8 @@ import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { FormatHint } from "./tournament/FormatHint";
+import { SwissSettingsFields, TableTiebreakField } from "./tournament/TableSettingsFields";
+import { SWISS_RECOMMENDED, TABLE_RECOMMENDED, swissFormError, swissPayload, usesTableTiebreakers } from "@/lib/tournamentTableSettings";
 import { prizeGroupOptions } from "./tournament/PrizeEditor";
 import { STREAM_ADDRESS_HINT, streamPayload } from "@/lib/tournamentStream";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
@@ -78,6 +80,9 @@ export default function AdminTournamentNewPage() {
     auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
     best_of: 1, bronze_match: false, grand_final_mode: "reset", heat_rebuild_mode: "suggest", seeding_mode: "random", advancement_mode: "fixed", draw_show_minutes: "",
+    // Schweizer System und Gleichstand (#1559): Vorgaben für neue Turniere - mitgeschickt nur beim passenden Format.
+    swiss_settings: { ...SWISS_RECOMMENDED, tiebreakers: [...SWISS_RECOMMENDED.tiebreakers] },
+    table_tiebreakers: [...TABLE_RECOMMENDED],
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
     prize_places: [
@@ -137,6 +142,8 @@ export default function AdminTournamentNewPage() {
 
   const submit = async (e) => {
     e.preventDefault();
+    const swissProblem = form.format === "swiss" ? swissFormError(form.swiss_settings) : "";
+    if (swissProblem) { toast.error(swissProblem); return; }
     setSaving(true);
     try {
       const payload = { ...form };
@@ -150,6 +157,9 @@ export default function AdminTournamentNewPage() {
       if (!payload.result_entry_mode) payload.result_entry_mode = null;
       if (!payload.schedule_mode) payload.schedule_mode = null;
       if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
+      // Schweizer System und Gleichstand (#1559): nur beim passenden Format.
+      payload.swiss_settings = payload.format === "swiss" ? swissPayload(payload.swiss_settings) : null;
+      payload.table_tiebreakers = usesTableTiebreakers(payload.format) ? payload.table_tiebreakers : null;
       if (!event) payload.requires_event_registration = false;
       if (payload.event_mode === "local") payload.auto_start_enabled = false;
       // Show-Auslosung (#1590): leer heißt Vorgabe; die Minuten zählen nur in diesem Modus.
@@ -327,6 +337,13 @@ export default function AdminTournamentNewPage() {
           )}
           {HEAT_REBUILD_FORMATS.has(form.format) && (
             <SelectField label="Läufe umbauen" value={form.heat_rebuild_mode} onChange={(v) => set("heat_rebuild_mode", v)} options={HEAT_REBUILD_OPTIONS} hint={HEAT_REBUILD_HINT} testId="new-tr-heat-rebuild" />
+          )}
+          {/* Schweizer System (#1559): Abschlussregel, nächste Runde automatisch, Reihenfolge bei Punktgleichheit. */}
+          {form.format === "swiss" && (
+            <SwissSettingsFields value={form.swiss_settings} onChange={(v) => set("swiss_settings", v)} participants={form.max_participants} testPrefix="new-tr-swiss" />
+          )}
+          {usesTableTiebreakers(form.format) && (
+            <TableTiebreakField value={form.table_tiebreakers} onChange={(v) => set("table_tiebreakers", v)} testPrefix="new-tr-table" />
           )}
         </FormSection>
 

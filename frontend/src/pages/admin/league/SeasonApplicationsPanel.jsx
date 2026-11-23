@@ -29,14 +29,18 @@ function when(value) {
 }
 
 const OTHER_DIVISION = " – andere Liga, nur mit Grund";
+const HIGHER_DIVISION = " – höhere Liga, nur mit Grund";
 
-function staffelOptions(divisions = [], row = null) {
-  // Übernommen aus der Vorgänger-Season (F.2, #1627): zuerst die Staffeln seiner neuen Liga N; die anderen nur mit Grund (der Server prüft es).
+export function staffelOptions(divisions = [], row = null) {
+  // Zuerst die Staffeln der Liga N, in die das Co-Team gehört; die anderen nur mit Grund (der Server prüft es). Übernommen aus der
+  // Vorgänger-Season (F.2, #1627): seine neue Liga N. Neu (#1623): die unterste Liga, wenn die Season es so einstellt
+  // (``target_division_id`` vom Server, sonst leer).
   const label = (division, staffel) => `${division.label} · Staffel ${staffel.staffel} (${staffel.participant_count} von ${staffel.max_participants})`;
-  const target = row?.carry_over?.division_id;
+  const target = row?.carry_over?.division_id || row?.target_division_id;
+  const suffix = row?.carry_over?.division_id ? OTHER_DIVISION : HIGHER_DIVISION;
   return divisions.flatMap((division) => (division.staffeln || []).map((staffel) => {
     const other = Boolean(target) && division.id !== target;
-    return [staffel.tournament_id, `${label(division, staffel)}${other ? OTHER_DIVISION : ""}`, other];
+    return [staffel.tournament_id, `${label(division, staffel)}${other ? suffix : ""}`, other];
   })).sort((left, right) => Number(left[2]) - Number(right[2]));
 }
 
@@ -107,11 +111,14 @@ function RowActions({ row, options, busy, act, superadmin }) {
       ) : <p className="text-xs text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
       {otherDivision ? (
         <TextField label="Grund für die andere Liga" required value={deviation} onChange={setDeviation} maxLength={500} className="max-w-md"
-          hint="Das Co-Team ist in eine andere Liga übernommen. Der Grund steht im Verlauf und im Protokoll." testId={`application-deviation-${row.id}`} />
+          hint={row.carry_over ? "Das Co-Team ist in eine andere Liga übernommen. Der Grund steht im Verlauf und im Protokoll."
+            : "Neue Co-Teams starten in der untersten Liga. Der Grund steht im Verlauf und im Protokoll."} testId={`application-deviation-${row.id}`} />
       ) : null}
       <div className="flex flex-wrap gap-2">
         {deciding ? (
-          <button type="button" disabled={blocked} onClick={() => send("accept", staffel ? { tournament_id: staffel } : {})} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
+          <button type="button" disabled={blocked || (otherDivision && deviation.trim().length < REASON_MIN)}
+            onClick={() => send("accept", staffel ? { tournament_id: staffel, ...(otherDivision ? { deviation_reason: deviation.trim() } : {}) } : {})}
+            className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
         ) : unassigned ? (
           <button type="button" disabled={blocked || !staffel || (otherDivision && deviation.trim().length < REASON_MIN)}
             onClick={() => send("assign", { tournament_id: staffel, ...(otherDivision ? { deviation_reason: deviation.trim() } : {}) })}

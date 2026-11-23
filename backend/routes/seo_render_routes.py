@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from database import get_db
 from services import help_topics, site_texts
 from services.league_scope import league_label
+from services.news_channels import APP_ONLY_MESSAGE, in_channel
 from services.slug_utils import find_by_slug_or_history
 from services.svg_logo import raster_url
 from services.visibility import user_can_see
@@ -167,7 +168,8 @@ async def resolve_slug_redirect(raw_path: str, request: Request) -> str | None:
 
 async def is_redirectable_public_doc(route: str, doc: dict) -> bool:
     if route == "news":
-        return bool(doc.get("published", True) and is_public_visibility(doc) and is_published_now(doc))
+        # „Nur App“ (#1532): die alte Adresse führt nicht auf die neue - die Website zeigt die News ohnehin nicht.
+        return bool(doc.get("published", True) and is_public_visibility(doc) and is_published_now(doc) and in_channel(doc, "web"))
     if route == "events":
         return bool(doc.get("status") != "draft" and is_public_visibility(doc))
     if route == "tournaments":
@@ -321,13 +323,27 @@ def restricted_meta(kind: str, item: dict, base: dict, origin: str, canonical: s
     return meta
 
 
+def app_only_meta(post: dict, base: dict, origin: str, slug: str) -> dict:
+    """Link-Vorschau einer News „nur App“ (#1532): Wer einen Link aus der App teilt, bekommt eine Karte statt nichts -
+    ohne Titel, Text und Bild der News und nie in Suchmaschinen. Die Seite selbst schreibt den Hinweis mit Link zur App."""
+    canonical = f"{origin}/news/{post.get('slug') or slug}"
+    return {**base, "url": canonical, "canonical": canonical, "robots": "noindex, nofollow", "type": "website",
+            "title": f"News in der LionsAPP · {base['site_name']}", "description": APP_ONLY_MESSAGE}
+
+
 async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
     post, _ = await find_by_slug_or_history(db.news_posts, slug, {"_id": 0})
     if not post or not post.get("published", True) or not is_published_now(post):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    on_web = in_channel(post, "web")
     if not is_public_visibility(post):
-        return restricted_meta("news", post, base, origin, f"{origin}/news/{post.get('slug') or slug}",
+        # Zuerst die Sichtbarkeit (#347); eine News nur für die App zeigt dabei nie Titel oder Bild - auch nicht mit der
+        # Freigabe fürs Teilen (#1532).
+        shown = post if on_web else {**post, "share_preview": False}
+        return restricted_meta("news", shown, base, origin, f"{origin}/news/{post.get('slug') or slug}",
                                title=post.get("title"), image=post.get("banner_url"))
+    if not on_web:
+        return app_only_meta(post, base, origin, slug)
     description = seo_description(
         post.get("excerpt") or post.get("content") or post.get("title"),
         prefix=post.get("category") or "News",

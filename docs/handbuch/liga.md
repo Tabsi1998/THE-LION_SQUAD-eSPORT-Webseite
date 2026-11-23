@@ -415,6 +415,20 @@ der Ligaseite weiter, bis die erste Fassung veröffentlicht ist. Gelöscht wird 
    Relegationsplätze. Die oberste Liga hat nie einen Aufstieg, die unterste nie einen Abstieg – das sagt der Satz unter der
    Liga („Auf- und Abstieg: oberste Liga: kein Aufstieg · 1 Absteiger“). Mehr Plätze als Teams in einer Staffel lehnt die Seite
    ab. Die Zonen stehen farbig in der Tabelle (siehe 3.11).
+   **Dazu über alle Staffeln dieser Liga** (die Felder stehen nur bei Ligen mit mehreren Staffeln): Mit **Beste Nächstplatzierte
+   steigen auf** steigen zusätzlich zu den Aufsteigern jeder Staffel die besten Teams auf dem Platz danach auf, etwa „Platz 1 jeder
+   Staffel und die zwei besten Zweiten“. Gibt es Relegationsplätze, ist der Platz **nach** ihnen gemeint: bei einem Aufsteiger und
+   einem Relegationsplatz also der Dritte – kein Team steht in zwei Zonen. **Schlechteste vor dem Abstieg steigen ab** ist das
+   Gegenstück unten. In der obersten Liga gibt es das Feld nach oben nicht, in der untersten das nach unten nicht. Leer oder 0
+   heißt: nur die Plätze je Staffel, wie bisher. Wer es wird, steht erst fest, wenn alle Staffeln der Liga abgeschlossen sind (3.10).
+   **Gesperrt ab dem ersten Abschluss:** Sobald eine Staffel der Liga abgeschlossen ist, sind beide Felder ausgegraut, mit dem
+   Hinweis „Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen.“ Ändern geht erst, wenn **alle abgeschlossenen
+   Staffeln dieser Liga** im Reiter **Abschluss** wieder geöffnet sind. So ändert eine spätere Einstellung nie eine abgeschlossene Season.
+   **Ligen stehen ab dem ersten Abschluss fest:** Sobald in der Season irgendeine Staffel abgeschlossen ist, lässt sich keine Liga
+   mehr anlegen, archivieren oder löschen – der Knopf **Liga N anlegen**, der Papierkorb und das Feld **Stand** sind ausgegraut,
+   darüber steht der Hinweis. Auf- und Abstieg rechnen mit den Ligen, die es beim Abschluss gab (welche die oberste und die unterste
+   ist, wohin es geht). Erst wenn alle abgeschlossenen Staffeln der Season wieder geöffnet sind, geht es wieder. Beiname, Abweichungen
+   und die Zonen je Staffel bleiben änderbar.
 2. In der Zeile von Liga 1 → **Staffel anlegen** → bestätigen. Es entsteht das Turnier „CoD-Liga Season 1 · Liga 1 ·
    Staffel A“ als **Entwurf** – ohne offene Anmeldung, ohne Discord, ohne Jahreswertung. Mehr als acht Teams? Eine
    zweite Staffel (B) anlegen und die Teams verteilen; zwei Co-Teams desselben Hauptteams spielen nie in derselben
@@ -568,9 +582,11 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 | --- | --- |
 | **In Prüfung nehmen** | Das Team sieht „In Prüfung“. Freiwillig |
 | **Annehmen** | Belegt einen Startplatz. Mit gewählter Staffel ist das Co-Team gleich zugeteilt, sonst teilst du später zu |
-| **Zuteilen** | Für Angenommene ohne Staffel. Erst jetzt steht das Team in der Staffel, und der Kader wird noch einmal geprüft |
+| **Zuteilen** | Für Angenommene ohne Staffel. Erst jetzt steht das Team in der Staffel, und der Kader wird noch einmal geprüft. Bei mehreren Staffeln einer Liga geht es für alle auf einmal mit dem Los (2.5b) |
 | **Warteliste** | Kein Startplatz. Rückt nicht von selbst nach: Wird ein Platz frei, nimmst du von Hand an. Eine schon angenommene Anmeldung setzt du nur mit Grund zurück, das Team liest ihn |
 | **Ablehnen** | Nur mit Grund (mindestens fünf Zeichen). Captain und Vertreter lesen ihn. Das Team darf im offenen Fenster neu einreichen |
+
+**Neue Co-Teams starten in der untersten Liga** (Schalter unter **Selbstanmeldung**, bei neuen Seasons an): Gibt es mehrere Ligen, stehen in der Auswahl **Staffel** zuerst die Staffeln der untersten Liga. Die anderen tragen den Zusatz „höhere Liga, nur mit Grund“: Wählst du eine davon, erscheint das Feld **Grund für die andere Liga** (mindestens fünf Zeichen), sonst geht Annehmen bzw. Zuteilen nicht. Der Grund steht im Verlauf der Anmeldung und im Protokoll. Co-Teams aus der Vorgänger-Season behalten ihre Liga aus Auf- und Abstieg (3.11). Schalter aus: Du teilst frei zu. Seasons, die es schon vor dieser Einstellung gab, haben ihn aus.
 
 Hat sich der Kader seit dem Einreichen geändert, sagt das die Anmeldung, und Annehmen oder Zuteilen lehnen mit demselben Satz ab. Sind alle Plätze belegt, geht **Annehmen** nicht mehr. Mit Warteliste nimmt die Season weiter Anmeldungen an, ohne Warteliste endet die Anmeldung.
 
@@ -583,6 +599,55 @@ Passt eine automatisch angenommene Anmeldung nicht, **lehnst du sie ab** oder se
 Teilst du ein Co-Team mit offener Anmeldung über 2.5 direkt zu, gilt die Anmeldung als angenommen. Nimmst du die Zuteilung zurück, bleibt sie angenommen und hält ihren Platz, bis du neu zuteilst oder ablehnst. Zugeteilte zieht niemand per Klick zurück: Den Austritt trägst du in der Teilnehmerliste ein. Ausnahme: Hat die Season das Co-Team automatisch zugeteilt, zieht das Team selbst zurück, solange der Spielplan nicht steht und der Check-in noch nicht begonnen hat. Die Warteliste bleibt dabei, wie sie ist; über den freien Platz entscheidest du.
 
 **Eigenes Team:** Über die Anmeldung deines eigenen Teams entscheidet eine andere Person. Eigenes Team heißt: Du stehst im Kader des Co-Teams, bist Captain oder Vertreter, leitest das Hauptteam mit oder hast den Antrag eingereicht. Dann stehen bei dieser Anmeldung keine Knöpfe, sondern der Satz „Über dein eigenes Team entscheidet eine andere Person.“ Die Anmeldungen der anderen Teams entscheidest du wie gewohnt. Dasselbe gilt für **Co-Team zuteilen** (2.5), wenn das Co-Team eine offene Anmeldung hat. Nur der **Superadmin** darf als Notausnahme: Er trägt bei der Anmeldung einen **Grund für die Notausnahme** ein (mindestens fünf Zeichen), erst dann gehen die Knöpfe. Der Grund steht im Verlauf der Anmeldung und im Protokoll.
+
+### 2.5b Staffeln auslosen
+
+Hat eine Liga mehrere Staffeln, verteilt das Los die angenommenen Co-Teams. Mit nur einer Staffel brauchst du es nicht, dann teilst
+du im Eingang zu (2.5a).
+
+**Wo:** Season-Seite, Reiter **Anmeldung und Kader** → **Staffeln auslosen** (unter dem Eingang). Recht: „Teams freigeben“. Der
+Abschnitt erscheint, sobald eine Liga mehrere Staffeln und wartende Co-Teams hat oder die Teams nicht in die Staffeln passen.
+
+**1. Platzprüfung lesen.** Je Liga steht, wie viele Co-Teams auf eine Staffel warten und ob sie hineinpassen, etwa „9 Co-Teams,
+höchstens 8 je Staffel: 2 Staffeln mit 5 und 4 Teams. Es gibt 1 Staffel – es fehlt 1.“ Gerechnet wird mit „Teams je Staffel
+höchstens“ und den aktiven Wochen der Season. Fehlt eine Staffel: im Reiter **Ligen und Staffeln** anlegen (2.3).
+
+**2. Auslosen.** Der Knopf **Auslosen** öffnet die Vorschau. Noch ist nichts zugeteilt, und kein Team bekommt eine Nachricht.
+
+<img src="../assets/liga/los-vorschau-1440.png" alt="Vorschau des Loses für Liga 1 am PC: Los Nr. 1 mit Seed, darunter Staffel A und Staffel B mit ihren Teams und einem Tausch-Knopf je Team, darunter Neu auslosen, Verwerfen und das Protokoll, unten der Knopf 6 Co-Teams zuteilen" width="720">
+
+- **Gleich große Staffeln:** Der Unterschied ist höchstens ein Team. Wer schon in einer Staffel steht, bleibt dort („schon
+  zugeteilt“), das Los füllt darum herum auf.
+- **Co-Teams eines Hauptteams** stehen nie in derselben Staffel, außer die Season erlaubt es (2.5a). Hat ein Hauptteam mehr Co-Teams
+  als Staffeln, sagt das Los es und verteilt nichts.
+- **Seed:** Die Zeichenfolge unter dem Titel. Dieselben Co-Teams und Staffeln mit demselben Seed ergeben immer dieselbe Verteilung.
+  Neu laden oder ein zweiter Klick auf **Auslosen** würfelt nicht neu.
+- **Wer gelost wird:** Co-Teams aus der Vorgänger-Season in ihrer neuen Liga (3.11), neue Co-Teams in der untersten Liga. Soll ein
+  neues Co-Team höher starten, teilst du es vorher im Eingang von Hand zu, mit Grund (2.5a).
+
+**3. Tauschen (freiwillig).** Der Pfeil neben einem Team öffnet den Tausch: Partner aus einer anderen Staffel wählen, **Grund**
+eintragen (mindestens fünf Zeichen), **Tauschen**. Die Größen bleiben, die Regel für Co-Teams eines Hauptteams wird neu geprüft.
+Getauschte Teams tragen den Vermerk „getauscht“, der Grund steht mit deinem Namen im Protokoll.
+
+**4. Zuteilen.** Der Knopf unten rechts („6 Co-Teams zuteilen“) schreibt die Staffeln fest: Jedes Co-Team steht in seiner Staffel,
+der Kader wird noch einmal geprüft, Captains und Vertreter bekommen die Nachricht wie nach jedem Zuteilen. Passt ein Kader nicht
+mehr, nennt die Meldung Team und Grund, und niemand wird zugeteilt.
+
+| Knopf | Was passiert |
+| --- | --- |
+| **Neu auslosen** | Neuer Seed, neues Los („Los Nr. 2“). Nur mit Grund, er steht im Protokoll |
+| **Verwerfen** | Das Los ist weg, zugeteilt wird von Hand oder mit einem neuen Los. Nur mit Grund |
+| **Schließen** | Die Vorschau bleibt gespeichert, du kannst später weitermachen |
+
+**Veraltet:** Kommt nach dem Auslosen eine Anmeldung dazu, zieht jemand zurück oder ändert sich eine Staffel, steht „veraltet“ am Los.
+Es lässt sich dann nicht mehr zuteilen. **Neu auslosen** geht in diesem Fall ohne Grund.
+
+**Danach** bleibt das Los zum Nachlesen stehen (**Los ansehen**): Seed, Verteilung, Tausche und wer wann was getan hat. Lost du
+später noch einmal, etwa für Nachzügler, bleibt der Verlauf des ersten Loses im Protokoll stehen. Ändern geht
+dann nur noch über die Teilnehmerliste der Staffel. Nicht gelost wird, sobald eine Staffel der Liga begonnen hat oder ihr Spielplan
+steht: Dann teilst du von Hand zu (Nachmeldung, siehe 2.5a).
+
+**Eigenes Team:** Steht dein eigenes Team im Los, lost, tauscht und teilt eine andere Person zu (wie in 2.5a).
 
 ### 2.6 Spielplan und Start
 
@@ -1642,7 +1707,28 @@ jede Zuständigkeit der Liga.
 | Laufende Fristen | abwarten – daneben steht, bis wann die Protest- oder Einspruchsfrist läuft |
 | Gleichstand auf Platz 1 | **Meister entscheiden** (nur in der obersten Liga) |
 | Gleichstand an der Grenze zu Auf- oder Abstieg | **Platz entscheiden** – zwei Teams stehen gleich, aber nur eines käme in die Zone (3.11) |
+| Gleichstand zwischen den Staffeln | weiter unten unter **Plätze über Staffeln hinweg** → **Gleichstand entscheiden** (siehe unten). Kommt nur bei der letzten offenen Staffel einer Liga |
 | Kein Meister | in der obersten Liga steht kein Team mehr in der Wertung – Anmeldungen prüfen |
+
+**Plätze über Staffeln hinweg:** Vergibt eine Liga mit mehreren Staffeln zusätzliche Auf- oder Abstiegsplätze über alle Staffeln
+(2.3), steht unter den Staffeln ein eigener Kasten je Liga. Er zeigt die Kandidaten – je Staffel das Team auf dem ersten Platz
+nach Aufsteigern und Relegation bzw. auf dem letzten davor unten – mit **Punkten je Spiel** und **Map-Differenz je Spiel**. Danach wird verglichen, in dieser
+Reihenfolge; so zählen auch verschieden große Staffeln gleich. Am Team steht „steigt auf“ bzw. „steigt ab“. Solange noch eine
+Staffel der Liga offen ist, ist das der **Stand von jetzt**: Keine Tabelle zeigt die Zone, bevor alle Staffeln abgeschlossen sind.
+Danach steht sie in der Tabelle, am TV, im PDF, in der App und in der Season-Historie.
+
+Stehen Teams an der Grenze nach beidem gleich, meldet der Kasten **Gleichstand**, und die letzte Staffel der Liga lässt sich nicht
+abschließen. **Gleichstand entscheiden** (Recht „Ergebnisse korrigieren“): die Teams anhaken, die den Platz bekommen, die Art
+wählen – **Entscheidungsspiel** oder **Entscheid der Leitung**, ein Los gibt es beim Auf- und Abstieg nicht – und den Grund
+eintragen. Über das eigene Team entscheidet eine andere Person. Nach dem Entscheid steht am gewählten Team „steigt auf“ bzw.
+„steigt ab“, am unterlegenen „bleibt“. **Zurücknehmen** geht mit Grund; dann ist der Gleichstand wieder offen. Auch das macht beim
+eigenen Team eine andere Person – der Knopf fehlt dann. Ein Entscheid gilt für genau diesen Gleichstand: dieselben Teams mit
+denselben Punkten und derselben Map-Differenz je Spiel. Ändert sich nach einem Wiederöffnen eines davon, gilt er nicht mehr, und
+du entscheidest neu. Du darfst schon entscheiden, bevor die letzte Staffel abgeschlossen ist.
+
+**Einer nach dem anderen:** Schließen zwei Personen im selben Moment zwei Staffeln derselben Season ab oder ändert jemand gerade
+eine Liga, bekommt die zweite den Satz „In dieser Season wird gerade eine andere Staffel abgeschlossen oder eine Liga geändert.
+Bitte erneut versuchen.“ Einfach noch einmal abschließen – der zweite Abschluss sieht dann den ersten.
 
 Der Chip an der Staffel zählt die offenen Punkte („4 offen“), **Bereit zum Abschluss** heißt: nichts hält mehr auf. Steht
 **Unvollständig** am Chip, ist ein Abschluss mittendrin abgebrochen: Die Staffel ist gesperrt, einen Endstand gibt es
@@ -1704,6 +1790,13 @@ alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
 - **Teams:** Pfeil hinauf = Aufstieg, hinunter = Abstieg, Strich = bleibt. Das ergibt sich ohne Bestätigung aus dem Endstand:
   oben die Aufsteiger, unten die Absteiger je Staffel. Ausgetretene und Disqualifizierte stehen hinten, belegen zuerst die
   Abstiegsplätze und sind **nicht dabei** (Liste unten). Ein Co-Team, das es nicht mehr gibt, fällt ebenfalls heraus.
+- **Über den Vergleich der Staffeln:** Wer als bester Nächstplatzierter aufsteigt (2.3, 3.10), steht mit „Aufstieg als bester
+  Nächstplatzierter“ da. Ist dort noch ein Gleichstand offen, nennt die Vorschau ihn, und Anlegen geht erst nach dem Entscheid.
+- **Platzprüfung:** Unter jeder Liga steht, ob ihre Teams in die Staffeln passen, die es bisher gab. Auf- und Abstieg zählen je
+  Staffel: Zwei Staffeln in Liga 2 mit je einem Aufsteiger schicken zwei Teams nach oben, aus der einen Staffel in Liga 1 kommt nur
+  eines herunter. Passt es nicht, steht dort zum Beispiel „5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher
+  gab es 1 Staffel – es fehlt 1.“, und über den Ligen der Hinweis **Platzprüfung**. Anlegen geht trotzdem: In der neuen Season
+  legst du die fehlende Staffel an oder erhöhst „Teams je Staffel höchstens“, bevor du zuteilst oder auslost (2.5b).
 - **Relegation** ist vorbereitet: Die Plätze stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.
 - **Abweichen** geht nur über **Wieder öffnen** (3.10): Endstand korrigieren, neu abschließen. Gibt es die neue Season schon,
   sagt das Blatt „Wieder öffnen“ es deutlich – danach in der neuen Season oben **Übernahme neu berechnen** (siehe unten).
@@ -1716,6 +1809,9 @@ Liga 1 (Aufstieg aus Liga 2)“. Staffeln anlegen und zuteilen wie immer (2.3, 2
 neuen Liga des Teams. Captains und Vertreter bekommen eine Nachricht: „Ihr seid in Liga N der neuen Season, abmelden bis …“.
 Wer sich bis zum Start abmeldet, gibt seinen Platz frei; über Warteliste und neue Anmeldungen entscheidet ihr wie in 2.5a.
 Eine Staffel einer anderen Liga geht nur mit Grund – die Auswahl sagt „andere Liga, nur mit Grund“ und fragt danach.
+Hat eine Liga mehrere Staffeln, verteilst du ihre Teams mit dem Los (2.5b).
+
+<img src="../assets/liga/platzpruefung-1440.png" alt="Blatt Neue Season aus Season 1 am PC mit dem Hinweis Platzprüfung: Liga 1 bekommt fünf Teams für eine Staffel mit vier Plätzen und trägt eine Warnung, Liga 2 passt und trägt einen Haken" width="720">
 
 **4. Korrektur nach dem Anlegen: Übernahme neu berechnen.** In der neuen Season oben (Recht **Liga verwalten**, nur vor dem Start):
 Die Vorschau zeigt, welche Teams eine neue Liga bekommen, dazukommen oder zurückgenommen werden. Teams ohne Staffel folgen dem
