@@ -4147,10 +4147,10 @@ Turnierkerns (`services/custom_bracket.py`) auf. Wer diesen Vertrag ändern will
 | 214 | **Belohnungen:** Die Staffel-Belohnungen (F.4) bleiben am Tabellenplatz. Die Playoffs haben eine eigene Zusammenstellung (Meister, Finalist, Platz 3, alle Playoff-Teilnehmer), vergeben beim Abschluss der Playoffs. Der Meister-Eintrag geht an den Playoff-Sieger. Die Relegation vergibt nichts. Nr. 163-168 gelten unverändert | `playoffs.rewards` (keine) | D |
 | 215 | **Gesamtwertung (F.5):** Punkte weiter aus dem Staffelplatz. Bei „Meister aus Playoffs“ geht der Meister-Bonus an den Playoff-Sieger statt an die Staffelsieger der obersten Liga N; dazu optional Zusatzpunkte je Playoff-Platz. In einer Liga N ohne Playoffs bleibt Nr. 174 | `leagues.overall.playoff_points` (Vorgabe: keine, also 0) | F |
 | 216 | **Regelwerk:** neuer automatischer Baustein „Playoffs und Relegation“ aus den Einstellungen (wie #2269), im Regelwerk der Tiroler Liga als eigene **Anlage F**. Wirksam nur, wenn vor dem Season-Start veröffentlicht (§ 2.3). Wird in einer laufenden Season etwas Sportliches geändert (Plätze, Format, Meister), schlägt das System eine neue Fassung mit erneuter Zustimmung vor; „Was fehlt noch?“ warnt bei eingeschalteten, aber nicht veröffentlichten Playoffs | - | F |
-| 217 | **Nichtantritt:** kampflos - der Gegner kommt weiter (Serie zählt wie Nr. 26, im K.-o. zählt nur das Weiterkommen). Beide nicht erschienen: Die Leitung setzt einmal neu an; kommt wieder niemand, scheiden beide aus und der nächste Gegner kommt kampflos weiter; im Finale bleibt der Titel dann unvergeben. Relegation: Tritt das untere Team nicht an, bleibt alles; tritt das obere nicht an, steigt das untere auf; kommt niemand, bleibt alles. Scheidet ein Team vor dem ersten Playoff-Spiel aus, rückt der Nächste derselben Staffel nach, danach wird kampflos gewertet. Strafen wie im Katalog (E.3). Sperren zählen Playoff-Runden mit | - | C, E |
+| 217 | **Nichtantritt:** kampflos - der Gegner kommt weiter (Serie zählt wie Nr. 26, im K.-o. zählt nur das Weiterkommen). Beide nicht erschienen: Die Leitung setzt einmal neu an; kommt wieder niemand, scheiden beide aus und der nächste Gegner kommt kampflos weiter; im Finale bleibt der Titel dann unvergeben. Relegation: Tritt das untere Team nicht an, bleibt alles; tritt das obere nicht an, steigt das untere auf; kommt niemand, bleibt alles. Scheidet ein Team vor dem ersten Playoff-Spiel aus, rückt der Nächste derselben Staffel nach, danach wird kampflos gewertet (dass der Nachrücker den freien Setzplatz übernimmt und nicht neu gesetzt wird, legt der Vertrag fest - Bestätigung durch Fabian vor Paket B, Offener Punkt 4). Strafen wie im Katalog (E.3). Sperren zählen Playoff-Runden mit | - | C, E |
 | 218 | **Einstellort:** Vorlage an der Season, jede Liga N kann abweichen (leer heißt „wie die Season“, wie Zonen und Belohnungen) | `league_seasons.postseason`, `league_divisions.postseason` | B |
 | 219 | **Anlage:** Die Setzliste entsteht automatisch aus dem Endstand; die Leitung sieht die Vorschau und legt die Playoff-Staffel per Knopf an (Zuständigkeit `season`, wie der Abschluss). Abweichen nur über Wiederöffnen des Endstands und „Setzliste neu berechnen“, solange kein Playoff-Spiel gewertet ist. Keine Änderung der Setzliste von Hand | - | B, C |
-| 221 | **Reihenfolge der Staffeln in der Setzung:** Die Staffelsieger werden einmal gereiht (Punkte je Spiel, Map-Differenz je Spiel, Los); diese Reihenfolge der Staffeln gilt für jede Platzgruppe. Ab drei Staffeln wird getauscht, bis keine Paarung der ersten Runde mehr aus derselben Staffel kommt (schärft Nr. 206) | - | B |
+| 221 | **Reihenfolge der Staffeln in der Setzung:** Die Staffelsieger werden einmal gereiht (Punkte je Spiel, Map-Differenz je Spiel, Los); diese Reihenfolge der Staffeln gilt für jede Platzgruppe. Bei zwei Staffeln ergibt die Reihenfolge das „über Kreuz“ von selbst, ab drei Staffeln wird getauscht - so kommt bei zwei und mehr Staffeln keine Paarung der ersten Runde aus derselben Staffel (schärft Nr. 206) | - | B |
 | 222 | **Termin der Relegation:** Die Relegation rückt automatisch hinter das Ende der Playoffs der unteren Liga N; die Vorschau zeigt das Datum | `relegation.start_date` (Vorgabe: automatisch) | E |
 | 223 | **Sperren über alle Pflichtspiele:** Bei einer Sperre für N Spiele zählt jedes gewertete Pflichtspiel des Teams - Tabelle, Playoff oder Relegation (schärft Nr. 217) | - | C, E |
 | 224 | **Vergleich über Staffeln hinweg** (#1627): Plätze aus verschiedenen Staffeln („beste Zweite“) werden nach Punkten je Spiel, dann Map-Differenz je Spiel, dann Entscheid der Leitung verglichen, **ohne Los** (Nr. 156). Die Vergleichsrechnung baut #1623/#1627; die Playoff-Setzung nutzt sie mit, dort kommt das Los nur als letzter Schritt dazu | - | B (Nutzung) |
@@ -4173,7 +4173,7 @@ Alle Felder optional; ohne Feld bleibt alles wie heute.
 | `tournament_registrations` (Playoff- und Relegations-Staffel) | `seed`, `postseason` | Setzplatz und Herkunft `{from_tournament_id, from_registration_id, from_staffel, rank}` | - |
 | `tournaments.veto_rules` (Playoff-Staffel) | `by_best_of` | `{<best_of>: {team_a, step_seconds, steps}}` - eine Vorlage je vorkommendem Best of (Nr. 207), ohne Schritt `preset` | die eine Vorlage der Staffel wie heute |
 | `matches_v2` (Playoff-Staffel) | `no_show_retry` | `{at, by, previous_at}`: einmal neu angesetzt nach „beide nicht erschienen“ (Nr. 217) | noch nicht neu angesetzt |
-| `leagues.overall` | `playoff_points` | Zusatzpunkte je Playoff-Platz `[Platz 1, Platz 2, …]` (höchstens 32 Einträge, je 0-999) | keine Zusatzpunkte |
+| `leagues.overall` | `playoff_points` | Zusatzpunkte je Playoff-Platz `[Platz 1, Platz 2, …]` (höchstens 32 Einträge, je 0-999 - Vertragsvorgabe, siehe unter den Einstellungen) | keine Zusatzpunkte |
 
 **Einstellungen im Einzelnen** (`league_seasons.postseason`, Zuständigkeit `season`, Prüfung beim Speichern mit 422 und Klartext):
 
@@ -4193,6 +4193,10 @@ Alle Felder optional; ohne Feld bleibt alles wie heute.
 | `relegation.best_of` | 1, 3, 5, 7 | Best of der Season |
 | `relegation.start_date` | Wiener Kalendertag; liegt er vor dem Ende der Playoffs der unteren Liga N, rückt die Relegation trotzdem dahinter (Nr. 222) | automatisch: erste aktive Woche nach der letzten Playoff-Woche der unteren Liga N; hat sie keine Playoffs, wie `playoffs.start_date` der oberen Liga N |
 | `champion_source` | `table` \| `playoffs`; `playoffs` nur, wenn die oberste Liga N Playoffs hat (sonst 422 „Meister aus Playoffs braucht Playoffs in der obersten Liga N“) | `table` |
+
+**Vertragsvorgabe, nicht von Fabian entschieden** (Paket B darf sie begründet anpassen): die Grenzen von `per_staffel` (1-16) und
+`playoff_points` (höchstens 32 Einträge, je 0-999), das Best of des Finales für das Spiel um Platz 3 und der Ersatzstart der Relegation,
+wenn die untere Liga N keine Playoffs hat (Playoff-Start der oberen Liga N).
 
 Weitere Prüfungen: Relegation „geht auf“ (Nr. 212) für jedes Paar benachbarter aktiver Liga N mit eingeschalteter Relegation - beim
 Speichern gegen die eingestellten Zonen und die Zahl der Staffeln, in der Vorschau noch einmal gegen die tatsächlichen Staffeln. Eine
@@ -4219,7 +4223,7 @@ denselben Baustein benutzt und er nicht zweimal entsteht.
    **jede** Platzgruppe.
 4. **Über Kreuz:** erst alle Ersten in Staffel-Reihenfolge, dann alle Zweiten in derselben Reihenfolge usw. - nicht als Schlange. Mit
    `custom_bracket._seed_positions` (1-N, 2-(N−1)) ergibt das A1-B2 und B1-A2, bei vier je Staffel A1-B4, B1-A4, A2-B3, B2-A3. Würde die
-   erste Runde zwei Teams derselben Staffel paaren (ab drei Staffeln möglich), tauscht das Modul in der unteren Platzgruppe benachbarte
+   erste Runde zwei Teams derselben Staffel paaren (bei zwei Staffeln nie, ab drei Staffeln möglich), tauscht das Modul in der unteren Platzgruppe benachbarte
    Setzplätze, bis keine Paarung der ersten Runde mehr staffelgleich ist; bei einer Staffel entfällt das.
 5. **Freilose:** Die Baumgröße ist die nächste Zweierpotenz; die fehlenden Plätze sind Freilose für die Bestgesetzten (vorhandenes Verhalten
    von `custom_bracket`).
@@ -4242,7 +4246,7 @@ Obere spielt gegen den schlechtesten Unteren, der zweitbeste Obere gegen den zwe
 | `GET /api/admin/leagues/seasons/{id}/postseason` | jede Zuständigkeit | je Liga N wirksame Einstellungen, Voraussetzungen („alle regulären Staffeln abgeschlossen“), Setzliste mit Grund, Paarungen der ersten Runde, Relegationspaarungen mit dem Datum der Relegation (Nr. 222), Playoff-Wochen, Warnungen (Veto-Vorlage passt nicht zum Best of, `fits_problem`), `stamp`, vorhandene Staffeln |
 | `POST …/postseason/playoffs` bzw. `…/postseason/relegation` mit `{division_id, stamp, confirm}` | `season`, nicht befangen | legt die Staffel an. Veralteter `stamp` → 409; ohne `confirm` 422; zweiter Aufruf antwortet mit der vorhandenen Staffel (einmalig je Liga N durch den eindeutigen Index `league_staffel`) |
 | `POST …/postseason/{tid}/reseed` mit `{stamp, confirm}` | `season`, nicht befangen | Setzliste neu aus dem korrigierten Endstand, nur solange kein Playoff-Spiel gewertet ist (wie `staffel_rebuild_problem`), sonst 409 |
-| `POST …/postseason/{tid}/replace` mit `{registration_id, reason}` | `season`, nicht befangen | Nachrücken für ein Team, das vor seinem ersten Playoff-Spiel ausgeschieden ist (Nr. 217): der Nächste derselben Staffel übernimmt den Setzplatz, die anderen bleiben, wo sie stehen |
+| `POST …/postseason/{tid}/replace` mit `{registration_id, reason}` | `season`, nicht befangen | Nachrücken für ein Team, das vor seinem ersten Playoff-Spiel ausgeschieden ist (Nr. 217): der Nächste derselben Staffel übernimmt den Setzplatz, die anderen bleiben, wo sie stehen (vom Vertrag festgelegt, Bestätigung durch Fabian vor Paket B, Offener Punkt 4) |
 
 #### Ablauf
 
@@ -4274,7 +4278,8 @@ Obere spielt gegen den schlechtesten Unteren, der zweitbeste Obere gegen den zwe
    → neuer Termin durch die Leitung, `no_show_retry` am Spiel; zweites Mal → beide scheiden aus, der nächste Gegner kommt kampflos weiter.
    Im Finale bleibt der Titel unvergeben (Endstand ohne Platz 1 und 2, `champion: null`). Relegation: unteres Team fehlt → `stay` für beide;
    oberes fehlt → unteres `up`, oberes `down`; beide fehlen → `stay` für beide. Scheidet ein Team vor seinem ersten Playoff-Spiel aus,
-   rückt der Nächste derselben Staffel nach (`replace`), später gilt kampflos.
+   rückt der Nächste derselben Staffel nach (`replace`, übernimmt den Setzplatz - vom Vertrag festgelegt, Offener Punkt 4), später gilt
+   kampflos.
 9. **Sperren** (Nr. 217, 223, E.3): Bei einer „Sperre nach Spielen“ zählt jedes gewertete Pflichtspiel des Co-Teams - Tabelle, Playoff
    oder Relegation -, auch wenn Playoff- und Relegations-Anmeldung eine neue `registration_id` haben (siehe V2 unten). Eine Sperre vom
    letzten Spieltag wirkt in Playoffs und Relegation weiter.
@@ -4306,7 +4311,7 @@ Obere spielt gegen den schlechtesten Unteren, der zweitbeste Obere gegen den zwe
 | `profile_references._tournament_rank_for_user` | Platz aus dem Endstand | nur reguläre |
 | `league_rewards` (`grant`, `tv_podium`) | Endstand einer Staffel | regulär mit der Zusammenstellung der Season/Liga N, Playoff-Fassung nur mit `playoffs.rewards`; Relegation nie |
 | `league_rank_banner._staffeln` | alle Staffeln der Season (Platz und Bilanz des Co-Teams) | Platz und Bilanz nur aus der regulären Staffel; das Playoff-Ergebnis höchstens als Zusatz (Paket G) |
-| übrige Abfragen über `league_context.season_id` (33 Dateien in `services/` und `routes/`, u. a. `league_applications`, `league_late_entry`, `squad_registration`, `league_veto_fit`, `league_veto_sweep`, `league_desk`, `daily_center`) | alle Staffeln | je Abfrage eingeordnet: „alle Arten“ (Leitstand, Aufgaben, Erinnerungen, Spielbetrieb) oder „nur regulär“ (Zuteilen, Nachmeldung, Vorlagen übertragen) |
+| übrige Abfragen über `league_context.season_id` (rund 30 Dateien in `services/` und `routes/`, u. a. `league_applications`, `league_late_entry`, `squad_registration`, `league_veto_fit`, `league_veto_sweep`, `league_desk`, `daily_center`) | alle Staffeln | je Abfrage eingeordnet: „alle Arten“ (Leitstand, Aufgaben, Erinnerungen, Spielbetrieb) oder „nur regulär“ (Zuteilen, Nachmeldung, Vorlagen übertragen) |
 
   Ein **Wächter-Test** (Paket B) verlangt, dass jede Abfrage über `league_context.season_id` und jede über `league_final_tables`
   eingeordnet ist - eine neue Abfrage ohne Einordnung lässt die CI rot werden.
@@ -4336,7 +4341,8 @@ Obere spielt gegen den schlechtesten Unteren, der zweitbeste Obere gegen den zwe
 
 Wiederöffnen einer regulären Staffel bleibt möglich (Nr. 155). Laufen ihre Playoffs schon, spielen sie mit der Setzliste ihres Schnappschusses
 weiter; weicht die Setzliste nach dem neuen Abschluss ab, zeigt das Cockpit das mit dem Hinweis, dass nur `reseed` (vor dem ersten gewerteten
-Spiel) sie ändert. Wie die Leitung danach verfährt, regelt Paket C (Offener Punkt 3).
+Spiel) sie ändert. **Abweichung vom Entwurf:** Der Entwurf sah hier eine Sperre vor (erst Playoffs zurücksetzen bzw. nur Korrekturen, die
+die Setzliste nicht ändern); der Vertrag sagt „Hinweis, alte Setzliste gilt weiter“. Das entscheidet Fabian vor Paket C (Offener Punkt 3).
 
 #### Belohnungen und Gesamtwertung
 
@@ -4442,7 +4448,7 @@ und F unabhängig voneinander, G zuletzt. B trägt das größte Regressionsrisik
 | Paket | Inhalt | Abnahme |
 | --- | --- | --- |
 | **A Vertrag** | dieser Abschnitt, Feature-Matrix | Fabian gibt den Vertrag frei; Doku-Prüfung grün |
-| **B Daten und Setzliste** | `league_context.kind`, `staffel_kind`/`REGULAR_ONLY`/`staffel_label`, alle Leser aus H6 und H7 umgestellt, Wächter-Test; Einstellungen `postseason` an Season und Liga N mit Prüfungen; Setzlisten-Modul; Vorschau-Endpunkt (nur lesen); Kennzeichen `playoff` an der Tabelle; V3, V4; Vergleich über Staffeln aus #1627 mitbenutzen (Nr. 224) | Ohne Einstellung ist jede Antwort bytegleich zu vorher (Regressionstest). Vorschau zeigt die richtige Setzliste für eine bis vier Staffeln und ein bis vier Plätze je Staffel, mit Gleichstand, Ausgeschiedenen und ungerader Zahl (Freilos); keine staffelgleiche Paarung in Runde 1 ab zwei Staffeln |
+| **B Daten und Setzliste** | `league_context.kind`, `staffel_kind`/`REGULAR_ONLY`/`staffel_label`, alle Leser aus H6 und H7 umgestellt, Wächter-Test; Einstellungen `postseason` an Season und Liga N mit Prüfungen; Setzlisten-Modul; Vorschau-Endpunkt (nur lesen); Kennzeichen `playoff` an der Tabelle; V3, V4; Vergleich über Staffeln aus #1627 mitbenutzen (Nr. 224) | Ohne Einstellung ist jede Antwort bytegleich zu vorher (Regressionstest). Vorschau zeigt die richtige Setzliste für eine bis vier Staffeln und ein bis vier Plätze je Staffel, mit Gleichstand, Ausgeschiedenen und ungerader Zahl (Freilos); bei zwei und mehr Staffeln keine staffelgleiche Paarung in Runde 1 (ab drei Staffeln durch Tauschen) |
 | **C Ablauf Playoffs** | Staffel anlegen, neu setzen, nachrücken; K.-o.-Baum; H1-H5, H8, V1, V2; Spielwochen je Runde, Heimrecht, Veto ohne Vorgabe, Kampflos-Regeln; Verwaltung | Lokaler Durchlauf mit echtem MongoDB: Tabelle → Playoff-Staffel → Check-in, Veto, Melden bis ins Finale; Kampflos und „beide nicht erschienen“ (neu ansetzen, dann beide raus); Sperre vom letzten Spieltag wirkt in Runde 1 und zählt Playoff-Spiele mit (Nr. 223); Browser bei 390 und 1440 px |
 | **C2 Best of je Runde** | `best_of_rounds`, Veto-Vorlage je Best of (`by_best_of`) | Finale Best of 7 mit eigenem Veto neben Halbfinale Best of 5 |
 | **D Abschluss und Meister** | Abschluss der Playoff-Staffel, `champion_source`, Meister-Eintrag aus dem Finale, Season-Abschluss, Playoff-Belohnungen, öffentliche Season-Seite, TV, PDF | Zwei Staffeln oben, ein Meister. Wiederöffnen und neuer Abschluss mit anderem Sieger: nie zwei Meister, Belohnungen ziehen nach; Platz 3 geteilt und mit Spiel |
@@ -4485,10 +4491,13 @@ ausdrückliches `kind: "regular"` an alten Staffeln wäre eine Migration und ist
 2. **Heimrecht ab Runde 2** (Anfang Paket C): entweder eine Funktion „Heimseite dieses Spiels“, die Veto, Terminregel und Anzeige lesen
    (sicherer für den Baum, braucht alle Leser von `home_registration_id`), oder beim Einzug in ein Spiel die Plätze so ordnen, dass der besser
    Gesetzte oben steht.
-3. **Wiederöffnen einer regulären Staffel nach dem ersten gewerteten Playoff-Spiel** mit geänderter Setzliste: Hinweis im Cockpit ist
-   vertraglich; ob es zusätzlich ein „Playoffs zurücksetzen“ gibt, klärt Paket C.
-4. **Verhältnis zu #1559:** Das Setzlisten-Modul dort als gemeinsamen Baustein eintragen (Hinweis).
-5. **Abgrenzung zu #1627 „Startrechte“:** von diesem Vertrag nicht berührt.
+3. **Wiederöffnen einer regulären Staffel nach dem ersten gewerteten Playoff-Spiel** mit geänderter Setzliste - **Entscheidung vor
+   Paket C:** Der Entwurf sah eine Sperre vor, der Vertrag sagt „Hinweis im Cockpit, die alte Setzliste gilt weiter“. Ob es zusätzlich ein
+   „Playoffs zurücksetzen“ gibt, klärt Paket C.
+4. **Nachrücken vor dem ersten Playoff-Spiel** - **Bestätigung vor Paket B:** Nr. 217 sagt „der Nächste derselben Staffel rückt nach“; der
+   Vertrag legt fest, dass er den freien Setzplatz übernimmt und die übrigen Setzplätze bleiben (kein Neusetzen, `replace`).
+5. **Verhältnis zu #1559:** Das Setzlisten-Modul dort als gemeinsamen Baustein eintragen (Hinweis).
+6. **Abgrenzung zu #1627 „Startrechte“:** von diesem Vertrag nicht berührt.
 
 Entschieden am 23.11. (vorher offen): Setzung mit einmal gereihten Staffeln (Nr. 221), Relegation automatisch hinter den Playoffs der
 unteren Liga N (Nr. 222), Relegationsspiele zählen für Sperren (Nr. 223), Vergleich über Staffeln aus #1627 ohne Los (Nr. 224).
