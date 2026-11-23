@@ -118,6 +118,20 @@ test("Rückgängig: 10 Sekunden lang, danach ist die Leiste weg", async () => {
   }
 });
 
+test("Rückgängig abgelehnt (#1559): der Satz des Servers steht in der Meldung, etwa wenn die nächste Schweizer Runde schon läuft", async () => {
+  const { toast } = await import("sonner");
+  const sentence = "Rückgängig geht nicht mehr: In Runde 3 hat schon ein Spiel begonnen oder steht an einer Station. Bitte das Ergebnis über „Korrigieren“ ändern.";
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: sentence } } });
+  const onDone = vi.fn();
+  render(<UndoHarness onDone={onDone} />);
+  fireEvent.click(screen.getByText("start"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-undo")); });
+  expect(toast.error).toHaveBeenCalledWith(sentence);
+  expect(toast.success).not.toHaveBeenCalled();
+  // Die Seite lädt neu - das Ergebnis steht ja noch.
+  expect(onDone).toHaveBeenCalledTimes(2);
+});
+
 test("inzwischen eingetragen (#2124): bei 409 fragt das Fenster „als Korrektur speichern?“ - dann mit Grund und force", async () => {
   apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Dieses Spiel hat inzwischen ein Ergebnis. Zum Ändern als Korrektur mit Grund speichern." } } });
   apiMock.get.mockResolvedValueOnce({ data: { result_entry: { ...DUEL, has_result: true } } });

@@ -71,6 +71,19 @@ async def insert_round(db, documents: list[dict]) -> bool:
     return True
 
 
+async def round_untouched(db, round_matches: list[dict]) -> bool:
+    """Lässt sich eine Runde noch herausnehmen? Ja, solange keines ihrer Spiele aufgerufen, gestartet, gemeldet oder
+    gewertet ist (ein Freilos zählt nicht) und keines an einer Station hängt - eine eingeplante Station hält die Runde
+    wie ein Aufruf (#2120, TA11). Dieselbe Regel für „Runde zurücknehmen“ und für „Rückgängig“ eines Ergebnisses der
+    Runde davor."""
+    if any(tournament_guard.match_begun(match) or match.get("station_id") for match in round_matches):
+        return False
+    match_ids = [match["id"] for match in round_matches if match.get("id")]
+    if await db.match_reports_v2.count_documents({"match_id": {"$in": match_ids}}):
+        return False
+    return not await db.stations.count_documents({"current_match_id": {"$in": match_ids}})
+
+
 def overview(tournament: dict, registrations: list[dict], matches: list[dict]) -> dict:
     """Wo das Schweizer System steht - für Verwaltung und TV: nur Zahlen, keine Namen."""
     settings = swiss_settings(tournament)

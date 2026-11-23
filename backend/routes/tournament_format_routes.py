@@ -117,10 +117,7 @@ async def swiss_undo_round(tid: str, me: dict = Depends(require_lead_of("season"
     last_round = [match for match in matches if int(match.get("round") or 0) == round_number]
     match_ids = [match["id"] for match in last_round if match.get("id")]
     # Eine eingeplante Station (station_id) hält die Runde wie ein Aufruf - genau wie die Seite (Review #2120).
-    begun = [match for match in last_round if tournament_guard.match_begun(match) or match.get("station_id")]
-    reported = await db.match_reports_v2.count_documents({"match_id": {"$in": match_ids}})
-    at_station = await db.stations.count_documents({"current_match_id": {"$in": match_ids}})
-    if begun or reported or at_station:
+    if not await swiss_rounds.round_untouched(db, last_round):
         raise HTTPException(
             status_code=409,
             detail=f"In Runde {round_number} hat schon ein Spiel begonnen oder steht an einer Station – die Runde "

@@ -358,6 +358,26 @@ def _open_status(match: dict) -> str:
     return "scheduled" if match.get("scheduled_at") else "ready"
 
 
+async def _swiss_follow_up(db, match: dict, stage_matches: list[dict]) -> list[dict]:
+    """Schweizer System (#1559): Die Runde nach diesem Spiel ist aus seinem Ergebnis gepaart - ohne das Ergebnis stimmt
+    sie nicht mehr. Wie beim Weiterrücken im Baum: Solange sie unberührt ist, geht sie mit zurück (dieselbe Regel wie
+    „Runde zurücknehmen“) und entsteht aus dem neuen Ergebnis neu. Hat sie begonnen, bleibt nur „Korrigieren“."""
+    if match.get("stage_type") != "swiss":
+        return []
+    own_round = int(match.get("round") or 0)
+    later = [row for row in stage_matches if int(row.get("round") or 0) > own_round and not row.get("is_preview")]
+    if not later:
+        return []
+    from services.swiss_rounds import round_untouched
+
+    if not await round_untouched(db, later):
+        following = min(int(row.get("round") or 0) for row in later)
+        raise MatchV2ResultError(
+            f"Rückgängig geht nicht mehr: In Runde {following} hat schon ein Spiel begonnen oder steht an einer Station. "
+            "Bitte das Ergebnis über „Korrigieren“ ändern.", 409)
+    return later
+
+
 async def undo_result(db, match: dict, *, actor_id: str, hold_id: str | None = None) -> dict:
     """„Rückgängig“: das bereitliegende Ergebnis verwerfen - oder das gerade veröffentlichte zurücknehmen."""
     hold = match.get("pending_result")
@@ -400,6 +420,7 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
             name = target.get("round_name") or target.get("match_key") or "Das nächste Spiel"
             raise MatchV2ResultError(
                 f"Rückgängig geht nicht mehr: {name} hat schon begonnen. Bitte das Ergebnis über „Korrigieren“ ändern.", 409)
+    follow_up = await _swiss_follow_up(db, match, stage_matches)
     now_iso = now_utc().isoformat()
     cleared: list[str] = []
     for target in targets:
@@ -441,8 +462,12 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
         # Vorfälle (D.5, #1619): Eine Feststellung, die nur aus diesem Ergebnis kam, geht mit ihm zurück.
         from services.league_incidents import unsettle_by_result
         await unsettle_by_result(db, match["id"])
+    removed: dict = {}
+    if follow_up:
+        await db.matches_v2.delete_many({"id": {"$in": [row["id"] for row in follow_up]}})
+        removed = {"removed_round": min(int(row.get("round") or 0) for row in follow_up), "removed_matches": len(follow_up)}
     await _audit(db, "match.result.undo", match, actor_id, {
-        "held": False, "report_id": meta.get("report_id"), "cleared_matches": cleared,
+        "held": False, "report_id": meta.get("report_id"), "cleared_matches": cleared, **removed,
     })
     await _tell_players_undone(db, match, meta.get("report_id"))
     try:
@@ -451,7 +476,7 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
         await publish_api_change("POST", f"/api/matches/{match['id']}/result/undo", 200)
     except Exception:  # noqa: BLE001
         logger.debug("Live-Meldung für Match %s nicht verschickt", match.get("id"), exc_info=True)
-    return {"ok": True, "undone": True, "held": False, "cleared_matches": cleared}
+    return {"ok": True, "undone": True, "held": False, "cleared_matches": cleared, **removed}
 
 
 async def _tell_players_undone(db, match: dict, report_id: str | None) -> int:

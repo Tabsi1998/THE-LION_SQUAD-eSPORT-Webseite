@@ -302,6 +302,84 @@ async def test_a_withdrawal_that_settles_the_round_starts_the_next_one(flow):
     assert len(round_two) == 2, "ein Spiel und ein Freilos"
 
 
+# ---------------------------------------------------------------- Rückgängig nach der nächsten Runde
+
+async def undo(flow, match):
+    return await flow.post(f"/api/matches/{match['id']}/result/undo")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("automatic", [True, False])
+async def test_taking_back_the_last_result_takes_the_untouched_next_round_with_it(flow, automatic):
+    """Runde 2 ist aus den Ergebnissen von Runde 1 gepaart. Geht das letzte Ergebnis zurück, darf sie nicht stehen
+    bleiben - solange niemand in ihr gespielt hat, geht sie mit und entsteht aus dem neuen Ergebnis neu."""
+    _staff, tournament, _regs = await swiss(flow, 6, auto_next_round=automatic)
+    assert (await next_round(flow, tournament)).status_code == 200
+    round_one = await round_matches(flow, tournament, 1)
+    for match in round_one:
+        await decide(flow, match)
+    if not automatic:
+        assert (await next_round(flow, tournament)).status_code == 200
+    assert len(await round_matches(flow, tournament, 2)) == 3
+
+    undone = await undo(flow, round_one[2])
+
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["removed_round"] == 2
+    assert await round_matches(flow, tournament, 2) == []
+    reopened = next(match for match in await round_matches(flow, tournament, 1) if match["id"] == round_one[2]["id"])
+    assert reopened["status"] != "completed" and reopened["results"] == []
+    audit = await flow.db.audit_logs.find({"action": "match.result.undo"}, {"_id": 0}).to_list(10)
+    assert audit[-1]["data"]["removed_round"] == 2
+
+    # Diesmal gewinnt die andere Seite - Runde 2 entsteht neu, aus diesem Ergebnis.
+    other_side = reopened["slots"][1]["registration_id"]
+    await decide(flow, reopened, winner=other_side)
+    if not automatic:
+        assert (await next_round(flow, tournament)).status_code == 200
+    round_two = await round_matches(flow, tournament, 2)
+    assert len(round_two) == 3
+    winners = {other_side, *(match["slots"][0]["registration_id"] for match in round_one[:2])}
+    mixed = sorted(len({slot["registration_id"] for slot in match["slots"]} & winners) for match in round_two)
+    assert mixed == [0, 1, 2], "drei Sieger, drei Verlierer: ein Paar Sieger, ein Paar Verlierer, eines gemischt"
+
+
+@pytest.mark.asyncio
+async def test_a_result_stays_once_the_next_round_has_begun(flow):
+    """Hat in Runde 2 schon jemand gespielt, bleibt beides stehen - mit einem Satz, was zu tun ist."""
+    _staff, tournament, _regs = await swiss(flow, 6, auto_next_round=True)
+    assert (await next_round(flow, tournament)).status_code == 200
+    round_one = await round_matches(flow, tournament, 1)
+    for match in round_one:
+        await decide(flow, match)
+    round_two = await round_matches(flow, tournament, 2)
+    await decide(flow, round_two[0])
+
+    refused = await undo(flow, round_one[2])
+
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert "Runde 2" in detail and "Korrigieren" in detail
+    assert len(await round_matches(flow, tournament, 2)) == 3
+    kept = next(match for match in await round_matches(flow, tournament, 1) if match["id"] == round_one[2]["id"])
+    assert kept["status"] == "completed" and kept["results"]
+
+
+@pytest.mark.asyncio
+async def test_a_result_taken_back_inside_a_running_round_removes_nothing(flow):
+    """Solange die Runde noch läuft, gibt es keine nächste - Rückgängig nimmt nur das eine Ergebnis zurück."""
+    _staff, tournament, _regs = await swiss(flow, 6, auto_next_round=True)
+    assert (await next_round(flow, tournament)).status_code == 200
+    round_one = await round_matches(flow, tournament, 1)
+    await decide(flow, round_one[0])
+
+    undone = await undo(flow, round_one[0])
+
+    assert undone.status_code == 200, undone.text
+    assert "removed_round" not in undone.json()
+    assert len(await round_matches(flow, tournament, 1)) == 3
+
+
 def test_the_model_and_the_calculation_know_the_same_values():
     from typing import get_args
 
