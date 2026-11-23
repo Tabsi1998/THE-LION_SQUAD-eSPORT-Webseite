@@ -21,11 +21,20 @@ export function candidateLine(candidate) {
   return `Staffel ${candidate.staffel}, Platz ${candidate.rank} · ${perGame(candidate.points_per_game)} Punkte je Spiel · ${signedPerGame(candidate.map_diff_per_game)} Maps je Spiel`;
 }
 
-/** Das Etikett am Kandidaten: gewählt, im Gleichstand oder nichts. */
+/** Das Etikett am Kandidaten: gewählt, im Gleichstand, nach dem Entscheid unterlegen („bleibt“) oder nichts. */
 export function candidateState(side, candidate) {
   if (candidate.chosen) return { key: "chosen", label: KIND_VERB[side.kind] || "gewählt" };
   if (candidate.tied) return { key: "tied", label: "Gleichstand" };
+  if (candidate.passed) return { key: "passed", label: "bleibt" };
   return null;
+}
+
+/** Welche der beiden Felder im Liga-Blatt gelten (#1627): nur in einer Liga mit mehreren Staffeln, „beste Nächstplatzierte“ nicht in der
+ * obersten, „schlechteste vor dem Abstieg“ nicht in der untersten Liga. Ein schon gesetzter Wert bleibt sichtbar, damit er sich leeren lässt. */
+export function crossFieldsShown({ staffelCount = 0, top = false, bottom = false, zones = {} } = {}) {
+  const several = staffelCount > 1;
+  const set = (key) => Number(zones?.[key]) > 0;
+  return { promote_best: (several && !top) || set("promote_best"), relegate_worst: (several && !bottom) || set("relegate_worst") };
 }
 
 /** Überschrift einer Regel: „Aufstieg über den Vergleich der Staffeln · 1 Platz“. */

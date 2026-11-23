@@ -749,7 +749,7 @@ test("Zonen je Liga N (F.2): Satz an der Liga, Ändern schickt nur geänderte Zo
 });
 
 test("Zonen über Staffeln hinweg (#1627): Felder im Liga-Blatt, der Satz an der Liga, gespeichert nur was gesetzt ist", async () => {
-  body = { ...BODY, divisions: [{ ...BODY.divisions[0], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1 },
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 3, max_participants: 8 }, { tournament_id: "t2", staffel: "B", status: "draft", participant_count: 3, max_participants: 8 }], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1 },
     zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1, top: false, bottom: false } }] };
   apiMock.patch.mockResolvedValue({ data: {} });
   renderPage("#ligen");
@@ -762,6 +762,36 @@ test("Zonen über Staffeln hinweg (#1627): Felder im Liga-Blatt, der Satz an der
   fireEvent.click(within(sheet).getByTestId("division-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1", expect.objectContaining({
     zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 2 } })));
+});
+
+test("Zonen über Staffeln hinweg stehen nur dort, wo sie gelten: nicht bei einer Staffel, nicht nach oben in der obersten Liga (#1627)", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0 },
+    zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, top: false, bottom: false } }] };
+  const { unmount } = renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  expect(within(screen.getByTestId("division-sheet")).queryByTestId("zones-cross")).toBeNull();
+  unmount();
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 3, max_participants: 8 }, { tournament_id: "t2", staffel: "B", status: "draft", participant_count: 3, max_participants: 8 }], zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0 },
+    zones_effective: { promote: 0, relegate: 1, playoff_promote: 0, playoff_relegate: 0, top: true, bottom: false } }] };
+  renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).queryByTestId("zones-promote-best")).toBeNull();
+  expect(within(sheet).getByTestId("zones-relegate-worst")).toBeEnabled();
+});
+
+test("Zonen über Staffeln hinweg sind gesperrt, sobald eine Staffel der Liga abgeschlossen ist - mit Hinweis (#1627, Nr. 228)", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 3, max_participants: 8 }, { tournament_id: "t2", staffel: "B", status: "draft", participant_count: 3, max_participants: 8 }], zones_cross_locked: true,
+    zones: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1 },
+    zones_effective: { promote: 1, relegate: 1, playoff_promote: 0, playoff_relegate: 0, promote_best: 1, top: false, bottom: false } }] };
+  renderPage("#ligen");
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("zones-cross-locked")).toHaveTextContent("Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen.");
+  expect(within(sheet).getByTestId("zones-promote-best")).toBeDisabled();
+  expect(within(sheet).getByTestId("zones-relegate-worst")).toBeDisabled();
+  // Gegenprobe: Die Zonen je Staffel bleiben änderbar.
+  expect(within(sheet).getByTestId("zones-promote")).toBeEnabled();
 });
 
 test("Neue Season aus …: wer über den Vergleich der Staffeln aufsteigt, steht so da (#1627)", async () => {

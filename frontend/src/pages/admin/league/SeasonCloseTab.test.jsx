@@ -298,3 +298,33 @@ test("der Sperrgrund „Gleichstand zwischen den Staffeln“ nennt die Teams ohn
   expect(screen.getByTestId("close-button-t1")).toBeDisabled();
   expect(screen.getByTestId("cross-decide-d2-promote_best")).toBeInTheDocument();
 });
+
+// Fix-Runde (#1627): Zurücknehmen folgt denselben Regeln wie das Entscheiden, der Unterlegene trägt „bleibt“.
+const DECISION = { registration_ids: ["rb"], names: ["Probe Blau"], tied: ["ra", "rb"], method: "playoff", method_label: "Entscheidungsspiel", reason: "3:1 gewonnen" };
+const decidedSide = (extra = {}) => side({ decision: DECISION,
+  candidates: [candidate("rb", "Probe Blau", "B", { chosen: true }), candidate("ra", "Probe Rot", "A", { passed: true })], ...extra });
+
+test("nach dem Entscheid: der Gewählte steigt auf, der Unterlegene bleibt", async () => {
+  renderTab(data([staffel()], cross([decidedSide()])), { canResults: true });
+  expect(await screen.findByTestId("cross-candidate-rb")).toHaveTextContent("steigt auf");
+  expect(screen.getByTestId("cross-candidate-ra")).toHaveTextContent("bleibt");
+});
+
+test("beim eigenen Team gibt es kein „Zurücknehmen“, sondern den Hinweis auf eine andere Person", async () => {
+  renderTab(data([staffel()], cross([decidedSide({ own_team: true })])), { canResults: true });
+  expect(await screen.findByTestId("cross-clear-own-d2-promote_best")).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
+  expect(screen.queryByTestId("cross-clear-d2-promote_best")).toBeNull();
+});
+
+test("der Superadmin nimmt beim eigenen Team nur mit dem Grund der Notausnahme zurück", async () => {
+  apiMock.delete = vi.fn().mockResolvedValue({ data: { ok: true } });
+  renderTab(data([staffel()], { ...cross([decidedSide({ own_team: true })]), superadmin: true }), { canResults: true });
+  fireEvent.click(await screen.findByTestId("cross-clear-d2-promote_best"));
+  const sheet = await screen.findByTestId("cross-clear-sheet");
+  fireEvent.change(within(sheet).getByTestId("cross-clear-reason"), { target: { value: "Spiel wird wiederholt" } });
+  expect(within(sheet).getByTestId("cross-clear-save")).toBeDisabled();
+  fireEvent.change(within(sheet).getByTestId("cross-clear-conflict"), { target: { value: "Niemand sonst erreichbar" } });
+  fireEvent.click(within(sheet).getByTestId("cross-clear-save"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/divisions/d2/zone-decision/promote_best",
+    { data: { reason: "Spiel wird wiederholt", conflict_reason: "Niemand sonst erreichbar" } }));
+});

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { candidateLine, candidateState, crossDecisionLine, crossStatus, decisionReady, perGame, sideTitle, signedPerGame, tieLine } from "./leagueCrossZones";
+import { candidateLine, candidateState, crossDecisionLine, crossFieldsShown, crossStatus, decisionReady, perGame, sideTitle, signedPerGame, tieLine } from "./leagueCrossZones";
 
 describe("Plätze über Staffeln hinweg (#1627)", () => {
   test("Schnitt je Spiel mit Komma und Vorzeichen", () => {
@@ -21,6 +21,20 @@ describe("Plätze über Staffeln hinweg (#1627)", () => {
     expect(candidateState({ kind: "relegate_worst" }, { chosen: true })).toEqual({ key: "chosen", label: "steigt ab" });
     expect(candidateState({ kind: "promote_best" }, { chosen: false, tied: true })).toEqual({ key: "tied", label: "Gleichstand" });
     expect(candidateState({ kind: "promote_best" }, { chosen: false, tied: false })).toBeNull();
+    // Nach dem Entscheid: Wer im Gleichstand stand und nicht gewählt wurde, bleibt.
+    expect(candidateState({ kind: "promote_best" }, { chosen: false, tied: false, passed: true })).toEqual({ key: "passed", label: "bleibt" });
+  });
+
+  test("die Felder im Liga-Blatt stehen nur dort, wo sie gelten", () => {
+    expect(crossFieldsShown({ staffelCount: 2 })).toEqual({ promote_best: true, relegate_worst: true });
+    // Eine Staffel: Es gibt nichts zu vergleichen.
+    expect(crossFieldsShown({ staffelCount: 1 })).toEqual({ promote_best: false, relegate_worst: false });
+    expect(crossFieldsShown()).toEqual({ promote_best: false, relegate_worst: false });
+    // Oberste Liga ohne Aufstieg, unterste ohne Abstieg.
+    expect(crossFieldsShown({ staffelCount: 3, top: true })).toEqual({ promote_best: false, relegate_worst: true });
+    expect(crossFieldsShown({ staffelCount: 3, bottom: true })).toEqual({ promote_best: true, relegate_worst: false });
+    // Ein gesetzter Wert bleibt sichtbar, damit er sich leeren lässt.
+    expect(crossFieldsShown({ staffelCount: 1, zones: { promote_best: "2" } })).toEqual({ promote_best: true, relegate_worst: false });
   });
 
   test("Überschrift, Stand und Sätze", () => {

@@ -12,7 +12,7 @@ import { api, formatApiError } from "@/lib/api";
 import { candidateLine, candidateState, crossDecisionLine, crossStatus, decisionReady, sideTitle, tieLine } from "@/lib/leagueCrossZones";
 
 const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
-const STATE_CLASS = { chosen: "border-ok/50 text-ok", tied: "border-warn/50 text-warn" };
+const STATE_CLASS = { chosen: "border-ok/50 text-ok", tied: "border-warn/50 text-warn", passed: "border-white/15 text-white/60" };
 
 function DecisionSheet({ entry, side, methods, superadmin, onClose, onDone }) {
   const [picked, setPicked] = useState([]);
@@ -66,15 +66,19 @@ function DecisionSheet({ entry, side, methods, superadmin, onClose, onDone }) {
   );
 }
 
-function ClearSheet({ entry, side, onClose, onDone }) {
+function ClearSheet({ entry, side, superadmin, onClose, onDone }) {
   const [reason, setReason] = useState("");
+  const [conflictReason, setConflictReason] = useState("");
   const [saving, setSaving] = useState(false);
+  // Wie beim Entscheiden: Gehört die Person zu einem Team des Gleichstands, geht es nur als Notausnahme des Superadmins mit Grund.
+  const needsReason = Boolean(side.own_team && superadmin);
   const submit = async (event) => {
     event.preventDefault();
-    if (saving || reason.trim().length < 5) return;
+    if (saving || reason.trim().length < 5 || overrideMissing(needsReason, conflictReason)) return;
     setSaving(true);
     try {
-      await api.delete(`/admin/leagues/divisions/${entry.division_id}/zone-decision/${side.kind}`, { data: { reason: reason.trim() } });
+      await api.delete(`/admin/leagues/divisions/${entry.division_id}/zone-decision/${side.kind}`,
+        { data: { reason: reason.trim(), ...overridePayload(needsReason, conflictReason) } });
       toast.success("Entscheid zurückgenommen. Der Gleichstand ist wieder offen.");
       onDone();
     } catch (failure) {
@@ -84,10 +88,11 @@ function ClearSheet({ entry, side, onClose, onDone }) {
   };
   return (
     <AdminSheet title="Entscheid zurücknehmen" eyebrow={entry.label} onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Zurücknehmen"
-      submitTestId="cross-clear-save" submitDisabled={reason.trim().length < 5} testId="cross-clear-sheet">
+      submitTestId="cross-clear-save" submitDisabled={reason.trim().length < 5 || overrideMissing(needsReason, conflictReason)} testId="cross-clear-sheet">
       <p className="text-sm text-white/80">Bisher: {crossDecisionLine(side.decision)}</p>
       <TextAreaField label="Grund (Pflicht)" rows={2} value={reason} onChange={setReason} testId="cross-clear-reason"
         hint="Danach ist der Gleichstand wieder offen und hält die neue Season auf, bis neu entschieden ist." />
+      {needsReason ? <ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="cross-clear-conflict" /> : null}
     </AdminSheet>
   );
 }
@@ -124,7 +129,9 @@ function Side({ entry, side, canResults, superadmin, onSheet }) {
       {side.decision ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70" data-testid={`cross-decision-${entry.division_id}-${side.kind}`}>
           <span className="min-w-0 [overflow-wrap:anywhere]">Entscheid: {crossDecisionLine(side.decision)}</span>
-          {canResults ? <button type="button" onClick={() => onSheet({ kind: "clear", entry, side })} className="tls-btn tls-btn--quiet min-h-11 rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider" data-testid={`cross-clear-${entry.division_id}-${side.kind}`}>Zurücknehmen</button> : null}
+          {/* Zurücknehmen entscheidet wie das Entscheiden: nie über das eigene Team, der Superadmin nur als Notausnahme. */}
+          {canResults && !(side.own_team && !superadmin) ? <button type="button" onClick={() => onSheet({ kind: "clear", entry, side })} className="tls-btn tls-btn--quiet min-h-11 rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider" data-testid={`cross-clear-${entry.division_id}-${side.kind}`}>Zurücknehmen</button> : null}
+          {canResults && side.own_team && !superadmin ? <OwnTeamNote testId={`cross-clear-own-${entry.division_id}-${side.kind}`} /> : null}
         </div>
       ) : null}
     </div>
@@ -149,7 +156,7 @@ export function SeasonCrossZones({ data, canResults, onChanged }) {
         </section>
       ))}
       {sheet?.kind === "decide" ? <DecisionSheet entry={sheet.entry} side={sheet.side} methods={data.cross_methods} superadmin={Boolean(data.superadmin)} onClose={() => setSheet(null)} onDone={done} /> : null}
-      {sheet?.kind === "clear" ? <ClearSheet entry={sheet.entry} side={sheet.side} onClose={() => setSheet(null)} onDone={done} /> : null}
+      {sheet?.kind === "clear" ? <ClearSheet entry={sheet.entry} side={sheet.side} superadmin={Boolean(data.superadmin)} onClose={() => setSheet(null)} onDone={done} /> : null}
     </div>
   );
 }

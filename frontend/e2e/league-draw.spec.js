@@ -294,12 +294,12 @@ const closeRow = (id, letter, extra = {}) => ({
 const crossCandidate = (id, name, letter, extra = {}) => ({ registration_id: id, display_name: name, tournament_id: `c${letter}`, staffel: letter, rank: 2, played: 3, points: 6,
   score_diff: 2, points_per_game: 2, map_diff_per_game: 0.667, chosen: false, tied: true, ...extra });
 const crossTie = (names) => ({ kind: "promote_best", open: 1, registration_ids: ["ra", "rb"], names, staffeln: ["A", "B"] });
-const closing = (names, sideExtra = {}) => ({
+const closing = (names, sideExtra = {}, decided = false) => ({
   season: { id: "s2", name: "Season 2", status: "active", closed: false }, can_act: true, superadmin: true, responsible: "„Season konfigurieren“", successor: null,
   methods: { playoff: "Entscheidungsspiel", lot: "Los", lead: "Entscheid der Leitung" }, cross_methods: { playoff: "Entscheidungsspiel", lead: "Entscheid der Leitung" },
   staffeln: [closeRow("cA", "A", { closed: true, can_close: false, status: "completed",
     final: { id: "f1", version: 1, closed_at: "2027-04-13T17:00:00+00:00", closed_by_name: "Leitung", champion: null, decisions: [] } }),
-  closeRow("cB", "B", { can_close: false, blockers: [{ code: "zone_cross_tie", label: "Gleichstand zwischen den Staffeln", count: 1,
+  closeRow("cB", "B", decided ? {} : { can_close: false, blockers: [{ code: "zone_cross_tie", label: "Gleichstand zwischen den Staffeln", count: 1,
     text: "Über die Staffeln hinweg stehen Teams gleich, aber nur ein Teil bekommt den Platz.", items: [{ text: names.join(" – "), url: "/admin/leagues/seasons/s2#abschluss" }] }] })],
   cross: [{ division_id: "d2", label: "Liga 2", final: false, sides: [{ kind: "promote_best", label: "Aufstieg über den Vergleich der Staffeln", count: 1, zone: "promotion",
     own_team: false, decision: null, tie: crossTie(names), candidates: [crossCandidate("ra", names[0], "A"), crossCandidate("rb", names[1], "B")], ...sideExtra }] }],
@@ -316,8 +316,8 @@ test.describe("Liga: Plätze über Staffeln hinweg", () => {
       let decided = false;
       let sent = null;
       await page.route("**/api/admin/leagues/seasons/s2/closing", (route) => json(decided
-        ? closing(names, { tie: null, decision: { registration_ids: ["rb"], names: [names[1]], method: "playoff", method_label: "Entscheidungsspiel", reason: "Entscheidungsspiel 3:1" },
-          candidates: [crossCandidate("rb", names[1], "B", { chosen: true, tied: false }), crossCandidate("ra", names[0], "A", { tied: false })] })
+        ? closing(names, { tie: null, decision: { registration_ids: ["rb"], names: [names[1]], tied: ["ra", "rb"], method: "playoff", method_label: "Entscheidungsspiel", reason: "Entscheidungsspiel 3:1" },
+          candidates: [crossCandidate("rb", names[1], "B", { chosen: true, tied: false }), crossCandidate("ra", names[0], "A", { tied: false, passed: true })] }, true)
         : closing(names))(route));
       await page.route("**/api/admin/leagues/divisions/d2/zone-decision", (route) => {
         sent = route.request().postDataJSON();
@@ -346,7 +346,11 @@ test.describe("Liga: Plätze über Staffeln hinweg", () => {
       await expect.poll(() => sent).toEqual({ kind: "promote_best", registration_ids: ["rb"], method: "playoff", reason: "Entscheidungsspiel 3:1" });
       await expect(page.getByTestId("cross-decision-d2-promote_best")).toContainText("Entscheid: Wüstenfüchse · Füchse A – Entscheidungsspiel: Entscheidungsspiel 3:1");
       await expect(page.getByTestId("cross-candidate-rb")).toContainText("steigt auf");
+      await expect(page.getByTestId("cross-candidate-ra")).toContainText("bleibt");
       await expect(page.getByTestId("cross-tie-d2-promote_best")).toHaveCount(0);
+      // Mit dem Entscheid entfällt der Sperrgrund: Die letzte Staffel lässt sich abschließen.
+      await expect(page.getByTestId("close-blocker-cB-zone_cross_tie")).toHaveCount(0);
+      await expect(page.getByTestId("close-button-cB")).toBeEnabled();
       await section.scrollIntoViewIfNeeded();
       await shot(page, `staffelvergleich-${width}`);
     });

@@ -10,6 +10,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
 import { nicknameRepeatsLevel, seasonWithEnd } from "@/lib/seasonTabs";
+import { crossFieldsShown } from "@/lib/leagueCrossZones";
 import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
 import { PrizeEditor } from "./LeagueLookFields";
@@ -100,7 +101,8 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
         <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} placeholder={String(points.loss ?? 0)} testId="override-points-loss" />
       </FormGrid>
       )}
-      <ZoneFields zones={zones} onChange={setZones} effective={division?.zones_effective} level={level} />
+      <ZoneFields zones={zones} onChange={setZones} effective={division?.zones_effective} level={level} staffelCount={division?.staffeln?.length || 0}
+        crossLocked={Boolean(division?.zones_cross_locked)} />
       <PrizeEditor rows={prizes} onChange={setPrizes} testId="division-prizes"
         emptyHint={season.prizes?.length ? `Wie die Season: ${season.prizes.map((row) => `${row.place}. ${row.text}`).join(" · ")}` : "Wie die Season – dort sind noch keine Gewinne eingetragen."} />
     </AdminSheet>
@@ -108,8 +110,11 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
 }
 
 /** Auf- und Abstieg dieser Liga N (F.2, #1627, Nr. 158): je Staffel, die Randfälle sagt der Hinweis. */
-function ZoneFields({ zones, onChange, effective, level }) {
+function ZoneFields({ zones, onChange, effective, level, staffelCount = 0, crossLocked = false }) {
   const set = (key) => (value) => onChange((current) => ({ ...current, [key]: value }));
+  // Plätze über alle Staffeln (#1627): nur dort zeigen, wo sie gelten - mehrere Staffeln, nicht nach oben in der obersten, nicht nach
+  // unten in der untersten Liga. Ab dem ersten Abschluss einer Staffel sind sie gesperrt (Nr. 228).
+  const cross = crossFieldsShown({ staffelCount, top: Boolean(effective?.top), bottom: Boolean(effective?.bottom), zones });
   const edge = [effective?.top ? "Als oberste Liga gibt es hier keinen Aufstieg." : "", effective?.bottom ? "Als unterste Liga gibt es hier keinen Abstieg." : ""]
     .filter(Boolean).join(" ");
   return (
@@ -127,18 +132,32 @@ function ZoneFields({ zones, onChange, effective, level }) {
         <TextField label="Relegation unten (freiwillig)" type="number" min={0} max={10} value={zones.playoff_relegate} onChange={set("playoff_relegate")}
           testId="zones-playoff-relegate" />
       </FormGrid>
-      {/* Zielregel über Staffeln hinweg (#1627): nur sinnvoll, wenn diese Liga mehrere Staffeln hat. */}
-      <p className="pt-1 text-xs font-bold uppercase tracking-wider text-white/70">Dazu über alle Staffeln dieser Liga</p>
-      <p className="text-xs text-white/55">
-        Für Ligen mit mehreren Staffeln, etwa „Platz 1 jeder Staffel und die zwei besten Zweiten“. Verglichen wird nach Punkten je Spiel, dann nach Map-Differenz je Spiel;
-        bei Gleichstand entscheidet die Leitung, ohne Los. Fest steht es erst, wenn alle Staffeln der Liga abgeschlossen sind. Leer oder 0: nur die Plätze je Staffel.
-      </p>
-      <FormGrid cols={2}>
-        <TextField label="Beste Nächstplatzierte steigen auf" type="number" min={0} max={10} value={zones.promote_best ?? ""} onChange={set("promote_best")} placeholder="0"
-          hint="Die besten Teams auf dem Platz gleich nach den Aufsteigern." testId="zones-promote-best" />
-        <TextField label="Schlechteste vor dem Abstieg steigen ab" type="number" min={0} max={10} value={zones.relegate_worst ?? ""} onChange={set("relegate_worst")} placeholder="0"
-          hint="Die schlechtesten Teams auf dem Platz gleich vor den Absteigern." testId="zones-relegate-worst" />
-      </FormGrid>
+      {/* Zielregel über Staffeln hinweg (#1627): nur, wo sie gilt. */}
+      {cross.promote_best || cross.relegate_worst ? (
+        <div className="space-y-2" data-testid="zones-cross">
+          <p className="pt-1 text-xs font-bold uppercase tracking-wider text-white/70">Dazu über alle Staffeln dieser Liga</p>
+          <p className="text-xs text-white/55">
+            Etwa „Platz 1 jeder Staffel und die zwei besten Zweiten“. Kandidat ist je Staffel der erste Platz nach den Aufsteigern und den Relegationsplätzen, unten
+            entsprechend. Verglichen wird nach Punkten je Spiel, dann nach Map-Differenz je Spiel; bei Gleichstand entscheidet die Leitung, ohne Los. Fest steht es erst, wenn
+            alle Staffeln der Liga abgeschlossen sind. Leer oder 0: nur die Plätze je Staffel.
+          </p>
+          {crossLocked ? (
+            <p className="text-xs text-warn" data-testid="zones-cross-locked">
+              Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn sie im Reiter „Abschluss“ wieder geöffnet ist.
+            </p>
+          ) : null}
+          <FormGrid cols={2}>
+            {cross.promote_best ? (
+              <TextField label="Beste Nächstplatzierte steigen auf" type="number" min={0} max={10} value={zones.promote_best ?? ""} onChange={set("promote_best")} placeholder="0"
+                disabled={crossLocked} hint="Die besten Teams auf dem ersten Platz nach Aufsteigern und Relegation." testId="zones-promote-best" />
+            ) : null}
+            {cross.relegate_worst ? (
+              <TextField label="Schlechteste vor dem Abstieg steigen ab" type="number" min={0} max={10} value={zones.relegate_worst ?? ""} onChange={set("relegate_worst")} placeholder="0"
+                disabled={crossLocked} hint="Die schlechtesten Teams auf dem letzten Platz vor Relegation und Absteigern." testId="zones-relegate-worst" />
+            ) : null}
+          </FormGrid>
+        </div>
+      ) : null}
     </fieldset>
   );
 }
