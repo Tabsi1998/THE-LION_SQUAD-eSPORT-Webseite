@@ -1717,7 +1717,7 @@ deren Seite die Person nicht öffnen darf, steht ohne Link da.
 
 **Liga-Abzeichen (#1638):** Überall, wo eine Liga N steht, zeigt ein Wappen mit ihrer Zahl die Stufe: **Liga 1** trägt eine Krone,
 einen doppelten Rand und einen zarten Glanz, **Liga 2** den doppelten Rand, ab **Liga 3** nur die Kontur. Die Farbe ist Cyan; **Gold**
-bekommt nur das Co-Team, das die Season gewonnen hat (Meister in der Season-Historie). Der Beiname der Liga N (2.3, z. B. „Elite“)
+tragen nur Wappen und das Wort „Meister“ beim Co-Team, das die Season gewonnen hat (Season-Historie); der Beiname bleibt Cyan. Der Beiname der Liga N (2.3, z. B. „Elite“)
 steht als Text daneben: „Liga 1 · Elite“. Zu sehen im Kopf jeder Liga N auf der Ligaseite, in **Aktuelle Ligen**, auf der Teamseite
 (Abschnitt *Liga*), in der Season-Historie und in der Gesamtwertung. Beim ersten Erscheinen setzt sich die Krone einmal auf und der
 Glanz läuft einmal darüber; mit „Bewegung reduzieren“ steht alles still.
@@ -1735,7 +1735,8 @@ selbst alles. Die Teamseite zeigt im Abschnitt *Liga* dieselben Karten für alle
 
 **Saisonverlauf:** Ab zwei abgeschlossenen Seasons zeigen Spielerprofil und Teamseite eine Linie: je Season ein Punkt, Liga N als
 Band, der Platz am Punkt, der Meister in Gold. Ein Aufstieg hebt die Linie, auch wenn der Platz in der höheren Liga N schlechter ist.
-Auf der Teamseite hat jedes Co-Team eine eigene Linie mit Legende.
+Auf der Teamseite hat jedes Co-Team eine eigene Linie mit Legende – höchstens vier, die besten zuerst (aktuelle Liga N, dann Platz);
+gibt es mehr, steht darunter „und N weitere Co-Teams“.
 
 <img src="../assets/liga/teamseite-liga-1440.png" alt="Teamseite am PC: Abschnitt Liga mit drei Co-Teams nach Liga N sortiert, darunter der Saisonverlauf mit einer Linie je Co-Team" width="720">
 
