@@ -31,6 +31,7 @@ from services import league_rewards
 from services import league_protest_settings as protest_settings
 from services import league_cross_zones, league_zones
 from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
+from services.league_finale import FIELD as TV_FINALE
 # Gleichstände um Meister und Zonengrenze (#2262): im Blatt-Modul, damit Tabelle und Abschluss dieselbe Rechnung nutzen.
 from services.league_ties import (  # noqa: F401 - weiter über league_final erreichbar
     METHODS, champion_ties, classify_ties, division_levels, leaders, tie_context, top_division_id,
@@ -545,6 +546,13 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
 
 # ---------------------------------------------------------------- Abschließen
 
+async def _forget_tv_finale(db, season_id: str | None) -> None:
+    """Wiederöffnen (#1641): Die Auf- und Absteiger der Season stehen nicht mehr fest - der TV-Schritt fällt an allen Staffeln weg."""
+    from services.league_finale import forget
+
+    await forget(db, season_id)
+
+
 async def _follow_up(what: str, tournament_id: str, step):
     """Ein Schritt nach dem Abschluss bzw. dem Wiederöffnen: Sein Fehler wird geloggt und hält nichts auf."""
     try:
@@ -607,7 +615,9 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
     mark = {"id": final["id"], "version": final["version"], "closed_at": final["closed_at"]}
     claimed = await db.tournaments.update_one(
         {"id": tid, "final_table": None},
-        {"$set": {"final_table": mark, "status": "completed", "status_before_final": tournament.get("status"), "updated_at": final["closed_at"]}})
+        {"$set": {"final_table": mark, "status": "completed", "status_before_final": tournament.get("status"), "updated_at": final["closed_at"]},
+         # Ein übrig gebliebener TV-Schritt (#1641) gilt nicht für den neuen Endstand - erst „Weiter“ zeigt ihn wieder.
+         "$unset": {TV_FINALE: ""}})
     if not claimed.modified_count:
         raise FinalProblem(ALREADY_CLOSED, 409)
     # Scheitert das Schreiben der Fassung - aus welchem Grund auch immer -, fällt die Marke wieder weg: Die Staffel bleibt offen und
@@ -690,7 +700,7 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
     # Scheitert das Entsperren der Staffel, gilt die Fassung wieder - sonst wäre die Staffel gesperrt, ohne Endstand (N3).
     try:
         await db.tournaments.update_one({"id": tid}, {"$set": {"final_table": None, "status": status, "updated_at": now.isoformat()},
-                                                      "$unset": {"status_before_final": ""}})
+                                                      "$unset": {"status_before_final": "", TV_FINALE: ""}})
     except BaseException:
         await db.league_final_tables.update_one(
             {"id": final["id"]}, {"$set": {"active": True, "reopened_at": None, "reopened_by": None, "reopen_reason": None}})
@@ -713,6 +723,7 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
 
     await _follow_up("Protokoll der Notausnahme", tid, record_overrides)
     await _follow_up("Ruhen des Meister-Eintrags", tid, lambda: suspend_champion(db, tid))
+    await _follow_up("TV-Saisonfinale", tid, lambda: _forget_tv_finale(db, context.get("season_id")))
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, tell)
@@ -734,7 +745,7 @@ async def _free_incomplete(db, tournament: dict, actor: dict, reason, *, conflic
     status = tournament.get("status_before_final") or "live"
     freed = await db.tournaments.update_one({"id": tid, "final_table.id": mark.get("id")},
                                             {"$set": {"final_table": None, "status": status, "updated_at": now.isoformat()},
-                                             "$unset": {"status_before_final": ""}})
+                                             "$unset": {"status_before_final": "", TV_FINALE: ""}})
     if not freed.modified_count:
         raise FinalProblem(NOT_CLOSED, 409)
 

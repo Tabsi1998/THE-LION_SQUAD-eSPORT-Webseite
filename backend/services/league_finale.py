@@ -205,3 +205,19 @@ async def control(db, season: dict, action: str, actor: dict | None) -> dict:
         for tournament_id in ids:
             await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)
     return {**state, "step": step if state["reason"] is None else 0}
+
+
+async def forget(db, season_id: str | None) -> None:
+    """Den TV-Schritt an allen Staffeln der Season wegnehmen (Wiederöffnen): Ihre TVs zeigen wieder das gewohnte Bild, bis die Leitung
+    nach dem nächsten Abschluss erneut „Weiter“ drückt."""
+    from services.change_events import publish_api_change
+
+    if not season_id:
+        return
+    rows = await db.tournaments.find({"league_context.season_id": season_id, FIELD: {"$exists": True}}, {"_id": 0, "id": 1}).to_list(STAFFEL_LIMIT)
+    ids = [row["id"] for row in rows]
+    if not ids:
+        return
+    await db.tournaments.update_many({"id": {"$in": ids}}, {"$unset": {FIELD: ""}})
+    for tournament_id in ids:
+        await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)
