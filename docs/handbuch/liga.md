@@ -1724,12 +1724,15 @@ Glanz läuft einmal darüber; mit „Bewegung reduzieren“ steht alles still.
 
 <img src="../assets/liga/liga-abzeichen-stufen.png" alt="Liga-Abzeichen in drei Größen: Liga 1 mit Krone, Liga 2 mit doppeltem Rand, Liga 3 schlicht, dazu zwei goldene Meister-Abzeichen und ein langer Beiname" width="720">
 
-**Aktuelle Ligen (#1630):** Das Spielerprofil zeigt je Co-Team, in dessen Kader die Person steht, die laufende Staffel: Liga N mit
+**Aktuelle Ligen (#1630):** Das Spielerprofil zeigt je Co-Team, in dessen Kader die Person steht oder das sie als Captain bzw.
+Vertreter führt, die laufende Staffel (wer ein Co-Team nur angemeldet hat, sieht es dort nicht): Liga N mit
 Abzeichen, Staffel, **Platz von N**, Zone (Auf- oder Abstieg, Relegation) und das **nächste Spiel** mit Gegner und Termin (ohne
-Termin der Spieltag). Einen Platz gibt es erst mit dem ersten gewerteten Spiel – vorher steht „Noch ohne Ergebnis“. Die beste Liga N
+Termin der Spieltag). Plätze gibt es ab dem ersten gewerteten Spiel der Staffel – vorher steht „Noch ohne Ergebnis“, auf der
+Warteliste bzw. vor der Zulassung „Warteliste“ bzw. „Anmeldung offen“. Die beste Liga N
 steht oben. Sichtbar nach derselben Regel wie die Season-Historie: Gäste und Nicht-Mitglieder nur öffentliche Seasons, Mitglieder
 bei eingeschaltetem „Vereinsinterne Erfolge zeigen“ auch Seasons „Nur Mitglieder“ mit dem Etikett **Vereinsintern**, die Person
-selbst alles. Die Teamseite zeigt im Abschnitt *Liga* dieselben Karten für alle Co-Teams des Teams, beste Liga N oben.
+selbst alles. Ein **privates Team** und seine Co-Teams stehen in „Aktuelle Ligen“ und in der Season-Historie nur für die Person
+selbst – wie die Teamseite, die außer dem Team niemand öffnen kann. Die Teamseite zeigt im Abschnitt *Liga* dieselben Karten für alle Co-Teams des Teams, beste Liga N oben.
 
 <img src="../assets/liga/profil-aktuelle-ligen-390.png" alt="Spielerprofil am Handy: Aktuelle Ligen mit drei Co-Teams in Liga 1, 2 und 3, Platz, Aufstieg und nächstem Spiel, darunter der Saisonverlauf als Linie" width="300">
 
