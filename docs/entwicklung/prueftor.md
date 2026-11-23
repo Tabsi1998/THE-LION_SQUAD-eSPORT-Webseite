@@ -52,7 +52,9 @@ sieht die Prüfung nicht. Die Laufzeit prüft `ui-motion.spec.js`.
 
 **Bestand:** Alle Verstöße von vor dem Tor stehen je Datei und Regel mit Zahl und Begründung in
 `motion-rules-allowlist.json` – der Code wurde dafür nicht umgebaut. Rot wird eine Datei erst, wenn sie **mehr**
-Verstöße einer Regel hat als erlaubt. Wer aufräumt, senkt die Liste:
+Verstöße einer Regel hat als erlaubt. Rot ist auch **Luft**: Erlaubt die Liste mehr, als es gibt (jemand hat
+aufgeräumt), muss sie im selben PR mitsinken – sonst kämen später unbemerkt neue Verstöße bis zur alten Zahl dazu.
+Wer aufräumt, senkt die Liste:
 
 ```bash
 cd frontend

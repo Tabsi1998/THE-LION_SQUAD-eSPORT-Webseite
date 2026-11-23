@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   allowlistGrowth, allowlistProblems, compare, countFindings, cssDeclarations, markChanged, parseDiffLines, scanCss, scanJs,
-  scanTree, tightened, transitionProperties,
+  scanTree, slackProblems, tightened, transitionProperties,
 } from "../../scripts/check-motion-rules.mjs";
 
 // Bewegungsregeln (#1660, Entscheidung 15.10.2026): nur transform/opacity animieren, „Bewegung reduzieren“ beachten,
@@ -136,6 +136,11 @@ describe("Bewegungsregeln: Ausnahmeliste", () => {
     ]);
   });
 
+  it("nennt Luft mit dem Hinweis auf --tighten", () => {
+    expect(slackProblems([{ file: "src/a.css", rule: "token-duration", count: 2, allowed: 3 }]))
+      .toEqual(['src/a.css – token-duration: erlaubt 3, gefunden 2 – "--tighten" ausführen']);
+  });
+
   it("erkennt eine gewachsene Liste gegenüber main und senkt nur, nie hinauf", () => {
     const base = { ausnahmen: { "src/a.css": { "token-duration": { anzahl: 1, grund } } } };
     const current = { ausnahmen: { "src/a.css": { "token-duration": { anzahl: 2, grund } }, "src/c.css": { "token-easing": { anzahl: 1, grund } } } };
@@ -155,10 +160,13 @@ describe("Bewegungsregeln: Wächter über src", () => {
 
   // Liest alle Quelldateien: allein gut 2 s, auf einem ausgelasteten Rechner (volle Suite parallel) mehr als die
   // 5 s Vorgabe - darum ein eigenes Zeitlimit.
-  it("keine neuen Verstöße gegenüber der Ausnahmeliste", () => {
-    const { fresh } = compare(scanTree(root), allowlist);
+  it("keine neuen Verstöße gegenüber der Ausnahmeliste und keine Luft darin", () => {
+    const { fresh, slack } = compare(scanTree(root), allowlist);
     const report = fresh.map((item) => `${item.file} ${item.rule}: ${item.count} statt höchstens ${item.allowed} `
       + `(${item.findings.map((finding) => `Zeile ${finding.line}`).join(", ")})`);
     expect(report).toEqual([]);
+    // Luft: Die Liste erlaubt mehr, als es gibt - sonst kämen später unbemerkt neue Verstöße bis zur alten Zahl dazu.
+    // Behebung: node scripts/check-motion-rules.mjs --tighten
+    expect(slackProblems(slack)).toEqual([]);
   }, 30_000);
 });

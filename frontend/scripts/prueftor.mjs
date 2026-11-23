@@ -117,11 +117,15 @@ export function checkForTest(test, specs = PRUEFTOR_SPECS) {
   return specs.find((spec) => spec.file === test.file)?.check || null;
 }
 
+/** Luft in der Bewegungs-Ausnahmeliste (check-motion-rules.mjs): Texte mit dem Hinweis auf --tighten. */
+const motionSlack = (bewegung) => (Array.isArray(bewegung && bewegung.slack) ? bewegung.slack : []);
+
 function browserSummary(tests) {
   const failed = tests.filter((test) => test.status === "unexpected");
   const passed = tests.filter((test) => test.status === "expected" || test.status === "flaky");
   return {
-    ok: tests.length > 0 && failed.length === 0,
+    // Mindestens ein bestandener Test: Lauter übersprungene Tests (etwa ein vergessenes test.skip) sind nicht grün.
+    ok: passed.length > 0 && failed.length === 0,
     passed: passed.length,
     total: tests.filter((test) => test.status !== "skipped").length,
     flaky: tests.filter((test) => test.status === "flaky").map((test) => test.title),
@@ -193,8 +197,10 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
       motionDetails.push(`${item.file} – ${item.rule}: ${item.count} statt höchstens ${item.allowed} (${shown.map((finding) => `Zeile ${finding.line}${finding.geaendert ? " (geändert)" : ""}: ${finding.detail}`).join("; ")})`);
     }
     for (const problem of bewegung.allowlistProblems || []) motionDetails.push(`Ausnahmeliste: ${problem}`);
+    for (const problem of motionSlack(bewegung)) motionDetails.push(`Ausnahmeliste hat Luft: ${problem}`);
   } else motionDetails.push(missing("Bewegungs-Prüfung"));
-  add("bewegung", Boolean(bewegung) && !(bewegung.fresh || []).length && !(bewegung.allowlistProblems || []).length && motionBrowser.ok,
+  add("bewegung", Boolean(bewegung) && !(bewegung.fresh || []).length && !(bewegung.allowlistProblems || []).length
+    && !motionSlack(bewegung).length && motionBrowser.ok,
     bewegung ? { neu: (bewegung.fresh || []).reduce((sum, item) => sum + item.count - item.allowed, 0), bestand: bewegung.allowedTotal, funde: bewegung.total } : {},
     motionDetails);
 

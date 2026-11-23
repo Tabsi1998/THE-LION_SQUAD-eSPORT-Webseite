@@ -379,6 +379,14 @@ export function compare(findingsByFile, allowlist) {
   return { fresh, slack, total, allowedTotal };
 }
 
+/**
+ * Luft in der Ausnahmeliste (erlaubt mehr, als es gibt) ist ein Fehler: Sonst kämen später unbemerkt neue Verstöße
+ * bis zur alten Zahl dazu. Behebung: --tighten.
+ */
+export function slackProblems(slack) {
+  return slack.map((item) => `${item.file} – ${item.rule}: erlaubt ${item.allowed}, gefunden ${item.count} – "--tighten" ausführen`);
+}
+
 /** Wo erlaubt die Ausnahmeliste mehr als die von main? Neue Ausnahmen brauchen eine Begründung im PR. */
 export function allowlistGrowth(current, base) {
   const grown = [];
@@ -476,9 +484,8 @@ function main() {
   }
   for (const problem of listProblems) console.log(`AUSNAHMELISTE ${problem}`);
   for (const item of grown) console.log(`ERWEITERT ${item.file} - ${item.rule}: ${item.before} -> ${item.after} (${item.grund})`);
-  if (result.slack.length) {
-    console.log(`${result.slack.length} Einträge der Ausnahmeliste haben Luft - "node scripts/check-motion-rules.mjs --tighten" senkt sie.`);
-  }
+  const slack = slackProblems(result.slack);
+  for (const problem of slack) console.log(`LUFT ${problem}`);
 
   const reportFile = argValue("--report");
   if (reportFile) {
@@ -486,7 +493,7 @@ function main() {
       total: result.total,
       allowedTotal: result.allowedTotal,
       fresh: result.fresh,
-      slack: result.slack.length,
+      slack,
       allowlistProblems: listProblems,
       grown,
     }, null, 2)}\n`);
@@ -494,6 +501,11 @@ function main() {
   if (result.fresh.length || listProblems.length) {
     console.error("\nBewegungsregeln verletzt: nur transform/opacity animieren, Dauern und Kurven aus den Tokens, " +
       "„Bewegung reduzieren“ beachten (docs/entwicklung/prueftor.md).");
+    process.exit(1);
+  }
+  if (slack.length) {
+    console.error(`\nDie Ausnahmeliste erlaubt ${slack.length}-mal mehr als nötig. "node scripts/check-motion-rules.mjs --tighten" `
+      + "ausführen und die Liste mitcommitten - sonst könnten später unbemerkt neue Verstöße bis zur alten Zahl dazukommen.");
     process.exit(1);
   }
   console.log("Bewegungsregeln: keine neuen Verstöße – ok");

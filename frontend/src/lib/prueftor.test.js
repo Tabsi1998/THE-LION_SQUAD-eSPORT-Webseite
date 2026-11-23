@@ -82,6 +82,18 @@ describe("Prüftor: Auswertung", () => {
     expect(CHECKS.map((check) => result.checks[check.id].status)).toEqual(["gruen", "gruen", "gruen", "gruen", "gruen"]);
   });
 
+  it("lauter übersprungene Tests sind nicht grün", () => {
+    const tests = GOOD.tests.map((test) => (test.file === "a11y-pages.spec.js" ? { ...test, status: "skipped" } : test));
+    expect(evaluate({ ...GOOD, tests }).blocking).toEqual(["a11y"]);
+  });
+
+  it("Luft in der Bewegungs-Ausnahmeliste ist rot und nennt --tighten", () => {
+    const bewegung = { ...GOOD.bewegung, slack: ['src/x.css – token-duration: erlaubt 3, gefunden 2 – "--tighten" ausführen'] };
+    const result = evaluate({ ...GOOD, bewegung });
+    expect(result.blocking).toEqual(["bewegung"]);
+    expect(result.checks.bewegung.details[0]).toContain("--tighten");
+  });
+
   it("fehlende Teile sind rot - ein Tor, das nicht lief, ist nicht grün", () => {
     const result = evaluate({});
     expect(result.ok).toBe(false);
