@@ -244,7 +244,7 @@ function TeamDetail({ id }) {
   const overview = overviewLoad.data || null;
   // Co-Teams, die gerade in einer laufenden Staffel spielen - der Saisonverlauf zeigt sie zuerst (Review #1638).
   const leaguePlaying = (overview?.league || []).flatMap((row) => [row.squad_id, row.display_name]).filter(Boolean);
-  const refresh =() => Promise.all([teamLoad.reload(), levelLoad.reload(), overviewLoad.reload()]);
+  const refresh = () => Promise.all([teamLoad.reload(), levelLoad.reload(), overviewLoad.reload()]);
   const load = refresh;
   useApiInvalidation(refresh, ["teams"]);
 
