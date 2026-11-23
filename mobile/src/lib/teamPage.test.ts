@@ -1,4 +1,4 @@
-import { dissolveSentence, INVITE_PARAM, outcomeLabel, recentLine, sameTeamName, upcomingLine } from "./teamPage";
+import { dissolveSentence, INVITE_PARAM, outcomeLabel, recentLine, sameTeamName, teamFieldsProblem, upcomingLine } from "./teamPage";
 
 // Team-Seite (#1191): dieselben Zeilen wie im Web.
 
@@ -28,4 +28,13 @@ test("Team auflösen (#1274): derselbe Satz wie im Web; der Name zählt ohne Gro
   expect(dissolveSentence({ member_count: 1 })).not.toContain("wird gelöscht");
   expect(sameTeamName({ name: "Lions Rocket" }, "  lions   ROCKET ")).toBe(true);
   expect(sameTeamName({ name: "Lions Rocket" }, "Lions")).toBe(false);
+});
+
+// Wie der Server (_team_label, #2128 TM11): Ein älterer, unveränderter Wert bleibt gültig - geprüft wird nur, was sich ändert.
+test("Team-Grenzen: ein unveränderter Altwert sperrt nicht, ein geänderter schon", () => {
+  const old = { name: "L", tag: "X" };
+  expect(teamFieldsProblem(" L ", "X", old)).toBeNull();
+  expect(teamFieldsProblem("L", "Y", old)).toBe("Kürzel: 2 bis 8 Zeichen.");
+  expect(teamFieldsProblem("M", "X", old)).toBe("Name: 2 bis 60 Zeichen.");
+  expect(teamFieldsProblem("L", "X")).toBe("Name: 2 bis 60 Zeichen.");
 });

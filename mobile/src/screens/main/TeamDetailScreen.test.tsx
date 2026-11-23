@@ -381,3 +381,23 @@ test("Co-Team: Spiel aus /games antippen, archivierte fehlen, der alte Freitext 
   await fireEvent.press(screen.getByText("Co-Team speichern"));
   await waitFor(() => expect(mockPatch).toHaveBeenLastCalledWith("/teams/t1/squads/s1", expect.objectContaining({ game_id: "g-rl" })));
 });
+
+// Muss-Punkt der Prüfung (#2173): Ein Team mit älterem 1-Zeichen-Kürzel kann weiter Beschreibung, Farbe oder Discord speichern.
+test("Team mit älterem Kürzel unter der Grenze: unverändert speichert es, ein neues zu kurzes nicht", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, tag: "L", can_manage: true });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  expect(screen.queryByTestId("team-fields-problem")).toBeNull();
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "M");
+  expect(screen.getByTestId("team-fields-problem")).toHaveTextContent("Kürzel: 2 bis 8 Zeichen.");
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "L");
+  expect(screen.queryByTestId("team-fields-problem")).toBeNull();
+  await fireEvent.press(screen.getByTestId("team-color-green"));
+  await fireEvent.press(screen.getByText("Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ tag: "L", color: "green" })));
+});

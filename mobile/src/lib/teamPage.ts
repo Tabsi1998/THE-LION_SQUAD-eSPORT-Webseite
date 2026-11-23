@@ -87,12 +87,18 @@ export const TEAM_NAME_MAX = 60;
 export const TEAM_TAG_MIN = 2;
 export const TEAM_TAG_MAX = 8;
 
-/** Was an Name oder Kürzel nicht passt - der Satz für die Seite, sonst `null`. */
-export function teamFieldsProblem(name?: string | null, tag?: string | null): string | null {
-  const nameLength = String(name || "").trim().length;
-  const tagLength = String(tag || "").trim().length;
-  if (nameLength < TEAM_NAME_MIN || nameLength > TEAM_NAME_MAX) return `Name: ${TEAM_NAME_MIN} bis ${TEAM_NAME_MAX} Zeichen.`;
-  if (tagLength < TEAM_TAG_MIN || tagLength > TEAM_TAG_MAX) return `Kürzel: ${TEAM_TAG_MIN} bis ${TEAM_TAG_MAX} Zeichen.`;
+/**
+ * Was an Name oder Kürzel nicht passt - der Satz für die Seite, sonst `null`. Wie der Server (`_team_label`): Ein älterer, unveränderter
+ * Wert (`current`, getrimmt verglichen) bleibt gültig, auch außerhalb der Grenzen - geprüft wird nur, was sich ändert.
+ */
+export function teamFieldsProblem(name?: string | null, tag?: string | null, current?: { name?: string | null; tag?: string | null } | null): string | null {
+  const outside = (value: string | null | undefined, before: string | null | undefined, low: number, high: number) => {
+    const text = String(value || "").trim();
+    if (current && text === String(before || "").trim()) return false;
+    return text.length < low || text.length > high;
+  };
+  if (outside(name, current?.name, TEAM_NAME_MIN, TEAM_NAME_MAX)) return `Name: ${TEAM_NAME_MIN} bis ${TEAM_NAME_MAX} Zeichen.`;
+  if (outside(tag, current?.tag, TEAM_TAG_MIN, TEAM_TAG_MAX)) return `Kürzel: ${TEAM_TAG_MIN} bis ${TEAM_TAG_MAX} Zeichen.`;
   return null;
 }
 

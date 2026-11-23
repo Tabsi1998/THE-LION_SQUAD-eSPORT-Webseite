@@ -230,13 +230,16 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     ]);
   }, [showActionResult, team]);
 
-  const teamProblem = teamFieldsProblem(teamForm.name, teamForm.tag);
+  // Ein älterer, unveränderter Name bzw. ein älteres Kürzel bleibt gültig wie im Server (`_team_label`) - auch nicht in Großbuchstaben
+  // umgeschrieben, sonst gälte es als geändert.
+  const teamProblem = teamFieldsProblem(teamForm.name, teamForm.tag, team);
   const saveTeam = useCallback(() => {
-    if (!team || !canManage || teamFieldsProblem(teamForm.name, teamForm.tag)) return;
+    if (!team || !canManage || teamFieldsProblem(teamForm.name, teamForm.tag, team)) return;
+    const tag = teamForm.tag.trim();
     showActionResult(async () => {
       await api.patch(`/teams/${team.id}`, {
         name: teamForm.name.trim(),
-        tag: teamForm.tag.trim().toUpperCase(),
+        tag: tag === String(team.tag || "").trim() ? tag : tag.toUpperCase(),
         description: teamForm.description.trim() || null,
         logo_url: teamForm.logo_url.trim() || null,
         banner_url: teamForm.banner_url.trim() || null,
@@ -429,8 +432,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         {editOpen && canManage ? (
           <Card style={styles.card}>
             <Heading>Basisdaten bearbeiten</Heading>
-            <Field label="Name" value={teamForm.name} maxLength={TEAM_NAME_MAX} testID="team-name-input" onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
-            <Field label="Kürzel" value={teamForm.tag} maxLength={TEAM_TAG_MAX} testID="team-tag-input" onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, TEAM_TAG_MAX) }))} />
+            <Field label="Name" value={teamForm.name} maxLength={Math.max(TEAM_NAME_MAX, String(team.name || "").length)} testID="team-name-input" onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
+            <Field label="Kürzel" value={teamForm.tag} maxLength={Math.max(TEAM_TAG_MAX, String(team.tag || "").length)} testID="team-tag-input"
+              onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value === team.tag ? value : value.toUpperCase().slice(0, Math.max(TEAM_TAG_MAX, String(team.tag || "").length)) }))} />
             <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
             {/* Logo und Banner vom Handy (#1153) - nur für Teamleitung und Co-Leitung; gespeichert wird sofort. */}
             <ImagePickField label="Logo" shape="square" value={teamForm.logo_url} onUploaded={(url) => saveTeamImage("logo_url", url)} fallback={<Body style={styles.logoInitials}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>} testID="team-logo" />
