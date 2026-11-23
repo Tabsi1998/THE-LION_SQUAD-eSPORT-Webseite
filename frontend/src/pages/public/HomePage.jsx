@@ -32,6 +32,8 @@ import { KIND_COLORS } from "@/lib/categoryColors";
 import { withoutRepeatedBanners } from "@/lib/newsCards";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { NewsLead } from "@/components/tls/NewsLead";
+import { RoleLine, splitRole } from "@/components/tls/BoardPortrait";
+import { isLongTitle } from "@/lib/longTitle";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
@@ -391,7 +393,8 @@ function BoardTeaser({ contacts }) {
               <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black text-2xl inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
             )}
             <span className="min-w-0">
-              <span className="block text-[11px] uppercase tracking-widest font-bold text-[#FFD700] truncate">{contact.title}</span>
+              {/* Lange Rollen in Etikett und Wort (#1314, wie auf „Vorstand“): „Stellvertretung“ / „Obmann“ statt „…“. */}
+              <RoleLine {...splitRole(contact.title)} />
               <span className="block font-heading text-lg md:text-xl font-black uppercase leading-tight break-words group-hover:text-[#FFD700] transition">{contact.name}</span>
             </span>
           </Link>
@@ -453,13 +456,13 @@ function NextUp({ items }) {
               <div className="flex items-center gap-3 min-w-0 w-full">
                 <KindIcon kind={item.kind} accent={item.accent_color} />
                 <div className="min-w-0 flex-1">
-                  <div className="font-heading font-bold leading-tight line-clamp-2 flex items-center gap-2 flex-wrap">
-                    <span>{item.label}</span>
+                  <div className="font-heading font-bold leading-tight flex items-center gap-2 flex-wrap">
+                    <span className="tls-wrap">{item.label}</span>
                     {isChanged && <span className="tls-new-chip" data-testid="home-next-new">Neu</span>}
                   </div>
                   {counts && <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/55 tabular-nums" data-testid="home-live-counts"><Users className="w-3 h-3" /> {counts}</div>}
                   {item.children?.length > 0 && (
-                    <div className="mt-1 text-xs text-white/55 line-clamp-2" data-testid={`home-next-children-${item.slug || item.id}`}>
+                    <div className="tls-wrap mt-1 text-xs text-white/55" data-testid={`home-next-children-${item.slug || item.id}`}>
                       {childSummary(item.children.map((child) => ({ kind: child.kind })))}: {item.children.map((child) => child.label).join(", ")}
                     </div>
                   )}
@@ -545,7 +548,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
           {newsCategoryLabel(news.category)}
           {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
-        <h3 className={`tls-card__title mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>
+        <h3 className={`tls-card__title mt-2 font-heading font-black uppercase leading-tight tls-wrap ${featured ? (isLongTitle(news.title) ? "text-lg md:text-xl" : "text-xl md:text-2xl") : ""}`}>{news.title}</h3>
         {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{formatAgo(news.published_at || news.created_at)}</div>}
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>

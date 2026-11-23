@@ -4,7 +4,8 @@ from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
-from services.notification_preferences import enqueue_newsletter_for_item
+from services.notification_preferences import NEWSLETTER_SKIP_REASONS, enqueue_newsletter_for_item
+from services.news_channels import notification_meta
 from services.user_notifications import create_user_notification
 from services.visibility import user_can_see
 
@@ -22,6 +23,7 @@ INTERNAL_NEWS_FIELDS = frozenset({
     "newsletter_sent_at", "newsletter_sent_count", "newsletter_sent_by", "newsletter_skipped_reason", "newsletter_checked_at",
     "news_mention_notified_user_ids", "news_mentions_processed_at",
     "discord_checked_at", "discord_outcome", "members_notified_at", "members_notified_count",
+    "app_push_notified_at", "app_push_count", "app_push_skipped_reason",
 })
 
 
@@ -195,7 +197,8 @@ async def notify_news_mentions(db, post: dict, actor: dict | None = None) -> int
             body=f"{user_label(actor)} hat dich in \"{post.get('title') or 'News'}\" erwähnt.",
             url=url,
             kind="news_mention",
-            meta={"news_id": post.get("id"), "slug": post.get("slug")},
+            # Kanal der News (#1532): Push nur auf der Seite, auf der die News erscheint.
+            meta={"news_id": post.get("id"), "slug": post.get("slug"), **notification_meta(post)},
         )
         notified_ids.append(user["id"])
 
@@ -228,7 +231,7 @@ async def finalize_due_news(limit: int = 100) -> dict:
         processed += 1
         if not post.get("newsletter_sent_at") and not post.get("newsletter_skipped_reason"):
             result = await enqueue_newsletter_for_item("news", post)
-            if result.get("reason") in {"internal_visibility", "not_published"}:
+            if result.get("reason") in NEWSLETTER_SKIP_REASONS:
                 skipped += 1
                 await db.news_posts.update_one(
                     {"id": post["id"]},

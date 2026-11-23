@@ -294,9 +294,9 @@ function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, 
       <button type="button" onClick={onSelect} aria-expanded={selected} className="min-w-0 flex-1 text-left" data-testid={`event-lead-name-${row.id}`}>
         <span className="flex items-center gap-2">
           {here ? <Check className="w-4 h-4 shrink-0 text-[color:var(--tls-success)]" aria-label="da" /> : null}
-          <span className="block truncate text-base font-bold text-white">{row.display_name}</span>
+          <span className="tls-wrap block text-base font-bold text-white">{row.display_name}</span>
         </span>
-        {sub ? <span className="mt-0.5 block truncate text-xs text-white/55">{sub}</span> : null}
+        {sub ? <span className="tls-wrap mt-0.5 block text-xs text-white/55">{sub}</span> : null}
       </button>
       {row.status === "registered" ? (
         <button type="button" disabled={busy} onClick={onCheckIn} className="tls-btn tls-btn--primary shrink-0 min-h-[48px] min-w-[84px] px-5 py-2 rounded-sm text-sm uppercase tracking-wider font-black" data-testid={`event-lead-checkin-${row.id}`}>Da</button>
@@ -420,7 +420,7 @@ function UndoBar({ undo, onUndo }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pointer-events-none print:hidden" data-testid="event-lead-undo-bar">
       <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-lg border border-[#29B6E8]/40 bg-[#0F1D23] px-4 py-3 shadow-2xl shadow-black/60" role="status" aria-live="polite">
-        <div className="min-w-0 flex-1 text-sm text-white/85 truncate">{undo.sentence}</div>
+        <div className="tls-wrap flex-1 text-sm text-white/85">{undo.sentence}</div>
         <button type="button" onClick={onUndo} className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-undo-last">
           <Undo2 className="w-4 h-4" /> Rückgängig
         </button>

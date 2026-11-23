@@ -99,7 +99,7 @@ export function AmpPanelCard() {
         <span className="inline-flex items-center gap-2 min-w-0">
           <Server className="w-4 h-4 shrink-0 text-[#29B6E8]" />
           <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">AMP-Panel</span>
-          <span className="text-xs text-white/45 truncate">für Server mit Live-Daten vom AMP-Panel</span>
+          <span className="text-xs text-white/45 tls-wrap">für Server mit Live-Daten vom AMP-Panel</span>
         </span>
         <ChevronDown className={`w-4 h-4 shrink-0 text-white/50 transition ${open ? "rotate-180" : ""}`} />
       </button>

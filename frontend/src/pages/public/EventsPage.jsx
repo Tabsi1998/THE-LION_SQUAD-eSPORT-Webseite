@@ -17,6 +17,7 @@ import { Calendar, ChevronDown, Flag, MapPin, Trophy, Users as UsersIcon, Crown,
 import { formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
 import { scheduleLine } from "@/lib/eventDays";
+import { splitTournamentTitle } from "@/lib/tournamentTitle";
 
 // Events (#1182): das Event als Klammer um seine Turniere und Fast Laps - eine Karte für die Herbst-LAN, darin jedes
 // Turnier mit Tag, Uhrzeit, Spielart und dem eigenen Stand (aufklappbar). Turniere und Fast Laps ohne Event stehen für
@@ -148,7 +149,7 @@ export default function EventsPage() {
             <button onClick={() => updateEventFilters({ view: "past" })} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
             <Link to="/calendar" data-testid="events-tab-calendar" aria-label="Kalender" title="Kalender" className="tls-btn tls-btn--quiet px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Kalender</span></Link>
           </div>
-          <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
+          <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" aria-label="Event-Typ" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
             <option value="">Alle Typen</option>
             {filterTypes.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
           </select>
@@ -211,7 +212,7 @@ export default function EventsPage() {
 function MineChip({ state, testId }) {
   if (!state) return null;
   const text = [state.label || "Dabei", state.team_name].filter(Boolean).join(" · ");
-  return <span data-testid={testId} className="inline-flex max-w-full truncate rounded-sm border border-brand/50 bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">{text}</span>;
+  return <span data-testid={testId} className="tls-wrap inline-block max-w-full rounded-sm border border-brand/50 bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">{text}</span>;
 }
 
 // Ein Datumsformat (#1307): „Sa 23. Mai · 18:00“, „heute 18:00“.
@@ -259,14 +260,14 @@ function EventCard({ card, meta }) {
         <h3 className={`tls-card__title mt-2 font-heading font-black text-lg break-words ${cancelled ? "text-white/60 line-through decoration-white/40" : ""}`}>{e.name}</h3>
         {card.mine && <div className="mt-2"><MineChip state={card.mine} testId={`event-card-mine-${e.slug}`} /></div>}
         {e.start_date && (
-          <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
-            <Calendar className="w-3 h-3" />
-            <span className="min-w-0 truncate" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || formatWhen(e.start_date)}</span>
+          <div className="mt-2 flex min-w-0 items-start gap-1.5 text-xs text-white/60">
+            <Calendar className="mt-0.5 w-3 h-3 shrink-0" />
+            <span className="tls-wrap" data-testid={e.schedule?.multi_day ? "event-card-days" : undefined}>{scheduleLine(e.schedule) || formatWhen(e.start_date)}</span>
           </div>
         )}
         {e.location && (
-          <div className="mt-1 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
-            <MapPin className="w-3 h-3 shrink-0" /> <span className="min-w-0 truncate">{e.location}</span>
+          <div className="mt-1 flex min-w-0 items-start gap-1.5 text-xs text-white/60">
+            <MapPin className="mt-0.5 w-3 h-3 shrink-0" /> <span className="tls-wrap">{e.location}</span>
           </div>
         )}
         {showsSeats && e.max_participants && (
@@ -292,7 +293,7 @@ function EventCard({ card, meta }) {
       {card.children.length > 0 && (
         <div className="border-t border-white/10">
           <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} data-testid={`event-card-toggle-${e.slug}`} className="tls-btn tls-btn--quiet w-full rounded-none border-0 px-5 py-3 flex items-center justify-between gap-2 text-xs font-bold">
-            <span className="min-w-0 truncate">{childSummary(card.children)}</span>
+            <span className="tls-wrap text-left">{childSummary(card.children)}</span>
             <span className="inline-flex items-center gap-2 shrink-0">
               {ownChild && !open && <span className="text-brand">Du bist dabei</span>}
               <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -300,7 +301,7 @@ function EventCard({ card, meta }) {
           </button>
           {open && (
             <ul className="px-3 pb-3 space-y-1.5" data-testid={`event-card-children-${e.slug}`}>
-              {card.children.map((row) => <li key={row.key}><ChildRow row={row} /></li>)}
+              {card.children.map((row) => <li key={row.key}><ChildRow row={row} event={e} /></li>)}
             </ul>
           )}
         </div>
@@ -309,8 +310,11 @@ function EventCard({ card, meta }) {
   );
 }
 
-function ChildRow({ row }) {
+// Unter seinem Event steht ein Turnier ohne den Event-Teil im Titel (#1314): „Herbst-LAN • Kleines Turnier“ heißt dort
+// „Kleines Turnier“ und darf zwei Zeilen haben, statt mit „…“ zu enden. Der volle Titel bleibt im `title`.
+function ChildRow({ row, event }) {
   const item = row.item;
+  const name = splitTournamentTitle({ ...item, event }).name;
   const Icon = row.kind === "fastlap" ? Flag : Trophy;
   const path = row.kind === "fastlap" ? `/fastlap/${item.slug || item.id}` : `/tournaments/${item.slug || item.id}`;
   const play = playLabel(row);
@@ -318,8 +322,8 @@ function ChildRow({ row }) {
     <Link to={path} data-testid={`event-child-${row.kind}-${item.id}`} className="flex items-start gap-2.5 rounded-sm border border-white/5 bg-black/20 hover:border-white/25 px-3 py-2 transition min-w-0">
       <Icon className="mt-0.5 w-3.5 h-3.5 shrink-0" style={{ color: KIND_COLORS[row.kind === "fastlap" ? "fastlap" : "tournament"] }} />
       <span className="min-w-0 flex-1">
-        <span className="block text-[10px] uppercase tracking-widest text-white/45 font-bold truncate">{[whenLine(item), play].filter(Boolean).join(" · ")}</span>
-        <span className="block text-sm font-bold truncate">{item.title}</span>
+        <span className="tls-wrap block text-[10px] uppercase tracking-widest text-white/45 font-bold">{[whenLine(item), play].filter(Boolean).join(" · ")}</span>
+        <span className="tls-wrap block text-sm font-bold" title={name !== item.title ? item.title : undefined}>{name}</span>
         {row.mine && <span className="mt-1 block"><MineChip state={row.mine} testId={`event-child-mine-${item.id}`} /></span>}
       </span>
     </Link>
@@ -332,6 +336,8 @@ function SingleCard({ card }) {
   const Icon = isLap ? Flag : Trophy;
   const path = isLap ? `/fastlap/${item.slug || item.id}` : `/tournaments/${item.slug || item.id}`;
   const play = playLabel(card);
+  // Mit „gehört zu …“ darunter fällt der Event-Teil im Titel weg (#1314).
+  const name = card.event ? splitTournamentTitle({ ...item, event: card.event }).name : item.title;
   return (
     <Link
       to={path}
@@ -343,13 +349,13 @@ function SingleCard({ card }) {
         <span className="inline-flex items-center gap-1" style={{ color: KIND_COLORS[isLap ? "fastlap" : "tournament"] }}><Icon className="w-3 h-3" /> {isLap ? "Fast Lap" : "Turnier"}</span>
         <PhaseBadge phase={item.public_phase} status={item.status} />
       </div>
-      <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{item.title}</h3>
+      <h3 className="tls-card__title tls-wrap mt-2 font-heading font-black text-lg" title={name !== item.title ? item.title : undefined}>{name}</h3>
       {card.mine && <div className="mt-2"><MineChip state={card.mine} testId={`${card.kind}-card-mine-${item.id}`} /></div>}
-      <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
-        <Calendar className="w-3 h-3 shrink-0" /> <span className="min-w-0 truncate">{[whenLine(item), play].filter(Boolean).join(" · ")}</span>
+      <div className="mt-2 flex min-w-0 items-start gap-1.5 text-xs text-white/60">
+        <Calendar className="mt-0.5 w-3 h-3 shrink-0" /> <span className="tls-wrap">{[whenLine(item), play].filter(Boolean).join(" · ")}</span>
       </div>
       {card.event && (
-        <div className="mt-1 text-xs text-white/50 truncate" data-testid={`${card.kind}-card-event-${item.id}`}>gehört zu {card.event.name}</div>
+        <div className="tls-wrap mt-1 text-xs text-white/50" data-testid={`${card.kind}-card-event-${item.id}`}>gehört zu {card.event.name}</div>
       )}
     </Link>
   );

@@ -141,7 +141,7 @@ function PeopleTab() {
               <li key={row.user_id}>
                 <button type="button" onClick={() => setSelected(row.user_id)} data-testid={`people-row-${row.user.username}`} className={`w-full text-left py-2 px-2 rounded-sm ${selected === row.user_id ? "bg-[#29B6E8]/10" : "hover:bg-white/[0.03]"}`}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-sm truncate">{row.user.display_name || row.user.username}</span>
+                    <span className="font-bold text-sm tls-wrap">{row.user.display_name || row.user.username}</span>
                     {row.open_appeal && <span className="text-[10px] font-black uppercase tracking-widest text-[#FFD700]">Einspruch</span>}
                     {row.protected && !row.open_appeal && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid={`people-protected-${row.user.username}`}>Admin-Konto</span>}
                   </div>

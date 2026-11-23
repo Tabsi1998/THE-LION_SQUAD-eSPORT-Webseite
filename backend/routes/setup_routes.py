@@ -11,6 +11,7 @@ from database import get_db
 from auth import password_fields, require_super, require_any_admin
 from models import now_utc, new_id
 from services import help_topics
+from services.news_channels import in_channel
 from services.password_policy import NewPassword
 from services.public_site_settings import build_public_legal_settings
 from services.secret_store import encrypt_secret
@@ -378,10 +379,11 @@ async def sitemap():
     # news
     async for n in db.news_posts.find(
         {"published": True, **public_visibility},
-        {"slug": 1, "id": 1, "updated_at": 1, "published_at": 1, "created_at": 1, "_id": 0},
+        {"slug": 1, "id": 1, "updated_at": 1, "published_at": 1, "created_at": 1, "channels": 1, "_id": 0},
     ).sort([("published_at", -1), ("created_at", -1)]):
         published = _parse_sitemap_dt(n.get("published_at") or n.get("created_at"))
-        if published and published > now_utc():
+        # News „nur App“ (#1532) haben auf der Website keine Seite.
+        if (published and published > now_utc()) or not in_channel(n, "web"):
             continue
         slug = n.get("slug") or n.get("id")
         if slug:
@@ -444,8 +446,9 @@ async def news_sitemap():
     public_visibility = {"$or": [{"visibility": "public"}, {"visibility": {"$exists": False}}, {"visibility": None}]}
     rows = await db.news_posts.find(
         {"published": True, **public_visibility},
-        {"slug": 1, "id": 1, "title": 1, "published_at": 1, "created_at": 1, "_id": 0},
+        {"slug": 1, "id": 1, "title": 1, "published_at": 1, "created_at": 1, "channels": 1, "_id": 0},
     ).sort([("published_at", -1), ("created_at", -1)]).limit(1000).to_list(1000)
+    rows = [row for row in rows if in_channel(row, "web")]
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">',

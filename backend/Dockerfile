@@ -33,7 +33,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /app/backend/uploads /app/backend/uploads/public /app/backend/uploads/documents \
+    && mkdir -p /app/backend/uploads /app/backend/uploads/public /app/backend/uploads/documents /app/backend/spool \
     && chown -R appuser:appuser /app \
     && chmod +x /app/docker-entrypoint.py
 

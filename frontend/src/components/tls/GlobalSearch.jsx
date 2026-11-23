@@ -215,9 +215,9 @@ function SearchResult({ item, onClose }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate font-heading text-sm font-bold uppercase text-white">{item.title}</div>
+        <div className="tls-wrap font-heading text-sm font-bold uppercase text-white">{item.title}</div>
         {(item.subtitle || date) && (
-          <div className="mt-0.5 truncate text-xs text-white/45">
+          <div className="tls-wrap mt-0.5 text-xs text-white/45">
             {[item.subtitle, date].filter(Boolean).join(" · ")}
           </div>
         )}

@@ -1,6 +1,6 @@
 """Public global search for quick navigation."""
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from auth import get_optional_user
 from database import get_db
@@ -11,6 +11,7 @@ from services.league_scope import is_league_staffel, league_label
 from services.tournament_permissions import leads_tournament
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
+from services import news_channels
 from services.query_filters import safe_regex
 from services.usernames import profile_path
 
@@ -118,7 +119,7 @@ async def _search_events(db, pattern: str, user: dict | None, limit: int) -> lis
     return out
 
 
-async def _search_news(db, pattern: str, user: dict | None, limit: int) -> list[dict]:
+async def _search_news(db, pattern: str, user: dict | None, limit: int, channel: str = "web") -> list[dict]:
     rows = await db.news_posts.find(
         {
             "$or": [
@@ -128,10 +129,12 @@ async def _search_news(db, pattern: str, user: dict | None, limit: int) -> list[
                 {"category": {"$regex": pattern, "$options": "i"}},
             ],
         },
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "published": 1, "published_at": 1, "created_at": 1, "visibility": 1, "banner_url": 1, "category": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "published": 1, "published_at": 1, "created_at": 1, "visibility": 1, "banner_url": 1, "category": 1,
+         "channels": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(limit * 3)
     out = []
-    for row in rows:
+    # Website und App teilen sich die Suche (#1532): jede findet nur ihre News.
+    for row in news_channels.filter_channel(rows, channel):
         # Die Suche ist eine öffentliche Liste (#2122 NW2): Entwürfe und geplante Beiträge findet auch das Admin-Team
         # hier nicht - die stehen in Admin → News.
         if row.get("published") is False or not _published_now(row):
@@ -213,6 +216,7 @@ async def _search_league_rules(db, pattern: str, user: dict | None, limit: int) 
 
 @router.get("")
 async def global_search(
+    request: Request,
     q: str = Query(default="", min_length=0, max_length=80),
     limit: int = Query(default=6, ge=1, le=12),
     user: dict | None = Depends(get_optional_user),
@@ -225,7 +229,7 @@ async def global_search(
     groups = [
         await _search_tournaments(db, pattern, user, limit),
         await _search_events(db, pattern, user, limit),
-        await _search_news(db, pattern, user, limit),
+        await _search_news(db, pattern, user, limit, news_channels.request_channel(request)),
         await _search_players(db, pattern, limit),
         await _search_teams(db, pattern, limit),
         await _search_league_rules(db, pattern, user, limit),

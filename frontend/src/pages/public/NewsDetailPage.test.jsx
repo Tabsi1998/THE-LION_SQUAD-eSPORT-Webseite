@@ -146,3 +146,37 @@ test("zurückgezogener Beitrag: freundlicher Hinweis statt „nicht gefunden“"
   expect(screen.getByTestId("news-error")).toHaveTextContent("Alle aktuellen News findest du auf der News-Seite.");
   expect(screen.getByRole("link", { name: /Zu den aktuellen News/ })).toHaveAttribute("href", "/news");
 });
+
+// Kanal (#1532): eine News „nur App“ zeigt die Website nicht - wer den Link bekommt (etwa aus der App geteilt), liest
+// einen Hinweis auf die LionsAPP mit Knopf zum Store statt „Nicht gefunden“.
+test("„nur App“: Hinweis auf die LionsAPP mit Store-Knopf statt „nicht gefunden“", async () => {
+  const { setCachedBranding } = await import("@/lib/brandingEvents");
+  setCachedBranding({ play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app" });
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news/mario-kart-abgesagt") throw Object.assign(new Error("app"), { response: { status: 404, data: { detail: { code: "app_only", message: "Diese Nachricht gibt es nur in der LionsAPP. Öffne sie in der App." } } } });
+    if (url.startsWith("/news?")) return { data: LIST };
+    throw new Error(`unbekannt: ${url}`);
+  });
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Nur in der LionsAPP");
+  expect(screen.getByTestId("news-error")).toHaveTextContent("Diese Nachricht gibt es nur in der LionsAPP.");
+  expect(screen.getByTestId("news-app-only-play")).toHaveAttribute("href", "https://play.google.com/store/apps/details?id=at.lionsquad.app");
+  expect(screen.getByRole("link", { name: /Zu den aktuellen News/ })).toHaveAttribute("href", "/news");
+  setCachedBranding({});
+});
+
+test("„nur App“ ohne Store-Link: der Hinweis bleibt, statt Knopf ein ruhiger Satz", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news/mario-kart-abgesagt") throw Object.assign(new Error("app"), { response: { status: 404, data: { detail: { code: "app_only", message: "Diese Nachricht gibt es nur in der LionsAPP. Öffne sie in der App." } } } });
+    if (url.startsWith("/news?")) return { data: LIST };
+    throw new Error(`unbekannt: ${url}`);
+  });
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Nur in der LionsAPP");
+  expect(screen.queryByTestId("news-app-only-play")).toBeNull();
+  expect(screen.getByTestId("news-app-only-soon")).toBeInTheDocument();
+});
+
+test("previewText: nur App (#1532)", () => {
+  expect(previewText({ state: "app_only" })).toBe("Erscheint nur in der LionsAPP – Besucher der Website sehen statt des Beitrags einen Hinweis auf die App.");
+});

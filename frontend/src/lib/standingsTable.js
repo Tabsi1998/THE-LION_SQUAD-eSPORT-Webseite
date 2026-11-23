@@ -24,12 +24,14 @@ export function standingSections(data) {
 }
 
 /**
- * „league“: Liga, Round Robin, Gruppen (mit Differenz); „swiss“: Schweizer System (mit Buchholz); sonst „knockout“ - oder
- * „ffa“, wenn das Turnier in Läufen spielt (`heats`, #2121): dort zählen Punkte und der Platz im Schnitt, keine Niederlagen.
+ * „league“: Liga, Round Robin, Gruppen (mit Differenz); „swiss“: Schweizer System (mit Buchholz), „swiss_median“ dazu mit
+ * Median-Buchholz (#1559, wenn er bei Punktgleichheit zählt); sonst „knockout“ - oder „ffa“, wenn das Turnier in Läufen
+ * spielt (`heats`, #2121): dort zählen Punkte und der Platz im Schnitt, keine Niederlagen.
  */
 export function tableKind(rows, { heats = false } = {}) {
   const list = Array.isArray(rows) ? rows : [];
   if (list.some((row) => row && "score_diff" in row)) return "league";
+  if (list.some((row) => row && "median_buchholz" in row)) return "swiss_median";
   if (list.some((row) => row && "buchholz" in row)) return "swiss";
   return heats ? "ffa" : "knockout";
 }
@@ -47,6 +49,9 @@ const DIFF = { key: "score_diff", label: "Diff", title: "Differenz", format: (va
 // Am Handy ohne Form (#2498): Name und Punkte brauchen den Platz - TV und Druck zeigen sie ohnehin nicht.
 const FORM = { key: "form", label: "Form", title: "Die letzten fünf Spiele", wide: true };
 const POINTS = { key: "points", label: "Pkt", title: "Punkte", strong: true };
+const BUCHHOLZ = { key: "buchholz", label: "BHZ", title: "Buchholz: Punkte der Gegner" };
+// Median-Buchholz (#1559): am Handy bleibt nur er stehen - das einfache Buchholz daneben fällt dort weg.
+const MEDIAN_BUCHHOLZ = { key: "median_buchholz", label: "MBHZ", title: "Median-Buchholz: Punkte der Gegner ohne den besten und den schlechtesten" };
 
 /**
  * Die Spalten der Rangliste je Art (#1562, #2121) - Website, TV und Druck zeigen dieselben. `read`: der Wert aus der
@@ -55,7 +60,8 @@ const POINTS = { key: "points", label: "Pkt", title: "Punkte", strong: true };
  */
 export const STANDING_COLUMNS = Object.freeze({
   league: [PLAYED, WON, DRAWN, LOST, DIFF, FORM, POINTS],
-  swiss: [PLAYED, WON, DRAWN, LOST, { key: "buchholz", label: "BHZ", title: "Buchholz: Punkte der Gegner" }, FORM, POINTS],
+  swiss: [PLAYED, WON, DRAWN, LOST, BUCHHOLZ, FORM, POINTS],
+  swiss_median: [PLAYED, WON, DRAWN, LOST, MEDIAN_BUCHHOLZ, { ...BUCHHOLZ, wide: true }, FORM, POINTS],
   // Team-Liga externer Serien (#1747): wie die Liga, dazu die Maps (gewonnen:verloren).
   team_league: [PLAYED, WON, DRAWN, LOST,
     { key: "maps", label: "Maps", title: "Maps gewonnen : verloren", wide: true, read: (row) => `${formatNumber(row.score_for ?? 0)}:${formatNumber(row.score_against ?? 0)}` },

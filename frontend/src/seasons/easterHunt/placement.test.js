@@ -115,6 +115,29 @@ test("was die Leiste unten für immer verdeckt, ist belegt", () => {
   }
 });
 
+test("ein Ei weit unter dem Seitenende verlängert die Seite nicht - die Leiste unten verdeckt weiter die unteren Ecken", () => {
+  // Beim Laden ist die Seite kurz länger (Schrift noch nicht da), ein Ei liegt dort; danach wird sie kürzer. Das alte
+  // Ei hielte scrollHeight hoch - gemessen wird darum ohne die Ebene der Eier (#1314, Ostereiersuche auf /news).
+  mount();
+  const bar = document.createElement("nav");
+  bar.style.position = "fixed";
+  document.body.appendChild(bar);
+  box(bar, { left: 0, right: 1280, top: 736, bottom: 800 });
+  const layer = document.createElement("div");
+  layer.className = "tls-eggs";
+  document.body.appendChild(layer);
+  box(layer, { left: 0, right: 0, top: 0, bottom: 0 });
+  document.elementsFromPoint = () => [bar];
+  Object.defineProperty(document.documentElement, "scrollHeight", { configurable: true, value: 1400 });
+  try {
+    const place = placeEgg({ spot: { kind: "footer", index: 0, place: "bottom-left" } }, { win, probe });
+    expect(place.side).toBe("tr");
+  } finally {
+    delete document.elementsFromPoint;
+    delete document.documentElement.scrollHeight;
+  }
+});
+
 test("sind alle Ecken der Fußzeile belegt, liegt das Ei in der Ecke eines Blocks darin (#1228)", () => {
   mount();
   const foot = document.getElementById("foot");

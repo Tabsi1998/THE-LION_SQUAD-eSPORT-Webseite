@@ -88,7 +88,7 @@ export default function AdminGalleryPage() {
               </div>
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="font-heading font-black uppercase truncate">{a.title}</div>
+                  <div className="font-heading font-black uppercase tls-wrap">{a.title}</div>
                   <span className="text-[10px] uppercase tracking-widest text-white/40">{albumMediaCount(a)} Medien</span>
                 </div>
                 {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}

@@ -133,6 +133,13 @@ describe("Tabelle (#2121)", () => {
     expect(league.rows.map((item) => item.name)).toEqual(["Nordlicht", "Steinbock (ausgetreten)", "Eisfuchs (disqualifiziert)"]);
   });
 
+  test("Schweizer System (#1559): Median-Buchholz als Spalte, weiter und ausgeschieden am Namen", () => {
+    const swiss = (name, rank, extra) => ({ registration_id: `r-${name}`, display_name: name, rank, played: 3, won: 2, drawn: 0, lost: 1, buchholz: 5, median_buchholz: 2, points: 2, ...extra });
+    const [table] = standingsSections([swiss("Nordlicht", 1, { swiss_status: "advanced" }), swiss("Steinbock", 2), swiss("Eisfuchs", 3, { swiss_status: "eliminated" }), swiss("Bergdohle", 2, { swiss_status: "tied" })]);
+    expect(table.heads.map((head) => head.label)).toEqual(["Sp", "S", "U", "N", "MBHZ", "BHZ", "Pkt"]);
+    expect(table.rows.map((item) => item.name)).toEqual(["Nordlicht (weiter)", "Steinbock", "Eisfuchs (ausgeschieden)", "Bergdohle (Gleichstand an der Grenze)"]);
+  });
+
   test("Nachmeldung (#2422): die Zeile sagt, ab welcher Woche das Team dabei ist", () => {
     const [league] = standingsSections([row("Nordlicht", 1), row("Neuling", 2, { late_entry: true, late_from_week: 4 })]);
     expect(league.rows.map((item) => item.name)).toEqual(["Nordlicht", "Neuling (Nachgemeldet ab Woche 4)"]);

@@ -45,6 +45,8 @@ Teilen auf mehreren Rechnern gleichzeitig – mit denselben Tests und denselben 
 | Frontend-Unit-Tests (1/2, 2/2) | je die Hälfte der Vitest-Dateien (`--shard`), mit Blob-Bericht samt Coverage |
 | Frontend-Coverage | legt beide Berichte zum Gesamtbericht zusammen (`--merge-reports`), wie vorher aus einem Lauf |
 | Browser-Tests (1/6 … 6/6) | je ein Sechstel der Browser-Tests (Desktop und Handy) |
+| Prüftor | Barrierefreiheit, Kontrast, Bundle, Ladezeit der Startseite am Handy und Bewegungsregeln gegen das gebaute dist; rot heißt nicht mergen ([Prüftor](prueftor.md), #1660) |
+| Prüftor-Kommentar | schreibt bzw. aktualisiert den einen Kommentar des Prüftors im PR (nur PRs aus diesem Repo) |
 
 Verteilt wird nach **gemessener Dauer**, nicht nach Zahl der Tests: die längsten Gruppen zuerst auf den Teil mit
 der wenigsten Arbeit. Eine Gruppe ist im Backend eine Testdatei

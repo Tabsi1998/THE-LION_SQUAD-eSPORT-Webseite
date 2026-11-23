@@ -264,7 +264,7 @@ export function CatalogTab({ board = false }) {
                       {isOpen ? <ChevronDown className="w-4 h-4 text-white/40 shrink-0" /> : <ChevronRight className="w-4 h-4 text-white/40 shrink-0" />}
                       <Badge material={groupTiers[groupTiers.length - 1]?.material || "bronze"} art={g.art} icon={g.icon} size="sm" animate={false} />
                       <span className="min-w-0">
-                        <span className="block font-semibold truncate">{g.name}</span>
+                        <span className="block font-semibold tls-wrap">{g.name}</span>
                         <span className="block text-[11px] text-white/45 truncate">{g.description || "ohne Beschreibung"}</span>
                       </span>
                     </button>

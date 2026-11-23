@@ -59,7 +59,9 @@ Die technische Seite (Bauen, Signieren, Hochladen in die Play Console) steht in 
 
 ### 2.2 Erstes Anmelden am Handy
 
-1. App öffnen: Die App startet **ohne Konto** auf der Startseite mit allem Öffentlichen (Turniere, Events, News).
+1. App öffnen: Die App startet **ohne Konto** auf der Startseite mit allem Öffentlichen (Turniere, Events, News). News, die die
+   Redaktion auf **Nur Website** gestellt hat, stehen nicht in der App; News **Nur App** gibt es nur hier
+   ([Inhalte](inhalte.md#news-nur-in-der-app-oder-nur-auf-der-website)).
 2. Beim ersten Start erscheint nach ein paar Sekunden einmal der Hinweis zum Anmelden. Sonst: Tab **Profil** → **Anmelden**.
 3. Mit **E-Mail und Passwort** anmelden, oder **Mit Passkey anmelden** (Fingerabdruck oder Gesicht). Hat die Person Zwei-Faktor eingerichtet, fragt die App nach
    dem **MFA- oder Wiederherstellungscode**.

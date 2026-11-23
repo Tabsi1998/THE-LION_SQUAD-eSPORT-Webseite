@@ -181,8 +181,8 @@ export default function AdminUsersPage() {
           <li key={u.id} className={`border border-white/10 bg-[#121212] rounded-sm p-3 ${u.is_banned ? "opacity-70" : ""}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-semibold truncate">{displayName(u)}</div>
-                <div className="text-xs text-white/45 truncate">@{u.username} · {accountKind(u)} · {roleLabel(u.role || "player")}</div>
+                <div className="font-semibold tls-wrap">{displayName(u)}</div>
+                <div className="text-xs text-white/45 tls-wrap">@{u.username} · {accountKind(u)} · {roleLabel(u.role || "player")}</div>
               </div>
               <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-card-${u.username}`} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider">
                 <Pencil className="w-3 h-3" /> Bearbeiten

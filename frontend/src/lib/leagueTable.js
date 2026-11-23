@@ -129,8 +129,9 @@ export function lateEntryText(row) {
 const DECISION_METHOD_NOTES = { playoff: "Platz durch Entscheidungsspiel", lot: "Platz durch Losentscheid", lead: "Platz durch Entscheid der Leitung" };
 
 /** Hinweise an einer Zeile der Staffel-Tabelle: was den Platz entschied, kampflos, Abzug, Ausscheiden. Leer bei
- *  Tabellen ohne diese Felder (andere Turniere). */
-export function standingNotes(row) {
+ *  Tabellen ohne diese Felder (andere Turniere). `labels` (#1559): die Wörter für „was entschied“ - Turnier-Tabellen
+ *  nennen Differenz und Buchholz statt Maps (lib/tournamentTableSettings); ohne Angabe die der Liga. */
+export function standingNotes(row, labels = TIEBREAK_LABELS) {
   const notes = [];
   if (!row) return notes;
   if (row.exit?.kind) notes.push({ key: "exit", tone: "exit", text: EXIT_LABELS[row.exit.kind] || "Ausgeschieden" });
@@ -139,8 +140,8 @@ export function standingNotes(row) {
     // Wie entschieden wurde (F.1, Nr. 156) - ohne Angabe wie bisher „Entscheid der Leitung“.
     const text = DECISION_METHOD_NOTES[row.lead_decision?.method] || DECISION_METHOD_NOTES.lead;
     notes.push({ key: "tiebreak", tone: "decision", text, title: reason ? `Grund: ${reason}` : undefined, reason });
-  } else if (row.tiebreak && TIEBREAK_LABELS[row.tiebreak]) {
-    notes.push({ key: "tiebreak", tone: "tiebreak", text: TIEBREAK_LABELS[row.tiebreak], title: `Bei Punktgleichheit entschied: ${TIEBREAK_LABELS[row.tiebreak]}` });
+  } else if (row.tiebreak && labels[row.tiebreak]) {
+    notes.push({ key: "tiebreak", tone: "tiebreak", text: labels[row.tiebreak], title: `Bei Punktgleichheit entschied: ${labels[row.tiebreak]}` });
   }
   const won = Number(row.forfeit_won) || 0;
   const lost = Number(row.forfeit_lost) || 0;

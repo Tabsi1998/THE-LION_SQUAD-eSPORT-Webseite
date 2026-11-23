@@ -72,6 +72,9 @@ services:
       MIGRATION_LEASE_RENEW_SECONDS: "${MIGRATION_LEASE_RENEW_SECONDS:-}"
       MIGRATION_WAIT_SECONDS: "${MIGRATION_WAIT_SECONDS:-1800}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
+      # Große Uploads (#2548): FastAPI legt Dateien beim Lesen des Formulars in TMPDIR ab - nicht im 128-MB-tmpfs
+      # unter /tmp, sonst scheitert jedes Video über ~128 MB mit „There was an error parsing the body“.
+      TMPDIR: "/app/backend/spool"
       MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
       MAX_VIDEO_UPLOAD_MB: "${MAX_VIDEO_UPLOAD_MB:-1536}"
       MAX_ORIGINAL_UPLOAD_MB: "${MAX_ORIGINAL_UPLOAD_MB:-1536}"
@@ -111,6 +114,7 @@ services:
       - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_PORT:-8001}:8001"
     volumes:
       - uploads_data:${UPLOAD_DIR:-/app/backend/uploads}
+      - upload_spool:/app/backend/spool
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -185,6 +189,7 @@ services:
 volumes:
   mongo_data:
   uploads_data:
+  upload_spool:
 
 networks:
   tls-net:

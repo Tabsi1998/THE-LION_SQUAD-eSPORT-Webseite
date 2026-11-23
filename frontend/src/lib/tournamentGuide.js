@@ -30,8 +30,8 @@ export const GUIDE_STEPS = [
     key: "groups",
     title: "Ab etwa 32 Teilnehmern: Gruppenphase statt reinem K.-o.",
     why: "Ein reiner K.-o.-Baum mit 32 Teilnehmern ist für die Hälfte nach einem Spiel vorbei. Gruppen geben jedem mehrere Partien.",
-    how: "Format „Gruppenphase“; „Gruppen generieren“ fragt nach der Zahl der Gruppen – Teilnehmer geteilt durch 4 bis 8. Eine K.-o.-Runde danach gibt es im selben Turnier noch nicht; die Besten spielen sie als eigenes Turnier.",
-    fields: ["Format", "Gruppen generieren"],
+    how: "Format „Gruppenphase“; „Gruppen generieren“ fragt nach der Zahl der Gruppen – Teilnehmer geteilt durch 4 bis 8. Das Heimrecht ist je Gruppe fair verteilt; bei Punktgleichheit entscheidet, was unter „Bei Punktgleichheit in der Tabelle“ gewählt ist (Vorgabe: direkter Vergleich). Eine K.-o.-Runde danach gibt es im selben Turnier noch nicht; die Besten spielen sie als eigenes Turnier.",
+    fields: ["Format", "Gruppen generieren", "Bei Punktgleichheit in der Tabelle"],
   },
   {
     key: "disputes",
@@ -52,9 +52,9 @@ export const GUIDE_STEPS = [
 export const GUIDE_FORMATS = [
   { key: "single_elim", label: "Einzelausscheidung", when: "Ein Abend, ein Sieger. Wer verliert, ist draußen – schnell, aber für die Hälfte nach einem Spiel vorbei." },
   { key: "double_elim", label: "Doppel-K.-o.", when: "Eine Niederlage soll nicht sofort das Aus sein. Gut für kleine Felder mit Zeit für ein Loser Bracket." },
-  { key: "swiss", label: "Schweizer System", when: "Viele Teilnehmer, kein fester Baum: Jeder spielt gleich viele Runden gegen ähnlich Starke. Übliche Gruppenphase bei Counter-Strike und Valorant." },
+  { key: "swiss", label: "Schweizer System", when: "Viele Teilnehmer, kein fester Baum: Jeder spielt gleich viele Runden gegen ähnlich Starke, niemand zweimal gegen denselben. Schluss ist nach einer festen Rundenzahl oder nach Siegen und Niederlagen (3 Siege weiter, 3 Niederlagen raus); die nächste Runde kann von selbst starten. Übliche Gruppenphase bei Counter-Strike und Valorant." },
   { key: "groups", label: "Gruppenphase", when: "Ab etwa 32 Teilnehmern: Gruppen zu 4 bis 8, jeder spielt mehrere Partien. Eine K.-o.-Runde danach läuft als eigenes Turnier." },
-  { key: "round_robin", label: "Jeder gegen jeden – einfach", when: "Kleines Feld, alle sollen einmal gegeneinander spielen. Die Tabelle entscheidet." },
+  { key: "round_robin", label: "Jeder gegen jeden – einfach", when: "Kleines Feld, alle sollen einmal gegeneinander spielen. Die Tabelle entscheidet – bei Punktgleichheit auf Wunsch der direkte Vergleich." },
   { key: "league", label: "Jeder gegen jeden über Wochen", when: "Hin- und Rückrunde über Wochen; jede Woche ein Spieltag, Termine machen die Teams aus. Die Vereinsliga mit Seasons und Staffeln läuft über Admin → Liga." },
   { key: "ffa", label: "Mehrspieler frei", when: "Alle gleichzeitig in einer Lobby – Rennen, Battle Royale, Party-Spiele. Ein Spiel mit allen, gewertet nach Platzierung. Mehrere Runden mit Gesamtwertung gibt es noch nicht – für mehrere Läufe gibt es den „Mehrspieler freien Turnierbaum“." },
 ];

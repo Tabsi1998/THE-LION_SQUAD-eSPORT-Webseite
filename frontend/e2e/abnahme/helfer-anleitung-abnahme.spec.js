@@ -9,6 +9,10 @@ const { HANDY, PC, bild, bilder } = require("./anleitungBilder");
 // zugeschnitten); sie liegen danach in docs/assets/helfer/. „B. Simulator“ steht in helfer-anleitung-fastlap-abnahme
 // (eigener Seed). Läuft nur mit ABNAHME=1; Stand aus scripts/seed_abnahme.py (local_live, local_draft, onsite_members).
 
+// Nur die Knöpfe „Aufrufen“ in den Stationskacheln - der Kasten „Alle aufrufen“ über den Kacheln (#1162) heißt ebenfalls
+// live-call-…, trägt aber keine Station.
+const STATION_CALL = "[data-testid^='live-station-'] [data-testid^='live-call-']";
+
 const live = state?.tournaments?.local_live;
 const liveSlug = state?.slugs?.local_live || live;
 const members = state?.tournaments?.onsite_members;
@@ -65,7 +69,7 @@ test.describe("Abnahme: Helfer-Anleitung (Station, Einlass, Wenn etwas nicht pas
     await bilder(page, "a0-oeffnen", [head.getByText("Turnierleitung", { exact: true }), head.locator("h1"), page.getByRole("tablist", { name: "Turnierleitung" })]);
 
     // 1. „Als Nächstes“ an einer freien Station - „Aufrufen“.
-    const call = board.locator("[data-testid^='live-call-']").first();
+    const call = board.locator(STATION_CALL).first();
     await expect(call).toBeVisible();
     const stationId = (await call.getAttribute("data-testid")).replace("live-call-", "");
     const card = page.getByTestId(`live-station-${stationId}`);
@@ -177,26 +181,26 @@ test.describe("Abnahme: Helfer-Anleitung (Station, Einlass, Wenn etwas nicht pas
       await guestContext.close();
     }
 
-    // 2. Einchecken macht die Turnierleitung: Reiter „Teilnehmer“, Knopf „Check-in“.
-    await page.goto(`/admin/tournaments/${members}`);
+    // 2. Einchecken macht die Turnierleitung - seit #1161 an einem Ort: Turnierleitung, Reiter „Check-in“, Knopf „Da“ (wie in
+    //    helfer-eventtag.md). Die Verwaltung führt nur noch dorthin.
     const regs = await (await page.request.get(`/api/tournaments/${members}/registrations`)).json();
-    const waiting = regs.find((row) => row.status !== "checked_in" && !["rejected", "waitlist"].includes(row.status));
-    expect(waiting, "Anmeldung zum Einchecken").toBeTruthy();
-    const table = page.locator("table").filter({ visible: true });
-    await expect(table.getByRole("button", { name: "Check-in" }).first()).toBeVisible();
-    // Am PC die Knöpfe der ersten Zeile (die Tabelle ist sehr breit, der Name steht weit links), am Handy die erste Karte.
-    const firstRow = table.locator("tbody tr").first();
-    await bilder(page, "c2-einchecken", (mode) => (mode === "pc"
-      ? [firstRow.locator("select"), firstRow.getByRole("button", { name: "Entfernen" })]
-      : page.locator("div[class*='md:hidden'][class*='divide-y'] > div").first()));
-    await table.getByRole("row").filter({ hasText: waiting.display_name || waiting.user?.display_name || waiting.ingame_name })
-      .getByRole("button", { name: "Check-in" }).click();
+    const waiting = regs.find((row) => row.status === "approved");
+    expect(waiting, "bestätigte Anmeldung zum Einchecken").toBeTruthy();
+    await page.goto(`/tournaments/${membersSlug}/leitung?reiter=checkin`);
+    await expect(page.getByTestId("lead-tab-checkin")).toHaveAttribute("aria-selected", "true");
+    const checkinRow = page.getByTestId(`lead-checkin-row-${waiting.id}`);
+    const here = page.getByTestId(`lead-checkin-here-${waiting.id}`);
+    await expect(here).toBeVisible();
+    await bilder(page, "c2-einchecken", checkinRow);
+    await here.click();
+    await expect(checkinRow).toHaveAttribute("data-status", "checked_in");
     await expect.poll(async () => {
       const after = await (await page.request.get(`/api/tournaments/${members}/registrations`)).json();
       return after.find((row) => row.id === waiting.id)?.status;
     }).toBe("checked_in");
 
     // 3. Foto vom QR-Code geht herum: die Turnierleitung macht einen neuen Code - der alte gilt nicht mehr.
+    await page.goto(`/admin/tournaments/${members}`);
     const panel = page.getByTestId("onsite-access-panel");
     // Am PC ohne die leere rechte Hälfte des Kastens.
     await bilder(page, "c3-neuer-code", (mode) => (mode === "pc"

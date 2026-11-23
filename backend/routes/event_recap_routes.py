@@ -12,13 +12,13 @@
 """
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from auth import get_current_user, get_optional_user
 from database import get_db
 from models import now_utc
-from services import event_friends, event_recap
+from services import event_friends, event_recap, news_channels
 from services.access_links import validate_access_link
 from services.permissions import is_confirmed_tournament_lead
 from services.slug_utils import find_by_slug_or_history
@@ -66,12 +66,14 @@ async def _visible_event(slug_or_id: str, user: dict | None, access: str | None)
 
 
 @router.get("/api/events/{event_id}/recap")
-async def event_recap_view(event_id: str, response: Response, access: str | None = None, user: dict | None = Depends(get_optional_user)):
+async def event_recap_view(event_id: str, request: Request, response: Response, access: str | None = None,
+                           user: dict | None = Depends(get_optional_user)):
     if user:
         response.headers["Cache-Control"] = PRIVATE_CACHE
-    response.headers["Vary"] = "Authorization, Cookie"
+    # Der Bericht hängt am Kanal (#1532): Website und App können verschiedene Rückblick-News zeigen.
+    response.headers["Vary"] = f"Authorization, Cookie, {news_channels.CHANNEL_HEADER}"
     event = await _visible_event(event_id, user, access)
-    return await event_recap.build(get_db(), event, user)
+    return await event_recap.build(get_db(), event, user, channel=news_channels.request_channel(request))
 
 
 @router.get("/api/events/{event_id}/friends")

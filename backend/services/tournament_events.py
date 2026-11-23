@@ -732,6 +732,9 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
     await publish_api_change("POST", f"/api/tournaments/{tid}/registrations/{registration['id']}/removal", 200)
     # Ein 409 im Lauf-Planer wird dort abgefangen; der nächste Auslöser prüft neu.
     await evaluate_after_write(db, tid, actor_id=actor_id, trigger="removal")
+    # Schweizer System (#1559): wertet ein Austritt das letzte offene Spiel der Runde kampflos, folgt die nächste Runde.
+    from services.swiss_rounds import advance_after_write
+    await advance_after_write(db, tid, actor_id=actor_id)
     for stage in stages:
         if any(m.get("stage_id") == stage.get("id") for m in changed):
             await _replan_schedule(db, tournament, stage)

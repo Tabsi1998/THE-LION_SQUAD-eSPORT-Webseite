@@ -515,7 +515,7 @@ async def ensure_anmeldung(admin: Session, db, game: dict, maps: dict) -> dict:
 # Schaufenster der Season-Seite (#2268), nur mit --schaufenster: eine öffentliche Season, die alles hat, was die Seite zeigt - Modi
 # mit Symbol und Ergebnisregel, Map-Pool mit Bildern, Sperrliste mit Bildern, Regelwerk, zwei Ligen mit je einer Staffel, gestartete
 # Spieltage mit Ergebnissen (Maps, kampflos, wiederholte Map, „in Klärung“), Banner, Emblem und Logos. Ändert dafür die Modi des Spiels
-# (Symbol, Regel) - darum nicht im nächtlichen Lauf. Alles erfunden, Bilder sind Farbflächen mit Namen.
+# (Symbol, Regel) - darum läuft es im nächtlichen Lauf zuletzt (#2529). Alles erfunden, Bilder sind Farbflächen mit Namen.
 SCHAUFENSTER_LEAGUE = "Alpenliga"
 MODE_LOOK = {"stellung": ((41, 182, 232), "ST", {"kind": "score", "target": 250, "time_limit_seconds": 600}),
              "suchen": ((255, 159, 67), "SZ", {"kind": "rounds", "target": 6, "round_limit": 11}),

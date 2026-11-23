@@ -632,7 +632,7 @@ function WhatsOnRow({ row, accessToken }) {
           {/* Ecken-Klammern (#1316): deine Karte trägt Winkel, Fläche und „Du“. */}
           <span className="flex min-w-0 items-center gap-2 text-xs text-white/55">
             {row.mine && !saysYou(row.mine.label) ? <span className="tls-you-tag" data-testid="event-row-you">Du</span> : null}
-            <span className="truncate">{[row.mode, row.detail].filter(Boolean).join(" · ")}</span>
+            <span className="tls-wrap">{[row.mode, row.detail].filter(Boolean).join(" · ")}</span>
           </span>
         </span>
         <span className="shrink-0">
@@ -895,7 +895,7 @@ function ParticipantList({ title, rows, testId }) {
       <div className="space-y-1.5">
         {shown.map((registration) => (
           <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
-            <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
+            <span className="tls-wrap">{registration.display_name || "Teilnehmer"}</span>
             <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
           </div>
         ))}

@@ -1,5 +1,5 @@
 """Event routes — Vereins-CMS Phase 3."""
-from fastapi import APIRouter, HTTPException, Depends, Response
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
@@ -14,7 +14,7 @@ from services.public_phase import derive_public_phase
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import games_won_text, place_paths, standings_for_structure
 from services.sponsor_utils import dedupe_public_sponsors
-from services import partner_pages
+from services import news_channels, partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
@@ -604,7 +604,7 @@ async def event_meta():
 
 
 @router.get("/{slug_or_id}")
-async def get_event(slug_or_id: str, include_draft: bool = False, access: str | None = None, user: dict | None = Depends(get_optional_user)):
+async def get_event(slug_or_id: str, request: Request, include_draft: bool = False, access: str | None = None, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     event, was_old_slug = await _find_event(slug_or_id)
     if not event:
@@ -654,10 +654,12 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     # Linked news
     news = await db.news_posts.find(
         {"linked_event_ids": event["id"], "published": True},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1, "published_at": 1, "visibility": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "created_at": 1, "published_at": 1, "visibility": 1,
+         "channels": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(20)
+    # Website und App teilen sich die Event-Seite (#1532): jede listet nur ihre News.
     event["news"] = [
-        post for post in news
+        post for post in news_channels.filter_channel(news, news_channels.request_channel(request))
         if _published_now(post) and await _user_can_see(user, post.get("visibility") or "public")
     ]
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)

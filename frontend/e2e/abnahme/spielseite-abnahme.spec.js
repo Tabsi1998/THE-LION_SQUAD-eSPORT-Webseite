@@ -35,6 +35,16 @@ async function apiJson(page, method, url, data) {
   return { status: response.status(), body: await response.json().catch(() => null) };
 }
 
+// Speichern im Reiter Modi und auf die Antwort des Servers warten. Die Meldung „Spiel gespeichert.“ taugt dafür nicht: Die aus dem
+// vorigen Speichern kann noch stehen (Nachtlauf bei 390 px), dann läse der Test den
+// Stand vor dem Speichern (#2529).
+async function saveModes(page, gameId) {
+  const answer = page.waitForResponse((response) => response.request().method() === "PATCH" && new URL(response.url()).pathname === `/api/games/${gameId}`);
+  await page.getByTestId("game-save-modi").click();
+  expect((await answer).status()).toBe(200);
+  await expect(page.getByText("Spiel gespeichert.", { exact: false }).first()).toBeVisible();
+}
+
 test.describe("Abnahme: Spielseite gegen den echten Server", () => {
   test.skip(!ENABLED, "nur für die lokale Abnahme (ABNAHME=1, siehe docs/entwicklung/abnahme-lokal.md)");
   test.skip(ENABLED && !game, `Kein Liga-Stand in ${STATE_FILE} - erst scripts/seed_abnahme_liga.py laufen lassen und ABNAHME_STATE auf dessen Stand-Datei setzen`);
@@ -70,8 +80,7 @@ test.describe("Abnahme: Spielseite gegen den echten Server", () => {
       await page.getByTestId(`game-edit-mode-players-${index}`).fill("4");
       await expect(page.getByTestId("game-tab-dirty-modi")).toBeVisible();
       await noSideScroll(page);
-      await page.getByTestId("game-save-modi").click();
-      await expect(page.getByText("Spiel gespeichert.", { exact: false }).first()).toBeVisible();
+      await saveModes(page, game.id);
       await expect(page.getByTestId("game-saved-state")).toBeVisible();
       const created = (await apiJson(page, "GET", `/api/games/${game.id}`)).body.match_modes.find((mode) => mode.label === label);
       expect(created).toMatchObject({ players_per_side: 4 });
@@ -99,8 +108,7 @@ test.describe("Abnahme: Spielseite gegen den echten Server", () => {
       await page.getByTestId(`game-edit-mode-more-${index}`).click();
       await page.getByTestId(`game-edit-mode-status-${index}`).selectOption("inactive");
       await expect(page.getByTestId(`game-edit-mode-status-hint-${index}`)).toContainText("nicht mehr zur Wahl");
-      await page.getByTestId("game-save-modi").click();
-      await expect(page.getByText("Spiel gespeichert.", { exact: false }).first()).toBeVisible();
+      await saveModes(page, game.id);
       await expect(page.getByTestId(`game-edit-mode-chip-${index}`)).toHaveText("Inaktiv");
       const after = (await apiJson(page, "GET", `/api/games/${game.id}`)).body.match_modes.find((mode) => mode.mode === key);
       expect(after.status).toBe("inactive");
