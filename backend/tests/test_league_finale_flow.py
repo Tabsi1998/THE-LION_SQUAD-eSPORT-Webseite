@@ -1,0 +1,294 @@
+"""Saisonfinale am TV (#1641) und Liga im Discord (#1642) über die echten Routen: Schritt „Auf- und Absteiger“ mit Weiter und Ende,
+nur für öffentliche Seasons; Spieltag-Zusammenfassung und Saisonende-Meldung je Season einstellbar, nie doppelt. Discord ist ein Fake -
+kein Token, kein Netz. Nur erfundene Namen."""
+import asyncio
+import pathlib
+import sys
+from datetime import timedelta
+
+import pytest
+import pytest_asyncio
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
+from services import discord_runtime, league_discord  # noqa: E402
+from test_league_final_flow import ADMIN, add_staffel, lead, matches_of, must_close, play_all, setup  # noqa: E402
+
+CHANNEL = "100000000000000042"
+OTHER_CHANNEL = "100000000000000043"
+
+
+class FakeBot:
+    def __init__(self):
+        self.sent = []
+        self.fail = False
+
+    async def send_embed(self, channel_id, embed, buttons=None, **kwargs):
+        if self.fail:
+            return {"ok": False, "reason": "bot_offline"}
+        self.sent.append({"channel_id": channel_id, "embed": embed, "buttons": buttons or []})
+        return {"ok": True, "message_id": str(900000000000000000 + len(self.sent)), "channel_id": channel_id}
+
+    async def list_channels(self, guild_id=""):
+        return {"ok": True, "channels": [{"id": CHANNEL, "name": "liga-ergebnisse", "category": "Liga", "can_send": True},
+                                         {"id": OTHER_CHANNEL, "name": "nur-lesen", "category": "Liga", "can_send": False}]}
+
+
+@pytest_asyncio.fixture
+async def flow():
+    instance, shutdown = make_flow()
+    try:
+        yield instance
+    finally:
+        await shutdown()
+
+
+@pytest.fixture
+def bot(monkeypatch):
+    fake = FakeBot()
+    monkeypatch.setattr(discord_runtime.bot, "send_embed", fake.send_embed)
+    monkeypatch.setattr(discord_runtime.bot, "list_channels", fake.list_channels)
+    return fake
+
+
+async def two_leagues(flow, *, close_both: bool = True):
+    """Liga 1 und Liga 2 mit je vier Teams, alles gespielt (1 vor 2 vor 3 vor 4) - Vorgabe 1 Auf-, 1 Absteiger."""
+    admin, league, season, top, staffel = await setup(flow)
+    second = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={})).json()
+    lower = await add_staffel(flow, second, "b")
+    await play_all(flow, staffel)
+    await play_all(flow, lower)
+    await must_close(flow, staffel)
+    if close_both:
+        await must_close(flow, lower)
+    return admin, league, season, staffel, lower
+
+
+async def display(flow, staffel):
+    response = await flow.get(f"/api/tournaments/{staffel['id']}/bracket/display", params={"table": 1})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+async def step(flow, season, action):
+    response = await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": action})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+async def discord_ready(flow):
+    """Discord an, Bot an - ohne Token: gesendet wird nur an den Fake."""
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {"enabled": True, "bot_enabled": True}}, upsert=True)
+
+
+# ---------------------------------------------------------------- TV (#1641)
+
+@pytest.mark.asyncio
+async def test_tv_finale_steps_through_each_league_with_next_and_end(flow):
+    _admin, _league, season, staffel, lower = await two_leagues(flow)
+    assert (await display(flow, staffel))["league_finale"] is None
+
+    state = (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).json()
+    assert state == {"step": 0, "count": 2, "labels": ["Liga 1", "Liga 2"], "closed": 2, "reason": None}
+
+    assert (await step(flow, season, "next"))["step"] == 1
+    finale = (await display(flow, staffel))["league_finale"]
+    assert finale["step"] == 1 and finale["count"] == 2 and finale["season"] == season["name"]
+    first, second = finale["pages"]
+    assert [(row["name"], row["move"], row["target"]) for row in first["rows"]] == [("Probe 4", "down", "Liga 2")]
+    assert [(row["name"], row["move"], row["target"]) for row in second["rows"]] == [("Probe b1", "up", "Liga 1")]
+    # Jeder TV der Season geht mit - auch der der anderen Staffel.
+    assert (await display(flow, lower))["league_finale"]["step"] == 1
+
+    assert (await step(flow, season, "next"))["step"] == 2
+    assert (await step(flow, season, "next"))["step"] == 2, "auf der letzten Liga N bleibt Weiter stehen"
+    assert (await display(flow, staffel))["league_finale"]["step"] == 2
+
+    assert (await step(flow, season, "end"))["step"] == 0
+    assert (await display(flow, staffel))["league_finale"] is None
+    assert (await display(flow, lower))["league_finale"] is None
+    logged = await flow.db.audit_logs.find({"action": "league.season.tv_finale"}, {"_id": 0}).to_list(10)
+    assert [row["data"]["step"] for row in logged] == [1, 2, 0]
+    # Am Turnier steht nur Schritt und Zeit - keine Person.
+    stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "tv_finale": 1})
+    assert set(stored["tv_finale"]) == {"step", "updated_at"}
+
+
+@pytest.mark.asyncio
+async def test_tv_finale_never_for_internal_seasons_or_open_staffeln(flow):
+    _admin, _league, season, staffel, lower = await two_leagues(flow, close_both=False)
+    # Nur Liga 1 abgeschlossen: der Schritt kennt nur ihren Absteiger; der TV der offenen Staffel zeigt nichts.
+    assert (await step(flow, season, "next"))["labels"] == ["Liga 1"]
+    assert (await display(flow, staffel))["league_finale"]["step"] == 1
+    assert (await display(flow, lower))["league_finale"] is None
+
+    for visibility in ("admins", "members", "off"):
+        await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": visibility}})
+        assert (await display(flow, staffel))["league_finale"] is None, visibility
+        state = (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).json()
+        assert state["reason"] == "season_hidden" and state["step"] == 0
+    # Gegenprobe: wieder öffentlich - der gespeicherte Schritt gilt wieder.
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": "public"}})
+    assert (await display(flow, staffel))["league_finale"]["step"] == 1
+    # Eine Staffel, die Gäste nicht sehen, auch nicht.
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"is_public": False}})
+    assert (await display(flow, staffel))["league_finale"] is None
+
+
+@pytest.mark.asyncio
+async def test_tv_finale_needs_league_rights(flow):
+    _admin, league, season, _staffel, _lower = await two_leagues(flow)
+    stranger = await flow.add_user(name="Fremd")
+    flow.act_as(stranger)
+    assert (await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next"})).status_code == 403
+    reader = await lead(flow, league, "Nur Kader", "roster")
+    flow.act_as(reader)
+    assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).status_code == 200
+    assert (await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next"})).status_code == 403
+    helper = await lead(flow, league, "Spielbetrieb", "matches")
+    flow.act_as(helper)
+    assert (await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next"})).json()["step"] == 1
+    assert (await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "jump"})).status_code == 422
+
+
+# ---------------------------------------------------------------- Discord (#1642)
+
+async def switch_on(flow, season, **body):
+    response = await flow.put(f"{ADMIN}/seasons/{season['id']}/discord",
+                              json={"matchday": True, "season_end": True, "channel_id": CHANNEL, **body})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+async def since_long_ago(flow, season):
+    """Wie eingeschaltet vor Saisonbeginn - sonst gälten die gespielten Spieltage als „vor dem Einschalten“."""
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {f"{league_discord.FIELD}.matchday_since": "2025-01-01T00:00:00+00:00"}})
+
+
+@pytest.mark.asyncio
+async def test_discord_is_off_without_setting(flow, bot):
+    _admin, _league, season, _staffel, _lower = await two_leagues(flow)
+    await discord_ready(flow)
+    got = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()
+    assert got["active"] is False and got["settings"]["matchday"] is False and got["settings"]["season_end"] is False
+    assert [row["id"] for row in got["channels"]] == [CHANNEL, OTHER_CHANNEL]
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert bot.sent == [] and await flow.db.league_discord_posts.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_discord_matchdays_and_season_end_once_into_the_chosen_channel(flow, bot):
+    _admin, _league, season, staffel, _lower = await two_leagues(flow)
+    await discord_ready(flow)
+    saved = await switch_on(flow, season, table_rows=3)
+    assert saved["active"] is True and saved["settings"]["channel_id"] == CHANNEL
+    assert "matchday_since" not in saved["settings"]
+
+    # Frisch eingeschaltet: die alten Spieltage gehen nicht nachträglich hinaus - nur das Saisonende.
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 1}
+    end = bot.sent[-1]
+    assert end["channel_id"] == CHANNEL
+    assert end["embed"]["title"] == f"Saisonende · {season['name']}"
+    assert "Meister: **Probe 1**" in end["embed"]["description"]
+    fields = {field["name"]: field["value"] for field in end["embed"]["fields"]}
+    assert fields == {"Liga 1": "▼ Probe 4 → Liga 2", "Liga 2": "▲ Probe b1 → Liga 1"}
+    assert end["buttons"][0]["label"] == "Zur Season" and end["buttons"][0]["url"].endswith("/liga/probe-shooter/season-1")
+
+    # Eingeschaltet vor Saisonbeginn: jeder Spieltag je Staffel einmal (4 Teams: 3 Spieltage, 2 Staffeln).
+    await since_long_ago(flow, season)
+    assert await league_discord.sweep(flow.db) == {"matchday": 6, "season_end": 0}
+    titles = sorted(sent["embed"]["title"] for sent in bot.sent[1:])
+    assert titles == sorted([f"Spieltag {n} · Liga {level}" for n in (1, 2, 3) for level in (1, 2)])
+    one = next(sent for sent in bot.sent if sent["embed"]["title"] == "Spieltag 3 · Liga 1")
+    assert "*Alle Spiele gewertet*" in one["embed"]["description"]
+    assert one["embed"]["fields"][0]["value"].splitlines()[:3] == ["1. Probe 1 · 9 Pkt.", "2. Probe 2 · 6 Pkt.", "3. Probe 3 · 3 Pkt."]
+    assert all(sent["channel_id"] == CHANNEL for sent in bot.sent)
+
+    # Doppellauf - auch zwei zugleich: keine zweite Nachricht.
+    before = len(bot.sent)
+    results = await asyncio.gather(league_discord.sweep(flow.db), league_discord.sweep(flow.db))
+    assert results == [{"matchday": 0, "season_end": 0}] * 2
+    assert len(bot.sent) == before
+    assert await flow.db.league_discord_posts.count_documents({"status": "sent"}) == 7
+    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": f"matchday:{staffel['id']}:1"}, {"_id": 0})
+    assert stored["status"] == "sent" and stored["channel_id"] == CHANNEL and stored["message_id"]
+
+
+@pytest.mark.asyncio
+async def test_discord_open_games_wait_for_the_deadline_then_say_how_many(flow, bot):
+    admin, _league, season, _top, staffel = await setup(flow)
+    await play_all(flow, staffel)
+    last = (await matches_of(flow, staffel, 3))[0]
+    await flow.db.matches_v2.update_one({"id": last["id"]}, {"$set": {"status": "scheduled", "results": []}})
+    await discord_ready(flow)
+    await switch_on(flow, season, season_end=False, late=False)
+    await since_long_ago(flow, season)
+    # Ohne „trotzdem melden“: Spieltag 3 wartet, bis alles gewertet ist.
+    assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
+    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 1 · Liga 1", "Spieltag 2 · Liga 1"]
+    # Mit „trotzdem melden“ nach der Frist (Spielwoche längst vorbei): mit „1 Spiel offen“.
+    await switch_on(flow, season, season_end=False, late=True)
+    await since_long_ago(flow, season)
+    assert await league_discord.sweep(flow.db) == {"matchday": 1, "season_end": 0}
+    assert "*1 Spiel offen*" in bot.sent[-1]["embed"]["description"]
+    assert " · offen" in bot.sent[-1]["embed"]["description"]
+    # Season noch nicht beendet: keine Saisonende-Meldung, auch wenn eingeschaltet.
+    await switch_on(flow, season)
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+
+
+@pytest.mark.asyncio
+async def test_discord_never_for_internal_seasons_and_never_without_bot(flow, bot):
+    _admin, _league, season, _staffel, _lower = await two_leagues(flow)
+    await switch_on(flow, season)
+    await since_long_ago(flow, season)
+    # Bot aus: nichts gesendet, nichts belegt.
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {"enabled": True, "bot_enabled": False}}, upsert=True)
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    await discord_ready(flow)
+    for visibility in ("admins", "members", "off"):
+        await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": visibility}})
+        assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}, visibility
+    assert bot.sent == [] and await flow.db.league_discord_posts.count_documents({}) == 0
+    # Gegenprobe: öffentlich - jetzt geht es hinaus.
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": "public"}})
+    assert await league_discord.sweep(flow.db) == {"matchday": 6, "season_end": 1}
+
+
+@pytest.mark.asyncio
+async def test_discord_failure_is_retried_later_but_never_twice_sent(flow, bot):
+    _admin, _league, season, _staffel, _lower = await two_leagues(flow)
+    await discord_ready(flow)
+    await switch_on(flow, season, matchday=False)
+    bot.fail = True
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 1}
+    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": f"season_end:{season['id']}"}, {"_id": 0})
+    assert stored["status"] == "failed" and stored["attempts"] == 1 and stored["error"] == "bot_offline"
+    bot.fail = False
+    # Gleich danach: noch nicht wieder.
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert bot.sent == []
+    later = now_utc() + timedelta(minutes=league_discord.RETRY_MINUTES + 1)
+    assert await league_discord.sweep(flow.db, now=later) == {"matchday": 0, "season_end": 1}
+    assert len(bot.sent) == 1
+    assert await league_discord.sweep(flow.db, now=later + timedelta(hours=2)) == {"matchday": 0, "season_end": 0}
+    assert len(bot.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_discord_setting_rights_and_checks(flow, bot):
+    _admin, league, season, _staffel, _lower = await two_leagues(flow)
+    missing = await flow.put(f"{ADMIN}/seasons/{season['id']}/discord", json={"matchday": True})
+    assert missing.status_code == 422 and "Kanal" in missing.json()["detail"]
+    reader = await lead(flow, league, "Nur Kader", "roster")
+    flow.act_as(reader)
+    assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).status_code == 200
+    assert (await flow.put(f"{ADMIN}/seasons/{season['id']}/discord", json={"season_end": True, "channel_id": CHANNEL})).status_code == 403
+    configurer = await lead(flow, league, "Season-Leitung", "season")
+    flow.act_as(configurer)
+    assert (await flow.put(f"{ADMIN}/seasons/{season['id']}/discord", json={"season_end": True, "channel_id": CHANNEL})).status_code == 200
+    logged = await flow.db.audit_logs.find_one({"action": "league.season.discord_digest"}, {"_id": 0})
+    assert logged["actor_id"] == configurer["id"] and logged["data"]["to"]["season_end"] is True
