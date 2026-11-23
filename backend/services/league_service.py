@@ -887,6 +887,30 @@ def _zones(raw: dict | None, season: dict, overrides: dict | None) -> dict:
         raise LeagueProblem(problem.message, problem.status) from None
 
 
+ZONES_CROSS_LOCKED = ("Die Plätze über alle Staffeln lassen sich nicht mehr ändern: In dieser Liga ist schon eine Staffel abgeschlossen. "
+                      "Erst im Reiter „Abschluss“ wieder öffnen, dann ändern.")
+
+
+async def cross_zones_locked(db, division_ids: list[str]) -> set[str]:
+    """Die Liga N, in denen schon eine Staffel abgeschlossen ist (#1627, Nr. 228): Dort sind ``promote_best`` und ``relegate_worst`` gesperrt -
+    der Vergleich über Staffeln hinweg rechnet mit dem Stand des ersten Abschlusses."""
+    if not division_ids:
+        return set()
+    rows = await db.tournaments.find({"league_context.division_id": {"$in": division_ids}, "final_table": {"$type": "object"}, **ONLY_LEAGUE},
+                                     {"_id": 0, "league_context.division_id": 1}).to_list(500)
+    return {row["league_context"]["division_id"] for row in rows}
+
+
+async def _cross_zones_lock(db, division: dict, wanted: dict) -> None:
+    from services import league_zones
+
+    before = league_zones.settings_of(division)
+    if all((before.get(key) or 0) == (wanted.get(key) or 0) for key in league_zones.CROSS_FIELDS):
+        return
+    if await cross_zones_locked(db, [division["id"]]):
+        raise LeagueProblem(ZONES_CROSS_LOCKED, 422)
+
+
 async def create_division(db, season: dict, body: dict, user: dict, *, warnings: list | None = None) -> dict:
     level = body.get("level")
     if level is None:
@@ -928,6 +952,7 @@ async def update_division(db, division: dict, body: dict, *, warnings: list | No
         # Auf- und Abstieg (F.2): auch eine kleinere Staffelgröße darf die gespeicherten Zonen nicht überschneiden lassen.
         updates["zones"] = _zones(body.get("zones") if body.get("zones") is not None else division.get("zones"), season,
                                   updates.get("overrides", division.get("overrides")))
+        await _cross_zones_lock(db, division, updates["zones"])
     updates.update(await _look(db, body, (league_look.PRIZES,)))
     if "overrides" in updates or "status" in updates:
         await _division_order_check(db, season, {**division, **updates}, division, warnings)

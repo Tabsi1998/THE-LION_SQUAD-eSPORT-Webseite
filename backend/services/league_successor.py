@@ -146,13 +146,14 @@ async def plan(db, season: dict) -> dict:
     decided: list[str] = []
     if levels and not problems:
         for division in active:
-            rule = league_zones.effective(division, levels)
             mine = [row for row in tournaments if row["league_context"].get("division_id") == division["id"] and loaded.get(row["id"])]
+            # Aus dem gespeicherten Stand (Nr. 228): die Zonen, mit denen die Staffeln abgeschlossen wurden - nie die heutige Einstellung.
+            rule = league_cross_zones.stored_rule([loaded[row["id"]] for row in mine])
             if not mine or not league_cross_zones.has_rule(rule):
                 continue
             found = league_cross_zones.evaluate(rule, [{"tournament_id": row["id"], "staffel": row["league_context"].get("staffel"),
-                                                        "rows": loaded[row["id"]].get("rows") or []} for row in mine],
-                                                division.get("zone_decisions"))
+                                                        "rows": loaded[row["id"]].get("rows") or [], "zones": loaded[row["id"]].get("zones")}
+                                                       for row in mine], division.get("zone_decisions"))
             crossed.update(found["zones"])
             decided += [str((division.get("zone_decisions") or {}).get(side["kind"], {}).get("id")) for side in found["sides"] if side["decision"]]
             problems += [league_cross_zones.SUCCESSOR_TIE.format(label=division_label(division), names=" – ".join(tie["names"]))

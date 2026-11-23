@@ -262,7 +262,7 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
                 "Teams stehen gleich, aber nur ein Teil kommt in die Zone. Vor dem Abschluss braucht es einen begründeten Entscheid "
                 "(Entscheidungsspiel, Los oder Leitung).",
                 [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in zone_ties]))
-    if rows is not None and league_cross_zones.has_rule(zones) and not any(row["code"] == "no_matches" for row in out):
+    if rows is not None and zones is not None and not any(row["code"] == "no_matches" for row in out):
         # Plätze über Staffeln hinweg (#1627): Ist das die letzte offene Staffel der Liga N, steht mit ihr fest, wer über den Vergleich
         # auf- oder absteigt - ein Gleichstand an der Grenze braucht vorher den Entscheid der Leitung (kein Los).
         cross = await league_cross_zones.resolve(db, (tournament.get("league_context") or {}).get("division_id"), live={tournament["id"]: rows})
@@ -856,7 +856,7 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
     cross = []
     for division in sorted(divisions.values(), key=lambda row: row.get("level") if isinstance(row.get("level"), int) else 99):
         mine = [row for row in tournaments if row["league_context"].get("division_id") == division["id"]]
-        if not mine or not league_cross_zones.has_rule(league_zones.effective(division, levels)):
+        if not mine:
             continue
         tables = {row["tournament_id"]: row["standings"] for row in staffeln if not row["closed"]}
         found = await league_cross_zones.resolve(db, division["id"], live={row["id"]: tables.get(row["id"]) or [] for row in mine if not is_closed(row)})

@@ -138,10 +138,13 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
     pool = await map_pools.current(db, "league_season", season_id)
     rows = []
     levels = sorted({row["level"] for row in divisions if row.get("status") != "archived" and isinstance(row.get("level"), int)})
+    # Plätze über Staffeln hinweg (#1627, Nr. 228): ab dem ersten Abschluss einer Staffel der Liga N gesperrt.
+    locked = await leagues.cross_zones_locked(db, [row["id"] for row in divisions])
     for division in divisions:
         settings = leagues.effective_settings(season, division)
         zones = league_zones.effective(division, levels)
         rows.append({
+            "zones_cross_locked": division["id"] in locked,
             **division, "label": leagues.division_label(division),
             # Auf- und Abstieg (F.2, #1627): eingestellt (``zones``) und was gilt (oberste ohne Aufstieg, unterste ohne Abstieg).
             "zones": league_zones.settings_of(division), "zones_effective": zones, "zones_label": league_zones.summary(zones),

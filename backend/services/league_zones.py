@@ -11,7 +11,7 @@ die neue Season (``league_successor``) lesen dieselbe Rechnung.
   sie rechnerisch vorn lässt. Sie steigen nie auf, belegen zuerst die Abstiegsplätze und fallen aus der Liga heraus (``out``).
 - **Zielregel über Staffeln hinweg** (#1627, Entscheidung 23.11.): ``promote_best`` - zusätzlich zu den festen Aufsteigern jeder Staffel
   steigen die N besten Nächstplatzierten aller Staffeln der Liga N auf („die zwei besten Zweiten“); ``relegate_worst`` spiegelbildlich für
-  den Platz vor der Abstiegszone. Fehlen die Felder, gilt nichts davon. Hier steht nur, wer je Staffel Kandidat ist
+  den Platz vor der Abstiegszone. Kandidat ist der erste Platz nach Aufsteigern und Relegationsplätzen (Nr. 227). Fehlen die Felder, gilt nichts davon. Hier steht nur, wer je Staffel Kandidat ist
   (``cross_candidates``); verglichen und entschieden wird in ``league_cross_zones`` - erst wenn alle Staffeln abgeschlossen sind.
 - **Relegation** ist vorbereitet: Die Plätze stehen farbig in der Tabelle, eine Wirkung auf die neue Season haben sie noch nicht -
   die Teams bleiben in ihrer Liga N (``MOVES``).
@@ -145,16 +145,18 @@ def assign(rows: list[dict], zones: dict | None) -> dict[str, str | None]:
 
 
 def cross_candidates(rows: list[dict], zones: dict | None) -> dict[str, dict | None]:
-    """Wen diese Staffel in den Vergleich über Staffeln hinweg schickt (#1627): für ``promote_best`` das Team auf dem Platz gleich nach
-    den festen Aufsteigern, für ``relegate_worst`` das auf dem Platz gleich vor den festen Absteigern. ``None``, wo die Regel nicht gilt,
-    der Platz schon in der anderen Zone liegt oder dort ein Ausgeschiedener steht (Nr. 43: Sie belegen zuerst die Abstiegsplätze und
-    steigen nie auf)."""
+    """Wen diese Staffel in den Vergleich über Staffeln hinweg schickt (#1627, Nr. 227): für ``promote_best`` das Team auf dem ersten
+    Platz nach den festen Aufsteigern **und** den Relegationsplätzen, für ``relegate_worst`` spiegelbildlich das auf dem letzten Platz
+    vor den Relegationsplätzen und den festen Absteigern - so steht kein Team je in zwei Zonen. ``None``, wo die Regel nicht gilt, der
+    Platz schon in der anderen Hälfte liegt oder dort ein Ausgeschiedener steht (Nr. 43: Sie belegen zuerst die Abstiegsplätze und steigen
+    nie auf)."""
     out: dict[str, dict | None] = {PROMOTE_BEST: None, RELEGATE_WORST: None}
     if not zones or not started(rows):
         return out
     order = ordered(rows)
     size = len(order)
-    up, down = zones.get("promote") or 0, zones.get("relegate") or 0
+    up = (zones.get("promote") or 0) + (zones.get("playoff_promote") or 0)
+    down = (zones.get("relegate") or 0) + (zones.get("playoff_relegate") or 0)
     upper = up if zones.get(PROMOTE_BEST) and up < size - down and not order[up].get("exit") else None
     if upper is not None:
         out[PROMOTE_BEST] = order[upper]

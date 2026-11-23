@@ -948,3 +948,114 @@ async def test_the_lead_never_decides_a_tie_of_the_own_team_and_needs_the_right(
     assert "zone_decisions" not in await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
     page = ok(await flow.get(CLOSING.format(admin=ADMIN, season=world["season"]["id"])))
     assert page["cross"][0]["sides"][0]["own_team"] is True
+
+
+# ---------------------------------------------------------------- Fix-Runde (Entscheidungen Nr. 227-229)
+
+async def set_zones(flow, world: dict, level: int, **own) -> None:
+    """Direkt in der Datenbank - so, als hätte jemand die Einstellung an der Sperre vorbei geändert (oder ein alter Stand läge vor)."""
+    await flow.db.league_divisions.update_one({"id": world["divisions"][level - 1]["id"]}, {"$set": {f"zones.{key}": value for key, value in own.items()}})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("later", [0, 2])
+async def test_a_later_change_of_the_rule_never_changes_a_closed_season(flow, later):
+    """Nr. 228: Gelesen wird aus dem beim Abschluss gespeicherten Endstand. Steht ``promote_best`` danach auf 0, bleibt die Zone; steht
+    es auf 2, steigt niemand nachträglich auf."""
+    world = await build(flow, levels=2, zones=BEST, extra={2: [3]})
+    await close_all(flow, world)
+    _top, first, second = world["tids"]
+    before = (await zones_of(flow, first), await zones_of(flow, second))
+    assert before[0][1] == ("promotion", True) and before[1][1] == (None, False)
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
+    moves = {team["squad_id"]: team["movement"] for row in preview["divisions"] for team in row["teams"]}
+
+    await set_zones(flow, world, 2, promote_best=later)
+
+    assert (await zones_of(flow, first), await zones_of(flow, second)) == before
+    after = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
+    assert {team["squad_id"]: team["movement"] for row in after["divisions"] for team in row["teams"]} == moves
+    squad = await flow.db.team_squads.find_one({"id": squad_of(world, 2, 1)}, {"_id": 0})
+    assert ok(await flow.get(f"/api/teams/{squad['team_id']}"))["league_history"][0]["zone"] == "promotion"
+    side = (await cockpit(flow, world))["cross"][0]["sides"][0]
+    assert side["count"] == 1 and [item["chosen"] for item in side["candidates"]] == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_the_rule_is_locked_from_the_first_close_until_everything_is_reopened(flow):
+    """Nr. 228: Ab dem ersten Abschluss einer Staffel der Liga N sind die Plätze über Staffeln hinweg gesperrt - ändern geht nur nach
+    Wiederöffnen. Die Zonen je Staffel bleiben änderbar wie bisher."""
+    world = await build(flow, levels=2, zones=BEST, extra={2: [3]})
+    division = world["divisions"][1]["id"]
+    _top, first, _second = world["tids"]
+    flow.act_as(world["lead"])
+    page = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}"))
+    assert [row["zones_cross_locked"] for row in page["divisions"]] == [False, False]
+    ok(await close(flow, world, first))
+    for wanted in ({"promote": 1, "relegate": 1, "promote_best": 2}, {"promote": 1, "relegate": 1}, {"promote": 1, "relegate": 1, "promote_best": 1, "relegate_worst": 1}):
+        refused = await flow.patch(f"{ADMIN}/divisions/{division}", json={"zones": wanted})
+        assert refused.status_code == 422 and "abgeschlossen" in refused.json()["detail"], wanted
+    stored = await flow.db.league_divisions.find_one({"id": division}, {"_id": 0})
+    assert stored["zones"]["promote_best"] == 1
+    page = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}"))
+    assert [row["zones_cross_locked"] for row in page["divisions"]] == [False, True]
+    # Gegenprobe: Was je Staffel gilt, lässt sich weiter ändern, solange die Plätze über Staffeln hinweg gleich bleiben - auch der Beiname.
+    ok(await flow.patch(f"{ADMIN}/divisions/{division}", json={"zones": {"promote": 2, "relegate": 0, "promote_best": 1}}))
+    ok(await flow.patch(f"{ADMIN}/divisions/{division}", json={"nickname": "Aufbau"}))
+    other = await flow.add_staff(name="Zweite Leitung")
+    flow.act_as(other)
+    ok(await flow.post(f"{STAFFELN}/{first}/reopen", json={"reason": "Ergebnis wird korrigiert"}))
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/divisions/{division}", json={"zones": {"promote": 1, "relegate": 1, "promote_best": 2}}))
+
+
+@pytest.mark.asyncio
+async def test_taking_a_decision_back_follows_the_same_rules_as_making_it(flow):
+    """Zurücknehmen entscheidet wie das Entscheiden: nie über das eigene Team (auch mit „Ergebnisse korrigieren“), der Superadmin nur
+    als Notausnahme mit Grund."""
+    world = await build(flow, levels=2, zones=BEST, extra={2: [4]})
+    top, first, _second = world["tids"]
+    ok(await close(flow, world, top))
+    ok(await close(flow, world, first))
+    tied = world["more"][2][0]["regs"][1]
+    url = f"{ADMIN}/divisions/{world['divisions'][1]['id']}/zone-decision"
+    flow.act_as(world["lead"])
+    ok(await flow.put(url, json={"kind": "promote_best", "registration_ids": [tied["id"]], "method": "lead", "reason": "Entscheid nach Sichtung der Spiele"}))
+    stored = await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+    assert stored["zone_decisions"]["promote_best"]["values"] == ["2", "2/3"]
+
+    squad = await flow.db.team_squads.find_one({"id": tied["squad_id"]}, {"_id": 0})
+    insider = await flow.db.users.find_one({"id": squad["captain_id"]}, {"_id": 0})
+    await flow.db.league_staff.insert_one({"id": new_id(), "league_id": world["league"]["id"], "user_id": insider["id"], "capabilities": ["results"],
+                                           "created_at": now_utc().isoformat(), "created_by": "test"})
+    flow.act_as(insider)
+    refused = await flow.client.request("DELETE", f"{url}/promote_best", json={"reason": "Wir wollen lieber neu spielen"})
+    assert refused.status_code == 403 and "eigenes Team" in refused.json()["detail"]
+    page = ok(await flow.get(CLOSING.format(admin=ADMIN, season=world["season"]["id"])))
+    assert page["cross"][0]["sides"][0]["own_team"] is True and page["cross"][0]["sides"][0]["decision"] is not None
+    # Notausnahme des Superadmins: nur mit Grund, und der steht im Protokoll.
+    boss = {**insider, "role": "superadmin"}
+    flow.act_as(boss)
+    bare = await flow.client.request("DELETE", f"{url}/promote_best", json={"reason": "Entscheidungsspiel wird wiederholt"})
+    assert bare.status_code == 403
+    stored = await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+    assert "promote_best" in stored["zone_decisions"]
+    ok(await flow.client.request("DELETE", f"{url}/promote_best", json={"reason": "Entscheidungsspiel wird wiederholt", "conflict_reason": "Niemand sonst erreichbar"}))
+    override = await flow.db.audit_logs.find_one({"action": "league.conflict.override", "data.action": "zone_decision_clear"}, {"_id": 0})
+    assert override["actor_id"] == insider["id"] and override["data"]["reason"] == "Niemand sonst erreichbar"
+    stored = await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+    assert "promote_best" not in (stored.get("zone_decisions") or {})
+
+
+@pytest.mark.asyncio
+async def test_with_relegation_places_the_candidate_is_the_place_after_them(flow):
+    """Nr. 227 im Ablauf: ein Aufsteiger, ein Relegationsplatz oben, dazu der beste Nächstplatzierte - Kandidat ist der Dritte."""
+    world = await build(flow, levels=2, zones={"promote": 1, "relegate": 1, "playoff_promote": 1, "promote_best": 1}, extra={2: [3]})
+    await close_all(flow, world)
+    _top, first, second = world["tids"]
+    side = (await cockpit(flow, world))["cross"][0]["sides"][0]
+    assert [(item["staffel"], item["rank"], item["chosen"]) for item in side["candidates"]] == [("A", 3, True), ("B", 3, False)]
+    # Kein Team in zwei Zonen: Der Zweite spielt die Relegation, der Dritte geht in den Vergleich.
+    assert await zones_of(flow, first) == [("promotion", False), ("playoff_promotion", False), ("promotion", True), (None, False)]
+    assert await zones_of(flow, second) == [("promotion", False), ("playoff_promotion", False), (None, False)]

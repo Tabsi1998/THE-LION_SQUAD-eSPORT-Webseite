@@ -59,6 +59,8 @@ class ZoneDecisionClear(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reason: str = Field(default="", max_length=500)
+    # Notausnahme des Superadmins beim eigenen Team - wie beim Entscheiden.
+    conflict_reason: str | None = Field(default=None, max_length=500)
 
 
 def _refuse(problem: league_final.FinalProblem) -> HTTPException:
@@ -148,7 +150,7 @@ async def admin_set_zone_decision(division_id: str, body: ZoneDecisionBody, me: 
 @admin_router.delete("/divisions/{division_id}/zone-decision/{kind}")
 async def admin_clear_zone_decision(division_id: str, kind: str, body: ZoneDecisionClear, me: dict = Depends(require_zone_decision)):
     try:
-        await league_cross_decisions.clear(get_db(), division_id, kind, body.reason, me)
+        await league_cross_decisions.clear(get_db(), division_id, kind, body.reason, me, conflict_reason=body.conflict_reason)
     except league_cross_zones.CrossProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
     return {"ok": True}

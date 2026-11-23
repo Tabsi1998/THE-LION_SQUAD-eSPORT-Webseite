@@ -9,7 +9,7 @@ from __future__ import annotations
 from models import new_id, now_utc
 from services import league_cross_zones, league_final, league_permissions
 from services.league_cross_zones import (
-    BUSY, KINDS, METHOD_NEEDED, METHODS, NO_DIVISION, NO_RULE, NO_TIE, PICK_EXACT, REASON_MIN, REASON_NEEDED, CrossProblem,
+    BUSY, KINDS, METHOD_NEEDED, METHODS, NO_DECISION, NO_DIVISION, NO_RULE, NO_TIE, PICK_EXACT, REASON_MIN, REASON_NEEDED, CrossProblem,
 )
 from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock
 
@@ -58,8 +58,9 @@ async def decide(db, division_id: str, body: dict, actor: dict) -> dict:
             registrations = await db.tournament_registrations.find({"id": {"$in": tie["registration_ids"]}}, {"_id": 0}).to_list(64)
             overrides = [await league_permissions.require_no_side_conflict(db, actor, registration, conflict_reason=body.get("conflict_reason"))
                          for registration in registrations]
-            decision = {"id": new_id(), "registration_ids": chosen, "tied": sorted(tie["registration_ids"]), "method": body["method"],
-                        "reason": reason, "by": actor.get("id"), "at": now_utc().isoformat()}
+            # Gebunden an die Gruppe und ihre Werte (Nr. 229): Ändern sich Punkte oder Map-Differenz je Spiel, gilt der Entscheid nicht mehr.
+            decision = {"id": new_id(), "registration_ids": chosen, "tied": sorted(tie["registration_ids"]), "values": list(tie["values"]),
+                        "method": body["method"], "reason": reason, "by": actor.get("id"), "at": now_utc().isoformat()}
             await db.league_divisions.update_one({"id": division_id}, {"$set": {f"zone_decisions.{kind}": decision}})
     except MutationLockBusy:
         raise CrossProblem(BUSY, 409) from None
@@ -72,18 +73,34 @@ async def decide(db, division_id: str, body: dict, actor: dict) -> dict:
     return decision
 
 
-async def clear(db, division_id: str, kind: str, reason: str | None, actor: dict) -> None:
-    """Den Entscheid zurücknehmen - mit Grund. Der Gleichstand ist dann wieder offen."""
+async def clear(db, division_id: str, kind: str, reason: str | None, actor: dict, *, conflict_reason: str | None = None) -> None:
+    """Den Entscheid zurücknehmen - mit Grund. Der Gleichstand ist dann wieder offen. Dieselben Regeln wie beim Entscheiden: unter der
+    Season-Sperre, nie über das eigene Team (wer zu einem Team des entschiedenen Gleichstands gehört, bekommt 403), der Superadmin
+    als Notausnahme mit Grund."""
     if kind not in KINDS:
         raise CrossProblem(NO_RULE)
     text = " ".join(str(reason or "").split())[:500]
     if len(text) < REASON_MIN:
         raise CrossProblem(REASON_NEEDED)
-    division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0, "id": 1, "season_id": 1, "zone_decisions": 1})
-    if not division:
+    seen = await db.league_divisions.find_one({"id": division_id}, {"_id": 0, "id": 1, "season_id": 1})
+    if not seen:
         raise CrossProblem(NO_DIVISION, 404)
-    decision = (division.get("zone_decisions") or {}).get(kind)
-    if not decision:
-        raise CrossProblem(NO_TIE, 409)
-    await db.league_divisions.update_one({"id": division_id}, {"$unset": {f"zone_decisions.{kind}": ""}})
-    await _audit(db, "league.zone.decision.clear", division, actor, kind=kind, decision_id=decision.get("id"), reason=text)
+    try:
+        async with mutation_lock(db, league_season_resource(seen["season_id"]), wait_seconds=10.0):
+            division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0, "id": 1, "season_id": 1, "zone_decisions": 1})
+            decision = ((division or {}).get("zone_decisions") or {}).get(kind)
+            if not decision:
+                raise CrossProblem(NO_DECISION, 409)
+            involved = list(decision.get("tied") or decision.get("registration_ids") or [])
+            registrations = await db.tournament_registrations.find({"id": {"$in": involved}}, {"_id": 0}).to_list(64)
+            overrides = [await league_permissions.require_no_side_conflict(db, actor, registration, conflict_reason=conflict_reason)
+                         for registration in registrations]
+            await db.league_divisions.update_one({"id": division_id}, {"$unset": {f"zone_decisions.{kind}": ""}})
+    except MutationLockBusy:
+        raise CrossProblem(BUSY, 409) from None
+    override = next((item for item in overrides if item), None)
+    if override:
+        await league_permissions.record_override(db, actor, action="zone_decision_clear", target_id=division["season_id"], reason=override,
+                                                 division_id=division_id, decision_id=decision.get("id"))
+    await _audit(db, "league.zone.decision.clear", division, actor, kind=kind, decision_id=decision.get("id"), reason=text,
+                 **({"conflict_override": override} if override else {}))

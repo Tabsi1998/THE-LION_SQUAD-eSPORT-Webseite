@@ -146,13 +146,16 @@ def test_a_tie_at_the_cut_stays_open_until_the_lead_decides():
     tie = found["ties"][0]
     assert (tie["kind"], tie["open"], sorted(tie["registration_ids"])) == ("promote_best", 1, ["A2", "B2"])
     decided = cross.evaluate(rule(promote_best=1), [one, two],
-                             {"promote_best": {"registration_ids": ["B2"], "tied": ["A2", "B2"], "method": "playoff", "reason": "Entscheidungsspiel 3:1"}})
+                             {"promote_best": {"registration_ids": ["B2"], "tied": ["A2", "B2"], "values": tie["values"], "method": "playoff",
+                                               "reason": "Entscheidungsspiel 3:1"}})
     assert decided["zones"] == {"B2": zones.PROMOTION} and decided["ties"] == []
     assert decided["sides"][0]["decision"]["method"] == "playoff"
     # Gegenprobe: Ein Entscheid zu einem anderen Gleichstand gilt nicht mehr - etwa nach einem korrigierten Ergebnis.
-    stale = cross.evaluate(rule(promote_best=1), [one, two], {"promote_best": {"registration_ids": ["B2"], "tied": ["B2", "C2"], "method": "lead"}})
+    stale = cross.evaluate(rule(promote_best=1), [one, two],
+                           {"promote_best": {"registration_ids": ["B2"], "tied": ["B2", "C2"], "values": tie["values"], "method": "lead"}})
     assert stale["zones"] == {} and len(stale["ties"]) == 1
-    wrong = cross.evaluate(rule(promote_best=1), [one, two], {"promote_best": {"registration_ids": ["A2", "B2"], "tied": ["A2", "B2"], "method": "lead"}})
+    wrong = cross.evaluate(rule(promote_best=1), [one, two],
+                           {"promote_best": {"registration_ids": ["A2", "B2"], "tied": ["A2", "B2"], "values": tie["values"], "method": "lead"}})
     assert wrong["zones"] == {} and len(wrong["ties"]) == 1
 
 
@@ -174,3 +177,62 @@ def test_overlay_only_touches_the_chosen_rows():
     other = zones.mark([dict(item) for item in one["rows"]], rule(promote_best=1))
     cross.apply(other, found["zones"])
     assert [item["zone"] for item in other] == [zones.PROMOTION, None, None, zones.RELEGATION]
+
+
+# ---------------------------------------------------------------- Fix-Runde (Entscheidungen Nr. 227-229)
+
+def test_the_candidate_comes_after_the_relegation_places_too():
+    """Nr. 227: Kandidat ist der erste Platz nach den festen Aufsteigern **und** den Relegationsplätzen - unten spiegelbildlich. Kein
+    Team steht je in zwei Zonen."""
+    rows = table("A", [(5, 15, 9), (5, 12, 6), (5, 9, 3), (5, 6, -3), (5, 3, -6), (5, 0, -9)])["rows"]
+    both = rule(playoff_promote=1, playoff_relegate=1, promote_best=1, relegate_worst=1)
+    found = zones.cross_candidates(rows, both)
+    assert found["promote_best"]["registration_id"] == "A3"  # nicht A2: Der spielt die Relegation um den Aufstieg
+    assert found["relegate_worst"]["registration_id"] == "A4"  # nicht A5: Der spielt die Relegation gegen den Abstieg
+    marked = zones.assign(rows, both)
+    assert (marked["A2"], marked["A3"], marked["A4"], marked["A5"]) == (zones.PLAYOFF_PROMOTION, None, None, zones.PLAYOFF_RELEGATION)
+    # Gegenprobe: ohne Relegationsplätze ist es wie bisher der Platz gleich nach den Aufsteigern.
+    plain = zones.cross_candidates(rows, rule(promote_best=1, relegate_worst=1))
+    assert plain["promote_best"]["registration_id"] == "A2" and plain["relegate_worst"]["registration_id"] == "A5"
+    # Liegen die Kandidatenplätze schon in der anderen Hälfte, gibt es keinen Kandidaten.
+    small = table("A", [(2, 6, 4), (2, 3, 0), (2, 0, -4)])["rows"]
+    assert zones.cross_candidates(small, both) == {"promote_best": None, "relegate_worst": None}
+
+
+def test_each_staffel_uses_the_zones_of_its_own_final():
+    """Nr. 228: Gelesen wird aus dem beim Abschluss gespeicherten Stand. Trägt eine Tabelle eigene ``zones``, zählen die für ihren
+    Kandidaten - die heutige Einstellung der Liga N ändert daran nichts."""
+    one = {**table("A", [(3, 9, 5), (3, 6, 2), (3, 3, -2), (3, 0, -5)]), "zones": rule(promote_best=1)}
+    two = {**table("B", [(3, 9, 6), (3, 7, 2), (3, 3, -2), (3, 0, -5)]), "zones": rule(promote=2, promote_best=1)}
+    found = cross.evaluate(rule(promote_best=1), [one, two])
+    # Staffel B schloss mit zwei festen Aufsteigern ab: Ihr Kandidat ist der Dritte.
+    assert [(item["registration_id"], item["chosen"]) for item in found["sides"][0]["candidates"]] == [("A2", True), ("B3", False)]
+
+
+def test_a_decision_is_bound_to_the_values_it_was_made_for():
+    """Nr. 229: Der Entscheid gilt für die Gruppe **und** ihre Punkte bzw. Map-Differenz je Spiel. Ändern sich die Werte, ist er hinfällig."""
+    one = table("A", [(3, 9, 5), (3, 6, 2), (3, 3, -2), (3, 0, -5)])
+    two = table("B", [(3, 9, 5), (3, 6, 2), (3, 3, -2), (3, 0, -5)])
+    open_tie = cross.evaluate(rule(promote_best=1), [one, two])["ties"][0]
+    assert open_tie["values"] == ["2", "2/3"]
+    decision = {"registration_ids": ["B2"], "tied": ["A2", "B2"], "values": open_tie["values"], "method": "lead", "reason": "Sichtung der Spiele"}
+    assert cross.evaluate(rule(promote_best=1), [one, two], {"promote_best": decision})["zones"] == {"B2": zones.PROMOTION}
+    # Beide Zweiten haben nach einer Korrektur andere Werte, stehen aber wieder gleich: derselbe Kreis, ein neuer Gleichstand.
+    other = [table("A", [(3, 9, 5), (3, 5, 1), (3, 3, -2), (3, 0, -5)]), table("B", [(3, 9, 5), (3, 5, 1), (3, 3, -2), (3, 0, -5)])]
+    stale = cross.evaluate(rule(promote_best=1), other, {"promote_best": decision})
+    assert stale["zones"] == {} and stale["ties"][0]["values"] == ["5/3", "1/3"]
+    # Ein Entscheid ohne gespeicherte Werte gilt nicht.
+    bare = {key: value for key, value in decision.items() if key != "values"}
+    assert cross.evaluate(rule(promote_best=1), [one, two], {"promote_best": bare})["zones"] == {}
+
+
+def test_the_loser_of_a_decision_is_marked_as_staying():
+    one = table("A", [(3, 9, 5), (3, 6, 2), (3, 3, -2), (3, 0, -5)])
+    two = table("B", [(3, 9, 5), (3, 6, 2), (3, 3, -2), (3, 0, -5)])
+    values = cross.evaluate(rule(promote_best=1), [one, two])["ties"][0]["values"]
+    found = cross.evaluate(rule(promote_best=1), [one, two],
+                           {"promote_best": {"registration_ids": ["B2"], "tied": ["A2", "B2"], "values": values, "method": "playoff", "reason": "3:1"}})
+    by_id = {item["registration_id"]: item for item in found["sides"][0]["candidates"]}
+    assert (by_id["B2"]["chosen"], by_id["B2"]["passed"]) == (True, False)
+    assert (by_id["A2"]["chosen"], by_id["A2"]["passed"]) == (False, True)
+    assert found["sides"][0]["decision"]["tied"] == ["A2", "B2"]
