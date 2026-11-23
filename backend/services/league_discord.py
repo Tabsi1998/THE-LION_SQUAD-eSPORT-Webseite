@@ -1,0 +1,453 @@
+"""Liga im Discord (#1642): Spieltag-Zusammenfassung je Staffel und Saisonende-Meldung - je Season einstellbar.
+
+- **Einstellung** ``league_seasons.discord_digest`` (Reiter „Termine“ der Season, ``GET|PUT /api/admin/leagues/seasons/{id}/discord``):
+  ``matchday`` und ``season_end`` an/aus, ``channel_id`` (ein Kanal für beides), ``wait_hours`` (wie lange nach dem Ende der
+  Spielwoche auf fehlende Ergebnisse gewartet wird), ``late`` (danach trotzdem melden, mit „x Spiele offen“) und ``table_rows``
+  (Plätze im Tabellenausschnitt). **Ohne Einstellung ist alles aus** - es bleibt, wie es war. Die Folge-Season übernimmt die
+  Einstellung (F.2 kopiert Season-Felder).
+- **Spieltag fertig**, sobald jedes Spiel des Spieltags gewertet oder abgesagt ist - spätestens ``wait_hours`` nach dem Ende der
+  Spielwoche mit den offenen Spielen dazu (nur mit ``late``). Ein Spieltag ohne ein einziges Ergebnis geht nie hinaus. Wer die
+  Meldung später einschaltet, bekommt nur Spieltage, deren Frist danach endet - nichts Altes auf einmal.
+- **Saisonende**, sobald die Season „beendet“ ist (alle Staffeln abgeschlossen, ``league_final._season_follows``): Meister, Auf- und
+  Absteiger je Liga N (``league_final.build_pages``-Rechnung aus ``league_finale``), Link zur öffentlichen Season-Seite.
+- **Nur, was Gäste sehen**: Season öffentlich (``public_season``), Staffel als Turnier sichtbar. Interne oder Leitungs-Seasons gehen
+  nie hinaus, auch nicht mit Einstellung.
+- **Nie doppelt** (``league_discord_posts``, eindeutiger ``dedupe_key``): Vor dem Senden wird der Schlüssel belegt, nur wer ihn
+  belegt, sendet. Ein zweiter Lauf des Jobs - auch gleichzeitig auf zwei Servern - findet ihn und sendet nichts. Ein Fehlschlag
+  wird höchstens ``MAX_ATTEMPTS``-mal wiederholt, frühestens nach ``RETRY_MINUTES``.
+- **Kein Rückfall**: ohne Kanal, ohne Bot oder mit Discord aus wird nichts gesendet und nichts belegt.
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timedelta
+
+from pymongo.errors import DuplicateKeyError
+
+from models import now_utc
+from services.log_safe import log_safe
+
+logger = logging.getLogger("tls.league_discord")
+
+FIELD = "discord_digest"
+COLLECTION = "league_discord_posts"
+DEFAULTS = {"matchday": False, "season_end": False, "channel_id": "", "wait_hours": 48, "late": True, "table_rows": 5}
+RANGES = {"wait_hours": (0, 336), "table_rows": (0, 20)}
+MAX_ATTEMPTS = 3
+RETRY_MINUTES = 30
+MAX_POSTS_PER_RUN = 10
+SEASON_LIMIT = 200
+MATCH_LIMIT = 2000
+SETTLED = frozenset({"completed", "forfeit", "cancelled", "archived", "bye"})
+DECIDED = frozenset({"completed", "forfeit"})
+COLOR = 0x29B6E8
+GOLD = 0xD4A84B
+# Ein Embed trägt höchstens 4096 Zeichen Beschreibung und 1024 je Feld - darüber fallen ganze Zeilen weg, nie ein halber Name.
+DESCRIPTION_MAX = 3900
+FIELD_MAX = 1000
+MOVE_SIGNS = {"up": "▲", "down": "▼", "out": "✕"}
+
+
+class DigestProblem(ValueError):
+    def __init__(self, message: str, status_code: int = 422):
+        super().__init__(message)
+        self.detail = message
+        self.status_code = status_code
+
+
+# ---------------------------------------------------------------- Einstellung
+
+def _number(value, key: str) -> int:
+    low, high = RANGES[key]
+    if value is None or value == "" or isinstance(value, bool):
+        return DEFAULTS[key]
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise DigestProblem(f"Bitte eine ganze Zahl von {low} bis {high} eintragen.") from None
+    if not low <= number <= high:
+        raise DigestProblem(f"Bitte eine ganze Zahl von {low} bis {high} eintragen.")
+    return number
+
+
+def channel_of(value) -> str:
+    text = str(value or "").strip()
+    return text if text.isdigit() else ""
+
+
+def settings_of(season: dict | None) -> dict:
+    """Die geltende Einstellung - fehlt sie oder ein Wert, gilt die Vorgabe (alles aus)."""
+    raw = (season or {}).get(FIELD)
+    raw = raw if isinstance(raw, dict) else {}
+    out = dict(DEFAULTS)
+    out["matchday"] = raw.get("matchday") is True
+    out["season_end"] = raw.get("season_end") is True
+    out["late"] = raw.get("late") is not False
+    out["channel_id"] = channel_of(raw.get("channel_id"))
+    for key in RANGES:
+        try:
+            out[key] = _number(raw.get(key), key)
+        except DigestProblem:
+            out[key] = DEFAULTS[key]
+    if raw.get("matchday_since"):
+        out["matchday_since"] = raw["matchday_since"]
+    return out
+
+
+def normalize(body: dict, before: dict | None, now: datetime) -> dict:
+    """Die Eingabe der Leitung geprüft. Wer etwas einschaltet, braucht einen Kanal. ``matchday_since`` merkt sich, ab wann die
+    Spieltag-Meldung gilt - frühere Spieltage gehen nicht nachträglich hinaus."""
+    current = settings_of({FIELD: before or {}})
+    out = {**current}
+    for key in ("matchday", "season_end", "late"):
+        if key in body and body[key] is not None:
+            out[key] = bool(body[key])
+    if "channel_id" in body and body["channel_id"] is not None:
+        raw = str(body["channel_id"]).strip()
+        if raw and not raw.isdigit():
+            raise DigestProblem("Die Kanal-ID besteht nur aus Ziffern (in Discord: Rechtsklick auf den Kanal → Kanal-ID kopieren).")
+        out["channel_id"] = raw
+    for key in RANGES:
+        if key in body:
+            out[key] = _number(body[key], key)
+    if (out["matchday"] or out["season_end"]) and not out["channel_id"]:
+        raise DigestProblem("Bitte einen Kanal wählen - ohne Kanal geht nichts hinaus.")
+    if out["matchday"] and not current["matchday"]:
+        out["matchday_since"] = now.isoformat()
+    elif not out["matchday"]:
+        out.pop("matchday_since", None)
+    return out
+
+
+# ---------------------------------------------------------------- Texte
+
+def _esc(value) -> str:
+    from services.discord_design import escape_markdown
+
+    return escape_markdown(" ".join(str(value or "").split()))
+
+
+def _fit(lines: list[str], limit: int, more: str) -> str:
+    """Ganze Zeilen, bis das Feld voll ist - dann ein Satz, wie viele fehlen. Nie ein abgeschnittener Name."""
+    out: list[str] = []
+    used = 0
+    for index, line in enumerate(lines):
+        rest = len(lines) - index
+        tail = len(more.format(n=rest)) + 1 if rest > 1 else 0
+        if used + len(line) + 1 + tail > limit:
+            out.append(more.format(n=rest))
+            break
+        out.append(line)
+        used += len(line) + 1
+    return "\n".join(out)
+
+
+def result_line(match: dict) -> str:
+    """Ein Spiel als Zeile: „Lions **2 : 0** Tigers“ - kampflos, abgesagt oder offen mit Wort."""
+    home = _esc((match.get("home") or {}).get("name") or "offen")
+    away = _esc((match.get("away") or {}).get("name") or "offen")
+    status = match.get("status")
+    if status == "cancelled":
+        return f"{home} – {away} · abgesagt"
+    if not match.get("done"):
+        return f"{home} – {away} · offen"
+    if match.get("double_forfeit"):
+        return f"{home} – {away} · beide nicht angetreten"
+    hs, aw = (match.get("home") or {}).get("score"), (match.get("away") or {}).get("score")
+    score = f"**{_score(hs)} : {_score(aw)}**" if hs is not None and aw is not None else "**gewertet**"
+    if match.get("forfeit"):
+        winner = match.get("winner_registration_id")
+        side = home if winner and winner == (match.get("home") or {}).get("registration_id") else away
+        return f"{home} {score} {away} · kampflos für {side}"
+    return f"{home} {score} {away}"
+
+
+def _score(value) -> str:
+    return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+
+
+def open_text(count: int) -> str:
+    return "1 Spiel offen" if count == 1 else f"{count} Spiele offen"
+
+
+def table_lines(rows: list[dict], limit: int) -> list[str]:
+    out = []
+    for row in rows[:limit]:
+        sign = {"promotion": " ▲", "relegation": " ▼", "out": " ✕"}.get(row.get("zone") or "", "")
+        points = row.get("points")
+        tail = f" · {_score(points)} Pkt." if isinstance(points, (int, float)) and not isinstance(points, bool) else ""
+        out.append(f"{row.get('rank') or '–'}. {_esc(row.get('display_name') or 'Team')}{tail}{sign}")
+    return out
+
+
+def matchday_message(context: dict) -> dict:
+    """Die Spieltag-Zusammenfassung: Titel, Text, Tabellenausschnitt, Link. ``context``: ``league``, ``season``, ``division``,
+    ``staffel`` (nur bei mehreren Staffeln je Liga N), ``number``, ``matches`` (wie die Ligaseite), ``open``, ``table``, ``table_rows``, ``url``."""
+    head = " · ".join(part for part in (f"Spieltag {context['number']}", context.get("division"),
+                                         f"Staffel {context['staffel']}" if context.get("staffel") else None) if part)
+    intro = " · ".join(_esc(part) for part in (context.get("league"), context.get("season")) if part)
+    lines = [result_line(match) for match in context.get("matches") or []]
+    opened = int(context.get("open") or 0)
+    footer = open_text(opened) if opened else "Alle Spiele gewertet"
+    body = _fit(lines, DESCRIPTION_MAX - len(intro) - len(footer) - 4, "… und {n} weitere Spiele auf der Ligaseite")
+    fields = []
+    rows = table_lines(context.get("table") or [], int(context.get("table_rows") or 0))
+    if rows:
+        more = len(context.get("table") or []) - len(rows)
+        if more > 0:
+            rows.append("… ganze Tabelle auf der Ligaseite")
+        fields.append({"name": "Tabelle", "value": _fit(rows, FIELD_MAX, "… und {n} weitere Plätze"), "inline": False})
+    return {"title": head, "description": "\n\n".join(part for part in (intro, body, f"*{footer}*") if part), "fields": fields,
+            "url": context.get("url"), "color": COLOR, "buttons": [{"label": "Zur Ligaseite", "url": context["url"]}] if context.get("url") else []}
+
+
+def mover_line(row: dict) -> str:
+    name = _esc(row.get("name") or "Team")
+    staffel = f" (Staffel {row['staffel']})" if row.get("staffel") else ""
+    if row.get("move") == "out":
+        return f"{MOVE_SIGNS['out']} {name}{staffel} scheidet aus"
+    target = f" → {row['target']}" if row.get("target") else ""
+    return f"{MOVE_SIGNS.get(row.get('move'), '')} {name}{staffel}{target}"
+
+
+def season_end_message(context: dict) -> dict:
+    """Die Saisonende-Meldung: Meister, je Liga N die Auf- und Absteiger, Link zur Season-Seite. ``context``: ``league``,
+    ``season``, ``champions`` (Liste ``{name, staffel}``), ``pages`` (``league_finale.build_pages``), ``url``."""
+    champions = context.get("champions") or []
+    if len(champions) == 1:
+        title_line = f"Meister: **{_esc(champions[0]['name'])}**"
+    elif champions:
+        title_line = "\n".join(f"Meister Staffel {row['staffel']}: **{_esc(row['name'])}**" if row.get("staffel")
+                               else f"Meister: **{_esc(row['name'])}**" for row in champions)
+    else:
+        title_line = ""
+    intro = f"{_esc(context.get('league'))}: Die Season ist abgeschlossen." if context.get("league") else "Die Season ist abgeschlossen."
+    fields = []
+    for page in (context.get("pages") or [])[:20]:
+        lines = [mover_line(row) for row in page.get("rows") or []]
+        if page.get("more"):
+            lines.append(f"… und {page['more']} weitere auf der Season-Seite")
+        fields.append({"name": page["label"], "value": _fit(lines, FIELD_MAX, "… und {n} weitere auf der Season-Seite"), "inline": False})
+    if not fields:
+        fields.append({"name": "Auf- und Abstieg", "value": "In dieser Season steigt niemand auf oder ab.", "inline": False})
+    return {"title": f"Saisonende · {context.get('season') or 'Season'}", "description": "\n".join(part for part in (intro, title_line) if part),
+            "fields": fields, "url": context.get("url"), "color": GOLD,
+            "buttons": [{"label": "Zur Season", "url": context["url"]}] if context.get("url") else []}
+
+
+# ---------------------------------------------------------------- Spieltag fertig?
+
+def matchday_due(games: list[dict], window_end: datetime | None, settings: dict, now: datetime) -> tuple[bool, int]:
+    """Ist der Spieltag zu melden - und wie viele Spiele sind offen? Fertig: alles gewertet oder abgesagt. Mit ``late`` spätestens
+    ``wait_hours`` nach dem Ende der Spielwoche, dann mit den offenen Spielen. Ohne ein einziges Ergebnis nie."""
+    open_count = sum(1 for game in games if game.get("status") not in SETTLED)
+    if not any(game.get("status") in DECIDED for game in games):
+        return False, open_count
+    if not open_count:
+        return True, 0
+    if not settings.get("late") or window_end is None:
+        return False, open_count
+    return now >= window_end + timedelta(hours=int(settings.get("wait_hours") or 0)), open_count
+
+
+def _parse(value) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else None
+
+
+# ---------------------------------------------------------------- Merker gegen Doppelversand
+
+async def claim(db, key: str, doc: dict, now: datetime) -> bool:
+    """Den Schlüssel belegen - ``True`` nur für den, der ihn belegt hat. Ein Fehlschlag darf nach ``RETRY_MINUTES`` noch einmal,
+    insgesamt höchstens ``MAX_ATTEMPTS``-mal. Ein Eintrag „sending“ (Lauf abgebrochen) bleibt: lieber keine als zwei Meldungen."""
+    stamp = now.isoformat()
+    try:
+        result = await db[COLLECTION].update_one(
+            {"dedupe_key": key},
+            {"$setOnInsert": {**doc, "dedupe_key": key, "status": "sending", "attempts": 1, "claimed_at": stamp, "created_at": stamp}},
+            upsert=True)
+    except DuplicateKeyError:
+        return False
+    if getattr(result, "upserted_id", None) is not None:
+        return True
+    cutoff = (now - timedelta(minutes=RETRY_MINUTES)).isoformat()
+    retried = await db[COLLECTION].update_one(
+        {"dedupe_key": key, "status": "failed", "attempts": {"$lt": MAX_ATTEMPTS}, "claimed_at": {"$lt": cutoff}},
+        {"$set": {"status": "sending", "claimed_at": stamp}, "$inc": {"attempts": 1}})
+    return bool(retried.modified_count)
+
+
+async def _send(db, key: str, channel_id: str, message: dict, now: datetime) -> bool:
+    from services.discord_links import build_embed, resolve_buttons
+    from services.discord_runtime import bot
+
+    embed = await build_embed(message["title"], message["description"], color=message["color"], url=message.get("url"),
+                              fields=message.get("fields"))
+    try:
+        result = await bot.send_embed(channel_id, embed, await resolve_buttons(message.get("buttons")))
+    except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf den Job nicht abbrechen
+        result = {"ok": False, "reason": "error", "error": type(exc).__name__}
+    if result.get("ok"):
+        await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "sent", "message_id": str(result.get("message_id") or ""),
+                                                                       "channel_id": channel_id, "sent_at": now.isoformat(), "error": None}})
+        return True
+    await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "failed", "channel_id": channel_id,
+                                                                   "error": str(result.get("reason") or result.get("error") or "error")[:200]}})
+    logger.info("[league_discord] Meldung %s nicht gesendet: %s", log_safe(key), log_safe(result.get("reason")))
+    return False
+
+
+# ---------------------------------------------------------------- Der Job
+
+async def _discord_ready(db) -> bool:
+    from services.discord_runtime import bot_settings
+
+    settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    return bool(settings.get("enabled", True)) and bot_settings(settings)["enabled"]
+
+
+async def _names(db, tournament_id: str) -> dict:
+    from services import league_page
+
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tournament_id, "status": {"$in": [*league_page.PUBLIC_REGISTRATION_STATUSES, "withdrawn", "disqualified"]}},
+        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1}).to_list(500)
+    return {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+
+
+async def _table(db, tournament: dict) -> list[dict]:
+    from routes.tournament_view_routes import _standing_rows
+
+    try:
+        rows = await _standing_rows(db, tournament, None, False)
+    except Exception:  # noqa: BLE001 - ohne Tabelle geht die Zusammenfassung trotzdem hinaus
+        logger.warning("[league_discord] Tabelle %s nicht lesbar", log_safe(tournament.get("id")), exc_info=True)
+        return []
+    return [row for row in rows if row.get("registration_id")]
+
+
+def season_url(league: dict | None, season: dict | None, page: str = "") -> str | None:
+    if not (league or {}).get("slug") or not (season or {}).get("slug"):
+        return None
+    return f"/liga/{league['slug']}/{season['slug']}{page}"
+
+
+async def matchday_posts(db, season: dict, league: dict, settings: dict, now: datetime, budget: int) -> int:
+    """Je Staffel der Season, die Gäste sehen: jeder fertige Spieltag genau einmal."""
+    from services import league_page
+    from services.league_finale import guest_sees_staffel
+    from services.league_scope import ONLY_LEAGUE
+    from services.league_service import division_label
+    from services.matchday_schedule import matchday_number_of, tournament_matchday_window
+
+    since = _parse(settings.get("matchday_since"))
+    sent = 0
+    staffeln = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE,
+                                          "status": {"$nin": ["draft", "cancelled", "archived"]}}, {"_id": 0}).to_list(SEASON_LIMIT)
+    divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0}).to_list(50)}
+    per_division: dict[str, int] = {}
+    for staffel in staffeln:
+        per_division[(staffel.get("league_context") or {}).get("division_id")] = per_division.get(
+            (staffel.get("league_context") or {}).get("division_id"), 0) + 1
+    for staffel in sorted(staffeln, key=lambda row: str(row.get("title") or "")):
+        if sent >= budget:
+            break
+        if not await guest_sees_staffel(staffel):
+            continue
+        context_ids = staffel.get("league_context") or {}
+        matches = await db.matches_v2.find({"tournament_id": staffel["id"], "is_preview": {"$ne": True}}, {"_id": 0}).to_list(MATCH_LIMIT)
+        by_day: dict[int, list[dict]] = {}
+        for match in matches:
+            number = matchday_number_of(match)
+            if number:
+                by_day.setdefault(number, []).append(match)
+        names = None
+        table = None
+        for number in sorted(by_day):
+            if sent >= budget:
+                break
+            try:
+                window_end = tournament_matchday_window(staffel, number).end
+            except Exception:  # noqa: BLE001 - ohne Spielwoche (kein Start) zählt nur „alles gewertet“
+                window_end = None
+            due, open_count = matchday_due(by_day[number], window_end, settings, now)
+            if not due:
+                continue
+            # Später eingeschaltet: nur Spieltage, deren Meldefrist danach endet.
+            if since and window_end and window_end + timedelta(hours=int(settings["wait_hours"])) < since:
+                continue
+            key = f"matchday:{staffel['id']}:{number}"
+            if await db[COLLECTION].count_documents({"dedupe_key": key, "status": {"$in": ["sent", "sending"]}}, limit=1):
+                continue
+            if names is None:
+                names = await _names(db, staffel["id"])
+                table = await _table(db, staffel)
+            division = divisions.get(context_ids.get("division_id")) or {}
+            games = sorted(by_day[number], key=lambda match: (match.get("order") or 0, match.get("match_key") or ""))
+            message = matchday_message({
+                "league": league.get("name"), "season": season.get("name"),
+                "division": division_label(division) if division.get("level") is not None else None,
+                "staffel": context_ids.get("staffel") if per_division.get(context_ids.get("division_id"), 0) > 1 else None,
+                "number": number, "matches": [league_page.public_match(match, names) for match in games], "open": open_count,
+                "table": table or [], "table_rows": settings["table_rows"], "url": season_url(league, season, "/spieltage"),
+            })
+            if not await claim(db, key, {"kind": "matchday", "season_id": season["id"], "tournament_id": staffel["id"], "matchday": number,
+                                         "open": open_count}, now):
+                continue
+            await _send(db, key, settings["channel_id"], message, now)
+            sent += 1
+    return sent
+
+
+async def season_end_post(db, season: dict, league: dict, settings: dict, now: datetime) -> int:
+    """Ist die Season beendet: einmal die Meldung mit Meister, Auf- und Absteigern."""
+    from services.league_finale import season_finals, season_pages
+
+    if season.get("status") != "completed":
+        return 0
+    key = f"season_end:{season['id']}"
+    if await db[COLLECTION].count_documents({"dedupe_key": key, "status": {"$in": ["sent", "sending"]}}, limit=1):
+        return 0
+    staffeln, finals = await season_finals(db, season)
+    if not finals:
+        return 0
+    letters = {row["id"]: (row.get("league_context") or {}).get("staffel") for row in staffeln}
+    with_champion = [final for final in finals if (final.get("champion") or {}).get("display_name")]
+    champions = [{"name": final["champion"]["display_name"],
+                  "staffel": letters.get(final.get("tournament_id")) if len(with_champion) > 1 else None}
+                 for final in sorted(with_champion, key=lambda final: str(letters.get(final.get("tournament_id")) or ""))]
+    message = season_end_message({"league": league.get("name"), "season": season.get("name"), "champions": champions,
+                                  "pages": await season_pages(db, season), "url": season_url(league, season)})
+    if not await claim(db, key, {"kind": "season_end", "season_id": season["id"]}, now):
+        return 0
+    await _send(db, key, settings["channel_id"], message, now)
+    return 1
+
+
+async def sweep(db, *, now: datetime | None = None) -> dict:
+    """Der Job (Scheduler „league_discord“, alle 15 Minuten auf genau einem Server): je Season mit Einstellung melden, was fertig ist."""
+    from services.profile_visibility import public_season
+
+    current = now or now_utc()
+    counts = {"matchday": 0, "season_end": 0}
+    query = {"$or": [{f"{FIELD}.matchday": True}, {f"{FIELD}.season_end": True}], "status": {"$in": ["active", "completed"]},
+             "visibility": "public"}
+    seasons = await db.league_seasons.find(query, {"_id": 0}).to_list(SEASON_LIMIT)
+    if not seasons or not await _discord_ready(db):
+        return counts
+    for season in seasons:
+        settings = settings_of(season)
+        if not settings["channel_id"] or not public_season(season):
+            continue
+        league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "id": 1, "name": 1, "slug": 1}) or {}
+        try:
+            if settings["matchday"]:
+                counts["matchday"] += await matchday_posts(db, season, league, settings, current, MAX_POSTS_PER_RUN - counts["matchday"])
+            if settings["season_end"]:
+                counts["season_end"] += await season_end_post(db, season, league, settings, current)
+        except Exception:  # noqa: BLE001 - eine Season hält die anderen nicht auf
+            logger.warning("[league_discord] Season %s nicht gemeldet", log_safe(season.get("id")), exc_info=True)
+    return counts

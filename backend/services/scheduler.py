@@ -793,6 +793,18 @@ async def _safe_draw_show():
         _log_task_failure("draw_show", exc)
 
 
+async def _safe_league_discord():
+    """Liga im Discord (#1642): Spieltag-Zusammenfassung und Saisonende-Meldung, je Season eingeschaltet - jede genau einmal."""
+    try:
+        from database import get_db
+        from services.league_discord import sweep
+        result = await sweep(get_db())
+        if result.get("matchday") or result.get("season_end"):
+            logger.info(f"[scheduler] league_discord matchday={result['matchday']} season_end={result['season_end']}")
+    except Exception as exc:
+        _log_task_failure("league_discord", exc)
+
+
 async def _safe_proof_photo_retention():
     """Nachweise zu Spielen (#1157, #2360): nie verwendete nach 24 Stunden; Turniere 30 Tage nach dem Hochladen, Liga-Staffeln
     nach Season-Ende plus Frist, MOSS nach Verfahrensende plus Einspruchsfrist (``match_proof_retention.purge``)."""
@@ -1280,6 +1292,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Show-Auslosung (#1590): erinnern und nach der Frist selbst auslosen - jede Minute.
     sched.add_job(_single_replica("draw_show", _safe_draw_show, lease_seconds=120.0), IntervalTrigger(seconds=60),
                   id="draw_show", max_instances=1, coalesce=True)
+    # Liga im Discord (#1642): fertige Spieltage und das Saisonende melden - alle 15 Minuten, nie doppelt (league_discord_posts).
+    sched.add_job(_single_replica("league_discord", _safe_league_discord, lease_seconds=300.0), IntervalTrigger(minutes=15),
+                  id="league_discord", max_instances=1, coalesce=True)
     # Veto der Liga (#1618, D.3): 60 Sekunden je Schritt - alle 10 Sekunden nachsehen, ob eine Frist abgelaufen ist.
     sched.add_job(_single_replica("league_veto", _safe_league_veto, lease_seconds=60.0), IntervalTrigger(seconds=10),
                   id="league_veto", max_instances=1, coalesce=True)

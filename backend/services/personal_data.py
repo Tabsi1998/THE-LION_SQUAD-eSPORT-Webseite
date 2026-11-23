@@ -120,6 +120,7 @@ PERSONAL: dict[str, Entry] = {
     "twitch_stream_sessions": Entry(DELETED, ("stream_sessions",)),
     "tournament_stream_announcements": Entry(DELETED, ("stream_announcements",)),
     "discord_stream_posts": Entry(KEPT, note="Beitrag im Discord zum Stream; ohne Namen, der Job beendet ihn mit dem Stream"),
+    "league_discord_posts": Entry(KEPT, note="Merker je Liga-Meldung im Discord (Spieltag, Saisonende) - nur Kennungen von Season, Staffel und Nachricht, ohne Person"),
     # Verein und Mitgliedschaft
     "memberships": Entry(OVERWRITTEN, ("membership",)),
     "membership_applications": Entry(OVERWRITTEN, ("membership_applications",)),
