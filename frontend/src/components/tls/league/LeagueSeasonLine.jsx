@@ -28,6 +28,9 @@ const EXIT_AIR = 6;
 const CHAR = 6.2;
 // Mindestabstand zweier Platz-Zahlen übereinander (Schrift 10 px).
 const LABEL_GAP = 11;
+// Eine Beschriftung (Grundlinie `spot`, Schrift 10 px: etwa 9 px darüber, 2 px darunter) trifft einen Kreis (Radius bis 6 px plus Rand
+// und 1 px Luft), wenn ihre Grundlinie zwischen 9 px über und 16 px unter seiner Mitte liegt (Review #1638: „6.“ lag auf Kreisen).
+const hitsCircle = (spot, cy) => spot > cy - 9 && spot < cy + 16;
 // Ohne Messung (erster Zeichenschritt, Tests) die kleinste nötige Breite - nie breiter als die Fläche (Review #1638: bei 320 px wuchs
 // die Spalte sonst auf die Startbreite mit, und die Messung bestätigte sie).
 const FALLBACK_WIDTH = 0;
@@ -116,15 +119,20 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
   const yOf = (point) => (point.exit ? y(point.level - 0.5) : y(point.value));
   // Höchstens vier Linien - die besten Co-Teams (seasonLine sortiert); die übrigen nennt ein Satz darunter (Fabian 23.11.).
   const series = line.series;
-  // Wo eine Beschriftung am Punkt steht (Review #1638): zuerst über dem Punkt, stößt sie dort an eine schon gesetzte derselben Season,
-  // darunter - und passt auch das nicht (oder rutschte sie in die Season-Zeile), bleibt sie weg. „ausgetreten“ kommt vor den Plätzen
-  // dran; Plätze stehen nur am Anfang, am Ende und bei einem Wechsel, die besten Co-Teams zuerst. Alles steht in der Bildbeschreibung.
+  // Wo eine Beschriftung am Punkt steht (Review #1638): zuerst über dem Punkt, stößt sie dort an eine schon gesetzte derselben Season
+  // oder an einen Kreis irgendeiner Linie, darunter - und passt auch das nicht (oder rutschte sie in die Season-Zeile), bleibt sie weg.
+  // „ausgetreten“ kommt vor den Plätzen dran; Plätze stehen nur am Anfang, am Ende und bei einem Wechsel, die besten Co-Teams zuerst.
+  // Alles steht in der Bildbeschreibung.
   const bottom = TOP + bands.length * BAND;
+  const circles = new Map();
+  series.forEach((row) => row.points.forEach((point) => circles.set(point.index, [...(circles.get(point.index) || []), yOf(point)])));
   const placed = new Map();
   const spots = new Map();
   const place = (at, point) => {
     const taken = placed.get(point.index) || [];
-    const free = (spot) => spot >= TOP - 6 && spot < bottom && taken.every((other) => Math.abs(other - spot) >= LABEL_GAP);
+    const dots = circles.get(point.index) || [];
+    const free = (spot) => spot >= TOP - 6 && spot < bottom && taken.every((other) => Math.abs(other - spot) >= LABEL_GAP)
+      && dots.every((cy) => !hitsCircle(spot, cy));
     const spot = [yOf(point) - 10, yOf(point) + 17].find(free);
     if (spot === undefined) return;
     placed.set(point.index, [...taken, spot]);
