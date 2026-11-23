@@ -79,11 +79,9 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   expect((await page.request.get(`/api/tournaments/${slug}`)).status()).toBe(403);
   // Erwartet: 401/403 vor der Anmeldung; die Login-Seite fragt Passkeys an, die der Abnahme-Stand nicht eingerichtet hat (503).
   const passkeys = (response) => response.status() === 503 && response.url().includes("/api/auth/passkeys/");
-  // Jede dieser erlaubten Antworten schreibt der Browser zusätzlich als „Failed to load resource: … status of …“ in die Konsole -
-  // etwa wenn die offene Turnierseite nach dem Abmelden nachlädt und, wie gewollt, 403 bekommt (#2529). Nur dieses Echo ist erlaubt.
   const problems = watch(page, {
     allow: (response) => [401, 403].includes(response.status()) || passkeys(response),
-    allowConsole: (text) => ["status of 401", "status of 403", "status of 503"].some((part) => text.includes(part)),
+    allowConsole: (text) => text.includes("status of 503"),
   });
 
   // QR-Code scannen: der Code verlässt die Adresse sofort und landet nie in einer URL.
