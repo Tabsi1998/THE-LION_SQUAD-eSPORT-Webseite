@@ -35,8 +35,8 @@
   font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; font-size: 12px; line-height: 1.2;
 }
 .tls-lbadge__level { flex: none; }
-.tls-lbadge__nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: rgb(var(--tls-lbadge-rgb)); }
-.tls-lbadge[data-metal="cyan"] .tls-lbadge__nick { color: var(--tls-brand, #29B6E8); }
+/* Der Beiname bleibt auch beim Meister in seiner Farbe - Gold tragen nur das Wappen und das Wort „Meister“ (Fabian 23.11.). */
+.tls-lbadge__nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--tls-brand, #29B6E8); }
 .tls-lbadge__champion { flex: none; color: var(--tls-honor); }
 .tls-lbadge--list .tls-lbadge__text { font-size: 11px; letter-spacing: 0.06em; }
 /* Hero: der Beiname darf umbrechen (lange Beinamen), die Zahl steht groß im Wappen. */
