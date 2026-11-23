@@ -11,6 +11,26 @@ Diese Budgets gelten fuer die oeffentliche Website und sollen bei groesseren UI-
 - INP: unter 200 ms fuer Navigation, Filter, Suche, Galerie-Lightbox und Formularaktionen.
 - TTFB: unter 800 ms fuer gecachte Public-Routen; unter 1.2 s fuer dynamische Detailseiten.
 
+### Ladezeit-Budget der Startseite am Handy (Prüftor, #1660)
+
+Das [Prüftor](../docs/entwicklung/prueftor.md) misst bei jedem PR mit sichtbaren Änderungen die Startseite am Handy
+(`e2e/prueftor-ladezeit.spec.js`): gebautes `dist` hinter einem gzip-Server wie nginx, Chromium headless, Pixel 5,
+„Handy 4G“ (9 Mbit/s herunter, 1,5 Mbit/s hinauf, 100 ms Umlaufzeit), CPU vierfach gebremst, API mit 200 ms
+Antwortzeit, kalter Cache je Lauf, ein Aufwärmlauf, dann der Median aus drei Läufen. Über dem *Ziel* nur ein Hinweis
+im Kommentar, über der *Grenze* rot. Das Ziel ist der Wert aus #1660 (Startseite unter 2 Sekunden am Handy); die
+Grenze lässt Platz für den langsameren CI-Rechner und fängt grobe Rückschritte (etwa ein schwerer Import im Start).
+
+| | Ist (23.11.2026, lokal) | Ziel (Hinweis) | Grenze (Fehler) |
+| --- | --- | --- | --- |
+| LCP Startseite am Handy | 1.860–2.356 ms (Median 2.356 ms) | 2.000 ms | 4.000 ms |
+| CLS Startseite am Handy | 0,002 | – | 0,10 |
+
+<!-- goal:home-mobile-lcp-ms 2000 -->
+<!-- budget:home-mobile-lcp-ms 4000 -->
+<!-- budget:home-mobile-cls-milli 100 -->
+
+Nach den ersten Läufen in der CI werden Ist-Wert und Grenze hier nachgezogen (Wert aus dem Kommentar im PR).
+
 ## Bundle
 
 Gemessen wird der **anonyme öffentliche Start**: der Einstieg aus `index.html` und alles, was er statisch (transitiv)

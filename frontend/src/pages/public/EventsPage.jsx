@@ -149,7 +149,7 @@ export default function EventsPage() {
             <button onClick={() => updateEventFilters({ view: "past" })} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
             <Link to="/calendar" data-testid="events-tab-calendar" aria-label="Kalender" title="Kalender" className="tls-btn tls-btn--quiet px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Kalender</span></Link>
           </div>
-          <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
+          <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" aria-label="Event-Typ" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
             <option value="">Alle Typen</option>
             {filterTypes.map((t) => <option key={t.k} value={t.k}>{t.l}</option>)}
           </select>

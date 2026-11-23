@@ -51,6 +51,10 @@ ALL = set(areas.AREAS)
         # Dokumentation braucht nur die Linkprüfung im Backend-Job.
         ("README.md", {"backend"}),
         ("mobile/RELEASES.md", {"backend"}),
+        # Das Prüftor (#1660) liest seine Grenzen aus dieser Datei: Wer nur sie ändert, muss durchs Tor.
+        ("frontend/PERFORMANCE_BUDGETS.md", {"backend", "frontend"}),
+        ("frontend/motion-rules-allowlist.json", {"frontend", "container"}),
+        ("frontend/e2e/prueftor-bekannt.json", {"frontend", "container"}),
         (".gitignore", set()),
     ],
 )
