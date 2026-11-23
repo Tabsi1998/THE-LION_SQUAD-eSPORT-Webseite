@@ -48,6 +48,7 @@ import { useLoad } from "@/hooks/useLoad";
 import { ShareButton } from "@/components/tls/ShareButton";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
+import { LeagueSeasonLine } from "@/components/tls/league/LeagueSeasonLine";
 
 const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview" };
 
@@ -490,6 +491,8 @@ function TeamDetail({ id }) {
           {/* Co-Teams mit Captain und Vertreter (#2110) - nur für Mitglieder und Teamleitung. */}
           <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEditTeam} enabled={isMember || canEditTeam} />
           <TeamSchedule overview={overview} />
+          {/* Saisonverlauf als Linie (#1630): je Co-Team eine Linie über die Seasons. */}
+          <LeagueSeasonLine rows={team.league_history} byTeam testId="team-season-line" />
           {/* Season-Historie (F.2, #1627): Liga N, Platz, Meister je abgeschlossener Season. */}
           <LeagueSeasonHistory rows={team.league_history} showTeam testId="team-league-history" />
           {/* Gesamtwertung über Seasons (F.5, #2215): Platz je Co-Team und Zeitraum. */}
