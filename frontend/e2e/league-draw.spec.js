@@ -62,14 +62,14 @@ const LIGA_1 = {
 };
 const LIGA_2 = {
   id: "d2", level: 2, label: "Liga 2", lowest: true, own_team: false, can_draw: false, draw: null,
-  problem: "Liga 2 hat nur eine Staffel - dort teilst du im Eingang direkt zu.",
+  problem: "Liga 2 hat nur eine Staffel – dort teilst du im Eingang direkt zu.",
   waiting: Array.from({ length: 5 }, (_, index) => ({ application_id: `b${index}`, squad_id: `p${index}`, display_name: `Probe ${index}`, carry_over: true })),
   staffeln: [{ tournament_id: "t3", staffel: "A", status: "draft", open: true, max_participants: 4, seats: 0 }],
-  suggestion: { teams: 5, cap: 4, needed: 2, sizes: [3, 2], fits: false, text: "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Es gibt 1 Staffel - es fehlt 1." },
+  suggestion: { teams: 5, cap: 4, needed: 2, sizes: [3, 2], fits: false, text: "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Es gibt 1 Staffel – es fehlt 1." },
 };
 
 const team = (squad, name, extra) => ({ squad_id: squad, display_name: name, from_staffel: "A", ...extra });
-const SEATS_1 = "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher gab es 1 Staffel - es fehlt 1.";
+const SEATS_1 = "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher gab es 1 Staffel – es fehlt 1.";
 const SEATS_2 = "7 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 4 und 3 Teams.";
 const PREVIEW = {
   season: { id: "s1", name: "Season 1", number: 1, status: "completed" }, can_create: true, problems: [], successor: null, suggested: { number: 2, name: "Season 2" },
@@ -149,7 +149,7 @@ test.describe("Liga: mehrere Staffeln je Liga", () => {
       await expect(page.getByTestId("draw-seats-1")).toHaveAttribute("data-fits", "yes");
       // Liga 2: eine Staffel für fünf Teams - die Platzprüfung warnt, gelost wird dort nicht.
       await expect(page.getByTestId("draw-seats-2")).toHaveAttribute("data-fits", "no");
-      await expect(page.getByTestId("draw-seats-2")).toContainText("Es gibt 1 Staffel - es fehlt 1.");
+      await expect(page.getByTestId("draw-seats-2")).toContainText("Es gibt 1 Staffel – es fehlt 1.");
       await expect(page.getByTestId("draw-run-2")).toHaveCount(0);
       await noSideScroll(page);
 

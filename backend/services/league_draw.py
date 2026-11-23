@@ -43,7 +43,7 @@ LOG_LIMIT = 50
 
 NO_DIVISION = "Diese Liga gehört nicht zu dieser Season."
 NO_STAFFEL = "{label} hat noch keine Staffel."
-ONE_STAFFEL = "{label} hat nur eine Staffel - dort teilst du im Eingang direkt zu."
+ONE_STAFFEL = "{label} hat nur eine Staffel – dort teilst du im Eingang direkt zu."
 STAFFEL_STARTED = "In {label} hat Staffel {staffel} schon begonnen. Neue Co-Teams teilst du von Hand zu."
 STAFFEL_PLAN = "In {label} steht der Spielplan von Staffel {staffel} schon. Neue Co-Teams teilst du von Hand zu (Nachmeldung)."
 STAFFEL_LOCKED = "Staffel {staffel} in {label} ist gesperrt. Erst entsperren, dann auslosen."
@@ -53,12 +53,12 @@ APPLIED_ALREADY = "Dieses Los ist schon übernommen."
 STALE = "Seit dem Los hat sich etwas geändert (Anmeldungen, Staffeln oder Teilnehmer). Bitte neu auslosen."
 CHANGED = "Das Los hat sich inzwischen geändert. Bitte die Vorschau neu laden."
 CONFIRM = "Bitte das Übernehmen bestätigen."
-REASON_NEEDED = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen) - er steht im Protokoll."
+REASON_NEEDED = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen) – er steht im Protokoll."
 OWN_TEAM = "Im Los steht dein eigenes Team. Auslosen, tauschen und übernehmen macht eine andere Person."
 OWN_TEAM_SUPERADMIN = ("Im Los steht dein eigenes Team. Als Superadmin geht es nur als Notausnahme, mit einem Grund von mindestens "
                        "fünf Zeichen.")
 NOT_READY = "Übernehmen geht noch nicht: {problems}"
-OTHER_STAFFEL = "hat schon eine angefangene Zuteilung in einer anderen Staffel - bitte im Eingang einzeln zuteilen"
+OTHER_STAFFEL = "hat schon eine angefangene Zuteilung in einer anderen Staffel – bitte im Eingang einzeln zuteilen"
 SIBLINGS_NAMED = " Betroffen: {names}."
 
 

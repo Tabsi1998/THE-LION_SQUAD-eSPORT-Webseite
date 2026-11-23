@@ -22,14 +22,14 @@ POLICY = 1
 MIN_TEAMS = 2
 SEARCH_LIMIT = 50_000
 
-NO_ENTRIES = "Es gibt kein angenommenes Co-Team ohne Staffel - nichts auszulosen."
+NO_ENTRIES = "Es gibt kein angenommenes Co-Team ohne Staffel – nichts auszulosen."
 NO_STAFFELN = "Diese Liga hat noch keine Staffel, in die gelost werden kann."
 NO_SEATS = "{teams} Co-Teams, aber nur {free} freie Plätze in {count}. Bitte eine weitere Staffel anlegen oder die Staffelgröße erhöhen."
 TOO_MANY_SIBLINGS = ("Ein Hauptteam hat mehr Co-Teams als Staffeln, in denen noch keines von ihm steht. Zwei Co-Teams eines Hauptteams "
                      "spielen in dieser Season nicht in derselben Staffel.")
 NO_SOLUTION = "Mit der Regel für Co-Teams eines Hauptteams lässt sich keine ausgeglichene Verteilung finden. Bitte von Hand zuteilen."
 SWAP_UNKNOWN = "Dieses Co-Team steht nicht im Los."
-SWAP_SAME = "Beide Co-Teams stehen in derselben Staffel - da gibt es nichts zu tauschen."
+SWAP_SAME = "Beide Co-Teams stehen in derselben Staffel – da gibt es nichts zu tauschen."
 SWAP_SIBLING = "Nach dem Tausch stünden zwei Co-Teams eines Hauptteams in derselben Staffel."
 
 
@@ -83,12 +83,12 @@ def suggest(teams: int, *, max_size: int | None, active_weeks: int | None, legs:
     limit = f"höchstens {cap} je Staffel" + (f" (mehr lassen {int(active_weeks or 0)} aktive Wochen nicht zu)" if out["cap_by"] == "weeks" else "")
     out.update({"needed": needed, "sizes": sizes})
     if teams < MIN_TEAMS:
-        return {**out, "fits": False, "text": f"Nur 1 Co-Team - für eine Staffel braucht es mindestens {MIN_TEAMS}."}
+        return {**out, "fits": False, "text": f"Nur 1 Co-Team – für eine Staffel braucht es mindestens {MIN_TEAMS}."}
     text = f"{teams} Co-Teams, {limit}: {_staffeln(count)} mit {_words(sizes)} Teams."
     if have and have < needed:
         missing = needed - have
         return {**out, "fits": False,
-                "text": f"{text} {have_word} {_staffeln(have)} - es {'fehlt' if missing == 1 else 'fehlen'} {missing}."}
+                "text": f"{text} {have_word} {_staffeln(have)} – es {'fehlt' if missing == 1 else 'fehlen'} {missing}."}
     return {**out, "text": text}
 
 

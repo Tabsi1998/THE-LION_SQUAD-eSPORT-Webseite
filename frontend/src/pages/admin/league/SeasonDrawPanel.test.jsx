@@ -48,8 +48,8 @@ test("ohne Liga mit mehreren Staffeln und ohne Hinweis steht nichts da", async (
 });
 
 test("die Platzprüfung warnt, wenn die Teams nicht in die Staffeln passen - auch mit nur einer Staffel", async () => {
-  const text = "9 Co-Teams, höchstens 8 je Staffel: 2 Staffeln mit 5 und 4 Teams. Es gibt 1 Staffel - es fehlt 1.";
-  apiMock.get.mockResolvedValue({ data: body({ ...DIVISION, staffeln: DIVISION.staffeln.slice(0, 1), can_draw: false, problem: "Liga 1 hat nur eine Staffel - dort teilst du im Eingang direkt zu.",
+  const text = "9 Co-Teams, höchstens 8 je Staffel: 2 Staffeln mit 5 und 4 Teams. Es gibt 1 Staffel – es fehlt 1.";
+  apiMock.get.mockResolvedValue({ data: body({ ...DIVISION, staffeln: DIVISION.staffeln.slice(0, 1), can_draw: false, problem: "Liga 1 hat nur eine Staffel – dort teilst du im Eingang direkt zu.",
     suggestion: { teams: 9, needed: 2, sizes: [5, 4], fits: false, text } }) });
   render(<SeasonDrawPanel seasonId="s1" />);
   const seats = await screen.findByTestId("draw-seats-1");

@@ -696,7 +696,7 @@ test("Neue Season aus …: Vorschau mit Teams, Anlegen mit Beginn, danach die ne
 });
 
 test("Neue Season aus …: Platzprüfung je Liga - Hinweis statt stiller Überfüllung, Anlegen geht trotzdem (#1627)", async () => {
-  const text = "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher gab es 1 Staffel - es fehlt 1.";
+  const text = "5 Co-Teams, höchstens 4 je Staffel: 2 Staffeln mit 3 und 2 Teams. Bisher gab es 1 Staffel – es fehlt 1.";
   const fits = "4 Co-Teams, höchstens 8 je Staffel: 1 Staffel mit 4 Teams.";
   extra = { "/admin/leagues/seasons/s1/successor": { ...SUCCESSOR, capacity_hints: [`Liga 1: ${text}`], divisions: [
     { ...SUCCESSOR.divisions[0], capacity: { teams: 5, staffeln_before: 1, cap: 4, needed: 2, sizes: [3, 2], fits: false, text } },
