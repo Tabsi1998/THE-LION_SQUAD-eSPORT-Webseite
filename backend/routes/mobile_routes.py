@@ -19,7 +19,7 @@ from services.match_audience import acting_registration_ids
 from services.tournament_rules import self_checkin_allowed, tournament_event_mode
 from services.match_overview import operational_match_overviews, own_match_overviews, own_match_tasks, own_squad_tasks
 from services.profile_references import personal_profile_references
-from services import event_days
+from services import event_days, news_channels
 from services.public_phase import derive_public_phase
 from services.tournament_permissions import is_staffel, leads_tournament
 from services.news_publish import pin_active
@@ -382,11 +382,13 @@ async def _latest_news(user: dict | None) -> list[dict]:
             "pinned": 1,
             "pinned_until": 1,
             "visibility": 1,
+            "channels": 1,
         },
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(80)
     now = now_utc()
     visible = []
-    for post in posts:
+    # Das Dashboard ist nur für die App (#1532): News „nur Website“ stehen hier nie.
+    for post in news_channels.filter_channel(posts, "app"):
         published_at = _parse_dt(post.get("published_at") or post.get("created_at"))
         if published_at and published_at > now:
             continue
@@ -724,7 +726,8 @@ async def mobile_profile_references(user: dict = Depends(get_current_user)):
 @router.get("/notifications")
 async def mobile_notifications(user: dict = Depends(get_current_user)):
     db = get_db()
-    return await db.notifications.find({"user_id": user["id"], "in_app_visible": {"$ne": False}}, {"_id": 0}).sort("created_at", -1).to_list(80)
+    # Meldungen zu News nur für die Website (#1532) stehen nicht im Postfach der App.
+    return await db.notifications.find({"user_id": user["id"], "in_app_visible": {"$ne": False}, **news_channels.inbox_query("app")}, {"_id": 0}).sort("created_at", -1).to_list(80)
 
 
 @router.post("/notifications/{notification_id}/read")
@@ -740,8 +743,9 @@ async def mark_mobile_notification_read(notification_id: str, user: dict = Depen
 @router.post("/notifications/read-all")
 async def mark_all_mobile_notifications_read(user: dict = Depends(get_current_user)):
     db = get_db()
+    # „Alle gelesen“ betrifft nur das Postfach der App - Meldungen nur für die Website bleiben dort ungelesen (#1532).
     await db.notifications.update_many(
-        {"user_id": user["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}},
+        {"user_id": user["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}, **news_channels.inbox_query("app")},
         {"$set": {"read": True, "read_at": now_utc().isoformat()}},
     )
     return {"ok": True}

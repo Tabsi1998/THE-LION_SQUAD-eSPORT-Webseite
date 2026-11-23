@@ -3,6 +3,7 @@ import { emitApiInvalidation } from "./apiInvalidation";
 import { noteFresh, noteRequestFailed } from "./network";
 import { isWritePauseError, noteWritePause, retryAfterSeconds } from "./writePause";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { CHANNEL_HEADER } from "./newsChannels";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
 const configuredUploadBackendUrl = (import.meta.env.VITE_UPLOAD_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -130,6 +131,8 @@ function attachRequestInterceptors(client) {
   client.interceptors.request.use((config) => {
     const method = (config.method || "get").toUpperCase();
     const headers = ensureHeaders(config);
+    // Kanal (#1532): die Website meldet sich als „web“ - ohne Kopfzeile gilt ein Aufruf als App, die sie nicht sendet.
+    setHeader(headers, CHANNEL_HEADER, "web");
     if (config.data instanceof FormData) {
       deleteHeader(headers, "Content-Type");
       deleteHeader(headers, "content-type");

@@ -98,9 +98,10 @@ async def create_user_notification(
     in_app_allowed = (not user) or notification_allowed(user, kind, category)
     # `in_app_only`: nur ins Postfach - etwa eine Rücknahme (#622), die niemand per Push erfahren soll.
     in_app_only = bool((meta or {}).get("in_app_only"))
-    push_channel_allowed = push_allowed(user, kind, category) and not in_app_only
+    # `no_push` / `no_browser`: ein Weg bleibt zu - etwa bei News nur für die Website bzw. nur für die App (#1532).
+    push_channel_allowed = push_allowed(user, kind, category) and not in_app_only and not (meta or {}).get("no_push")
     # Browser-Benachrichtigungen (#1163): wie der App-Push, mit eigenem Kanal „Browser“.
-    browser_channel_allowed = browser_allowed(user, kind, category) and not in_app_only
+    browser_channel_allowed = browser_allowed(user, kind, category) and not in_app_only and not (meta or {}).get("no_browser")
     if browser_channel_allowed:
         # Ohne angemeldeten Browser zählt der Kanal nicht - sonst entstünde für Personen ohne Browser-Anmeldung eine
         # unsichtbare Meldung, obwohl Postfach und Push aus sind.

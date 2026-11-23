@@ -27,6 +27,7 @@ from database import get_db
 from models import now_utc
 
 from services import event_days
+from services.news_channels import in_channel
 from services.discord_plain_text import _without_tags, plain_text  # noqa: F401 - umgezogen (#1420)
 from services.tournament_rules import self_checkin_allowed
 
@@ -216,6 +217,9 @@ def skip_reason(item: dict, *, published_at, now: datetime | None = None) -> str
     darf, entscheidet send_event (#605)."""
     if item.get("discord_skip"):
         return "author_opt_out"
+    # News „nur App“ (#1532): der Link der Meldung führt zur Website, die sie nicht zeigt. Events haben kein Feld.
+    if not in_channel(item, "web"):
+        return "app_only"
     when = _parse(published_at)
     if when and (now or now_utc()) - when > timedelta(hours=MAX_AGE_HOURS):
         return "too_old"
