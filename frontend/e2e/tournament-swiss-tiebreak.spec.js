@@ -189,11 +189,11 @@ test.describe("Turnierverwaltung stellt Schweizer System und Gleichstand ein (#1
       tiebreakers: ["median_buchholz", "buchholz", "head_to_head", "wins"] } };
     await mock(page, {
       "/api/tournaments/t-1": stored,
-      "/api/tournaments/t-1/bracket": { rounds: [], swiss: { end_rule: "wins_losses", rounds_played: 3, rounds_total: null, round_open: false, complete: false,
+      "/api/tournaments/t-1/bracket": { rounds: [], swiss: { end_rule: "wins_losses", rounds_played: 3, rounds_total: null, round_open: true, complete: false,
         auto_next_round: true, advanced: 2, eliminated: 2, active: 12, wins_to_advance: 3, losses_to_exit: 3, top_n: null } },
     }, { user: ADMIN });
     await page.goto("/admin/tournaments/t-1?tab=edit");
-    await expect(page.getByTestId("admin-tr-swiss-state")).toHaveText("Runde 3 ist gewertet · 2 weiter, 2 raus, 12 offen · die nächste Runde entsteht automatisch");
+    await expect(page.getByTestId("admin-tr-swiss-state")).toHaveText("Runde 3 läuft · 2 weiter, 2 raus, 12 offen · die nächste Runde entsteht automatisch");
     await expect(page.getByTestId("tr-edit-swiss-wins")).toHaveValue("3");
     await expect(page.getByTestId("tr-edit-swiss-losses")).toHaveValue("3");
     await expect(page.getByTestId("tr-edit-swiss-rounds")).toHaveCount(0);

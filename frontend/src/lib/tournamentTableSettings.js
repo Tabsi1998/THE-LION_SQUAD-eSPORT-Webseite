@@ -180,8 +180,10 @@ export function swissStateText(swiss) {
   if (!played) return "Noch keine Runde · die erste startest du mit „Schweizer Runde“";
   const parts = [`Runde ${played}${swiss.rounds_total ? ` von ${swiss.rounds_total}` : ""} ${swiss.round_open ? "läuft" : "ist gewertet"}`];
   if (swiss.end_rule === "wins_losses") parts.push(`${tally}, ${swiss.active} offen`);
-  if (swiss.auto_next_round) parts.push("die nächste Runde entsteht automatisch");
-  else if (!swiss.round_open) parts.push("die nächste Runde startest du mit „Schweizer Runde“");
+  // Ist die Runde gewertet und keine neue da, kam sie nicht von selbst (Einstellung aus, Turnier nicht live oder gesperrt) -
+  // dann führt der Knopf weiter, auch wenn „automatisch“ an ist.
+  if (!swiss.round_open) parts.push("die nächste Runde startest du mit „Schweizer Runde“");
+  else if (swiss.auto_next_round) parts.push("die nächste Runde entsteht automatisch");
   return parts.join(" · ");
 }
 

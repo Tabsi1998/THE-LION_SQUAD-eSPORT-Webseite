@@ -106,6 +106,11 @@ describe("Regeln in Worten", () => {
 describe("Stand des Schweizer Systems für die Turnierleitung", () => {
   const base = { end_rule: "rounds", rounds_played: 2, rounds_total: 5, round_open: true, complete: false, auto_next_round: true, advanced: 0, eliminated: 0, active: 8 };
 
+  it("führt zum Knopf, wenn die Runde gewertet ist und trotz „automatisch“ keine neue da ist", () => {
+    // Etwa pausiert oder gesperrt: automatisch gepaart wird nur im laufenden Turnier.
+    expect(swissStateText({ ...base, round_open: false })).toBe("Runde 2 von 5 ist gewertet · die nächste Runde startest du mit „Schweizer Runde“");
+  });
+
   it("nennt Runde, Ziel und ob die nächste von selbst kommt", () => {
     expect(swissStateText(base)).toBe("Runde 2 von 5 läuft · die nächste Runde entsteht automatisch");
     expect(swissStateText({ ...base, round_open: false, auto_next_round: false })).toBe("Runde 2 von 5 ist gewertet · die nächste Runde startest du mit „Schweizer Runde“");
@@ -120,7 +125,9 @@ describe("Stand des Schweizer Systems für die Turnierleitung", () => {
 
   it("zählt bei Siegen und Niederlagen, wer weiter, raus und offen ist", () => {
     expect(swissStateText({ ...base, end_rule: "wins_losses", rounds_total: null, rounds_played: 3, round_open: false, advanced: 2, eliminated: 1, active: 5 }))
-      .toBe("Runde 3 ist gewertet · 2 weiter, 1 raus, 5 offen · die nächste Runde entsteht automatisch");
+      .toBe("Runde 3 ist gewertet · 2 weiter, 1 raus, 5 offen · die nächste Runde startest du mit „Schweizer Runde“");
+    expect(swissStateText({ ...base, end_rule: "wins_losses", rounds_total: null, rounds_played: 3, advanced: 2, eliminated: 1, active: 5 }))
+      .toBe("Runde 3 läuft · 2 weiter, 1 raus, 5 offen · die nächste Runde entsteht automatisch");
     expect(swissStateText({ ...base, end_rule: "manual", rounds_total: null, auto_next_round: false }))
       .toBe("Runde 2 läuft");
     expect(swissStateText(null)).toBe("");

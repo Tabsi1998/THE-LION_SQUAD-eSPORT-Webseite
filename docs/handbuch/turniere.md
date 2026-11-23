@@ -184,7 +184,9 @@ Zu den Besonderheiten:
 
   Gepaart wird nach Punkten: ähnlich Starke treffen sich, bei ungerader Zahl setzt jemand aus, der noch nicht
   ausgesetzt hat. Niemand spielt zweimal gegen denselben Gegner, solange es eine Runde ohne Wiederholung gibt.
-  Über den Reitern steht der Stand, etwa „Runde 2 von 5 läuft · die nächste Runde entsteht automatisch“. Ist die
+  Über den Reitern steht der Stand, etwa „Runde 2 von 5 läuft · die nächste Runde entsteht automatisch“. Automatisch
+  gepaart wird nur im laufenden Turnier (nicht pausiert, gesperrt oder beendet) – steht dort „die nächste Runde startest
+  du mit „Schweizer Runde““, führt der Knopf weiter. Ist die
   Abschlussregel erfüllt, steht dort „Schweizer System abgeschlossen“ und der Knopf **Schweizer Runde** fehlt – mehr
   Runden gibt es, wenn ihr die Rundenzahl erhöht. Neue Turniere starten mit fester Rundenzahl, automatischer Runde und
   Median-Buchholz zuerst; ein Turnier von früher läuft weiter wie bisher, bis ihr etwas ändert.
