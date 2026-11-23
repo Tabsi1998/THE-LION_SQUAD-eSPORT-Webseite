@@ -79,8 +79,9 @@ cmd_down() {
   compose down --volumes --remove-orphans
 }
 
-# Specs, die das Schaufenster der Season-Seite nennen (#2268), bekommen den Liga-Seed mit --schaufenster (#2529).
-SCHAUFENSTER="seed_abnahme_liga.py --schaufenster"
+# Specs mit der Zeile „// abnahme:schaufenster“ brauchen das Schaufenster der Season-Seite (#2268): Liga-Seed mit --schaufenster
+# (#2529). Ein eigener Marker statt des Wortlauts eines Aufrufs - ein Kommentar, der den Aufruf nur erwähnt, löst nichts aus.
+SCHAUFENSTER="^// abnahme:schaufenster"
 
 # Alle Abnahme-Specs, alphabetisch - neue kommen von selbst dazu. Die README-Bilder sind keine Abnahme (eigener
 # Workflow), sie bleiben draußen. Die Specs mit Schaufenster laufen zuletzt: Ihr Seed gibt den Modi des Spiels Symbol und
@@ -93,7 +94,7 @@ schaufenster_last() {
   local spec rest=() last=()
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    if grep -qF -- "$SCHAUFENSTER" "$spec"; then last+=("$spec"); else rest+=("$spec"); fi
+    if grep -q -- "$SCHAUFENSTER" "$spec"; then last+=("$spec"); else rest+=("$spec"); fi
   done
   printf '%s\n' ${rest[@]+"${rest[@]}"} ${last[@]+"${last[@]}"}
 }
@@ -132,7 +133,7 @@ cmd_run() {
     elif grep -q 'seed_abnahme_liga.py' "$spec"; then
       seed="seed_abnahme_liga.py"
       state="$STATE_LIGA"
-      if grep -qF -- "$SCHAUFENSTER" "$spec"; then seed_args=(--schaufenster); fi
+      if grep -q -- "$SCHAUFENSTER" "$spec"; then seed_args=(--schaufenster); fi
     else
       seed="seed_abnahme.py"
       state="$STATE"

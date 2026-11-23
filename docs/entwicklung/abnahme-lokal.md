@@ -231,8 +231,8 @@ Der Workflow [Nächtliche Abnahme](../../.github/workflows/nightly-abnahme.yml) 
 Wiener Sommerzeit, 02:23 Winterzeit) den Event-Abend auf GitHub durch (#1656): frischer Abnahme-Stand, dann **jede
 Abnahme-Spec der Reihe nach, vor jeder frisch geseedet**. Die Specs verbrauchen Testdaten (`advancement-modes` spielt
 die Show-Runde, die `tv-abnahme` danach noch braucht) - der Seed legt bei jedem Aufruf neue Turniere an. Specs, die
-`seed_abnahme_fastlap.py` bzw. `seed_abnahme_liga.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei; nennen sie
-`seed_abnahme_liga.py --schaufenster`, seedet das Skript mit diesem Schalter und lässt sie zuletzt laufen (es ändert die Modi des
+`seed_abnahme_fastlap.py` bzw. `seed_abnahme_liga.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei; tragen sie
+die Zeile `// abnahme:schaufenster`, seedet das Skript mit `--schaufenster` und lässt sie zuletzt laufen (es ändert die Modi des
 Spiels, siehe oben). Neue Specs in `e2e/abnahme/` laufen von selbst mit, `readme-screenshots.spec.js` nicht (eigener Workflow).
 
 - **Bericht:** im Lauf unter *Summary* - je Spec grün oder rot, Zahl der Tests, Dauer, bei Rot Testname und erste
