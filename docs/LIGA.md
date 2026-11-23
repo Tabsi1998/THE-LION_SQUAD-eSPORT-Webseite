@@ -4564,6 +4564,15 @@ in der Gesamtabnahme G.1 mit echtem MongoDB, echter API und Browser bei 390/1440
 | Belohnungen | Rankingbanner, drei Embleme neben dem Namen, Filter der Sammlung | fehlend | – | – (Vorschlag A4 im Regelwerksabgleich) |
 | Belohnungen | Sieger-Moment am TV mit Podest | fehlend | – | #2410 |
 | Gesamtwertung | Punkte je Season-Platz, Spielerwertung, Abschluss, Belohnungen je Liga | abgenommen (Hauptweg „Gesamtwertung“) | F.5 #2415 | #2215 |
+| Playoffs | Einstellungen an Season und Liga N, Kennzeichen „Playoff-Platz“, Setzliste über Kreuz aus dem Endstand, Vorschau | fehlend (Vertrag F.6) | #2404 Paket B | #2404 |
+| Playoffs | Playoff-Staffel als Einfach-K.-o., Spielwochen je Runde, Heimrecht des besser Gesetzten, Veto ohne Vorgabe der Woche, Nichtantritt, Nachrücken | fehlend (Vertrag F.6) | #2404 Paket C | #2404 |
+| Playoffs | Best of je Runde mit Veto-Vorlage je Best of | fehlend (Vertrag F.6) | #2404 Paket C2 | #2404 |
+| Playoffs | Abschluss, Meister aus Playoffs, Spiel um Platz 3, Playoff-Belohnungen, Season-Seite, TV, PDF | fehlend (Vertrag F.6) | #2404 Paket D | #2404 |
+| Relegation | Relegations-Staffel, Paarungen über Kreuz, Wirkung auf die Folge-Season | fehlend (Vertrag F.6; heute nur farbig) | #2404 Paket E | #2404, #1627 |
+| Gesamtwertung | Meister-Bonus an den Playoff-Sieger, Zusatzpunkte je Playoff-Platz | fehlend (Vertrag F.6) | #2404 Paket F | #2404 |
+| Regeln | Regelwerk-Baustein „Playoffs und Relegation“ (Anlage F) | fehlend (Vertrag F.6) | #2404 Paket F | #2404 |
+| Playoffs | Profil, Historie, Mail, Glocke, Discord, Handbuch, App-Liste | fehlend (Vertrag F.6) | #2404 Paket G | #2404, #2173 |
+| Playoffs | Doppel-K.-o., Wildcards, Finaltag, Hin- und Rückspiel | fehlend (Folgepakete) | #2404 Paket H | - |
 | Historie | Season-Historie an Team und Spieler | getestet | F.2 #2397 | #1627 |
 | Öffentlich | Season-Seite mit Spieltagen und Teams, Startseite | abgenommen (Sz. 5, 11: Ligaseite 390/1440); Startseite getestet | #2378, #2327 | #2268, #2324 |
 | Tests | Echtes MongoDB, Browser mit echter API, nächtlich | abgenommen (G.1 nächtlich in GitHub Actions) | A.2 #2217, #2373, G.1 #2423 | #1632 |
