@@ -394,7 +394,7 @@ export default function AdminLeagueSeasonPage() {
     // Strafen (E.3): eigener Reiter - Formular oben, darunter die Strafen der Season.
     strafen: () => <SeasonSanctionsTab seasonId={seasonId} />,
     // Abschluss (F.1, #1645): Endstand je Staffel festhalten - eigenes Laden, eigene Knöpfe.
-    abschluss: () => <SeasonCloseTab seasonId={seasonId} canResults={can("results")} />,
+    abschluss: () => <SeasonCloseTab seasonId={seasonId} canResults={can("results")} canMatches={can("matches")} />,
     // Belohnungen (F.4, #2214): eigenes Laden und Speichern - lesen jede Zuständigkeit, ändern „Season konfigurieren“ (der Server prüft).
     belohnungen: () => <SeasonRewardsTab seasonId={seasonId} />,
     regelwerk: () => (
