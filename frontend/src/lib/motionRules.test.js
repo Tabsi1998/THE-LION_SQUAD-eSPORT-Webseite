@@ -153,10 +153,12 @@ describe("Bewegungsregeln: Wächter über src", () => {
     expect(allowlistProblems(allowlist)).toEqual([]);
   });
 
+  // Liest alle Quelldateien: allein gut 2 s, auf einem ausgelasteten Rechner (volle Suite parallel) mehr als die
+  // 5 s Vorgabe - darum ein eigenes Zeitlimit.
   it("keine neuen Verstöße gegenüber der Ausnahmeliste", () => {
     const { fresh } = compare(scanTree(root), allowlist);
     const report = fresh.map((item) => `${item.file} ${item.rule}: ${item.count} statt höchstens ${item.allowed} `
       + `(${item.findings.map((finding) => `Zeile ${finding.line}`).join(", ")})`);
     expect(report).toEqual([]);
-  });
+  }, 30_000);
 });
