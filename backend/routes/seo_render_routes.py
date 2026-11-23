@@ -335,11 +335,15 @@ async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
     post, _ = await find_by_slug_or_history(db.news_posts, slug, {"_id": 0})
     if not post or not post.get("published", True) or not is_published_now(post):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
-    if not in_channel(post, "web"):
-        return app_only_meta(post, base, origin, slug)
+    on_web = in_channel(post, "web")
     if not is_public_visibility(post):
-        return restricted_meta("news", post, base, origin, f"{origin}/news/{post.get('slug') or slug}",
+        # Zuerst die Sichtbarkeit (#347); eine News nur für die App zeigt dabei nie Titel oder Bild - auch nicht mit der
+        # Freigabe fürs Teilen (#1532).
+        shown = post if on_web else {**post, "share_preview": False}
+        return restricted_meta("news", shown, base, origin, f"{origin}/news/{post.get('slug') or slug}",
                                title=post.get("title"), image=post.get("banner_url"))
+    if not on_web:
+        return app_only_meta(post, base, origin, slug)
     description = seo_description(
         post.get("excerpt") or post.get("content") or post.get("title"),
         prefix=post.get("category") or "News",
