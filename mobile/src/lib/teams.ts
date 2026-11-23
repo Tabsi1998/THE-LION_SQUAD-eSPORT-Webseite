@@ -1,7 +1,7 @@
 import type { Team } from "../types";
 
 // Teamliste: was die Karte zeigt und wie sich eigene und weitere Teams
-// aufteilen. Squads erscheinen nur, wenn ein Team welche hat - "0 Squads"
+// aufteilen. Co-Teams erscheinen nur, wenn ein Team welche hat - "0 Co-Teams"
 // stand vorher zweimal auf jeder Karte (#215).
 
 export function teamMembers(team: Team): number {
@@ -16,7 +16,7 @@ export function teamMeta(team: Team): string {
   const members = teamMembers(team);
   const squads = teamSquads(team);
   const parts = [`${members} ${members === 1 ? "Mitglied" : "Mitglieder"}`];
-  if (squads > 0) parts.push(`${squads} ${squads === 1 ? "Squad" : "Squads"}`);
+  if (squads > 0) parts.push(`${squads} ${squads === 1 ? "Co-Team" : "Co-Teams"}`);
   return parts.join(" · ");
 }
 

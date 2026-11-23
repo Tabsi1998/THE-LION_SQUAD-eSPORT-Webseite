@@ -51,3 +51,17 @@ test("Onyx erreicht heißt Krone wie die anderen Kronen-Meldungen (#2506)", () =
   expect(notificationKindLabel("crown_onyx", { category: "achievements" })).toBe("Krone");
   expect(notificationKindLabel("crown_gained", { category: "achievements" })).toBe("Krone");
 });
+
+// Nachzug aus #2125, #2127, #2128 (#2173): Team, Rechte, Mitgliedschaft und Event-Anmeldung haben eigene Wörter statt
+// des Anfangs („Team“, „Event“) bzw. „Hinweis“.
+test("Team, Rechte, Mitgliedschaft und Event-Anmeldung haben eigene Wörter (#2173)", () => {
+  expect(notificationKindLabel("team_invite_declined")).toBe("Einladung abgelehnt");
+  expect(notificationKindLabel("team_member_removed")).toBe("Aus dem Team entfernt");
+  expect(notificationKindLabel("team_member_left")).toBe("Team verlassen");
+  expect(notificationKindLabel("team_dissolved")).toBe("Team aufgelöst");
+  expect(notificationKindLabel("team_restored")).toBe("Team wiederhergestellt");
+  expect(notificationKindLabel("team_join_code_renewed")).toBe("Neuer Beitrittscode");
+  expect(notificationKindLabel("rights_change")).toBe("Rechte geändert");
+  expect(notificationKindLabel("membership_decision")).toBe("Mitgliedschaft entschieden");
+  expect(notificationKindLabel("event_registration")).toBe("Event-Anmeldung");
+});

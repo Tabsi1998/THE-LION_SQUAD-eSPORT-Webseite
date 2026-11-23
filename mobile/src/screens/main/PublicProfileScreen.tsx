@@ -109,6 +109,7 @@ export type PublicProfilePayload = {
   main_platform?: string | null;
   main_platforms?: string[];
   input_devices?: string[];
+  preferred_role?: string | null;
   gaming_subscriptions?: string[] | string | null;
   favorite_games?: string[];
   is_club_member?: boolean;
@@ -484,7 +485,6 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
               <View style={styles.wrap}>
                 {clubHint ? <ClubProfileHint hint={clubHint} /> : <Pill label={member ? "Vereinsmitglied" : "Community"} tone={member ? "success" : "cyan"} />}
                 <Pill label={`${shown.achievement_level?.title || `Level ${shown.achievement_level?.level || stats.level || 1}`}${Number(shown.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(shown.achievement_level?.prestige)}` : ""}`} tone="gold" />
-                {shown.role && shown.role !== "player" ? <Pill label={formatStatus(shown.role)} /> : null}
               </View>
               {!own && shown.can_message ? (
                 <Button compact arrow={false} icon="chatbubble-ellipses-outline" label="Nachricht" onPress={() => navigation.navigate("DirectThread" as never, { userId: shown.id, title: display } as never)} testID="profile-message" />
@@ -557,6 +557,8 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
                 ["Plattformen", listValue(shown.main_platforms?.length ? shown.main_platforms : shown.main_platform)],
                 ["Eingabe", listValue(shown.input_devices)],
                 ["Abos", listValue(shown.gaming_subscriptions)],
+                // Freitext (#2126): genau so, wie die Person ihn eingetragen hat - ohne Freigabe schickt der Server nichts.
+                ["Rolle", shown.preferred_role || ""],
               ]}
             />
 
