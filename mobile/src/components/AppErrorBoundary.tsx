@@ -1,13 +1,26 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 import { logMobileError } from "../lib/mobileLog";
+import { bugReportUrl } from "../lib/contactLinks";
+import { openLink } from "../lib/openLink";
+import { navigationRef } from "../navigation/rootNavigation";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
 
 type State = {
   error?: Error;
 };
+
+/** Der Name des offenen Bildschirms (etwa „MatchDetail“) - leer, solange die Navigation nicht bereit ist. */
+function currentScreen(): string {
+  try {
+    return navigationRef.isReady() ? String(navigationRef.getCurrentRoute()?.name || "") : "";
+  } catch {
+    return "";
+  }
+}
 
 export class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
   state: State = {};
@@ -32,6 +45,8 @@ export class AppErrorBoundary extends React.Component<{ children: React.ReactNod
               Die App ist weiter gestartet, aber diese Ansicht hat einen Fehler ausgelöst. Du kannst die Ansicht neu laden oder die App neu öffnen.
             </Text>
             <Button label="Ansicht neu laden" onPress={() => this.setState({ error: undefined })} />
+            {/* Fehler melden (#2131 KO9): mit dem Namen des Bildschirms und der Version - ohne Kennungen aus der Adresse. */}
+            <Button label="Fehler melden" variant="secondary" onPress={() => { void openLink(bugReportUrl(currentScreen(), Constants.expoConfig?.version)); }} testID="app-error-report" />
           </View>
         </SafeAreaView>
       );

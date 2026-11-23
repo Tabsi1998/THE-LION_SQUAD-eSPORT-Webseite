@@ -22,8 +22,8 @@ import { useModalGate } from "../lib/modalGate";
 import { useReduceMotion } from "./motion/useReduceMotion";
 
 // „Spielst du auch mit?“ (#1184) in der App - wie im Web: nach der Event-Anmeldung ein Blatt von unten mit den Turnieren
-// des Events. Haken nur bei Einzel-Turnieren (Tippfläche mindestens 48 Punkte); Team-Turniere sagen, dass der Kapitän
-// anmeldet (Kapitäne bekommen den Weg zur Turnierseite), Fast Laps brauchen keine Anmeldung. „Anmelden“ legt je Haken eine
+// des Events. Haken nur bei Einzel-Turnieren (Tippfläche mindestens 48 Punkte); Team-Turniere sagen, dass die Teamleitung
+// anmeldet (die Teamleitung bekommt den Weg zur Turnierseite), Fast Laps brauchen keine Anmeldung. „Anmelden“ legt je Haken eine
 // normale Turnier-Anmeldung an; danach steht je Eintrag, was passiert ist. „Nein danke“ beendet ohne Rückfrage.
 
 type Props = {

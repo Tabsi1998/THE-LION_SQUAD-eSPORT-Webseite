@@ -22,6 +22,13 @@ const KIND_LABELS: Record<string, string> = {
   team_invite_accepted: "Team-Beitritt",
   team_role_changed: "Team-Rolle",
   team_leader_transferred: "Team-Leitung",
+  // Wer kommt und geht, und was mit dem Team passiert (#2128, TM5, TM8, TM10; Nachzug #2173).
+  team_invite_declined: "Einladung abgelehnt",
+  team_member_removed: "Aus dem Team entfernt",
+  team_member_left: "Team verlassen",
+  team_dissolved: "Team aufgelöst",
+  team_restored: "Team wiederhergestellt",
+  team_join_code_renewed: "Neuer Beitrittscode",
   team_presence_nudge: "Spieltag",
   match_reminder: "Match-Erinnerung",
   // Liga-Spieltag und Belohnungen (#2173, docs/LIGA.md D.2-D.4, E.4, F.4).
@@ -59,6 +66,9 @@ const KIND_LABELS: Record<string, string> = {
   membership_blocked: "Mitgliedschaft",
   membership_approve: "Mitgliedschaft",
   membership_reject: "Mitgliedschaft",
+  // Pflicht-Meldungen (#2125): Rechte und Entscheidungen über die Mitgliedschaft - kein Thema zum Abbestellen.
+  rights_change: "Rechte geändert",
+  membership_decision: "Mitgliedschaft entschieden",
   access_link_invite: "Einladung",
   ballot_open: "Abstimmung",
   crown_gained: "Krone",
@@ -77,6 +87,8 @@ const KIND_LABELS: Record<string, string> = {
   news_board: "Vereins-News",
   event_member: "Vereins-Event",
   event_board: "Vereins-Event",
+  // Die eigene Event-Anmeldung (#2127): angemeldet, Warteliste, nachgerückt, storniert.
+  event_registration: "Event-Anmeldung",
   gallery_event: "Fotos",
   gallery_member: "Fotos",
   gallery_submission: "Eingesandte Fotos",
