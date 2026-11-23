@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Lock, Trophy } from "lucide-react";
 import { pointsWord } from "@/lib/leagueOverall";
 import { InternalTag } from "@/components/tls/InternalTag";
+import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 
 export function LeagueOverallStanding({ rows, showTeam = false, testId = "league-overall" }) {
   if (!rows?.length) return null;
@@ -25,7 +26,9 @@ export function LeagueOverallStanding({ rows, showTeam = false, testId = "league
                   {/* Vereinsintern (#2521): Gäste sähen diese Wertung nicht oder nicht so - eine Season „Nur Mitglieder“ zählt mit. */}
                   {row.internal ? <InternalTag testId={`${testId}-${row.level}-internal`} /> : null}
                 </div>
-                <p className="text-xs text-white/60 [overflow-wrap:anywhere] hyphens-auto">
+                <p className="flex flex-wrap items-center gap-x-2 text-xs text-white/60 [overflow-wrap:anywhere] hyphens-auto">
+                  {/* Liga-Abzeichen (#1638) klein vor der Liga N - der Text daneben trägt den Beinamen. */}
+                  <LeagueBadge badge={{ level: row.level }} size="list" label={false} testId={`${testId}-${row.level}-badge`} />
                   {[row.division_label, showTeam ? row.name : "", row.closed ? (row.complete ? "Endstand" : "Endstand ohne nicht öffentliche Seasons") : "laufend"].filter(Boolean).join(" · ")}
                 </p>
               </div>

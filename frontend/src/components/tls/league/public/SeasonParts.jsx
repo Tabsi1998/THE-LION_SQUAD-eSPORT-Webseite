@@ -14,6 +14,7 @@ import { platformLines } from "@/lib/leaguePlatform";
 import { formatFacts, mapOrder, nextSteps, playModes, pointsLines, scheduleLines, weeksText } from "@/lib/leagueSeasonPage";
 import { publicGroups } from "@/lib/loadoutBans";
 import { dayNoon, viennaDate } from "@/lib/vienna";
+import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 
 function SectionTitle({ id, icon: Icon, children, aside }) {
   return (
@@ -245,7 +246,11 @@ export function Division({ division, leagueSlug, seasonSlug, hash, topLevel, ord
   return (
     <section className="tls-season-division scroll-mt-24" aria-labelledby={`liga-${division.level}`} data-testid={`league-division-${division.level}`}>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-3">
-        <h2 id={`liga-${division.level}`} className="font-heading text-2xl md:text-3xl font-black uppercase [overflow-wrap:anywhere]">{division.label}</h2>
+        <div className="flex min-w-0 items-center gap-3">
+          {/* Liga-Abzeichen (#1638) vor dem Namen - der Name steht daneben als Überschrift, das Wappen bleibt ohne eigenen Text. */}
+          <LeagueBadge badge={{ level: division.level, nickname: division.nickname }} size="card" label={false} testId={`league-division-badge-${division.level}`} />
+          <h2 id={`liga-${division.level}`} className="font-heading text-2xl md:text-3xl font-black uppercase [overflow-wrap:anywhere]">{division.label}</h2>
+        </div>
         {tabbed ? (
           <div className="tls-season-tabs tls-swipe" role="tablist" aria-label={`Staffeln in ${division.label}`}>
             {staffeln.map((row, index) => {
