@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services.competition_read import load_competition_read_model, load_registration_matches
+from services.competition_read import CompetitionReadModel, load_registration_matches
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.team_colors import effective_color
 from services.visibility import user_can_see
@@ -212,8 +212,15 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
         for row in await db.tournament_registrations.find({"id": {"$in": other_ids}}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(len(other_ids)):
             names[row["id"]] = row.get("display_name") or row.get("ingame_name") or row.get("team_name") or "Gegner"
     labels: dict[str, str] = {}
-    for tid in sorted({m.get("tournament_id") for m in chosen}):
-        model = await load_competition_read_model(db, tid)
+    # Runden-Namen (#1630, kein N+1): Spiele und Phasen aller gezeigten Turniere in je einer Abfrage statt zwei je Turnier.
+    label_ids = sorted({m.get("tournament_id") for m in chosen if m.get("tournament_id")})
+    graph = await db.matches_v2.find({"tournament_id": {"$in": label_ids}}, {"_id": 0}).sort(
+        [("stage_number", 1), ("round", 1), ("order", 1)]).to_list(5000) if label_ids else []
+    phases = await db.tournament_stages.find({"tournament_id": {"$in": label_ids}}, {"_id": 0}).sort("number", 1).to_list(
+        len(label_ids) * 20 + 1) if label_ids else []
+    for tid in label_ids:
+        model = CompetitionReadModel(tournament_id=tid, stage_matches=[row for row in graph if row.get("tournament_id") == tid],
+                                     stages=[row for row in phases if row.get("tournament_id") == tid])
         snapshot = model.structure_snapshot()
         stage_types = {stage.get("id"): stage.get("stage_type") for stage in snapshot.get("stages") or []}
         rounds = rounds_by_section(snapshot.get("matches") or [])
