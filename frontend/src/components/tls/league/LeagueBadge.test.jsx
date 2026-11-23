@@ -269,3 +269,54 @@ describe("Review #1638: nichts mit „…“, nichts doppelt vorgelesen, Rückzu
     expect(screen.getByRole("img", { name: /Frühjahr 2026: Liga 2, ausgetreten; Herbst 2026\/27: Liga 1, Platz 1 von 6, Meister/ })).toBeInTheDocument();
   });
 });
+
+describe("Review #1638 Runde 3: keine Beschriftung auf einem Kreis, Rückzüge nebeneinander", () => {
+  const row = (team, number, level, rank, extra = {}) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
+    rank, of: 12, badge: { level }, display_name: team, ...extra });
+  // Wie im Baustein: Grundlinie zwischen 9 px über und 16 px unter der Kreismitte trifft den Kreis.
+  const hits = (spot, cy) => spot > cy - 9 && spot < cy + 16;
+
+  function labelsOnCircles(svg) {
+    const out = [];
+    const circles = [...svg.querySelectorAll("circle")].map((node) => ({ cx: Number(node.getAttribute("cx")), cy: Number(node.getAttribute("cy")) }));
+    for (const text of svg.querySelectorAll(".tls-season-line__rank, .tls-season-line__exit")) {
+      const tx = Number(text.getAttribute("x"));
+      const ty = Number(text.getAttribute("y"));
+      for (const circle of circles) {
+        if (Math.abs(circle.cx - tx) <= 20 && hits(ty, circle.cy)) out.push(`${text.textContent} auf Kreis ${circle.cx},${circle.cy}`);
+      }
+    }
+    return out;
+  }
+
+  it("drei Co-Teams in Liga 3 auf Platz 1 bis 3 von 12: keine Platz-Zahl auf einem Kreis", () => {
+    const rows = ["Kader A", "Kader B", "Kader C"].flatMap((team, at) => [row(team, 1, 3, at + 1), row(team, 2, 3, 3 - at), row(team, 3, 3, at + 1)]);
+    render(<LeagueSeasonLine rows={rows} byTeam testId="l" />);
+    expect(labelsOnCircles(screen.getByTestId("l-svg"))).toEqual([]);
+    // Die oberste Zahl je Season steht trotzdem da.
+    expect(screen.getByTestId("l-svg").querySelectorAll(".tls-season-line__rank").length).toBeGreaterThan(0);
+  });
+
+  it("zwei Rückzüge in derselben Season und Liga N liegen nebeneinander, mit dem Rand in der Linienfarbe", () => {
+    const rows = [row("Kader A", 1, 2, 1), row("Kader A", 2, 2, null, { exit: "withdrawn" }), row("Kader A", 3, 2, 2),
+      row("Kader B", 1, 2, 3), row("Kader B", 2, 2, null, { exit: "disqualified" }), row("Kader B", 3, 2, 4)];
+    render(<LeagueSeasonLine rows={rows} byTeam testId="l" />);
+    const one = screen.getByTestId("l-exit-dot-0-1");
+    const two = screen.getByTestId("l-exit-dot-1-1");
+    expect(one.getAttribute("cy")).toBe(two.getAttribute("cy"));
+    expect(Math.abs(Number(one.getAttribute("cx")) - Number(two.getAttribute("cx")))).toBeGreaterThanOrEqual(10);
+    expect(one.getAttribute("stroke")).not.toBe(two.getAttribute("stroke"));
+    expect(labelsOnCircles(screen.getByTestId("l-svg"))).toEqual([]);
+  });
+});
+
+describe("Rückzugs-Texte aus einer Quelle (Review #1638)", () => {
+  it("Tabelle, Season-Historie und Saisonverlauf sagen dasselbe", async () => {
+    const { EXIT_TEXTS, exitText } = await import("@/lib/leagueTable");
+    const { exitLabel } = await import("@/lib/leagueBadge");
+    expect(exitText("withdrawn")).toBe(EXIT_TEXTS.withdrawn);
+    expect(exitLabel("disqualified")).toBe(EXIT_TEXTS.disqualified);
+    expect(exitText("unbekannt")).toBe("ausgeschieden");
+    expect(exitLabel("unbekannt")).toBe("ausgetreten");
+  });
+});

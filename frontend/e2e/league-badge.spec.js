@@ -103,9 +103,21 @@ async function seeLine(page, line) {
 }
 
 // Zwei Abschnitte untereinander in einem Bild.
+// Wappen warten unsichtbar, bis sie ins Bild kommen - vor der Aufnahme jedes einmal zeigen, sonst fehlen sie im Bild (Review #1638, 320 px).
+async function revealBadges(page, area) {
+  const waiting = area.locator('.tls-lbadge[data-play="wait"]');
+  for (let round = 0; round < 20 && await waiting.count(); round += 1) {
+    await waiting.first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(150);
+  }
+  await expect(waiting).toHaveCount(0);
+  await page.waitForTimeout(1600);
+}
+
 async function shotSpan(page, first, last, name) {
   const dir = process.env.E2E_SCREENS_DIR;
   if (!dir) return;
+  await revealBadges(page, first);
   await first.scrollIntoViewIfNeeded();
   const a = await first.boundingBox();
   const b = await last.boundingBox();

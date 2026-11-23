@@ -132,6 +132,23 @@ function overlaps(id) {
   return out.slice(0, 12);
 }
 
+/** Platz-Zahlen und „ausgetreten“, die auf einem Kreis irgendeiner Linie liegen (Review #1638: „6.“ lag auf dem Kreis eines anderen). */
+function onCircles(id) {
+  const svg = document.querySelector(`[data-testid="${id}"] svg.tls-season-line__svg`);
+  if (!svg) return ["keine Linie"];
+  const circles = [...svg.querySelectorAll("circle")].map((node) => node.getBoundingClientRect());
+  const out = [];
+  for (const text of svg.querySelectorAll(".tls-season-line__rank, .tls-season-line__exit")) {
+    const box = text.getBoundingClientRect();
+    for (const circle of circles) {
+      const x = Math.min(box.right, circle.right) - Math.max(box.left, circle.left);
+      const y = Math.min(box.bottom, circle.bottom) - Math.max(box.top, circle.top);
+      if (x > 1 && y > 1) out.push(`„${text.textContent}“ auf einem Kreis bei ${Math.round(circle.left)},${Math.round(circle.top)}`);
+    }
+  }
+  return out.slice(0, 12);
+}
+
 async function noSideScroll(page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, "kein Querlauf").toBeLessThanOrEqual(1);
@@ -170,6 +187,7 @@ test.describe("Liga-Abzeichen und Saisonverlauf im schlimmsten Fall", () => {
       if ([390, 1440].includes(width)) await shotSpan(page, page.getByTestId("profile-league-current"), line, `worst-profil-${width}`);
       expect(await page.evaluate(problems, ["profile-league-current", "profile-season-line", "profile-league-history"])).toEqual([]);
       expect(await page.evaluate(overlaps, "profile-season-line")).toEqual([]);
+      expect(await page.evaluate(onCircles, "profile-season-line")).toEqual([]);
       await noSideScroll(page);
       // Der volle Co-Team-Name steht da - umgebrochen, nicht gekürzt.
       await expect(page.getByTestId("profile-league-current-a")).toContainText(LONG_SQUAD);
@@ -196,15 +214,36 @@ test.describe("Liga-Abzeichen und Saisonverlauf im schlimmsten Fall", () => {
       if ([390, 1440].includes(width)) await shotSpan(page, page.getByTestId("team-league"), line, `worst-team-${width}`);
       expect(await page.evaluate(problems, ["team-league", "team-season-line", "team-league-history"])).toEqual([]);
       expect(await page.evaluate(overlaps, "team-season-line")).toEqual([]);
+      expect(await page.evaluate(onCircles, "team-season-line")).toEqual([]);
       await noSideScroll(page);
       await expect(page.getByTestId("team-league").locator(".tls-league-now__row")).toHaveCount(6);
       await expect(line.getByTestId("team-season-line-legend").locator("li")).toHaveCount(4);
       await expect(line.getByTestId("team-season-line-more")).toHaveText("und 2 weitere Co-Teams");
       await expect(line.locator(".tls-season-line__season")).toHaveCount(9);
-      // Drei Rückzüge (zwei in Season 6, einer in Season 7) - jeder mit lesbarem „ausgetreten“, keines über einem anderen.
-      await expect(line.locator("[data-exit] text.tls-season-line__exit")).toHaveCount(3);
+      // Drei Rückzüge (zwei in Season 6 nebeneinander, einer in Season 7): drei Punkte, je Season ein lesbares „ausgetreten“ - die zwei
+      // nebeneinander teilen sich ihre Beschriftung, keine liegt über einer anderen oder auf einem Kreis.
+      await expect(line.locator("[data-exit]")).toHaveCount(3);
+      await expect(line.locator("[data-exit] text.tls-season-line__exit")).toHaveCount(2);
     });
   }
+
+  // Zoom 200 % an einem 1440-px-Bildschirm: 720 CSS-Pixel bei doppelter Pixeldichte.
+  test.describe("Zoom 200 %", () => {
+    test.use({ viewport: { width: 720, height: 450 }, deviceScaleFactor: 2 });
+
+    test("Profil und Teamseite: keine Beschriftung auf einem Kreis oder über einer anderen, nichts gekürzt", async ({ page }) => {
+      await mockServer(page);
+      await ready(page, "/u/neonfalke", "profile-league-current");
+      expect(await page.evaluate(problems, ["profile-league-current", "profile-season-line", "profile-league-history"])).toEqual([]);
+      expect(await page.evaluate(overlaps, "profile-season-line")).toEqual([]);
+      expect(await page.evaluate(onCircles, "profile-season-line")).toEqual([]);
+      await ready(page, "/teams/team-1", "team-league");
+      expect(await page.evaluate(problems, ["team-league", "team-season-line", "team-league-history"])).toEqual([]);
+      expect(await page.evaluate(overlaps, "team-season-line")).toEqual([]);
+      expect(await page.evaluate(onCircles, "team-season-line")).toEqual([]);
+      await noSideScroll(page);
+    });
+  });
 
   test("Profil mit nur einer Season: keine Linie, Historie und Karte vollständig", async ({ page }) => {
     for (const [width, height] of [[320, 700], [1440, 900]]) {
