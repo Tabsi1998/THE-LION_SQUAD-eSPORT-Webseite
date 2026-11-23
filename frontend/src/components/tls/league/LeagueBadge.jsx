@@ -8,13 +8,14 @@
 // `index`. Mit „Bewegung reduzieren“, im Druck und ohne Beobachter steht alles still da.
 import { useEffect, useId, useRef, useState } from "react";
 import { motionAllowed } from "@/lib/motion";
-import { badgeAria, badgeLabel, badgeMetal, badgeTier } from "@/lib/leagueBadge";
+import { badgeAria, badgeMetal, badgeTier } from "@/lib/leagueBadge";
 import "./leagueBadge.css";
 
 // Die Metalle (Cyan, Gold für den Meister) stehen als --tls-lbadge-light/-base/-dark in leagueBadge.css - Gold über die Rolle
 // --tls-honor, wie REWARD_METALS (RewardArt) bzw. METALS.gold (TrophyShelf).
 const paint = (part) => `var(--tls-lbadge-${part})`;
-const SEP = " · ";
+// Festes Leerzeichen vor dem Punkt, normales danach: Bricht der Text um, dann hinter dem Punkt - er steht nie am Zeilenanfang.
+const SEP = " · ";
 const SHIELD = "M10 20h44v24c0 17-10 27-22 33C20 71 10 61 10 44z";
 const FIELD = "M15.5 25.5h33v18.5c0 12.6-7.4 20.4-16.5 25.4-9.1-5-16.5-12.8-16.5-25.4z";
 const RIM = "M13 23h38v21c0 15-9 24-19 29.6C22 68 13 59 13 44z";
@@ -79,7 +80,6 @@ export function LeagueBadge({ badge, size = "card", label = true, play = true, i
   const number = String(badge.level);
   const shine = tier === "top" || badge.champion;
   const nickname = String(badge.nickname || "").trim();
-  const text = badgeLabel(badge);
   return (
     <span ref={ref} className={`tls-lbadge tls-lbadge--${size} ${className}`.trim()} data-tier={tier} data-metal={metalKey}
       data-play={state} style={{ "--tls-i": Math.min(index, STAGGER_MAX) }} data-testid={testId} title={label ? undefined : badgeAria(badge)}>
@@ -115,9 +115,8 @@ export function LeagueBadge({ badge, size = "card", label = true, play = true, i
         </svg>
       </span>
       {label ? (
-        <span className="tls-lbadge__text" data-testid={testId ? `${testId}-label` : undefined} title={text}>
+        <span className="tls-lbadge__text" data-testid={testId ? `${testId}-label` : undefined}>
           <span className="tls-lbadge__level">Liga {number}</span>
-          {/* Feste Leerzeichen um den Punkt: Am Rand eines Flex-Elements fiele ein normales Leerzeichen weg. */}
           {nickname ? <span className="tls-lbadge__nick"><span className="tls-lbadge__dot">{SEP}</span>{nickname}</span> : null}
           {badge.champion ? <span className="tls-lbadge__champion">{size === "list" ? <span className="sr-only">, Season-Meister</span> : size === "hero" ? "Meister" : `${SEP}Meister`}</span> : null}
         </span>

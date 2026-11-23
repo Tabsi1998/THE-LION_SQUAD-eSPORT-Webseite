@@ -30,21 +30,22 @@
   background: radial-gradient(closest-side, rgb(var(--tls-lbadge-rgb) / 0.55), transparent);
 }
 
+/* Nie mit „…“ gekürzt (#1314, Review #1638): Der Text fließt und bricht um - „Liga N“ bleibt zusammen, ein langer Beiname bricht an
+   seinem Bindestrich bzw. notfalls mitten im Wort. */
 .tls-lbadge__text {
-  display: inline-flex; flex-wrap: nowrap; align-items: baseline; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  display: block; min-width: 0; overflow-wrap: anywhere;
   font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; font-size: 12px; line-height: 1.2;
 }
-.tls-lbadge__level { flex: none; }
+.tls-lbadge__level { white-space: nowrap; }
 /* Der Beiname bleibt auch beim Meister in seiner Farbe - Gold tragen nur das Wappen und das Wort „Meister“ (Fabian 23.11.). */
-.tls-lbadge__nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--tls-brand, #29B6E8); }
-.tls-lbadge__champion { flex: none; color: var(--tls-honor); }
+.tls-lbadge__nick { overflow-wrap: anywhere; color: var(--tls-brand, #29B6E8); }
+.tls-lbadge__champion { white-space: nowrap; color: var(--tls-honor); }
 .tls-lbadge--list .tls-lbadge__text { font-size: 11px; letter-spacing: 0.06em; }
 /* Hero: der Beiname darf umbrechen (lange Beinamen), die Zahl steht groß im Wappen. */
 .tls-lbadge--hero .tls-lbadge__text {
-  flex-direction: column; align-items: flex-start; white-space: normal; overflow: visible; font-size: 15px; letter-spacing: 0.1em;
+  display: flex; flex-direction: column; align-items: flex-start; font-size: 15px; letter-spacing: 0.1em;
 }
 .tls-lbadge--hero .tls-lbadge__level { font-family: 'Unbounded', 'Arial Black', sans-serif; font-size: 22px; letter-spacing: 0.02em; }
-.tls-lbadge--hero .tls-lbadge__nick { overflow-wrap: anywhere; }
 .tls-lbadge--hero .tls-lbadge__dot { display: none; }
 
 /* Bis zum ersten Sichtbarwerden wartet das Wappen unsichtbar - sonst stünde es einen Augenblick da und spränge dann. */
@@ -98,7 +99,7 @@
 }
 
 /* Aktuelle Ligen (#1630): Profil und Teamseite - eine Karte je Co-Team. */
-.tls-league-now { display: grid; gap: 10px; }
+.tls-league-now { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .tls-league-now__row {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 14px; padding: 12px 14px;
   border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212;
@@ -109,7 +110,8 @@
   a.tls-league-now__row:hover { border-color: rgb(41 182 232 / 0.45); transform: translateY(calc(-1px * var(--tls-motion-on))); }
 }
 a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E8); outline-offset: 2px; }
-.tls-league-now__name { font-weight: 800; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Der Co-Team-Name bricht um (tls-wrap tls-wrap--name), nie „…“ (#1314, Review #1638). */
+.tls-league-now__name { font-weight: 800; color: #fff; }
 .tls-league-now__meta { margin-top: 2px; font-size: 12px; color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; }
 .tls-league-now__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .tls-league-now__place { font-weight: 800; color: #fff; }
