@@ -9,6 +9,9 @@
   Spielwoche mit den offenen Spielen dazu (nur mit ``late``). Ein Spieltag ohne ein einziges Ergebnis geht nie hinaus. Wer die
   Meldung später einschaltet, bekommt nur Spieltage, deren Frist danach endet - ohne Spielwoche zählt das letzte Ergebnis des
   Spieltags. Nichts Altes auf einmal.
+- **Kanal nur aus der freigegebenen Liste** (Nr. 234): die öffentlichen „Kanäle je Zweck“ unter Verbindungen → Discord (Community,
+  News, Events und Turniere - nie ein privater Zweck). Der Server prüft beim Speichern (422); fällt ein Kanal später aus der Liste,
+  geht nichts mehr hinein und der Kasten sagt es.
 - **Saisonende**, sobald die Season „beendet“ ist (alle Staffeln abgeschlossen, ``league_final._season_follows``): Meister, Auf- und
   Absteiger je Liga N (``league_final.build_pages``-Rechnung aus ``league_finale``), Link zur öffentlichen Season-Seite.
 - **Nur, was Gäste sehen**: Season öffentlich (``public_season``), Staffel als Turnier sichtbar. Interne oder Leitungs-Seasons gehen
@@ -53,6 +56,8 @@ EMBED_MAX = 5900
 # Sicher nichts hinausgegangen: Bot nicht verbunden, Kanal unbekannt, keine Schreibrechte - und eine 4xx-Antwort (abgewiesen).
 SAFE_REASONS = frozenset({"bot_offline", "unknown_channel", "forbidden"})
 UNCLEAR = "unclear"
+NOT_APPROVED = ("Dieser Kanal ist nicht freigegeben. Wählbar sind die öffentlichen Kanäle unter Verbindungen → Discord → "
+                "Kanäle je Zweck (Community, News, Events und Turniere).")
 MOVE_SIGNS = {"up": "▲", "down": "▼", "out": "✕"}
 
 
@@ -102,9 +107,10 @@ def settings_of(season: dict | None) -> dict:
     return out
 
 
-def normalize(body: dict, before: dict | None, now: datetime) -> dict:
-    """Die Eingabe der Leitung geprüft. Wer etwas einschaltet, braucht einen Kanal. ``matchday_since`` merkt sich, ab wann die
-    Spieltag-Meldung gilt - frühere Spieltage gehen nicht nachträglich hinaus."""
+def normalize(body: dict, before: dict | None, now: datetime, approved: dict | None = None) -> dict:
+    """Die Eingabe der Leitung geprüft. Wer etwas einschaltet, braucht einen Kanal - aus der freigegebenen Liste (``approved``,
+    Kanal-ID → Zweck; ``None`` prüft nicht). ``matchday_since`` merkt sich, ab wann die Spieltag-Meldung gilt - frühere Spieltage
+    gehen nicht nachträglich hinaus."""
     current = settings_of({FIELD: before or {}})
     out = {**current}
     for key in ("matchday", "season_end", "late"):
@@ -120,6 +126,8 @@ def normalize(body: dict, before: dict | None, now: datetime) -> dict:
             out[key] = _number(body[key], key)
     if (out["matchday"] or out["season_end"]) and not out["channel_id"]:
         raise DigestProblem("Bitte einen Kanal wählen - ohne Kanal geht nichts hinaus.")
+    if approved is not None and (out["matchday"] or out["season_end"]) and out["channel_id"] not in approved:
+        raise DigestProblem(NOT_APPROVED)
     if out["matchday"] and not current["matchday"]:
         out["matchday_since"] = now.isoformat()
     elif not out["matchday"]:
@@ -346,6 +354,25 @@ async def _send(db, key: str, channel_id: str, message: dict, now: datetime) -> 
 
 # ---------------------------------------------------------------- Der Job
 
+def approved_channels(discord_settings: dict | None) -> dict[str, str]:
+    """Die freigegebenen Kanäle (Nr. 234): die öffentlichen „Kanäle je Zweck“ des Hauptservers - Kanal-ID → Zweck. Private Zwecke
+    (Vorstand, Betrieb, Test, Mitglieder) nie: Hier steht nur, was Gäste sehen."""
+    from services.discord_targets import PUBLIC_TARGETS, TARGET_LABELS
+
+    stored = (discord_settings or {}).get("channels")
+    stored = stored if isinstance(stored, dict) else {}
+    out: dict[str, str] = {}
+    for target in PUBLIC_TARGETS:
+        channel = channel_of(stored.get(target))
+        if channel and channel not in out:
+            out[channel] = TARGET_LABELS[target].replace(" (Standard)", "")
+    return out
+
+
+async def approved(db) -> dict[str, str]:
+    return approved_channels(await db.settings.find_one({"id": "discord"}, {"_id": 0, "channels": 1}))
+
+
 async def _discord_ready(db) -> bool:
     from services.discord_runtime import bot_settings
 
@@ -497,9 +524,10 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
     seasons = await db.league_seasons.find(query, {"_id": 0}).to_list(SEASON_LIMIT)
     if not seasons or not await _discord_ready(db):
         return counts
+    allowed = await approved(db)
     for season in seasons:
         settings = settings_of(season)
-        if not settings["channel_id"] or not public_season(season):
+        if not settings["channel_id"] or settings["channel_id"] not in allowed or not public_season(season):
             continue
         league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "id": 1, "name": 1, "slug": 1}) or {}
         try:

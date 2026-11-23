@@ -6,8 +6,9 @@
   zurück zum gewohnten Bild) - Zuständigkeit „Spiele betreuen“. Gilt für alle TVs der abgeschlossenen Staffeln der Season. Mit
   ``from_step`` (der Stand im Fenster der Leitung) gibt „Weiter“ 409, wenn ein anderes Fenster schon geschaltet hat.
 - ``GET|PUT /api/admin/leagues/seasons/{season_id}/discord``: Spieltag-Zusammenfassung und Saisonende-Meldung an/aus, Kanal, Wartezeit
-  und Tabellenausschnitt - lesen jede Zuständigkeit, ändern „Season konfigurieren“. Dazu die Textkanäle des Hauptservers zur Wahl
-  und die Hinweise zu Meldungen, deren Zustellung unklar ist oder die aufgegeben wurden.
+  und Tabellenausschnitt - lesen jede Zuständigkeit, ändern „Season konfigurieren“. Zur Wahl stehen nur die freigegebenen Kanäle
+  (öffentliche „Kanäle je Zweck“ unter Verbindungen → Discord, Nr. 234); ein anderer Kanal gibt 422. Dazu die Hinweise zu Meldungen,
+  deren Zustellung unklar ist oder die aufgegeben wurden.
 
 Logik in ``services/league_finale.py`` und ``services/league_discord.py``.
 """
@@ -70,17 +71,19 @@ async def post_tv_finale(season_id: str, body: FinaleBody, me: dict = Depends(re
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
 
 
-async def _channels() -> dict:
-    """Die Textkanäle des Hauptservers - ist der Bot offline, die zuletzt gesehene Liste mit Hinweis."""
+async def _channels(allowed: dict[str, str]) -> dict:
+    """Die freigegebenen Kanäle mit Zweck - Name und Schreibrecht aus der Kanalliste des Bots (offline: die zuletzt gesehene)."""
     from services.discord_runtime import bot
 
     try:
         listing = await bot.list_channels()
-    except Exception:  # noqa: BLE001 - ohne Liste bleibt die Kanal-ID zum Eintragen
+    except Exception:  # noqa: BLE001 - ohne Liste stehen die Kanäle mit ihrem Zweck da
         listing = {"ok": False, "channels": []}
-    channels = [{"id": str(row.get("id")), "name": row.get("name"), "category": row.get("category") or "",
-                 "can_send": row.get("can_send", True) is not False}
-                for row in listing.get("channels") or [] if str(row.get("id") or "").isdigit()]
+    seen = {str(row.get("id")): row for row in listing.get("channels") or [] if str(row.get("id") or "").isdigit()}
+    channels = [{"id": channel, "purpose": purpose, "name": (seen.get(channel) or {}).get("name") or "",
+                 "category": (seen.get(channel) or {}).get("category") or "",
+                 "can_send": (seen.get(channel) or {}).get("can_send", True) is not False}
+                for channel, purpose in allowed.items()]
     return {"channels": channels, "channels_ok": bool(listing.get("ok")), "channels_text": listing.get("text") if not listing.get("ok") else None}
 
 
@@ -90,8 +93,10 @@ async def _digest_answer(db, season: dict, **extra) -> dict:
     settings.pop("matchday_since", None)
     from services.profile_visibility import public_season
 
+    allowed = await league_discord.approved(db)
     return {"settings": settings, "active": isinstance(stored, dict), "defaults": dict(league_discord.DEFAULTS),
-            "public": public_season(season), "problems": await league_discord.problems(db, season["id"]), **await _channels(), **extra}
+            "public": public_season(season), "channel_approved": not settings["channel_id"] or settings["channel_id"] in allowed,
+            "problems": await league_discord.problems(db, season["id"]), **await _channels(allowed), **extra}
 
 
 @admin_router.get("/seasons/{season_id}/discord")
@@ -107,7 +112,7 @@ async def put_discord_digest(season_id: str, body: DigestBody, me: dict = Depend
     now = now_utc()
     before = season.get(league_discord.FIELD) if isinstance(season.get(league_discord.FIELD), dict) else None
     try:
-        settings = league_discord.normalize(body.model_dump(exclude_unset=True), before, now)
+        settings = league_discord.normalize(body.model_dump(exclude_unset=True), before, now, await league_discord.approved(db))
     except league_discord.DigestProblem as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
     if settings != before:
