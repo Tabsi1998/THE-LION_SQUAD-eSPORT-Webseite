@@ -588,10 +588,20 @@ async def preview_newsletter(kind: str, item: dict, display_name: str) -> dict |
     return {"template_key": template_key, "subject": subject, "html": html}
 
 
+# Gründe, aus denen ein Beitrag nie als Newsletter hinausgeht - der Versand gilt dann nicht als erledigt, sondern als
+# übersprungen. „Nur App“ (#1532): die Mail führt zur Website, die den Beitrag nicht zeigt.
+NEWSLETTER_SKIP_REASONS = frozenset({"internal_visibility", "not_published", "app_only"})
+
+
 async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str = "") -> dict:
     """Queue opt-in newsletter mails for a published news post or announced event."""
     if kind not in {"news", "event"}:
         return {"queued": 0, "reason": "unsupported_kind"}
+    if kind == "news":
+        from services.news_channels import in_channel
+
+        if not in_channel(item, "web"):
+            return {"queued": 0, "reason": "app_only"}
     visibility = item.get("visibility") or "public"
     if visibility == "internal":
         return {"queued": 0, "reason": "internal_visibility"}

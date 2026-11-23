@@ -1,19 +1,19 @@
 """News, Sponsors & Gallery routes — Vereins-CMS Phase 3."""
 import re
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 from database import get_db
 from auth import get_optional_user, require_area
-from services import game_usage
+from services import game_usage, news_channels
 from services.permissions import can_use_area, is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.news_cards import attach_result_winners, event_signups, tournament_signups
 from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 from services import partner_pages, sponsor_images
-from services.notification_preferences import enqueue_newsletter_for_item
+from services.notification_preferences import NEWSLETTER_SKIP_REASONS, enqueue_newsletter_for_item
 from services.news_publish import PIN_DEFAULT_DAYS, parse_pin_day, pin_active, pin_end, public_news, publish_day
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -49,7 +49,7 @@ WITHDRAWN_MESSAGE = "Dieser Beitrag wurde zurückgezogen. Alle aktuellen News fi
 # Verlauf im Editor (#2122 NW3): was sich geändert hat, in Worten statt Feldnamen. Felder ohne Eintrag zählen nicht.
 NEWS_FIELD_LABELS = {
     "title": "Titel", "slug": "Adresse", "excerpt": "Kurzbeschreibung", "content": "Text", "banner_url": "Bild",
-    "video_url": "Video", "category": "Kategorie", "visibility": "Sichtbarkeit", "published": "Veröffentlichung",
+    "video_url": "Video", "category": "Kategorie", "visibility": "Sichtbarkeit", "channels": "Kanal", "published": "Veröffentlichung",
     "published_at": "Termin", "pinned": "Anpinnen", "pinned_until": "Anpinnen", "discord_skip": "Discord", "share_preview": "Link-Vorschau",
     "linked_event_ids": "Verknüpfungen", "linked_tournament_ids": "Verknüpfungen",
     "linked_f1_challenge_ids": "Verknüpfungen", "linked_team_ids": "Verknüpfungen",
@@ -120,14 +120,17 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
-def _preview_state(post: dict) -> dict | None:
-    """Warum ein Beitrag noch nicht öffentlich ist - oder None, wenn ihn alle sehen dürfen (#2122 NW2)."""
+def _preview_state(post: dict, channel: str | None = None) -> dict | None:
+    """Warum ein Beitrag noch nicht öffentlich ist - oder None, wenn ihn alle sehen dürfen (#2122 NW2). Auf der Website
+    zählt auch „nur App“ (#1532): Besucher sehen dort nur den Hinweis auf die LionsAPP."""
     if post.get("withdrawn_at"):
         return {"state": "withdrawn", "since": post.get("withdrawn_at")}
     if post.get("published") is False:
         return {"state": "draft"}
     if not _published_now(post):
         return {"state": "scheduled", "published_at": post.get("published_at")}
+    if channel and not news_channels.in_channel(post, channel):
+        return {"state": "app_only"}
     return None
 
 
@@ -431,7 +434,8 @@ async def _notify_news_mentions(db, post: dict, actor: dict) -> None:
             body=f"{_user_label(actor)} hat dich in \"{post.get('title') or 'News'}\" erwähnt.",
             url=url,
             kind="news_mention",
-            meta={"news_id": post.get("id"), "slug": post.get("slug")},
+            # Kanal der News (#1532): Push nur auf der Seite, auf der die News erscheint.
+            meta={"news_id": post.get("id"), "slug": post.get("slug"), **news_channels.notification_meta(post)},
         )
         notified_ids.append(user["id"])
     if notified_ids:
@@ -444,6 +448,7 @@ async def _notify_news_mentions(db, post: dict, actor: dict) -> None:
 # ---------- News ----------
 @router.get("/news")
 async def list_news(
+    request: Request,
     category: Optional[str] = None,
     search: Optional[str] = Query(default=None, alias="q"),
     pinned_only: bool = False,
@@ -472,11 +477,13 @@ async def list_news(
         projection = {
             "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1,
             "category": 1, "visibility": 1, "pinned": 1, "pinned_until": 1, "published": 1,
-            "published_at": 1, "created_at": 1, "linked_tournament_ids": 1,
+            "published_at": 1, "created_at": 1, "linked_tournament_ids": 1, "channels": 1,
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
     posts = await db.news_posts.find(q, projection).sort([("published_at", -1), ("created_at", -1)]).to_list(fetch_limit)
     posts = [p for p in posts if _published_now(p)]
+    # Kanal (#1532): Website und App teilen sich diese Liste - jede sieht nur ihre News.
+    posts = news_channels.filter_channel(posts, news_channels.request_channel(request))
     posts = await _filter_visible(posts, user)
     # Abgelaufene Anheftung (#1263): der Beitrag rutscht normal in die Liste - für Website und App gleich.
     for post in posts:
@@ -504,7 +511,7 @@ async def list_news(
 
 
 @router.get("/news/{slug_or_id}")
-async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_user)):
+async def get_news(slug_or_id: str, request: Request, user: dict | None = Depends(get_optional_user)):
     db = get_db()
     p, was_old_slug = await find_by_slug_or_history(db.news_posts, slug_or_id, {"_id": 0})
     if not p:
@@ -525,11 +532,17 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not await _user_can_see(user, p.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
+    # „Nur App“ auf der Website (#1532): kein Inhalt, nur der Hinweis auf die LionsAPP - die Seite schreibt ihn mit Link
+    # zur App. Die App selbst öffnet jede News über ihren Link: Android leitet Website-Links auf /news/… in die App, sonst
+    # endeten Newsletter- und Discord-Links zu „nur Website“ auf dem Handy bei „nicht gefunden“.
+    on_web = news_channels.request_channel(request) == "web"
+    if on_web and not can_preview and not news_channels.in_channel(p, "web"):
+        raise HTTPException(status_code=404, detail={"code": news_channels.APP_ONLY_CODE, "message": news_channels.APP_ONLY_MESSAGE})
     if was_old_slug and p.get("slug"):
         return RedirectResponse(url=f"/api/news/{p['slug']}", status_code=301)
     # Vorschau für das Admin-Team (#2122 NW2): ein nicht öffentlicher Beitrag trägt sein Kennzeichen, die Seite zeigt
-    # das Band „Noch nicht öffentlich“.
-    preview = _preview_state(p)
+    # das Band „Noch nicht öffentlich“ - auf der Website auch für „nur App“ (#1532).
+    preview = _preview_state(p, "web" if on_web else None)
     if preview:
         p["preview"] = preview
     # Resolve linked entities
@@ -685,6 +698,14 @@ async def _news_history(db, post_id: str) -> list[dict]:
     } for row in rows]
 
 
+def _clean_channels(value) -> list[str]:
+    """Kanal beim Speichern (#1532): Website, App oder beides - nie keiner."""
+    try:
+        return news_channels.clean_channels(value if value is not None else news_channels.DEFAULT_CHANNELS)
+    except ValueError as exc:
+        raise HTTPException(400, "Bitte wählen, wo der Beitrag erscheint: Website, App oder beides.") from exc
+
+
 def _ever_public(post: dict) -> bool:
     """Ging der Beitrag schon hinaus? Dann zeigen Links aus Newsletter, Discord oder Meldungen auf ihn."""
     if post.get("withdrawn_at") or (post.get("published") and _published_now(post)):
@@ -699,6 +720,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_area("content
     db = get_db()
     doc = body.model_dump()
     publish_now = bool(doc.pop("publish_now", None))
+    doc["channels"] = _clean_channels(doc.get("channels"))
     doc["slug"] = await unique_slug(db.news_posts, doc.get("slug") or doc.get("title"), fallback="news")
     if doc.get("published_at"):
         doc["published_at"] = doc["published_at"].isoformat()
@@ -722,7 +744,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_area("content
     await _audit_news(db, me, "news.create", doc["id"], {"published": bool(doc.get("published")), "published_at": doc.get("published_at")})
     if doc.get("published") and _published_now(doc):
         result = await enqueue_newsletter_for_item("news", doc)
-        if result.get("reason") not in {"internal_visibility", "not_published"}:
+        if result.get("reason") not in NEWSLETTER_SKIP_REASONS:
             doc["newsletter_sent_at"] = now_utc().isoformat()
             doc["newsletter_sent_count"] = int(result.get("queued") or 0)
             await db.news_posts.update_one(
@@ -746,6 +768,11 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
         raise HTTPException(404, "Beitrag nicht gefunden.")
     update = body.model_dump(exclude_unset=True)
     publish_now = bool(update.pop("publish_now", None))
+    if "channels" in update:
+        if update["channels"] is None:
+            update.pop("channels")
+        else:
+            update["channels"] = _clean_channels(update["channels"])
     if not update and not publish_now:
         raise HTTPException(400, "Keine Änderungen.")
     slug_source = slug_source_for_update(update, existing, "title", fallback="news")
@@ -802,7 +829,7 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
     saved = await db.news_posts.find_one({"id": nid}, {"_id": 0})
     if saved and saved.get("published") and _published_now(saved) and not saved.get("newsletter_sent_at"):
         result = await enqueue_newsletter_for_item("news", saved)
-        if result.get("reason") not in {"internal_visibility", "not_published"}:
+        if result.get("reason") not in NEWSLETTER_SKIP_REASONS:
             await db.news_posts.update_one(
                 {"id": nid},
                 {"$set": {
@@ -886,12 +913,13 @@ NEWS_CATEGORIES = [
 EXTRA_CATEGORY_LABELS = {"video": "Video"}
 
 
-async def _categories_in_use(user: dict | None) -> list[dict]:
+async def _categories_in_use(user: dict | None, channel: str = "web") -> list[dict]:
     """Kategorien mit mindestens einem Beitrag, den dieser Besucher in der Liste sieht (#1249) - mit Anzahl. Dieselben
     Regeln wie ``GET /news``: veröffentlicht, schon fällig und sichtbar - auch für das Admin-Team (#2122 NW2)."""
     db = get_db()
-    posts = await db.news_posts.find({"published": True}, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1}).to_list(5000)
-    posts = [p for p in posts if _published_now(p)]
+    posts = await db.news_posts.find({"published": True}, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1, "channels": 1}).to_list(5000)
+    # Kanal (#1532): eine Kategorie nur mit App-News steht nicht im Filter der Website - und umgekehrt.
+    posts = news_channels.filter_channel([p for p in posts if _published_now(p)], channel)
     posts = await _filter_visible(posts, user)
     counts: dict[str, int] = {}
     for post in posts:
@@ -907,12 +935,12 @@ async def _categories_in_use(user: dict | None) -> list[dict]:
 
 
 @router.get("/news-meta")
-async def news_meta(user: dict | None = Depends(get_optional_user)):
+async def news_meta(request: Request, user: dict | None = Depends(get_optional_user)):
     """Public: list of valid categories and visibility options. ``in_use``: nur Kategorien mit Beiträgen, die dieser
     Besucher sieht, samt Anzahl (#1249) - die Filterzeile der News-Seite."""
     return {
         "categories": NEWS_CATEGORIES,
-        "in_use": await _categories_in_use(user),
+        "in_use": await _categories_in_use(user, news_channels.request_channel(request)),
         "visibilities": [
             {"k": "public", "l": "Öffentlich"},
             {"k": "community", "l": "Nur registrierte Community"},
@@ -1203,12 +1231,13 @@ async def _partner_news(db, partner: dict, user: dict | None) -> list[dict]:
     rx = {"$regex": re.escape(name), "$options": "i"}
     projection = {
         "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "category": 1,
-        "visibility": 1, "pinned": 1, "pinned_until": 1, "published": 1, "published_at": 1, "created_at": 1,
+        "visibility": 1, "pinned": 1, "pinned_until": 1, "published": 1, "published_at": 1, "created_at": 1, "channels": 1,
     }
     posts = await db.news_posts.find(
         {"published": True, "$or": [{"title": rx}, {"excerpt": rx}, {"content": rx}]}, projection,
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(30)
-    posts = [{**p, "pinned": pin_active(p)} for p in posts if _published_now(p)]
+    # Partnerseiten gibt es nur auf der Website (#1532): „nur App“ steht hier nie.
+    posts = [{**p, "pinned": pin_active(p)} for p in news_channels.filter_channel(posts, "web") if _published_now(p)]
     posts = await _filter_visible(posts, user)
     return posts[:6]
 
