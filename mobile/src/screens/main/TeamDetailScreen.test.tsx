@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
+import { Alert } from "react-native";
 import { TeamDetailScreen } from "./TeamDetailScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
@@ -175,15 +176,16 @@ test("Auflösen nur unten beim Bearbeiten und nur mit dem richtigen Teamnamen", 
   const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
   api.delete = mockDelete;
   serve({ ...CREW, name: "Lions Rocket", can_manage: true }, {
-    "/teams/t1/dissolve-preview": { member_count: 3, chat_messages: 2, withdraw: [{ title: "Herbst-Cup" }], blocked: [], can_dissolve: true },
+    "/teams/t1/dissolve-preview": { member_count: 3, chat_messages: 2, withdraw: [{ title: "Herbst-Cup" }], blocked: [], can_dissolve: true, restore_days: 30 },
   });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
   await render(<TeamDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
   expect(screen.queryByText("Team bearbeiten")).toBeNull();
   await fireEvent.press(screen.getByTestId("team-edit-open"));
   await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent(
-    "Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 2 Nachrichten wird gelöscht und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben.",
+    "Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 2 Nachrichten ist nicht mehr erreichbar und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben. 30 Tage lang lässt sich das Team wiederherstellen (zurückgezogene Anmeldungen bleiben zurückgezogen), danach ist es endgültig weg.",
   ));
   await fireEvent.changeText(screen.getByTestId("team-dissolve-name"), "Lions");
   await fireEvent.press(screen.getByTestId("team-dissolve-submit"));
@@ -192,6 +194,8 @@ test("Auflösen nur unten beim Bearbeiten und nur mit dem richtigen Teamnamen", 
   await fireEvent.press(screen.getByTestId("team-dissolve-submit"));
   await waitFor(() => expect(mockDelete).toHaveBeenCalledWith("/teams/t1", { params: { confirm: "lions rocket" } }));
   await waitFor(() => expect(goBack).toHaveBeenCalled());
+  expect(alert).toHaveBeenCalledWith("Team aufgelöst", "Lions Rocket ist aufgelöst und lässt sich 30 Tage lang wiederherstellen.");
+  alert.mockRestore();
 });
 
 test("Co-Kapitän bearbeitet, löst aber nicht auf", async () => {

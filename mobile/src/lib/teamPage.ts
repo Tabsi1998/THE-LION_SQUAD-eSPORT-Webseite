@@ -80,13 +80,16 @@ export function initials(name?: string | null): string {
   return text.slice(0, 2).toUpperCase();
 }
 
-// Team auflösen (#1274): derselbe Satz wie im Web - Mitglieder, Chat und kommende Turnier-Anmeldungen.
+// Team auflösen (#1274): derselbe Satz wie im Web - Mitglieder, Chat und kommende Turnier-Anmeldungen, dazu seit #2128
+// die Frist zum Wiederherstellen (frontend/src/lib/teamPage.js).
 export type DissolvePreview = {
   member_count?: number;
   chat_messages?: number;
   withdraw?: Array<{ registration_id?: string; tournament_id?: string; slug?: string | null; title: string }>;
   blocked?: Array<{ registration_id?: string; tournament_id?: string; slug?: string | null; title: string; reason?: string }>;
   can_dissolve?: boolean;
+  // Wie lange sich das Team wiederherstellen lässt (#2128) - ältere Server schicken es nicht.
+  restore_days?: number | null;
 };
 
 export function dissolveSentence(preview?: DissolvePreview | null): string {
@@ -95,13 +98,15 @@ export function dissolveSentence(preview?: DissolvePreview | null): string {
   const chat = Number(preview.chat_messages || 0);
   const parts = [
     members === 1 ? "Das Mitglied verliert das Team" : `Alle ${members} Mitglieder verlieren das Team`,
-    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} wird gelöscht` : "der Team-Chat wird gelöscht",
+    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} ist nicht mehr erreichbar` : "der Team-Chat ist nicht mehr erreichbar",
   ];
   const titles = (preview.withdraw || []).map((row) => `„${row.title}“`);
   if (titles.length === 1) parts.push(`die Anmeldung für ${titles[0]} wird zurückgezogen`);
   if (titles.length > 1) parts.push(`die Anmeldungen für ${titles.slice(0, -1).join(", ")} und ${titles[titles.length - 1]} werden zurückgezogen`);
   const last = parts.pop();
-  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.`;
+  const days = Number(preview.restore_days || 0);
+  const undo = days ? ` ${days} Tage lang lässt sich das Team wiederherstellen (zurückgezogene Anmeldungen bleiben zurückgezogen), danach ist es endgültig weg.` : "";
+  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.${undo}`;
 }
 
 export function sameTeamName(team: { name?: string | null } | null | undefined, typed?: string | null): boolean {
