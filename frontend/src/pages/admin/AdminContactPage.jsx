@@ -397,7 +397,7 @@ export default function AdminContactPage() {
                     <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{viennaDate(m.created_at)}</td>
                     <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="text-xs text-white/40">{m.email}</div></td>
                     <td className="px-4 py-3 text-xs text-[#29B6E8]" data-testid={`contact-topic-${m.id}`}>{topics[m.topic] || m.topic}</td>
-                    <td className="px-4 py-3"><div className="font-semibold truncate max-w-md">{m.subject}</div></td>
+                    <td className="px-4 py-3"><div className="font-semibold tls-wrap max-w-md">{m.subject}</div></td>
                     <td className="px-4 py-3 text-xs text-white/60">{m.assigned_to_name || "–"}</td>
                     <td className="px-4 py-3"><span className={`inline-flex text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm border ${s.c}`}>{s.l}</span></td>
                   </tr>

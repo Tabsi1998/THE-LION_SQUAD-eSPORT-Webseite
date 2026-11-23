@@ -571,7 +571,7 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
           className="fixed inset-2 sm:inset-5 z-50 flex flex-col overflow-hidden rounded-sm border border-white/15 bg-[#0b0d12] text-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-safe:data-[state=open]:zoom-in-[0.98] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:zoom-out-[0.98] duration-200 ease-out"
           data-testid={testId}>
           <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2">
-            <DialogPrimitive.Title className="text-sm font-bold mr-auto min-w-0 truncate">{title}</DialogPrimitive.Title>
+            <DialogPrimitive.Title className="text-sm font-bold mr-auto tls-wrap">{title}</DialogPrimitive.Title>
             <div className="flex items-center gap-1" role="group" aria-label="Zoom">
               <button type="button" onClick={() => zoomTo(-1)} disabled={zoom <= ZOOM_LIMITS.min} aria-label="Verkleinern" className={iconButton} data-testid={`${testId}-zoom-out`}><ZoomOut className="w-4 h-4" aria-hidden="true" /></button>
               <span className="w-14 text-center text-xs tabular-nums" aria-live="polite" data-testid={`${testId}-zoom`}>{Math.round(zoom * 100)} %</span>

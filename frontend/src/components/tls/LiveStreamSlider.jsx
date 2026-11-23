@@ -139,7 +139,7 @@ export function LiveStreamSlider() {
               />
             )}
             <div className="border-t border-white/10 bg-[#101010] p-4">
-              <div className="line-clamp-2 font-semibold text-white">{activeStream.title || "Live-Stream"}</div>
+              <div className="line-clamp-2 font-semibold text-white" title={activeStream.title || undefined}>{activeStream.title || "Live-Stream"}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
                 {activeStream.game_name && <span className="text-[#9146FF]">{activeStream.game_name}</span>}
                 {memberHref && (
@@ -191,7 +191,7 @@ export function LiveStreamSlider() {
                   }`}
                 >
                   <div className="text-sm font-bold text-white">{stream.member_profile?.gamertag || stream.display_name || stream.username}</div>
-                  <div className="mt-1 truncate text-xs text-white/50">{stream.title || "Live-Stream"}</div>
+                  <div className="mt-1 truncate text-xs text-white/50" title={stream.title || undefined}>{stream.title || "Live-Stream"}</div>
                   <div className="mt-2 text-[10px] font-bold uppercase tracking-widest text-[#FF3B30]">Live</div>
                 </button>
               );

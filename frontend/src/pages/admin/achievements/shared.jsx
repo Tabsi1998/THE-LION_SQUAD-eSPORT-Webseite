@@ -155,7 +155,7 @@ export function Stat({ label, value, hint, accent = "#FFD700", testId }) {
   return (
     <div className="border border-white/10 bg-[#0F0F10] rounded-sm px-4 py-3 min-w-0" data-testid={testId}>
       <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</div>
-      <div className={`mt-1 font-heading font-black tabular-nums break-words ${wordy ? "text-lg leading-tight" : "text-2xl truncate"}`} style={{ color: accent }}>{value}</div>
+      <div className={`mt-1 font-heading font-black tabular-nums break-words ${wordy ? "text-lg leading-tight" : "text-2xl tls-wrap"}`} style={{ color: accent }}>{value}</div>
       {hint && <div className="mt-0.5 text-[11px] text-white/50">{hint}</div>}
     </div>
   );
@@ -178,7 +178,7 @@ export function Bars({ rows, accent = "#29B6E8", testId, unit = "" }) {
     <div className="space-y-1.5" data-testid={testId}>
       {rows.map((row) => (
         <div key={row.key} className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-2 text-xs" data-testid={testId ? `${testId}-${row.key}` : undefined}>
-          <span className="text-white/60 truncate">{row.label}</span>
+          <span className="text-white/60 tls-wrap">{row.label}</span>
           <span className="h-2.5 bg-white/5 rounded-sm overflow-hidden">
             <span className="block h-full rounded-sm" style={{ width: `${Math.round(((row.value || 0) / max) * 100)}%`, backgroundColor: row.color || accent }} />
           </span>
@@ -212,8 +212,8 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
       <div className="flex items-center gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
         {value.avatar_url ? <img src={resolveMediaUrl(value.avatar_url)} alt="" className="w-8 h-8 rounded-sm object-cover" /> : <div className="w-8 h-8 rounded-sm bg-[#0A0A0A] border border-white/10" />}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold truncate">{personName(value)}</div>
-          <div className="text-[10px] text-white/45 truncate">@{value.username}{value.is_club_member ? " · Vereinsmitglied" : ""}</div>
+          <div className="text-sm font-semibold tls-wrap">{personName(value)}</div>
+          <div className="text-[10px] text-white/45 tls-wrap">@{value.username}{value.is_club_member ? " · Vereinsmitglied" : ""}</div>
         </div>
         <button type="button" onClick={() => onChange(null)} aria-label="Andere Person wählen" data-testid={`${testId}-clear`} className="p-1 text-white/50 hover:text-white">
           <X className="w-4 h-4" />
@@ -235,8 +235,8 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
           <button key={u.id} type="button" onClick={() => onChange(u)} data-testid={`${testId}-option-${u.id}`} className="w-full text-left px-3 py-2 hover:bg-white/5 transition flex items-center gap-3">
             {u.avatar_url ? <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-7 h-7 rounded-sm object-cover" /> : <div className="w-7 h-7 rounded-sm bg-[#0A0A0A] border border-white/10" />}
             <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">{personName(u)}</div>
-              <div className="text-[10px] text-white/40 truncate">@{u.username}</div>
+              <div className="text-sm font-semibold tls-wrap">{personName(u)}</div>
+              <div className="text-[10px] text-white/40 tls-wrap">@{u.username}</div>
             </div>
             {u.is_club_member && <Crown className="ml-auto w-3.5 h-3.5 text-[#FFD700]" aria-label="Vereinsmitglied" />}
           </button>

@@ -399,7 +399,7 @@ function ItemRow({ item, withDate = false }) {
         <span className="block text-[10px] uppercase tracking-widest text-white/40 font-bold">
           {kindLabel(item)}{when ? ` · ${when}` : ""}{item.location ? ` · ${item.location}` : ""}
         </span>
-        <span className="block text-sm font-bold truncate">{item.title}</span>
+        <span className="tls-wrap block text-sm font-bold">{item.title}</span>
         {badge ? (
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/50">
             <span className="tls-own-badge" data-tone={badge.tone} data-testid={`calendar-badge-${item.kind}-${item.id}`}>{badge.label}</span>

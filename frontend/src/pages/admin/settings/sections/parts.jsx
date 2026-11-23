@@ -55,7 +55,7 @@ export function BannerScopePicker({ value, onChange }) {
               <span className={`w-4 h-4 border rounded-sm inline-flex items-center justify-center shrink-0 ${active ? "border-[#29B6E8] bg-[#29B6E8] text-black" : "border-white/20"}`}>
                 {active && <CheckCircle2 className="w-3 h-3" />}
               </span>
-              <span className="truncate">{label}</span>
+              <span className="tls-wrap">{label}</span>
             </button>
           );
         })}

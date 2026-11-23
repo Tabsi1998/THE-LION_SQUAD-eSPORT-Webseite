@@ -98,7 +98,7 @@ export function SeasonPassWidget() {
                     <div className="text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: ["#FFD700", "#C0C0C0", "#CD7F32"][spotlightIdx] }}>
                       Position {spotlight.rank}
                     </div>
-                    <div className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase leading-tight tracking-tight truncate">
+                    <div className="tls-wrap tls-wrap--name mt-2 font-heading text-3xl md:text-4xl font-black uppercase leading-tight tracking-tight">
                       {spotlight.display_name}
                     </div>
                     <div className="mt-4 flex items-end gap-4">
@@ -131,7 +131,7 @@ export function SeasonPassWidget() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`font-display font-bold w-6 ${r.rank === 1 ? "text-[#FFD700]" : r.rank === 2 ? "text-white/80" : r.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{r.rank}</span>
-                    <span className="truncate text-white/90">{r.display_name}</span>
+                    <span className="tls-wrap text-white/90">{r.display_name}</span>
                   </div>
                   <span className="font-display font-bold text-[#29B6E8] tabular-nums">{r.points}</span>
                 </div>

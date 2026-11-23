@@ -329,7 +329,7 @@ export default function AdminDolibarrPage() {
               {links.map((link) => (
                 <div key={link.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-2.5" data-testid={`dolibarr-link-${link.username}`}>
                   <div className="sm:w-56 min-w-0">
-                    <div className="font-bold truncate">{link.display_name || link.username}</div>
+                    <div className="font-bold tls-wrap">{link.display_name || link.username}</div>
                     <div className="text-xs text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
                   </div>
                   <span className={`text-[10px] font-black uppercase tracking-widest ${link.status === "verified" ? "text-[#00FF88]" : link.status === "conflict" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
@@ -366,7 +366,7 @@ export default function AdminDolibarrPage() {
                     {preview.rows.map((row) => (
                       <div key={row.user_id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-2.5" data-testid={`dolibarr-preview-${row.username}`}>
                         <div className="sm:w-52 min-w-0">
-                          <div className="font-bold truncate">{row.display_name || row.username}</div>
+                          <div className="font-bold tls-wrap">{row.display_name || row.username}</div>
                           <div className="text-xs text-white/45">hier: {row.local_status}{row.requested_ref ? ` · gibt Nr. ${row.requested_ref} an` : ""}</div>
                         </div>
                         <div className="text-xs text-white/70 flex-1 min-w-0">
@@ -454,7 +454,7 @@ export default function AdminDolibarrPage() {
                   <label key={code} className="flex items-center gap-3 text-sm" data-testid={`dolibarr-policy-${code}`}>
                     <input type="checkbox" checked={checked} disabled={!isSuperAdmin} className="accent-[#29B6E8]"
                       onChange={(e) => { policyDirtyRef.current = true; setPolicyPreview(null); setPolicyMap((current) => ({ ...current, [code]: e.target.checked ? ["club"] : [] })); }} />
-                    <span className="font-mono text-xs text-white/50 w-44 truncate">{code}</span>
+                    <span className="font-mono text-xs text-white/50 w-44 tls-wrap">{code}</span>
                     <span>{info?.label || code}{info ? <span className="text-white/40"> ({info.holders})</span> : null}</span>
                     <span className="text-xs text-white/45">{checked ? "öffnet die Vereinsverwaltung" : "öffnet nichts"}</span>
                   </label>

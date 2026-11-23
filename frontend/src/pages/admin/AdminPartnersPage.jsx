@@ -156,7 +156,7 @@ export default function AdminPartnersPage() {
                 )}
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{p.kind || "Partner"}</div>
-                  <div className="font-heading text-lg font-bold truncate">{p.name}</div>
+                  <div className="font-heading text-lg font-bold tls-wrap">{p.name}</div>
                   {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Archiviert</div>}
                   {p.source === "dolibarr" && <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 font-bold" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
                 </div>
@@ -179,7 +179,7 @@ export default function AdminPartnersPage() {
                   Seite ansehen <ExternalLink className="w-3 h-3" />
                 </a>
               )}
-              {p.link && <a href={p.link} target="_blank" rel="noreferrer" className="text-white/45 hover:text-white truncate max-w-full">{p.link}</a>}
+              {p.link && <a href={p.link} target="_blank" rel="noreferrer" className="text-white/45 hover:text-white truncate max-w-full" title={p.link}>{p.link}</a>}
             </div>
           </div>
         ))}

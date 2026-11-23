@@ -52,7 +52,7 @@ export function PortraitImage({ photo, cutout, round = false, size, sizes = PORT
   );
 }
 
-function RoleLine({ label, word, quiet = false }) {
+export function RoleLine({ label, word, quiet = false }) {
   return (
     <span className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
       <span lang="de" className={`text-[11px] font-bold uppercase tracking-[0.18em] break-words hyphens-auto ${quiet ? "text-white/55" : "text-[#FFD700]"}`}>{softBreaks(label)}</span>

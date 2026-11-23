@@ -48,8 +48,8 @@ function MailText({ job }) {
   return (
     <>
       <div className="text-[#29B6E8] font-bold">{mailTemplateLabel(job)}</div>
-      {job.subject && <div className="text-white/45 truncate">{job.subject}</div>}
-      {job.meta?.username && <div className="text-white/35 truncate">Benutzer: {job.meta.username}</div>}
+      {job.subject && <div className="text-white/45 tls-wrap">{job.subject}</div>}
+      {job.meta?.username && <div className="text-white/35 tls-wrap">Benutzer: {job.meta.username}</div>}
     </>
   );
 }

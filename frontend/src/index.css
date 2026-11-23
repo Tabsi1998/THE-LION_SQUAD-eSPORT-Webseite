@@ -128,6 +128,16 @@ img, video, canvas, svg {
   padding-block: 0.06em;
 }
 
+/* Nichts Wichtiges mit „…“ (#1314): Titel, Namen, Orte, Rollen und Daten brechen um statt abgeschnitten zu werden -
+   an Leerzeichen und Bindestrich, lange Wörter ab zehn Buchstaben trennt der Browser mit Bindestrich (lang="de" am
+   Dokument). Mitten im Wort ohne Zeichen bricht nur ein Wort, das allein breiter ist als sein Platz („xX_Nebelwolf_Xx“) -
+   `anywhere` statt `break-word`, damit es die Zeile nicht breiter macht als den Bildschirm (wie .tls-standing-name, #2498).
+   `min-width: 0`, damit der Text auch in Flex- und Grid-Zeilen schmaler werden darf. */
+.tls-wrap { min-width: 0; overflow-wrap: anywhere; -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 10 4 4; }
+/* Große Personennamen (Sieger auf der Textkarte): keine Silbentrennung im Namen („Fitz-gerald“), Umbruch nur an
+   Leerzeichen und am eigenen Bindestrich („Fitzgerald-“ / „Hinterberger“). */
+.tls-wrap--name { -webkit-hyphens: manual; hyphens: manual; }
+
 /* Selection */
 ::selection { background: var(--tls-cyan); color: #000; }
 

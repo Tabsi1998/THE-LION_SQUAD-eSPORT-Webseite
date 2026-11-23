@@ -55,9 +55,9 @@ export function OpsOverview({ onOpenSource }) {
                   <CheckCircle2 className="h-4 w-4 text-ok" />
                 )}
               </div>
-              <div className="mt-4 truncate text-[10px] font-bold uppercase tracking-widest text-white/45">{item.label}</div>
+              <div className="mt-4 tls-wrap text-[10px] font-bold uppercase tracking-widest text-white/45">{item.label}</div>
               <div className="mt-1 font-heading text-2xl font-black tabular-nums text-white">{item.total || 0}</div>
-              <div className="mt-1 truncate text-[11px] text-white/40">{item.latest_at ? formatEventTime(item.latest_at) : "Noch keine Einträge"}</div>
+              <div className="mt-1 tls-wrap text-[11px] text-white/40">{item.latest_at ? formatEventTime(item.latest_at) : "Noch keine Einträge"}</div>
             </button>
           );
         })}

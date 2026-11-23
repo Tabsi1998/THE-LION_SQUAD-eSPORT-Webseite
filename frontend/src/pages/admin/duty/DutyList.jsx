@@ -38,7 +38,7 @@ export function DutyList({ rows, testId = "duty-list" }) {
             <div className="mt-1 min-w-0 flex-1 md:mt-0">
               <div className="flex items-center gap-2 min-w-0">
                 <Icon className="w-4 h-4 shrink-0 text-white/45" aria-hidden="true" />
-                <span className="font-heading font-bold text-white truncate">{row.title}</span>
+                <span className="font-heading font-bold text-white tls-wrap">{row.title}</span>
                 <span className="shrink-0 text-[10px] uppercase tracking-widest text-white/40">{kind.label}</span>
               </div>
               {roles && <div className="mt-1 text-sm text-white/60" data-testid={`duty-roles-${row.id}`}>Deine Rolle: {roles}</div>}

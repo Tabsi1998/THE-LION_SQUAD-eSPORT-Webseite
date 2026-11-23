@@ -174,7 +174,7 @@ function ModeRow({ mode, index, open, onToggle, setMode, usage, onRemove, isFirs
           <ChevronDown className={`w-4 h-4 text-[#29B6E8] transition-transform duration-fast ease-tls ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           <span className="flex min-w-0 items-center gap-2">
             <ModeIcon src={mode.icon_url} size="sm" testId={`${testPrefix}-mode-icon-thumb-${index}`} />
-            <span className="min-w-0 truncate font-semibold text-white" data-testid={`${testPrefix}-mode-name-${index}`}>
+            <span className="tls-wrap font-semibold text-white" data-testid={`${testPrefix}-mode-name-${index}`}>
               {String(mode.label || "").trim() || <span className="font-normal text-white/45">Neuer Modus</span>}
             </span>
           </span>

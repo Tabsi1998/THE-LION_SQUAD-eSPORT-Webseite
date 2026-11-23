@@ -158,7 +158,7 @@ export default function AdminIntegrationsOverviewPage() {
               <Link key={item.key} to={item.to} data-testid={`integration-row-${item.key}`} className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition">
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-sm">{item.label}</div>
-                  {item.detail ? <div className="text-xs text-white/50 truncate" data-testid={`integration-detail-${item.key}`}>{item.detail}</div> : null}
+                  {item.detail ? <div className="text-xs text-white/50 tls-wrap" data-testid={`integration-detail-${item.key}`}>{item.detail}</div> : null}
                 </div>
                 <StateChip state={item.state} testId={`integration-state-${item.key}`} />
                 <ArrowRight className="w-4 h-4 text-white/30 shrink-0" />
