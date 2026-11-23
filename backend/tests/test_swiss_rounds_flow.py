@@ -380,6 +380,75 @@ async def test_a_result_taken_back_inside_a_running_round_removes_nothing(flow):
     assert len(await round_matches(flow, tournament, 1)) == 3
 
 
+# ---------------------------------------------------------------- Gleichzeitig
+
+async def post_result(flow, match, winner, loser):
+    """Ein Ergebnis eintragen wie die Oberfläche: Ist das Turnier gerade gesperrt (409 „wird bereits verarbeitet“),
+    noch einmal versuchen."""
+    response = None
+    for _attempt in range(5):
+        response = await flow.post(f"/api/matches/{match['id']}/result", json={"results": ranking(winner, loser)})
+        if response.status_code != 409 or "bereits verarbeitet" not in response.text:
+            break
+    return response
+
+
+@pytest.mark.asyncio
+async def test_the_last_two_results_at_the_same_time_pair_one_round(flow):
+    """Zwei Stationen melden die beiden letzten Spiele der Runde im selben Augenblick: genau eine Runde 2, jeder sitzt
+    genau einmal, und sie ist aus beiden Ergebnissen gepaart."""
+    _staff, tournament, regs = await swiss(flow, 8, auto_next_round=True)
+    assert (await next_round(flow, tournament)).status_code == 200
+    round_one = await round_matches(flow, tournament, 1)
+    await decide(flow, round_one[0])
+    await decide(flow, round_one[1])
+    sides = [[slot["registration_id"] for slot in match["slots"]] for match in round_one[2:]]
+
+    answers = await asyncio.gather(post_result(flow, round_one[2], *sides[0]), post_result(flow, round_one[3], *sides[1]))
+
+    assert [answer.status_code for answer in answers] == [200, 200], [answer.text for answer in answers]
+    matches = await flow.matches(tournament)
+    assert max(match["round"] for match in matches) == 2
+    round_two = [match for match in matches if match["round"] == 2]
+    assert len(round_two) == 4 and len({match["id"] for match in round_two}) == 4
+    seated = sorted(slot["registration_id"] for match in round_two for slot in match["slots"])
+    assert seated == sorted(reg["id"] for reg in regs)
+    winners = {match["slots"][0]["registration_id"] for match in round_one}
+    assert all(len({slot["registration_id"] for slot in match["slots"]} & winners) in (0, 2) for match in round_two), \
+        "Sieger gegen Sieger, Verlierer gegen Verlierer - beide letzten Ergebnisse zählen"
+    audit = await flow.db.audit_logs.find({"action": "tournament.swiss.next_round"}, {"_id": 0}).to_list(10)
+    assert [entry["data"].get("automatic") for entry in audit] == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_taking_back_and_playing_on_at_the_same_time_never_leaves_a_stale_round(flow):
+    """„Rückgängig“ für das letzte Ergebnis von Runde 1 und ein Ergebnis in Runde 2 im selben Augenblick. Wer zuerst
+    kommt, gewinnt - aber nie steht Runde 2 neben einer wieder offenen Runde 1."""
+    _staff, tournament, _regs = await swiss(flow, 6, auto_next_round=True)
+    assert (await next_round(flow, tournament)).status_code == 200
+    round_one = await round_matches(flow, tournament, 1)
+    for match in round_one:
+        await decide(flow, match)
+    round_two = await round_matches(flow, tournament, 2)
+    first, second = (slot["registration_id"] for slot in round_two[0]["slots"])
+
+    undone, played = await asyncio.gather(undo(flow, round_one[2]), post_result(flow, round_two[0], first, second))
+
+    matches = await flow.matches(tournament)
+    open_in_one = [match for match in matches if match["round"] == 1 and match["status"] != "completed"]
+    later = [match for match in matches if match["round"] == 2]
+    if undone.status_code == 200:
+        # Rückgängig war zuerst da: Runde 2 ist weg, das Ergebnis für ihr Spiel lief ins Leere.
+        assert undone.json()["removed_round"] == 2
+        assert len(open_in_one) == 1 and later == []
+        assert played.status_code in (404, 409), played.text
+    else:
+        # Das Ergebnis in Runde 2 war zuerst da: Runde 1 bleibt gewertet, Runde 2 vollständig.
+        assert undone.status_code == 409 and "Runde 2" in undone.json()["detail"], undone.text
+        assert played.status_code == 200, played.text
+        assert open_in_one == [] and len(later) == 3
+
+
 # ---------------------------------------------------------------- Korrektur, wenn die nächste Runde schon steht
 
 async def correct(flow, match, winner, loser, **extra):
