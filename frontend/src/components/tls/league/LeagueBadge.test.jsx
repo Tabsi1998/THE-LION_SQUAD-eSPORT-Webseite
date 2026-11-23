@@ -208,3 +208,64 @@ describe("Review #1638: Saisonlinie lesbar und per Tastatur erreichbar", () => {
     expect(region).toHaveAttribute("tabindex", "0");
   });
 });
+
+describe("Review #1638: nichts mit „…“, nichts doppelt vorgelesen, Rückzug auf der Achse", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/components/tls/league/leagueBadge.css"), "utf8");
+
+  it("die Bausteine kürzen nirgends mit „…“ - Namen, Beinamen und Legende brechen um (#1314)", () => {
+    const rules = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(rules).not.toMatch(/text-overflow\s*:\s*ellipsis/);
+    expect(rules).not.toMatch(/line-clamp/);
+    expect(rules).toMatch(/\.tls-lbadge__nick \{[^}]*overflow-wrap: anywhere/);
+    expect(rules).toMatch(/\.tls-season-line__legend li \{[^}]*overflow-wrap: anywhere/);
+    expect(rules).not.toMatch(/\.tls-lbadge__text \{[^}]*white-space: nowrap/);
+  });
+
+  it("der Co-Team-Name in „Aktuelle Ligen“ trägt den Umbruch-Baustein und steht ganz da", () => {
+    const long = "Donaudampfschifffahrtsgesellschaftskapitäne Nachwuchs";
+    render(<MemoryRouter><LeagueCurrent rows={[{ ...ROW, squad_name: long }]} nameOf={(row) => row.squad_name} testId="p" /></MemoryRouter>);
+    const name = screen.getByTestId("p-r1-name");
+    expect(name).toHaveTextContent(long);
+    expect(name.className).toContain("tls-wrap");
+  });
+
+  it("das Wappen neben dem Text schweigt für Screenreader - sonst hörte man „Liga 1 · Elite“ doppelt", () => {
+    render(<MemoryRouter><LeagueCurrent rows={[ROW]} testId="p" /></MemoryRouter>);
+    expect(screen.getByTestId("p-r1-badge")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("img", { name: /Liga 1/ })).toBeNull();
+    render(<LeagueBadge badge={{ level: 2 }} label={false} testId="alone" />);
+    expect(screen.getByTestId("alone")).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByRole("img", { name: "Liga 2" })).toBeInTheDocument();
+  });
+
+  const season = (number, name, level, rank, extra = {}) => ({ season_id: `s${number}`, season_name: name, closed_at: `2026-0${number}-01`, rank, of: 6,
+    badge: { level }, display_name: "Kader A", ...extra });
+  const ROWS = [season(1, "Herbst 2025/26", 2, 3), season(2, "Frühjahr 2026", 2, null, { exit: "withdrawn" }), season(3, "Herbst 2026/27", 1, 1, { champion: true })];
+
+  it("schreibt Season-Namen ungekürzt, lange in zwei Zeilen, den vollen Namen im title", () => {
+    render(<LeagueSeasonLine rows={ROWS} testId="l" />);
+    const label = screen.getByTestId("l-season-2");
+    expect(label.querySelector("title")).toHaveTextContent("Herbst 2026/27");
+    expect([...label.querySelectorAll("tspan")].map((node) => node.textContent)).toEqual(["Herbst", "2026/27"]);
+    expect(screen.getByTestId("l-svg").textContent).not.toContain("…");
+  });
+
+  it("rückt die Seasons so weit auseinander, wie der längste Name braucht", () => {
+    render(<LeagueSeasonLine rows={ROWS} testId="short" />);
+    const wide = ROWS.map((row, at) => (at === 1 ? { ...row, season_name: "Donaudampfschifffahrtssaison" } : row));
+    render(<LeagueSeasonLine rows={wide} testId="long" />);
+    expect(Number(screen.getByTestId("short-svg").getAttribute("data-step"))).toBe(75);
+    expect(Number(screen.getByTestId("long-svg").getAttribute("data-step"))).toBeGreaterThan(28 * 6);
+  });
+
+  it("zeigt den Rückzug als grauen Punkt „ausgetreten“ ohne Platz und unterbricht dort die Linie", () => {
+    render(<LeagueSeasonLine rows={ROWS} testId="l" />);
+    expect(screen.getAllByTestId(/^l-season-\d$/)).toHaveLength(3);
+    const exit = screen.getByTestId("l-exit-0-1");
+    expect(exit).toHaveAttribute("data-exit", "withdrawn");
+    expect(exit).toHaveTextContent("ausgetreten");
+    expect(screen.queryByTestId("l-rank-0-1")).toBeNull();
+    expect(screen.getByTestId("l-svg").querySelectorAll("polyline")).toHaveLength(2);
+    expect(screen.getByRole("img", { name: /Frühjahr 2026: Liga 2, ausgetreten; Herbst 2026\/27: Liga 1, Platz 1 von 6, Meister/ })).toBeInTheDocument();
+  });
+});

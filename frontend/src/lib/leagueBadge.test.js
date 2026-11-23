@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { badgeAria, badgeLabel, badgeMetal, badgeTier, currentPlace, ladderValue, nextMatchText, seasonLine } from "./leagueBadge";
+import { badgeAria, badgeLabel, badgeMetal, badgeTier, currentPlace, exitLabel, ladderValue, lineRuns, nextMatchText, seasonLabelLines, seasonLine } from "./leagueBadge";
 
 describe("Liga-Abzeichen (#1638)", () => {
   it("zeigt die Stufe über die Form: Liga 1 oben, Liga 2 mittel, ab Liga 3 schlicht", () => {
@@ -114,5 +114,62 @@ describe("Review #1638: Statushinweis und nur gezeigte Linien", () => {
     expect(line.levels).toEqual([1, 2]);
     expect(line.seasons.map((season) => season.name)).toEqual(["Season 1", "Season 2"]);
     expect(seasonLine(rows, { byTeam: true }).levels).toEqual([1, 2, 5]);
+  });
+});
+
+describe("Review #1638: Season-Namen, Rückzug und Reihenfolge der Linien", () => {
+  const row = (team, number, level, rank, extra = {}) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
+    rank, of: 6, badge: level ? { level } : null, display_name: team, ...extra });
+
+  it("teilt einen langen Season-Namen am Leerzeichen nahe der Mitte in zwei Zeilen und kürzt nie", () => {
+    expect(seasonLabelLines("Herbst 2026/27")).toEqual(["Herbst", "2026/27"]);
+    expect(seasonLabelLines("Season 3")).toEqual(["Season 3"]);
+    expect(seasonLabelLines("Donaudampfschifffahrtssaison")).toEqual(["Donaudampfschifffahrtssaison"]);
+    expect(seasonLabelLines("Große  Frühjahrs Season 2026")).toEqual(["Große Frühjahrs", "Season 2026"]);
+    expect(seasonLabelLines("Herbst 2026/27").join(" ")).not.toContain("…");
+  });
+
+  it("setzt die Season eines Rückzugs auf die Achse, ohne Platz, in ihrer Liga N", () => {
+    const line = seasonLine([row("Kader A", 1, 2, 1), row("Kader A", 2, 2, 3, { exit: "withdrawn" }), row("Kader A", 3, 1, 2)]);
+    expect(line.seasons.map((season) => season.name)).toEqual(["Season 1", "Season 2", "Season 3"]);
+    const exit = line.series[0].points[1];
+    expect(exit).toMatchObject({ index: 1, exit: "withdrawn", value: null, rank: null, level: 2, champion: false });
+    expect(line.levels).toEqual([1, 2]);
+  });
+
+  it("nimmt bei einem Rückzug ohne Liga N die Liga N der Season davor", () => {
+    const line = seasonLine([row("Kader A", 1, 3, 1), row("Kader A", 2, null, null, { exit: "disqualified" }), row("Kader A", 3, 3, 2)]);
+    expect(line.series[0].points[1]).toMatchObject({ exit: "disqualified", level: 3 });
+    expect(exitLabel("disqualified")).toBe("disqualifiziert");
+    expect(exitLabel("withdrawn")).toBe("ausgetreten");
+  });
+
+  it("im Profil schlägt ein gewerteter Eintrag derselben Season den Rückzug", () => {
+    const line = seasonLine([row("Kader A", 1, 2, 1), row("Kader A", 2, 2, 3, { exit: "withdrawn" }), row("Kader B", 2, 3, 4)]);
+    expect(line.series[0].points[1]).toMatchObject({ exit: null, rank: 4, level: 3 });
+  });
+
+  it("zeigt keine Linie, wenn es außer Rückzügen keinen Platz gibt", () => {
+    expect(seasonLine([row("Kader A", 1, 2, 1, { exit: "withdrawn" }), row("Kader A", 2, 2, 1, { exit: "withdrawn" })])).toBe(null);
+  });
+
+  it("unterbricht die Linie am Rückzug", () => {
+    const points = [{ index: 0 }, { index: 1 }, { index: 2, exit: "withdrawn" }, { index: 3 }];
+    expect(lineRuns(points).map((run) => run.map((point) => point.index))).toEqual([[0, 1], [3]]);
+    expect(lineRuns([{ index: 0, exit: "withdrawn" }])).toEqual([]);
+  });
+
+  it("stellt Co-Teams, die gerade spielen, vor die übrigen - dann nach der Liga N der letzten Season", () => {
+    const rows = [row("Früher Liga 1", 1, 1, 1), row("Früher Liga 1", 2, 1, 1),
+      row("Spielt Liga 3", 1, 3, 2, { squad_id: "sq-3" }), row("Spielt Liga 3", 2, 3, 1, { squad_id: "sq-3" }),
+      row("Spielt Liga 2", 1, 2, 5), row("Spielt Liga 2", 2, 2, 4)];
+    const line = seasonLine(rows, { byTeam: true, playing: ["sq-3", "Spielt Liga 2"] });
+    expect(line.series.map((series) => series.name)).toEqual(["Spielt Liga 2", "Spielt Liga 3", "Früher Liga 1"]);
+    expect(seasonLine(rows, { byTeam: true }).series[0].name).toBe("Früher Liga 1");
+  });
+
+  it("ein Rückzug in der letzten Season zählt wie der letzte Platz seiner Liga N", () => {
+    const rows = [row("Raus", 1, 2, 1), row("Raus", 2, 2, null, { exit: "withdrawn" }), row("Drin", 1, 2, 6), row("Drin", 2, 2, 6)];
+    expect(seasonLine(rows, { byTeam: true }).series.map((series) => series.name)).toEqual(["Drin", "Raus"]);
   });
 });

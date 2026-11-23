@@ -336,3 +336,80 @@ async def test_registering_a_co_team_alone_does_not_make_it_the_persons_league(f
     assert [row["registration_id"] for row in rows] == [world["extra"]]
     await flow.db.team_squads.update_one({"id": "squad-1b"}, {"$set": {"captain_id": None, "vice_captain_id": "captain-1"}})
     assert len((await profile(flow, None, "captain-1"))["league_current"]) == 1
+
+
+# ---------------------------------------------------------------- Fix-Runde (Review #1638)
+
+@pytest.mark.asyncio
+async def test_long_team_history_does_not_push_running_leagues_out_of_the_profile(flow):
+    """Viele alte Anmeldungen (mehr als die Grenze von 200) vor den laufenden: Das Profil schränkt zuerst auf laufende Liga-Staffeln
+    ein, neueste zuerst - die laufenden Ligen fehlen nicht."""
+    world = await setup(flow)
+    await flow.db.tournament_registrations.insert_many([
+        {"id": f"alt-{index}", "tournament_id": f"alt-turnier-{index}", "team_id": "team-1", "squad_id": "squad-1", "status": "approved",
+         "registration_type": "team", "display_name": "Probe 1", "created_at": f"2024-01-01T00:00:{index % 60:02d}+00:00"}
+        for index in range(240)])
+    await flow.db.tournaments.insert_many([{"id": f"alt-turnier-{index}", "title": "Altes Turnier", "status": "archived"} for index in range(240)])
+    season = await add_season(flow, world, levels=2)
+    lower = await staffel(flow, world, season, 2, [1, 2, 3, 4], start=False)
+    ok(await flow.post(f"/api/tournaments/{lower['id']}/status", json={"status": "live"}))
+    rows = (await profile(flow, None))["league_current"]
+    assert [row["registration_id"] for row in rows] == [f"{lower['id']}-reg-1"]
+
+
+@pytest.mark.asyncio
+async def test_hidden_participant_list_hides_the_registration_state_from_outsiders(flow):
+    """``show_participants: false``: „Warteliste“ bzw. „Anmeldung offen“ sieht nur, wer dazugehört - Teamseite: das Team, Profil: die
+    Person selbst. Gegenprobe: mit sichtbarer Liste sehen es alle."""
+    world = await two_levels(flow)
+    await flow.db.tournament_registrations.update_one({"id": world["extra"]}, {"$set": {"status": "waitlist"}})
+    await flow.db.tournaments.update_one({"id": world["upper"]["id"]}, {"$set": {"show_participants": False}})
+    owner = await flow.db.users.find_one({"id": PERSON}, {"_id": 0})
+    outsider = await flow.add_user(role="player", name="sturmvogel")
+
+    async def team_note(viewer):
+        flow.act_as(viewer)
+        rows = {row["registration_id"]: row for row in ok(await flow.get("/api/teams/team-1/overview"))["league"]}
+        return rows[world["extra"]]["status_note"]
+
+    async def profile_note(viewer):
+        return {row["registration_id"]: row for row in (await profile(flow, viewer))["league_current"]}[world["extra"]]["status_note"]
+
+    assert await team_note(None) is None, "Gast: Liste verborgen, kein Stand"
+    assert await team_note(outsider) is None
+    assert await team_note(owner) == "Warteliste", "das Team selbst sieht den Stand"
+    assert await profile_note(None) is None
+    assert await profile_note(owner) == "Warteliste", "die Person selbst sieht den Stand"
+    await flow.db.tournaments.update_one({"id": world["upper"]["id"]}, {"$set": {"show_participants": True}})
+    assert await team_note(None) == "Warteliste"
+    assert await profile_note(None) == "Warteliste"
+
+
+@pytest.mark.asyncio
+async def test_solo_opponent_without_own_name_shows_the_account_name(flow):
+    """Solo-Anmeldung ohne eigenen Namen (#1629): Das nächste Spiel nennt den Namen aus dem Konto statt „Team“."""
+    world = await two_levels(flow)
+    own = f"{world['lower']['id']}-reg-1"
+    flow.act_as(None)
+    before = {row["registration_id"]: row for row in ok(await flow.get("/api/teams/team-1/overview"))["league"]}[own]["next_match"]
+    opponent = next(row for row in await flow.db.tournament_registrations.find(
+        {"tournament_id": world["lower"]["id"]}, {"_id": 0}).to_list(None) if row.get("display_name") == before["opponent"])
+    await flow.db.users.insert_one({"id": "solo-1", "username": "sturmvogel", "display_name": "Sturmvogel", "role": "user", "is_active": True})
+    await flow.db.tournament_registrations.update_one({"id": opponent["id"]}, {
+        "$set": {"user_id": "solo-1", "registration_type": "solo"},
+        "$unset": {"display_name": "", "team_name": "", "squad_name": "", "team_id": "", "squad_id": ""}})
+    after = {row["registration_id"]: row for row in ok(await flow.get("/api/teams/team-1/overview"))["league"]}[own]["next_match"]
+    assert after["opponent"] == "Sturmvogel"
+
+
+@pytest.mark.asyncio
+async def test_history_and_team_rows_carry_the_co_team_id(flow):
+    """Der Saisonverlauf der Teamseite stellt Co-Teams, die gerade spielen, zuerst - dafür tragen Historie und Liga-Zeilen ``squad_id``."""
+    world = await two_levels(flow)
+    flow.act_as(None)
+    rows = ok(await flow.get("/api/teams/team-1/overview"))["league"]
+    assert sorted(row["squad_id"] for row in rows) == ["squad-1", "squad-1b"]
+    await play(flow, world["lower"], [1, 2, 3, 4])
+    await close_staffel(flow, world, world["lower"])
+    history = ok(await flow.get("/api/teams/team-1"))["league_history"]
+    assert [row["squad_id"] for row in history] == ["squad-1"]

@@ -33,6 +33,8 @@ const HISTORY = [
   season(1, 3, 1, "Nordlicht · Nordlicht A", { zone: "promotion" }),
   season(2, 2, 2, "Nordlicht · Nordlicht A", { zone: "promotion" }),
   season(3, 1, 1, "Nordlicht · Nordlicht A", { champion: true }),
+  // Rückzug in Season 4 (Fabian 23.11.): steht als grauer Punkt „ausgetreten“ auf der Achse.
+  season(4, 1, null, "Nordlicht · Nordlicht A", { exit: "withdrawn" }),
 ].reverse();
 // Fünf Co-Teams: Die Linie zeigt die vier besten (aktuelle Liga N, dann Platz), das fünfte nennt der Satz darunter (Fabian 23.11.).
 const TEAM_HISTORY = [...HISTORY, season(2, 3, 4, "Nordlicht · Nordlicht B"), season(3, 3, 2, "Nordlicht · Nordlicht B"),
@@ -166,6 +168,7 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       const line = page.getByTestId("profile-season-line");
       await expect(line.getByRole("img")).toHaveAttribute("aria-label", /Season 1: Liga 3, Platz 1 von 6; Season 2: Liga 2, Platz 2 von 6; Season 3: Liga 1, Platz 1 von 6, Meister/);
       await expect(line.getByTestId("profile-season-line-point-0-2")).toHaveAttribute("data-champion", "true");
+      await expect(line.getByTestId("profile-season-line-exit-0-3")).toContainText("ausgetreten");
       await expect(page.getByTestId("profile-league-history-s3-badge")).toHaveAttribute("data-metal", "gold");
       await expect(page.getByTestId("profile-league-history-s2-badge")).toHaveAttribute("data-metal", "cyan");
       await noSideScroll(page);
