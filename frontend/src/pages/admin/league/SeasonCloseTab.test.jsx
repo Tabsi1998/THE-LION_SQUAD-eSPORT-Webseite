@@ -212,3 +212,89 @@ test("Nachmeldung (#2422): eine offene Nachmeldung steht als Hinweis mit Link da
   expect(screen.getByTestId("close-ready-t1")).toBeInTheDocument();
   expect(screen.getByTestId("close-button-t1")).not.toBeDisabled();
 });
+
+// Plätze über Staffeln hinweg (#1627): Kandidaten mit Schnitt je Spiel, Gleichstand an der Grenze, Entscheid ohne Los.
+const candidate = (id, name, staffel, extra = {}) => ({ registration_id: id, display_name: name, tournament_id: `t-${staffel}`, staffel, rank: 2, played: 3, points: 6,
+  score_diff: 2, points_per_game: 2, map_diff_per_game: 0.667, chosen: false, tied: false, ...extra });
+const side = (extra = {}) => ({ kind: "promote_best", label: "Aufstieg über den Vergleich der Staffeln", count: 1, zone: "promotion", tie: null, decision: null, own_team: false,
+  candidates: [candidate("ra", "Probe Rot", "A", { chosen: true }), candidate("rb", "Probe Blau", "B", { points_per_game: 1.5, map_diff_per_game: 0 })], ...extra });
+const cross = (sides, extra = {}) => ({ cross: [{ division_id: "d2", label: "Liga 2", final: false, sides, ...extra }], cross_methods: { playoff: "Entscheidungsspiel", lead: "Entscheid der Leitung" } });
+const TIE = { kind: "promote_best", open: 1, registration_ids: ["ra", "rb"], names: ["Probe Rot", "Probe Blau"], staffeln: ["A", "B"] };
+const tiedSide = (extra = {}) => side({ tie: TIE, candidates: [candidate("ra", "Probe Rot", "A", { tied: true }), candidate("rb", "Probe Blau", "B", { tied: true })], ...extra });
+
+test("ohne die Regel steht nichts über Staffeln hinweg da", async () => {
+  renderTab(data([staffel()]));
+  await screen.findByTestId("season-close-summary");
+  expect(screen.queryByTestId("season-cross-zones")).toBeNull();
+});
+
+test("Kandidaten über Staffeln hinweg: Schnitt je Spiel, wer aufsteigt, und dass es erst nach allen Abschlüssen gilt", async () => {
+  renderTab(data([staffel()], cross([side()])));
+  const section = await screen.findByTestId("cross-division-d2");
+  expect(section).toHaveTextContent("Liga 2 · Plätze über Staffeln hinweg");
+  expect(screen.getByTestId("cross-status-d2")).toHaveTextContent("Stand von jetzt. Fest steht es erst, wenn alle Staffeln dieser Liga abgeschlossen sind");
+  expect(screen.getByTestId("cross-candidate-ra")).toHaveTextContent("Probe RotStaffel A, Platz 2 · 2,00 Punkte je Spiel · +0,67 Maps je Spielsteigt auf");
+  expect(screen.getByTestId("cross-candidate-rb")).toHaveTextContent("1,50 Punkte je Spiel · 0,00 Maps je Spiel");
+  expect(screen.getByTestId("cross-candidate-rb")).not.toHaveTextContent("steigt auf");
+  expect(screen.queryByTestId("cross-tie-d2-promote_best")).toBeNull();
+});
+
+test("Gleichstand zwischen Staffeln: entscheiden mit genau einem Team, Art und Grund - ein Los steht nicht zur Wahl", async () => {
+  renderTab(data([staffel()], cross([tiedSide()])), { canResults: true });
+  expect(await screen.findByTestId("cross-tie-d2-promote_best")).toHaveTextContent("Probe Rot – Probe Blau. Nur einer bekommt den Platz.");
+  fireEvent.click(screen.getByTestId("cross-decide-d2-promote_best"));
+  const sheet = await screen.findByTestId("cross-decision-sheet");
+  const methods = Array.from(within(sheet).getByTestId("cross-decision-method").querySelectorAll("option")).map((option) => option.textContent);
+  expect(methods).toEqual(["Bitte wählen …", "Entscheidungsspiel", "Entscheid der Leitung"]);
+  const save = within(sheet).getByTestId("cross-decision-save");
+  expect(save).toBeDisabled();
+  fireEvent.click(within(sheet).getByTestId("cross-decision-pick-rb"));
+  fireEvent.change(within(sheet).getByTestId("cross-decision-method"), { target: { value: "playoff" } });
+  fireEvent.change(within(sheet).getByTestId("cross-decision-reason"), { target: { value: "ja" } });
+  expect(save).toBeDisabled();
+  fireEvent.change(within(sheet).getByTestId("cross-decision-reason"), { target: { value: "Entscheidungsspiel 3:1" } });
+  // Zwei gewählt, aber nur ein Platz: geht nicht.
+  fireEvent.click(within(sheet).getByTestId("cross-decision-pick-ra"));
+  expect(save).toBeDisabled();
+  fireEvent.click(within(sheet).getByTestId("cross-decision-pick-ra"));
+  fireEvent.click(save);
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/divisions/d2/zone-decision",
+    { kind: "promote_best", registration_ids: ["rb"], method: "playoff", reason: "Entscheidungsspiel 3:1" }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Entscheid gespeichert."));
+});
+
+test("Gleichstand zwischen Staffeln: ohne das Recht nur der Hinweis, beim eigenen Team eine andere Person", async () => {
+  const { unmount } = renderTab(data([staffel()], cross([tiedSide()])));
+  expect(await screen.findByTestId("cross-tie-d2-promote_best")).toHaveTextContent("Den Entscheid trifft, wer in dieser Liga „Ergebnisse korrigieren“ darf.");
+  expect(screen.queryByTestId("cross-decide-d2-promote_best")).toBeNull();
+  unmount();
+  renderTab(data([staffel()], cross([tiedSide({ own_team: true })])), { canResults: true });
+  expect(await screen.findByTestId("cross-own-d2-promote_best")).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
+  expect(screen.queryByTestId("cross-decide-d2-promote_best")).toBeNull();
+});
+
+test("ein Entscheid steht mit Art und Grund da und lässt sich mit Grund zurücknehmen", async () => {
+  apiMock.delete = vi.fn().mockResolvedValue({ data: { ok: true } });
+  const decided = side({ candidates: [candidate("rb", "Probe Blau", "B", { chosen: true }), candidate("ra", "Probe Rot", "A")],
+    decision: { registration_ids: ["rb"], names: ["Probe Blau"], method: "playoff", method_label: "Entscheidungsspiel", reason: "3:1 gewonnen", decided_at: "2026-11-23T17:00:00+00:00" } });
+  renderTab(data([staffel()], cross([decided], { final: true })), { canResults: true });
+  expect(await screen.findByTestId("cross-decision-d2-promote_best")).toHaveTextContent("Entscheid: Probe Blau – Entscheidungsspiel: 3:1 gewonnen");
+  expect(screen.getByTestId("cross-status-d2")).toHaveTextContent("Alle Staffeln dieser Liga sind abgeschlossen");
+  fireEvent.click(screen.getByTestId("cross-clear-d2-promote_best"));
+  const sheet = await screen.findByTestId("cross-clear-sheet");
+  expect(within(sheet).getByTestId("cross-clear-save")).toBeDisabled();
+  fireEvent.change(within(sheet).getByTestId("cross-clear-reason"), { target: { value: "Spiel wird wiederholt" } });
+  fireEvent.click(within(sheet).getByTestId("cross-clear-save"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/divisions/d2/zone-decision/promote_best", { data: { reason: "Spiel wird wiederholt" } }));
+});
+
+test("der Sperrgrund „Gleichstand zwischen den Staffeln“ nennt die Teams ohne toten Link und hält den Knopf zu", async () => {
+  renderTab(data([staffel({ can_close: false, blockers: [{ code: "zone_cross_tie", label: "Gleichstand zwischen den Staffeln", count: 1,
+    text: "Vor dem Abschluss der letzten Staffel braucht es einen begründeten Entscheid.", items: [{ text: "Probe Rot – Probe Blau", url: "/admin/leagues/seasons/s1#abschluss" }] }] })],
+  cross([tiedSide()])), { canResults: true });
+  const blocker = await screen.findByTestId("close-blocker-t1-zone_cross_tie");
+  expect(blocker).toHaveTextContent("Probe Rot – Probe Blau");
+  expect(within(blocker).queryByRole("link")).toBeNull();
+  expect(screen.getByTestId("close-button-t1")).toBeDisabled();
+  expect(screen.getByTestId("cross-decide-d2-promote_best")).toBeInTheDocument();
+});
