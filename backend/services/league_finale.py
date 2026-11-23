@@ -61,11 +61,12 @@ def _label(division: dict) -> str:
     return division_label(division)
 
 
-def build_pages(divisions: list[dict], finals: list[dict]) -> list[dict]:
+def build_pages(divisions: list[dict], finals: list[dict], column_max: int | None = None) -> list[dict]:
     """Je Liga N (nach Stufe) eine Seite mit ihren Auf- und Absteigern - Liga N ohne Bewegung fallen weg.
 
     ``divisions``: die aktiven Liga N der Season; ``finals``: die geltenden Endstände (``division_id``, ``staffel``, ``rows``). Das Ziel
-    ist die benachbarte Liga N nach Stufe (nicht Stufe ± 1: eine Lücke in der Nummerierung bleibt möglich)."""
+    ist die benachbarte Liga N nach Stufe (nicht Stufe ± 1: eine Lücke in der Nummerierung bleibt möglich). ``column_max``: höchstens so
+    viele Zeilen je Spalte (TV: ``TV_COLUMN_ROWS``), der Rest zählt in ``more_up`` bzw. ``more_down``."""
     ordered = sorted((row for row in divisions if isinstance(row.get("level"), int)), key=lambda row: row["level"])
     position = {row["id"]: index for index, row in enumerate(ordered)}
     by_division: dict[str, list[dict]] = {}
@@ -89,9 +90,25 @@ def build_pages(divisions: list[dict], finals: list[dict]) -> list[dict]:
                                  "rank": row.get("rank"), "move": move, "target": targets[move],
                                  "staffel": final.get("staffel") if several else None})
         if rows:
+            shown, more = _per_column(rows, column_max)
             pages.append({"division_id": division["id"], "level": division["level"], "label": _label(division), "staffeln": len(own),
-                          "rows": rows[:MAX_ROWS], "more": max(0, len(rows) - MAX_ROWS)})
+                          "rows": shown, "more_up": more[UP], "more_down": more[DOWN], "more": more[UP] + more[DOWN]})
     return pages
+
+
+def _per_column(rows: list[dict], column_max: int | None) -> tuple[list[dict], dict[str, int]]:
+    """Höchstens ``column_max`` Zeilen je Spalte (Reihenfolge bleibt) - und wie viele je Spalte wegfallen."""
+    used = {UP: 0, DOWN: 0}
+    more = {UP: 0, DOWN: 0}
+    shown = []
+    for row in rows:
+        column = COLUMN_OF_MOVE[row["move"]]
+        if column_max is not None and used[column] >= column_max:
+            more[column] += 1
+            continue
+        used[column] += 1
+        shown.append(row)
+    return shown, more
 
 
 def clamp_step(value, count: int) -> int:
@@ -177,7 +194,7 @@ async def tv_payload(db, tournament: dict | None) -> dict | None:
     season, league = await season_frame(db, ((tournament or {}).get("league_context") or {}).get("season_id"))
     if not public_season(season):
         return None
-    pages = await season_pages(db, season)
+    pages = await season_pages(db, season, column_max=TV_COLUMN_ROWS)
     step = clamp_step(state.get("step"), len(pages))
     if not step:
         return None
