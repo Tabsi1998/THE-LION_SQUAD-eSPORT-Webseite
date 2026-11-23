@@ -99,3 +99,9 @@ test("PSN-ID: gültige Online-ID und eingefügte Profil-Adresse werden verlinkt,
     expect(psnProfileUrl(bad)).toBe("");
   }
 });
+
+// Nachzug #2173: das alte Feld `socials` liefert der Server nicht mehr - wie im Web zählen nur Konten und Profilfelder.
+test("accountGroups liest kein altes `socials`-Feld mehr", () => {
+  const groups = accountGroups({ socials: [{ platform: "mastodon", value: "@alt@example.social" }] } as never);
+  expect(groups.socials).toEqual([]);
+});

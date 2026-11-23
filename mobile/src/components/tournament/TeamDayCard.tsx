@@ -9,9 +9,9 @@ import { lineupLabel, presenceLine, starterLabel, type TeamDay } from "../../lib
 import { viennaDateTime, viennaTime } from "../../lib/vienna";
 import { colors, radius } from "../../theme";
 
-// Team am Spieltag (#1192) - wie im Web in „Dein Stand“: Kapitän oder Co-Kapitän wählt, wer spielt (genau so viele
+// Team am Spieltag (#1192) - wie im Web in „Dein Stand“: Teamleitung oder Co-Leitung wählt, wer spielt (genau so viele
 // wie je Team, die übrigen sind Ersatz, wenn erlaubt), bis zum Ende des Check-ins. Am Turniertag tippt jedes Mitglied
-// „Ich bin da“; der Kapitän sieht „4 von 5 da“ und kann Fehlende anstupsen. Bei Einzel-Turnieren steht hier nichts.
+// „Ich bin da“; die Teamleitung sieht „4 von 5 da“ und kann Fehlende anstupsen. Bei Einzel-Turnieren steht hier nichts.
 
 export function TeamDayCard({ tournamentId }: { tournamentId: string }) {
   const [data, setData] = useState<TeamDay | null>(null);

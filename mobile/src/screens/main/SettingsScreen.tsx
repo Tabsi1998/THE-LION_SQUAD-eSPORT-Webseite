@@ -17,6 +17,7 @@ import { openLink } from "../../lib/openLink";
 import { ACCOUNT_CHANGED_MESSAGE } from "../../lib/profileSaveQueue";
 import { useProfileSaveQueue } from "../../lib/useProfileSaveQueue";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
+import { bugReportUrl } from "../../lib/contactLinks";
 import { isGuestUser } from "../../live";
 import { useAppLock } from "../../lock/AppLockProvider";
 import { DecoSetting } from "../../seasons/DecoSetting";
@@ -436,6 +437,8 @@ function AboutGroup() {
         {openWhatsNew ? <Row icon="sparkles-outline" label="Was ist neu" onPress={openWhatsNew} testID="more-whats-new" border /> : null}
         {/* FAQ (#2449): Fragen zu App und Website - wie /faq im Web, dazu der Bereich LionsAPP. */}
         <Row icon="help-circle-outline" label="FAQ" detail="Häufige Fragen zu App und Website" onPress={() => navigation?.navigate("Faq" as never)} testID="settings-faq" border />
+        {/* Fehler melden (#2131 KO9): das Kontaktformular mit Thema, Bildschirm und Version - wie die Fehlerseite im Web. */}
+        <Row icon="bug-outline" label="Fehler melden" detail="Kontaktformular mit App-Version" onPress={() => openLink(bugReportUrl("einstellungen", Constants.expoConfig?.version))} testID="settings-report-bug" border />
         <Row icon="shield-outline" label="Datenschutz" onPress={() => openLink(`${WEB_BASE_URL}/privacy`)} testID="settings-privacy-policy" border />
         <Row icon="document-text-outline" label="Impressum" onPress={() => openLink(`${WEB_BASE_URL}/imprint`)} testID="settings-imprint" border />
       </Card>

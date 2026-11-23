@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 test("Sätze wie im Web", () => {
-  expect(starterLabel({ role: "captain" })).toBe("Kapitän");
+  expect(starterLabel({ role: "captain" })).toBe("Teamleitung");
   expect(lineupLabel({ team_size: 3, can_edit: false, lineup_set: true, lineup: ["a", "b", "c"] })).toBe("Die Turnierleitung sieht die Aufstellung beim Check-in. Aufruf und Spiel-Meldungen gehen an diese drei.");
   expect(presenceLine({ count: 4, total: 5 })).toBe("4 von 5 da");
 });
