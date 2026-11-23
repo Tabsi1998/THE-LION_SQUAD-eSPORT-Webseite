@@ -23,6 +23,9 @@ function startsOpen() {
   }
 }
 
+// „Nur App“ (#1532): kein Newsletter - die Mail führte zur Website, die den Beitrag nicht zeigt.
+export const APP_ONLY_NEWSLETTER = "Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.";
+
 export function newsletterLine(box) {
   if (!box) return "";
   if (box.state === "sent") return `Gesendet am ${viennaDateTime(box.sent_at)} an ${people(box.sent_count)}.`;
@@ -38,7 +41,7 @@ export function audienceLine(audience) {
   return `Geht beim Veröffentlichen an ${people(audience.recipients)} mit Newsletter-Zustimmung – vorher kommt eine Rückfrage.`;
 }
 
-export function DistributeBox({ kind, itemId, title = "", visibility = "", children }) {
+export function DistributeBox({ kind, itemId, title = "", visibility = "", appOnly = false, children }) {
   const [box, setBox] = useState(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(startsOpen);
@@ -47,7 +50,7 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", child
   const confirm = useConfirm();
 
   useEffect(() => {
-    if (itemId || !visibility) {
+    if (itemId || !visibility || appOnly) {
       setAudience(null);
       return undefined;
     }
@@ -56,7 +59,7 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", child
       .then(({ data }) => { if (!cancelled) setAudience(data && typeof data === "object" && !Array.isArray(data) ? data : null); })
       .catch(() => { if (!cancelled) setAudience(null); });
     return () => { cancelled = true; };
-  }, [kind, itemId, visibility]);
+  }, [kind, itemId, visibility, appOnly]);
 
   const load = useCallback(() => {
     if (!itemId) return;
@@ -129,11 +132,14 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", child
             <Mail className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
             <div className="min-w-0 flex-1 space-y-2">
               <div className="text-xs font-bold uppercase tracking-wider text-white/70">Newsletter</div>
-              {!itemId && (audience
-                ? <p className="text-sm text-white/75" data-testid="distribute-audience-line">{audienceLine(audience)}</p>
+              {!itemId && (audience || appOnly
+                ? <p className="text-sm text-white/75" data-testid="distribute-audience-line">{appOnly ? APP_ONLY_NEWSLETTER : audienceLine(audience)}</p>
                 : <p className="text-sm text-white/55">Nach dem ersten Speichern steht hier, an wie viele Personen der Newsletter geht.</p>)}
               {itemId && error && <p className="text-sm text-white/55" data-testid="distribute-error">{error}</p>}
-              {itemId && !error && box && (
+              {itemId && !error && box && appOnly && box.state !== "sent" && (
+                <p className="text-sm text-white/75" data-testid="distribute-newsletter-line">{APP_ONLY_NEWSLETTER}</p>
+              )}
+              {itemId && !error && box && !(appOnly && box.state !== "sent") && (
                 <>
                   <p className="text-sm text-white/75" data-testid="distribute-newsletter-line">{newsletterLine(box)}</p>
                   {box.state === "ready" && box.can_send && (

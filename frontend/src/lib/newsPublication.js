@@ -57,10 +57,12 @@ function persons(count) {
 }
 
 /** Die Rückfrage vor dem Veröffentlichen: was hinausgeht und wann. */
-export function publishQuestion({ mode, whenText = "", audience = null, sentAt = "", sentText = "", discord = null }) {
+export function publishQuestion({ mode, whenText = "", audience = null, sentAt = "", sentText = "", discord = null, appOnly = false }) {
   const scheduled = mode === "scheduled";
   const lines = [];
-  if (sentAt) lines.push(`Der Newsletter ging schon${sentText ? ` am ${sentText}` : ""} hinaus – kein zweites Mal.`);
+  // „Nur App“ (#1532): die Mail führte zur Website, die den Beitrag nicht zeigt - also keine.
+  if (appOnly) lines.push("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+  else if (sentAt) lines.push(`Der Newsletter ging schon${sentText ? ` am ${sentText}` : ""} hinaus – kein zweites Mal.`);
   else if (audience?.internal) lines.push("Kein Newsletter – „Nur intern“ geht nicht per Mail hinaus.");
   else if (audience) lines.push(scheduled
     ? `Zum Termin geht der Newsletter an ${persons(audience.recipients)} mit Newsletter-Zustimmung (Stand jetzt).`

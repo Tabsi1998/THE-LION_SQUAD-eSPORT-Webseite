@@ -41,3 +41,13 @@ test("„Nur intern“ hat keine Mail und darum keine Vorschau", async () => {
   expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Nur intern");
   expect(screen.queryByTestId("distribute-preview-toggle")).toBeNull();
 });
+
+test("„Nur App“ (#1532): kein Newsletter, kein Senden, keine Vorschau - auch vor dem ersten Speichern", async () => {
+  const { rerender } = render(<DistributeBox kind="news" itemId="n1" appOnly />);
+  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+  expect(screen.queryByTestId("distribute-send")).toBeNull();
+  expect(screen.queryByTestId("distribute-preview-toggle")).toBeNull();
+  rerender(<DistributeBox kind="news" visibility="public" appOnly />);
+  expect(await screen.findByTestId("distribute-audience-line")).toHaveTextContent("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/settings/newsletter/audience", expect.anything());
+});

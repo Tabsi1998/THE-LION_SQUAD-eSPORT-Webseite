@@ -5,7 +5,9 @@ import { Share2 } from "lucide-react";
 // dieser Haken erlaubt Titel, Datum und Bild für genau diesen Eintrag. Für Internes
 // (nur Vorstand) gibt es ihn nicht.
 
-export function sharePreviewHint(visibility, checked) {
+export function sharePreviewHint(visibility, checked, appOnly = false) {
+  // „Nur App“ (#1532): die Website zeigt den Beitrag nicht - die Vorschau ist immer die Karte „News in der LionsAPP“.
+  if (appOnly) return "Nur App: Beim Teilen erscheint nur „News in der LionsAPP“ – ohne Titel und Bild, nie bei Google.";
   if (visibility === "public" || !visibility) return "Öffentlich: Beim Teilen erscheinen Titel, Beschreibung und Bild.";
   if (visibility === "internal") return "Intern: Beim Teilen erscheint nur eine neutrale Karte mit dem Vereinsbild – nie Titel oder Bild.";
   return checked
@@ -13,8 +15,8 @@ export function sharePreviewHint(visibility, checked) {
     : "Beim Teilen erscheint nur eine neutrale Karte („nur für Mitglieder“) mit dem Vereinsbild.";
 }
 
-export function SharePreviewToggle({ visibility, checked, onChange }) {
-  const selectable = visibility === "members" || visibility === "community";
+export function SharePreviewToggle({ visibility, checked, onChange, appOnly = false }) {
+  const selectable = !appOnly && (visibility === "members" || visibility === "community");
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="share-preview">
       <div className="text-xs font-bold uppercase tracking-widest text-white/60 inline-flex items-center gap-2"><Share2 className="w-3.5 h-3.5" /> Vorschau beim Teilen (WhatsApp, Discord …)</div>
@@ -24,7 +26,7 @@ export function SharePreviewToggle({ visibility, checked, onChange }) {
           <span>Beim Teilen Titel und Bild zeigen</span>
         </label>
       )}
-      <p className="text-xs text-white/50" data-testid="share-preview-hint">{sharePreviewHint(visibility, selectable && checked)}</p>
+      <p className="text-xs text-white/50" data-testid="share-preview-hint">{sharePreviewHint(visibility, selectable && checked, appOnly)}</p>
     </div>
   );
 }
