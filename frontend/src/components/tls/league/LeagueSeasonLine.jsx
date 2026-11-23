@@ -18,10 +18,12 @@ const TOP = 16;
 // Unter den Bändern: eine bzw. zwei Zeilen Season-Name (Schrift 10 px).
 const BOTTOM = 24;
 const LINE = 12;
-// Mindestabstand zweier Seasons; sonst die breiteste Beschriftung (Season-Name oder „ausgetreten“) plus Luft - reicht die Breite nicht,
-// wischt man die Linie seitlich (Review #1638: lange Namen liefen ineinander).
+// Mindestabstand zweier Seasons; sonst der breiteste Season-Name plus Luft - reicht die Breite nicht, wischt man die Linie seitlich
+// (Review #1638: lange Namen liefen ineinander). „ausgetreten“ steht im Band und braucht nur Abstand zu einem zweiten „ausgetreten“
+// daneben (EXIT_AIR); zu einer Platz-Zahl reicht der Mindestabstand.
 const STEP = 64;
 const LABEL_AIR = 14;
+const EXIT_AIR = 6;
 // Schätzung je Zeichen (Schrift 10 px, fett), bis der Browser gemessen hat - in Tests ohne Messung bleibt sie stehen.
 const CHAR = 6.2;
 // Mindestabstand zweier Platz-Zahlen übereinander (Schrift 10 px).
@@ -46,7 +48,10 @@ function useWidth() {
   return [ref, width];
 }
 
-/** Die breiteste Beschriftung im SVG (`data-measure`), gemessen nach dem Zeichnen und noch einmal, wenn die Schrift geladen ist. */
+/**
+ * Die breitesten Beschriftungen im SVG je Art (`data-measure="season"` bzw. `"exit"`), gemessen nach dem Zeichnen und noch einmal, wenn
+ * die Schrift geladen ist. `estimate`: `{season, exit}` bis dahin.
+ */
 function useLabelWidth(estimate, key) {
   const ref = useRef(null);
   const [measured, setMeasured] = useState(null);
@@ -55,15 +60,17 @@ function useLabelWidth(estimate, key) {
     if (!svg) return undefined;
     let alive = true;
     const measure = () => {
-      let widest = 0;
+      const widest = { season: 0, exit: 0 };
       svg.querySelectorAll("[data-measure]").forEach((node) => {
         try {
-          widest = Math.max(widest, node.getBBox().width);
+          const kind = node.getAttribute("data-measure");
+          widest[kind] = Math.max(widest[kind] || 0, Math.ceil(node.getBBox().width));
         } catch {
           // Ohne Layout (jsdom) gibt es keine Messung - dann bleibt die Schätzung.
         }
       });
-      if (alive && widest > 0) setMeasured((before) => (before !== null && Math.abs(before - widest) < 0.5 ? before : Math.ceil(widest)));
+      if (!alive || widest.season <= 0) return;
+      setMeasured((before) => (before && before.season === widest.season && before.exit === widest.exit ? before : widest));
     };
     measure();
     document.fonts?.ready?.then(measure);
@@ -90,16 +97,16 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
   const [boxRef, box] = useWidth();
   const names = (line?.seasons || []).map((season) => seasonLabelLines(season.name));
   const exits = (line?.series || []).flatMap((row) => row.points.filter((point) => point.exit).map((point) => exitLabel(point.exit)));
-  const estimate = Math.max(0, ...names.flat().map((text) => text.length * CHAR), ...exits.map((text) => text.length * CHAR));
-  const [svgRef, labelWidth] = useLabelWidth(estimate, `${names.flat().join("|")}#${[...new Set(exits)].join("|")}`);
+  const estimate = { season: Math.max(0, ...names.flat().map((text) => text.length * CHAR)), exit: Math.max(0, ...exits.map((text) => text.length * CHAR)) };
+  const [svgRef, labels] = useLabelWidth(estimate, `${names.flat().join("|")}#${[...new Set(exits)].join("|")}`);
   if (!line) return null;
   const first = line.levels[0];
   const last = line.levels[line.levels.length - 1];
   const bands = Array.from({ length: last - first + 1 }, (_, at) => first + at);
   const rowsOfNames = Math.max(...names.map((parts) => parts.length));
-  const step = Math.max(STEP, Math.ceil(labelWidth) + LABEL_AIR);
+  const step = Math.max(STEP, Math.ceil(labels.season) + LABEL_AIR, Math.ceil(labels.exit) + EXIT_AIR);
   // Rand links und rechts: Die äußeren Beschriftungen stehen ganz im SVG.
-  const pad = Math.max(28, Math.ceil(labelWidth / 2) + 4);
+  const pad = Math.max(28, Math.ceil(Math.max(labels.season, labels.exit) / 2) + 4);
   const width = Math.max(box, GUTTER + 2 * pad + (line.seasons.length - 1) * step);
   const height = TOP + bands.length * BAND + BOTTOM + (rowsOfNames - 1) * LINE;
   const span = width - GUTTER - 2 * pad;
@@ -114,14 +121,14 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
   // dran; Plätze stehen nur am Anfang, am Ende und bei einem Wechsel, die besten Co-Teams zuerst. Alles steht in der Bildbeschreibung.
   const bottom = TOP + bands.length * BAND;
   const placed = new Map();
-  const labels = new Map();
+  const spots = new Map();
   const place = (at, point) => {
     const taken = placed.get(point.index) || [];
     const free = (spot) => spot >= TOP - 6 && spot < bottom && taken.every((other) => Math.abs(other - spot) >= LABEL_GAP);
     const spot = [yOf(point) - 10, yOf(point) + 17].find(free);
     if (spot === undefined) return;
     placed.set(point.index, [...taken, spot]);
-    labels.set(`${at}-${point.index}`, spot);
+    spots.set(`${at}-${point.index}`, spot);
   };
   series.forEach((row, at) => row.points.forEach((point) => (point.exit ? place(at, point) : null)));
   series.forEach((row, at) => row.points.forEach((point, index) => {
@@ -152,7 +159,7 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
               </g>
             ))}
             {line.seasons.map((season, index) => (
-              <text key={season.key} className="tls-season-line__season" x={x(index)} y={bottom + 16} textAnchor="middle" data-measure=""
+              <text key={season.key} className="tls-season-line__season" x={x(index)} y={bottom + 16} textAnchor="middle" data-measure="season"
                 data-testid={`${testId}-season-${index}`}>
                 <title>{season.name}</title>
                 {names[index].map((part, at) => <tspan key={`${at}-${part}`} x={x(index)} dy={at ? LINE : 0}>{part}</tspan>)}
@@ -163,8 +170,8 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
                 points={run.map((point) => `${x(point.index)},${y(point.value)}`).join(" ")} />
             )))}
             {series.map((row, at) => row.points.map((point, index) => {
-              // Die Beschriftung steht, wo `labels` Platz gefunden hat (siehe oben) - sonst nur in der Bildbeschreibung.
-              const spot = labels.get(`${at}-${point.index}`);
+              // Die Beschriftung steht, wo `spots` Platz gefunden hat (siehe oben) - sonst nur in der Bildbeschreibung.
+              const spot = spots.get(`${at}-${point.index}`);
               if (point.exit) {
                 return (
                   <g key={`${row.name}-${point.index}`} className="tls-season-line__point" data-exit={point.exit} style={{ "--tls-i": Math.min(index, 8) }}
@@ -172,7 +179,7 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
                     <title>{`${point.season}: ${exitLabel(point.exit)}`}</title>
                     <circle cx={x(point.index)} cy={yOf(point)} r="4.5" fill="#0A0A0A" stroke={EXIT_COLOR} strokeWidth="2" strokeDasharray="2 2" />
                     {spot !== undefined ? (
-                      <text className="tls-season-line__exit" x={x(point.index)} y={spot} textAnchor="middle" data-measure="">{exitLabel(point.exit)}</text>
+                      <text className="tls-season-line__exit" x={x(point.index)} y={spot} textAnchor="middle" data-measure="exit">{exitLabel(point.exit)}</text>
                     ) : null}
                   </g>
                 );
