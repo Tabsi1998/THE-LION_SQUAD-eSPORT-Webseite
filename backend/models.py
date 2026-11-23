@@ -1005,6 +1005,41 @@ BEST_OF_LIMIT = 99
 SEASON_WEIGHT_LIMIT = 10
 MIN_OVER_MAX = "Min. Teilnehmer darf nicht größer als Max. Teilnehmer sein."
 
+# Schweizer System und Tabellen (#1559). Dieselben Werte wie in ``services/graph_swiss.py`` (END_RULES, TIEBREAKERS) und
+# ``services/competition_standings.py`` (TOURNAMENT_TABLE_TIEBREAKERS) - ein Test hält sie beisammen.
+SwissEndRule = Literal["manual", "rounds", "wins_losses"]
+SwissTiebreaker = Literal["median_buchholz", "buchholz", "head_to_head", "wins"]
+TableTiebreaker = Literal["head_to_head", "score_diff", "score_for", "wins"]
+
+
+def _each_once(values):
+    """Eine Reihenfolge nennt jedes Kriterium höchstens einmal - das erste Vorkommen zählt."""
+    if not isinstance(values, (list, tuple)):
+        return values
+    seen = []
+    for value in values:
+        if value not in seen:
+            seen.append(value)
+    return seen
+
+
+class SwissSettings(BaseModel):
+    """Vorgaben für ein Turnier im Schweizer System (#1559) - alles einstellbar, ohne Feld läuft es wie vorher.
+
+    ``end_rule``: ``manual`` (kein festes Ende), ``rounds`` (nach ``rounds`` Runden ist Schluss, leer = nach der Größe des
+    Felds; die besten ``top_n`` kommen weiter) oder ``wins_losses`` (``wins_to_advance`` Siege weiter,
+    ``losses_to_exit`` Niederlagen raus). ``auto_next_round``: die nächste Runde entsteht mit dem letzten Ergebnis der
+    laufenden. ``tiebreakers``: Reihenfolge bei Punktgleichheit - zuerst zählen immer die Punkte."""
+    end_rule: SwissEndRule = "manual"
+    rounds: Optional[int] = Field(default=None, ge=1, le=30)
+    top_n: Optional[int] = Field(default=None, ge=1, le=PARTICIPANT_LIMIT)
+    wins_to_advance: int = Field(default=3, ge=1, le=20)
+    losses_to_exit: int = Field(default=3, ge=1, le=20)
+    auto_next_round: bool = False
+    tiebreakers: List[SwissTiebreaker] = Field(default_factory=lambda: ["buchholz", "wins"], max_length=8)
+
+    _tiebreakers_once = field_validator("tiebreakers", mode="before")(_each_once)
+
 
 class TournamentCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
@@ -1045,6 +1080,11 @@ class TournamentCreate(BaseModel):
     grand_final_mode: Literal["none", "single", "reset"] = "reset"
     # FFA-Läufe zusammenlegen (#1550, Entscheidung E13): Vorschlag für die Turnierleitung (Vorgabe) oder automatisch.
     heat_rebuild_mode: Literal["suggest", "auto"] = "suggest"
+    # Schweizer System (#1559): Abschlussregel, nächste Runde automatisch, Reihenfolge bei Punktgleichheit.
+    swiss_settings: Optional[SwissSettings] = None
+    # Gruppenphase und Jeder gegen jeden (#1559): Reihenfolge bei Punktgleichheit, auch mit direktem Vergleich wie in der
+    # Liga. Leer: wie bisher Siege, dann Differenz.
+    table_tiebreakers: Optional[List[TableTiebreaker]] = Field(default=None, max_length=8)
     # Leer: die Dauer kommt vom Spiel (Modus, #1554), sonst 30 Minuten - siehe services/match_duration.py.
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     # Puffer je Spiel (#1557): kommt auf die Dauer aus Spiel, Phase oder Turnier - siehe services/match_duration.py.
@@ -1101,6 +1141,7 @@ class TournamentCreate(BaseModel):
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
     _strip_title = field_validator("title", mode="before")(_strip_text)
+    _table_tiebreakers_once = field_validator("table_tiebreakers", mode="before")(_each_once)
 
     @model_validator(mode="after")
     def _min_not_over_max(self):
@@ -1150,6 +1191,8 @@ class TournamentUpdate(BaseModel):
     bronze_match: Optional[bool] = None
     grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     heat_rebuild_mode: Optional[Literal["suggest", "auto"]] = None
+    swiss_settings: Optional[SwissSettings] = None
+    table_tiebreakers: Optional[List[TableTiebreaker]] = Field(default=None, max_length=8)
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     match_buffer_minutes: Optional[int] = Field(default=None, ge=0, le=120)
     game_mode: Optional[str] = Field(default=None, max_length=40)
@@ -1189,6 +1232,7 @@ class TournamentUpdate(BaseModel):
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
     _strip_title = field_validator("title", mode="before")(_strip_text)
+    _table_tiebreakers_once = field_validator("table_tiebreakers", mode="before")(_each_once)
 
 
 class RegistrationCreate(BaseModel):

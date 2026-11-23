@@ -17,6 +17,7 @@ import { Award, FileDown } from "lucide-react";
 import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
 import { nameHead, standingSections, tableKind } from "@/lib/standingsTable";
 import { isHeatSchedule } from "@/lib/tournamentLabels";
+import { TOURNAMENT_TIEBREAK_LABELS, tableRuleLines } from "@/lib/tournamentTableSettings";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
@@ -63,6 +64,10 @@ export default function TournamentStandingsPage() {
   const grouped = sections.some((section) => section.label);
   const hasCertificates = !grouped && flatRows.some((row) => Number(row?.rank) >= 1 && Number(row?.rank) <= 4);
   const heats = isHeatSchedule(t);
+  // Unter der Tabelle (#1559): Abschlussregel des Schweizer Systems und die Reihenfolge bei Punktgleichheit - eine Liga-Staffel
+  // nennt ihre Regeln auf der Ligaseite und behält hier ihre Wörter.
+  const ruleLines = tableRuleLines(t, tableKind(flatRows, { heats }));
+  const tiebreakLabels = t?.league_context || t?.scoring_rules ? undefined : TOURNAMENT_TIEBREAK_LABELS;
   const certificateHref = (row) => `${API}/exports/tournaments/${t.slug || t.id}/certificates/${row.registration_id}.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
   if (!t) {
@@ -126,10 +131,16 @@ export default function TournamentStandingsPage() {
                 registerRow={registerRow}
                 label={section.label ? `Tabelle ${section.label}` : "Rangliste"}
                 certificateHref={PUBLIC_RESULT_STATUSES.has(t.status) && hasCertificates ? certificateHref : null}
+                tiebreakLabels={tiebreakLabels}
               />
             </section>
           ))}
         </div>
+        {ruleLines.length > 0 && (
+          <div className="mt-4 space-y-1 text-xs text-white/55" data-testid="standings-rules">
+            {ruleLines.map((line) => <p key={line.key} data-rule={line.key}>{line.text}</p>)}
+          </div>
+        )}
       </div>
     </PublicLayout>
   );

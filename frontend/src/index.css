@@ -415,6 +415,8 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-standing-note { overflow-wrap: anywhere; }
 .tls-standing-note[data-tone="decision"], .tls-standing-note[data-tone="tiebreak"] { color: rgb(var(--tls-brand-rgb) / 0.9); }
 .tls-standing-note[data-tone="exit"] { color: rgb(var(--tls-warn-rgb)); font-weight: 600; }
+/* Schweizer System (#1559): „Weiter“ nach der Abschlussregel - Grün wie der Aufstieg in der Liga-Tabelle. */
+.tls-standing-note[data-tone="advance"] { color: rgb(var(--tls-ok-rgb)); font-weight: 600; }
 .tls-standing-note__reason { color: var(--tls-muted); }
 .tls-standing-row:has(.tls-standing-note[data-tone="exit"]) .tls-standing-name { color: rgb(255 255 255 / 0.6); }
 /* Zonen für Auf- und Abstieg (F.2, #1627): ein Strich links am Platz - Grün hinauf, Orange hinunter, Relegation heller.

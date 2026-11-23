@@ -25,6 +25,8 @@ import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, seedingModeOf, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { isStaffel } from "./StaffelParts";
+import { SwissSettingsFields, TableTiebreakField } from "./TableSettingsFields";
+import { TABLE_BEFORE, swissForm, swissFormError, swissPayload, usesTableTiebreakers } from "@/lib/tournamentTableSettings";
 import { FormatHint } from "./FormatHint";
 import { STREAM_ADDRESS_HINT, streamFormValues, streamPayload } from "@/lib/tournamentStream";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
@@ -94,6 +96,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     bronze_match: !!source.bronze_match,
     grand_final_mode: source.grand_final_mode || "reset",
     heat_rebuild_mode: source.heat_rebuild_mode || "suggest",
+    // Schweizer System und Gleichstand (#1559): ohne gespeicherte Einstellung `null` - dann ändert das Speichern nichts.
+    swiss_settings: source.swiss_settings ? swissForm(source.swiss_settings) : null,
+    table_tiebreakers: Array.isArray(source.table_tiebreakers) ? source.table_tiebreakers : null,
     seeding_mode: seedingModeOf(source.seeding_mode),
     advancement_mode: advancementModeOf(source),
     draw_show_minutes: source.draw_show_minutes ?? "",
@@ -157,6 +162,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     bronze_match: !!tournament.bronze_match,
     grand_final_mode: tournament.grand_final_mode || "reset",
     heat_rebuild_mode: tournament.heat_rebuild_mode || "suggest",
+    swiss_settings: tournament.swiss_settings ? swissForm(tournament.swiss_settings) : null,
+    table_tiebreakers: Array.isArray(tournament.table_tiebreakers) ? tournament.table_tiebreakers : null,
     seeding_mode: seedingModeOf(tournament.seeding_mode),
     advancement_mode: advancementModeOf(tournament),
     draw_show_minutes: tournament.draw_show_minutes ?? "",
@@ -256,6 +263,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     payload.game_mode = payload.game_mode || null;
     payload.format_label = (payload.format_label || "").trim() || null;
     if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
+    // Schweizer System (#1559): Zahlen als Zahlen; `null` heißt „nichts gewählt“ und bleibt unverändert.
+    payload.swiss_settings = swissPayload(payload.swiss_settings);
     // Show-Auslosung (#1590): leer heißt Vorgabe; die Minuten zählen nur in diesem Modus.
     payload.draw_show_minutes = payload.advancement_mode === "draw_show" ? drawShowMinutesPayload(payload.draw_show_minutes) : null;
     normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
@@ -316,6 +325,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     try {
       const billingProblem = sendBilling ? billingFormError(billingForm) : "";
       if (billingProblem) { toast.error(billingProblem); return; }
+      const swissProblem = f.format === "swiss" ? swissFormError(f.swiss_settings) : "";
+      if (swissProblem) { toast.error(swissProblem); return; }
       const patch = sendBilling ? { ...dirtyPayload, billing: formToBilling(billingForm) } : dirtyPayload;
       if (!hasPayloadChanges(patch)) {
         if (rebuildPreview) {
@@ -448,6 +459,15 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             {show && <TextField label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>}
             {show && <TextField label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>}
           </FormGrid>
+          {/* Schweizer System (#1559): Abschlussregel, nächste Runde automatisch, Reihenfolge bei Punktgleichheit - direkt beim
+              Format, nicht in den erweiterten Optionen: Das sind die Regeln des Formats. */}
+          {show && f.format === "swiss" && (
+            <SwissSettingsFields value={f.swiss_settings || swissForm(null)} onChange={(v)=>set("swiss_settings",v)} participants={f.max_participants} testPrefix="tr-edit-swiss" />
+          )}
+          {/* Gruppenphase und Jeder gegen jeden (#1559): Reihenfolge bei Punktgleichheit - eine Staffel nimmt die ihrer Season. */}
+          {show && usesTableTiebreakers(f.format) && (
+            <TableTiebreakField value={f.table_tiebreakers || [...TABLE_BEFORE]} onChange={(v)=>set("table_tiebreakers",v)} testPrefix="tr-edit-table" />
+          )}
           <FormSection title="Erweiterte Spieloptionen" collapsible plain>
             <FormGrid cols={3}>
               {show && <SelectInput label="Setzliste" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} testId="tr-edit-seeding" />}

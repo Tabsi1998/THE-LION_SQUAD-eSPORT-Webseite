@@ -241,3 +241,51 @@ test("Weiterkommen nur mit Turnierbaum, bei Hin- und Rückrunde „Spieltage aus
   fireEvent.submit(screen.getByTestId("new-tr-form"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ format: "league", advancement_mode: "draw_round" })));
 });
+
+// Schweizer System und Gleichstand (#1559): neue Turniere bekommen die Vorgaben, mitgeschickt nur beim passenden Format.
+test("Schweizer System: Vorgabe feste Rundenzahl mit automatischer Runde, Median-Buchholz zuerst - wird mitgeschickt", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockClear();
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  fireEvent.change(await screen.findByTestId("new-tr-format"), { target: { value: "swiss" } });
+  expect(screen.getByTestId("new-tr-swiss-end-rule")).toHaveValue("rounds");
+  expect(screen.getByTestId("new-tr-swiss-auto")).toBeChecked();
+  expect(screen.getByTestId("new-tr-swiss-tiebreaker-median_buchholz").closest("label")).toHaveTextContent("1.");
+  expect(screen.queryByTestId("new-tr-table-settings")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("new-tr-swiss-top-n"), { target: { value: "4" } });
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Schweizer Abend" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({
+    format: "swiss", table_tiebreakers: null,
+    swiss_settings: { end_rule: "rounds", rounds: null, top_n: 4, wins_to_advance: 3, losses_to_exit: 3, auto_next_round: true,
+      tiebreakers: ["median_buchholz", "buchholz", "head_to_head", "wins"] },
+  })));
+});
+
+test("Gruppenphase: Vorgabe direkter Vergleich zuerst; ein K.-o.-Turnier schickt keine Tabellen-Einstellungen", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockClear();
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  const { unmount } = renderAt("");
+  expect(await screen.findByTestId("new-tr-format")).toHaveValue("single_elim");
+  expect(screen.queryByTestId("new-tr-table-settings")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("new-tr-swiss-settings")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "K.-o.-Abend" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ swiss_settings: null, table_tiebreakers: null })));
+  unmount();
+
+  apiMock.post.mockClear();
+  renderAt("");
+  fireEvent.change(await screen.findByTestId("new-tr-format"), { target: { value: "groups" } });
+  expect(screen.getByTestId("new-tr-table-tiebreaker-head_to_head").closest("label")).toHaveTextContent("1.");
+  fireEvent.click(screen.getByTestId("new-tr-table-tiebreaker-wins"));
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Gruppen-Abend" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({
+    format: "groups", swiss_settings: null, table_tiebreakers: ["head_to_head", "score_diff", "score_for"] })));
+});

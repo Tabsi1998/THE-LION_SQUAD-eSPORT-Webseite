@@ -164,3 +164,53 @@ test("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
   await screen.findByTestId("standing-row-r-Anna");
   await waitFor(() => expect(liveOptions.tournamentId).toBe("t1"));
 });
+
+// Tiebreaker-Erklärung (#1559): unter der Tabelle stehen Abschlussregel und Reihenfolge, an der Zeile, was entschied.
+function mockTournament(extra, standings) {
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...tournament, ...extra } });
+    if (path === "/tournaments/t1/standings") return Promise.resolve({ data: standings });
+    return Promise.reject(new Error(path));
+  });
+}
+
+test("Schweizer System: Abschlussregel, Reihenfolge, Median-Buchholz und wer weiter ist", async () => {
+  const swiss = (name, rank, extra) => ({ registration_id: `r-${name}`, display_name: name, rank, played: 3, won: 4 - rank, drawn: 0, lost: rank - 1,
+    points: 4 - rank, buchholz: 5, median_buchholz: 2, form: [], ...extra });
+  mockTournament(
+    { format: "swiss", swiss_settings: { end_rule: "rounds", rounds: 3, top_n: 2, tiebreakers: ["median_buchholz", "buchholz", "head_to_head"] } },
+    [swiss("Nordlicht", 1, { swiss_status: "advanced" }), swiss("Steinbock", 2, { swiss_status: "advanced", tiebreak: "median_buchholz" }), swiss("Eisfuchs", 3, { tiebreak: "median_buchholz" })],
+  );
+  renderPage();
+  const rules = await screen.findByTestId("standings-rules");
+  expect(rules).toHaveTextContent("Gespielt werden 3 Runden. Die besten 2 kommen weiter.");
+  expect(rules).toHaveTextContent("Reihenfolge: Punkte → Median-Buchholz → Buchholz → Direkter Vergleich");
+  expect(rules.querySelector("[data-rule='median_buchholz']")).toHaveTextContent("ohne den besten und den schlechtesten");
+  expect(screen.getByRole("columnheader", { name: "MBHZ" })).toBeInTheDocument();
+  expect(screen.getByTestId("standing-notes-r-Nordlicht")).toHaveTextContent("Weiter");
+  expect(screen.getByTestId("standing-notes-r-Steinbock")).toHaveTextContent("Median-Buchholz");
+  expect(screen.getByTestId("standing-notes-r-Eisfuchs")).not.toHaveTextContent("Weiter");
+});
+
+test("Gruppenphase mit direktem Vergleich: Reihenfolge unter den Tabellen, der Grund an der Zeile - in Turnier-Worten", async () => {
+  const row = (name, rank, extra) => ({ registration_id: `r-${name}`, display_name: name, rank, played: 3, won: 1, drawn: 0, lost: 2,
+    score_for: 3, score_against: 3, score_diff: 0, points: 3, form: [], ...extra });
+  mockTournament(
+    { format: "groups", table_tiebreakers: ["head_to_head", "score_diff"] },
+    [{ group: { id: "g1", group_key: "a" }, standings: [row("Nordlicht", 1, { tiebreak: "head_to_head" }), row("Steinbock", 2, { tiebreak: "score_diff" })] }],
+  );
+  renderPage();
+  const rules = await screen.findByTestId("standings-rules");
+  expect(rules).toHaveTextContent("Reihenfolge: Punkte → Direkter Vergleich → Differenz");
+  expect(rules).toHaveTextContent("nur die Spiele der Punktgleichen untereinander");
+  expect(screen.getByTestId("standing-notes-r-Nordlicht")).toHaveTextContent("Direkter Vergleich");
+  // Nicht „Map-Differenz“ wie in der Liga - ein Turnier zählt nicht immer Maps.
+  expect(screen.getByTestId("standing-notes-r-Steinbock").textContent).toBe("Differenz");
+});
+
+test("K.-o.: keine Erklärung unter der Rangliste", async () => {
+  mockTournament({ format: "single_elim" }, rows(["Anna", "Ben"]));
+  renderPage();
+  await screen.findByTestId("standing-row-r-Anna");
+  expect(screen.queryByTestId("standings-rules")).toBeNull();
+});

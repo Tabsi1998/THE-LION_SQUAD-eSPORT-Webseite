@@ -213,3 +213,68 @@ test("Automatisch live/beendet: vor Ort nur, solange es an ist", async () => {
   expect(await screen.findByTestId("tr-edit-auto-start")).toBeChecked();
   expect(screen.getByTestId("tr-edit-auto-start").closest("label")).toHaveTextContent("besser ausschalten");
 });
+
+// Schweizer System und Gleichstand (#1559): die Einstellungen stehen im Abschnitt Struktur beim passenden Format. Ohne
+// gespeicherte Einstellung zeigt das Formular den bisherigen Stand und schickt nichts, solange niemand etwas ändert.
+test("Schweizer System: Abschlussregel, automatische Runde und Reihenfolge - geschickt wird erst nach einer Änderung", async () => {
+  apiMock.patch.mockClear();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<TournamentEditForm tournament={{ ...BASE, status: "draft", format: "swiss", max_participants: 16 }} onSaved={() => {}} />);
+  const rule = await screen.findByTestId("tr-edit-swiss-end-rule");
+  // Wie bisher: kein festes Ende, von Hand, Buchholz vor Siegen.
+  expect(rule).toHaveValue("manual");
+  expect(screen.getByTestId("tr-edit-swiss-auto")).not.toBeChecked();
+  expect(screen.getByTestId("tr-edit-swiss-tiebreaker-buchholz")).toBeChecked();
+  expect(screen.getByTestId("tr-edit-swiss-tiebreaker-median_buchholz")).not.toBeChecked();
+  expect(screen.queryByTestId("tr-edit-swiss-rounds")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-table-settings")).toBeNull();
+
+  fireEvent.change(rule, { target: { value: "rounds" } });
+  expect(screen.getByTestId("tr-edit-swiss-rounds").closest("label")).toHaveTextContent("bei 16 Teilnehmern 4");
+  fireEvent.change(screen.getByTestId("tr-edit-swiss-rounds"), { target: { value: "5" } });
+  fireEvent.change(screen.getByTestId("tr-edit-swiss-top-n"), { target: { value: "8" } });
+  fireEvent.click(screen.getByTestId("tr-edit-swiss-auto"));
+  fireEvent.click(screen.getByTestId("tr-edit-swiss-tiebreaker-median_buchholz"));
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ swiss_settings: {
+    end_rule: "rounds", rounds: 5, top_n: 8, wins_to_advance: 3, losses_to_exit: 3, auto_next_round: true,
+    tiebreakers: ["buchholz", "wins", "median_buchholz"],
+  } });
+});
+
+test("Schweizer System: Siege und Niederlagen haben eigene Felder, Unsinn wird vor dem Speichern gemeldet", async () => {
+  const { toast } = await import("sonner");
+  apiMock.patch.mockClear();
+  render(<TournamentEditForm tournament={{ ...BASE, status: "draft", format: "swiss",
+    swiss_settings: { end_rule: "wins_losses", wins_to_advance: 3, losses_to_exit: 3, auto_next_round: true, tiebreakers: ["median_buchholz"] } }} onSaved={() => {}} />);
+  const wins = await screen.findByTestId("tr-edit-swiss-wins");
+  expect(wins).toHaveValue(3);
+  expect(screen.getByTestId("tr-edit-swiss-losses")).toHaveValue(3);
+  expect(screen.getByTestId("tr-edit-swiss-auto")).toBeChecked();
+  expect(screen.queryByTestId("tr-edit-swiss-rounds")).toBeNull();
+  fireEvent.change(wins, { target: { value: "0" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/Siege zum Weiterkommen/)));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+});
+
+test("Gruppenphase und Jeder gegen jeden: Reihenfolge bei Punktgleichheit mit direktem Vergleich - in der Staffel nicht", async () => {
+  apiMock.patch.mockClear();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, status: "draft", format: "groups" }} onSaved={() => {}} />);
+  // Wie bisher: Siege, dann Differenz.
+  expect(await screen.findByTestId("tr-edit-table-tiebreaker-wins")).toBeChecked();
+  expect(screen.getByTestId("tr-edit-table-tiebreaker-score_diff")).toBeChecked();
+  expect(screen.getByTestId("tr-edit-table-tiebreaker-head_to_head")).not.toBeChecked();
+  expect(screen.queryByTestId("tr-edit-swiss-settings")).toBeNull();
+  fireEvent.click(screen.getByTestId("tr-edit-table-tiebreaker-head_to_head"));
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ table_tiebreakers: ["wins", "score_diff", "head_to_head"] });
+  unmount();
+
+  renderStaffel();
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-table-settings")).toBeNull();
+});

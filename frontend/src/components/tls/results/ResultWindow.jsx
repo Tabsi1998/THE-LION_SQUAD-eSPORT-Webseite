@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { api, formatApiError } from "@/lib/api";
 import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
@@ -140,6 +141,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
         reason: correcting || deciding ? reason.trim() : null,
       });
       onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence, ...(entry.conflict_override ? { conflictReason: conflictReason.trim() } : {}) });
+      // Hinweis des Servers zur Korrektur, etwa „Runde 3 ist schon gepaart – nach dem alten Ergebnis“ (#1559).
+      if (data?.notice) toast.warning(data.notice, { duration: 12000 });
       onClose?.();
     } catch (err) {
       if (!correcting && err.response?.status === 409 && await resultArrived(entry.id)) {

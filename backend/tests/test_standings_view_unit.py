@@ -122,6 +122,41 @@ def test_the_swiss_pdf_has_buchholz():
     assert table["rows"][0][-2:] == ["4,5", "2,5"]
 
 
+def test_the_swiss_pdf_shows_median_buchholz_and_who_advanced():
+    """Schweizer System mit Median-Buchholz (#1559): eigene Spalte, dazu „weiter“ und „ausgeschieden“ am Namen."""
+    rows = [
+        {"rank": 1, "display_name": "Nordlicht", "played": 3, "won": 3, "drawn": 0, "lost": 0, "buchholz": 4, "median_buchholz": 1.5,
+         "points": 3, "swiss_status": "advanced"},
+        {"rank": 2, "display_name": "Steinbock", "played": 3, "won": 0, "drawn": 0, "lost": 3, "buchholz": 6, "median_buchholz": 2,
+         "points": 0, "swiss_status": "eliminated"},
+    ]
+
+    [table] = _pdf_standings_tables({"format": "swiss"}, rows)
+
+    assert table["headers"] == ["Platz", "Name", "Sp", "S", "U", "N", "MBHZ", "BHZ", "Pkt"]
+    assert table["rows"][0][1] == "Nordlicht (weiter)" and table["rows"][0][-3:] == ["1,5", "4", "3"]
+    assert table["rows"][1][1] == "Steinbock (ausgeschieden)"
+
+
+def test_the_swiss_pdf_names_a_tie_at_the_last_advancing_place():
+    rows = [{"rank": 2, "display_name": "Eisfuchs", "played": 3, "won": 2, "drawn": 0, "lost": 1, "buchholz": 4,
+             "median_buchholz": 1.5, "points": 2, "swiss_status": "tied"}]
+
+    [table] = _pdf_standings_tables({"format": "swiss"}, rows)
+
+    assert table["rows"][0][1] == "Eisfuchs (Gleichstand an der Grenze)"
+
+
+def test_the_tv_keeps_the_new_swiss_fields():
+    from services.tv_display import display_standings
+
+    [row] = display_standings([{"registration_id": "r1", "display_name": "Nordlicht", "rank": 1, "points": 3, "buchholz": 4,
+                                "median_buchholz": 1.5, "swiss_status": "advanced", "tiebreak": "median_buchholz", "user_id": "u1"}])
+
+    assert row["median_buchholz"] == 1.5 and row["swiss_status"] == "advanced" and row["tiebreak"] == "median_buchholz"
+    assert "user_id" not in row
+
+
 def test_the_ffa_pdf_has_average_place_and_points():
     rows = [{"rank": 1, "display_name": "Nordlicht", "played": 3, "won": 2, "lost": 1, "avg_rank": 1.33, "points": 28, "furthest_round": 2}]
 
