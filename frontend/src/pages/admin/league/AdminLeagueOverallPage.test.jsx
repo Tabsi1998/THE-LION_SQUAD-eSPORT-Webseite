@@ -71,8 +71,10 @@ test("Einstellungen: eigene Punkte und beste X - gespeichert werden nur die Punk
 test("Zeiträume: eine Season in einem anderen Zeitraum ist gesperrt", async () => {
   renderPage("#zeitraeume");
   const panel = await screen.findByTestId("overall-panel-zeitraeume");
+  // Erst wenn der gespeicherte Zeitraum steht, hinzufügen: Sonst setzt das Laden der Daten die Zeilen zurück (wackelte unter Last).
+  await within(panel).findByTestId("overall-period-0-season-1");
   fireEvent.click(within(panel).getByTestId("overall-period-add"));
-  expect(within(panel).getByTestId("overall-period-1-season-1")).toBeDisabled();
+  expect(await within(panel).findByTestId("overall-period-1-season-1")).toBeDisabled();
   expect(panel).toHaveTextContent("in „2027“");
   expect(within(panel).getByTestId("overall-periods-bar")).toHaveTextContent("Namen");
   fireEvent.change(within(panel).getByTestId("overall-period-name-1"), { target: { value: "2028" } });
