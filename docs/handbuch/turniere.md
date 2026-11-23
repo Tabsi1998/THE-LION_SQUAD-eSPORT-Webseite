@@ -176,14 +176,21 @@ Zu den Besonderheiten:
 
   | Einstellung | Was sie tut |
   | --- | --- |
-  | **Abschluss** | **Feste Rundenzahl**: nach der letzten Runde ist Schluss. **Runden** leer heißt nach der Größe des Felds (8 Teilnehmer 3, 9 bis 16 4, 17 bis 32 5); mit **So viele kommen weiter** zeigt die Tabelle die Besten danach als „Weiter“. **Siege und Niederlagen**: wer die eingestellten Siege hat, ist weiter, wer die Niederlagen hat, raus (Vorgabe 3 und 3) – beide werden nicht mehr gepaart, ein Freilos zählt als Sieg. **Kein festes Ende**: es gibt Runden, solange ihr welche startet |
+  | **Abschluss** | **Feste Rundenzahl**: nach der letzten Runde ist Schluss. **Runden** leer heißt nach der Größe des Felds (8 Teilnehmer 3, 9 bis 16 4, 17 bis 32 5); mit **So viele kommen weiter** zeigt die Tabelle die Besten danach als „Weiter“. Teilen sich mehrere den letzten dieser Plätze und reichen die Plätze nicht für alle, steht bei ihnen „Gleichstand an der Grenze“ – wer von ihnen weiter ist, entscheidet ihr. **Siege und Niederlagen**: wer die eingestellten Siege hat, ist weiter, wer die Niederlagen hat, raus (Vorgabe 3 und 3) – beide werden nicht mehr gepaart, ein Freilos zählt als Sieg. **Kein festes Ende**: es gibt Runden, solange ihr welche startet |
   | **Nächste Runde automatisch** | Sobald das letzte Spiel einer Runde gewertet ist (auch kampflos oder durch einen Austritt), wird die nächste gepaart. Nur im laufenden Turnier; Runde 1 startet ihr immer selbst. Aus: jede Runde per **Schweizer Runde** |
   | **Bei Punktgleichheit** | Reihenfolge durch Anklicken: **Median-Buchholz** (Punkte der Gegner ohne den besten und den schlechtesten), **Buchholz** (Punkte aller Gegner), **Direkter Vergleich** (zählt nur, wenn sich alle Punktgleichen getroffen haben), **Mehr Siege**. Ohne Kriterium teilen sich Punktgleiche den Platz |
 
   ![Kasten „Schweizer System“ im Abschnitt Struktur](bilder/turnier-schweizer-einstellungen.png)
 
-  Gepaart wird nach Punkten: ähnlich Starke treffen sich, bei ungerader Zahl setzt jemand aus, der noch nicht
-  ausgesetzt hat. Niemand spielt zweimal gegen denselben Gegner, solange es eine Runde ohne Wiederholung gibt.
+  Gepaart wird nach Punkten: Wer gleich viele Punkte hat, spielt gegeneinander. Geht eine Punktgruppe nicht auf, trifft
+  der Übrige auf die nächste Gruppe – nie der Erste auf den Letzten. Bei ungerader Zahl setzt jemand aus, der noch nicht
+  ausgesetzt hat. Niemand spielt zweimal gegen denselben Gegner, solange es eine Runde ohne Wiederholung gibt. Für die
+  Punkte zählt jedes gewertete Spiel, auch gegen jemanden, der schon weiter oder ausgeschieden ist.
+
+  Nehmt ihr das letzte Ergebnis einer Runde mit **Rückgängig** zurück, geht die daraus gepaarte nächste Runde mit –
+  solange dort niemand gespielt hat. Sie entsteht aus dem neuen Ergebnis neu. Hat die nächste Runde begonnen, sagt die
+  Meldung das, und es bleibt **Ergebnis korrigieren**. Dreht eine Korrektur den Sieger um und steht die nächste Runde
+  schon, bleibt deren Paarung; das Ergebnis-Fenster weist darauf hin.
   Über den Reitern steht der Stand, etwa „Runde 2 von 5 läuft · die nächste Runde entsteht automatisch“. Automatisch
   gepaart wird nur im laufenden Turnier (nicht pausiert, gesperrt oder beendet) – steht dort „die nächste Runde startest
   du mit „Schweizer Runde““, führt der Knopf weiter. Ist die
