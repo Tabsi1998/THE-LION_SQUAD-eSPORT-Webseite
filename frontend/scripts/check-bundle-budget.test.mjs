@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  FORBIDDEN_STARTUP_CHUNKS, PAGE_ONLY_CSS, REQUIRED_LIGHT_ROUTES, collectStartup, gzipSize, heavyRouteProblems, judge, pageCssProblems, parseBudgets, parseGoals,
+  FORBIDDEN_STARTUP_CHUNKS, PAGE_ONLY_CSS, REQUIRED_LIGHT_ROUTES, budgetReport, collectStartup, gzipSize, heavyRouteProblems, judge, pageCssProblems, parseBudgets, parseGoals,
   startupVideoProblems,
 } from "./check-bundle-budget.mjs";
 
@@ -148,4 +148,16 @@ test("ähnliche Namen und Videos sind kein Matchplan-CSS", () => {
   const text = ".bump{x:1}.tls-mp-x{y:1}.amp-card{z:1}.mpx{a:1}.mp4-note{b:1}.x{background:url(/a.mp4)}";
   assert.deepEqual(pageCssProblems([{ file: "assets/index-a.css", text }]), []);
   assert.ok(PAGE_ONLY_CSS.every((rule) => rule.pattern instanceof RegExp && rule.label));
+});
+
+// Prüftor (#1660): das Ergebnis für den Kommentar im PR trägt Messwerte, Ziel, Grenze und Fehler.
+test("Ergebnis fürs Prüftor: ok nur ohne Fehler, Grenzen aus PERFORMANCE_BUDGETS.md", () => {
+  const budgets = { "startup-js-gzip": 305000, "startup-css-gzip": 60500 };
+  const goals = { "startup-js-gzip": 290000 };
+  const ok = budgetReport({ jsGzip: 287000, cssGzip: 58000, jsCount: 45, budgets, goals, failures: [] });
+  assert.deepEqual(ok, { ok: true, jsGzip: 287000, cssGzip: 58000, jsCount: 45, budgetJs: 305000, budgetCss: 60500, goalJs: 290000, failures: [] });
+  const bad = budgetReport({ jsGzip: 400000, cssGzip: 58000, jsCount: 50, budgets: {}, goals: {}, failures: ["Start-JS zu groß"] });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.budgetJs, null);
+  assert.deepEqual(bad.failures, ["Start-JS zu groß"]);
 });
