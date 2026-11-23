@@ -437,6 +437,53 @@ async def test_a_correction_in_the_latest_round_says_nothing(flow):
     assert not corrected.json().get("notice")
 
 
+# ---------------------------------------------------------------- Bilanz und Tabelle zählen gleich
+
+@pytest.mark.asyncio
+async def test_the_record_for_the_end_rule_and_the_table_count_the_same(flow):
+    """Zwei Rechnungen lesen dieselben Spiele: die Bilanz für „Siege und Niederlagen“ (``graph_swiss.records``) und die
+    Tabelle (``competition_standings``). Mit Freilos, kampfloser Wertung nach einem Austritt und Korrektur müssen Siege,
+    Niederlagen und Unentschieden übereinstimmen - und „Weiter“/„Ausgeschieden“ in der Tabelle zum Stand passen."""
+    from services import graph_swiss
+
+    _staff, tournament, regs = await swiss(flow, 7, auto_next_round=True, end_rule="wins_losses",
+                                           wins_to_advance=3, losses_to_exit=3)
+    assert (await next_round(flow, tournament)).status_code == 200
+    round_one = [match for match in await round_matches(flow, tournament, 1) if match["status"] != "completed"]
+    await decide(flow, round_one[0])
+    await decide(flow, round_one[1])
+    leaving = round_one[2]["slots"][0]["registration_id"]
+    url = f"/api/tournaments/{tournament['id']}/registrations/{leaving}/removal"
+    proposed = await flow.post(url, json={"kind": "withdrawn", "reason": "Krank"})
+    assert proposed.status_code == 200, proposed.text
+    confirmed = await flow.post(url, json={"kind": "withdrawn", "plan_id": proposed.json()["plan"]["id"]})
+    assert confirmed.status_code == 200, confirmed.text
+    await play_round(flow, tournament, 2)
+    turned = next(match for match in await round_matches(flow, tournament, 2) if len(match["results"]) == 2)
+    first, second = (slot["registration_id"] for slot in turned["slots"])
+    assert (await correct(flow, turned, second, first)).status_code == 200
+    await play_round(flow, tournament, 3)
+
+    matches = await flow.db.matches_v2.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(500)
+    assert max(match["round"] for match in matches) >= 3
+    settings = graph_swiss.swiss_settings(await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))
+    everyone = [reg["id"] for reg in regs]
+    record = graph_swiss.records(everyone, matches)
+    table = await flow.get(f"/api/tournaments/{tournament['id']}/standings")
+    assert table.status_code == 200, table.text
+    rows = {row["registration_id"]: row for row in table.json()}
+    playing = [registration_id for registration_id in everyone if registration_id != leaving]
+    assert set(playing) <= set(rows)
+
+    for registration_id in rows:
+        counted = record[registration_id]
+        row = rows[registration_id]
+        assert (row["won"], row["lost"], row["drawn"]) == (counted["won"], counted["lost"], counted["drawn"]), registration_id
+    state = graph_swiss.swiss_state(settings, playing, matches)
+    assert sorted(key for key in playing if rows[key].get("swiss_status") == "advanced") == sorted(state["advanced"])
+    assert sorted(key for key in playing if rows[key].get("swiss_status") == "eliminated") == sorted(state["eliminated"])
+
+
 def test_the_model_and_the_calculation_know_the_same_values():
     from typing import get_args
 
