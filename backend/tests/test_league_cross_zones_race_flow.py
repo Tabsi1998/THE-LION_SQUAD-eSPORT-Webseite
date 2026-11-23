@@ -51,9 +51,9 @@ async def test_two_decisions_at_once_leave_exactly_one(flow):  # noqa: F811
 
 @pytest.mark.asyncio
 async def test_two_staffeln_closing_at_once_never_slip_a_tie_into_the_new_season(flow):  # noqa: F811
-    """Beide Staffeln der Liga 2 schließen im selben Moment, ihre Zweiten stehen gleich. Nacheinander sperrt der Gleichstand den zweiten
-    Abschluss; wirklich gleichzeitig sieht jede die andere noch offen, und beide schließen. In beiden Fällen gilt: Solange niemand
-    entschieden hat, trägt keine Tabelle die Zone, und die neue Season lässt sich nicht anlegen."""
+    """Beide Staffeln der Liga 2 schließen im selben Moment, ihre Zweiten stehen gleich. Der Abschluss hält die Season-Sperre
+    (Nr. 232): Die Abschlüsse laufen nacheinander, genau einer geht durch - der andere wartet kurz und scheitert dann am Gleichstand
+    bzw. bekommt „bitte erneut versuchen“. Solange niemand entschieden hat, trägt keine Tabelle die Zone."""
     world = await build(flow, levels=2, zones=BEST, extra={2: [4]})
     top, first, second = world["tids"]
     ok(await close(flow, world, top))
@@ -63,22 +63,17 @@ async def test_two_staffeln_closing_at_once_never_slip_a_tie_into_the_new_season
                                    flow.post(f"{STAFFELN}/{second}/close", json={"confirm": True}))
 
     codes = sorted(answer.status_code for answer in answers)
-    assert codes in ([200, 200], [200, 409]), [answer.text for answer in answers]
+    assert codes == [200, 409], [answer.text for answer in answers]
+    assert await flow.db.league_final_tables.count_documents({"tournament_id": {"$in": [first, second]}, "active": True}) == 1
     for tid in (first, second):
         assert await zones_of(flow, tid) == [("promotion", False), (None, False), (None, False), (None, False)]
-    if codes == [200, 200]:
-        preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
-        assert preview["can_create"] is False and any("Gleichstand zwischen den Staffeln" in text for text in preview["problems"])
-        refused = await flow.post(f"{ADMIN}/seasons/{world['season']['id']}/successor", json={"start_date": "2031-03-01T00:00:00", "confirm": True})
-        assert refused.status_code == 409
     side = (await cockpit(flow, world))["cross"][0]["sides"][0]
     assert side["tie"] is not None and side["tie"]["open"] == 1
     winner = world["more"][2][0]["regs"][1]["id"]
     ok(await flow.put(f"{ADMIN}/divisions/{world['divisions'][1]['id']}/zone-decision",
                       json={"kind": "promote_best", "registration_ids": [winner], "method": "playoff", "reason": "Entscheidungsspiel 3:1"}))
-    if codes == [200, 409]:
-        open_one = first if answers[0].status_code == 409 else second
-        ok(await close(flow, world, open_one))
+    open_one = first if answers[0].status_code == 409 else second
+    ok(await close(flow, world, open_one))
     assert await zones_of(flow, second) == [("promotion", False), ("promotion", True), (None, False), (None, False)]
     preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
     assert preview["can_create"] is True and preview["problems"] == []

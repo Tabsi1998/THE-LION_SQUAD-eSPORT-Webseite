@@ -466,7 +466,11 @@ async def test_archived_middle_division_and_several_staffeln_of_unequal_size(flo
     world = await build(flow, levels=4, extra={2: [3]})
     await close_all(flow, world)
     flow.act_as(world["lead"])
-    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"status": "archived"}))
+    # Über die Verwaltung geht das Archivieren nach dem ersten Abschluss nicht mehr (Nr. 231). Für Bestand von davor muss die Rechnung
+    # trotzdem stimmen - darum steht der Stand hier direkt in der Datenbank.
+    refused = await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"status": "archived"})
+    assert refused.status_code == 422
+    await flow.db.league_divisions.update_one({"id": world["divisions"][1]["id"]}, {"$set": {"status": "archived"}})
     preview = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/successor"))
     where = {team["squad_id"]: (row["level"], team["movement"]) for row in preview["divisions"] for team in row["teams"]}
     assert [row["level"] for row in preview["divisions"]] == [1, 3, 4]
@@ -1059,3 +1063,150 @@ async def test_with_relegation_places_the_candidate_is_the_place_after_them(flow
     # Kein Team in zwei Zonen: Der Zweite spielt die Relegation, der Dritte geht in den Vergleich.
     assert await zones_of(flow, first) == [("promotion", False), ("playoff_promotion", False), ("promotion", True), (None, False)]
     assert await zones_of(flow, second) == [("promotion", False), ("playoff_promotion", False), (None, False)]
+
+
+# ---------------------------------------------------------------- Runde 3 (Entscheidungen Nr. 231, 232)
+
+@pytest.mark.asyncio
+async def test_no_division_is_created_archived_or_deleted_once_a_staffel_is_closed(flow):
+    """Nr. 231: Auf- und Abstieg rechnen mit den Ligen, die es beim Abschluss gab. Sobald in der Season eine Staffel abgeschlossen ist,
+    lässt sich keine Liga N mehr anlegen, archivieren oder löschen - erst wieder, wenn alle abgeschlossenen Staffeln offen sind."""
+    world = await build(flow, levels=2)
+    flow.act_as(world["lead"])
+    season = world["season"]["id"]
+    spare = ok(await flow.post(f"{ADMIN}/seasons/{season}/divisions", json={}))
+    page = ok(await flow.get(f"{ADMIN}/seasons/{season}"))
+    assert page["divisions_locked"] is False
+    ok(await close(flow, world, world["tids"][0]))
+
+    created = await flow.post(f"{ADMIN}/seasons/{season}/divisions", json={})
+    archived = await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"status": "archived"})
+    deleted = await flow.client.request("DELETE", f"{ADMIN}/divisions/{spare['id']}", json={"reason": "Liga 3 wird doch nicht gebraucht"})
+    for answer in (created, archived, deleted):
+        assert answer.status_code == 422 and "abgeschlossen" in answer.json()["detail"] and "wieder öffnen" in answer.json()["detail"], answer.text
+    rows = await flow.db.league_divisions.find({"season_id": season}, {"_id": 0, "level": 1, "status": 1}).sort("level", 1).to_list(10)
+    assert [(row["level"], row["status"]) for row in rows] == [(1, "active"), (2, "active"), (3, "active")]
+    assert ok(await flow.get(f"{ADMIN}/seasons/{season}"))["divisions_locked"] is True
+    # Gegenprobe: Was die Stufen nicht verändert, geht weiter - Beiname und Zonen je Staffel.
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"nickname": "Aufbau", "zones": {"promote": 2, "relegate": 0}}))
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"status": "active"}))  # derselbe Stand ist keine Änderung
+
+    other = await flow.add_staff(name="Zweite Leitung")
+    flow.act_as(other)
+    ok(await flow.post(f"{STAFFELN}/{world['tids'][0]}/reopen", json={"reason": "Ergebnis wird korrigiert"}))
+    flow.act_as(world["lead"])
+    assert ok(await flow.get(f"{ADMIN}/seasons/{season}"))["divisions_locked"] is False
+    ok(await flow.client.request("DELETE", f"{ADMIN}/divisions/{spare['id']}", json={"reason": "Liga 3 wird doch nicht gebraucht"}))
+    ok(await flow.post(f"{ADMIN}/seasons/{season}/divisions", json={}))
+
+
+@pytest.mark.asyncio
+async def test_archiving_a_lower_division_cannot_change_the_rule_between_two_closes(flow):
+    """Die Gegenprobe GP-C der Prüfung: Liga 2 (Mitte) mit ``relegate_worst``; Staffel A schließt, dann soll Liga 3 archiviert werden -
+    Liga 2 wäre plötzlich die unterste, und Staffel B schlösse ohne die Regel. Der Weg ist zu."""
+    world = await build(flow, levels=3, zones={"promote": 1, "relegate": 1, "relegate_worst": 1}, extra={2: [3]})
+    top, first, second, bottom = world["tids"]
+    for tid in (top, bottom, first):
+        ok(await close(flow, world, tid))
+    flow.act_as(world["lead"])
+    archived = await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"status": "archived"})
+    assert archived.status_code == 422
+    ok(await close(flow, world, second))
+    finals = [await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0, "zones": 1}) for tid in (first, second)]
+    assert [final["zones"].get("relegate_worst") for final in finals] == [1, 1]
+
+
+@pytest.mark.asyncio
+async def test_closing_and_changing_divisions_wait_for_the_season_lock(flow):
+    """Nr. 232: Der Abschluss einer Staffel hält die Season-Sperre - Abschlüsse einer Season laufen nacheinander, und eine Änderung an
+    einer Liga N kommt nicht mitten in einen Abschluss. Wer nicht drankommt, bekommt 409 „bitte erneut versuchen“."""
+    from services.mutation_lock import league_season_resource, mutation_lock
+
+    if not flow.real_mongo:
+        pytest.skip("nur echtes MongoDB kennt den eindeutigen Index der Sperre")
+    world = await build(flow, levels=2, zones=BEST, extra={2: [3]})
+    top, first, _second = world["tids"]
+    division = world["divisions"][1]["id"]
+    flow.act_as(world["lead"])
+    async with mutation_lock(flow.db, league_season_resource(world["season"]["id"]), wait_seconds=30.0):
+        busy = await close(flow, world, top)
+        patched = await flow.patch(f"{ADMIN}/divisions/{division}", json={"zones": {"promote": 1, "relegate": 1, "promote_best": 2}})
+        created = await flow.post(f"{ADMIN}/seasons/{world['season']['id']}/divisions", json={})
+    for answer in (busy, patched, created):
+        assert answer.status_code == 409 and "erneut versuchen" in answer.json()["detail"], answer.text
+    assert await flow.db.league_final_tables.count_documents({"tournament_id": top}) == 0
+    assert (await flow.db.league_divisions.find_one({"id": division}, {"_id": 0}))["zones"]["promote_best"] == 1
+    # Gegenprobe: Ist die Sperre frei, geht beides.
+    ok(await close(flow, world, top))
+    ok(await flow.patch(f"{ADMIN}/divisions/{division}", json={"zones": {"promote": 1, "relegate": 1, "promote_best": 2}}))
+    ok(await close(flow, world, first))
+
+
+@pytest.mark.asyncio
+async def test_a_change_inside_the_close_window_is_refused(flow, monkeypatch):
+    """Die Gegenprobe GP-A der Prüfung: Während Staffel A abschließt (nach den Sperrgründen, vor der Marke), will jemand ``promote_best``
+    ändern. Der Abschluss hält die Season-Sperre: Die Änderung wird abgelehnt, beide Endstände tragen denselben Wert."""
+    from services import league_final, league_service
+
+    if not flow.real_mongo:
+        pytest.skip("nur echtes MongoDB kennt den eindeutigen Index der Sperre")
+    world = await build(flow, levels=2, zones=BEST, extra={2: [3]})
+    top, first, second = world["tids"]
+    ok(await close(flow, world, top))
+    division_id = world["divisions"][1]["id"]
+    original = league_final.blockers
+    fired = []
+
+    async def sneaky(db, tournament, season, **kwargs):
+        found = await original(db, tournament, season, **kwargs)
+        if tournament["id"] == first and not fired:
+            division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0})
+            try:
+                await league_service.update_division(db, division, {"zones": {"promote": 1, "relegate": 1, "promote_best": 2}})
+                fired.append("patched")
+            except league_service.LeagueProblem as problem:
+                fired.append(problem.status)
+        return found
+
+    monkeypatch.setattr(league_final, "blockers", sneaky)
+    ok(await close(flow, world, first))
+    monkeypatch.setattr(league_final, "blockers", original)
+    assert fired == [409]
+    ok(await close(flow, world, second))
+    finals = [await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0, "zones": 1}) for tid in (first, second)]
+    assert [final["zones"].get("promote_best") for final in finals] == [1, 1]
+    assert (await flow.db.league_divisions.find_one({"id": division_id}, {"_id": 0}))["zones"]["promote_best"] == 1
+
+
+@pytest.mark.asyncio
+async def test_closing_and_every_change_of_a_division_ask_for_the_season_lock(flow, monkeypatch):
+    """Nr. 232, auch ohne echtes MongoDB prüfbar: Abschluss, Anlegen, Ändern und Löschen einer Liga N fordern die Sperre der Season an -
+    der Abschluss nach der Turnier-Sperre (Reihenfolge Turnier, dann Season, wie beim Zuteilen)."""
+    from services import league_final, league_service, mutation_lock as locks
+
+    world = await build(flow, levels=2)
+    flow.act_as(world["lead"])
+    season = world["season"]["id"]
+    spare = ok(await flow.post(f"{ADMIN}/seasons/{season}/divisions", json={}))
+    asked: list[str] = []
+    real = locks.mutation_lock
+
+    def recording(db, resource, **kwargs):
+        asked.append(resource)
+        return real(db, resource, **kwargs)
+
+    monkeypatch.setattr(league_final, "mutation_lock", recording)
+    monkeypatch.setattr(league_service, "mutation_lock", recording)
+    wanted = locks.league_season_resource(season)
+
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][1]['id']}", json={"nickname": "Aufbau"}))
+    assert asked == [wanted]
+    asked.clear()
+    ok(await flow.client.request("DELETE", f"{ADMIN}/divisions/{spare['id']}", json={"reason": "Liga 3 wird doch nicht gebraucht"}))
+    assert wanted in asked
+    asked.clear()
+    ok(await flow.post(f"{ADMIN}/seasons/{season}/divisions", json={}))
+    assert asked == [wanted]
+    asked.clear()
+    ok(await close(flow, world, world["tids"][0]))
+    assert asked == [wanted]

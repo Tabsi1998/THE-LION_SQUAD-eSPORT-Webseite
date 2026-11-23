@@ -10,9 +10,12 @@ Relegationsplätzen („die zwei besten Zweiten“) -, ``zones.relegate_worst`` 
 - **Aus dem gespeicherten Stand** (Nr. 228): Die Regel und die Zonen je Staffel kommen aus ``final.zones`` der abgeschlossenen Staffeln,
   nie aus der heutigen Einstellung der Liga N - eine spätere Änderung ändert keine abgeschlossene Season. Nur für noch offene Staffeln
   (Vorschau im Cockpit, Sperrgrund beim letzten Abschluss) gilt die heutige Einstellung; ab dem ersten Abschluss sind die beiden Felder
-  gesperrt (``league_service.update_division``), darum sagen beide dasselbe.
-- **Gleichstand an der Grenze** sperrt den Abschluss der letzten Staffel (``league_final.blockers``, ``zone_cross_tie``) und, falls zwei
-  Staffeln gleichzeitig schlossen, das Anlegen der neuen Season. Der Entscheid steht an der Liga N (``league_divisions.zone_decisions``)
+  gesperrt (``league_service.update_division``, geprüft unter der Season-Sperre) und lässt sich keine Liga N mehr anlegen, archivieren
+  oder löschen (Nr. 231) - darum sagen beide dasselbe, auch für „oberste“ und „unterste“.
+- **Gleichstand an der Grenze** sperrt den Abschluss der letzten Staffel (``league_final.blockers``, ``zone_cross_tie``). Abschlüsse
+  einer Season laufen nacheinander - ``league_final.close`` hält die Season-Sperre (Nr. 232) -, darum sieht der letzte Abschluss alle
+  anderen. Als Sicherheitsnetz hält ein offener Gleichstand auch das Anlegen der neuen Season auf (etwa wenn ein Entscheid nach dem
+  letzten Abschluss zurückgenommen wurde). Der Entscheid steht an der Liga N (``league_divisions.zone_decisions``)
   und gilt genau für den Gleichstand, zu dem er getroffen wurde (Nr. 229): dieselbe Gruppe **und** dieselben Punkte und dieselbe
   Map-Differenz je Spiel. Ändert sich eines davon, ist er hinfällig.
 

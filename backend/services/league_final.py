@@ -37,6 +37,7 @@ from services.league_ties import (  # noqa: F401 - weiter über league_final err
 )
 from services.league_scope import ONLY_LEAGUE, is_league_staffel
 from services.log_safe import log_safe
+from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock
 from services.match_disputes import decided_at, league_window_of
 from services.matchday_schedule import response_deadline
 
@@ -61,6 +62,7 @@ SECOND_PERSON = "Wieder öffnen muss eine zweite Person: nicht die, die abgeschl
 SECOND_PERSON_SUPERADMIN = ("Du hast diese Staffel selbst abgeschlossen. Als Superadmin geht das Wiederöffnen nur als "
                             "Notausnahme, mit einem Grund von mindestens fünf Zeichen.")
 BUSY = "Der Abschluss wird gerade bearbeitet. Bitte gleich noch einmal."
+SEASON_BUSY = ("In dieser Season wird gerade eine andere Staffel abgeschlossen oder eine Liga geändert. Bitte erneut versuchen.")
 INCOMPLETE = ("Der Abschluss wurde nicht fertig geschrieben: Die Staffel ist gesperrt, einen Endstand gibt es nicht. „Wieder öffnen“ "
               "gibt sie frei, danach neu abschließen.")
 
@@ -553,7 +555,23 @@ async def _follow_up(what: str, tournament_id: str, step):
 
 async def close(db, tournament: dict, actor: dict, *, conflict_reason: str | None = None, now: datetime | None = None) -> dict:
     """Schließt die Staffel ab. Der Aufrufer hält die Schreibsperre des Turniers und hat das Recht geprüft. Atomar: Den Abschluss
-    gewinnt, wer das Turnier zuerst markiert - jeder zweite bekommt 409."""
+    gewinnt, wer das Turnier zuerst markiert - jeder zweite bekommt 409.
+
+    **Season-Sperre** (Nr. 232): Der Abschluss hält ``league_season_resource`` - dieselbe Sperre wie Änderungen an einer Liga N
+    (``league_service.update_division``, Anlegen, Löschen) und der Entscheid über Staffeln hinweg. Abschlüsse einer Season laufen so
+    nacheinander: Der zweite sieht den ersten schon abgeschlossen (Sperrgrund ``zone_cross_tie``), und die Zonen, die der Endstand
+    festhält, ändern sich nicht mitten im Abschluss. Reihenfolge wie überall: erst Turnier, dann Season. Wer nicht drankommt: 409."""
+    season_id = ((tournament or {}).get("league_context") or {}).get("season_id")
+    if not season_id:
+        return await _close(db, tournament, actor, conflict_reason=conflict_reason, now=now)
+    try:
+        async with mutation_lock(db, league_season_resource(season_id)):
+            return await _close(db, tournament, actor, conflict_reason=conflict_reason, now=now)
+    except MutationLockBusy:
+        raise FinalProblem(SEASON_BUSY, 409) from None
+
+
+async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | None = None, now: datetime | None = None) -> dict:
     if not is_league_staffel(tournament):
         raise FinalProblem("Das gibt es nur in einer Liga-Staffel.", 404)
     if is_closed(tournament):

@@ -155,6 +155,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         })
     return {
         "capabilities": sorted(await capabilities_of(db, me, league["id"])),
+        # Nr. 231: Sobald eine Staffel der Season abgeschlossen ist, lässt sich keine Liga N mehr anlegen, archivieren oder löschen.
+        "divisions_locked": bool(locked),
         "league": league, "season": season, "game": map_pools.game_summary(game),
         # Gestaltung (#2107): was die Ligaseite zeigt - für die Vorschau mit dem Erbe der Liga.
         "look": league_look.effective(league, season),
