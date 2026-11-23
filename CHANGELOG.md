@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.93.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.93.0...v1.93.1) (2026-11-23)
+
+
+### Fehlerbehebungen
+
+* Ruhezeit endet in den Nächten der Zeitumstellung zur eingestellten Uhrzeit statt bis zu einer Stunde später ([#2514](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2514)) ([175daf5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/175daf55698d393b4bd9b4c22255e9ccf2d1c3b0))
+
 ## 1.93.0 (18.11.2026)
 
 ### Neu
