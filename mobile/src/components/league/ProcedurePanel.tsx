@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, errorMessage } from "../../lib/api";
 import { formatWhen } from "../../lib/format";
+import { useSingleFlight } from "../../lib/useSingleFlight";
 import {
   AGAINST_LABELS, KIND_HINTS, PROCEDURE_STATE_LABELS, claimedText, decisionText, incidentLabel, procedurePayload, remainingText,
   type Procedure, type ProcedureForm, type ProcedureGuide, type ProcedurePayload,
@@ -155,7 +156,8 @@ export function AppealForm({ matchId, against, until = null, onChanged, testID =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const now = useNow(Boolean(until));
-  const send = async () => {
+  const once = useSingleFlight();
+  const send = () => once(async () => {
     setBusy(true);
     setError("");
     try {
@@ -168,7 +170,7 @@ export function AppealForm({ matchId, against, until = null, onChanged, testID =
     } finally {
       setBusy(false);
     }
-  };
+  });
   return (
     <View style={styles.stackSmall} testID={testID}>
       <Deadline label="Einspruch möglich bis" until={until} now={now} testID={`${testID}-until`} />
@@ -199,7 +201,8 @@ export function ProcedureCard({ matchId, procedure: p, sideNames, onChanged }: {
   const [addition, setAddition] = useState("");
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const base = `/matches/${matchId}/procedures/${p.id}`;
-  const run = async (call: () => Promise<unknown>, after?: () => void) => {
+  const once = useSingleFlight();
+  const run = (call: () => Promise<unknown>, after?: () => void) => once(async () => {
     setBusy(true);
     setError("");
     try {
@@ -211,7 +214,7 @@ export function ProcedureCard({ matchId, procedure: p, sideNames, onChanged }: {
     } finally {
       setBusy(false);
     }
-  };
+  });
   const sideName = p.side ? sideNames[p.side] || (p.own ? "Eigene Seite" : "Gegenseite") : "Liga-Leitung";
   const claimed = claimedText(p.claimed, sideNames);
   const outcome = decisionText(p);

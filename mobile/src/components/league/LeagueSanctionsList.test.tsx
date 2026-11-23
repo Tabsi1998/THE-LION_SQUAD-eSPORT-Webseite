@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { LeagueSanctionsList } from "./LeagueSanctionsList";
 
 // Strafen der Liga in der App (#2173, docs/LIGA.md E.3) wie „Meine Strafen“ im Web: nur Liga-Strafen, mit Stand und Einspruch, den
@@ -63,4 +63,21 @@ test("keine Liga-Strafen oder keine Antwort: nichts steht da", async () => {
   await render(<LeagueSanctionsList />);
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/penalties/me"));
   expect(screen.queryByTestId("league-sanctions")).toBeNull();
+});
+
+// Gegen Doppeltippen (#2173, Prüfung): genau ein Einspruch, auch bei zwei Tipps im selben Takt.
+test("Doppeltippen auf „Einspruch einlegen“: genau eine Anfrage", async () => {
+  mockGet.mockResolvedValue({ data: { items: [SANCTION] } });
+  await render(<LeagueSanctionsList />);
+  await waitFor(() => expect(screen.getByTestId("sanction-appeal-open-s1")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("sanction-appeal-open-s1"));
+  await fireEvent.changeText(screen.getByTestId("sanction-appeal-input-s1"), "Wir waren da, der Server war down.");
+  mockPost.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 20)));
+  const button = screen.getByTestId("sanction-appeal-send-s1");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(mockPost).toHaveBeenCalledTimes(1);
 });

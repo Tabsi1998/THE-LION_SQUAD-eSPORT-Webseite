@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MatchDetailScreen } from "./MatchDetailScreen";
 
 // Vorfälle im Spiel in der App (#2173, docs/LIGA.md D.5): Captain und Vertreter melden mit Vorschlag, die Gegenseite stimmt zu oder
@@ -183,4 +183,18 @@ test("Zuschauer und ältere Server: kein Vorfall-Bereich, öffentlich nur „in 
   await open({ ...BASE, can_act: false, league: { ...LEAGUE, incident_info: null, incidents: [], map_state: [{ position: 2, state: "in_clarification" }] } });
   expect(screen.queryByTestId("incident-panel")).toBeNull();
   expect(screen.getByTestId("map-state-2")).toHaveTextContent("Map 2 ist in Klärung");
+});
+
+// Gegen Doppeltippen (#2173, Prüfung): zwei Tipps im selben Takt ergeben genau eine Anfrage.
+test("Doppeltippen auf „Zustimmen“: genau eine Antwort an den Server", async () => {
+  mockPost.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 20)));
+  await open({ ...BASE, league: { ...LEAGUE, incidents: [PROPOSED] } });
+  const button = screen.getByTestId("incident-answer-i1-accept");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(mockPost).toHaveBeenCalledTimes(1);
 });

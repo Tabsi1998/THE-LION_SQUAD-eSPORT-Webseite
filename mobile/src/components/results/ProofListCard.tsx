@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import { useSingleFlight } from "../../lib/useSingleFlight";
 import { uploadPartForAsset, type PickedAsset } from "../../lib/chatAttachments";
 import { openLink } from "../../lib/openLink";
 import { colors, radius } from "../../theme";
@@ -80,7 +81,9 @@ export function ProofListCard({ matchId, kind, refId = "", title = "Nachweise", 
     void load();
   }, [load]);
 
-  const send = async (fill: (form: FormData) => void, fallback: string) => {
+  // Gegen Doppeltippen (#2173): ein Hochladen bzw. Entfernen zur Zeit.
+  const once = useSingleFlight();
+  const send = async (fill: (form: FormData) => void, fallback: string) => Boolean(await once(async () => {
     setBusy(true);
     setError("");
     try {
@@ -97,7 +100,7 @@ export function ProofListCard({ matchId, kind, refId = "", title = "Nachweise", 
     } finally {
       setBusy(false);
     }
-  };
+  }));
 
   const addImage = async (asset?: PickedAsset | null) => {
     if (asset) await send((form) => form.append("file", uploadPartForAsset(asset, "image") as unknown as Blob), "Hochladen hat nicht geklappt.");
@@ -132,17 +135,19 @@ export function ProofListCard({ matchId, kind, refId = "", title = "Nachweise", 
       setConfirmId(item.id);
       return;
     }
-    setBusy(true);
-    setError("");
-    try {
-      await api.delete(`/matches/${matchId}/proofs/${item.id}`);
-      await load();
-    } catch (failure) {
-      setError(errorMessage(failure, "Entfernen hat nicht geklappt."));
-    } finally {
-      setConfirmId(null);
-      setBusy(false);
-    }
+    await once(async () => {
+      setBusy(true);
+      setError("");
+      try {
+        await api.delete(`/matches/${matchId}/proofs/${item.id}`);
+        await load();
+      } catch (failure) {
+        setError(errorMessage(failure, "Entfernen hat nicht geklappt."));
+      } finally {
+        setConfirmId(null);
+        setBusy(false);
+      }
+    });
   };
 
   const data = state.data;

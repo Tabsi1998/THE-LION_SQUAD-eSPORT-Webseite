@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MatchDetailScreen } from "./MatchDetailScreen";
 
 // Liga-Verfahren in der App (#2173, docs/LIGA.md E.2): Beanstandung bzw. Protest geführt einreichen, danach Nachweise; das eigene
@@ -178,4 +178,50 @@ test("Formular zu (Frist vorbei): kein geführtes Formular, auch nicht das alte"
   await open({ ...BASE, league: { ...LEAGUE, procedure_form: { ...GUIDE, open: false } } });
   expect(screen.queryByTestId("match-dispute-form")).toBeNull();
   expect(screen.queryByTestId("match-dispute-btn")).toBeNull();
+});
+
+// Gegen Doppeltippen (#2173, Prüfung): Einreichen und Stellung nehmen gehen je genau einmal raus.
+test("Doppeltippen beim Einreichen und bei der Stellungnahme: je genau eine Anfrage", async () => {
+  const theirs = { ...OWN, id: "pr2", side: "r2", own: false, can_amend: false, can_withdraw: false, can_state: true };
+  await open({ ...BASE, league: { ...LEAGUE, procedures: [theirs] } });
+  mockPost.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 20)));
+  await fireEvent.press(screen.getByTestId("match-dispute-reason-equipment"));
+  await fireEvent.press(screen.getByTestId("procedure-notified-no"));
+  await fireEvent.changeText(screen.getByTestId("match-dispute-input"), "Verbotene Waffe in Map 1 genutzt.");
+  let button = screen.getByTestId("match-dispute-btn");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(mockPost).toHaveBeenCalledTimes(1);
+  await fireEvent.changeText(screen.getByTestId("procedure-statement-input-pr2"), "Bei uns stand es 2:1 für Horst.");
+  button = screen.getByTestId("procedure-statement-send-pr2");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(mockPost.mock.calls.filter((call) => call[0] === "/matches/m1/procedures/pr2/statement")).toHaveLength(1);
+});
+
+test("Doppeltippen auf „Link hinzufügen“ bei den Nachweisen: genau ein Upload", async () => {
+  mockPost.mockResolvedValueOnce({ data: { procedure_id: "pr9" } });
+  await open(BASE);
+  await fireEvent.press(screen.getByTestId("match-dispute-reason-wrong_result"));
+  await fireEvent.changeText(screen.getByTestId("procedure-claimed-0"), "2");
+  await fireEvent.changeText(screen.getByTestId("procedure-claimed-1"), "1");
+  await fireEvent.changeText(screen.getByTestId("match-dispute-input"), "Map 2 ging an uns, der Clip zeigt es.");
+  await fireEvent.press(screen.getByTestId("match-dispute-btn"));
+  await waitFor(() => expect(screen.getByTestId("procedure-proofs-link-input")).toBeTruthy());
+  mockPost.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 20)));
+  await fireEvent.changeText(screen.getByTestId("procedure-proofs-link-input"), "https://video.example/clip");
+  const button = screen.getByTestId("procedure-proofs-link-add");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(mockPost.mock.calls.filter((call) => call[0] === "/matches/m1/proofs")).toHaveLength(1);
 });

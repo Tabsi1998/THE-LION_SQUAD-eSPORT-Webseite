@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, errorMessage } from "../../lib/api";
+import { useSingleFlight } from "../../lib/useSingleFlight";
 import { remainingText } from "../../lib/leagueProcedures";
 import { navigateToUrl } from "../../navigation/rootNavigation";
 import { viennaDateTime } from "../../lib/vienna";
@@ -49,7 +50,8 @@ function SanctionCard({ row, onChanged }: { row: PenaltyRow; onChanged: () => vo
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const submit = async () => {
+  const once = useSingleFlight();
+  const submit = () => once(async () => {
     setSaving(true);
     setError("");
     try {
@@ -61,7 +63,7 @@ function SanctionCard({ row, onChanged }: { row: PenaltyRow; onChanged: () => vo
     } finally {
       setSaving(false);
     }
-  };
+  });
   return (
     <View style={styles.card} testID={`penalty-card-${row.ref_id}`}>
       <View style={styles.rowBetween}>

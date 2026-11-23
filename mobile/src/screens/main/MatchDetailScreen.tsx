@@ -19,6 +19,7 @@ import { api, errorMessage } from "../../lib/api";
 import { invalidateCache } from "../../lib/cache";
 import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
+import { useSingleFlight } from "../../lib/useSingleFlight";
 import {
   continuesMessageGroup,
   formatChatTime,
@@ -411,64 +412,75 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   }, []);
 
   // Ergebnis melden (#1132): die Platzierungsliste an /report - der Server vergleicht die Meldungen beider Seiten.
+  // Gegen Doppeltippen (#2173): eine Aktion zur Zeit - `busy` greift erst nach dem nächsten Zeichnen.
+  const once = useSingleFlight();
   const submitReport = useCallback(async (payload: ReportPayload | LeagueReportSend) => {
     if (!canPlayerReportResult || busy) return false;
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    try {
-      const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${idSegment(route.params.id)}/report`, payload);
-      playMoment("result");
-      await refreshAfterResult();
-      setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
-      return true;
-    } catch (err) {
-      setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, canPlayerReportResult, refreshAfterResult, route.params.id]);
+    const done = await once(async () => {
+      setBusy(true);
+      setError("");
+      setSuccess("");
+      try {
+        const { data } = await api.post<{ awaiting_confirmation?: boolean }>(`/matches/${idSegment(route.params.id)}/report`, payload);
+        playMoment("result");
+        await refreshAfterResult();
+        setSuccess(data?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
+        return true;
+      } catch (err) {
+        setError(errorMessage(err, "Ergebnis konnte nicht gemeldet werden."));
+        // Ein veralteter Stand (409, die Gegenseite hat inzwischen gemeldet) ist meist der Grund - gleich frisch laden.
+        void load({ preserveDrafts: true });
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    });
+    return Boolean(done);
+  }, [busy, canPlayerReportResult, load, once, refreshAfterResult, route.params.id]);
 
   const resultUndo = useResultUndo(() => { void refreshAfterResult(); });
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
   const submitDispute = useCallback(async (payload: ProblemPayload | ProcedurePayload) => {
     if (busy || !page?.can_dispute) return false;
-    setBusy(true);
-    setError("");
-    try {
-      const { data: answer } = await api.post<{ procedure_id?: string | null }>(`/matches/${idSegment(route.params.id)}/dispute`, payload);
-      // Liga (E.2): Mit der Kennung des Verfahrens folgt gleich der Schritt „Nachweise“.
-      if (answer?.procedure_id) setProcedureStep(answer.procedure_id);
-      await load({ preserveDrafts: false });
-      setSuccess(answer?.procedure_id ? "Eingereicht. Die Liga-Leitung schaut es sich an." : "Gemeldet. Die Turnierleitung schaut es sich an.");
-      return true;
-    } catch (err) {
-      setError(errorMessage(err, "Problem konnte nicht gemeldet werden."));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, load, page?.can_dispute, route.params.id]);
+    return Boolean(await once(async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const { data: answer } = await api.post<{ procedure_id?: string | null }>(`/matches/${idSegment(route.params.id)}/dispute`, payload);
+        // Liga (E.2): Mit der Kennung des Verfahrens folgt gleich der Schritt „Nachweise“.
+        if (answer?.procedure_id) setProcedureStep(answer.procedure_id);
+        await load({ preserveDrafts: false });
+        setSuccess(answer?.procedure_id ? "Eingereicht. Die Liga-Leitung schaut es sich an." : "Gemeldet. Die Turnierleitung schaut es sich an.");
+        return true;
+      } catch (err) {
+        setError(errorMessage(err, "Problem konnte nicht gemeldet werden."));
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    }));
+  }, [busy, load, once, page?.can_dispute, route.params.id]);
 
   // Liga-Spieltag (#2173): ein Weg für Einchecken, Start, Veto-Zug und „Bereit“ - Fehler und Erfolg stehen oben wie überall.
   const runLeague = useCallback(async (task: () => Promise<string | void>, fallback: string) => {
     if (busy) return;
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    try {
-      const done = await task();
-      if (done) setSuccess(done);
-    } catch (err) {
-      setError(errorMessage(err, fallback));
-      // Ein veralteter Stand (409) ist meist der Grund - gleich frisch laden.
-      void load({ preserveDrafts: true });
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, load]);
+    await once(async () => {
+      setBusy(true);
+      setError("");
+      setSuccess("");
+      try {
+        const done = await task();
+        if (done) setSuccess(done);
+      } catch (err) {
+        setError(errorMessage(err, fallback));
+        // Ein veralteter Stand (409) ist meist der Grund - gleich frisch laden.
+        void load({ preserveDrafts: true });
+      } finally {
+        setBusy(false);
+      }
+    });
+  }, [busy, load, once]);
   const reloadLeague = useCallback(async () => {
     await invalidateCache(`/matches/${route.params.id}`);
     await load({ preserveDrafts: true });

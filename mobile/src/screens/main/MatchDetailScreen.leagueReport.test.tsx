@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MatchDetailScreen } from "./MatchDetailScreen";
 
 // Liga-Ergebnis mit Maps in der App (#2173, docs/LIGA.md C.3): Captain und Vertreter melden je Map Modus, Map (aus dem Veto fest),
@@ -208,4 +208,30 @@ test("älterer Server ohne Block `league`: das Meldeformular ohne Maps wie bishe
   await open({ ...BASE, league: undefined });
   expect(screen.queryByTestId("league-game-1")).toBeNull();
   expect(screen.getByTestId("match-report-form")).toBeTruthy();
+});
+
+// Gegen Doppeltippen (#2173, Prüfung): zwei Tipps auf „Stimmt“ im selben Takt ergeben genau eine Meldung.
+test("Doppeltippen auf „Stimmt“: genau eine Meldung an /report", async () => {
+  await open({ ...BASE, league: { ...LEAGUE, lineup_mode: "series", lineup_min_players: 1, own_lineup: [{ id: "p1", name: "Anna" }],
+    proposal_games: [{ position: 1, mode: "stellung", map_id: "hafen", winner_registration_id: "r2" }] }, report_state: { status: "confirm", can_confirm: true } });
+  mockPost.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 20)));
+  const button = screen.getByTestId("match-report-confirm");
+  await act(async () => {
+    void fireEvent.press(button);
+    void fireEvent.press(button);
+  });
+  await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(mockPost).toHaveBeenCalledTimes(1);
+});
+
+// Nach einem Fehler (etwa 409, veralteter Stand) lädt die Seite gleich frisch - wie bei Check-in und Veto.
+test("Meldung scheitert mit 409: Fehler steht da und die Seite lädt neu", async () => {
+  await open({ ...BASE, league: { ...LEAGUE, lineup_mode: "series", lineup_min_players: 1, own_lineup: [{ id: "p1", name: "Anna" }],
+    proposal_games: [{ position: 1, mode: "stellung", map_id: "hafen", winner_registration_id: "r2" }] }, report_state: { status: "confirm", can_confirm: true } });
+  const loads = mockGet.mock.calls.filter((call) => call[0] === "/matches/m1/page").length;
+  mockPost.mockRejectedValueOnce(new Error("Die Gegenseite hat ihre Meldung geändert."));
+  await fireEvent.press(screen.getByTestId("match-report-confirm"));
+  await waitFor(() => expect(screen.getByText("Die Gegenseite hat ihre Meldung geändert.")).toBeTruthy());
+  await waitFor(() => expect(mockGet.mock.calls.filter((call) => call[0] === "/matches/m1/page").length).toBeGreaterThan(loads));
 });
