@@ -15,7 +15,7 @@ from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services import advent_calendar as advent
-from services import seasons
+from services import news_channels, seasons
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/seasonal/advent", tags=["seasonal"])
@@ -85,7 +85,7 @@ PreviewToken = Query(None, max_length=200)
 
 
 @router.get("")
-async def calendar(response: Response, opened: str | None = Query(None, max_length=120), preview: str | None = PreviewToken,
+async def calendar(request: Request, response: Response, opened: str | None = Query(None, max_length=120), preview: str | None = PreviewToken,
                    user: dict | None = Depends(get_optional_user)):
     """Der Kalender: 24 Türchen mit Zustand. Inhalt tragen nur die geöffneten - angemeldet die eigenen, für Gäste
     die, die ihr Browser als geöffnet nennt (und die schon offen sein dürfen)."""
@@ -93,7 +93,8 @@ async def calendar(response: Response, opened: str | None = Query(None, max_leng
     demo = advent.preview_context(preview)
     if demo:
         return await advent.preview_calendar(get_db(), demo[0], demo[1], guest_opened=advent.parse_days(opened))
-    return await advent.calendar_view(get_db(), user if user and user.get("id") else None, guest_opened=advent.parse_days(opened))
+    return await advent.calendar_view(get_db(), user if user and user.get("id") else None, guest_opened=advent.parse_days(opened),
+                                      channel=news_channels.request_channel(request))
 
 
 @router.post("/{day}/open")
@@ -104,7 +105,7 @@ async def open_door(day: int, request: Request, response: Response, preview: str
     demo = advent.preview_context(preview)
     if demo:
         return await advent.preview_open(get_db(), demo[0], day, demo[1])
-    return await advent.open_door(get_db(), viewer, day)
+    return await advent.open_door(get_db(), viewer, day, channel=news_channels.request_channel(request))
 
 
 @router.post("/{day}/quiz")

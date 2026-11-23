@@ -549,3 +549,39 @@ async def test_auskunft_nennt_die_tuerchen_und_konto_loeschen_nimmt_sie_mit(flow
     assert await flow.db.advent_openings.count_documents({"user_id": paula["id"]}) == 0
     assert await flow.db.advent_openings.count_documents({"user_id": kai["id"]}) == 2
     assert await flow.db.user_signals.count_documents({"user_id": paula["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_news_tuerchen_folgen_dem_kanal(flow, monkeypatch):
+    """#1532: Website-Türchen zeigen keine News nur für die App, die App keine nur für die Website; der Editor nennt den Kanal."""
+    staff = await flow.add_staff("Redaktion")
+    flow.act_as(staff)
+    app_only = (await flow.post("/api/news", json={"title": "Nur in der App", "slug": "nur-app", "content": "Text", "channels": ["app"]})).json()
+    web_only = (await flow.post("/api/news", json={"title": "Nur im Web", "slug": "nur-web", "content": "Text", "channels": ["web"]})).json()
+    both = (await flow.post("/api/news", json={"title": "Überall", "slug": "ueberall", "content": "Text"})).json()
+    await save(flow, staff, 1, kind="news", title="App-News", body="", ref_id=app_only["id"])
+    await save(flow, staff, 2, kind="news", title="Web-News", body="", ref_id=web_only["id"])
+    await save(flow, staff, 3, kind="news", title="Für alle", body="", ref_id=both["id"])
+    set_clock(monkeypatch, vienna(2026, 12, 6, 10))
+    web = {"X-LSW-Channel": "web"}
+    flow.act_as(None)
+
+    async def card(day, headers=None):
+        res = await flow.post(f"/api/seasonal/advent/{day}/open", headers=headers or {})
+        assert res.status_code == 200, res.text
+        return (res.json()["content"].get("card") or {}).get("title")
+
+    assert await card(1, web) is None, "die Website zeigt keine News nur für die App"
+    assert await card(1) == "Nur in der App"
+    assert await card(2) is None, "die App zeigt keine News nur für die Website"
+    assert await card(2, web) == "Nur im Web"
+    assert await card(3, web) == "Überall" and await card(3) == "Überall"
+    view = (await flow.get("/api/seasonal/advent?opened=1,2,3", headers=web)).json()
+    titles = {door["day"]: (door.get("content", {}).get("card") or {}).get("title") for door in view["doors"] if door["day"] in (1, 2, 3)}
+    assert titles == {1: None, 2: "Nur im Web", 3: "Überall"}
+
+    flow.act_as(staff)
+    options = (await flow.get("/api/seasonal/advent/admin/options")).json()
+    hints = {row["id"]: row["hint"] for row in options["news"]}
+    assert hints[app_only["id"]].endswith("Nur App") and hints[web_only["id"]].endswith("Nur Website")
+    assert "Nur" not in hints[both["id"]]
