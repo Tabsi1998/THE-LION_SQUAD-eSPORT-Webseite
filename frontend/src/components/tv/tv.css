@@ -1140,8 +1140,9 @@
 .tv-finale__who { display: flex; flex-direction: column; min-width: 0; }
 /* Namen brechen um, nie abgeschnitten; lange eine bzw. zwei Stufen kleiner (data-fit). */
 .tv-finale__name { font-size: min(var(--tv-fs-name), calc(var(--tv-finale-unit) * 0.4)); line-height: 1.1; font-weight: 800; overflow-wrap: anywhere; hyphens: auto; }
-.tv-finale__name[data-fit="small"] { font-size: min(calc(var(--tv-fs-name) * 0.84), calc(var(--tv-finale-unit) * 0.34)); }
-.tv-finale__name[data-fit="tiny"] { font-size: min(calc(var(--tv-fs-name) * 0.7), calc(var(--tv-finale-unit) * 0.3)); }
+/* Nie unter die Untergrenze der TV-Namen (--tv-fs-name-min): lieber eine Zeile mehr. */
+.tv-finale__name[data-fit="small"] { font-size: max(var(--tv-fs-name-min), min(calc(var(--tv-fs-name) * 0.9), calc(var(--tv-finale-unit) * 0.36))); }
+.tv-finale__name[data-fit="tiny"] { font-size: max(var(--tv-fs-name-min), min(calc(var(--tv-fs-name) * 0.8), calc(var(--tv-finale-unit) * 0.32))); }
 .tv-finale__meta { color: var(--tv-muted); }
 .tv-finale__target {
   display: inline-flex;
