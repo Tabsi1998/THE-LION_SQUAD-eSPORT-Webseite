@@ -8,6 +8,9 @@ const { ENABLED, state, signIn, watch } = require("./abnahmeSession");
 // rufen gleichzeitig auf - genau einer gewinnt; der Spieler sieht „Du bist als Nächstes …“; alles auch bei 375 px.
 // Läuft nur mit ABNAHME=1 und E2E_BASE_URL auf einen frisch befüllten Abnahme-Stand (scripts/seed_abnahme.py).
 
+// Nur die Knöpfe „Aufrufen“ in den Stationskacheln - der Kasten „Alle aufrufen“ über den Kacheln (#1162) heißt ebenfalls
+// live-call-…, trägt aber keine Station.
+const STATION_CALL = "[data-testid^='live-station-'] [data-testid^='live-call-']";
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 
 async function shot(page, name) {
@@ -57,7 +60,7 @@ test.describe("Abnahme: Live-Warteschlange vor Ort", () => {
     await shot(page, "leitung-1440-vorher.png");
 
     // An einer freien Station das nächste bereite Spiel aufrufen …
-    const call = board.locator("[data-testid^='live-call-']").first();
+    const call = board.locator(STATION_CALL).first();
     await expect(call).toBeVisible();
     const stationId = (await call.getAttribute("data-testid")).replace("live-call-", "");
     await call.click();

@@ -3,7 +3,7 @@
 // #2207: aktiv, inaktiv, archiviert - mit Rückfrage, die betroffene Seasons nennt), Pool-Zählung, Reihenfolge, Bearbeiten und
 // Löschen (nur, solange sie in keinem Pool stand). „Aus Spiel übernehmen“ holt Maps einer anderen Version, der Standard-Pool
 // steht darunter. Modi sind dieselben wie im Reiter Modi - kein zweites Modussystem.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -165,14 +165,36 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
   const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState(() => new Set());
   const confirm = useConfirm();
+  // Häkchen unterwegs und ein Zähler, der bei jedem Start und Ende eines Häkchens weiterspringt (#2529): Eine Abfrage, die vorher oder
+  // währenddessen losging, kennt das Häkchen nicht - ihre Antwort fällt weg, statt es zurückzunehmen. Ist kein Häkchen mehr unterwegs,
+  // fragt sie gleich neu; sonst merkt sie es sich (`missed`), und das letzte Häkchen holt es nach.
+  const pending = useRef(0);
+  const edits = useRef(0);
+  const missed = useRef(false);
 
   const load = useCallback(async () => {
-    try {
-      const { data: body } = await api.get(`/games/${gameId}/maps`);
-      setData(body);
-      setMissing("");
-    } catch (err) {
-      setMissing(formatApiError(err.response?.data?.detail));
+    for (;;) {
+      const seen = edits.current;
+      let body = null;
+      let problem = "";
+      try {
+        ({ data: body } = await api.get(`/games/${gameId}/maps`));
+      } catch (err) {
+        problem = formatApiError(err.response?.data?.detail);
+      }
+      if (pending.current > 0) {
+        missed.current = true;
+        return;
+      }
+      if (seen !== edits.current) continue;
+      missed.current = false;
+      if (body) {
+        setData(body);
+        setMissing("");
+      } else {
+        setMissing(problem);
+      }
+      return;
     }
   }, [gameId]);
   useEffect(() => { load(); }, [load, reloadKey]);
@@ -201,20 +223,38 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
   const toggle = async (item, mode) => {
     const next = toggledModes(item, mode.mode, known);
     const on = next.includes(mode.mode);
+    pending.current += 1;
+    edits.current += 1;
     setBusy((current) => new Set(current).add(item.id));
     setData((current) => ({ ...current, maps: current.maps.map((row) => (row.id === item.id ? { ...row, modes: next } : row)) }));
+    let failed = null;
     try {
       await api.patch(`/games/${gameId}/maps/${item.id}`, { modes: next });
-      toast.success(`${item.name}: ${on ? "in" : "nicht mehr in"} ${mode.label} freigegeben.`);
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-      await load();
+      failed = err;
+    }
+    pending.current -= 1;
+    edits.current += 1;
+    if (failed) {
+      // Abgelehnt: sofort wieder der Stand von vor dem Klick - bevor die Zeile frei wird, sonst schickte das nächste Häkchen den
+      // abgelehnten Modus mit. Den Stand des Servers holt das Nachladen unten.
+      setData((current) => ({ ...current, maps: current.maps.map((row) => (row.id === item.id ? { ...row, modes: item.modes } : row)) }));
+      toast.error(formatApiError(failed.response?.data?.detail));
+    } else {
+      toast.success(`${item.name}: ${on ? "in" : "nicht mehr in"} ${mode.label} freigegeben.`);
     }
     setBusy((current) => {
       const rest = new Set(current);
       rest.delete(item.id);
       return rest;
     });
+    // Der Stand des Servers, sobald kein Häkchen mehr unterwegs ist: bei Ablehnung (dann steht wieder der gespeicherte da) und wenn
+    // währenddessen eine Abfrage verworfen wurde.
+    if (failed) missed.current = true;
+    if (!pending.current && missed.current) {
+      missed.current = false;
+      await load();
+    }
   };
   const assignModes = (modes) => act(async () => {
     const { data: body } = await api.post(`/games/${gameId}/maps/assign-modes`, { modes });
