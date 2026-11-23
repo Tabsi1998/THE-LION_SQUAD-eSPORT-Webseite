@@ -75,6 +75,9 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
    nach Zustimmung zu externen Medien.
 4. **Kategorie**: Verein, Turniere, Events, Community, Sponsoren, Mitglieder, Teams, Ankündigung, Rückblick, Wartung.
 5. **Sichtbarkeit**: **Öffentlich**, **Nur registrierte Community**, **Nur Vereinsmitglieder**, **Nur intern (Admins)**.
+   Direkt darunter **Wo erscheint der Beitrag?**: **Website und App** (Standard, wie bisher), **Nur App** oder **Nur Website**.
+   Beides gilt zusammen – „Nur App“ und „Nur Vereinsmitglieder“ heißt: nur Mitglieder, nur in der App. Was die Wahl bewirkt,
+   steht unter [News nur in der App oder nur auf der Website](#news-nur-in-der-app-oder-nur-auf-der-website).
 6. **Wann erscheint der Beitrag?** – eine von drei Möglichkeiten:
    - **Entwurf**: nur das Admin-Team sieht ihn, nichts wird verschickt.
    - **Jetzt veröffentlichen**: erscheint beim Speichern.
@@ -106,7 +109,8 @@ was Besucher sehen – nie Entwürfe oder geplante Beiträge. Die Vorschau gibt 
 **Vorschau** in der Liste: die echte Seite mit dem Band **„Noch nicht öffentlich“** und dem Weg zurück in den Editor.
 
 Die Liste unter Content → News hat Suche, Filter nach Stand (Veröffentlicht, Geplant, Entwurf, Zurückgezogen), Kategorie und
-Sichtbarkeit und eine CSV mit Begriffen statt Rohwerten.
+Sichtbarkeit und eine CSV mit Begriffen statt Rohwerten. Beiträge, die nicht überall erscheinen, tragen unter der Sichtbarkeit
+ein kleines Schild **Nur App** bzw. **Nur Website**; die CSV hat dafür die Spalte „Kanal“.
 
 **Zurückziehen statt Löschen:** Was schon öffentlich war, wird **zurückgezogen**: Der Beitrag verschwindet aus allen Listen,
 seine Adresse bleibt – wer einem Link aus Newsletter oder Discord folgt, sieht „Beitrag zurückgezogen“ statt „nicht gefunden“.
@@ -135,6 +139,32 @@ Uhr des Servers.
   Benachrichtigungen](mails.md).
 - Discord: Öffentliche News gehen über den Bot in den Kanal, den ihr unter Verbindungen → Discord gewählt habt
   ([Discord](discord.md)). Alles Nicht-Öffentliche geht nie in einen öffentlichen Kanal.
+- **Nur App** geht weder als Newsletter noch nach Discord hinaus – beide führen zur Website, die den Beitrag nicht zeigt.
+
+#### News nur in der App oder nur auf der Website
+
+Mit **Wo erscheint der Beitrag?** erreicht ihr gezielt die Nutzer der LionsAPP (etwa „Update da“ oder eine Aktion nur in der
+App) – oder lasst einen Beitrag aus der App heraus.
+
+| | Website und App | Nur App | Nur Website |
+|---|---|---|---|
+| News-Seite, Startseite, Suche, Event-Seite der Website | ja | nein | ja |
+| Google, Sitemap, Link-Vorschau mit Titel und Bild | ja | nein | ja |
+| News-Liste, Startseite und Suche der App | ja | ja | nein |
+| Newsletter-Mail, Discord-Meldung | ja | nein | ja |
+| Meldung an Mitglieder bzw. Vorstand und Erwähnungen | App-Push, Browser, Glocke | nur App-Push und Postfach der App | Browser und Glocke, kein App-Push |
+
+- **Link zu „Nur App“ auf der Website:** Wer die Adresse im Browser öffnet (etwa weil jemand den Beitrag aus der App geteilt
+  hat), sieht keinen Inhalt, sondern **„Nur in der LionsAPP“** mit den Knöpfen zum Store. Die Link-Vorschau in WhatsApp & Co.
+  zeigt nur „News in der LionsAPP“, ohne Titel und Bild, und Suchmaschinen nehmen die Seite nicht auf.
+- **Link zu „Nur Website“ auf dem Handy:** Ist die App installiert, öffnet Android Links auf `/news/…` in der App. Dort öffnet
+  sich der Beitrag trotzdem – sonst landeten Newsletter- und Discord-Links bei „nicht gefunden“. In Listen der App steht er nie.
+- Die **Vorschau** der Redaktion zeigt einen „Nur App“-Beitrag auch auf der Website, mit dem Band **„Nur in der App“**.
+- Alte Beiträge gelten als **Website und App**; es ändert sich nichts, solange ihr die Auswahl nicht umstellt.
+- Öffentliche News schicken heute keinen App-Push an alle – auch nicht bei „Nur App“. Gemeldet werden wie bisher nur
+  Mitglieder- und Vorstands-News und Erwähnungen.
+
+<img src="../assets/news/news-kanal-editor.png" alt="News-Editor: unter Sichtbarkeit die Auswahl „Wo erscheint der Beitrag?“ mit Hinweis, was „Nur App“ bewirkt" width="360">
 
 **So erscheint ein Beitrag auf der Website** – die Redaktion muss dafür nichts extra tun:
 
