@@ -153,7 +153,10 @@ function OwnProfile() {
     api.get<AchievementsMe>("/achievements/me").then(({ data }) => { if (data) setAchievements(data); }).catch(() => {});
   }), []);
 
+  // Strafen der Liga (#2173) laden beim Herunterziehen mit - ein eigener Teil der Seite mit eigenem Abruf.
+  const [sanctionsRound, setSanctionsRound] = useState(0);
   const refresh = useCallback(async () => {
+    setSanctionsRound((round) => round + 1);
     await refreshMe().catch(() => {});
     await load();
   }, [load, refreshMe]);
@@ -263,7 +266,7 @@ function OwnProfile() {
         />
       ) : null}
       {/* Strafen der Liga (E.3, #2173): gegen dich oder dein Co-Team, mit Einspruch - wie „Meine Strafen“ im Web. */}
-      <LeagueSanctionsList />
+      <LeagueSanctionsList reloadKey={sanctionsRound} />
     </Card>
   );
 

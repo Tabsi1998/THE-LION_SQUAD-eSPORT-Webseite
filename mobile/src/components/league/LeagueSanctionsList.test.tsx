@@ -81,3 +81,13 @@ test("Doppeltippen auf „Einspruch einlegen“: genau eine Anfrage", async () =
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
   expect(mockPost).toHaveBeenCalledTimes(1);
 });
+
+// Herunterziehen im Profil (#2173, Prüfung): ein neuer Ladeschlüssel holt die Strafen frisch.
+test("neuer Ladeschlüssel lädt die Strafen neu, derselbe nicht", async () => {
+  mockGet.mockResolvedValue({ data: { items: [SANCTION] } });
+  const view = await render(<LeagueSanctionsList reloadKey={0} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(1));
+  await view.rerender(<LeagueSanctionsList reloadKey={0} />);
+  await view.rerender(<LeagueSanctionsList reloadKey={1} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
+});

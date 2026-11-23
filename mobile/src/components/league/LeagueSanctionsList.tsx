@@ -113,7 +113,7 @@ function SanctionCard({ row, onChanged }: { row: PenaltyRow; onChanged: () => vo
 }
 
 /** Die Liga-Strafen aus `/penalties/me` - ohne Treffer oder ohne Antwort steht nichts da (ein Teil der Seite). */
-export function LeagueSanctionsList({ enabled = true }: { enabled?: boolean }) {
+export function LeagueSanctionsList({ enabled = true, reloadKey = 0 }: { enabled?: boolean; reloadKey?: number }) {
   const [rows, setRows] = useState<PenaltyRow[]>([]);
   const load = useCallback(async () => {
     try {
@@ -123,9 +123,10 @@ export function LeagueSanctionsList({ enabled = true }: { enabled?: boolean }) {
       // Kommt die Liste nicht, steht sie nicht da - der Rest des Profils bleibt.
     }
   }, []);
+  // `reloadKey`: Das Profil zählt ihn beim Herunterziehen hoch - dann kommt der Stand frisch.
   useEffect(() => {
     if (enabled) void load();
-  }, [enabled, load]);
+  }, [enabled, load, reloadKey]);
   if (!enabled || !rows.length) return null;
   return (
     <View style={styles.stack} testID="league-sanctions">
