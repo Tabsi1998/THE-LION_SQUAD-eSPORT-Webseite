@@ -127,7 +127,12 @@ async function contrastViolations(page) {
   return page.evaluate(async () => {
     const result = await window.axe.run(document, { runOnly: { type: "rule", values: ["color-contrast"] } });
     return result.violations.flatMap((violation) => violation.nodes.map((node) => {
-      const key = `${violation.id}: ${node.target.join(" ")}`;
+      // Bereich im Schlüssel (prueftor-bekannt.json): Fuß, Navigation, Kopf oder Inhalt - so gilt ein bekannter Fund des
+      // Rahmens nie für ein gleich benanntes Element im Inhalt.
+      const element = document.querySelector(node.target[node.target.length - 1]);
+      const region = !element ? "Inhalt" : element.closest("footer") ? "Fuß" : element.closest("nav") ? "Navigation"
+        : element.closest("header") ? "Kopf" : "Inhalt";
+      const key = `${violation.id}: [${region}] ${node.target.join(" ")}`;
       return { key, text: `${key} – ${node.any.map((check) => check.message).join(" ")}` };
     }));
   });

@@ -32,6 +32,10 @@ Funde aus der Zeit vor dem Tor stehen je Seite, Art (`a11y`, `tastatur`, `kontra
 Fehler auf einer anderen Seite oder an einem anderen Element. Wer einen behebt, streicht ihn aus der Liste. Die Liste
 soll schrumpfen; sie ist kein Ort für neue Funde.
 
+Ein Ziel trägt seinen Bereich: `color-contrast: [Fuß] a[data-testid="footer-imprint"]`. Bereiche sind `Fuß`
+(`<footer>`), `Navigation` (`<nav>`), `Kopf` (`<header>`) und `Inhalt`. Seite `"*"` (gilt auf jeder Seite) ist nur
+für `[Fuß]` und `[Navigation]` erlaubt – ein allgemeiner Selektor im Inhalt würde sonst überall Funde verdecken.
+
 ### Bewegungsregeln
 
 Entscheidung vom 15.10.2026: Bewegt wird über `transform` und `opacity`, „Bewegung reduzieren“ wird beachtet,

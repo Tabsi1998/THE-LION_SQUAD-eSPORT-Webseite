@@ -7,6 +7,8 @@ const path = require("node:path");
 
 const FILE = path.join(__dirname, "prueftor-bekannt.json");
 const ARTEN = new Set(["a11y", "kontrast", "tastatur"]);
+// Bereiche, für die ein Eintrag auf jeder Seite gelten darf (Seite „*“). Die Specs setzen den Bereich in den Schlüssel.
+const RAHMEN = ["[Fuß]", "[Navigation]"];
 
 function load(file = FILE) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
@@ -34,6 +36,10 @@ function problems(list = load()) {
     if (!fund.seite || !fund.ziel) out.push(`Eintrag ${index + 1}: Seite oder Ziel fehlt`);
     if (!ARTEN.has(fund.art)) out.push(`Eintrag ${index + 1}: unbekannte Art „${fund.art}“`);
     if (typeof fund.grund !== "string" || fund.grund.trim().length < 20) out.push(`Eintrag ${index + 1}: Begründung fehlt oder ist zu kurz`);
+    // „*“ (jede Seite) nur für den Rahmen: Ein allgemeines Ziel im Inhalt würde sonst überall Funde verdecken.
+    if (fund.seite === "*" && !RAHMEN.some((bereich) => String(fund.ziel).includes(bereich))) {
+      out.push(`Eintrag ${index + 1}: Seite „*“ nur für Fuß oder Navigation (${RAHMEN.join(", ")})`);
+    }
     return out;
   });
 }

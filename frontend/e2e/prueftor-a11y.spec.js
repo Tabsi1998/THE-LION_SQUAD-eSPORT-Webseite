@@ -74,7 +74,12 @@ async function axeViolations(page, { contrastOnly }) {
     return result.violations
       .filter((violation) => onlyContrast || ["serious", "critical"].includes(violation.impact))
       .flatMap((violation) => violation.nodes.map((node) => {
-        const key = `${violation.id}: ${node.target.join(" ")}`;
+        // Bereich im Schlüssel (prueftor-bekannt.json): Fuß, Navigation, Kopf oder Inhalt - so gilt ein bekannter Fund des
+        // Rahmens nie für ein gleich benanntes Element im Inhalt.
+        const element = document.querySelector(node.target[node.target.length - 1]);
+        const region = !element ? "Inhalt" : element.closest("footer") ? "Fuß" : element.closest("nav") ? "Navigation"
+          : element.closest("header") ? "Kopf" : "Inhalt";
+        const key = `${violation.id}: [${region}] ${node.target.join(" ")}`;
         return { key, text: onlyContrast ? `${key} – ${node.any.map((check) => check.message).join(" ")}` : key };
       }));
   }, contrastOnly);

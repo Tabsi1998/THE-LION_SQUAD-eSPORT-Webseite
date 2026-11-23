@@ -161,6 +161,9 @@ describe("Prüftor: bekannte Funde bei Barrierefreiheit und Kontrast", () => {
   it("jeder Eintrag der echten Liste hat Seite, Art, Ziel und Begründung", () => {
     expect(bekannt.problems()).toEqual([]);
     expect(bekannt.problems({ funde: [{ seite: "X", art: "farbe", ziel: "", grund: "kurz" }] })).toHaveLength(3);
+    // „*“ nur für Fuß und Navigation - ein allgemeines Ziel im Inhalt würde überall Funde verdecken.
+    expect(bekannt.problems({ funde: [{ seite: "*", art: "kontrast", ziel: "color-contrast: [Inhalt] .whitespace-nowrap", grund }] })).toHaveLength(1);
+    expect(bekannt.problems({ funde: [{ seite: "*", art: "kontrast", ziel: "color-contrast: [Fuß] .whitespace-nowrap", grund }] })).toEqual([]);
   });
 
   it("ein neuer bekannter Fund gegenüber main braucht eine Begründung im PR", () => {
