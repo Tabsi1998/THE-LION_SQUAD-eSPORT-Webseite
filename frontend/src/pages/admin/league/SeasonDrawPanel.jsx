@@ -2,7 +2,7 @@
 // angenommenen Co-Teams - ausgeglichen, Co-Teams eines Hauptteams getrennt. Erst die Vorschau (Seed gespeichert, neu laden würfelt nicht
 // neu), dann Tausch mit Grund, dann „Übernehmen“: Erst dort entstehen Zuteilungen und Nachrichten. Dazu die Platzprüfung: Passen die
 // Teams in die Staffeln, die es gibt? Gelost und geprüft wird auf dem Server.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, CircleAlert, CircleCheck } from "lucide-react";
 import { toast } from "sonner";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -73,6 +73,9 @@ export function DrawSheet({ seasonId, division, superadmin, onClose, onChanged }
   const [conflictReason, setConflictReason] = useState("");
   const url = `/admin/leagues/seasons/${seasonId}/draws/${division.id}`;
   const open = draw?.status === "draft";
+  // Der Tausch steht unter der Verteilung: Bei vielen Staffeln oder am Handy liegt er sonst unter dem Bildrand, und der Klick wirkt tot.
+  const swapRef = useRef(null);
+  useEffect(() => { if (swapFrom) swapRef.current?.scrollIntoView?.({ block: "nearest" }); }, [swapFrom]);
   // Befangenheit (Nr. 73): Steht das eigene Team im Los, macht es eine andere Person; der Superadmin nur mit Grund.
   const blockedOwn = Boolean(division.own_team && !superadmin);
   const needsReason = Boolean(division.own_team && superadmin);
@@ -141,7 +144,7 @@ export function DrawSheet({ seasonId, division, superadmin, onClose, onChanged }
           </section>
 
           {swapFrom ? (
-            <section aria-labelledby="draw-swap" className="space-y-3 rounded-sm border border-white/10 bg-[#121212] p-3" data-testid="draw-swap">
+            <section ref={swapRef} aria-labelledby="draw-swap" className="space-y-3 rounded-sm border border-white/10 bg-[#121212] p-3" data-testid="draw-swap">
               <h3 id="draw-swap" className={HEADING}>Tausch</h3>
               <SelectField label={`${swapFrom.display_name} tauscht mit`} value={swapWith} onChange={setSwapWith} testId="draw-swap-with"
                 options={[["", "Co-Team wählen …"], ...partners]} />
