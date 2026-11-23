@@ -324,6 +324,16 @@ def test_someone_who_left_is_never_marked_as_advanced():
     assert "swiss_status" not in done["c"]
 
 
+def test_someone_who_left_frees_the_advancing_place_and_never_causes_a_tie():
+    """a führt, ist aber ausgetreten: Die zwei Plätze gehen an die nächsten zwei, die noch spielen - kein falscher
+    „Gleichstand an der Grenze“, weil die ausgetretene Zeile einen Platz belegt."""
+    settings = swiss(end_rule="rounds", rounds=3, top_n=2, tiebreakers=["median_buchholz", "buchholz"])
+    rows = swiss_standings(three_rounds(), regs(*EIGHT, a="withdrawn"), settings)
+
+    marked = {row["registration_id"]: row["swiss_status"] for row in rows if row.get("swiss_status")}
+    assert marked == {"c": "advanced", "b": "advanced"}
+
+
 def test_the_structure_and_the_placements_use_the_swiss_settings():
     tournament = {"id": "t", **swiss(tiebreakers=["median_buchholz", "buchholz"])}
 

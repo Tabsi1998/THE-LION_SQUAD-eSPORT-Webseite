@@ -765,12 +765,16 @@ def _mark_swiss_progress(rows: list[dict], matches: list[dict], registrations: l
     elif rule == "rounds" and settings.get("top_n"):
         if swiss_state(settings, sorted(playing), [match for match in matches if not match.get("is_preview")])["complete"]:
             top_n = settings["top_n"]
-            inside = [row for row in rows if row["rank"] <= top_n]
-            # Mehr Zeilen als Plätze: Die Punktgleichen auf dem letzten dieser Ränge passen nicht alle hinein.
-            shared = max(row["rank"] for row in inside) if len(inside) > top_n else None
+            # Nur wer noch teilnimmt, belegt einen Platz: Ein ausgetretenes Team auf Rang 1 macht seinen Platz frei.
+            active = sorted((row for row in rows if row["registration_id"] in playing), key=lambda row: row["rank"])
+            if not active:
+                return
+            cutoff = active[min(top_n, len(active)) - 1]["rank"]
+            inside = [row for row in active if row["rank"] <= cutoff]
+            # Mehr Teams als Plätze: Die Punktgleichen auf dem letzten dieser Ränge passen nicht alle hinein.
+            shared = cutoff if len(inside) > top_n else None
             for row in inside:
-                if row["registration_id"] in playing:
-                    row["swiss_status"] = "tied" if row["rank"] == shared else "advanced"
+                row["swiss_status"] = "tied" if row["rank"] == shared else "advanced"
 
 
 # Der Wettbewerbsrang (#1593) wohnt seit #1741 im gemeinsamen Rechenkern; der alte Name bleibt als Weiterleitung.
