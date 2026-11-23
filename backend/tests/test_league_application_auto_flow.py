@@ -153,8 +153,10 @@ async def test_with_several_staffeln_the_lead_assigns(flow, shape):
     assert "Liga und Staffel teilt die Liga-Leitung noch zu" in note["body"]
     stats = (await inbox(flow, w))["stats"]
     assert stats["unassigned"] == 1 and stats["taken"] == 1
-    # Die Leitung teilt wie bisher zu - danach ist es eine Zuteilung der Leitung.
-    assigned = ok(await decide(flow, w, answer, "assign", tournament_id=w["tid"]))
+    # Die Leitung teilt wie bisher zu - danach ist es eine Zuteilung der Leitung. Gibt es darunter eine zweite Liga N, starten neue
+    # Co-Teams einer neuen Season dort (#1623): Liga 1 geht dann nur mit Grund.
+    reason = {} if shape == "two_staffeln" else {"deviation_reason": "Liga 2 startet erst mit mehr Teams"}
+    assigned = ok(await decide(flow, w, answer, "assign", tournament_id=w["tid"], **reason))
     assert assigned["assignment"]["tournament_id"] == w["tid"] and "auto" not in assigned["assignment"]
 
 

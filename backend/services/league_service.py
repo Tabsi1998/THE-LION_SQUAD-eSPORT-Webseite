@@ -90,6 +90,9 @@ SEASON_RULE_DEFAULTS: dict = {
     "application_waitlist": True,
     # Anmeldungen automatisch annehmen (#2348): aus = die Leitung prüft jede Anmeldung. Fehlt das Feld (ältere Seasons), gilt dasselbe.
     "application_auto_accept": False,
+    # Neue Co-Teams starten in der untersten Liga N (#1623, Entscheidung 15.10.): Der Eingang bietet sie zuerst an, höher nur mit Grund.
+    # Fehlt das Feld (ältere Seasons), gilt nichts - die Leitung teilt frei zu wie bisher.
+    "new_squads_lowest_division": True,
 }
 # Selbstanmeldung (#2205): Leer heißt: gibt es nicht - darum dürfen die Felder auch wieder leer werden.
 APPLICATION_TIMES = ("application_opens_at", "application_closes_at")
