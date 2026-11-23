@@ -5,7 +5,8 @@ Teams, die auf- oder absteigen (bzw. ausscheiden), mit Ziel-Liga. Die Leitung st
 **Weiter** (nächste Liga N) und **Ende** (zurück zum gewohnten Bild). Der Stand steht an jeder abgeschlossenen Staffel der Season
 (``tournaments.tv_finale``, nie an der Season - die Folge-Season übernimmt Season-Felder, F.2), damit jeder TV der Season mitgeht.
 
-Gelesen wird nur der Endstand (``league_final_tables``, Zonen an jeder Zeile - F.2, #1627). Relegationsplätze haben noch keine
+Gelesen wird nur der Endstand (``league_final_tables``, Zonen an jeder Zeile - F.2, #1627; Plätze über Staffeln hinweg wie „beste
+Zweite“ kommen beim Lesen dazu, ``league_cross_zones.overlay_finals``). Relegationsplätze haben noch keine
 Wirkung (``league_zones.MOVES``) und erscheinen hier nicht. Am TV und im Discord steht nur, was Gäste sehen: Season öffentlich
 (``profile_visibility.public_season``) und die Staffel als Turnier sichtbar - dieselbe Regel wie beim Podest (``awards._visible``).
 """
@@ -131,15 +132,20 @@ async def season_finals(db, season: dict, *, guests_only: bool = True) -> tuple[
     ids = [row["id"] for row in staffeln]
     finals = await db.league_final_tables.find({"tournament_id": {"$in": ids}, "active": True},
                                                {"_id": 0, "tournament_id": 1, "division_id": 1, "staffel": 1, "rows": 1, "champion": 1,
-                                                "champion_place": 1}).to_list(len(ids) or 1) if ids else []
+                                                "champion_place": 1, "zones": 1}).to_list(len(ids) or 1) if ids else []
+    # Plätze über Staffeln hinweg (#1627, „beste Zweite“): Der Endstand trägt sie nicht - sie kommen beim Lesen dazu, sobald alle
+    # Staffeln der Liga N abgeschlossen sind. So lesen TV, Steuerung und Discord dieselbe Zone wie Tabelle und Folge-Season.
+    from services import league_cross_zones
+
+    await league_cross_zones.overlay_finals(db, finals)
     return staffeln, finals
 
 
-async def season_pages(db, season: dict, *, guests_only: bool = True) -> list[dict]:
+async def season_pages(db, season: dict, *, guests_only: bool = True, column_max: int | None = None) -> list[dict]:
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": {"$ne": "archived"}},
                                                {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)
     _, finals = await season_finals(db, season, guests_only=guests_only)
-    return build_pages(divisions, finals)
+    return build_pages(divisions, finals, column_max)
 
 
 async def tv_payload(db, tournament: dict | None) -> dict | None:
