@@ -16,6 +16,11 @@ from services import result_share  # noqa: E402
 from services.tournament_path import _outcome, chip_text  # noqa: E402
 
 
+def pixels(image):
+    """Alle Pixel - `getdata` entfällt mit Pillow 14 (2027-10-15), `get_flattened_data` ersetzt es (ab Pillow 12)."""
+    return getattr(image, "get_flattened_data", image.getdata)()
+
+
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
@@ -229,7 +234,7 @@ async def test_group_stage_counts_wins_draws_and_losses(flow):
 
 def warn_pixels(content: bytes) -> int:
     """Pixel im Farbton der Warnfarbe (#FF9F43) - auch halb durchsichtig auf dunklem Grund; Gold, Bronze und Cyan nicht."""
-    return sum(1 for red, green, blue in Image.open(io.BytesIO(content)).convert("RGB").getdata()
+    return sum(1 for red, green, blue in pixels(Image.open(io.BytesIO(content)).convert("RGB"))
                if red > 60 and 0.5 < green / red < 0.75 and 0.15 < blue / red < 0.4)
 
 
