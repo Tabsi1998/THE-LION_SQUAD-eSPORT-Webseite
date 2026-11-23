@@ -109,11 +109,11 @@ function AlbumCard({ a }) {
         )}
       </div>
       <div className="p-4">
-        <div className="tls-card__title font-heading font-black uppercase">{a.title}</div>
+        <div className="tls-card__title tls-wrap font-heading font-black uppercase">{a.title}</div>
         {/* Leere Alben (#1224) sieht nur, wer Inhalte pflegt - mit diesem Hinweis. */}
         {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
         {a.taken_at && <div className="text-xs text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
-        {a.description && <div className="text-xs text-white/55 mt-2 line-clamp-2">{a.description}</div>}
+        {a.description && <p className="text-xs text-white/55 mt-2 line-clamp-2">{a.description}</p>}
       </div>
     </Link>
   );
