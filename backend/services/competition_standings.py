@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # ``is_bye`` (#2336) steht bei der einen Regel für Spiele und Siege (services/match_winner, #2337) und bleibt hier importierbar.
+from services.graph_swiss import swiss_settings, swiss_state
 from services.match_winner import is_bye, is_real_match, no_show_ids, participant_ids, won_by
 from services.round_labels import TABLE_FORMATS, TABLE_STAGE_TYPES, section_kind
 from services.scoring_rules import maps_mode, rank_with_ties
@@ -250,6 +251,49 @@ def table_rules(tournament: dict | None) -> dict | None:
         return None
 
 
+# Gleichstand in Turnier-Tabellen (#1559): Gruppenphase und „Jeder gegen jeden“ ohne Liga-Regeln. Die Reihenfolge steht
+# am Turnier (``table_tiebreakers``); ohne das Feld gilt wie bisher Siege, dann Differenz.
+TOURNAMENT_TABLE_TIEBREAKERS = ("head_to_head", "score_diff", "score_for", "wins")
+LEGACY_TABLE_TIEBREAKERS = ("wins", "score_diff")
+TOURNAMENT_MATCH_POINTS = {"win": 3, "draw": 1, "loss": 0}
+SWISS_MATCH_POINTS = {"win": 1, "draw": 0.5, "loss": 0}
+
+
+def tournament_table_tiebreakers(tournament: dict | None) -> list[str] | None:
+    """Die Reihenfolge bei Punktgleichheit eines Turniers - ``None`` ohne Einstellung (dann rechnet die Tabelle wie vor
+    #1559) und in einer Liga-Staffel (die rechnet nach den Regeln ihrer Season, ``scoring_rules``)."""
+    if isinstance((tournament or {}).get("scoring_rules"), dict):
+        return None
+    raw = (tournament or {}).get("table_tiebreakers")
+    if not isinstance(raw, (list, tuple)):
+        return None
+    chosen: list[str] = []
+    for key in raw:
+        if key in TOURNAMENT_TABLE_TIEBREAKERS and key not in chosen:
+            chosen.append(key)
+    return chosen
+
+
+def rank_table(rows: list[dict], matches: list[dict], criteria: list[str], *, match_points: dict | None = None,
+               head_to_head_criteria: list[str] | None = None, schedule: list[dict] | None = None,
+               all_pairs: bool = False) -> None:
+    """Die gemeinsame Stelle für Gleichstand (#1559): Punkte, dann ``criteria`` der Reihe nach - gerechnet von derselben
+    Funktion wie die Liga-Staffel (``_rank_league``), samt direktem Vergleich mit Mini-Tabelle und neu gerechneter
+    Restgruppe. Sortiert ``rows`` an Ort und Stelle, setzt ``rank`` (1, 2, 2, 4) und ``tiebreak`` (was entschied).
+
+    ``match_points``: Punkte der Mini-Tabelle; ``all_pairs``: der direkte Vergleich zählt nur, wenn sich alle
+    Punktgleichen untereinander getroffen haben (Schweizer System - dort spielt nicht jeder gegen jeden)."""
+    for row in rows:
+        row.setdefault("tiebreak", None)
+    rules = {
+        "table_tiebreakers": list(criteria),
+        "match_points": dict(match_points or TOURNAMENT_MATCH_POINTS),
+        "head_to_head_criteria": list(head_to_head_criteria or ("points", "score_diff", "score_for")),
+        "exit_rule": "half",
+    }
+    _rank_league(rows, matches, rules, [], schedule=schedule, all_pairs=all_pairs)
+
+
 def _round_robin_rows(matches: list[dict], registrations: list[dict], rules: dict | None = None) -> list[dict]:
     points = (rules or {}).get("match_points") or {"win": 3, "draw": 1, "loss": 0}
     win_points, draw_points, loss_points = points.get("win", 3), points.get("draw", 1), points.get("loss", 0)
@@ -327,8 +371,15 @@ def round_robin_standings(matches: list[dict], registrations: list[dict], rules:
     ``rules`` rechnet die Tabelle der Liga-Staffel (E.1, ``_league_rows``); ``tournament`` liefert dazu Best of,
     Punktabzüge und Entscheide der Leitung."""
     if rules is None:
+        # Turnier ohne Liga-Regeln (#1559): mit ``table_tiebreakers`` am Turnier die gemeinsame Rechnung, sonst wie bisher.
+        criteria = tournament_table_tiebreakers(tournament)
+
         def compute(rows_matches, rows_registrations):
-            return _round_robin_rows(rows_matches, rows_registrations, rules)
+            rows = _round_robin_rows(rows_matches, rows_registrations, rules)
+            if criteria is not None:
+                # Der ganze Spielplan entscheidet, ob unter Punktgleichen alles gespielt ist - wie in der Liga.
+                rank_table(rows, rows_matches, criteria, schedule=matches)
+            return rows
         return _with_form_and_movement(compute, matches, registrations)
     effective = _league_matches(matches, registrations, rules, (tournament or {}).get("best_of"))
     # Der ganze Spielplan: Ob unter Punktgleichen alles gespielt ist, entscheidet er - auch für die Tabelle des vorigen
@@ -510,7 +561,10 @@ def _league_rows(matches: list[dict], registrations: list[dict], rules: dict, co
     return rows
 
 
-TIEBREAK_FIELDS = {"wins": "won", "score_diff": "score_diff", "score_for": "score_for"}
+# ``buchholz`` und ``median_buchholz`` gibt es nur im Schweizer System (#1559) - die Liga kann sie nicht wählen
+# (``scoring_rules.TABLE_TIEBREAKERS``).
+TIEBREAK_FIELDS = {"wins": "won", "score_diff": "score_diff", "score_for": "score_for",
+                   "buchholz": "buchholz", "median_buchholz": "median_buchholz"}
 
 
 def _partition(rows: list[dict], key) -> list[list[dict]]:
@@ -568,18 +622,29 @@ def _mini_table(group: list[dict], matches: list[dict], rules: dict) -> dict[str
     return {registration_id: tuple(value(entry, name) for name in criteria) for registration_id, entry in mini.items()}
 
 
-def _head_to_head_complete(group: list[dict], matches: list[dict], schedule: list[dict] | None) -> bool:
+def _head_to_head_complete(group: list[dict], matches: list[dict], schedule: list[dict] | None, *,
+                           all_pairs: bool = False) -> bool:
     """Sind alle Spiele der Gruppe untereinander gespielt? Entscheidung des Obmanns zu E.1: sonst zählt der direkte
-    Vergleich nicht. ``schedule``: der ganze Spielplan; ``matches``: was in dieser Tabelle zählt."""
+    Vergleich nicht. ``schedule``: der ganze Spielplan; ``matches``: was in dieser Tabelle zählt. ``all_pairs`` (#1559,
+    Schweizer System): dazu muss jedes Paar der Gruppe mindestens einmal gegeneinander gespielt haben - in der Liga und
+    in Gruppen steht das ohnehin im Spielplan."""
     ids = {row["registration_id"] for row in group}
 
+    def sides_of(match: dict) -> list:
+        return [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
+
     def inside(match: dict) -> bool:
-        sides = [slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")]
+        sides = sides_of(match)
         return len(sides) == 2 and set(sides) <= ids and sides[0] != sides[1]
 
-    played = {match.get("id") for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES and inside(match)}
-    return all(match.get("id") in played for match in (schedule if schedule is not None else matches)
-               if inside(match) and match.get("status") != "cancelled" and not match.get("is_preview"))
+    decided = [match for match in matches if match.get("status") in TERMINAL_MATCH_STATUSES and inside(match)]
+    played = {match.get("id") for match in decided}
+    complete = all(match.get("id") in played for match in (schedule if schedule is not None else matches)
+                   if inside(match) and match.get("status") != "cancelled" and not match.get("is_preview"))
+    if complete and all_pairs:
+        met = {frozenset(sides_of(match)) for match in decided}
+        return len(met) == len(ids) * (len(ids) - 1) // 2
+    return complete
 
 
 def _decision_for(group: list[dict], decisions: list[dict]) -> dict | None:
@@ -591,9 +656,10 @@ def _decision_for(group: list[dict], decisions: list[dict]) -> dict | None:
 
 
 def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: list[dict], *,
-                 schedule: list[dict] | None = None) -> None:
+                 schedule: list[dict] | None = None, all_pairs: bool = False) -> None:
     """Reihenfolge der Liga-Staffel: Punkte, dann ``table_tiebreakers`` der Reihe nach (Nr. 25, 42). Ausgeschiedene mit
-    ``all_for_opponents`` stehen unten (Nr. 43). Sortiert ``rows`` an Ort und Stelle und setzt ``rank`` (1, 2, 2, 4)."""
+    ``all_for_opponents`` stehen unten (Nr. 43). Sortiert ``rows`` an Ort und Stelle und setzt ``rank`` (1, 2, 2, 4).
+    Turnier-Tabellen rechnen über ``rank_table`` mit derselben Funktion (#1559); ``all_pairs`` siehe dort."""
     criteria = list(rules.get("table_tiebreakers") or [])
 
     def separated(part: list[dict], criterion: str) -> None:
@@ -601,7 +667,7 @@ def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: 
             part[0]["tiebreak"] = criterion
 
     def head_to_head(group: list[dict], index: int) -> list[list[dict]]:
-        if not _head_to_head_complete(group, matches, schedule):
+        if not _head_to_head_complete(group, matches, schedule, all_pairs=all_pairs):
             # Noch nicht alles gespielt: das Kriterium fällt weg, es geht mit dem nächsten weiter.
             return resolve(group, index + 1)
         mini = _mini_table(group, matches, rules)
@@ -664,8 +730,41 @@ def _rank_league(rows: list[dict], matches: list[dict], rules: dict, decisions: 
     rows[:] = ordered
 
 
-def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
-    return _with_form_and_movement(_swiss_rows, matches, registrations)
+def swiss_standings(matches: list[dict], registrations: list[dict], tournament: dict | None = None) -> list[dict]:
+    """Die Tabelle des Schweizer Systems. Mit ``swiss_settings`` am Turnier (#1559) gilt dessen Reihenfolge bei
+    Punktgleichheit (Median-Buchholz, Buchholz, direkter Vergleich, Siege), und die Zeile sagt, wer nach der
+    Abschlussregel weiter oder raus ist (``swiss_status``). Ohne das Feld rechnet sie wie vorher."""
+    if not isinstance((tournament or {}).get("swiss_settings"), dict):
+        return _with_form_and_movement(_swiss_rows, matches, registrations)
+    settings = swiss_settings(tournament)
+
+    def compute(rows_matches, rows_registrations):
+        return _swiss_rows(rows_matches, rows_registrations, settings, schedule=matches)
+    rows = _with_form_and_movement(compute, matches, registrations)
+    _mark_swiss_progress(rows, matches, registrations, settings)
+    return rows
+
+
+def _mark_swiss_progress(rows: list[dict], matches: list[dict], registrations: list[dict], settings: dict) -> None:
+    """``swiss_status`` je Zeile: ``advanced`` (weiter) oder ``eliminated`` (raus) nach der Abschlussregel. Mit fester
+    Rundenzahl sind die besten ``top_n`` weiter, sobald die letzte Runde gewertet ist. Wer nicht mehr teilnimmt
+    (ausgetreten, disqualifiziert), bekommt keine Marke."""
+    playing = {row["id"] for row in registrations
+               if row.get("id") and (row.get("status") or "approved") in STANDING_REGISTRATION_STATUSES}
+    rule = settings.get("end_rule")
+    if rule == "wins_losses":
+        for row in rows:
+            if row["registration_id"] not in playing:
+                continue
+            if row["won"] >= settings["wins_to_advance"]:
+                row["swiss_status"] = "advanced"
+            elif row["lost"] >= settings["losses_to_exit"]:
+                row["swiss_status"] = "eliminated"
+    elif rule == "rounds" and settings.get("top_n"):
+        if swiss_state(settings, sorted(playing), [match for match in matches if not match.get("is_preview")])["complete"]:
+            for row in rows:
+                if row["registration_id"] in playing and row["rank"] <= settings["top_n"]:
+                    row["swiss_status"] = "advanced"
 
 
 # Der Wettbewerbsrang (#1593) wohnt seit #1741 im gemeinsamen Rechenkern; der alte Name bleibt als Weiterleitung.
@@ -724,7 +823,16 @@ def _with_form_and_movement(compute, matches: list[dict], registrations: list[di
     return rows
 
 
-def _swiss_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
+def _median_buchholz(opponent_points: list) -> float:
+    """Median-Buchholz (#1559): die Punkte der Gegner ohne den besten und den schlechtesten - ein einzelner sehr starker
+    oder sehr schwacher Gegner verzerrt den Wert dann nicht. Mit weniger als drei Gegnern zählt die einfache Summe."""
+    if len(opponent_points) < 3:
+        return sum(opponent_points)
+    return sum(sorted(opponent_points)[1:-1])
+
+
+def _swiss_rows(matches: list[dict], registrations: list[dict], settings: dict | None = None, *,
+                schedule: list[dict] | None = None) -> list[dict]:
     stats = {
         registration["id"]: {
             "registration_id": registration["id"],
@@ -773,15 +881,30 @@ def _swiss_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
             stats[registration_b]["drawn"] += 1
             stats[registration_a]["points"] += 0.5
             stats[registration_b]["points"] += 0.5
+    criteria = None if settings is None else list(settings.get("tiebreakers") or [])
     for row in stats.values():
-        row["buchholz"] = sum(stats[opponent]["points"] for opponent in row["opponents"] if opponent in stats)
+        opponent_points = [stats[opponent]["points"] for opponent in row["opponents"] if opponent in stats]
+        row["buchholz"] = sum(opponent_points)
+        if criteria and "median_buchholz" in criteria:
+            row["median_buchholz"] = _median_buchholz(opponent_points)
         row.pop("opponents", None)
     rows = list(stats.values())
-    _rank_with_ties(rows, lambda row: (row["points"], row["buchholz"], row["won"]))
+    if criteria is None:
+        _rank_with_ties(rows, lambda row: (row["points"], row["buchholz"], row["won"]))
+    else:
+        # Die Reihenfolge des Turniers (#1559) über die gemeinsame Rechnung; der direkte Vergleich zählt nur, wenn sich
+        # alle Punktgleichen getroffen haben, und rechnet seine Mini-Tabelle mit 1 und ½.
+        rank_table(rows, matches, criteria, match_points=SWISS_MATCH_POINTS, head_to_head_criteria=["points"],
+                   schedule=schedule, all_pairs=True)
     return rows
 
 
-def group_standings(matches: list[dict], registrations: list[dict], groups: list[dict]) -> list[dict]:
+def group_standings(matches: list[dict], registrations: list[dict], groups: list[dict], *,
+                    tournament: dict | None = None) -> list[dict]:
+    """Je Gruppe eine Tabelle. ``tournament`` (#1559): seine Reihenfolge bei Punktgleichheit (``table_tiebreakers``) gilt
+    in jeder Gruppe für sich - der direkte Vergleich sieht nur die Spiele der Gruppe."""
+    # Nur die Einstellung der Tabelle - Punktabzüge und Entscheide einer Liga gibt es in Gruppen nicht.
+    table_settings = {"table_tiebreakers": tournament_table_tiebreakers(tournament)}
     registration_map = {registration["id"]: registration for registration in registrations if registration.get("id")}
     result = []
     for group in groups:
@@ -799,7 +922,7 @@ def group_standings(matches: list[dict], registrations: list[dict], groups: list
         ]
         result.append({
             "group": group,
-            "standings": round_robin_standings(group_matches, group_registrations),
+            "standings": round_robin_standings(group_matches, group_registrations, tournament=table_settings),
         })
     return result
 
@@ -821,9 +944,9 @@ def standings_for_structure(
         # braucht Buchholz und ein Gruppenturnier seine Gruppentabellen, egal in
         # welcher Engine die Matches liegen.
         if format_key == "swiss":
-            return swiss_standings(stage_matches, registrations)
+            return swiss_standings(stage_matches, registrations, tournament)
         if format_key == "groups":
-            return group_standings(stage_matches, registrations, list(groups))
+            return group_standings(stage_matches, registrations, list(groups), tournament=tournament)
         if format_key in {"round_robin", "league"}:
             return round_robin_standings(stage_matches, registrations, table_rules(tournament), tournament=tournament)
         return stage_standings(stage_matches, registrations)
@@ -831,9 +954,9 @@ def standings_for_structure(
     if format_key in {"round_robin", "league"}:
         return round_robin_standings(legacy_matches, registrations, table_rules(tournament), tournament=tournament)
     if format_key == "swiss":
-        return swiss_standings(legacy_matches, registrations)
+        return swiss_standings(legacy_matches, registrations, tournament)
     if format_key == "groups":
-        return group_standings(legacy_matches, registrations, list(groups))
+        return group_standings(legacy_matches, registrations, list(groups), tournament=tournament)
     return elimination_standings(legacy_matches, registrations)
 
 
@@ -1130,7 +1253,7 @@ def placements_for_structure(
     if not wanted_sections and format_key in {"round_robin", "league"}:
         rows = round_robin_standings(stage_matches, registrations, table_rules(tournament), tournament=tournament)
     elif not wanted_sections and format_key == "swiss":
-        rows = swiss_standings(stage_matches, registrations)
+        rows = swiss_standings(stage_matches, registrations, tournament)
     else:
         rows = stage_standings(stage_matches, registrations)
     for row in rows:
