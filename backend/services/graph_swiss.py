@@ -41,8 +41,9 @@ DEFAULT_LOSSES_TO_EXIT = 3
 MAX_ROUNDS = 30
 MAX_RECORD = 20
 MAX_TOP_N = 4096
-# So viele Schritte sucht die Paarung nach einer Runde ohne Wiederholung, bevor sie die einfache Regel nimmt.
-PAIRING_BUDGET = 20000
+# So viele Schritte verbessert die Paarung die einfache Regel, bevor sie das Beste bis dahin nimmt. Ein Schritt ist ein
+# geprüfter Gegner; 60000 sind rund 30 ms. Felder bis etwa 32 Teilnehmer sind damit immer bewiesen die beste Runde.
+PAIRING_BUDGET = 60000
 # So viele Kandidaten für das Freilos werden durchprobiert, wenn die Runde sonst eine Wiederholung bräuchte.
 BYE_TRIES = 8
 _ROUND_NAMESPACE = uuid.UUID("6f0c1c5e-7a55-5b0e-9d1e-1559a0c0ffee")
@@ -235,70 +236,188 @@ def _ordered_by_score(scores: dict[str, float], rng: random.Random) -> list[str]
     return ordered
 
 
-class _BudgetSpent(Exception):
-    """Die Suche nach einer Runde ohne Wiederholung hat ihr Schrittbudget verbraucht."""
+def _half_points(score) -> int:
+    """Punkte in halben Schritten, als ganze Zahl - damit gleiche Punkte sicher gleich sind."""
+    return int(round(2 * float(score or 0)))
 
 
-def _search_pairs(ordered: list[str], opponents: dict[str, set], allowed: int,
-                  steps: list[int]) -> list[tuple[str, str]] | None:
-    """Eine vollständige Paarung mit höchstens ``allowed`` Wiederholungen - oder ``None``, wenn es keine gibt.
+def _best_pairs(ordered: list[str], opponents: dict[str, set], scores: dict[str, float] | None,
+                budget: int) -> tuple[list[tuple[str, str]], int, bool]:
+    """Die beste vollständige Paarung eines geraden Feldes: Paare, Zahl der Wiederholungen und ob sie bewiesen die
+    beste ist (``False``: das Schrittbudget war vorher verbraucht).
 
-    Tiefensuche von oben: der Beste ohne Gegner nimmt den nächsten in der Reihenfolge, gegen den er noch nicht gespielt
-    hat. Geht es weiter unten nicht auf, wird die letzte Wahl zurückgenommen und der nächste Kandidat versucht - so
-    bleibt die Paarung so nah an „ähnliche Punkte treffen sich“, wie es ohne Wiederholung geht. Ohne Rekursion, damit
-    auch ein großes Feld nicht an der Aufruftiefe scheitert.
+    Was „beste“ heißt, in dieser Reihenfolge:
+
+    1. so wenige Wiederholungen wie möglich,
+    2. die Punkte in jedem Paar so nah beieinander wie möglich. Gezählt wird die Summe der quadrierten Abstände: Gleiche
+       Punkte kosten nichts, also wird eine Punktgruppe erst in sich gepaart. Wer ausweichen muss, geht zur
+       Nachbargruppe - zwei kleine Schritte sind besser als ein weiter, der Erste trifft nie auf den Letzten, nur weil
+       beide in ihrer Gruppe übrig sind.
+
+    Gesucht wird von oben: Der Beste ohne Gegner probiert die anderen der Reihe nach, erst die noch nie gespielten,
+    dann die Wiederholungen. Der erste Durchlauf ist die einfache Regel und steht nach einem Gang durchs Feld. Danach
+    wird jede Wahl zurückgenommen und die nächste versucht, solange sie noch besser werden kann als das Gefundene
+    (Schranke ``rest``), und kein Stand wird zweimal durchsucht (``seen``). Steht eine Runde, die nach den Punkten gar
+    nicht besser sein kann (``floor``), ist sofort Schluss. Ohne Rekursion, damit auch ein großes Feld nicht an der
+    Aufruftiefe scheitert.
     """
     size = len(ordered)
+    value = [_half_points((scores or {}).get(player)) for player in ordered]
+    # Die Schranken brauchen absteigende Punkte; bei gleichen Punkten bleibt die übergebene Reihenfolge.
+    rank = sorted(range(size), key=lambda index: -value[index])
+    ordered = [ordered[index] for index in rank]
+    value = [value[index] for index in rank]
+    place = {player: index for index, player in enumerate(ordered)}
+
+    group = [0] * size
+    for index in range(1, size):
+        group[index] = group[index - 1] + (value[index] != value[index - 1])
+    groups = group[-1] + 1
+    free = [0] * groups
+    points = [0] * groups
+    for index, number in enumerate(group):
+        free[number] += 1
+        points[number] = value[index]
+
+    # Eine Zahl je Runde, die beide Ziele in ihrer Reihenfolge hält: Eine Wiederholung wiegt mehr als alle Abstände.
+    widest = value[0] - value[-1]
+    repeat = widest * widest * (size // 2) + 1
+
+    def rest(start: int) -> int:
+        """Was die noch Freien ab Gruppe ``start`` mindestens kosten - ohne Blick auf die Geschichte: Jede Gruppe paart
+        sich in sich, wer übrig ist, trifft auf die nächste Gruppe, in der noch jemand frei ist."""
+        total = 0
+        carried = -1
+        for number in range(start, groups):
+            count = free[number]
+            if not count:
+                continue
+            if carried >= 0:
+                gap = points[carried] - points[number]
+                total += gap * gap
+                count -= 1
+                carried = -1
+            if count % 2:
+                carried = number
+        return total
+
+    floor = rest(0)
+
+    faced_at: list[set[int]] = []
+    again: list[list[int]] = []
+    for index, player in enumerate(ordered):
+        met = {place[other] for other in opponents.get(player) or () if other in place}
+        faced_at.append(met)
+        again.append(sorted(other for other in met if other > index))
+
     used = [False] * size
-    pairs: list[tuple[int, int]] = []
-    rematches = 0
+    taken = 0
+    partial = 0
+    best_cost: int | None = None
+    best: list[tuple[int, int]] = []
+    seen: dict[int, int] = {}
+    steps = 0
+    proven = True
 
-    def first_free(start_at: int) -> int | None:
-        return next((index for index in range(start_at, size) if not used[index]), None)
-
-    def frame_for(index: int) -> list:
-        faced = opponents.get(ordered[index]) or set()
-        rest = [other for other in range(index + 1, size) if not used[other]]
-        fresh = [(other, 0) for other in rest if ordered[other] not in faced]
-        again = [(other, 1) for other in rest if ordered[other] in faced] if rematches < allowed else []
-        return [index, fresh + again, 0]
-
-    first = first_free(0)
-    if first is None:
-        return []
-    used[first] = True
-    stack = [frame_for(first)]
+    # Ein Eintrag je Spieler, der gerade seinen Gegner sucht:
+    # [Platz, Abschnitt (0 neu, 1 Wiederholung, 2 fertig), Zeiger, gewählter Gegner, Preis der Wahl]
+    used[0] = True
+    stack: list[list[int]] = [[0, 0, 1, -1, 0]]
     while stack:
-        steps[0] += 1
-        if steps[0] > PAIRING_BUDGET:
-            raise _BudgetSpent()
         frame = stack[-1]
-        index, candidates, position = frame
-        if position:
-            # Die vorige Wahl dieses Spielers ging nicht auf: zurücknehmen.
-            other, repeat = candidates[position - 1]
+        index = frame[0]
+        mine = group[index]
+        if frame[3] >= 0:
+            # Die vorige Wahl ist durchsucht: zurücknehmen.
+            other = frame[3]
             used[other] = False
-            pairs.pop()
-            rematches -= repeat
-        if position >= len(candidates):
+            taken ^= (1 << index) | (1 << other)
+            free[mine] += 1
+            free[group[other]] += 1
+            partial -= frame[4]
+            frame[3] = -1
+        picked = -1
+        cost = 0
+        while frame[1] < 2:
+            if frame[1] == 0:
+                cursor = frame[2]
+                met = faced_at[index]
+                while cursor < size and (used[cursor] or cursor in met):
+                    cursor += 1
+                steps += cursor - frame[2]
+                if cursor >= size:
+                    frame[1], frame[2] = 1, 0
+                    continue
+                frame[2] = cursor + 1
+                other = cursor
+                cost = 0
+            else:
+                options = again[index]
+                cursor = frame[2]
+                while cursor < len(options) and used[options[cursor]]:
+                    cursor += 1
+                if cursor >= len(options):
+                    frame[1] = 2
+                    break
+                frame[2] = cursor + 1
+                other = options[cursor]
+                cost = repeat
+            gap = value[index] - value[other]
+            cost += gap * gap
+            if best_cost is not None:
+                steps += 1
+                if steps > budget:
+                    proven = False
+                    stack = []
+                    break
+                if partial + cost >= best_cost:
+                    # Jeder weitere Gegner dieses Spielers ist mindestens so teuer: Der Abstand wächst nach unten, und
+                    # eine Wiederholung wiegt mehr als jeder Abstand.
+                    frame[1] = 2
+                    break
+                theirs = group[other]
+                free[mine] -= 1
+                free[theirs] -= 1
+                remaining = rest(mine)
+                free[mine] += 1
+                free[theirs] += 1
+                if partial + cost + remaining >= best_cost:
+                    continue
+                state = taken | (1 << index) | (1 << other)
+                if seen.get(state, best_cost) <= partial + cost:
+                    continue
+                seen[state] = partial + cost
+            picked = other
+            break
+        if not stack:
+            break
+        if picked < 0:
             stack.pop()
             used[index] = False
             continue
-        other, repeat = candidates[position]
-        frame[2] = position + 1
-        used[other] = True
-        pairs.append((index, other))
-        rematches += repeat
-        following = first_free(index + 1)
-        if following is None:
-            return [(ordered[left], ordered[right]) for left, right in pairs]
+        used[picked] = True
+        taken |= (1 << index) | (1 << picked)
+        free[mine] -= 1
+        free[group[picked]] -= 1
+        frame[3], frame[4] = picked, cost
+        partial += cost
+        following = index + 1
+        while following < size and used[following]:
+            following += 1
+        if following >= size:
+            if best_cost is None or partial < best_cost:
+                best_cost = partial
+                best = [(entry[0], entry[3]) for entry in stack]
+                if best_cost <= floor:
+                    break
+            continue
         used[following] = True
-        stack.append(frame_for(following))
-    return None
+        stack.append([following, 0, following + 1, -1, 0])
+    return [(ordered[left], ordered[right]) for left, right in best], (best_cost or 0) // repeat, proven
 
 
 def _greedy_pairs(ordered: list[str], opponents: dict[str, set]) -> tuple[list[tuple[str, str]], int]:
-    """Die einfache Regel als Rückfall: von oben, der nächste noch nicht gespielte Gegner - sonst eine Wiederholung."""
+    """Die einfache Regel: von oben, der nächste noch nicht gespielte Gegner - sonst eine Wiederholung."""
     pairs: list[tuple[str, str]] = []
     used: set[str] = set()
     rematches = 0
@@ -318,21 +437,18 @@ def _greedy_pairs(ordered: list[str], opponents: dict[str, set]) -> tuple[list[t
     return pairs, rematches
 
 
-def pair_field(ordered: list[str], opponents: dict[str, set]) -> tuple[list[tuple[str, str]], int]:
-    """Paart ein Feld in gegebener Reihenfolge mit so wenigen Wiederholungen wie möglich und liefert die Paare und die
-    Zahl der Wiederholungen. Erst wird bewiesen, dass es ohne nicht geht, dann mit einer, mit zwei und so weiter -
-    reicht das Schrittbudget nicht (sehr große Felder), gilt die einfache Regel."""
+def pair_field(ordered: list[str], opponents: dict[str, set],
+               scores: dict[str, float] | None = None) -> tuple[list[tuple[str, str]], int]:
+    """Paart ein Feld in gegebener Reihenfolge und liefert die Paare und die Zahl der Wiederholungen: so wenige
+    Wiederholungen wie möglich, dann die Punkte (``scores``) in jedem Paar so nah beieinander wie möglich - siehe
+    ``_best_pairs``. Reicht das Schrittbudget nicht für den Beweis (große Felder mit dichter Geschichte), gilt das Beste
+    bis dahin; das ist mindestens die einfache Regel."""
     if len(ordered) % 2:
         return _greedy_pairs(ordered, opponents)
-    steps = [0]
-    try:
-        for allowed in range(len(ordered) // 2 + 1):
-            found = _search_pairs(ordered, opponents, allowed, steps)
-            if found is not None:
-                return found, allowed
-    except _BudgetSpent:
-        pass
-    return _greedy_pairs(ordered, opponents)
+    if not ordered:
+        return [], 0
+    pairs, rematches, _proven = _best_pairs(ordered, opponents, scores, PAIRING_BUDGET)
+    return pairs, rematches
 
 
 def swiss_pairings(
@@ -343,11 +459,15 @@ def swiss_pairings(
 ) -> tuple[list[tuple[str, str]], str | None]:
     """Pair the next round. Returns the pairs and whoever gets a bye.
 
-    Pairing walks the field from the top and takes the closest opponent that
-    has not been faced yet. A rematch happens only when no complete round
-    without one exists (#1559) - refusing to pair at all would stall the
-    tournament, which is worse than a repeat. The same field, the same results
-    and the same ``seed`` always give the same round.
+    Equal scores meet first: a score group is paired within itself, and only
+    whoever is left over meets the neighbouring group. A rematch happens only
+    when no complete round without one exists (#1559) - refusing to pair at
+    all would stall the tournament, which is worse than a repeat. The same
+    field, the same results and the same ``seed`` always give the same round.
+
+    ``participants`` are the ones to pair; their points come from every
+    decided match in ``matches``, also against someone who is not paired any
+    more.
     """
     field = [item for item in participants if item]
     if len(field) < 2:
@@ -358,7 +478,7 @@ def swiss_pairings(
     ordered = _ordered_by_score(scores, rng)
 
     if len(ordered) % 2 == 0:
-        return pair_field(ordered, opponents)[0], None
+        return pair_field(ordered, opponents, scores)[0], None
 
     # Von hinten aufgerollt: das Freilos geht an den Letzten, der noch keines
     # hatte. Zweimal aussetzen wäre ein Vorteil, den niemand verdient hat. Bräuchte
@@ -367,7 +487,7 @@ def swiss_pairings(
     candidates = [item for item in reversed(ordered) if item not in seated] or [ordered[-1]]
     best: tuple[list[tuple[str, str]], str, int] | None = None
     for bye in candidates[:BYE_TRIES]:
-        pairs, rematches = pair_field([item for item in ordered if item != bye], opponents)
+        pairs, rematches = pair_field([item for item in ordered if item != bye], opponents, scores)
         if best is None or rematches < best[2]:
             best = (pairs, bye, rematches)
         if not rematches:

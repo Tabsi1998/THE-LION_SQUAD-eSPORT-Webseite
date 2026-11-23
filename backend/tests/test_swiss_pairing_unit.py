@@ -1,6 +1,7 @@
 """Schweizer System komplett (#1559): Paarung ohne vermeidbare Wiederholung, reproduzierbar, mit Freilos bei
 ungerader Zahl - dazu Abschlussregel und Bilanz. Reine Rechnung, ohne Datenbank. Nur erfundene Namen.
 """
+import functools
 import itertools
 import pathlib
 import random
@@ -434,3 +435,144 @@ def test_only_the_active_are_paired_but_by_all_their_results():
         pairs = sorted(tuple(sorted(slot["registration_id"] for slot in document["slots"])) for document in documents)
 
         assert pairs == [("p1", "p2"), ("p3", "p4")], f"Phase {stage_number}"
+
+
+# ---------------------------------------------------------------- Gleiche Punkte treffen sich, wo es geht
+
+def round_cost(pairs, opponents, scores):
+    """Was an einer Runde zählt, in dieser Reihenfolge: Wiederholungen, dann wie weit die Punkte in den Paaren
+    auseinanderliegen (Abstand in halben Punkten, quadriert und summiert - gleiche Punkte kosten nichts, zwei kleine
+    Abstände sind besser als ein großer)."""
+    return (
+        sum(1 for left, right in pairs if right in opponents[left]),
+        sum(round(2 * abs(scores[left] - scores[right])) ** 2 for left, right in pairs),
+    )
+
+
+def cheapest_round(players, opponents, scores):
+    """Die beste Runde, die es überhaupt gibt - jede vollständige Paarung durchgerechnet (nur kleine Felder)."""
+    everyone = (1 << len(players)) - 1
+
+    @functools.lru_cache(maxsize=None)
+    def best(taken):
+        if taken == everyone:
+            return (0, 0)
+        first = next(index for index in range(len(players)) if not taken & (1 << index))
+        found = None
+        for other in range(first + 1, len(players)):
+            if taken & (1 << other):
+                continue
+            pair = round_cost([(players[first], players[other])], opponents, scores)
+            rest = best(taken | (1 << first) | (1 << other))
+            total = tuple(a + b for a, b in zip(pair, rest))
+            if found is None or total < found:
+                found = total
+        return found
+
+    return best(0)
+
+
+def test_a_score_group_is_paired_inside_before_anyone_moves_down():
+    """Vier mit einem Punkt, zwei ohne; c und d haben schon gegeneinander gespielt. Die erste Paarung ohne Wiederholung
+    (a-b, dann c und d je nach unten) macht zwei ungleiche Paare - a-c und b-d macht keines."""
+    ordered = ["a", "b", "c", "d", "e", "f"]
+    scores = {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 0.0, "f": 0.0}
+    opponents = {player: set() for player in ordered}
+    opponents["c"].add("d")
+    opponents["d"].add("c")
+
+    pairs, rematches = pair_field(ordered, opponents, scores)
+
+    assert rematches == 0
+    assert pairs == [("a", "c"), ("b", "d"), ("e", "f")]
+
+
+def test_whoever_has_to_move_down_meets_the_next_score_group():
+    """Je einer mit 3, 2, 1 und 0 Punkten: 3 gegen 2 und 1 gegen 0 - nicht 3 gegen 0."""
+    scores = {"a": 3.0, "b": 2.0, "c": 1.0, "d": 0.0}
+
+    pairs, _ = pair_field(["d", "a", "c", "b"], {player: set() for player in scores}, scores)
+
+    assert pairs == [("a", "b"), ("c", "d")]
+
+
+def test_the_leader_never_meets_the_last_just_because_both_are_left_over():
+    """Einer vorn, vier in der Mitte, einer hinten: Der Erste spielt gegen die Mitte und die Mitte gegen den Letzten -
+    zwei kleine Schritte statt Erster gegen Letzter."""
+    scores = {"a": 2.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 1.0, "f": 0.0}
+
+    pairs, _ = pair_field(list(scores), {player: set() for player in scores}, scores)
+
+    assert pairs == [("a", "b"), ("c", "d"), ("e", "f")]
+
+
+def test_a_rematch_is_still_worse_than_an_uneven_pair():
+    """a und b führen und haben schon gegeneinander gespielt: lieber zwei ungleiche Paare als die Wiederholung."""
+    scores = {"a": 1.0, "b": 1.0, "c": 0.0, "d": 0.0}
+    opponents = {"a": {"b"}, "b": {"a"}, "c": set(), "d": set()}
+
+    pairs, rematches = pair_field(["a", "b", "c", "d"], opponents, scores)
+
+    assert rematches == 0
+    assert pairs == [("a", "c"), ("b", "d")]
+
+
+@pytest.mark.parametrize("size", [4, 6, 8, 10, 12])
+def test_simulated_even_fields_never_pair_uneven_scores_that_could_be_avoided(size):
+    """Viele gespielte Turniere mit gerader Zahl, jede Runde gegen die beste überhaupt mögliche gehalten: so wenige
+    Wiederholungen wie möglich, dann die Punkte in jedem Paar so nah beieinander wie möglich. Gibt es eine Runde ganz
+    ohne ungleiches Paar, ist es genau so eine."""
+    for run in range(10):
+        rng = random.Random(7000 * size + run)
+        players = field(size)
+        matches: list[dict] = []
+        for round_number in range(1, size):
+            scores, before = scores_and_history(players, matches)
+            pairs, sitting = play_round(players, matches, round_number, seed=run * 17 + round_number, rng=rng)
+
+            assert sitting is None
+            assert round_cost(pairs, before, scores) == cheapest_round(tuple(players), before, scores), (
+                f"Lauf {run}, Runde {round_number} bei {size} Teilnehmern")
+
+
+def test_three_wins_three_losses_with_sixteen_pairs_equal_records():
+    """Die Gegenprobe der Prüfung: 60 Turniere mit 16 Teilnehmern, „3 Siege weiter, 3 Niederlagen raus“, über den Weg,
+    den auch die echte Runde nimmt (Stand, dann Paarung nur der Aktiven). Kein Paar mit ungleicher Bilanz, das sich
+    hätte vermeiden lassen."""
+    settings = swiss_settings({"swiss_settings": {"end_rule": "wins_losses", "wins_to_advance": 3, "losses_to_exit": 3}})
+    players = field(16)
+    regs = registrations(*players)
+    uneven = 0
+    for run in range(60):
+        rng = random.Random(1559 + run)
+        stage = {**STAGE, "id": f"stage-{run}"}
+        matches: list[dict] = []
+        for round_number in range(1, 12):
+            state = swiss_state(settings, players, matches)
+            if state["complete"]:
+                break
+            active = state["active"]
+            record = records(players, matches)
+            _scores, before = scores_and_history(active, matches)
+            documents = swiss_round_documents(TOURNAMENT, stage, regs, matches, round_number=round_number,
+                                              participants=active)
+            pairs = []
+            for document in documents:
+                seated = [slot["registration_id"] for slot in document["slots"] if slot["registration_id"]]
+                if len(seated) == 1:
+                    matches.append(bye(round_number, seated[0]))
+                    continue
+                pairs.append(tuple(seated))
+                winner, loser = seated if rng.random() < 0.5 else reversed(seated)
+                matches.append(decided(round_number, winner, loser))
+            mixed = [pair for pair in pairs
+                     if (record[pair[0]]["won"], record[pair[0]]["lost"]) != (record[pair[1]]["won"], record[pair[1]]["lost"])]
+            if not mixed or len(active) % 2:
+                continue
+            uneven += len(mixed)
+            # Ein ungleiches Paar ist nur recht, wenn es keine Runde ohne es gibt (sonst bräuchte sie eine Wiederholung).
+            assert len(active) <= 12, f"Lauf {run}, Runde {round_number}: {mixed}"
+            wins = {player: float(record[player]["won"]) for player in active}
+            assert round_cost(pairs, before, wins) == cheapest_round(tuple(active), before, wins), (
+                f"Lauf {run}, Runde {round_number}: {mixed}")
+    assert uneven < 30, "ungleiche Paare bleiben die seltene Ausnahme"
