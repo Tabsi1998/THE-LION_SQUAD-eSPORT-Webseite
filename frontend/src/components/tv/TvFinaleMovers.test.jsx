@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { TvFinaleMovers } from "./TvFinaleMovers";
+import { FINALE_TIMING } from "@/lib/tvFinale";
 
 // Saisonfinale (#1641): je Liga N die Auf- und Absteiger - Spalten, Ziel-Liga, Staffelung und volle Namen. Erfundene Namen.
 
@@ -50,4 +51,27 @@ test("nur Absteiger: eine Spalte, ohne Punkte für eine einzige Liga N", () => {
   expect(screen.getByTestId("tv-finale")).toHaveAttribute("data-columns", "1");
   expect(screen.queryByTestId("tv-finale-col-up")).toBeNull();
   expect(screen.queryByTestId("tv-finale-dots")).toBeNull();
+});
+
+test("Spaltenköpfe: Verzögerung aus FINALE_TIMING über eine Variable - keine feste Zeit im CSS", () => {
+  render(<TvFinaleMovers page={PAGE} />);
+  expect(screen.getByTestId("tv-finale").style.getPropertyValue("--tv-finale-head-at")).toBe(`${FINALE_TIMING.head}s`);
+});
+
+test("Nr. 235: zwölf Absteiger - acht Zeilen, darunter „und 4 weitere“ in der eigenen Spalte, nach der letzten Zeile", () => {
+  const rows = Array.from({ length: 12 }, (_, index) => ({ registration_id: `x${index}`, name: `Probe ${index}`, rank: index + 3,
+    move: "down", target: "Liga 3", staffel: null }));
+  render(<TvFinaleMovers page={{ label: "Liga 2", step: 1, count: 1, rows }} />);
+  const down = screen.getByTestId("tv-finale-col-down");
+  expect(within(down).getAllByRole("listitem")).toHaveLength(8);
+  const more = within(down).getByTestId("tv-finale-more-down");
+  expect(more).toHaveTextContent("und 4 weitere");
+  const last = parseFloat(screen.getByTestId("tv-finale-row-x7").style.getPropertyValue("--tv-finale-at"));
+  expect(parseFloat(more.style.getPropertyValue("--tv-finale-at"))).toBeGreaterThan(last);
+  expect(screen.queryByTestId("tv-finale-more")).toBeNull();
+});
+
+test("ohne Liga und Season keine Zeile über dem Titel - die Kopfleiste des TV trägt „Saisonfinale“", () => {
+  render(<TvFinaleMovers page={PAGE} />);
+  expect(screen.queryByTestId("tv-finale-line")).toBeNull();
 });

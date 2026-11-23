@@ -1093,7 +1093,7 @@
 .tv-finale[data-columns="1"] .tv-finale__cols { grid-template-columns: minmax(0, calc(var(--tv-u) * 110)); justify-content: center; }
 .tv-finale__col { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.2); min-width: 0; }
 .tv-finale__col-title { margin: 0; color: rgb(var(--tv-finale-up)); font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em;
-  animation: tv-rise var(--tls-motion-slow) var(--tls-ease) 0.15s both; }
+  animation: tv-rise var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-head-at, 0s) both; }
 .tv-finale__col[data-col="down"] .tv-finale__col-title { color: rgb(var(--tv-finale-down)); }
 .tv-finale__rows { display: flex; flex-direction: column; gap: calc(var(--tv-finale-unit) * 0.16); margin: 0; padding: 0; list-style: none; }
 .tv-finale__row {
@@ -1101,7 +1101,8 @@
   --tv-finale-from: calc(var(--tv-u) * 3.2);
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Die Ziel-Liga hoechstens gut ein Drittel der Zeile - eine lange bricht um, statt den Teamnamen zu verdraengen. */
+  grid-template-columns: auto minmax(0, 1fr) fit-content(min(42%, calc(var(--tv-u) * 38)));
   align-items: center;
   gap: calc(var(--tv-u) * 1.6);
   min-height: var(--tv-finale-unit);
@@ -1139,8 +1140,9 @@
 .tv-finale__row[data-move="out"] .tv-finale__sign::after { content: none; }
 .tv-finale__who { display: flex; flex-direction: column; min-width: 0; }
 /* Namen brechen um, nie abgeschnitten; lange eine bzw. zwei Stufen kleiner (data-fit). */
-.tv-finale__name { font-size: min(var(--tv-fs-name), calc(var(--tv-finale-unit) * 0.4)); line-height: 1.1; font-weight: 800; overflow-wrap: anywhere; hyphens: auto; }
-/* Nie unter die Untergrenze der TV-Namen (--tv-fs-name-min): lieber eine Zeile mehr. */
+/* Nie unter die Untergrenze der TV-Namen (--tv-fs-name-min), auch nicht bei vielen Zeilen: lieber eine Zeile mehr. */
+.tv-finale__name { font-size: max(var(--tv-fs-name-min), min(var(--tv-fs-name), calc(var(--tv-finale-unit) * 0.4))); line-height: 1.1; font-weight: 800;
+  overflow-wrap: anywhere; hyphens: auto; }
 .tv-finale__name[data-fit="small"] { font-size: max(var(--tv-fs-name-min), min(calc(var(--tv-fs-name) * 0.9), calc(var(--tv-finale-unit) * 0.36))); }
 .tv-finale__name[data-fit="tiny"] { font-size: max(var(--tv-fs-name-min), min(calc(var(--tv-fs-name) * 0.8), calc(var(--tv-finale-unit) * 0.32))); }
 .tv-finale__meta { color: var(--tv-muted); }
@@ -1148,17 +1150,20 @@
   display: inline-flex;
   align-items: center;
   gap: calc(var(--tv-u) * 0.6);
-  padding: calc(var(--tv-u) * 0.5) calc(var(--tv-u) * 1.2);
+  padding: calc(var(--tv-u) * 0.25) calc(var(--tv-u) * 1.2);
   border: var(--tv-line-w) solid rgb(var(--tv-finale-rgb) / 0.6);
+  line-height: 1.05;
   border-radius: 999px;
   color: rgb(var(--tv-finale-rgb));
   font-weight: 800;
-  white-space: nowrap;
+  overflow-wrap: break-word;
   animation: tv-finale-target var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-target-at, 0s) both;
 }
 .tv-finale__row[data-move="out"] .tv-finale__target { border-color: var(--tv-line-strong); color: var(--tv-muted); }
 .tv-finale__arrow { width: 1em; height: 1em; }
-.tv-finale__more { color: var(--tv-muted); text-align: center; }
+/* „und N weitere“ in der eigenen Spalte, unter der letzten Zeile - hebt sich, wenn diese steht. */
+.tv-finale__more { margin: 0; padding-left: calc(var(--tv-u) * 2.4); color: var(--tv-muted); font-weight: 700;
+  animation: tv-rise var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-at, 0s) both; }
 .tv-screen[data-tv-contrast="1"] .tv-finale__row { background: #000000; border-color: var(--tv-line-strong); }
 @keyframes tv-finale-glide { from { opacity: 0; transform: translateY(var(--tv-finale-from)); } }
 @keyframes tv-finale-target { from { opacity: 0; transform: translateX(calc(var(--tv-u) * -1.6)); } }

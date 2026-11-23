@@ -1,10 +1,11 @@
 import { ArrowDown, ArrowRight, ArrowUp, X } from "lucide-react";
-import { FINALE_TIMING, finaleColumns, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetText } from "@/lib/tvFinale";
+import { FINALE_TIMING, columnWeight, finaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetText } from "@/lib/tvFinale";
 
 // Saisonfinale (#1641): je Liga N die Auf- und Absteiger nach dem Sieger-Moment. Links steigt auf, rechts steigt ab bzw. scheidet aus.
 // Detail-Runde (tv.css „Saisonfinale“): Titel und Spaltenköpfe kommen zuerst, dann gleiten die Zeilen gestaffelt auf ihren Platz -
 // Aufsteiger von unten, Absteiger von oben -, danach schiebt sich die Ziel-Liga heran und der Pfeil leuchtet kurz auf; zuletzt zeichnet
 // sich die Linie unter dem Titel. Nur Verschieben und Deckkraft; „Bewegung aus“ (Regel für .tv-screen) zeigt sofort das Endbild.
+// Höchstens 8 Zeilen je Spalte (Nr. 235), darunter „und N weitere“ - es hebt sich, wenn die letzte Zeile ihrer Spalte steht.
 
 const ICONS = { up: ArrowUp, down: ArrowDown, out: X };
 
@@ -33,17 +34,19 @@ function MoverRow({ row, index }) {
 
 export function TvFinaleMovers({ page, league = "", season = "" }) {
   const columns = finaleColumns(page);
-  const longest = Math.max(1, ...columns.map((column) => column.rows.length));
-  const line = ["Saisonfinale", league, season].filter(Boolean).join(" · ");
+  const longest = Math.max(1, ...columns.map(columnWeight));
+  // Über dem Titel Liga und Season - nur, wenn sie mitkommen (am Turnierbaum-TV trägt die Kopfleiste „Saisonfinale“ und beides).
+  const line = league || season ? ["Saisonfinale", league, season].filter(Boolean).join(" · ") : "";
   const total = columns.reduce((sum, column) => sum + column.rows.length, 0);
   // Der Schluss (Linie unter dem Titel), wenn die letzte Zeile steht und ihre Ziel-Liga da ist.
   const end = (rowDelay(Math.max(0, total - 1)) + FINALE_TIMING.target + FINALE_TIMING.settle).toFixed(2);
   let counter = 0;
   return (
-    <section className="tv-finale" data-columns={columns.length} style={{ "--tv-finale-row": rowUnits(longest), "--tv-finale-end": `${end}s` }}
+    <section className="tv-finale" data-columns={columns.length} data-more={columns.some((column) => column.more) ? "1" : undefined}
+      style={{ "--tv-finale-row": rowUnits(longest), "--tv-finale-end": `${end}s`, "--tv-finale-head-at": `${FINALE_TIMING.head}s` }}
       aria-label={`${page.label}: Auf- und Absteiger`} data-testid="tv-finale" data-step={page.step}>
       <header className="tv-finale__head">
-        <div className="tv-finale__line tv-t-info" data-testid="tv-finale-line">{line}</div>
+        {line ? <div className="tv-finale__line tv-t-info" data-testid="tv-finale-line">{line}</div> : null}
         <h2 className="tv-finale__title font-display" data-testid="tv-finale-title">
           <span className="tv-finale__league">{page.label}</span> <span className="tv-finale__what">Auf- und Absteiger</span>
         </h2>
@@ -57,20 +60,27 @@ export function TvFinaleMovers({ page, league = "", season = "" }) {
         <span className="tv-finale__rule" aria-hidden="true" />
       </header>
       <div className="tv-finale__cols">
-        {columns.map((column) => (
-          <div key={column.key} className="tv-finale__col" data-col={column.key} data-testid={`tv-finale-col-${column.key}`}>
-            <h3 className="tv-finale__col-title tv-t-head font-heading">{column.title}</h3>
-            <ol className="tv-finale__rows">
-              {column.rows.map((row) => {
-                const index = counter;
-                counter += 1;
-                return <MoverRow key={row.registration_id} row={row} index={index} />;
-              })}
-            </ol>
-          </div>
-        ))}
+        {columns.map((column) => {
+          const rows = column.rows.map((row) => {
+            const index = counter;
+            counter += 1;
+            return <MoverRow key={row.registration_id} row={row} index={index} />;
+          });
+          // „und N weitere“, sobald die letzte Zeile der Spalte steht (mit ihrer Ziel-Liga).
+          const moreAt = (rowDelay(Math.max(0, counter - 1)) + FINALE_TIMING.target).toFixed(2);
+          return (
+            <div key={column.key} className="tv-finale__col" data-col={column.key} data-testid={`tv-finale-col-${column.key}`}>
+              <h3 className="tv-finale__col-title tv-t-head font-heading">{column.title}</h3>
+              <ol className="tv-finale__rows">{rows}</ol>
+              {column.more ? (
+                <p className="tv-finale__more tv-t-info" style={{ "--tv-finale-at": `${moreAt}s` }} data-testid={`tv-finale-more-${column.key}`}>
+                  {moreText(column.more)}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
-      {page.more ? <div className="tv-finale__more tv-t-meta" data-testid="tv-finale-more">und {page.more} weitere auf der Ligaseite</div> : null}
     </section>
   );
 }
