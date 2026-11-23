@@ -132,8 +132,8 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
     season = await _call(leagues.get_season(db, season_id))
     league = await _call(leagues.get_league(db, season["league_id"]))
     game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0}) if league.get("game_id") else None
-    # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
-    divisions = await db.league_divisions.find({"season_id": season_id}, {"_id": 0, "draw": 0}).sort("level", 1).to_list(50)
+    # Ohne das Los (#1623, ``draw``) und die Entscheide über Staffeln hinweg (#1627): Die liefern ``…/draws`` bzw. ``…/closing``.
+    divisions = await db.league_divisions.find({"season_id": season_id}, {"_id": 0, "draw": 0, "zone_decisions": 0}).sort("level", 1).to_list(50)
     staffeln = await leagues.staffeln_of(db, season_id)
     pool = await map_pools.current(db, "league_season", season_id)
     rows = []
@@ -717,7 +717,7 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
     # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
-    return {**{key: value for key, value in doc.items() if key != "draw"}, "warnings": warnings}
+    return {**{key: value for key, value in doc.items() if key not in ("draw", "zone_decisions")}, "warnings": warnings}
 
 
 @admin_router.get("/divisions/{division_id}/delete-plan")

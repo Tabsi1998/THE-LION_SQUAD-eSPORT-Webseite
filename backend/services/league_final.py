@@ -29,7 +29,7 @@ from services import league_incident_rules as incident_rules
 from services import league_procedures as procedures
 from services import league_rewards
 from services import league_protest_settings as protest_settings
-from services import league_zones
+from services import league_cross_zones, league_zones
 from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
 # Gleichstände um Meister und Zonengrenze (#2262): im Blatt-Modul, damit Tabelle und Abschluss dieselbe Rechnung nutzen.
 from services.league_ties import (  # noqa: F401 - weiter über league_final erreichbar
@@ -262,6 +262,13 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
                 "Teams stehen gleich, aber nur ein Teil kommt in die Zone. Vor dem Abschluss braucht es einen begründeten Entscheid "
                 "(Entscheidungsspiel, Los oder Leitung).",
                 [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in zone_ties]))
+    if rows is not None and league_cross_zones.has_rule(zones) and not any(row["code"] == "no_matches" for row in out):
+        # Plätze über Staffeln hinweg (#1627): Ist das die letzte offene Staffel der Liga N, steht mit ihr fest, wer über den Vergleich
+        # auf- oder absteigt - ein Gleichstand an der Grenze braucht vorher den Entscheid der Leitung (kein Los).
+        cross = await league_cross_zones.resolve(db, (tournament.get("league_context") or {}).get("division_id"), live={tournament["id"]: rows})
+        if cross and cross["complete"] and cross["ties"]:
+            out.append(_blocker("zone_cross_tie", league_cross_zones.TIE_LABEL, league_cross_zones.TIE_TEXT,
+                                [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in cross["ties"]]))
     return out
 
 
@@ -844,7 +851,20 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
             db, tournament, season, user, decisive=bool(division) and division.get("id") == top,
             division_label=division_label(division) if division.get("level") is not None else None, can_act=can_act,
             zones=league_zones.effective(division, levels) if division else None, now=now))
+    # Plätze über Staffeln hinweg (#1627): je Liga N mit der Regel die Kandidaten, der offene Gleichstand und der Entscheid - mit dem
+    # Stand von jetzt, solange nicht alle Staffeln abgeschlossen sind.
+    cross = []
+    for division in sorted(divisions.values(), key=lambda row: row.get("level") if isinstance(row.get("level"), int) else 99):
+        mine = [row for row in tournaments if row["league_context"].get("division_id") == division["id"]]
+        if not mine or not league_cross_zones.has_rule(league_zones.effective(division, levels)):
+            continue
+        tables = {row["tournament_id"]: row["standings"] for row in staffeln if not row["closed"]}
+        found = await league_cross_zones.resolve(db, division["id"], live={row["id"]: tables.get(row["id"]) or [] for row in mine if not is_closed(row)})
+        if found:
+            cross.append(league_cross_zones.view(found, division_label(division),
+                                                 await league_cross_zones.own_ids(db, user, [row["id"] for row in mine])))
     return {
+        "cross": cross, "cross_methods": league_cross_zones.METHODS,
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),
                    "closed": bool(staffeln) and all(row["closed"] for row in staffeln)},
         "can_act": can_act, "superadmin": league_permissions.is_superadmin(user), "methods": METHODS,
