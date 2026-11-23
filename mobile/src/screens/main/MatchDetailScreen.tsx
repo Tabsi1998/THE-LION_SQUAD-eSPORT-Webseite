@@ -50,6 +50,8 @@ import { CheckinCard } from "../../components/league/CheckinCard";
 import { VetoCard } from "../../components/league/VetoCard";
 import { LeagueReportCard, type LeagueReportSend } from "../../components/league/LeagueReportCard";
 import { IncidentPanel, MapStateNotes, type IncidentLeague } from "../../components/league/IncidentPanel";
+import { AppealForm, ProcedureCard, ProcedureGuidedForm } from "../../components/league/ProcedurePanel";
+import type { Procedure, ProcedureGuide, ProcedurePayload } from "../../lib/leagueProcedures";
 import { sidesInSlotOrder } from "../../lib/leagueGames";
 import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
 import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
@@ -115,7 +117,7 @@ type MatchPage = {
   tournament?: Tournament | null;
   // Liga-Staffel (#2173, docs/LIGA.md C.3): Maps, Pool, Veto-Reihenfolge, Kader und Regeln fürs Melden mit Maps. Ältere Server
   // schicken den Block nicht - dann meldet die App wie bisher ohne Maps.
-  league?: IncidentLeague | null;
+  league?: (IncidentLeague & { procedure_form?: ProcedureGuide | null; procedures?: Procedure[] | null; contested?: boolean | null }) | null;
 };
 
 // Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
@@ -306,7 +308,12 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const resultModeLabel = formatResultEntryMode(page?.result_entry_mode);
   const scheduleModeLabel = formatScheduleMode(page?.schedule_mode);
   // Dispute (#1134): jeder Teilnehmer in jedem Modus, auch gegen ein eingetragenes Ergebnis - der Server sagt, bis wann.
-  const canDispute = Boolean(page?.can_dispute);
+  // Liga-Verfahren (E.2): Mit `procedure_form` wird „Problem melden“ geführt (Art, Grund, Pflichtangaben, Nachweise). Nach dem
+  // Einreichen bleibt das Formular für die Nachweise offen, auch wenn der Server `open` schon zurücknimmt (wie im Web).
+  const procedureForm = page?.league?.procedure_form || null;
+  const procedures = page?.league?.procedures || [];
+  const [procedureStep, setProcedureStep] = useState<string | null>(null);
+  const canDispute = Boolean(procedureForm ? (page?.can_dispute && procedureForm.open) || procedureStep : page?.can_dispute);
   const hasResultActions = Boolean(canPlayerReportResult || showReportReadOnly || canSubmitV2Result || canDispute);
   const showFlowNotice = Boolean(!hasResultActions && (page?.result_entry_mode || page?.schedule_mode));
   // Matchablauf (#2173): der Stand des Liga-Check-ins als Schild im Kopf - ohne Regeln an der Staffel nichts.
@@ -426,14 +433,16 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   const resultUndo = useResultUndo(() => { void refreshAfterResult(); });
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
-  const submitDispute = useCallback(async (payload: ProblemPayload) => {
+  const submitDispute = useCallback(async (payload: ProblemPayload | ProcedurePayload) => {
     if (busy || !page?.can_dispute) return false;
     setBusy(true);
     setError("");
     try {
-      await api.post(`/matches/${idSegment(route.params.id)}/dispute`, payload);
+      const { data: answer } = await api.post<{ procedure_id?: string | null }>(`/matches/${idSegment(route.params.id)}/dispute`, payload);
+      // Liga (E.2): Mit der Kennung des Verfahrens folgt gleich der Schritt „Nachweise“.
+      if (answer?.procedure_id) setProcedureStep(answer.procedure_id);
       await load({ preserveDrafts: false });
-      setSuccess("Gemeldet. Die Turnierleitung schaut es sich an.");
+      setSuccess(answer?.procedure_id ? "Eingereicht. Die Liga-Leitung schaut es sich an." : "Gemeldet. Die Turnierleitung schaut es sich an.");
       return true;
     } catch (err) {
       setError(errorMessage(err, "Problem konnte nicht gemeldet werden."));
@@ -578,7 +587,30 @@ export function MatchDetailScreen({ navigation, route }: Props) {
         {page.in_dispute ? (
           <View style={styles.disputeNotice} testID="match-in-dispute">
             <Ionicons name="alert-circle-outline" color={colors.live} size={20} />
-            <Body style={styles.flex}>In Klärung – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.</Body>
+            <Body style={styles.flex}>{page.league ? "In Klärung – zu diesem Spiel wurde ein Problem gemeldet. Die Liga-Leitung prüft und entscheidet." : "In Klärung – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet."}</Body>
+          </View>
+        ) : null}
+
+        {/* Liga-Verfahren (E.2): öffentlich nur „in Klärung“ - Beteiligte sehen Stand, Fristen und Entscheidung. */}
+        {page.league?.contested && !page.in_dispute ? (
+          <View style={styles.disputeNotice} testID="match-contested">
+            <Ionicons name="scale-outline" color={colors.gold} size={20} />
+            <Body style={styles.flex}>In Klärung – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.</Body>
+          </View>
+        ) : null}
+        {/* Einspruch gegen eine Wertung kampflos oder eine Korrektur (Nr. 41, 45) - gegen einen Protestentscheid steht er an dessen Karte. */}
+        {procedureForm?.appealable ? (
+          <Card style={styles.card} testID="match-appealable">
+            <Body>{procedureForm.appealable.type === "forfeit" ? "Dieses Spiel wurde kampflos gewertet." : "Das Ergebnis dieses Spiels wurde von der Liga-Leitung korrigiert."} Seid ihr nicht einverstanden, könnt ihr einmal Einspruch einlegen.</Body>
+            <AppealForm matchId={idSegment(route.params.id)} against={procedureForm.appealable} until={procedureForm.appealable.until} onChanged={reloadLeague} testID="match-appeal" />
+          </Card>
+        ) : null}
+        {procedures.length ? (
+          <View style={styles.stack} testID="match-procedures" accessibilityLabel="Verfahren zu diesem Spiel">
+            {procedures.map((procedure) => (
+              <ProcedureCard key={procedure.id} matchId={idSegment(route.params.id)} procedure={procedure} onChanged={reloadLeague}
+                sideNames={Object.fromEntries((league?.sides || []).map((side) => [side.registration_id, side.name || ""]))} />
+            ))}
           </View>
         ) : null}
 
@@ -621,7 +653,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             {canStaffSubmitResult && page.result_entry?.hold ? (
               <Muted style={styles.textCyan} testID="match-staff-result-held">{page.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${page.result_entry.hold.actor_name || "Die Turnierleitung"} trägt gerade das Ergebnis ein.`}</Muted>
             ) : null}
-            {canDispute ? (
+            {canDispute && procedureForm ? (
+              <ProcedureGuidedForm matchId={idSegment(route.params.id)} guide={procedureForm} busy={busy} initialReason={problemCategory}
+                sides={(league?.sides || []).map((side) => ({ id: side.registration_id, name: side.name || "" }))}
+                createdId={procedureStep} onSubmit={submitDispute} onDone={() => setProcedureStep(null)} />
+            ) : canDispute ? (
               <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} initialCategory={problemCategory} />
             ) : null}
           </Card>
