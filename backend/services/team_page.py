@@ -306,6 +306,8 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "link": link,
             # Verborgene Teilnehmerliste: den Stand der Anmeldung sieht nur das Team selbst (Review #1638).
             "status_note": status_note(reg, full_by_id.get(tournament["id"]), insider=insider),
+            # Co-Team-Kennung: Der Saisonverlauf stellt die Co-Teams, die gerade spielen, zuerst (Review #1638).
+            "squad_id": reg.get("squad_id"),
             **(places.get(reg.get("id")) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
     # Beste Liga N oben (#1630, aus #1644), dann Liga, Season und Co-Team.

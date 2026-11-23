@@ -242,7 +242,9 @@ function TeamDetail({ id }) {
   const team = missing ? null : teamLoad.data || null;
   const levelInfo = levelLoad.data || null;
   const overview = overviewLoad.data || null;
-  const refresh = () => Promise.all([teamLoad.reload(), levelLoad.reload(), overviewLoad.reload()]);
+  // Co-Teams, die gerade in einer laufenden Staffel spielen - der Saisonverlauf zeigt sie zuerst (Review #1638).
+  const leaguePlaying = (overview?.league || []).flatMap((row) => [row.squad_id, row.display_name]).filter(Boolean);
+  const refresh =() => Promise.all([teamLoad.reload(), levelLoad.reload(), overviewLoad.reload()]);
   const load = refresh;
   useApiInvalidation(refresh, ["teams"]);
 
@@ -492,7 +494,7 @@ function TeamDetail({ id }) {
           <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEditTeam} enabled={isMember || canEditTeam} />
           <TeamSchedule overview={overview} />
           {/* Saisonverlauf als Linie (#1630): je Co-Team eine Linie über die Seasons. */}
-          <LeagueSeasonLine rows={team.league_history} byTeam testId="team-season-line" />
+          <LeagueSeasonLine rows={team.league_history} byTeam playing={leaguePlaying} testId="team-season-line" />
           {/* Season-Historie (F.2, #1627): Liga N, Platz, Meister je abgeschlossener Season. */}
           <LeagueSeasonHistory rows={team.league_history} showTeam testId="team-league-history" />
           {/* Gesamtwertung über Seasons (F.5, #2215): Platz je Co-Team und Zeitraum. */}

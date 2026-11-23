@@ -58,7 +58,7 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
     return out
 
 
-def _entry(final: dict, season: dict, league: dict, registration_id: str, division: dict | None = None) -> dict | None:
+def _entry(final: dict, season: dict, league: dict, registration_id: str, division: dict | None = None, squad_id: str | None = None) -> dict | None:
     row = next((item for item in final.get("rows") or [] if item.get("registration_id") == registration_id), None)
     if not row:
         return None
@@ -70,6 +70,8 @@ def _entry(final: dict, season: dict, league: dict, registration_id: str, divisi
         "league_name": league.get("name") or title.get("league"),
         "url": f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug") else None,
         "division_label": title.get("division"), "staffel": final.get("staffel"), "display_name": row.get("display_name"),
+        # Co-Team-Kennung (Review #1638): Der Saisonverlauf der Teamseite erkennt daran, wer gerade spielt.
+        "squad_id": squad_id,
         # Von wie vielen: wer in der Wertung blieb - ohne Ausgeschiedene (wie ``participants`` im Endstand).
         "rank": row.get("rank"), "of": int(final.get("participants") or len([item for item in final.get("rows") or [] if not item.get("exit")])),
         "points": row.get("points"),
@@ -91,7 +93,7 @@ async def for_team(db, team_id: str, user: dict | None, *, hidden=None) -> list[
     for final, season, league, _internal, division in await _rows(db, {"team_ids": team_id}, user, hidden):
         for registration_id, side in (final.get("sides") or {}).items():
             if side.get("team_id") == team_id:
-                entry = _entry(final, season, league, registration_id, division)
+                entry = _entry(final, season, league, registration_id, division, side.get("squad_id"))
                 if entry:
                     out.append(entry)
     return _order(out)
@@ -118,7 +120,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scop
     for final, season, league, internal, division in found:
         for registration_id, side in (final.get("sides") or {}).items():
             if user_id in (side.get("player_ids") or []) and side.get("team_id") not in private:
-                entry = _entry(final, season, league, registration_id, division)
+                entry = _entry(final, season, league, registration_id, division, side.get("squad_id"))
                 if not entry:
                     continue
                 if scope is not None:

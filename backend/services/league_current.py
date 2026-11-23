@@ -220,7 +220,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
             "squad_name": registration.get("squad_name") or squad_names.get(registration.get("squad_id")),
             # Solo-Liga ohne eigenen Namen: der Name aus dem Konto statt einer leeren Zeile (Review #1638).
             "display_name": registration.get("display_name") or registration.get("team_name") or accounts.get(registration["id"]),
-            "team_id": registration.get("team_id"),
+            "team_id": registration.get("team_id"), "squad_id": registration.get("squad_id"),
             "league": {"name": league.get("name"), "slug": league.get("slug")},
             "season": {"name": season.get("name"), "slug": season.get("slug")},
             "division_label": division_label(division), "staffel": (tournament.get("league_context") or {}).get("staffel"),
