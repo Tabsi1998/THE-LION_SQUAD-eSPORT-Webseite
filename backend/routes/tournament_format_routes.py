@@ -8,12 +8,8 @@ from services.custom_bracket import (
     build_matches_v2_from_schema,
     groups_from_generated_matches,
 )
-from services.graph_swiss import (
-    next_round_number,
-    open_matches as open_swiss_matches,
-    swiss_round_documents,
-)
 from services.competition_versions import persist_competition_versions
+from services import swiss_rounds
 from services import tournament_guard
 from services.station_runtime import free_stations_of_deleted_matches, held_calls, tell_withdrawn_calls
 from models import REGISTRATION_LIMIT, GROUP_LIMIT, now_utc, new_id
@@ -70,46 +66,14 @@ async def _dedicated_stage(db, tournament: dict, stage_type: str, settings: dict
 
 
 async def _swiss_next_round_graph(db, tournament: dict, actor_id: str | None) -> dict:
-    tid = tournament["id"]
+    """„Schweizer Runde“ von Hand. Paarung, Abschlussregel und Schreiben liegen in ``services/swiss_rounds`` (#1559) -
+    derselbe Weg, den die automatische nächste Runde nimmt."""
     stage = await _dedicated_stage(db, tournament, "swiss", {}, "Schweizer System", actor_id)
-    played = await db.matches_v2.find({"stage_id": stage["id"]}, {"_id": 0}).to_list(3000)
-    round_number = next_round_number(played)
-    still_open = open_swiss_matches(played, round_number - 1)
-    if still_open:
-        # Wie die anderen Meldungen (#2111, TA28): auf Deutsch und mit dem, was zu tun ist.
-        raise HTTPException(status_code=400, detail=(
-            f"{len(still_open)} Spiele der letzten Runde sind noch offen – die nächste Runde entsteht, wenn alle "
-            "gewertet sind."))
-
-    regs = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0},
-    ).to_list(REGISTRATION_LIMIT)
-    documents = swiss_round_documents(
-        tournament, stage, regs, played, round_number=round_number,
-    )
-    if not documents:
-        raise HTTPException(status_code=400, detail="Mindestens 2 Teilnehmer benötigt")
-
-    await db.matches_v2.insert_many(documents)
-    await db.tournament_stages.update_one(
-        {"id": stage["id"]},
-        {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
-    )
-    await persist_competition_versions(db, tournament, "graph")
-    # Der Status bleibt (#2120, TA11): live geht es über „Turnier starten“ - mit Check-in-Ende und Planungsprüfung.
-    await _audit_tournament_action(
-        db, "tournament.swiss.next_round", actor_id, tid,
-        {"engine": "graph", "stage_id": stage["id"], "round": round_number,
-         "match_count": len(documents)},
-    )
-    return {
-        "ok": True,
-        "engine": "graph",
-        "stage_id": stage["id"],
-        "round": round_number,
-        "match_count": len(documents),
-    }
+    try:
+        created = await swiss_rounds.create_round(db, tournament, stage, actor_id=actor_id)
+    except swiss_rounds.SwissRoundProblem as problem:
+        raise HTTPException(status_code=problem.status, detail=problem.message)
+    return {key: created[key] for key in ("ok", "engine", "stage_id", "round", "match_count")}
 
 
 async def _swiss_tournament(db, tid: str) -> dict:
