@@ -84,10 +84,45 @@ def crosses_midnight(user: dict | None) -> bool:
     return bool(found and found[0] > found[1])
 
 
+def _inside(minute: int, start: int, end: int) -> bool:
+    return start <= minute < end if start < end else (minute >= start or minute < end)
+
+
+def _wall_minute(moment: datetime) -> int:
+    local = moment.astimezone(VIENNA)
+    return local.hour * 60 + local.minute
+
+
+def _offset(moment: datetime) -> timedelta:
+    """Wiener Uhr minus UTC für einen UTC-Zeitpunkt - aus der Wanduhr gerechnet, nicht über ``utcoffset()``: Das hinge in der
+    doppelten Stunde an ``fold``, und das verliert die Ersatzuhr der Zeitreise-Probe (#2474)."""
+    return moment.astimezone(VIENNA).replace(tzinfo=None) - moment.replace(tzinfo=None)
+
+
+def _clock_change(after: datetime, before: datetime) -> datetime | None:
+    """Der Moment (UTC), in dem die Wiener Uhr zwischen ``after`` und ``before`` umgestellt wird - ``None`` ohne Umstellung.
+
+    Beide liegen auf vollen Minuten und weniger als einen Tag auseinander, also höchstens eine Umstellung: minutengenau durch
+    Halbieren gesucht."""
+    offset = _offset(after)
+    if _offset(before) == offset:
+        return None
+    low, high = 0, (before - after) // timedelta(minutes=1)
+    while high - low > 1:
+        middle = (low + high) // 2
+        if _offset(after + timedelta(minutes=middle)) == offset:
+            low = middle
+        else:
+            high = middle
+    return after + timedelta(minutes=high)
+
+
 def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | None:
     """Liegt ``now`` in der Ruhezeit, das Ende dieser Ruhezeit (UTC) - sonst ``None``.
 
-    Gerechnet wird in Wiener Wanduhrzeit: 22:00 bis 7:00 bleibt 22:00 bis 7:00, auch in der Nacht der Zeitumstellung."""
+    Gerechnet wird in Wiener Wanduhrzeit: 22:00 bis 7:00 bleibt 22:00 bis 7:00, auch in der Nacht der Zeitumstellung. Liegt
+    das Ende in der Lücke der Vorstellung, endet die Ruhezeit mit der Lücke; springt die Uhr bei der Rückstellung vor den
+    Beginn zurück, endet sie mit dem Sprung (#2514)."""
     found = window(user)
     if not found:
         return None
@@ -98,17 +133,22 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
     local = moment.astimezone(VIENNA)
     minute = local.hour * 60 + local.minute
     day = local.date()
-    if start < end:
-        if not (start <= minute < end):
-            return None
-    else:
-        if not (minute >= start or minute < end):
-            return None
-        if minute >= start:
-            day = day + timedelta(days=1)
+    if not _inside(minute, start, end):
+        return None
+    if start > end and minute >= start:
+        day = day + timedelta(days=1)
     # In der Nacht der Rückstellung gibt es 02:00–02:59 zweimal: das erste Ende, das noch vor uns liegt (fold 0, dann 1).
     for fold in (0, 1):
         until = datetime(day.year, day.month, day.day, end // 60, end % 60, tzinfo=VIENNA, fold=fold).astimezone(timezone.utc)
         if until > moment:
-            return until
-    return None
+            break
+    else:
+        return None
+    # Eine Umstellung bis dahin beendet die Ruhezeit, wenn das Ende in ihrer Lücke liegt (00:00–02:30 im März: 03:00 statt
+    # 03:30 MESZ) oder die Uhr danach außerhalb des Fensters steht (ab 02:30 im Oktober: 02:59 MESZ springt auf 02:00 MEZ).
+    # Gesucht ab der vollen Minute (Umstellungen liegen auf vollen Minuten); ``_offset`` braucht dafür kein ``fold``.
+    whole_minute = datetime(moment.year, moment.month, moment.day, moment.hour, moment.minute, tzinfo=timezone.utc)
+    switch = _clock_change(whole_minute, until)
+    if switch is not None and (_wall_minute(until) != end or not _inside(_wall_minute(switch), start, end)):
+        return switch
+    return until
