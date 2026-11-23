@@ -7,6 +7,8 @@ import {
   formatMembershipType,
   formatNewsCategory,
   formatRole,
+  formatTeamMode,
+  formatTournamentDisplay,
   formatTournamentFormat,
   formatWhen,
   normalizeEventType,
@@ -21,11 +23,26 @@ describe("Turnierformat, Rolle, Mitgliedschaft", () => {
   test("Turnierformate heißen wie auf der Webseite, auch in alter Schreibweise", () => {
     expect(formatTournamentFormat("ffa_custom_bracket")).toBe("Mehrspieler freier Turnierbaum");
     expect(formatTournamentFormat("ffacustombracket")).toBe("Mehrspieler freier Turnierbaum");
-    expect(formatTournamentFormat("singleelim")).toBe("Single Elimination");
-    expect(formatTournamentFormat("Single-Elimination")).toBe("Single Elimination");
-    expect(formatTournamentFormat("round_robin")).toBe("Jeder gegen jeden");
+    expect(formatTournamentFormat("singleelim")).toBe("K.-o.");
+    expect(formatTournamentFormat("Single-Elimination")).toBe("K.-o.");
+    expect(formatTournamentFormat("double_elim")).toBe("Doppel-K.-o.");
+    expect(formatTournamentFormat("round_robin")).toBe("Jeder gegen jeden – einfach");
+    expect(formatTournamentFormat("battle_royale")).toBe("Mehrspieler frei");
     expect(formatTournamentFormat("")).toBe("");
     expect(formatTournamentFormat("irgend_was")).toBe("Irgend was");
+  });
+
+  // #2173 (Web #2111, F1): „Liga“ als Turnierformat heißt wie im Web - nur eine Liga-Staffel heißt weiter „Liga“.
+  test("das Format league heißt wie im Web, eine Liga-Staffel bleibt „Liga“", () => {
+    expect(formatTournamentFormat("league")).toBe("Jeder gegen jeden – Hin- und Rückrunde");
+    expect(formatTournamentDisplay({ format: "league" })).toBe("Jeder gegen jeden – Hin- und Rückrunde");
+    expect(formatTournamentDisplay({ format: "league", league_context: { season_id: "s1" } })).toBe("Liga");
+    expect(formatTournamentDisplay({ format: "league", format_label: "Eigene Liga" })).toBe("Eigene Liga");
+    expect(formatTournamentDisplay({ format: "single_elim" })).toBe("K.-o.");
+    expect(formatTournamentDisplay(null)).toBe("");
+    // Zweite Quelle wie im Web (tournamentLabels.js): `format_display_name`.
+    expect(formatTournamentDisplay({ format: "league", format_display_name: "Sommerliga" })).toBe("Sommerliga");
+    expect(formatTournamentDisplay({ format: "league", format_label: null, format_display_name: "Sommerliga", league_context: {} })).toBe("Sommerliga");
   });
 
   test("Nutzerarten und Rollen als Begriff", () => {
@@ -151,4 +168,14 @@ test("formatWhen: heute, morgen, Wochentag mit Monat, Jahr nur außerhalb des la
 test("Ausgeschieden (#1553): ausgetreten und disqualifiziert auf Deutsch wie im Web (tournamentLabels.js)", () => {
   expect(formatStatus("withdrawn")).toBe("Ausgetreten");
   expect(formatStatus("disqualified")).toBe("Disqualifiziert");
+});
+
+// Nachzug #2173: der Teammodus heißt wie TEAM_MODE_LABELS im Web - kein „Squad“ oder „Duo“ mehr.
+test("Teammodus wie im Web: Einzelspieler oder Team", () => {
+  expect(formatTeamMode("solo")).toBe("Einzelspieler");
+  expect(formatTeamMode(null)).toBe("Einzelspieler");
+  expect(formatTeamMode("squad")).toBe("Team");
+  expect(formatTeamMode("duo")).toBe("Team");
+  expect(formatTeamMode("team")).toBe("Team");
+  expect(formatTeamMode("mixed_mode")).toBe("mixed mode");
 });

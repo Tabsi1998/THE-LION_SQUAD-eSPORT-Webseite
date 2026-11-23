@@ -336,19 +336,21 @@ function humanizeStatus(value: string) {
 // Turnierformate wie in frontend/src/lib/tournamentLabels.js. Der Schlüssel
 // wird ohne Unterstriche und Großbuchstaben verglichen, weil ältere Turniere
 // "ffacustombracket" oder "singleelim" tragen und so roh auf der Karte
-// standen (#246).
+// standen (#246). Glossar wie im Web (#2124 TP10, #2111 F1, #2173): K.-o.,
+// Doppel-K.-o.; `league` heißt als Turnierformat „Jeder gegen jeden – Hin- und
+// Rückrunde“, nur eine Liga-Staffel heißt „Liga“ (formatTournamentDisplay).
 const TOURNAMENT_FORMAT_LABELS: Record<string, string> = {
-  single_elim: "Single Elimination",
-  single_elimination: "Single Elimination",
-  double_elim: "Double Elimination",
-  double_elimination: "Double Elimination",
-  round_robin: "Jeder gegen jeden",
+  single_elim: "K.-o.",
+  single_elimination: "K.-o.",
+  double_elim: "Doppel-K.-o.",
+  double_elimination: "Doppel-K.-o.",
+  round_robin: "Jeder gegen jeden – einfach",
   round_robin_groups: "Jeder-gegen-jeden-Gruppen",
   swiss: "Schweizer System",
   groups: "Gruppenphase",
   ffa: "Mehrspieler frei",
-  battle_royale: "Überlebensmodus",
-  league: "Liga",
+  battle_royale: "Mehrspieler frei",
+  league: "Jeder gegen jeden – Hin- und Rückrunde",
   ffa_league: "Mehrspieler-Liga",
   time_trial: "Zeitfahren",
   grand_prix: "Rennserie",
@@ -370,6 +372,25 @@ export function formatTournamentFormat(value?: string | null) {
   const raw = String(value || "").trim();
   if (!raw) return "";
   return TOURNAMENT_FORMAT_BY_KEY[normalizeKey(raw)] || humanizeStatus(raw);
+}
+
+// Wie TEAM_MODE_LABELS im Web (frontend/src/lib/tournamentLabels.js, Nachzug #2173): Einzelspieler oder Team.
+export function formatTeamMode(value?: string | null) {
+  if (!value || value === "solo") return "Einzelspieler";
+  if (["team", "duo", "squad"].includes(value)) return "Team";
+  return value.replace(/_/g, " ");
+}
+
+/**
+ * Der Formatname eines Turniers wie `formatTournamentDisplay` im Web: ein eigener Name zuerst, eine Liga-Staffel heißt
+ * „Liga“ (der lange Name gilt nur für Turniere, #2111 F1), sonst der Name des Formats.
+ */
+export function formatTournamentDisplay(tournament?: { format?: string | null; format_label?: string | null; format_display_name?: string | null; league_context?: unknown } | null) {
+  if (!tournament) return "";
+  const custom = String(tournament.format_label || tournament.format_display_name || "").trim();
+  if (custom) return custom;
+  if (tournament.league_context) return "Liga";
+  return formatTournamentFormat(tournament.format);
 }
 
 // Nutzerarten aus dem Backend (models.UserType) und Rollen, wie sie in

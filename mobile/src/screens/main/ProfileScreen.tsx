@@ -31,6 +31,7 @@ import { ProfileView, type PublicProfilePayload } from "./PublicProfileScreen";
 import { SettingsGroups } from "./SettingsScreen";
 import { profileStyles, WEB_BASE_URL, type ModerationStanding } from "./profile/parts";
 import { ProfileReferences } from "./profile/ProfileReferences";
+import { LeagueSanctionsList } from "../../components/league/LeagueSanctionsList";
 import { useMemberPlacements } from "../../lib/memberPlacements";
 
 // Das eigene Profil (#1149): derselbe Aufbau wie das, was andere sehen (Kopf mit Level und Zahlenleiste, Reiter Übersicht,
@@ -152,7 +153,10 @@ function OwnProfile() {
     api.get<AchievementsMe>("/achievements/me").then(({ data }) => { if (data) setAchievements(data); }).catch(() => {});
   }), []);
 
+  // Strafen der Liga (#2173) laden beim Herunterziehen mit - ein eigener Teil der Seite mit eigenem Abruf.
+  const [sanctionsRound, setSanctionsRound] = useState(0);
   const refresh = useCallback(async () => {
+    setSanctionsRound((round) => round + 1);
     await refreshMe().catch(() => {});
     await load();
   }, [load, refreshMe]);
@@ -261,6 +265,8 @@ function OwnProfile() {
           testID="profile-moderation-web"
         />
       ) : null}
+      {/* Strafen der Liga (E.3, #2173): gegen dich oder dein Co-Team, mit Einspruch - wie „Meine Strafen“ im Web. */}
+      <LeagueSanctionsList reloadKey={sanctionsRound} />
     </Card>
   );
 

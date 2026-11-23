@@ -220,7 +220,6 @@ export type AccountGroups = { socials: AccountEntry[]; games: AccountEntry[]; ve
 type AccountSource = {
   linked_accounts?: LinkedAccount[] | null;
   verified_platforms?: string[] | null;
-  socials?: Array<{ platform?: string | null; value?: string | null; url?: string | null }> | null;
 } & Record<string, unknown>;
 
 const SOCIAL_PLATFORMS = ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "mastodon", "bluesky", "website"];
@@ -302,18 +301,8 @@ export function accountGroups(profile: AccountSource | null | undefined): Accoun
     .filter((entry): entry is AccountEntry => Boolean(entry));
   const socials = build(SOCIAL_PLATFORMS);
   const games = build(GAME_PLATFORMS);
-  const seen = new Set([...socials, ...games].map((entry) => `${entry.platform}:${(entry.url || entry.value).toLowerCase()}`));
-  for (const social of profile.socials || []) {
-    const platform = platformKey(social.platform);
-    const value = String(social.value || social.url || "");
-    if (!value || linked.has(platform)) continue;
-    const url = String(social.url || manualUrl(platform, social.value ? String(social.value) : "") || (/^https?:\/\//i.test(value) ? value : ""));
-    const dedupe = `${platform}:${(url || value).toLowerCase()}`;
-    if (seen.has(dedupe)) continue;
-    seen.add(dedupe);
-    const label = PLATFORM_LABELS[platform] || String(social.platform || "Link");
-    socials.push({ platform, label, title: cleanHandle(value) || value, detail: label, value, url, verified: false });
-  }
+  // Bestätigte Konten neuer Plattformen, die noch keine feste Gruppe haben, stehen bei den Socials (wie im Web). Das alte Feld
+  // `socials` liefert der Server nicht mehr (Nachzug #2173).
   for (const [platform, entry] of linked) {
     if (!SOCIAL_PLATFORMS.includes(platform) && !GAME_PLATFORMS.includes(platform)) socials.push(entry);
   }

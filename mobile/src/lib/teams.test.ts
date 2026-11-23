@@ -3,11 +3,11 @@ import type { Team } from "../types";
 
 const team = (over: Partial<Team>): Team => ({ id: "t", name: "Lions", ...over });
 
-test("Squads stehen nur dabei, wenn es welche gibt", () => {
+test("Co-Teams stehen nur dabei, wenn es welche gibt (Begriffe wie im Web, #2173)", () => {
   expect(teamMeta(team({ member_count: 12, squad_count: 0 }))).toBe("12 Mitglieder");
   expect(teamMeta(team({ member_count: 1 }))).toBe("1 Mitglied");
-  expect(teamMeta(team({ member_count: 12, squad_count: 2 }))).toBe("12 Mitglieder · 2 Squads");
-  expect(teamMeta(team({ members: [{ id: "a" }, { id: "b" }], squads: [{ name: "A" }] }))).toBe("2 Mitglieder · 1 Squad");
+  expect(teamMeta(team({ member_count: 12, squad_count: 2 }))).toBe("12 Mitglieder · 2 Co-Teams");
+  expect(teamMeta(team({ members: [{ id: "a" }, { id: "b" }], squads: [{ name: "A" }] }))).toBe("2 Mitglieder · 1 Co-Team");
 });
 
 test("eigene Teams tauchen unter den weiteren nicht noch einmal auf", () => {
