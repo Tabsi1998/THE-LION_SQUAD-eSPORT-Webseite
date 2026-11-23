@@ -128,6 +128,42 @@ async def test_place_waits_for_the_first_scored_match(flow):
     assert row["next_match"] is not None
 
 
+@pytest.mark.asyncio
+async def test_a_bye_does_not_hide_the_place_once_the_table_has_started(flow):
+    """Review #1638: „Noch ohne Platz“ gilt für die ganze Tabelle, nicht je Zeile - wer am ersten Spieltag ein Freilos hat, steht trotzdem
+    auf dem Platz der Tabelle, mit Zone."""
+    from services.matchday_schedule import matchday_number_of
+
+    world = await setup(flow)
+    season = await add_season(flow, world, levels=2)
+    tournament = await staffel(flow, world, season, 2, [1, 2, 3])
+    first_day = [match for match in await flow.db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}}, {"_id": 0}).to_list(None)
+                 if matchday_number_of(match) == 1]
+    playing = {slot["registration_id"] for match in first_day for slot in match.get("slots") or [] if slot.get("registration_id")}
+    rested = next(f"{tournament['id']}-reg-{n}" for n in (1, 2, 3) if f"{tournament['id']}-reg-{n}" not in playing)
+    await play_first_matchday(flow, tournament, sorted(playing))
+    flow.act_as(None)
+    table = {row["registration_id"]: row for row in ok(await flow.get(f"/api/tournaments/{tournament['id']}/standings"))}
+    assert int(table[rested]["played"] or 0) == 0, "Gegenprobe: das Team hatte wirklich ein Freilos"
+    team = f"team-{rested.rsplit('-', 1)[1]}"
+    row = ok(await flow.get(f"/api/teams/{team}/overview"))["league"][0]
+    assert row["rank"] == table[rested]["rank"] and row["rank"] is not None, (row, table[rested])
+    assert row["zone"] == table[rested].get("zone")
+
+
+@pytest.mark.asyncio
+async def test_waitlist_and_open_registration_say_so_instead_of_no_result(flow):
+    world = await two_levels(flow)
+    await flow.db.tournament_registrations.update_one({"id": world["extra"]}, {"$set": {"status": "waitlist"}})
+    flow.act_as(None)
+    rows = {row["registration_id"]: row for row in ok(await flow.get("/api/teams/team-1/overview"))["league"]}
+    assert rows[world["extra"]]["status_note"] == "Warteliste"
+    assert rows[f"{world['lower']['id']}-reg-1"]["status_note"] is None
+    await flow.db.tournament_registrations.update_one({"id": world["extra"]}, {"$set": {"status": "pending"}})
+    profile_rows = {row["registration_id"]: row for row in (await profile(flow, None))["league_current"]}
+    assert profile_rows[world["extra"]]["status_note"] == "Anmeldung offen"
+
+
 # ---------------------------------------------------------------- Personenprofil
 
 @pytest.mark.asyncio
@@ -246,3 +282,57 @@ async def reads(count: int) -> dict:
 async def test_reads_do_not_grow_with_the_running_leagues():
     small, large = await reads(1), await reads(4)
     assert small == large, f"Abfragen mit 1 bzw. 4 laufenden Staffeln: {small} / {large}"
+
+
+# ---------------------------------------------------------------- Datenschutz und Zugehörigkeit (Review #1638)
+
+async def viewers(flow) -> dict:
+    owner = await flow.db.users.find_one({"id": PERSON}, {"_id": 0})
+    outsider = await flow.add_user(role="player", name="sturmvogel")
+    member = await flow.add_user(role="player", name="nachtfalke")
+    await flow.db.memberships.insert_one({"id": "m-1", "user_id": member["id"], "member_status": "active"})
+    return {"gast": None, "nicht-mitglied": outsider, "mitglied": member, "selbst": owner}
+
+
+@pytest.mark.asyncio
+async def test_private_team_shows_current_leagues_only_to_the_person(flow):
+    await two_levels(flow)
+    people = await viewers(flow)
+    for label, viewer in people.items():
+        assert len((await profile(flow, viewer))["league_current"]) == 2, ("Gegenprobe: öffentliches Team", label)
+    await flow.db.teams.update_one({"id": "team-1"}, {"$set": {"is_public": False}})
+    seen = {label: (await profile(flow, viewer))["league_current"] for label, viewer in people.items()}
+    assert seen["gast"] == [] and seen["nicht-mitglied"] == [] and seen["mitglied"] == [], seen
+    assert len(seen["selbst"]) == 2, "die Person selbst sieht ihre Ligen"
+
+
+@pytest.mark.asyncio
+async def test_private_team_shows_the_season_history_only_to_the_person(flow):
+    world = await setup(flow)
+    season = await add_season(flow, world)
+    tournament = await staffel(flow, world, season, 1, [1, 2, 3])
+    await play(flow, tournament, [1, 2, 3])
+    await close_staffel(flow, world, tournament)
+    people = await viewers(flow)
+    for label, viewer in people.items():
+        assert len((await profile(flow, viewer))["league_history"]) == 1, ("Gegenprobe: öffentliches Team", label)
+    await flow.db.teams.update_one({"id": "team-1"}, {"$set": {"is_public": False}})
+    seen = {label: (await profile(flow, viewer))["league_history"] for label, viewer in people.items()}
+    assert seen["gast"] == [] and seen["nicht-mitglied"] == [] and seen["mitglied"] == [], seen
+    assert len(seen["selbst"]) == 1
+    # Ein anderes, öffentliches Team derselben Staffel bleibt sichtbar.
+    assert len((await profile(flow, None, "p-2-1"))["league_history"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_registering_a_co_team_alone_does_not_make_it_the_persons_league(flow):
+    """Wer ein Co-Team nur angemeldet hat (``user_id`` der Anmeldung), ohne im Kader zu stehen, hat dort keine aktuelle Liga - als Captain
+    bzw. Vertreter des Co-Teams schon."""
+    world = await two_levels(flow)
+    await flow.db.tournament_registrations.update_many({"team_id": "team-1"}, {"$set": {"user_id": "captain-1"}})
+    assert (await profile(flow, None, "captain-1"))["league_current"] == []
+    await flow.db.team_squads.update_one({"id": "squad-1b"}, {"$set": {"captain_id": "captain-1"}})
+    rows = (await profile(flow, None, "captain-1"))["league_current"]
+    assert [row["registration_id"] for row in rows] == [world["extra"]]
+    await flow.db.team_squads.update_one({"id": "squad-1b"}, {"$set": {"captain_id": None, "vice_captain_id": "captain-1"}})
+    assert len((await profile(flow, None, "captain-1"))["league_current"]) == 1
