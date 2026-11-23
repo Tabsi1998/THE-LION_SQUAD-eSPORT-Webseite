@@ -6,7 +6,8 @@
   zurück zum gewohnten Bild) - Zuständigkeit „Spiele betreuen“. Gilt für alle TVs der abgeschlossenen Staffeln der Season. Mit
   ``from_step`` (der Stand im Fenster der Leitung) gibt „Weiter“ 409, wenn ein anderes Fenster schon geschaltet hat.
 - ``GET|PUT /api/admin/leagues/seasons/{season_id}/discord``: Spieltag-Zusammenfassung und Saisonende-Meldung an/aus, Kanal, Wartezeit
-  und Tabellenausschnitt - lesen jede Zuständigkeit, ändern „Season konfigurieren“. Dazu die Textkanäle des Hauptservers zur Wahl.
+  und Tabellenausschnitt - lesen jede Zuständigkeit, ändern „Season konfigurieren“. Dazu die Textkanäle des Hauptservers zur Wahl
+  und die Hinweise zu Meldungen, deren Zustellung unklar ist oder die aufgegeben wurden.
 
 Logik in ``services/league_finale.py`` und ``services/league_discord.py``.
 """
@@ -90,7 +91,7 @@ async def _digest_answer(db, season: dict, **extra) -> dict:
     from services.profile_visibility import public_season
 
     return {"settings": settings, "active": isinstance(stored, dict), "defaults": dict(league_discord.DEFAULTS),
-            "public": public_season(season), **await _channels(), **extra}
+            "public": public_season(season), "problems": await league_discord.problems(db, season["id"]), **await _channels(), **extra}
 
 
 @admin_router.get("/seasons/{season_id}/discord")

@@ -7,14 +7,17 @@
   Einstellung (F.2 kopiert Season-Felder).
 - **Spieltag fertig**, sobald jedes Spiel des Spieltags gewertet oder abgesagt ist - spätestens ``wait_hours`` nach dem Ende der
   Spielwoche mit den offenen Spielen dazu (nur mit ``late``). Ein Spieltag ohne ein einziges Ergebnis geht nie hinaus. Wer die
-  Meldung später einschaltet, bekommt nur Spieltage, deren Frist danach endet - nichts Altes auf einmal.
+  Meldung später einschaltet, bekommt nur Spieltage, deren Frist danach endet - ohne Spielwoche zählt das letzte Ergebnis des
+  Spieltags. Nichts Altes auf einmal.
 - **Saisonende**, sobald die Season „beendet“ ist (alle Staffeln abgeschlossen, ``league_final._season_follows``): Meister, Auf- und
   Absteiger je Liga N (``league_final.build_pages``-Rechnung aus ``league_finale``), Link zur öffentlichen Season-Seite.
 - **Nur, was Gäste sehen**: Season öffentlich (``public_season``), Staffel als Turnier sichtbar. Interne oder Leitungs-Seasons gehen
   nie hinaus, auch nicht mit Einstellung.
 - **Nie doppelt** (``league_discord_posts``, eindeutiger ``dedupe_key``): Vor dem Senden wird der Schlüssel belegt, nur wer ihn
   belegt, sendet. Ein zweiter Lauf des Jobs - auch gleichzeitig auf zwei Servern - findet ihn und sendet nichts. Ein Fehlschlag
-  wird höchstens ``MAX_ATTEMPTS``-mal wiederholt, frühestens nach ``RETRY_MINUTES``.
+  wird höchstens ``MAX_ATTEMPTS``-mal wiederholt, frühestens nach ``RETRY_MINUTES`` - aber nur, wenn sicher nichts hinausging
+  (``retryable``). Nach einem unklaren Fehler (Zeitüberschreitung, Discord 5xx) bleibt der Merker „unclear“ stehen und die Leitung
+  sieht den Hinweis im Kasten (``problems``).
 - **Kein Rückfall**: ohne Kanal, ohne Bot oder mit Discord aus wird nichts gesendet und nichts belegt.
 """
 from __future__ import annotations
@@ -45,6 +48,11 @@ GOLD = 0xD4A84B
 # Ein Embed trägt höchstens 4096 Zeichen Beschreibung und 1024 je Feld - darüber fallen ganze Zeilen weg, nie ein halber Name.
 DESCRIPTION_MAX = 3900
 FIELD_MAX = 1000
+# Und insgesamt (Titel, Text, alle Felder) höchstens 6000 - darüber fallen ganze Liga N weg, mit Hinweis auf die Season-Seite.
+EMBED_MAX = 5900
+# Sicher nichts hinausgegangen: Bot nicht verbunden, Kanal unbekannt, keine Schreibrechte - und eine 4xx-Antwort (abgewiesen).
+SAFE_REASONS = frozenset({"bot_offline", "unknown_channel", "forbidden"})
+UNCLEAR = "unclear"
 MOVE_SIGNS = {"up": "▲", "down": "▼", "out": "✕"}
 
 
@@ -222,16 +230,28 @@ def season_end_message(context: dict) -> dict:
     else:
         title_line = ""
     intro = f"{_esc(context.get('league'))}: Die Season ist abgeschlossen." if context.get("league") else "Die Season ist abgeschlossen."
+    title = f"Saisonende · {context.get('season') or 'Season'}"
+    description = "\n".join(part for part in (intro, title_line) if part)
+    pages = (context.get("pages") or [])[:20]
     fields = []
-    for page in (context.get("pages") or [])[:20]:
+    rest = "Weitere Ligen"
+    # Platz für den Hinweis auf weggefallene Liga N bleibt immer frei - der Rest geht an die Liga N der Reihe nach.
+    budget = EMBED_MAX - len(title) - len(description) - len(rest) - 60
+    for index, page in enumerate(pages):
         lines = [mover_line(row) for row in page.get("rows") or []]
         if page.get("more"):
             lines.append(f"… und {page['more']} weitere auf der Season-Seite")
-        fields.append({"name": page["label"], "value": _fit(lines, FIELD_MAX, "… und {n} weitere auf der Season-Seite"), "inline": False})
+        value = _fit(lines, min(FIELD_MAX, budget - len(page["label"])), "… und {n} weitere auf der Season-Seite")
+        if not value or len(page["label"]) + len(value) > budget:
+            left = len(pages) - index
+            fields.append({"name": rest, "value": f"… und {left} weitere Liga N auf der Season-Seite" if left > 1
+                           else "… und eine weitere Liga N auf der Season-Seite", "inline": False})
+            break
+        fields.append({"name": page["label"], "value": value, "inline": False})
+        budget -= len(page["label"]) + len(value)
     if not fields:
         fields.append({"name": "Auf- und Abstieg", "value": "In dieser Season steigt niemand auf oder ab.", "inline": False})
-    return {"title": f"Saisonende · {context.get('season') or 'Season'}", "description": "\n".join(part for part in (intro, title_line) if part),
-            "fields": fields, "url": context.get("url"), "color": GOLD,
+    return {"title": title, "description": description, "fields": fields, "url": context.get("url"), "color": GOLD,
             "buttons": [{"label": "Zur Season", "url": context["url"]}] if context.get("url") else []}
 
 
@@ -259,6 +279,29 @@ def _parse(value) -> datetime | None:
 
 
 # ---------------------------------------------------------------- Merker gegen Doppelversand
+
+def retryable(result: dict) -> bool:
+    """Ging sicher nichts hinaus? Nur dann darf derselbe Schlüssel noch einmal senden. Ein Fehler nach dem Absenden (Zeitüberschreitung,
+    Discord 5xx, unbekannt) kann die Nachricht schon zugestellt haben - lieber keine zweite als eine doppelte."""
+    reason = (result or {}).get("reason")
+    if reason in SAFE_REASONS:
+        return True
+    if reason == "http":
+        status = str((result or {}).get("error") or "").removeprefix("Discord ").split(":", 1)[0].strip()
+        return status.isdigit() and 400 <= int(status) < 500
+    return False
+
+
+async def blocked(db, key: str, now: datetime) -> bool:
+    """Vorprüfung ohne Belegen: gesendet, unterwegs, unklar, aufgegeben oder noch in der Wartezeit vor dem nächsten Versuch - dann
+    braucht der Lauf weder Namen noch Tabelle."""
+    row = await db[COLLECTION].find_one({"dedupe_key": key}, {"_id": 0, "status": 1, "attempts": 1, "claimed_at": 1})
+    if not row:
+        return False
+    if row.get("status") != "failed":
+        return True
+    cutoff = (now - timedelta(minutes=RETRY_MINUTES)).isoformat()
+    return int(row.get("attempts") or 0) >= MAX_ATTEMPTS or str(row.get("claimed_at") or "") >= cutoff
 
 async def claim(db, key: str, doc: dict, now: datetime) -> bool:
     """Den Schlüssel belegen - ``True`` nur für den, der ihn belegt hat. Ein Fehlschlag darf nach ``RETRY_MINUTES`` noch einmal,
@@ -294,7 +337,8 @@ async def _send(db, key: str, channel_id: str, message: dict, now: datetime) -> 
         await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "sent", "message_id": str(result.get("message_id") or ""),
                                                                        "channel_id": channel_id, "sent_at": now.isoformat(), "error": None}})
         return True
-    await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "failed", "channel_id": channel_id,
+    status = "failed" if retryable(result) else UNCLEAR
+    await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": status, "channel_id": channel_id,
                                                                    "error": str(result.get("reason") or result.get("error") or "error")[:200]}})
     logger.info("[league_discord] Meldung %s nicht gesendet: %s", log_safe(key), log_safe(result.get("reason")))
     return False
@@ -376,11 +420,11 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
             due, open_count = matchday_due(by_day[number], window_end, settings, now)
             if not due:
                 continue
-            # Später eingeschaltet: nur Spieltage, deren Meldefrist danach endet.
-            if since and window_end and window_end + timedelta(hours=int(settings["wait_hours"])) < since:
+            # Später eingeschaltet: nur Spieltage, deren Meldefrist danach endet - ohne Spielwoche, deren letztes Ergebnis danach kam.
+            if since and _before_switch_on(by_day[number], window_end, settings, since):
                 continue
             key = f"matchday:{staffel['id']}:{number}"
-            if await db[COLLECTION].count_documents({"dedupe_key": key, "status": {"$in": ["sent", "sending"]}}, limit=1):
+            if await blocked(db, key, now):
                 continue
             if names is None:
                 names = await _names(db, staffel["id"])
@@ -402,6 +446,21 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
     return sent
 
 
+def _last_result(games: list[dict]) -> datetime | None:
+    stamps = [_parse(game.get("completed_at") or game.get("confirmed_at") or game.get("updated_at")) for game in games]
+    stamps = [stamp for stamp in stamps if stamp]
+    return max(stamps) if stamps else None
+
+
+def _before_switch_on(games: list[dict], window_end: datetime | None, settings: dict, since: datetime) -> bool:
+    """Gehört der Spieltag in die Zeit vor dem Einschalten? Mit Spielwoche: Die Meldefrist endete davor. Ohne: Das letzte Ergebnis kam
+    davor - ohne jede Zeitangabe gilt er als alt (lieber keine Meldung als alte auf einmal)."""
+    if window_end is not None:
+        return window_end + timedelta(hours=int(settings.get("wait_hours") or 0)) < since
+    last = _last_result(games)
+    return last is None or last < since
+
+
 async def season_end_post(db, season: dict, league: dict, settings: dict, now: datetime) -> int:
     """Ist die Season beendet: einmal die Meldung mit Meister, Auf- und Absteigern."""
     from services.league_finale import season_finals, season_pages
@@ -409,7 +468,7 @@ async def season_end_post(db, season: dict, league: dict, settings: dict, now: d
     if season.get("status") != "completed":
         return 0
     key = f"season_end:{season['id']}"
-    if await db[COLLECTION].count_documents({"dedupe_key": key, "status": {"$in": ["sent", "sending"]}}, limit=1):
+    if await blocked(db, key, now):
         return 0
     staffeln, finals = await season_finals(db, season)
     if not finals:
@@ -451,3 +510,32 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
         except Exception:  # noqa: BLE001 - eine Season hält die anderen nicht auf
             logger.warning("[league_discord] Season %s nicht gemeldet", log_safe(season.get("id")), exc_info=True)
     return counts
+
+
+# ---------------------------------------------------------------- Hinweise für die Leitung
+
+PROBLEM_LIMIT = 20
+
+
+async def problems(db, season_id: str) -> list[dict]:
+    """Was die Leitung wissen muss: Meldungen, deren Zustellung unklar ist (nie wiederholt - bitte im Kanal nachsehen), und solche,
+    die nach ``MAX_ATTEMPTS`` Versuchen aufgegeben wurden. Neueste zuerst."""
+    from discord_service import REASON_TEXTS
+
+    query = {"season_id": season_id, "$or": [{"status": UNCLEAR}, {"status": "failed", "attempts": {"$gte": MAX_ATTEMPTS}}]}
+    rows = await db[COLLECTION].find(query, {"_id": 0}).sort("claimed_at", -1).to_list(PROBLEM_LIMIT)
+    titles = {}
+    ids = sorted({row["tournament_id"] for row in rows if row.get("tournament_id")})
+    if ids:
+        titles = {row["id"]: row.get("title") or "" for row in await db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "title": 1}).to_list(len(ids))}
+    out = []
+    for row in rows:
+        what = "Saisonende" if row.get("kind") == "season_end" else " · ".join(
+            part for part in (f"Spieltag {row.get('matchday')}", titles.get(row.get("tournament_id"))) if part)
+        if row.get("status") == UNCLEAR:
+            text = "Unklar, ob die Meldung ankam - Discord meldete einen Fehler nach dem Senden. Bitte im Kanal nachsehen; sie geht nicht noch einmal hinaus."
+        else:
+            reason = REASON_TEXTS.get(row.get("error") or "") or "Discord hat die Meldung nicht angenommen."
+            text = f"Nach {row.get('attempts')} Versuchen nicht gesendet. {reason}"
+        out.append({"kind": row.get("kind"), "label": what, "status": row.get("status"), "text": text, "at": row.get("claimed_at")})
+    return out
