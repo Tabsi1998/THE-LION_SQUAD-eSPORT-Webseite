@@ -75,7 +75,7 @@ export function LeagueSeasonLine({ rows, byTeam = false, testId = "league-season
     const before = row.points[index - 1];
     if (before && index !== row.points.length - 1 && before.rank === point.rank && before.level === point.level) return;
     const taken = placed.get(point.index) || [];
-    const free = (spot) => spot > TOP - 4 && spot < bottom && taken.every((other) => Math.abs(other - spot) >= LABEL_GAP);
+    const free = (spot) => spot >= TOP - 6 && spot < bottom && taken.every((other) => Math.abs(other - spot) >= LABEL_GAP);
     const spot = [y(point.value) - 10, y(point.value) + 17].find(free);
     if (spot === undefined) return;
     placed.set(point.index, [...taken, spot]);
