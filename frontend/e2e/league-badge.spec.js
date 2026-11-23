@@ -34,7 +34,11 @@ const HISTORY = [
   season(2, 2, 2, "Nordlicht · Nordlicht A", { zone: "promotion" }),
   season(3, 1, 1, "Nordlicht · Nordlicht A", { champion: true }),
 ].reverse();
-const TEAM_HISTORY = [...HISTORY, season(2, 3, 4, "Nordlicht · Nordlicht B"), season(3, 3, 2, "Nordlicht · Nordlicht B")];
+// Fünf Co-Teams: Die Linie zeigt die vier besten (aktuelle Liga N, dann Platz), das fünfte nennt der Satz darunter (Fabian 23.11.).
+const TEAM_HISTORY = [...HISTORY, season(2, 3, 4, "Nordlicht · Nordlicht B"), season(3, 3, 2, "Nordlicht · Nordlicht B"),
+  season(2, 3, 5, "Nordlicht · Nordlicht C"), season(3, 3, 3, "Nordlicht · Nordlicht C"),
+  season(2, 3, 6, "Nordlicht · Nordlicht D"), season(3, 3, 4, "Nordlicht · Nordlicht D"),
+  season(2, 3, 2, "Nordlicht · Nordlicht E"), season(3, 3, 6, "Nordlicht · Nordlicht E")];
 
 const PROFILE = { id: "p1", username: "neonfalke", display_name: "NeonFalke", role: "player", country: "AT", created_at: "2025-03-01T10:00:00+00:00", stats: {}, teams: [],
   tournaments: [], awards: [], featured_award: null, featured_title: null, featured_emblems: [], league_history: HISTORY, league_overall: [], league_current: CURRENT,
@@ -114,6 +118,12 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
         await expect(page.getByTestId(`gallery-${size}-0`)).toHaveAttribute("data-play", "done");
       }
       await expect(page.getByTestId("gallery-card-0-label")).toHaveText("Liga 1 · Elite");
+      // Gold nur für Wappen und „Meister“ - der Beiname bleibt Cyan (Fabian 23.11.).
+      const colors = await page.getByTestId("gallery-card-4-label").evaluate((node) => ({
+        nick: getComputedStyle(node.querySelector(".tls-lbadge__nick")).color,
+        champion: getComputedStyle(node.querySelector(".tls-lbadge__champion")).color,
+      }));
+      expect(colors).toEqual({ nick: "rgb(41, 182, 232)", champion: "rgb(255, 215, 0)" });
       await noSideScroll(page);
       await shot(gallery, `liga-abzeichen-${width}`);
     });
@@ -154,7 +164,9 @@ test.describe("Liga-Abzeichen und Aktuelle Ligen", () => {
       expect(order).toEqual(["top", "mid", "base"]);
       await expect(block.getByTestId("team-league-a")).toContainText("Nordlicht A");
       const line = page.getByTestId("team-season-line");
-      await expect(line.getByTestId("team-season-line-legend")).toContainText("Nordlicht · Nordlicht B");
+      const legend = await line.getByTestId("team-season-line-legend").locator("li").allTextContents();
+      expect(legend).toEqual(["Nordlicht · Nordlicht A", "Nordlicht · Nordlicht B", "Nordlicht · Nordlicht C", "Nordlicht · Nordlicht D"]);
+      await expect(line.getByTestId("team-season-line-more")).toHaveText("und 1 weiteres Co-Team");
       await expect(page.getByTestId("team-league-history")).toBeVisible();
       await noSideScroll(page);
       await seeLine(page, line);

@@ -80,3 +80,17 @@ describe("Saisonverlauf als Linie (#1630)", () => {
     expect(seasonLine([], { byTeam: true })).toBe(null);
   });
 });
+
+describe("Saisonverlauf an der Teamseite: die besten Co-Teams zuerst (#1630, Fabian 23.11.)", () => {
+  const row = (team, number, level, rank) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
+    rank, of: 6, badge: { level }, display_name: team });
+
+  it("ordnet nach der aktuellen Liga N und dann dem Platz der letzten Season - nicht nach dem besten Wert von früher", () => {
+    const line = seasonLine([
+      row("Früher oben", 1, 1, 1), row("Früher oben", 2, 3, 5),
+      row("Jetzt Liga 1", 1, 2, 2), row("Jetzt Liga 1", 2, 1, 4),
+      row("Jetzt Liga 1 vorn", 2, 1, 2),
+    ], { byTeam: true });
+    expect(line.series.map((series) => series.name)).toEqual(["Jetzt Liga 1 vorn", "Jetzt Liga 1", "Früher oben"]);
+  });
+});

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -126,5 +128,48 @@ describe("LeagueSeasonLine", () => {
   it("zeigt unter zwei Seasons nichts", () => {
     const { container } = render(<LeagueSeasonLine rows={HISTORY.slice(0, 1)} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Gold nur für Wappen und „Meister“ (Fabian 23.11.)", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/components/tls/league/leagueBadge.css"), "utf8");
+
+  it("der Beiname bleibt in seiner normalen Farbe, auch beim Meister", () => {
+    expect(css).toMatch(/\.tls-lbadge__nick \{[^}]*color: var\(--tls-brand, #29B6E8\)/);
+    expect(css).not.toMatch(/data-metal="gold"\][^{]*\.tls-lbadge__nick/);
+    expect(css).not.toMatch(/\.tls-lbadge__nick \{[^}]*--tls-lbadge-rgb/);
+    expect(css).toMatch(/\.tls-lbadge__champion \{[^}]*color: var\(--tls-honor\)/);
+  });
+
+  it("„Meister“ steht als eigener Teil neben dem Beinamen", () => {
+    render(<LeagueBadge badge={{ level: 1, nickname: "Elite", champion: true }} testId="m" />);
+    const label = screen.getByTestId("m-label");
+    expect(label.querySelector(".tls-lbadge__nick")).toHaveTextContent("Elite");
+    expect(label.querySelector(".tls-lbadge__nick")).not.toHaveTextContent("Meister");
+    expect(label.querySelector(".tls-lbadge__champion")).toHaveTextContent("Meister");
+  });
+});
+
+describe("Saisonverlauf: höchstens vier Co-Teams, der Rest als Text (Fabian 23.11.)", () => {
+  const team = (name, level, rank) => [1, 2].map((number) => ({ season_id: `s${number}`, season_name: `Season ${number}`,
+    closed_at: `2026-0${number}-01`, rank, of: 6, badge: { level }, display_name: name }));
+  const six = [team("Kader A", 1, 1), team("Kader B", 1, 3), team("Kader C", 2, 1), team("Kader D", 2, 2), team("Kader E", 3, 1),
+    team("Kader F", 3, 4)].flat();
+
+  it("zeigt die vier besten und nennt die übrigen", () => {
+    render(<LeagueSeasonLine rows={six} byTeam testId="l" />);
+    const legend = screen.getByTestId("l-legend");
+    expect([...legend.querySelectorAll("li")].map((node) => node.textContent)).toEqual(["Kader A", "Kader B", "Kader C", "Kader D"]);
+    expect(screen.getByTestId("l-more")).toHaveTextContent("und 2 weitere Co-Teams");
+  });
+
+  it("sagt es bei einem in der Einzahl", () => {
+    render(<LeagueSeasonLine rows={six.filter((row) => row.display_name !== "Kader F")} byTeam testId="l" />);
+    expect(screen.getByTestId("l-more")).toHaveTextContent("und 1 weiteres Co-Team");
+  });
+
+  it("ohne mehr als vier Co-Teams kein Hinweis", () => {
+    render(<LeagueSeasonLine rows={six.slice(0, 8)} byTeam testId="l" />);
+    expect(screen.queryByTestId("l-more")).toBeNull();
   });
 });
