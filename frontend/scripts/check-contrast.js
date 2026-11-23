@@ -58,6 +58,16 @@ for (const result of results) {
   );
 }
 
+// Prüftor (#1660): `--report out.json` schreibt das Ergebnis für den Kommentar im PR.
+const reportIndex = process.argv.indexOf("--report");
+if (reportIndex > 0 && process.argv[reportIndex + 1]) {
+  require("node:fs").writeFileSync(process.argv[reportIndex + 1], `${JSON.stringify({
+    ok: failed.length === 0,
+    total: results.length,
+    failed: failed.map((result) => `${result.label}: ${result.contrast.toFixed(2)}:1 (min ${result.min}:1)`),
+  }, null, 2)}\n`);
+}
+
 if (failed.length > 0) {
   process.stderr.write(`\nContrast audit failed: ${failed.length} combination(s) below target.\n`);
   process.exit(1);

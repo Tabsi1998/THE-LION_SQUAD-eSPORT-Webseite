@@ -1,8 +1,9 @@
 const { test, expect } = require("@playwright/test");
+const { withoutKnown } = require("./prueftor-bekannt");
 
 // Barrierefreiheit im Web (#1155): Turnier-, Match- und Event-Seite, Dashboard und Einstellungen
-// - axe (WCAG 2.1 A/AA) ohne schwere Funde. Den Kontrast prüft #1232 (Stil-System I) - dort wird die Regel hier
-//   eingeschaltet; bis dahin bleibt sie aus, damit dieser Test nicht dasselbe zweimal baut.
+// - axe (WCAG 2.1 A/AA) ohne schwere Funde. Den Kontrast prüft ein eigener Test je Seite (axe color-contrast, seit dem
+//   Prüftor #1660; #1232 hat die graue Schrift lesbar gemacht) - so meldet das Tor ihn unter „Kontrast“.
 // - 200 % ohne Querlauf und ohne abgeschnittene Überschriften oder Knöpfe: am PC als Browser-Zoom (1440 px → 720 px
 //   breit), am Handy als doppelte Schriftgröße bei 390 px (wie die Schriftgröße im Browser).
 // Die API ist nachgestellt, alle Namen sind erfunden.
@@ -120,6 +121,23 @@ async function seriousViolations(page) {
   });
 }
 
+/** Kontrast nach WCAG AA (axe color-contrast): jeder Fund zählt, außer bekannten aus prueftor-bekannt.json (#1660). */
+async function contrastViolations(page) {
+  await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
+  return page.evaluate(async () => {
+    const result = await window.axe.run(document, { runOnly: { type: "rule", values: ["color-contrast"] } });
+    return result.violations.flatMap((violation) => violation.nodes.map((node) => {
+      // Bereich im Schlüssel (prueftor-bekannt.json): Fuß, Navigation, Kopf oder Inhalt - so gilt ein bekannter Fund des
+      // Rahmens nie für ein gleich benanntes Element im Inhalt.
+      const element = document.querySelector(node.target[node.target.length - 1]);
+      const region = !element ? "Inhalt" : element.closest("footer") ? "Fuß" : element.closest("nav") ? "Navigation"
+        : element.closest("header") ? "Kopf" : "Inhalt";
+      const key = `${violation.id}: [${region}] ${node.target.join(" ")}`;
+      return { key, text: `${key} – ${node.any.map((check) => check.message).join(" ")}` };
+    }));
+  });
+}
+
 /**
  * Querlauf und abgeschnittene Überschriften, Texte, Knöpfe und Links: Text breiter als die eigene Fläche, die
  * abschneidet („…“), oder über den Rand einer Fläche darüber hinaus, die abschneidet (overflow hidden). Was mit
@@ -198,6 +216,19 @@ test.describe("Barrierefreiheit (#1155)", () => {
         await open(page, entry);
         expect(await seriousViolations(page), `axe bei ${width} px`).toEqual([]);
       }
+    });
+
+    test(`${entry.name}: Kontrast nach WCAG AA bei 390 und 1440 px`, async ({ page }) => {
+      // Ohne Bewegung: Eingeblendetes steht sofort in voller Deckkraft, axe misst die Endfarben.
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      // Erst beide Breiten sammeln, dann prüfen: so steht jeder Fund im Bericht.
+      const found = [];
+      for (const width of [390, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await open(page, entry);
+        found.push(...withoutKnown(entry.name, "kontrast", await contrastViolations(page)).map((text) => `${width} px: ${text}`));
+      }
+      expect([...new Set(found)]).toEqual([]);
     });
 
     test(`${entry.name}: Tippflächen am Handy mindestens 44 px`, async ({ page }) => {
