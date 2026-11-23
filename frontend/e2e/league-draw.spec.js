@@ -281,3 +281,93 @@ test.describe("Liga: mehrere Staffeln je Liga", () => {
     });
   }
 });
+
+// Plätze über Staffeln hinweg (#1627, docs/LIGA.md „F.2 … Zielregel je Zone“) im Reiter „Abschluss“: Kandidaten mit Schnitt je Spiel,
+// Gleichstand an der Grenze, Entscheid ohne Los - bei 390 und 1440 px, dazu mit den längsten Namen bei 320 px.
+const standing = (index, name) => ({ registration_id: `r${index}`, display_name: name, rank: index, played: 3, won: 4 - index, drawn: 0, lost: index - 1,
+  score_for: 8 - index, score_against: index, score_diff: 8 - 2 * index, points: 12 - 3 * index, form: [], zone: index === 1 ? "promotion" : null });
+const closeRow = (id, letter, extra = {}) => ({
+  tournament_id: id, title: `Probe-Liga · Liga 2 · Staffel ${letter}`, staffel: letter, division_label: "Liga 2", status: "live", champion_place: false, own_team: false,
+  history: [], closed: false, final: null, standings: [standing(1, `Probe ${letter}1`), standing(2, `Probe ${letter}2`), standing(3, `Probe ${letter}3`)],
+  table_rules: { allow_draws: false, tiebreakers: ["head_to_head", "lead_decision"] }, blockers: [], ties: [], can_decide: true, champion: null, can_close: true,
+  closed_by_me: false, can_reopen: false, zones_label: "1 Aufsteiger · dazu 1 bester Nächstplatzierter über alle Staffeln · unterste Liga: kein Abstieg", ...extra });
+const crossCandidate = (id, name, letter, extra = {}) => ({ registration_id: id, display_name: name, tournament_id: `c${letter}`, staffel: letter, rank: 2, played: 3, points: 6,
+  score_diff: 2, points_per_game: 2, map_diff_per_game: 0.667, chosen: false, tied: true, ...extra });
+const crossTie = (names) => ({ kind: "promote_best", open: 1, registration_ids: ["ra", "rb"], names, staffeln: ["A", "B"] });
+const closing = (names, sideExtra = {}) => ({
+  season: { id: "s2", name: "Season 2", status: "active", closed: false }, can_act: true, superadmin: true, responsible: "„Season konfigurieren“", successor: null,
+  methods: { playoff: "Entscheidungsspiel", lot: "Los", lead: "Entscheid der Leitung" }, cross_methods: { playoff: "Entscheidungsspiel", lead: "Entscheid der Leitung" },
+  staffeln: [closeRow("cA", "A", { closed: true, can_close: false, status: "completed",
+    final: { id: "f1", version: 1, closed_at: "2027-04-13T17:00:00+00:00", closed_by_name: "Leitung", champion: null, decisions: [] } }),
+  closeRow("cB", "B", { can_close: false, blockers: [{ code: "zone_cross_tie", label: "Gleichstand zwischen den Staffeln", count: 1,
+    text: "Über die Staffeln hinweg stehen Teams gleich, aber nur ein Teil bekommt den Platz.", items: [{ text: names.join(" – "), url: "/admin/leagues/seasons/s2#abschluss" }] }] })],
+  cross: [{ division_id: "d2", label: "Liga 2", final: false, sides: [{ kind: "promote_best", label: "Aufstieg über den Vergleich der Staffeln", count: 1, zone: "promotion",
+    own_team: false, decision: null, tie: crossTie(names), candidates: [crossCandidate("ra", names[0], "A"), crossCandidate("rb", names[1], "B")], ...sideExtra }] }],
+});
+
+test.describe("Liga: Plätze über Staffeln hinweg", () => {
+  test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`Gleichstand zwischen Staffeln entscheiden bei ${width} px: Kandidaten, Art ohne Los, Grund`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await mockServer(page);
+      const names = ["Sturmfalken · Falken Rot", "Wüstenfüchse · Füchse A"];
+      let decided = false;
+      let sent = null;
+      await page.route("**/api/admin/leagues/seasons/s2/closing", (route) => json(decided
+        ? closing(names, { tie: null, decision: { registration_ids: ["rb"], names: [names[1]], method: "playoff", method_label: "Entscheidungsspiel", reason: "Entscheidungsspiel 3:1" },
+          candidates: [crossCandidate("rb", names[1], "B", { chosen: true, tied: false }), crossCandidate("ra", names[0], "A", { tied: false })] })
+        : closing(names))(route));
+      await page.route("**/api/admin/leagues/divisions/d2/zone-decision", (route) => {
+        sent = route.request().postDataJSON();
+        decided = true;
+        return json({ ok: true })(route);
+      });
+      await page.goto("/admin/leagues/seasons/s2#abschluss");
+      const section = page.getByTestId("cross-division-d2");
+      await expect(section).toContainText("Liga 2 · Plätze über Staffeln hinweg");
+      await expect(page.getByTestId("cross-status-d2")).toContainText("Stand von jetzt");
+      await expect(page.getByTestId("cross-candidate-ra")).toContainText("Staffel A, Platz 2 · 2,00 Punkte je Spiel · +0,67 Maps je Spiel");
+      await expect(page.getByTestId("cross-candidate-ra")).toContainText("Gleichstand");
+      await expect(page.getByTestId("close-blocker-cB-zone_cross_tie")).toContainText("Gleichstand zwischen den Staffeln");
+      await expect(page.getByTestId("close-button-cB")).toBeDisabled();
+      await noSideScroll(page);
+      await page.getByTestId("cross-decide-d2-promote_best").click();
+      const sheet = page.getByTestId("cross-decision-sheet");
+      await expect(sheet.getByTestId("cross-decision-method").locator("option")).toHaveText(["Bitte wählen …", "Entscheidungsspiel", "Entscheid der Leitung"]);
+      await expect(sheet.getByTestId("cross-decision-save")).toBeDisabled();
+      await sheet.getByTestId("cross-decision-pick-rb").check();
+      await sheet.getByTestId("cross-decision-method").selectOption("playoff");
+      await sheet.getByTestId("cross-decision-reason").fill("Entscheidungsspiel 3:1");
+      await noSideScroll(page);
+      await shot(page, `staffelvergleich-entscheid-${width}`);
+      await sheet.getByTestId("cross-decision-save").click();
+      await expect.poll(() => sent).toEqual({ kind: "promote_best", registration_ids: ["rb"], method: "playoff", reason: "Entscheidungsspiel 3:1" });
+      await expect(page.getByTestId("cross-decision-d2-promote_best")).toContainText("Entscheid: Wüstenfüchse · Füchse A – Entscheidungsspiel: Entscheidungsspiel 3:1");
+      await expect(page.getByTestId("cross-candidate-rb")).toContainText("steigt auf");
+      await expect(page.getByTestId("cross-tie-d2-promote_best")).toHaveCount(0);
+      await section.scrollIntoViewIfNeeded();
+      await shot(page, `staffelvergleich-${width}`);
+    });
+  }
+
+  test("die längsten Namen bei 320 px: nichts schiebt die Seite zur Seite, der Knopf bleibt erreichbar", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await mockServer(page);
+    const names = ["Aleksandra-Wiśniewska-Kowalczyk-Gedächtnis-Gaming-Gemeinschaft · Zweite Mannschaft der Reserve",
+      "Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichenverein · Rindfleischetikettierungsüberwachung"];
+    await page.route("**/api/admin/leagues/seasons/s2/closing", json(closing(names)));
+    await page.goto("/admin/leagues/seasons/s2#abschluss");
+    await expect(page.getByTestId("cross-tie-d2-promote_best")).toContainText("Nur einer bekommt den Platz.");
+    await noSideScroll(page);
+    const button = page.getByTestId("cross-decide-d2-promote_best");
+    await button.scrollIntoViewIfNeeded();
+    const box = await button.boundingBox();
+    expect(box.x + box.width).toBeLessThanOrEqual(320);
+    await button.click();
+    await expect(page.getByTestId("cross-decision-pick-rb")).toBeVisible();
+    await noSideScroll(page);
+  });
+});
+
