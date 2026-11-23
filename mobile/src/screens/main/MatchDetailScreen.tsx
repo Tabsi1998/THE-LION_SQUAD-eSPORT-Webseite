@@ -49,7 +49,8 @@ import { playMoment } from "../../lib/tournamentHaptics";
 import { CheckinCard } from "../../components/league/CheckinCard";
 import { VetoCard } from "../../components/league/VetoCard";
 import { LeagueReportCard, type LeagueReportSend } from "../../components/league/LeagueReportCard";
-import { sidesInSlotOrder, type LeagueBlock } from "../../lib/leagueGames";
+import { IncidentPanel, MapStateNotes, type IncidentLeague } from "../../components/league/IncidentPanel";
+import { sidesInSlotOrder } from "../../lib/leagueGames";
 import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
 import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
 import { useVetoPolling } from "../../lib/useVetoPolling";
@@ -114,7 +115,7 @@ type MatchPage = {
   tournament?: Tournament | null;
   // Liga-Staffel (#2173, docs/LIGA.md C.3): Maps, Pool, Veto-Reihenfolge, Kader und Regeln fürs Melden mit Maps. Ältere Server
   // schicken den Block nicht - dann meldet die App wie bisher ohne Maps.
-  league?: LeagueBlock | null;
+  league?: IncidentLeague | null;
 };
 
 // Dieselben Wörter wie auf der Website (#1139, MatchPage.jsx).
@@ -558,6 +559,9 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}
         </Card>
 
+        {/* Vorfälle (D.5): öffentlich nur „in Klärung“ bzw. „zählt nicht“ je Map - wie im Web unter dem Ergebnis. */}
+        {league ? <MapStateNotes league={league} /> : null}
+
         {page.call ? <MatchCallCard call={page.call} /> : null}
 
         {/* Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt. */}
@@ -621,6 +625,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <ProblemReportCard matchId={route.params.id} until={page.dispute_until} busy={busy} onSubmit={submitDispute} initialCategory={problemCategory} />
             ) : null}
           </Card>
+        ) : null}
+
+        {/* Vorfälle im Spiel (D.5, #1619): melden, antworten, Nachweise - nur Beteiligte und Leitung bekommen den Block. */}
+        {league?.incident_info ? (
+          <IncidentPanel league={league} matchId={idSegment(route.params.id)} busy={busy} run={runLeague} onChanged={reloadLeague} />
         ) : null}
 
         {showScheduleCard ? (
