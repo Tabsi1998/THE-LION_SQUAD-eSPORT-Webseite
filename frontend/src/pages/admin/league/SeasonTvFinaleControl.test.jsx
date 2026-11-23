@@ -23,7 +23,8 @@ test("Weiter und Ende schalten den TV, auf der letzten Liga N bleibt nur Ende", 
   expect(await screen.findByTestId("tv-finale-status")).toHaveTextContent("gewohnte Bild");
   expect(screen.getByTestId("tv-finale-end")).toBeDisabled();
   fireEvent.click(screen.getByTestId("tv-finale-next"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/tv-finale", { action: "next" }));
+  // „Weiter“ schickt den Stand mit, den dieses Fenster zeigt (zwei Leitungs-Tabs).
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/tv-finale", { action: "next", from_step: 0 }));
   expect(await screen.findByTestId("tv-finale-status")).toHaveTextContent("Der TV zeigt Liga 2 (2 von 2).");
   expect(screen.getByTestId("tv-finale-next")).toBeDisabled();
   expect(screen.getByTestId("tv-finale-last")).toBeInTheDocument();
@@ -52,4 +53,15 @@ test("finaleStatus: Gründe und Stand in einem Satz", () => {
   expect(finaleStatus({ ...STATE, reason: "no_movers" })).toContain("niemand auf oder ab");
   expect(finaleStatus({ ...STATE, reason: "none_closed" })).toContain("Noch keine Staffel");
   expect(finaleStatus({ ...STATE, step: 1 })).toBe("Der TV zeigt Liga 1 (1 von 2).");
+});
+
+test("zwei Leitungs-Fenster: hat ein anderes schon weitergeschaltet (409), lädt dieses den Stand neu und sagt es", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: STATE }).mockResolvedValue({ data: { ...STATE, step: 1 } });
+  apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Der TV-Schritt wurde inzwischen in einem anderen Fenster weitergeschaltet. Der aktuelle Stand ist geladen." } } });
+  render(<SeasonTvFinaleControl seasonId="s1" canSteer />);
+  fireEvent.click(await screen.findByTestId("tv-finale-next"));
+  expect(await screen.findByTestId("tv-finale-status")).toHaveTextContent("Der TV zeigt Liga 1 (1 von 2).");
+  expect(apiMock.get).toHaveBeenCalledTimes(2);
+  expect(screen.getByTestId("tv-finale-stale")).toHaveTextContent("anderen Fenster");
+  expect(screen.queryByTestId("tv-finale-error")).toBeNull();
 });
