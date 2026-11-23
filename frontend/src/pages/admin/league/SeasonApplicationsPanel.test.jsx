@@ -305,3 +305,33 @@ test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist und nu
   fireEvent.change(select, { target: { value: "t1" } });
   expect(screen.queryByTestId("application-deviation-a2")).toBeNull();
 });
+
+test("neue Co-Teams (#1623): zuerst die unterste Liga, eine höhere beim Annehmen und Zuteilen nur mit Grund", async () => {
+  const divisions = [...BODY.divisions.map((row) => ({ ...row, lowest: false })),
+    { id: "d2", label: "Liga 2", lowest: true, staffeln: [{ tournament_id: "t2", staffel: "A", participant_count: 0, max_participants: 8 }] }];
+  apiMock.get.mockResolvedValue({ data: { ...BODY, new_lowest: true, divisions, items: [{ ...ROW, target_division_id: "d2" }] } });
+  renderPanel();
+  const select = await screen.findByTestId("application-staffel-a1");
+  const labels = Array.from(select.querySelectorAll("option")).map((option) => option.textContent);
+  expect(labels).toEqual(["Staffel wählen …", "Liga 2 · Staffel A (0 von 8)", "Liga 1 · Staffel A (1 von 8) – höhere Liga, nur mit Grund"]);
+  fireEvent.change(select, { target: { value: "t1" } });
+  expect(screen.getByTestId("application-accept-a1")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("application-deviation-a1"), { target: { value: "Sieger der Turnierserie" } });
+  fireEvent.click(screen.getByTestId("application-accept-a1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/accept", { tournament_id: "t1", deviation_reason: "Sieger der Turnierserie" }));
+  // Gegenprobe: die unterste Liga geht ohne Grund.
+  fireEvent.change(select, { target: { value: "t2" } });
+  expect(screen.queryByTestId("application-deviation-a1")).toBeNull();
+  expect(screen.getByTestId("application-accept-a1")).toBeEnabled();
+});
+
+test("ohne Vorgabe der Season (ältere Seasons) stehen alle Staffeln gleich da, ohne Grund", async () => {
+  const divisions = [...BODY.divisions, { id: "d2", label: "Liga 2", staffeln: [{ tournament_id: "t2", staffel: "A", participant_count: 0, max_participants: 8 }] }];
+  apiMock.get.mockResolvedValue({ data: { ...BODY, divisions, items: [{ ...ROW, target_division_id: null }] } });
+  renderPanel();
+  const select = await screen.findByTestId("application-staffel-a1");
+  const labels = Array.from(select.querySelectorAll("option")).map((option) => option.textContent);
+  expect(labels).toEqual(["Staffel wählen …", "Liga 1 · Staffel A (1 von 8)", "Liga 2 · Staffel A (0 von 8)"]);
+  fireEvent.change(select, { target: { value: "t1" } });
+  expect(screen.queryByTestId("application-deviation-a1")).toBeNull();
+});

@@ -4,6 +4,13 @@ import { viennaDateTime } from "@/lib/vienna";
 export const MOVEMENT_TEXT = { up: "Aufstieg", down: "Abstieg", stay: "bleibt" };
 const LONG = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
+/** Was mit einem Team geschieht: „Aufstieg“, über den Vergleich der Staffeln (#1627) „Aufstieg als bester Nächstplatzierter“. */
+export function movementText(team) {
+  if (team?.zone_cross && team.movement === "up") return "Aufstieg als bester Nächstplatzierter";
+  if (team?.zone_cross && team.movement === "down") return "Abstieg über den Vergleich der Staffeln";
+  return MOVEMENT_TEXT[team?.movement] || "";
+}
+
 /** Woher ein Team kommt: „Liga 2 · Staffel A, Platz 1“. */
 export function teamFrom(team) {
   if (!team) return "";

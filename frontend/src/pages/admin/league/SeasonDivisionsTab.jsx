@@ -10,6 +10,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { ACTIVE_STATUS_OPTIONS, BEST_OF_OPTIONS, overridesPayload, overridesToForm, settingsLine, syncSummary } from "@/lib/league";
 import { nicknameRepeatsLevel, seasonWithEnd } from "@/lib/seasonTabs";
+import { crossFieldsShown } from "@/lib/leagueCrossZones";
 import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
 import { PrizeEditor } from "./LeagueLookFields";
@@ -22,8 +23,10 @@ import { toast } from "sonner";
 const asStaffel = (staffel, season) => ({ ...staffel, id: staffel.tournament_id, league_context: { season_id: season?.id, staffel: staffel.staffel } });
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
+// Nr. 231: Sobald eine Staffel der Season abgeschlossen ist, stehen ihre Ligen fest - Auf- und Abstieg rechnen mit ihnen.
+export const DIVISIONS_LOCKED_HINT = "Gesperrt: In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht erst, wenn alle abgeschlossenen Staffeln im Reiter „Abschluss“ wieder geöffnet sind.";
 
-export function DivisionSheet({ division, season, nextLevel, onClose, onSaved }) {
+export function DivisionSheet({ division, season, nextLevel, divisionsLocked = false, onClose, onSaved }) {
   const [nickname, setNickname] = useState(division?.nickname || "");
   const [status, setStatus] = useState(division?.status || "active");
   const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
@@ -71,8 +74,8 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
         </p>
       ) : null}
       {division ? (
-        <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS}
-          hint="Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten." testId="division-status" />
+        <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS} disabled={divisionsLocked}
+          hint={divisionsLocked ? DIVISIONS_LOCKED_HINT : "Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten."} testId="division-status" />
       ) : null}
       <p className="text-xs text-white/55">Leer lassen heißt: wie die Season. Nur was diese Liga anders macht, eintragen.</p>
       <FormGrid>
@@ -100,7 +103,8 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
         <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} placeholder={String(points.loss ?? 0)} testId="override-points-loss" />
       </FormGrid>
       )}
-      <ZoneFields zones={zones} onChange={setZones} effective={division?.zones_effective} level={level} />
+      <ZoneFields zones={zones} onChange={setZones} effective={division?.zones_effective} level={level} staffelCount={division?.staffeln?.length || 0}
+        crossLocked={Boolean(division?.zones_cross_locked)} />
       <PrizeEditor rows={prizes} onChange={setPrizes} testId="division-prizes"
         emptyHint={season.prizes?.length ? `Wie die Season: ${season.prizes.map((row) => `${row.place}. ${row.text}`).join(" · ")}` : "Wie die Season – dort sind noch keine Gewinne eingetragen."} />
     </AdminSheet>
@@ -108,8 +112,11 @@ export function DivisionSheet({ division, season, nextLevel, onClose, onSaved })
 }
 
 /** Auf- und Abstieg dieser Liga N (F.2, #1627, Nr. 158): je Staffel, die Randfälle sagt der Hinweis. */
-function ZoneFields({ zones, onChange, effective, level }) {
+function ZoneFields({ zones, onChange, effective, level, staffelCount = 0, crossLocked = false }) {
   const set = (key) => (value) => onChange((current) => ({ ...current, [key]: value }));
+  // Plätze über alle Staffeln (#1627): nur dort zeigen, wo sie gelten - mehrere Staffeln, nicht nach oben in der obersten, nicht nach
+  // unten in der untersten Liga. Ab dem ersten Abschluss einer Staffel sind sie gesperrt (Nr. 228).
+  const cross = crossFieldsShown({ staffelCount, top: Boolean(effective?.top), bottom: Boolean(effective?.bottom), zones });
   const edge = [effective?.top ? "Als oberste Liga gibt es hier keinen Aufstieg." : "", effective?.bottom ? "Als unterste Liga gibt es hier keinen Abstieg." : ""]
     .filter(Boolean).join(" ");
   return (
@@ -127,6 +134,32 @@ function ZoneFields({ zones, onChange, effective, level }) {
         <TextField label="Relegation unten (freiwillig)" type="number" min={0} max={10} value={zones.playoff_relegate} onChange={set("playoff_relegate")}
           testId="zones-playoff-relegate" />
       </FormGrid>
+      {/* Zielregel über Staffeln hinweg (#1627): nur, wo sie gilt. */}
+      {cross.promote_best || cross.relegate_worst ? (
+        <div className="space-y-2" data-testid="zones-cross">
+          <p className="pt-1 text-xs font-bold uppercase tracking-wider text-white/70">Dazu über alle Staffeln dieser Liga</p>
+          <p className="text-xs text-white/55">
+            Etwa „Platz 1 jeder Staffel und die zwei besten Zweiten“. Kandidat ist je Staffel der erste Platz nach den Aufsteigern und den Relegationsplätzen, unten
+            entsprechend. Verglichen wird nach Punkten je Spiel, dann nach Map-Differenz je Spiel; bei Gleichstand entscheidet die Leitung, ohne Los. Fest steht es erst, wenn
+            alle Staffeln der Liga abgeschlossen sind. Leer oder 0: nur die Plätze je Staffel.
+          </p>
+          {crossLocked ? (
+            <p className="text-xs text-warn" data-testid="zones-cross-locked">
+              Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.
+            </p>
+          ) : null}
+          <FormGrid cols={2}>
+            {cross.promote_best ? (
+              <TextField label="Beste Nächstplatzierte steigen auf" type="number" min={0} max={10} value={zones.promote_best ?? ""} onChange={set("promote_best")} placeholder="0"
+                disabled={crossLocked} hint="Die besten Teams auf dem ersten Platz nach Aufsteigern und Relegation." testId="zones-promote-best" />
+            ) : null}
+            {cross.relegate_worst ? (
+              <TextField label="Schlechteste vor dem Abstieg steigen ab" type="number" min={0} max={10} value={zones.relegate_worst ?? ""} onChange={set("relegate_worst")} placeholder="0"
+                disabled={crossLocked} hint="Die schlechtesten Teams auf dem letzten Platz vor Relegation und Absteigern." testId="zones-relegate-worst" />
+            ) : null}
+          </FormGrid>
+        </div>
+      ) : null}
     </fieldset>
   );
 }
@@ -164,12 +197,13 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
             <p className="mt-0.5 text-xs text-white/50">Liga 1, 2 … sind die Stufen der Season. In jeder entstehen Staffeln – je Staffel ein Liga-Turnier mit den Vorgaben der Season.</p>
           </div>
           {canSeason ? (
-            <button type="button" onClick={onAddDivision} data-testid="division-add"
-              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+            <button type="button" onClick={onAddDivision} disabled={Boolean(data.divisions_locked)} data-testid="division-add"
+              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
               <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga {(data.divisions.at(-1)?.level || 0) + 1} anlegen
             </button>
           ) : null}
         </div>
+        {canSeason && data.divisions_locked ? <p className="text-xs text-warn" data-testid="divisions-locked">{DIVISIONS_LOCKED_HINT}</p> : null}
         {!data.divisions.length ? <p className="text-sm text-white/55">Noch keine Liga. Lege Liga 1 an – darin entstehen die Staffeln.</p> : null}
         {data.divisions.map((division) => (
           <div key={division.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0" data-testid={`division-${division.level}`}>
@@ -193,7 +227,8 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                   <button type="button" className={ICON_BUTTON} onClick={() => onEditDivision(division)} aria-label={`${division.label} bearbeiten`} data-testid={`division-edit-${division.level}`}>
                     <Pencil className="w-4 h-4" aria-hidden="true" />
                   </button>
-                  <button type="button" className={ICON_DANGER} onClick={() => onDelete({ kind: "division", target: division, name: division.label })}
+                  <button type="button" className={`${ICON_DANGER} disabled:opacity-40 disabled:hover:text-white/50`} disabled={Boolean(data.divisions_locked)}
+                    onClick={() => onDelete({ kind: "division", target: division, name: division.label })}
                     aria-label={`${division.label} löschen`} data-testid={`division-delete-${division.level}`}>
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>

@@ -16,6 +16,7 @@ import { api, formatApiError } from "@/lib/api";
 import { closeState, decisionLine, finalMoment, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws } from "@/lib/leagueTable";
 import { rosterFallbackText } from "@/lib/leagueRewards";
+import { SeasonCrossZones } from "./SeasonCrossZones";
 import { OrderSheet } from "./SeasonTablePanel";
 import "./seasonClose.css";
 
@@ -42,6 +43,8 @@ function Table({ rows, rules, championId, label }) {
 }
 
 // Gleichstände, die einen Entscheid brauchen (Nr. 156): um den Meistertitel und - seit F.2 (#1627) - an einer Grenze zu Auf- oder Abstieg.
+// Gleichstand zwischen Staffeln (#1627): entschieden wird unten unter „Plätze über Staffeln hinweg“, nicht an der Staffel.
+const CROSS_TIE = "zone_cross_tie";
 const TIE_BLOCKERS = { champion_tie: { kind: "champion", label: "Meister entscheiden" }, zone_tie: { kind: "zone", label: "Platz entscheiden" } };
 
 /** Hinweise ohne Sperre (#2422: Nachmeldung nicht entschieden) - mit Link dorthin, wo es zu entscheiden ist. */
@@ -92,7 +95,7 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
             <ul className="mt-2 space-y-1">
               {blocker.items.map((item, index) => (
                 <li key={`${item.url}-${index}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                  {TIE_BLOCKERS[blocker.code]
+                  {TIE_BLOCKERS[blocker.code] || blocker.code === CROSS_TIE
                     ? <span className="min-w-0 break-words text-white/85">{item.text}</span>
                     : <Link to={item.url} className="inline-flex min-h-11 min-w-0 items-center break-words text-[#29B6E8] hover:underline">{item.text}</Link>}
                   {untilText(item) ? <span className="text-xs tabular-nums text-white/55">{untilText(item)}</span> : null}
@@ -377,6 +380,8 @@ export function SeasonCloseTab({ seasonId, canResults = false }) {
       <div className="mt-4 space-y-4">
         {data.staffeln.map((row) => <StaffelCard key={row.tournament_id} row={row} data={data} canResults={canResults} onSheet={setSheet} />)}
       </div>
+      {/* Plätze über Staffeln hinweg (#1627): je Liga mit dieser Regel die Kandidaten, der Gleichstand und der Entscheid. */}
+      <SeasonCrossZones data={data} canResults={canResults} onChanged={load} />
       <p className="mt-4 text-[11px] text-white/45">
         Auf- und Abstieg ergeben sich aus dem Endstand (Zonen je Liga im Reiter „Ligen und Staffeln“). Ist alles abgeschlossen, legt „Neue Season aus …“ oben die nächste Season an.
       </p>

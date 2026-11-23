@@ -67,6 +67,9 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
       <TextAreaField label="Regel zur Warteliste" rows={2} value={form.application_waitlist_note} onChange={(value) => set("application_waitlist_note", value)} hint="Steht öffentlich auf der Ligaseite, z. B. nach welcher Reihenfolge die Leitung entscheidet." testId="season-form-application-waitlist-note" />
       <Toggle label="Zwei Co-Teams eines Hauptteams in derselben Staffel" hint="Vorgabe: Nein. Gilt auch fürs Zuteilen auf der Staffel-Seite. Ein Co-Team bleibt je Season in einer Staffel."
         checked={form.sibling_squads_in_staffel} onChange={(value) => set("sibling_squads_in_staffel", value)} testId="season-form-sibling-squads" />
+      <Toggle label="Neue Co-Teams starten in der untersten Liga"
+        hint="Der Eingang bietet beim Zuteilen zuerst die Staffeln der untersten Liga an, und das Los setzt neue Co-Teams dorthin. Eine höhere Liga geht nur mit Grund, er steht im Protokoll. Co-Teams aus der Vorgänger-Season behalten ihre Liga aus Auf- und Abstieg. Aus: Du teilst frei zu."
+        checked={form.new_squads_lowest_division} onChange={(value) => set("new_squads_lowest_division", value)} testId="season-form-new-lowest" />
       <TextAreaField label="Hinweis zum Datenschutz" rows={3} value={form.application_privacy_text} onChange={(value) => set("application_privacy_text", value)}
         hint="Steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer: ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei." testId="season-form-application-privacy" />
     </FormSection>
