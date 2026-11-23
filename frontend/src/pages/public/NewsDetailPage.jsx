@@ -13,11 +13,14 @@ import { RichContent } from "@/components/tls/RichContent";
 import { VideoEmbed } from "@/components/tls/VideoEmbed";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { NewsSignupCards, signupItems } from "@/components/tls/NewsSignupCard";
+import { StoreButton } from "@/components/tls/StoreButton";
+import { getCachedBranding, onBrandingUpdated } from "@/lib/brandingEvents";
+import { footerButtons } from "@/lib/siteFooter";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
-import { Pin, ArrowLeft, ArrowRight, Calendar, Trophy, Users, Flag, Clock, Link2, Share2, MessageCircle, Newspaper, User } from "lucide-react";
+import { Pin, ArrowLeft, ArrowRight, Calendar, Trophy, Users, Flag, Clock, Link2, Share2, MessageCircle, Newspaper, User, Smartphone } from "lucide-react";
 import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
 // News-Detail (Rückmeldung des Betreibers, 24.09.: „sieht am PC aus wie am Handy, nichts ist
@@ -91,6 +94,9 @@ export function previewText(preview) {
     const since = preview.since ? ` am ${formatDate(preview.since, "medium")}` : "";
     return `Zurückgezogen${since}. Besucher sehen statt des Beitrags nur einen Hinweis.`;
   }
+  if (preview.state === "app_only") {
+    return "Erscheint nur in der LionsAPP – Besucher der Website sehen statt des Beitrags einen Hinweis auf die App.";
+  }
   if (preview.state === "scheduled") {
     const when = asInstant(preview.published_at || 0);
     const at = Number.isNaN(when.getTime()) ? "" : ` am ${viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" })}`;
@@ -102,9 +108,30 @@ export function previewText(preview) {
 function PreviewBand({ preview, postId }) {
   return (
     <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-warn/50 bg-warn/10 px-4 py-3 text-sm">
-      <span className="font-heading font-black uppercase tracking-wider text-warn">Noch nicht öffentlich</span>
+      <span className="font-heading font-black uppercase tracking-wider text-warn">{preview.state === "app_only" ? "Nur in der App" : "Noch nicht öffentlich"}</span>
       <span className="min-w-0 flex-1 text-white/80">{previewText(preview)}</span>
       {postId && <Link to={`/admin/news/${encodeURIComponent(postId)}`} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Im Editor öffnen</Link>}
+    </div>
+  );
+}
+
+// „Nur App“ (#1532): statt des Beitrags ein Hinweis auf die LionsAPP - mit Store-Knopf, sobald der Link gepflegt ist
+// (Einstellungen → Marke), sonst ein ruhiger Satz wie im Footer.
+function AppOnlyStores() {
+  const [branding, setBranding] = useState(() => getCachedBranding() || {});
+  useEffect(() => onBrandingUpdated((next) => setBranding(next || {})), []);
+  const stores = footerButtons(branding);
+  if (!stores.playStoreUrl && !stores.appStoreUrl) {
+    return (
+      <p data-testid="news-app-only-soon" className="mt-5 inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+        <Smartphone className="w-4 h-4" aria-hidden="true" /> {stores.bothSoonLabel}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+      {stores.playStoreUrl && <StoreButton href={stores.playStoreUrl} testId="news-app-only-play" />}
+      {stores.appStoreUrl && <StoreButton href={stores.appStoreUrl} small="Laden im" big="App Store" icon="apple" testId="news-app-only-appstore" />}
     </div>
   );
 }
@@ -133,8 +160,11 @@ export default function NewsDetailPage() {
       if (user?.id) api.post(`/news/${slug}/read`, null, { skipInvalidation: true }).catch(() => {});
     }).catch((e) => {
       const status = e.response?.status;
+      const detail = e.response?.data?.detail;
+      // Nur in der App (#1532): kein Inhalt auf der Website, aber ein Weg dorthin.
+      if (status === 404 && detail?.code === "app_only") setError({ title: "Nur in der LionsAPP", text: detail.message || "Diese Nachricht gibt es nur in der LionsAPP.", appOnly: true });
       // Zurückgezogen (#2122 NW3): ein Link aus Newsletter oder Discord bekommt einen freundlichen Hinweis.
-      if (status === 410) setError({ title: "Beitrag zurückgezogen", text: typeof e.response?.data?.detail === "string" ? e.response.data.detail : "Dieser Beitrag wurde zurückgezogen." });
+      else if (status === 410) setError({ title: "Beitrag zurückgezogen", text: typeof e.response?.data?.detail === "string" ? e.response.data.detail : "Dieser Beitrag wurde zurückgezogen." });
       else setError({ title: status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden." });
     });
     api.get("/news?limit=6").then(({ data }) => setMore(Array.isArray(data) ? data : data?.items || [])).catch(() => setMore([]));
@@ -151,7 +181,8 @@ export default function NewsDetailPage() {
       <div className="max-w-2xl mx-auto px-6 py-20 text-center" data-testid="news-error">
         <h1 className="font-heading text-3xl font-black">{error.title}</h1>
         {error.text && <p className="mt-3 text-white/65">{error.text}</p>}
-        <Link to="/news" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> {error.text ? "Zu den aktuellen News" : "Zurück zu News"}</Link>
+        {error.appOnly && <AppOnlyStores />}
+        <Link to="/news" className={`${error.appOnly ? "mt-8" : "mt-6"} inline-flex items-center gap-2 text-[#29B6E8]`}><ArrowLeft className="w-4 h-4" /> {error.text ? "Zu den aktuellen News" : "Zurück zu News"}</Link>
       </div>
     </PublicLayout>
   );
