@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Reiter Maps der Spielseite (#2249, vorher eigene Map-Seite aus #1616): Tabelle Map × Modus, ein Häkchen gibt frei und speichert
@@ -7,7 +7,9 @@ import { MemoryRouter } from "react-router-dom";
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler"), formatRequestError: () => "Fehler", resolveMediaUrl: (url) => url || "" }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+// Der Rückruf bei „Daten geändert“ (Live-Ereignis) - ein Test stößt ihn selbst an.
+const invalidation = { reload: null };
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (reload) => { invalidation.reload = reload; } }));
 const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/components/tls/ImageUpload", () => ({
@@ -87,6 +89,39 @@ test("lehnt der Server ab, steht wieder der gespeicherte Stand da", async () => 
   fireEvent.click(await screen.findByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" }));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Der Modus ist archiviert."));
   await waitFor(() => expect(screen.getByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" })).not.toBeChecked());
+});
+
+// Nächtliche Abnahme (#2529, spielseite): Eine Abfrage lief schon (etwa nach „Map angelegt“) und antwortet erst, während das Häkchen
+// speichert - mit dem Stand von vorher. Sie darf das Häkchen nicht zurücknehmen, sonst schickt das nächste Häkchen eine Liste ohne
+// das erste und der Server verliert die Freigabe.
+test("eine Abfrage von vor dem Häkchen nimmt es nicht zurück - das zweite Häkchen behält das erste", async () => {
+  let server = BODY.maps.map((row) => ({ ...row }));
+  apiMock.get.mockImplementation(async () => ({ data: { ...BODY, maps: server.map((row) => ({ ...row })) } }));
+  let saved;
+  apiMock.patch.mockImplementation((url, body) => new Promise((resolve) => {
+    saved = () => {
+      server = server.map((row) => (url.endsWith(`/${row.id}`) ? { ...row, ...body } : row));
+      resolve({ data: {} });
+    };
+  }));
+  renderTab();
+  const first = await screen.findByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" });
+  let answer;
+  apiMock.get.mockImplementationOnce(() => {
+    const before = { ...BODY, maps: server.map((row) => ({ ...row })) };
+    return new Promise((resolve) => { answer = () => resolve({ data: before }); });
+  });
+  act(() => { invalidation.reload(); });
+  fireEvent.click(first);
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  await act(async () => answer());
+  await act(async () => saved());
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Nebelwerk: in Stellung freigegeben."));
+  await waitFor(() => expect(screen.getByRole("checkbox", { name: "Nebelwerk in Suchen & Zerstören freigeben" })).toBeEnabled());
+  expect(screen.getByRole("checkbox", { name: "Nebelwerk in Stellung freigeben" })).toBeChecked();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Nebelwerk in Suchen & Zerstören freigeben" }));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
+  expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1/maps/nebel", { modes: ["stellung", "snd"] });
 });
 
 test("ein Modus, den das Spiel nicht mehr hat: keine Spalte, keine rohe Kennung, das Umschalten scheitert nicht daran", async () => {
