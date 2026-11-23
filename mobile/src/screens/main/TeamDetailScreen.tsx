@@ -15,8 +15,9 @@ import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatStatus } from "../../lib/format";
+import { gameOptionLabel, selectableGames, type GameChoice } from "../../lib/gameLabels";
 import { isGuestUser } from "../../live";
-import { memberRole as faceRole, ROLE_LABELS, type TeamOverview } from "../../lib/teamPage";
+import { memberRole as faceRole, ROLE_LABELS, TEAM_NAME_MAX, TEAM_TAG_MAX, teamFieldsProblem, type TeamOverview } from "../../lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "../../lib/teamColors";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
@@ -229,8 +230,9 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     ]);
   }, [showActionResult, team]);
 
+  const teamProblem = teamFieldsProblem(teamForm.name, teamForm.tag);
   const saveTeam = useCallback(() => {
-    if (!team || !canManage) return;
+    if (!team || !canManage || teamFieldsProblem(teamForm.name, teamForm.tag)) return;
     showActionResult(async () => {
       await api.patch(`/teams/${team.id}`, {
         name: teamForm.name.trim(),
@@ -279,7 +281,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
       id: squad.id,
       name: squad.name || "",
       description: squad.description || "",
-      game_id: squad.game_id || squad.game || "",
+      // Nur eine echte Kennung - ein alter Freitext in `game` bleibt gespeichert, das Formular schickt ihn nicht (#2128, TM3).
+      game_id: squad.game_id || "",
       status: squad.status || "active",
       member_ids: squad.member_ids || squad.members?.map((member) => member.id).filter(Boolean) || [],
     } : { ...emptySquad });
@@ -292,12 +295,24 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     mutate((current) => ({ ...current, team: { ...current.team, [key]: url } }));
   }, [mutate, team]);
 
+  // Spiel im Co-Team aus /games (#2128 TM3, Nachzug #2173) - geladen, sobald das Formular aufgeht.
+  const [games, setGames] = useState<GameChoice[] | null>(null);
+  const squadFormOpen = Boolean(squadForm);
+  useEffect(() => {
+    if (!squadFormOpen || games) return undefined;
+    let alive = true;
+    api.get<GameChoice[]>("/games")
+      .then(({ data }) => { if (alive) setGames(Array.isArray(data) ? data : []); })
+      .catch(() => { if (alive) setGames([]); });
+    return () => { alive = false; };
+  }, [games, squadFormOpen]);
+
   const saveSquad = useCallback(() => {
     if (!team || !squadForm || !canManage) return;
     const payload = {
       name: squadForm.name.trim(),
       description: squadForm.description.trim() || null,
-      game_id: squadForm.game_id.trim() || null,
+      game_id: squadForm.game_id || null,
       status: squadForm.status === "archived" ? "archived" : "active",
       member_ids: squadForm.member_ids,
     };
@@ -414,15 +429,16 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         {editOpen && canManage ? (
           <Card style={styles.card}>
             <Heading>Basisdaten bearbeiten</Heading>
-            <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
-            <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
+            <Field label="Name" value={teamForm.name} maxLength={TEAM_NAME_MAX} testID="team-name-input" onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
+            <Field label="Kürzel" value={teamForm.tag} maxLength={TEAM_TAG_MAX} testID="team-tag-input" onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, TEAM_TAG_MAX) }))} />
             <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
             {/* Logo und Banner vom Handy (#1153) - nur für Teamleitung und Co-Leitung; gespeichert wird sofort. */}
             <ImagePickField label="Logo" shape="square" value={teamForm.logo_url} onUploaded={(url) => saveTeamImage("logo_url", url)} fallback={<Body style={styles.logoInitials}>{(team.tag || team.name).slice(0, 2).toUpperCase()}</Body>} testID="team-logo" />
             <ImagePickField label="Banner" shape="banner" value={teamForm.banner_url} onUploaded={(url) => saveTeamImage("banner_url", url)} testID="team-banner" />
             <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
             <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
-            <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
+            {teamProblem ? <Muted style={styles.error} testID="team-fields-problem">{teamProblem}</Muted> : null}
+            <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || Boolean(teamProblem)} onPress={saveTeam} />
             {canDissolve ? <TeamDissolve team={team} onDissolved={dissolved} /> : null}
           </Card>
         ) : null}
@@ -545,7 +561,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             <View style={styles.squadForm}>
               <Field label="Name" value={squadForm.name} onChangeText={(value) => setSquadForm((current) => current && { ...current, name: value })} />
               <Field label="Beschreibung" value={squadForm.description} multiline onChangeText={(value) => setSquadForm((current) => current && { ...current, description: value })} />
-              <Field label="Spiel / Game-ID" value={squadForm.game_id} onChangeText={(value) => setSquadForm((current) => current && { ...current, game_id: value })} />
+              <SquadGamePicker games={games} squad={squads.find((row) => row.id === squadForm.id) || null} value={squadForm.game_id}
+                onChange={(gameId) => setSquadForm((current) => current && { ...current, game_id: gameId })} />
               <View style={styles.wrap}>
                 <Pressable onPress={() => setSquadForm((current) => current && { ...current, status: "active" })} style={[styles.option, squadForm.status !== "archived" && styles.optionActive]}>
                   <Muted style={squadForm.status !== "archived" && styles.optionTextActive}>Aktiv</Muted>
@@ -697,7 +714,7 @@ function SquadRow({ canManage, onDelete, onEdit, squad }: { canManage: boolean; 
       </View>
       {canManage ? (
         <View style={styles.squadActions}>
-          <Button compact variant="quiet" label="Bearbeiten" onPress={() => onEdit(squad)} />
+          <Button compact variant="quiet" label="Bearbeiten" onPress={() => onEdit(squad)} testID={squad.id ? `team-squad-edit-${squad.id}` : undefined} />
           {squad.id ? <Button compact variant="danger" label="Löschen" accessibilityLabel="Co-Team löschen" onPress={() => onDelete(squad)} /> : null}
         </View>
       ) : null}
@@ -735,12 +752,48 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (color: str
   );
 }
 
-function Field({ label, value, onChangeText, multiline = false }: { label: string; value?: string; onChangeText: (value: string) => void; multiline?: boolean }) {
+/**
+ * Spiel des Co-Teams (#2128 TM3, Nachzug #2173): wie die Auswahl im Web - „Kein bestimmtes Spiel“, die aktiven Spiele, ein schon
+ * gewähltes archiviertes und eine Kennung, die es nicht mehr gibt. Das Spiel zählt für Discord-Rollen und die Liga.
+ */
+function SquadGamePicker({ games, squad, value, onChange }: { games: GameChoice[] | null; squad: TeamSquad | null; value: string; onChange: (gameId: string) => void }) {
+  const list = selectableGames(games || [], value);
+  const unknown = value && games && !games.some((game) => game.id === value) ? value : "";
+  const options: Array<{ id: string; label: string }> = [
+    { id: "", label: "Kein bestimmtes Spiel" },
+    ...(unknown ? [{ id: unknown, label: squad?.game || `${unknown} (nicht in der Liste)` }] : []),
+    ...list.map((game) => ({ id: game.id, label: gameOptionLabel(game) })),
+  ];
+  return (
+    <View style={styles.field}>
+      <Muted style={styles.fieldLabel}>Spiel</Muted>
+      {games === null ? <Muted>Spiele werden geladen …</Muted> : (
+        <View style={styles.wrap} accessibilityRole="radiogroup">
+          {options.map((option) => {
+            const active = option.id === value;
+            return (
+              <Pressable key={option.id || "none"} onPress={() => onChange(option.id)} accessibilityRole="radio" accessibilityState={{ checked: active }}
+                style={[styles.option, active && styles.optionActive]} testID={`team-squad-game-${option.id || "none"}`}>
+                <Muted style={active && styles.optionTextActive}>{option.label}</Muted>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+      {!value && squad?.game ? <Muted>Bisher als Text eingetragen: {squad.game}</Muted> : null}
+      <Muted testID="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</Muted>
+    </View>
+  );
+}
+
+function Field({ label, value, onChangeText, multiline = false, maxLength, testID }: { label: string; value?: string; onChangeText: (value: string) => void; multiline?: boolean; maxLength?: number; testID?: string }) {
   return (
     <View style={styles.field}>
       <Muted style={styles.fieldLabel}>{label}</Muted>
       <TextInput
         autoCapitalize="none"
+        maxLength={maxLength}
+        testID={testID}
         multiline={multiline}
         onChangeText={onChangeText}
         placeholderTextColor={colors.muted}

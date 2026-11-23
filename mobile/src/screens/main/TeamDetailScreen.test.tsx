@@ -333,3 +333,51 @@ test("Squads beim Nachladen nicht da: die bisherigen bleiben stehen (#1000)", as
   await waitFor(() => expect(screen.getByTestId("team-partial-load")).toBeTruthy());
   expect(screen.getAllByText("Rocket Squad").length).toBeGreaterThan(0);
 });
+
+// Team-Grenzen (#2128 TM11, Nachzug #2173): Name 2-60, Kürzel 2-8 wie im Server - der Knopf geht erst, wenn beides passt.
+test("Team bearbeiten: Kürzel unter 2 Zeichen sperrt Speichern mit Satz, gültig geht es raus", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, can_manage: true });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "l");
+  expect(screen.getByTestId("team-fields-problem")).toHaveTextContent("Kürzel: 2 bis 8 Zeichen.");
+  await fireEvent.press(screen.getByText("Team speichern"));
+  expect(mockPatch).not.toHaveBeenCalled();
+  await fireEvent.changeText(screen.getByTestId("team-name-input"), "L");
+  expect(screen.getByTestId("team-fields-problem")).toHaveTextContent("Name: 2 bis 60 Zeichen.");
+  await fireEvent.changeText(screen.getByTestId("team-name-input"), "Lions Rakete");
+  await fireEvent.changeText(screen.getByTestId("team-tag-input"), "lrk2");
+  expect(screen.queryByTestId("team-fields-problem")).toBeNull();
+  await fireEvent.press(screen.getByText("Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ name: "Lions Rakete", tag: "LRK2" })));
+});
+
+// Spiel im Co-Team (#2128 TM3, Nachzug #2173): Auswahl aus /games statt Freitext; ein alter Freitext wird nicht als Kennung geschickt.
+test("Co-Team: Spiel aus /games antippen, archivierte fehlen, der alte Freitext geht nicht als Kennung raus", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, can_manage: true }, {
+    "/teams/t1/squads": [{ id: "s1", name: "Rocket Crew", game: "Rocket League (alt)", member_ids: [], status: "active" }],
+    "/games": [{ id: "g-rl", name: "Rocket League" }, { id: "g-old", name: "Altspiel", status: "archived" }],
+  });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getAllByText("Rocket Crew").length).toBeGreaterThan(0));
+  await fireEvent.press(screen.getByTestId("team-squad-edit-s1"));
+  await waitFor(() => expect(screen.getByTestId("team-squad-game-g-rl")).toBeTruthy());
+  expect(screen.queryByTestId("team-squad-game-g-old")).toBeNull();
+  expect(screen.getByTestId("team-squad-game-hint")).toHaveTextContent("Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.");
+  await fireEvent.press(screen.getByText("Co-Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1/squads/s1", expect.objectContaining({ game_id: null })));
+  await fireEvent.press(screen.getByTestId("team-squad-edit-s1"));
+  await waitFor(() => expect(screen.getByTestId("team-squad-game-g-rl")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("team-squad-game-g-rl"));
+  await fireEvent.press(screen.getByText("Co-Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenLastCalledWith("/teams/t1/squads/s1", expect.objectContaining({ game_id: "g-rl" })));
+});
