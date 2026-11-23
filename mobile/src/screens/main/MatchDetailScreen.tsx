@@ -322,7 +322,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
   // Erst einchecken, dann melden (D.2): Der Server schickt den Satz, solange Melden noch nicht geht - er steht statt des Formulars.
   const reportHint = canPlayerReportResult ? page?.report_hint || null : null;
   // Liga mit Maps (C.3): die Seiten in der Reihenfolge der Plätze, wie im Web (sidesInSlotOrder).
-  const league = useMemo(() => (page?.league?.sides?.length ? sidesInSlotOrder(page.league, page.match) : null), [page?.league, page?.match]);
+  // Wie im Web (`data.league`): der Block entscheidet, nicht die Zahl der Seiten - fehlen sie, sagt ein Satz es statt des alten Formulars.
+  const league = useMemo(() => (page?.league ? sidesInSlotOrder(page.league, page.match) : null), [page?.league, page?.match]);
 
   const propose = useCallback(async () => {
     // Datum und Uhrzeit zum Antippen (#1139) - als Wiener Uhr gewählt, als Zeitpunkt an den Server.
@@ -633,6 +634,11 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <View style={styles.reportHint} testID="match-report-hint">
                 <Ionicons name="time-outline" color={colors.cyan} size={20} />
                 <Body style={styles.flex}>{reportHint}</Body>
+              </View>
+            ) : (canPlayerReportResult || showReportReadOnly) && league && !league.sides?.length ? (
+              <View style={styles.reportHint} testID="league-report-no-sides">
+                <Ionicons name="time-outline" color={colors.cyan} size={20} />
+                <Body style={styles.flex}>Für dieses Liga-Spiel stehen noch nicht beide Co-Teams fest. Melden geht, sobald beide eingetragen sind.</Body>
               </View>
             ) : (canPlayerReportResult || showReportReadOnly) && league ? (
               <LeagueReportCard

@@ -235,3 +235,11 @@ test("Meldung scheitert mit 409: Fehler steht da und die Seite lädt neu", async
   await waitFor(() => expect(screen.getByText("Die Gegenseite hat ihre Meldung geändert.")).toBeTruthy());
   await waitFor(() => expect(mockGet.mock.calls.filter((call) => call[0] === "/matches/m1/page").length).toBeGreaterThan(loads));
 });
+
+// Wie im Web entscheidet der Block `league`, nicht die Zahl der Seiten: fehlen sie, steht ein Satz statt des alten Formulars.
+test("Liga-Block ohne Seiten: klarer Hinweis, kein Meldeformular ohne Maps", async () => {
+  answer({ ...BASE, league: { ...LEAGUE, sides: [] } });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("league-report-no-sides")).toBeTruthy());
+  expect(screen.queryByTestId("match-report-form")).toBeNull();
+});
