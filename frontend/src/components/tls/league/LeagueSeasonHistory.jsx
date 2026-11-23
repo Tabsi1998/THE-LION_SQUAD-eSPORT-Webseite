@@ -3,11 +3,10 @@
 // und was die Person sehen darf - ohne Einträge zeigt der Baustein nichts.
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Crown, Layers } from "lucide-react";
-import { ZONE_LABELS } from "@/lib/leagueTable";
+import { ZONE_LABELS, exitText } from "@/lib/leagueTable";
 import { InternalTag } from "@/components/tls/InternalTag";
 import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 
-const EXIT_TEXT = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
 
 function Movement({ zone }) {
   if (zone === "promotion") return <span className="inline-flex items-center gap-1 text-ok"><ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /> {ZONE_LABELS.promotion}</span>;
@@ -16,7 +15,7 @@ function Movement({ zone }) {
 }
 
 function placeText(row) {
-  if (row.exit) return EXIT_TEXT[row.exit] || "ausgeschieden";
+  if (row.exit) return exitText(row.exit);
   return row.of ? `Platz ${row.rank} von ${row.of}` : `Platz ${row.rank}`;
 }
 

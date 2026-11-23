@@ -3,6 +3,7 @@
 // Form: Liga 1 mit Krone und zartem Glanz, Liga 2 mit doppeltem Rand, ab Liga 3 schlicht. Cyan ist die Markenfarbe, Gold gibt es nur
 // für den Season-Meister.
 import { viennaDateTime } from "@/lib/vienna";
+import { EXIT_TEXTS, exitText } from "@/lib/leagueTable";
 
 /** "top" (Liga 1), "mid" (Liga 2), "base" (ab Liga 3) - ohne gültige Liga N `null`. */
 export function badgeTier(level) {
@@ -69,11 +70,9 @@ function levelOf(row) {
 /** Ein Rückzug (`withdrawn`) bzw. Ausschluss (`disqualified`) - die Season steht trotzdem auf der Achse (Fabian 23.11.). */
 const isExit = (row) => Boolean(row?.exit);
 
-/** Was am grauen Punkt eines Rückzugs steht. */
-export const EXIT_LABELS = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
-
+/** Was am grauen Punkt eines Rückzugs steht - der Text kommt aus lib/leagueTable (eine Quelle mit Tabelle und Season-Historie). */
 export function exitLabel(kind) {
-  return EXIT_LABELS[kind] || EXIT_LABELS.withdrawn;
+  return exitText(kind, EXIT_TEXTS.withdrawn);
 }
 
 /**
