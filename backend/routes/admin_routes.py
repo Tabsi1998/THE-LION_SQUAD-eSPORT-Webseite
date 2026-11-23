@@ -1169,14 +1169,21 @@ async def mark_read(nid: str, me: dict = Depends(get_current_user)):
 @router.post("/notifications/read-all")
 async def mark_all_read(me: dict = Depends(get_current_user)):
     db = get_db()
-    await db.notifications.update_many({"user_id": me["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}}, {"$set": {"read": True}})
+    from services.news_channels import inbox_query
+
+    # „Alle gelesen“ betrifft nur die Glocke - Meldungen nur für die App bleiben dort ungelesen (#1532).
+    await db.notifications.update_many({"user_id": me["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}, **inbox_query("web")},
+                                       {"$set": {"read": True}})
     return {"ok": True}
 
 
 @router.delete("/notifications/read")
 async def delete_read_notifications(me: dict = Depends(get_current_user)):
     db = get_db()
-    result = await db.notifications.delete_many({"user_id": me["id"], "read": True, "in_app_visible": {"$ne": False}})
+    from services.news_channels import inbox_query
+
+    # „Gelesene löschen“ nur in der Glocke - das Postfach der App behält seine Meldungen (#1532).
+    result = await db.notifications.delete_many({"user_id": me["id"], "read": True, "in_app_visible": {"$ne": False}, **inbox_query("web")})
     return {"ok": True, "deleted": result.deleted_count}
 
 

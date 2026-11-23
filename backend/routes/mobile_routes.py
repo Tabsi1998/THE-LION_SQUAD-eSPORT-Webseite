@@ -743,8 +743,9 @@ async def mark_mobile_notification_read(notification_id: str, user: dict = Depen
 @router.post("/notifications/read-all")
 async def mark_all_mobile_notifications_read(user: dict = Depends(get_current_user)):
     db = get_db()
+    # „Alle gelesen“ betrifft nur das Postfach der App - Meldungen nur für die Website bleiben dort ungelesen (#1532).
     await db.notifications.update_many(
-        {"user_id": user["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}},
+        {"user_id": user["id"], "read": {"$ne": True}, "in_app_visible": {"$ne": False}, **news_channels.inbox_query("app")},
         {"$set": {"read": True, "read_at": now_utc().isoformat()}},
     )
     return {"ok": True}
