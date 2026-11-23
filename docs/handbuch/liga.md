@@ -1824,8 +1824,9 @@ Glanz läuft einmal darüber; mit „Bewegung reduzieren“ steht alles still.
 Vertreter führt, die laufende Staffel (wer ein Co-Team nur angemeldet hat, sieht es dort nicht): Liga N mit
 Abzeichen, Staffel, **Platz von N**, Zone (Auf- oder Abstieg, Relegation) und das **nächste Spiel** mit Gegner und Termin (ohne
 Termin der Spieltag). Plätze gibt es ab dem ersten gewerteten Spiel der Staffel – vorher steht „Noch ohne Ergebnis“, auf der
-Warteliste bzw. vor der Zulassung „Warteliste“ bzw. „Anmeldung offen“ – verbirgt die Staffel ihre Teilnehmerliste, sehen diesen
-Stand nur die Person selbst bzw. auf der Teamseite das Team und der Staff. Ein Co-Team, das sich zurückgezogen hat, steht hier nicht. Lange
+Warteliste bzw. vor der Zulassung „Warteliste“ bzw. „Anmeldung offen“. Verbirgt die Staffel ihre Teilnehmerliste, gibt es eine solche
+Anmeldung für Außenstehende gar nicht – wie in der Teilnehmerliste; sehen können sie nur die Person selbst bzw. auf der Teamseite das
+Team und der Staff. Ein Co-Team, das sich zurückgezogen hat, steht hier nicht. Lange
 Namen brechen um und werden nie mit „…“ gekürzt. Die beste Liga N steht oben. Sichtbar nach derselben Regel wie die Season-Historie: Gäste und Nicht-Mitglieder nur öffentliche Seasons, Mitglieder
 bei eingeschaltetem „Vereinsinterne Erfolge zeigen“ auch Seasons „Nur Mitglieder“ mit dem Etikett **Vereinsintern**, die Person
 selbst alles. Ein **privates Team** und seine Co-Teams stehen in „Aktuelle Ligen“ und in der Season-Historie nur für die Person
@@ -1838,7 +1839,9 @@ Band, der Platz am Punkt, der Meister in Gold. Ein Aufstieg hebt die Linie, auch
 Auf der Teamseite hat jedes Co-Team eine eigene Linie mit Legende – höchstens vier, die besten zuerst: Co-Teams, die gerade in einer
 laufenden Staffel spielen, vor den übrigen, dann nach der Liga N und dem Platz der letzten Season; gibt es mehr, steht darunter
 „und N weitere Co-Teams“. Hat sich ein Co-Team in einer Season **zurückgezogen**, steht die Season trotzdem auf der Achse: ein grauer
-Punkt „ausgetreten“ (bzw. „disqualifiziert“) ohne Platz, die Linie ist dort unterbrochen. Season-Namen werden nie gekürzt – ein
+Punkt „ausgetreten“ (bzw. „disqualifiziert“) ohne Platz, mit dem Rand in der Farbe seiner Linie, die Linie ist dort unterbrochen; ziehen
+sich zwei Co-Teams in derselben Season zurück, stehen ihre Punkte nebeneinander. Platz-Zahlen stehen nie auf dem Punkt einer anderen
+Linie – ist kein Platz frei, fehlt die Zahl im Bild, Screenreader lesen sie trotzdem vor. Season-Namen werden nie gekürzt – ein
 langer Name steht in zwei Zeilen („Herbst“ / „2026/27“), die Seasons rücken so weit auseinander, wie der längste Name braucht; den
 vollen Namen zeigt auch der Hinweis beim Darüberfahren. Reicht die Breite nicht (viele Seasons, Handy), wischt man die Linie seitlich.
 
