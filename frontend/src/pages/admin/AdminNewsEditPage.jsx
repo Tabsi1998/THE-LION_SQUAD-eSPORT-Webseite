@@ -218,6 +218,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
       whenText: when && !Number.isNaN(when.getTime()) ? viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" }) : "",
       audience: audience.status === "fulfilled" && audience.value?.data && typeof audience.value.data === "object" ? audience.value.data : null,
       appOnly,
+      // Öffentlich und nur App (#1532): ein App-Push an alle mit Zustimmung - nur, wenn er noch nicht hinausging.
+      appPush: appOnly && ["public", "community"].includes(form.visibility) && !post.app_push_notified_at,
       sentAt: post.newsletter_sent_at || "",
       sentText: post.newsletter_sent_at ? viennaDateTime(post.newsletter_sent_at, { dateStyle: "medium" }) : "",
       discord: discord.status === "fulfilled" && typeof discord.value?.data?.would_send === "boolean" ? discord.value.data.would_send : null,
@@ -359,7 +361,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
               </>
             )}
           </FormSection>
-          <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility} appOnly={appOnly}>
+          <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility} appOnly={appOnly}
+            appPush={post.app_push_notified_at ? { sent_at: post.app_push_notified_at, count: post.app_push_count, skipped: post.app_push_skipped_reason } : null}>
             <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           </DistributeBox>
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} appOnly={appOnly} />

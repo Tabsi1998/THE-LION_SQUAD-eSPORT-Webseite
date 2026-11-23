@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, ChevronDown, Mail, MessageSquare } from "lucide-react";
+import { Bell, ChevronDown, Mail, MessageSquare, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -26,6 +26,16 @@ function startsOpen() {
 // „Nur App“ (#1532): kein Newsletter - die Mail führte zur Website, die den Beitrag nicht zeigt.
 export const APP_ONLY_NEWSLETTER = "Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.";
 
+// App-Push bei öffentlichen News „nur App“ (#1532): angekündigt, gesendet oder bewusst ausgelassen.
+const APP_PUSH_VISIBILITIES = new Set(["", "public", "community"]);
+
+export function appPushLine({ appOnly = false, visibility = "", appPush = null } = {}) {
+  if (!appOnly || !APP_PUSH_VISIBILITIES.has(visibility || "")) return "";
+  if (appPush?.skipped === "channel_changed") return "Kein App-Push – der Beitrag war schon öffentlich, als er auf „Nur App“ gestellt wurde.";
+  if (appPush?.sent_at) return `App-Push gesendet am ${viennaDateTime(appPush.sent_at)} an ${people(appPush.count)}.`;
+  return "Beim Veröffentlichen geht ein App-Push an alle App-Nutzer mit Zustimmung für „News & Events“.";
+}
+
 export function newsletterLine(box) {
   if (!box) return "";
   if (box.state === "sent") return `Gesendet am ${viennaDateTime(box.sent_at)} an ${people(box.sent_count)}.`;
@@ -41,7 +51,7 @@ export function audienceLine(audience) {
   return `Geht beim Veröffentlichen an ${people(audience.recipients)} mit Newsletter-Zustimmung – vorher kommt eine Rückfrage.`;
 }
 
-export function DistributeBox({ kind, itemId, title = "", visibility = "", appOnly = false, children }) {
+export function DistributeBox({ kind, itemId, title = "", visibility = "", appOnly = false, appPush = null, children }) {
   const [box, setBox] = useState(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(startsOpen);
@@ -168,6 +178,15 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
               )}
             </div>
           </div>
+          {appPushLine({ appOnly, visibility, appPush }) && (
+            <div className="flex items-start gap-3" data-testid="distribute-app-push-row">
+              <Smartphone className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-white/70">App-Push</div>
+                <p className="mt-1 text-sm text-white/75" data-testid="distribute-app-push">{appPushLine({ appOnly, visibility, appPush })}</p>
+              </div>
+            </div>
+          )}
           {box && (
             <div className="flex items-start gap-3" data-testid="distribute-announcement">
               <Bell className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />

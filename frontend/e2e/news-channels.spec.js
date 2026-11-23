@@ -71,6 +71,8 @@ for (const [label, width, height] of WIDTHS) {
       await expect(page.getByText("Erscheint nur in der LionsAPP", { exact: false })).toBeVisible();
       await page.getByTestId("distribute-toggle").evaluate((node) => node.getAttribute("aria-expanded") === "false" && node.click());
       await expect(page.getByTestId("distribute-audience-line")).toHaveText("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+      // Öffentlich und „Nur App“: beim Veröffentlichen ein App-Push an alle App-Nutzer mit Zustimmung (Fabian, 23.11.).
+      await expect(page.getByTestId("distribute-app-push")).toContainText("App-Push an alle App-Nutzer mit Zustimmung");
       await page.getByTestId("news-title").fill("LionsAPP 1.9.4 ist da");
       await select.scrollIntoViewIfNeeded();
       await noSideScroll(page);
@@ -79,6 +81,7 @@ for (const [label, width, height] of WIDTHS) {
       await page.getByTestId("news-save").click();
       const dialog = page.getByTestId("confirm-dialog");
       await expect(dialog).toContainText("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
+      await expect(dialog).toContainText("Die App schickt einen Push an alle App-Nutzer mit Zustimmung");
       await expect(dialog).toContainText("Keine Meldung auf Discord.");
       await page.getByTestId("confirm-dialog-confirm").click();
       await expect.poll(() => state.created?.channels).toEqual(["app"]);

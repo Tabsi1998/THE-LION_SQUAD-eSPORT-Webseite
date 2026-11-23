@@ -57,3 +57,8 @@ test("Rückfrage bei „nur App“ (#1532): kein Newsletter, auch wenn sonst Emp
     .toBe("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus. Keine Meldung auf Discord.");
   expect(publishQuestion({ mode: "scheduled", appOnly: true }).description).toBe("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus.");
 });
+
+test("Rückfrage bei „nur App“ und öffentlich (#1532): App-Push an alle App-Nutzer mit Zustimmung", () => {
+  expect(publishQuestion({ mode: "now", appOnly: true, appPush: true, discord: false }).description)
+    .toBe("Kein Newsletter – „Nur App“ geht nicht per Mail hinaus. Die App schickt einen Push an alle App-Nutzer mit Zustimmung für „News & Events“. Keine Meldung auf Discord.");
+});
