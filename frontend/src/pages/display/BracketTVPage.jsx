@@ -507,7 +507,7 @@ function BracketTv() {
     : screen === "pause" ? (t.paused_until ? `Pause bis ${viennaTime(t.paused_until, { hour: "2-digit", minute: "2-digit" })}` : "Kurze Pause")
       : screen === "checkin" ? "Check-in"
         : screen === "registration" ? "Anmeldung offen"
-          : finale ? "Saisonfinale"
+          : finale ? [data.league_finale?.league, data.league_finale?.season].filter(Boolean).join(" · ") || null
           : hasMatches || hasTable ? (parked ? kindWords.decided : { tree: words.tree, [TABLE_SLIDE]: tableSections.length > 1 ? "Tabellen" : "Tabelle", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: kindWords.stats }[active] || words.tree) : null;
 
   return (
@@ -518,7 +518,8 @@ function BracketTv() {
           // Rot heißt „läuft gerade“ (#1116): der Punkt in der Kopfleiste nur, solange das Turnier läuft.
           kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : `THE LION SQUAD · ${words.kicker}`}
           live={toneFor(t.status) === "live"}
-          title={t.title}
+          // Im Saisonfinale (#1641) geht es um die ganze Season, nicht um diese Staffel: „Saisonfinale“ als Kopf, Liga und Season darunter.
+          title={finale ? "Saisonfinale" : t.title}
           subtitle={subtitle}
           aside={(
             <>
@@ -599,7 +600,7 @@ function BracketTv() {
               {lowEmpty && !finale ? <div className="tv-empty tv-t-head font-display" data-testid="tv-slide-empty">{lowEmpty}</div> : null}
               {finale ? (
                 <div className="tv-slide tv-slide--finale" key={`finale-${finale.step}`}>
-                  <TvFinaleMovers page={finale} league={data.league_finale?.league || ""} season={data.league_finale?.season || ""} />
+                  <TvFinaleMovers page={finale} />
                 </div>
               ) : null}
             </>
