@@ -823,6 +823,28 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     return doc
 
 
+# Die Season läuft wirklich (#2404, Nr. 254): Eine reguläre Staffel ist live (oder gelaufen) oder ein Spiel ist gewertet.
+RUNNING_STAFFEL_STATUSES = frozenset({"live", "paused", "completed", "results_published"})
+SCORED_MATCH_STATUSES = ("completed", "forfeit")
+
+
+async def start_to_remember(db, season: dict | None):
+    """Was jetzt als ``started_at`` festzuhalten ist (Nr. 253, 254) - ``None``, solange nichts zu merken ist. Gemerkt wird erst, wenn die
+    Season **wirklich läuft**: ihr Beginn ist erreicht (``league_calendar.start_stamp``) **und** mindestens eine reguläre Staffel ist
+    live oder ein Spiel gewertet. Ein vertipptes Startdatum allein merkt nichts - es lässt sich korrigieren."""
+    stamp = start_stamp(season)
+    if not stamp:
+        return None
+    rows = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.kind": None, **ONLY_LEAGUE},
+                                     {"_id": 0, "id": 1, "status": 1}).to_list(500)
+    if any(row.get("status") in RUNNING_STAFFEL_STATUSES for row in rows):
+        return stamp
+    ids = [row["id"] for row in rows]
+    scored = await db.matches_v2.find_one({"tournament_id": {"$in": ids}, "status": {"$in": list(SCORED_MATCH_STATUSES)},
+                                           "is_preview": {"$ne": True}}, {"_id": 0, "id": 1}) if ids else None
+    return stamp if scored else None
+
+
 async def update_season(db, season: dict, body: dict, *, before_write=None,
                         warnings: list | None = None) -> tuple[dict, list[str]]:
     """Eine Season ändern. ``before_write(neuer Stand)`` läuft nach allen Prüfungen und vor dem Schreiben (Prüfung vor der
@@ -849,7 +871,7 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     changed = sorted(key for key, value in fields.items() if season.get(key) != value)
     # Einmal gestartet bleibt gestartet (#2404, Nr. 253): Hat die Season nach dem bisherigen Stand begonnen, merkt sich dieses
     # Schreiben den Start - bevor Startdatum oder Stand sich ändern. Kein eigenes Feld der Leitung, darum nicht in ``changed``.
-    stamp = start_stamp(season)
+    stamp = await start_to_remember(db, season)
     if stamp:
         fields[STARTED_AT] = stamp
     if before_write:

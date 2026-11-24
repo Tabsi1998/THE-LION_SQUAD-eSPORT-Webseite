@@ -43,7 +43,7 @@ READERS = {
     "services/league_rules.py": (2, ALL, "Regelwerk an jeder Staffel"),
     "services/league_sanctions.py": (2, ALL, "Strafen: jede Staffel"),
     "services/league_schedule.py": (2, ALL, "Termine: jede Staffel"),
-    "services/league_service.py": (11, MIXED, "Verwaltung; die Ligaseite trennt Staffeln und ``postseason``"),
+    "services/league_service.py": (12, MIXED, "Verwaltung; die Ligaseite trennt Staffeln und ``postseason``; ob die Season läuft (Nr. 254), sagen nur reguläre Staffeln"),
     "services/league_veto.py": (2, REGULAR, "Vorlage der Season geht nur an reguläre Staffeln"),
     "services/league_veto_fit.py": (2, REGULAR, "Passt die Vorlage: reguläre Staffeln der Liga N"),
     "services/league_veto_sweep.py": (1, ALL, "wartende Vetos: jede Staffel"),
