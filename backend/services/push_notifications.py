@@ -190,6 +190,91 @@ def _log_safe(value: Any, limit: int = 240) -> str:
     return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
 
 
+# Expo nimmt bis zu 100 Nachrichten je Anfrage (#2553): ein App-Push an viele geht in Stücken statt je Person einzeln.
+EXPO_BATCH_SIZE = 100
+TOKENS_PER_USER = 20
+
+
+async def _deliver(db, items: list[tuple[str, str, dict[str, Any]]]) -> dict[str, int]:
+    """``items``: je Gerät (Kennung der Meldung, Token, Nachricht). Je bis zu ``EXPO_BATCH_SIZE`` eine Anfrage; ein
+    Stück, das scheitert, lässt die anderen nicht ausfallen. Rückgabe: je Meldung die Zahl der Geräte, die Expo
+    angenommen hat (wie bisher: angenommen heißt, die Anfrage ging durch - Fehler je Gerät stehen am Token)."""
+    counts: dict[str, int] = {}
+    if not items:
+        return counts
+    async with httpx.AsyncClient(timeout=8) as client:
+        for begin in range(0, len(items), EXPO_BATCH_SIZE):
+            chunk = items[begin:begin + EXPO_BATCH_SIZE]
+            try:
+                response = await client.post(EXPO_PUSH_URL, json=[payload for _nid, _token, payload in chunk])
+                response.raise_for_status()
+                result = response.json()
+            except Exception:
+                logger.warning("Expo push delivery failed for notification %s (%s Geräte)", _log_safe(chunk[0][0], 80), len(chunk),
+                               exc_info=True)
+                continue
+            try:
+                await _record_tickets(db, chunk, result)
+            except Exception:
+                logger.warning("Expo push tickets not stored for notification %s", _log_safe(chunk[0][0], 80), exc_info=True)
+            for notification_id, _token, _payload in chunk:
+                counts[notification_id] = counts.get(notification_id, 0) + 1
+    return counts
+
+
+async def _record_tickets(db, chunk: list[tuple[str, str, dict[str, Any]]], result: Any) -> None:
+    rows = result.get("data") if isinstance(result, dict) else None
+    if isinstance(rows, dict):
+        rows = [rows]
+    failed_tokens = []
+    ticket_updates = []
+    if isinstance(rows, list):
+        for (notification_id, token, _payload), row in zip(chunk, rows):
+            if not isinstance(row, dict):
+                continue
+            if row.get("status") == "ok":
+                ticket_updates.append({"token": token, "ticket_id": row.get("id"), "status": "ok", "message": "", "error": ""})
+                continue
+            if row.get("status") != "error":
+                continue
+            details = row.get("details") or {}
+            logger.warning(
+                "Expo push token failed for notification %s: %s",
+                _log_safe(notification_id, 80),
+                _log_safe(row.get("message") or details),
+            )
+            ticket_updates.append({
+                "token": token,
+                "ticket_id": row.get("id"),
+                "status": "error",
+                "message": row.get("message") or "",
+                "error": details.get("error") or "",
+            })
+            if details.get("error") == "DeviceNotRegistered":
+                failed_tokens.append(token)
+    now = now_utc().isoformat()
+    for update in ticket_updates:
+        await db.mobile_push_tokens.update_one(
+            {"token": update["token"]},
+            {"$set": {
+                "last_ticket_id": update.get("ticket_id"),
+                "last_ticket_status": update.get("status"),
+                "last_ticket_message": update.get("message"),
+                "last_ticket_error": update.get("error"),
+                "last_ticket_at": now,
+            }},
+        )
+    if failed_tokens:
+        await db.mobile_push_tokens.update_many(
+            {"token": {"$in": failed_tokens}},
+            {"$set": {"enabled": False, "disabled_at": now}},
+        )
+    await db.mobile_push_tokens.update_many(
+        {"token": {"$in": [token for _nid, token, _payload in chunk]}},
+        {"$set": {"last_sent_at": now}},
+    )
+
+
 async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int:
     user_id = notification.get("user_id")
     if not user_id:
@@ -204,83 +289,43 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
     tokens = await db.mobile_push_tokens.find(
         {"user_id": user_id, "enabled": {"$ne": False}},
         {"_id": 0, "token": 1, "channel_set": 1, "private_content": 1},
-    ).to_list(20)
+    ).to_list(TOKENS_PER_USER)
     valid = [row for row in tokens if _is_expo_token(row.get("token"))]
-    push_tokens = [row.get("token") for row in valid]
-    if not push_tokens:
+    if not valid:
         return 0
-    payloads = [_push_payload(notification, row) for row in valid]
-
+    items = [(notification.get("id"), row.get("token"), _push_payload(notification, row)) for row in valid]
     try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            response = await client.post(EXPO_PUSH_URL, json=payloads)
-            response.raise_for_status()
-        result = response.json()
-        rows = result.get("data") if isinstance(result, dict) else None
-        if isinstance(rows, dict):
-            rows = [rows]
-        failed_tokens = []
-        ticket_updates = []
-        if isinstance(rows, list):
-            for token, row in zip(push_tokens, rows):
-                if not isinstance(row, dict):
-                    continue
-                if row.get("status") == "ok":
-                    ticket_id = row.get("id")
-                    ticket_updates.append(
-                        {
-                            "token": token,
-                            "ticket_id": ticket_id,
-                            "status": "ok",
-                            "message": "",
-                            "error": "",
-                        }
-                    )
-                    continue
-                if row.get("status") != "error":
-                    continue
-                details = row.get("details") or {}
-                logger.warning(
-                    "Expo push token failed for notification %s: %s",
-                    _log_safe(notification.get("id"), 80),
-                    _log_safe(row.get("message") or details),
-                )
-                ticket_updates.append(
-                    {
-                        "token": token,
-                        "ticket_id": row.get("id"),
-                        "status": "error",
-                        "message": row.get("message") or "",
-                        "error": details.get("error") or "",
-                    }
-                )
-                if details.get("error") == "DeviceNotRegistered":
-                    failed_tokens.append(token)
-        now = now_utc().isoformat()
-        for update in ticket_updates:
-            await db.mobile_push_tokens.update_one(
-                {"token": update["token"]},
-                {"$set": {
-                    "last_ticket_id": update.get("ticket_id"),
-                    "last_ticket_status": update.get("status"),
-                    "last_ticket_message": update.get("message"),
-                    "last_ticket_error": update.get("error"),
-                    "last_ticket_at": now,
-                }},
-            )
-        if failed_tokens:
-            await db.mobile_push_tokens.update_many(
-                {"token": {"$in": failed_tokens}},
-                {"$set": {"enabled": False, "disabled_at": now}},
-            )
-        await db.mobile_push_tokens.update_many(
-            {"token": {"$in": push_tokens}},
-            {"$set": {"last_sent_at": now}},
-        )
-        return len(push_tokens)
+        counts = await _deliver(db, items)
     except Exception:
         logger.warning("Expo push delivery failed for notification %s", _log_safe(notification.get("id"), 80), exc_info=True)
         return 0
+    return counts.get(notification.get("id"), 0)
+
+
+async def send_mobile_push_batch(notifications: list[dict[str, Any]]) -> dict[str, int]:
+    """Viele Meldungen auf einmal (#2553): ein Abruf der Tokens für alle, dann Anfragen zu je bis zu 100 Nachrichten.
+    Rückgabe: je Kennung der Meldung die Zahl der Geräte - wie ``send_mobile_push_for_notification`` je Meldung."""
+    from services.outbound_guard import outbound_disabled
+
+    wanted = [doc for doc in notifications if doc.get("user_id") and doc.get("id")]
+    if not wanted or outbound_disabled():
+        return {}
+    db = get_db()
+    user_ids = sorted({doc["user_id"] for doc in wanted})
+    by_user: dict[str, list[dict[str, Any]]] = {}
+    async for row in db.mobile_push_tokens.find(
+        {"user_id": {"$in": user_ids}, "enabled": {"$ne": False}},
+        {"_id": 0, "user_id": 1, "token": 1, "channel_set": 1, "private_content": 1},
+    ):
+        rows = by_user.setdefault(row.get("user_id"), [])
+        if len(rows) < TOKENS_PER_USER and _is_expo_token(row.get("token")):
+            rows.append(row)
+    items = [(doc["id"], row.get("token"), _push_payload(doc, row)) for doc in wanted for row in by_user.get(doc["user_id"], [])]
+    try:
+        return await _deliver(db, items)
+    except Exception:
+        logger.warning("Expo push batch failed (%s Meldungen)", len(wanted), exc_info=True)
+        return {}
 
 
 async def _check_receipts_for_tokens(tokens: list[dict[str, Any]]) -> dict[str, Any]:

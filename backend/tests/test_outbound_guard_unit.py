@@ -50,6 +50,8 @@ async def test_no_push_and_no_direct_message_while_locked(no_selection, monkeypa
     monkeypatch.setattr(discord_dm, "get_db", lambda: Explodes(), raising=False)
     notification = {"id": "n1", "user_id": "u1", "kind": "draw_show_reminder", "title": "Auslosung", "body": "jetzt"}
     assert await push_notifications.send_mobile_push_for_notification(notification) == 0
+    # Gebündelter Versand (#2553) hält sich an dieselbe Sperre.
+    assert await push_notifications.send_mobile_push_batch([notification]) == {}
     assert await discord_dm.send_discord_dm_for_notification(notification, "tournaments") == 0
 
 

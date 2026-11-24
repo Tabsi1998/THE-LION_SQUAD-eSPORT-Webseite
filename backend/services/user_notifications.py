@@ -86,7 +86,10 @@ async def create_user_notification(
     url: str = "",
     kind: str = "general",
     meta: dict[str, Any] | None = None,
+    push_batch: list[dict] | None = None,
 ) -> dict | None:
+    """``push_batch`` (#2553): statt sofort an Expo kommt die Meldung in diese Liste - ``send_collected_pushes`` schickt
+    sie dann gebündelt (bis zu 100 Nachrichten je Anfrage) und trägt ``push_sent_count`` nach."""
     if not user_id:
         return None
     db = get_db()
@@ -199,19 +202,23 @@ async def create_user_notification(
     if capped:
         push_channel_allowed = False
         browser_channel_allowed = False
-    try:
-        push_sent_count = 0
-        if push_channel_allowed:
-            from services.push_notifications import send_mobile_push_for_notification
-            push_sent_count = await send_mobile_push_for_notification(doc)
-        doc["push_sent_count"] = push_sent_count
-        doc["push_sent_at"] = now_utc().isoformat()
-        await db.notifications.update_one(
-            {"id": doc["id"]},
-            {"$set": {"push_sent_count": push_sent_count, "push_sent_at": doc["push_sent_at"]}},
-        )
-    except Exception:
-        logger.warning("[push] Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
+    if push_channel_allowed and push_batch is not None:
+        # Gebündelt (#2553): Versand und ``push_sent_count`` übernimmt ``send_collected_pushes``.
+        push_batch.append(doc)
+    else:
+        try:
+            push_sent_count = 0
+            if push_channel_allowed:
+                from services.push_notifications import send_mobile_push_for_notification
+                push_sent_count = await send_mobile_push_for_notification(doc)
+            doc["push_sent_count"] = push_sent_count
+            doc["push_sent_at"] = now_utc().isoformat()
+            await db.notifications.update_one(
+                {"id": doc["id"]},
+                {"$set": {"push_sent_count": push_sent_count, "push_sent_at": doc["push_sent_at"]}},
+            )
+        except Exception:
+            logger.warning("[push] Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
     try:
         browser_sent = 0
         if browser_channel_allowed:
@@ -234,3 +241,29 @@ async def create_user_notification(
     except Exception:
         doc.setdefault("discord_sent_count", 0)
     return doc
+
+
+async def send_collected_pushes(batch: list[dict]) -> int:
+    """Schickt die über ``push_batch`` gesammelten Meldungen gebündelt an Expo (#2553), trägt je Meldung
+    ``push_sent_count`` und ``push_sent_at`` nach und leert die Liste. Rückgabe: Zahl der Geräte."""
+    if not batch:
+        return 0
+    docs = list(batch)
+    batch.clear()
+    try:
+        from services.push_notifications import send_mobile_push_batch
+        counts = await send_mobile_push_batch(docs)
+    except Exception:
+        logger.warning("[push] Gebündelter Push für %s Meldungen fehlgeschlagen", len(docs), exc_info=True)
+        counts = {}
+    db = get_db()
+    stamp = now_utc().isoformat()
+    by_count: dict[int, list[str]] = {}
+    for doc in docs:
+        sent = int(counts.get(doc["id"], 0) or 0)
+        doc["push_sent_count"] = sent
+        doc["push_sent_at"] = stamp
+        by_count.setdefault(sent, []).append(doc["id"])
+    for sent, ids in by_count.items():
+        await db.notifications.update_many({"id": {"$in": ids}}, {"$set": {"push_sent_count": sent, "push_sent_at": stamp}})
+    return sum(int(value or 0) for value in counts.values())

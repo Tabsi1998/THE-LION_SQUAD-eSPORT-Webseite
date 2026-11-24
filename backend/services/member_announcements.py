@@ -121,7 +121,8 @@ async def notify_app_news(db, limit: int = 20) -> dict:
     schicken nichts doppelt), dann je Person eine Meldung mit eindeutigem Schlüssel - Ruhezeiten gelten wie überall."""
     from services.news_channels import notification_meta, only_channel
     from services.news_publish import published_now
-    from services.user_notifications import create_user_notification
+    from services.push_notifications import EXPO_BATCH_SIZE
+    from services.user_notifications import create_user_notification, send_collected_pushes
 
     now_iso = now_utc().isoformat()
     cutoff = (now_utc() - timedelta(hours=MAX_AGE_HOURS)).isoformat()
@@ -141,14 +142,20 @@ async def notify_app_news(db, limit: int = 20) -> dict:
             continue
         sent = 0
         slug = post.get("slug") or post["id"]
+        # Gebündelt (#2553): je bis zu 100 Nachrichten eine Anfrage an Expo statt einer je Person.
+        batch: list[dict] = []
         for user_id in await app_push_user_ids(db):
             created = await create_user_notification(
                 user_id, "Neu in der LionsAPP", str(post.get("title") or "News"), url=f"/news/{slug}", kind="news_app",
                 meta={"category": "news_events", "news_id": post["id"], "slug": post.get("slug"),
                       "dedupe_key": f"news_app:{post['id']}", "unique_dedupe": True, **notification_meta(post)},
+                push_batch=batch,
             )
             if created:
                 sent += 1
+            if len(batch) >= EXPO_BATCH_SIZE:
+                await send_collected_pushes(batch)
+        await send_collected_pushes(batch)
         await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_count": sent}})
         results.append({"news_id": post["id"], "sent": sent})
     return {"items": len(results), "sent": sum(row["sent"] for row in results)}
