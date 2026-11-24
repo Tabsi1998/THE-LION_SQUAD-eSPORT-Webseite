@@ -712,6 +712,8 @@ def _ever_public(post: dict) -> bool:
         return True
     return any(post.get(key) for key in (
         "newsletter_sent_at", "newsletter_skipped_reason", "discord_checked_at", "members_notified_at", "news_mentions_processed_at",
+        # App-Push (#2553): auch ein ausgelassener Push (zu alt, Kanal gewechselt) heißt, der Beitrag war öffentlich.
+        "app_push_notified_at",
     ))
 
 
