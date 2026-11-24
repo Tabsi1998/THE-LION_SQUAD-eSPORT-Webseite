@@ -1170,7 +1170,7 @@
 .tv-finale__title .tls-lbadge--tv { --tls-lbadge-w: 1em; margin-right: 0.3em; vertical-align: -0.2em; }
 .tv-finale__target .tls-lbadge--tv { --tls-lbadge-w: 1.1em; }
 .tv-finale__badge .tls-lbadge__art { animation: tv-finale-badge var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-head-at, 0s) both; }
-@keyframes tv-finale-badge { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 0.6 * var(--tls-motion-on, 1))) scale(0.94); } }
+@keyframes tv-finale-badge { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 0.6 * var(--tls-motion-on, 1))) scale(calc(1 - 0.06 * var(--tls-motion-on, 1))); } }
 /* „und N weitere“ in der eigenen Spalte, unter der letzten Zeile - hebt sich, wenn diese steht. */
 .tv-finale__more { margin: 0; padding-left: calc(var(--tv-u) * 2.4); color: var(--tv-muted); font-weight: 700;
   animation: tv-rise var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-at, 0s) both; }

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { COLUMN_ROWS, FALLBACK_AREA, FINALE_BOX, FINALE_TIMING, TARGET_BADGE_EM, TARGET_BADGE_HEIGHT_EM, columnUnits, finaleColumns, finalePage, finaleRowUnits, fitFinaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetChipUnits, targetText } from "./tvFinale";
 import { tvScale } from "./tvType";
 
@@ -134,4 +136,14 @@ test("#2561: das Abzeichen im Ziel-Chip zählt bei der Messung mit - breiter und
   expect(targetChipUnits(one, { columnU, scale: NORMAL }).height)
     .toBeCloseTo(NORMAL.info * TARGET_BADGE_HEIGHT_EM + FINALE_BOX.targetPadY * 2 + FINALE_BOX.line * 2, 5);
   expect(finaleRowUnits(short, { columnU, unitU: unit, scale: NORMAL })).toBe(5.9);
+});
+
+test("#2561 K6: das Titel-Wappen bewegt sich nur über --tls-motion-on - auch die Skalierung steht bei „Bewegung aus“ still", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/components/tv/tv.css"), "utf8");
+  const start = css.indexOf("@keyframes tv-finale-badge");
+  expect(start).toBeGreaterThan(-1);
+  const block = css.slice(start, css.indexOf("}", css.indexOf("}", start) + 1) + 1);
+  expect(block).toContain("translateY(calc(var(--tv-u) * 0.6 * var(--tls-motion-on, 1)))");
+  expect(block).toContain("scale(calc(1 - 0.06 * var(--tls-motion-on, 1)))");
+  expect(block).not.toMatch(/scale\(0\.94\)/);
 });
