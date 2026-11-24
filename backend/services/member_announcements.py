@@ -170,6 +170,13 @@ async def notify_app_news(db, limit: int = 20) -> dict:
         slug = post.get("slug") or post["id"]
         dedupe_key = f"news_app:{post['id']}"
         recipients = await app_push_user_ids(db)
+        if recipients:
+            # Fabian 23.11. (Nr. 230): Wer zu dieser News schon eine Mitglieder- oder Vorstands-Meldung bekam (die News war
+            # erst intern und wurde später öffentlich), bekommt keinen zweiten App-Push.
+            notified = set(await db.notifications.distinct("user_id", {
+                "user_id": {"$in": recipients}, "kind": {"$in": [f"news_{kind}" for kind in KINDS.values()]},
+                "meta.dedupe_key": f"news:{post['id']}"}))
+            recipients = [user_id for user_id in recipients if user_id not in notified]
         sent = 0
         # Gebündelt: je bis zu 100 Nachrichten eine Anfrage an Expo statt einer je Person.
         batch: list[dict] = []
