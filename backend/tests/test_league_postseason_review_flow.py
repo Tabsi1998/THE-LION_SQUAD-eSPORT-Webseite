@@ -608,8 +608,9 @@ async def test_the_lower_division_of_a_relegation_takes_no_further_staffel_eithe
     flow.act_as(world["lead"])
     refused = await flow.post(f"{ADMIN}/divisions/{world['divisions'][2]['id']}/staffeln", json={})
     assert refused.status_code == 422 and "abgeschlossen" in refused.json()["detail"]
-    # In der oberen Liga ist noch nichts abgeschlossen - dort geht es.
-    ok(await flow.post(f"{ADMIN}/divisions/{world['divisions'][1]['id']}/staffeln", json={}))
+    # Die Relegation bindet beide Ligen des Paares: Auch die obere nimmt keine weitere Staffel, sobald die untere abgeschlossen hat.
+    partner = await flow.post(f"{ADMIN}/divisions/{world['divisions'][1]['id']}/staffeln", json={})
+    assert partner.status_code == 422 and "abgeschlossen" in partner.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -694,12 +695,14 @@ async def test_playoffs_keep_their_best_of_when_the_season_changes_its_own_after
     assert answer["best_of"] == 5
     assert any("behalten Best of 3" in text and "Liga 1" in text for text in answer["warnings"])
     season = await reload_season(flow, world)
-    assert season["best_of"] == 5 and season["postseason"]["playoffs"]["best_of"] == 3
+    # Festgehalten wird der Wert vom Start (Nr. 255) - die Einstellung selbst bleibt „wie in der Season“.
+    assert season["best_of"] == 5 and season["postseason_best_of_kept"] == 3 and season["postseason"]["playoffs"]["best_of"] is None
     assert division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]["best_of"] == 3
     # Ein zweites Ändern schreibt nichts mehr fest und meldet nichts.
     again = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 1}))
     assert not any("behalten" in text for text in again["warnings"])
-    assert (await stored_playoffs(flow, world))["best_of"] == 3
+    assert (await reload_season(flow, world))["postseason_best_of_kept"] == 3
+    assert division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]["best_of"] == 3
 
 
 @pytest.mark.asyncio
@@ -733,11 +736,12 @@ async def test_playoffs_keep_their_best_of_when_a_division_gets_its_own_after_th
     assert any("behalten Best of 3" in text and "Liga 2" in text for text in answer["warnings"])
     view = await cockpit(flow, world)
     assert division_of(view, 2)["settings"]["playoffs"]["best_of"] == 3 and division_of(view, 1)["settings"]["playoffs"]["best_of"] == 3
-    # Festgeschrieben wird an Liga 2 - die Vorlage der Season und Liga 1 bleiben, wie sie sind.
-    assert (await stored_playoffs(flow, world))["best_of"] is None
-    own = (await flow.db.league_divisions.find_one({"id": world["divisions"][2]["id"]}, {"_id": 0}))["postseason"]["playoffs"]
-    assert (own["enabled"], own["per_staffel"], own["best_of"]) == (True, 4, 3)
-    assert "postseason" not in await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+    # Liga 2 merkt sich nur ihr Best of vom Start (Nr. 255) und folgt weiter der Vorlage - Season und Liga 1 bleiben, wie sie sind.
+    assert (await stored_playoffs(flow, world))["best_of"] is None and "postseason_best_of_kept" not in await reload_season(flow, world)
+    two = await flow.db.league_divisions.find_one({"id": world["divisions"][2]["id"]}, {"_id": 0})
+    assert two["postseason_best_of_kept"] == 3 and "postseason" not in two
+    one = await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+    assert "postseason" not in one and "postseason_best_of_kept" not in one
 
 
 @pytest.mark.asyncio
@@ -819,3 +823,175 @@ async def test_the_admin_view_says_when_a_division_takes_no_further_staffel(flow
     flow.act_as(world["lead"])
     after = ok(await flow.get(SEASON_URL.format(id=world["season"]["id"])))
     assert after["divisions"][0]["staffeln_locked"] is True
+
+
+# ================================================================ Runde 5: Nr. 254 (Start erst, wenn die Season läuft), Nr. 255 (Best of
+# bleibt auch im Zustand „aus“, Relegation wie Playoffs, die Liga N merkt nur den Rückfallwert), Kann-Punkte der Schlussprüfung
+
+KEPT = "postseason_best_of_kept"
+
+
+@pytest.mark.asyncio
+async def test_playoffs_that_are_switched_off_keep_the_best_of_from_the_start_too(flow):
+    # Der Umweg: Playoffs aus, Best of der Season auf 5, Playoffs wieder ein - sie spielen trotzdem das Best of vom Start.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    await start_season(flow, world)
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    flow.act_as(world["lead"])
+    ok(await flow.put(url, json={"playoffs": {"enabled": False, "per_staffel": 4}}))
+    answer = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    # Ausgeschaltet gibt es nichts zu melden - festgehalten wird trotzdem.
+    assert not any("behalten" in text for text in answer["warnings"])
+    assert (await reload_season(flow, world))[KEPT] == 3
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4}}))
+    part = division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]
+    assert (part["enabled"], part["best_of"]) == (True, 3)
+    # Ausdrücklich das neue Best of der Season zu wählen, geht ebenso wenig.
+    refused = await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 5}})
+    assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_saving_right_after_the_season_changed_its_best_of_keeps_the_start_value(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    # „Wie in der Season“ heißt nach dem Start: wie zum Start - das Speichern ändert nichts und geht durch.
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": None}}))
+    refused = await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 5}})
+    assert refused.status_code == 422
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 2, "best_of": 3}}))
+    part = division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]
+    assert (part["best_of"], part["per_staffel"]) == (3, 2)
+
+
+@pytest.mark.asyncio
+async def test_the_best_of_of_the_relegation_is_fixed_from_the_start_and_kept_like_the_playoffs(flow):
+    world = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}})
+    await start_season(flow, world)
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    flow.act_as(world["lead"])
+    # Ab dem Start fest: ein anderes Best of der Relegation geht nicht mehr.
+    refused = await flow.put(url, json={"relegation": {"enabled": True, "best_of": 5}})
+    assert refused.status_code == 422 and "Relegation" in refused.json()["detail"]
+    # Ändert die Season ihr Best of, bleibt die Relegation beim Wert vom Start - mit Hinweis.
+    answer = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    assert any("Die Relegation von Liga 1 behält Best of 3" in text for text in answer["warnings"])
+    view = await cockpit(flow, world)
+    assert division_of(view, 1)["settings"]["relegation"]["best_of"] == 3
+    assert (await reload_season(flow, world))["best_of"] == 5
+
+
+@pytest.mark.asyncio
+async def test_a_division_only_remembers_its_best_of_and_keeps_following_the_template(flow):
+    # Liga 2 spielt regulär Best of 1. Nach dem Start ändert die Season ihr Best of - und später die Plätze je Staffel.
+    world = await build(flow, levels=2, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"overrides": {"best_of": 1}}))
+    await start_season(flow, world)
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    ok(await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/postseason", json={"playoffs": {"enabled": True, "per_staffel": 2}}))
+    view = await cockpit(flow, world)
+    one, two = division_of(view, 1)["settings"], division_of(view, 2)["settings"]
+    # Beide folgen der Vorlage (Plätze je Staffel) - jede mit ihrem Best of vom Start.
+    assert (one["playoffs"]["per_staffel"], one["playoffs"]["best_of"]) == (2, 3)
+    assert (two["playoffs"]["per_staffel"], two["playoffs"]["best_of"]) == (2, 1)
+    assert two["own"] == {"playoffs": False, "relegation": False}
+    stored = await flow.db.league_divisions.find_one({"id": world["divisions"][2]["id"]}, {"_id": 0})
+    assert "postseason" not in stored
+
+
+@pytest.mark.asyncio
+async def test_a_division_that_loses_its_own_best_of_after_the_start_keeps_it_for_the_playoffs(flow):
+    world = await build(flow, levels=2, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"overrides": {"best_of": 1}}))
+    await start_season(flow, world)
+    answer = ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"overrides": {}}))
+    assert any("behalten Best of 1" in text and "Liga 2" in text for text in answer["warnings"])
+    view = await cockpit(flow, world)
+    assert division_of(view, 2)["settings"]["playoffs"]["best_of"] == 1 and division_of(view, 1)["settings"]["playoffs"]["best_of"] == 3
+    stored = await flow.db.league_divisions.find_one({"id": world["divisions"][2]["id"]}, {"_id": 0})
+    assert stored[KEPT] == 1 and "postseason" not in stored and KEPT not in await reload_season(flow, world)
+
+
+@pytest.mark.asyncio
+async def test_the_next_season_starts_again_with_the_best_of_of_the_season(flow):
+    # Vorlage vorhanden, Playoffs aus - so ist die Season mit dem Abschluss der Staffeln beendet.
+    world = await build(flow, levels=2, postseason={"playoffs": {"enabled": False, "per_staffel": 4}})
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"overrides": {"best_of": 1}}))
+    assert (await reload_season(flow, world))[KEPT] == 3
+    assert (await flow.db.league_divisions.find_one({"id": world["divisions"][2]["id"]}, {"_id": 0}))[KEPT] == 3
+    await close(flow, world)
+    flow.act_as(world["lead"])
+    start = (now_utc() + timedelta(days=400)).date().isoformat() + "T00:00:00"
+    created = ok(await flow.post(f"{ADMIN}/seasons/{world['season']['id']}/successor", json={"start_date": start, "confirm": True}))
+    # Was die alte Season festgehalten hat, gilt nur ihr: Die neue beginnt mit „wie in der Season“ - und ohne gemerkten Start.
+    new_season = await flow.db.league_seasons.find_one({"id": created["season"]["id"]}, {"_id": 0})
+    assert KEPT not in new_season and "started_at" not in new_season and new_season["postseason"]["playoffs"]["best_of"] is None
+    rows = await flow.db.league_divisions.find({"season_id": new_season["id"]}, {"_id": 0}).to_list(10)
+    assert len(rows) == 2 and not any(KEPT in row for row in rows)
+
+
+# ---------------------------------------------------------------- Nr. 254: Der Start wird erst gemerkt, wenn die Season wirklich läuft
+
+@pytest.mark.asyncio
+async def test_a_mistyped_start_date_alone_remembers_nothing(flow):
+    from league_start_world import build as plain, start as go_live
+
+    # Eine Season, in der noch nichts läuft: die Staffel ist Entwurf, kein Spiel gewertet.
+    world = await plain(flow, 4)
+    season_id = world["season"]["id"]
+    await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"start_date": later(), "status": "active"}})
+    flow.act_as(world["lead"])
+    url = SEASON_URL.format(id=season_id)
+    ok(await flow.patch(url, json={"start_date": later(-1)}))
+    ok(await flow.patch(url, json={"start_date": later()}))
+    season = await flow.db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+    assert "started_at" not in season
+    view = ok(await flow.get(f"{ADMIN}/seasons/{season_id}/postseason"))
+    assert view["started"] is False
+    # Von außen lässt sich der Start nicht setzen.
+    ok(await flow.patch(url, json={"started_at": later(-10), "name": "Probe Season"}))
+    assert "started_at" not in await flow.db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+    # Läuft die Season wirklich - Start erreicht und eine Staffel live -, merkt das nächste Schreiben den Start.
+    ok(await flow.patch(url, json={"start_date": later(-1)}))
+    ok(await go_live(flow, world))
+    flow.act_as(world["lead"])
+    ok(await flow.patch(url, json={"start_date": later()}))
+    season = await flow.db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+    assert season.get("started_at") and (ok(await flow.get(f"{ADMIN}/seasons/{season_id}/postseason")))["started"] is True
+
+
+# ---------------------------------------------------------------- K5: Relegation sperrt beide Partner-Ligen
+
+@pytest.mark.asyncio
+async def test_a_relegation_fixes_the_staffeln_of_both_divisions_once_one_is_closed(flow):
+    world = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}})
+    await close(flow, world, world["tids"][1][0])
+    flow.act_as(world["lead"])
+    # Liga 1 hat abgeschlossen - auch Liga 2 nimmt keine weitere Staffel mehr (die Paarungen rechnen mit ihren Staffeln).
+    for level in (1, 2):
+        refused = await flow.post(f"{ADMIN}/divisions/{world['divisions'][level]['id']}/staffeln", json={})
+        assert refused.status_code == 422 and "abgeschlossen" in refused.json()["detail"], level
+    view = ok(await flow.get(SEASON_URL.format(id=world["season"]["id"])))
+    assert [row.get("staffeln_locked") for row in view["divisions"]] == [True, True]
+
+
+# ---------------------------------------------------------------- K6: Die Nachricht zum Abschluss kennt den Meister ohne Playoffs
+
+@pytest.mark.asyncio
+async def test_the_captains_hear_who_is_champion_without_playoffs(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 2}, "champion_source": "playoffs"})
+    tid = world["tids"][1][0]
+    teams = world["regs"][tid]
+    for index in (0, 1, 3):
+        await remove(flow, world, tid, teams[index]["id"])
+    await close(flow, world)
+    notes = await flow.db.notifications.find({"meta.reason": "league_final", "title": "Staffel abgeschlossen"}, {"_id": 0}).to_list(50)
+    assert notes and all(f"Meister: {teams[2]['display_name']}." in note["body"] for note in notes)

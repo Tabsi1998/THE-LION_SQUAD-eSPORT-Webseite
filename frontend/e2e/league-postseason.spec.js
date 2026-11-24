@@ -176,6 +176,9 @@ test.describe("Liga: Playoffs und Relegation", () => {
         await expect(sheet.getByTestId(id)).toBeDisabled();
       }
       await expect(sheet.getByTestId("postseason-round-add")).toHaveCount(0);
+      // Relegation wie Playoffs (Nr. 255): Auch ihr Best of steht ab dem Start fest.
+      await expect(sheet.getByTestId("postseason-relegation-best-of")).toBeDisabled();
+      await expect(sheet.getByTestId("postseason-relegation-start-locked")).toBeVisible();
       // Der Start der Playoffs und die Relegation gehören nicht dazu.
       await expect(sheet.getByTestId("postseason-start")).toBeEnabled();
       await noSideScroll(page);
