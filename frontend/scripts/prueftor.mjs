@@ -161,25 +161,28 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
   }
   const results = {};
   const add = (id, ok, metrics, details = []) => { results[id] = { ok, metrics, details }; };
-  const missing = (what) => `${what} fehlt - nicht gelaufen (Bau oder Schritt davor fehlgeschlagen?)`;
+  // Was nicht gelaufen ist, ist kein Fund (#2556): Eine Ausnahme im PR-Text deckt das nicht ab.
+  const absent = Object.fromEntries(CHECKS.map((check) => [check.id, []]));
+  const gone = (id, text) => { absent[id].push(text); return text; };
+  const missing = (id, what) => gone(id, `${what} fehlt - nicht gelaufen (Bau oder Schritt davor fehlgeschlagen?)`);
 
   const a11y = browserSummary(byCheck.a11y);
-  add("a11y", a11y.ok, { tests: a11y.passed, total: a11y.total }, a11y.total ? a11y.failed : [missing("Browser-Ergebnis")]);
+  add("a11y", a11y.ok, { tests: a11y.passed, total: a11y.total }, a11y.total ? a11y.failed : [missing("a11y", "Browser-Ergebnis")]);
 
   const contrastBrowser = browserSummary(byCheck.kontrast);
   const palette = kontrast || null;
   add("kontrast", Boolean(palette && palette.ok) && contrastBrowser.ok,
     { palette: palette ? palette.total - palette.failed.length : 0, paletteTotal: palette ? palette.total : 0, seiten: contrastBrowser.passed, seitenTotal: contrastBrowser.total },
-    [...(palette ? palette.failed.map((item) => `Palette: ${item}`) : [missing("Kontrast der Palette")]),
-      ...(contrastBrowser.total ? contrastBrowser.failed : [missing("Kontrast der Seiten")])]);
+    [...(palette ? palette.failed.map((item) => `Palette: ${item}`) : [missing("kontrast", "Kontrast der Palette")]),
+      ...(contrastBrowser.total ? contrastBrowser.failed : [missing("kontrast", "Kontrast der Seiten")])]);
 
   if (bundle) {
     add("bundle", bundle.ok, { jsGzip: bundle.jsGzip, cssGzip: bundle.cssGzip, budgetJs: bundle.budgetJs, budgetCss: bundle.budgetCss, goalJs: bundle.goalJs }, bundle.failures || []);
-  } else add("bundle", false, {}, [missing("Bundle-Messung")]);
+  } else add("bundle", false, {}, [missing("bundle", "Bundle-Messung")]);
 
   const loadBrowser = browserSummary(byCheck.ladezeit);
   const loadDetails = [...loadBrowser.failed];
-  if (!ladezeit) loadDetails.push(missing("Ladezeit-Messung"));
+  if (!ladezeit) loadDetails.push(missing("ladezeit", "Ladezeit-Messung"));
   if (ladezeit && Number.isFinite(ladezeit.goalLcpMs) && ladezeit.lcpMs > ladezeit.goalLcpMs) {
     loadDetails.push(`Hinweis: LCP ${ladezeit.lcpMs} ms liegt über dem Ziel von ${ladezeit.goalLcpMs} ms (Grenze ${ladezeit.budgetLcpMs} ms).`);
   }
@@ -198,7 +201,7 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
     }
     for (const problem of bewegung.allowlistProblems || []) motionDetails.push(`Ausnahmeliste: ${problem}`);
     for (const problem of motionSlack(bewegung)) motionDetails.push(`Ausnahmeliste hat Luft: ${problem}`);
-  } else motionDetails.push(missing("Bewegungs-Prüfung"));
+  } else motionDetails.push(missing("bewegung", "Bewegungs-Prüfung"));
   add("bewegung", Boolean(bewegung) && !(bewegung.fresh || []).length && !(bewegung.allowlistProblems || []).length
     && !motionSlack(bewegung).length && motionBrowser.ok,
     bewegung ? { neu: (bewegung.fresh || []).reduce((sum, item) => sum + item.count - item.allowed, 0), bestand: bewegung.allowedTotal, funde: bewegung.total } : {},
@@ -213,8 +216,14 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
   for (const check of CHECKS) {
     const result = results[check.id];
     result.loosened = loosened[check.id] || [];
+    result.missing = absent[check.id];
     const red = !result.ok || result.loosened.length > 0;
-    result.exception = red && exceptions[check.id] ? exceptions[check.id] : null;
+    // Ausnahmen gelten nur für echte Funde und gelockerte Grenzen, nie für einen fehlenden Teilbericht (#2556).
+    const excusable = red && result.missing.length === 0;
+    result.exception = excusable && exceptions[check.id] ? exceptions[check.id] : null;
+    if (red && !excusable && exceptions[check.id]) {
+      result.details.push("Ausnahme gilt nicht: Ein Teil ist nicht gelaufen - erst neu starten, eine Ausnahme deckt nur echte Funde und gelockerte Grenzen ab.");
+    }
     result.status = !red ? "gruen" : result.exception ? "ausnahme" : "rot";
   }
   const blocking = CHECKS.filter((check) => results[check.id].status === "rot").map((check) => check.id);
