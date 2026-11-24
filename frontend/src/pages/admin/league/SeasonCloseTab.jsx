@@ -17,7 +17,9 @@ import { api, formatApiError } from "@/lib/api";
 import { closeState, decisionLine, finalMoment, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws } from "@/lib/leagueTable";
 import { rosterFallbackText } from "@/lib/leagueRewards";
+import { placeText, reachedText, relegationRowText } from "@/lib/leaguePostseason";
 import { SeasonCrossZones } from "./SeasonCrossZones";
+import { SeasonPostseason } from "./SeasonPostseason";
 import { OrderSheet } from "./SeasonTablePanel";
 import "./seasonClose.css";
 
@@ -46,7 +48,32 @@ function Table({ rows, rules, championId, label }) {
 // Gleichstände, die einen Entscheid brauchen (Nr. 156): um den Meistertitel und - seit F.2 (#1627) - an einer Grenze zu Auf- oder Abstieg.
 // Gleichstand zwischen Staffeln (#1627): entschieden wird unten unter „Plätze über Staffeln hinweg“, nicht an der Staffel.
 const CROSS_TIE = "zone_cross_tie";
-const TIE_BLOCKERS = { champion_tie: { kind: "champion", label: "Meister entscheiden" }, zone_tie: { kind: "zone", label: "Platz entscheiden" } };
+// Dazu - seit #2404 - an der Playoff-Grenze: Wer in die Playoffs kommt, steht vor dem Abschluss fest.
+const TIE_BLOCKERS = {
+  champion_tie: { kind: "champion", label: "Meister entscheiden" }, zone_tie: { kind: "zone", label: "Platz entscheiden" },
+  playoff_tie: { kind: "playoff", label: "Playoff-Platz entscheiden" },
+};
+const TIE_TEST_ID = { zone: "close-decide-zone", playoff: "close-decide-playoff" };
+
+/** Der Endstand einer Playoff- bzw. Relegations-Staffel (#2404): Plätze aus dem Baum bzw. Paarungen mit Ergebnis - keine Tabelle. */
+function Placements({ row, label }) {
+  const rows = row.standings || [];
+  if (!rows.length) return <p className="text-sm text-white/55">Noch keine Teams.</p>;
+  const relegation = row.kind === "relegation";
+  return (
+    <ol className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]" aria-label={label} data-testid={`close-placements-${row.tournament_id}`}>
+      {rows.map((item) => (
+        <li key={item.registration_id} className="flex items-center gap-3 px-3 py-2">
+          {relegation ? null : <span className="w-6 shrink-0 text-right font-display text-base font-bold tabular-nums text-white">{placeText(item)}</span>}
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold text-white [overflow-wrap:anywhere]">{item.display_name}</span>
+            <span className="block text-xs text-white/60">{relegation ? relegationRowText(item) : reachedText(item)}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /** Hinweise ohne Sperre (#2422: Nachmeldung nicht entschieden) - mit Link dorthin, wo es zu entscheiden ist. */
 function Hints({ row }) {
@@ -118,7 +145,7 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
                 ? <OwnTeamNote key={tie.rank} testId={`close-tie-own-${row.tournament_id}`} />
                 : (
                   <button key={tie.rank} type="button" onClick={() => onDecide(tie)} className={`${BUTTON} tls-btn--secondary`}
-                    data-testid={tie.kind === "zone" ? `close-decide-zone-${row.tournament_id}-${tie.rank}` : `close-decide-${row.tournament_id}`}>
+                    data-testid={TIE_TEST_ID[tie.kind] ? `${TIE_TEST_ID[tie.kind]}-${row.tournament_id}-${tie.rank}` : `close-decide-${row.tournament_id}`}>
                     {TIE_BLOCKERS[blocker.code].label}
                   </button>
                 )))}
@@ -166,7 +193,9 @@ function CloseSheet({ row, superadmin, onClose, onDone }) {
           <p className="flex items-center gap-2 rounded-sm border border-honor/40 bg-honor/5 px-3 py-2 text-white" data-testid="close-sheet-champion">
             <Crown className="h-4 w-4 shrink-0 text-honor" aria-hidden="true" /> Meister: <strong className="min-w-0 break-words">{row.champion?.display_name || "–"}</strong>
           </p>
-        ) : <p className="text-white/55">In dieser Liga N gibt es keinen Meistertitel.</p>}
+        ) : row.kind === "relegation" ? <p className="text-white/65" data-testid="close-sheet-relegation">Das Ergebnis gilt für Auf- und Abstieg der nächsten Season: Gewinnt das Team der unteren Liga, steigt es auf und das der oberen ab.</p>
+          : row.kind === "playoff" ? <p className="text-white/55">Der Sieger der Playoffs steht im Endstand. Einen Meistertitel vergibt diese Staffel nicht.</p>
+            : <p className="text-white/55">In dieser Liga N gibt es keinen Meistertitel.</p>}
         {row.zones_label ? <p className="text-white/65" data-testid="close-sheet-zones">Auf- und Abstieg: {row.zones_label}. Er ergibt sich aus diesem Endstand und gilt für die nächste Season.</p> : null}
       </div>
       {override ? <div className="mt-4"><ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="close-conflict-reason" /></div> : null}
@@ -305,7 +334,9 @@ function StaffelCard({ row, data, canResults, onSheet }) {
       <div className="mt-4">
         <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">{row.closed ? "Endstand" : "Vorschau des Endstands"}</h4>
         {row.zones_label ? <p className="mb-2 text-xs text-white/55" data-testid={`close-zones-${row.tournament_id}`}>Auf- und Abstieg: {row.zones_label}</p> : null}
-        <Table rows={row.standings || []} rules={row.table_rules} championId={championId} label={`${row.closed ? "Endstand" : "Vorschau"} ${label}`} />
+        {row.kind
+          ? <Placements row={row} label={`${row.closed ? "Endstand" : "Vorschau"} ${label}`} />
+          : <Table rows={row.standings || []} rules={row.table_rules} championId={championId} label={`${row.closed ? "Endstand" : "Vorschau"} ${label}`} />}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -383,6 +414,8 @@ export function SeasonCloseTab({ seasonId, canResults = false, canMatches = fals
       </div>
       {/* Plätze über Staffeln hinweg (#1627): je Liga mit dieser Regel die Kandidaten, der Gleichstand und der Entscheid. */}
       <SeasonCrossZones data={data} canResults={canResults} onChanged={load} />
+      {/* Playoffs und Relegation (#2404, F.6): Einstellungen, Vorschau der Setzung aus dem Endstand, Anlegen, Stand, Sperrgründe. */}
+      <SeasonPostseason seasonId={seasonId} onChanged={load} />
       {/* Saisonfinale am TV (#1641): nach dem Sieger-Moment je Liga N die Auf- und Absteiger - Weiter und Ende. */}
       <div className="mt-4"><SeasonTvFinaleControl seasonId={seasonId} canSteer={canMatches} /></div>
       <p className="mt-4 text-[11px] text-white/45">

@@ -26,10 +26,14 @@ const FINAL = { id: "f1", version: 1, closed_at: "2026-11-12T17:00:00+00:00", cl
   decisions: [], rules_label: "Fassung 1.0" };
 const HISTORY = [{ id: "f1", version: 1, active: true, closed_at: "2026-11-12T17:00:00+00:00", closed_by_name: "Erste Leitung", reopened_at: null, champion: "Probe 1" }];
 
+const POSTSEASON_OFF = { season: { id: "s1", name: "Season 1" }, settings: {}, configured: false, can_act: false, superadmin: false, options: {}, missing: [], divisions: [] };
+
 function renderTab(body, props = {}) {
   // Der Kasten „Saisonfinale am TV“ (#1641) lädt seinen Stand selbst.
   apiMock.get.mockImplementation(async (url) => ({ data: url.includes("/tv-finale") ? { step: 0, count: 0, labels: [], closed: 0, reason: "none_closed" }
-    : url.includes("/final-tables/") ? { standings: ROWS, decisions: [], table_rules: null } : body }));
+    : url.includes("/final-tables/") ? { standings: ROWS, decisions: [], table_rules: null }
+      // Playoffs und Relegation (#2404) laden ihr Cockpit ebenfalls selbst - hier: nichts eingestellt.
+      : url.endsWith("/postseason") ? POSTSEASON_OFF : body }));
   return render(<MemoryRouter><SeasonCloseTab seasonId="s1" {...props} /></MemoryRouter>);
 }
 
@@ -331,4 +335,48 @@ test("der Superadmin nimmt beim eigenen Team nur mit dem Grund der Notausnahme z
   fireEvent.click(within(sheet).getByTestId("cross-clear-save"));
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/divisions/d2/zone-decision/promote_best",
     { data: { reason: "Spiel wird wiederholt", conflict_reason: "Niemand sonst erreichbar" } }));
+});
+
+
+// ---------------------------------------------------------------- Playoffs und Relegation (#2404, F.6)
+
+test("eine Playoff-Staffel zeigt Plätze aus dem Baum statt einer Tabelle und heißt „Playoffs“", async () => {
+  const standings = [
+    { registration_id: "p1", display_name: "Probe 1", rank: 1, reached: "Finale" }, { registration_id: "p2", display_name: "Probe 2", rank: 2, reached: "Finale" },
+    { registration_id: "p3", display_name: "Probe 3", rank: 3, reached: "Halbfinale" }, { registration_id: "p4", display_name: "Probe 4", rank: 3, reached: "Halbfinale", exit: { kind: "withdrawn" } }];
+  renderTab(data([staffel({ tournament_id: "po1", staffel: "PO", kind: "playoff", label: "Playoffs", standings, table_rules: null, champion: { registration_id: "p1", display_name: "Probe 1" } })]));
+  expect(await screen.findByRole("heading", { name: "Liga 1 · Playoffs" })).toBeInTheDocument();
+  const list = screen.getByTestId("close-placements-po1");
+  expect(within(list).getAllByRole("listitem")).toHaveLength(4);
+  expect(list).toHaveTextContent("Probe 4");
+  expect(list).toHaveTextContent("Halbfinale · zurückgezogen");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("close-button-po1"));
+  expect(within(screen.getByTestId("close-sheet")).getByTestId("close-sheet-champion")).toHaveTextContent("Meister: Probe 1");
+});
+
+test("die Relegation zeigt je Team Ergebnis und Wirkung - und sagt im Fenster, wofür das Ergebnis gilt", async () => {
+  const standings = [
+    { registration_id: "u1", display_name: "Probe Oben", rank: 0, side: "upper", result: "lost", outcome_label: "steigt ab" },
+    { registration_id: "l1", display_name: "Probe Unten", rank: 0, side: "lower", result: "won", outcome_label: "steigt auf" }];
+  renderTab(data([staffel({ tournament_id: "rel1", staffel: "REL", kind: "relegation", label: "Relegation", standings, table_rules: null, champion_place: false, champion: null })]));
+  expect(await screen.findByTestId("close-placements-rel1")).toHaveTextContent("obere Liga · verloren · steigt ab");
+  expect(screen.getByTestId("close-placements-rel1")).toHaveTextContent("untere Liga · gewonnen · steigt auf");
+  fireEvent.click(screen.getByTestId("close-button-rel1"));
+  expect(screen.getByTestId("close-sheet-relegation")).toHaveTextContent("Auf- und Abstieg der nächsten Season");
+});
+
+test("Gleichstand an der Playoff-Grenze: entscheiden wie an einer Zonengrenze", async () => {
+  const tie = { kind: "playoff", rank: 2, registration_ids: ["r2", "r3"], names: ["Probe 2", "Probe 3"], points: 6, own_team: false };
+  renderTab(data([staffel({ can_close: false, ties: [tie], blockers: [
+    { code: "playoff_tie", label: "Gleichstand an der Playoff-Grenze", text: "Nur ein Teil kommt in die Playoffs.", count: 1, items: [{ text: "Probe 2 – Probe 3", url: "#abschluss" }] }] })]),
+  { canResults: true });
+  expect(await screen.findByTestId("close-blocker-t1-playoff_tie")).toHaveTextContent("Gleichstand an der Playoff-Grenze");
+  expect(screen.getByTestId("close-decide-playoff-t1-2")).toHaveTextContent("Playoff-Platz entscheiden");
+});
+
+test("fehlen eingestellte Playoffs noch, ist die Season nicht beendet", async () => {
+  renderTab(data([staffel({ closed: true, final: FINAL, history: HISTORY, can_close: false })],
+    { postseason_missing: [{ kind: "playoff", division_id: "d1", text: "Die Playoffs von Liga 1 sind noch nicht angelegt." }] }));
+  expect(await screen.findByTestId("season-close-summary")).toHaveTextContent("Die Playoffs von Liga 1 sind noch nicht angelegt. Solange läuft die Season weiter.");
 });
