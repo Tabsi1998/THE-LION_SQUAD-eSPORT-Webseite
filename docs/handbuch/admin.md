@@ -324,6 +324,7 @@ Jedes Thema hat genau **einen** Ort:
 | Meldungen, Sperren, Wortfilter | Admin → System → Moderation | [Moderation](../MODERATION.md) |
 | Rollen und Freigaben | Admin → Mitglieder → Alle Benutzer | dieses Kapitel, [Rollen](../ROLLEN.md) |
 | Server, Updates, Sicherungen | Admin → System → Betrieb & Logs, Status | [Betrieb](../BETRIEB.md) |
+| Fehler von Server, Website und App, Statusseite | Admin → System → Betrieb & Logs → Fehler | 3.10, [Betrieb](../BETRIEB.md#fehler-sammler-1657) |
 | App-Versionen, Play Store | Admin → System → App-Versionen | [Play Store](../PLAY_STORE.md) |
 | Game-Server, AMP-Zugang | Admin → eSports → Game-Server | dieser Abschnitt (unten) |
 
@@ -364,6 +365,40 @@ als die **Toleranz bei Preisänderung** (Shop → Einstellungen, Vorgabe 0,50 �
 geändert“ auf die Leitung; wird es günstiger, bleibt die Differenz beim Verein.
 
 ---
+
+### 3.10 Fehler sehen und die Statusseite
+
+**Wo:** Admin → System → Betrieb & Logs → **Fehler**. Nur mit dem Bereich System und bestätigter Zwei-Faktor-Anmeldung.
+
+Hier landen Fehler vom **Server**, von der **Website** und später von der **App** – zusammengefasst zu Gruppen. Eine Zeile
+zeigt: Quelle, Fehlerart, Seite, die Stelle im Code, wie oft, wann zuerst und zuletzt, und die Version.
+
+1. Oben steht die **Erreichbarkeit**: Website, API und Datenbank – „läuft“, „weg seit …“ oder „nicht geprüft“.
+2. **Quelle** wählen (Alle, Server, Website, App) und bei Bedarf **suchen** (Fehlerart, Seite, Stelle oder die Kennung von
+   der Fehlerseite).
+3. Zeile antippen: die Code-Stellen klappen auf.
+4. Behoben? **Als gelöst markieren** – oder mehrere ankreuzen und **Ausgewählte als gelöst**. Tritt der Fehler wieder auf,
+   ist die Gruppe von selbst wieder offen.
+
+**Was nie gespeichert wird:** der Text der Fehlermeldung, Namen, E-Mail-Adressen, Tokens, IP-Adressen und Inhalte. Darum
+steht in der Zeile die Stelle im Code statt einer Meldung.
+
+**Kennung auf der Fehlerseite:** Stürzt eine Seite ab, sehen Admins unter „Technische Angaben“ eine Kennung.
+**Unter „Betrieb & Logs“ ansehen** öffnet genau diese Gruppe.
+
+**Meldungen** (unter **Alarme**, je Zeile Discord und/oder E-Mail):
+
+| Ereignis | Was du einstellen kannst |
+| --- | --- |
+| Häufung von Fehlern | **Häufung ab** (Vorgabe 20) und **Zeitfenster** (Vorgabe 10 Minuten) – eine Warnung je Fenster |
+| Tageszusammenfassung | **um** wie viel Uhr (Vorgabe 8) – an ruhigen Tagen kommt nichts |
+| Erreichbarkeit | **Ausfall nach Fehlversuchen in Folge** (Vorgabe 2) – Meldung bei Ausfall und bei Wiederkehr |
+
+**Aufbewahrung:** Fehlergruppen 30 Tage ab dem letzten Auftreten, unter Alarme änderbar.
+
+**Statusseite:** `lionsquad.at/status` zeigt allen nur **„Alles läuft“** oder **„Störung, wir sind dran“**. Sie schaltet
+von selbst um und nennt keine Einzelheiten. Grenze: Die Prüfung läuft auf demselben Server – fällt der ganze Server aus,
+meldet sie nichts. Dafür braucht es eine Prüfung von außen ([Betrieb](../BETRIEB.md#externe-überwachung)).
 
 ## 4. Wenn etwas nicht klappt
 

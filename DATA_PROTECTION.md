@@ -136,7 +136,12 @@ Es bleiben zwei Folgen: Benutzername und Adresse sind belegt, und an die angegeb
 (darum die Limits). Unbestätigte Konten werden derzeit nicht automatisch gelöscht.
 
 Betriebsdaten (`ops_errors`, `ops_slow_requests`, `ops_vitals`: über Besucher nur „angemeldet“ oder „anonym“)
-laufen nach 30 Tagen ab. Quittieren im Betrieb (#2447) hält fest, wer einen Eintrag gesehen bzw. gelöst hat - nur als
+laufen nach 30 Tagen ab; bei Fehlergruppen ist die Frist unter Betrieb → Alarme einstellbar (#1657). Der Fehler-Sammler
+(#1657) nimmt auch Fehler aus Website und App an (`POST /api/ops/client-errors`, ohne Anmeldung) und speichert dabei nur
+Quelle, Fehlerart, Code-Stellen ohne Werte, die Seite als Vorlage ohne Abfrage und Kennungen, die Version und die Anzahl –
+nie den Meldungstext, nie Namen, E-Mail-Adressen, Tokens, IP-Adressen oder Inhalte. Die Adresse des Absenders dient nur der
+Drosselung (wie bei den Web Vitals) und wird nicht bei der Gruppe gespeichert. Der Stand der Erreichbarkeitsprüfung
+(`settings/ops_reachability`) enthält keine Personendaten. Quittieren im Betrieb (#2447) hält fest, wer einen Eintrag gesehen bzw. gelöst hat - nur als
 Kennung der Person aus der Verwaltung, der Name kommt erst beim Lesen (gelöschtes Konto: „Gelöschter User“):
 `resolved_by` an `ops_errors` (30 Tage), `acknowledged_by` an `ops_alert_log` (ein Jahr), `ops_check_episodes`
 (7 Tage nach dem letzten Lauf), `mobile_client_logs`, `email_logs`, `mail_jobs` und `upload_events` (deren Fristen), beim

@@ -6,14 +6,14 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 
 | Seite | Was | Woher |
 |---|---|---|
-| System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens); „Als gelöst markieren“ direkt in der Zeile, mehrere ankreuzen und „Ausgewählte als gelöst“ (#2447) | `ops_errors`, 30 Tage |
+| System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler, Antworten mit Status 5xx und Fehler aus Website und App (#1657) – mit Quelle, Anzahl, erstem und letztem Auftreten, Version und oberster Code-Stelle, nie mit Meldungstext; Filter nach Stand, Quelle und Text (auch die Kennung von der Fehlerseite); darüber die Erreichbarkeit von Website, API und Datenbank; „Als gelöst markieren“ direkt in der Zeile, mehrere ankreuzen und „Ausgewählte als gelöst“ (#2447) | `ops_errors`, 30 Tage (einstellbar) |
 | System → Betrieb & Logs → **Tempo** | Anfragen über der Schwelle (Route, Dauer); Datei-Uploads mit Kennzeichen „Upload“ am Ende, sie zählen nicht als langsam (#2447) | `ops_slow_requests` |
 | System → Betrieb & Logs → **Vitals** | Ladezeiten aus dem Browser je Route (LCP, INP, CLS, TTFB), anonym | `ops_vitals` |
 | System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse, eindeutige Indizes, Datei-Nacharbeit, Bild-Erkennung (Tesseract und zweiter Leser, #2018), Shop (Stufe, Notschalter, Printful-Schlüssel, Fehler des letzten Verbindungstests, #1706); darunter die Dateien, deren Löschung scheiterte, mit „Erneut versuchen“. „Jetzt neu prüfen“ läuft sofort, höchstens dreimal je Minute und Person (#2447) | `ops_check_runs`, `ops_check_episodes`, `pending_file_cleanups` |
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
 | System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und „X auffällig“ (nur Offenes), darunter die offenen Probleme zum Quittieren – siehe [Quittieren](#quittieren-und-von-selbst-erledigt-2447) | Sammelsicht |
 | System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“; „Nur offene“ und „Quittierte zeigen“ (#2447). Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`, zugleich Sperre: bleibt er nach einem Abbruch länger als 10 Minuten auf „running“, übernimmt ihn der nächste Start; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
-| System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP und der Website (Gerät, Version, Stufe) mit Status und Notiz; die Suche findet auch die Kennung, die Admins auf der Fehlerseite der Website sehen (#1230) | `mobile_client_logs`, 90 Tage |
+| System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP (Gerät, Version, Stufe) mit Status und Notiz. Fehler der Website gehen seit #1657 an den Fehler-Sammler (Reiter **Fehler**); ältere Website-Einträge stehen hier, bis sie ablaufen | `mobile_client_logs`, 90 Tage |
 | E-Mail → Mail-Queue | Wartende und fehlgeschlagene Sendungen, neu einreihen | `mail_jobs` |
 
 Die früheren Seiten Logs, Audit Logs, App-Logs und Versandlogs leiten auf die passenden Reiter um
@@ -259,6 +259,9 @@ und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 | Discord-Bot offline | der Bot ist eingeschaltet, kommt aber nicht mehr auf den Server |
 | App: kritischer Fehler | die LionsAPP meldet einen kritischen Fehler (Absturz, Login, Push) |
 | Turnierabschluss unvollständig | beim Veröffentlichen der Ergebnisse ist ein Schritt gescheitert (Jahreswertung, Auszeichnungen, Erfolge, Gewinne) – beim Turnier **Abschluss nachholen** tippen (#2460) |
+| Häufung von Fehlern | eine Fehlergruppe (Server, Website, App) tritt im Zeitfenster öfter auf als die Schwelle (Vorgabe 20 in 10 Minuten) – genau eine Warnung je Fenster, dazu die Sperrfrist je Gruppe (#1657) |
+| Tageszusammenfassung | einmal am Tag ab der eingestellten Stunde (Vorgabe 8 Uhr Wien): aktive und neue Fehlergruppen der letzten 24 Stunden, die häufigsten fünf, offene Gruppen, Ausfälle. An ruhigen Tagen nichts; je Tag höchstens eine (#1657) |
+| Erreichbarkeit | Website, API oder Datenbank antworten nach der eingestellten Zahl von Fehlversuchen in Folge nicht (Vorgabe 2) – und wenn sie wieder da sind, mit Ausfallzeit. Je Wechsel genau eine Meldung, siehe [Erreichbarkeit](#erreichbarkeit-und-statusseite-1657) |
 
 Vorgabe: Discord an, E-Mail aus. **Sperrfrist:** je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job,
 ein App-Fingerabdruck) meldet die Website höchstens einmal je Frist (Vorgabe 60 Minuten) – ein
@@ -279,10 +282,68 @@ Ereignis, Route, Fehlerart und Zähler.
 
 - Versandlogs: 90 Tage (einstellbar unter Alarme, 7 Tage bis 10 Jahre)
 - Adminaktionen: 2 Jahre (einstellbar)
-- App-Logs 90 Tage, Fehlergruppen 30 Tage, Tempo-Messungen und Upload-Ereignisse: feste Frist, räumt die Datenbank selbst
+- Fehlergruppen: 30 Tage ab dem letzten Auftreten (einstellbar unter Alarme, 7 Tage bis 10 Jahre, #1657) – das Ablaufdatum an
+  der Gruppe folgt der Frist beim Schreiben, der tägliche Job löscht zusätzlich alles, was älter ist
+- App-Logs 90 Tage, Tempo-Messungen und Upload-Ereignisse: feste Frist, räumt die Datenbank selbst
 - Alarm-Verlauf: 1 Jahr
 
 Der Job `ops_retention` läuft einmal am Tag.
+
+## Fehler-Sammler (#1657)
+
+Server, Website und App melden Fehler in dieselbe Liste (**Fehler**), selbst gehostet, ohne Fremddienst.
+
+- **Server:** jede unbehandelte Ausnahme und jede 5xx-Antwort (Middleware `OpsMonitorMiddleware`, `services/ops_monitor.py`).
+- **Website:** die Fehlergrenzen (`AppErrorBoundary`, `OptionalBoundary`) und `window.onerror`/`unhandledrejection`
+  (`frontend/src/lib/clientLog.js`) schicken an `POST /api/ops/client-errors` – ohne Anmeldung, damit auch Fehler von
+  Gästen ankommen. Der Browser sendet höchstens 12 je Minute und gleiche Fehler nur einmal je 30 Sekunden; der Server
+  nimmt höchstens 16 KB je Meldung und 20 Meldungen je Adresse und Minute an (sonst 413 bzw. 429).
+- **App:** derselbe Endpunkt mit `"source": "app"`. Die LionsAPP meldet noch nicht dorthin (Folgepunkt); bis dahin bleiben
+  App-Fehler unter **App-Logs**.
+
+**Was gespeichert wird:** nur Quelle, Fehlerart, Code-Stellen (Datei, Zeile, Funktion – nie Quelltext, nie Werte), die Seite
+als Vorlage (`/u/:slug`, `/api/teams/{team_id}`), die Version (`APP_VERSION` bzw. `VITE_APP_VERSION`) und die Anzahl mit
+erstem und letztem Auftreten; beim Server zusätzlich Methode, Status und „angemeldet“/„anonym“. **Der Meldungstext einer
+Ausnahme wird nie gespeichert** – er kann Namen, E-Mail-Adressen, Tokens, IP-Adressen und Inhalte enthalten, und Namen lassen
+sich nicht sicher erkennen. Statt Personendaten zu suchen, übernimmt `services/ops_error_scrub.py` nur, was sicher Code ist;
+alles andere fällt vor dem Speichern weg. Den vollen Text gibt es nur im Container-Log. Gruppen aus der Zeit davor verlieren
+ihre Meldung beim nächsten Auftreten.
+
+**Gruppe:** gleiche Quelle, Fehlerart, Route bzw. Seite und oberste Code-Stelle. Der Hash im Dateinamen der Bausteine
+(`TeamPage-AbC12_x9.js`) zählt nicht, so bleibt eine Gruppe über Deploys gleich. Die Kennung, die Admins auf der Fehlerseite
+sehen, ist der Fingerabdruck der Gruppe; „Unter Betrieb & Logs ansehen“ öffnet **Fehler** mit dieser Suche.
+
+**Ampel:** Der Auto-Check **Fehlergruppen** zählt nur Gruppen des Servers – Browser-Fehler (Erweiterungen, alte Browser)
+halten die Ampel nicht gelb; für sie gibt es die **Häufung**.
+
+## Erreichbarkeit und Statusseite (#1657)
+
+Der Job `ops_reachability` prüft jede Minute:
+
+| Ziel | Wie | Adresse |
+|---|---|---|
+| Website | `GET` auf den Frontend-Container | `OPS_REACH_WEB_URL`, Vorgabe in `docker-compose.yml`: `http://frontend/health` |
+| API | `GET` auf das eigene Backend | `OPS_REACH_API_URL`, Vorgabe: `http://127.0.0.1:8001/api/health/live` |
+| Datenbank | `ping` | – |
+
+Ohne Adresse (leer) wird ein Ziel nicht geprüft. Die Adressen kommen bewusst nur aus der Umgebung, nicht aus der
+Verwaltung – der Server ruft sie selbst auf. Ein Ziel gilt nach **Ausfall nach Fehlversuchen in Folge** (unter Alarme,
+Vorgabe 2, also nach rund 2 Minuten) als ausgefallen und nach dem ersten Erfolg als wieder da. Jeder Wechsel meldet sich genau
+einmal (Ereignis **Erreichbarkeit**); die Wiederkehr nennt die Ausfallzeit und markiert den Ausfall unter Ereignisse als
+behoben. Ist die Datenbank selbst weg, läuft der Job ohne Sperre weiter und merkt sich den Stand im Speicher; die Meldung kommt
+dann mit der Wiederkehr („Ausfall seit …“), denn Discord-Kanal und Empfänger stehen in der Datenbank. Während der
+Schreibpause fürs Backup setzt der Job aus.
+
+**Statusseite** `/status` (öffentlich, `noindex`, nicht in der Sitemap): zwei Zustände, die die Prüfung selbst umstellt –
+**„Alles läuft“** und **„Störung, wir sind dran“**, ohne Einzelheiten. Sie liest `GET /api/ops/status` (nur `state` und
+`checked_at`) und fragt jede Minute neu. Störung heißt: ein Ziel ist ausgefallen, der letzte Lauf liegt mehr als 15 Minuten
+zurück, der Stand ist nicht lesbar oder der Server antwortet gar nicht. Wurde nie geprüft (frische Installation, Job aus),
+zeigt sie „Alles läuft“.
+
+**Grenze – wichtig:** Diese Prüfung läuft **auf demselben Server**. Fällt der ganze Server, Docker, der Backend-Prozess, das
+Netz oder der Proxy davor aus, prüft und meldet niemand; die Statusseite ist dann selbst nicht erreichbar. Auch ein Fehler
+zwischen Besuchern und Server (DNS, Cloudflare, Zertifikat) bleibt unbemerkt, weil die Website-Prüfung den Frontend-Container
+direkt fragt. Einen Totalausfall meldet nur eine Prüfung **von außen** – siehe [Externe Überwachung](#externe-überwachung).
 
 ## Live-Updates (SSE)
 
@@ -568,7 +629,16 @@ Die Checks **Freier Speicher** und **Bildvarianten** schreiben im gelben bzw. ro
 ## Externe Überwachung
 
 Ein Uptime-Dienst prüft mindestens jede Minute `https://lionsquad.at/api/health/live`,
-`/api/health/ready` und `/health` und meldet sich nach zwei bis drei Fehlern in Folge. Dazu
+`/api/health/ready` und `/health` und meldet sich nach zwei bis drei Fehlern in Folge.
+
+**Vorschlag (#1657, noch nicht eingerichtet):** ein kostenloser Uptime-Dienst von außen, etwa UptimeRobot (Gratisstufe mit
+Prüfung im 5-Minuten-Takt) oder Better Stack Uptime (Gratisstufe mit 3-Minuten-Takt) – Takt und Grenzen der Gratisstufen vor
+dem Einrichten beim Anbieter nachsehen, sie ändern sich. Zwei HTTP-Prüfungen: `https://lionsquad.at/health` (Website über
+Cloudflare und Proxy) und `https://lionsquad.at/api/health/ready` (API und Datenbank); Meldung nach zwei Fehlversuchen per
+Mail an den Vorstand oder per Discord-Webhook in den Betriebskanal. Der Dienst sieht nur diese zwei Adressen, keine
+Personendaten. Ergänzend möglich: ein „Herzschlag“ bei healthchecks.io (Gratisstufe), den der Server regelmäßig anpingt –
+bleibt er aus, meldet der Dienst; das fängt auch einen hängenden Server. Anbieter-Sitz und Datenschutz vor dem Einrichten
+prüfen. Dazu
 Speicherplatz (Warnung 80 %, kritisch 90 %), Docker-Neustarts und die Backup-Timer im Blick behalten:
 
 ```bash

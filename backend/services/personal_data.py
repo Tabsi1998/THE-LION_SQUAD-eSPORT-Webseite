@@ -286,7 +286,9 @@ CLUB_CONTENT = frozenset({
     # hat; Banner und TV zeigen nie eine Person.
     "tournament_notices",
     # Betrieb (#2447): Fehlergruppen, Zustände der Auto-Checks und Alarme tragen nach dem Quittieren nur die Kennung, wer
-    # quittiert bzw. gelöst hat (``acknowledged_by``, ``resolved_by``); der Name kommt erst beim Lesen.
+    # quittiert bzw. gelöst hat (``acknowledged_by``, ``resolved_by``); der Name kommt erst beim Lesen. Fehlergruppen aus
+    # Server, Website und App (#1657) speichern sonst nur Fehlerart, Code-Stellen, Seite als Vorlage, Version und Anzahl -
+    # nie den Meldungstext (``services/ops_error_scrub.py``); Frist unter Betrieb → Alarme, Vorgabe 30 Tage.
     "ops_alert_log", "ops_check_episodes", "ops_errors",
 })
 
