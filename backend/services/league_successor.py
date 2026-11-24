@@ -42,6 +42,9 @@ NOT_COPIED = frozenset({
     "postseason_end",
     # Verlängerte Nachmeldung (#2422, Nr. 184): gilt nur dieser Season, die Frist selbst (``late_registration_days``) geht mit.
     "application_late_extension",
+    # Der gemerkte Rückfallwert fürs Best of von Playoffs und Relegation (#2404, Nr. 255): Die neue Season beginnt wieder mit „wie in
+    # der Season“ - an der Season und an jeder Liga N (``_copy_divisions``).
+    league_postseason.KEPT,
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (
@@ -393,7 +396,7 @@ async def _copy_divisions(db, season: dict, doc: dict, actor: dict) -> dict[int,
         if row.get("level") in have:
             continue
         # Das Los der alten Season (#1623, ``draw``) und ihre Entscheide über Staffeln hinweg (#1627) gehören zu ihr und gehen nicht mit.
-        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at", "draw", "zone_decisions")}
+        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at", "draw", "zone_decisions", league_postseason.KEPT)}
         if isinstance(copy.get(league_postseason_rules.FIELD), dict):
             copy[league_postseason_rules.FIELD] = league_postseason_rules.without_dates(copy[league_postseason_rules.FIELD])
         copy.update({"id": new_id(), "season_id": doc["id"], "league_id": doc["league_id"], "status": "active",
