@@ -19,6 +19,9 @@ test("alles läuft: ein Satz, wann zuletzt geprüft, nicht im Index", async () =
   render(<StatusPage />);
   expect(await screen.findByText("Alles läuft")).toBeInTheDocument();
   expect(screen.getByTestId("status-page")).toHaveAttribute("data-state", "ok");
+  // Ehrlich (Fabian, 24.11.): geprüft werden nur Website (nginx), Server (API) und Datenbank - nicht App oder Anmeldung.
+  expect(screen.getByTestId("status-page")).toHaveTextContent("Website und Server laufen.");
+  expect(screen.getByTestId("status-page")).not.toHaveTextContent(/App|Anmeldung/);
   expect(screen.getByTestId("status-page")).toHaveTextContent("Zuletzt geprüft");
   expect(apiMock.get).toHaveBeenCalledWith("/ops/status");
   expect(titleMock).toHaveBeenCalledWith("Status", expect.any(String), { robots: "noindex, follow" });

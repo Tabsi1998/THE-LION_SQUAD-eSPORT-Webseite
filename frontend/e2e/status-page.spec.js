@@ -30,6 +30,9 @@ for (const size of SIZES) {
       await expect(card).toHaveAttribute("data-state", "ok");
       await expect(card.getByRole("heading", { name: "Alles läuft" })).toBeVisible();
       await expect(card).toContainText("Zuletzt geprüft");
+      await expect(card).toContainText("Website und Server laufen.");
+      // Kleiner Link in der Fußzeile (Fabian, 24.11.).
+      await expect(page.getByTestId("footer-status")).toHaveAttribute("href", "/status");
       await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow).toBeLessThanOrEqual(0);

@@ -370,6 +370,8 @@ export function PublicLayout({ children }) {
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>
+              {/* Statusseite (#1657): ob Website und Server gerade laufen. */}
+              <Link to="/status" className="hover:text-[#29B6E8] transition" data-testid="footer-status">Status</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
               <WhatsNewLink className="hover:text-[#29B6E8] transition" />
               {/* Der Deko-Schalter (#634) steht hier nur für Gäste; Angemeldete stellen ihn unter Einstellungen →

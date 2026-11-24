@@ -85,6 +85,10 @@ function ErrorCard({ error, report }) {
       <p className="mt-3 text-sm text-white/60">
         Lade die Seite neu. Hilft das nicht, probier es später noch einmal – der Rest der Website funktioniert weiter.
       </p>
+      {/* Statusseite (#1657): ob Website und Server gerade laufen. */}
+      <p className="mt-2 text-xs text-white/50">
+        Läuft gerade etwas nicht? <Link to="/status" data-testid="page-error-status" className="font-semibold text-brand hover:text-white">Status ansehen</Link>
+      </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
           type="button"

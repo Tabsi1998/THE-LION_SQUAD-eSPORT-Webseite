@@ -14,7 +14,8 @@ const POLL_MS = 60_000;
 const STATES = {
   ok: {
     title: "Alles läuft",
-    text: "Website, App und Anmeldung sind erreichbar.",
+    // Ehrlich (Fabian, 24.11.): geprüft werden nur die Website (nginx), der Server (API) und die Datenbank.
+    text: "Website und Server laufen.",
     art: "plain",
     tone: "border-ok/30",
     badge: "border-ok/40 bg-ok/10 text-ok",

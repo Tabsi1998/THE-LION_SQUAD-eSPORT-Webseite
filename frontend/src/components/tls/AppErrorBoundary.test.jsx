@@ -60,6 +60,8 @@ describe("AppErrorBoundary", () => {
     expect(screen.getByRole("button", { name: /Neu laden/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Startseite/ })).toHaveAttribute("href", "/");
     expect(screen.getByTestId("kopf")).toBeInTheDocument();
+    // #1657: ein kleiner Hinweis auf die Statusseite.
+    expect(screen.getByTestId("page-error-status")).toHaveAttribute("href", "/status");
     expect(screen.getByTestId("footer")).toBeInTheDocument();
     expect(report).toHaveBeenCalledTimes(1);
     expect(report.mock.calls[0][0].message).toBe("list.filter is not a function");

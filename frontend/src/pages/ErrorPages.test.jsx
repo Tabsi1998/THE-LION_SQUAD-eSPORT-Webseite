@@ -89,3 +89,9 @@ test("Gäste behalten den Anmelden-Knopf", () => {
   renderForbidden({ areas: ["content"] });
   expect(screen.getByTestId("error-login-btn")).toBeInTheDocument();
 });
+
+// #1657: Bei „Kabel rausgerutscht“ ein kleiner Hinweis auf die Statusseite.
+test("die 500er-Seite verweist auf die Statusseite", () => {
+  render(<MemoryRouter><ServerErrorPage /></MemoryRouter>);
+  expect(screen.getByTestId("error-status-link")).toHaveAttribute("href", "/status");
+});

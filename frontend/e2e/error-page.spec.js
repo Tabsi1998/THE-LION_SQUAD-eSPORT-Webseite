@@ -39,6 +39,7 @@ test("als Gast: freundlicher Satz und zwei Knöpfe, kein Programmierer-Text", as
   await expect(card).toContainText("Diese Seite konnte nicht angezeigt werden");
   await expect(card.getByRole("button", { name: /Neu laden/ })).toBeVisible();
   await expect(card.getByRole("link", { name: /Startseite/ })).toBeVisible();
+  await expect(card.getByTestId("page-error-status")).toHaveAttribute("href", "/status");
   await expect(page.getByTestId("page-error-details")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("is not a function");
   await expect(page.locator("body")).not.toContainText("Technische Angaben");
