@@ -1,22 +1,21 @@
 # Changelog
 
-## [1.95.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.94.0...v1.95.0) (2026-11-24)
-
+## 1.95.0 (24.11.2026)
 
 ### Neu
 
-* Discord-Kanal der Liga-Meldungen nur aus den freigegebenen Kanälen der Discord-Einstellungen ([#1642](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1642)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Discord-Saisonende-Meldung bleibt unter 6000 Zeichen mit höchstens 9 Liga N plus „Weitere Ligen“ ([#1642](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1642)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Discord-Spieltag-Zusammenfassung und Saisonende-Meldung je Season, nie doppelt, im Reiter Termine einstellbar ([#1642](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1642)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Folge-Season übernimmt die Discord-Meldungen der Liga, die Vorschau nennt sie unter „wird übernommen“ ([#1642](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1642)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Nach einem Discord-Ausfall kommt je Staffel nur der neueste Spieltag, verworfene stehen als leiser Hinweis im Kasten ([#1642](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1642)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Saisonfinale am TV – nach dem Sieger-Moment Auf- und Absteiger je Liga N mit gestaffelten Zeilen, gesteuert mit Weiter und Ende im Reiter Abschluss ([#1641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1641)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Staffeln, die während des Saisonfinales abschließen, gehen am TV sofort mit; nach Wiederöffnen beginnt das Finale neu ([#1641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1641)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Steuerung des TV-Saisonfinales – zwei Fenster überspringen nie eine Liga N, „Ende“ gewinnt immer, Stand lädt live nach ([#1641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1641)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* TV-Saisonfinale – Namen nie unter der Mindestgröße, lange Ziel-Liga bricht um, Kopfleiste „Saisonfinale“ mit Liga und Season ([#1641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1641)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* TV-Saisonfinale zeigt auch Auf- und Absteiger über Staffeln hinweg, etwa den besten Zweiten ([#1641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1641)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* TV-Saisonfinale zeigt je Spalte so viele Zeilen, wie über der Fußleiste Platz haben, höchstens 8, der Rest als „und N weitere“ ([#1641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1641)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
-* Unklare, hängende und verworfene Discord-Liga-Meldungen stehen im Kasten und lassen sich mit „Noch einmal senden“ genau einmal nachholen ([#1642](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1642)) ([06cdf06](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06cdf06ee14b3d33d97fa113cc26f29b4f369baa))
+* Discord-Kanal der Liga-Meldungen nur aus den freigegebenen Kanälen der Discord-Einstellungen (#1642)
+* Discord-Saisonende-Meldung bleibt unter 6000 Zeichen mit höchstens 9 Liga N plus „Weitere Ligen“ (#1642)
+* Discord-Spieltag-Zusammenfassung und Saisonende-Meldung je Season, nie doppelt, im Reiter Termine einstellbar (#1642)
+* Folge-Season übernimmt die Discord-Meldungen der Liga, die Vorschau nennt sie unter „wird übernommen“ (#1642)
+* Nach einem Discord-Ausfall kommt je Staffel nur der neueste Spieltag, verworfene stehen als leiser Hinweis im Kasten (#1642)
+* Saisonfinale am TV – nach dem Sieger-Moment Auf- und Absteiger je Liga N mit gestaffelten Zeilen, gesteuert mit Weiter und Ende im Reiter Abschluss (#1641)
+* Staffeln, die während des Saisonfinales abschließen, gehen am TV sofort mit; nach Wiederöffnen beginnt das Finale neu (#1641)
+* Steuerung des TV-Saisonfinales – zwei Fenster überspringen nie eine Liga N, „Ende“ gewinnt immer, Stand lädt live nach (#1641)
+* TV-Saisonfinale – Namen nie unter der Mindestgröße, lange Ziel-Liga bricht um, Kopfleiste „Saisonfinale“ mit Liga und Season (#1641)
+* TV-Saisonfinale zeigt auch Auf- und Absteiger über Staffeln hinweg, etwa den besten Zweiten (#1641)
+* TV-Saisonfinale zeigt je Spalte so viele Zeilen, wie über der Fußleiste Platz haben, höchstens 8, der Rest als „und N weitere“ (#1641)
+* Unklare, hängende und verworfene Discord-Liga-Meldungen stehen im Kasten und lassen sich mit „Noch einmal senden“ genau einmal nachholen (#1642)
 
 ## 1.94.0 (24.11.2026)
 
