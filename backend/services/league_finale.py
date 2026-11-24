@@ -6,9 +6,12 @@ Teams, die auf- oder absteigen (bzw. ausscheiden), mit Ziel-Liga. Die Leitung st
 (``tournaments.tv_finale``, nie an der Season - die Folge-Season übernimmt Season-Felder, F.2), damit jeder TV der Season mitgeht.
 
 Gelesen wird nur der Endstand (``league_final_tables``, Zonen an jeder Zeile - F.2, #1627; Plätze über Staffeln hinweg wie „beste
-Zweite“ kommen beim Lesen dazu, ``league_cross_zones.overlay_finals``). Relegationsplätze haben noch keine
-Wirkung (``league_zones.MOVES``) und erscheinen hier nicht. Am TV und im Discord steht nur, was Gäste sehen: Season öffentlich
+Zweite“ kommen beim Lesen dazu, ``league_cross_zones.overlay_finals``). Relegationsplätze selbst bewegen niemanden
+(``league_zones.MOVES``); erst das Ergebnis einer **abgeschlossenen Relegation** (#2404, Nr. 213) kommt beim Lesen dazu
+(``_overlay_relegation``): Ihr Sieger aus der unteren Liga N steht als Aufsteiger, ihr Verlierer aus der oberen als Absteiger, in der
+Seite mit ``via: "relegation"``. Am TV und im Discord steht nur, was Gäste sehen: Season öffentlich
 (``profile_visibility.public_season``) und die Staffel als Turnier sichtbar - dieselbe Regel wie beim Podest (``awards._visible``).
+Das gilt auch für die Relegations-Staffel: Ist sie für Gäste versteckt, bleibt ihr Ergebnis dort unsichtbar.
 """
 from __future__ import annotations
 
@@ -90,7 +93,9 @@ def build_pages(divisions: list[dict], finals: list[dict], column_max: int | Non
                 for row in movers(final.get("rows") or [])[move]:
                     rows.append({"registration_id": row["registration_id"], "name": row.get("display_name") or "Team",
                                  "rank": row.get("rank"), "move": move, "target": targets[move],
-                                 "staffel": final.get("staffel") if several else None})
+                                 "staffel": final.get("staffel") if several else None,
+                                 # Auf- oder Abstieg über die Relegation (#2404) - nur dann steht das Feld da.
+                                 **({"via": "relegation"} if row.get("zone_relegation") else {})})
         if rows:
             shown, more = _per_column(rows, column_max)
             pages.append({"division_id": division["id"], "level": division["level"], "label": _label(division), "staffeln": len(own),
@@ -190,16 +195,24 @@ async def season_finals(db, season: dict, *, guests_only: bool = True) -> tuple[
     from services import league_cross_zones
 
     await league_cross_zones.overlay_finals(db, finals)
-    await _overlay_relegation(db, season["id"], finals)
+    await _overlay_relegation(db, season["id"], finals, guests_only=guests_only)
     return staffeln, finals
 
 
-async def _overlay_relegation(db, season_id: str, finals: list[dict]) -> None:
+async def _overlay_relegation(db, season_id: str, finals: list[dict], *, guests_only: bool = True) -> None:
     """Wirkung der abgeschlossenen Relegation (#2404, Nr. 213) an den Zeilen der Tabellen-Endstände: Der Sieger aus der unteren Liga N
     steht als Aufsteiger, der Verlierer aus der oberen als Absteiger - wie in der Folge-Season. Wer bleibt, bleibt ohne Bewegung.
-    Nichts wird zurückgeschrieben; ohne abgeschlossene Relegation ändert sich nichts."""
+    Nichts wird zurückgeschrieben; ohne abgeschlossene Relegation ändert sich nichts. Mit ``guests_only`` zählt nur eine
+    Relegations-Staffel, die Gäste als Turnier sähen - eine versteckte verrät ihr Ergebnis weder am TV noch im Discord."""
+    found = await db.league_final_tables.find({"season_id": season_id, "active": True, "kind": "relegation"},
+                                              {"_id": 0, "tournament_id": 1, "outcome": 1}).to_list(STAFFEL_LIMIT)
+    if found and guests_only:
+        shown = await db.tournaments.find({"id": {"$in": [row["tournament_id"] for row in found]}},
+                                          {"_id": 0, "id": 1, "status": 1, "visibility": 1, "is_public": 1}).to_list(len(found))
+        seen = {row["id"] for row in shown if await guest_sees_staffel(row)}
+        found = [row for row in found if row["tournament_id"] in seen]
     moved: dict[str, str] = {}
-    async for row in db.league_final_tables.find({"season_id": season_id, "active": True, "kind": "relegation"}, {"_id": 0, "outcome": 1}):
+    for row in found:
         moved.update({str(key): value for key, value in (row.get("outcome") or {}).items()})
     if not moved:
         return
