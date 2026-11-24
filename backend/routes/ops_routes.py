@@ -87,8 +87,9 @@ async def receive_client_error(request: Request, response: Response):
 
 @router.get("/status")
 async def public_status_view(response: Response):
-    """Für die Statusseite ``/status`` (#1657): nur „ok“ oder „disturbance“ und wann zuletzt geprüft wurde."""
-    from services.ops_reachability import public_status
+    """Für die Statusseite ``/status`` (#1657): nur „ok“ oder „disturbance“ und wann zuletzt geprüft wurde. Im Prozess
+    höchstens 15 s zwischengespeichert; ein neuer Lauf der Prüfung gilt sofort."""
+    from services.ops_reachability import cached_public_status
 
     response.headers["Cache-Control"] = "no-store"
-    return await public_status(get_db())
+    return await cached_public_status(get_db())

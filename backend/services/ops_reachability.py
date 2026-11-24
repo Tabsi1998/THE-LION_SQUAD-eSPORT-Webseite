@@ -33,6 +33,14 @@ STALE_MINUTES = 15
 PROBE_INTERVAL_SECONDS = 60
 
 _memory: dict = {}
+# Antwort für /status (#1657): höchstens alle STATUS_CACHE_SECONDS gelesen; jeder gespeicherte Lauf macht sie sofort ungültig.
+STATUS_CACHE_SECONDS = 15.0
+_status_cache: dict = {}
+_state_version = {"n": 0}
+
+
+def forget_status() -> None:
+    _status_cache.clear()
 
 
 def stale_seconds() -> int:
@@ -104,7 +112,9 @@ def _next_row(row: dict, ok: bool, stamp: str, threshold: int, recover: int = 1)
             successes = int(row.get("successes") or 0) + 1
             if successes < recover:
                 return {**row, "successes": successes, "fails": 0}
-            return {"state": "up", "since": stamp, "fails": 0, "pending": "up", "down_since": row.get("since")}
+            # Ging die Ausfallmeldung nie raus, wird daraus eine einzige: „war nicht erreichbar von … bis …“.
+            pending = "was_down" if row.get("pending") == "down" else "up"
+            return {"state": "up", "since": stamp, "fails": 0, "pending": pending, "down_since": row.get("since")}
         kept = {key: value for key, value in row.items() if key in ("pending", "down_since")}
         return {**kept, "state": "up", "since": row.get("since") if previous == "up" else stamp, "fails": 0}
     fails = int(row.get("fails") or 0) + 1
@@ -121,6 +131,10 @@ def _message(key: str, label: str, row: dict, stamp: str) -> dict:
     if row.get("pending") == "down":
         return {"key": f"reach:{key}", "title": f"Betrieb: {label} nicht erreichbar",
                 "description": f"Keine Antwort seit {_vienna(row.get('since'))} ({row.get('fails')} Prüfungen in Folge). Die Statusseite zeigt „Störung“.",
+                "fields": [{"name": "Ziel", "value": label, "inline": True}]}
+    if row.get("pending") == "was_down":
+        return {"key": f"reach:{key}:back", "title": f"Betrieb: {label} war nicht erreichbar",
+                "description": f"Nicht erreichbar von {_vienna(row.get('down_since'))} bis {_vienna(row.get('since') or stamp)}.",
                 "fields": [{"name": "Ziel", "value": label, "inline": True}]}
     return {"key": f"reach:{key}:back", "title": f"Betrieb: {label} wieder erreichbar",
             "description": f"Wieder da seit {_vienna(row.get('since') or stamp)}. Ausfall seit {_vienna(row.get('down_since'))}.",
@@ -140,7 +154,7 @@ async def _announce(db, key: str, label: str, row: dict, stamp: str) -> bool:
         return False
     if not (outcome.get("sent") or outcome.get("reason") == "undeliverable"):
         return False
-    if row.get("pending") == "up":
+    if row.get("pending") in ("up", "was_down"):
         try:
             await db.ops_alert_log.update_many({"key": {"$in": [f"reach:{key}", f"reach:{key}:back"]}, "resolved_at": None},
                                                {"$set": {"resolved_at": now_utc().isoformat()}})
@@ -188,7 +202,10 @@ async def run_reachability(db, probes: dict | None = None, now: datetime | None 
     # Erst den Stand speichern - als wäre alles Vorgemerkte schon gemeldet -, dann senden (#1657). So schickt kein
     # späterer Lauf dieselbe Meldung noch einmal, weil das Speichern nach dem Senden scheiterte. Lässt sich nicht
     # speichern, geht nichts raus; die Vormerkung bleibt im Speicher für den nächsten Lauf.
-    pending = {key: dict(row) for key, row in targets.items() if row.get("pending")}
+    # Eine Ausfallmeldung, die erst nach einem Erfolg ginge, wartet: Kommt das Ziel ganz zurück, wird daraus eine
+    # einzige Meldung („war nicht erreichbar von … bis …“); scheitert es wieder, geht sie als Ausfall raus.
+    pending = {key: dict(row) for key, row in targets.items()
+               if row.get("pending") and not (row.get("pending") == "down" and int(row.get("successes") or 0) > 0)}
     committed = {key: {name: value for name, value in row.items() if key not in pending or name not in ("pending", "down_since")}
                  for key, row in targets.items()}
     state = {"id": STATE_ID, "targets": targets, "overall": overall, "checked_at": stamp}
@@ -213,6 +230,7 @@ async def run_reachability(db, probes: dict | None = None, now: datetime | None 
 async def _try_save(db, state: dict) -> bool:
     try:
         await _save_state(db, state)
+        _state_version["n"] += 1
         return True
     except Exception:  # noqa: BLE001
         logger.warning("[ops] Stand der Erreichbarkeit nicht gespeichert")
@@ -233,6 +251,23 @@ def _stale(checked_at: str | None, now: datetime) -> bool:
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
     return now - moment > timedelta(seconds=stale_seconds())
+
+
+async def cached_public_status(db) -> dict:
+    """``public_status`` für die Route, höchstens alle ``STATUS_CACHE_SECONDS`` neu gelesen (im Prozess)."""
+    import time
+    import weakref
+
+    ref = _status_cache.get("ref")
+    if (ref is not None and ref() is db and _status_cache.get("version") == _state_version["n"]
+            and time.monotonic() - _status_cache.get("at", 0.0) < STATUS_CACHE_SECONDS):
+        return _status_cache["value"]
+    value = await public_status(db)
+    try:
+        _status_cache.update({"ref": weakref.ref(db), "at": time.monotonic(), "version": _state_version["n"], "value": value})
+    except TypeError:
+        _status_cache.clear()
+    return value
 
 
 async def public_status(db, now: datetime | None = None) -> dict:

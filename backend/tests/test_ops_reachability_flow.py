@@ -18,8 +18,10 @@ from services import ops_alerts, ops_reachability  # noqa: E402
 def fresh_memory():
     """Der Stand im Speicher gehört zum Prozess - jeder Test beginnt wie ein frisch gestarteter Server."""
     ops_reachability._memory.clear()
+    ops_reachability.forget_status()
     yield
     ops_reachability._memory.clear()
+    ops_reachability.forget_status()
 
 
 @pytest_asyncio.fixture
@@ -128,6 +130,7 @@ async def test_a_stale_or_unreadable_state_shows_a_disturbance(flow, monkeypatch
     await ops_reachability.run_reachability(flow.db, probes(Switch()))
     old = (now_utc() - timedelta(seconds=ops_reachability.stale_seconds() + 300)).isoformat()
     await flow.db.settings.update_one({"id": ops_reachability.STATE_ID}, {"$set": {"checked_at": old}})
+    ops_reachability.forget_status()  # im Betrieb wäre die Antwort höchstens 15 s alt
     assert (await status(flow))["state"] == "disturbance", "prüft niemand mehr, ist etwas faul"
 
     async def broken_find(*args, **kwargs):
@@ -209,9 +212,11 @@ async def test_a_database_outage_is_reported_when_the_database_is_back(flow, dis
     await ops_reachability.run_reachability(flow.db, probes(Switch(), database=database))
     await ops_reachability.run_reachability(flow.db, probes(Switch(), database=database))
     calls = reach_calls(discord_recorder)
-    # Mit der Datenbank kommt erst die vorgemerkte Ausfallmeldung, nach dem zweiten Erfolg in Folge die Wiederkehr.
-    assert [call["title"] for call in calls] == ["Betrieb: Datenbank nicht erreichbar", "Betrieb: Datenbank wieder erreichbar"]
-    assert "Ausfall seit" in calls[1]["description"]
+    # Die Ausfallmeldung ginge erst nach der Wiederkehr raus - stattdessen genau eine: „war nicht erreichbar von … bis …“.
+    assert [call["title"] for call in calls] == ["Betrieb: Datenbank war nicht erreichbar"]
+    assert calls[0]["description"].startswith("Nicht erreichbar von ") and " bis " in calls[0]["description"]
+    rows = [row for row in await ops_alerts.recent_alerts(flow.db) if row["kind"] == "reachability"]
+    assert len(rows) == 1 and rows[0].get("resolved_at")
     assert (await status(flow))["state"] == "ok"
 
 
@@ -260,3 +265,26 @@ def test_the_stale_limit_covers_the_longest_backup_write_pause(monkeypatch):
     assert ops_reachability.stale_seconds() >= 900 + 120
     monkeypatch.setenv("BACKUP_WRITE_PAUSE_MAX_SECONDS", "1500")
     assert ops_reachability.stale_seconds() >= 1500 + 120
+
+
+
+@pytest.mark.asyncio
+async def test_the_status_answer_is_kept_15_seconds_and_follows_each_run(flow, monkeypatch):
+    """Die Statusseite fragt jede Minute, Besucher zu Tausenden: höchstens alle 15 s ein Lesen - ein neuer Lauf gilt sofort."""
+    await ops_reachability.run_reachability(flow.db, probes(Switch()))
+    reads = {"n": 0}
+    real = ops_reachability._load_state
+
+    async def counting(db):
+        reads["n"] += 1
+        return await real(db)
+
+    monkeypatch.setattr(ops_reachability, "_load_state", counting)
+    for _ in range(5):
+        assert (await status(flow))["state"] == "ok"
+    assert reads["n"] == 1
+    web = Switch()
+    web.up = False
+    await ops_alerts.save_alert_settings(flow.db, {"reach_fail_threshold": 1})
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    assert (await status(flow))["state"] == "disturbance"
