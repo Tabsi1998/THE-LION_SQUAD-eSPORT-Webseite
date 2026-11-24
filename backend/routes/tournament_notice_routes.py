@@ -1,7 +1,8 @@
 """Hinweis der Turnierleitung (#1166) - Logik in ``services/tournament_notices.py``.
 
 - ``GET    /api/tournaments/{tid}/notices``: die stehenden Hinweise für das Banner der Turnierseite - nur Text und Zeit,
-  sichtbar wie das Turnier.
+  sichtbar wie das Turnier. Vor-Ort-Gäste (#2546) mit gültiger Freigabe für genau dieses Turnier lesen sie auch, wenn sie
+  das Turnier sonst nicht sehen (Mitglieder-Turnier) - nur dieses Turnier, nur lesend, nur die Hinweise.
 - ``GET    /api/tournaments/{tid}/lead/notices``: Reiter „Hinweis“ - die letzten Hinweise mit Protokoll.
 - ``POST   /api/tournaments/{tid}/lead/notices/preview``: wie viele Personen den Hinweis bekämen.
 - ``POST   /api/tournaments/{tid}/lead/notices``: schreiben, einmal je ``request_id``. Die Antwort kommt sofort, verschickt
@@ -17,7 +18,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import BackgroundTasks, Depends, HTTPException, Response
+from fastapi import BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from auth import get_current_user, get_optional_user
@@ -66,11 +67,29 @@ async def _check_target(db, tournament: dict, me: dict, target: str) -> None:
         raise HTTPException(status_code=403, detail="An das ganze Event schreibt, wer in allen Turnieren des Events Hinweise schreiben darf.")
 
 
+async def _notice_tournament(db, tid: str, user: dict | None, request: Request) -> dict:
+    """Das Turnier, wenn die Person es sieht - sonst nur mit gültiger Vor-Ort-Freigabe für genau dieses Turnier (#2546), wie die
+    schlanke Turnierseite (``get_tournament``). Ohne Freigabe bleibt es bei 403 bzw. 404."""
+    from services import onsite_access
+
+    tournament_id = await _resolve_tid(tid)
+    try:
+        return await _get_visible_tournament(tournament_id, user)
+    except HTTPException as denied:
+        if denied.status_code not in (403, 404):
+            raise
+        tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+        if tournament and await onsite_access.has_pass(db, request, tournament):
+            return tournament
+        raise
+
+
 @router.get("/{tid}/notices")
-async def public_notices(tid: str, response: Response, user: dict | None = Depends(get_optional_user)):
-    """Banner der Turnierseite: die stehenden Hinweise dieses Turniers und die an sein ganzes Event."""
+async def public_notices(tid: str, response: Response, request: Request, user: dict | None = Depends(get_optional_user)):
+    """Banner der Turnierseite: die stehenden Hinweise dieses Turniers und die an sein ganzes Event - nur Text, Zeit und Ziel
+    (``tournament_notices.public_notice``), auch für Vor-Ort-Gäste."""
     db = get_db()
-    tournament = await _get_visible_tournament(await _resolve_tid(tid), user)
+    tournament = await _notice_tournament(db, tid, user, request)
     # Ein entfernter Hinweis soll sofort verschwinden - kein gemeinsamer Zwischenspeicher.
     response.headers["Cache-Control"] = "no-store"
     return {"items": await notices.for_tournament(db, tournament)}
