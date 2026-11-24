@@ -315,9 +315,11 @@ async def ops_overview(me: dict = Depends(require_club_admin())):
 async def ops_errors(
     status: str = Query(default="open", pattern="^(open|resolved|all)$"),
     limit: int = Query(default=100, ge=1, le=500),
+    source: str = Query(default="all", pattern="^(all|server|web|app)$"),
+    q: str = Query(default="", max_length=200),
     me: dict = Depends(require_club_admin()),
 ):
-    return await errors_overview(get_db(), status=status, limit=limit)
+    return await errors_overview(get_db(), status=status, limit=limit, source=source, q=q)
 
 
 async def _ops_audit(db, me: dict, action: str, target_id: str | None, data: dict) -> None:

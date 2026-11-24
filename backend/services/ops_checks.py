@@ -419,7 +419,9 @@ async def check_image_variants() -> dict:
 async def check_error_groups(db) -> dict:
     label = "Fehlergruppen"
     try:
-        open_groups = await db.ops_errors.count_documents({"resolved_at": None})
+        # Nur Gruppen des Servers (#1657): Website und App melden in dieselbe Liste, Browser-Fehler (Erweiterungen,
+        # alte Browser) sollen die Server-Ampel aber nicht dauerhaft gelb halten - dafür gibt es die Häufungswarnung.
+        open_groups = await db.ops_errors.count_documents({"resolved_at": None, "source": {"$nin": ["web", "app"]}})
         since = (now_utc() - timedelta(hours=1)).isoformat()
         new_5xx = await db.ops_errors.count_documents({"first_seen_at": {"$gte": since}, "status_code": {"$gte": 500}})
     except Exception as exc:  # noqa: BLE001
