@@ -71,6 +71,14 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   }
   const { path: qrPath } = await onsiteState(admin);
   const token = qrPath.split("#")[1];
+  // Hinweis der Turnierleitung (#2546): Die Begleitperson sieht ihn in der schlanken Ansicht. Der Abnahme-Stand schickt nichts
+  // nach außen (OUTBOUND_DISABLED, Mail-Jobs aus).
+  const noticeText = `Start verschiebt sich um 15 Minuten (Abnahme ${Date.now()})`;
+  const written = await admin.request.post(`/api/tournaments/${tid}/lead/notices`, {
+    headers: await csrfHeaders(admin),
+    data: { request_id: `abnahme-vor-ort-${Date.now()}`, text: noticeText, show_on_tv: false, duration_minutes: 15 },
+  });
+  expect(written.status(), await written.text()).toBeLessThan(300);
 
   const context = await browser.newContext({ viewport: HANDY, isMobile: true, hasTouch: true });
   const page = await context.newPage();
@@ -79,8 +87,13 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   expect((await page.request.get(`/api/tournaments/${slug}`)).status()).toBe(403);
   // Erwartet: 401/403 vor der Anmeldung; die Login-Seite fragt Passkeys an, die der Abnahme-Stand nicht eingerichtet hat (503).
   const passkeys = (response) => response.status() === 503 && response.url().includes("/api/auth/passkeys/");
+  // Die Hinweise sind nie unter den erlaubten 401/403 (#2546): Die schlanke Ansicht darf sie mit der Freigabe lesen.
+  const noticeCalls = [];
+  page.on("response", (response) => {
+    if (/\/api\/tournaments\/[^/]+\/notices$/.test(new URL(response.url()).pathname)) noticeCalls.push(response.status());
+  });
   const problems = watch(page, {
-    allow: (response) => [401, 403].includes(response.status()) || passkeys(response),
+    allow: (response) => ([401, 403].includes(response.status()) && !response.url().includes("/notices")) || passkeys(response),
     allowConsole: (text) => text.includes("status of 503"),
   });
 
@@ -94,6 +107,9 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   const view = page.getByTestId("onsite-tournament-view");
   await expect(view).toBeVisible();
   await expect(page.getByTestId("onsite-seats")).toContainText("frei");
+  await expect(view.getByTestId("notice-banner")).toContainText(noticeText);
+  expect(noticeCalls.length).toBeGreaterThan(0);
+  expect(noticeCalls.every((status) => status === 200)).toBe(true);
   await shot(page, "schlanke-ansicht-handy");
 
   // Ohne Konto: Mitspielen führt zum Login mit Rückweg - ohne Code.
