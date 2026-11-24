@@ -675,3 +675,147 @@ async def test_a_hidden_relegation_does_not_show_at_the_tv_or_in_discord(flow):
     await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"is_public": False}})
     assert await moving_up(True) == []
     assert len(await moving_up(False)) == 1
+
+
+# ================================================================ Runde 4: Nr. 252 (Best of bleibt), Nr. 253 (einmal gestartet bleibt gestartet)
+
+SEASON_URL = ADMIN + "/seasons/{id}"
+
+
+@pytest.mark.asyncio
+async def test_playoffs_keep_their_best_of_when_the_season_changes_its_own_after_the_start(flow):
+    # Bei den Playoffs steht „wie in der Season“ - das Best of der Season ist 3.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    assert (await stored_playoffs(flow, world))["best_of"] is None
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    answer = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    # Die reguläre Season hat ihr neues Best of - die Playoffs behalten das vom Start, und die Leitung erfährt es.
+    assert answer["best_of"] == 5
+    assert any("behalten Best of 3" in text and "Liga 1" in text for text in answer["warnings"])
+    season = await reload_season(flow, world)
+    assert season["best_of"] == 5 and season["postseason"]["playoffs"]["best_of"] == 3
+    assert division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]["best_of"] == 3
+    # Ein zweites Ändern schreibt nichts mehr fest und meldet nichts.
+    again = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 1}))
+    assert not any("behalten" in text for text in again["warnings"])
+    assert (await stored_playoffs(flow, world))["best_of"] == 3
+
+
+@pytest.mark.asyncio
+async def test_before_the_start_the_playoffs_follow_the_seasons_best_of(flow):
+    # Gegenprobe: Vor dem Start folgen die Playoffs der Season - nichts wird festgeschrieben.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    flow.act_as(world["lead"])
+    answer = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    assert not any("behalten" in text for text in answer["warnings"])
+    assert (await stored_playoffs(flow, world))["best_of"] is None
+    assert division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]["best_of"] == 5
+
+
+@pytest.mark.asyncio
+async def test_a_season_without_playoffs_changes_its_best_of_as_before(flow):
+    world = await build(flow)
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    answer = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    assert answer["best_of"] == 5 and not any("behalten" in text for text in answer["warnings"])
+    assert "postseason" not in await reload_season(flow, world)
+
+
+@pytest.mark.asyncio
+async def test_playoffs_keep_their_best_of_when_a_division_gets_its_own_after_the_start(flow):
+    # Zwei Ligen folgen der Vorlage der Season („wie in der Season“). Liga 2 bekommt nach dem Start ein eigenes Best of.
+    world = await build(flow, levels=2, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    answer = ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"overrides": {"best_of": 5}}))
+    assert any("behalten Best of 3" in text and "Liga 2" in text for text in answer["warnings"])
+    view = await cockpit(flow, world)
+    assert division_of(view, 2)["settings"]["playoffs"]["best_of"] == 3 and division_of(view, 1)["settings"]["playoffs"]["best_of"] == 3
+    # Festgeschrieben wird an Liga 2 - die Vorlage der Season und Liga 1 bleiben, wie sie sind.
+    assert (await stored_playoffs(flow, world))["best_of"] is None
+    own = (await flow.db.league_divisions.find_one({"id": world["divisions"][2]["id"]}, {"_id": 0}))["postseason"]["playoffs"]
+    assert (own["enabled"], own["per_staffel"], own["best_of"]) == (True, 4, 3)
+    assert "postseason" not in await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+async def test_a_division_with_its_own_best_of_keeps_it_when_the_season_changes(flow):
+    # Liga 2 spielt regulär Best of 1 - ihre Playoffs erben das. Ändert die Season ihr Best of, bleibt jede Liga bei ihrem Wert.
+    world = await build(flow, levels=2, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/divisions/{world['divisions'][2]['id']}", json={"overrides": {"best_of": 1}}))
+    await start_season(flow, world)
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    view = await cockpit(flow, world)
+    assert division_of(view, 1)["settings"]["playoffs"]["best_of"] == 3 and division_of(view, 2)["settings"]["playoffs"]["best_of"] == 1
+
+
+# ---------------------------------------------------------------- Nr. 253: einmal gestartet bleibt gestartet
+
+def later(days: int = 30) -> str:
+    return f"{(now_utc() + timedelta(days=days)).date().isoformat()}T00:00:00"
+
+
+@pytest.mark.asyncio
+async def test_once_started_the_season_stays_started_when_its_start_date_moves(flow):
+    from services import league_applications, league_calendar, league_late, league_successor
+
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}})
+    await start_season(flow, world)
+    began = league_calendar.aware((await reload_season(flow, world))["start_date"])
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    flow.act_as(world["lead"])
+    # Das Datum lässt sich weiter verschieben - der Start von damals ist gemerkt.
+    moved = ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"start_date": later()}))
+    assert "started_at" not in moved["changed"]
+    season = await reload_season(flow, world)
+    assert league_calendar.aware(season["start_date"]) > now_utc() and league_calendar.aware(season["started_at"]) == began
+    # Die Sperren bleiben: Nr. 249 und alles andere, was am Start hängt.
+    assert (await cockpit(flow, world))["started"] is True
+    refused = await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 5}})
+    assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"]
+    assert league_successor.started(season) is True
+    assert league_late.late_deadline(season) == began + timedelta(days=league_late.late_days(season))
+    assert league_applications.carry_deadline({"carry_over": {"from_season_id": "alt"}}, season) == began
+    # Ein zweites Verschieben ändert den gemerkten Start nicht (idempotent) - auch nicht zurück in den Entwurf.
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"start_date": later(60)}))
+    assert league_calendar.aware((await reload_season(flow, world))["started_at"]) == began
+
+
+@pytest.mark.asyncio
+async def test_a_season_that_has_not_started_yet_can_still_move_its_start(flow):
+    # Gegenprobe: Vor dem Start wird nichts gemerkt - nach dem Verschieben ist die Season weiter „nicht gestartet“.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}})
+    flow.act_as(world["lead"])
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"start_date": later()}))
+    season = await reload_season(flow, world)
+    assert "started_at" not in season and (await cockpit(flow, world))["started"] is False
+    ok(await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/postseason", json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 5}}))
+
+
+@pytest.mark.asyncio
+async def test_saving_playoff_settings_after_the_start_remembers_the_start(flow):
+    from services import league_calendar
+
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}})
+    await start_season(flow, world)
+    began = league_calendar.aware((await reload_season(flow, world))["start_date"])
+    flow.act_as(world["lead"])
+    ok(await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/postseason", json={"playoffs": {"enabled": True, "per_staffel": 2, "best_of": 3}}))
+    assert league_calendar.aware((await reload_season(flow, world))["started_at"]) == began
+
+
+# ---------------------------------------------------------------- Die Verwaltung erfährt, dass die Staffeln feststehen
+
+@pytest.mark.asyncio
+async def test_the_admin_view_says_when_a_division_takes_no_further_staffel(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    flow.act_as(world["lead"])
+    before = ok(await flow.get(SEASON_URL.format(id=world["season"]["id"])))
+    assert "staffeln_locked" not in before["divisions"][0]
+    await close(flow, world)
+    flow.act_as(world["lead"])
+    after = ok(await flow.get(SEASON_URL.format(id=world["season"]["id"])))
+    assert after["divisions"][0]["staffeln_locked"] is True
