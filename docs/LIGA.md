@@ -4719,7 +4719,12 @@ unteren Liga N (Nr. 222), Relegationsspiele zählen für Sperren (Nr. 223), Verg
   (`league_finale.join_running`, Folgeschritt in `league_final.close`).
 - `GET|POST /api/admin/leagues/seasons/{id}/tv-finale` (`{action: "next"|"end", from_step?}`): lesen jede Zuständigkeit, schalten
   `matches` (Nr. 233: bleibt bei „Spiele betreuen“). „Weiter“ bleibt auf der letzten Seite stehen. Mit `from_step` (Stand im Fenster
-  der Leitung) gibt „Weiter“ 409, wenn ein anderes Fenster schon geschaltet hat; das Fenster lädt dann neu.
+  der Leitung) gibt „Weiter“ 409, wenn sich der Stand geändert hat (neutraler Text „Der Stand hat sich geändert – neu geladen.“);
+  das Fenster lädt dann neu und lädt auch von selbst nach (`useLiveRefresh`).
+- **Nr. 244 (24.11.): „Ende“ gewinnt immer.** `control` liest Staffeln und Seiten einmal und prüft und schreibt auf genau diesen Stand:
+  „Weiter“ schreibt bedingt - nur an Turniere ohne Stand oder mit dem gelesenen `updated_at` (läuft nichts: Schritt 0). „Ende“ schreibt
+  immer. Hat dazwischen „Ende“ (oder ein zweites Fenster) geschrieben, ändert „Weiter“ nichts und gibt 409. Die Antwort ist der frisch
+  gelesene Stand. Im Finale-Schritt zeigt der TV „THE LION SQUAD · LIGA“ und „Saisonfinale aktuell“.
 - Wiederöffnen (`league_final.reopen`, auch die Reparatur eines abgebrochenen Abschlusses) nimmt `tv_finale` an allen Staffeln der
   Season weg (`league_finale.forget`) - danach zeigt der TV den Schritt erst nach dem nächsten „Weiter“. Abschließen räumt einen
   übrig gebliebenen Schritt am Turnier weg und übernimmt dann einen laufenden (Nr. 241). Geschaltet werden alle abgeschlossenen
@@ -4759,7 +4764,12 @@ unteren Liga N (Nr. 222), Relegationsspiele zählen für Sperren (Nr. 223), Verg
   wird auf `failed`, `attempts = MAX_ATTEMPTS - 1`, `claimed_at = ""` gesetzt - der nächste Lauf sendet genau einmal; ein zweiter
   Klick findet nichts mehr (409), ein unbekannter Schlüssel 404. Der Kasten lädt die Hinweise live nach (`useLiveRefresh`).
 - **Nach einem Ausfall (Nr. 240, 24.11.):** Liegen in einer Staffel mehrere fertige, nicht gemeldete Spieltage, geht nur der neueste
-  hinaus; die älteren bekommen `status: skipped`, `reason: missed` (`league_discord.skip`) und gehen nie hinaus.
+  hinaus; die älteren bekommen `status: skipped`, `reason: missed` (`league_discord.skip`) und gehen nicht von selbst hinaus.
+  **Nr. 243:** `problems` zeigt sie als leisen Hinweis (`status: skipped`, eigener Abschnitt „Verworfene Spieltage“); `release` nimmt sie
+  an und sendet sie genau einmal (Protokoll wie gehabt, Doppelklick 409).
+- **Nr. 242 (24.11.): Eine Freigabe geht vor.** `skip` nimmt freigegebene Einträge aus (`released_at`), und `matchday_posts` sendet
+  freigegebene Spieltage neben dem neuesten neuen - nie werden sie verworfen. Das Ergebnis eines Versands schreibt `_send` nur auf
+  einen Eintrag, der noch `sending` ist; ein spät zurückkommender Versand überschreibt keine Freigabe.
 - Texte (`matchday_message`, `season_end_message`): kurz, deutsch, Markdown in Namen entschärft, lange Listen verlieren ganze Zeilen
   („… und x weitere“), nie einen halben Namen. Je Embed höchstens 6000 Zeichen (`EMBED_MAX`), sonst „… und N weitere Liga N auf der
   Season-Seite“. Discord nimmt 10 Felder je Embed: höchstens 9 Liga N plus das Feld „Weitere Ligen“ (`MAX_LEAGUE_FIELDS`).

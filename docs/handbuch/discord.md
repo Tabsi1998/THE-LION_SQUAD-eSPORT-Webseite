@@ -166,7 +166,8 @@ Erweitert → Entwicklermodus an → Rechtsklick auf den Kanal → „Kanal-ID k
 **öffentlichen** Kanälen (Community, News, Events und Turniere). Soll die Liga in einen eigenen Kanal melden, tragt ihn hier
 bei einem dieser Zwecke ein. Private Zwecke stehen der Liga nie zur Wahl (Nr. 234, [Liga, 2.7g](liga.md#27g-discord-meldungen)).
 Ist unklar, ob eine Liga-Meldung ankam, schickt die Website sie nie von selbst noch einmal; die Liga-Leitung sieht im Kanal nach
-und gibt sie mit **Noch einmal senden** frei (Nr. 239). Nach einem Ausfall kommt je Staffel nur der neueste Spieltag (Nr. 240).
+und gibt sie mit **Noch einmal senden** frei (Nr. 239). Nach einem Ausfall kommt je Staffel nur der neueste Spieltag (Nr. 240); verworfene stehen leise im Kasten und lassen sich ebenso
+nachholen (Nr. 243). Eine Freigabe geht dabei immer vor (Nr. 242).
 
 ### 2.5 Festlegen, was gemeldet wird
 

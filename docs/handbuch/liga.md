@@ -911,7 +911,13 @@ Unter den Erinnerungen steht im Reiter **Termine** der Kasten **Discord** (Zust�
   (spätestens nach 15 Minuten) schickt sie genau einmal – auch wenn zwei von euch gleichzeitig freigeben. Recht: „Season
   konfigurieren“; im Protokoll steht, wer wann freigegeben hat. Die Hinweise laden von selbst nach.
 - **Nach einem Ausfall** (Nr. 240): War der Bot länger aus oder der Kanal nicht freigegeben, kommt danach je Staffel nur der
-  **neueste** fertige Spieltag. Ältere, liegen gebliebene Spieltage werden verworfen und nie nachgeschickt.
+  **neueste** fertige Spieltag. Ältere, liegen gebliebene Spieltage werden verworfen und gehen nicht von selbst hinaus. Sie stehen
+  leise unter **Verworfene Spieltage** im Kasten; willst du einen doch melden, holst du ihn mit **Noch einmal senden** nach – genau
+  einmal (Nr. 243).
+- **Freigabe geht vor** (Nr. 242): Einen Spieltag, den du freigegeben hast, verwirft der Job nie – auch wenn im selben Lauf ein
+  neuerer Spieltag fertig wird. Beide gehen dann genau einmal hinaus.
+
+<img src="../assets/liga/liga-season-discord-verworfen-pc.png" alt="Kasten Discord: oben Meldungen, die du prüfen solltest, mit dem unklaren Saisonende; darunter leiser der Abschnitt Verworfene Spieltage mit drei Spieltagen, jeweils mit Noch einmal senden" width="820">
 - Die neue Season aus dem Vorgänger (3.11) übernimmt die Einstellung samt „an“ und Kanal (Nr. 236). Ist der Kanal dann nicht mehr
   freigegeben, geht nichts hinaus, bis du einen freigegebenen wählst.
 
@@ -1790,8 +1796,10 @@ gerade zeigt („Der TV zeigt Liga 2 (2 von 3)“). Recht: **Spiele betreuen** (
 öffentlichen Seasons; steigt niemand auf oder ab, gibt es nichts zu zeigen. Mehr in [TV & Beamer](tv.md). Die Saisonende-Meldung
 im Discord steht unter 2.7g.
 
-- **Zwei Fenster:** Hat jemand in einem anderen Fenster schon weitergeschaltet, springt **Weiter** nicht eine Liga N weiter, sondern
-  der Kasten lädt den aktuellen Stand und sagt es. Erst das nächste **Weiter** schaltet.
+- **Zwei Fenster:** Hat sich der Stand inzwischen geändert (ein anderes Fenster hat geschaltet, jemand hat **Ende** gedrückt oder eine
+  Staffel ist abgeschlossen), springt **Weiter** nicht eine Liga N weiter: Der Kasten lädt den aktuellen Stand und sagt „Der Stand
+  hat sich geändert – neu geladen.“ Erst das nächste **Weiter** schaltet. Der Kasten lädt auch von selbst nach.
+- **Ende gewinnt** (Nr. 244): Drücken zwei gleichzeitig **Ende** und **Weiter**, ist das Finale danach immer beendet.
 - **Wieder öffnen:** Öffnest du eine Staffel wieder, verschwindet der Schritt von allen TVs der Season. Nach dem erneuten Abschluss
   kommt er erst mit dem nächsten **Weiter** – nie ein alter Stand.
 - **Über Staffeln hinweg:** Steigt etwa der beste Zweite aus mehreren Staffeln auf (3.11), steht er am TV und im Discord mit.
