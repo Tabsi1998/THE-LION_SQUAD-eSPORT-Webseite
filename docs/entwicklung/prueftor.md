@@ -7,7 +7,10 @@ gibt es nur mit Begründung im PR-Text.
 [`scripts/ci-changed-areas.py`](../../scripts/ci-changed-areas.py) – also alles unter `frontend/` außer
 Markdown, Compose- und Env-Vorlagen sowie Änderungen an `.github/`. Markdown zählt sonst nur zur Linkprüfung;
 `frontend/PERFORMANCE_BUDGETS.md` ist die Ausnahme, weil das Tor seine Grenzen daraus liest
-(`PRUEFTOR_MARKDOWN`) – wer nur eine Grenze anhebt, läuft trotzdem durchs Tor. Die übrigen Listen des Tors
+(`PRUEFTOR_MARKDOWN`) – wer nur eine Grenze anhebt, läuft trotzdem durchs Tor. Dafür gibt es den eigenen Bereich
+`prueftor` (#2556): Er startet nur das Tor (und die Linkprüfung), nicht den ganzen Frontend-Bereich. Das Tor lässt
+dafür den Selbsttest der Grenzen (`check-bundle-budget.test.mjs`, sonst Teil von `check:bundle` im Job „Frontend“)
+vor der Bundle-Messung mitlaufen; ist er rot, fehlt die Messung, und das Tor ist rot. Die übrigen Listen des Tors
 (`motion-rules-allowlist.json`, `e2e/prueftor-bekannt.json`) liegen unter `frontend/` und zählen ohnehin dazu.
 
 ## Was geprüft wird
@@ -88,8 +91,24 @@ einer neuen Grenze die Zeile in `PERFORMANCE_BUDGETS.md`.
 
 Das Tor schreibt **einen** Kommentar (erkennbar an `<!-- prueftor:1660 -->`) und aktualisiert ihn bei jedem
 neuen Lauf. Er zeigt je Prüfung das Ergebnis, die Werte dieses PRs und die von `main`: Bundle in Bytes, LCP und CLS,
-Zahl der Bewegungs-Verstöße. Die Werte von `main` stammen aus dem letzten Lauf des Tors auf `main` (Artefakt
-`prueftor-main`, 90 Tage aufbewahrt). Dasselbe steht in der Zusammenfassung des Laufs.
+Zahl der Bewegungs-Verstöße. Dasselbe steht in der Zusammenfassung des Laufs.
+
+Die Werte von `main` stammen aus dem Artefakt **`prueftor-main`**. Es entsteht nur bei einem **Push auf `main`, der
+den Bereich `frontend` oder `prueftor` berührt** – also nach dem Merge eines PRs mit Frontend-Änderung; ein reiner
+Backend- oder Doku-Merge erzeugt keins. Jedes Artefakt läuft nach **90 Tagen** aus. Das Tor nimmt das jüngste noch
+gültige; gab es 90 Tage lang keinen Frontend-Merge, steht im Kommentar „Vergleich: noch kein Ergebnis von main“ – das
+Tor selbst hängt davon nicht ab, nur die Spalte `main` bleibt leer.
+
+Ausnahmen gelten nur für **echte Funde und gelockerte Grenzen**. Fehlt ein Teilbericht („nicht gelaufen“, etwa weil
+der Bau scheiterte) oder ist eine Spec-Datei aus [`e2e/prueftor-specs.js`](../../frontend/e2e/prueftor-specs.js) ganz
+übersprungen, bleibt die Prüfung rot – auch mit Ausnahmezeile (#2556). Dann hilft nur: Ursache beheben und neu starten.
+Je Spec-Datei muss mindestens ein Test bestanden sein, nicht nur je Prüfung.
+
+Bricht das Tor ab (Zeitlimit oder Abbruch), gibt es kein Ergebnis. Der Kommentar zeigt dann **„Ergebnis: nicht
+gelaufen“** mit dem aktuellen Stand statt des alten Ergebnisses mit alter SHA (#2556).
+
+Text aus dem PR und aus Spec-Titeln wird im Kommentar entschärft: keine Erwähnungen, kein HTML, keine Tabellenbrüche,
+keine Links und Bilder (eckige Klammern werden zu ［ ］, nackte Adressen werden nicht verlinkt).
 
 ## Aufbau in der CI
 
@@ -114,6 +133,15 @@ ausführt, hat nur Leserechte (`contents`, `pull-requests`, `actions`) und legt 
 kein Code aus dem PR, er postet nur das Markdown aus dem Ergebnis-Artefakt; Text aus dem PR (Begründungen) wird
 darin entschärft (keine Erwähnungen, kein HTML). Bei PRs aus Forks läuft der Kommentar-Job nicht (der Token hätte
 dort ohnehin kein Schreibrecht); das Ergebnis steht dann in der Zusammenfassung des Laufs.
+
+**Dependabot beobachten (#2556):** PRs von Dependabot laufen mit einem eigenen, standardmäßig nur lesenden Token. Das
+`permissions: pull-requests: write` des Kommentar-Jobs soll das anheben – geprüft ist das noch nicht. Beim **ersten
+Dependabot-PR fürs Frontend** (`.github/dependabot.yml`, npm in `/frontend`, wöchentlich) nachsehen:
+
+1. Läuft „Prüftor-Kommentar“ (die Dependabot-Zweige liegen im selben Repo, die Fork-Bedingung greift nicht)?
+2. Steht der Kommentar im PR? Wenn nicht, zeigt der Job-Log „Resource not accessible by integration“ (HTTP 403).
+3. Fehlt er: Das Tor selbst gilt trotzdem (es braucht kein Schreibrecht), das Ergebnis steht in der Zusammenfassung des
+   Laufs. Dann ein Issue anlegen, statt die Rechte des Tor-Jobs zu erweitern.
 
 ## Lokal
 

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
@@ -486,9 +486,31 @@ test("schlanke Ansicht: Titel, Termin, Spiel, freie Plätze und „Mitspielen“
   expect(screen.getByTestId("onsite-start")).toHaveTextContent("31");
   expect(screen.getByTestId("onsite-register-btn")).toHaveTextContent("Mitspielen");
   expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/registrations", expect.anything());
-  // Hinweise (#1166) zeigt nur die volle Ansicht - und der Server gibt sie dem Vor-Ort-Gast nicht (403, #2529).
-  expect(apiMock.get.mock.calls.map(([path]) => path)).not.toContain("/tournaments/t1/notices");
   expect(screen.queryByTestId("tournament-bracket-link")).toBeNull();
+});
+
+test("#2546: schlanke Ansicht zeigt die Hinweise der Turnierleitung als Banner über dem Titel", async () => {
+  const soon = new Date(Date.now() + 20 * 60000).toISOString();
+  mockApi(SLIM);
+  const plain = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation((path) => (path === "/tournaments/t1/notices"
+    ? Promise.resolve({ data: { items: [{ id: "n1", text: "Start verschiebt sich um 30 Minuten", created_at: new Date().toISOString(), expires_at: soon, target: "tournament", tv: false }] } })
+    : plain(path)));
+  renderPage();
+  const view = await screen.findByTestId("onsite-tournament-view");
+  const banner = await within(view).findByTestId("notice-banner");
+  expect(banner).toHaveTextContent("Hinweis der Turnierleitung");
+  expect(banner).toHaveTextContent("Start verschiebt sich um 30 Minuten");
+  // Über dem Titel - wer in der Halle scannt, sieht die Änderung zuerst.
+  expect(banner.compareDocumentPosition(screen.getByTestId("tournament-title")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("#2546: ohne Hinweis kein leerer Kasten in der schlanken Ansicht", async () => {
+  mockApi(SLIM);
+  renderPage();
+  await screen.findByTestId("onsite-tournament-view");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/notices"));
+  expect(screen.queryByTestId("notice-banner")).toBeNull();
 });
 
 test("schlanke Ansicht ohne Konto: „Mitspielen“ führt zu Login mit Rückweg ohne Code", async () => {

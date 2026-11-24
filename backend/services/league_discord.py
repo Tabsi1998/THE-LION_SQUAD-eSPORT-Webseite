@@ -155,18 +155,23 @@ def _esc(value) -> str:
     return escape_markdown(" ".join(str(value or "").split()))
 
 
+def discord_len(text) -> int:
+    """Länge wie Discord sie zählt (#2561 K5): in UTF-16 - 👑, 🔷 und 🔹 sind je zwei Zeichen."""
+    return len(str(text or "").encode("utf-16-le")) // 2
+
+
 def _fit(lines: list[str], limit: int, more: str) -> str:
     """Ganze Zeilen, bis das Feld voll ist - dann ein Satz, wie viele fehlen. Nie ein abgeschnittener Name."""
     out: list[str] = []
     used = 0
     for index, line in enumerate(lines):
         rest = len(lines) - index
-        tail = len(more.format(n=rest)) + 1 if rest > 1 else 0
-        if used + len(line) + 1 + tail > limit:
+        tail = discord_len(more.format(n=rest)) + 1 if rest > 1 else 0
+        if used + discord_len(line) + 1 + tail > limit:
             out.append(more.format(n=rest))
             break
         out.append(line)
-        used += len(line) + 1
+        used += discord_len(line) + 1
     return "\n".join(out)
 
 
@@ -211,13 +216,14 @@ def table_lines(rows: list[dict], limit: int) -> list[str]:
 def matchday_message(context: dict) -> dict:
     """Die Spieltag-Zusammenfassung: Titel, Text, Tabellenausschnitt, Link. ``context``: ``league``, ``season``, ``division``,
     ``staffel`` (nur bei mehreren Staffeln je Liga N), ``number``, ``matches`` (wie die Ligaseite), ``open``, ``table``, ``table_rows``, ``url``."""
-    head = " · ".join(part for part in (f"Spieltag {context['number']}", context.get("division"),
+    division = marked(context.get("division"), context.get("division_level")) if context.get("division") else None
+    head = " · ".join(part for part in (f"Spieltag {context['number']}", division,
                                          f"Staffel {context['staffel']}" if context.get("staffel") else None) if part)
     intro = " · ".join(_esc(part) for part in (context.get("league"), context.get("season")) if part)
     lines = [result_line(match) for match in context.get("matches") or []]
     opened = int(context.get("open") or 0)
     footer = open_text(opened) if opened else "Alle Spiele gewertet"
-    body = _fit(lines, DESCRIPTION_MAX - len(intro) - len(footer) - 4, "… und {n} weitere Spiele auf der Ligaseite")
+    body = _fit(lines, DESCRIPTION_MAX - discord_len(intro) - discord_len(footer) - 4, "… und {n} weitere Spiele auf der Ligaseite")
     fields = []
     rows = table_lines(context.get("table") or [], int(context.get("table_rows") or 0))
     if rows:
@@ -229,12 +235,30 @@ def matchday_message(context: dict) -> dict:
             "url": context.get("url"), "color": COLOR, "buttons": [{"label": "Zur Ligaseite", "url": context["url"]}] if context.get("url") else []}
 
 
+# Liga-Abzeichen in Discord (#2561): ein Bild bräuchte einen Bilder-Host - stattdessen ein kurzes, gleichbleibendes Zeichen je Stufe,
+# wie die Form des Wappens (lib/leagueBadge.badgeTier im Web): Liga 1 mit Krone, Liga 2, ab Liga 3 schlicht. Gold (Meister) nie hier.
+TIER_MARKS = {"top": "👑", "mid": "🔷", "base": "🔹"}
+
+
+def tier_mark(level) -> str:
+    """Das Zeichen der Stufe - leer ohne gültige Liga N."""
+    if isinstance(level, bool) or not isinstance(level, int) or level < 1:
+        return ""
+    return TIER_MARKS["top" if level == 1 else "mid" if level == 2 else "base"]
+
+
+def marked(label, level) -> str:
+    """„👑 Liga 1 · Elite“ - ohne Stufe der Text wie bisher."""
+    mark = tier_mark(level)
+    return f"{mark} {label}" if mark and label else str(label or "")
+
+
 def mover_line(row: dict) -> str:
     name = _esc(row.get("name") or "Team")
     staffel = f" (Staffel {row['staffel']})" if row.get("staffel") else ""
     if row.get("move") == "out":
         return f"{MOVE_SIGNS['out']} {name}{staffel} scheidet aus"
-    target = f" → {row['target']}" if row.get("target") else ""
+    target = f" → {marked(row['target'], (row.get('target_badge') or {}).get('level'))}" if row.get("target") else ""
     return f"{MOVE_SIGNS.get(row.get('move'), '')} {name}{staffel}{target}"
 
 
@@ -256,7 +280,7 @@ def season_end_message(context: dict) -> dict:
     fields = []
     rest = "Weitere Ligen"
     # Platz für den Hinweis auf weggefallene Liga N bleibt immer frei - der Rest geht an die Liga N der Reihe nach.
-    budget = EMBED_MAX - len(title) - len(description) - len(rest) - 60
+    budget = EMBED_MAX - discord_len(title) - discord_len(description) - discord_len(rest) - 60
     for index, page in enumerate(pages):
         # Höchstens 9 Liga N als Feld, wenn danach noch welche kommen - das zehnte Feld ist der Hinweis (K1).
         if index >= MAX_LEAGUE_FIELDS and len(pages) > MAX_LEAGUE_FIELDS + 1:
@@ -266,14 +290,15 @@ def season_end_message(context: dict) -> dict:
         lines = [mover_line(row) for row in page.get("rows") or []]
         if page.get("more"):
             lines.append(f"… und {page['more']} weitere auf der Season-Seite")
-        value = _fit(lines, min(FIELD_MAX, budget - len(page["label"])), "… und {n} weitere auf der Season-Seite")
-        if not value or len(page["label"]) + len(value) > budget:
+        name = marked(page["label"], page.get("level"))
+        value = _fit(lines, min(FIELD_MAX, budget - discord_len(name)), "… und {n} weitere auf der Season-Seite")
+        if not value or discord_len(name) + discord_len(value) > budget:
             left = len(pages) - index
             fields.append({"name": rest, "value": f"… und {left} weitere Liga N auf der Season-Seite" if left > 1
                            else "… und eine weitere Liga N auf der Season-Seite", "inline": False})
             break
-        fields.append({"name": page["label"], "value": value, "inline": False})
-        budget -= len(page["label"]) + len(value)
+        fields.append({"name": name, "value": value, "inline": False})
+        budget -= discord_len(name) + discord_len(value)
     if not fields:
         fields.append({"name": "Auf- und Abstieg", "value": "In dieser Season steigt niemand auf oder ab.", "inline": False})
     return {"title": title, "description": description, "fields": fields, "url": context.get("url"), "color": GOLD,
@@ -522,6 +547,7 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
             message = matchday_message({
                 "league": league.get("name"), "season": season.get("name"),
                 "division": division_label(division) if division.get("level") is not None else None,
+                "division_level": division.get("level"),
                 "staffel": context_ids.get("staffel") if per_division.get(context_ids.get("division_id"), 0) > 1 else None,
                 "number": number, "matches": [league_page.public_match(match, names) for match in games], "open": open_count,
                 "table": table or [], "table_rows": settings["table_rows"], "url": season_url(league, season, "/spieltage"),

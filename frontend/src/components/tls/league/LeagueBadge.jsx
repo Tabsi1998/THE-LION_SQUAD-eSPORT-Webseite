@@ -66,7 +66,8 @@ function Shield({ tier, id }) {
 }
 
 /**
- * Das Abzeichen. `badge`: `{level, nickname, champion}` vom Server. `size`: "list" (Zeilen), "card" (Karten, Tabellenkopf), "hero".
+ * Das Abzeichen. `badge`: `{level, nickname, champion}` vom Server. `size`: "list" (Zeilen), "card" (Karten, Tabellenkopf), "hero",
+ * "tv" (Saisonfinale am TV, #2561: die Breite setzt tv.css in em der umgebenden Schrift).
  * `label`: den Text „Liga N · Beiname“ daneben zeigen (sonst trägt das Wappen ihn als Bildbeschreibung). `play`: beim ersten
  * Sichtbarwerden einmal bewegen; `index` staffelt mehrere. `decorative`: Steht „Liga N · Beiname“ schon als Text daneben (Karte,
  * Tabellenkopf), schweigt das Wappen für Screenreader - sonst hörte man es doppelt (Review #1638).

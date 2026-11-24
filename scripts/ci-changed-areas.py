@@ -18,7 +18,9 @@ import argparse
 import subprocess
 import sys
 
-AREAS = ("backend", "frontend", "mobile", "container")
+# ``prueftor`` (#2556): nur der Job „Prüftor“. Jede Frontend-Änderung startet ihn ohnehin über ``frontend``; der eigene
+# Bereich gilt für Dateien, die nur das Tor liest.
+AREAS = ("backend", "frontend", "mobile", "container", "prueftor")
 
 BADGE_ART = "frontend/src/components/achievements/motifs/"
 BADGE_ART_FILES = {"frontend/src/components/achievements/badgeArt.jsx", "frontend/src/components/achievements/materials.js"}
@@ -29,6 +31,8 @@ AUDIT_GATE = {"scripts/dependency-audit-gate.cjs", "scripts/dependency-audit-gat
 
 # Markdown, aus dem das Prüftor Werte liest (Ziele und Grenzen, #1660). Seine übrigen Eingaben
 # (motion-rules-allowlist.json, e2e/prueftor-bekannt.json) liegen unter frontend/ und zählen ohnehin zum Frontend.
+# Die Grenzen liest sonst nur ``check:bundle`` (Selbsttest check-bundle-budget.test.mjs) - den lässt das Tor mitlaufen
+# (#2556), deshalb reicht hier der Bereich ``prueftor`` statt des ganzen Frontends.
 PRUEFTOR_MARKDOWN = {"frontend/PERFORMANCE_BUDGETS.md"}
 
 # Dateien, die keinen Job brauchen. Der Geheimnis-Scan läuft trotzdem.
@@ -43,7 +47,7 @@ def areas_for(path: str) -> set[str]:
         return set()
     # Markdown, das das Prüftor liest (#1660): Linkprüfung und Tor. Sonst ginge eine höhere Grenze ungeprüft durch.
     if path in PRUEFTOR_MARKDOWN:
-        return {"backend", "frontend"}
+        return {"backend", "prueftor"}
     if path.endswith(".md"):
         return {"backend"}  # Linkprüfung der Dokumentation
 

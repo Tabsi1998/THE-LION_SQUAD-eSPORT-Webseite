@@ -606,3 +606,17 @@ async def test_same_request_with_other_duration_or_tv_is_another_notice(flow):
     same = await send(flow, world["tournament"], "Pause bis 14:30", request_id=rid, duration_minutes=60, show_on_tv=False)
     assert same.json()["replay"] is True
     assert await flow.db.tournament_notices.count_documents({}) == 1
+
+
+@pytest.mark.asyncio
+async def test_lead_list_says_whether_onsite_guests_read_along(flow):
+    """#2546, Fabian 24.11. (F3): Ist der Vor-Ort-Zugang eingeschaltet, sagt das Formular, dass auch Gäste mit dem QR-Code
+    den Hinweis sehen. Die Leitungs-Ansicht nennt dafür nur an oder aus - nie den Code."""
+    tournament = await flow.create_tournament(status="live", event_mode="local")
+    flow.act_as(await flow.add_staff())
+    listed = (await flow.get(lead_url(tournament))).json()
+    assert listed["onsite_access"] is True, "vor Ort: Vorgabe an"
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"onsite_access_enabled": False}})
+    assert (await flow.get(lead_url(tournament))).json()["onsite_access"] is False
+    online = await flow.create_tournament(status="live", event_mode="online")
+    assert (await flow.get(lead_url(online))).json()["onsite_access"] is False, "online: Vorgabe aus"

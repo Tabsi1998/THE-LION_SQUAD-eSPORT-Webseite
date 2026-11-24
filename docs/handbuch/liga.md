@@ -891,6 +891,10 @@ Unter den Erinnerungen steht im Reiter **Termine** der Kasten **Discord** (Zust�
 | **Spieltag-Zusammenfassung** | je Staffel, sobald alle Spiele des Spieltags gewertet oder abgesagt sind. Fehlen Ergebnisse, wartet sie bis **Warten auf Ergebnisse (Stunden nach Ende der Spielwoche)** (Vorgabe 48 Stunden) nach dem Ende der Spielwoche und kommt dann mit „x Spiele offen“ – außer **Nach der Wartezeit trotzdem melden** ist aus | Liga, Season, Liga N (bei mehreren Staffeln mit Staffel), jedes Spiel mit Ergebnis, kampflos, abgesagt oder offen, darunter der **Tabellenausschnitt** (Vorgabe 5 Plätze, 0 = ohne Tabelle) und der Knopf **Zur Ligaseite** |
 | **Saisonende-Meldung** | einmal, sobald alle Staffeln abgeschlossen sind (3.10) | Meister, je Liga N die Auf- und Absteiger mit Ziel-Liga (auch über Staffeln hinweg, etwa der beste Zweite), Knopf **Zur Season**. Sehr viele Ligen: Was nicht mehr in die Meldung passt, steht als „… und N weitere Liga N auf der Season-Seite“ |
 
+**Kennzeichnung je Stufe** (#2561): Discord zeigt kein Wappen (dafür bräuchte es einen Bilder-Host). Vor „Liga N“ steht deshalb
+ein festes Zeichen, das zur Form des Abzeichens passt – **👑** Liga 1, **🔷** Liga 2, **🔹** ab Liga 3. Es steht im Titel der
+Spieltag-Zusammenfassung, vor jeder Liga N der Saisonende-Meldung und vor der Ziel-Liga („▲ Team → 👑 Liga 1 · Elite“).
+
 - **Kanal nur aus der freigegebenen Liste:** einer für beide Meldungen. Zur Wahl stehen nur die öffentlichen Kanäle, die unter
   **Verbindungen → Discord → Reiter „Meldungen“ → Kanäle je Zweck** eingetragen sind (Community, News, Events und Turniere), je mit
   ihrem Zweck – nie ein privater Kanal (Vorstand, Betrieb, Test, Mitglieder) und keine frei eingetippte Kanal-ID. Ist noch keiner
@@ -1803,6 +1807,9 @@ im Discord steht unter 2.7g.
 - **Wieder öffnen:** Öffnest du eine Staffel wieder, verschwindet der Schritt von allen TVs der Season. Nach dem erneuten Abschluss
   kommt er erst mit dem nächsten **Weiter** – nie ein alter Stand.
 - **Über Staffeln hinweg:** Steigt etwa der beste Zweite aus mehreren Staffeln auf (3.11), steht er am TV und im Discord mit.
+- **Liga-Abzeichen** (#2561): Am TV steht das Wappen der Liga N im Titel vor „Liga N“ und in jeder Zeile vor der Ziel-Liga – Liga 1
+  mit Krone, Liga 2 mit doppeltem Rand, ab Liga 3 schlicht, wie auf Profil und Teamseite. Im Discord steht stattdessen ein
+  Zeichen je Stufe (siehe 2.7g).
 - **Staffel schließt während des Finales ab** (Nr. 241): Ihr TV zeigt sofort dieselbe Liga N wie die anderen TVs, und die neue
   Liga N kommt in die Reihenfolge. Kein TV springt dabei auf eine andere Liga N.
 

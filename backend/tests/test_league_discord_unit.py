@@ -208,3 +208,63 @@ def test_text_unit_season_end_at_most_nine_leagues_then_the_rest_line():
     assert message["fields"][9] == {"name": "Weitere Ligen", "value": "… und 6 weitere Liga N auf der Season-Seite", "inline": False}
     ten = digest.season_end_message({"league": "Probe-Liga", "season": "Season 1", "champions": [], "pages": pages[:10], "url": None})
     assert len(ten["fields"]) == 10 and ten["fields"][9]["name"] == "Liga 10"
+
+
+# ---------------------------------------------------------------- Kennzeichnung je Stufe (#2561)
+
+def test_text_unit_tier_mark_is_short_and_the_same_per_tier():
+    """Discord kennt kein Wappen ohne Bilder-Host - stattdessen ein Zeichen je Stufe wie die Form des Abzeichens: Liga 1 mit
+    Krone, Liga 2, ab Liga 3 schlicht. Ohne Stufe nichts."""
+    assert digest.tier_mark(1) == "👑"
+    assert digest.tier_mark(2) == "🔷"
+    assert digest.tier_mark(3) == digest.tier_mark(4) == digest.tier_mark(12) == "🔹"
+    assert digest.tier_mark(None) == digest.tier_mark(0) == digest.tier_mark("x") == ""
+    assert len({digest.tier_mark(1), digest.tier_mark(2), digest.tier_mark(3)}) == 3
+
+
+def test_text_unit_season_end_marks_field_names_and_targets():
+    pages = [{"label": "Liga 1 · Elite", "level": 1, "more": 0,
+              "rows": [{"name": "Probe Süd", "move": "down", "target": "Liga 2", "target_badge": {"level": 2}, "staffel": None}]},
+             {"label": "Liga 3", "level": 3, "more": 0,
+              "rows": [{"name": "Probe Auf", "move": "up", "target": "Liga 2", "target_badge": {"level": 2}, "staffel": None},
+                       {"name": "Probe Raus", "move": "out", "target": None, "target_badge": None, "staffel": None}]}]
+    message = digest.season_end_message({"league": "Probe-Liga", "season": "Season 1", "champions": [], "pages": pages, "url": None})
+    assert [field["name"] for field in message["fields"]] == ["👑 Liga 1 · Elite", "🔹 Liga 3"]
+    assert message["fields"][0]["value"] == "▼ Probe Süd → 🔷 Liga 2"
+    assert message["fields"][1]["value"].splitlines() == ["▲ Probe Auf → 🔷 Liga 2", "✕ Probe Raus scheidet aus"]
+
+
+def test_text_unit_matchday_title_marks_the_tier():
+    message = digest.matchday_message(context(division_level=1))
+    assert message["title"] == "Spieltag 3 · 👑 Liga 1"
+
+
+# ---------------------------------------------------------------- Längen wie Discord (#2561 K5)
+
+def utf16(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def test_text_unit_lengths_count_like_discord():
+    """Discord zählt in UTF-16: 👑, 🔷 und 🔹 sind je zwei Zeichen."""
+    assert digest.discord_len("👑 Liga 1") == 9
+    assert digest.discord_len("Liga 1") == 6
+    lines = ["👑" * 10] * 5
+    out = digest._fit(lines, 45, "… und {n} weitere")
+    assert utf16(out) <= 45
+
+
+def test_text_unit_season_end_with_tier_marks_stays_under_6000_utf16():
+    """Der 6000-Zeichen-Test mit den Stufen-Zeichen: Feldnamen und jede Ziel-Liga tragen eins."""
+    name = "Probe-Mannschaft mit einem wirklich sehr langen Namen"
+    pages = [{"label": f"Liga {level}", "level": level, "more": 0,
+              "rows": [{"name": f"{name} {level}-{i}", "move": "down", "target": f"Liga {level + 1}", "target_badge": {"level": level + 1},
+                        "staffel": "A"} for i in range(30)]}
+             for level in range(1, 21)]
+    message = digest.season_end_message({"league": "Probe-Liga", "season": "Season 1", "champions": [{"name": "Probe Nord", "staffel": None}],
+                                         "pages": pages, "url": "/liga/probe-liga/season-1"})
+    total = utf16(message["title"]) + utf16(message["description"]) + sum(utf16(f["name"]) + utf16(f["value"]) for f in message["fields"])
+    assert total <= 6000
+    assert all(utf16(f["value"]) <= 1024 and utf16(f["name"]) <= 256 for f in message["fields"])
+    assert message["fields"][0]["name"] == "👑 Liga 1"
+    assert message["fields"][-1]["name"] == "Weitere Ligen"

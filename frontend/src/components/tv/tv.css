@@ -1161,6 +1161,16 @@
 }
 .tv-finale__row[data-move="out"] .tv-finale__target { border-color: var(--tv-line-strong); color: var(--tv-muted); }
 .tv-finale__arrow { width: 1em; height: 1em; }
+/* Liga-Abzeichen (#2561, LeagueBadge size="tv"): Größe in em der Schrift, in der es steht - groß genug, dass Krone und doppelter
+   Rand aus der Distanz als Form zu erkennen sind. Im Titel 1 em breit (1,25 em hoch, der Titel misst die Fläche ohnehin nach), im
+   Ziel-Chip 1,1 em (lib/tvFinale TARGET_BADGE_EM - die Messung rechnet Breite und Höhe mit). Kein Abstand eigener Art: der Chip hat
+   seinen gap. Bewegung: Im Titel setzt sich das Wappen mit den Spaltenköpfen leise auf (Deckkraft, kaum Skalierung), im Chip fährt
+   es mit dem Chip. „Bewegung aus“ (Regel für .tv-screen) zeigt es sofort. */
+.tls-lbadge--tv { gap: 0; }
+.tv-finale__title .tls-lbadge--tv { --tls-lbadge-w: 1em; margin-right: 0.3em; vertical-align: -0.2em; }
+.tv-finale__target .tls-lbadge--tv { --tls-lbadge-w: 1.1em; }
+.tv-finale__badge .tls-lbadge__art { animation: tv-finale-badge var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-head-at, 0s) both; }
+@keyframes tv-finale-badge { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 0.6 * var(--tls-motion-on, 1))) scale(calc(1 - 0.06 * var(--tls-motion-on, 1))); } }
 /* „und N weitere“ in der eigenen Spalte, unter der letzten Zeile - hebt sich, wenn diese steht. */
 .tv-finale__more { margin: 0; padding-left: calc(var(--tv-u) * 2.4); color: var(--tv-muted); font-weight: 700;
   animation: tv-rise var(--tls-motion-slow) var(--tls-ease) var(--tv-finale-at, 0s) both; }

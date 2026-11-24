@@ -437,6 +437,9 @@ async def lead_list(db, tournament: dict, me: dict) -> dict:
             "from_other_tournament": row.get("tournament_id") != tournament["id"],
             "can_remove": row.get("target") != "event" or event_ok,
         })
-    return {"items": items, "can_target_event": event_ok, "event_id": tournament.get("event_id"),
+    from services.onsite_access import is_enabled
+
+    # Vor-Ort-Zugang (#2546, Fabian 24.11.): eingeschaltet, dann lesen auch Gäste mit dem QR-Code den Hinweis - nur an oder aus.
+    return {"items": items, "can_target_event": event_ok, "event_id": tournament.get("event_id"), "onsite_access": is_enabled(tournament),
             "limits": {"text_max": TEXT_MAX, "duration_default": DURATION_DEFAULT, "duration_min": DURATION_MIN,
                        "duration_max": DURATION_MAX}}

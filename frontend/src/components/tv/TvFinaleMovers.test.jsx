@@ -91,3 +91,32 @@ test("Nr. 238: genau acht kurze Zeilen ohne Rest - alle acht, kein Hinweis; acht
   expect(up.length).toBeLessThan(8);
   expect(screen.getByTestId("tv-finale-more-up")).toHaveTextContent(`und ${8 - up.length} weitere`);
 });
+
+test("#2561: Liga-Abzeichen in TV-Größe neben „Liga N“ und neben der Ziel-Liga - Zierde, der Text bleibt", () => {
+  const page = {
+    ...PAGE, label: "Liga 2 · Aufbau", badge: { level: 2, nickname: "Aufbau", champion: false },
+    rows: PAGE.rows.map((row) => ({ ...row, target_badge: row.move === "up" ? { level: 1, nickname: null, champion: false }
+      : row.move === "down" ? { level: 3, nickname: null, champion: false } : null })),
+  };
+  render(<TvFinaleMovers page={page} />);
+  const title = screen.getByTestId("tv-finale-title");
+  const badge = screen.getByTestId("tv-finale-badge");
+  expect(title).toContainElement(badge);
+  expect(badge).toHaveAttribute("data-tier", "mid");
+  expect(badge).toHaveAttribute("aria-hidden", "true");
+  // Keine eigene Erst-Sicht-Bewegung: das Abzeichen läuft in der Choreografie des Finales mit (tv.css).
+  expect(badge).toHaveAttribute("data-play", "done");
+  expect(title).toHaveTextContent("Liga 2 · Aufbau Auf- und Absteiger");
+  const up = screen.getByTestId("tv-finale-target-badge-b");
+  expect(screen.getByTestId("tv-finale-target-b")).toContainElement(up);
+  expect(up).toHaveAttribute("data-tier", "top");
+  expect(screen.getByTestId("tv-finale-target-badge-c")).toHaveAttribute("data-tier", "base");
+  expect(screen.queryByTestId("tv-finale-target-badge-e")).toBeNull();
+  expect(screen.getByTestId("tv-finale-target-b")).toHaveTextContent("Liga 1");
+});
+
+test("#2561: ohne Abzeichen vom Server (älterer Stand) kein leerer Platz", () => {
+  render(<TvFinaleMovers page={PAGE} />);
+  expect(screen.queryByTestId("tv-finale-badge")).toBeNull();
+  expect(screen.queryByTestId("tv-finale-target-badge-b")).toBeNull();
+});

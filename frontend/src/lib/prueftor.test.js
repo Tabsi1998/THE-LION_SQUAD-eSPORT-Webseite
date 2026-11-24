@@ -125,6 +125,62 @@ describe("Prüftor: Auswertung", () => {
   });
 });
 
+describe("Prüftor: Feinschliff (#2556)", () => {
+  const ALL_EXCEPTIONS = CHECKS.map((check) => `Prüftor-Ausnahme ${check.id}: Bitte trotzdem durchlassen, es eilt sehr.`).join("\n");
+
+  it("Punkt 1: fehlende Berichte sind nicht ausnahmefähig - fünf Ausnahmezeilen machen ein leeres Tor nicht grün", () => {
+    const result = evaluate({ prText: ALL_EXCEPTIONS });
+    expect(result.ok).toBe(false);
+    expect(result.blocking).toEqual(["a11y", "kontrast", "bundle", "ladezeit", "bewegung"]);
+    expect(CHECKS.map((check) => result.checks[check.id].status)).toEqual(["rot", "rot", "rot", "rot", "rot"]);
+    expect(result.checks.bundle.details.join(" ")).toContain("Ausnahme gilt nicht");
+  });
+
+  it("Punkt 1: je fehlendem Teil - eine fehlende Bundle-Messung bleibt rot, ein echter Fund wird zur Ausnahme", () => {
+    const missingBundle = evaluate({ ...GOOD, bundle: null, prText: "Prüftor-Ausnahme bundle: Kalender gehört bewusst in den Start (#9999)." });
+    expect(missingBundle.checks.bundle.status).toBe("rot");
+    const missingPalette = evaluate({ ...GOOD, kontrast: null, prText: "Prüftor-Ausnahme kontrast: Gold auf Weiß ist Markenfarbe (#9999)." });
+    expect(missingPalette.checks.kontrast.status).toBe("rot");
+    const missingLoad = evaluate({ ...GOOD, ladezeit: null, prText: "Prüftor-Ausnahme ladezeit: Messung wackelt auf dem Runner (#9999)." });
+    expect(missingLoad.checks.ladezeit.status).toBe("rot");
+    const missingMotion = evaluate({ ...GOOD, bewegung: null, prText: "Prüftor-Ausnahme bewegung: Ticker läuft bewusst mit 1,2 s (#9999)." });
+    expect(missingMotion.checks.bewegung.status).toBe("rot");
+    const realFinding = evaluate({ ...GOOD, bundle: { ...GOOD.bundle, ok: false, failures: ["1 Byte zu viel"] }, prText: "Prüftor-Ausnahme bundle: Kalender gehört bewusst in den Start (#9999)." });
+    expect(realFinding.checks.bundle.status).toBe("ausnahme");
+    const loosened = evaluate({ ...GOOD, raised: [{ key: "startup-js-gzip", before: 1, after: 2 }], prText: "Prüftor-Ausnahme bundle: Grenze nach Messung neu gesetzt (#1234)." });
+    expect(loosened.checks.bundle.status).toBe("ausnahme");
+  });
+
+  it("Punkt 2: je Spec-Datei aus PRUEFTOR_SPECS mindestens ein bestandener Test", () => {
+    // Kontrast hat noch einen Test in a11y-pages.spec.js - hier geht es nur um die übersprungene Datei.
+    const skipped = [...GOOD.tests, passing("a11y-pages.spec.js", "Turnier: Kontrast (axe) bei 390 und 1440 px")]
+      .map((test) => (test.file === "prueftor-a11y.spec.js" ? { ...test, status: "skipped" } : test));
+    const result = evaluate({ ...GOOD, tests: skipped });
+    expect(result.blocking).toEqual(["a11y"]);
+    expect(result.checks.a11y.details.join(" ")).toContain("prueftor-a11y.spec.js");
+    // Eine ganz fehlende Datei zählt genauso.
+    const without = evaluate({ ...GOOD, tests: GOOD.tests.filter((test) => test.file !== "no-layout-jump.spec.js") });
+    expect(without.blocking).toEqual(["ladezeit"]);
+    // Nicht gelaufen ist kein Fund: auch mit Ausnahme rot.
+    const excused = evaluate({ ...GOOD, tests: skipped, prText: "Prüftor-Ausnahme a11y: Spec absichtlich ausgeschaltet (#9999)." });
+    expect(excused.checks.a11y.status).toBe("rot");
+  });
+
+  it("Punkt 4: safeText entschärft Markdown-Links und -Bilder", () => {
+    const text = safeText("Siehe [hier](https://boese.example/x) und ![Bild](https://boese.example/p.png)");
+    expect(text).not.toContain("](");
+    expect(text).not.toContain("![");
+    expect(text).not.toContain("https://");
+    expect(text).toContain("Siehe ［hier］(https:/");
+    // Ein eigener Backslash davor hilft nicht: es gibt keine Klammer mehr, die er schützen könnte.
+    expect(safeText("\\[x](y)")).not.toContain("[");
+    // Nackte Adressen werden nicht zum Link (GitHub verlinkt „https://…“ und „www.…“ von selbst).
+    expect(safeText("www.boese.example")).not.toContain("www.");
+    const comment = renderComment(evaluate({ ...GOOD, kontrast: { ok: false, total: 35, failed: ["x"] }, prText: "Prüftor-Ausnahme kontrast: [klick mich](https://boese.example) ist Markenfarbe" }));
+    expect(comment).not.toContain("[klick mich](");
+  });
+});
+
 describe("Prüftor: Kommentar", () => {
   it("trägt die Marke zum Wiederfinden, die Tabelle und den Vergleich mit main", () => {
     const base = { sha: "abcdef1234567", date: "2026-11-20", checks: { bundle: { metrics: { jsGzip: 286000, cssGzip: 58000 } }, ladezeit: { metrics: { lcpMs: 1700, cls: 0.002 } }, bewegung: { metrics: { funde: 950 } } } };

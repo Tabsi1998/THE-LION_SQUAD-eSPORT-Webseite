@@ -14,6 +14,7 @@ const POSTS = [
   { id: "n-4", slug: "alt", title: "Rückblick Sommerturnier", category: "recap", visibility: "public", published: true, published_at: NOW, can_delete: false },
 ];
 const PLAY = "https://play.google.com/store/apps/details?id=at.lionsquad.app";
+const SHOTS = process.env.SHOT_DIR || "";
 
 async function mockApi(page, state, { user = EDITOR } = {}) {
   await page.addInitScript(() => {
@@ -38,7 +39,11 @@ async function mockApi(page, state, { user = EDITOR } = {}) {
     if (url.pathname === "/api/settings/public") return json({ club_name: "THE LION SQUAD", domain: "lionsquad.at", play_store_url: PLAY });
     if (url.pathname === "/api/news-meta") return json({ categories: [{ k: "club", l: "Verein" }, { k: "announcement", l: "Ankündigung" }, { k: "recap", l: "Rückblick" }], visibilities: [{ k: "public", l: "Öffentlich" }, { k: "members", l: "Nur Vereinsmitglieder" }], in_use: [] });
     if (url.pathname === "/api/settings/newsletter/audience") return json({ kind: "news", visibility: "public", internal: false, recipients: 214, announcement: "" });
+    // Ein schon veröffentlichter Beitrag: der Newsletter ging hinaus (wie auf dem echten Stand).
+    if (url.pathname === "/api/settings/newsletter/state") return json({ kind: "news", source_id: url.searchParams.get("id"), state: "sent", recipients: 214, sent_at: NOW, sent_count: 214, can_send: false, can_resend: false, announcement: "Keine eigene Meldung – öffentliche Beiträge gehen über Newsletter und Discord." });
     if (url.pathname === "/api/admin/news") return json(POSTS);
+    const own = POSTS.find((post) => url.pathname === `/api/admin/news/${post.id}`);
+    if (own) return json(own);
     if (url.pathname === "/api/news/app-update") return json({ detail: { code: "app_only", message: "Diese Nachricht gibt es nur in der LionsAPP. Öffne sie in der App." } }, 404);
     if (url.pathname === "/api/home/about") return json({ games: [] });
     const list = /notifications|games$|site-banners|sponsors|partners|tournaments|challenges|events|news$|users/.test(url.pathname);
@@ -85,6 +90,22 @@ for (const [label, width, height] of WIDTHS) {
       await expect(dialog).toContainText("Keine Meldung auf Discord.");
       await page.getByTestId("confirm-dialog-confirm").click();
       await expect.poll(() => state.created?.channels).toEqual(["app"]);
+    });
+
+    test("#2553: schon veröffentlicht und jetzt auf „Nur App“ - die Box kündigt keinen Push an", async ({ page }) => {
+      await mockApi(page, {});
+      await page.goto("/admin/news/n-1");
+      const select = page.getByTestId("news-channels");
+      await expect(select).toHaveValue("both");
+      await expect(page.getByTestId("distribute-app-push")).toHaveCount(0);
+      await select.selectOption("app");
+      await page.getByTestId("distribute-toggle").evaluate((node) => node.getAttribute("aria-expanded") === "false" && node.click());
+      const line = page.getByTestId("distribute-app-push");
+      await expect(line).toHaveText("Kein App-Push – der Beitrag ist schon öffentlich. Wird er auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.");
+      const row = page.getByTestId("distribute-app-push-row");
+      await row.scrollIntoViewIfNeeded();
+      await noSideScroll(page);
+      if (SHOTS) await page.getByTestId("distribute-box").screenshot({ path: `${SHOTS}/verteilen-box-schon-oeffentlich-${width}.png` });
     });
 
     test("Liste: Schild „Nur App“ und „Nur Website“, keins bei beidem und bei alten Beiträgen", async ({ page }, testInfo) => {
