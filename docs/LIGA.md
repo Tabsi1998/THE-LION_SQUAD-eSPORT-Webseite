@@ -4390,10 +4390,10 @@ Alle Felder optional; ohne Feld bleibt alles wie heute.
 | | `outcome` | nur Relegation: `{<squad_id>: "up" \| "down" \| "stay"}` | - |
 | | `rows[].playoff` | an der Fassung einer **regulären** Staffel: `true` für die qualifizierten Teams (eigenes Kennzeichen neben `zone`, weil ein Team in einer unteren Liga N zugleich Aufsteiger und Playoff-Teilnehmer sein kann) | nicht qualifiziert |
 | `tournament_registrations` (Playoff- und Relegations-Staffel) | `seed`, `postseason` | Setzplatz und Herkunft `{from_tournament_id, from_registration_id, from_staffel, rank}` | - |
-| `tournaments.veto_rules` (Playoff-Staffel) | `by_best_of` | `{<best_of>: {team_a, step_seconds, steps}}` - eine Vorlage je vorkommendem Best of (Nr. 207), ohne Schritt `preset` | die eine Vorlage der Staffel wie heute |
+| `tournaments` (Playoff-Staffel) | `veto_by_best_of` | `{<best_of>: {enabled, team_a, step_seconds, steps}}` - eine Vorlage je vorkommendem Best of (Nr. 207), ohne Schritt `preset`. Eigenes Feld neben `veto_rules` (das trägt die Vorlage des Haupt-Best-of): `league_veto_rules.normalize` nimmt in `veto_rules` kein fremdes Feld an und schaltete das Veto sonst aus | die eine Vorlage der Staffel wie heute |
 | `matches_v2` (Playoff-Staffel) | `no_show_retry` | `{at, by, previous_at}`: einmal neu angesetzt nach „beide nicht erschienen“ (Nr. 217) | noch nicht neu angesetzt |
 | | `double_forfeit_sides` | die beiden Anmeldungen, die nach dem zweiten „beide nicht erschienen“ ausgeschieden sind - ihre Plätze im Spiel sind dann Freilose, der Endstand liest hier, in welcher Runde sie ausschieden | - |
-| | `postseason` | `{home: "better_seed", seeds: {<registration_id>: <Setzplatz>}}` - daraus liest `matchday_schedule.duel_sides` Heimteam und Team A in jeder Runde (Nr. 209) | Heim ist der obere Platz im Baum |
+| | `postseason` | `{kind, home?, seeds?}`: die Art an jedem Spiel (`playoff` \| `relegation`); bei Heimrecht des besser Gesetzten dazu `home: "better_seed"` und `seeds: {<registration_id>: <Setzplatz>}` - daraus liest `matchday_schedule.duel_sides` Heimteam und Team A in jeder Runde (Nr. 209) | Heim ist der obere Platz im Baum |
 | | `best_of` | das Best of der Runde, wenn es vom Best of der Staffel abweicht (Nr. 207) | Best of der Staffel |
 | `leagues.overall` | `playoff_points` | Zusatzpunkte je Playoff-Platz `[Platz 1, Platz 2, …]` (höchstens 32 Einträge, je 0-999 - Vertragsvorgabe, siehe unter den Einstellungen) | keine Zusatzpunkte |
 
@@ -4426,13 +4426,14 @@ Speichern gegen die eingestellten Zonen und die Zahl der Staffeln, in der Vorsch
 Staffel-Art lässt sich nicht von Hand setzen (`TournamentUpdate` nimmt `league_context` weiter nicht an).
 
 **Blatt-Bausteine in `league_scope.py`:** `staffel_kind(t)` (`None` \| `"playoff"` \| `"relegation"`), der Mongo-Filter `REGULAR_ONLY`
-(`{"league_context.kind": None}` trifft „fehlt“) und `staffel_label(t)` („Staffel A“, „Playoffs“, „Relegation“). Jede Stelle, die heute
+(`{"league_context.kind": None}` trifft „fehlt“), `staffel_label(t)` („Staffel A“, „Playoffs“, „Relegation“) und `context_label(context)`
+für Stellen, die nur den `league_context` in der Hand haben. Jede Stelle, die heute
 „Staffel X“ selbst baut, liest `staffel_label()`; der Server liefert das fertige Wort mit, damit alte App-Builds nichts Falsches bauen.
 
 #### Setzliste aus dem Endstand
 
-Blatt-Modul `services/postseason_seeding.py` (Arbeitsname), rein rechnend, ohne Datenbank - damit #1559 (Gruppen → K.-o. im Turnier)
-denselben Baustein benutzt und er nicht zweimal entsteht.
+Blatt-Modul `services/postseason_seeding.py`, rein rechnend, ohne Datenbank - damit #1559 (Gruppen → K.-o. im Turnier)
+denselben Baustein benutzt und er nicht zweimal entsteht. Verglichen wird mit `league_cross_rank.ranked`, hier steht keine zweite Rechnung.
 
 1. **Eingabe:** die geltenden Fassungen (`league_final_tables`, `active`, ohne `kind`) aller regulären Staffeln einer Liga N, `per_staffel`,
    Setzungsart. Ist eine reguläre Staffel dieser Liga N nicht abgeschlossen, gibt es keine Setzliste (Voraussetzung in der Vorschau).
@@ -4470,7 +4471,7 @@ Obere spielt gegen den schlechtesten Unteren, der zweitbeste Obere gegen den zwe
 | `POST …/postseason/playoffs` bzw. `…/postseason/relegation` mit `{division_id, stamp, confirm}` | `season`, nicht befangen | legt die Staffel an. Veralteter `stamp` → 409; ohne `confirm` 422; zweiter Aufruf antwortet mit der vorhandenen Staffel (einmalig je Liga N durch den eindeutigen Index `league_staffel`) |
 | `POST …/postseason/{tid}/reseed` mit `{stamp, confirm, reason}` | `season`, nicht befangen | Setzliste neu aus dem geltenden Endstand - nach einer Korrektur oder wenn ein Team ausgeschieden ist (Nachrücken, Nr. 217). Nur solange kein Playoff-Spiel gespielt ist (kampflos nach einem Austritt zählt nicht), sonst 409. Die Reihenfolge der Staffeln bleibt, solange dieselben Staffelsieger gleich stehen; sonst wird mit Grund neu gelost (Nr. 225) |
 | `PUT /api/admin/leagues/seasons/{id}/postseason`, `PUT /api/admin/leagues/divisions/{id}/postseason` | `season` | die Einstellungen der Season bzw. die Abweichung einer Liga N (leerer Körper `{}`: wie die Season). 422 mit Klartext, 409 bei der Sperre nach Nr. 228 |
-| `GET /api/leagues/{liga}/{season}/postseason` | öffentlich, nur bei sichtbarer Season | je Liga N die Playoff- und die Relegations-Staffel mit Baum bzw. Paarungen und Ergebnis - nur was angelegt ist und was die Person auch als Turnier sähe |
+| `GET /api/leagues/{liga}/{season}` (vorhanden) | öffentlich, nur bei sichtbarer Season | je Liga N neu `postseason`: die Playoff- und die Relegations-Staffel (`tournament_id`, `slug`, `kind`, `label`, `closed`) - nur was angelegt ist und was die Person auch als Turnier sähe. `staffeln` trägt weiter nur die Tabellen. Den Baum liefert die vorhandene Turnier-Antwort `GET /api/tournaments/{id}/bracket`. Dieselbe Trennung in der Verwaltung (`GET /api/admin/leagues/seasons/{id}`) |
 
 #### Ablauf
 

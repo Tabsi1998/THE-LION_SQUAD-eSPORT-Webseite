@@ -1808,6 +1808,107 @@ im Discord steht unter 2.7g.
 
 <img src="../assets/liga/liga-season-tv-finale-pc.png" alt="Kasten Saisonfinale am TV im Reiter Abschluss: Der TV zeigt Liga 1 (1 von 3), Hinweis, dass ein anderes Fenster schon weitergeschaltet hat, Knöpfe Weiter und Ende" width="820">
 
+### 3.10a Playoffs und Relegation
+
+**Wo:** **Admin → Ligen → Season → Reiter Abschluss**, Abschnitt **Playoffs und Relegation**. Recht: **Season konfigurieren**;
+lesen darf jede Zuständigkeit der Liga. Ohne Einstellung gibt es beides nicht: Meister wird der Erste der Tabelle, Relegationsplätze
+sind nur farbig, alles ist wie bisher.
+
+Playoffs und Relegation sind **eigene Staffeln** der Liga: ein K.-o.-Baum statt einer Tabelle. Sie entstehen aus dem **Endstand**
+der regulären Staffeln und ändern ihn nie.
+
+**1. Einstellen – vor dem Season-Start.** Knopf **Einstellen** öffnet die Vorlage der Season. Jede Liga kann abweichen
+(**Abweichen** an der Liga) – ohne Haken gilt, was die Season vorgibt.
+
+<img src="../assets/liga/playoffs-einstellungen-pc.png" alt="Fenster Playoffs und Relegation: Playoffs spielen mit vier Plätzen je Staffel, Best of 3, Heimrecht für den besser Gesetzten, Best of 5 für Runde 3, Relegation spielen, Meister aus den Playoffs" width="720">
+
+| Einstellung | Was sie bewirkt | Vorgabe |
+| --- | --- | --- |
+| Playoffs spielen | die besten Teams jeder Staffel spielen nach der regulären Season einen K.-o.-Baum | aus |
+| Plätze je Staffel | so viele Teams **jeder** Staffel kommen hinein (1 bis 16). Ausgeschiedene nie – der Nächste rückt nach | – |
+| Best of | für alle Runden | wie in der Season |
+| Best of je Runde | nur für Runden, die abweichen (Runde 1 ist die erste Runde des Baums). Das Spiel um Platz 3 folgt dem Finale | keine |
+| Heimrecht und Team A im Veto | der besser Gesetzte in jeder Runde – oder Los je Spiel | besser Gesetzter |
+| Spiel um Platz 3 | ohne das Spiel teilen sich beide Halbfinal-Verlierer Platz 3 | aus |
+| Start der Playoffs | leer: die erste freie Woche nach der letzten regulären Spielwoche | automatisch |
+| Relegation spielen | die Relegationsplätze unten gegen die Relegationsplätze oben der Liga darunter, je Paarung ein Spiel | aus |
+| Start der Relegation | leer: automatisch. Sie liegt **immer hinter** den Playoffs der Liga darunter | automatisch |
+| Meister aus | Tabelle (Platz 1 jeder Staffel der obersten Liga) oder Playoffs (Sieger des Finales, Platz 1 heißt dann Staffelsieger) | Tabelle |
+| Wiederöffnen nach dem Start der Playoffs | erlaubt mit Hinweis – oder gesperrt, sobald ein Playoff- oder Relegationsspiel gespielt ist | erlaubt |
+
+- **Relegationsplätze** stellst du wie bisher bei den Zonen ein (Reiter **Ligen und Staffeln**: „Relegation unten“ in der oberen Liga,
+  „Relegation oben“ in der Liga darunter). Die Zahl muss **aufgehen** – sonst sagt das Speichern, was nicht passt.
+- **Fest ab dem ersten Abschluss:** Sobald eine Staffel einer Liga abgeschlossen ist, lassen sich dort an/aus, die Plätze je Staffel
+  und „Meister aus“ nicht mehr ändern. Zum Ändern erst alle Staffeln dieser Liga wieder öffnen. Best of, Platz 3, Heimrecht und Termine
+  bleiben bis zum Anlegen änderbar.
+- **Tabelle:** Während der Season tragen die Playoff-Plätze ein Zeichen am Teamnamen, die Legende darunter nennt es „Playoff-Platz“.
+  Steht an der Grenze ein Gleichstand, braucht es vor dem Abschluss einen Entscheid – wie an einer Zonengrenze (Knopf
+  **Playoff-Platz entscheiden**).
+
+**2. Vorschau ansehen und anlegen.** Sind alle regulären Staffeln einer Liga abgeschlossen, zeigt die Karte die **Setzliste**, die
+Paarungen der ersten Runde, die Freilose und die Wochen. Vorher steht dort, was noch fehlt.
+
+<img src="../assets/liga/playoffs-vorschau-pc.png" alt="Abschnitt Playoffs und Relegation am PC: Liga 1 bereit zum Anlegen mit Setzliste aus acht Teams, Paarungen der ersten Runde, Hinweis auf das Los, Wochen je Runde und darunter die Relegation gegen Liga 2 mit zwei Paarungen" width="900">
+
+<img src="../assets/liga/playoffs-vorschau-handy.png" alt="Derselbe Abschnitt am Handy: Setzliste, erste Runde, Wochen und Relegation untereinander" width="300">
+
+- **Gesetzt wird über Kreuz:** erst alle Ersten, dann alle Zweiten. Bei zwei Staffeln spielt A1 gegen B2 und B1 gegen A2. Welche
+  Staffel vorn steht, entscheiden die Staffelsieger: mehr Punkte je Spiel, dann die bessere Map-Differenz je Spiel, zuletzt das Los.
+  Ab drei Staffeln tauscht das System, bis in der ersten Runde niemand auf ein Team der eigenen Staffel trifft.
+- **Das Los fällt erst beim Anlegen** – einmal, mit Protokoll. Die Vorschau lost nicht, sie nennt die gleich stehenden Teams.
+- **Freilose** bekommen die Bestgesetzten, wenn die Zahl der Teams keine Zweierpotenz ist (6 Teams: Platz 1 und 2).
+- **Playoffs anlegen** bzw. **Relegation anlegen** fragt einmal nach. Danach läuft die Staffel sofort, die Spiele stehen in ihren
+  Wochen. Ein zweiter Klick legt nichts doppelt an.
+- **Eigenes Team:** Wer zu einem Team der Liga gehört, legt nicht an – das macht eine andere Person. Der Superadmin kann es als
+  Notausnahme mit Grund.
+- **Die Relegation** lässt sich anlegen, sobald die regulären Staffeln **beider** Ligen abgeschlossen sind. Das Team der oberen Liga
+  hat Heimrecht.
+
+**3. Spielen.** Check-in, Veto, Melden, Proteste, Strafen und Fristen gelten wie in der Season. Je Runde eine Spielwoche; Sperrzeiten
+zählen nicht mit.
+
+<img src="../assets/liga/playoffs-stand-pc.png" alt="Abschnitt Playoffs und Relegation nach dem Anlegen: Playoffs angelegt mit sechs von sieben entschiedenen Spielen, Links Staffel verwalten und Baum ansehen, Setzliste und Wochen, Relegation angelegt" width="900">
+
+- **Staffel verwalten** führt auf die Staffel-Seite. Der Reiter „Tabelle“ heißt dort **Baum**.
+- **Veto:** In Playoffs gibt es keine „Vorgabe der Woche“. Für jedes vorkommende Best of schlägt das System eine eigene Vorlage vor.
+  Passt eine nicht zum Map-Pool, steht der Hinweis an der Karte.
+- **Kampflos:** Tritt ein Team nicht an, kommt der Gegner weiter – wie gewohnt über „kampflos werten“.
+- **Beide nicht erschienen:** Beim ersten Mal wird **einmal neu angesetzt** – nichts wird gewertet, du setzt den neuen Termin. Kommt
+  wieder niemand, scheiden **beide aus**: Der nächste Gegner kommt kampflos weiter, im Finale bleibt der Titel unvergeben, in der
+  Relegation bleibt alles, wie es ist. Das lässt sich nicht zurücknehmen.
+- **Team zieht sich zurück:** Austritt wie gewohnt auf der Staffel-Seite (Teilnehmer). Der Gegner kommt kampflos weiter.
+  Ist noch **kein Playoff-Spiel gespielt**, kannst du stattdessen **Setzliste neu berechnen** (mit Grund): Der Nächste derselben
+  Staffel rückt nach und übernimmt den Platz, alle anderen Setzplätze bleiben.
+- **Sperren für N Spiele** zählen jedes gewertete Pflichtspiel: Tabelle, Playoff und Relegation.
+- **Zuteilen von Hand** gibt es hier nicht – die Teams kommen aus dem Endstand.
+
+**4. Abschließen.** Die Playoff- und die Relegations-Staffel stehen im Reiter **Abschluss** neben den anderen Staffeln und werden
+genauso abgeschlossen (Checkliste, Bestätigung, zweite Person beim Wiederöffnen). Statt einer Tabelle steht dort:
+
+- **Playoffs:** die Plätze aus dem Baum – 1 Sieger, 2 Finalist, 3 geteilt für beide Halbfinal-Verlierer (mit Spiel um Platz 3: Platz 3
+  und 4), dann je Runde geteilt (Platz 5 für die Viertelfinal-Verlierer).
+- **Relegation:** je Team das Ergebnis und was daraus folgt – „steigt auf“, „steigt ab“ oder „bleibt“.
+- **Meister:** Bei „Meister aus Playoffs“ entsteht der Meister-Eintrag beim Abschluss der Playoffs der obersten Liga. Es gibt nie
+  zwei Meister. In unteren Ligen heißt der Sieger Playoff-Sieger.
+- **Die Season ist erst beendet**, wenn auch Playoffs und Relegation abgeschlossen sind. Solange etwas Eingestelltes noch nicht
+  angelegt ist, steht es oben im Reiter und die Season läuft weiter.
+
+**5. Neue Season.** Playoffs ändern keine Liga – wer auf- und absteigt, sagen Tabelle und Relegation. Aus der abgeschlossenen
+Relegation gilt automatisch: Gewinnt das Team der unteren Liga, steigt es auf und das der oberen ab; sonst bleiben beide. „Neue
+Season aus …“ (3.11) geht erst, wenn die Relegation abgeschlossen ist. Korrigierst du sie später, hilft dort **Übernahme neu
+berechnen**.
+
+**Wiederöffnen einer regulären Staffel:** geht weiter nach den Regeln aus 3.10 (Grund, zweite Person). Laufen die Playoffs schon,
+spielen sie mit ihrer Setzliste weiter; weicht die neue Setzliste ab, sagt die Karte das. **Setzliste neu berechnen** geht nur vor
+dem ersten gespielten Spiel.
+
+**Auf der Ligaseite** stehen Playoffs und Relegation unter den Tabellen ihrer Liga, als Baum – nur bei einer sichtbaren Season.
+
+<img src="../assets/liga/playoffs-ligaseite-pc.png" alt="Ligaseite am PC: Abschnitt Playoffs mit K.-o.-Baum aus Viertelfinale, Halbfinale und Finale, daneben der Link Alle Spiele" width="900">
+
+**Noch nicht dabei:** eigene Belohnungen für die Playoffs, Zusatzpunkte in der Gesamtwertung, die Anlage im Regelwerk, Nachrichten
+„für die Playoffs qualifiziert“, Doppel-K.-o. und Wildcards. Belohnungen und Gesamtwertung zählen weiter den Tabellenplatz.
+
 ### 3.11 Neue Season aus der Vorgänger-Season
 
 **Wo:** Season-Seite oben → **Neue Season aus Season 1** (neben „Season löschen“). Recht: **Liga verwalten**. Geht erst, wenn
