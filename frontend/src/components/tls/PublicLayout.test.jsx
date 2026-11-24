@@ -156,3 +156,9 @@ test("Fußzeile: Mitglied sieht „Mitgliederbereich“, Gast „Mitglied werden
     Object.assign(authState, { user: null, isClubMember: false });
   }
 });
+// #1657: In der Fußzeile steht neben Impressum und Datenschutz ein kleiner Link „Status“.
+test("Fußzeile: kleiner Link zur Statusseite", () => {
+  renderLayout();
+  expect(screen.getByTestId("footer-status")).toHaveAttribute("href", "/status");
+  expect(screen.getByTestId("footer-status")).toHaveTextContent("Status");
+});

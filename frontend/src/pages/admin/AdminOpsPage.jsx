@@ -31,6 +31,38 @@ const TABS = [
   { key: "alerts", label: "Alarme" },
 ];
 const VITAL_COLUMNS = ["LCP", "INP", "CLS", "TTFB"];
+// Fehler-Sammler (#1657): Server, Website und App in einer Liste.
+const SOURCE_LABELS = { server: "Server", web: "Website", app: "App" };
+const REACH_LABELS = { web: "Website", api: "API", database: "Datenbank" };
+
+/** Die oberste eigene Code-Stelle - statt einer Meldung, die seit #1657 nie gespeichert wird. Im Python-Traceback die
+ *  letzte Zeile, im Browser- und App-Stack die erste. */
+export function topPlace(row) {
+  const lines = String(row?.stack || "").split("\n").filter((line) => line.trim());
+  if (!lines.length) return "";
+  return (row.source || "server") === "server" ? lines[lines.length - 1] : lines[0];
+}
+
+function reachText(key, row) {
+  const label = REACH_LABELS[key] || key;
+  if (row?.state === "down") return `${label}: weg seit ${formatTime(row.since)}`;
+  if (row?.state === "up") return `${label}: läuft`;
+  return `${label}: nicht geprüft`;
+}
+
+function ReachabilityStrip({ reachability }) {
+  if (!reachability?.targets) return null;
+  const bad = reachability.overall === "disturbance";
+  return (
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 border rounded-sm px-3 py-2 text-xs ${bad ? "border-warn/40 bg-warn/10" : "border-white/10 bg-[#121212] text-white/60"}`} data-testid="ops-reachability">
+      <span className="font-bold uppercase tracking-wider">Erreichbarkeit</span>
+      {Object.keys(REACH_LABELS).map((key) => (
+        <span key={key} className={reachability.targets[key]?.state === "down" ? "text-warn font-bold" : ""}>{reachText(key, reachability.targets[key])}</span>
+      ))}
+      <span className="text-white/40">geprüft {formatTime(reachability.checked_at)}</span>
+    </div>
+  );
+}
 
 function formatTime(value) {
   if (!value) return "-";
@@ -71,6 +103,10 @@ export default function AdminOpsPage() {
     }, { replace: true });
   };
   const [status, setStatus] = useState("open");
+  // Quelle und Suche (#1657); ?q= kommt von der Fehlerseite mit der Kennung der Gruppe.
+  const [source, setSource] = useState("all");
+  const [search, setSearch] = useState(() => searchParams.get("q") || "");
+  const [searchDraft, setSearchDraft] = useState(() => searchParams.get("q") || "");
   const [summary, setSummary] = useState(null);
   const [errors, setErrors] = useState([]);
   const [slow, setSlow] = useState(null);
@@ -87,7 +123,7 @@ export default function AdminOpsPage() {
     try {
       const [summaryResult, errorsResult, slowResult, vitalsResult, checksResult] = await Promise.all([
         api.get("/admin/ops/summary"),
-        api.get(`/admin/ops/errors?status=${status}&limit=200`),
+        api.get(`/admin/ops/errors?status=${status}&limit=200&source=${source}${search ? `&q=${encodeURIComponent(search)}` : ""}`),
         api.get("/admin/ops/slow?hours=24&limit=50"),
         api.get("/admin/ops/vitals?days=7"),
         api.get("/admin/ops/checks"),
@@ -102,7 +138,7 @@ export default function AdminOpsPage() {
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, source, search]);
 
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, ["admin/ops"], { pollMs: 30000 });
@@ -181,7 +217,7 @@ export default function AdminOpsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1" data-testid="ops-title">Betrieb & Logs</h1>
           <p className="text-sm text-white/55 mt-2 max-w-2xl">
-            Alles, was der Betrieb meldet, an einem Ort: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand,
+            Alles, was der Betrieb meldet, an einem Ort: Fehler aus Server, Website und App, Auto-Checks, Alarme, App-Logs, E-Mail-Versand,
             Adminaktionen und Abgleiche. Ohne Namen, Adressen oder Tokens; Aufbewahrung unter Alarme.
           </p>
         </div>
@@ -241,6 +277,24 @@ export default function AdminOpsPage() {
         <ChecksTab checks={checks} loading={loading} running={running} onRun={runChecks} />
       ) : tab === "errors" ? (
         <div className="space-y-3" data-testid="ops-errors">
+          <ReachabilityStrip reachability={summary?.reachability} />
+          <form
+            className="flex flex-col sm:flex-row gap-2"
+            onSubmit={(event) => { event.preventDefault(); setSearch(searchDraft.trim()); }}
+            role="search"
+          >
+            <select value={source} onChange={(event) => setSource(event.target.value)} data-testid="ops-errors-source" aria-label="Quelle"
+              className="min-h-[44px] bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+              <option value="all">Alle Quellen</option>
+              <option value="server">Server</option>
+              <option value="web">Website</option>
+              <option value="app">App</option>
+            </select>
+            <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} data-testid="ops-errors-search" aria-label="Suche"
+              placeholder="Fehlerart, Seite, Stelle oder Kennung" maxLength={80}
+              className="min-h-[44px] flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <button type="submit" className="min-h-[44px] px-4 border border-white/10 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">Suchen</button>
+          </form>
           {/* Mehrfachauswahl (#2447): offene Gruppen ankreuzen, dann „Ausgewählte als gelöst“. */}
           {openErrors.length ? (
             <div className="flex flex-wrap items-center gap-2 border border-white/10 bg-[#121212] rounded-sm p-2" data-testid="ops-errors-bulk">
@@ -275,6 +329,7 @@ export default function AdminOpsPage() {
             const isExpanded = expanded === row.fingerprint;
             const resolved = Boolean(row.resolved_at);
             const isPicked = picked.includes(row.fingerprint);
+            const isClient = row.source === "web" || row.source === "app";
             return (
               <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : isPicked ? "border-ok/40" : "border-[#FF3B30]/30"}`} data-testid={`ops-error-${row.fingerprint}`}>
                 <div className="flex flex-col md:flex-row md:items-stretch">
@@ -296,12 +351,16 @@ export default function AdminOpsPage() {
                           <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]"}`}>
                             <AlertTriangle className="w-3 h-3" /> {row.error_type}
                           </span>
-                          <span className="text-[11px] font-mono text-white/60 break-all">{row.method} {row.route}</span>
-                          <span className="text-[11px] text-white/40">HTTP {row.status_code}</span>
+                          {SOURCE_LABELS[row.source] && row.source !== "server" ? (
+                            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border border-brand/40 text-brand">{SOURCE_LABELS[row.source]}</span>
+                          ) : null}
+                          <span className="text-[11px] font-mono text-white/60 break-all">{`${row.method || ""} ${row.route || ""}`.trim()}</span>
+                          {isClient ? null : <span className="text-[11px] text-white/40">HTTP {row.status_code}</span>}
                         </div>
-                        <div className="mt-1 text-sm font-semibold break-words">{row.message || "Ohne Meldung"}</div>
+                        <div className="mt-1 text-sm font-semibold break-words font-mono">{row.message || topPlace(row) || "Ohne Stelle"}</div>
                         <div className="mt-1 text-[11px] text-white/45">
-                          {row.count}× · zuerst {formatTime(row.first_seen_at)} · zuletzt {formatTime(row.last_seen_at)} · {row.actor}
+                          {row.count}× · zuerst {formatTime(row.first_seen_at)} · zuletzt {formatTime(row.last_seen_at)}{isClient ? "" : ` · ${row.actor || ""}`}
+                          {row.version ? ` · Version ${row.version}` : ""}
                           {resolved ? ` · gelöst ${formatTime(row.resolved_at)}` : ""}
                         </div>
                       </div>
@@ -328,7 +387,7 @@ export default function AdminOpsPage() {
                     {row.stack ? (
                       <pre className="text-[11px] leading-relaxed text-white/70 bg-[#0A0A0A] border border-white/10 rounded-sm p-3 tls-swipe max-h-96">{row.stack}</pre>
                     ) : (
-                      <p className="text-sm text-white/50">Keine Ausnahme – der Server hat diese Antwort bewusst gesendet.</p>
+                      <p className="text-sm text-white/50">{isClient ? "Ohne Code-Stelle – der Browser hat keine mitgeschickt." : "Keine Ausnahme – der Server hat diese Antwort bewusst gesendet."}</p>
                     )}
                   </div>
                 ) : null}
@@ -336,7 +395,7 @@ export default function AdminOpsPage() {
             );
           })}
           {errors.length ? (
-            <p className="text-[11px] text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt die offenen Gruppen – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt.</p>
+            <p className="text-[11px] text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt nur die offenen Gruppen des Servers – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt. Website und App stehen hier, färben die Ampel aber nicht.</p>
           ) : null}
         </div>
       ) : (

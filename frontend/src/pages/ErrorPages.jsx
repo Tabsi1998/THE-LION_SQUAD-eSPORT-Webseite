@@ -94,6 +94,12 @@ export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
                   </Link>
                 )}
               </div>
+              {def.code === "500" ? (
+                // Statusseite (#1657): ob Website und Server gerade laufen.
+                <p className="mt-5 text-sm text-white/55">
+                  Läuft gerade etwas nicht? <Link to="/status" data-testid="error-status-link" className="tls-hit font-semibold text-brand hover:text-white">Status ansehen</Link>
+                </p>
+              ) : null}
               <p className="mt-6 text-xs text-white/40" data-testid="error-code">Fehler {def.code}</p>
             </div>
           </div>

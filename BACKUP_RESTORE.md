@@ -107,7 +107,7 @@ beiden Zählungen, steht sie in `unstable_collections`, und der Restore vergleic
 | `BACKUP_WRITE_PAUSE` | `true` | `false`: ohne Pause sichern (nicht empfohlen, das Paar kann dann abweichen) |
 | `BACKUP_WRITE_PAUSE_TTL` | `120` | Lease in Sekunden (5 bis 1800); wird im Hintergrund alle TTL/3 Sekunden verlängert |
 | `BACKUP_WRITE_PAUSE_SETTLE_SECONDS` | `3` | Wartezeit, bis alle Backend-Prozesse die Pause sehen |
-| `BACKUP_WRITE_PAUSE_MAX_SECONDS` | `900` | harte Höchstdauer der Pause: danach wird die Lease nicht mehr verlängert (Backup gilt dann als unsicher) |
+| `BACKUP_WRITE_PAUSE_MAX_SECONDS` | `900` | harte Höchstdauer der Pause: danach wird die Lease nicht mehr verlängert (Backup gilt dann als unsicher). Dieselbe Variable bekommt auch das Backend (`docker-compose.yml`): Bis zu dieser Dauer plus Lease zeigt die Statusseite keine Störung, nur weil die Erreichbarkeitsprüfung in der Pause aussetzt (#1657). Wer den Wert ändert, setzt ihn in der `.env`, dann gilt er für beide |
 | `BACKUP_WRITE_PAUSE_DRAIN_SECONDS` | `60` | so lange höchstens auf laufende Schreibvorgänge warten; sonst Warnung und Vermerk im Manifest |
 | `BACKUP_REFERENCE_SCAN` | `true` | Datei-Verweise in der Pause mitzählen (für den fachlichen Vergleich beim Restore); `false` verkürzt die Pause |
 

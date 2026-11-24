@@ -15,7 +15,7 @@ export { OptionalBoundary } from "@/components/tls/OptionalBoundary";
 // stehen, dazwischen ein Hinweis mit „Neu laden“. Stürzt auch der Rahmen ab, oder im Adminbereich und auf den
 // Anzeige-Seiten, bleibt die schlichte Karte über die ganze Fläche.
 // Technische Angaben (#1230): nur Konten mit Admin-Bereich sehen sie, zugeklappt und zum Kopieren - Fehlertext,
-// Seite, Uhrzeit und die Kennung der Meldung, die unter „Betrieb & Logs“ wieder auftaucht. Alle anderen sehen nur
+// Seite, Uhrzeit und die Kennung der Meldung, die unter „Betrieb & Logs → Fehler“ als Fehlergruppe wieder auftaucht (#1657). Alle anderen sehen nur
 // den freundlichen Satz, auch beim Entwickeln - so prüft der Browser-Test genau das, was im Betrieb gilt.
 
 const PLAIN_ROUTES = /^\/(admin|display)(\/|$)/;
@@ -63,7 +63,7 @@ function TechnicalDetails({ error, report, canSeeLogs }) {
           </button>
           {copied ? <span className="text-xs text-white/60" role="status" data-testid="page-error-copied">{copied}</span> : null}
           {canSeeLogs && report?.id ? (
-            <Link to={`/admin/ops?tab=app&q=${encodeURIComponent(report.id)}`} className="text-xs text-[#29B6E8] hover:underline" data-testid="page-error-log-link">
+            <Link to={`/admin/ops?tab=errors&q=${encodeURIComponent(report.id)}`} className="text-xs text-[#29B6E8] hover:underline" data-testid="page-error-log-link">
               Unter „Betrieb &amp; Logs“ ansehen
             </Link>
           ) : null}
@@ -84,6 +84,10 @@ function ErrorCard({ error, report }) {
       <h1 className="font-heading text-2xl md:text-3xl font-black uppercase">Diese Seite konnte nicht angezeigt werden</h1>
       <p className="mt-3 text-sm text-white/60">
         Lade die Seite neu. Hilft das nicht, probier es später noch einmal – der Rest der Website funktioniert weiter.
+      </p>
+      {/* Statusseite (#1657): ob Website und Server gerade laufen. */}
+      <p className="mt-2 text-xs text-white/50">
+        Läuft gerade etwas nicht? <Link to="/status" data-testid="page-error-status" className="font-semibold text-brand hover:text-white">Status ansehen</Link>
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button

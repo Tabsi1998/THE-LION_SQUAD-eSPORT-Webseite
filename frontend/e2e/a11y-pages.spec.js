@@ -74,6 +74,8 @@ const PAGES = [
   { name: "FAQ-Anleitung", path: "/faq/team-und-co-team", ready: "help-topic", user: null },
   // Paket 3: eine Anleitung mit vielen Schleifen (Events und Kalender).
   { name: "FAQ-Anleitung Events", path: "/faq/events-und-kalender", ready: "help-topic", user: null },
+  // Statusseite (#1657): öffentlich, für alle lesbar - auch bei Störung.
+  { name: "Status", path: "/status", ready: "status-page", user: null },
 ];
 
 async function mockServer(page, user) {

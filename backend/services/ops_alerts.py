@@ -29,6 +29,8 @@ DEFAULT_RED_REMINDER_HOURS = 24
 MAX_RED_REMINDER_HOURS = 720
 RED = 0xFF3B30
 SETTINGS_ID = "ops_alerts"
+# Zählt jedes Speichern mit - ops_monitor.error_settings verwirft dann seinen Zwischenspeicher (ohne Rückimport).
+SETTINGS_VERSION = 0
 LOG_LIMIT = 200
 
 # Ereignisarten mit Vorgabe: Discord an, E-Mail aus. `email_allowed` False, wo eine Mail-Meldung sich
@@ -41,13 +43,31 @@ ALERT_KINDS = {
     "dolibarr_sync_failed": {"label": "Dolibarr-Abgleich rot", "hint": "Der Abgleich mit der Mitgliederverwaltung ist fehlgeschlagen (nicht erreichbar, Schlüssel, Antwort)."},
     "discord_bot_offline": {"label": "Discord-Bot offline", "hint": "Der Bot ist eingeschaltet, kommt aber nicht mehr auf den Server (Token, Intent, Netz)."},
     "client_log_critical": {"label": "App: kritischer Fehler", "hint": "Die LionsAPP hat einen kritischen Fehler gemeldet (Absturz, Login, Push)."},
+    # Fehler-Sammler (#1657): Häufung einer Fehlergruppe, Tageszusammenfassung, Erreichbarkeit (Ausfall und Wiederkehr).
+    "error_spike": {"label": "Häufung von Fehlern", "hint": "Eine Fehlergruppe des Servers tritt im eingestellten Zeitfenster öfter auf als die Schwelle - eine Warnung je Fenster. Häufungen aus Website und App stehen nur in der Tageszusammenfassung."},
+    "daily_summary": {"label": "Tageszusammenfassung", "hint": "Einmal am Tag zur eingestellten Stunde: neue und aktive Fehlergruppen der letzten 24 Stunden und Ausfälle. An ruhigen Tagen kommt nichts."},
+    "reachability": {"label": "Erreichbarkeit", "hint": "Website, API oder Datenbank antworten nicht mehr - und wenn sie wieder da sind. Schaltet auch die Statusseite um."},
     "tournament_settle_failed": {"label": "Turnierabschluss unvollständig", "hint": "Beim Veröffentlichen der Ergebnisse ist ein Schritt gescheitert (Jahreswertung, Auszeichnungen, Erfolge oder Gewinne) - beim Turnier „Abschluss nachholen“ tippen."},
 }
 
 DEFAULT_RULES = {kind: {"discord": True, "email": False} for kind in ALERT_KINDS}
 # Kontaktanfragen (#2131): erledigt 12 Monate, Spam 30 Tage - siehe services/contact_retention.py.
 # Abgemeldete Push-Geräte (#2467): 30 Tage ab dem Abmelden, dann ist der Eintrag weg.
-DEFAULT_RETENTION = {"email_logs": 90, "audit_logs": 730, "contact_done": 365, "contact_spam": 30, "push_devices": 30}
+# Fehlergruppen (#1657): 30 Tage ab dem letzten Auftreten, einstellbar.
+DEFAULT_RETENTION = {"email_logs": 90, "audit_logs": 730, "contact_done": 365, "contact_spam": 30, "push_devices": 30, "ops_errors": 30}
+# Fehler-Sammler (#1657): Schwellen unter Betrieb → Alarme - Vorgabe, kleinster und größter Wert, Hinweis bei falschem Wert.
+NUMBER_SETTINGS = {
+    "spike_threshold": (20, 2, 10000, "Die Schwelle für eine Häufung liegt zwischen 2 und 10000 Auftreten."),
+    "spike_window_minutes": (10, 1, 1440, "Das Zeitfenster für eine Häufung liegt zwischen 1 Minute und einem Tag."),
+    "daily_summary_hour": (8, 0, 23, "Die Stunde der Tageszusammenfassung liegt zwischen 0 und 23."),
+    "reach_fail_threshold": (2, 1, 10, "Ein Ausfall gilt nach 1 bis 10 Fehlversuchen in Folge."),
+    "reach_recover_threshold": (2, 1, 10, "Wieder erreichbar gilt nach 1 bis 10 Erfolgen in Folge."),
+    "client_group_cap": (200, 10, 5000, "Die Obergrenze neuer Fehlergruppen aus Website und App liegt zwischen 10 und 5000 je Tag."),
+    "alert_hourly_cap": (10, 1, 100, "Höchstens 1 bis 100 Meldungen je Ereignisart und Stunde."),
+}
+# Ereignisarten, die Verkehr von außen auslösen kann: höchstens ``alert_hourly_cap`` Meldungen je Stunde, danach genau
+# eine Sammelmeldung und Ruhe bis zur nächsten vollen Stunde.
+BRAKED_KINDS = frozenset({"error_spike", "error_group", "client_log_critical"})
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -180,7 +200,20 @@ def merge_settings(stored: dict | None) -> dict:
         "retention_days": retention,
         # Datei-Uploads, die nicht als langsam zählen (#2447); nie gespeichert = die Vorgabe aus ops_monitor.
         "upload_routes": list(DEFAULT_UPLOAD_ROUTES if upload_routes is None else upload_routes),
+        **{key: _stored_number(stored.get(key), spec) for key, spec in NUMBER_SETTINGS.items()},
+        # Fehler aus Website und App sammeln (#1657): ab Werk aus, bis der Datenschutz-Absatz freigegeben ist.
+        "client_errors_enabled": stored.get("client_errors_enabled") is True,
     }
+
+
+def _stored_number(value, spec) -> int:
+    """Ein gespeicherter Wert außerhalb der Grenzen (oder unlesbar) gilt als nicht gesetzt - die Vorgabe greift."""
+    default, low, high, _message = spec
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return number if low <= number <= high else default
 
 
 async def load_alert_settings(db) -> dict:
@@ -224,9 +257,23 @@ async def save_alert_settings(db, patch: dict) -> dict:
         update["retention_days"] = retention
     if "upload_routes" in patch:
         update["upload_routes"] = clean_upload_routes(patch["upload_routes"])
+    if "client_errors_enabled" in patch:
+        update["client_errors_enabled"] = patch["client_errors_enabled"] is True
+    for key, (_default, low, high, message) in NUMBER_SETTINGS.items():
+        if key in patch:
+            try:
+                number = int(patch[key])
+            except (TypeError, ValueError):
+                raise ValueError(message) from None
+            if not low <= number <= high:
+                raise ValueError(message)
+            update[key] = number
     if update:
         update["updated_at"] = now_utc().isoformat()
         await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"id": SETTINGS_ID, **update}}, upsert=True)
+        # Der Zwischenspeicher des Fehler-Sammlers (ops_monitor.error_settings) liest beim nächsten Fehler frisch.
+        global SETTINGS_VERSION
+        SETTINGS_VERSION += 1
     return await load_alert_settings(db)
 
 
@@ -271,6 +318,16 @@ async def notify(db, kind: str, title: str, description: str = "", fields: list[
         if claim is None:
             return {"sent": False, "channels": [], "reason": "cooldown"}
     fields = fields or []
+    if kind in BRAKED_KINDS and not force:
+        gate = await _hourly_gate(db, kind, int(settings["alert_hourly_cap"]))
+        if gate == "drop":
+            return {"sent": False, "channels": [], "reason": "braked"}
+        if gate == "summary":
+            title = f"Betrieb: weitere Meldungen „{spec['label']}“ in dieser Stunde"
+            description = ("Diese Art hat in dieser Stunde ihre Höchstzahl an Meldungen erreicht. Weitere kommen erst ab der "
+                           "nächsten vollen Stunde - der Stand steht unter Betrieb & Logs.")
+            fields = []
+            alert_key = f"{alert_key}:brake"
     if rule.get("discord"):
         try:
             outcome = await _send(title, description, fields, event_key or f"ops_{kind}")
@@ -302,6 +359,27 @@ async def notify(db, kind: str, title: str, description: str = "", fields: list[
             "channels": channels, "at": now_utc().isoformat(),
         })
     return {"sent": True, "channels": channels} if channels else {"sent": False, "channels": [], "reason": reason}
+
+
+def helper_day(now: datetime | None = None) -> str:
+    """Tag eines Hilfszählers in ``ops_alert_state`` - der tägliche Job räumt ältere weg."""
+    return (now or now_utc()).date().isoformat()
+
+
+async def _hourly_gate(db, kind: str, cap: int) -> str:
+    """Bremse je Ereignisart: ``send`` bis zur Höchstzahl, dann einmal ``summary``, danach ``drop``. Atomar gezählt."""
+    from pymongo import ReturnDocument
+
+    current = now_utc()
+    key = f"hour:{kind}:{current.strftime('%Y%m%d%H')}"
+    row = await db.ops_alert_state.find_one_and_update(
+        {"key": key}, {"$inc": {"count": 1}, "$setOnInsert": {"key": key, "helper_day": helper_day(current)}},
+        upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0, "count": 1},
+    )
+    count = int((row or {}).get("count") or 0)
+    if count <= cap:
+        return "send"
+    return "summary" if count == cap + 1 else "drop"
 
 
 def schedule_notify(db, kind: str, title: str, description: str = "", fields: list[dict] | None = None, *, key: str | None = None) -> None:
@@ -370,10 +448,22 @@ def check_red_message(check: dict, run: dict, *, still_red_since: str | None = N
             "fields": [{"name": "Prüfung", "value": check.get("key") or "-", "inline": True}, {"name": "Lauf", "value": run.get("at") or "-", "inline": True}]}
 
 
+SOURCE_LABELS = {"server": "Server", "web": "Website", "app": "App"}
+
+
+def _top_place(group: dict) -> str:
+    """Die oberste eigene Code-Stelle (#1657) steht statt einer Meldung im Alarm - eine Meldung wird nie gespeichert.
+    Im Python-Traceback ist das die letzte Zeile, im Browser-Stack die erste."""
+    lines = [line for line in str(group.get("stack") or "").splitlines() if line.strip()]
+    if not lines:
+        return ""
+    return f"Stelle: {lines[-1] if (group.get('source') or 'server') == 'server' else lines[0]}"
+
+
 def error_group_message(group: dict) -> dict:
     """Titel, Text und Felder einer neuen Fehlergruppe."""
     return {"title": f"Serverfehler: {group.get('error_type') or 'Fehler'} auf {group.get('method') or ''} {group.get('route') or ''}".strip(),
-            "description": (group.get("message") or "")[:1000],
+            "description": (group.get("message") or _top_place(group))[:1000],
             "fields": [{"name": "HTTP", "value": str(group.get("status_code") or ""), "inline": True}, {"name": "Zähler", "value": str(group.get("count") or 1), "inline": True}]}
 
 
@@ -437,22 +527,56 @@ async def alert_error_group(db, group: dict) -> bool:
 
 def schedule_error_alert(db, group: dict) -> None:
     """Aus dem Anfrage-Pfad heraus: nicht warten, nur anstoßen."""
+    _spawn(alert_error_group(db, group))
+
+
+def _spawn(coroutine) -> None:
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        coroutine.close()
         return
-    task = loop.create_task(alert_error_group(db, group))
+    task = loop.create_task(coroutine)
     task.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+
+
+def error_spike_message(group: dict, count: int, window_minutes: int) -> dict:
+    """Häufung (#1657): Quelle, Fehlerart, Seite und Zahl - keine Nutzdaten."""
+    source = SOURCE_LABELS.get(group.get("source") or "server", "Server")
+    place = f"{group.get('method') or ''} {group.get('route') or ''}".strip() or "/"
+    return {"title": f"Häufung: {group.get('error_type') or 'Fehler'} auf {place} ({source})",
+            "description": f"{count}× in {window_minutes} Minuten. {_top_place(group)}".strip(),
+            "fields": [{"name": "Quelle", "value": source, "inline": True},
+                       {"name": "Zähler gesamt", "value": str(group.get("count") or count), "inline": True},
+                       {"name": "Version", "value": group.get("version") or "-", "inline": True}]}
+
+
+async def alert_error_spike(db, group: dict, count: int, window_minutes: int) -> bool:
+    """Eine Warnung je Häufung: ``ops_monitor`` stößt sie nur einmal je Zeitfenster an; die Sperrfrist je Gruppe
+    (``spike:<Fingerabdruck>``) fängt Fenster ab, die dicht aufeinander folgen."""
+    message = error_spike_message(group, count, window_minutes)
+    outcome = await notify(db, "error_spike", message["title"], message["description"], message["fields"],
+                           key=f"spike:{group.get('fingerprint')}", event_key="ops_error_spike")
+    return bool(outcome.get("sent"))
+
+
+def schedule_spike_alert(db, group: dict, count: int, window_minutes: int) -> None:
+    _spawn(alert_error_spike(db, group, count, window_minutes))
 
 
 # ---------------------------------------------------------------- Aufbewahrung
 
 async def purge_old_logs(db, *, now: datetime | None = None) -> dict:
-    """Versandlogs und Adminaktionen nach der eingestellten Frist löschen; die übrigen Quellen räumt die
-    Datenbank selbst (Ablaufdatum an App-Logs, Fehlergruppen, Vitals, Upload-Ereignissen)."""
+    """Versandlogs, Adminaktionen und Fehlergruppen nach der eingestellten Frist löschen; die übrigen Quellen räumt die
+    Datenbank selbst (Ablaufdatum an App-Logs, Vitals, Upload-Ereignissen)."""
     settings = await load_alert_settings(db)
     current = now or now_utc()
     removed = {}
+    # Fehlergruppen (#1657): ab dem letzten Auftreten. Das Ablaufdatum an der Gruppe folgt der Frist beim Schreiben;
+    # das hier fängt eine verkürzte Frist ab.
+    cutoff = (current - timedelta(days=settings["retention_days"]["ops_errors"])).isoformat()
+    result = await db.ops_errors.delete_many({"last_seen_at": {"$lt": cutoff}})
+    removed["ops_errors"] = int(getattr(result, "deleted_count", 0) or 0)
     for source in ("email_logs", "audit_logs"):
         cutoff = (current - timedelta(days=settings["retention_days"][source])).isoformat()
         result = await getattr(db, source).delete_many({"created_at": {"$lt": cutoff}})
@@ -474,6 +598,8 @@ async def purge_old_logs(db, *, now: datetime | None = None) -> dict:
     removed["push_devices"] = await purge_disabled_push_devices(db, days=settings["retention_days"]["push_devices"], now=current)
     old_alerts = (current - timedelta(days=365)).isoformat()
     await db.ops_alert_log.delete_many({"at": {"$lt": old_alerts}})
+    # Hilfszähler (#1657): Bremse je Stunde, Obergrenze je Tag, Häufungsfenster - nach zwei Tagen ohne Nutzen.
+    await db.ops_alert_state.delete_many({"helper_day": {"$lt": helper_day(current - timedelta(days=2))}})
     return removed
 
 
