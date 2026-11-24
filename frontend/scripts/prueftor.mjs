@@ -248,10 +248,17 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
   return { ok: blocking.length === 0, blocking, checks: results, exceptions, exceptionProblems };
 }
 
-// Text aus dem PR (Begründungen) und aus Dateien in den Kommentar: keine Erwähnungen, kein HTML, keine Tabellenbrüche.
+// Text aus dem PR (Begründungen) und aus Dateien in den Kommentar: keine Erwähnungen, kein HTML, keine Tabellenbrüche,
+// keine Links und Bilder (#2556). Eckige Klammern werden zu ［ ］ - ohne sie gibt es weder [Text](Adresse) noch ![Bild]
+// noch Verweise, und ein vorangestellter Backslash hat nichts mehr zu schützen. Nackte Adressen verlinkt GitHub selbst:
+// ein unsichtbares Trennzeichen nach „:/“ bzw. „www“ verhindert das.
+const ZWSP = "\u200b";
 export function safeText(value, max = 300) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-  return text.replace(/[<>`|]/g, (char) => ({ "<": "‹", ">": "›", "`": "'", "|": "/" })[char]).replace(/@/g, "@​");
+  return text.replace(/[<>`|[\]]/g, (char) => ({ "<": "‹", ">": "›", "`": "'", "|": "/", "[": "［", "]": "］" })[char])
+    .replace(/@/g, `@${ZWSP}`)
+    .split("://").join(`:/${ZWSP}/`)
+    .replace(/www\./gi, (match) => `${match.slice(0, 3)}${ZWSP}.`);
 }
 
 // Tausender mit Punkt, selbst gesetzt: toLocaleString("de-AT") liefert je nach ICU-Stand Punkt oder Leerzeichen.
