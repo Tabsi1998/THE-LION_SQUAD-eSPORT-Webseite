@@ -78,7 +78,8 @@ test("ein veralteter Baustein kommt nur als Hinweis an, nicht als Fehler", async
   expect(api.post).toHaveBeenCalledTimes(1);
   const [, body] = api.post.mock.calls[0];
   expect(body.error_type).toBe("ChunkLoadError");
-  expect(body.stack).toContain("ReferenceRoundPage");
+  // #1657: der Kopf mit der Meldung (hier die Adresse des Bausteins) geht nicht mit - der Server speichert nur Code-Stellen.
+  expect(body.stack).not.toContain("Failed to fetch dynamically imported module");
 });
 
 // #1657: gemeldet wird ohne Anmeldung an den Fehler-Sammler - Fehlerart, Stack, Seite als Vorlage, Version. Nie der
@@ -114,4 +115,32 @@ test("lädt die Seite schon neu, meldet ein veralteter Baustein gar nichts", asy
   event.reason = new TypeError("Failed to fetch dynamically imported module: https://lionsquad.at/assets/Other-2.js");
   window.dispatchEvent(event);
   expect(api.post).not.toHaveBeenCalled();
+});
+
+// #1657 (Prüfung): Als Fehlerart geht nur der Name eines echten Fehlers mit, und nur als Bezeichner - sonst „Error“.
+test("die Fehlerart ist nur der Name eines echten Fehlers, nie freier Text", async () => {
+  const { api } = await import("./api");
+  const { reportCaughtError } = await import("./clientLog");
+  api.post.mockClear();
+  await reportCaughtError({ name: "Max Mustermann wohnt in Wien 1010", message: "abgelehnt" }, "");
+  const odd = Object.assign(new Error("x"), { name: "Max Mustermann wohnt in Wien 1010" });
+  await reportCaughtError(odd, "anders");
+  await reportCaughtError(new SyntaxError("y"), "noch anders");
+  const types = api.post.mock.calls.map(([, body]) => body.error_type);
+  expect(types).toEqual(["Error", "Error", "SyntaxError"]);
+  expect(JSON.stringify(api.post.mock.calls)).not.toContain("Mustermann");
+});
+
+test("window.onerror schickt den Stack ohne die Meldungszeile des Fehlers", async () => {
+  const { api } = await import("./api");
+  delete window.__tlsWebClientLoggingStarted;
+  startWebClientLogging();
+  api.post.mockClear();
+  const error = new TypeError("Profil von Max Mustermann fehlt");
+  const event = new window.ErrorEvent("error", { message: "Uncaught TypeError: Profil von Max Mustermann fehlt", error });
+  window.dispatchEvent(event);
+  expect(api.post).toHaveBeenCalledTimes(1);
+  const [, body] = api.post.mock.calls[0];
+  expect(body.error_type).toBe("TypeError");
+  expect(body.stack).not.toContain("Mustermann");
 });

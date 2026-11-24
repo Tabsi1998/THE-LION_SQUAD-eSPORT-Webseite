@@ -33,6 +33,14 @@ export function scrubClientLogText(value, limit) {
   return clip(safe, limit);
 }
 
+// Fehlerart (#1657): nur der Name eines echten Fehlers und nur als Bezeichner - nie freier Text aus einem abgelehnten
+// Objekt. Der Server prüft dasselbe noch einmal.
+const ERROR_NAME = /^[A-Za-z0-9_.$]{1,60}$/;
+
+function errorName(value) {
+  return value instanceof Error && typeof value.name === "string" && ERROR_NAME.test(value.name) ? value.name : "Error";
+}
+
 function fingerprintFor(payload) {
   return [
     payload.level,
@@ -44,12 +52,14 @@ function fingerprintFor(payload) {
   ].join("|").toLowerCase();
 }
 
-/** Der Stack ohne die Zeile mit dem Meldungstext („TypeError: …“) - darin können Namen stehen. */
-function stackWithoutMessage(stack, name, message) {
+/** Der Stack ohne den Kopf mit Fehlerart und Meldungstext („TypeError: …“, auch mehrzeilig) - darin können Namen stehen.
+ *  Chrome und Edge setzen den Kopf vor die erste Zeile „    at …“; Firefox und Safari haben keinen Kopf („name@url“).
+ *  Was weder das eine noch das andere ist, geht gar nicht mit. */
+function stackWithoutMessage(stack) {
   const text = String(stack || "");
-  const head = message ? `${name || "Error"}: ${message}` : "";
-  const rest = head && text.startsWith(head) ? text.slice(head.length) : text;
-  return message ? rest.split(String(message)).join("") : rest;
+  const firstFrame = text.search(/\n\s*at /);
+  if (firstFrame >= 0) return text.slice(firstFrame + 1);
+  return text.includes("@") ? text : "";
 }
 
 /** Schickt die Meldung; zurück kommt die Kennung der Fehlergruppe unter „Betrieb & Logs → Fehler“ - oder null (nicht
@@ -68,7 +78,7 @@ function sendClientLog(payload) {
   const reportId = api.post("/ops/client-errors", {
     source: "web",
     error_type: clip(payload.error_name || "Error", 80),
-    stack: scrubClientLogText(stackWithoutMessage(payload.stack, payload.error_name, payload.message), 8000),
+    stack: scrubClientLogText(stackWithoutMessage(payload.stack), 8000),
     route: vitalsRoute(window.location?.pathname || "/"),
     version: clip(import.meta.env.VITE_APP_VERSION || "", 40),
   }).then(({ data } = {}) => (data && typeof data.id === "string" ? data.id : null)).catch(() => null);
@@ -92,7 +102,7 @@ function reportPayload(error, fallbackMessage, fallbackName, stack) {
       stack: `${error?.message || error}\n${stack}`,
     };
   }
-  return { level: "error", message: error?.message || fallbackMessage, error_name: error?.name || fallbackName, stack };
+  return { level: "error", message: error?.message || fallbackMessage, error_name: errorName(error), stack };
 }
 
 /** Ein Fehler, den eine Fehlergrenze gefangen hat (#944) - der Browser meldet ihn nicht mehr von selbst.
@@ -108,10 +118,11 @@ export function startWebClientLogging() {
 
   window.addEventListener("error", (event) => {
     if (isAudioProblem(event.error || event.message)) return;
+    // Die Meldung des Fehlers selbst (nicht „Uncaught …“ des Ereignisses) - nur so fällt ihre Zeile aus dem Stack.
     sendClientLog({
       level: "error",
-      message: event.message || event.error?.message || "Web runtime error",
-      error_name: event.error?.name || "Error",
+      message: event.error?.message || event.message || "Web runtime error",
+      error_name: errorName(event.error),
       stack: event.error?.stack || "",
     });
   });
