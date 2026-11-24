@@ -739,18 +739,17 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     if "overrides" in payload:
         payload["overrides"] = body.overrides.model_dump(exclude_none=True) if body.overrides else {}
     warnings: list[str] = []
-    if "overrides" in payload:
+    async def before_write(before: dict, after: dict) -> None:
         # Nr. 252, 255 (#2404): Ein eigenes Best of der Liga N ändert nach dem Season-Start nicht das Best of ihrer Playoffs und ihrer
-        # Relegation - der Wert vom Start wird gemerkt, bevor die Liga N schreibt (unter der Season-Sperre).
+        # Relegation - der Wert vom Start wird gemerkt: nach allen Prüfungen, vor dem Schreiben, unter der Sperre von ``update_division``.
+        if (before.get("overrides") or {}).get("best_of") == (after.get("overrides") or {}).get("best_of"):
+            return
         from services import league_postseason
 
-        season = await _call(leagues.get_season(db, division["season_id"]))
-        try:
-            warnings.extend(await league_postseason.keep_best_of(db, season, season, me, division=division,
-                                                                 after_division={**division, "overrides": payload["overrides"]}))
-        except league_postseason.PostseasonProblem as problem:
-            raise HTTPException(status_code=problem.status, detail=problem.message) from None
-    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
+        season = await leagues.get_season(db, before["season_id"])
+        warnings.extend(await league_postseason.keep_best_of(db, season, season, me, division=before, after_division=after, locked=True))
+
+    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings, before_write=before_write))
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
     # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.

@@ -309,10 +309,17 @@ async def table_champion(db, season_id: str | None) -> dict | None:
             "display_name": seed.get("display_name") or row.get("display_name") or "Team", "team_id": row.get("team_id")}
 
 
-def season_started(season: dict | None, now=None) -> bool:
-    """Hat die Season begonnen? Im Entwurf nie, sonst ab dem Beginn der ersten Spielwoche - und einmal gestartet bleibt gestartet
-    (Nr. 253): Ist der Start gemerkt (``started_at``), gilt er, auch wenn das Startdatum danach verschoben wird."""
-    return league_calendar.season_started(season, now or now_utc())
+async def really_started(db, season: dict | None) -> bool:
+    """Läuft die Season wirklich (Nr. 254, 256)? Ja, wenn ihr Start gemerkt ist (``started_at``, Nr. 253) - oder gemerkt würde: Der
+    Beginn ist erreicht **und** eine reguläre Staffel ist live oder ein Spiel gewertet (``league_service.start_to_remember``). Erst
+    ab dann greifen die Sperren aus Nr. 249 und entsteht ein Rückfallwert (Nr. 252) - das Datum allein sperrt und merkt nichts."""
+    if not season:
+        return False
+    if league_calendar.aware(season.get(league_calendar.STARTED_AT)):
+        return True
+    from services.league_service import start_to_remember
+
+    return bool(await start_to_remember(db, season))
 
 
 async def remember_start(db, season: dict | None) -> None:
@@ -333,6 +340,14 @@ def _group_text(template: str, values: dict[int, list[str]]) -> list[str]:
     return out
 
 
+def _kept_for(season: dict, division: dict):
+    """Der gemerkte Rückfallwert, nach dem sich „wie in der Season“ in dieser Liga N richtet - ``None``, wenn keiner gilt (dann folgt
+    sie dem Best of von heute, auch mit eigenem Best of der Liga N)."""
+    if division.get(KEPT):
+        return division[KEPT]
+    return None if ((division.get("overrides") or {}).get("best_of")) else season.get(KEPT)
+
+
 def _inherits(season: dict, division: dict, part: str) -> bool:
     """Steht bei den Playoffs bzw. der Relegation dieser Liga N „wie in der Season“ (kein eigenes Best of)?"""
     own = division.get(rules.FIELD) if isinstance(division.get(rules.FIELD), dict) else {}
@@ -341,18 +356,24 @@ def _inherits(season: dict, division: dict, part: str) -> bool:
 
 
 async def keep_best_of(db, season: dict, after_season: dict, actor: dict | None, *, division: dict | None = None,
-                       after_division: dict | None = None) -> list[str]:
+                       after_division: dict | None = None, locked: bool = False) -> list[str]:
     """Das Best of von Playoffs und Relegation bleibt, wenn sich nach dem Season-Start das Best of der Season oder einer Liga N ändert
     (Nr. 252, 255). Steht dort „wie in der Season“, erbten sie den neuen Wert - darum wird der **Rückfallwert vom Start** gemerkt
     (``postseason_best_of_kept``): an der Season, wenn ihr Best of sich ändert, sonst an der einen Liga N. Die Einstellungen selbst
     bleiben, wie sie sind - eine Liga N folgt weiter der Vorlage. Gemerkt wird, **sobald es Einstellungen gibt** (Vorlage oder eigene
     einer Liga N), auch wenn Playoffs oder Relegation gerade aus sind; die reguläre Season ändert ihr Best of wie bisher.
 
-    Vor dem Schreiben der Season bzw. der Liga N aufrufen, unter der Season-Sperre (wie ``save_season``). ``season``/``after_season``:
-    die Season vor und nach der Änderung; ``division``/``after_division``: die eine Liga N, deren Abweichung sich ändert. Antwort: die
-    Sätze für die Leitung - nur für Ligen, deren eingeschaltete Playoffs oder Relegation sonst mitgewandert wären."""
-    if not season_started(season):
-        return []
+    Vor dem Schreiben der Season bzw. der Liga N aufrufen, unter der Season-Sperre (wie ``save_season``) - ``locked``: Der Aufrufer
+    hält sie schon (``league_service.update_division``). ``season``/``after_season``: die Season vor und nach der Änderung;
+    ``division``/``after_division``: die eine Liga N, deren Abweichung sich ändert. Antwort: die Sätze für die Leitung - nur für
+    Ligen, deren eingeschaltete Playoffs oder Relegation sonst mitgewandert wären.
+
+    Nur wenn die Season **wirklich läuft** (Nr. 256, ``really_started``): Ein erreichtes Startdatum allein merkt nichts. Im selben
+    Schritt wird der Start gemerkt - Rückfallwert und ``started_at`` entstehen immer zusammen."""
+    if not league_calendar.season_started(season, now_utc()):
+        return []  # nach Datum und gemerktem Start noch nicht begonnen - dann läuft sie sicher nicht
+    if locked:
+        return await _keep_best_of(db, season, after_season, actor, division, after_division)
     try:
         async with mutation_lock(db, league_season_resource(season["id"]), wait_seconds=LOCK_WAIT_SECONDS):
             return await _keep_best_of(db, season, after_season, actor, division, after_division)
@@ -362,7 +383,11 @@ async def keep_best_of(db, season: dict, after_season: dict, actor: dict | None,
 
 async def _keep_best_of(db, season: dict, after_season: dict, actor: dict | None, division: dict | None, after_division: dict | None) -> list[str]:
     # Einstellungen und Rückfallwert, wie sie jetzt gespeichert sind (unter der Sperre gelesen) - das Best of kommt vom Aufrufer.
-    fresh = await db.league_seasons.find_one({"id": season["id"]}, {"_id": 0, rules.FIELD: 1, KEPT: 1}) or {}
+    fresh = await db.league_seasons.find_one({"id": season["id"]}, {"_id": 0, rules.FIELD: 1, KEPT: 1, league_calendar.STARTED_AT: 1}) or {}
+    running = {**season, league_calendar.STARTED_AT: fresh.get(league_calendar.STARTED_AT)}
+    if not await really_started(db, running):
+        return []
+    await remember_start(db, running)
     base = {**season, rules.FIELD: fresh.get(rules.FIELD), KEPT: fresh.get(KEPT)}
     later = {**after_season, rules.FIELD: fresh.get(rules.FIELD), KEPT: fresh.get(KEPT)}
     stored = await _divisions(db, season["id"])
@@ -612,7 +637,8 @@ async def _check_settings(db, season: dict, divisions: list[dict], before: dict[
     for division in divisions:
         if division["id"] in closed and rules.sport_key(after[division["id"]]) != rules.sport_key(before[division["id"]]):
             raise PostseasonProblem(LOCKED.format(label=_label(division)), 409)
-    if season_started(season):
+    if await really_started(db, season):
+        # Erst wenn die Season wirklich läuft (Nr. 256) - das Datum allein sperrt nichts.
         # Ohne Blick auf an/aus (Nr. 249): Die Werte stehen auch im Zustand „aus“ fest. Wer die Playoffs nach dem Start aus- und
         # wieder einschaltet oder erst einschaltet, bekommt die Werte vom Start - bzw. die Vorgaben, wenn es vorher keine gab.
         for division in divisions:
@@ -1249,6 +1275,8 @@ async def overview(db, season: dict, user: dict) -> dict:
         rows.append({
             "division_id": division["id"], "level": division["level"], "label": _label(division), "settings": settings,
             "own_settings": division.get(rules.FIELD) if isinstance(division.get(rules.FIELD), dict) else None,
+            # Der Rückfallwert, der für diese Liga N gilt (Nr. 255) - ihr eigener oder der der Season; das Feld fehlt ohne ihn.
+            **({"best_of_kept": int(kept)} if (kept := _kept_for(season, division)) else {}),
             "locked": division["id"] in closed, "top": division["id"] == divisions[0]["id"], "has_lower": bool(lower),
             "lower_label": _label(lower) if lower else None,
             "zones": {"playoff_relegate": zones.get("playoff_relegate") or 0,
@@ -1262,8 +1290,8 @@ async def overview(db, season: dict, user: dict) -> dict:
         "season": {"id": season["id"], "name": season.get("name"), "best_of": season.get("best_of"),
                    "regular_end_day": (rules.regular_end_day(season).isoformat() if rules.regular_end_day(season) else None)},
         "settings": rules.stored(season), "configured": rules.any_enabled(season), "can_act": can_act,
-        # Ab dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht der Playoffs fest (Nr. 249) - die Felder sind dann gesperrt.
-        "started": season_started(season),
+        # Läuft die Season wirklich (Nr. 256), stehen Best of, Spiel um Platz 3 und Heimrecht fest (Nr. 249) - die Felder sind dann gesperrt.
+        "started": await really_started(db, season),
         # Der gemerkte Rückfallwert (Nr. 255): Nach dem Start heißt „wie in der Season“ dieses Best of - das Feld fehlt ohne ihn.
         **({"best_of_kept": int(season[KEPT])} if season.get(KEPT) else {}),
         "superadmin": league_permissions.is_superadmin(user),

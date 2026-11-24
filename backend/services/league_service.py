@@ -1006,18 +1006,20 @@ async def _create_division(db, season: dict, body: dict, user: dict, *, warnings
     return doc
 
 
-async def update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
+async def update_division(db, division: dict, body: dict, *, warnings: list | None = None, before_write=None) -> tuple[dict, list[str]]:
     """Ändert eine Liga N - unter der Season-Sperre (Nr. 232): Die Prüfungen „schon eine Staffel abgeschlossen?“ (Plätze über Staffeln
-    hinweg, Nr. 228; archivieren, Nr. 231) und der Abschluss einer Staffel kommen sich so nicht in die Quere."""
+    hinweg, Nr. 228; archivieren, Nr. 231) und der Abschluss einer Staffel kommen sich so nicht in die Quere.
+    ``before_write(vorher, nachher)`` läuft nach allen Prüfungen und vor dem Schreiben, unter derselben Sperre - nur, wenn sich etwas
+    ändert (#2404: der Rückfallwert fürs Best of der Playoffs). Eine abgelehnte Änderung erreicht ihn nie."""
     try:
         async with _season_lock(db, division["season_id"]):
             fresh = await db.league_divisions.find_one({"id": division["id"]}, {"_id": 0}) or division
-            return await _update_division(db, fresh, body, warnings=warnings)
+            return await _update_division(db, fresh, body, warnings=warnings, before_write=before_write)
     except MutationLockBusy:
         raise LeagueProblem(SEASON_BUSY, 409) from None
 
 
-async def _update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
+async def _update_division(db, division: dict, body: dict, *, warnings: list | None = None, before_write=None) -> tuple[dict, list[str]]:
     season = await get_season(db, division["season_id"])
     # Archivieren oder zurückholen verändert die Stufen der Season (Nr. 231): nicht mehr, sobald eine Staffel abgeschlossen ist.
     if body.get("status") and body["status"] != (division.get("status") or "active") and await divisions_locked(db, division["season_id"]):
@@ -1040,6 +1042,8 @@ async def _update_division(db, division: dict, body: dict, *, warnings: list | N
         await _division_order_check(db, season, {**division, **updates}, division, warnings)
     changed = sorted(key for key, value in updates.items() if division.get(key) != value)
     if changed:
+        if before_write:
+            await before_write(division, {**division, **updates})
         updates["updated_at"] = _now()
         await db.league_divisions.update_one({"id": division["id"]}, {"$set": updates})
     return {**division, **updates}, changed
