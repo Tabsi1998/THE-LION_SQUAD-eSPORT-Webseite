@@ -1237,7 +1237,8 @@ und allen Turnierseiten des Events) steht er als Banner mit Uhrzeit und Restzeit
 Banner und TV zeigen nie, wer geschrieben hat. Auch Gäste mit **Vor-Ort-Zugang** (QR-Code, 3.3) sehen das
 Banner über dem Titel ihrer schlanken Turnierseite – auch bei einem Mitglieder-Turnier (#2546). Sie lesen nur die Hinweise
 dieses Turniers (und die an sein ganzes Event), sonst nichts; eine Benachrichtigung bekommen sie erst, wenn sie angemeldet
-sind.
+sind. Ist der Vor-Ort-Zugang eingeschaltet, steht das im Formular unter den Empfängern: „Auch Gäste mit Vor-Ort-QR-Code sehen
+diesen Hinweis.“
 
 <img src="../assets/turniere/hinweis-banner-pc.png" alt="Turnierseite am PC: oben unter dem Pfad ein goldenes Banner Hinweis der Turnierleitung mit Megafon, Text Pause bis 14:25 und darunter 14:07 Uhr, noch 2 Stunden" width="600">
 

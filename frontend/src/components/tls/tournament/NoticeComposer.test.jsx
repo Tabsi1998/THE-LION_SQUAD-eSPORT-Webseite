@@ -161,3 +161,16 @@ it("nimmt eine neue Kennung, sobald sich der Hinweis nach einem Fehler ändert -
   expect(third.request_id).not.toBe(second.request_id);
   expect(second.duration_minutes).toBe(30);
 });
+
+it("#2546: mit eingeschaltetem Vor-Ort-Zugang sagt das Formular, dass auch Gäste den Hinweis sehen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...LIST, onsite_access: true } });
+  apiMock.post.mockImplementation(async () => ({ data: { recipients: 12 } }));
+  render(<NoticeComposer slug="lan-cup" tournament={{ id: "t1", event_id: "ev1", status: "live" }} stations={[]} />);
+  expect(await screen.findByTestId("notice-onsite")).toHaveTextContent("Auch Gäste mit Vor-Ort-QR-Code sehen diesen Hinweis.");
+});
+
+it("#2546: ohne Vor-Ort-Zugang kein Satz dazu", async () => {
+  setup();
+  await waitFor(() => expect(screen.getByTestId("notice-recipients").textContent).toMatch(/Geht an 12 Personen/));
+  expect(screen.queryByTestId("notice-onsite")).toBeNull();
+});
