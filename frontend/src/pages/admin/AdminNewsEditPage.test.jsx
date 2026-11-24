@@ -138,6 +138,15 @@ test("ein veröffentlichter Beitrag: Änderungen ohne Rückfrage, Datum bleibt",
   expect(confirmMock).not.toHaveBeenCalled();
 });
 
+test("#2553: ein schon veröffentlichter Beitrag wird auf „Nur App“ gestellt - die Verteilen-Box kündigt keinen Push an", async () => {
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-publish-now")).toBeChecked();
+  fireEvent.change(screen.getByTestId("news-channels"), { target: { value: "app" } });
+  const line = await screen.findByTestId("distribute-app-push");
+  expect(line).toHaveTextContent("Kein App-Push – der Beitrag ist schon öffentlich.");
+  expect(line).not.toHaveTextContent("Beim Veröffentlichen geht ein App-Push");
+});
+
 test("Bearbeiten lädt den Beitrag aus der Admin-Liste und schickt nur die Änderung", async () => {
   apiMock.patch.mockResolvedValue({ data: { ...POSTS[0], excerpt: "Neuer Termin 2027." } });
   renderAt("/admin/news/n1");

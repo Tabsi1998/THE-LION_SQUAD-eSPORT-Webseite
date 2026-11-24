@@ -65,3 +65,22 @@ test("„Nur App“ öffentlich (#1532): die Box kündigt den App-Push an alle A
   rerender(<DistributeBox kind="news" visibility="public" appOnly appPush={{ sent_at: "2026-11-23T10:00:00Z", count: 0, skipped: "channel_changed" }} />);
   expect(screen.getByTestId("distribute-app-push")).toHaveTextContent("Kein App-Push – der Beitrag war schon öffentlich, als er auf „Nur App“ gestellt wurde.");
 });
+
+test("#2553: schon öffentlich und jetzt auf „Nur App“ - die Box kündigt keinen Push an", async () => {
+  render(<DistributeBox kind="news" visibility="public" appOnly alreadyPublic />);
+  const line = await screen.findByTestId("distribute-app-push");
+  expect(line).toHaveTextContent("Kein App-Push – der Beitrag ist schon öffentlich. Wird er auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.");
+  expect(line).not.toHaveTextContent("Beim Veröffentlichen");
+});
+
+test("#2553: zu alte Beiträge zeigen den Grund statt „an 0 Personen“", async () => {
+  render(<DistributeBox kind="news" visibility="public" appOnly appPush={{ sent_at: "2026-11-23T10:00:00Z", count: 0, skipped: "too_old" }} />);
+  const line = await screen.findByTestId("distribute-app-push");
+  expect(line).toHaveTextContent("Kein App-Push – der Beitrag war beim Veröffentlichen schon älter als 24 Stunden.");
+  expect(line).not.toHaveTextContent("0 Personen");
+});
+
+test("#2553 Nr. 230: nach einer Mitglieder-Meldung sagt die Box, dass Benachrichtigte keinen zweiten Push bekommen", async () => {
+  render(<DistributeBox kind="news" visibility="public" appOnly membersNotified />);
+  expect(await screen.findByTestId("distribute-app-push")).toHaveTextContent("Wer die Mitglieder-Meldung schon bekam, bekommt keinen zweiten Push.");
+});
