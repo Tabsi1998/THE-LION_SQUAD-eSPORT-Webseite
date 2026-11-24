@@ -440,6 +440,10 @@ class OpsAlertSettingsBody(BaseModel):
     spike_window_minutes: int | None = None
     daily_summary_hour: int | None = None
     reach_fail_threshold: int | None = None
+    reach_recover_threshold: int | None = None
+    client_group_cap: int | None = None
+    alert_hourly_cap: int | None = None
+    client_errors_enabled: bool | None = None
 
 
 @router.get("/ops/alerts")
@@ -650,7 +654,7 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "", open_only: b
     error_query = {**since("last_seen_at"), **({"resolved_at": None} if open_only else {})}
     error_rows = await db.ops_errors.find(error_query, {"_id": 0, "stack": 0}).sort("last_seen_at", -1).limit(safe_limit).to_list(safe_limit)
     server_items = [
-        _with_state(_log_item("server", "Serverfehler", HREFS["server"], row, severity="info" if row.get("resolved_at") else "error",
+        _with_state(_log_item("server", "Fehler", HREFS["server"], row, severity="info" if row.get("resolved_at") else "error",
                               status="gelöst" if row.get("resolved_at") else "offen",
                               title=_error_title(row),
                               subtitle=_error_subtitle(row),
@@ -727,7 +731,7 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "", open_only: b
             for items in (server_items, check_items, alert_items, client_items, email_items, queue_items, upload_items, sync_items, bot_items))
 
     sources = [
-        _source_summary("server", "Serverfehler", HREFS["server"], total=await db.ops_errors.count_documents({}), problem_count=await ops_acks.open_count(db, "server"), items=server_items, tone="danger"),
+        _source_summary("server", "Fehler", HREFS["server"], total=await db.ops_errors.count_documents({}), problem_count=await ops_acks.open_count(db, "server"), items=server_items, tone="danger"),
         _source_summary("checks", "Auto-Checks", HREFS["checks"], total=await db.ops_check_episodes.count_documents({}), problem_count=await ops_acks.open_count(db, "checks"), items=check_items, tone="danger"),
         _source_summary("alerts", "Alarme", HREFS["alerts"], total=await db.ops_alert_log.count_documents({}), problem_count=await ops_acks.open_count(db, "alerts"), items=alert_items, tone="warn"),
         _source_summary("client", "App-Logs", HREFS["client"], total=await db.mobile_client_logs.count_documents({}), problem_count=await ops_acks.open_count(db, "client"), items=client_items, tone="danger"),

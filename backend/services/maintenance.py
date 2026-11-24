@@ -60,6 +60,8 @@ DEFAULT_EXEMPT_PATHS = frozenset({
     "/api/auth/mobile/refresh",
     "/api/auth/passkeys/login/options",
     "/api/auth/passkeys/login/verify",
+    # Fehler-Sammler (#1657): eine Meldung im Hintergrund - sie soll in der Pause keine Hinweisleiste auslösen.
+    "/api/ops/client-errors",
 })
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 

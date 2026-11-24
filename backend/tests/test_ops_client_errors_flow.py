@@ -26,6 +26,8 @@ SECRETS = (NAME, "Mustermann", MAIL, TOKEN, IP)
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
+    # Der Sammler für Website und App ist ab Werk aus (#1657, bis zur Freigabe des Datenschutz-Absatzes) - hier an.
+    await ops_alerts.save_alert_settings(instance.db, {"client_errors_enabled": True})
     try:
         yield instance
     finally:
@@ -154,14 +156,16 @@ async def test_a_server_error_keeps_type_place_and_version_only(flow, boom_route
 
 
 @pytest.mark.asyncio
-async def test_a_burst_warns_exactly_once(flow, discord_recorder):
+async def test_a_server_burst_warns_exactly_once(flow, discord_recorder, boom_route):
+    # Häufungen des Servers melden sich sofort; die aus Website und App nur in der Tageszusammenfassung (Fabian, 24.11.).
     await ops_alerts.save_alert_settings(flow.db, {"spike_threshold": 5, "spike_window_minutes": 10, "rules": {"error_group": {"discord": False}}})
-    for _ in range(12):
-        await flow.client.post("/api/ops/client-errors", json=web_error())
+    async with AsyncClient(transport=ASGITransport(app=boom_route, raise_app_exceptions=False), base_url="http://testserver") as client:
+        for _ in range(12):
+            await client.get("/api/_test/boom1657/x")
     await asyncio.sleep(0.1)
     spikes = [call for call in discord_recorder if call.get("event_key") == "ops_error_spike"]
     assert len(spikes) == 1, discord_recorder
-    assert spikes[0]["title"].startswith("Häufung") and "/u/:slug" in spikes[0]["title"]
+    assert spikes[0]["title"].startswith("Häufung") and "/api/_test/boom1657/{item_id}" in spikes[0]["title"]
     assert leaks(spikes[0]) == []
     rows = [row for row in await ops_alerts.recent_alerts(flow.db) if row["kind"] == "error_spike"]
     assert len(rows) == 1
@@ -236,3 +240,14 @@ async def test_the_event_list_names_the_source(flow):
     events = (await flow.get("/api/admin/ops/events?source=server")).json()
     titles = [item["title"] for item in events["items"]]
     assert titles == ["Website · TypeError · /u/:slug"]
+    # Die Quelle zählt Server, Website und App - sie heißt darum „Fehler“, nicht „Serverfehler“.
+    assert {item["source_label"] for item in events["items"]} == {"Fehler"}
+
+
+@pytest.mark.asyncio
+async def test_the_error_group_check_says_it_counts_the_server_only(flow):
+    from services.ops_checks import check_error_groups
+
+    await flow.client.post("/api/ops/client-errors", json=web_error())
+    check = await check_error_groups(flow.db)
+    assert check["value"].startswith("0 offen vom Server")

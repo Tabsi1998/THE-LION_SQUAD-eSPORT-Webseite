@@ -426,8 +426,9 @@ async def check_error_groups(db) -> dict:
         new_5xx = await db.ops_errors.count_documents({"first_seen_at": {"$gte": since}, "status_code": {"$gte": 500}})
     except Exception as exc:  # noqa: BLE001
         return failed("error_groups", label, exc)
-    value = f"{open_groups} offen, {new_5xx} neue 5xx in 1 h"
-    return result("error_groups", label, rate_error_groups(open_groups, new_5xx), value, "Server-Fehler als Gruppen (Betrieb → Fehler)")
+    value = f"{open_groups} offen vom Server, {new_5xx} neue 5xx in 1 h"
+    return result("error_groups", label, rate_error_groups(open_groups, new_5xx), value,
+                  "Nur Gruppen des Servers - Website und App stehen unter Betrieb → Fehler, zählen hier aber nicht")
 
 
 async def check_scheduler() -> dict:

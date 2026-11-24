@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from database import get_db
-from services.ops_monitor import record_client_error
+from services.ops_monitor import error_settings, record_client_error
 from services.ops_vitals import MAX_ENTRIES, clean_batch, store_vitals
 from services.rate_limit import enforce_rate_limit
 
@@ -45,7 +45,8 @@ class ClientErrorBody(BaseModel):
     """Was Website und App schicken dürfen. Alles andere (etwa ``message``) fällt weg."""
 
     source: Literal["web", "app"] = "web"
-    error_type: str = Field(default="Error", max_length=300)
+    # Kein Text erzwungen: ein Objekt oder eine Zahl wird bei der Bereinigung zu „Error“.
+    error_type: str | int | float | bool | dict | list | None = "Error"
     stack: str = Field(default="", max_length=CLIENT_ERROR_MAX_BYTES)
     route: str = Field(default="/", max_length=1000)
     version: str = Field(default="", max_length=200)
@@ -66,6 +67,10 @@ async def _read_limited(request: Request, limit: int) -> bytes:
 
 @router.post("/client-errors", status_code=202)
 async def receive_client_error(request: Request, response: Response):
+    # Ab Werk aus (#1657): Der Web-Melder fragt den Schalter nicht ab (Start-Bündel), er sendet - der Server verwirft.
+    settings = await error_settings(get_db())
+    if not settings.get("client_errors_enabled"):
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
     await enforce_rate_limit(request, "ops:client-errors", limit=CLIENT_ERROR_RATE_LIMIT, window_seconds=60)
     raw = await _read_limited(request, CLIENT_ERROR_MAX_BYTES)
     try:
@@ -75,7 +80,7 @@ async def receive_client_error(request: Request, response: Response):
         broken = any(error.get("type") == "json_invalid" for error in exc.errors())
         raise HTTPException(status_code=400 if broken else 422, detail="Ungültige Meldung") from None
     fingerprint = await record_client_error(get_db(), source=body.source, error_type=body.error_type, stack=body.stack,
-                                            route=body.route, version=body.version)
+                                            route=body.route, version=body.version, settings=settings)
     response.headers["Cache-Control"] = "no-store"
     return {"ok": fingerprint is not None, "id": fingerprint}
 

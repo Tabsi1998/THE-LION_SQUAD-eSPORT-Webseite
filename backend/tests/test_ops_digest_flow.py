@@ -93,3 +93,15 @@ async def test_outages_count_and_the_hour_is_a_setting(flow, discord_recorder):
     outcome = await ops_digest.send_daily_summary(flow.db, now=MORNING.replace(hour=5, minute=10))
     assert outcome["sent"] is True
     assert "1 Ausfall" in digests(discord_recorder)[0]["description"]
+
+
+@pytest.mark.asyncio
+async def test_bursts_from_website_and_app_are_listed_in_the_summary(flow, discord_recorder):
+    """Häufungen aus Website und App melden sich nie sofort (Fabian, 24.11.) - sie stehen hier."""
+    await add_group(flow, "web-burst", count=90)
+    await flow.db.ops_errors.update_one({"fingerprint": "web-burst"}, {"$set": {"spike_window": (MORNING - timedelta(hours=3)).isoformat(), "spike_count": 20}})
+    outcome = await ops_digest.send_daily_summary(flow.db, now=MORNING)
+    assert outcome["sent"] is True
+    text = digests(discord_recorder)[0]["description"]
+    assert "Häufungen aus Website und App: 1" in text
+    assert "Häufung: TypeError auf /teams/:slug (Website)" in text

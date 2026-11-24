@@ -2,7 +2,8 @@
 
 Einmal am Tag, ab der Stunde unter Betrieb → Alarme (Vorgabe 8 Uhr Wiener Zeit), geht über den gewohnten Weg
 (Ereignisart „Tageszusammenfassung“: Discord-Betriebskanal, auf Wunsch Mail) eine kurze Übersicht der letzten 24 Stunden:
-aktive und neue Fehlergruppen, die häufigsten fünf, offene Gruppen und Ausfälle. An ruhigen Tagen kommt nichts.
+aktive und neue Fehlergruppen, die häufigsten fünf, offene Gruppen, Ausfälle und die Häufungen aus Website und App
+(die sich nie sofort melden). An ruhigen Tagen kommt nichts.
 
 Nie doppelt: Der Schlüssel ``daily:<Datum>`` wird für zwei Tage geholt (``claim_alert``) - auch zwei Läufe zugleich
 oder ein Neustart senden ihn nur einmal. Scheitert der Versand, versucht es der nächste Lauf nach dem wachsenden
@@ -25,6 +26,12 @@ def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
+def _label(row: dict) -> str:
+    source = ops_alerts.SOURCE_LABELS.get(row.get("source") or "server", "Server")
+    place = f"{row.get('method') or ''} {row.get('route') or ''}".strip() or "/"
+    return f"{row.get('error_type') or 'Fehler'} auf {place} ({source})"
+
+
 async def build_summary(db, now: datetime) -> dict | None:
     since = (now - timedelta(hours=24)).isoformat()
     active = await db.ops_errors.find({"last_seen_at": {"$gte": since}}, {"_id": 0, "stack": 0}).to_list(2000)
@@ -39,9 +46,13 @@ async def build_summary(db, now: datetime) -> dict | None:
         f"{_plural(outages, 'Ausfall', 'Ausfälle')}.",
     ]
     for row in top:
-        source = ops_alerts.SOURCE_LABELS.get(row.get("source") or "server", "Server")
-        place = f"{row.get('method') or ''} {row.get('route') or ''}".strip() or "/"
-        lines.append(f"• {int(row.get('count') or 0)}× {row.get('error_type') or 'Fehler'} auf {place} ({source})")
+        lines.append(f"• {int(row.get('count') or 0)}× {_label(row)}")
+    # Häufungen aus Website und App (#1657) melden sich nie sofort - hier stehen sie.
+    bursts = [row for row in active if row.get("source") in ("web", "app") and str(row.get("spike_window") or "") >= since]
+    if bursts:
+        lines.append(f"Häufungen aus Website und App: {len(bursts)}")
+        for row in sorted(bursts, key=lambda item: -int(item.get("spike_count") or 0))[:TOP_LIMIT]:
+            lines.append(f"• Häufung: {_label(row)}")
     return {"description": "\n".join(lines), "fields": [{"name": "Zeitraum", "value": "letzte 24 Stunden", "inline": True}]}
 
 
