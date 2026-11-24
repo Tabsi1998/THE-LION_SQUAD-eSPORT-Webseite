@@ -3,7 +3,8 @@ const { test, expect } = require("@playwright/test");
 
 // Playoffs und Relegation (#2404, docs/LIGA.md „F.6 Playoffs und Relegation“) im echten Browser, Server nachgestellt: im Reiter
 // „Abschluss“ die Sperrgründe, die Vorschau der Setzung mit Paarungen und Wochen, Anlegen mit Bestätigung, der Stand der angelegten
-// Staffeln und die Einstellungen - und auf der Ligaseite der Baum der Playoffs, die Paarungen der Relegation und das Kennzeichen
+// Staffeln und die Einstellungen (ab dem Season-Start mit ausgegrauten Feldern, Nr. 249), der Hinweis „zu wenige Teams“ - und auf der
+// Ligaseite der Baum der Playoffs (ohne „Winner Bracket“, Nr. 248), die Paarungen der Relegation als Karten und das Kennzeichen
 // „Playoff-Platz“ in der Tabelle. Bei 390 und 1440 px ohne seitliches Scrollen. Mit E2E_SCREENS_DIR legt der Test die Bilder ab
 // (playoffs-…). Die Antworten kommen aus dem echten Server (e2e/fixtures/league-postseason.json), nur erfundene Namen.
 const DATA = require("./fixtures/league-postseason.json");
@@ -87,7 +88,11 @@ test.describe("Liga: Playoffs und Relegation", () => {
       await expect(seeds.first()).toContainText("Staffel A · Platz 1");
       // Die beiden Staffelsieger stehen gleich: gelost wird erst beim Anlegen, die Vorschau sagt es.
       await expect(division.getByTestId(`postseason-lot-${ids.division_1}`)).toContainText("wird beim Anlegen gelost");
-      await expect(division.getByTestId(`postseason-pairings-${ids.division_1}`).getByRole("listitem")).toHaveCount(4);
+      // Die erste Runde als Karten: je Paarung beide Seiten mit Setzplatz, für Screenreader ein Satz.
+      const pairings = division.getByTestId(`postseason-pairings-${ids.division_1}`);
+      await expect(pairings.getByRole("listitem")).toHaveCount(4);
+      await expect(pairings.getByRole("listitem").first()).toHaveAttribute("aria-label", /^1 .+ – 8 .+$/);
+      await shot(pairings, `playoffs-paarungen-${width}`);
       await expect(division.getByTestId(`postseason-rounds-${ids.division_1}`)).toContainText("Finale · Best of 5");
       const relegation = division.getByTestId(`postseason-relegation-${ids.division_1}`);
       await expect(relegation).toContainText("Relegation gegen Liga 2");
@@ -149,7 +154,7 @@ test.describe("Liga: Playoffs und Relegation", () => {
       await expect(sheet.getByTestId("postseason-per-staffel")).toHaveValue("4");
       await expect(sheet.getByTestId("postseason-champion-source")).toHaveValue("playoffs");
       // In Liga 1 ist schon abgeschlossen: an/aus und die Plätze stehen fest - das Fenster sagt es.
-      await expect(sheet.getByTestId("postseason-settings-locked")).toBeVisible();
+      await expect(sheet.getByTestId("postseason-settings-locked")).toContainText("bis zum Season-Start ändern, Termine bis zum Anlegen");
       await noSideScroll(page);
       await shot(sheet, `playoffs-einstellungen-${width}`);
       await sheet.getByTestId("postseason-third-place").check();
@@ -157,6 +162,50 @@ test.describe("Liga: Playoffs und Relegation", () => {
       await expect.poll(() => sent.body?.playoffs).toEqual({ enabled: true, per_staffel: 4, best_of: 3, third_place: true, home: "better_seed", start_date: null,
         best_of_rounds: [{ round: 3, best_of: 5 }] });
       expect(sent.body.champion_source).toBe("playoffs");
+    });
+
+    test(`Ab dem Season-Start bei ${width} px: Best of, Platz 3 und Heimrecht sind ausgegraut, mit Hinweis`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      // Dieselbe Antwort des Servers, nur nach dem Beginn der ersten Spielwoche (`started`).
+      await mockServer(page, { admin: true, cockpit: { ...DATA.cockpit_ready, started: true } });
+      await page.goto(ABSCHLUSS);
+      await page.getByTestId("postseason-settings").click();
+      const sheet = page.getByTestId("postseason-settings-sheet");
+      await expect(sheet.getByTestId("postseason-start-locked")).toContainText("Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest");
+      for (const id of ["postseason-best-of", "postseason-home", "postseason-third-place", "postseason-round-0", "postseason-round-best-of-0"]) {
+        await expect(sheet.getByTestId(id)).toBeDisabled();
+      }
+      await expect(sheet.getByTestId("postseason-round-add")).toHaveCount(0);
+      // Der Start der Playoffs und die Relegation gehören nicht dazu.
+      await expect(sheet.getByTestId("postseason-start")).toBeEnabled();
+      await noSideScroll(page);
+      await shot(sheet, `playoffs-gesperrt-${width}`);
+    });
+
+    test(`Zu wenige Teams bei ${width} px: der Hinweis steht an der Liga und nach dem Speichern`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const few = DATA.cockpit_too_few;
+      const id = few.divisions[0].division_id;
+      const hint = few.divisions[0].playoffs.too_few_hint;
+      await mockServer(page, { admin: true, cockpit: few });
+      await page.route(`**/api/admin/leagues/seasons/${ids.season}/postseason`, (route) => {
+        if (route.request().method() !== "PUT") return json(few)(route);
+        return json({ ok: true, settings: route.request().postDataJSON(), warnings: [hint] })(route);
+      });
+      await page.goto(ABSCHLUSS);
+      const panel = page.getByTestId("season-postseason");
+      await expect(panel.getByTestId(`postseason-too-few-${id}`)).toHaveText(hint);
+      await expect(panel.getByTestId(`postseason-too-few-${id}`)).toContainText("weniger als zwei Teams");
+      // Diese Liga spielt keine Playoffs: nichts anzulegen, nichts, worauf zu warten wäre.
+      await expect(panel.getByTestId(`postseason-playoffs-state-${id}`)).toHaveText("Keine Playoffs");
+      await expect(panel.getByTestId(`postseason-create-playoffs-${id}`)).toHaveCount(0);
+      // Die Season wartet nicht auf diese Playoffs.
+      await expect(panel.getByTestId("postseason-missing")).toHaveCount(0);
+      await noSideScroll(page);
+      await shot(panel.getByTestId(`postseason-division-${id}`), `playoffs-zu-wenige-${width}`);
+      await page.getByTestId("postseason-settings").click();
+      await page.getByTestId("postseason-settings-sheet").getByTestId("postseason-settings-save").click();
+      await expect(page.getByText(`Einstellungen gespeichert. ${hint}`)).toBeVisible();
     });
 
     test(`Ligaseite bei ${width} px: Baum der Playoffs, Paarungen der Relegation, Playoff-Plätze in der Tabelle`, async ({ page }) => {
@@ -175,10 +224,24 @@ test.describe("Liga: Playoffs und Relegation", () => {
       // Am Handy blättert der Baum Runde für Runde, am Desktop steht er als Leinwand - beides trägt den Abschnitt.
       await expect(playoffs.locator("[data-testid^='bracket-section-']").first()).toBeVisible();
       await expect(playoffs).toContainText("Nordlicht · Nordlicht A");
+      // Nr. 248: Der Baum heißt „Playoffs“ - der Abschnittstitel des Turnierbaums steht hier nirgends.
+      await expect(division.getByText(/Winner Bracket/i)).toHaveCount(0);
       await expect(playoffs.getByTestId(`league-postseason-link-${ids.playoff}`)).toHaveAttribute("href", `/tournaments/${ids.playoff_slug}/bracket`);
       const relegation = division.getByTestId(`league-postseason-relegation-${ids.relegation}`);
       await expect(relegation.getByRole("heading", { name: "Relegation" })).toBeVisible();
-      await expect(relegation.locator("[data-testid^='bracket-section-']").first()).toBeVisible();
+      // Die Relegation lesbar: je Paarung das Team der oberen (Heim) und das der unteren Liga, ohne Baum und ohne Setzplätze.
+      await expect(relegation.locator("[data-testid^='bracket-section-']")).toHaveCount(0);
+      await expect(relegation.getByText(/^REL$/)).toHaveCount(0);
+      const pairs = relegation.getByTestId(`league-relegation-pairs-${ids.relegation}`).getByRole("listitem");
+      await expect(pairs).toHaveCount(2);
+      const [played, open] = DATA.public_season.divisions[0].postseason[1].pairs;
+      await expect(pairs.first()).toContainText("Liga 1 · Heim");
+      await expect(pairs.first()).toContainText(played.upper.display_name);
+      await expect(pairs.first()).toContainText("Liga 2");
+      await expect(pairs.first()).toContainText(`${played.lower.display_name} steigt auf, ${played.upper.display_name} steigt ab.`);
+      await expect(pairs.first().getByRole("link")).toHaveAttribute("href", `/matches/${played.match_id}`);
+      await expect(pairs.nth(1)).toContainText(open.lower.display_name);
+      await expect(pairs.nth(1)).toContainText("Noch nicht gespielt");
       await noSideScroll(page);
       await shot(table, `playoffs-tabelle-${width}`);
       await shot(playoffs, `playoffs-ligaseite-${width}`);
