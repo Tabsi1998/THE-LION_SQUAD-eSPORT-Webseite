@@ -1,6 +1,6 @@
 import {
   championLine, divisionBody, formOf, formProblem, fullDay, kindLabel, lotLine, missingLine, pairingLine, partState, placeText, playoffLine,
-  reachedText, relegationLine, relegationRowText, roundLine, seasonBody, seedOrigin, shortDay, tieText, weekRange,
+  reachedText, relegationLine, relegationPairState, relegationRowText, roundLine, seasonBody, seedOrigin, shortDay, tieText, weekRange,
 } from "./leaguePostseason";
 
 // Playoffs und Relegation (#2404): Texte und kleine Rechnungen für Cockpit und Ligaseite. Erfundene Namen.
@@ -90,4 +90,13 @@ test("Los, fehlende Staffeln, Plätze und Zeilen der Relegation", () => {
   expect(kindLabel({ kind: "playoff", label: "Playoffs" })).toBe("Playoffs");
   expect(kindLabel({ kind: "relegation" })).toBe("Relegation");
   expect(kindLabel({ staffel: "A" })).toBe("");
+});
+
+test("Stand einer Paarung der Relegation auf der Ligaseite", () => {
+  const upper = { display_name: "Probe Oben", division_label: "Liga 1" };
+  const lower = { display_name: "Probe Unten", division_label: "Liga 2" };
+  expect(relegationPairState({ decided: false, upper, lower })).toBe("Noch nicht gespielt");
+  expect(relegationPairState({ decided: true, upper, lower: { ...lower, won: true } })).toBe("Probe Unten steigt auf, Probe Oben steigt ab.");
+  expect(relegationPairState({ decided: true, upper: { ...upper, won: true }, lower })).toBe("Probe Oben bleibt in Liga 1, Probe Unten in Liga 2.");
+  expect(relegationPairState({ void: true, upper, lower })).toBe("Nicht gespielt – beide bleiben in ihrer Liga.");
 });

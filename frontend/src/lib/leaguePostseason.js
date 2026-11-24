@@ -167,3 +167,11 @@ export function relegationRowText(row) {
 export function kindLabel(row) {
   return row?.label || KIND_LABELS[row?.kind] || "";
 }
+
+/** Stand einer Paarung der Relegation auf der Ligaseite: wer gewonnen hat und was daraus folgt - oder dass noch gespielt wird. */
+export function relegationPairState(pair) {
+  if (pair?.void) return "Nicht gespielt – beide bleiben in ihrer Liga.";
+  if (!pair?.decided) return "Noch nicht gespielt";
+  if (pair.lower?.won) return `${pair.lower.display_name} steigt auf, ${pair.upper.display_name} steigt ab.`;
+  return `${pair.upper?.display_name} bleibt in ${pair.upper?.division_label}, ${pair.lower?.display_name} in ${pair.lower?.division_label}.`;
+}

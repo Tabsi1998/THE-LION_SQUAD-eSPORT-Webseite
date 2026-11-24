@@ -53,7 +53,7 @@ function StaffelBracketPanel({ tournamentId }) {
   return (
     <div className="space-y-3" data-testid="staffel-bracket">
       <p className="text-sm text-white/65">Die Setzliste kommt aus dem Endstand der regulären Staffeln. Neu berechnen und abschließen: Reiter „Abschluss“ der Season.</p>
-      <BracketTree data={data} />
+      <BracketTree data={data} quietSections />
     </div>
   );
 }

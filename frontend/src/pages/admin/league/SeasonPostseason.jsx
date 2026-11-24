@@ -89,6 +89,25 @@ function SeedList({ seeds, testId }) {
   );
 }
 
+/** Eine Seite einer Paarung der ersten Runde: Setzplatz und Team - oder das Freilos. */
+function PairSide({ entry }) {
+  if (!entry) return <p className="px-3 py-2 text-sm text-white/45">Freilos</p>;
+  return (
+    <p className="flex items-center gap-2 px-3 py-2 text-sm">
+      <span className="w-5 shrink-0 text-right font-display font-bold tabular-nums text-white/60">{entry.seed}</span>
+      <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{entry.display_name}</span>
+    </p>
+  );
+}
+
+function Note({ children, testId }) {
+  return (
+    <p className="flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/5 p-3 text-sm text-white" role="note" data-testid={testId}>
+      <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" /> <span>{children}</span>
+    </p>
+  );
+}
+
 function Playoffs({ row, data, onSheet }) {
   const part = row.playoffs;
   const id = row.division_id;
@@ -101,6 +120,7 @@ function Playoffs({ row, data, onSheet }) {
         <Chip part={part} testId={`postseason-playoffs-state-${id}`} />
       </div>
       <p className="text-xs text-white/60" data-testid={`postseason-playoffs-line-${id}`}>{playoffLine(row.settings)}</p>
+      {part.too_few_hint ? <Note testId={`postseason-too-few-${id}`}>{part.too_few_hint}</Note> : null}
       {!part.staffel ? <Blockers part={part} testId={`postseason-playoffs-blockers-${id}`} /> : null}
       <StaffelLinks staffel={part.staffel} kind="playoff" />
       {part.stale ? (
@@ -117,8 +137,14 @@ function Playoffs({ row, data, onSheet }) {
           </div>
           <div className="space-y-2">
             <h5 className={HEAD}>Erste Runde</h5>
-            <ul className="space-y-1 text-sm text-white/85" data-testid={`postseason-pairings-${id}`}>
-              {part.pairings.map((pair) => <li key={pair.order} className="[overflow-wrap:anywhere]">{pairingLine(pair)}</li>)}
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" data-testid={`postseason-pairings-${id}`}>
+              {part.pairings.map((pair) => (
+                <li key={pair.order} className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]" aria-label={pairingLine(pair)}
+                  data-testid={`postseason-pairing-${id}-${pair.order}`}>
+                  <PairSide entry={pair.a} />
+                  <PairSide entry={pair.b} />
+                </li>
+              ))}
             </ul>
             {part.byes ? <p className="text-xs text-white/60">{part.byes === 1 ? "Ein Freilos" : `${part.byes} Freilose`} für die Bestgesetzten.</p> : null}
             {lot && !part.staffel ? <p className="text-xs text-white/60">Die Paarungen stehen nach dem Los fest.</p> : null}
@@ -133,7 +159,7 @@ function Playoffs({ row, data, onSheet }) {
           </ul>
         </div>
       ) : null}
-      {(part.staffel?.veto_notes || []).map((note) => <p key={note} className="text-xs text-warn">{note}</p>)}
+      {[...(part.veto_notes || []), ...(part.staffel?.veto_notes || [])].map((note) => <Note key={note} testId={`postseason-veto-note-${id}`}>{note}</Note>)}
       {part.stale && part.next_seeds?.length ? (
         <div className="space-y-2">
           <h5 className={HEAD}>Setzliste nach dem geltenden Endstand</h5>
@@ -197,6 +223,7 @@ function Relegation({ row, data, onSheet }) {
         </ul>
       ) : null}
       {lot ? <p className="flex items-start gap-2 text-xs text-white/70"><Shuffle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#29B6E8]" aria-hidden="true" /> <span>{lot}</span></p> : null}
+      {[...(part.veto_notes || []), ...(part.staffel?.veto_notes || [])].map((note) => <Note key={note} testId={`postseason-relegation-veto-note-${id}`}>{note}</Note>)}
       {part.start_day ? (
         <p className="text-sm text-white/75" data-testid={`postseason-relegation-week-${id}`}>
           Woche {weekRange(part.start_day, part.end_day)}
@@ -310,7 +337,9 @@ function BestOfSelect({ label, value, onChange, options, fallback, testId, disab
     options={[["", fallback], ...options.map((item) => [String(item), `Best of ${item}`])]} />;
 }
 
-function PlayoffFields({ form, change, options, locked, earliest, prefix }) {
+const START_LOCK_NOTE = "Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest. Das gilt auch nach einem Wiederöffnen.";
+
+function PlayoffFields({ form, change, options, locked, startLocked = false, earliest, prefix }) {
   const rounds = form.best_of_rounds || [];
   const setRound = (index, patch) => change({ best_of_rounds: rounds.map((row, at) => (at === index ? { ...row, ...patch } : row)) });
   return (
@@ -319,17 +348,18 @@ function PlayoffFields({ form, change, options, locked, earliest, prefix }) {
         hint="Die besten Teams jeder Staffel spielen nach der regulären Season einen K.-o.-Baum." testId={`${prefix}-playoffs-enabled`} />
       {form.enabled ? (
         <>
+          {startLocked ? <p className="rounded-sm border border-white/15 bg-white/5 p-3 text-xs text-white/75" role="note" data-testid={`${prefix}-start-locked`}>{START_LOCK_NOTE}</p> : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField label="Plätze je Staffel" type="number" min={options.per_staffel[0]} max={options.per_staffel[1]} value={form.per_staffel} required disabled={locked}
               onChange={(value) => change({ per_staffel: value })} hint="So viele Teams jeder Staffel kommen in die Playoffs." testId={`${prefix}-per-staffel`} />
             <BestOfSelect label="Best of" value={form.best_of} onChange={(value) => change({ best_of: value })} options={options.best_of}
-              fallback="Wie in der Season" testId={`${prefix}-best-of`} />
-            <SelectField label="Heimrecht und Team A im Veto" value={form.home} onChange={(value) => change({ home: value })} testId={`${prefix}-home`}
+              fallback="Wie in der Season" testId={`${prefix}-best-of`} disabled={startLocked} />
+            <SelectField label="Heimrecht und Team A im Veto" value={form.home} onChange={(value) => change({ home: value })} testId={`${prefix}-home`} disabled={startLocked}
               options={[["better_seed", "Der besser Gesetzte"], ["draw", "Los je Spiel"]]} />
             <TextField label="Start der Playoffs" type="date" min={earliest || undefined} value={form.start_date} onChange={(value) => change({ start_date: value })}
               hint="Leer: die erste freie Woche nach der regulären Season." testId={`${prefix}-start`} />
           </div>
-          <CheckField label="Spiel um Platz 3" checked={form.third_place} onChange={(value) => change({ third_place: value })}
+          <CheckField label="Spiel um Platz 3" checked={form.third_place} onChange={(value) => change({ third_place: value })} disabled={startLocked}
             hint="Ohne das Spiel teilen sich die beiden Halbfinal-Verlierer Platz 3." testId={`${prefix}-third-place`} />
           <fieldset className="space-y-2">
             <legend className={HEAD}>Best of je Runde</legend>
@@ -337,17 +367,17 @@ function PlayoffFields({ form, change, options, locked, earliest, prefix }) {
             {rounds.map((row, index) => (
               // Die Zeilen stehen fest in dieser Reihenfolge - der Index ist hier der Schlüssel.
               <div key={index} className="flex flex-wrap items-end gap-2">
-                <SelectField label="Runde" value={row.round} onChange={(value) => setRound(index, { round: value })} className="w-28" testId={`${prefix}-round-${index}`}
+                <SelectField label="Runde" value={row.round} onChange={(value) => setRound(index, { round: value })} className="w-28" testId={`${prefix}-round-${index}`} disabled={startLocked}
                   options={[["", "–"], ...Array.from({ length: options.round_max }, (_unused, at) => [String(at + 1), `Runde ${at + 1}`])]} />
                 <BestOfSelect label="Best of" value={row.best_of} onChange={(value) => setRound(index, { best_of: value })} options={options.best_of}
-                  fallback="–" testId={`${prefix}-round-best-of-${index}`} />
-                <button type="button" onClick={() => change({ best_of_rounds: rounds.filter((_row, at) => at !== index) })} aria-label={`Zeile ${index + 1} entfernen`}
+                  fallback="–" testId={`${prefix}-round-best-of-${index}`} disabled={startLocked} />
+                <button type="button" disabled={startLocked} onClick={() => change({ best_of_rounds: rounds.filter((_row, at) => at !== index) })} aria-label={`Zeile ${index + 1} entfernen`}
                   className="tls-btn tls-btn--quiet inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm">
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
             ))}
-            {rounds.length < options.round_max ? (
+            {rounds.length < options.round_max && !startLocked ? (
               <button type="button" onClick={() => change({ best_of_rounds: [...rounds, { round: "", best_of: "" }] })} className={`${BUTTON} tls-btn--quiet`} data-testid={`${prefix}-round-add`}>
                 <Plus className="h-4 w-4" aria-hidden="true" /> Runde hinzufügen
               </button>
@@ -393,8 +423,8 @@ function SettingsSheet({ data, seasonId, onClose, onDone }) {
     }
     setSaving(true);
     try {
-      await api.put(`/admin/leagues/seasons/${seasonId}/postseason`, seasonBody(form));
-      toast.success("Einstellungen gespeichert.");
+      const { data: saved } = await api.put(`/admin/leagues/seasons/${seasonId}/postseason`, seasonBody(form));
+      toast.success(["Einstellungen gespeichert.", ...(saved?.warnings || [])].join(" "));
       onDone();
     } catch (failure) {
       toast.error(errorOf(failure, "Speichern hat nicht geklappt."));
@@ -409,7 +439,7 @@ function SettingsSheet({ data, seasonId, onClose, onDone }) {
       {locked ? <p className="mt-3 rounded-sm border border-warn/40 bg-warn/5 p-3 text-xs text-white/80" role="note" data-testid="postseason-settings-locked">{SEASON_LOCK_NOTE}</p> : null}
       <div className="mt-4 space-y-6">
         <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
-          options={data.options} earliest={earliest} prefix="postseason" />
+          options={data.options} earliest={earliest} prefix="postseason" startLocked={Boolean(data.started && data.settings?.playoffs?.enabled)} />
         <RelegationFields form={form.relegation} change={(patch) => setForm((current) => ({ ...current, relegation: { ...current.relegation, ...patch } }))}
           options={data.options} earliest={earliest} prefix="postseason" />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -438,8 +468,8 @@ function DivisionSheet({ data, row, onClose, onDone }) {
     }
     setSaving(true);
     try {
-      await api.put(`/admin/leagues/divisions/${row.division_id}/postseason`, divisionBody(form, own));
-      toast.success(own.playoffs || own.relegation ? "Abweichung gespeichert." : "Die Liga folgt wieder der Season.");
+      const { data: saved } = await api.put(`/admin/leagues/divisions/${row.division_id}/postseason`, divisionBody(form, own));
+      toast.success([own.playoffs || own.relegation ? "Abweichung gespeichert." : "Die Liga folgt wieder der Season.", ...(saved?.warnings || [])].join(" "));
       onDone();
     } catch (failure) {
       toast.error(errorOf(failure, "Speichern hat nicht geklappt."));
@@ -457,7 +487,8 @@ function DivisionSheet({ data, row, onClose, onDone }) {
           <CheckField label="Eigene Playoff-Einstellungen für diese Liga" checked={own.playoffs} onChange={(value) => setOwn((current) => ({ ...current, playoffs: value }))}
             testId="postseason-division-own-playoffs" />
           {own.playoffs ? <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
-            options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division" /> : <p className="text-xs text-white/55">Season: {playoffLine({ playoffs: data.settings.playoffs })}</p>}
+            options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division"
+            startLocked={Boolean(data.started && row.settings?.playoffs?.enabled)} /> : <p className="text-xs text-white/55">Season: {playoffLine({ playoffs: data.settings.playoffs })}</p>}
         </div>
         {row.has_lower ? (
           <div className="space-y-3">

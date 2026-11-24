@@ -55,7 +55,10 @@ test("die Vorschau zeigt Setzliste, Paarungen und Wochen - anlegen schickt den F
   expect(seeds).toHaveLength(4);
   expect(seeds[0]).toHaveTextContent("Probe A1");
   expect(seeds[0]).toHaveTextContent("Staffel A · Platz 1");
-  expect(screen.getByTestId("postseason-pairings-d1")).toHaveTextContent("1 Probe A1 – 4 Probe A4");
+  // Die erste Runde als Karten: je Paarung beide Seiten mit Setzplatz - für Screenreader ein Satz.
+  expect(within(screen.getByTestId("postseason-pairings-d1")).getAllByRole("listitem")).toHaveLength(2);
+  expect(screen.getByTestId("postseason-pairing-d1-1")).toHaveAttribute("aria-label", "1 Probe A1 – 4 Probe A4");
+  expect(screen.getByTestId("postseason-pairing-d1-1")).toHaveTextContent("Probe A4");
   expect(screen.getByTestId("postseason-rounds-d1")).toHaveTextContent("Finale · Best of 3 · 07.04.–13.04.2031");
   fireEvent.click(screen.getByTestId("postseason-create-playoffs-d1"));
   expect(apiMock.post).not.toHaveBeenCalled();
@@ -181,4 +184,47 @@ test("ein Fehler des Servers beim Speichern bleibt im Fenster stehen", async () 
   fireEvent.click(screen.getByTestId("postseason-settings-save"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("In Liga 1 ist schon eine Staffel abgeschlossen."));
   expect(screen.getByTestId("postseason-settings-sheet")).toBeInTheDocument();
+});
+
+test("ein Freilos steht in der Karte der Paarung", async () => {
+  renderPanel(cockpit([division({ playoffs: playoffs({ seeds: SEEDS.slice(0, 3), byes: 1, pairings: [{ order: 1, a: SEEDS[0], b: null }, { order: 2, a: SEEDS[1], b: SEEDS[2] }] }) })]));
+  expect(await screen.findByTestId("postseason-pairing-d1-1")).toHaveTextContent("Freilos");
+  expect(screen.getByTestId("postseason-pairing-d1-1")).toHaveAttribute("aria-label", "1 Probe A1 – Freilos");
+});
+
+test("zu wenige Teams: der Hinweis steht an der Liga und nach dem Speichern im Satz", async () => {
+  const hint = "In Liga 1 kommen mit 1 Platz je Staffel und 1 Staffel weniger als zwei Teams zusammen. Dort gibt es keine Playoffs - der Meister kommt aus der Tabelle, die Season wartet nicht darauf.";
+  apiMock.put.mockResolvedValue({ data: { ok: true, warnings: [hint] } });
+  renderPanel(cockpit([division({ playoffs: playoffs({ state: "waiting", can_create: false, seeds: [], pairings: [], too_few_hint: hint }) })]));
+  expect(await screen.findByTestId("postseason-too-few-d1")).toHaveTextContent("weniger als zwei Teams");
+  fireEvent.click(screen.getByTestId("postseason-settings"));
+  fireEvent.click(screen.getByTestId("postseason-settings-save"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(`Einstellungen gespeichert. ${hint}`));
+});
+
+test("ab dem Season-Start sind Best of, Platz 3 und Heimrecht ausgegraut - mit Hinweis", async () => {
+  renderPanel(cockpit([division()], { started: true, settings: { ...SETTINGS, playoffs: { ...SETTINGS.playoffs, best_of_rounds: [{ round: 2, best_of: 5 }] } } }));
+  fireEvent.click(await screen.findByTestId("postseason-settings"));
+  expect(screen.getByTestId("postseason-start-locked")).toHaveTextContent("Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest");
+  for (const id of ["postseason-best-of", "postseason-home", "postseason-third-place", "postseason-round-0", "postseason-round-best-of-0"]) {
+    expect(screen.getByTestId(id)).toBeDisabled();
+  }
+  expect(screen.queryByTestId("postseason-round-add")).not.toBeInTheDocument();
+  // Was nicht dazugehört, bleibt offen: Plätze je Staffel, Start, Relegation, Meister.
+  for (const id of ["postseason-per-staffel", "postseason-start", "postseason-relegation-enabled", "postseason-champion-source"]) {
+    expect(screen.getByTestId(id)).toBeEnabled();
+  }
+});
+
+test("vor dem Season-Start ist nichts ausgegraut", async () => {
+  renderPanel(cockpit([division()], { started: false }));
+  fireEvent.click(await screen.findByTestId("postseason-settings"));
+  expect(screen.queryByTestId("postseason-start-locked")).not.toBeInTheDocument();
+  expect(screen.getByTestId("postseason-best-of")).toBeEnabled();
+  expect(screen.getByTestId("postseason-third-place")).toBeEnabled();
+});
+
+test("passt keine Veto-Vorlage zum Best of, steht das schon in der Vorschau", async () => {
+  renderPanel(cockpit([division({ playoffs: playoffs({ veto_notes: ["Veto für Best of 5: Für dieses Spiel gilt kein Map-Pool."] }) })]));
+  expect(await screen.findByTestId("postseason-veto-note-d1")).toHaveTextContent("Veto für Best of 5");
 });

@@ -8,7 +8,11 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(d
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => true }));
-vi.mock("@/components/tls/BracketTree", () => ({ BracketTree: ({ data }) => <div data-testid="bracket-tree">{(data.matches_v2 || []).length} Spiele</div> }));
+const bracketProps = [];
+vi.mock("@/components/tls/BracketTree", () => ({ BracketTree: (props) => {
+  bracketProps.push(props);
+  return <div data-testid="bracket-tree">{(props.data.matches_v2 || []).length} Spiele</div>;
+} }));
 
 const { StandingsTable, ZoneLegend } = await import("@/components/tls/tournament/StandingsTable");
 const { DoubleNoShowAction } = await import("./DoubleNoShowAction");
@@ -68,10 +72,15 @@ test("beide nicht erschienen im K.-o.: erst neu ansetzen, beim zweiten Mal schei
   const { unmount } = render(<DoubleNoShowAction match={base} />);
   fireEvent.click(screen.getByTestId("match-double-no-show"));
   expect(screen.getByTestId("match-double-no-show-sheet")).toHaveTextContent("beim ersten Mal einmal neu angesetzt");
+  // Nr. 245: Schon das erste Mal zählt - das Fenster sagt es vorher.
+  expect(screen.getByTestId("match-double-no-show-sheet")).toHaveTextContent("zählt es schon als „nicht erschienen“");
+  expect(screen.queryByTestId("match-double-no-show-back")).not.toBeInTheDocument();
   expect(screen.getByTestId("match-double-no-show-save")).toHaveTextContent("Neu ansetzen");
   fireEvent.change(screen.getByTestId("match-double-no-show-text"), { target: { value: "Beide nicht erschienen" } });
   fireEvent.click(screen.getByTestId("match-double-no-show-save"));
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Einmal neu angesetzt – bitte den Termin setzen. Kommt wieder niemand, scheiden beide aus."));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/matches/m1/double-no-show", { note: "Beide nicht erschienen" });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(
+    "Einmal neu angesetzt – bitte den Termin setzen. Es zählt für beide als „nicht erschienen“. Kommt wieder niemand, scheiden beide aus."));
   unmount();
   apiMock.post.mockResolvedValue({ data: {} });
   render(<DoubleNoShowAction match={{ ...base, no_show_retry: { at: "2031-04-01T10:00:00+00:00" } }} />);
@@ -93,17 +102,49 @@ test("in einer regulären Staffel bleibt „beide nicht erschienen“ die Wertun
 
 test("die Ligaseite zeigt Playoffs und Relegation einer Liga als Baum - ohne sie nichts", async () => {
   apiMock.get.mockResolvedValue({ data: { matches_v2: [{ id: "a" }, { id: "b" }, { id: "c" }] } });
+  const pairs = [
+    { pair: 1, decided: true, void: false, match_id: "m1", upper: { display_name: "Probe Oben", division_label: "Liga 1", score: 0, won: false },
+      lower: { display_name: "Probe Unten", division_label: "Liga 2", score: 2, won: true } },
+    { pair: 2, decided: false, void: false, match_id: "m2", upper: { display_name: "Probe Zwei", division_label: "Liga 1", score: null, won: false },
+      lower: { display_name: "Probe Drei", division_label: "Liga 2", score: null, won: false } }];
   const division = { id: "d1", level: 1, label: "Liga 1", postseason: [
     { tournament_id: "po1", slug: "probe-po", kind: "playoff", label: "Playoffs", closed: false },
-    { tournament_id: "rel1", slug: "probe-rel", kind: "relegation", label: "Relegation", closed: true }] };
+    { tournament_id: "rel1", slug: "probe-rel", kind: "relegation", label: "Relegation", closed: true, pairs }] };
   const { unmount } = render(<MemoryRouter><DivisionPostseason division={division} /></MemoryRouter>);
   const playoffs = screen.getByTestId("league-postseason-playoff-po1");
   expect(within(playoffs).getByRole("heading", { name: "Playoffs" })).toBeInTheDocument();
   await waitFor(() => expect(within(playoffs).getByTestId("bracket-tree")).toHaveTextContent("3 Spiele"));
   expect(apiMock.get).toHaveBeenCalledWith("/tournaments/po1/bracket");
   expect(within(playoffs).getByRole("link", { name: "Playoffs Liga 1: alle Spiele" })).toHaveAttribute("href", "/tournaments/probe-po/bracket");
-  expect(screen.getByTestId("league-postseason-relegation-rel1")).toHaveTextContent("Endstand");
+  // Nr. 248: Der Baum heißt „Playoffs“ - der Abschnittstitel des Turnierbaums („Winner Bracket“) entfällt.
+  expect(bracketProps.at(-1)).toMatchObject({ quietSections: true, compact: true });
+  // Relegation lesbar: je Paarung, wer aus welcher Liga kommt, ohne Setzplätze - und was aus dem Ergebnis folgt.
+  const relegation = screen.getByTestId("league-postseason-relegation-rel1");
+  expect(relegation).toHaveTextContent("Endstand");
+  expect(within(relegation).queryByTestId("bracket-tree")).not.toBeInTheDocument();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/rel1/bracket");
+  const first = within(relegation).getByTestId("league-relegation-pair-rel1-1");
+  expect(first).toHaveTextContent("Liga 1 · Heim");
+  expect(first).toHaveTextContent("Probe Oben");
+  expect(first).toHaveTextContent("Liga 2");
+  expect(first).toHaveTextContent("Probe Unten steigt auf, Probe Oben steigt ab.");
+  expect(within(first).getByRole("link")).toHaveAttribute("href", "/matches/m1");
+  expect(within(relegation).getByTestId("league-relegation-pair-rel1-2")).toHaveTextContent("Noch nicht gespielt");
   unmount();
   const { container } = render(<MemoryRouter><DivisionPostseason division={{ id: "d2", label: "Liga 2", staffeln: [] }} /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();
+});
+
+test("im K.-o. lässt sich die Neuansetzung mit Grund zurücknehmen", async () => {
+  apiMock.delete.mockResolvedValue({ data: { no_show_step: "undo" } });
+  const match = { id: "m1", tournament_id: "t1", status: "scheduled", results: [], postseason: { kind: "relegation" }, no_show_retry: { at: "2031-04-01T10:00:00+00:00" } };
+  render(<DoubleNoShowAction match={match} />);
+  fireEvent.click(screen.getByTestId("match-double-no-show-back"));
+  expect(screen.getByTestId("match-double-no-show-sheet")).toHaveTextContent("Der Eintrag „nicht erschienen“ fällt für beide Seiten weg");
+  expect(screen.getByTestId("match-double-no-show-save")).toHaveTextContent("Zurücknehmen");
+  fireEvent.change(screen.getByTestId("match-double-no-show-text"), { target: { value: "Server war ausgefallen" } });
+  fireEvent.click(screen.getByTestId("match-double-no-show-save"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/matches/m1/double-no-show", { data: { reason: "Server war ausgefallen" } }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Zurückgenommen. Der Eintrag „nicht erschienen“ fällt für beide weg."));
+  expect(apiMock.post).not.toHaveBeenCalled();
 });
