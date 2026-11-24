@@ -1,5 +1,5 @@
 """Relegation aus dem Endstand und ihre Wirkung auf die Folge-Season (#2404, docs/LIGA.md „F.6 … Relegation und Folge-Season“;
-Entscheidungen Nr. 212, 213, 222, 223, 226) - über die echten Routen.
+Entscheidungen Nr. 212, 213, 222, 223, 246) - über die echten Routen.
 
 Zwei Liga N mit Relegationsplätzen: der Dritte der oberen gegen den Zweiten der unteren. Paarungen, Heimrecht, Termin hinter den
 Playoffs der unteren Liga, Abschluss mit ``outcome``, Auf- und Abstieg in der neuen Season samt „Übernahme neu berechnen“, Sperren
@@ -82,7 +82,7 @@ async def test_relegation_pairs_the_upper_places_against_the_lower_ones_with_hom
     assert part["state"] == "ready" and part["can_create"]
     assert [(pair["upper"]["display_name"], pair["lower"]["display_name"]) for pair in part["pairs"]] == [
         (reg(world, 1, 2)["display_name"], reg(world, 2, 1)["display_name"])]
-    # Die unterste Liga hat keine Relegation nach unten (Nr. 226) - die Vorlage der Season gilt dort einfach nicht.
+    # Die unterste Liga hat keine Relegation nach unten (F.2) - die Vorlage der Season gilt dort einfach nicht.
     assert division_of(view, 2)["relegation"] is None
     ok(await create(flow, world, "relegation"))
     tournament = await relegation_tournament(flow, world)

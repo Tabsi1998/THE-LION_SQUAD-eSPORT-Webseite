@@ -177,6 +177,21 @@ async def test_relegation_lies_behind_the_playoffs_of_the_upper_division_too(flo
 
 
 @pytest.mark.asyncio
+async def test_relegation_does_not_wait_for_playoffs_that_are_never_played(flow):
+    # Ein Platz je Staffel bei einer Staffel: Diese Liga spielt keine Playoffs - die Relegation liegt dann nicht hinter einer Woche,
+    # die es nie gibt.
+    plain = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}})
+    wanted = division_of(await cockpit(flow, plain), 1)["relegation"]["start_day"]
+    await flow.db.league_seasons.update_one({"id": plain["season"]["id"]}, {"$set": {"postseason.playoffs": {"enabled": True, "per_staffel": 1}}})
+    relegation = division_of(await cockpit(flow, plain), 1)["relegation"]
+    assert relegation["start_day"] == wanted and relegation["after_playoffs_of"] is None
+    # Gegenprobe: Mit vier Plätzen wird gespielt, die Relegation rückt dahinter.
+    await flow.db.league_seasons.update_one({"id": plain["season"]["id"]}, {"$set": {"postseason.playoffs.per_staffel": 4}})
+    relegation = division_of(await cockpit(flow, plain), 1)["relegation"]
+    assert relegation["start_day"] > wanted and relegation["after_playoffs_of"] == "Liga 1 und Liga 2"
+
+
+@pytest.mark.asyncio
 async def test_relegation_names_both_divisions_when_both_play_playoffs(flow):
     world = await build(flow, levels=2, zones=ZONES, postseason={"playoffs": {"enabled": True, "per_staffel": 4}, "relegation": {"enabled": True}},
                         division_postseason={2: {"playoffs": {"enabled": True, "per_staffel": 2}}})

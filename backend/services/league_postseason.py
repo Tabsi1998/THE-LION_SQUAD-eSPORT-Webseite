@@ -331,6 +331,9 @@ async def playoff_end_day(db, season: dict, division: dict, *, count: int | None
     existing = await _existing(db, division["id"], PLAYOFF)
     if existing and existing.get("end_date"):
         return rules.local_day(existing["end_date"])
+    if not existing and division["id"] in await too_few_hints(db, season, [division]):
+        # Keine zwei Playoff-Teams: Diese Liga N spielt keine Playoffs - also wartet auch die Relegation auf keine.
+        return None
     teams = count if count is not None else await _team_estimate(db, division, settings)
     end = _playoff_weeks(season, settings, max(teams, 2))["end_day"]
     return date.fromisoformat(end) if end else None
@@ -440,7 +443,7 @@ async def _check_settings(db, season: dict, divisions: list[dict], before: dict[
             continue
         lower = _lower(divisions, division)
         if not lower:
-            # Die unterste Liga N (Nr. 226): Eine Vorlage der Season mit Relegation gilt für sie einfach nicht.
+            # Die unterste Liga N (F.2, keine Relegation nach unten): Eine Vorlage der Season mit Relegation gilt für sie einfach nicht.
             continue
         down = league_zones.effective(division, levels).get("playoff_relegate") or 0
         up = league_zones.effective(lower, levels).get("playoff_promote") or 0
