@@ -69,3 +69,27 @@ test("der Testalarm nennt die Wege - und sagt, wenn keiner eingerichtet ist", as
   await user.click(screen.getByTestId("ops-alert-test"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("Kein Weg eingerichtet")));
 });
+
+// #1657: Häufung, Tageszusammenfassung und Erreichbarkeit haben einstellbare Schwellen; Fehlergruppen eine Frist.
+test("Schwellen des Fehler-Sammlers und die Frist der Fehlergruppen werden mitgespeichert", async () => {
+  const settings = { ...VIEW.settings, retention_days: { ...VIEW.settings.retention_days, ops_errors: 30 }, spike_threshold: 20, spike_window_minutes: 10, daily_summary_hour: 8, reach_fail_threshold: 2 };
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, settings } });
+  apiMock.put.mockResolvedValue({ data: settings });
+  const user = userEvent.setup();
+  render(<OpsAlertsPanel />);
+  const spike = await screen.findByTestId("ops-alert-spike-threshold");
+  expect(spike).toHaveValue(20);
+  expect(screen.getByTestId("ops-alert-spike-window")).toHaveValue(10);
+  expect(screen.getByTestId("ops-alert-daily-hour")).toHaveValue(8);
+  expect(screen.getByTestId("ops-alert-reach-fails")).toHaveValue(2);
+  expect(screen.getByTestId("ops-retention-ops_errors")).toHaveValue(30);
+  await user.clear(spike);
+  await user.type(spike, "50");
+  await user.clear(screen.getByTestId("ops-retention-ops_errors"));
+  await user.type(screen.getByTestId("ops-retention-ops_errors"), "14");
+  await user.click(screen.getByTestId("ops-alert-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/ops/alerts", expect.objectContaining({
+    spike_threshold: 50, spike_window_minutes: 10, daily_summary_hour: 8, reach_fail_threshold: 2,
+    retention_days: expect.objectContaining({ ops_errors: 14 }),
+  })));
+});

@@ -14,7 +14,17 @@ const RETENTION_LABELS = {
   contact_done: "Kontaktanfragen, erledigt (Tage)", contact_spam: "Kontaktanfragen, Spam (Tage)",
   // Push-Geräte (#2467): ab dem Abmelden; aktive Handys laufen nie ab.
   push_devices: "Abgemeldete Push-Geräte (Tage)",
+  // Fehlergruppen (#1657): ab dem letzten Auftreten, Vorgabe 30 Tage.
+  ops_errors: "Fehlergruppen (Tage)",
 };
+
+// Fehler-Sammler (#1657): Schwellen für Häufung, Tageszusammenfassung und Erreichbarkeit - je Feld Grenzen wie im Backend.
+const NUMBER_FIELDS = [
+  { key: "spike_threshold", testId: "ops-alert-spike-threshold", label: "Häufung ab (Auftreten je Fenster)", min: 2, max: 10000 },
+  { key: "spike_window_minutes", testId: "ops-alert-spike-window", label: "Zeitfenster für Häufung (Minuten)", min: 1, max: 1440 },
+  { key: "daily_summary_hour", testId: "ops-alert-daily-hour", label: "Tageszusammenfassung um (Uhr, Wien)", min: 0, max: 23 },
+  { key: "reach_fail_threshold", testId: "ops-alert-reach-fails", label: "Ausfall nach Fehlversuchen in Folge", min: 1, max: 10 },
+];
 
 // Formularstand: Empfänger mit Komma, Upload-Routen (#2447) eine je Zeile.
 function toForm(settings) {
@@ -56,6 +66,9 @@ export function OpsAlertsPanel() {
     try {
       const payload = { emails: form.emails, cooldown_minutes: Number(form.cooldown_minutes), red_reminder_hours: Number(form.red_reminder_hours ?? 24), rules: form.rules, retention_days: Object.fromEntries(Object.entries(form.retention_days).map(([k, v]) => [k, Number(v)])) };
       if (form.upload_routes !== undefined) payload.upload_routes = form.upload_routes;
+      for (const field of NUMBER_FIELDS) {
+        if (form[field.key] !== undefined && form[field.key] !== "") payload[field.key] = Number(form[field.key]);
+      }
       const { data: saved } = await api.put("/admin/ops/alerts", payload);
       setForm(toForm(saved));
       setData((current) => ({ ...current, settings: saved }));
@@ -130,6 +143,12 @@ export function OpsAlertsPanel() {
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Erinnerung bei Dauer-Rot (Stunden, 0 = aus)</div>
             <input type="number" min={0} max={720} value={form.red_reminder_hours ?? 24} onChange={(e) => setForm((c) => ({ ...c, red_reminder_hours: e.target.value }))} data-testid="ops-alert-red-reminder" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
+          {NUMBER_FIELDS.filter((field) => form[field.key] !== undefined).map((field) => (
+            <label key={field.key} className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}</div>
+              <input type="number" min={field.min} max={field.max} value={form[field.key]} onChange={(e) => setForm((c) => ({ ...c, [field.key]: e.target.value }))} data-testid={field.testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </label>
+          ))}
           {Object.entries(RETENTION_LABELS).map(([key, label]) => (
             <label key={key} className="block">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aufbewahrung: {label}</div>
@@ -146,7 +165,7 @@ export function OpsAlertsPanel() {
             </label>
           ) : null}
         </div>
-        <p className="text-xs text-white/40 mt-2">App-Logs, Fehlergruppen, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
+        <p className="text-xs text-white/40 mt-2">App-Logs, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
         <button type="button" onClick={save} disabled={!!busy} data-testid="ops-alert-save" className="mt-3 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy === "save" ? "Speichere …" : "Alarme speichern"}</button>
       </div>
 
