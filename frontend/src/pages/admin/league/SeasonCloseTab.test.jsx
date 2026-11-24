@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 // Reiter „Abschluss“ der Season (F.1, #1645): Checkliste mit Link, Entscheid bei Gleichstand auf Platz 1, Abschließen mit
 // Bestätigung, Verlauf und Wieder öffnen durch eine zweite Person. Erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
+// Wie oft der Reiter den Abschluss geladen hat - ohne die eigene Abfrage des TV-Kastens (#1641).
+const closingLoads = () => apiMock.get.mock.calls.filter(([url]) => String(url).endsWith("/closing")).length;
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "") }));
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -25,7 +27,9 @@ const FINAL = { id: "f1", version: 1, closed_at: "2026-11-12T17:00:00+00:00", cl
 const HISTORY = [{ id: "f1", version: 1, active: true, closed_at: "2026-11-12T17:00:00+00:00", closed_by_name: "Erste Leitung", reopened_at: null, champion: "Probe 1" }];
 
 function renderTab(body, props = {}) {
-  apiMock.get.mockImplementation(async (url) => ({ data: url.includes("/final-tables/") ? { standings: ROWS, decisions: [], table_rules: null } : body }));
+  // Der Kasten „Saisonfinale am TV“ (#1641) lädt seinen Stand selbst.
+  apiMock.get.mockImplementation(async (url) => ({ data: url.includes("/tv-finale") ? { step: 0, count: 0, labels: [], closed: 0, reason: "none_closed" }
+    : url.includes("/final-tables/") ? { standings: ROWS, decisions: [], table_rules: null } : body }));
   return render(<MemoryRouter><SeasonCloseTab seasonId="s1" {...props} /></MemoryRouter>);
 }
 
@@ -64,7 +68,7 @@ test("ohne Sperrgrund: abschließen mit Bestätigung, der Meister steht im Fenst
   fireEvent.click(within(sheet).getByTestId("close-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/staffeln/t1/close", { confirm: true }));
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Staffel abgeschlossen. Der Endstand steht."));
-  expect(apiMock.get).toHaveBeenCalledTimes(2);
+  expect(closingLoads()).toBe(2);
 });
 
 test("Gleichstand auf Platz 1: der Entscheid braucht Art und Grund", async () => {
@@ -149,7 +153,7 @@ test("ein abgelehnter Abschluss lädt die Karte neu und sagt, warum", async () =
   fireEvent.click(screen.getByTestId("close-confirm"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Abschließen geht noch nicht: Offene Verfahren."));
   await waitFor(() => expect(screen.queryByTestId("close-sheet")).toBeNull());
-  expect(apiMock.get).toHaveBeenCalledTimes(2);
+  expect(closingLoads()).toBe(2);
 });
 
 test("ein abgebrochener Abschluss steht ehrlich da: kein Abschließen, Wieder öffnen gibt die Staffel frei", async () => {

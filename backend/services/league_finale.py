@@ -1,0 +1,314 @@
+"""Saisonfinale: Auf- und Absteiger je Liga N (#1641 TV, #1642 Discord).
+
+Nach dem Sieger-Moment (#2410) zeigt der Turnierbaum-TV einer abgeschlossenen Liga-Staffel einen weiteren Schritt: je Liga N die
+Teams, die auf- oder absteigen (bzw. ausscheiden), mit Ziel-Liga. Die Leitung steuert ihn im Reiter „Abschluss“ der Season mit
+**Weiter** (nächste Liga N) und **Ende** (zurück zum gewohnten Bild). Der Stand steht an jeder abgeschlossenen Staffel der Season
+(``tournaments.tv_finale``, nie an der Season - die Folge-Season übernimmt Season-Felder, F.2), damit jeder TV der Season mitgeht.
+
+Gelesen wird nur der Endstand (``league_final_tables``, Zonen an jeder Zeile - F.2, #1627; Plätze über Staffeln hinweg wie „beste
+Zweite“ kommen beim Lesen dazu, ``league_cross_zones.overlay_finals``). Relegationsplätze haben noch keine
+Wirkung (``league_zones.MOVES``) und erscheinen hier nicht. Am TV und im Discord steht nur, was Gäste sehen: Season öffentlich
+(``profile_visibility.public_season``) und die Staffel als Turnier sichtbar - dieselbe Regel wie beim Podest (``awards._visible``).
+"""
+from __future__ import annotations
+
+from models import new_id, now_utc
+
+FIELD = "tv_finale"
+UP, DOWN, OUT = "up", "down", "out"
+MOVE_OF_ZONE = {"promotion": UP, "relegation": DOWN, "out": OUT}
+MOVE_ORDER = (UP, DOWN, OUT)
+ACTIONS = ("next", "end")
+# Zeilen je Spalte am TV (Nr. 235): links Aufstieg, rechts Abstieg und Ausscheiden, je höchstens 8 - der Rest als „und N weitere“.
+# Mehr wird aus der Distanz unlesbar und rutscht unter die Fußleiste. Discord bekommt alle (dort kürzt das Feld ganze Zeilen).
+TV_COLUMN_ROWS = 8
+COLUMN_OF_MOVE = {UP: UP, DOWN: DOWN, OUT: DOWN}
+# Neutral (K-b): Der Stand kann sich auch durch einen Abschluss oder „Ende“ geändert haben, nicht nur durch ein zweites Fenster.
+STALE_STEP = "Der Stand hat sich geändert – neu geladen."
+
+
+class FinaleConflict(ValueError):
+    """„Weiter“ auf einen Stand, der nicht mehr gilt (zweites Fenster, „Ende“ dazwischen, neuer Abschluss) - 409, damit der TV keine
+    Liga N überspringt und „Ende“ immer gewinnt (Nr. 244)."""
+
+    def __init__(self, message: str = STALE_STEP):
+        super().__init__(message)
+        self.detail = message
+        self.status_code = 409
+STAFFEL_LIMIT = 200
+
+
+def _rank(row: dict) -> int:
+    try:
+        return int(row.get("rank") or 0) or 10**6
+    except (TypeError, ValueError):
+        return 10**6
+
+
+def movers(rows: list[dict]) -> dict[str, list[dict]]:
+    """Aus den Zeilen eines Endstands: wer aufsteigt, absteigt oder ausscheidet - je Gruppe nach Platz."""
+    out: dict[str, list[dict]] = {move: [] for move in MOVE_ORDER}
+    for row in rows or []:
+        move = MOVE_OF_ZONE.get(row.get("zone"))
+        if move and row.get("registration_id"):
+            out[move].append(row)
+    for move in MOVE_ORDER:
+        out[move].sort(key=_rank)
+    return out
+
+
+def _label(division: dict) -> str:
+    from services.league_service import division_label
+
+    return division_label(division)
+
+
+def build_pages(divisions: list[dict], finals: list[dict], column_max: int | None = None) -> list[dict]:
+    """Je Liga N (nach Stufe) eine Seite mit ihren Auf- und Absteigern - Liga N ohne Bewegung fallen weg.
+
+    ``divisions``: die aktiven Liga N der Season; ``finals``: die geltenden Endstände (``division_id``, ``staffel``, ``rows``). Das Ziel
+    ist die benachbarte Liga N nach Stufe (nicht Stufe ± 1: eine Lücke in der Nummerierung bleibt möglich). ``column_max``: höchstens so
+    viele Zeilen je Spalte (TV: ``TV_COLUMN_ROWS``), der Rest zählt in ``more_up`` bzw. ``more_down``."""
+    ordered = sorted((row for row in divisions if isinstance(row.get("level"), int)), key=lambda row: row["level"])
+    position = {row["id"]: index for index, row in enumerate(ordered)}
+    by_division: dict[str, list[dict]] = {}
+    for final in finals:
+        if final.get("division_id") in position:
+            by_division.setdefault(final["division_id"], []).append(final)
+    pages = []
+    for division in ordered:
+        own = sorted(by_division.get(division["id"]) or [], key=lambda final: str(final.get("staffel") or ""))
+        if not own:
+            continue
+        index = position[division["id"]]
+        targets = {UP: _label(ordered[index - 1]) if index > 0 else None,
+                   DOWN: _label(ordered[index + 1]) if index + 1 < len(ordered) else None, OUT: None}
+        several = len(own) > 1
+        rows = []
+        for move in MOVE_ORDER:
+            for final in own:
+                for row in movers(final.get("rows") or [])[move]:
+                    rows.append({"registration_id": row["registration_id"], "name": row.get("display_name") or "Team",
+                                 "rank": row.get("rank"), "move": move, "target": targets[move],
+                                 "staffel": final.get("staffel") if several else None})
+        if rows:
+            shown, more = _per_column(rows, column_max)
+            pages.append({"division_id": division["id"], "level": division["level"], "label": _label(division), "staffeln": len(own),
+                          "rows": shown, "more_up": more[UP], "more_down": more[DOWN], "more": more[UP] + more[DOWN]})
+    return pages
+
+
+def _per_column(rows: list[dict], column_max: int | None) -> tuple[list[dict], dict[str, int]]:
+    """Höchstens ``column_max`` Zeilen je Spalte (Reihenfolge bleibt) - und wie viele je Spalte wegfallen."""
+    used = {UP: 0, DOWN: 0}
+    more = {UP: 0, DOWN: 0}
+    shown = []
+    for row in rows:
+        column = COLUMN_OF_MOVE[row["move"]]
+        if column_max is not None and used[column] >= column_max:
+            more[column] += 1
+            continue
+        used[column] += 1
+        shown.append(row)
+    return shown, more
+
+
+def current_step(state: dict | None, pages: list[dict]) -> int:
+    """Welche Seite gerade dran ist: die Liga N, die die Leitung zuletzt geschaltet hat (``division_id``) - kommt durch einen späteren
+    Abschluss eine Liga N davor dazu, bleibt der TV bei seiner Liga N (Nr. 241). Ohne sie (älterer Stand) der gespeicherte Schritt."""
+    state = state or {}
+    if not clamp_step(state.get("step"), len(pages)):
+        return 0
+    division = state.get("division_id")
+    if division:
+        for index, page in enumerate(pages):
+            if page.get("division_id") == division:
+                return index + 1
+    return clamp_step(state.get("step"), len(pages))
+
+
+def running_state(staffeln: list[dict]) -> dict | None:
+    """Der zuletzt geschaltete Stand der Season (an den abgeschlossenen Staffeln) - ``None``, wenn das Finale nicht läuft."""
+    states = [row.get(FIELD) for row in staffeln if (row.get(FIELD) or {}).get("step")]
+    return max(states, key=lambda state: str(state.get("updated_at") or "")) if states else None
+
+
+def clamp_step(value, count: int) -> int:
+    """Der Schritt der Leitung: 0 heißt aus, 1 bis ``count`` die Seite je Liga N."""
+    if isinstance(value, bool):
+        return 0
+    try:
+        step = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(int(count or 0), step))
+
+
+def next_step(step: int, count: int) -> int:
+    """„Weiter“: zur nächsten Liga N - auf der letzten bleibt es dort (erst „Ende“ schaltet zurück)."""
+    return clamp_step(clamp_step(step, count) + 1, count)
+
+
+# ---------------------------------------------------------------- Lesen
+
+async def guest_sees_staffel(tournament: dict | None) -> bool:
+    """Sähe ein Gast die Staffel als Turnier? Wie ``awards._visible`` ohne Person."""
+    from services.visibility import user_can_see
+
+    if not tournament or tournament.get("status") == "draft" or tournament.get("is_public") is False:
+        return False
+    return await user_can_see(None, tournament.get("visibility") or "public")
+
+
+async def season_frame(db, season_id: str | None) -> tuple[dict | None, dict | None]:
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) if season_id else None
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "id": 1, "name": 1, "slug": 1}) if season else None
+    return season, league
+
+
+async def closed_staffeln(db, season_id: str) -> list[dict]:
+    from services.league_scope import ONLY_LEAGUE
+
+    rows = await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE, "final_table": {"$type": "object"}},
+                                     {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1,
+                                      "league_context": 1, "final_table": 1, FIELD: 1}).to_list(STAFFEL_LIMIT)
+    return rows
+
+
+async def season_finals(db, season: dict, *, guests_only: bool = True) -> tuple[list[dict], list[dict]]:
+    """Die abgeschlossenen Staffeln der Season (mit ``guests_only`` nur die, die Gäste sehen) und ihre geltenden Endstände."""
+    staffeln = await closed_staffeln(db, season["id"])
+    if guests_only:
+        staffeln = [row for row in staffeln if await guest_sees_staffel(row)]
+    ids = [row["id"] for row in staffeln]
+    finals = await db.league_final_tables.find({"tournament_id": {"$in": ids}, "active": True},
+                                               {"_id": 0, "tournament_id": 1, "division_id": 1, "staffel": 1, "rows": 1, "champion": 1,
+                                                "champion_place": 1, "zones": 1}).to_list(len(ids) or 1) if ids else []
+    # Plätze über Staffeln hinweg (#1627, „beste Zweite“): Der Endstand trägt sie nicht - sie kommen beim Lesen dazu, sobald alle
+    # Staffeln der Liga N abgeschlossen sind. So lesen TV, Steuerung und Discord dieselbe Zone wie Tabelle und Folge-Season.
+    from services import league_cross_zones
+
+    await league_cross_zones.overlay_finals(db, finals)
+    return staffeln, finals
+
+
+async def season_pages(db, season: dict, *, guests_only: bool = True, column_max: int | None = None) -> list[dict]:
+    divisions = await db.league_divisions.find({"season_id": season["id"], "status": {"$ne": "archived"}},
+                                               {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)
+    _, finals = await season_finals(db, season, guests_only=guests_only)
+    return build_pages(divisions, finals, column_max)
+
+
+async def tv_payload(db, tournament: dict | None) -> dict | None:
+    """Für ``GET /bracket/display``: solange die Leitung den Schritt zeigt, die Seiten und welche gerade dran ist - sonst ``None``.
+
+    Nur bei einer abgeschlossenen Staffel, die Gäste sehen, in einer öffentlichen Season. Eine interne oder Leitungs-Season kommt
+    nie auf den TV, auch nicht mit Anzeige-Schlüssel."""
+    from services.league_final_read import is_closed
+    from services.league_scope import is_league_staffel
+    from services.profile_visibility import public_season
+
+    state = (tournament or {}).get(FIELD) or {}
+    if not is_league_staffel(tournament) or not is_closed(tournament) or not state.get("step"):
+        return None
+    if not await guest_sees_staffel(tournament):
+        return None
+    season, league = await season_frame(db, ((tournament or {}).get("league_context") or {}).get("season_id"))
+    if not public_season(season):
+        return None
+    pages = await season_pages(db, season, column_max=TV_COLUMN_ROWS)
+    step = current_step(state, pages)
+    if not step:
+        return None
+    return {"step": step, "count": len(pages), "league": (league or {}).get("name"), "season": season.get("name"), "pages": pages,
+            "updated_at": state.get("updated_at")}
+
+
+# ---------------------------------------------------------------- Steuerung der Leitung
+
+async def control_state(db, season: dict) -> dict:
+    """Was der Reiter „Abschluss“ zur TV-Steuerung zeigt: Schritt, Seiten (Liga N) und warum der TV gegebenenfalls nichts zeigt."""
+    return _state_of(season, await closed_staffeln(db, season["id"]), await season_pages(db, season))
+
+
+def _state_of(season: dict, staffeln: list[dict], pages: list[dict]) -> dict:
+    from services.profile_visibility import public_season
+
+    step = current_step(running_state(staffeln), pages)
+    reason = None
+    if not public_season(season):
+        reason = "season_hidden"
+    elif not staffeln:
+        reason = "none_closed"
+    elif not pages:
+        reason = "no_movers"
+    return {"step": step if reason is None else 0, "count": len(pages), "labels": [page["label"] for page in pages],
+            "closed": len(staffeln), "reason": reason}
+
+
+async def control(db, season: dict, action: str, actor: dict | None, from_step: int | None = None) -> dict:
+    """„Weiter“ bzw. „Ende“ - an allen abgeschlossenen Staffeln der Season zugleich; danach laden ihre TVs sofort nach. ``from_step``:
+    der Stand, den das Fenster der Leitung zeigt - weicht er bei „Weiter“ ab (ein zweiter Tab hat schon geschaltet), gibt es 409."""
+    from services.change_events import publish_api_change
+
+    # Ein Blick auf Staffeln und Seiten - Prüfen und Schreiben beziehen sich auf genau diesen Stand.
+    staffeln = await closed_staffeln(db, season["id"])
+    pages = await season_pages(db, season)
+    state = _state_of(season, staffeln, pages)
+    if action == "next" and from_step is not None and clamp_step(from_step, state["count"]) != state["step"]:
+        raise FinaleConflict()
+    step = 0 if action == "end" or state["reason"] else next_step(state["step"], state["count"])
+    now = now_utc().isoformat()
+    division = pages[step - 1]["division_id"] if step and step <= len(pages) else None
+    ids = [row["id"] for row in staffeln if ((row.get(FIELD) or {}).get("step") or 0, (row.get(FIELD) or {}).get("division_id")) != (step, division)]
+    if ids:
+        query = {"id": {"$in": ids}}
+        if action == "next":
+            # Nr. 244: „Weiter“ schreibt nur auf den Stand, den es gelesen hat - hat inzwischen „Ende“ (oder ein zweites Fenster)
+            # geschrieben, trägt das Turnier einen anderen Zeitstempel und nichts wird überschrieben. „Ende“ schreibt immer.
+            running = running_state(staffeln)
+            untouched = [{FIELD: {"$exists": False}}, {FIELD: None}]
+            query["$or"] = untouched + ([{f"{FIELD}.updated_at": running.get("updated_at")}] if running else [{f"{FIELD}.step": 0}])
+        # Am Turnier nur Schritt, Liga N und Zeit (die Turnier-Antworten sind öffentlich) - wer geschaltet hat, steht im Protokoll.
+        written = await db.tournaments.update_many(query, {"$set": {FIELD: {"step": step, "division_id": division, "updated_at": now}}})
+        if action == "next" and not written.modified_count:
+            raise FinaleConflict()
+        await db.audit_logs.insert_one({"id": new_id(), "action": "league.season.tv_finale", "target_id": season["id"],
+                                        "actor_id": (actor or {}).get("id"), "data": {"action": action, "step": step, "staffeln": ids},
+                                        "created_at": now})
+        for tournament_id in ids:
+            await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)
+    # Frisch gelesen: Kam „Ende“ während „Weiter“ schrieb, zeigt die Antwort schon das Ende.
+    return await control_state(db, season)
+
+
+async def forget(db, season_id: str | None) -> None:
+    """Den TV-Schritt an allen Staffeln der Season wegnehmen (Wiederöffnen): Ihre TVs zeigen wieder das gewohnte Bild, bis die Leitung
+    nach dem nächsten Abschluss erneut „Weiter“ drückt."""
+    from services.change_events import publish_api_change
+
+    if not season_id:
+        return
+    rows = await db.tournaments.find({"league_context.season_id": season_id, FIELD: {"$exists": True}}, {"_id": 0, "id": 1}).to_list(STAFFEL_LIMIT)
+    ids = [row["id"] for row in rows]
+    if not ids:
+        return
+    await db.tournaments.update_many({"id": {"$in": ids}}, {"$unset": {FIELD: ""}})
+    for tournament_id in ids:
+        await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)
+
+
+async def join_running(db, season_id: str | None, tournament_id: str) -> None:
+    """Nr. 241: Schließt eine Staffel ab, während das Finale der Season läuft, übernimmt ihr TV sofort den laufenden Schritt (dieselbe
+    Liga N wie die anderen TVs), statt bis zum nächsten „Weiter“ nichts zu zeigen."""
+    from services.change_events import publish_api_change
+
+    if not season_id:
+        return
+    others = [row for row in await closed_staffeln(db, season_id) if row["id"] != tournament_id]
+    state = running_state(others)
+    if not state:
+        return
+    await db.tournaments.update_one({"id": tournament_id}, {"$set": {FIELD: {"step": state.get("step"), "division_id": state.get("division_id"),
+                                                                             "updated_at": state.get("updated_at")}}})
+    await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)

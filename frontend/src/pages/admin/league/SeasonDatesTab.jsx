@@ -1,6 +1,7 @@
 // Reiter „Termine“ der Season-Seite (#2267): Kalender mit Beginn, Wochen, Standardtermin und Sperrzeiten, die Antwortfrist auf
 // Terminvorschläge, die Terminregeln (D.1, eigenes Speichern) und darunter die Check-in-Regeln (D.2, `SeasonCheckinRulesPanel`,
-// #1652, eigenes Speichern, Sprungmarke `#checkin`) und die Erinnerungen (E.5, `SeasonReminderRulesPanel`, #1647, `#erinnerungen`).
+// #1652, eigenes Speichern, Sprungmarke `#checkin`), die Erinnerungen (E.5, `SeasonReminderRulesPanel`, #1647, `#erinnerungen`) und die Discord-Meldungen
+// (#1642, `SeasonDiscordPanel`, `#discord`).
 import { CalendarOff, Trash2 } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
@@ -8,6 +9,7 @@ import { LEGS_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/league";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import { SeasonCheckinRulesPanel } from "./SeasonCheckinRulesPanel";
 import { SeasonReminderRulesPanel } from "./SeasonReminderRulesPanel";
+import { SeasonDiscordPanel } from "./SeasonDiscordPanel";
 import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
@@ -103,6 +105,10 @@ export function SeasonDatesTab({ seasonId, data, form, set, canSeason, formProps
       </div>
       <div id="erinnerungen" className="scroll-mt-24">
         <SeasonReminderRulesPanel seasonId={seasonId} canEdit={canSeason !== false} />
+      </div>
+      {/* Liga im Discord (#1642): Spieltag-Zusammenfassung und Saisonende-Meldung - gleich neben den Erinnerungen. */}
+      <div id="discord" className="scroll-mt-24">
+        <SeasonDiscordPanel seasonId={seasonId} canEdit={canSeason !== false} />
       </div>
     </div>
   );

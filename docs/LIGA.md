@@ -472,7 +472,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
 | Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
 | Solo-Ligen (`participant_kind="solo"`) | #1629 |
-| Discord-Meldungen der Liga (Spieltag, Saisonende) | eigenes Folgepaket |
+| Discord-Meldungen der Liga (Spieltag, Saisonende) | #1642 (F.7) |
 | Map-Pool je Liga N, Statistik je Map/Spieler | später |
 
 ## 10. Sichtbarkeit, Schalter, Migration
@@ -4693,6 +4693,90 @@ ausdrückliches `kind: "regular"` an alten Staffeln wäre eine Migration und ist
 
 Entschieden am 23.11. (vorher offen): Setzung mit einmal gereihten Staffeln (Nr. 221), Relegation automatisch hinter den Playoffs der
 unteren Liga N (Nr. 222), Relegationsspiele zählen für Sperren (Nr. 223), Vergleich über Staffeln aus #1627 ohne Los (Nr. 224).
+
+### F.7 Saisonfinale am TV und Liga im Discord (#1641, #1642)
+
+**TV (#1641):** Nach dem Sieger-Moment (#2410) ein Schritt „Auf- und Absteiger je Liga N“ am Turnierbaum-TV, gesteuert von der Leitung.
+`services/league_finale.py`:
+
+- `build_pages(divisions, finals)`: je aktiver Liga N (nach Stufe) die Zeilen der geltenden Endstände mit `zone` `promotion` (`up`),
+  `relegation` (`down`) und `out` - Relegationsplätze haben keine Wirkung (`league_zones.MOVES`) und fehlen. Ziel ist die benachbarte
+  Liga N nach Stufe. Liga N ohne Bewegung fallen weg. Zonen über Staffeln hinweg (#1627, „beste Zweite“) liest `season_finals` mit
+  (`zones` in der Projektion, `league_cross_zones.overlay_finals`) - TV, Steuerung und Discord-Saisonende zeigen dieselbe Zone wie
+  Tabelle und Folge-Season.
+- **Nr. 235 (23.11.):** am TV höchstens `TV_COLUMN_ROWS = 8` Zeilen je Spalte (Aufstieg | Abstieg und Ausscheiden), der Rest als
+  `more_up`/`more_down` („und N weitere“ unter der Spalte). Discord bekommt alle Zeilen (`column_max=None`). Die Kopfleiste zeigt im
+  Schritt „Saisonfinale“ mit Liga und Season.
+- **Nr. 238 (24.11.): Die 8 sind eine Obergrenze.** Das Frontend entscheidet, wie viele Zeilen sicher über die Fußleiste passen:
+  `lib/tvFinale.fitFinaleColumns` schätzt je Zeile die Höhe aus den Umbrüchen von Name und Ziel-Liga (`wrapLines`, Namen mit 0,7 em
+  je Zeichen, Maße wie tv.css in `FINALE_BOX`) auf der gemessenen Fläche von `.tv-finale__cols` (`useTvArea`, ohne Layout 169 × 61
+  Einheiten). Der Rest zählt zu „und N weitere“. Läuft eine Spalte am TV trotzdem über (Layout-Werte, unabhängig von Bewegung),
+  kommt sie mit einer Zeile weniger. Namen in `--tv-fs-name`, lange in `--tv-fs-name-min`.
+- Stand je Staffel-Turnier `tournaments.tv_finale = {step, division_id, updated_at}` (0 aus, 1..n Seite je Liga N) - bewusst nicht an
+  der Season, weil F.2 Season-Felder in die Folge-Season kopiert. Wer geschaltet hat, steht nur im Protokoll `league.season.tv_finale`.
+  **Nr. 241:** `division_id` hält jeden TV bei seiner Liga N (`current_step`), auch wenn durch einen späteren Abschluss eine Liga N
+  davor dazukommt. Schließt eine Staffel ab, während das Finale läuft, übernimmt sie den zuletzt geschalteten Stand der Season
+  (`league_finale.join_running`, Folgeschritt in `league_final.close`).
+- `GET|POST /api/admin/leagues/seasons/{id}/tv-finale` (`{action: "next"|"end", from_step?}`): lesen jede Zuständigkeit, schalten
+  `matches` (Nr. 233: bleibt bei „Spiele betreuen“). „Weiter“ bleibt auf der letzten Seite stehen. Mit `from_step` (Stand im Fenster
+  der Leitung) gibt „Weiter“ 409, wenn sich der Stand geändert hat (neutraler Text „Der Stand hat sich geändert – neu geladen.“);
+  das Fenster lädt dann neu und lädt auch von selbst nach (`useLiveRefresh`).
+- **Nr. 244 (24.11.): „Ende“ gewinnt immer.** `control` liest Staffeln und Seiten einmal und prüft und schreibt auf genau diesen Stand:
+  „Weiter“ schreibt bedingt - nur an Turniere ohne Stand oder mit dem gelesenen `updated_at` (läuft nichts: Schritt 0). „Ende“ schreibt
+  immer. Hat dazwischen „Ende“ (oder ein zweites Fenster) geschrieben, ändert „Weiter“ nichts und gibt 409. Die Antwort ist der frisch
+  gelesene Stand. Im Finale-Schritt zeigt der TV „THE LION SQUAD · LIGA“ und „Saisonfinale aktuell“.
+- Wiederöffnen (`league_final.reopen`, auch die Reparatur eines abgebrochenen Abschlusses) nimmt `tv_finale` an allen Staffeln der
+  Season weg (`league_finale.forget`) - danach zeigt der TV den Schritt erst nach dem nächsten „Weiter“. Abschließen räumt einen
+  übrig gebliebenen Schritt am Turnier weg und übernimmt dann einen laufenden (Nr. 241). Geschaltet werden alle abgeschlossenen
+  Staffeln zugleich; danach je Staffel ein Nachlade-Ereignis (`publish_api_change`), damit die TVs sofort folgen.
+- `GET /api/tournaments/{tid}/bracket/display` trägt `league_finale = {step, count, league, season, pages}` - nur bei abgeschlossener
+  Staffel, die Gäste sehen (`guest_sees_staffel`, wie `awards._visible`), in einer Season mit `public_season`. Interne und
+  Leitungs-Seasons nie, auch nicht mit Anzeige-Schlüssel.
+- Frontend: `lib/tvFinale.js`, `components/tv/TvFinaleMovers.jsx` (tv.css „Saisonfinale“), `BracketTVPage` pausiert die
+  Wiedergabeliste, solange der Schritt steht. Verwaltung: `SeasonTvFinaleControl` im Reiter „Abschluss“ (`#tv-finale`).
+
+**Discord (#1642):** `services/league_discord.py`, Job `league_discord` (alle 15 Minuten, `_single_replica`).
+
+- Einstellung `league_seasons.discord_digest`: `matchday`, `season_end` (Vorgabe aus), `channel_id` (Pflicht, sobald etwas an ist; kein
+  Rückfall), `wait_hours` (48, 0-336), `late` (an), `table_rows` (5, 0-20), `matchday_since` (gesetzt beim Einschalten). Die Folge-Season
+  übernimmt sie samt „an“ (F.2, Nr. 236). `GET|PUT /api/admin/leagues/seasons/{id}/discord`: lesen jede Zuständigkeit, ändern `season`;
+  Protokoll `league.season.discord_digest`. Verwaltung: `SeasonDiscordPanel` im Reiter „Termine“ (`#discord`).
+- **Kanal nur aus der freigegebenen Liste (Nr. 234, 23.11.):** `approved_channels` = die öffentlichen „Kanäle je Zweck“ des Hauptservers
+  (`settings.discord.channels`, Ziele `PUBLIC_TARGETS`: community, news, events), Kanal-ID → Zweck. `PUT` mit einem anderen Kanal: 422.
+  `GET` liefert nur diese Kanäle (mit `purpose`, Name aus der Kanalliste des Bots), dazu `channel_approved` und `problems`. Der Job
+  sendet nur in freigegebene Kanäle; fällt einer heraus, wird nichts belegt.
+- **Spieltag fertig** (`matchday_due`): alle Spiele gewertet oder abgesagt (`SETTLED`), sonst mit `late` ab Ende der Spielwoche plus
+  `wait_hours` mit „x Spiele offen“; ohne ein Ergebnis nie. Spieltage, deren Meldefrist vor `matchday_since` endete, gehen nicht hinaus;
+  ohne Spielwoche (`window_end` fehlt) zählt das letzte Ergebnis (`completed_at`), ohne jede Zeitangabe gilt der Spieltag als alt.
+- **Saisonende**: Season `completed` (`league_final._season_follows`), Meister aus den Endständen, Auf- und Absteiger aus `build_pages`,
+  Link `/liga/{liga}/{season}`.
+- Nur öffentliche Seasons (`public_season`) und Staffeln, die Gäste sehen; Discord bzw. Bot aus: nichts gesendet, nichts belegt.
+- **Doppelversand:** `league_discord_posts` mit eindeutigem `dedupe_key` (`matchday:{tid}:{n}`, `season_end:{season_id}`). Vor dem Senden
+  belegt der Job den Schlüssel per Upsert; nur wer ihn belegt, sendet. Wiederholt wird nur, wenn sicher nichts hinausging (`retryable`:
+  `bot_offline`, `unknown_channel`, `forbidden`, Discord 4xx): `status: failed`, höchstens drei Versuche, frühestens nach 30 Minuten.
+  Zeitüberschreitung, Discord 5xx oder ein unbekannter Fehler nach dem Absenden: `status: unclear`, nie wiederholt. Ein Fehler beim
+  Aufbau der Meldung (vor dem Senden): `failed` mit `error: build`, sofort aufgegeben. Ein Eintrag `sending` (Lauf abgebrochen) wird
+  nie von selbst wiederholt; nach `RETRY_MINUTES` gilt er als unklar. `problems` (Kasten „Meldungen, die du prüfen solltest“) listet
+  `unclear`, aufgegebene und hängende Einträge mit `key`. Die Vorprüfung (`blocked`) überspringt gesendete, laufende, unklare,
+  verworfene, aufgegebene und noch wartende Einträge, bevor Namen und Tabelle geladen werden.
+- **Noch einmal senden (Nr. 239, 24.11.):** `POST /api/admin/leagues/seasons/{id}/discord/release` (`{key, confirm: true}`), Recht
+  `season`, Protokoll `league.season.discord_release` (Person, Zeit). Atomar: Nur ein offener Eintrag (unklar, aufgegeben, hängend)
+  wird auf `failed`, `attempts = MAX_ATTEMPTS - 1`, `claimed_at = ""` gesetzt - der nächste Lauf sendet genau einmal; ein zweiter
+  Klick findet nichts mehr (409), ein unbekannter Schlüssel 404. Der Kasten lädt die Hinweise live nach (`useLiveRefresh`).
+- **Nach einem Ausfall (Nr. 240, 24.11.):** Liegen in einer Staffel mehrere fertige, nicht gemeldete Spieltage, geht nur der neueste
+  hinaus; die älteren bekommen `status: skipped`, `reason: missed` (`league_discord.skip`) und gehen nicht von selbst hinaus.
+  **Nr. 243:** `problems` zeigt sie als leisen Hinweis (`status: skipped`, eigener Abschnitt „Verworfene Spieltage“); `release` nimmt sie
+  an und sendet sie genau einmal (Protokoll wie gehabt, Doppelklick 409).
+- **Nr. 242 (24.11.): Eine Freigabe geht vor.** `skip` nimmt freigegebene Einträge aus (`released_at`), und `matchday_posts` sendet
+  freigegebene Spieltage neben dem neuesten neuen - nie werden sie verworfen. Das Ergebnis eines Versands schreibt `_send` nur auf
+  einen Eintrag, der noch `sending` ist; ein spät zurückkommender Versand überschreibt keine Freigabe.
+- Texte (`matchday_message`, `season_end_message`): kurz, deutsch, Markdown in Namen entschärft, lange Listen verlieren ganze Zeilen
+  („… und x weitere“), nie einen halben Namen. Je Embed höchstens 6000 Zeichen (`EMBED_MAX`), sonst „… und N weitere Liga N auf der
+  Season-Seite“. Discord nimmt 10 Felder je Embed: höchstens 9 Liga N plus das Feld „Weitere Ligen“ (`MAX_LEAGUE_FIELDS`).
+- Die Vorschau der Folge-Season nennt die Discord-Meldungen unter „wird übernommen“ (`league_successor.COPIED_GROUPS`).
+
+**Nicht in F.7:** Rückblick-Seite (#1640 - die Meldung verlinkt bis dahin die Season-Seite), Liga-Abzeichen statt „Liga N“ (#1638),
+Meldung auf Spielservern (nur ein Kanal, gewählt aus dem Hauptserver), eine Korrektur-Meldung nach Wiederöffnen, die App.
 
 ## 13. Feature-Matrix (Stand G.3, 15.11.2026)
 

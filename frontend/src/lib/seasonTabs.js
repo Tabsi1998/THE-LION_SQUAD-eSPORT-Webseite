@@ -46,6 +46,8 @@ export const SEASON_SECTIONS = {
   checkin: "termine",
   // Erinnerungen (E.5, #1647): 24 h / 1 h vorher, Termin offen, Ergebnis fehlt, Map-Veto wartet - eigenes Speichern.
   erinnerungen: "termine",
+  // Liga im Discord (#1642): Spieltag-Zusammenfassung und Saisonende-Meldung - eigenes Speichern.
+  discord: "termine",
   selbstanmeldung: "anmeldung",
   spielberechtigung: "anmeldung",
   plattform: "anmeldung",
@@ -63,6 +65,8 @@ export const SEASON_SECTIONS = {
   staffeln: "ligen",
   uebertragen: "ligen",
   "belohnungen-ligen": "belohnungen",
+  // Saisonfinale am TV (#1641): Weiter und Ende für den Schritt „Auf- und Absteiger“.
+  "tv-finale": "abschluss",
 };
 
 /** Reiter und Abschnitt aus der Sprungmarke: `#termine` → Reiter, `#kader` → Reiter „Anmeldung und Kader“ samt Abschnitt. */

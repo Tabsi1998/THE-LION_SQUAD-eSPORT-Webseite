@@ -17,6 +17,7 @@ import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/componen
 import { TvNoticeBand } from "@/components/tv/TvNotice";
 import { TvNextUp } from "@/components/tv/TvNextUp";
 import { TvStandingsSlide } from "@/components/tv/TvStandings";
+import { TvFinaleMovers } from "@/components/tv/TvFinaleMovers";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
 import { bracketChanges, bracketSnapshot, isLiveMatch } from "@/lib/tvLive";
@@ -24,6 +25,7 @@ import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
 import { podiumPlaces } from "@/lib/tvPodium";
+import { FINALE_SLIDE, finalePage } from "@/lib/tvFinale";
 import { TABLE_SLIDE, isTreeless, tableChampionOf, tvTableSections, tvWords, withTableSlide } from "@/lib/tvTable";
 import { nameHead } from "@/lib/standingsTable";
 import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
@@ -458,11 +460,13 @@ function BracketTv() {
     queue.next();
   }, [queue]);
 
-  const paused = Boolean(moment) || screen !== "playlist";
+  // Saisonfinale (#1641): Zeigt die Leitung „Auf- und Absteiger“, steht dieser Schritt - die Wiedergabeliste wartet, bis sie „Ende“ drückt.
+  const finale = screen === "playlist" ? finalePage(data?.league_finale) : null;
+  const paused = Boolean(moment) || screen !== "playlist" || Boolean(finale);
   const playing = usePlaylist({ playlist, availableRef, paused, onMoments });
   const current = playlist[playing.index]?.slide || "tree";
-  const active = highMoment ? "tree" : lowMoment ? lowMoment.moment.type : current;
-  const showBar = !moment && screen === "playlist" && changesAfter(playlist, playing.index, available);
+  const active = finale ? FINALE_SLIDE : highMoment ? "tree" : lowMoment ? lowMoment.moment.type : current;
+  const showBar = !moment && !finale && screen === "playlist" && changesAfter(playlist, playing.index, available);
 
   // ------------------------------------------------------------ Ton
   const { gong, needsClick } = useTvSound(Boolean(settings.result_sound || settings.call_sound));
@@ -503,6 +507,7 @@ function BracketTv() {
     : screen === "pause" ? (t.paused_until ? `Pause bis ${viennaTime(t.paused_until, { hour: "2-digit", minute: "2-digit" })}` : "Kurze Pause")
       : screen === "checkin" ? "Check-in"
         : screen === "registration" ? "Anmeldung offen"
+          : finale ? [data.league_finale?.league, data.league_finale?.season].filter(Boolean).join(" · ") || null
           : hasMatches || hasTable ? (parked ? kindWords.decided : { tree: words.tree, [TABLE_SLIDE]: tableSections.length > 1 ? "Tabellen" : "Tabelle", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: kindWords.stats }[active] || words.tree) : null;
 
   return (
@@ -511,9 +516,10 @@ function BracketTv() {
         <TvHeader
           className="tls-header-sweep"
           // Rot heißt „läuft gerade“ (#1116): der Punkt in der Kopfleiste nur, solange das Turnier läuft.
-          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : `THE LION SQUAD · ${words.kicker}`}
+          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : finale ? "THE LION SQUAD · LIGA" : `THE LION SQUAD · ${words.kicker}`}
           live={toneFor(t.status) === "live"}
-          title={t.title}
+          // Im Saisonfinale (#1641) geht es um die ganze Season, nicht um diese Staffel: „Saisonfinale“ als Kopf, Liga und Season darunter.
+          title={finale ? "Saisonfinale" : t.title}
           subtitle={subtitle}
           aside={(
             <>
@@ -526,13 +532,13 @@ function BracketTv() {
           )}
         />
       ) : null}
-      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label={words.board} onRetry={load} />
+      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label={finale ? "Saisonfinale" : words.board} onRetry={load} />
       {/* Hinweis der Turnierleitung (#1166): nur mit „auch am TV zeigen“, solange er steht. */}
       <TvNoticeBand items={data?.notices} />
 
       <main className="tv-main tv-main--slides" data-testid="tv-main" data-paused={paused ? "1" : "0"} data-run={playing.runId} data-moment={moment?.type || undefined}>
-        {showBar && !lowMoment ? <TvSlideBar key={`${playing.runId}-${playing.tick}`} clock={playing.clock} totalMs={playing.totalMs} paused={paused} /> : null}
-        {lowMoment ? <TvSlideBar key={lowMoment.moment.id} clock={{ current: { startedAt: lowMoment.startedAt, elapsed: 0 } }} totalMs={lowMoment.ms} /> : null}
+        {showBar && !lowMoment && !finale ? <TvSlideBar key={`${playing.runId}-${playing.tick}`} clock={playing.clock} totalMs={playing.totalMs} paused={paused} /> : null}
+        {lowMoment && !finale ? <TvSlideBar key={lowMoment.moment.id} clock={{ current: { startedAt: lowMoment.startedAt, elapsed: 0 } }} totalMs={lowMoment.ms} /> : null}
         <div className="h-full min-h-0 relative" data-testid="tv-board-area">
           {!data ? (
             <div className="tv-empty tv-t-head font-display">{loadError ? "Turnierbaum konnte nicht geladen werden" : "Lade Turnierbaum …"}</div>
@@ -591,14 +597,19 @@ function BracketTv() {
                   <TvStatsSlide tiles={tiles} avatarOf={avatarOf} />
                 </div>
               ) : null}
-              {lowEmpty ? <div className="tv-empty tv-t-head font-display" data-testid="tv-slide-empty">{lowEmpty}</div> : null}
+              {lowEmpty && !finale ? <div className="tv-empty tv-t-head font-display" data-testid="tv-slide-empty">{lowEmpty}</div> : null}
+              {finale ? (
+                <div className="tv-slide tv-slide--finale" key={`finale-${finale.step}`}>
+                  <TvFinaleMovers page={finale} />
+                </div>
+              ) : null}
             </>
           )}
         </div>
       </main>
 
       <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : words.qr}>
-        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} queue={liveQueue} /> : null}
+        {screen === "playlist" && hasMatches && !parked && !finale ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} queue={liveQueue} /> : null}
       </TvFooter>
       {needsClick ? <div className="tv-hint tv-t-meta" role="status" data-testid="tv-sound-hint">Für Ton einmal klicken</div> : null}
     </div>

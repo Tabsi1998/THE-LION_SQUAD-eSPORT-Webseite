@@ -642,6 +642,9 @@ async def init_indexes():
     # Neue Season aus dem Vorgänger (F.2): höchstens eine je Vorgänger - auch bei einem Doppelklick.
     await unique_index(db.league_seasons, "predecessor_id", "league_season_predecessor",
                        partialFilterExpression={"predecessor_id": {"$type": "string"}})
+    # Liga im Discord (#1642): je Spieltag bzw. Saisonende höchstens eine Meldung - der Job belegt den Schlüssel vor dem Senden.
+    await unique_index(db.league_discord_posts, "dedupe_key", "league_discord_dedupe")
+    await db.league_discord_posts.create_index("season_id")
     await init_audit_indexes(db)
 
 

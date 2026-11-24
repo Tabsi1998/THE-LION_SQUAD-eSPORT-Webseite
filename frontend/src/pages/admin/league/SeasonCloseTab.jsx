@@ -12,6 +12,7 @@ import { TextAreaField } from "@/components/tls/FormFields";
 import { ConflictReasonField, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 import { StandingsTable, ZoneLegend, standingKey } from "@/components/tls/tournament/StandingsTable";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { SeasonTvFinaleControl } from "./SeasonTvFinaleControl";
 import { api, formatApiError } from "@/lib/api";
 import { closeState, decisionLine, finalMoment, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws } from "@/lib/leagueTable";
@@ -351,7 +352,7 @@ function StaffelCard({ row, data, canResults, onSheet }) {
   );
 }
 
-export function SeasonCloseTab({ seasonId, canResults = false }) {
+export function SeasonCloseTab({ seasonId, canResults = false, canMatches = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [sheet, setSheet] = useState(null);
@@ -382,6 +383,8 @@ export function SeasonCloseTab({ seasonId, canResults = false }) {
       </div>
       {/* Plätze über Staffeln hinweg (#1627): je Liga mit dieser Regel die Kandidaten, der Gleichstand und der Entscheid. */}
       <SeasonCrossZones data={data} canResults={canResults} onChanged={load} />
+      {/* Saisonfinale am TV (#1641): nach dem Sieger-Moment je Liga N die Auf- und Absteiger - Weiter und Ende. */}
+      <div className="mt-4"><SeasonTvFinaleControl seasonId={seasonId} canSteer={canMatches} /></div>
       <p className="mt-4 text-[11px] text-white/45">
         Auf- und Abstieg ergeben sich aus dem Endstand (Zonen je Liga im Reiter „Ligen und Staffeln“). Ist alles abgeschlossen, legt „Neue Season aus …“ oben die nächste Season an.
       </p>
