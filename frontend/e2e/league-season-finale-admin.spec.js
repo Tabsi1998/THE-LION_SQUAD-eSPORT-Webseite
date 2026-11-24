@@ -87,7 +87,7 @@ async function noSideScroll(page) {
 async function shot(target, name) {
   const dir = process.env.E2E_SCREENS_DIR;
   if (!dir) return;
-  await target.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", style: ".tls-bottom-nav { display: none !important; }" });
+  await target.screenshot({ path: path.join(dir, `${name}.png`), animations: "disabled", style: ".tls-bottom-nav { display: none !important; } .tls-skip-link, .sticky.top-0 { visibility: hidden !important; }" });
 }
 
 test.describe("Liga: Saisonfinale am TV und Discord in der Verwaltung", () => {
@@ -148,6 +148,29 @@ test.describe("Liga: Saisonfinale am TV und Discord in der Verwaltung", () => {
       await expect(page.getByText("Freigegeben – die Meldung geht mit dem nächsten Lauf hinaus", { exact: false })).toBeVisible();
       await expect(box.getByTestId("season-discord-problems")).not.toContainText("Saisonende:");
       expect(state.releases).toEqual([{ key: "season_end:s1", confirm: true }]);
+    });
+
+    test(`Termine bei ${width} px: verworfene Spieltage leise unter den Hinweisen, mit „Noch einmal senden“ (Nr. 243)`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const skipped = (number, letter) => ({ key: `matchday:t${letter}:${number}`, kind: "matchday", status: "skipped", at: "2026-11-24T09:00:00+00:00",
+        label: `Spieltag ${number} · Probe-Liga · Season 3 · Liga 2 · Staffel ${letter}`,
+        text: "Verworfen – nach einem Ausfall kam nur der neueste Spieltag. Mit „Noch einmal senden“ holst du ihn nach." });
+      const state = await mockServer(page, { discord: { ...DISCORD, problems: [DISCORD.problems[0], skipped(7, "A"), skipped(8, "A"), skipped(8, "B")] } });
+      await page.goto("/admin/leagues/seasons/s1#discord");
+      const box = page.getByTestId("season-discord");
+      const quiet = box.getByTestId("season-discord-skipped");
+      await expect(quiet).toHaveAttribute("data-tone", "quiet");
+      await expect(quiet).toContainText("Verworfene Spieltage");
+      await expect(quiet.locator("li")).toHaveCount(3);
+      await expect(box.getByTestId("season-discord-problems")).not.toContainText("Spieltag 7");
+      await noSideScroll(page);
+      await quiet.scrollIntoViewIfNeeded();
+      await shot(box, `admin-discord-verworfen-${width}`);
+      await box.getByTestId("season-discord-release-matchday:tA:7").click();
+      await box.getByText("Ich habe im Kanal nachgesehen, die Meldung fehlt").click();
+      await box.getByTestId("season-discord-release-go").click();
+      await expect(quiet.locator("li")).toHaveCount(2);
+      expect(state.releases).toEqual([{ key: "matchday:tA:7", confirm: true }]);
     });
 
     test(`Termine bei ${width} px: ohne freigegebenen Kanal der Weg zu den Kanälen je Zweck`, async ({ page }) => {

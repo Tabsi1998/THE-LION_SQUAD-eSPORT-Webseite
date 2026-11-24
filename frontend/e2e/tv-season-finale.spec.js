@@ -128,6 +128,10 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       await expect(page.getByTestId("tv-header").locator("h1")).toHaveText("Saisonfinale");
       await expect(page.getByTestId("tv-header")).toContainText("Probe-Liga · Season 3");
       await expect(page.getByTestId("tv-header")).not.toContainText("Staffel A");
+      // K-e: Kicker und Statuszeile passen zum Finale - nicht mehr „Tabelle“.
+      await expect(page.getByTestId("tv-header")).toContainText("THE LION SQUAD · LIGA");
+      await expect(page.getByTestId("tv-header")).not.toContainText("TABELLE");
+      await expect(page.getByTestId("tv-status")).toContainText("Saisonfinale aktuell");
       await expect(page.getByTestId("bracket-tv")).toHaveAttribute("data-slide", "finale");
       // Gestaffelt: gut eine halbe Sekunde nach dem Schritt ist die erste Zeile unterwegs, die letzte noch nicht da.
       await page.waitForTimeout(550);

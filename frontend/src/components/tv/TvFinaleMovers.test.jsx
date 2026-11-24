@@ -64,10 +64,10 @@ test("Nr. 235/238: zwölf Absteiger - höchstens acht Zeilen (so viele, wie samt
   render(<TvFinaleMovers page={{ label: "Liga 2", step: 1, count: 1, rows }} />);
   const down = screen.getByTestId("tv-finale-col-down");
   const shown = within(down).getAllByRole("listitem");
-  expect(shown.length).toBeLessThanOrEqual(8);
-  expect(shown.length).toBeGreaterThanOrEqual(6);
+  // Ohne Layout (16:9-Vorgabe): sieben kurze Zeilen plus Hinweis passen, eine achte samt Hinweis nicht.
+  expect(shown).toHaveLength(7);
   const more = within(down).getByTestId("tv-finale-more-down");
-  expect(more).toHaveTextContent(`und ${12 - shown.length} weitere`);
+  expect(more).toHaveTextContent("und 5 weitere");
   const last = parseFloat(screen.getByTestId(`tv-finale-row-x${shown.length - 1}`).style.getPropertyValue("--tv-finale-at"));
   expect(parseFloat(more.style.getPropertyValue("--tv-finale-at"))).toBeGreaterThan(last);
   expect(screen.queryByTestId("tv-finale-more")).toBeNull();
