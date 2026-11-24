@@ -176,7 +176,9 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
   gleiten nacheinander auf ihren Platz – Aufsteiger von unten, Absteiger von oben –, danach kommt die Ziel-Liga, zuletzt die Linie
   unter dem Titel. Jedes weitere **Weiter** zeigt die nächste Liga N, **Ende** das gewohnte Bild. Solange der Schritt steht, wartet
   die Wiedergabeliste und die Kopfleiste zeigt **Saisonfinale** mit Liga und Season statt der eigenen Staffel. Nur bei öffentlichen
-  Seasons; mit **Bewegung aus** steht das Bild sofort.
+  Seasons; mit **Bewegung aus** steht das Bild sofort. Vor „Liga N“ im Titel und vor jeder Ziel-Liga steht das **Liga-Abzeichen**
+  (#2561) – Liga 1 mit Krone, Liga 2 mit doppeltem Rand, ab Liga 3 schlicht. Das Wappen im Titel setzt sich mit den Spaltenköpfen
+  leise auf, das in der Zeile kommt mit der Ziel-Liga.
   **Viele Teams:** Je Spalte stehen höchstens **8 Zeilen**, der Rest darunter als „und N weitere“ (Nr. 235). Die 8 sind eine
   Obergrenze (Nr. 238): Brechen lange Namen oder eine lange Ziel-Liga um, kommen nur so viele Zeilen, wie samt „und N weitere“
   sicher über der Fußleiste stehen – der Rest zählt zu „und N weitere“. Kein Name wird kleiner als die Mindestgröße für TV-Namen,
