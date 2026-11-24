@@ -327,9 +327,11 @@ async def blocked(db, key: str, now: datetime) -> bool:
 
 async def skip(db, key: str, doc: dict, now: datetime) -> None:
     """Einen liegen gebliebenen Spieltag verwerfen (Nr. 240): Merker „skipped“ mit Grund ``missed`` - er geht nie hinaus. Ein wartender
-    Fehlversuch wird ebenfalls verworfen; ein gesendeter, laufender oder unklarer Eintrag bleibt, wie er ist."""
+    Fehlversuch wird ebenfalls verworfen; ein gesendeter, laufender, unklarer oder von der Leitung freigegebener Eintrag (Nr. 242)
+    bleibt, wie er ist."""
     stamp = now.isoformat()
-    changed = await db[COLLECTION].update_one({"dedupe_key": key, "status": "failed", "attempts": {"$lt": MAX_ATTEMPTS}},
+    changed = await db[COLLECTION].update_one({"dedupe_key": key, "status": "failed", "attempts": {"$lt": MAX_ATTEMPTS},
+                                               "released_at": {"$exists": False}},
                                               {"$set": {"status": SKIPPED, "reason": "missed", "skipped_at": stamp}})
     if changed.modified_count:
         return
@@ -375,19 +377,20 @@ async def _send(db, key: str, channel_id: str, message: dict, now: datetime) -> 
         buttons = await discord_links.resolve_buttons(message.get("buttons"))
     except Exception:  # noqa: BLE001 - ein Fehler beim Aufbau darf den Job nicht abbrechen
         logger.warning("[league_discord] Meldung %s nicht aufgebaut", log_safe(key), exc_info=True)
-        await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "failed", "attempts": MAX_ATTEMPTS, "channel_id": channel_id,
-                                                                       "error": "build"}})
+        await db[COLLECTION].update_one({"dedupe_key": key, "status": "sending"},
+                                        {"$set": {"status": "failed", "attempts": MAX_ATTEMPTS, "channel_id": channel_id, "error": "build"}})
         return False
     try:
         result = await bot.send_embed(channel_id, embed, buttons)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf den Job nicht abbrechen
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
+    # Nur ein Eintrag, der noch „sending“ ist, bekommt das Ergebnis (K-c): Kommt es erst nach einer Freigabe zurück, bleibt die Freigabe.
     if result.get("ok"):
-        await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "sent", "message_id": str(result.get("message_id") or ""),
+        await db[COLLECTION].update_one({"dedupe_key": key, "status": "sending"}, {"$set": {"status": "sent", "message_id": str(result.get("message_id") or ""),
                                                                        "channel_id": channel_id, "sent_at": now.isoformat(), "error": None}})
         return True
     status = "failed" if retryable(result) else UNCLEAR
-    await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": status, "channel_id": channel_id,
+    await db[COLLECTION].update_one({"dedupe_key": key, "status": "sending"}, {"$set": {"status": status, "channel_id": channel_id,
                                                                    "error": str(result.get("reason") or result.get("error") or "error")[:200]}})
     logger.info("[league_discord] Meldung %s nicht gesendet: %s", log_safe(key), log_safe(result.get("reason")))
     return False
@@ -496,10 +499,17 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
             ready.append((number, open_count, key))
         if not ready or sent >= budget:
             continue
-        # Nr. 240: Nach einem Ausfall nur der neueste fertige Spieltag - die älteren werden verworfen, nie nachgeschickt.
-        for number, _open, key in ready[:-1]:
+        # Nr. 242: Freigegebene gehen immer (genau einmal) - sie sind nie verwerfbar.
+        released = {row["dedupe_key"] for row in await db[COLLECTION].find(
+            {"dedupe_key": {"$in": [key for _number, _open, key in ready]}, "status": "failed", "released_at": {"$exists": True}},
+            {"_id": 0, "dedupe_key": 1}).to_list(len(ready))}
+        fresh = [item for item in ready if item[2] not in released]
+        # Nr. 240: Nach einem Ausfall nur der neueste neue Spieltag - die älteren werden verworfen (leiser Hinweis, Nr. 243).
+        for number, _open, key in fresh[:-1]:
             await skip(db, key, {"kind": "matchday", "season_id": season["id"], "tournament_id": staffel["id"], "matchday": number}, now)
-        for number, open_count, key in ready[-1:]:
+        for number, open_count, key in sorted([item for item in ready if item[2] in released] + fresh[-1:]):
+            if sent >= budget:
+                break
             if names is None:
                 names = await _names(db, staffel["id"])
                 table = await _table(db, staffel)
