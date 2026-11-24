@@ -261,7 +261,8 @@ async def champion_from_playoffs(db, season: dict | None, top_division: dict | N
 async def staffeln_locked(db, season: dict | None, division: dict | None) -> bool:
     """Stehen die regulären Staffeln dieser Liga N fest? Ja, sobald eine von ihnen abgeschlossen ist **und** die Liga N Playoffs
     spielt oder an einer Relegation hängt (als obere oder als untere Liga N): Wie viele Teams in die Playoffs kommen und ob die
-    Relegation aufgeht, steht mit dem ersten Abschluss fest. Ohne Playoffs und Relegation nie - dort bleibt alles wie vorher."""
+    Relegation aufgeht, steht mit dem ersten Abschluss fest. Eine Relegation bindet **beide** Liga N des Paares: Hat eine von ihnen
+    abgeschlossen, nimmt auch die andere keine weitere Staffel. Ohne Playoffs und Relegation nie - dort bleibt alles wie vorher."""
     if not season or not division or not division.get("id"):
         return False
     divisions = await _divisions(db, division["season_id"])
@@ -269,9 +270,18 @@ async def staffeln_locked(db, season: dict | None, division: dict | None) -> boo
         return False
     upper = next((row for row in divisions if (_lower(divisions, row) or {}).get("id") == division["id"]), None)
     own = settings_of(season, division)
-    if not (own["playoffs"]["enabled"] or own["relegation"]["enabled"] or (upper and settings_of(season, upper)["relegation"]["enabled"])):
+    lower = _lower(divisions, division)
+    bound = [division]
+    if own["relegation"]["enabled"] and lower:
+        bound.append(lower)
+    if upper and settings_of(season, upper)["relegation"]["enabled"]:
+        bound.append(upper)
+    if not own["playoffs"]["enabled"] and len(bound) == 1:
         return False
-    return (await _frozen(db, division["id"]))[0]
+    for row in bound:
+        if (await _frozen(db, row["id"]))[0]:
+            return True
+    return False
 
 
 async def table_champion(db, season_id: str | None) -> dict | None:

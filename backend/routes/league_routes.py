@@ -148,7 +148,7 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
         rows.append({
             "zones_cross_locked": division["id"] in locked,
             # Mit Playoffs oder Relegation stehen die Staffeln ab dem ersten Abschluss fest (#2404) - nur dann steht das Feld da.
-            **({"staffeln_locked": True} if division["id"] in locked and await league_postseason.staffeln_locked(db, season, division) else {}),
+            **({"staffeln_locked": True} if locked and await league_postseason.staffeln_locked(db, season, division) else {}),
             **division, "label": leagues.division_label(division),
             # Auf- und Abstieg (F.2, #1627): eingestellt (``zones``) und was gilt (oberste ohne Aufstieg, unterste ohne Abstieg).
             "zones": league_zones.settings_of(division), "zones_effective": zones, "zones_label": league_zones.summary(zones),
@@ -798,9 +798,16 @@ async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: 
     # Wie viele Teams in die Playoffs kommen und ob die Relegation aufgeht, rechnet mit den Staffeln, die es beim Abschluss gab.
     from services import league_postseason
 
-    if await league_postseason.staffeln_locked(db, await _call(leagues.get_season(db, division["season_id"])), division):
-        raise HTTPException(status_code=422, detail=league_postseason.STAFFELN_LOCKED)
-    doc = await _call(leagues.create_staffel(db, division, body.staffel, me))
+    from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock
+
+    # Unter der Season-Sperre (Nr. 232): Ein gleichzeitiger Abschluss sieht die neue Staffel - oder sie wird hier schon abgelehnt.
+    try:
+        async with mutation_lock(db, league_season_resource(division["season_id"])):
+            if await league_postseason.staffeln_locked(db, await _call(leagues.get_season(db, division["season_id"])), division):
+                raise HTTPException(status_code=422, detail=league_postseason.STAFFELN_LOCKED)
+            doc = await _call(leagues.create_staffel(db, division, body.staffel, me))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=leagues.SEASON_BUSY) from None
     reset_scope_cache()
     await _create_initial_stage_bracket_preview(db, doc, me.get("id"))
     await _audit(db, "league.staffel.create", me, doc["id"],
