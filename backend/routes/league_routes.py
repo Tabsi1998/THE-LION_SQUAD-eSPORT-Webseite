@@ -402,10 +402,13 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     async def before_write(after: dict) -> None:
         await gate(after)
         if after.get("best_of") != season.get("best_of"):
-            # Nr. 252 (#2404): Nach dem Season-Start behalten die Playoffs ihr Best of - es wird festgeschrieben, bevor die Season schreibt.
+            # Nr. 252, 255 (#2404): Nach dem Season-Start behalten Playoffs und Relegation ihr Best of - gemerkt, bevor die Season schreibt.
             from services import league_postseason
 
-            warnings.extend(await league_postseason.keep_best_of(db, season, after, me))
+            try:
+                warnings.extend(await league_postseason.keep_best_of(db, season, after, me))
+            except league_postseason.PostseasonProblem as problem:
+                raise LeagueProblem(problem.message, problem.status) from None
 
     doc, changed = await _call(leagues.update_season(db, season, payload, warnings=warnings, before_write=before_write))
     await _record_readiness_override(db, me, season_id, passed)
@@ -736,15 +739,20 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     if "overrides" in payload:
         payload["overrides"] = body.overrides.model_dump(exclude_none=True) if body.overrides else {}
     warnings: list[str] = []
-    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
-    if changed:
-        await _audit(db, "league.division.update", me, division_id, {"fields": changed})
-    if "overrides" in changed:
-        # Nr. 252 (#2404): Ein eigenes Best of der Liga N ändert nach dem Season-Start nicht das Best of ihrer Playoffs.
+    if "overrides" in payload:
+        # Nr. 252, 255 (#2404): Ein eigenes Best of der Liga N ändert nach dem Season-Start nicht das Best of ihrer Playoffs und ihrer
+        # Relegation - der Wert vom Start wird gemerkt, bevor die Liga N schreibt (unter der Season-Sperre).
         from services import league_postseason
 
         season = await _call(leagues.get_season(db, division["season_id"]))
-        warnings.extend(await league_postseason.keep_best_of(db, season, season, me, division=division, after_division=doc))
+        try:
+            warnings.extend(await league_postseason.keep_best_of(db, season, season, me, division=division,
+                                                                 after_division={**division, "overrides": payload["overrides"]}))
+        except league_postseason.PostseasonProblem as problem:
+            raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
+    if changed:
+        await _audit(db, "league.division.update", me, division_id, {"fields": changed})
     # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
     return {**{key: value for key, value in doc.items() if key not in ("draw", "zone_decisions")}, "warnings": warnings}
 
