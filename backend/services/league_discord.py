@@ -249,12 +249,17 @@ def season_end_message(context: dict) -> dict:
     intro = f"{_esc(context.get('league'))}: Die Season ist abgeschlossen." if context.get("league") else "Die Season ist abgeschlossen."
     title = f"Saisonende · {context.get('season') or 'Season'}"
     description = "\n".join(part for part in (intro, title_line) if part)
-    pages = (context.get("pages") or [])[:20]
+    pages = context.get("pages") or []
     fields = []
     rest = "Weitere Ligen"
     # Platz für den Hinweis auf weggefallene Liga N bleibt immer frei - der Rest geht an die Liga N der Reihe nach.
     budget = EMBED_MAX - len(title) - len(description) - len(rest) - 60
     for index, page in enumerate(pages):
+        # Höchstens 9 Liga N als Feld, wenn danach noch welche kommen - das zehnte Feld ist der Hinweis (K1).
+        if index >= MAX_LEAGUE_FIELDS and len(pages) > MAX_LEAGUE_FIELDS + 1:
+            left = len(pages) - index
+            fields.append({"name": rest, "value": f"… und {left} weitere Liga N auf der Season-Seite", "inline": False})
+            break
         lines = [mover_line(row) for row in page.get("rows") or []]
         if page.get("more"):
             lines.append(f"… und {page['more']} weitere auf der Season-Seite")
@@ -319,6 +324,24 @@ async def blocked(db, key: str, now: datetime) -> bool:
         return True
     cutoff = (now - timedelta(minutes=RETRY_MINUTES)).isoformat()
     return int(row.get("attempts") or 0) >= MAX_ATTEMPTS or str(row.get("claimed_at") or "") >= cutoff
+
+async def skip(db, key: str, doc: dict, now: datetime) -> None:
+    """Einen liegen gebliebenen Spieltag verwerfen (Nr. 240): Merker „skipped“ mit Grund ``missed`` - er geht nie hinaus. Ein wartender
+    Fehlversuch wird ebenfalls verworfen; ein gesendeter, laufender oder unklarer Eintrag bleibt, wie er ist."""
+    stamp = now.isoformat()
+    changed = await db[COLLECTION].update_one({"dedupe_key": key, "status": "failed", "attempts": {"$lt": MAX_ATTEMPTS}},
+                                              {"$set": {"status": SKIPPED, "reason": "missed", "skipped_at": stamp}})
+    if changed.modified_count:
+        return
+    try:
+        await db[COLLECTION].update_one(
+            {"dedupe_key": key},
+            {"$setOnInsert": {**doc, "dedupe_key": key, "status": SKIPPED, "reason": "missed", "attempts": 0, "claimed_at": stamp,
+                              "skipped_at": stamp, "created_at": stamp}},
+            upsert=True)
+    except DuplicateKeyError:
+        return
+
 
 async def claim(db, key: str, doc: dict, now: datetime) -> bool:
     """Den Schlüssel belegen - ``True`` nur für den, der ihn belegt hat. Ein Fehlschlag darf nach ``RETRY_MINUTES`` noch einmal,
@@ -455,9 +478,8 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
                 by_day.setdefault(number, []).append(match)
         names = None
         table = None
+        ready = []
         for number in sorted(by_day):
-            if sent >= budget:
-                break
             try:
                 window_end = tournament_matchday_window(staffel, number).end
             except Exception:  # noqa: BLE001 - ohne Spielwoche (kein Start) zählt nur „alles gewertet“
@@ -471,6 +493,13 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
             key = f"matchday:{staffel['id']}:{number}"
             if await blocked(db, key, now):
                 continue
+            ready.append((number, open_count, key))
+        if not ready or sent >= budget:
+            continue
+        # Nr. 240: Nach einem Ausfall nur der neueste fertige Spieltag - die älteren werden verworfen, nie nachgeschickt.
+        for number, _open, key in ready[:-1]:
+            await skip(db, key, {"kind": "matchday", "season_id": season["id"], "tournament_id": staffel["id"], "matchday": number}, now)
+        for number, open_count, key in ready[-1:]:
             if names is None:
                 names = await _names(db, staffel["id"])
                 table = await _table(db, staffel)
