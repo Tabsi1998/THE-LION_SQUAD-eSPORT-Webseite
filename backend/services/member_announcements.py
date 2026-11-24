@@ -139,6 +139,8 @@ async def notify_app_news(db, limit: int = 20) -> dict:
         if not claimed.modified_count:
             continue
         if str(post.get("published_at") or "") < cutoff:
+            # Älter als einen Tag (#2553): kein Push - mit Grund, damit die Verteilen-Box nicht „an 0 Personen“ zeigt.
+            await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_skipped_reason": "too_old"}})
             continue
         sent = 0
         slug = post.get("slug") or post["id"]
