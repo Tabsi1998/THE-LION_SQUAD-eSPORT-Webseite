@@ -3,7 +3,8 @@ const { test, expect } = require("@playwright/test");
 
 // Saisonfinale am TV (#1641) und Liga im Discord (#1642) in der Verwaltung der Season, Server nachgestellt: der Kasten „Saisonfinale am
 // TV“ im Reiter „Abschluss“ (Weiter aus einem veralteten Fenster: 409, der Stand wird neu geladen) und der Kasten „Discord“ im Reiter
-// „Termine“ (Kanal nur aus den freigegebenen Kanälen je Zweck, Nr. 234; Hinweise zu unklaren und aufgegebenen Meldungen). Bei 390 und
+// „Termine“ (Kanal nur aus den freigegebenen Kanälen je Zweck, Nr. 234; Hinweise zu unklaren und aufgegebenen Meldungen, je Hinweis
+// „Noch einmal senden“ nach der Bestätigung, Nr. 239). Bei 390 und
 // 1440 px ohne seitliches Scrollen. Mit E2E_SCREENS_DIR legt der Test die Bilder ab. Nur erfundene Namen, kein Discord.
 
 const json = (body, status = 200) => (route) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -40,9 +41,9 @@ const DISCORD = {
     { id: "100000000000000043", purpose: "Community", name: "allgemein", category: "Treffpunkt", can_send: true },
   ],
   problems: [
-    { kind: "season_end", label: "Saisonende", status: "unclear", at: "2026-11-23T19:00:00+00:00",
-      text: "Unklar, ob die Meldung ankam - Discord meldete einen Fehler nach dem Senden. Bitte im Kanal nachsehen; sie geht nicht noch einmal hinaus." },
-    { kind: "matchday", label: "Spieltag 9 · Probe-Liga · Season 3 · Liga 2 · Staffel A", status: "failed", at: "2026-11-22T19:00:00+00:00",
+    { key: "season_end:s1", kind: "season_end", label: "Saisonende", status: "unclear", at: "2026-11-23T19:00:00+00:00",
+      text: "Ob die Meldung ankam, ist unklar. Bitte im Kanal nachsehen - fehlt sie dort, gibst du sie mit „Noch einmal senden“ frei." },
+    { key: "matchday:t2:9", kind: "matchday", label: "Spieltag 9 · Probe-Liga · Season 3 · Liga 2 · Staffel A", status: "failed", at: "2026-11-22T19:00:00+00:00",
       text: "Nach 3 Versuchen nicht gesendet. Der Bot ist nicht verbunden – der Grund steht im Bot-Kasten unter Verbindungen → Discord." },
   ],
 };
@@ -69,6 +70,12 @@ async function mockServer(page, { tv = TV, discord = DISCORD } = {}) {
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(state.tv) });
   });
   await page.route("**/api/admin/leagues/seasons/s1/discord", json(discord));
+  state.releases = [];
+  await page.route("**/api/admin/leagues/seasons/s1/discord/release", async (route) => {
+    const body = route.request().postDataJSON();
+    state.releases.push(body);
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...discord, problems: discord.problems.filter((row) => row.key !== body.key) }) });
+  });
   return state;
 }
 
@@ -122,6 +129,25 @@ test.describe("Liga: Saisonfinale am TV und Discord in der Verwaltung", () => {
       await noSideScroll(page);
       await box.scrollIntoViewIfNeeded();
       await shot(box, `admin-discord-${width}`);
+    });
+
+    test(`Termine bei ${width} px: „Noch einmal senden“ erst nach der Bestätigung, danach ist der Hinweis weg`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const state = await mockServer(page);
+      await page.goto("/admin/leagues/seasons/s1#discord");
+      const box = page.getByTestId("season-discord");
+      await box.getByTestId("season-discord-release-season_end:s1").click();
+      const go = box.getByTestId("season-discord-release-go");
+      await expect(go).toBeDisabled();
+      await box.getByText("Ich habe im Kanal nachgesehen, die Meldung fehlt").click();
+      await expect(go).toBeEnabled();
+      await noSideScroll(page);
+      await box.getByTestId("season-discord-problems").scrollIntoViewIfNeeded();
+      await shot(box, `admin-discord-noch-einmal-senden-${width}`);
+      await go.click();
+      await expect(page.getByText("Freigegeben – die Meldung geht mit dem nächsten Lauf hinaus", { exact: false })).toBeVisible();
+      await expect(box.getByTestId("season-discord-problems")).not.toContainText("Saisonende:");
+      expect(state.releases).toEqual([{ key: "season_end:s1", confirm: true }]);
     });
 
     test(`Termine bei ${width} px: ohne freigegebenen Kanal der Weg zu den Kanälen je Zweck`, async ({ page }) => {
