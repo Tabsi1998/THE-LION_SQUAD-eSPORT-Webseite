@@ -340,7 +340,8 @@ async def _frame(db, tournament: dict) -> dict:
     # jeder regulären Staffel der obersten Liga N (Vorgabe) oder der Sieger ihrer Playoffs - nie beides.
     kind = staffel_kind(tournament)
     top = bool(division.get("id")) and division.get("id") == await top_division_id(db, season.get("id"))
-    from_playoffs = await league_postseason.champion_from_playoffs(db, season)
+    # Mit weniger als zwei Playoff-Teams in der obersten Liga N bleibt es beim Meister aus der Tabelle (``champion_from_playoffs``).
+    from_playoffs = await league_postseason.champion_from_playoffs(db, season, division) if top else False
     snapshot = await league_postseason.close_snapshot(db, season, division) if division.get("id") and not kind else None
     return {"league": league, "season": season, "division": division, "kind": kind,
             "division_label": division_label(division) if division.get("level") is not None else None,
@@ -758,8 +759,23 @@ def second_person_override(final: dict, actor: dict, emergency_reason) -> str | 
 
 async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: str | None = None, emergency_reason: str | None = None,
                  now: datetime | None = None) -> dict:
-    """Öffnet die abgeschlossene Staffel wieder: Die Fassung bleibt im Verlauf, die Tabelle wird wieder gerechnet, der Meister-Eintrag
-    ruht. Der Aufrufer hält die Schreibsperre und hat das Recht geprüft."""
+    """Öffnet die abgeschlossene Staffel wieder. Der Aufrufer hält die Schreibsperre des Turniers und hat das Recht geprüft.
+
+    **Season-Sperre** (Nr. 232): wie der Abschluss - Wiederöffnen, Abschließen, Anlegen der Playoffs und „Setzliste neu berechnen“
+    einer Season laufen nacheinander. Reihenfolge wie überall: erst Turnier, dann Season. Wer nicht drankommt: 409."""
+    season_id = ((tournament or {}).get("league_context") or {}).get("season_id")
+    if not season_id:
+        return await _reopen(db, tournament, actor, reason, conflict_reason=conflict_reason, emergency_reason=emergency_reason, now=now)
+    try:
+        async with mutation_lock(db, league_season_resource(season_id)):
+            return await _reopen(db, tournament, actor, reason, conflict_reason=conflict_reason, emergency_reason=emergency_reason, now=now)
+    except MutationLockBusy:
+        raise FinalProblem(SEASON_BUSY, 409) from None
+
+
+async def _reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: str | None = None, emergency_reason: str | None = None,
+                  now: datetime | None = None) -> dict:
+    """Die Fassung bleibt im Verlauf, die Tabelle wird wieder gerechnet, der Meister-Eintrag ruht."""
     from services import league_permissions
 
     if not is_league_staffel(tournament):
@@ -976,7 +992,7 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
                                       bool(staffel_kind(row)), str(row["league_context"].get("staffel") or "")))
     from services import league_postseason
 
-    from_playoffs = await league_postseason.champion_from_playoffs(db, season)
+    from_playoffs = await league_postseason.champion_from_playoffs(db, season, divisions.get(top))
     staffeln = []
     for tournament in tournaments:
         division = divisions.get(tournament["league_context"].get("division_id")) or {}

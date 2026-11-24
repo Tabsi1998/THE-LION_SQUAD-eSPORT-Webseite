@@ -152,9 +152,11 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
             "calendar": leagues.calendar_summary(season, settings),
             "staffeln": [leagues.staffel_summary(row) for row in staffeln
                          if row["league_context"].get("division_id") == division["id"] and not row["league_context"].get("kind")],
-            # Playoffs und Relegation dieser Liga N (#2404, F.6): eigene K.-o.-Staffeln - bedient im Reiter "Abschluss".
-            "postseason": [leagues.staffel_summary(row) for row in staffeln
-                           if row["league_context"].get("division_id") == division["id"] and row["league_context"].get("kind")],
+            # Playoffs und Relegation dieser Liga N (#2404, F.6): eigene K.-o.-Staffeln - bedient im Reiter "Abschluss". Ohne sie fehlt
+            # das Feld: Die Antwort einer Season ohne Playoffs sieht aus wie vorher.
+            **({"postseason": extra} if (extra := [
+                leagues.staffel_summary(row) for row in staffeln
+                if row["league_context"].get("division_id") == division["id"] and row["league_context"].get("kind")]) else {}),
         })
     return {
         "capabilities": sorted(await capabilities_of(db, me, league["id"])),

@@ -53,7 +53,14 @@ NO_STAFFELN = "{label} hat noch keine reguläre Staffel."
 REGULAR_OPEN = "Erst alle regulären Staffeln von {label} abschließen ({closed} von {total} abgeschlossen)."
 NO_SNAPSHOT = ("Die Staffeln von {label} wurden abgeschlossen, bevor die Playoffs eingeschaltet waren. Bitte wieder öffnen und neu "
                "abschließen - der Endstand hält fest, wer in die Playoffs kommt.")
-TOO_FEW = "Für Playoffs braucht es mindestens zwei qualifizierte Teams - in {label} {verb} es {count}."
+TOO_FEW = ("Für Playoffs braucht es mindestens zwei qualifizierte Teams - in {label} {verb} es {count}. Diese Liga spielt darum keine "
+           "Playoffs; für den Abschluss der Season zählt sie als „ohne Playoffs“.")
+TOO_FEW_HINT = ("In {label} kommen mit {per} {per_word} je Staffel und {count} {staffel_word} weniger als zwei Teams zusammen. Dort gibt es "
+                "keine Playoffs - der Meister kommt aus der Tabelle, die Season wartet nicht darauf.")
+START_LOCKED = ("Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht der Playoffs fest ({label}). Das gilt auch nach "
+                "einem Wiederöffnen.")
+NO_RETRY = "Dieses Spiel wurde nicht neu angesetzt."
+OUT_FINAL = "Beide sind schon ausgeschieden - das lässt sich nicht zurücknehmen."
 LOCKED = ("In {label} ist schon eine Staffel abgeschlossen. Playoffs an/aus, Plätze je Staffel und Relegation an/aus lassen sich dann "
           "nicht mehr ändern - erst alle Staffeln dieser Liga wieder öffnen.")
 CHAMPION_LOCKED = ("In der obersten Liga ist schon eine Staffel abgeschlossen. „Meister aus“ lässt sich dann nicht mehr ändern - erst "
@@ -113,9 +120,19 @@ def _lower(divisions: list[dict], division: dict) -> dict | None:
     return min(below, key=lambda row: row["level"]) if below else None
 
 
-async def _existing(db, division_id: str, kind: str) -> dict | None:
+async def _stored(db, division_id: str, kind: str) -> dict | None:
+    """Das Staffel-Turnier dieser Art, wie es in der Datenbank steht - auch ein unfertiges."""
     return await db.tournaments.find_one({"league_context.division_id": division_id, "league_context.staffel": STAFFEL_CODES[kind],
                                           "league_context.kind": kind, **ONLY_LEAGUE}, {"_id": 0})
+
+
+async def _existing(db, division_id: str, kind: str) -> dict | None:
+    """Die angelegte Playoff- bzw. Relegations-Staffel. Eine Staffel **ohne Phase** ist nicht angelegt, sondern unfertig (der Prozess
+    endete mitten im Bau): Sie zählt nirgends als vorhanden, das nächste Anlegen räumt sie weg und baut neu."""
+    row = await _stored(db, division_id, kind)
+    if row and not await db.tournament_stages.find_one({"tournament_id": row["id"]}, {"_id": 1}):
+        return None
+    return row
 
 
 async def _finals(db, staffeln: list[dict]) -> dict[str, dict]:
@@ -161,12 +178,42 @@ async def close_snapshot(db, season: dict, division: dict) -> dict | None:
     if found["playoffs"]["enabled"]:
         out["per_staffel"] = int(found["playoffs"]["per_staffel"])
     if found["champion_source"] == rules.PLAYOFFS:
-        out["champion_source"] = rules.PLAYOFFS
+        # Nur, wenn die oberste Liga N wirklich Playoffs spielen kann - sonst bleibt der Meister bei der Tabelle (``champion_from_playoffs``).
+        divisions = await _divisions(db, season["id"])
+        if await champion_from_playoffs(db, season, divisions[0] if divisions else None):
+            out["champion_source"] = rules.PLAYOFFS
     return out or None
 
 
-async def champion_from_playoffs(db, season: dict | None) -> bool:
-    return rules.stored(season)["champion_source"] == rules.PLAYOFFS
+async def playoffs_feasible(db, season: dict | None, division: dict | None) -> bool:
+    """Kommen in dieser Liga N überhaupt zwei Playoff-Teams zusammen (Plätze je Staffel mal reguläre Staffeln)? Sonst spielt sie keine
+    Playoffs - für Abschluss und Meister gilt sie als „ohne Playoffs“. Aus den Einstellungen und der Zahl der Staffeln, damit es schon
+    beim Abschluss der ersten Staffel feststeht."""
+    if not season or not division or not division.get("id"):
+        return False
+    settings = settings_of(season, division)
+    if not settings["playoffs"]["enabled"]:
+        return False
+    staffeln = await league_cross_zones.staffeln_of(db, division["id"])
+    return int(settings["playoffs"].get("per_staffel") or 0) * len(staffeln) >= 2
+
+
+async def champion_from_playoffs(db, season: dict | None, top_division: dict | None = None) -> bool:
+    """Kommt der Meister aus den Playoffs? Nur, wenn die Season das sagt **und** die oberste Liga N Playoffs spielen kann - mit weniger
+    als zwei Playoff-Teams bleibt es beim Meister aus der Tabelle (sonst gäbe es keinen)."""
+    if rules.stored(season)["champion_source"] != rules.PLAYOFFS:
+        return False
+    return await playoffs_feasible(db, season, top_division)
+
+
+def season_started(season: dict | None, now=None) -> bool:
+    """Hat die Season begonnen? Im Entwurf nie, sonst ab dem Beginn der ersten Spielwoche."""
+    if not season or (season.get("status") or "draft") == "draft":
+        return False
+    from services.league_calendar import aware
+
+    start = aware(season.get("start_date"))
+    return bool(start and (now or now_utc()) >= start)
 
 
 # ---------------------------------------------------------------- Plan: Setzliste und Paarungen
@@ -185,6 +232,9 @@ async def _gone(db, staffeln: list[dict], existing: dict | None) -> set[str]:
             origin = (row.get("postseason") or {}).get("from_registration_id")
             if origin:
                 out.add(origin)
+        # Wer schon einmal beim Neuberechnen herausfiel, bleibt draußen: Die Anmeldung von damals gibt es nicht mehr (``reseed`` baut
+        # die Staffel neu) - der Schnappschuss merkt es sich.
+        out |= {str(item) for item in (existing.get(rules.FIELD) or {}).get("gone") or [] if item}
     return out
 
 
@@ -287,17 +337,20 @@ async def playoff_end_day(db, season: dict, division: dict, *, count: int | None
 
 
 async def relegation_week(db, season: dict, upper: dict, lower: dict | None) -> dict:
-    """Die Woche der Relegation (Nr. 222): frühestens der eingestellte Tag, immer hinter dem Ende der Playoffs der unteren Liga N.
-    Hat die untere keine Playoffs, gilt der Start der Playoffs der oberen (Vertragsvorgabe)."""
+    """Die Woche der Relegation (Nr. 222, 246): frühestens der eingestellte Tag, **immer hinter den Playoffs beider Ligen** - der
+    oberen und der unteren. So spielt kein Team in einer Woche zweimal, auch wenn die untere Liga keine Playoffs hat. Ohne Playoffs in
+    beiden beginnt sie nach der regulären Season."""
     settings = settings_of(season, upper)
-    wanted = rules.start_of({"start_date": settings["relegation"].get("start_date") or settings["playoffs"].get("start_date")}, season)
-    behind = await playoff_end_day(db, season, lower) if lower else None
+    wanted = rules.start_of({"start_date": settings["relegation"].get("start_date")}, season)
+    ends = [(await playoff_end_day(db, season, division), division) for division in (upper, lower) if division]
+    after = [(day, division) for day, division in ends if day]
+    behind = max((day for day, _division in after), default=None)
     start = wanted
     moved = False
     if behind and (start is None or start <= behind):
         start, moved = behind + timedelta(days=1), bool(settings["relegation"].get("start_date"))
     found = rules.weeks(season, start, 1)
-    return {**found, "after_playoffs_of": _label(lower) if behind and lower else None, "moved": moved}
+    return {**found, "after_playoffs_of": " und ".join(_label(division) for _day, division in after) or None, "moved": moved}
 
 
 async def refresh_season_end(db, season_id: str | None) -> str | None:
@@ -338,15 +391,44 @@ async def _closed_divisions(db, season_id: str) -> set[str]:
     return {row["league_context"].get("division_id") for row in rows if not row["league_context"].get("kind")}
 
 
-async def _check_settings(db, season: dict, divisions: list[dict], before: dict[str, dict]) -> None:
-    """Die Prüfungen über Liga N hinweg: Sperre ab dem ersten Abschluss (Nr. 228), „Meister aus Playoffs“ braucht Playoffs oben,
-    Relegation braucht Plätze auf beiden Seiten."""
+def _play_key(found: dict) -> tuple:
+    """Was ab dem Season-Start feststeht (Nr. 249): Best of (auch je Runde), Spiel um Platz 3 und Heimrecht der Playoffs."""
+    playoffs = found["playoffs"]
+    return (int(playoffs.get("best_of") or 0), tuple((int(row["round"]), int(row["best_of"])) for row in playoffs.get("best_of_rounds") or []),
+            bool(playoffs.get("third_place")), playoffs.get("home"))
+
+
+async def too_few_hints(db, season: dict, divisions: list[dict]) -> dict[str, str]:
+    """Je Liga N mit eingeschalteten Playoffs, in der keine zwei Teams zusammenkommen: der Satz dazu. Eine Liga N ohne Staffel bekommt
+    keinen - dort steht noch nicht fest, wie viele es werden."""
+    out = {}
+    for division in divisions:
+        settings = settings_of(season, division)
+        if not settings["playoffs"]["enabled"]:
+            continue
+        count = len(await league_cross_zones.staffeln_of(db, division["id"]))
+        per = int(settings["playoffs"].get("per_staffel") or 0)
+        if count and per * count < 2:
+            out[division["id"]] = TOO_FEW_HINT.format(label=_label(division), per=per, per_word="Platz" if per == 1 else "Plätzen",
+                                                       count=count, staffel_word="Staffel" if count == 1 else "Staffeln")
+    return out
+
+
+async def _check_settings(db, season: dict, divisions: list[dict], before: dict[str, dict]) -> list[str]:
+    """Die Prüfungen über Liga N hinweg: Sperre ab dem ersten Abschluss (Nr. 228), Sperre ab dem Season-Start (Nr. 249), „Meister aus
+    Playoffs“ braucht Playoffs oben, Relegation braucht Plätze auf beiden Seiten. Gibt Hinweise zurück, die das Speichern nicht
+    aufhalten (zu wenige Playoff-Teams)."""
     closed = await _closed_divisions(db, season["id"])
     levels = [row["level"] for row in divisions]
     after = {row["id"]: settings_of(season, row) for row in divisions}
     for division in divisions:
         if division["id"] in closed and rules.sport_key(after[division["id"]]) != rules.sport_key(before[division["id"]]):
             raise PostseasonProblem(LOCKED.format(label=_label(division)), 409)
+    if season_started(season):
+        for division in divisions:
+            was, now_ = before[division["id"]], after[division["id"]]
+            if was["playoffs"]["enabled"] and now_["playoffs"]["enabled"] and _play_key(was) != _play_key(now_):
+                raise PostseasonProblem(START_LOCKED.format(label=_label(division)))
     top = divisions[0] if divisions else None
     source = rules.stored(season)["champion_source"]
     if top and source != before[top["id"]]["champion_source"] and top["id"] in closed:
@@ -370,6 +452,7 @@ async def _check_settings(db, season: dict, divisions: list[dict], before: dict[
             raise PostseasonProblem(seeding.ADD_UP.format(
                 upper=down * upper_count, upper_word="Team" if down * upper_count == 1 else "Teams", upper_label=_label(division),
                 lower=up * lower_count, lower_word="Team" if up * lower_count == 1 else "Teams", lower_label=_label(lower)))
+    return list((await too_few_hints(db, season, divisions)).values())
 
 
 async def _audit(db, action: str, season_id: str, actor: dict, **data) -> None:
@@ -385,13 +468,13 @@ async def save_season(db, season: dict, body: dict, actor: dict) -> dict:
             divisions = await _divisions(db, fresh["id"])
             before = {row["id"]: settings_of(fresh, row) for row in divisions}
             cleaned = rules.clean_season(body, fresh)
-            await _check_settings(db, {**fresh, rules.FIELD: cleaned}, divisions, before)
+            warnings = await _check_settings(db, {**fresh, rules.FIELD: cleaned}, divisions, before)
             await db.league_seasons.update_one({"id": fresh["id"]}, {"$set": {rules.FIELD: cleaned, "updated_at": now_utc().isoformat()}})
     except MutationLockBusy:
         raise PostseasonProblem(BUSY, 409) from None
     await refresh_season_end(db, season["id"])
     await _audit(db, "league.postseason.settings", season["id"], actor, scope="season", settings=cleaned)
-    return cleaned
+    return {"settings": cleaned, "warnings": warnings}
 
 
 async def save_division(db, division: dict, body: dict, actor: dict) -> dict | None:
@@ -409,14 +492,14 @@ async def save_division(db, division: dict, body: dict, actor: dict) -> dict | N
             cleaned = rules.clean_division(body, season, staffel_size=effective_settings(season, fresh).get("max_staffel_size"))
             changed = [({**row, rules.FIELD: cleaned} if cleaned else {key: value for key, value in row.items() if key != rules.FIELD})
                        if row["id"] == fresh["id"] else row for row in divisions]
-            await _check_settings(db, season, changed, before)
+            warnings = await _check_settings(db, season, changed, before)
             await db.league_divisions.update_one({"id": fresh["id"]}, {"$set": {rules.FIELD: cleaned, "updated_at": now_utc().isoformat()}}
                                                  if cleaned else {"$unset": {rules.FIELD: ""}, "$set": {"updated_at": now_utc().isoformat()}})
     except MutationLockBusy:
         raise PostseasonProblem(BUSY, 409) from None
     await refresh_season_end(db, division["season_id"])
     await _audit(db, "league.postseason.settings", division["season_id"], actor, scope="division", division_id=division["id"], settings=cleaned)
-    return cleaned
+    return {"settings": cleaned, "warnings": warnings}
 
 
 # ---------------------------------------------------------------- Befangenheit
@@ -483,8 +566,13 @@ async def _veto(db, tournament: dict, best_ofs: list[int], home: str) -> tuple[d
     if not base:
         return {}, []
     pool = await map_pools.effective_pool(db, tournament)
-    order = league_games.effective_mode_order(tournament, pool)
-    repeat = league_games.map_repeat_of(tournament)
+    by, notes = _veto_templates(base, pool, league_games.effective_mode_order(tournament, pool), league_games.map_repeat_of(tournament), best_ofs, home)
+    main = by.get(str(int(tournament.get("best_of") or 1))) or next(iter(by.values()))
+    return {"veto_rules": dict(main), VETO_FIELD: by}, notes
+
+
+def _veto_templates(base: dict, pool: dict | None, order: list, repeat: str, best_ofs: list[int], home: str) -> tuple[dict, list[str]]:
+    """Je Best of die Vorlage und - wo keine passt - der Hinweis. Rein gerechnet: dieselbe Rechnung für die Vorschau und fürs Anlegen."""
     team_a = veto_rules.HOME if home == rules.BETTER_SEED else veto_rules.DRAW
     by, notes = {}, []
     for best_of in sorted(set(best_ofs)):
@@ -495,8 +583,22 @@ async def _veto(db, tournament: dict, best_ofs: list[int], home: str) -> tuple[d
         if problem:
             notes.append(VETO_NOTE.format(best_of=best_of, problem=problem))
         by[str(best_of)] = {"enabled": True, "team_a": team_a, "step_seconds": int(base["step_seconds"]), "steps": own["steps"]}
-    main = by.get(str(int(tournament.get("best_of") or 1))) or next(iter(by.values()))
-    return {"veto_rules": dict(main), VETO_FIELD: by}, notes
+    return by, notes
+
+
+async def veto_preview(db, season: dict, division: dict, best_ofs: list[int], home: str) -> list[str]:
+    """Die Veto-Hinweise schon in der Vorschau (Nr. 200, 207): Passt für ein Best of keine Vorlage, steht es dort, bevor die Staffel
+    angelegt ist - ein still übersprungenes Veto darf es in den Playoffs nicht geben. Ohne Veto in der Season: nichts."""
+    from services import league_games, league_service
+
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0}) or {}
+    pseudo = {**league_service.staffel_fields(league, season, division), "league_context": {"season_id": season["id"], "division_id": division["id"]}}
+    base = veto_rules.rules_of(pseudo)
+    if not base:
+        return []
+    pool = map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]), league.get("game_id"))
+    _by, notes = _veto_templates(base, pool, league_games.effective_mode_order(pseudo, pool), league_games.map_repeat_of(pseudo), best_ofs, home)
+    return notes
 
 
 async def _write_matches(db, tournament: dict, stage: dict, registrations: list[dict], actor: dict, *, mark) -> list[dict]:
@@ -585,6 +687,8 @@ async def _build_playoffs(db, season: dict, division: dict, settings: dict, plan
         "sources": [{"tournament_id": table["tournament_id"], "final_table_id": table["final"]["id"], "version": table["final"].get("version")}
                     for table in frame["tables"]],
         "seeds": snapshot, "staffel_order": plan["order"],
+        # Wer seit dem Abschluss ausgeschieden ist und darum fehlt (Nr. 217) - bleibt über jedes weitere Neuberechnen draußen.
+        "gone": list(plan["gone"]),
         "draws": [{**draw, "at": now, "by": actor.get("id")} for draw in plan["draws"]],
         "draw_count": int(previous.get("draw_count") or 0) + draw_count, "swaps": plan["swaps"], "settings": settings,
         "veto_notes": notes, "created_at": previous.get("created_at") or now, "created_by": previous.get("created_by") or actor.get("id"),
@@ -681,6 +785,8 @@ async def _create(db, season_id: str, kind: str, body: dict, actor: dict) -> dic
         return {"tournament": existing, "replay": True, "override": None}
     if not body.get("confirm"):
         raise PostseasonProblem(CONFIRM)
+    # Unfertig aus einem früheren Versuch (Prozessende mitten im Bau): wegräumen und neu bauen - nie als „schon angelegt“ behandeln.
+    await _discard(db, division["id"], kind)
     settings = settings_of(season, division)
     if not settings["playoffs" if kind == PLAYOFF else "relegation"]["enabled"]:
         raise PostseasonProblem(NOT_ENABLED[kind], 409)
@@ -717,7 +823,7 @@ async def _discard(db, division_id: str, kind: str) -> None:
     from services import league_service
 
     try:
-        half = await _existing(db, division_id, kind)
+        half = await _stored(db, division_id, kind)
         if half:
             await league_service._purge_staffel(db, half["id"])
     except Exception:  # noqa: BLE001 - der eigentliche Fehler geht an den Aufrufer
@@ -801,8 +907,11 @@ async def missing(db, season_id: str | None) -> list[dict]:
     played_in = {row["id"]: bool(await league_cross_zones.staffeln_of(db, row["id"])) for row in divisions}
     for division in divisions:
         settings = settings_of(season, division)
-        # Eine Liga N ohne reguläre Staffel spielt nichts aus - sie hält die Season nicht offen.
-        if settings["playoffs"]["enabled"] and played_in[division["id"]] and not await _existing(db, division["id"], PLAYOFF):
+        # Eine Liga N ohne reguläre Staffel spielt nichts aus - sie hält die Season nicht offen. Ebenso eine, in der keine zwei
+        # Playoff-Teams zusammenkommen (nach den Einstellungen oder - wenn Teams ausgeschieden sind - nach dem Endstand): Sie gilt für
+        # den Abschluss als „ohne Playoffs“.
+        if (settings["playoffs"]["enabled"] and played_in[division["id"]] and not await _existing(db, division["id"], PLAYOFF)
+                and await playoffs_feasible(db, season, division) and not await _too_few_by_final(db, season, division)):
             out.append({"kind": PLAYOFF, "division_id": division["id"], "label": _label(division),
                         "text": f"Die Playoffs von {_label(division)} sind noch nicht angelegt."})
         lower = _lower(divisions, division)
@@ -811,6 +920,12 @@ async def missing(db, season_id: str | None) -> list[dict]:
             out.append({"kind": RELEGATION, "division_id": division["id"], "label": _label(division),
                         "text": f"Die Relegation zwischen {_label(division)} und {_label(lower)} ist noch nicht angelegt."})
     return out
+
+
+async def _too_few_by_final(db, season: dict, division: dict) -> bool:
+    """Alle regulären Staffeln sind abgeschlossen und der Endstand ergibt weniger als zwei Playoff-Teams."""
+    plan = await playoff_plan(db, season, division)
+    return any(row["code"] == "too_few" for row in plan["blockers"])
 
 
 async def reopen_refusal(db, tournament: dict) -> str | None:
@@ -872,6 +987,9 @@ async def _playoff_view(db, season: dict, division: dict, settings: dict, user: 
            "open_lot": plan["open_lot"], "swaps": plan["swaps"], "rounds": _rounds_view(settings, calendar, total),
            "start_day": calendar["start_day"], "end_day": calendar["end_day"], "estimated": not plan["seeds"], "own_team": own_team,
            "staffel": None, "stale": False, "can_reseed": False, "reseed_refusal": None,
+           # Vor dem Anlegen gerechnet, danach aus dem Schnappschuss der Staffel (``staffel.veto_notes``).
+           "veto_notes": [] if existing else await veto_preview(
+               db, season, division, [rules.best_of_for(settings["playoffs"], number) for number in range(1, total + 1)], settings["playoffs"]["home"]),
            "can_create": can_act and not existing and not plan["blockers"] and (not own_team or superadmin)}
     if existing:
         record = existing.get(rules.FIELD) or {}
@@ -907,6 +1025,7 @@ async def _relegation_view(db, season: dict, divisions: list[dict], division: di
            "pairs": [{"upper": _seed_view(pair["upper"]), "lower": _seed_view(pair["lower"])} for pair in plan["pairs"]],
            "open_lot": plan["open_lot"], "best_of": settings["relegation"]["best_of"], "start_day": week["start_day"], "end_day": week["end_day"],
            "after_playoffs_of": week["after_playoffs_of"], "moved": week["moved"], "own_team": own_team, "staffel": None, "stale": False,
+           "veto_notes": [] if existing else await veto_preview(db, season, division, [int(settings["relegation"]["best_of"])], rules.BETTER_SEED),
            "can_create": can_act and not existing and not plan["blockers"] and (not own_team or superadmin)}
     if existing:
         record = existing.get(rules.FIELD) or {}
@@ -930,6 +1049,7 @@ async def overview(db, season: dict, user: dict) -> dict:
     divisions = await _divisions(db, season["id"])
     closed = await _closed_divisions(db, season["id"])
     levels = [row["level"] for row in divisions]
+    hints = await too_few_hints(db, season, divisions)
     rows = []
     for division in divisions:
         settings = settings_of(season, division)
@@ -942,7 +1062,8 @@ async def overview(db, season: dict, user: dict) -> dict:
             "lower_label": _label(lower) if lower else None,
             "zones": {"playoff_relegate": zones.get("playoff_relegate") or 0,
                       "lower_playoff_promote": (league_zones.effective(lower, levels).get("playoff_promote") or 0) if lower else 0},
-            "playoffs": await _playoff_view(db, season, division, settings, user, can_act) if settings["playoffs"]["enabled"] else None,
+            "playoffs": ({**await _playoff_view(db, season, division, settings, user, can_act), "too_few_hint": hints.get(division["id"])}
+                         if settings["playoffs"]["enabled"] else None),
             "relegation": (await _relegation_view(db, season, divisions, division, settings, user, can_act)
                            if settings["relegation"]["enabled"] else None),
         })
@@ -950,6 +1071,8 @@ async def overview(db, season: dict, user: dict) -> dict:
         "season": {"id": season["id"], "name": season.get("name"), "best_of": season.get("best_of"),
                    "regular_end_day": (rules.regular_end_day(season).isoformat() if rules.regular_end_day(season) else None)},
         "settings": rules.stored(season), "configured": rules.any_enabled(season), "can_act": can_act,
+        # Ab dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht der Playoffs fest (Nr. 249) - die Felder sind dann gesperrt.
+        "started": season_started(season),
         "superadmin": league_permissions.is_superadmin(user),
         "responsible": f"„{league_permissions.CAPABILITY_LABELS[CAPABILITY]}“",
         "options": {"best_of": list(rules.BEST_OF), "per_staffel": [rules.PER_STAFFEL_MIN, rules.PER_STAFFEL_MAX], "round_max": rules.ROUND_MAX,
@@ -976,7 +1099,9 @@ async def double_no_show(db, tournament: dict, match: dict, note: str, actor: di
     sides = [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
     season_id = (tournament.get("league_context") or {}).get("season_id")
     if not isinstance(match.get("no_show_retry"), dict):
-        retry = {"at": now, "by": actor.get("id"), "previous_at": match.get("scheduled_at"), "note": note}
+        # Schon das erste Mal zählt als „nicht erschienen“ (Nr. 245) - je Seite, wie in der regulären Saison; die Route trägt es ein.
+        retry = {"at": now, "by": actor.get("id"), "previous_at": match.get("scheduled_at"), "note": note, "registration_ids": sides,
+                 "counted": True}
         await db.matches_v2.update_one({"id": match["id"]}, {"$set": {"no_show_retry": retry, "updated_at": now}})
         await _audit(db, "league.postseason.no_show", season_id, actor, step=RETRY, tournament_id=tournament["id"], match_id=match["id"],
                      registration_ids=sides)
@@ -998,3 +1123,21 @@ async def double_no_show(db, tournament: dict, match: dict, note: str, actor: di
     await _audit(db, "league.postseason.no_show", season_id, actor, step=OUT, tournament_id=tournament["id"], match_id=match["id"],
                  registration_ids=sides, changed=len(target_sets))
     return {"step": OUT, "sides": sides}
+
+
+async def undo_no_show(db, tournament: dict, match: dict, reason: str, actor: dict) -> list[str]:
+    """Die Neuansetzung nach dem ersten „beide nicht erschienen“ zurücknehmen (Nr. 245) - mit Grund, wie in der regulären Saison. Das
+    Spiel steht danach, als wäre nichts gewesen; die Einträge „nicht erschienen“ nimmt die Route zurück. Sind beide schon ausgeschieden,
+    geht das nicht mehr: Der Baum ist weitergelaufen. Gibt die beiden Seiten zurück."""
+    if match.get("double_forfeit_sides"):
+        raise PostseasonProblem(OUT_FINAL, 409)
+    retry = match.get("no_show_retry")
+    if not isinstance(retry, dict):
+        raise PostseasonProblem(NO_RETRY, 409)
+    sides = [str(item) for item in retry.get("registration_ids") or [] if item] or [
+        slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
+    now = now_utc().isoformat()
+    await db.matches_v2.update_one({"id": match["id"]}, {"$unset": {"no_show_retry": ""}, "$set": {"updated_at": now}})
+    await _audit(db, "league.postseason.no_show", (tournament.get("league_context") or {}).get("season_id"), actor, step="undo",
+                 tournament_id=tournament["id"], match_id=match["id"], registration_ids=sides, reason=reason)
+    return sides

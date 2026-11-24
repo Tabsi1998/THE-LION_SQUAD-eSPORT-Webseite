@@ -122,7 +122,7 @@ async def admin_save_postseason(season_id: str, body: SeasonPostseasonBody, me: 
     except league_postseason.rules.PostseasonProblem as problem:
         raise _refuse(problem) from None
     await publish_api_change("PUT", f"/api/admin/leagues/seasons/{season_id}", 200)
-    return {"ok": True, "settings": saved}
+    return {"ok": True, "settings": saved["settings"], "warnings": saved["warnings"]}
 
 
 @admin_router.put("/divisions/{division_id}/postseason")
@@ -136,7 +136,7 @@ async def admin_save_division_postseason(division_id: str, body: DivisionPostsea
     except league_postseason.rules.PostseasonProblem as problem:
         raise _refuse(problem) from None
     await publish_api_change("PUT", f"/api/admin/leagues/seasons/{division['season_id']}", 200)
-    return {"ok": True, "settings": saved}
+    return {"ok": True, "settings": saved["settings"], "warnings": saved["warnings"]}
 
 
 async def _create(season_id: str, kind: str, body: CreateBody, me: dict) -> dict:

@@ -92,6 +92,10 @@ def playoff_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
             rank = 2 if winner_of(last) else 0
         elif reached == total - 1 and bronze_winner and key in bronze_sides:
             rank = 3 if bronze_winner == key else 4
+        elif reached == total - 1 and key in (last.get("double_forfeit_sides") or []):
+            # Im Halbfinale beide nicht erschienen (Nr. 217): nie Platz 3 neben einem, der gespielt hat. Findet das Spiel um Platz 3
+            # statt (der andere Halbfinal-Verlierer gewinnt es kampflos), sind die beiden Vierte - sonst haben sie keinen Platz.
+            rank = 4 if bronze_winner else 0
         else:
             rank = 2 ** (total - reached) + 1
         row = {"registration_id": key, "team_id": registration.get("team_id"), "squad_id": registration.get("squad_id"),
@@ -149,6 +153,30 @@ def final_match_id(matches: list[dict]) -> str | None:
     total = max((_round(match) for match in main), default=0)
     finals = [match for match in main if _round(match) == total]
     return finals[0].get("id") if len(finals) == 1 else None
+
+
+async def relegation_pairs_view(db, tournament: dict, labels: dict[str, str]) -> list[dict]:
+    """Die Paarungen der Relegation zum Lesen (Ligaseite): je Paarung das Team der oberen und das der unteren Liga N mit dem Namen
+    ihrer Liga, dazu Ergebnis und Spiel - ohne Setzplätze, die hier nichts bedeuten. ``labels``: Liga N → „Liga 1“."""
+    record = tournament.get("postseason") if isinstance(tournament.get("postseason"), dict) else {}
+    context = tournament.get("league_context") or {}
+    names = {"upper": labels.get(context.get("division_id") or ""), "lower": labels.get(record.get("lower_division_id") or context.get("lower_division_id") or "")}
+    matches = await db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}},
+                                       {"_id": 0, "id": 1, "status": 1, "results": 1, "scheduled_at": 1, "slots.registration_id": 1,
+                                        "slots.source_result": 1, "double_forfeit_sides": 1}).to_list(200)
+    out = []
+    for pair in record.get("pairs") or []:
+        ids = {side: (pair.get(side) or {}).get("registration_id") for side in ("upper", "lower")}
+        match = next((row for row in matches if set(ids.values()) & set(sides_of(row))), None)
+        winner = winner_of(match)
+        scores = {row.get("registration_id"): row.get("score") for row in (match or {}).get("results") or []}
+        entry = {"pair": pair.get("pair"), "decided": bool(winner), "void": bool(match) and str(match.get("status") or "") == "cancelled",
+                 "match_id": (match or {}).get("id"), "scheduled_at": (match or {}).get("scheduled_at")}
+        for side in ("upper", "lower"):
+            entry[side] = {"display_name": (pair.get(side) or {}).get("display_name") or "Team", "division_label": names[side],
+                           "score": scores.get(ids[side]), "won": bool(winner) and winner == ids[side]}
+        out.append(entry)
+    return out
 
 
 async def load(db, tournament: dict) -> tuple[list[dict], list[dict]]:

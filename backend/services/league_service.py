@@ -29,7 +29,8 @@ from services.advancement_draw import sync_advancement_fields
 from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
 from services.league_final_read import is_closed
-from services.league_scope import ONLY_LEAGUE, staffel_kind, staffel_label
+from services.league_scope import ONLY_LEAGUE, RELEGATION, staffel_kind, staffel_label
+from services import league_postseason_final
 from services import checkin_rules, league_protest_settings, league_reminder_rules, league_reward_rules, league_veto_fit, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.league_schedule import public_rules as schedule_public_rules
@@ -564,7 +565,9 @@ async def _game(db, game_id: str | None) -> dict | None:
 
 
 STAFFEL_PROJECTION = {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1,
-                      "league_context": 1, "max_participants": 1, "start_date": 1, "final_table": 1}
+                      "league_context": 1, "max_participants": 1, "start_date": 1, "final_table": 1,
+                      # Relegation (#2404): die Paarungen für die Ligaseite - nur an der Relegations-Staffel vorhanden.
+                      "postseason.pairs": 1, "postseason.lower_division_id": 1}
 
 
 async def staffeln_of(db, season_id: str) -> list[dict]:
@@ -1622,6 +1625,10 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
     pool = map_pools.view(map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]),
                                               league.get("game_id")), "league_season")
     bans_doc = loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]), league.get("game_id"))
+    # Relegation lesbar (#2404, K5): je Paarung, welches Team aus der oberen und welches aus der unteren Liga N kommt.
+    labels = {division["id"]: division_label(division) for division in divisions}
+    pairs = {row["id"]: await league_postseason_final.relegation_pairs_view(db, row, labels)
+             for row in staffeln if staffel_kind(row) == RELEGATION}
     return {
         "league": {**public_league(league), "game": map_pools.game_summary(game)},
         "season": public_season(season),
@@ -1651,7 +1658,7 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
             # Playoffs und Relegation dieser Liga N (#2404, F.6): eigene K.-o.-Staffeln neben den Tabellen - nur was angelegt ist und
             # die Person auch als Turnier sähe. Ohne sie fehlt das Feld.
             **({"postseason": extra} if (extra := [
-                {**staffel_summary(row), "closed": is_closed(row)} for row in staffeln
+                {**staffel_summary(row), "closed": is_closed(row), **({"pairs": pairs[row["id"]]} if row["id"] in pairs else {})} for row in staffeln
                 if row["league_context"].get("division_id") == division["id"] and staffel_kind(row)]) else {}),
         } for division in divisions],
     }
