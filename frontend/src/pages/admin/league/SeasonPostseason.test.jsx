@@ -197,6 +197,10 @@ test("zu wenige Teams: der Hinweis steht an der Liga und nach dem Speichern im S
   apiMock.put.mockResolvedValue({ data: { ok: true, warnings: [hint] } });
   renderPanel(cockpit([division({ playoffs: playoffs({ state: "waiting", can_create: false, seeds: [], pairings: [], too_few_hint: hint }) })]));
   expect(await screen.findByTestId("postseason-too-few-d1")).toHaveTextContent("weniger als zwei Teams");
+  // Diese Liga spielt keine Playoffs: nichts anzulegen, nichts, worauf zu warten wäre.
+  expect(screen.getByTestId("postseason-playoffs-state-d1")).toHaveTextContent("Keine Playoffs");
+  expect(screen.queryByTestId("postseason-create-playoffs-d1")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("postseason-playoffs-blockers-d1")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("postseason-settings"));
   fireEvent.click(screen.getByTestId("postseason-settings-save"));
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(`Einstellungen gespeichert. ${hint}`));

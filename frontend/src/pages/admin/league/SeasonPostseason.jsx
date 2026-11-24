@@ -113,15 +113,19 @@ function Playoffs({ row, data, onSheet }) {
   const id = row.division_id;
   const lot = lotLine(part.open_lot);
   const blockedByTeam = part.own_team && !data.superadmin;
+  // Weniger als zwei Teams: Diese Liga spielt keine Playoffs. Dann gibt es nichts anzulegen und nichts, worauf zu warten wäre.
+  const few = Boolean(part.too_few_hint) && !part.staffel;
   return (
     <div className="space-y-3" data-testid={`postseason-playoffs-${id}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className={HEAD}>Playoffs</h4>
-        <Chip part={part} testId={`postseason-playoffs-state-${id}`} />
+        {few
+          ? <span className="shrink-0 rounded-sm border border-white/20 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-white/70" data-testid={`postseason-playoffs-state-${id}`}>Keine Playoffs</span>
+          : <Chip part={part} testId={`postseason-playoffs-state-${id}`} />}
       </div>
       <p className="text-xs text-white/60" data-testid={`postseason-playoffs-line-${id}`}>{playoffLine(row.settings)}</p>
       {part.too_few_hint ? <Note testId={`postseason-too-few-${id}`}>{part.too_few_hint}</Note> : null}
-      {!part.staffel ? <Blockers part={part} testId={`postseason-playoffs-blockers-${id}`} /> : null}
+      {!part.staffel && !few ? <Blockers part={part} testId={`postseason-playoffs-blockers-${id}`} /> : null}
       <StaffelLinks staffel={part.staffel} kind="playoff" />
       {part.stale ? (
         <p className="flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/5 p-3 text-sm text-white" role="note" data-testid={`postseason-stale-${id}`}>
@@ -151,7 +155,7 @@ function Playoffs({ row, data, onSheet }) {
           </div>
         </div>
       ) : null}
-      {part.rounds.length ? (
+      {part.rounds.length && !few ? (
         <div className="space-y-1">
           <h5 className={HEAD}>{part.estimated ? "Wochen (voraussichtlich)" : "Wochen"}</h5>
           <ul className="space-y-1 text-sm text-white/75" data-testid={`postseason-rounds-${id}`}>
@@ -166,6 +170,7 @@ function Playoffs({ row, data, onSheet }) {
           <SeedList seeds={part.next_seeds} testId={`postseason-next-seeds-${id}`} />
         </div>
       ) : null}
+      {few ? null : (
       <div className="flex flex-wrap items-center gap-3">
         {!part.staffel && data.can_act && !blockedByTeam ? (
           <button type="button" disabled={!part.can_create} onClick={() => onSheet({ kind: "create", what: "playoffs", row, part })}
@@ -183,6 +188,7 @@ function Playoffs({ row, data, onSheet }) {
         {!part.staffel && blockedByTeam ? <span className="text-xs font-semibold text-white/80" data-testid={`postseason-own-${id}`}>Du gehörst zu einem Team dieser Liga. Anlegen muss eine andere Person.</span> : null}
         {!data.can_act ? <span className="text-xs text-white/55">Anlegen darf, wer {data.responsible} hat.</span> : null}
       </div>
+      )}
     </div>
   );
 }
@@ -408,7 +414,7 @@ function RelegationFields({ form, change, options, locked, earliest, prefix }) {
 }
 
 const LOCK_NOTE = "In dieser Liga ist schon eine Staffel abgeschlossen: an/aus und die Plätze je Staffel stehen fest. Zum Ändern erst alle Staffeln der Liga wieder öffnen.";
-const SEASON_LOCK_NOTE = "In mindestens einer Liga ist schon eine Staffel abgeschlossen: Dort stehen an/aus, die Plätze je Staffel und „Meister aus“ fest. Zum Ändern erst alle Staffeln dieser Liga wieder öffnen. Best of, Platz 3, Heimrecht und Termine lassen sich bis zum Anlegen ändern.";
+const SEASON_LOCK_NOTE = "In mindestens einer Liga ist schon eine Staffel abgeschlossen: Dort stehen an/aus, die Plätze je Staffel und „Meister aus“ fest. Zum Ändern erst alle Staffeln dieser Liga wieder öffnen. Best of, Platz 3 und Heimrecht lassen sich bis zum Season-Start ändern, Termine bis zum Anlegen.";
 
 function SettingsSheet({ data, seasonId, onClose, onDone }) {
   const [form, setForm] = useState(() => formOf(data.settings));
