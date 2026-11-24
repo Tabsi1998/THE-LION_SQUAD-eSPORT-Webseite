@@ -20,7 +20,9 @@ export const finalMoment = (value) => safe(viennaDateTime, value, MOMENT);
 
 /** „Liga 1 · Staffel A“ - der Name einer Staffel im Cockpit. */
 export function staffelLabel(row) {
-  return [row?.division_label, row?.staffel ? `Staffel ${row.staffel}` : ""].filter(Boolean).join(" · ") || row?.title || "Staffel";
+  // Playoffs und Relegation (#2404, F.6): Das fertige Wort kommt vom Server (`label`) - nie „Staffel PO“.
+  const own = row?.kind ? row.label : row?.staffel ? `Staffel ${row.staffel}` : "";
+  return [row?.division_label, own].filter(Boolean).join(" · ") || row?.title || "Staffel";
 }
 
 /** Stand einer Staffel: abgeschlossen, bereit (nichts hält auf) oder offen (mit der Zahl der Sperrgründe, kurz: „4 offen“).
@@ -38,6 +40,9 @@ export function seasonSummary(data) {
   const rows = data?.staffeln || [];
   if (!rows.length) return "Noch keine gestartete Staffel.";
   const done = rows.filter((row) => row.closed).length;
+  // Playoffs oder Relegation eingestellt, aber noch nicht angelegt (#2404): Die Season läuft weiter, auch wenn alles andere steht.
+  const missing = (data?.postseason_missing || []).map((row) => row.text).join(" ");
+  if (done === rows.length && missing) return `Alle ${rows.length === 1 ? "Staffeln" : `${rows.length} Staffeln`} sind abgeschlossen. ${missing} Solange läuft die Season weiter.`;
   if (done === rows.length) return rows.length === 1 ? "Die Staffel ist abgeschlossen – die Season ist beendet." : `Alle ${rows.length} Staffeln sind abgeschlossen – die Season ist beendet.`;
   return `${done} von ${rows.length} ${rows.length === 1 ? "Staffel" : "Staffeln"} abgeschlossen. Die Season ist beendet, wenn alle abgeschlossen sind.`;
 }

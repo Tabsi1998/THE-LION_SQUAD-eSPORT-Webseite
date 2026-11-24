@@ -9,6 +9,13 @@ oder sie nur kennzeichnen (Profil, Teamseite, Suche). Alle Stellen benutzen dies
 - ``ONLY_LEAGUE`` - nur Staffeln.
 - ``is_league_staffel(t)`` - für Turniere, die schon geladen sind.
 - ``league_label(t)`` - die Kennzeichnung „Liga · Staffel A“, sonst ``None``.
+
+**Staffel-Art** (#2404, docs/LIGA.md „F.6 Playoffs und Relegation“): Eine Staffel mit ``league_context.kind`` ist die Playoff- bzw.
+Relegations-Staffel einer Liga N. Fehlt das Feld, ist es eine reguläre Staffel - den Wert ``"regular"`` gibt es nicht.
+
+- ``staffel_kind(t)`` - ``None`` (regulär oder gar keine Staffel), ``"playoff"`` oder ``"relegation"``.
+- ``REGULAR_ONLY`` - Mongo-Filter „nur reguläre Staffeln“ (trifft das fehlende Feld), zusätzlich zu ``ONLY_LEAGUE``.
+- ``staffel_label(t)`` - „Staffel A“, „Playoffs“ oder „Relegation“; der Server liefert das Wort fertig mit.
 """
 from __future__ import annotations
 
@@ -16,18 +23,53 @@ NOT_LEAGUE: dict = {"league_context": None}
 ONLY_LEAGUE: dict = {"league_context": {"$type": "object"}}
 LEAGUE_FILTER_CHOICES = ("include", "exclude", "only")
 
+PLAYOFF, RELEGATION = "playoff", "relegation"
+POSTSEASON_KINDS = (PLAYOFF, RELEGATION)
+# Die Staffel-Kennung in ``league_context.staffel``: mehrstellig, kann nie mit einem Buchstaben A-Z kollidieren.
+STAFFEL_CODES = {PLAYOFF: "PO", RELEGATION: "REL"}
+KIND_LABELS = {PLAYOFF: "Playoffs", RELEGATION: "Relegation"}
+REGULAR_ONLY: dict = {"league_context.kind": None}
+
 
 def is_league_staffel(tournament: dict | None) -> bool:
     """Ist dieses Turnier eine Liga-Staffel?"""
     return isinstance((tournament or {}).get("league_context"), dict)
 
 
-def league_label(tournament: dict | None) -> str | None:
-    """Kennzeichnung einer Staffel - „Liga · Staffel A“; ``None`` für alle anderen Turniere."""
+def staffel_kind(tournament: dict | None) -> str | None:
+    """Die Art einer Staffel: ``None`` für die reguläre (und für Turniere ohne Liga), sonst ``playoff`` oder ``relegation``."""
     if not is_league_staffel(tournament):
         return None
-    staffel = str(tournament["league_context"].get("staffel") or "").strip()
-    return f"Liga · Staffel {staffel}" if staffel else "Liga"
+    kind = tournament["league_context"].get("kind")
+    return kind if kind in POSTSEASON_KINDS else None
+
+
+def is_regular_staffel(tournament: dict | None) -> bool:
+    return is_league_staffel(tournament) and staffel_kind(tournament) is None
+
+
+def context_label(context: dict | None) -> str | None:
+    """Wie ``staffel_label``, aber aus dem ``league_context`` allein - für Stellen, die nur ihn in der Hand haben."""
+    context = context if isinstance(context, dict) else {}
+    if context.get("kind") in POSTSEASON_KINDS:
+        return KIND_LABELS[context["kind"]]
+    staffel = str(context.get("staffel") or "").strip()
+    return f"Staffel {staffel}" if staffel else None
+
+
+def staffel_label(tournament: dict | None) -> str | None:
+    """„Staffel A“, „Playoffs“ oder „Relegation“ - ``None`` für Turniere ohne Liga und für eine Staffel ohne Kennung."""
+    if not is_league_staffel(tournament):
+        return None
+    return context_label(tournament["league_context"])
+
+
+def league_label(tournament: dict | None) -> str | None:
+    """Kennzeichnung einer Staffel - „Liga · Staffel A“ bzw. „Liga · Playoffs“; ``None`` für alle anderen Turniere."""
+    if not is_league_staffel(tournament):
+        return None
+    label = staffel_label(tournament)
+    return f"Liga · {label}" if label else "Liga"
 
 
 def without_league(query: dict | None = None) -> dict:

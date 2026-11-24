@@ -97,7 +97,8 @@ async def store_template(db, season: dict, rules: dict, *, actor_id: str | None,
         await db.league_seasons.update_one({"id": season["id"]}, {"$set": {"veto_rules": rules, "updated_at": now_iso}})
     stored = Stored()
     misfits: list[Misfit] = []
-    rows = await db.tournaments.find({"league_context.season_id": season["id"], "locked_at": None, "veto_rules": {"$ne": rules}},
+    # Nur reguläre Staffeln (#2404, V3): Playoffs und Relegation tragen eigene Vorlagen je Best of.
+    rows = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.kind": None, "locked_at": None, "veto_rules": {"$ne": rules}},
                                      {"_id": 0, "id": 1, "league_context": 1}).to_list(None)
     for row in sorted(rows, key=lambda item: item["id"]):
         tournament_id = row["id"]
@@ -263,7 +264,7 @@ async def preset_weeks(db, season: dict, divisions: list[dict] | None = None) ->
         divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0}).to_list(50)
     settings = [league_service.effective_settings(season, division) for division in divisions] or [league_service.effective_settings(season, None)]
     needed = max(rounds_needed(int(row.get("max_staffel_size") or 0), int(row.get("round_robin_legs") or 1)) for row in settings)
-    staffeln = await db.tournaments.find({"league_context.season_id": season["id"]}, {"_id": 0, "id": 1}).to_list(200)
+    staffeln = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.kind": None}, {"_id": 0, "id": 1}).to_list(200)
     played, started = 0, set()
     if staffeln:
         rows = await db.matches_v2.find({"tournament_id": {"$in": [row["id"] for row in staffeln]}},
@@ -516,6 +517,19 @@ def wait_of(match: dict | None) -> dict | None:
     return wait if same else None
 
 
+def rules_for_best_of(tournament: dict | None, rules: dict, best_of: int) -> dict:
+    """Die Vorlage für dieses Best of: die eigene der Runde aus ``veto_by_best_of`` (Playoff-Staffel, #2404), sonst die der Staffel.
+    Ein verbogener Eintrag gilt nicht - dann bleibt die Vorlage der Staffel."""
+    own = ((tournament or {}).get("veto_by_best_of") or {}).get(str(best_of)) if isinstance((tournament or {}).get("veto_by_best_of"), dict) else None
+    if not isinstance(own, dict):
+        return rules
+    try:
+        found = rules_mod.normalize(own)
+    except rules_mod.VetoProblem:
+        return rules
+    return found if found["steps"] else rules
+
+
 async def ensure_started(db, match: dict, tournament: dict | None, *, now: datetime | None = None, manual: bool = False,
                          actor_id: str | None = None, via: str = "ready") -> dict:
     """Das Veto beginnen, sobald beide Seiten eingecheckt sind - genau einmal je Termin (Bedingung: kein Veto für diesen Termin).
@@ -538,7 +552,13 @@ async def ensure_started(db, match: dict, tournament: dict | None, *, now: datet
     # Termin-Revision (Codex zu D.3): das Veto gehört zu Termin und Revision - A → B → A zählt nicht als derselbe Termin.
     rev = schedule_rev(match)
     home, away = filled(match)[:2]
+    # Playoffs einer Liga (#2404, Nr. 209): Team A ist der besser Gesetzte - auch ab Runde 2, wo sonst die obere Zeile im Baum zählt.
+    from services.matchday_schedule import better_seed_first
+
+    home, away = better_seed_first(match, home, away) or (home, away)
     pool, best_of, order, repeat = await _match_setup(db, match, tournament)
+    # Best of je Runde (Nr. 207): Die Staffel trägt je vorkommendem Best of eine eigene Vorlage (``veto_by_best_of``).
+    rules = rules_for_best_of(tournament, rules, best_of)
     problem = rules_mod.fits_problem(rules, pool=pool, best_of=best_of, order=order, repeat=repeat)
     # Vorgabe der Woche (#2326): die Map der Spielwoche dieses Spiels - fehlt sie, beginnt das Veto nicht (kein ``skipped``, keine
     # Wertung): Die Leitung trägt sie nach, danach startet eine Seite das Veto von Hand.

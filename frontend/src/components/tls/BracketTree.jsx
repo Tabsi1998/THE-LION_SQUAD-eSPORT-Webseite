@@ -41,6 +41,9 @@ export { initials };
 
 // TV (#1115): eine eigene Karte statt der Karte der Turnierseite, und wie viele Spalten ins Bild passen.
 const NodeRendererContext = createContext(null);
+// Ohne Titel über dem Hauptabschnitt (#2404, Nr. 248): Auf der Ligaseite heißt der Baum schon „Playoffs“ - „Winner Bracket“ darüber wäre
+// ein zweiter, falscher Name. Die übrigen Abschnitte (Spiel um Platz 3) behalten ihren Titel.
+const QuietSectionsContext = createContext(false);
 const TvLayoutContext = createContext({ columns: 4, viewport: null, minZoom: 1, textSize: "normal" });
 
 const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived", "cancelled"]);
@@ -108,7 +111,7 @@ function usePath(matches, edges) {
   return useMemo(() => ({ active, selected, toggle, clear, preview: setPreviewIds }), [active, selected, toggle, clear]);
 }
 
-export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null, quietUpdate = false }) {
+export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null, quietUpdate = false, quietSections = false }) {
   const { matches_v2: matchesRaw, stages: stagesRaw, registrations: registrationsRaw } = data || {};
   // Rundennamen je Abschnitt fortlaufend (#1591): das Loser Bracket beginnt mit „Loser Runde 1“.
   const matches_v2 = useMemo(() => displayRoundLabels(matchesRaw || []), [matchesRaw]);
@@ -183,7 +186,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
                       <MatchLinkContext.Provider value={linkValue}>
                         <DurationContext.Provider value={duration}>
                           <BracketMotionContext.Provider value={motionValue}>
-                            {tree}
+                            <QuietSectionsContext.Provider value={quietSections}>{tree}</QuietSectionsContext.Provider>
                           </BracketMotionContext.Provider>
                         </DurationContext.Provider>
                       </MatchLinkContext.Provider>
@@ -425,6 +428,8 @@ function WebStages({ stages, matches, regMap, podiumMap, steps, finalMatch, tour
 function SectionTitle({ section, flowHint, sticky = false, fit = false }) {
   const key = normalizeSection(section);
   const group = sectionGroup(section);
+  const quiet = useContext(QuietSectionsContext);
+  if (quiet && group === "main") return null;
   // Auf der Leinwand (`fit`) höchstens so breit wie eine Karte (#1561): Titel und Erklärzeile stehen über der ersten
   // Spalte, die Gassen daneben bleiben für die Linien frei. Am Handy (Runde für Runde) volle Breite.
   return (

@@ -9,6 +9,7 @@ import { StaggerIn } from "@/components/tls/motion";
 import { LoadoutBansView, EquipmentThumb } from "@/components/tls/league/LoadoutBansView";
 import { LeaguePrizes } from "@/components/tls/league/public/LeagueLook";
 import { StaffelPanel } from "@/components/tls/league/public/StaffelPanel";
+import { DivisionPostseason } from "@/components/tls/league/public/SeasonPostseasonSection";
 import { blockedLines, seasonPeriod, weekSpan } from "@/lib/leaguePage";
 import { platformLines } from "@/lib/leaguePlatform";
 import { formatFacts, mapOrder, nextSteps, playModes, pointsLines, scheduleLines, weeksText } from "@/lib/leagueSeasonPage";
@@ -278,6 +279,8 @@ export function Division({ division, leagueSlug, seasonSlug, hash, topLevel, ord
           ? <StaffelPanel key={current.tournament_id} leagueSlug={leagueSlug} seasonSlug={seasonSlug} staffel={current} topLevel={topLevel} order={order} />
           : <p className="text-sm text-white/55">Die Staffeln dieser Liga werden gerade eingeteilt.</p>}
       </div>
+      {/* Playoffs und Relegation dieser Liga (#2404, F.6): eigene K.-o.-Staffeln unter den Tabellen - nur wenn es sie gibt. */}
+      <DivisionPostseason division={division} />
     </section>
   );
 }

@@ -29,7 +29,8 @@ from services.advancement_draw import sync_advancement_fields
 from services.competition_versions import new_competition_version_fields
 from services.league_presets import INCIDENT_FIELDS
 from services.league_final_read import is_closed
-from services.league_scope import ONLY_LEAGUE
+from services.league_scope import ONLY_LEAGUE, RELEGATION, staffel_kind, staffel_label
+from services import league_postseason_final
 from services import checkin_rules, league_protest_settings, league_reminder_rules, league_reward_rules, league_veto_fit, league_veto_rules
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.league_schedule import public_rules as schedule_public_rules
@@ -43,7 +44,7 @@ from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, division_rules, league
 from services.slug_utils import slugify, unique_slug
 
 # Spielwochen und Zeitzone stehen im Blatt-Modul (auch für Aufbewahrung und Sperren, E.3) und werden hier weitergereicht.
-from services.league_calendar import VIENNA, aware as _aware, local_day as _local_day, week_days  # noqa: E402, F401
+from services.league_calendar import STARTED_AT, VIENNA, aware as _aware, local_day as _local_day, start_stamp, week_days  # noqa: E402, F401
 
 # Vorgaben einer neuen Season (docs/LIGA.md, Abschnitt 2 und 3).
 SEASON_DEFAULTS: dict = {
@@ -564,7 +565,9 @@ async def _game(db, game_id: str | None) -> dict | None:
 
 
 STAFFEL_PROJECTION = {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1,
-                      "league_context": 1, "max_participants": 1, "start_date": 1}
+                      "league_context": 1, "max_participants": 1, "start_date": 1, "final_table": 1,
+                      # Relegation (#2404): die Paarungen für die Ligaseite - nur an der Relegations-Staffel vorhanden.
+                      "postseason.pairs": 1, "postseason.lower_division_id": 1}
 
 
 async def staffeln_of(db, season_id: str) -> list[dict]:
@@ -579,9 +582,12 @@ async def staffeln_of(db, season_id: str) -> list[dict]:
 
 
 def staffel_summary(row: dict) -> dict:
+    kind = staffel_kind(row)
     return {"tournament_id": row["id"], "slug": row.get("slug"), "title": row.get("title"),
             "staffel": row["league_context"].get("staffel"), "status": row.get("status"),
-            "max_participants": row.get("max_participants"), "participant_count": row.get("participant_count", 0)}
+            "max_participants": row.get("max_participants"), "participant_count": row.get("participant_count", 0),
+            # Playoffs und Relegation (#2404, F.6): die Art und das fertige Wort - eine reguläre Staffel trägt beides nicht.
+            **({"kind": kind, "label": staffel_label(row)} if kind else {})}
 
 
 # ---------------------------------------------------------------- Liga
@@ -817,6 +823,28 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     return doc
 
 
+# Die Season läuft wirklich (#2404, Nr. 254): Eine reguläre Staffel ist live (oder gelaufen) oder ein Spiel ist gewertet.
+RUNNING_STAFFEL_STATUSES = frozenset({"live", "paused", "completed", "results_published"})
+SCORED_MATCH_STATUSES = ("completed", "forfeit")
+
+
+async def start_to_remember(db, season: dict | None):
+    """Was jetzt als ``started_at`` festzuhalten ist (Nr. 253, 254) - ``None``, solange nichts zu merken ist. Gemerkt wird erst, wenn die
+    Season **wirklich läuft**: ihr Beginn ist erreicht (``league_calendar.start_stamp``) **und** mindestens eine reguläre Staffel ist
+    live oder ein Spiel gewertet. Ein vertipptes Startdatum allein merkt nichts - es lässt sich korrigieren."""
+    stamp = start_stamp(season)
+    if not stamp:
+        return None
+    rows = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.kind": None, **ONLY_LEAGUE},
+                                     {"_id": 0, "id": 1, "status": 1}).to_list(500)
+    if any(row.get("status") in RUNNING_STAFFEL_STATUSES for row in rows):
+        return stamp
+    ids = [row["id"] for row in rows]
+    scored = await db.matches_v2.find_one({"tournament_id": {"$in": ids}, "status": {"$in": list(SCORED_MATCH_STATUSES)},
+                                           "is_preview": {"$ne": True}}, {"_id": 0, "id": 1}) if ids else None
+    return stamp if scored else None
+
+
 async def update_season(db, season: dict, body: dict, *, before_write=None,
                         warnings: list | None = None) -> tuple[dict, list[str]]:
     """Eine Season ändern. ``before_write(neuer Stand)`` läuft nach allen Prüfungen und vor dem Schreiben (Prüfung vor der
@@ -841,9 +869,20 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     # Gestaltung (#2107): wirkt sofort, braucht kein Übertragen - das Banner geht gleich auf die Staffeln (App).
     fields.update(await _look(db, body, league_look.SEASON_FIELDS))
     changed = sorted(key for key, value in fields.items() if season.get(key) != value)
+    # Einmal gestartet bleibt gestartet (#2404, Nr. 253): Hat die Season nach dem bisherigen Stand begonnen, merkt sich dieses
+    # Schreiben den Start - bevor Startdatum oder Stand sich ändern. Kein eigenes Feld der Leitung, darum nicht in ``changed``.
+    stamp = await start_to_remember(db, season)
+    if (season.get(STARTED_AT) or stamp) and "start_date" in changed:
+        # Korrigiertes Startdatum (Nr. 256): Ist das neue Datum schon erreicht, zieht der gemerkte Start nach - Fristen zählen ab
+        # dem korrigierten Datum. Liegt es in der Zukunft, bleibt der gemerkte Start (Nr. 253).
+        moved = _aware(fields.get("start_date"))
+        if moved and moved <= now_utc():
+            stamp = fields["start_date"]
+    if stamp:
+        fields[STARTED_AT] = stamp
     if before_write:
         await before_write({**season, **fields})
-    if changed:
+    if changed or stamp:
         fields["updated_at"] = _now()
         try:
             await db.league_seasons.update_one({"id": season["id"]}, {"$set": fields})
@@ -967,18 +1006,20 @@ async def _create_division(db, season: dict, body: dict, user: dict, *, warnings
     return doc
 
 
-async def update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
+async def update_division(db, division: dict, body: dict, *, warnings: list | None = None, before_write=None) -> tuple[dict, list[str]]:
     """Ändert eine Liga N - unter der Season-Sperre (Nr. 232): Die Prüfungen „schon eine Staffel abgeschlossen?“ (Plätze über Staffeln
-    hinweg, Nr. 228; archivieren, Nr. 231) und der Abschluss einer Staffel kommen sich so nicht in die Quere."""
+    hinweg, Nr. 228; archivieren, Nr. 231) und der Abschluss einer Staffel kommen sich so nicht in die Quere.
+    ``before_write(vorher, nachher)`` läuft nach allen Prüfungen und vor dem Schreiben, unter derselben Sperre - nur, wenn sich etwas
+    ändert (#2404: der Rückfallwert fürs Best of der Playoffs). Eine abgelehnte Änderung erreicht ihn nie."""
     try:
         async with _season_lock(db, division["season_id"]):
             fresh = await db.league_divisions.find_one({"id": division["id"]}, {"_id": 0}) or division
-            return await _update_division(db, fresh, body, warnings=warnings)
+            return await _update_division(db, fresh, body, warnings=warnings, before_write=before_write)
     except MutationLockBusy:
         raise LeagueProblem(SEASON_BUSY, 409) from None
 
 
-async def _update_division(db, division: dict, body: dict, *, warnings: list | None = None) -> tuple[dict, list[str]]:
+async def _update_division(db, division: dict, body: dict, *, warnings: list | None = None, before_write=None) -> tuple[dict, list[str]]:
     season = await get_season(db, division["season_id"])
     # Archivieren oder zurückholen verändert die Stufen der Season (Nr. 231): nicht mehr, sobald eine Staffel abgeschlossen ist.
     if body.get("status") and body["status"] != (division.get("status") or "active") and await divisions_locked(db, division["season_id"]):
@@ -1001,6 +1042,8 @@ async def _update_division(db, division: dict, body: dict, *, warnings: list | N
         await _division_order_check(db, season, {**division, **updates}, division, warnings)
     changed = sorted(key for key, value in updates.items() if division.get(key) != value)
     if changed:
+        if before_write:
+            await before_write(division, {**division, **updates})
         updates["updated_at"] = _now()
         await db.league_divisions.update_one({"id": division["id"]}, {"$set": updates})
     return {**division, **updates}, changed
@@ -1196,20 +1239,24 @@ async def _next_letter(db, division_id: str) -> str:
 STAFFEL_POOL_BUSY = "Der Map-Pool der Season wird gerade geändert – bitte die Staffel gleich noch einmal anlegen."
 
 
-async def create_staffel(db, division: dict, staffel: str | None, user: dict) -> dict:
+async def create_staffel(db, division: dict, staffel: str | None, user: dict, *, postseason: dict | None = None) -> dict:
     """Legt das Staffel-Turnier an (Status ``draft``) mit allen Vorgaben aus Season und Liga N, dem Map-Pool der Season
     als eigener Version im Scope ``tournament`` und der Prüfung „Runden ≤ aktive Wochen“.
 
     Unter der Pool-Sperre der Season (#2207): So liest eine neue Staffel nie einen Pool, den „Map aus dem Pool nehmen“ gerade ersetzt.
-    Die Staffel ist neu und hat noch keine Turnier-Sperre - die Reihenfolge „erst Turniere, dann Pool“ bleibt gewahrt."""
+    Die Staffel ist neu und hat noch keine Turnier-Sperre - die Reihenfolge „erst Turniere, dann Pool“ bleibt gewahrt.
+
+    ``postseason`` (#2404, F.6): die Playoff- bzw. Relegations-Staffel einer Liga N - derselbe Weg, aber K.-o. statt Tabelle:
+    ``{kind, code, label, format, fields, context}``. ``fields`` legt sich über die Vorgaben der Liga N (Best of, Start, Wochen),
+    ``context`` kommt in ``league_context`` dazu. Ohne ``postseason`` ist alles wie bisher."""
     try:
         async with mutation_lock(db, league_season_pool_resource(division["season_id"])):
-            return await _create_staffel(db, division, staffel, user)
+            return await _create_staffel(db, division, staffel, user, postseason=postseason)
     except MutationLockBusy:
         raise LeagueProblem(STAFFEL_POOL_BUSY, 409) from None
 
 
-async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -> dict:
+async def _create_staffel(db, division: dict, staffel: str | None, user: dict, *, postseason: dict | None = None) -> dict:
     season = await get_season(db, division["season_id"])
     league = await get_league(db, division["league_id"])
     game = await _game(db, league.get("game_id"))
@@ -1220,17 +1267,27 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -
     fields = staffel_fields(league, season, division)
     # Regelwerk (#1646): statt des Regeltexts der Hinweis auf die Regelseite, sobald es eines gibt.
     fields["rules"] = await staffel_rules(db, league, season)
-    problem = rounds_problem(fields["max_participants"], fields["round_robin_legs"], fields["matchday_weeks_total"],
-                             fields["matchday_blocked_weeks"])
-    if problem:
-        raise LeagueProblem(problem)
-    letter = (staffel or "").strip().upper() or await _next_letter(db, division["id"])
+    fmt = "league"
+    if postseason:
+        # Playoffs und Relegation (#2404): K.-o. hat Runden statt einer Tabelle - die Rundenprüfung der Liga gilt hier nicht.
+        fields.update(postseason.get("fields") or {})
+        fmt = postseason["format"]
+        letter = postseason["code"]
+        exists = f"{postseason['label']} gibt es in dieser Liga schon."
+        title = f"{league.get('name')} {season.get('name')} · Liga {division.get('level')} · {postseason['label']}"
+    else:
+        problem = rounds_problem(fields["max_participants"], fields["round_robin_legs"], fields["matchday_weeks_total"],
+                                 fields["matchday_blocked_weeks"])
+        if problem:
+            raise LeagueProblem(problem)
+        letter = (staffel or "").strip().upper() or await _next_letter(db, division["id"])
+        exists = f"Staffel {letter} gibt es in dieser Liga schon."
+        title = staffel_title(league, season, division, letter)
     if await db.tournaments.find_one({"league_context.division_id": division["id"],
                                       "league_context.staffel": letter, **ONLY_LEAGUE}, {"_id": 1}):
-        raise LeagueProblem(f"Staffel {letter} gibt es in dieser Liga schon.", 409)
+        raise LeagueProblem(exists, 409)
 
-    title = staffel_title(league, season, division, letter)
-    base = TournamentCreate(title=title, game_id=game["id"], format="league", team_mode="team").model_dump()
+    base = TournamentCreate(title=title, game_id=game["id"], format=fmt, team_mode="team").model_dump()
     doc = {
         **base,
         **fields,
@@ -1238,7 +1295,7 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -
         "title": title,
         "slug": await unique_slug(db.tournaments, f"{league.get('slug')}-{season.get('slug')}-liga-"
                                   f"{division.get('level')}-{letter}", fallback="liga"),
-        "format": "league",
+        "format": fmt,
         "team_mode": "team",
         "min_participants": 2,
         "result_entry_mode": "player_confirmed",
@@ -1246,9 +1303,10 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -
         "discord_registration": False,
         "discord_skip": True,
         "season_weight": 0,
-        "status": "draft",
+        # Eine Playoff- bzw. Relegations-Staffel entsteht mitten in der laufenden Season und wird mit ihrem Baum angelegt (#2404).
+        "status": (postseason or {}).get("status") or "draft",
         "league_context": {"league_id": league["id"], "season_id": season["id"], "division_id": division["id"],
-                           "staffel": letter},
+                           "staffel": letter, **((postseason or {}).get("context") or {})},
         "billing": pricing.normalize_offer(None),
         "partner_ids": [],
         "created_at": _now(), "updated_at": _now(), "created_by": user["id"],
@@ -1258,11 +1316,11 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict) -
         # Die App zeigt Turnierbanner (#2107): die Staffel trägt das Banner der Season bzw. Liga.
         doc.update({"banner_url": banner, STAFFEL_BANNER_MARK: banner})
     sync_advancement_fields(doc)
-    doc.update(new_competition_version_fields("league"))
+    doc.update(new_competition_version_fields(fmt))
     try:
         await db.tournaments.insert_one(dict(doc))
     except DuplicateKeyError:
-        raise LeagueProblem(f"Staffel {letter} gibt es in dieser Liga schon.", 409) from None
+        raise LeagueProblem(exists, 409) from None
     # Wurde das Banner von Liga oder Season geändert, während die Staffel entstand, gilt das neue (Review #2107).
     await apply_banner(db, await get_league(db, league["id"]), await get_season(db, season["id"]))
     pool = await map_pools.current(db, "league_season", season["id"])
@@ -1301,6 +1359,8 @@ class SyncResult:
 
 
 LOCKED_REASON = "Die Staffel ist gesperrt."
+POSTSEASON_OWN_GROUPS = frozenset({"veto", "before_start", "before_result"})
+POSTSEASON_REASON = "Playoffs und Relegation haben eigene Werte - sie stehen im Reiter „Abschluss“."
 CLOSED_REASON = "Die Staffel ist abgeschlossen - der Endstand steht. Erst im Reiter „Abschluss“ wieder öffnen."
 
 
@@ -1318,12 +1378,18 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     has_result = await _has_result(db, tournament["id"])
     # Abgeschlossen (F.1, #1645): wie gesperrt - Fristen, Regeln und Wertung bleiben, sonst öffnet eine neue Frist Verfahren wieder.
     closed = is_closed(tournament)
+    # Playoffs und Relegation (#2404, V3): Format, Best of, Kalender und Veto-Vorlage gehören der Staffel selbst (Einstellungen im
+    # Reiter „Abschluss“) - von der Season kommen nur die Gruppen, die dort genauso gelten.
+    postseason = bool((tournament.get("league_context") or {}).get("kind"))
     veto_wanted = None
     for group, keys in SYNC_GROUPS.items():
         if not any(key in wanted for key in keys):
             continue  # eine ältere Season ohne Antwortfrist: die Staffel behält ihre
         if group != "always" and (locked or closed):
             skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": LOCKED_REASON if locked else CLOSED_REASON})
+            continue
+        if postseason and group in POSTSEASON_OWN_GROUPS:
+            skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": POSTSEASON_REASON})
             continue
         if group == "veto":
             veto_wanted = wanted["veto_rules"]  # erst nach Feldern und Pool geprüft (Nr. 200, ``_sync_veto``)
@@ -1350,7 +1416,7 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
                 continue
         updates.update({key: wanted[key] for key in keys if key in wanted})
         applied.append(group)
-    if (has_result and not locked and tournament.get("status") not in FINISHED_STAFFEL_STATUSES
+    if (has_result and not locked and not postseason and tournament.get("status") not in FINISHED_STAFFEL_STATUSES
             and season.get("status") not in CLOSED_SEASON_STATUSES):
         # Punkteart (#2312): auch nach dem ersten Ergebnis, aber nur, wenn sie wechselt.
         switched = table_points_update(tournament, wanted)
@@ -1596,6 +1662,10 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
     pool = map_pools.view(map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]),
                                               league.get("game_id")), "league_season")
     bans_doc = loadout_bans.valid_for(await loadout_bans.current(db, loadout_bans.SEASON, season["id"]), league.get("game_id"))
+    # Relegation lesbar (#2404, K5): je Paarung, welches Team aus der oberen und welches aus der unteren Liga N kommt.
+    labels = {division["id"]: division_label(division) for division in divisions}
+    pairs = {row["id"]: await league_postseason_final.relegation_pairs_view(db, row, labels)
+             for row in staffeln if staffel_kind(row) == RELEGATION}
     return {
         "league": {**public_league(league), "game": map_pools.game_summary(game)},
         "season": public_season(season),
@@ -1621,7 +1691,12 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
             "settings": {key: effective_settings(season, division)[key]
                          for key in ("best_of", "team_size", "min_squad_size", "max_staffel_size")},
             "staffeln": [staffel_summary(row) for row in staffeln
-                         if row["league_context"].get("division_id") == division["id"]],
+                         if row["league_context"].get("division_id") == division["id"] and not staffel_kind(row)],
+            # Playoffs und Relegation dieser Liga N (#2404, F.6): eigene K.-o.-Staffeln neben den Tabellen - nur was angelegt ist und
+            # die Person auch als Turnier sähe. Ohne sie fehlt das Feld.
+            **({"postseason": extra} if (extra := [
+                {**staffel_summary(row), "closed": is_closed(row), **({"pairs": pairs[row["id"]]} if row["id"] in pairs else {})} for row in staffeln
+                if row["league_context"].get("division_id") == division["id"] and staffel_kind(row)]) else {}),
         } for division in divisions],
     }
 

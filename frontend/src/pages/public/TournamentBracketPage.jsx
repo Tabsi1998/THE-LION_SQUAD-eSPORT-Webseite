@@ -111,7 +111,9 @@ export default function TournamentBracketPage() {
             <div className="text-muted-text font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>
         ) : (
-          <BracketTree data={data} changedMatchIds={changedMatches} mineId={mineId} quietUpdate={quietUpdate} />
+          <BracketTree data={data} changedMatchIds={changedMatches} mineId={mineId} quietUpdate={quietUpdate}
+            // Playoffs und Relegation einer Liga (#2404, Nr. 248): Die Staffel hat ihren Namen schon - kein Abschnittstitel darüber.
+            quietSections={Boolean(t.league_context?.kind)} />
         )}
       </div>
     </PublicLayout>

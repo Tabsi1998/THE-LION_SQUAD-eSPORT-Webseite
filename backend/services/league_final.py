@@ -36,7 +36,7 @@ from services.league_finale import FIELD as TV_FINALE
 from services.league_ties import (  # noqa: F401 - weiter über league_final erreichbar
     METHODS, champion_ties, classify_ties, division_levels, leaders, tie_context, top_division_id,
 )
-from services.league_scope import ONLY_LEAGUE, is_league_staffel
+from services.league_scope import ONLY_LEAGUE, PLAYOFF, RELEGATION, is_league_staffel, staffel_kind, staffel_label
 from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock
 from services.match_disputes import decided_at, league_window_of
@@ -170,9 +170,11 @@ def _blocker(code: str, label: str, text: str, items: list[dict]) -> dict:
 
 
 async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict] | None = None, decisive: bool = False,
-                   zones: dict | None = None, now: datetime | None = None) -> list[dict]:
+                   zones: dict | None = None, now: datetime | None = None, playoff_places: int = 0) -> list[dict]:
     """Was dem Abschluss dieser Staffel entgegensteht - leer heißt: Es kann abgeschlossen werden. ``rows``: die Tabelle wie
-    öffentlich; ``decisive``: Platz 1 ist ein entscheidender Platz (oberste Liga N); ``zones``: die Zonen der Liga N (F.2)."""
+    öffentlich; ``decisive``: Platz 1 ist ein entscheidender Platz (oberste Liga N); ``zones``: die Zonen der Liga N (F.2);
+    ``playoff_places``: so viele Teams dieser Staffel kommen in die Playoffs (F.6, #2404) - ein Gleichstand an dieser Grenze sperrt
+    wie an einer Zonengrenze. Eine Playoff- oder Relegations-Staffel reicht keine Tabelle herein (``rows=None``)."""
     from services import league_sanctions as sanctions
 
     now = now or now_utc()
@@ -187,7 +189,9 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
         {"tournament_id": tid}, {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1}).to_list(REGISTRATION_LIMIT)
     names = {row["id"]: row.get("display_name") or row.get("team_name") or row.get("squad_name") or "Team" for row in registrations}
     duels = [match for match in matches if len(procedures.side_ids(match)) == 2]
-    if not any(str(match.get("status") or "") in ("completed", "forfeit") for match in duels):
+    # Playoffs und Relegation (#2404, Nr. 217): Schieden beide nach dem zweiten Nichtantritt aus, ist das Spiel entschieden - ohne Sieger.
+    if (not any(str(match.get("status") or "") in ("completed", "forfeit") for match in duels)
+            and not any(match.get("double_forfeit_sides") for match in matches)):
         out.append(_blocker("no_matches", "Kein gewertetes Spiel", "In dieser Staffel ist noch kein Spiel gewertet.", []))
 
     open_matches = [match for match in duels if str(match.get("status") or "pending") not in SETTLED_MATCH_STATUSES]
@@ -272,7 +276,26 @@ async def blockers(db, tournament: dict, season: dict | None, *, rows: list[dict
         if cross and cross["complete"] and cross["ties"]:
             out.append(_blocker("zone_cross_tie", league_cross_zones.TIE_LABEL, league_cross_zones.TIE_TEXT,
                                 [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in cross["ties"]]))
+    if rows is not None and playoff_places and not any(row["code"] == "no_matches" for row in out):
+        # Gleichstand an der Playoff-Grenze (Nr. 203): Wer in die Playoffs kommt, steht vor dem Abschluss fest.
+        playoff_ties = playoff_boundary_ties(rows, playoff_places, decisive=decisive, zones=zones)
+        if playoff_ties:
+            out.append(_blocker(
+                "playoff_tie", "Gleichstand an der Playoff-Grenze",
+                "Teams stehen gleich, aber nur ein Teil kommt in die Playoffs. Vor dem Abschluss braucht es einen begründeten Entscheid "
+                "(Entscheidungsspiel, Los oder Leitung).",
+                [{"text": " – ".join(tie["names"]), "url": f"/admin/leagues/seasons/{season_id}#abschluss"} for tie in playoff_ties]))
     return out
+
+
+def playoff_boundary_ties(rows: list[dict], playoff_places: int, *, decisive: bool, zones: dict | None) -> list[dict]:
+    """Gleichstände an der Playoff-Grenze, die nicht schon als Meister- oder Zonen-Gleichstand zu entscheiden sind."""
+    from services import postseason_seeding
+
+    if not playoff_places:
+        return []
+    taken = {tie["rank"] for tie in classify_ties(rows, decisive=decisive, zones=zones)}
+    return [tie for tie in postseason_seeding.boundary_ties(rows, playoff_places) if tie["rank"] not in taken]
 
 
 # ---------------------------------------------------------------- Tabelle und Meister
@@ -311,11 +334,39 @@ async def _frame(db, tournament: dict) -> dict:
     division = await db.league_divisions.find_one({"id": context.get("division_id")}, {"_id": 0}) or {}
     from services.league_service import division_label
 
-    return {"league": league, "season": season, "division": division,
+    from services import league_postseason
+
+    # Staffel-Art (F.6, #2404): Eine Playoff- oder Relegations-Staffel hat keine Zonen. Meister wird, je nach „Meister aus“, der Erste
+    # jeder regulären Staffel der obersten Liga N (Vorgabe) oder der Sieger ihrer Playoffs - nie beides.
+    kind = staffel_kind(tournament)
+    top = bool(division.get("id")) and division.get("id") == await top_division_id(db, season.get("id"))
+    # Mit weniger als zwei Playoff-Teams in der obersten Liga N bleibt es beim Meister aus der Tabelle (``champion_from_playoffs``).
+    from_playoffs = await league_postseason.champion_from_playoffs(db, season, division) if top else False
+    snapshot = await league_postseason.close_snapshot(db, season, division) if division.get("id") and not kind else None
+    return {"league": league, "season": season, "division": division, "kind": kind,
             "division_label": division_label(division) if division.get("level") is not None else None,
-            "decisive": bool(division.get("id")) and division.get("id") == await top_division_id(db, season.get("id")),
+            "decisive": top and ((kind == PLAYOFF) if from_playoffs else kind is None),
+            "postseason": snapshot, "playoff_places": int((snapshot or {}).get("per_staffel") or 0),
             "zones": (league_zones.effective(division, await league_zones.season_levels(db, season.get("id")))
-                      if division.get("id") else None)}
+                      if division.get("id") and not kind else None)}
+
+
+def playoff_champion(rows: list[dict]) -> dict | None:
+    """Der Sieger der Playoffs: die eine Zeile auf Platz 1 - nach „beide nicht erschienen“ im Finale bleibt der Titel unvergeben."""
+    first = [row for row in rows if int(row.get("rank") or 0) == 1 and not row.get("exit")]
+    if len(first) != 1:
+        return None
+    return {"registration_id": first[0]["registration_id"], "display_name": first[0].get("display_name") or "Team", "team_id": first[0].get("team_id")}
+
+
+async def current_rows(db, tournament: dict) -> list[dict]:
+    """Die Zeilen von jetzt: die gerechnete Tabelle einer regulären Staffel bzw. die Plätze aus dem Baum (Playoffs) oder die
+    Paarungen (Relegation)."""
+    if not staffel_kind(tournament):
+        return await live_rows(db, tournament)
+    from services import league_postseason_final
+
+    return (await league_postseason_final.rows_of(db, tournament))["rows"]
 
 
 async def _rules_snapshot(db, tournament: dict, frame: dict) -> dict:
@@ -443,7 +494,7 @@ async def record_champion(db, tournament: dict, final: dict, frame: dict) -> int
     doc = {
         "tournament_id": tid, "registration_id": registration["id"], "user_id": registration.get("user_id"),
         "team_id": registration.get("team_id"), "rank": 1, "kind": "trophy", "participants": int(final.get("participants") or 0),
-        "finalist": False, "final_match_id": None,
+        "finalist": False, "final_match_id": final.get("final_match_id"),
         "matches": {"played": summary["matches_played"], "won": summary["matches_won"]},
         "tournament": {**{key: tournament.get(key) for key in ("id", "slug", "start_date", "visibility", "is_public")},
                        "title": title, "status": "completed"},
@@ -451,7 +502,9 @@ async def record_champion(db, tournament: dict, final: dict, frame: dict) -> int
         "team": {"id": team["id"], "name": team.get("name"), "tag": team.get("tag"), "logo_url": team.get("logo_url")} if team else None,
         # Liga-Titel: Meister der Staffel, an den eingesetzten Spielern - kein Turnier-Pokal, keine Jahreswertung.
         "league": {"title": "Meister", "league_id": league.get("id"), "season_id": season.get("id"),
-                   "division_label": frame.get("division_label"), "staffel": (tournament.get("league_context") or {}).get("staffel"),
+                   "division_label": frame.get("division_label"),
+                   # Der Meister aus den Playoffs (#2404) gehört zu keiner Staffel - ``staffel`` bleibt leer.
+                   "staffel": None if staffel_kind(tournament) else (tournament.get("league_context") or {}).get("staffel"),
                    "display_name": champion.get("display_name"), "final_table_id": final["id"], "version": final["version"]},
         "player_ids": await champion_players(db, tid, registration),
         "suspended": False, "updated_at": now,
@@ -477,12 +530,60 @@ async def suspend_champion(db, tournament_id: str) -> None:
 
 async def season_staffeln(db, season_id: str) -> list[dict]:
     return await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE},
-                                     {"_id": 0, "id": 1, "status": 1, "final_table": 1}).to_list(500)
+                                     {"_id": 0, "id": 1, "status": 1, "final_table": 1, "league_context.kind": 1}).to_list(500)
 
 
 def all_closed(staffeln: list[dict]) -> bool:
     counted = [row for row in staffeln if is_closed(row) or row.get("status") not in IGNORED_STAFFEL_STATUSES]
     return bool(counted) and all(is_closed(row) for row in counted)
+
+
+async def _season_done(db, season_id: str) -> bool:
+    """Alle Staffeln aller Arten abgeschlossen - und nichts Eingeschaltetes fehlt noch."""
+    if not all_closed(await season_staffeln(db, season_id)):
+        return False
+    # Playoffs oder Relegation eingeschaltet, aber noch nicht angelegt (F.6, #2404): Die Season läuft weiter.
+    from services import league_postseason
+
+    return not await league_postseason.missing(db, season_id)
+
+
+async def champion_without_playoffs(db, season_id: str | None) -> dict | None:
+    """Meister ohne Playoffs (Nr. 251): Spielt die oberste Liga N keine Playoffs, obwohl der Meister aus ihnen kommen sollte, ist
+    Meister das beste verbliebene Team der Tabelle - sobald die Season fertig ist. Der Eintrag steht am Endstand der Staffel dieses
+    Teams (``champion`` mit ``champion_fallback``) und in ``tournament_awards``. Läuft die Season wieder (Wiederöffnen) oder gibt es
+    doch Playoffs, verschwindet er - nie ein Meister aus der Tabelle neben einem aus den Playoffs. Antwort: der Meister
+    (``{tournament_id, registration_id, display_name, team_id}``) oder ``None``."""
+    if not season_id:
+        return None
+    from services import league_postseason
+    from services.awards import forget_outcome
+
+    # Ohne „Meister aus Playoffs“ gibt es hier nichts zu tun - eine Season ohne Einstellungen kostet eine Abfrage, mehr nicht.
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "postseason": 1})
+    if (((season or {}).get("postseason") or {}).get("champion_source") if isinstance((season or {}).get("postseason"), dict) else None) != "playoffs":
+        return None
+
+    wanted = await league_postseason.table_champion(db, season_id) if await _season_done(db, season_id) else None
+    marked = await db.league_final_tables.find({"season_id": season_id, "active": True, "kind": None, "champion_fallback": True},
+                                               {"_id": 0, "id": 1, "tournament_id": 1, "champion": 1}).to_list(ITEM_LIMIT)
+    for final in marked:
+        if (wanted and final["tournament_id"] == wanted["tournament_id"]
+                and (final.get("champion") or {}).get("registration_id") == wanted["registration_id"]):
+            continue
+        await db.league_final_tables.update_one({"id": final["id"]}, {"$set": {"champion": None}, "$unset": {"champion_fallback": ""}})
+        forget_outcome(db, final["tournament_id"])
+        await db.tournament_awards.delete_many({"tournament_id": final["tournament_id"], "reward_key": None})
+    if not wanted:
+        return None
+    tournament = await db.tournaments.find_one({"id": wanted["tournament_id"]}, {"_id": 0})
+    final = await active_final(db, wanted["tournament_id"])
+    if not tournament or not final:
+        return None
+    champion = {key: wanted.get(key) for key in ("registration_id", "display_name", "team_id")}
+    await db.league_final_tables.update_one({"id": final["id"], "active": True}, {"$set": {"champion": champion, "champion_fallback": True}})
+    await record_champion(db, tournament, {**final, "champion": champion}, await _frame(db, tournament))
+    return wanted
 
 
 async def _season_follows(db, season_id: str | None, actor_id: str | None, tournament_id: str) -> str | None:
@@ -491,7 +592,7 @@ async def _season_follows(db, season_id: str | None, actor_id: str | None, tourn
     if not season_id:
         return None
     now = now_utc().isoformat()
-    closed = all_closed(await season_staffeln(db, season_id))
+    closed = await _season_done(db, season_id)
     if closed:
         changed = await db.league_seasons.update_one({"id": season_id, "status": "active"},
                                                      {"$set": {"status": "completed", "final_closed_at": now, "updated_at": now}})
@@ -595,8 +696,18 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
     tid = tournament["id"]
     override = await _conflict_override(db, actor, tid, conflict_reason)
     frame = await _frame(db, tournament)
-    rows = await live_rows(db, tournament)
-    found = await blockers(db, tournament, frame["season"], rows=rows, decisive=frame["decisive"], zones=frame["zones"], now=now)
+    kind = frame["kind"]
+    extra = {}
+    if kind:
+        # Playoffs und Relegation (F.6, #2404): statt der Tabelle die Plätze aus dem Baum bzw. die Paarungen mit Ergebnis.
+        from services import league_postseason_final
+
+        extra = await league_postseason_final.rows_of(db, tournament)
+        rows = extra["rows"]
+    else:
+        rows = await live_rows(db, tournament)
+    found = await blockers(db, tournament, frame["season"], rows=None if kind else rows, decisive=False if kind else frame["decisive"],
+                           zones=frame["zones"], now=now, playoff_places=frame["playoff_places"])
     if found:
         raise FinalProblem("Abschließen geht noch nicht: " + ", ".join(row["label"] for row in found) + ".", 409, blockers=found)
     last = await db.league_final_tables.find({"tournament_id": tid}, {"_id": 0, "version": 1}).sort("version", -1).to_list(1)
@@ -609,7 +720,14 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
         "title": {"league": frame["league"].get("name"), "season": frame["season"].get("name"),
                   "division": frame.get("division_label"), "tournament": tournament.get("title")},
         "rows": rows, "participants": len([row for row in rows if not row.get("exit")]),
-        "champion_place": frame["decisive"], "champion": champion_of(rows) if frame["decisive"] else None,
+        "champion_place": frame["decisive"],
+        "champion": (playoff_champion(rows) if kind else champion_of(rows)) if frame["decisive"] else None,
+        # Staffel-Art (F.6): nur an Playoff- und Relegations-Fassungen - eine Fassung ohne ``kind`` ist ein Tabellen-Endstand.
+        **({"kind": kind} if kind else {}),
+        **({"winner": playoff_champion(rows), "final_match_id": extra.get("final_match_id")} if kind == PLAYOFF else {}),
+        **({"outcome": extra.get("outcome") or {}} if kind == RELEGATION else {}),
+        # Was für die Playoffs dieser Liga N beim Abschluss galt (Nr. 228): Plätze je Staffel und „Meister aus“.
+        **({"postseason": frame["postseason"]} if frame.get("postseason") else {}),
         "decisions": applied_decisions(tournament, rows), "rules": await _rules_snapshot(db, tournament, frame),
         # Auf- und Abstieg (F.2, Nr. 158/159): die Zonen der Liga N von jetzt und je Team die Zone - daraus entsteht die neue Season.
         "zones": frame["zones"] or {},
@@ -655,7 +773,14 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
     await _follow_up("Protokoll der Notausnahme", tid, record_override)
     await _follow_up("Meister-Eintrag", tid, lambda: record_champion(db, {**tournament, "status": "completed"}, final, frame))
     # Belohnungen (F.4, Nr. 165): sofort mit dem Abschluss, aus dem Endstand - mit Nachricht an alle, die etwas gewinnen oder verlieren.
-    await _follow_up("Belohnungen", tid, lambda: league_rewards.grant_and_notify(db, {**tournament, "status": "completed"}, final, frame))
+    if not kind:
+        # Die Zusammenstellung der Season gilt dem Tabellenplatz (Nr. 214) - eine Playoff- oder Relegations-Fassung vergibt sie nicht.
+        await _follow_up("Belohnungen", tid, lambda: league_rewards.grant_and_notify(db, {**tournament, "status": "completed"}, final, frame))
+    # Meister ohne Playoffs (Nr. 251) **vor** dem Stand der Season: Was auf „beendet“ wartet (Discord-Saisonende) und die Nachricht an
+    # die Captains kennen den Meister dann schon.
+    kept = await _follow_up("Meister ohne Playoffs", tid, lambda: champion_without_playoffs(db, context.get("season_id")))
+    if kept and kept.get("tournament_id") == tid:
+        final = {**final, "champion": {key: kept.get(key) for key in ("registration_id", "display_name", "team_id")}, "champion_fallback": True}
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
     await _follow_up("TV-Saisonfinale", tid, lambda: _join_tv_finale(db, context.get("season_id"), tid))
     await _follow_up("Protokoll", tid, audit)
@@ -682,8 +807,23 @@ def second_person_override(final: dict, actor: dict, emergency_reason) -> str | 
 
 async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: str | None = None, emergency_reason: str | None = None,
                  now: datetime | None = None) -> dict:
-    """Öffnet die abgeschlossene Staffel wieder: Die Fassung bleibt im Verlauf, die Tabelle wird wieder gerechnet, der Meister-Eintrag
-    ruht. Der Aufrufer hält die Schreibsperre und hat das Recht geprüft."""
+    """Öffnet die abgeschlossene Staffel wieder. Der Aufrufer hält die Schreibsperre des Turniers und hat das Recht geprüft.
+
+    **Season-Sperre** (Nr. 232): wie der Abschluss - Wiederöffnen, Abschließen, Anlegen der Playoffs und „Setzliste neu berechnen“
+    einer Season laufen nacheinander. Reihenfolge wie überall: erst Turnier, dann Season. Wer nicht drankommt: 409."""
+    season_id = ((tournament or {}).get("league_context") or {}).get("season_id")
+    if not season_id:
+        return await _reopen(db, tournament, actor, reason, conflict_reason=conflict_reason, emergency_reason=emergency_reason, now=now)
+    try:
+        async with mutation_lock(db, league_season_resource(season_id)):
+            return await _reopen(db, tournament, actor, reason, conflict_reason=conflict_reason, emergency_reason=emergency_reason, now=now)
+    except MutationLockBusy:
+        raise FinalProblem(SEASON_BUSY, 409) from None
+
+
+async def _reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: str | None = None, emergency_reason: str | None = None,
+                  now: datetime | None = None) -> dict:
+    """Die Fassung bleibt im Verlauf, die Tabelle wird wieder gerechnet, der Meister-Eintrag ruht."""
     from services import league_permissions
 
     if not is_league_staffel(tournament):
@@ -698,6 +838,12 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
     text = reason_text(reason, "einen Grund für das Wiederöffnen")
     emergency = second_person_override(final, actor, emergency_reason)
     override = await _conflict_override(db, actor, tid, conflict_reason)
+    # Playoffs oder Relegation laufen schon (F.6, #2404): Ob das Wiederöffnen dann gesperrt ist, sagt die Einstellung der Season.
+    from services import league_postseason
+
+    refusal = await league_postseason.reopen_refusal(db, tournament)
+    if refusal:
+        raise FinalProblem(refusal, 409)
     now = now or now_utc()
     claimed = await db.league_final_tables.update_one(
         {"id": final["id"], "active": True},
@@ -733,6 +879,7 @@ async def reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason: 
     await _follow_up("Ruhen des Meister-Eintrags", tid, lambda: suspend_champion(db, tid))
     await _follow_up("TV-Saisonfinale", tid, lambda: _forget_tv_finale(db, context.get("season_id")))
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
+    await _follow_up("Meister ohne Playoffs", tid, lambda: champion_without_playoffs(db, context.get("season_id")))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, tell)
     return {"final": {**final, "active": False, "reopened_at": now.isoformat(), "reopened_by": actor.get("id"), "reopen_reason": text},
@@ -808,12 +955,13 @@ async def _late_entry_hints(db, tournament: dict, season: dict | None) -> list[d
 
 
 async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, decisive: bool, division_label: str | None,
-                           can_act: bool, zones: dict | None = None, now: datetime | None = None) -> dict:
+                           can_act: bool, zones: dict | None = None, now: datetime | None = None, playoff_places: int = 0) -> dict:
     """Eine Staffel im Cockpit: Stand, Sperrgründe mit Link, Vorschau bzw. Endstand, Gleichstand auf Platz 1, Verlauf."""
     from services import league_permissions
     from services.league_table import can_decide, public_rules
 
     tid = tournament["id"]
+    kind = staffel_kind(tournament)
     history = await db.league_final_tables.find({"tournament_id": tid}, {"_id": 0, "rows": 0}).sort("version", -1).to_list(HISTORY_LIMIT)
     active = next((row for row in history if row.get("active")), None) if is_closed(tournament) else None
     names = await _names(db, {value for row in history for value in (row.get("closed_by"), row.get("reopened_by"))})
@@ -823,6 +971,8 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
     base = {
         "tournament_id": tid, "title": tournament.get("title"), "slug": tournament.get("slug"),
         "staffel": (tournament.get("league_context") or {}).get("staffel"), "division_label": division_label,
+        # Staffel-Art (F.6, #2404): ``kind`` und das fertige Wort („Staffel A“, „Playoffs“, „Relegation“).
+        **({"kind": kind, "label": staffel_label(tournament)} if kind else {}),
         "status": tournament.get("status"), "champion_place": decisive, "own_team": own_team,
         "history": [_history_row(row, names) for row in history],
         # Zonen der Liga N (F.2): was gilt bzw. beim Abschluss galt - für den Satz unter der Tabelle.
@@ -840,7 +990,7 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
         base["hints"] = await _late_entry_hints(db, tournament, season)
     if is_closed(tournament) and not active:
         # Abgebrochener Abschluss (N-b): ehrlich als solcher - gesperrt, ohne Endstand, mit „Wieder öffnen“ als Ausweg.
-        return {**base, "closed": False, "incomplete": True, "final": None, "standings": await live_rows(db, tournament),
+        return {**base, "closed": False, "incomplete": True, "final": None, "standings": await current_rows(db, tournament),
                 "table_rules": public_rules(tournament), "blockers": [_blocker("incomplete_close", "Abschluss unvollständig", INCOMPLETE, [])],
                 "ties": [], "can_decide": False, "champion": None, "can_close": False, "closed_by_me": False,
                 "can_reopen": can_act and (not own_team or superadmin)}
@@ -855,11 +1005,18 @@ async def staffel_overview(db, tournament: dict, season: dict, user: dict, *, de
                 "closed_by_me": closed_by_me,
                 # Wieder öffnen: zweite Person; wer selbst abgeschlossen hat, nur als Superadmin mit Notausnahme.
                 "can_reopen": can_act and (not closed_by_me or superadmin) and (not own_team or superadmin)}
-    rows = await live_rows(db, tournament)
-    found = await blockers(db, tournament, season, rows=rows, decisive=decisive, zones=zones, now=now)
+    rows = await current_rows(db, tournament)
+    if kind:
+        found = await blockers(db, tournament, season, rows=None, now=now)
+        return {**base, "closed": False, "final": None, "standings": rows, "table_rules": None, "blockers": found, "ties": [],
+                "can_decide": False, "champion": playoff_champion(rows) if decisive else None,
+                "can_close": can_act and not found and (not own_team or superadmin), "closed_by_me": False, "can_reopen": False}
+    found = await blockers(db, tournament, season, rows=rows, decisive=decisive, zones=zones, now=now, playoff_places=playoff_places)
     # Je Gleichstand: Gehört die Person zu einer der Seiten? Dann entscheidet eine andere (wie im Reiter „Tabelle“). Dazu die
-    # Gleichstände an einer Zonengrenze (F.2) - nur die, die noch nicht im Meister-Gleichstand stehen.
-    ties = [{**tie, "own_team": bool(own_ids & set(tie["registration_ids"]))} for tie in classify_ties(rows, decisive=decisive, zones=zones)]
+    # Gleichstände an einer Zonengrenze (F.2) - nur die, die noch nicht im Meister-Gleichstand stehen - und an der Playoff-Grenze (F.6).
+    ties = [{**tie, "own_team": bool(own_ids & set(tie["registration_ids"]))}
+            for tie in [*classify_ties(rows, decisive=decisive, zones=zones),
+                        *playoff_boundary_ties(rows, playoff_places, decisive=decisive, zones=zones)]]
     return {**base, "closed": False, "final": None, "standings": rows, "table_rules": public_rules(tournament), "blockers": found,
             "ties": ties, "can_decide": can_decide(tournament),
             "champion": champion_of(rows) if decisive else None,
@@ -879,20 +1036,28 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
     tournaments = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE},
                                             {"_id": 0, "creation_key": 0, "billing": 0}).to_list(500)
     tournaments = [row for row in tournaments if is_closed(row) or row.get("status") not in IGNORED_STAFFEL_STATUSES]
+    # Reguläre Staffeln nach Buchstabe, dahinter die Playoffs und die Relegation der Liga N (F.6, #2404).
     tournaments.sort(key=lambda row: ((divisions.get(row["league_context"].get("division_id")) or {}).get("level") or 99,
-                                      str(row["league_context"].get("staffel") or "")))
+                                      bool(staffel_kind(row)), str(row["league_context"].get("staffel") or "")))
+    from services import league_postseason
+
+    from_playoffs = await league_postseason.champion_from_playoffs(db, season, divisions.get(top))
     staffeln = []
     for tournament in tournaments:
         division = divisions.get(tournament["league_context"].get("division_id")) or {}
+        kind = staffel_kind(tournament)
+        is_top = bool(division) and division.get("id") == top
+        snapshot = await league_postseason.close_snapshot(db, season, division) if division and not kind else None
         staffeln.append(await staffel_overview(
-            db, tournament, season, user, decisive=bool(division) and division.get("id") == top,
+            db, tournament, season, user, decisive=is_top and ((kind == PLAYOFF) if from_playoffs else kind is None),
             division_label=division_label(division) if division.get("level") is not None else None, can_act=can_act,
-            zones=league_zones.effective(division, levels) if division else None, now=now))
+            zones=league_zones.effective(division, levels) if division and not kind else None, now=now,
+            playoff_places=int((snapshot or {}).get("per_staffel") or 0)))
     # Plätze über Staffeln hinweg (#1627): je Liga N mit der Regel die Kandidaten, der offene Gleichstand und der Entscheid - mit dem
     # Stand von jetzt, solange nicht alle Staffeln abgeschlossen sind.
     cross = []
     for division in sorted(divisions.values(), key=lambda row: row.get("level") if isinstance(row.get("level"), int) else 99):
-        mine = [row for row in tournaments if row["league_context"].get("division_id") == division["id"]]
+        mine = [row for row in tournaments if row["league_context"].get("division_id") == division["id"] and not staffel_kind(row)]
         if not mine:
             continue
         tables = {row["tournament_id"]: row["standings"] for row in staffeln if not row["closed"]}
@@ -902,10 +1067,13 @@ async def season_overview(db, season: dict, user: dict, *, now: datetime | None 
             for row in mine:
                 own |= await own_registration_ids(db, user, row["id"])
             cross.append(league_cross_zones.view(found, division_label(division), own))
+    # Eingeschaltet, aber noch nicht angelegt (F.6): Solange ist die Season nicht abgeschlossen - das Cockpit nennt, was fehlt.
+    postseason_missing = await league_postseason.missing(db, season["id"])
     return {
         "cross": cross, "cross_methods": league_cross_zones.METHODS,
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),
-                   "closed": bool(staffeln) and all(row["closed"] for row in staffeln)},
+                   "closed": bool(staffeln) and all(row["closed"] for row in staffeln) and not postseason_missing},
+        **({"postseason_missing": postseason_missing} if postseason_missing else {}),
         "can_act": can_act, "superadmin": league_permissions.is_superadmin(user), "methods": METHODS,
         # Gibt es schon eine neue Season aus dieser (F.2, Nr. 162)? Dann sagt „Wieder öffnen“, dass die Übernahme dort neu zu berechnen ist.
         "successor": await db.league_seasons.find_one({"predecessor_id": season["id"]}, {"_id": 0, "id": 1, "name": 1}),

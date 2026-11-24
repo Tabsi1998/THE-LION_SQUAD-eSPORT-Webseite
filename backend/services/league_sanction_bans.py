@@ -104,15 +104,31 @@ async def frame_for(db, rows: list[dict]) -> Frame:
         frame.season_ends[season["id"]] = season_end_at(season)
     registration_ids = sorted({row["registration_id"] for row in counted if row.get("registration_id")})
     if registration_ids:
+        # Playoffs und Relegation (#2404, Nr. 223): Dort hat das Co-Team eine eigene Anmeldung mit der Herkunft
+        # ``postseason.from_registration_id``. Jedes gewertete Pflichtspiel zählt - Tabelle, Playoff oder Relegation.
+        # In beide Richtungen: Auch eine Sperre, die in den Playoffs ausgesprochen wurde, zählt die Relegationsspiele desselben Co-Teams
+        # (und umgekehrt). Die Familie eines Co-Teams ist seine reguläre Anmeldung und alle, die von ihr herkommen.
+        root = {key: key for key in registration_ids}
+        async for row in db.tournament_registrations.find({"id": {"$in": registration_ids}, "postseason.from_registration_id": {"$type": "string"}},
+                                                          {"_id": 0, "id": 1, "postseason.from_registration_id": 1}):
+            root[row["id"]] = row["postseason"]["from_registration_id"]
+        wanted: dict[str, set[str]] = {}
+        for key, base in root.items():
+            wanted.setdefault(base, set()).add(key)
+        # Welche gesperrten Anmeldungen ein Spiel dieser Anmeldung zählen: die Wurzel selbst und jede Anmeldung, die von ihr herkommt.
+        counts_for: dict[str, set[str]] = {base: set(keys) for base, keys in wanted.items()}
+        async for row in db.tournament_registrations.find({"postseason.from_registration_id": {"$in": sorted(wanted)}},
+                                                          {"_id": 0, "id": 1, "postseason.from_registration_id": 1}):
+            counts_for.setdefault(row["id"], set()).update(wanted[row["postseason"]["from_registration_id"]])
         async for match in db.matches_v2.find(
-                {"slots.registration_id": {"$in": registration_ids}, "status": {"$in": sorted(DECIDED_MATCH)}},
+                {"slots.registration_id": {"$in": sorted(counts_for)}, "status": {"$in": sorted(DECIDED_MATCH)}},
                 {"_id": 0, "id": 1, "completed_at": 1, "is_preview": 1, "slots.registration_id": 1}):
             moment = parse(match.get("completed_at"))
             if match.get("is_preview") or not moment:
                 continue
             for slot in match.get("slots") or []:
-                if slot.get("registration_id") in registration_ids:
-                    frame.decided.setdefault(slot["registration_id"], []).append((moment, match["id"]))
+                for key in counts_for.get(slot.get("registration_id") or "", ()):
+                    frame.decided.setdefault(key, []).append((moment, match["id"]))
         for played in frame.decided.values():
             played.sort()
     return frame

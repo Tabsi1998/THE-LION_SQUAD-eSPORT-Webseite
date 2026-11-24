@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { API, api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminTabBar } from "@/components/tls/AdminTabBar";
+import { BracketTree } from "@/components/tls/BracketTree";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useTeamLineups } from "@/components/tls/tournament/LineupMark";
@@ -34,6 +35,28 @@ import { StaffelStand } from "./staffel/StaffelStand";
 import { hasCapability, sanctionsByRegistration } from "./staffel/staffelPage";
 
 const TABS = STAFFEL_TABS.filter((tab) => STAFFEL_TABS_READY.has(tab.key));
+// Playoffs und Relegation (#2404, F.6): ein K.-o.-Baum statt einer Tabelle - der Reiter heißt dort „Baum“.
+const KNOCKOUT_TABS = TABS.map((tab) => (tab.key === "tabelle" ? { ...tab, label: "Baum" } : tab));
+
+function StaffelBracketPanel({ tournamentId }) {
+  const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api.get(`/tournaments/${encodeURIComponent(tournamentId)}/bracket`)
+      .then(({ data: body }) => alive && setData(body))
+      .catch(() => alive && setFailed(true));
+    return () => { alive = false; };
+  }, [tournamentId]);
+  if (failed) return <p className="text-sm text-warn" role="alert">Der Baum ließ sich nicht laden.</p>;
+  if (!data) return <p className="text-sm text-white/45" aria-busy="true">Lade Baum …</p>;
+  return (
+    <div className="space-y-3" data-testid="staffel-bracket">
+      <p className="text-sm text-white/65">Die Setzliste kommt aus dem Endstand der regulären Staffeln. Neu berechnen und abschließen: Reiter „Abschluss“ der Season.</p>
+      <BracketTree data={data} quietSections />
+    </div>
+  );
+}
 
 /** Rollt zu einem Abschnitt (`#zuteilen`), sobald er gezeichnet ist. */
 function useScrollToSection(section, ready) {
@@ -180,6 +203,8 @@ function StaffelPage({ tournamentId }) {
     );
   }
 
+  const knockout = Boolean(t.league_context?.kind);
+  const tabs = knockout ? KNOCKOUT_TABS : TABS;
   const bySanction = sanctionsByRegistration(sanctions, registrations, t.id);
   // Ladefehler bei schon geladener Staffel: ein sichtbarer Hinweis mit „Nochmal versuchen“ statt stiller Leere.
   const loadNotice = error ? (
@@ -203,10 +228,10 @@ function StaffelPage({ tournamentId }) {
     spielplan: () => <StaffelScheduleTab tournament={t} registrations={registrations} matches={matches} onReload={loadSafely} />,
     spiele: () => <StaffelGamesTab tournament={t} registrations={registrations} matches={matches} onReload={loadSafely} />,
     // Tabelle samt Gleichstand-Entscheid (Nr. 190): lesen jede Zuständigkeit, entscheiden „Ergebnisse korrigieren“.
-    tabelle: () => (
+    tabelle: () => (knockout ? <StaffelBracketPanel tournamentId={t.id} /> : (
       <StaffelTablePanel tournamentId={t.id} label={`Tabelle ${staffelLabel(t)}`} canDecide={hasCapability(t, "results")}
         pdfHref={`${API}/exports/tournaments/${encodeURIComponent(t.id)}/standings.pdf`} />
-    ),
+    )),
     // Protokoll der Season auf diese Staffel gefiltert (Paket C): lesen jede Zuständigkeit, Strafen und Notausnahmen nur mit der passenden.
     protokoll: () => <SeasonLog seasonId={t.league_context.season_id} staffelId={t.id} title="Protokoll der Staffel" sectionId="staffel-log" />,
     // Unterreiter per Sprungmarke (`#vorgaben`, `#helfer` …) - wie die Reiter oben, ohne neuen Eintrag im Verlauf.
@@ -225,7 +250,7 @@ function StaffelPage({ tournamentId }) {
       </header>
 
       {loadNotice}
-      <AdminTabBar tabs={TABS} active={tab} onSelect={go} idBase={idBase} label="Bereiche der Staffel" testPrefix="staffel" />
+      <AdminTabBar tabs={tabs} active={tab} onSelect={go} idBase={idBase} label="Bereiche der Staffel" testPrefix="staffel" />
       {!lists && !error ? <p className="text-sm text-white/60" data-testid="staffel-lists-loading">Lade Co-Teams und Spiele …</p> : null}
       {lists && TABS.map((row) => (row.key === tab ? (
         <div key={row.key} role="tabpanel" id={`${idBase}-panel-${row.key}`} aria-labelledby={`${idBase}-tab-${row.key}`} data-testid={`staffel-panel-${row.key}`} className="min-w-0">

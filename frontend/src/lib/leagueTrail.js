@@ -20,7 +20,12 @@ export function leagueTrail(leagues, tournament) {
   };
 }
 
+// Playoffs und Relegation (#2404, F.6): eine eigene K.-o.-Staffel der Liga - sie heißt nicht „Staffel PO“.
+const KIND_LABELS = { playoff: "Playoffs", relegation: "Relegation" };
+
 export function staffelLabel(tournament) {
+  const kind = KIND_LABELS[tournament?.league_context?.kind];
+  if (kind) return kind;
   const staffel = String(tournament?.league_context?.staffel || "").trim();
   return staffel ? `Staffel ${staffel}` : "Staffel";
 }

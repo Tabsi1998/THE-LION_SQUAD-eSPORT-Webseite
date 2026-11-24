@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services.league_scope import context_label
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_roster")
@@ -977,7 +978,7 @@ async def season_overview(db, season: dict) -> dict:
         level = division.get("level")
         label = " · ".join(part for part in (
             f"Liga {level}" if level else None, division.get("nickname"),
-            f"Staffel {context.get('staffel')}" if context.get("staffel") else None) if part)
+            context_label(context)) if part)
         squad = squads.get(reg.get("squad_id")) or {}
         players = [
             {**status(ctx, uid, reg.get("squad_id")), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names)}

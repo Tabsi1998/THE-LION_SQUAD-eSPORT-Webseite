@@ -260,8 +260,24 @@ def duel_sides(match: dict) -> tuple[str | None, str | None]:
         ids = [(slot or {}).get("registration_id") for slot in slots[:2]]
         while len(ids) < 2:
             ids.append(None)
-        return ids[0], ids[1]
+        # Playoffs einer Liga (#2404, Nr. 209): Heim ist in jeder Runde der besser Gesetzte - nicht die obere Zeile im Baum.
+        better = better_seed_first(match, ids[0], ids[1])
+        return better if better else (ids[0], ids[1])
     return (match or {}).get("participant_a_id"), (match or {}).get("participant_b_id")
+
+
+def better_seed_first(match: dict | None, first: str | None, second: str | None) -> tuple[str, str] | None:
+    """Die beiden Seiten eines Playoff-Spiels, die besser gesetzte zuerst - ``None``, wenn das Spiel die Regel nicht trägt
+    (``postseason.home == "better_seed"``), eine Seite fehlt oder ein Setzplatz unbekannt ist. Dann gilt die Reihenfolge im Baum."""
+    rule = (match or {}).get("postseason")
+    if not isinstance(rule, dict) or rule.get("home") != "better_seed" or not first or not second:
+        return None
+    seeds = rule.get("seeds") if isinstance(rule.get("seeds"), dict) else {}
+    try:
+        one, two = int(seeds[first]), int(seeds[second])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (second, first) if two < one else (first, second)
 
 
 def home_registration_id(match: dict) -> str | None:
@@ -384,6 +400,11 @@ def plays_in_matchdays(tournament: dict, stage: dict | None = None) -> bool:
     """Spielwochen gibt es nur online (#1552): vor Ort hat eine Gruppenphase Runden an einem Tag, die der
     Stationsplaner legt. Die Phase entscheidet vor dem Turnier (Vorrang wie in ``tournament_rules``)."""
     tournament = tournament or {}
+    context = tournament.get("league_context")
+    if isinstance(context, dict) and context.get("kind"):
+        # Playoffs und Relegation einer Liga (#2404, Nr. 208): je Runde eine Spielwoche - Runde N ist die N-te aktive Woche ab dem
+        # Start dieser Staffel. Ein K.-o.-Turnier ohne Liga hat weiter keine Wochen.
+        return match_policy({}, tournament, stage)["event_mode"] != "local"
     if stage is not None and stage.get("stage_type"):
         weekly_format = stage.get("stage_type") in MATCHDAY_STAGE_TYPES
     else:

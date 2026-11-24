@@ -21,9 +21,10 @@ from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_cross_zones, league_final, league_staffel_plan, league_zones, loadout_bans, map_pools, squad_registration
+from services import league_postseason, league_postseason_rules
 from services import league_service as leagues
 from services.league_final_read import active_final, is_closed
-from services.league_scope import ONLY_LEAGUE
+from services.league_scope import ONLY_LEAGUE, RELEGATION, staffel_kind
 from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock
 
@@ -37,8 +38,13 @@ NOT_COPIED = frozenset({
     "_id", "id", "league_id", "number", "name", "slug", "status", "visibility", "created_at", "created_by", "updated_at",
     "start_date", "blocked_periods", "registration_deadline", "application_opens_at", "application_closes_at", "transfer_windows",
     "roster_deadline", "final_closed_at", "predecessor_id", "predecessor", "successor_ready",
+    # Playoffs und Relegation (F.6, #2404): Die Einstellungen gehen mit (ohne ihre Termine, ``take_over``), das Ende gehört zur alten Season.
+    "postseason_end",
     # Verlängerte Nachmeldung (#2422, Nr. 184): gilt nur dieser Season, die Frist selbst (``late_registration_days``) geht mit.
     "application_late_extension",
+    # Der gemerkte Rückfallwert fürs Best of von Playoffs und Relegation (#2404, Nr. 255): Die neue Season beginnt wieder mit „wie in
+    # der Season“ - an der Season und an jeder Liga N (``_copy_divisions``).
+    league_postseason.KEPT,
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (
@@ -65,6 +71,11 @@ NOT_SUCCESSOR = "Diese Season ist nicht aus einer Vorgänger-Season entstanden."
 STARTED = "Die Season hat schon begonnen. Neu berechnen geht nur vor dem Start - jetzt bitte von Hand im Eingang."
 STAMP_CHANGED = "Der Endstand hat sich inzwischen geändert - bitte die Vorschau neu laden."
 REVOKED_REASON = "Übernahme zurückgenommen: Nach dem korrigierten Endstand ist das Co-Team nicht mehr in der neuen Season."
+RELEGATION_OPEN = "Die Relegation ist noch nicht abgeschlossen."
+RELEGATION_APPLIED = ("Relegation: Aus dem abgeschlossenen Ergebnis steigt der Sieger aus der unteren Liga auf und der Verlierer aus der "
+                      "oberen ab; alle anderen Relegations-Teams bleiben.")
+# Wirkung der Relegation auf die Stufe (Nr. 213): wie ``league_zones.MOVES`` - eine höher, eine tiefer, bleibt.
+RELEGATION_MOVES = {"up": -1, "down": 1, "stay": 0}
 
 
 class SuccessorProblem(ValueError):
@@ -127,6 +138,11 @@ async def plan(db, season: dict) -> dict:
     elif not all(is_closed(row) for row in counted):
         open_count = len([row for row in counted if not is_closed(row)])
         problems.append(f"{NOT_CLOSED} Offen: {open_count} {'Staffel' if open_count == 1 else 'Staffeln'}.")
+        # Relegation (F.6, #2404, Nr. 213): Die neue Season gibt es erst, wenn sie abgeschlossen ist - eigens gesagt.
+        if any(staffel_kind(row) == RELEGATION and not is_closed(row) for row in counted):
+            problems.append(RELEGATION_OPEN)
+    # Playoffs oder Relegation eingeschaltet, aber noch nicht angelegt: Auch dann fehlt noch ein Ergebnis.
+    problems += [row["text"] for row in await league_postseason.missing(db, season["id"])]
     divisions = await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0}).sort("level", 1).to_list(50)
     active = [row for row in divisions if row.get("status") != "archived" and isinstance(row.get("level"), int)]
     if not active:
@@ -137,11 +153,23 @@ async def plan(db, season: dict) -> dict:
     dropped: list[dict] = []
     seen: set[str] = set()
     finals: list[str] = []
-    tournaments = await db.tournaments.find({"id": {"$in": [row["id"] for row in counted if is_closed(row)]}, **ONLY_LEAGUE},
+    closed_rows = await db.tournaments.find({"id": {"$in": [row["id"] for row in counted if is_closed(row)]}, **ONLY_LEAGUE},
                                             {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(500)
+    # Nur reguläre Staffeln sind Tabellen (F.6, #2404): Der Playoff-Endstand ändert keine Liga N, die Relegation überlagert unten.
+    tournaments = [row for row in closed_rows if not staffel_kind(row)]
     tournaments.sort(key=lambda row: ((by_id.get(row["league_context"].get("division_id")) or {}).get("level") or 99,
                                       str(row["league_context"].get("staffel") or "")))
     loaded = {row["id"]: await active_final(db, row["id"]) for row in tournaments} if levels else {}
+    # Wirkung der Relegation (Nr. 213): je Co-Team ``up``, ``down`` oder ``stay`` aus dem abgeschlossenen Ergebnis.
+    relegated: dict[str, str] = {}
+    relegation_finals: list[str] = []
+    for row in closed_rows if levels else []:
+        if staffel_kind(row) != RELEGATION:
+            continue
+        final = await active_final(db, row["id"])
+        if final:
+            relegation_finals.append(str(final.get("id")))
+            relegated.update({str(key): value for key, value in (final.get("outcome") or {}).items()})
     # Plätze über Staffeln hinweg (#1627): je Liga N aus allen ihren Endständen - nur wenn die Season ganz abgeschlossen ist. Ein
     # offener Gleichstand an der Grenze hält die neue Season auf, bis die Leitung entschieden hat.
     crossed: dict[str, str] = {}
@@ -197,11 +225,14 @@ async def plan(db, season: dict) -> dict:
             else:
                 seen.add(squad["id"])
                 level = division.get("level")
-                there = target_level(levels, level, league_zones.MOVES.get(zone, 0))
+                # Die Relegation überlagert die Bewegung aus der Zone - vor Zielregel und Platzprüfung (F.6).
+                outcome = relegated.get(squad["id"])
+                move = RELEGATION_MOVES[outcome] if outcome in RELEGATION_MOVES else league_zones.MOVES.get(zone, 0)
+                there = target_level(levels, level, move)
                 team = teams[squad["team_id"]]
                 carried.append({**entry, "squad_id": squad["id"], "team_id": team["id"], "team_name": team.get("name"),
                                 "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad),
-                                "target_level": there,
+                                "target_level": there, **({"via": "relegation", "relegation": outcome} if outcome in RELEGATION_MOVES else {}),
                                 "movement": "up" if isinstance(level, int) and there < level else "down" if isinstance(level, int) and there > level else "stay"})
     # Umzug innerhalb der Season (in Staffel A ausgetreten, in Staffel B aktiv): Das Co-Team steht nur einmal da, bei den Übernommenen.
     dropped = [row for row in dropped if not row.get("squad_id") or row["squad_id"] not in seen]
@@ -217,8 +248,10 @@ async def plan(db, season: dict) -> dict:
                               "capacity": capacity(season, division, len(teams_here), before)})
     # Die Fassung des Endstands, aus der gerechnet wurde (Nachrichten nach „Übernahme neu berechnen“ tragen sie im Schlüssel).
     # Mit den Entscheiden über Staffeln hinweg (#1627): Ein neuer Entscheid ändert, wer wohin geht - „Übernahme neu berechnen“ merkt es.
-    stamp = hashlib.sha1("|".join(sorted(finals) + sorted(decided)).encode("utf-8")).hexdigest()[:12] if finals else ""
-    return {"problems": problems, "divisions": out_divisions, "dropped": dropped, "carried": len(carried), "stamp": stamp}
+    # Dazu die Fassungen der Relegation (F.6): Eine korrigierte Relegation ändert, wer wohin geht.
+    stamp = hashlib.sha1("|".join(sorted(finals) + sorted(decided) + sorted(relegation_finals)).encode("utf-8")).hexdigest()[:12] if finals else ""
+    return {"problems": problems, "divisions": out_divisions, "dropped": dropped, "carried": len(carried), "stamp": stamp,
+            "relegation": bool(relegation_finals)}
 
 
 # ---------------------------------------------------------------- Vorschau
@@ -265,7 +298,8 @@ async def preview(db, season: dict) -> dict:
         "capacity_hints": [f"{row['label']}: {row['capacity']['text']}" for row in found["divisions"] if not row["capacity"]["fits"]],
         "dropped": found["dropped"],
         "carried": found["carried"],
-        "relegation_note": "Relegationsplätze sind vorbereitet: Sie stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.",
+        "relegation_note": RELEGATION_APPLIED if found.get("relegation") else
+        "Relegationsplätze sind vorbereitet: Sie stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.",
     }
 
 
@@ -312,6 +346,9 @@ async def _create(db, season: dict, body: dict, actor: dict) -> dict:
     async def take_over(doc: dict) -> None:
         # Die Vorgaben der neuen Season sind die des Vorgängers - die Kennung bleibt, Zeitraum und Stand sind neu (Nr. 161).
         doc.update(copied)
+        if isinstance(doc.get(league_postseason_rules.FIELD), dict):
+            # Playoffs und Relegation gehen als Einstellung mit - ihre Termine setzt die neue Season neu (Nr. 161).
+            doc[league_postseason_rules.FIELD] = league_postseason_rules.without_dates(doc[league_postseason_rules.FIELD])
         doc.update({"predecessor_id": season["id"], "status": "draft", "visibility": "off",
                     "predecessor": {"id": season["id"], "name": season.get("name"), "number": season.get("number"), "slug": season.get("slug")}})
 
@@ -359,7 +396,9 @@ async def _copy_divisions(db, season: dict, doc: dict, actor: dict) -> dict[int,
         if row.get("level") in have:
             continue
         # Das Los der alten Season (#1623, ``draw``) und ihre Entscheide über Staffeln hinweg (#1627) gehören zu ihr und gehen nicht mit.
-        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at", "draw", "zone_decisions")}
+        copy = {key: value for key, value in row.items() if key not in ("_id", "id", "season_id", "created_at", "created_by", "updated_at", "draw", "zone_decisions", league_postseason.KEPT)}
+        if isinstance(copy.get(league_postseason_rules.FIELD), dict):
+            copy[league_postseason_rules.FIELD] = league_postseason_rules.without_dates(copy[league_postseason_rules.FIELD])
         copy.update({"id": new_id(), "season_id": doc["id"], "league_id": doc["league_id"], "status": "active",
                      "created_at": now, "created_by": actor.get("id"), "updated_at": now})
         try:
@@ -415,7 +454,8 @@ async def _carry_teams(db, league: dict, season: dict, doc: dict, actor: dict, c
             carry = {"from_season_id": season["id"], "from_season_name": season.get("name"), "from_level": team["from_level"],
                      "from_label": team["from_label"], "from_staffel": team.get("from_staffel"), "rank": team.get("rank"),
                      "zone": team.get("zone"), "movement": team["movement"], "division_id": target.get("id"),
-                     "division_level": division["level"], "division_label": division["label"]}
+                     "division_level": division["level"], "division_label": division["label"],
+                     **({"via": team["via"]} if team.get("via") else {})}
             row = {
                 "id": new_id(), "league_id": league["id"], "season_id": doc["id"], "team_id": team["team_id"], "squad_id": team["squad_id"],
                 "team_name": team.get("team_name"), "squad_name": team.get("squad_name"), "display_name": team["display_name"],
@@ -455,7 +495,8 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
         try:
             squad = await db.team_squads.find_one({"id": row["squad_id"]}, {"_id": 0}) or {"id": row["squad_id"], "team_id": row["team_id"]}
             carry = row["carry_over"]
-            way = {"up": f" - Aufstieg aus {carry['from_label']}", "down": f" - Abstieg aus {carry['from_label']}"}.get(carry["movement"], "")
+            how = " über die Relegation" if carry.get("via") == "relegation" else ""
+            way = {"up": f" - Aufstieg{how} aus {carry['from_label']}", "down": f" - Abstieg{how} aus {carry['from_label']}"}.get(carry["movement"], "")
             if kind == "revoked":
                 headline = "Neue Season: Übernahme zurückgenommen"
                 text = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
@@ -480,22 +521,22 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
 
 # ---------------------------------------------------------------- Übernahme neu berechnen (Entscheidung Nr. 162)
 
-CARRY_KEYS = ("from_label", "from_level", "from_staffel", "rank", "zone", "movement", "division_level")
+CARRY_KEYS = ("from_label", "from_level", "from_staffel", "rank", "zone", "movement", "division_level", "via")
 
 
 def started(season: dict, now: datetime | None = None) -> bool:
-    """Hat die neue Season begonnen? Im Entwurf nie, sonst ab ihrem ersten Tag."""
-    if (season.get("status") or "draft") == "draft":
-        return False
-    start = leagues._aware(season.get("start_date"))
-    return bool(start and (now or now_utc()) >= start)
+    """Hat die neue Season begonnen? Im Entwurf nie, sonst ab ihrem ersten Tag - und einmal gestartet bleibt gestartet (#2404,
+    Nr. 253, ``league_calendar.season_started``)."""
+    from services import league_calendar
+
+    return league_calendar.season_started(season, now or now_utc())
 
 
 def _carry_of(season: dict, team: dict, division: dict | None, label: str) -> dict:
     return {"from_season_id": season["id"], "from_season_name": season.get("name"), "from_level": team["from_level"],
             "from_label": team["from_label"], "from_staffel": team.get("from_staffel"), "rank": team.get("rank"),
             "zone": team.get("zone"), "movement": team["movement"], "division_id": (division or {}).get("id"),
-            "division_level": team["target_level"], "division_label": label}
+            "division_level": team["target_level"], "division_label": label, **({"via": team["via"]} if team.get("via") else {})}
 
 
 async def _recompute_plan(db, season: dict) -> dict:

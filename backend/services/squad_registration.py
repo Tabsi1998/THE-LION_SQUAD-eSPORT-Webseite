@@ -37,9 +37,11 @@ STATUS_LABELS = {
 
 def league_squad_key(tournament: dict, squad_id: str) -> str | None:
     """``<season_id>:<squad_id>`` - ein eindeutiger Index hält „ein Co-Team je Season nur in einer Staffel“ auch bei
-    gleichzeitigem Zuteilen. Ohne Liga-Rahmen (``league_context``) gibt es keinen Schlüssel."""
-    season_id = (tournament.get("league_context") or {}).get("season_id")
-    return f"{season_id}:{squad_id}" if season_id and squad_id else None
+    gleichzeitigem Zuteilen. Ohne Liga-Rahmen (``league_context``) gibt es keinen Schlüssel - und keinen in einer Playoff- oder
+    Relegations-Staffel (#2404, H1): Dort spielt das Co-Team zusätzlich zu seiner regulären Staffel."""
+    context = tournament.get("league_context") or {}
+    season_id = context.get("season_id")
+    return f"{season_id}:{squad_id}" if season_id and squad_id and not context.get("kind") else None
 
 
 def season_lock_resource(tournament: dict) -> str | None:
@@ -48,6 +50,8 @@ def season_lock_resource(tournament: dict) -> str | None:
 
 
 SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
+POSTSEASON_ASSIGN = ("In Playoffs und Relegation kommen die Teams aus dem Endstand. Zuteilen geht hier nicht - im Reiter „Abschluss“ der "
+                     "Season steht die Setzliste, dort lässt sie sich vor dem ersten Spiel neu berechnen.")
 
 
 async def sync_season_key(db, registration: dict | None, new_status: str | None, tournament: dict | None) -> None:
@@ -218,8 +222,9 @@ async def _staffel_state(db, tournament: dict) -> tuple[dict[str, str | None], i
 
 
 async def _squads_in_staffeln(db, season_id: str, *, except_tournament: str | None = None) -> set[str]:
-    """Die Co-Teams, die in Staffeln dieser Season stehen - aktiv oder noch mit Season-Schlüssel."""
-    query: dict = {"league_context.season_id": season_id}
+    """Die Co-Teams, die in **regulären** Staffeln dieser Season stehen - aktiv oder noch mit Season-Schlüssel. Playoffs und Relegation
+    (#2404) zählen nicht: Wer dort spielt, ist deshalb nicht „schon in einer anderen Staffel“."""
+    query: dict = {"league_context.season_id": season_id, "league_context.kind": None}
     if except_tournament:
         query["id"] = {"$ne": except_tournament}
     staffel_ids = [row["id"] for row in await db.tournaments.find(query, {"_id": 0, "id": 1}).to_list(200) if row.get("id")]
@@ -401,6 +406,9 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
     und ob ausdrücklich zugestimmt wurde (``consent``). Ohne diese Angaben bleibt es das Zuteilen durch die Leitung."""
     if not is_league_tournament(tournament):
         raise SquadAssignError(400, "Co-Teams teilt die Turnierleitung nur Team-Turnieren im Format Liga zu.")
+    if (tournament.get("league_context") or {}).get("kind"):
+        # Playoffs und Relegation (#2404, Nr. 219): Die Teams kommen aus dem Endstand - von Hand wird hier niemand zugeteilt.
+        raise SquadAssignError(409, POSTSEASON_ASSIGN)
     if tournament.get("status") in FINISHED_TOURNAMENT_STATUSES:
         raise SquadAssignError(409, "Diese Staffel ist schon beendet.")
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})

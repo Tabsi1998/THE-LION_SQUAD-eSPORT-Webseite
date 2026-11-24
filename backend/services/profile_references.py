@@ -211,7 +211,7 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
             return rank, participant_count
 
     # Abgeschlossene Liga-Staffel (F.1, #1645): Der Platz kommt aus dem Endstand, nicht aus einer neuen Rechnung.
-    final = await db.league_final_tables.find_one({"tournament_id": tournament_id, "active": True},
+    final = await db.league_final_tables.find_one({"tournament_id": tournament_id, "active": True, "kind": None},
                                                   {"_id": 0, "rows.registration_id": 1, "rows.rank": 1})
     if final:
         for reg_id in reg_ids:

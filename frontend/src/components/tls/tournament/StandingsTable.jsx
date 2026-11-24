@@ -2,9 +2,10 @@ import { Fragment } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FORM_LETTERS, STANDING_COLUMNS, formLabel, rankMove, standingCell } from "@/lib/standingsTable";
 import { ZONE_LABELS, standingNotes, zoneLegend } from "@/lib/leagueTable";
+import { PLAYOFF_PLACE } from "@/lib/leaguePostseason";
 import { swissStatusNote } from "@/lib/tournamentTableSettings";
 import { CountUp } from "@/components/tls/motion/CountUp";
-import { ZoneMark } from "@/components/tls/league/ZoneMark";
+import { PlayoffMark, ZoneMark } from "@/components/tls/league/ZoneMark";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
 // Pfeile zeigen den Weg seit dem vorigen Spieltag (vom Server), die eigene Zeile ist markiert. Sieg hell in Cyan,
@@ -167,6 +168,8 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 <td className="px-2 py-2.5 align-middle min-w-0">
                   <span className="flex items-center gap-2 min-w-0">
                     <StandingName name={row.display_name || "Teilnehmer"} />
+                    {/* Playoff-Platz (#2404, F.6): Symbol am Namen, für Screenreader das Wort - die Legende erklärt es. */}
+                    {row.playoff ? <span className="inline-flex shrink-0 items-center" title={PLAYOFF_PLACE}><span className="sr-only">{PLAYOFF_PLACE}</span><PlayoffMark testId={`standing-playoff-${row.registration_id}`} /></span> : null}
                     {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
                   <Notes row={row} labels={tiebreakLabels} />
@@ -198,7 +201,8 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
 /** Legende der Zonen unter einer Liga-Tabelle (F.2, #1627): nur, was in der Tabelle vorkommt - sonst nichts. */
 export function ZoneLegend({ rows, testId }) {
   const items = zoneLegend(rows);
-  if (!items.length) return null;
+  const playoffs = (rows || []).some((row) => row?.playoff);
+  if (!items.length && !playoffs) return null;
   return (
     <ul className="tls-zone-legend mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/60" aria-label="Zonen der Tabelle" data-testid={testId}>
       {items.map((item) => (
@@ -207,6 +211,7 @@ export function ZoneLegend({ rows, testId }) {
           <ZoneMark zone={item.zone} testId={`zone-legend-mark-${item.zone}`} /> {item.label}
         </li>
       ))}
+      {playoffs ? <li className="inline-flex items-center gap-1.5" data-testid="zone-legend-playoff"><PlayoffMark /> {PLAYOFF_PLACE}</li> : null}
     </ul>
   );
 }

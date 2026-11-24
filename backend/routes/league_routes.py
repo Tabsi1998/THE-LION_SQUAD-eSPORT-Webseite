@@ -140,18 +140,27 @@ async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, vi
     levels = sorted({row["level"] for row in divisions if row.get("status") != "archived" and isinstance(row.get("level"), int)})
     # Plätze über Staffeln hinweg (#1627, Nr. 228): ab dem ersten Abschluss einer Staffel der Liga N gesperrt.
     locked = await leagues.cross_zones_locked(db, [row["id"] for row in divisions])
+    from services import league_postseason
+
     for division in divisions:
         settings = leagues.effective_settings(season, division)
         zones = league_zones.effective(division, levels)
         rows.append({
             "zones_cross_locked": division["id"] in locked,
+            # Mit Playoffs oder Relegation stehen die Staffeln ab dem ersten Abschluss fest (#2404) - nur dann steht das Feld da.
+            **({"staffeln_locked": True} if locked and await league_postseason.staffeln_locked(db, season, division) else {}),
             **division, "label": leagues.division_label(division),
             # Auf- und Abstieg (F.2, #1627): eingestellt (``zones``) und was gilt (oberste ohne Aufstieg, unterste ohne Abstieg).
             "zones": league_zones.settings_of(division), "zones_effective": zones, "zones_label": league_zones.summary(zones),
             "settings": {key: settings[key] for key in leagues.OVERRIDE_FIELDS},
             "calendar": leagues.calendar_summary(season, settings),
             "staffeln": [leagues.staffel_summary(row) for row in staffeln
-                         if row["league_context"].get("division_id") == division["id"]],
+                         if row["league_context"].get("division_id") == division["id"] and not row["league_context"].get("kind")],
+            # Playoffs und Relegation dieser Liga N (#2404, F.6): eigene K.-o.-Staffeln - bedient im Reiter "Abschluss". Ohne sie fehlt
+            # das Feld: Die Antwort einer Season ohne Playoffs sieht aus wie vorher.
+            **({"postseason": extra} if (extra := [
+                leagues.staffel_summary(row) for row in staffeln
+                if row["league_context"].get("division_id") == division["id"] and row["league_context"].get("kind")]) else {}),
         })
     return {
         "capabilities": sorted(await capabilities_of(db, me, league["id"])),
@@ -388,8 +397,20 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     league = await _call(leagues.get_league(db, season["league_id"]))
     passed: dict = {}
     warnings: list[str] = []
-    doc, changed = await _call(leagues.update_season(db, season, payload, warnings=warnings,
-                                                     before_write=_readiness_gate(db, league, season, me, reason, passed)))
+    gate = _readiness_gate(db, league, season, me, reason, passed)
+
+    async def before_write(after: dict) -> None:
+        await gate(after)
+        if after.get("best_of") != season.get("best_of"):
+            # Nr. 252, 255 (#2404): Nach dem Season-Start behalten Playoffs und Relegation ihr Best of - gemerkt, bevor die Season schreibt.
+            from services import league_postseason
+
+            try:
+                warnings.extend(await league_postseason.keep_best_of(db, season, after, me))
+            except league_postseason.PostseasonProblem as problem:
+                raise LeagueProblem(problem.message, problem.status) from None
+
+    doc, changed = await _call(leagues.update_season(db, season, payload, warnings=warnings, before_write=before_write))
     await _record_readiness_override(db, me, season_id, passed)
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
@@ -718,7 +739,17 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     if "overrides" in payload:
         payload["overrides"] = body.overrides.model_dump(exclude_none=True) if body.overrides else {}
     warnings: list[str] = []
-    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
+    async def before_write(before: dict, after: dict) -> None:
+        # Nr. 252, 255 (#2404): Ein eigenes Best of der Liga N ändert nach dem Season-Start nicht das Best of ihrer Playoffs und ihrer
+        # Relegation - der Wert vom Start wird gemerkt: nach allen Prüfungen, vor dem Schreiben, unter der Sperre von ``update_division``.
+        if (before.get("overrides") or {}).get("best_of") == (after.get("overrides") or {}).get("best_of"):
+            return
+        from services import league_postseason
+
+        season = await leagues.get_season(db, before["season_id"])
+        warnings.extend(await league_postseason.keep_best_of(db, season, season, me, division=before, after_division=after, locked=True))
+
+    doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings, before_write=before_write))
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
     # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
@@ -762,7 +793,20 @@ async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: 
 
     db = get_db()
     division = await _call(leagues.get_division(db, division_id))
-    doc = await _call(leagues.create_staffel(db, division, body.staffel, me))
+    # Ab dem ersten Abschluss stehen die regulären Staffeln einer Liga N mit Playoffs oder Relegation fest (#2404, wie Nr. 228/231):
+    # Wie viele Teams in die Playoffs kommen und ob die Relegation aufgeht, rechnet mit den Staffeln, die es beim Abschluss gab.
+    from services import league_postseason
+
+    from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock
+
+    # Unter der Season-Sperre (Nr. 232): Ein gleichzeitiger Abschluss sieht die neue Staffel - oder sie wird hier schon abgelehnt.
+    try:
+        async with mutation_lock(db, league_season_resource(division["season_id"])):
+            if await league_postseason.staffeln_locked(db, await _call(leagues.get_season(db, division["season_id"])), division):
+                raise HTTPException(status_code=422, detail=league_postseason.STAFFELN_LOCKED)
+            doc = await _call(leagues.create_staffel(db, division, body.staffel, me))
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=leagues.SEASON_BUSY) from None
     reset_scope_cache()
     await _create_initial_stage_bracket_preview(db, doc, me.get("id"))
     await _audit(db, "league.staffel.create", me, doc["id"],

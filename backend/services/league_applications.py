@@ -112,7 +112,10 @@ def carry_deadline(application: dict | None, season: dict | None) -> datetime | 
     """Bis wann sich ein übernommenes Co-Team abmelden kann: der Start der Season (Nr. 160). ``None``: kein übernommener Antrag."""
     if not (application or {}).get("carry_over") or not season:
         return None
-    return league_service._aware(season.get("start_date"))
+    # Der gemerkte Start gilt (#2404, Nr. 253): Rückt das Startdatum nach dem Start in die Zukunft, geht die Frist nicht wieder auf.
+    from services import league_calendar
+
+    return league_calendar.start_moment(season)
 
 
 def carry_open(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
@@ -134,7 +137,9 @@ def window_state(season: dict, now: datetime | None = None) -> str | None:
 
 
 async def _staffel_ids(db, season_id: str) -> list[str]:
-    return [row["id"] for row in await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE}, {"_id": 0, "id": 1}).to_list(200)]
+    # Nur reguläre Staffeln (#2404, F.6): Zugeteilt wird nie in die Playoffs oder die Relegation.
+    return [row["id"] for row in await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": None, **ONLY_LEAGUE},
+                                                           {"_id": 0, "id": 1}).to_list(200)]
 
 
 async def seat_stats(db, season: dict) -> dict:
@@ -463,7 +468,7 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
                 raise LeagueProblem(DECIDED, 409)
             fresh = await league_service.get_season(db, season["id"])
             if not carry_open(application, fresh):
-                raise LeagueProblem(CARRY_DEADLINE.format(day=_day(fresh.get("start_date"))), 409)
+                raise LeagueProblem(CARRY_DEADLINE.format(day=_day(fresh.get("started_at") or fresh.get("start_date"))), 409)
             seat = await _auto_seat(db, season, application, locked_id, fixed_detail=WITHDRAW_ASSIGNED)
             if not seat and (application.get("assignment") or await _left_over(db, application)):
                 raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
@@ -567,7 +572,8 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
 
 
 async def _load_staffel(db, season: dict, tournament_id: str) -> dict:
-    tournament = await db.tournaments.find_one({"id": tournament_id, "league_context.season_id": season["id"], **ONLY_LEAGUE}, {"_id": 0})
+    tournament = await db.tournaments.find_one({"id": tournament_id, "league_context.season_id": season["id"], "league_context.kind": None, **ONLY_LEAGUE},
+                                               {"_id": 0})
     if not tournament:
         raise LeagueProblem(STAFFEL_GONE, 404)
     return tournament
@@ -787,7 +793,7 @@ async def _auto_staffel(db, season: dict) -> tuple[str | None, str | None]:
     divisions = [row["id"] for row in await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0, "id": 1}).to_list(50)]
     if len(divisions) != 1:
         return None, None
-    rows = [row for row in await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": divisions[0], **ONLY_LEAGUE},
+    rows = [row for row in await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": divisions[0], "league_context.kind": None, **ONLY_LEAGUE},
                                                      {"_id": 0, "id": 1, "status": 1}).to_list(200)
             if row.get("status") not in squad_registration.FINISHED_TOURNAMENT_STATUSES]
     if len(rows) != 1:
@@ -1313,7 +1319,8 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
                          "reason": step.get("reason"), "conflict_reason": step.get("conflict_reason"), "auto": bool(step.get("auto"))}
                         for step in row.get("history") or []],
         })
-    staffeln = await league_service.staffeln_of(db, season["id"])
+    # Zuteilen geht nur in reguläre Staffeln (#2404, F.6).
+    staffeln = [row for row in await league_service.staffeln_of(db, season["id"]) if not row["league_context"].get("kind")]
     return {
         "items": items,
         # Beim eigenen Team (``own_team``) darf nur der Superadmin, als Notausnahme mit Grund.

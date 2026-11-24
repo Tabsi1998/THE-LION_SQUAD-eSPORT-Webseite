@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserX } from "lucide-react";
+import { Undo2, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -10,15 +10,31 @@ import { ConflictReasonField, CONFLICT_REASON_MIN, OwnTeamNote, overrideMissing,
 // Leitung kann das Spiel danach neu ansetzen - es geht ohne Ergebnis zurück, den Termin setzt sie wie gewohnt.
 // Rechte und Befangenheit prüft der Server (Zuständigkeit „Ergebnisse korrigieren“). ``conflict`` kommt von der Matchseite
 // (``{kind: "involved", override}``): befangen ohne Notausnahme heißt der Satz statt des Knopfs, der Superadmin gibt einen Grund an.
+//
+// Playoffs und Relegation (#2404, Nr. 217, 245): Im K.-o. gibt es keine Wertung „beide verlieren“. Beim ersten Mal wird einmal neu
+// angesetzt - und es zählt schon als „nicht erschienen“ für beide Seiten; die Leitung kann das mit Grund zurücknehmen. Beim zweiten
+// Mal scheiden beide aus. Das Spiel trägt die Art (`postseason`) und ob schon einmal neu angesetzt wurde (`no_show_retry`).
 
 const MIN_TEXT = 5;
+const BUTTON = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider";
+
+const TEXT = {
+  undo: "Die Wertung fällt weg, das Spiel ist wieder offen. Den neuen Termin setzt du danach wie gewohnt.",
+  first: "In Playoffs und Relegation wird beim ersten Mal einmal neu angesetzt: Du setzt danach den neuen Termin. Für beide Seiten zählt es schon als „nicht erschienen“. Kommt wieder niemand, scheiden beide aus.",
+  second: "Das Spiel wurde schon einmal neu angesetzt. Jetzt scheiden beide aus: Der nächste Gegner kommt kampflos weiter, im Finale bleibt der Titel unvergeben, in der Relegation bleibt alles, wie es ist. Das lässt sich nicht zurücknehmen.",
+  back: "Das erste „beide nicht erschienen“ gilt dann nicht mehr: Der Eintrag „nicht erschienen“ fällt für beide Seiten weg, das Spiel steht wie vorher.",
+  regular: "Beide Seiten verlieren: keine Punkte, keine Maps, je Seite ein Eintrag „nicht erschienen“. Neu ansetzen geht danach hier.",
+};
 
 export function DoubleNoShowAction({ match, conflict = null, onDone }) {
-  const [open, setOpen] = useState(false);
+  // `act`: werten bzw. (reguläre Staffel) neu ansetzen; `back`: die Neuansetzung im K.-o. zurücknehmen.
+  const [mode, setMode] = useState(null);
   const [text, setText] = useState("");
   const [conflictReason, setConflictReason] = useState("");
   const [saving, setSaving] = useState(false);
   const scored = Boolean(match?.double_forfeit) && match?.status === "forfeit";
+  const knockout = Boolean(match?.postseason);
+  const retried = Boolean(match?.no_show_retry);
   // Nur vor dem Spiel - wie der Server: kein Beginn, keine Meldung, kein bereitliegendes Ergebnis.
   const openMatch = !match?.results?.length && ["pending", "ready", "scheduled"].includes(String(match?.status || "pending"))
     && !match?.started_at && !match?.reports?.length && !match?.pending_result;
@@ -26,6 +42,9 @@ export function DoubleNoShowAction({ match, conflict = null, onDone }) {
   if (conflict && !conflict.override) return <OwnTeamNote testId="match-double-no-show-own" />;
   const override = Boolean(conflict?.override);
   const url = `/admin/leagues/staffeln/${match.tournament_id}/matches/${match.id}/double-no-show`;
+  const back = mode === "back";
+  const undo = scored || back;
+  const close = () => { setMode(null); setText(""); setConflictReason(""); };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -40,12 +59,14 @@ export function DoubleNoShowAction({ match, conflict = null, onDone }) {
     setSaving(true);
     try {
       const extra = overridePayload(override, conflictReason);
-      if (scored) await api.delete(url, { data: { reason: text.trim(), ...extra } });
-      else await api.post(url, { note: text.trim(), ...extra });
-      toast.success(scored ? "Spiel neu angesetzt – bitte den Termin setzen." : "Gewertet: beide nicht erschienen.");
-      setOpen(false);
-      setText("");
-      setConflictReason("");
+      let step = "";
+      if (undo) await api.delete(url, { data: { reason: text.trim(), ...extra } });
+      else step = (await api.post(url, { note: text.trim(), ...extra }))?.data?.no_show_step || "";
+      toast.success(back ? "Zurückgenommen. Der Eintrag „nicht erschienen“ fällt für beide weg."
+        : scored ? "Spiel neu angesetzt – bitte den Termin setzen."
+          : step === "retry" ? "Einmal neu angesetzt – bitte den Termin setzen. Es zählt für beide als „nicht erschienen“. Kommt wieder niemand, scheiden beide aus."
+            : knockout ? "Beide sind ausgeschieden. Der nächste Gegner kommt kampflos weiter." : "Gewertet: beide nicht erschienen.");
+      close();
       onDone?.();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -53,22 +74,26 @@ export function DoubleNoShowAction({ match, conflict = null, onDone }) {
     setSaving(false);
   };
 
+  const title = back ? "Neuansetzung zurücknehmen" : scored ? "Spiel neu ansetzen" : "Beide nicht erschienen";
+  const submitLabel = back ? "Zurücknehmen" : scored || (knockout && !retried) ? "Neu ansetzen" : knockout ? "Beide ausscheiden lassen" : "Werten";
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} data-testid={scored ? "match-double-no-show-undo" : "match-double-no-show"}
-        className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider">
+      <button type="button" onClick={() => setMode("act")} data-testid={scored ? "match-double-no-show-undo" : "match-double-no-show"} className={BUTTON}>
         <UserX className="h-3.5 w-3.5" aria-hidden="true" /> {scored ? "Neu ansetzen" : "Beide nicht erschienen"}
       </button>
-      {open ? (
-        <AdminSheet title={scored ? "Spiel neu ansetzen" : "Beide nicht erschienen"} onClose={() => setOpen(false)} onSubmit={submit} saving={saving}
-          submitLabel={scored ? "Neu ansetzen" : "Werten"} submitTestId="match-double-no-show-save" testId="match-double-no-show-sheet">
+      {knockout && retried && !scored ? (
+        <button type="button" onClick={() => setMode("back")} data-testid="match-double-no-show-back" className={BUTTON}>
+          <Undo2 className="h-3.5 w-3.5" aria-hidden="true" /> Neuansetzung zurücknehmen
+        </button>
+      ) : null}
+      {mode ? (
+        <AdminSheet title={title} onClose={close} onSubmit={submit} saving={saving} submitLabel={submitLabel}
+          submitTestId="match-double-no-show-save" testId="match-double-no-show-sheet">
           <p className="text-sm text-white/65">
-            {scored
-              ? "Die Wertung fällt weg, das Spiel ist wieder offen. Den neuen Termin setzt du danach wie gewohnt."
-              : "Beide Seiten verlieren: keine Punkte, keine Maps, je Seite ein Eintrag „nicht erschienen“. Neu ansetzen geht danach hier."}
+            {back ? TEXT.back : scored ? TEXT.undo : knockout ? (retried ? TEXT.second : TEXT.first) : TEXT.regular}
           </p>
           <div className="mt-4">
-            <TextAreaField label={scored ? "Grund" : "Begründung"} rows={3} value={text} onChange={setText} required testId="match-double-no-show-text"
+            <TextAreaField label={undo ? "Grund" : "Begründung"} rows={3} value={text} onChange={setText} required testId="match-double-no-show-text"
               hint="Steht im Protokoll." />
           </div>
           {override ? (
