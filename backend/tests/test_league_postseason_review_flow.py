@@ -995,3 +995,144 @@ async def test_the_captains_hear_who_is_champion_without_playoffs(flow):
     await close(flow, world)
     notes = await flow.db.notifications.find({"meta.reason": "league_final", "title": "Staffel abgeschlossen"}, {"_id": 0}).to_list(50)
     assert notes and all(f"Meister: {teams[2]['display_name']}." in note["body"] for note in notes)
+
+
+# ================================================================ Runde 6: Nr. 256 - gesperrt und gemerkt wird erst, wenn die Season
+# wirklich läuft; ein korrigiertes Startdatum zieht den gemerkten Start nach
+
+async def not_running_yet(flow) -> dict:
+    """Eine Season, in der noch nichts läuft (Staffel im Entwurf, kein Spiel gewertet) - mit Playoffs „wie in der Season“ und einem
+    Startdatum von gestern: Das Datum sagt „begonnen“, mehr nicht."""
+    from league_start_world import build as plain
+
+    world = await plain(flow, 4)
+    flow.act_as(world["lead"])
+    ok(await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/postseason", json={"playoffs": {"enabled": True, "per_staffel": 2}}))
+    await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {"start_date": later(-1), "status": "active"}})
+    return world
+
+
+async def season_doc(flow, world: dict) -> dict:
+    return await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0})
+
+
+async def overview(flow, world: dict) -> dict:
+    flow.act_as(world["lead"])
+    return ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}/postseason"))
+
+
+@pytest.mark.asyncio
+async def test_a_start_date_alone_keeps_no_best_of(flow):
+    # Datum erreicht, nichts läuft: Das Best of der Season ändert sich, dann wird das Datum korrigiert - nichts bleibt hängen.
+    world = await not_running_yet(flow)
+    url = SEASON_URL.format(id=world["season"]["id"])
+    answer = ok(await flow.patch(url, json={"best_of": 5}))
+    assert not any("behalten" in text for text in answer["warnings"])
+    ok(await flow.patch(url, json={"start_date": later(14)}))
+    season, view = await season_doc(flow, world), await overview(flow, world)
+    assert view["started"] is False and "started_at" not in season
+    assert KEPT not in season and "best_of_kept" not in view
+    # Die Playoffs folgen der Season.
+    assert view["divisions"][0]["settings"]["playoffs"]["best_of"] == 5
+    assert await flow.db.audit_logs.count_documents({"action": "league.postseason.settings", "data.scope": "best_of_kept"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_start_lock_waits_until_the_season_really_runs(flow):
+    from league_start_world import start as go_live
+
+    world = await not_running_yet(flow)
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    # Das Datum allein sperrt nichts: Die Vorschau sagt „nicht gestartet“, Best of, Platz 3 und Heimrecht lassen sich ändern.
+    assert (await overview(flow, world))["started"] is False
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 2, "best_of": 5, "third_place": True, "home": "draw"}}))
+    assert "started_at" not in await season_doc(flow, world)
+    # Läuft die Season wirklich (eine Staffel ist live), stehen die Werte fest - und der Start ist gemerkt, sobald gespeichert wird.
+    ok(await go_live(flow, world))
+    assert (await overview(flow, world))["started"] is True
+    refused = await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 2, "best_of": 3, "third_place": True, "home": "draw"}})
+    assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"]
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 5, "third_place": True, "home": "draw"}}))
+    assert (await season_doc(flow, world)).get("started_at")
+
+
+@pytest.mark.asyncio
+async def test_the_best_of_and_the_start_are_remembered_together(flow):
+    from league_start_world import start as go_live
+    from services import league_calendar
+
+    world = await not_running_yet(flow)
+    ok(await go_live(flow, world))
+    flow.act_as(world["lead"])
+    began = league_calendar.aware((await season_doc(flow, world))["start_date"])
+    # Das Best of ändert sich und im selben Zug rückt das Startdatum in die Zukunft: Rückfallwert und Start entstehen zusammen.
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5, "start_date": later(14)}))
+    season = await season_doc(flow, world)
+    assert season[KEPT] == 3 and league_calendar.aware(season["started_at"]) == began
+    view = await overview(flow, world)
+    assert view["started"] is True and view["best_of_kept"] == 3 and view["divisions"][0]["settings"]["playoffs"]["best_of"] == 3
+    # Auch die Liga N erfährt den Wert, für ihr eigenes Fenster.
+    assert view["divisions"][0]["best_of_kept"] == 3
+
+
+@pytest.mark.asyncio
+async def test_playoffs_first_set_up_after_the_start_take_the_best_of_of_today(flow):
+    # Zum Start gab es keine Playoff-Einstellungen: Wer sie später anlegt, bekommt das Best of der Season von heute.
+    world = await build(flow)
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    ok(await flow.patch(SEASON_URL.format(id=world["season"]["id"]), json={"best_of": 5}))
+    season = await reload_season(flow, world)
+    assert KEPT not in season and "postseason" not in season
+    ok(await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/postseason", json={"playoffs": {"enabled": True, "per_staffel": 4}}))
+    part = division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]
+    assert (part["enabled"], part["best_of"]) == (True, 5)
+
+
+@pytest.mark.asyncio
+async def test_a_corrected_start_date_that_is_reached_moves_the_remembered_start(flow):
+    from services import league_calendar, league_late
+
+    # Die Staffeln laufen, das Startdatum war vertippt (30 Tage zurück) und wird auf vorgestern korrigiert.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}})
+    await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {"start_date": later(), "status": "active"}})
+    flow.act_as(world["lead"])
+    url = SEASON_URL.format(id=world["season"]["id"])
+    ok(await flow.patch(url, json={"start_date": later(-30)}))
+    ok(await flow.patch(url, json={"start_date": later(-2)}))
+    season = await reload_season(flow, world)
+    corrected = league_calendar.aware(season["start_date"])
+    # Der gemerkte Start zieht nach - Fristen zählen ab dem korrigierten Datum.
+    assert league_calendar.aware(season["started_at"]) == corrected
+    assert league_late.late_deadline(season) == corrected + timedelta(days=league_late.late_days(season))
+    # Auch ein schon gemerkter Start folgt einer Korrektur auf ein erreichtes Datum.
+    ok(await flow.patch(url, json={"start_date": later(-5)}))
+    season = await reload_season(flow, world)
+    assert league_calendar.aware(season["started_at"]) == league_calendar.aware(season["start_date"])
+    moved = league_calendar.aware(season["started_at"])
+    # In die Zukunft verschoben bleibt er, wie er war (Nr. 253).
+    ok(await flow.patch(url, json={"start_date": later()}))
+    season = await reload_season(flow, world)
+    assert league_calendar.aware(season["started_at"]) == moved and league_calendar.aware(season["start_date"]) > now_utc()
+    assert (await cockpit(flow, world))["started"] is True
+
+
+# ---------------------------------------------------------------- K-a: Eine abgelehnte Änderung der Liga N merkt nichts
+
+@pytest.mark.asyncio
+async def test_a_refused_change_of_a_division_remembers_nothing(flow):
+    world = await build(flow, levels=2, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    await start_season(flow, world)
+    flow.act_as(world["lead"])
+    division_id = world["divisions"][2]["id"]
+    # Eigenes Best of und zugleich ein Mindestkader unter der Teamgröße: Die Prüfung lehnt ab - und nichts ist geschrieben.
+    refused = await flow.patch(f"{ADMIN}/divisions/{division_id}", json={"overrides": {"best_of": 5, "min_squad_size": 1}})
+    assert refused.status_code == 422 and "Mindestkader" in refused.json()["detail"]
+    stored = await flow.db.league_divisions.find_one({"id": division_id}, {"_id": 0})
+    assert KEPT not in stored and not (stored.get("overrides") or {}).get("best_of")
+    assert await flow.db.audit_logs.count_documents({"action": "league.postseason.settings", "data.scope": "best_of_kept"}) == 0
+    # Die gültige Änderung merkt den Wert vom Start - genau einmal protokolliert.
+    ok(await flow.patch(f"{ADMIN}/divisions/{division_id}", json={"overrides": {"best_of": 5}}))
+    assert (await flow.db.league_divisions.find_one({"id": division_id}, {"_id": 0}))[KEPT] == 3
+    assert await flow.db.audit_logs.count_documents({"action": "league.postseason.settings", "data.scope": "best_of_kept"}) == 1
+    assert division_of(await cockpit(flow, world), 2)["best_of_kept"] == 3
