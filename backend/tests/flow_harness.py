@@ -279,11 +279,16 @@ class InterleavedReads:
     die ersten ``parties`` Zugriffe auf ``collection`` alle den alten Stand, bevor eine weiterschreibt: so wie
     mehrere Worker auf echtem MongoDB. Wer statt Lesen-dann-Schreiben atomar bedingt schreibt, merkt davon nichts.
     Einsatz: ``monkeypatch.setattr(routes.modul, "get_db", lambda: gate)`` mit ``gate = InterleavedReads(...)``.
+
+    ``before`` (#2553): nur diese Methoden halten an, und zwar vor dem Zugriff - z. B. ``before=("update_one",)``: die
+    ersten ``parties`` Aufrufe von ``update_one`` laufen erst los, wenn alle Läufe dort angekommen sind. Gates lassen sich
+    schachteln (``InterleavedReads(InterleavedReads(db, "a"), "b")``), wenn zwei Sammlungen gleichzeitig gelten.
     """
 
-    def __init__(self, db, collection: str, parties: int = 2, timeout: float = 1.0):
+    def __init__(self, db, collection: str, parties: int = 2, timeout: float = 1.0, before: tuple[str, ...] = ()):
         self._db = db
         self._collection = collection
+        self.before = tuple(before)
         self._parties = parties
         self._barrier = asyncio.Barrier(parties)
         self._timeout = timeout
@@ -310,9 +315,22 @@ class _InterleavedCollection:
         self._gate = gate
 
     def __getattr__(self, name):
-        return getattr(self._collection, name)
+        target = getattr(self._collection, name)
+        if name not in self._gate.before:
+            return target
+
+        async def gated(*args, **kwargs):
+            await self._gate.meet()
+            return await target(*args, **kwargs)
+        return gated
 
     async def find_one(self, *args, **kwargs):
+        if self._gate.before and "find_one" not in self._gate.before:
+            # Mit ``before`` gilt nur, was dort steht - Lesen läuft dann ungebremst.
+            return await self._collection.find_one(*args, **kwargs)
+        if "find_one" in self._gate.before:
+            await self._gate.meet()
+            return await self._collection.find_one(*args, **kwargs)
         document = await self._collection.find_one(*args, **kwargs)
         await self._gate.meet()
         return document

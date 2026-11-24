@@ -301,7 +301,14 @@ def _capture(monkeypatch):
     async def has_browser(*_args):
         return True
 
+    async def push_batch(docs, *_args):
+        # Gebündelter Versand (#2553): je Meldung ein Eintrag wie beim Einzelversand.
+        for doc in docs:
+            sent["push"].append(doc["meta"].get("item_id") or doc["meta"].get("news_id"))
+        return {doc["id"]: 1 for doc in docs}
+
     monkeypatch.setattr("services.push_notifications.send_mobile_push_for_notification", push)
+    monkeypatch.setattr("services.push_notifications.send_mobile_push_batch", push_batch, raising=False)
     monkeypatch.setattr("services.web_push.send_web_push_for_notification", browser)
     monkeypatch.setattr("services.web_push.has_browser_subscription", has_browser)
     monkeypatch.setattr("services.discord_dm.send_discord_dm_for_notification", discord)
@@ -483,3 +490,222 @@ async def test_app_push_waits_for_quiet_hours(flow, monkeypatch):
     row = await flow.db.notifications.find_one({"kind": "news_app", "user_id": dora["id"]}, {"_id": 0})
     assert row and row.get("quiet_hold_until") and row.get("quiet_held_channels") == ["push"]
     assert sent["push"] == []
+
+
+# ---------------------------------------------------------------- Feinschliff App-Push (#2553)
+
+async def _app_news_row(flow, slug):
+    return await flow.db.news_posts.find_one({"slug": slug}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+async def test_old_app_only_news_is_marked_too_old(flow, monkeypatch):
+    """Punkt 2: Älter als 24 h - kein Push, aber mit Grund statt „an 0 Personen“. Auch ein Entwurf mit altem Termin,
+    der per API veröffentlicht wird."""
+    sent = _capture(monkeypatch)
+    await _app_user(flow, "anna")
+    await news(flow, "alt", channels=["app"], days_ago=3)
+    await news(flow, "entwurf", channels=["app"], published=False, days_ago=5)
+    flow.act_as(await flow.add_user(role="club_admin", name="redaktion"))
+    res = await flow.patch("/api/news/n-entwurf", json={"published": True})
+    assert res.status_code == 200
+    await member_announcements.notify_app_news(flow.db)
+    for slug in ("alt", "entwurf"):
+        row = await _app_news_row(flow, slug)
+        assert row.get("app_push_notified_at"), slug
+        assert row.get("app_push_skipped_reason") == "too_old", slug
+        assert row.get("app_push_count") == 0, slug
+    assert await _app_pushes(flow) == []
+    assert sent["push"] == []
+
+
+@pytest.mark.asyncio
+async def test_parallel_runs_send_once_with_real_interleaving(flow, monkeypatch):
+    """Punkt 3: Zwei Läufe gleichzeitig - beide lesen den Beitrag, beide prüfen „schon gemeldet?“ beim ersten Empfänger
+    gleichzeitig (Barriere nach dem Lesen der Meldungen) und markieren erst gemeinsam (Barriere vor
+    ``news_posts.update_one``). Den zweiten Eintrag hält der Teilindex ``user_unique_dedupe`` auf."""
+    import asyncio
+
+    import database
+    from flow_harness import InterleavedReads
+
+    if not flow.real_mongo:
+        await database.init_audit_indexes(flow.db)
+    sent = _capture(monkeypatch)
+    people = [await _app_user(flow, name) for name in ("anna", "ben", "carla")]
+    await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    gate = InterleavedReads(InterleavedReads(flow.db, "notifications"), "news_posts", before=("update_one",))
+    monkeypatch.setattr("services.user_notifications.get_db", lambda: gate)
+    await asyncio.gather(member_announcements.notify_app_news(gate), member_announcements.notify_app_news(gate))
+
+    expected = sorted((person["id"], "n-nurapp") for person in people)
+    assert await _app_pushes(flow) == expected, "je Person genau eine Meldung"
+    assert sorted(sent["push"]) == ["n-nurapp"] * 3, "je Person genau ein Push"
+    row = await _app_news_row(flow, "nurapp")
+    assert row.get("app_push_notified_at")
+    assert row.get("app_push_count") == 3
+
+
+@pytest.mark.asyncio
+async def test_aborted_run_is_finished_by_the_next(flow, monkeypatch):
+    """Punkt 6: Mindestens einmal - bricht ein Lauf mitten in der Schleife ab, holt der nächste die übrigen nach.
+    Doppelt bekommt niemand etwas (eindeutiger Schlüssel je Person)."""
+    from services import user_notifications
+
+    sent = _capture(monkeypatch)
+    people = [await _app_user(flow, name) for name in ("anna", "ben", "carla")]
+    await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    real = user_notifications.create_user_notification
+    calls = {"n": 0}
+
+    async def breaks_once(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("Prozess bricht ab")
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(user_notifications, "create_user_notification", breaks_once)
+    with pytest.raises(RuntimeError):
+        await member_announcements.notify_app_news(flow.db)
+    row = await _app_news_row(flow, "nurapp")
+    assert not row.get("app_push_notified_at"), "erst am Ende als erledigt markiert"
+    monkeypatch.setattr(user_notifications, "create_user_notification", real)
+    # Gleich danach: die übrigen bekommen ihren Push. Die erste Meldung lag beim Abbruch gesammelt, aber noch nicht bei
+    # Expo - sie könnte noch einem laufenden Lauf gehören, deshalb bleibt der Beitrag offen.
+    await member_announcements.notify_app_news(flow.db)
+    assert await _app_pushes(flow) == sorted((person["id"], "n-nurapp") for person in people)
+    assert sorted(sent["push"]) == ["n-nurapp"] * 2
+    row = await _app_news_row(flow, "nurapp")
+    assert not row.get("app_push_notified_at")
+    # Eine Minute später gehört sie keinem Lauf mehr: der nächste Lauf holt den Push nach und markiert den Beitrag.
+    earlier = (now_utc() - timedelta(seconds=member_announcements.ORPHANED_PUSH_AFTER_SECONDS + 5)).isoformat()
+    await flow.db.notifications.update_many({"kind": "news_app", "push_sent_at": {"$exists": False}}, {"$set": {"created_at": earlier}})
+    await member_announcements.notify_app_news(flow.db)
+    await member_announcements.notify_app_news(flow.db)
+    assert sorted(sent["push"]) == ["n-nurapp"] * 3, "jede Person genau ein Push"
+    row = await _app_news_row(flow, "nurapp")
+    assert row.get("app_push_notified_at")
+    assert row.get("app_push_count") == 3
+
+
+@pytest.mark.asyncio
+async def test_app_push_bundles_expo_requests(flow, monkeypatch):
+    """Punkt 4: Bis zu 100 Nachrichten je Anfrage an Expo statt einer Anfrage je Person."""
+    from services import push_notifications
+
+    posts = []
+
+    class FakeResponse:
+        def __init__(self, count):
+            self._count = count
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": [{"status": "ok", "id": f"ticket-{i}"} for i in range(self._count)]}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, json=None):
+            posts.append(len(json))
+            return FakeResponse(len(json))
+
+    monkeypatch.setattr(push_notifications.httpx, "AsyncClient", FakeClient)
+    for index in range(150):
+        await _app_user(flow, f"leser{index:03d}")
+    await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    await member_announcements.notify_app_news(flow.db)
+
+    assert posts == [100, 50], "zwei Anfragen statt 150"
+    rows = await flow.db.notifications.find({"kind": "news_app"}, {"_id": 0, "push_sent_count": 1, "push_sent_at": 1}).to_list(200)
+    assert len(rows) == 150
+    assert all(row.get("push_sent_count") == 1 and row.get("push_sent_at") for row in rows), "Zählung je Meldung bleibt"
+    token = await flow.db.mobile_push_tokens.find_one({"id": "t-leser149"}, {"_id": 0})
+    assert token.get("last_ticket_status") == "ok"
+    assert token.get("last_sent_at")
+    row = await _app_news_row(flow, "nurapp")
+    assert row.get("app_push_count") == 150
+
+
+@pytest.mark.asyncio
+async def test_scheduler_runs_app_news_even_if_member_news_fails(monkeypatch):
+    """Punkt 5: Eigene ``try``-Blöcke - ein Fehler bei den Mitglieder-News lässt den App-Push nicht ausfallen."""
+    from services import member_announcements as module
+    from services import scheduler
+
+    called = []
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Mitglieder-News kaputt")
+
+    async def app_news(*_args, **_kwargs):
+        called.append("app")
+        return {"items": 0}
+
+    monkeypatch.setattr(module, "notify_due", broken)
+    monkeypatch.setattr(module, "notify_app_news", app_news)
+    monkeypatch.setattr(scheduler, "_log_task_failure", lambda *_args, **_kwargs: None)
+    await scheduler._safe_member_announcements()
+    assert called == ["app"]
+
+
+@pytest.mark.asyncio
+async def test_ever_public_knows_the_app_push(flow):
+    """Punkt 7a: Ging ein App-Push hinaus, zeigen Meldungen auf den Beitrag - er ist nicht mehr löschbar."""
+    from routes.news_routes import _ever_public
+
+    assert _ever_public({"published": False, "app_push_notified_at": now_utc().isoformat()}) is True
+    assert _ever_public({"published": False}) is False
+
+
+@pytest.mark.asyncio
+async def test_read_counts_only_in_the_channel_of_the_news(flow):
+    """Punkt 7b: Eine News „nur App“ zählt auf der Website nicht als gelesen - dort steht nur der Hinweis auf die App."""
+    anna = await flow.add_user(name="anna")
+    await news(flow, "nurapp", channels=["app"])
+    await news(flow, "nurweb", channels=["web"])
+    flow.act_as(anna)
+    res = await flow.post("/api/news/nurapp/read", headers=WEB)
+    assert res.status_code == 404
+    assert await flow.db.news_reads.count_documents({"user_id": anna["id"]}) == 0
+    res = await flow.post("/api/news/nurapp/read")
+    assert res.status_code == 200
+    res = await flow.post("/api/news/nurweb/read", headers=WEB)
+    assert res.status_code == 200
+    # Die App öffnet per Link jede News (news_channels.py) - dort ist „nur Website“ gelesen.
+    ben = await flow.add_user(name="ben")
+    flow.act_as(ben)
+    res = await flow.post("/api/news/nurweb/read")
+    assert res.status_code == 200
+    assert await flow.db.news_reads.count_documents({"user_id": anna["id"]}) == 2
+
+
+@pytest.mark.asyncio
+async def test_member_news_made_public_skips_members_already_notified(flow, monkeypatch):
+    """Nr. 230 (Fabian 23.11.): Wer zu einer News schon eine Mitglieder-Meldung bekam, bekommt beim späteren
+    Öffentlich-Werden keinen zweiten App-Push. Alle anderen App-Nutzer mit Zustimmung schon."""
+    sent = _capture(monkeypatch)
+    paula = await _app_user(flow, "paula")
+    await flow.db.memberships.insert_one({"id": "m-paula", "user_id": paula["id"], "member_status": "active"})
+    anna = await _app_user(flow, "anna")
+    await news(flow, "intern", channels=["app"], visibility="members", published_at=(now_utc() - timedelta(minutes=5)).isoformat())
+    await member_announcements.notify_due()
+    assert await flow.db.notifications.count_documents({"user_id": paula["id"], "kind": "news_member"}) == 1
+
+    flow.act_as(await flow.add_user(role="club_admin", name="redaktion"))
+    res = await flow.patch("/api/news/n-intern", json={"visibility": "public"})
+    assert res.status_code == 200
+    await member_announcements.notify_app_news(flow.db)
+    assert await _app_pushes(flow) == [(anna["id"], "n-intern")], "Paula hatte die Mitglieder-Meldung schon"
+    assert sent["push"].count("n-intern") == 2, "eine Mitglieder-Meldung an Paula, ein App-Push an Anna"
+    row = await _app_news_row(flow, "intern")
+    assert row.get("app_push_count") == 1
