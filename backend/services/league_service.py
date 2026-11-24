@@ -872,6 +872,12 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     # Einmal gestartet bleibt gestartet (#2404, Nr. 253): Hat die Season nach dem bisherigen Stand begonnen, merkt sich dieses
     # Schreiben den Start - bevor Startdatum oder Stand sich ändern. Kein eigenes Feld der Leitung, darum nicht in ``changed``.
     stamp = await start_to_remember(db, season)
+    if (season.get(STARTED_AT) or stamp) and "start_date" in changed:
+        # Korrigiertes Startdatum (Nr. 256): Ist das neue Datum schon erreicht, zieht der gemerkte Start nach - Fristen zählen ab
+        # dem korrigierten Datum. Liegt es in der Zukunft, bleibt der gemerkte Start (Nr. 253).
+        moved = _aware(fields.get("start_date"))
+        if moved and moved <= now_utc():
+            stamp = fields["start_date"]
     if stamp:
         fields[STARTED_AT] = stamp
     if before_write:
