@@ -903,12 +903,19 @@ Unter den Erinnerungen steht im Reiter **Termine** der Kasten **Discord** (Zust�
 - **Nie doppelt:** Jede Meldung geht genau einmal hinaus, auch wenn der Job doppelt läuft. Ging sicher nichts hinaus (Bot offline,
   Kanal unbekannt, keine Rechte), versucht er es nach 30 Minuten noch zweimal. Meldet Discord erst nach dem Senden einen Fehler
   (Zeitüberschreitung, Störung bei Discord), kann die Nachricht schon im Kanal stehen: Dann versucht er es **nicht** noch einmal.
-  Solche Meldungen und aufgegebene stehen im Kasten unter **Meldungen, die du prüfen solltest** – bitte im Kanal nachsehen. Ein
-  Wiederöffnen und neues Abschließen schickt keine zweite Saisonende-Meldung.
+  Solche Meldungen und aufgegebene stehen im Kasten unter **Meldungen, die du prüfen solltest** – ebenso eine, die länger als 30
+  Minuten „unterwegs“ hängt (etwa nach einem Neustart des Servers), und eine, die sich nicht aufbauen ließ. Ein Wiederöffnen und
+  neues Abschließen schickt keine zweite Saisonende-Meldung.
+- **Noch einmal senden** (Nr. 239): Sieh zuerst im Kanal nach. Fehlt die Meldung dort, drückst du beim Hinweis **Noch einmal
+  senden**, setzt das Häkchen **Ich habe im Kanal nachgesehen, die Meldung fehlt** und drückst **Freigeben**. Der nächste Lauf
+  (spätestens nach 15 Minuten) schickt sie genau einmal – auch wenn zwei von euch gleichzeitig freigeben. Recht: „Season
+  konfigurieren“; im Protokoll steht, wer wann freigegeben hat. Die Hinweise laden von selbst nach.
+- **Nach einem Ausfall** (Nr. 240): War der Bot länger aus oder der Kanal nicht freigegeben, kommt danach je Staffel nur der
+  **neueste** fertige Spieltag. Ältere, liegen gebliebene Spieltage werden verworfen und nie nachgeschickt.
 - Die neue Season aus dem Vorgänger (3.11) übernimmt die Einstellung samt „an“ und Kanal (Nr. 236). Ist der Kanal dann nicht mehr
   freigegeben, geht nichts hinaus, bis du einen freigegebenen wählst.
 
-<img src="../assets/liga/liga-season-discord-pc.png" alt="Kasten Discord im Reiter Termine: Spieltag-Zusammenfassung und Saisonende-Meldung an, Kanal Events und Turniere · Liga › #liga-ergebnisse, darunter zwei Meldungen zum Prüfen" width="820">
+<img src="../assets/liga/liga-season-discord-pc.png" alt="Kasten Discord im Reiter Termine: Kanal Events und Turniere · Liga › #liga-ergebnisse, darunter Meldungen, die du prüfen solltest; beim Saisonende ist das Häkchen Ich habe im Kanal nachgesehen, die Meldung fehlt gesetzt, daneben Freigeben und Abbrechen, beim Spieltag 9 der Knopf Noch einmal senden" width="820">
 
 ### 2.8 Sichtbarkeit
 
@@ -1788,6 +1795,8 @@ im Discord steht unter 2.7g.
 - **Wieder öffnen:** Öffnest du eine Staffel wieder, verschwindet der Schritt von allen TVs der Season. Nach dem erneuten Abschluss
   kommt er erst mit dem nächsten **Weiter** – nie ein alter Stand.
 - **Über Staffeln hinweg:** Steigt etwa der beste Zweite aus mehreren Staffeln auf (3.11), steht er am TV und im Discord mit.
+- **Staffel schließt während des Finales ab** (Nr. 241): Ihr TV zeigt sofort dieselbe Liga N wie die anderen TVs, und die neue
+  Liga N kommt in die Reihenfolge. Kein TV springt dabei auf eine andere Liga N.
 
 <img src="../assets/liga/liga-season-tv-finale-pc.png" alt="Kasten Saisonfinale am TV im Reiter Abschluss: Der TV zeigt Liga 1 (1 von 3), Hinweis, dass ein anderes Fenster schon weitergeschaltet hat, Knöpfe Weiter und Ende" width="820">
 

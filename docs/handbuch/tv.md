@@ -177,13 +177,15 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
   unter dem Titel. Jedes weitere **Weiter** zeigt die nächste Liga N, **Ende** das gewohnte Bild. Solange der Schritt steht, wartet
   die Wiedergabeliste und die Kopfleiste zeigt **Saisonfinale** mit Liga und Season statt der eigenen Staffel. Nur bei öffentlichen
   Seasons; mit **Bewegung aus** steht das Bild sofort.
-  **Viele Teams:** Je Spalte stehen höchstens **8 Zeilen**, der Rest darunter als „und N weitere“ (Nr. 235). Alles bleibt über der
-  Fußleiste, kein Name wird kleiner als die Mindestgröße für TV-Namen; lange Namen und lange Ziel-Ligen brechen um, statt
-  abgeschnitten zu werden.
+  **Viele Teams:** Je Spalte stehen höchstens **8 Zeilen**, der Rest darunter als „und N weitere“ (Nr. 235). Die 8 sind eine
+  Obergrenze (Nr. 238): Brechen lange Namen oder eine lange Ziel-Liga um, kommen nur so viele Zeilen, wie samt „und N weitere“
+  sicher über der Fußleiste stehen – der Rest zählt zu „und N weitere“. Kein Name wird kleiner als die Mindestgröße für TV-Namen,
+  nichts wird abgeschnitten oder verdeckt. Schließt eine Staffel ab, während das Finale läuft, zeigt ihr TV sofort dieselbe
+  Liga N wie die anderen (Nr. 241).
 
   <img src="../assets/tv/tv-saisonfinale-1920.png" alt="TV bei 1920 Pixeln: Kopfleiste Saisonfinale, Liga 2, links Aufstieg mit zwei Teams und Ziel Liga 1, rechts Abstieg mit Ziel Liga 3 und ein Team, das ausscheidet" width="820">
 
-  <img src="../assets/tv/tv-saisonfinale-12-kandidaten-1920.png" alt="TV bei 1920 Pixeln: Saisonfinale Liga 2 mit je acht Zeilen in Aufstieg und Abstieg, darunter jeweils und 4 weitere" width="820">
+  <img src="../assets/tv/tv-saisonfinale-viele-teams-1920.png" alt="TV bei 1920 Pixeln: Saisonfinale Liga 2 mit sehr langen Teamnamen und langen Ziel-Ligen, je fünf Zeilen in Aufstieg und Abstieg, darunter und 3 weitere bzw. und 5 weitere, alles über der Fußleiste" width="820">
 
 **Pause bis:** Setzt ihr ein Turnier unter **Admin → eSports → Turniere → Turnier öffnen** auf **Pausiert**, erscheint
 darunter das Feld **Pause bis**. Uhrzeit wählen, **Speichern**, und der TV zeigt „Weiter um …“ mit Countdown. **Ohne
