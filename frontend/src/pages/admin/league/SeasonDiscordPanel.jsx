@@ -99,6 +99,37 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
   const anyOn = form.matchday || form.season_end;
   const listed = (state?.channels || []).length > 0;
   const problems = state?.problems || [];
+  const loud = problems.filter((row) => row.status !== "skipped");
+  const quiet = problems.filter((row) => row.status === "skipped");
+  // Ein Hinweis mit „Noch einmal senden“ (Nr. 239/243) - gleich für unklare, aufgegebene und verworfene Meldungen.
+  const item = (row) => (
+    <li key={row.key || `${row.kind}-${row.label}-${row.at}`} className="space-y-2">
+      <p><span className="font-semibold">{row.label}:</span> {row.text}</p>
+      {canEdit && row.key && releasing?.key !== row.key ? (
+        <button type="button" onClick={() => setReleasing({ key: row.key, confirmed: false })} data-testid={`season-discord-release-${row.key}`}
+          className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+          Noch einmal senden
+        </button>
+      ) : null}
+      {canEdit && row.key && releasing?.key === row.key ? (
+        <div className="space-y-2 rounded-sm border border-white/15 bg-black/20 p-2" data-testid="season-discord-release-box">
+          <CheckField label={RELEASE_CONFIRM} checked={releasing.confirmed} onChange={(value) => setReleasing((current) => ({ ...current, confirmed: Boolean(value) }))}
+            testId="season-discord-release-confirm" className="min-h-[44px]"
+            hint="Erst nachsehen: Steht sie doch im Kanal, nicht freigeben – sonst steht sie zweimal da." />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={release} disabled={!releasing.confirmed || releasing.busy} data-testid="season-discord-release-go"
+              className="tls-btn tls-btn--primary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+              {releasing.busy ? "Gebe frei …" : "Freigeben"}
+            </button>
+            <button type="button" onClick={() => setReleasing(null)} data-testid="season-discord-release-cancel"
+              className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </li>
+  );
   const notApproved = state?.channel_approved === false && Boolean(form.channel_id) && form.channel_id === state?.settings?.channel_id;
 
   return (
@@ -152,39 +183,18 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
           Der gespeicherte Kanal ist nicht freigegeben – solange geht nichts hinaus. Bitte einen freigegebenen Kanal wählen.
         </p>
       ) : null}
-      {problems.length ? (
+      {loud.length ? (
         <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="note" data-testid="season-discord-problems">
           <p className="font-bold">Meldungen, die du prüfen solltest</p>
-          <ul className="mt-1 space-y-1">
-            {problems.map((row) => (
-              <li key={row.key || `${row.kind}-${row.label}-${row.at}`} className="space-y-2">
-                <p><span className="font-semibold">{row.label}:</span> {row.text}</p>
-                {canEdit && row.key && releasing?.key !== row.key ? (
-                  <button type="button" onClick={() => setReleasing({ key: row.key, confirmed: false })} data-testid={`season-discord-release-${row.key}`}
-                    className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
-                    Noch einmal senden
-                  </button>
-                ) : null}
-                {canEdit && row.key && releasing?.key === row.key ? (
-                  <div className="space-y-2 rounded-sm border border-white/15 bg-black/20 p-2" data-testid="season-discord-release-box">
-                    <CheckField label={RELEASE_CONFIRM} checked={releasing.confirmed} onChange={(value) => setReleasing((current) => ({ ...current, confirmed: Boolean(value) }))}
-                      testId="season-discord-release-confirm" className="min-h-[44px]"
-                      hint="Erst nachsehen: Steht sie doch im Kanal, nicht freigeben – sonst steht sie zweimal da." />
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={release} disabled={!releasing.confirmed || releasing.busy} data-testid="season-discord-release-go"
-                        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-40">
-                        {releasing.busy ? "Gebe frei …" : "Freigeben"}
-                      </button>
-                      <button type="button" onClick={() => setReleasing(null)} data-testid="season-discord-release-cancel"
-                        className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
-                        Abbrechen
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <ul className="mt-1 space-y-1">{loud.map(item)}</ul>
+        </div>
+      ) : null}
+      {quiet.length ? (
+        // Nr. 243: verworfene Spieltage - nichts ist schiefgegangen, darum leiser als „unklar“.
+        <div className="rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 text-sm text-white/70" role="note" data-tone="quiet"
+          data-testid="season-discord-skipped">
+          <p className="font-semibold text-white/80">Verworfene Spieltage</p>
+          <ul className="mt-1 space-y-1">{quiet.map(item)}</ul>
         </div>
       ) : null}
       {anyOn && !String(form.channel_id || "").trim() ? <p className="text-sm text-warn" data-testid="season-discord-channel-missing">Bitte einen Kanal wählen – ohne Kanal geht nichts hinaus.</p> : null}

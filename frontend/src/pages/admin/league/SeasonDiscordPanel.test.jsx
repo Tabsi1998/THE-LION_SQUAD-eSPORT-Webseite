@@ -138,3 +138,27 @@ test("K5: die Hinweise laden live nach - ohne das Formular zu überschreiben, an
   expect(await screen.findByTestId("season-discord-problems")).toHaveTextContent("Saisonende");
   expect(screen.getByTestId("season-discord-rows")).toHaveValue(9);
 });
+
+// ---------------------------------------------------------------- Runde 3: verworfene Spieltage als leiser Hinweis (Nr. 243)
+
+const SKIPPED = { key: "matchday:t1:1", kind: "matchday", label: "Spieltag 1 · Staffel A", status: "skipped", at: "2026-11-24T09:00:00+00:00",
+  text: "Verworfen – nach einem Ausfall kam nur der neueste Spieltag. Mit „Noch einmal senden“ holst du ihn nach." };
+
+test("Nr. 243: verworfene Spieltage stehen leiser getrennt von „unklar“ - und lassen sich ebenso nachholen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...LIVE, problems: [UNCLEAR, SKIPPED] } });
+  apiMock.post.mockResolvedValue({ data: { ...LIVE, problems: [UNCLEAR] } });
+  render(<SeasonDiscordPanel seasonId="s1" />);
+  const loud = await screen.findByTestId("season-discord-problems");
+  const quiet = screen.getByTestId("season-discord-skipped");
+  expect(loud).toHaveTextContent("Saisonende");
+  expect(loud).not.toHaveTextContent("Spieltag 1");
+  expect(quiet).toHaveTextContent("Spieltag 1 · Staffel A");
+  expect(quiet).toHaveTextContent("Verworfen");
+  expect(quiet).toHaveAttribute("data-tone", "quiet");
+  fireEvent.click(screen.getByTestId("season-discord-release-matchday:t1:1"));
+  fireEvent.click(screen.getByTestId("season-discord-release-confirm"));
+  fireEvent.click(screen.getByTestId("season-discord-release-go"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/discord/release", { key: "matchday:t1:1", confirm: true }));
+  await waitFor(() => expect(screen.queryByTestId("season-discord-skipped")).toBeNull());
+  expect(screen.getByTestId("season-discord-problems")).toHaveTextContent("Saisonende");
+});
