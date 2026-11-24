@@ -5,7 +5,7 @@
 // - Playoffs: derselbe Baum wie auf der Turnierseite (`BracketTree`, GET /api/tournaments/<id>/bracket) - unter der Überschrift
 //   „Playoffs“, ohne den Abschnittstitel des Turnierbaums (Nr. 248: nie „Winner Bracket“).
 // - Relegation: Paarungen als Karten aus der Season-Antwort (`pairs`). Je Paarung steht, welches Team aus der oberen und welches aus
-//   der unteren Liga kommt; Setzplätze gibt es hier nicht.
+//   der unteren Liga kommt; Setzplätze gibt es hier nicht. Wer auf- oder absteigt, steht erst nach dem Abschluss da (Nr. 213).
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Swords } from "lucide-react";
@@ -86,7 +86,7 @@ function RelegationPairs({ row }) {
   return (
     <ul className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="Paarungen der Relegation" data-testid={`league-relegation-pairs-${row.tournament_id}`}>
       {pairs.map((pair) => {
-        const state = relegationPairState(pair);
+        const state = relegationPairState(pair, { closed: Boolean(row.closed) });
         const body = (
           <>
             <PairTeam side={pair.upper} home />

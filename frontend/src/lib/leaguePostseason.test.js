@@ -95,8 +95,15 @@ test("Los, fehlende Staffeln, Plätze und Zeilen der Relegation", () => {
 test("Stand einer Paarung der Relegation auf der Ligaseite", () => {
   const upper = { display_name: "Probe Oben", division_label: "Liga 1" };
   const lower = { display_name: "Probe Unten", division_label: "Liga 2" };
+  const closed = { closed: true };
   expect(relegationPairState({ decided: false, upper, lower })).toBe("Noch nicht gespielt");
-  expect(relegationPairState({ decided: true, upper, lower: { ...lower, won: true } })).toBe("Probe Unten steigt auf, Probe Oben steigt ab.");
-  expect(relegationPairState({ decided: true, upper: { ...upper, won: true }, lower })).toBe("Probe Oben bleibt in Liga 1, Probe Unten in Liga 2.");
-  expect(relegationPairState({ void: true, upper, lower })).toBe("Nicht gespielt – beide bleiben in ihrer Liga.");
+  expect(relegationPairState({ decided: false, upper, lower }, closed)).toBe("Noch nicht gespielt");
+  // Vor dem Abschluss der Relegation steht nur, wer gewonnen hat (Nr. 213) - die Wirkung gilt erst aus dem abgeschlossenen Ergebnis.
+  expect(relegationPairState({ decided: true, upper, lower: { ...lower, won: true } })).toBe("Probe Unten gewinnt.");
+  expect(relegationPairState({ decided: true, upper: { ...upper, won: true }, lower })).toBe("Probe Oben gewinnt.");
+  expect(relegationPairState({ void: true, upper, lower })).toBe("Nicht gespielt");
+  // Nach dem Abschluss: was daraus folgt.
+  expect(relegationPairState({ decided: true, upper, lower: { ...lower, won: true } }, closed)).toBe("Probe Unten steigt auf, Probe Oben steigt ab.");
+  expect(relegationPairState({ decided: true, upper: { ...upper, won: true }, lower }, closed)).toBe("Probe Oben bleibt in Liga 1, Probe Unten in Liga 2.");
+  expect(relegationPairState({ void: true, upper, lower }, closed)).toBe("Nicht gespielt – beide bleiben in ihrer Liga.");
 });

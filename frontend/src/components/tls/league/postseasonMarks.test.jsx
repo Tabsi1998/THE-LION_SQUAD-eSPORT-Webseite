@@ -130,7 +130,13 @@ test("die Ligaseite zeigt Playoffs und Relegation einer Liga als Baum - ohne sie
   expect(first).toHaveTextContent("Probe Unten steigt auf, Probe Oben steigt ab.");
   expect(within(first).getByRole("link")).toHaveAttribute("href", "/matches/m1");
   expect(within(relegation).getByTestId("league-relegation-pair-rel1-2")).toHaveTextContent("Noch nicht gespielt");
+  // Solange die Relegation nicht abgeschlossen ist, steht nur, wer gewonnen hat (Nr. 213).
   unmount();
+  const open = render(<MemoryRouter><DivisionPostseason division={{ ...division, postseason: [{ ...division.postseason[1], closed: false }] }} /></MemoryRouter>);
+  const running = screen.getByTestId("league-relegation-pair-rel1-1");
+  expect(running).toHaveTextContent("Probe Unten gewinnt.");
+  expect(running).not.toHaveTextContent("steigt");
+  open.unmount();
   const { container } = render(<MemoryRouter><DivisionPostseason division={{ id: "d2", label: "Liga 2", staffeln: [] }} /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();
 });
