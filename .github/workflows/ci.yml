@@ -674,6 +674,9 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/download-artifact@v8
+        # Bricht das Tor per Zeitlimit ab, gibt es kein Ergebnis (#2556): dann meldet der Kommentar „nicht gelaufen“,
+        # statt mit der alten SHA stehen zu bleiben.
+        continue-on-error: true
         with:
           name: prueftor-ergebnis
           path: prueftor
@@ -682,16 +685,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GATE_RESULT: ${{ needs.prueftor.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          test -s prueftor/kommentar.md
-          head -n1 prueftor/kommentar.md | grep -qx '<!-- prueftor:1660 -->'
+          marker='<!-- prueftor:1660 -->'
+          body=prueftor/kommentar.md
+          # Gepostet wird nur ein Ergebnis mit der Marke in der ersten Zeile - sonst die Meldung „nicht gelaufen“.
+          if ! { [ -s "$body" ] && head -n1 "$body" | grep -qx "$marker"; }; then
+            body="$RUNNER_TEMP/prueftor-nicht-gelaufen.md"
+            {
+              echo "$marker"
+              echo "## Prüftor: Barrierefreiheit, Ladezeit, Bewegung"
+              echo ""
+              echo "**Ergebnis: nicht gelaufen** – für Stand ${HEAD_SHA:0:9} gibt es kein Ergebnis (Job: ${GATE_RESULT}, etwa Zeitlimit oder Abbruch). Ohne Ergebnis nicht mergen: den Job „Prüftor“ neu starten."
+              echo ""
+              echo "<sub>[Lauf](${RUN_URL}) · Ablauf: docs/entwicklung/prueftor.md</sub>"
+            } > "$body"
+          fi
           id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- prueftor:1660 -->"))) | .id' | head -n1)
           if [ -n "$id" ]; then
-            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F body=@prueftor/kommentar.md > /dev/null
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F body=@"$body" > /dev/null
             echo "Kommentar $id aktualisiert."
           else
-            gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" -F body=@prueftor/kommentar.md > /dev/null
+            gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" -F body=@"$body" > /dev/null
             echo "Kommentar angelegt."
           fi
 

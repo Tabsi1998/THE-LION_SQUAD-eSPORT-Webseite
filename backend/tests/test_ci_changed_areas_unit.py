@@ -130,3 +130,16 @@ def test_prueftor_runs_the_budget_self_test():
 def test_frontend_files_still_start_the_gate_through_the_frontend_area():
     assert "prueftor" not in areas.areas_for("frontend/src/pages/HomePage.jsx")
     assert "frontend" in areas.areas_for("frontend/motion-rules-allowlist.json")
+
+
+def test_gate_comment_reports_not_run_when_the_result_is_missing():
+    """Bricht das Tor per Zeitlimit ab, fehlt das Ergebnis-Artefakt (#2556). Der Kommentar-Job scheitert dann nicht am
+    Herunterladen, sondern ersetzt den alten Kommentar (alte SHA) durch „nicht gelaufen“ mit dem aktuellen Stand."""
+    job = _job_block(CI_YML.read_text(encoding="utf-8"), "prueftor-kommentar")
+    download = job[job.index("actions/download-artifact"):job.index("- name: Create or update the gate comment")]
+    assert "continue-on-error: true" in download
+    assert "HEAD_SHA: ${{ github.event.pull_request.head.sha }}" in job
+    assert "GATE_RESULT: ${{ needs.prueftor.result }}" in job
+    assert "**Ergebnis: nicht gelaufen**" in job
+    # Nur ein Artefakt mit der Marke in der ersten Zeile wird gepostet - sonst die Meldung „nicht gelaufen“.
+    assert "grep -qx \"$marker\"" in job
