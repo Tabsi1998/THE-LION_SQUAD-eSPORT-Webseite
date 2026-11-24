@@ -18,7 +18,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
-from services import league_applications, league_late, league_look
+from services import league_applications, league_calendar, league_late, league_look
 from services import league_service as leagues
 from services.log_safe import log_safe
 from services.public_phase import STATUS_LABELS
@@ -66,7 +66,8 @@ def season_state(season: dict, now: datetime | None = None) -> tuple[dict, str |
         return _phase("registration_open", STATUS_LABELS["registration_open"], closes, "registration_closes", now), closes
     if window == league_applications.UPCOMING:
         return _phase("registration_pending", STATUS_LABELS["registration_pending"], opens, "registration_opens", now), opens
-    started = leagues._aware(start)
+    # Einmal gestartet bleibt gestartet (#2404, Nr. 253): Der gemerkte Start gilt - wird das Datum danach verschoben, bleibt „läuft“.
+    started = league_calendar.start_moment(season)
     if not started or started > now:
         state = "registration_closed" if window == league_applications.CLOSED else "announced"
         return _phase(state, STATUS_LABELS[state], start, "starts", now), start
