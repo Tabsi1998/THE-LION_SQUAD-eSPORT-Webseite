@@ -428,6 +428,8 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-standing-row[data-zone="relegation"], .tls-zone-swatch[data-zone="relegation"], .tls-zone-mark[data-zone="relegation"], .tv-standings__row[data-zone="relegation"] { --tls-zone-color: rgb(var(--tls-warn-rgb)); }
 /* Das Symbol zur Zone (#1648): dieselbe Farbe wie der Strich, die Form sagt die Richtung auch ohne Farbe. */
 .tls-zone-mark { flex-shrink: 0; color: var(--tls-zone-color); }
+/* Playoff-Platz (#2404, F.6): eigenes Kennzeichen am Namen, in der Akzentfarbe - Grün und Orange bleiben den Zonen. */
+.tls-playoff-mark { flex-shrink: 0; color: #29B6E8; }
 .tls-zone-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: rgb(255 255 255 / 0.04); box-shadow: inset 3px 0 0 var(--tls-zone-color); }
 .tls-standing-move {
   display: inline-flex; align-items: center; gap: 1px; font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif;
