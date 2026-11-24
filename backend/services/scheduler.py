@@ -940,6 +940,63 @@ async def _safe_ops_checks():
         _log_task_failure("ops_checks", exc)
 
 
+async def _safe_ops_reachability():
+    """Erreichbarkeit (#1657): Website, API und Datenbank jede Minute - Ausfall und Wiederkehr melden, Statusseite."""
+    try:
+        from database import get_db
+        from services.ops_reachability import run_reachability
+
+        state = await run_reachability(get_db())
+        if state.get("overall") != "ok":
+            from services.log_safe import log_safe
+
+            down = [key for key, row in (state.get("targets") or {}).items() if row.get("state") == "down"]
+            logger.info("[scheduler] ops_reachability down=%s", log_safe(",".join(down)))
+    except Exception as exc:
+        _log_task_failure("ops_reachability", exc)
+
+
+async def _ops_reachability_job():
+    """Wie ``_single_replica``, aber: Lässt sich die Sperre nicht holen, weil die Datenbank nicht antwortet, prüft der Lauf
+    trotzdem - genau dann muss jemand den Ausfall bemerken (der Stand bleibt im Speicher, die Meldung kommt mit der
+    Wiederkehr). Eine Sperre, die ein anderes Replikat hält, heißt weiter: aussetzen."""
+    from database import get_db
+    from services import maintenance
+    from services.mutation_lock import MutationLockBusy, MutationLockLost, mutation_lock
+
+    try:
+        # Schreibpause fürs Backup (#1009): den Takt auslassen wie die anderen Intervall-Jobs.
+        if await maintenance.active_state(get_db()):
+            return
+    except Exception:  # noqa: BLE001 - ohne Datenbank gibt es auch keine Schreibpause
+        pass
+    ran = False
+    try:
+        async with mutation_lock(get_db(), scheduler_lock_resource("ops_reachability"), wait_seconds=0.0, lease_seconds=90.0):
+            ran = True
+            await _safe_ops_reachability()
+        return
+    except (MutationLockBusy, MutationLockLost):
+        return
+    except Exception:  # noqa: BLE001 - Sperre nicht holbar: meist ist die Datenbank weg
+        logger.debug("[scheduler] ops_reachability runs without lease")
+    if not ran:
+        await _safe_ops_reachability()
+
+
+async def _safe_ops_daily_summary():
+    """Tageszusammenfassung (#1657): alle 15 Minuten nachsehen, ob die Stunde erreicht und heute noch nichts raus ist."""
+    try:
+        from database import get_db
+        from services.ops_digest import send_daily_summary
+
+        outcome = await send_daily_summary(get_db())
+        if outcome.get("sent"):
+            logger.info("[scheduler] ops_daily_summary sent")
+    except Exception as exc:
+        _log_task_failure("ops_daily_summary", exc)
+
+
 def _parse_dt(value):
     if not value:
         return None
@@ -1285,6 +1342,11 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("proof_photo_retention", _safe_proof_photo_retention, lease_seconds=300.0), IntervalTrigger(hours=1),
                   id="proof_photo_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_retention", _safe_ops_retention, lease_seconds=600.0), IntervalTrigger(hours=24), id="ops_retention", max_instances=1, coalesce=True)
+    # Erreichbarkeit und Tageszusammenfassung (#1657).
+    sched.add_job(_ops_reachability_job, IntervalTrigger(seconds=60), id="ops_reachability",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("ops_daily_summary", _safe_ops_daily_summary), IntervalTrigger(minutes=15), id="ops_daily_summary",
+                  max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
                   max_instances=1, coalesce=True)
     # Braucht Aufmerksamkeit (#1160): fehlende Ergebnisse und defekte Stationen - jede Minute nachsehen.

@@ -60,6 +60,8 @@ describe("AppErrorBoundary", () => {
     expect(screen.getByRole("button", { name: /Neu laden/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Startseite/ })).toHaveAttribute("href", "/");
     expect(screen.getByTestId("kopf")).toBeInTheDocument();
+    // #1657: ein kleiner Hinweis auf die Statusseite.
+    expect(screen.getByTestId("page-error-status")).toHaveAttribute("href", "/status");
     expect(screen.getByTestId("footer")).toBeInTheDocument();
     expect(report).toHaveBeenCalledTimes(1);
     expect(report.mock.calls[0][0].message).toBe("list.filter is not a function");
@@ -112,7 +114,8 @@ describe("AppErrorBoundary", () => {
     expect(text).toHaveTextContent("Seite: /");
     expect(text).toHaveTextContent("Uhrzeit: 7.10.2026, 12:15:30");
     expect(text).toHaveTextContent("Kennung: log-4711");
-    expect(screen.getByTestId("page-error-log-link")).toHaveAttribute("href", "/admin/ops?tab=app&q=log-4711");
+    // #1657: die Kennung ist die Fehlergruppe unter Betrieb → Fehler.
+    expect(screen.getByTestId("page-error-log-link")).toHaveAttribute("href", "/admin/ops?tab=errors&q=log-4711");
     await act(async () => { fireEvent.click(screen.getByTestId("page-error-copy")); });
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Kennung: log-4711"));
     expect(screen.getByTestId("page-error-copied")).toHaveTextContent("Kopiert");

@@ -59,9 +59,10 @@ async def test_an_exception_becomes_one_group_that_counts(flow, boom_route):
     assert group["route"] == "/api/_test/boom/{item_id}"
     assert group["method"] == "GET"
     assert group["resolved_at"] is None
-    assert "person@example.test" not in group["message"]
-    assert "[redacted-email]" in group["message"]
-    assert "RuntimeError" in group["stack"]
+    # Seit #1657 wird die Meldung gar nicht mehr gespeichert - auch nicht geschwärzt; der Stack hat nur Code-Stellen.
+    assert "message" not in group
+    assert "person@example.test" not in str(group)
+    assert "in boom" in group["stack"]
 
 
 @pytest.mark.asyncio

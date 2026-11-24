@@ -219,3 +219,62 @@ test("Datei-Uploads stehen in Tempo gekennzeichnet, die Kachel nennt sie", async
   expect(screen.getByTestId("ops-slow-GET-/api/gallery")).not.toHaveTextContent("Upload");
   expect(screen.getByText("ohne 1 Datei-Upload")).toBeInTheDocument();
 });
+
+// Fehler-Sammler (#1657): Gruppen aus Website und App stehen in derselben Liste - mit Quelle, Version und der obersten
+// Code-Stelle statt einer Meldung (die wird nie gespeichert).
+const WEB_GROUP = {
+  fingerprint: "web789",
+  source: "web",
+  error_type: "TypeError",
+  route: "/u/:slug",
+  method: "",
+  status_code: 0,
+  count: 12,
+  version: "2.3",
+  first_seen_at: "2026-11-24T08:00:00Z",
+  last_seen_at: "2026-11-24T09:30:00Z",
+  stack: "renderTeam (TeamPage.js:12:345)\nindex.js:1:20",
+  resolved_at: null,
+};
+
+test("Gruppen aus der Website zeigen Quelle, Version und die oberste Stelle", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).startsWith("/admin/ops/errors") ? { data: [WEB_GROUP] } : respond(url)));
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByText("TypeError")).toBeInTheDocument());
+  const row = screen.getByTestId("ops-error-web789");
+  expect(row).toHaveTextContent("Website");
+  expect(row).toHaveTextContent("/u/:slug");
+  expect(row).toHaveTextContent("renderTeam (TeamPage.js:12:345)");
+  expect(row).toHaveTextContent("Version 2.3");
+  expect(row).not.toHaveTextContent("HTTP");
+});
+
+test("Quelle und Suche filtern die Liste, die Kennung aus der Adresse sucht gleich", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors&q=web789"]}><AdminOpsPage /></MemoryRouter>);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(expect.stringContaining("q=web789")));
+  expect(screen.getByTestId("ops-errors-search")).toHaveValue("web789");
+
+  await user.selectOptions(screen.getByTestId("ops-errors-source"), "app");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(expect.stringContaining("source=app")));
+
+  await user.clear(screen.getByTestId("ops-errors-search"));
+  await user.type(screen.getByTestId("ops-errors-search"), "TypeError{Enter}");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(expect.stringMatching(/source=app.*q=TypeError/)));
+});
+
+test("die Erreichbarkeit steht über der Liste, in kurzen Worten", async () => {
+  apiMock.get.mockImplementation((url) => {
+    if (String(url).startsWith("/admin/ops/summary")) {
+      return Promise.resolve({ data: { open_error_groups: 0, reachability: { overall: "disturbance", checked_at: "2026-11-24T09:31:00Z", targets: {
+        web: { state: "up", since: "2026-11-24T08:00:00Z" }, api: { state: "unchecked" }, database: { state: "down", since: "2026-11-24T09:29:00Z" },
+      } } } });
+    }
+    return Promise.resolve(respond(url));
+  });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
+  const strip = await screen.findByTestId("ops-reachability");
+  expect(strip).toHaveTextContent("Website: läuft");
+  expect(strip).toHaveTextContent("API: nicht geprüft");
+  expect(strip).toHaveTextContent("Datenbank: weg seit");
+});
