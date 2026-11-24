@@ -129,8 +129,8 @@ async def _finals(db, staffeln: list[dict]) -> dict[str, dict]:
 # ---------------------------------------------------------------- Kennzeichen in der Tabelle, Sperrgrund an der Grenze
 
 async def places_for(db, tournament: dict | None) -> int:
-    """Wie viele Teams dieser regulären Staffel in die Playoffs kommen - 0 ohne Playoffs. Eine Season ohne ``postseason`` kostet eine
-    Abfrage (die Season) und sonst nichts."""
+    """Wie viele Teams dieser regulären Staffel in die Playoffs kommen - 0 ohne Playoffs. Ohne Einstellung kostet das zwei kleine
+    Abfragen (Season und Liga N, je nur das Feld ``postseason``)."""
     context = (tournament or {}).get("league_context") or {}
     if not context.get("season_id") or context.get("kind"):
         return 0
@@ -702,9 +702,26 @@ async def _create(db, season_id: str, kind: str, body: dict, actor: dict) -> dic
             tournament = await _build_playoffs(db, season, division, settings, plan, actor, tournament=None, draw_count=counter[0])
         else:
             tournament = await _build_relegation(db, season, division, _lower(divisions, division), settings, plan, actor, counter[0])
-    except LeagueProblem as problem:
-        raise PostseasonProblem(problem.message, problem.status) from None
+    except BaseException as failure:
+        # Nichts halb Angelegtes: Bricht der Bau ab (Sperre des Map-Pools, Absturz mitten im Schreiben), verschwindet die Staffel wieder -
+        # sonst fände der nächste Klick eine Playoff-Staffel ohne Baum. Unter der Season-Sperre gab es vorher keine.
+        await _discard(db, division["id"], kind)
+        if isinstance(failure, LeagueProblem):
+            raise PostseasonProblem(failure.message, failure.status) from None
+        raise
     return {"tournament": tournament, "replay": False, "override": override}
+
+
+async def _discard(db, division_id: str, kind: str) -> None:
+    """Die gerade angelegte, unfertige Staffel wieder entfernen - ein Fehler dabei steht im Log und überdeckt den ersten nicht."""
+    from services import league_service
+
+    try:
+        half = await _existing(db, division_id, kind)
+        if half:
+            await league_service._purge_staffel(db, half["id"])
+    except Exception:  # noqa: BLE001 - der eigentliche Fehler geht an den Aufrufer
+        logger.exception("[liga] Unfertige Staffel in Liga %s nicht entfernt", log_safe(division_id))
 
 
 async def any_played(db, tournament_id: str) -> bool:

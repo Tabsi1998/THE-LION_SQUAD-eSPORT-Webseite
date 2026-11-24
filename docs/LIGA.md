@@ -4336,9 +4336,11 @@ Turnierkerns (`services/custom_bracket.py`) auf. Wer diesen Vertrag ändern will
 | Relegation mit Wirkung auf die Folge-Season samt „Übernahme neu berechnen“ | gebaut | `league_successor` |
 | Verwaltung: Reiter „Abschluss“ mit Einstellungen, Vorschau, Anlegen, Stand, Sperrgründen | gebaut | `SeasonPostseason.jsx` |
 | Öffentlich: Ligaseite mit Playoffs und Relegation, Kennzeichen „Playoff-Platz“ in der Tabelle | gebaut | `SeasonPostseasonSection.jsx`, `StandingsTable` |
+| Verwaltung: Staffel-Seite mit Reiter „Baum“ statt „Tabelle“, „Beide nicht erschienen“ mit dem K.-o.-Weg, kein Zuteilen von Hand | gebaut | `AdminLeagueStaffelPage.jsx`, `DoubleNoShowAction.jsx`, `squad_registration.build_registration` |
 | Playoff-Belohnungen (Nr. 214), Zusatzpunkte und Meister-Bonus der Gesamtwertung (Nr. 215) | **Folgepaket** | Leser sind schon getrennt: Playoff-Endstände zählen nirgends als Staffel |
 | Regelwerk-Baustein Anlage F, Warnungen in „Was fehlt noch?“ (Nr. 211, 216) | **Folgepaket** | - |
-| Mail, Glocke, Push („qualifiziert“, „Relegation gegen …“), Historie an Profil und Team, PDF, TV-Kennzeichen, Discord | **Folgepaket** | Tabelle „Gesamtpaket“ |
+| Discord: Die Abschluss-Meldung der Season nennt den Meister aus den Playoffs | gebaut (kleine Anbindung) | `league_discord.playoff_champions` |
+| Mail, Glocke, Push („qualifiziert“, „Relegation gegen …“), Historie an Profil und Team, PDF, TV (Kennzeichen in der Tabelle, Relegation im Saisonfinale), Discord-Meldungen je Playoff-Runde | **Folgepaket** | Tabelle „Gesamtpaket“ |
 
 #### Regeln (Nr. 203-219, 221-232)
 

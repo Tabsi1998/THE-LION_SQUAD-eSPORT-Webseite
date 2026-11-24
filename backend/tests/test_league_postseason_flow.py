@@ -662,3 +662,28 @@ async def test_nobody_is_assigned_to_a_playoff_staffel_by_hand(flow):
     refused = await flow.post(f"/api/tournaments/{tournament['id']}/squad-registrations", json={"team_id": left_out["team_id"], "squad_id": left_out["squad_id"]})
     assert refused.status_code == 409 and "aus dem Endstand" in refused.json()["detail"]
     assert await flow.db.tournament_registrations.count_documents({"tournament_id": tournament["id"]}) == 4
+
+
+@pytest.mark.asyncio
+async def test_a_failed_build_leaves_no_half_created_staffel(flow, monkeypatch):
+    from services import league_postseason
+
+    world = await build(flow, postseason=PLAYOFFS_4)
+    await close(flow, world)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Abbruch mitten im Bau")
+
+    monkeypatch.setattr(league_postseason, "_write_matches", broken)
+    part = division_of(await cockpit(flow, world), 1)["playoffs"]
+    flow.act_as(world["lead"])
+    body = {"division_id": world["divisions"][1]["id"], "stamp": part["stamp"], "confirm": True}
+    with pytest.raises(RuntimeError):
+        await flow.post(f"{ADMIN}/seasons/{world['season']['id']}/postseason/playoffs", json=body)
+    # Nichts bleibt zurück: keine Staffel ohne Baum, keine Anmeldungen - der nächste Versuch legt sauber an.
+    assert await flow.db.tournaments.count_documents({"league_context.kind": "playoff"}) == 0
+    assert await flow.db.tournament_registrations.count_documents({"registered_via": "league_postseason"}) == 0
+    monkeypatch.undo()
+    ok(await create(flow, world, "playoffs"))
+    tournament = await playoff_tournament(flow, world)
+    assert len(await matches_of(flow, tournament["id"])) == 3
