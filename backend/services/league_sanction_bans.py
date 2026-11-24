@@ -104,15 +104,21 @@ async def frame_for(db, rows: list[dict]) -> Frame:
         frame.season_ends[season["id"]] = season_end_at(season)
     registration_ids = sorted({row["registration_id"] for row in counted if row.get("registration_id")})
     if registration_ids:
+        # Playoffs und Relegation (#2404, Nr. 223): Dort hat das Co-Team eine eigene Anmeldung mit der Herkunft
+        # ``postseason.from_registration_id``. Jedes gewertete Pflichtspiel zählt - Tabelle, Playoff oder Relegation.
+        origin = {key: key for key in registration_ids}
+        async for row in db.tournament_registrations.find({"postseason.from_registration_id": {"$in": registration_ids}},
+                                                          {"_id": 0, "id": 1, "postseason.from_registration_id": 1}):
+            origin[row["id"]] = row["postseason"]["from_registration_id"]
         async for match in db.matches_v2.find(
-                {"slots.registration_id": {"$in": registration_ids}, "status": {"$in": sorted(DECIDED_MATCH)}},
+                {"slots.registration_id": {"$in": sorted(origin)}, "status": {"$in": sorted(DECIDED_MATCH)}},
                 {"_id": 0, "id": 1, "completed_at": 1, "is_preview": 1, "slots.registration_id": 1}):
             moment = parse(match.get("completed_at"))
             if match.get("is_preview") or not moment:
                 continue
             for slot in match.get("slots") or []:
-                if slot.get("registration_id") in registration_ids:
-                    frame.decided.setdefault(slot["registration_id"], []).append((moment, match["id"]))
+                if slot.get("registration_id") in origin:
+                    frame.decided.setdefault(origin[slot["registration_id"]], []).append((moment, match["id"]))
         for played in frame.decided.values():
             played.sort()
     return frame

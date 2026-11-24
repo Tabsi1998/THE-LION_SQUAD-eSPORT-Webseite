@@ -605,8 +605,10 @@ async def log_both_sides_kept(db, setup: LeagueSetup, games: list[dict] | None, 
 
 async def check_double_use(db, setup: LeagueSetup, games: list[dict], registration_ids: set[str] | list[str]) -> None:
     """Kein Doppel-Einsatz: dieselbe Person steht am selben Spieltag in Staffeln derselben Season nicht in den
-    Aufstellungen zweier Anmeldungen (``lineup_user_ids``-Index)."""
+    Aufstellungen zweier Anmeldungen (``lineup_user_ids``-Index). Verglichen wird nur unter Staffeln derselben Art (#2404, H2): Im
+    K.-o. ist die Nummer die Runde - wer an Spieltag 1 gespielt hat, darf in Playoff-Runde 1 spielen."""
     season_id = (setup.tournament.get("league_context") or {}).get("season_id")
+    kind = (setup.tournament.get("league_context") or {}).get("kind")
     matchday = matchday_number_of(setup.match)
     if not season_id or not matchday:
         return
@@ -620,7 +622,7 @@ async def check_double_use(db, setup: LeagueSetup, games: list[dict], registrati
         return
     tournament_ids = [
         row["id"]
-        for row in await db.tournaments.find({"league_context.season_id": season_id}, {"_id": 0, "id": 1}).to_list(200)
+        for row in await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": kind}, {"_id": 0, "id": 1}).to_list(200)
         if row.get("id")
     ]
     others = await db.matches_v2.find(

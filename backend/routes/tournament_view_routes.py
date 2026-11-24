@@ -407,8 +407,15 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
         # Zonen für Auf- und Abstieg (F.2, #1627): je Zeile ``zone`` - Website, TV, PDF und App lesen dieselbe Rechnung.
         from services.league_zones import mark, mark_rows
 
-        if zones is NO_ZONES:
+        if (t.get("league_context") or {}).get("kind"):
+            # Playoffs und Relegation (F.6, #2404): ein K.-o.-Baum hat keine Zonen.
+            pass
+        elif zones is NO_ZONES:
             await mark_rows(db, t, rows)
+            # Kennzeichen „Playoff-Platz“ (F.6): wie die Zone live gerechnet - ohne Playoffs bleibt die Zeile, wie sie ist.
+            from services import league_postseason
+
+            await league_postseason.mark_rows(db, t, rows)
         elif zones is not None:
             mark(rows, zones)
         for row in rows:

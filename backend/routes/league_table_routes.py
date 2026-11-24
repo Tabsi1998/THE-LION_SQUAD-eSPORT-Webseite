@@ -179,12 +179,23 @@ async def admin_double_no_show(tournament_id: str, match_id: str, body: DoubleNo
             await league_permissions.require_no_conflict(db, me, match, action="double_no_show",
                                                          conflict_reason=body.conflict_reason)
             now_iso = now_utc().isoformat()
-            fields = league_table.double_no_show_fields(match, note, me["id"], now_iso)
-            await db.matches_v2.update_one({"id": match_id}, {"$set": fields})
+            knockout = None
+            if (tournament.get("league_context") or {}).get("kind"):
+                # Playoffs und Relegation (#2404, Nr. 217): einmal neu ansetzen, beim zweiten Mal scheiden beide aus dem Baum aus.
+                from services import league_postseason
+
+                knockout = await league_postseason.double_no_show(db, tournament, match, note, me)
+            else:
+                fields = league_table.double_no_show_fields(match, note, me["id"], now_iso)
+                await db.matches_v2.update_one({"id": match_id}, {"$set": fields})
     except league_table.TableProblem as problem:
         raise _refuse(problem) from None
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=BUSY) from None
+    if knockout and knockout["step"] == "retry":
+        # Neu angesetzt: nichts gewertet, kein Eintrag „nicht erschienen“ - das Spiel bleibt offen, die Leitung legt den Termin.
+        await publish_api_change("POST", f"/api/matches/{match_id}/result", 200)
+        return {**await league_procedures.guard(db, await _match(db, tournament_id, match_id), me), "no_show_step": "retry"}
     for side in sides:
         await record_walkover_incident(db, match, side, me["id"])
     await league_table.after_change(db, tournament, match, scored=True)

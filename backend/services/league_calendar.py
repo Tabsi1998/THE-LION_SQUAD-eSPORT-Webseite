@@ -55,7 +55,8 @@ def week_days(season: dict) -> list[tuple[date, date]]:
 
 def season_end_at(season: dict | None) -> datetime | None:
     """Wann die Season zu Ende ist: der Abschluss durch die Leitung (``closed_at``, kommt mit F.1) - bis dahin das Ende des
-    letzten Tages der letzten Spielwoche. ``None``: nicht bestimmbar."""
+    letzten Tages der letzten Spielwoche. Spielt die Season Playoffs oder eine Relegation (#2404, F.6), endet sie erst mit deren
+    letzter Woche (``postseason_end``, vom Server gepflegt) - Spielsperren und Nachweise enden nicht davor. ``None``: nicht bestimmbar."""
     if not season:
         return None
     closed = _utc(season.get("closed_at"))
@@ -64,4 +65,6 @@ def season_end_at(season: dict | None) -> datetime | None:
     weeks = week_days(season)
     if not weeks:
         return None
-    return datetime.combine(weeks[-1][1] + timedelta(days=1), time.min, tzinfo=VIENNA).astimezone(timezone.utc)
+    regular = datetime.combine(weeks[-1][1] + timedelta(days=1), time.min, tzinfo=VIENNA).astimezone(timezone.utc)
+    after = _utc(season.get("postseason_end"))
+    return after if after and after > regular else regular

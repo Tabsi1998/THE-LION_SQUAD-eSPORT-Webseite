@@ -37,9 +37,11 @@ STATUS_LABELS = {
 
 def league_squad_key(tournament: dict, squad_id: str) -> str | None:
     """``<season_id>:<squad_id>`` - ein eindeutiger Index hält „ein Co-Team je Season nur in einer Staffel“ auch bei
-    gleichzeitigem Zuteilen. Ohne Liga-Rahmen (``league_context``) gibt es keinen Schlüssel."""
-    season_id = (tournament.get("league_context") or {}).get("season_id")
-    return f"{season_id}:{squad_id}" if season_id and squad_id else None
+    gleichzeitigem Zuteilen. Ohne Liga-Rahmen (``league_context``) gibt es keinen Schlüssel - und keinen in einer Playoff- oder
+    Relegations-Staffel (#2404, H1): Dort spielt das Co-Team zusätzlich zu seiner regulären Staffel."""
+    context = tournament.get("league_context") or {}
+    season_id = context.get("season_id")
+    return f"{season_id}:{squad_id}" if season_id and squad_id and not context.get("kind") else None
 
 
 def season_lock_resource(tournament: dict) -> str | None:
@@ -218,8 +220,9 @@ async def _staffel_state(db, tournament: dict) -> tuple[dict[str, str | None], i
 
 
 async def _squads_in_staffeln(db, season_id: str, *, except_tournament: str | None = None) -> set[str]:
-    """Die Co-Teams, die in Staffeln dieser Season stehen - aktiv oder noch mit Season-Schlüssel."""
-    query: dict = {"league_context.season_id": season_id}
+    """Die Co-Teams, die in **regulären** Staffeln dieser Season stehen - aktiv oder noch mit Season-Schlüssel. Playoffs und Relegation
+    (#2404) zählen nicht: Wer dort spielt, ist deshalb nicht „schon in einer anderen Staffel“."""
+    query: dict = {"league_context.season_id": season_id, "league_context.kind": None}
     if except_tournament:
         query["id"] = {"$ne": except_tournament}
     staffel_ids = [row["id"] for row in await db.tournaments.find(query, {"_id": 0, "id": 1}).to_list(200) if row.get("id")]
