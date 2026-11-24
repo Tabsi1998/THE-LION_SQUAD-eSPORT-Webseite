@@ -21,11 +21,10 @@ async function mockBrokenServersPage(page, user) {
     if (url.includes("/api/auth/me")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(user) });
     // Absichtlich kaputt: die Seite erwartet eine Liste und rechnet damit.
     if (url.includes("/api/game-servers")) return route.fulfill({ contentType: "application/json", body: JSON.stringify({ items: "kaputt", summary: {} }) });
-    if (url.includes("/api/mobile/client-logs") && request.method() === "POST") {
+    // Fehler-Sammler (#1657): nimmt Meldungen auch ohne Anmeldung an - Fehler von Gästen sollen ankommen.
+    if (url.includes("/api/ops/client-errors") && request.method() === "POST") {
       reports.push(request.postDataJSON());
-      // Ohne Anmeldung nimmt der Server keine Meldung an - wie im Betrieb.
-      if (!user) return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Nicht angemeldet" }) });
-      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, id: REPORT_ID }) });
+      return route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ ok: true, id: REPORT_ID }) });
     }
     return route.abort();
   });
@@ -40,10 +39,15 @@ test("als Gast: freundlicher Satz und zwei Knöpfe, kein Programmierer-Text", as
   await expect(card).toContainText("Diese Seite konnte nicht angezeigt werden");
   await expect(card.getByRole("button", { name: /Neu laden/ })).toBeVisible();
   await expect(card.getByRole("link", { name: /Startseite/ })).toBeVisible();
+  await expect(card.getByTestId("page-error-status")).toHaveAttribute("href", "/status");
   await expect(page.getByTestId("page-error-details")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("is not a function");
   await expect(page.locator("body")).not.toContainText("Technische Angaben");
   await expect.poll(() => reports.length).toBeGreaterThan(0);
+  // Gemeldet wird ohne Meldungstext - nur Art, Stack ohne die Meldungszeile, Seite als Vorlage, Version (#1657).
+  expect(reports[0].source).toBe("web");
+  expect(reports[0].route).toBe("/servers");
+  expect(reports[0]).not.toHaveProperty("message");
 });
 
 test("als Admin: Technische Angaben zugeklappt, mit Kennung zum Kopieren", async ({ page, context }) => {
@@ -61,7 +65,7 @@ test("als Admin: Technische Angaben zugeklappt, mit Kennung zum Kopieren", async
   await expect(technical).toContainText("is not a function");
   await expect(technical).toContainText("Seite: /servers");
   await expect(technical).toContainText(`Kennung: ${REPORT_ID}`);
-  await expect(page.getByTestId("page-error-log-link")).toHaveAttribute("href", `/admin/ops?tab=app&q=${REPORT_ID}`);
+  await expect(page.getByTestId("page-error-log-link")).toHaveAttribute("href", `/admin/ops?tab=errors&q=${REPORT_ID}`);
 
   await page.getByTestId("page-error-copy").click();
   await expect(page.getByTestId("page-error-copied")).toHaveText("Kopiert");
@@ -89,7 +93,7 @@ test("eine kaputte Abstimmung vom Server lässt die Seite stehen", async ({ page
       asked += 1;
       return json({ ballots: { length: 1 }, poll_seconds: 0 });
     }
-    if (url.includes("/api/mobile/client-logs")) return json({ ok: true, id: null });
+    if (url.includes("/api/ops/client-errors")) return json({ ok: true, id: null });
     if (/notifications|sponsors|partners|news|events|games|nav$|site-banners/.test(url)) return json([]);
     return json({});
   });

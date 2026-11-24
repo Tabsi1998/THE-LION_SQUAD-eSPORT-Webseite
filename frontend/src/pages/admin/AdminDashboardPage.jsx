@@ -252,7 +252,8 @@ export default function AdminDashboardPage() {
       tone: (data?.discord_broken || []).length ? "#FF3B30" : "#00FF88",
     },
     {
-      label: "Client-Logs",
+      // Seit #1657 nur noch die App - Fehler der Website stehen unter Betrieb & Logs → Fehler.
+      label: "App-Logs",
       detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
       to: "/admin/ops?tab=app",
       icon: Bug,

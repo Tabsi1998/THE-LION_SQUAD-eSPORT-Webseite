@@ -419,13 +419,17 @@ async def check_image_variants() -> dict:
 async def check_error_groups(db) -> dict:
     label = "Fehlergruppen"
     try:
-        open_groups = await db.ops_errors.count_documents({"resolved_at": None})
+        # Nur Gruppen des Servers (#1657): Website und App melden in dieselbe Liste, Browser-Fehler (Erweiterungen,
+        # alte Browser) sollen die Server-Ampel aber nicht dauerhaft gelb halten - ihre Häufungen stehen in der
+        # Tageszusammenfassung.
+        open_groups = await db.ops_errors.count_documents({"resolved_at": None, "source": {"$nin": ["web", "app"]}})
         since = (now_utc() - timedelta(hours=1)).isoformat()
         new_5xx = await db.ops_errors.count_documents({"first_seen_at": {"$gte": since}, "status_code": {"$gte": 500}})
     except Exception as exc:  # noqa: BLE001
         return failed("error_groups", label, exc)
-    value = f"{open_groups} offen, {new_5xx} neue 5xx in 1 h"
-    return result("error_groups", label, rate_error_groups(open_groups, new_5xx), value, "Server-Fehler als Gruppen (Betrieb → Fehler)")
+    value = f"{open_groups} offen vom Server, {new_5xx} neue 5xx in 1 h"
+    return result("error_groups", label, rate_error_groups(open_groups, new_5xx), value,
+                  "Nur Gruppen des Servers - Website und App stehen unter Betrieb → Fehler, zählen hier aber nicht")
 
 
 async def check_scheduler() -> dict:

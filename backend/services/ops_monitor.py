@@ -21,7 +21,7 @@ import os
 import re
 import time
 import traceback
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from starlette.routing import Match
@@ -29,11 +29,23 @@ from starlette.routing import Match
 from database import get_db
 from models import new_id, now_utc
 from services.log_safe import log_safe
+from services.ops_error_scrub import (
+    CLIENT_FRAME_LIMIT,
+    clean_client_error_type,
+    clean_error_type,
+    clean_version,
+    client_frames,
+    client_route,
+    server_frames,
+    server_route_fallback,
+)
 from services.ops_upload_routes import is_upload
 
 logger = logging.getLogger("tls.ops")
 
 SLOW_REQUEST_MS = int(os.environ.get("SLOW_REQUEST_MS", "1000") or 1000)
+# Stand der Website an jeder Fehlergruppe (#1657) - wie VITE_APP_VERSION im Web, aus derselben APP_VERSION der .env.
+APP_VERSION = os.environ.get("APP_VERSION", "")
 RETENTION_DAYS = 30
 STACK_LIMIT = 6000
 MESSAGE_LIMIT = 500
@@ -108,45 +120,144 @@ def _expires_at():
     return now_utc() + timedelta(days=RETENTION_DAYS)
 
 
-async def _upsert_error(app: Any, request: Any, *, error_type: str, message: str, stack: str, status_code: int, frame: str = "") -> str | None:
+SETTINGS_CACHE_SECONDS = 30.0
+_settings_cache: dict = {}
+
+
+def forget_settings() -> None:
+    """Nach dem Speichern unter Betrieb → Alarme: beim nächsten Fehler frisch lesen."""
+    _settings_cache.clear()
+
+
+async def error_settings(db) -> dict:
+    """Die Einstellungen für den Sammler, höchstens alle ``SETTINGS_CACHE_SECONDS`` gelesen. Scheitert das Lesen (Datenbank
+    weg), gelten die Vorgaben für dieselbe Zeit - ein Fehler wartet dann nicht ein zweites Mal auf die Datenbank."""
+    import weakref
+
+    from services import ops_alerts
+
+    cached = _settings_cache.get("ref")
+    fresh = _settings_cache.get("version") == ops_alerts.SETTINGS_VERSION
+    if cached is not None and cached() is db and fresh and time.monotonic() - _settings_cache.get("at", 0.0) < SETTINGS_CACHE_SECONDS:
+        return _settings_cache["value"]
     try:
-        route = route_template(app, request.scope)
-        method = str(request.method or "GET").upper()
-        fingerprint = error_fingerprint(error_type, route, method, frame)
-        now_iso = now_utc().isoformat()
-        db = get_db()
+        value = await ops_alerts.load_alert_settings(db)
+    except Exception:  # noqa: BLE001 - ohne Einstellungen gelten die Vorgaben
+        value = ops_alerts.merge_settings(None)
+    try:
+        _settings_cache.update({"ref": weakref.ref(db), "at": time.monotonic(), "value": value, "version": ops_alerts.SETTINGS_VERSION})
+    except TypeError:
+        _settings_cache.clear()
+    return value
+
+
+async def upsert_group(db, *, fingerprint: str, fields: dict, status_code: int = 0, settings: dict | None = None,
+                       on_new=None) -> str | None:
+    """Eine Fehlergruppe zählen (#233, #1657) - für Server, Website und App derselbe Weg.
+
+    ``fields`` sind schon bereinigt (``ops_error_scrub``): Quelle, Fehlerart, Stelle, Route, Version. Eine Meldung wird
+    nie gespeichert; eine alte aus der Zeit vor #1657 fällt beim nächsten Auftreten weg. Das Ablaufdatum folgt der
+    Aufbewahrung unter Betrieb → Alarme. Danach die Häufung im Zeitfenster zählen: Beim Server meldet sie sich sofort,
+    bei Website und App wird sie nur vermerkt und steht in der Tageszusammenfassung."""
+    try:
+        settings = settings or await error_settings(db)
+        current = now_utc()
+        now_iso = current.isoformat()
         outcome = await db.ops_errors.update_one(
             {"fingerprint": fingerprint},
             {
                 "$setOnInsert": {"id": new_id(), "fingerprint": fingerprint, "first_seen_at": now_iso},
                 "$set": {
-                    "error_type": error_type[:120],
-                    "message": scrub_text(message, MESSAGE_LIMIT),
-                    "stack": scrub_text(stack, STACK_LIMIT),
-                    "route": route[:200],
-                    "method": method,
+                    **fields,
                     "status_code": int(status_code),
-                    "actor": _actor(request),
                     "last_seen_at": now_iso,
-                    "expires_at": _expires_at(),
+                    "expires_at": current + timedelta(days=int(settings["retention_days"]["ops_errors"])),
                     "resolved_at": None,
                     "resolved_by": None,
                 },
+                "$unset": {"message": "", "window_started_at": "", "window_count": ""},
                 "$inc": {"count": 1},
             },
             upsert=True,
         )
-        if int(status_code) >= 500 and getattr(outcome, "upserted_id", None) is not None:
-            # Eine neue 5xx-Gruppe meldet sich per Discord (#265) - im Hintergrund.
-            from services.ops_alerts import schedule_error_alert
+        from services.ops_alerts import schedule_error_alert, schedule_spike_alert
 
-            group = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0, "stack": 0})
+        created = getattr(outcome, "upserted_id", None) is not None
+        if created and on_new is not None:
+            # Nur wer die Gruppe wirklich angelegt hat, zählt sie (Obergrenze je Tag) - nicht jede Anfrage.
+            await on_new(current)
+        if int(status_code) >= 500 and created:
+            # Eine neue 5xx-Gruppe meldet sich per Discord (#265) - im Hintergrund.
+            group = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0})
             if group:
                 schedule_error_alert(db, group)
+        spike = await _count_in_window(db, fingerprint, current, settings)
+        if spike and fields.get("source") not in CLIENT_SOURCES:
+            schedule_spike_alert(db, spike["group"], spike["count"], spike["window_minutes"])
         return fingerprint
     except Exception as exc:  # noqa: BLE001 - die Aufzeichnung darf die Antwort nie verhindern
         logger.debug("[ops] error record failed: %s", type(exc).__name__)
         return None
+
+
+async def _counter(db, key: str, current) -> int:
+    """Ein Zähler in ``ops_alert_state``, atomar per ``$inc`` mit Upsert. Legen zwei Läufe ihn zugleich an, verliert einer
+    am eindeutigen Schlüssel und zählt einfach noch einmal."""
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+
+    from services.ops_alerts import helper_day
+
+    for _attempt in range(2):
+        try:
+            row = await db.ops_alert_state.find_one_and_update(
+                {"key": key}, {"$inc": {"count": 1}, "$setOnInsert": {"key": key, "helper_day": helper_day(current)}},
+                upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0, "count": 1},
+            )
+            return int((row or {}).get("count") or 0)
+        except DuplicateKeyError:
+            continue
+    return 0
+
+
+async def _count_in_window(db, fingerprint: str, current, settings: dict) -> dict | None:
+    """Häufung (#1657): Auftreten je festem Zeitfenster (an der Uhr ausgerichtet), atomar gezählt in einem eigenen
+    Fenster-Dokument. Genau das Auftreten, das die Schwelle erreicht, vermerkt die Häufung an der Gruppe
+    (``spike_window``, ``spike_count``) - je Fenster höchstens einmal."""
+    window_seconds = int(settings["spike_window_minutes"]) * 60
+    threshold = int(settings["spike_threshold"])
+    bucket = int(current.timestamp()) // window_seconds
+    count = await _counter(db, f"win:{fingerprint}:{window_seconds}:{bucket}", current)
+    if count != threshold:
+        return None
+    started = datetime.fromtimestamp(bucket * window_seconds, tz=timezone.utc).isoformat()
+    await db.ops_errors.update_one({"fingerprint": fingerprint}, {"$set": {"spike_window": started, "spike_count": count}})
+    group = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0})
+    return {"group": group or {"fingerprint": fingerprint}, "count": count, "window_minutes": window_seconds // 60}
+
+
+def _server_route(app: Any, scope: dict) -> str:
+    route = route_template(app, scope)
+    return route if "{" in route or not any(char.isdigit() for char in route) else server_route_fallback(str(scope.get("path") or "/"))
+
+
+async def _upsert_error(app: Any, request: Any, *, error_type: str, stack: str, status_code: int, frame: str = "") -> str | None:
+    try:
+        route = _server_route(app, request.scope)
+        method = str(request.method or "GET").upper()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("[ops] error record failed: %s", type(exc).__name__)
+        return None
+    fields = {
+        "source": "server",
+        "error_type": clean_error_type(error_type),
+        "stack": stack[:STACK_LIMIT],
+        "route": route[:200],
+        "method": method,
+        "version": clean_version(APP_VERSION),
+        "actor": _actor(request),
+    }
+    return await upsert_group(get_db(), fingerprint=error_fingerprint(error_type, route, method, frame), fields=fields, status_code=status_code)
 
 
 def unwrap_exception(exc: BaseException) -> BaseException:
@@ -161,20 +272,19 @@ def unwrap_exception(exc: BaseException) -> BaseException:
 
 def format_stack(exc: BaseException) -> str:
     """Nur diese Ausnahme ohne verkettete Vorgänger; bleibt sie zu lang, das Ende -
-    dort stehen die eigenen Zeilen und die Meldung."""
+    dort stehen die eigenen Zeilen und die Meldung. Nur fürs Container-Log - gespeichert werden die Stellen
+    (``server_frames``)."""
     text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__, chain=False))
     return text[-STACK_LIMIT:] if len(text) > STACK_LIMIT else text
 
 
 async def record_exception(app: Any, request: Any, exc: BaseException, status_code: int = 500) -> str | None:
-    """Eine unbehandelte Ausnahme als Gruppe festhalten."""
+    """Eine unbehandelte Ausnahme als Gruppe festhalten - Art, Stellen, Route, Version; nie die Meldung (#1657)."""
     exc = unwrap_exception(exc)
-    stack = format_stack(exc)
     return await _upsert_error(
         app, request,
         error_type=type(exc).__name__,
-        message=str(exc) or type(exc).__name__,
-        stack=stack,
+        stack=server_frames(exc),
         status_code=status_code,
         frame=top_frame(exc),
     )
@@ -185,10 +295,74 @@ async def record_http_error(app: Any, request: Any, status_code: int) -> str | N
     return await _upsert_error(
         app, request,
         error_type=f"HTTP {status_code}",
-        message=f"Antwort {status_code}",
         stack="",
         status_code=status_code,
     )
+
+
+CLIENT_SOURCES = ("web", "app")
+
+
+def client_fingerprint(source: str, error_type: str, route: str, frames: str) -> str:
+    """Gleiche Art, gleiche Seite, gleiche oberste Stelle - eine Gruppe. Der Hash der Bausteine fällt vorher weg
+    (``ops_error_scrub``), so bleibt die Gruppe über Deploys hinweg dieselbe, solange die Zeile gleich ist."""
+    first = frames.split("\n", 1)[0] if frames else ""
+    return error_fingerprint(f"{source}:{error_type}", route, "", first)
+
+
+OVERFLOW_PREFIX = "client-overflow"
+OVERFLOW_TYPE = "Weitere Fehler (Obergrenze)"
+
+
+def overflow_fingerprint(source: str) -> str:
+    """Je Quelle eine eigene Sammelgruppe (``client-overflow:web``, ``client-overflow:app``)."""
+    return f"{OVERFLOW_PREFIX}:{source}"
+
+
+def _cap_key(current) -> str:
+    from services.ops_alerts import helper_day
+
+    return f"client_groups:{helper_day(current)}"
+
+
+async def _room_for_new_group(db, settings: dict, current) -> bool:
+    """Obergrenze (#1657): höchstens ``client_group_cap`` neue Gruppen aus Website und App je Tag (UTC). Hier wird nur
+    gelesen; gezählt wird erst, wenn eine Gruppe wirklich angelegt wurde (``_count_new_group``). Kommen viele neue Fehler
+    zugleich, kann die Grenze knapp überschritten werden - das ist hinnehmbar."""
+    row = await db.ops_alert_state.find_one({"key": _cap_key(current)}, {"_id": 0, "count": 1}) or {}
+    return int(row.get("count") or 0) < int(settings["client_group_cap"])
+
+
+async def _count_new_group(db, current) -> None:
+    await _counter(db, _cap_key(current), current)
+
+
+async def record_client_error(db, *, source: str, error_type: object, stack: str, route: str, version: str, settings: dict | None = None) -> str | None:
+    """Ein Fehler aus Website oder App (#1657) - bereinigt wie ein Serverfehler, in derselben Liste. Ist die Obergrenze
+    neuer Gruppen für heute erreicht, zählt ein neuer Fehler in der Sammelgruppe „Weitere Fehler (Obergrenze)“ seiner
+    Quelle; bekannte Gruppen zählen weiter."""
+    if source not in CLIENT_SOURCES:
+        return None
+    settings = settings or await error_settings(db)
+    kind = clean_client_error_type(error_type)
+    frames = client_frames(stack, limit=CLIENT_FRAME_LIMIT)
+    page = client_route(route)
+    fingerprint = client_fingerprint(source, kind, page, frames)
+    fields = {"source": source, "error_type": kind, "stack": frames, "route": page, "method": "", "version": clean_version(version)}
+    on_new = None
+    try:
+        known = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0, "fingerprint": 1})
+        if not known:
+            if await _room_for_new_group(db, settings, now_utc()):
+                async def on_new(current):
+                    await _count_new_group(db, current)
+            else:
+                fingerprint = overflow_fingerprint(source)
+                fields = {"source": source, "error_type": OVERFLOW_TYPE, "stack": "", "route": "/", "method": "", "version": clean_version(version)}
+    except Exception as exc:  # noqa: BLE001 - die Aufzeichnung darf die Antwort nie verhindern
+        logger.debug("[ops] client error record failed: %s", type(exc).__name__)
+        return None
+    return await upsert_group(db, fingerprint=fingerprint, fields=fields, settings=settings, on_new=on_new)
 
 
 def is_multipart(request: Any) -> bool:
@@ -329,12 +503,29 @@ def _since_iso(hours: int) -> str:
     return (now_utc() - timedelta(hours=hours)).isoformat()
 
 
-async def errors_overview(db, status: str = "open", limit: int = 100) -> list[dict]:
+async def errors_overview(db, status: str = "open", limit: int = 100, source: str = "all", q: str = "") -> list[dict]:
+    """Die Gruppen für Betrieb → Fehler: Stand, Quelle (#1657: Server, Website, App) und Suche in Fehlerart, Route,
+    Stelle und Kennung (die Kennung von der Fehlerseite - auch nur ihr Anfang)."""
     query: dict = {}
     if status == "open":
         query["resolved_at"] = None
     elif status == "resolved":
         query["resolved_at"] = {"$ne": None}
+    if source == "server":
+        # Gruppen aus der Zeit vor #1657 haben keine Quelle - sie sind alle vom Server.
+        query["source"] = {"$nin": list(CLIENT_SOURCES)}
+    elif source in CLIENT_SOURCES:
+        query["source"] = source
+    text = " ".join(str(q or "").split())[:80]
+    if text:
+        pattern = re.escape(text)
+        query["$or"] = [
+            {"fingerprint": {"$regex": f"^{pattern}"}},
+            {"error_type": {"$regex": pattern, "$options": "i"}},
+            {"route": {"$regex": pattern, "$options": "i"}},
+            {"stack": {"$regex": pattern, "$options": "i"}},
+            {"version": {"$regex": pattern, "$options": "i"}},
+        ]
     rows = await db.ops_errors.find(query, {"_id": 0}).sort("last_seen_at", -1).to_list(max(1, min(int(limit), 500)))
     return rows
 
@@ -407,4 +598,16 @@ async def ops_summary(db) -> dict:
         "slowest_route_24h": {"route": slowest.get("route"), "duration_ms": slowest.get("duration_ms")} if slowest else None,
         "threshold_ms": SLOW_REQUEST_MS,
         "checks": await latest_checks_summary(db),
+        "reachability": await _reachability_summary(db),
     }
+
+
+async def _reachability_summary(db) -> dict | None:
+    """Erreichbarkeit (#1657) für Betrieb → Fehler: je Ziel Zustand und seit wann - nur für die Verwaltung."""
+    from services.ops_reachability import STATE_ID
+
+    doc = await db.settings.find_one({"id": STATE_ID}, {"_id": 0})
+    if not doc:
+        return None
+    targets = {key: {"state": row.get("state"), "since": row.get("since")} for key, row in (doc.get("targets") or {}).items()}
+    return {"overall": doc.get("overall") or "ok", "checked_at": doc.get("checked_at"), "targets": targets}
