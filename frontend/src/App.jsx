@@ -121,6 +121,8 @@ const EmailVerificationPage = lazyPage(() => import("@/pages/public/EmailVerific
 const NewsletterUnsubscribePage = lazyPage(() => import("@/pages/public/NewsletterUnsubscribePage"));
 const PrivacyPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const ImprintPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.ImprintPage })));
+// Statusseite (#1657): zwei Zustände aus der Überwachung, nicht im Index.
+const StatusPage = lazyPage(() => import("@/pages/public/StatusPage"));
 const TermsPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
 // „Neu auf der Website“ (#1240): die letzten Neuerungen aus src/whatsnew.json.
 const WhatsNewPage = lazyPage(() => import("@/pages/public/WhatsNewPage"));
@@ -365,6 +367,7 @@ function App() {
           <Route path="/news/:slug" element={<NewsDetailPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/imprint" element={<ImprintPage />} />
+          <Route path="/status" element={<StatusPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/neu" element={<WhatsNewPage />} />
           <Route path="/faq" element={<FaqPage />} />
