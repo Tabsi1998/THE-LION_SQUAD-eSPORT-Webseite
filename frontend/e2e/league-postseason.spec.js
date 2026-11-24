@@ -238,7 +238,9 @@ test.describe("Liga: Playoffs und Relegation", () => {
       await expect(pairs.first()).toContainText("Liga 1 · Heim");
       await expect(pairs.first()).toContainText(played.upper.display_name);
       await expect(pairs.first()).toContainText("Liga 2");
-      await expect(pairs.first()).toContainText(`${played.lower.display_name} steigt auf, ${played.upper.display_name} steigt ab.`);
+      // Die Relegation läuft noch: Es steht nur, wer gewonnen hat - was daraus folgt, erst nach ihrem Abschluss (Nr. 213).
+      await expect(pairs.first()).toContainText(`${played.lower.display_name} gewinnt.`);
+      await expect(pairs.first()).not.toContainText("steigt");
       await expect(pairs.first().getByRole("link")).toHaveAttribute("href", `/matches/${played.match_id}`);
       await expect(pairs.nth(1)).toContainText(open.lower.display_name);
       await expect(pairs.nth(1)).toContainText("Noch nicht gespielt");
@@ -248,6 +250,25 @@ test.describe("Liga: Playoffs und Relegation", () => {
       await shot(relegation, `playoffs-relegation-${width}`);
     });
   }
+
+  test("Ligaseite: nach dem Abschluss der Relegation steht, wer auf- und wer absteigt", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const season = JSON.parse(JSON.stringify(DATA.public_season));
+    const row = season.divisions[0].postseason[1];
+    // Derselbe Stand, beide Paarungen gespielt und die Relegation abgeschlossen: in der zweiten gewinnt das Team der oberen Liga.
+    row.closed = true;
+    row.pairs[1] = { ...row.pairs[1], decided: true, upper: { ...row.pairs[1].upper, score: 2, won: true }, lower: { ...row.pairs[1].lower, score: 0, won: false } };
+    await mockServer(page);
+    await page.route(`**/api/leagues/${ids.league_slug}/${ids.season_slug}`, json(season));
+    await page.goto(LIGA);
+    const relegation = page.getByTestId(`league-postseason-relegation-${ids.relegation}`);
+    const pairs = relegation.getByTestId(`league-relegation-pairs-${ids.relegation}`).getByRole("listitem");
+    const [first, second] = row.pairs;
+    await expect(pairs.first()).toContainText(`${first.lower.display_name} steigt auf, ${first.upper.display_name} steigt ab.`);
+    await expect(pairs.nth(1)).toContainText(`${second.upper.display_name} bleibt in Liga 1, ${second.lower.display_name} in Liga 2.`);
+    await noSideScroll(page);
+    await shot(relegation, "playoffs-relegation-abgeschlossen-1440");
+  });
 
   test("ohne Playoffs zeigt die Ligaseite keinen Abschnitt und die Tabelle kein Kennzeichen", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
