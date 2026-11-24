@@ -345,8 +345,9 @@ Verwaltung – der Server ruft sie selbst auf. Ein Ziel gilt nach **Ausfall nach
 Vorgabe 2, also nach rund 2 Minuten) als ausgefallen und nach **Wieder da nach Erfolgen in Folge** (Vorgabe 2) als wieder
 da – ein einzelner Erfolg zwischen Fehlversuchen meldet nichts. Jeder Wechsel meldet sich genau einmal (Ereignis
 **Erreichbarkeit**); der Stand wird vor dem Senden gespeichert, damit kein späterer Lauf dieselbe Meldung wiederholt. Die
-Wiederkehr nennt die Ausfallzeit und markiert den Ausfall unter Ereignisse als behoben. Ist die Datenbank selbst weg, läuft der Job ohne Sperre weiter und merkt sich den Stand im Speicher; die Meldung kommt
-dann mit der Wiederkehr („Ausfall seit …“), denn Discord-Kanal und Empfänger stehen in der Datenbank. Während der
+Wiederkehr nennt die Ausfallzeit und markiert den Ausfall unter Ereignisse als behoben. Ist die Datenbank selbst weg, läuft der Job ohne Sperre weiter und merkt sich den Stand im Speicher; denn Discord-Kanal
+und Empfänger stehen in der Datenbank. Ginge die Ausfallmeldung erst nach der Wiederkehr raus, kommt stattdessen genau
+eine Meldung „… war nicht erreichbar“ mit „von … bis …“. Während der
 Schreibpause fürs Backup setzt der Job aus.
 
 **Statusseite** `/status` (öffentlich, `noindex`, nicht in der Sitemap): zwei Zustände, die die Prüfung selbst umstellt –
@@ -354,8 +355,10 @@ Schreibpause fürs Backup setzt der Job aus.
 nginx (`/health`), die API und die Datenbank – nicht App, Anmeldung oder einzelne Seiten. Sie liest `GET /api/ops/status`
 (nur `state` und `checked_at`) und fragt jede Minute neu. Verlinkt ist sie klein in der Fußzeile und auf den Fehlerseiten.
 Störung heißt: ein Ziel ist ausgefallen, der letzte Lauf ist veraltet, der Stand ist nicht lesbar oder der Server antwortet
-gar nicht. **Veraltet** heißt: älter als die längste Backup-Schreibpause (`BACKUP_WRITE_PAUSE_MAX_SECONDS`, Vorgabe 900 s)
-plus die Lease (120 s) plus zwei Takte, mindestens 15 Minuten – in der Pause setzt die Prüfung ja aus. Wurde nie geprüft (frische Installation, Job aus),
+gar nicht. **Veraltet** heißt: älter als die längste Backup-Schreibpause (`BACKUP_WRITE_PAUSE_MAX_SECONDS`, Vorgabe 900 s – das
+Backend bekommt denselben Wert wie `scripts/backup.sh` über `docker-compose.yml`, siehe [Backup](../BACKUP_RESTORE.md))
+plus die Lease (120 s) plus zwei Takte, mindestens 15 Minuten – in der Pause setzt die Prüfung ja aus. Die Antwort von
+`/api/ops/status` hält der Server bis zu 15 Sekunden vor; ein neuer Lauf der Prüfung gilt sofort. Wurde nie geprüft (frische Installation, Job aus),
 zeigt sie „Alles läuft“.
 
 **Grenze – wichtig:** Diese Prüfung läuft **auf demselben Server**. Fällt der ganze Server, Docker, der Backend-Prozess, das
