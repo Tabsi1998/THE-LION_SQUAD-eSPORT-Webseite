@@ -207,6 +207,24 @@ export function evaluate({ bundle, kontrast, bewegung, ladezeit, tests = [], prT
     bewegung ? { neu: (bewegung.fresh || []).reduce((sum, item) => sum + item.count - item.allowed, 0), bestand: bewegung.allowedTotal, funde: bewegung.total } : {},
     motionDetails);
 
+  // Je Spec-Datei aus PRUEFTOR_SPECS mindestens ein bestandener Test (#2556): Ist eine Datei ganz übersprungen oder
+  // fehlt sie, zählt das nicht als grün, auch wenn die andere Datei derselben Prüfung bestanden hat. Ohne jedes
+  // Browser-Ergebnis der Prüfung steht das schon oben („fehlt - nicht gelaufen“).
+  const browserTotals = { a11y: a11y.total, kontrast: contrastBrowser.total, ladezeit: loadBrowser.total, bewegung: motionBrowser.total };
+  for (const spec of PRUEFTOR_SPECS) {
+    if (!browserTotals[spec.check]) continue;
+    const own = tests.filter((test) => test.file === spec.file);
+    const ran = own.filter((test) => test.status !== "skipped");
+    const passed = own.filter((test) => test.status === "expected" || test.status === "flaky");
+    if (!ran.length) {
+      results[spec.check].details.push(gone(spec.check, `${spec.file}: kein Test gelaufen (übersprungen oder nicht im Bericht)`));
+      results[spec.check].ok = false;
+    } else if (!passed.length) {
+      results[spec.check].details.push(`${spec.file}: kein Test bestanden`);
+      results[spec.check].ok = false;
+    }
+  }
+
   // Gelockerte Regeln (Ausnahmeliste erweitert, Grenze erhöht) sind nur mit Begründung im PR grün.
   const loosened = {};
   for (const item of (bewegung && bewegung.grown) || []) (loosened.bewegung ??= []).push(`Ausnahmeliste erweitert: ${item.file} ${item.rule} ${item.before} → ${item.after}`);
