@@ -168,7 +168,7 @@ async def division_veto_gaps(db, season: dict, divisions: list[dict]) -> list[st
         own = (division.get("overrides") or {}).get("best_of")
         if (division.get("status") or "active") != "active" or not own or int(own) == best_of:
             continue
-        staffeln = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": division["id"]},
+        staffeln = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.division_id": division["id"], "league_context.kind": None},
                                              {"_id": 0}).to_list(None)
         runs = [await staffel_runs_veto(db, row) for row in staffeln]
         if staffeln and all(runs):

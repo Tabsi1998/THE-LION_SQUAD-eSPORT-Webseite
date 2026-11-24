@@ -19,7 +19,8 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
     from services.league_service import can_see_season
     from services.profile_visibility import PUBLIC, public_season, sees_listed_tournament, sees_season
 
-    finals = await db.league_final_tables.find({"active": True, **query}, {"_id": 0}).sort("closed_at", -1).to_list(LIMIT)
+    # Je Season eine Zeile aus dem Tabellen-Endstand (#2404, F.6): Playoff- und Relegations-Fassungen sind keine weitere Staffel.
+    finals = await db.league_final_tables.find({"active": True, "kind": None, **query}, {"_id": 0}).sort("closed_at", -1).to_list(LIMIT)
     season_ids = sorted({row.get("season_id") for row in finals if row.get("season_id")})
     seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}).to_list(len(season_ids) + 1)}
     league_ids = sorted({row.get("league_id") for row in seasons.values() if row.get("league_id")})

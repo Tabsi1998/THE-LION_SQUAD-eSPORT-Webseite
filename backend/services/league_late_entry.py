@@ -409,7 +409,8 @@ async def season_items(db, season_id: str) -> list[dict]:
     """Die Nachmeldungen aller Staffeln der Season für die Verwaltung: offene zuerst."""
     from services.league_scope import ONLY_LEAGUE
 
-    staffeln = await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE},
+    # Nur reguläre Staffeln (#2404, F.6): Eine Nachmeldung gibt es in Playoffs und Relegation nicht.
+    staffeln = await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": None, **ONLY_LEAGUE},
                                          {"_id": 0, "id": 1, "title": 1, "league_context": 1}).to_list(200)
     by_id = {row["id"]: row for row in staffeln}
     if not by_id:

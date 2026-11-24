@@ -80,7 +80,8 @@ async def _public_staffel(db, tournament: dict, season_id: str, hidden) -> dict 
 
 
 async def _staffeln(db, season_id: str) -> list[dict]:
-    return await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE}, {"_id": 0}).to_list(200)
+    # Platz und Bilanz kommen aus der regulären Staffel (#2404, F.6) - nie aus Playoffs oder Relegation.
+    return await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": None, **ONLY_LEAGUE}, {"_id": 0}).to_list(200)
 
 
 async def find_entry(db, league_slug: str, season_slug: str, ref: str, *, hidden) -> dict | None:

@@ -195,7 +195,7 @@ async def season_readiness(db, league: dict, season: dict, user: dict | None = N
         items.append(("problem", _item("divisions_missing", "Die Season hat noch keine Liga N – darin entstehen die Staffeln.")))
     else:
         with_staffel = set(await db.tournaments.distinct("league_context.division_id",
-                                                         {"league_context.season_id": season["id"], **ONLY_LEAGUE}))
+                                                         {"league_context.season_id": season["id"], "league_context.kind": None, **ONLY_LEAGUE}))
         for division in sorted(active, key=lambda row: int(row.get("level") or 0)):
             if division["id"] not in with_staffel:
                 items.append(("problem", _item("staffel_missing", f"Liga {division.get('level')} hat noch keine Staffel.")))

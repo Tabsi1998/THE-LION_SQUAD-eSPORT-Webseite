@@ -169,7 +169,8 @@ async def season_frame(db, season_id: str | None) -> tuple[dict | None, dict | N
 async def closed_staffeln(db, season_id: str) -> list[dict]:
     from services.league_scope import ONLY_LEAGUE
 
-    rows = await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE, "final_table": {"$type": "object"}},
+    # Auf- und Absteiger kommen aus den Tabellen (#2404, F.6): nur reguläre Staffeln.
+    rows = await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": None, **ONLY_LEAGUE, "final_table": {"$type": "object"}},
                                      {"_id": 0, "id": 1, "slug": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1,
                                       "league_context": 1, "final_table": 1, FIELD: 1}).to_list(STAFFEL_LIMIT)
     return rows

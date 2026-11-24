@@ -155,7 +155,8 @@ async def _sources(db, period: dict, *, viewer: dict | None, hidden, internal: b
     if not internal:
         seasons = [row for row in seasons if await _season_seen(row, viewer, scope)]
     ids = [row["id"] for row in seasons]
-    finals = await db.league_final_tables.find({"season_id": {"$in": ids}, "active": True}, {"_id": 0}).to_list(500) if ids else []
+    # Punkte nur aus Tabellen-Endständen (#2404, F.6): Eine Playoff- oder Relegations-Fassung ist keine weitere Staffel.
+    finals = await db.league_final_tables.find({"season_id": {"$in": ids}, "active": True, "kind": None}, {"_id": 0}).to_list(500) if ids else []
     tournament_ids = sorted({row["tournament_id"] for row in finals})
     tournaments = {row["id"]: row for row in await db.tournaments.find(
         {"id": {"$in": tournament_ids}}, {"_id": 0, "creation_key": 0, "billing": 0}).to_list(len(tournament_ids) + 1)} if tournament_ids else {}
@@ -452,7 +453,7 @@ async def _standing_rows(db, league: dict, period: dict, viewer: dict | None, hi
 
 async def _periods_with(db, query: dict) -> list[tuple[dict, dict]]:
     """Zeiträume, in deren Seasons ein Endstand das Team bzw. die Person trägt (Vorauswahl über die Teilindizes aus F.2)."""
-    finals = await db.league_final_tables.find({"active": True, **query},
+    finals = await db.league_final_tables.find({"active": True, "kind": None, **query},
                                                {"_id": 0, "season_id": 1, "league_id": 1, "closed_at": 1}).to_list(500)
     league_ids = sorted({row.get("league_id") for row in finals if row.get("league_id")})
     if not league_ids:

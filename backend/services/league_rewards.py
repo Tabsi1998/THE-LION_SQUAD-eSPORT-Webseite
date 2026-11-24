@@ -137,7 +137,8 @@ async def admin_view(db, season: dict, *, can_edit: bool) -> dict:
     from services.league_service import division_label
 
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": {"$ne": "archived"}}, {"_id": 0}).sort("level", 1).to_list(50)
-    staffeln = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE},
+    # Die Zusammenstellung gilt dem Tabellenplatz (#2404, Nr. 214): nur reguläre Staffeln.
+    staffeln = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.kind": None, **ONLY_LEAGUE},
                                          {"_id": 0, "id": 1, "title": 1, "status": 1, "final_table": 1, "league_context": 1}).to_list(500)
     counts: dict[str, dict] = {}
     async for doc in db.tournament_awards.find({"league.season_id": season["id"], "reward_key": {"$type": "string"}},
@@ -551,7 +552,7 @@ async def tv_podium(db, tournament: dict | None) -> dict | None:
     from services.league_scope import is_league_staffel
 
     # Erst die Marke am Turnier (ohne Abfrage), dann die geltende Fassung - nur ihre Kennung, nie die ganze Tabelle.
-    if not is_league_staffel(tournament) or not is_closed(tournament):
+    if not is_league_staffel(tournament) or not is_closed(tournament) or (tournament.get("league_context") or {}).get("kind"):
         return None
     if not await db.league_final_tables.find_one({"tournament_id": tournament["id"], "active": True}, {"_id": 0, "id": 1}):
         return None

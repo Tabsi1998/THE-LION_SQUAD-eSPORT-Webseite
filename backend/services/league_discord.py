@@ -463,7 +463,8 @@ async def matchday_posts(db, season: dict, league: dict, settings: dict, now: da
 
     since = _parse(settings.get("matchday_since"))
     sent = 0
-    staffeln = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE,
+    # Spieltags-Meldungen mit Tabelle gibt es nur für reguläre Staffeln (#2404, F.6).
+    staffeln = await db.tournaments.find({"league_context.season_id": season["id"], "league_context.kind": None, **ONLY_LEAGUE,
                                           "status": {"$nin": ["draft", "cancelled", "archived"]}}, {"_id": 0}).to_list(SEASON_LIMIT)
     divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season["id"]}, {"_id": 0}).to_list(50)}
     per_division: dict[str, int] = {}
