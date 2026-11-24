@@ -62,6 +62,8 @@ START_LOCKED = ("Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heim
 STAFFELN_LOCKED = ("In dieser Liga ist schon eine Staffel abgeschlossen. Eine weitere Staffel anlegen geht dann nicht mehr: Playoffs und "
                    "Relegation rechnen mit den Staffeln, die es beim Abschluss gab. Erst alle abgeschlossenen Staffeln dieser Liga im "
                    "Reiter „Abschluss“ wieder öffnen.")
+BEST_OF_KEPT = ("Die Playoffs von {labels} behalten Best of {value}: Seit dem Season-Start steht ihr Best of fest. Für die reguläre "
+                "Season gilt der neue Wert.")
 NO_RETRY = "Dieses Spiel wurde nicht neu angesetzt."
 OUT_FINAL = "Beide sind schon ausgeschieden - das lässt sich nicht zurücknehmen."
 LOCKED = ("In {label} ist schon eine Staffel abgeschlossen. Playoffs an/aus, Plätze je Staffel und Relegation an/aus lassen sich dann "
@@ -291,6 +293,66 @@ async def remember_start(db, season: dict | None) -> None:
     stamp = league_calendar.start_stamp(season)
     if stamp:
         await db.league_seasons.update_one({"id": season["id"], league_calendar.STARTED_AT: None}, {"$set": {league_calendar.STARTED_AT: stamp}})
+
+
+def _group_text(values: dict[int, list[str]]) -> list[str]:
+    out = []
+    for value in sorted(values):
+        labels = values[value]
+        names = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " und " + labels[-1]
+        out.append(BEST_OF_KEPT.format(labels=names, value=value))
+    return out
+
+
+async def keep_best_of(db, season: dict, after_season: dict, actor: dict | None, *, division: dict | None = None,
+                       after_division: dict | None = None) -> list[str]:
+    """Das Best of der Playoffs bleibt, wenn sich nach dem Season-Start das Best of der Season oder einer Liga N ändert (Nr. 252):
+    Steht bei den Playoffs „wie in der Season“, erbten sie den neuen Wert - der Wert vom Start wird darum **ausdrücklich
+    festgeschrieben**. Nur wo Playoffs eingeschaltet sind; die reguläre Season ändert ihr Best of wie bisher.
+
+    ``season``/``after_season``: die Season vor und nach der Änderung. ``division``/``after_division``: die eine Liga N, deren
+    Abweichung sich ändert (vorher, nachher). Geschrieben wird an der Vorlage der Season, wenn ihr Best of sich ändert, sonst als
+    eigene Playoff-Einstellung der Liga N. Antwort: die Sätze für die Leitung."""
+    if not season_started(season):
+        return []
+    stored = await _divisions(db, season["id"])
+    before = [division if division and row["id"] == division["id"] else row for row in stored]
+    after = [after_division if after_division and row["id"] == after_division["id"] else row for row in stored]
+    if not rules.any_enabled(season) and not any(isinstance(row.get(rules.FIELD), dict) for row in before):
+        return []
+    was = {row["id"]: settings_of(season, row)["playoffs"] for row in before}
+    moved = [old for old, new in zip(before, after)
+             if was[old["id"]]["enabled"] and settings_of(after_season, new)["playoffs"]["best_of"] != was[old["id"]]["best_of"]]
+    if not moved:
+        return []
+    raw = season.get(rules.FIELD) if isinstance(season.get(rules.FIELD), dict) else {}
+    template = raw.get("playoffs") if isinstance(raw.get("playoffs"), dict) else None
+    pinned = dict(after_season)
+    season_value = None
+    followers = [row for row in moved if not isinstance((row.get(rules.FIELD) or {}).get("playoffs"), dict)]
+    if followers and template is not None and not template.get("best_of") and after_season.get("best_of") != season.get("best_of"):
+        # Das Best of der Season selbst ändert sich: Die Vorlage hält den Wert vom Start fest - wer ihr folgt, folgt weiter.
+        season_value = int(was[followers[0]["id"]]["best_of"])
+        pinned[rules.FIELD] = {**raw, "playoffs": {**template, "best_of": season_value}}
+    own_sets: dict[str, dict] = {}
+    for old, new in zip(before, after):
+        if not was[old["id"]]["enabled"] or settings_of(pinned, new)["playoffs"]["best_of"] == was[old["id"]]["best_of"]:
+            continue
+        # Diese Liga N stünde sonst woanders als am Start (eigenes Best of oder eigene Playoff-Einstellung): ihr Wert an ihr selbst.
+        own = new.get(rules.FIELD) if isinstance(new.get(rules.FIELD), dict) else {}
+        base = own["playoffs"] if isinstance(own.get("playoffs"), dict) else rules.stored(pinned)["playoffs"]
+        own_sets[old["id"]] = {**rules.PLAYOFF_DEFAULTS, **base, "best_of": int(was[old["id"]]["best_of"])}
+    now = now_utc().isoformat()
+    if season_value is not None:
+        await db.league_seasons.update_one({"id": season["id"]}, {"$set": {f"{rules.FIELD}.playoffs.best_of": season_value, "updated_at": now}})
+    for division_id, playoffs in own_sets.items():
+        await db.league_divisions.update_one({"id": division_id}, {"$set": {f"{rules.FIELD}.playoffs": playoffs, "updated_at": now}})
+    await _audit(db, "league.postseason.settings", season["id"], actor or {}, scope="best_of_kept", season_best_of=season_value,
+                 divisions={row["id"]: int(was[row["id"]]["best_of"]) for row in moved}, own=sorted(own_sets))
+    groups: dict[int, list[str]] = {}
+    for row in moved:
+        groups.setdefault(int(was[row["id"]]["best_of"]), []).append(_label(row))
+    return _group_text(groups)
 
 
 # ---------------------------------------------------------------- Plan: Setzliste und Paarungen

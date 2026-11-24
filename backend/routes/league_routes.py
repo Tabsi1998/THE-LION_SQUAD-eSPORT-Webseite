@@ -393,8 +393,17 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
     league = await _call(leagues.get_league(db, season["league_id"]))
     passed: dict = {}
     warnings: list[str] = []
-    doc, changed = await _call(leagues.update_season(db, season, payload, warnings=warnings,
-                                                     before_write=_readiness_gate(db, league, season, me, reason, passed)))
+    gate = _readiness_gate(db, league, season, me, reason, passed)
+
+    async def before_write(after: dict) -> None:
+        await gate(after)
+        if after.get("best_of") != season.get("best_of"):
+            # Nr. 252 (#2404): Nach dem Season-Start behalten die Playoffs ihr Best of - es wird festgeschrieben, bevor die Season schreibt.
+            from services import league_postseason
+
+            warnings.extend(await league_postseason.keep_best_of(db, season, after, me))
+
+    doc, changed = await _call(leagues.update_season(db, season, payload, warnings=warnings, before_write=before_write))
     await _record_readiness_override(db, me, season_id, passed)
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
@@ -726,6 +735,12 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     doc, changed = await _call(leagues.update_division(db, division, payload, warnings=warnings))
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
+    if "overrides" in changed:
+        # Nr. 252 (#2404): Ein eigenes Best of der Liga N ändert nach dem Season-Start nicht das Best of ihrer Playoffs.
+        from services import league_postseason
+
+        season = await _call(leagues.get_season(db, division["season_id"]))
+        warnings.extend(await league_postseason.keep_best_of(db, season, season, me, division=division, after_division=doc))
     # Ohne das Los (#1623, ``draw``): Das liefert ``…/draws`` nur der Zuständigkeit „Anmeldungen“.
     return {**{key: value for key, value in doc.items() if key not in ("draw", "zone_decisions")}, "warnings": warnings}
 
