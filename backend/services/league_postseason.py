@@ -59,6 +59,9 @@ TOO_FEW_HINT = ("In {label} kommen mit {per} {per_word} je Staffel und {count} {
                 "keine Playoffs - der Meister kommt aus der Tabelle, die Season wartet nicht darauf.")
 START_LOCKED = ("Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht der Playoffs fest ({label}). Das gilt auch nach "
                 "einem Wiederöffnen.")
+STAFFELN_LOCKED = ("In dieser Liga ist schon eine Staffel abgeschlossen. Eine weitere Staffel anlegen geht dann nicht mehr: Playoffs und "
+                   "Relegation rechnen mit den Staffeln, die es beim Abschluss gab. Erst alle abgeschlossenen Staffeln dieser Liga im "
+                   "Reiter „Abschluss“ wieder öffnen.")
 NO_RETRY = "Dieses Spiel wurde nicht neu angesetzt."
 OUT_FINAL = "Beide sind schon ausgeschieden - das lässt sich nicht zurücknehmen."
 LOCKED = ("In {label} ist schon eine Staffel abgeschlossen. Playoffs an/aus, Plätze je Staffel und Relegation an/aus lassen sich dann "
@@ -172,11 +175,17 @@ async def mark_rows(db, tournament: dict | None, rows: list[dict]) -> list[dict]
 
 
 async def close_snapshot(db, season: dict, division: dict) -> dict | None:
-    """Was der Endstand einer regulären Staffel festhält (Nr. 228): Plätze je Staffel und „Meister aus“ - ``None``, wenn nichts davon gilt."""
+    """Was der Endstand einer regulären Staffel festhält (Nr. 228): Plätze je Staffel, die Zahl der regulären Staffeln und „Meister
+    aus“ - ``None``, wenn nichts davon gilt. Ist in der Liga N schon eine Staffel abgeschlossen, gilt ihr Schnappschuss für jede
+    weitere: So steht mit dem ersten Abschluss fest, ob gespielt wird und woher der Meister kommt."""
+    frozen, snapshot = await _frozen(db, division.get("id"))
+    if frozen:
+        return dict(snapshot) or None
     found = settings_of(season, division)
     out = {}
     if found["playoffs"]["enabled"]:
         out["per_staffel"] = int(found["playoffs"]["per_staffel"])
+        out["staffeln"] = len(await league_cross_zones.staffeln_of(db, division["id"]))
     if found["champion_source"] == rules.PLAYOFFS:
         # Nur, wenn die oberste Liga N wirklich Playoffs spielen kann - sonst bleibt der Meister bei der Tabelle (``champion_from_playoffs``).
         divisions = await _divisions(db, season["id"])
@@ -185,25 +194,90 @@ async def close_snapshot(db, season: dict, division: dict) -> dict | None:
     return out or None
 
 
+async def _frozen(db, division_id: str | None) -> tuple[bool, dict]:
+    """Was der erste Abschluss dieser Liga N festgehalten hat (Nr. 228): der Schnappschuss ``postseason`` ihres frühesten geltenden
+    Tabellen-Endstands. ``(False, {})``, solange keine reguläre Staffel der Liga N abgeschlossen ist - dann gilt die Einstellung von
+    heute. Sind alle wieder geöffnet, ebenso."""
+    if not division_id:
+        return False, {}
+    finals = await _finals(db, await league_cross_zones.staffeln_of(db, division_id))
+    if not finals:
+        return False, {}
+    first = min(finals.values(), key=lambda row: (str(row.get("closed_at") or ""), str(row.get("id") or "")))
+    snapshot = first.get(rules.FIELD)
+    return True, snapshot if isinstance(snapshot, dict) else {}
+
+
 async def playoffs_feasible(db, season: dict | None, division: dict | None) -> bool:
     """Kommen in dieser Liga N überhaupt zwei Playoff-Teams zusammen (Plätze je Staffel mal reguläre Staffeln)? Sonst spielt sie keine
-    Playoffs - für Abschluss und Meister gilt sie als „ohne Playoffs“. Aus den Einstellungen und der Zahl der Staffeln, damit es schon
-    beim Abschluss der ersten Staffel feststeht."""
+    Playoffs - für Abschluss und Meister gilt sie als „ohne Playoffs“. Vor dem ersten Abschluss aus den Einstellungen und der Zahl der
+    Staffeln von heute; **ab dem ersten Abschluss aus dem Endstand** (``postseason.staffeln``, eingefroren wie Nr. 228): Eine Staffel,
+    die danach dazukommt oder wegfällt, ändert nicht mehr, ob gespielt wird."""
     if not season or not division or not division.get("id"):
         return False
     settings = settings_of(season, division)
     if not settings["playoffs"]["enabled"]:
         return False
-    staffeln = await league_cross_zones.staffeln_of(db, division["id"])
-    return int(settings["playoffs"].get("per_staffel") or 0) * len(staffeln) >= 2
+    found, snapshot = await _frozen(db, division["id"])
+    count = int(snapshot.get("staffeln") or 0) if found else 0
+    if not count:
+        count = len(await league_cross_zones.staffeln_of(db, division["id"]))
+    per = int((snapshot.get("per_staffel") if found else None) or settings["playoffs"].get("per_staffel") or 0)
+    return per * count >= 2
 
 
 async def champion_from_playoffs(db, season: dict | None, top_division: dict | None = None) -> bool:
     """Kommt der Meister aus den Playoffs? Nur, wenn die Season das sagt **und** die oberste Liga N Playoffs spielen kann - mit weniger
-    als zwei Playoff-Teams bleibt es beim Meister aus der Tabelle (sonst gäbe es keinen)."""
-    if rules.stored(season)["champion_source"] != rules.PLAYOFFS:
+    als zwei Playoff-Teams bleibt es beim Meister aus der Tabelle (sonst gäbe es keinen). Ab dem ersten Abschluss in der obersten
+    Liga N sagt es ihr Endstand (``postseason.champion_source``): Alle Staffeln derselben Liga N bekommen dieselbe Antwort - nie ein
+    Meister aus der Tabelle **und** einer aus den Playoffs."""
+    if rules.stored(season)["champion_source"] != rules.PLAYOFFS or not top_division:
         return False
+    found, snapshot = await _frozen(db, top_division.get("id"))
+    if found:
+        return snapshot.get("champion_source") == rules.PLAYOFFS
     return await playoffs_feasible(db, season, top_division)
+
+
+async def staffeln_locked(db, season: dict | None, division: dict | None) -> bool:
+    """Stehen die regulären Staffeln dieser Liga N fest? Ja, sobald eine von ihnen abgeschlossen ist **und** die Liga N Playoffs
+    spielt oder an einer Relegation hängt (als obere oder als untere Liga N): Wie viele Teams in die Playoffs kommen und ob die
+    Relegation aufgeht, steht mit dem ersten Abschluss fest. Ohne Playoffs und Relegation nie - dort bleibt alles wie vorher."""
+    if not season or not division or not division.get("id"):
+        return False
+    divisions = await _divisions(db, division["season_id"])
+    if not rules.any_enabled(season) and not any(isinstance(row.get(rules.FIELD), dict) for row in divisions):
+        return False
+    upper = next((row for row in divisions if (_lower(divisions, row) or {}).get("id") == division["id"]), None)
+    own = settings_of(season, division)
+    if not (own["playoffs"]["enabled"] or own["relegation"]["enabled"] or (upper and settings_of(season, upper)["relegation"]["enabled"])):
+        return False
+    return (await _frozen(db, division["id"]))[0]
+
+
+async def table_champion(db, season_id: str | None) -> dict | None:
+    """Der Meister, wenn die oberste Liga N **keine Playoffs spielt**, obwohl er aus den Playoffs kommen sollte (Nr. 251) - gleich
+    warum: zu wenige Teams nach den Einstellungen oder nach Austritten. Dann ist Meister das beste verbliebene Team der Tabelle; ist
+    keines übrig, bleibt der Titel unvergeben (``None``). ``None`` auch, solange Playoffs noch möglich sind oder es sie gibt - dort
+    entscheidet der Baum (und „im Finale fehlen beide“ lässt den Titel unvergeben, Nr. 247).
+
+    Antwort: ``{tournament_id, registration_id, display_name, team_id}`` - die reguläre Staffel, aus deren Endstand das Team kommt."""
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0}) if season_id else None
+    divisions = await _divisions(db, season_id) if season else []
+    top = divisions[0] if divisions else None
+    if not top:
+        return None
+    found, snapshot = await _frozen(db, top["id"])
+    if not found or snapshot.get("champion_source") != rules.PLAYOFFS or await _stored(db, top["id"], PLAYOFF):
+        return None
+    plan = await playoff_plan(db, season, top)
+    if plan["frame"]["blockers"] or len(plan["seeds"]) != 1:
+        return None
+    seed = plan["seeds"][0]
+    table = next((row for row in plan["frame"]["tables"] if row["tournament_id"] == seed["tournament_id"]), None)
+    row = next((item for item in (table or {}).get("rows") or [] if item.get("registration_id") == seed["registration_id"]), {})
+    return {"tournament_id": seed["tournament_id"], "registration_id": seed["registration_id"],
+            "display_name": seed.get("display_name") or row.get("display_name") or "Team", "team_id": row.get("team_id")}
 
 
 def season_started(season: dict | None, now=None) -> bool:

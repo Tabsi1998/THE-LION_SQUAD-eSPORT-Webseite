@@ -26,7 +26,7 @@ READERS = {
     "services/league_discord.py": (2, MIXED, "Spieltags-Meldung mit Tabelle nur regulär; der Meister aus den Playoffs für die Abschluss-Meldung"),
     "services/league_draw.py": (1, REGULAR, "Los auf Staffeln: filtert ``kind`` nach dem Lesen"),
     "services/league_eligibility.py": (2, ALL, "Spielberechtigung gilt der Season"),
-    "services/league_final.py": (5, MIXED, "Abschluss zählt alle Arten; Tabelle, Zonen und Vergleich nur regulär"),
+    "services/league_final.py": (6, MIXED, "Abschluss zählt alle Arten; Tabelle, Zonen, Vergleich und der Meister ohne Playoffs (Nr. 251) nur regulär"),
     "services/league_final_read.py": (1, ALL, "die geltende Fassung genau dieser Staffel"),
     "services/league_finale.py": (4, MIXED, "Auf- und Absteiger nur aus Tabellen, dazu die Wirkung der Relegation; der TV-Schritt an jeder Staffel"),
     "services/league_games.py": (1, REGULAR, "Doppel-Einsatz: nur unter Staffeln derselben Art"),

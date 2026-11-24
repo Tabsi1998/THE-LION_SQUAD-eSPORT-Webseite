@@ -767,6 +767,12 @@ async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: 
 
     db = get_db()
     division = await _call(leagues.get_division(db, division_id))
+    # Ab dem ersten Abschluss stehen die regulären Staffeln einer Liga N mit Playoffs oder Relegation fest (#2404, wie Nr. 228/231):
+    # Wie viele Teams in die Playoffs kommen und ob die Relegation aufgeht, rechnet mit den Staffeln, die es beim Abschluss gab.
+    from services import league_postseason
+
+    if await league_postseason.staffeln_locked(db, await _call(leagues.get_season(db, division["season_id"])), division):
+        raise HTTPException(status_code=422, detail=league_postseason.STAFFELN_LOCKED)
     doc = await _call(leagues.create_staffel(db, division, body.staffel, me))
     reset_scope_cache()
     await _create_initial_stage_bracket_preview(db, doc, me.get("id"))

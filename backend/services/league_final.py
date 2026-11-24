@@ -538,18 +538,54 @@ def all_closed(staffeln: list[dict]) -> bool:
     return bool(counted) and all(is_closed(row) for row in counted)
 
 
+async def _season_done(db, season_id: str) -> bool:
+    """Alle Staffeln aller Arten abgeschlossen - und nichts Eingeschaltetes fehlt noch."""
+    if not all_closed(await season_staffeln(db, season_id)):
+        return False
+    # Playoffs oder Relegation eingeschaltet, aber noch nicht angelegt (F.6, #2404): Die Season läuft weiter.
+    from services import league_postseason
+
+    return not await league_postseason.missing(db, season_id)
+
+
+async def champion_without_playoffs(db, season_id: str | None) -> int:
+    """Meister ohne Playoffs (Nr. 251): Spielt die oberste Liga N keine Playoffs, obwohl der Meister aus ihnen kommen sollte, ist
+    Meister das beste verbliebene Team der Tabelle - sobald die Season fertig ist. Der Eintrag steht am Endstand der Staffel dieses
+    Teams (``champion`` mit ``champion_fallback``) und in ``tournament_awards``. Läuft die Season wieder (Wiederöffnen) oder gibt es
+    doch Playoffs, verschwindet er - nie ein Meister aus der Tabelle neben einem aus den Playoffs."""
+    if not season_id:
+        return 0
+    from services import league_postseason
+    from services.awards import forget_outcome
+
+    wanted = await league_postseason.table_champion(db, season_id) if await _season_done(db, season_id) else None
+    marked = await db.league_final_tables.find({"season_id": season_id, "active": True, "kind": None, "champion_fallback": True},
+                                               {"_id": 0, "id": 1, "tournament_id": 1, "champion": 1}).to_list(ITEM_LIMIT)
+    for final in marked:
+        if (wanted and final["tournament_id"] == wanted["tournament_id"]
+                and (final.get("champion") or {}).get("registration_id") == wanted["registration_id"]):
+            continue
+        await db.league_final_tables.update_one({"id": final["id"]}, {"$set": {"champion": None}, "$unset": {"champion_fallback": ""}})
+        forget_outcome(db, final["tournament_id"])
+        await db.tournament_awards.delete_many({"tournament_id": final["tournament_id"], "reward_key": None})
+    if not wanted:
+        return 0
+    tournament = await db.tournaments.find_one({"id": wanted["tournament_id"]}, {"_id": 0})
+    final = await active_final(db, wanted["tournament_id"])
+    if not tournament or not final:
+        return 0
+    champion = {key: wanted.get(key) for key in ("registration_id", "display_name", "team_id")}
+    await db.league_final_tables.update_one({"id": final["id"], "active": True}, {"$set": {"champion": champion, "champion_fallback": True}})
+    return await record_champion(db, tournament, {**final, "champion": champion}, await _frame(db, tournament))
+
+
 async def _season_follows(db, season_id: str | None, actor_id: str | None, tournament_id: str) -> str | None:
     """Sind alle Staffeln abgeschlossen, ist die Season „beendet“ (mit Protokoll); wird eine wieder geöffnet, läuft sie wieder -
     aber nur, wenn der Abschluss sie beendet hat (``final_closed_at``), nie gegen eine Schaltung von Hand."""
     if not season_id:
         return None
     now = now_utc().isoformat()
-    closed = all_closed(await season_staffeln(db, season_id))
-    if closed:
-        # Playoffs oder Relegation eingeschaltet, aber noch nicht angelegt (F.6, #2404): Die Season läuft weiter.
-        from services import league_postseason
-
-        closed = not await league_postseason.missing(db, season_id)
+    closed = await _season_done(db, season_id)
     if closed:
         changed = await db.league_seasons.update_one({"id": season_id, "status": "active"},
                                                      {"$set": {"status": "completed", "final_closed_at": now, "updated_at": now}})
@@ -734,6 +770,7 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
         # Die Zusammenstellung der Season gilt dem Tabellenplatz (Nr. 214) - eine Playoff- oder Relegations-Fassung vergibt sie nicht.
         await _follow_up("Belohnungen", tid, lambda: league_rewards.grant_and_notify(db, {**tournament, "status": "completed"}, final, frame))
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
+    await _follow_up("Meister ohne Playoffs", tid, lambda: champion_without_playoffs(db, context.get("season_id")))
     await _follow_up("TV-Saisonfinale", tid, lambda: _join_tv_finale(db, context.get("season_id"), tid))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, lambda: notify_captains(db, tournament, final, frame, "closed"))
@@ -831,6 +868,7 @@ async def _reopen(db, tournament: dict, actor: dict, reason, *, conflict_reason:
     await _follow_up("Ruhen des Meister-Eintrags", tid, lambda: suspend_champion(db, tid))
     await _follow_up("TV-Saisonfinale", tid, lambda: _forget_tv_finale(db, context.get("season_id")))
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
+    await _follow_up("Meister ohne Playoffs", tid, lambda: champion_without_playoffs(db, context.get("season_id")))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, tell)
     return {"final": {**final, "active": False, "reopened_at": now.isoformat(), "reopened_by": actor.get("id"), "reopen_reason": text},

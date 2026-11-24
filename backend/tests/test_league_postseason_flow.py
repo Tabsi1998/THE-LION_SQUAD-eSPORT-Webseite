@@ -215,7 +215,7 @@ async def test_an_exited_team_never_qualifies_and_the_next_one_moves_up(flow):
     part = division_of(await cockpit(flow, world), 1)["playoffs"]
     assert [row["display_name"] for row in part["seeds"]] == [regs[index]["display_name"] for index in (0, 2, 3, 4)]
     final = await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0})
-    assert final["postseason"] == {"per_staffel": 4}
+    assert final["postseason"] == {"per_staffel": 4, "staffeln": 1}
     assert [bool(row.get("playoff")) for row in final["rows"]] == [True, True, True, True, False]
 
 
@@ -290,7 +290,7 @@ async def test_the_playoff_final_decides_the_champion_when_the_season_says_so(fl
     # „Meister aus Playoffs“: Platz 1 der Staffel ist Staffelsieger, nicht Meister - kein Meister-Eintrag aus der Tabelle.
     finals = await flow.db.league_final_tables.find({"season_id": world["season"]["id"], "active": True}, {"_id": 0}).to_list(None)
     assert all(row["champion_place"] is False and row["champion"] is None for row in finals)
-    assert all(row["postseason"] == {"per_staffel": 2, "champion_source": "playoffs"} for row in finals)
+    assert all(row["postseason"] == {"per_staffel": 2, "staffeln": 2, "champion_source": "playoffs"} for row in finals)
     assert await flow.db.tournament_awards.count_documents({"reward_key": None}) == 0
     season = await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0})
     assert season["status"] != "completed"  # die Playoffs fehlen noch
