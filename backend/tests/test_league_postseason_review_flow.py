@@ -2,7 +2,9 @@
 
 Nachrücken bleibt auch nach einem zweiten Neuberechnen bestehen, eine Liga mit weniger als zwei Playoff-Teams hält die Season nicht
 offen, der erste doppelte Nichtantritt zählt und lässt sich zurücknehmen, die Relegation liegt hinter den Playoffs beider Ligen, Best of,
-Platz 3 und Heimrecht stehen ab dem Season-Start fest. Über die echten Routen, nur erfundene Namen.
+Platz 3 und Heimrecht stehen ab dem Season-Start fest. Dazu die Nachprüfung mit Nr. 250 und 251: die Sperre ab dem Start ohne Umweg,
+beidseitig Abwesende einen Platz hinter den Verlierern ihrer Runde, ohne Playoffs ist Meister das beste verbliebene Team.
+Über die echten Routen, nur erfundene Namen.
 """
 import pathlib
 import sys
@@ -400,3 +402,276 @@ async def test_the_tv_season_finale_shows_who_moves_through_the_relegation(flow)
     # Der gespeicherte Endstand bleibt, wie er war - die Wirkung kommt beim Lesen dazu.
     final = await flow.db.league_final_tables.find_one({"tournament_id": world["tids"][1][0], "active": True}, {"_id": 0})
     assert [row["zone"] for row in final["rows"]] == [None, None, "playoff_relegation", "relegation"]
+
+
+# ================================================================ Nachprüfung (Runde 3): Nr. 249 ohne Umweg, Nr. 250, Nr. 251
+
+async def start_season(flow, world: dict) -> None:
+    await flow.db.league_seasons.update_one({"id": world["season"]["id"]}, {"$set": {
+        "start_date": (now_utc() - timedelta(days=3)).isoformat(), "status": "active"}})
+
+
+async def stored_playoffs(flow, world: dict) -> dict:
+    return (await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0}))["postseason"]["playoffs"]
+
+
+OTHER = {"per_staffel": 4, "best_of": 7, "third_place": True, "home": "draw"}
+
+
+@pytest.mark.asyncio
+async def test_switching_playoffs_off_and_on_does_not_open_the_start_lock(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}})
+    await start_season(flow, world)
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    flow.act_as(world["lead"])
+    # Ausschalten und dabei andere Werte mitschicken: Die Werte stehen auch im Zustand „aus“ fest.
+    refused = await flow.put(url, json={"playoffs": {"enabled": False, **OTHER}})
+    assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"]
+    # Ausschalten allein geht - und wieder einschalten nur mit den Werten vom Start.
+    ok(await flow.put(url, json={"playoffs": {"enabled": False, "per_staffel": 4, "best_of": 3}}))
+    refused = await flow.put(url, json={"playoffs": {"enabled": True, **OTHER}})
+    assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"]
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}}))
+    stored = await stored_playoffs(flow, world)
+    assert (stored["enabled"], stored["best_of"], stored["third_place"], stored["home"], stored["best_of_rounds"]) == (True, 3, False, "better_seed", [])
+
+
+@pytest.mark.asyncio
+async def test_playoffs_switched_on_after_the_start_get_the_defaults(flow):
+    world = await build(flow)
+    await start_season(flow, world)
+    url = f"{ADMIN}/seasons/{world['season']['id']}/postseason"
+    flow.act_as(world["lead"])
+    for body in ({"enabled": True, **OTHER}, {"enabled": True, "per_staffel": 4, "third_place": True},
+                 {"enabled": True, "per_staffel": 4, "home": "draw"}, {"enabled": True, "per_staffel": 4, "best_of_rounds": [{"round": 2, "best_of": 5}]}):
+        refused = await flow.put(url, json={"playoffs": body})
+        assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"], body
+    assert "postseason" not in await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0})
+    # Einschalten selbst geht - mit den Vorgaben: Best of der Season, kein Spiel um Platz 3, Heimrecht für den besser Gesetzten.
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4}}))
+    part = division_of(await cockpit(flow, world), 1)["settings"]["playoffs"]
+    assert (part["enabled"], part["best_of"], part["third_place"], part["home"]) == (True, 3, False, "better_seed")
+
+
+@pytest.mark.asyncio
+async def test_a_division_cannot_set_new_playoff_values_after_the_start(flow):
+    world = await build(flow)
+    await start_season(flow, world)
+    url = f"{ADMIN}/divisions/{world['divisions'][1]['id']}/postseason"
+    flow.act_as(world["lead"])
+    refused = await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 7, "third_place": True}})
+    assert refused.status_code == 422 and "Season-Start" in refused.json()["detail"]
+    assert "postseason" not in await flow.db.league_divisions.find_one({"id": world["divisions"][1]["id"]}, {"_id": 0})
+    # Mit den Vorgaben darf die Liga eigene Playoffs einschalten.
+    ok(await flow.put(url, json={"playoffs": {"enabled": True, "per_staffel": 4, "best_of": 3}}))
+
+
+# ---------------------------------------------------------------- Nr. 250: beidseitig abwesend - ein Platz hinter den Verlierern der Runde
+
+async def absent_twice(flow, world: dict, tid: str, match: dict) -> None:
+    flow.act_as(world["lead"])
+    url = f"{STAFFELN}/{tid}/matches/{match['id']}/double-no-show"
+    ok(await flow.post(url, json={"note": "Beide nicht erschienen"}))
+    ok(await flow.post(url, json={"note": "Wieder nicht erschienen"}))
+
+
+async def final_rows(flow, world: dict, tid: str) -> list[dict]:
+    await settle(flow, tid)
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+    return (await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0}))["rows"]
+
+
+@pytest.mark.asyncio
+async def test_both_absent_in_the_quarterfinal_stand_one_place_behind_its_losers(flow):
+    world = await build(flow, staffeln={1: [8]}, postseason={"playoffs": {"enabled": True, "per_staffel": 8}})
+    await close(flow, world)
+    ok(await create(flow, world, "playoffs"))
+    tid = (await tournament_of(flow, world, "playoff"))["id"]
+    quarter = [match for match in await matches_of(flow, tid) if match["round"] == 1]
+    await absent_twice(flow, world, tid, quarter[0])
+    for _ in range(3):
+        await play_round(flow, world, tid)
+    rows = await final_rows(flow, world, tid)
+    rank = {row["registration_id"]: row["rank"] for row in rows}
+    # Die drei Verlierer der gespielten Viertelfinale teilen Platz 5 - die beiden Abwesenden stehen einen Platz dahinter.
+    assert sorted(rank.values()) == [1, 2, 3, 5, 5, 5, 6, 6]
+    assert [rank[side] for side in sides(quarter[0])] == [6, 6]
+    # Sie bleiben Teilnehmer (für Belohnungen): kein Ausscheiden an der Zeile.
+    assert not any(row.get("exit") for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_both_absent_in_the_semifinal_are_fourth_without_a_third_place_game(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 4}})
+    await close(flow, world)
+    ok(await create(flow, world, "playoffs"))
+    tid = (await tournament_of(flow, world, "playoff"))["id"]
+    first, second = [match for match in await matches_of(flow, tid) if match["round"] == 1]
+    await absent_twice(flow, world, tid, first)
+    await play_round(flow, world, tid)
+    rows = await final_rows(flow, world, tid)
+    rank = {row["registration_id"]: row["rank"] for row in rows}
+    assert sorted(rank.values()) == [1, 3, 4, 4] and [rank[side] for side in sides(first)] == [4, 4]
+    assert not any(row.get("exit") for row in rows)
+
+
+# ---------------------------------------------------------------- Nr. 251: keine Playoffs - Meister ist das beste verbliebene Team
+
+async def reload_season(flow, world: dict) -> dict:
+    return await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+async def test_without_playoffs_after_exits_the_best_remaining_team_is_champion(flow):
+    # Eine Staffel, zwei Playoff-Plätze, Meister aus den Playoffs - drei der vier Teams ziehen sich zurück.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 2}, "champion_source": "playoffs"})
+    tid = world["tids"][1][0]
+    teams = world["regs"][tid]
+    for index in (0, 1, 3):
+        await remove(flow, world, tid, teams[index]["id"])
+    await close(flow, world)
+    # Die Season wartet nicht auf Playoffs, die es nicht geben kann - Meister ist, wer übrig ist.
+    assert (await reload_season(flow, world))["status"] == "completed"
+    final = await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0})
+    assert final["champion"]["registration_id"] == teams[2]["id"] and final["champion_fallback"] is True
+    awards = await flow.db.tournament_awards.find({"reward_key": None}, {"_id": 0}).to_list(10)
+    assert [(row["registration_id"], row["league"]["title"], row["suspended"]) for row in awards] == [(teams[2]["id"], "Meister", False)]
+    # Wiederöffnen: Der Eintrag ruht, die Season läuft wieder - und ein neuer Abschluss setzt ihn wieder, nie doppelt.
+    flow.act_as(await flow.add_staff(name="Zweite Leitung"))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    assert (await reload_season(flow, world))["status"] == "active"
+    assert await flow.db.tournament_awards.count_documents({"reward_key": None, "suspended": False}) == 0
+    await close(flow, world)
+    assert (await reload_season(flow, world))["status"] == "completed"
+    awards = await flow.db.tournament_awards.find({"reward_key": None, "suspended": False}, {"_id": 0}).to_list(10)
+    assert [row["registration_id"] for row in awards] == [teams[2]["id"]]
+
+
+@pytest.mark.asyncio
+async def test_without_playoffs_and_without_a_team_left_the_title_stays_open(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 2}, "champion_source": "playoffs"})
+    tid = world["tids"][1][0]
+    for team in world["regs"][tid]:
+        await remove(flow, world, tid, team["id"])
+    await close(flow, world)
+    assert (await reload_season(flow, world))["status"] == "completed"
+    final = await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0})
+    assert not final.get("champion") and not final.get("champion_fallback")
+    assert await flow.db.tournament_awards.count_documents({"reward_key": None}) == 0
+
+
+@pytest.mark.asyncio
+async def test_played_playoffs_keep_their_champion_and_no_table_champion_appears(flow):
+    # Gegenprobe: Mit genug Teams entscheiden die Playoffs - beim Abschluss der Staffel entsteht kein Meister aus der Tabelle.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 2}, "champion_source": "playoffs"})
+    tid = world["tids"][1][0]
+    await remove(flow, world, tid, world["regs"][tid][3]["id"])
+    await close(flow, world)
+    assert (await reload_season(flow, world))["status"] == "active"
+    final = await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0})
+    assert not final.get("champion") and not final.get("champion_fallback")
+    assert await flow.db.tournament_awards.count_documents({"reward_key": None}) == 0
+
+
+# ---------------------------------------------------------------- KN1: Machbarkeit steht ab dem ersten Abschluss fest
+
+@pytest.mark.asyncio
+async def test_no_further_staffel_once_one_of_the_division_is_closed(flow):
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 1}, "champion_source": "playoffs"})
+    await close(flow, world)
+    url = f"{ADMIN}/divisions/{world['divisions'][1]['id']}/staffeln"
+    flow.act_as(world["lead"])
+    refused = await flow.post(url, json={})
+    assert refused.status_code == 422 and "abgeschlossen" in refused.json()["detail"]
+    assert len(await flow.db.tournaments.find({"league_context.division_id": world["divisions"][1]["id"]}, {"_id": 0}).to_list(10)) == 1
+    # Sind alle Staffeln der Liga wieder offen, geht es wieder.
+    flow.act_as(await flow.add_staff(name="Zweite Leitung"))
+    ok(await flow.post(f"{STAFFELN}/{world['tids'][1][0]}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    flow.act_as(world["lead"])
+    ok(await flow.post(url, json={}))
+
+
+@pytest.mark.asyncio
+async def test_a_league_without_playoffs_and_relegation_still_takes_a_further_staffel(flow):
+    # Gegenprobe: Ohne Playoffs und Relegation ändert die Sperre nichts - dort bleibt alles wie vorher.
+    world = await build(flow)
+    await close(flow, world)
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{ADMIN}/divisions/{world['divisions'][1]['id']}/staffeln", json={}))
+
+
+@pytest.mark.asyncio
+async def test_the_lower_division_of_a_relegation_takes_no_further_staffel_either(flow):
+    world = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}})
+    await close(flow, world, world["tids"][2][0])
+    flow.act_as(world["lead"])
+    refused = await flow.post(f"{ADMIN}/divisions/{world['divisions'][2]['id']}/staffeln", json={})
+    assert refused.status_code == 422 and "abgeschlossen" in refused.json()["detail"]
+    # In der oberen Liga ist noch nichts abgeschlossen - dort geht es.
+    ok(await flow.post(f"{ADMIN}/divisions/{world['divisions'][1]['id']}/staffeln", json={}))
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_appearing_after_the_first_close_never_brings_a_second_champion(flow):
+    from services import league_postseason
+
+    # Ein Platz bei einer Staffel: keine Playoffs, der Meister kommt aus der Tabelle. Das steht mit dem ersten Abschluss fest.
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 1}, "champion_source": "playoffs"})
+    await close(flow, world)
+    first = await flow.db.league_final_tables.find_one({"tournament_id": world["tids"][1][0], "active": True}, {"_id": 0})
+    assert first["champion_place"] is True and first["postseason"] == {"per_staffel": 1, "staffeln": 1}
+    # Taucht danach doch eine zweite Staffel auf (an der Sperre vorbei), bleibt es dabei: keine Playoffs, kein zweiter Weg zum Meister.
+    twin = await flow.db.tournaments.find_one({"id": world["tids"][1][0]}, {"_id": 0})
+    twin.update({"id": "staffel-b", "slug": "staffel-b", "status": "live", "final_table": None,
+                 "league_context": {**twin["league_context"], "staffel": "B"}})
+    twin.pop("status_before_final", None)
+    await flow.db.tournaments.insert_one(twin)
+    season, division = await reload_season(flow, world), world["divisions"][1]
+    assert await league_postseason.playoffs_feasible(flow.db, season, division) is False
+    assert await league_postseason.champion_from_playoffs(flow.db, season, division) is False
+    assert (await cockpit(flow, world))["missing"] == []
+
+
+@pytest.mark.asyncio
+async def test_feasible_playoffs_stay_feasible_when_a_staffel_drops_out_later(flow):
+    from services import league_postseason
+
+    world = await build(flow, staffeln={1: [4, 4]}, postseason={"playoffs": {"enabled": True, "per_staffel": 1}, "champion_source": "playoffs"})
+    await close(flow, world, world["tids"][1][0])
+    season, division = await reload_season(flow, world), world["divisions"][1]
+    await flow.db.tournaments.update_one({"id": world["tids"][1][1]}, {"$set": {"status": "cancelled"}})
+    # Der Endstand der ersten Staffel hält fest, dass der Meister aus den Playoffs kommt - die Tabelle macht keinen.
+    assert await league_postseason.champion_from_playoffs(flow.db, season, division) is True
+    assert await league_postseason.playoffs_feasible(flow.db, season, division) is True
+
+
+# ---------------------------------------------------------------- KN2: versteckte Relegation bleibt am TV und im Discord unsichtbar
+
+@pytest.mark.asyncio
+async def test_a_hidden_relegation_does_not_show_at_the_tv_or_in_discord(flow):
+    from services import league_finale
+
+    world = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}})
+    await close(flow, world)
+    ok(await create(flow, world, "relegation"))
+    tournament = await tournament_of(flow, world, "relegation")
+    await play_round(flow, world, tournament["id"], favourite=False)
+    await settle(flow, tournament["id"])
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tournament['id']}/close", json={"confirm": True}))
+    await flow.db.tournaments.update_many({"league_context.season_id": world["season"]["id"]}, {"$set": {"is_public": True, "visibility": "public"}})
+    season = await reload_season(flow, world)
+    lower = world["regs"][world["tids"][2][0]][1]
+
+    async def moving_up(guests_only: bool) -> list[dict]:
+        pages = await league_finale.season_pages(flow.db, season, guests_only=guests_only)
+        return [row for page in pages for row in page["rows"] if row["move"] == league_finale.UP and row["name"] == lower["display_name"]]
+
+    # Sichtbar: Der Sieger der Relegation steht als Aufsteiger da - mit dem Vermerk, dass er über die Relegation kommt.
+    shown = await moving_up(True)
+    assert len(shown) == 1 and shown[0]["via"] == "relegation"
+    # Versteckt: Gäste (TV, Discord) sehen das Ergebnis nicht - die Leitung schon.
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"is_public": False}})
+    assert await moving_up(True) == []
+    assert len(await moving_up(False)) == 1
