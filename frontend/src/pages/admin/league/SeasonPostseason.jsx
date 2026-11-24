@@ -346,7 +346,12 @@ function BestOfSelect({ label, value, onChange, options, fallback, testId, disab
 // Nr. 249: ab dem Season-Start fest - auch wenn die Playoffs aus sind oder erst jetzt eingeschaltet werden (dann gelten die Werte vom Start).
 const START_LOCK_NOTE = "Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest. Das gilt auch nach einem Wiederöffnen und wenn die Playoffs erst jetzt eingeschaltet werden.";
 
-function PlayoffFields({ form, change, options, locked, startLocked = false, earliest, prefix }) {
+// „Wie in der Season“ heißt nach dem Start: wie zum Season-Start - hat die Season ihr Best of seither geändert, sagt der Server den
+// gemerkten Wert (`best_of_kept`, Nr. 255).
+const bestOfFallback = (kept) => (kept ? `Wie zum Season-Start (Best of ${kept})` : "Wie in der Season");
+const RELEGATION_LOCK_NOTE = "Seit dem Season-Start steht das Best of der Relegation fest.";
+
+function PlayoffFields({ form, change, options, locked, startLocked = false, earliest, prefix, kept = null }) {
   const rounds = form.best_of_rounds || [];
   const setRound = (index, patch) => change({ best_of_rounds: rounds.map((row, at) => (at === index ? { ...row, ...patch } : row)) });
   return (
@@ -360,7 +365,7 @@ function PlayoffFields({ form, change, options, locked, startLocked = false, ear
             <TextField label="Plätze je Staffel" type="number" min={options.per_staffel[0]} max={options.per_staffel[1]} value={form.per_staffel} required disabled={locked}
               onChange={(value) => change({ per_staffel: value })} hint="So viele Teams jeder Staffel kommen in die Playoffs." testId={`${prefix}-per-staffel`} />
             <BestOfSelect label="Best of" value={form.best_of} onChange={(value) => change({ best_of: value })} options={options.best_of}
-              fallback="Wie in der Season" testId={`${prefix}-best-of`} disabled={startLocked} />
+              fallback={bestOfFallback(kept)} testId={`${prefix}-best-of`} disabled={startLocked} />
             <SelectField label="Heimrecht und Team A im Veto" value={form.home} onChange={(value) => change({ home: value })} testId={`${prefix}-home`} disabled={startLocked}
               options={[["better_seed", "Der besser Gesetzte"], ["draw", "Los je Spiel"]]} />
             <TextField label="Start der Playoffs" type="date" min={earliest || undefined} value={form.start_date} onChange={(value) => change({ start_date: value })}
@@ -379,7 +384,7 @@ function PlayoffFields({ form, change, options, locked, startLocked = false, ear
                 <BestOfSelect label="Best of" value={row.best_of} onChange={(value) => setRound(index, { best_of: value })} options={options.best_of}
                   fallback="–" testId={`${prefix}-round-best-of-${index}`} disabled={startLocked} />
                 <button type="button" disabled={startLocked} onClick={() => change({ best_of_rounds: rounds.filter((_row, at) => at !== index) })} aria-label={`Zeile ${index + 1} entfernen`}
-                  className="tls-btn tls-btn--quiet inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm">
+                  className="tls-btn tls-btn--quiet inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm disabled:opacity-40 disabled:cursor-not-allowed">
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
@@ -396,7 +401,7 @@ function PlayoffFields({ form, change, options, locked, startLocked = false, ear
   );
 }
 
-function RelegationFields({ form, change, options, locked, earliest, prefix }) {
+function RelegationFields({ form, change, options, locked, startLocked = false, earliest, prefix, kept = null }) {
   return (
     <div className="space-y-4">
       <CheckField label="Relegation spielen" checked={form.enabled} onChange={(value) => change({ enabled: value })} disabled={locked}
@@ -405,9 +410,10 @@ function RelegationFields({ form, change, options, locked, earliest, prefix }) {
       {form.enabled ? (
         <div className="grid gap-4 sm:grid-cols-2">
           <BestOfSelect label="Best of" value={form.best_of} onChange={(value) => change({ best_of: value })} options={options.best_of}
-            fallback="Wie in der Season" testId={`${prefix}-relegation-best-of`} />
+            fallback={bestOfFallback(kept)} testId={`${prefix}-relegation-best-of`} disabled={startLocked} />
           <TextField label="Start der Relegation" type="date" min={earliest || undefined} value={form.start_date} onChange={(value) => change({ start_date: value })}
             hint="Leer: automatisch. Sie liegt immer hinter den Playoffs der Liga darunter." testId={`${prefix}-relegation-start`} />
+          {startLocked ? <p className="text-xs text-white/60 sm:col-span-2" role="note" data-testid={`${prefix}-relegation-start-locked`}>{RELEGATION_LOCK_NOTE}</p> : null}
         </div>
       ) : null}
     </div>
@@ -446,9 +452,9 @@ function SettingsSheet({ data, seasonId, onClose, onDone }) {
       {locked ? <p className="mt-3 rounded-sm border border-warn/40 bg-warn/5 p-3 text-xs text-white/80" role="note" data-testid="postseason-settings-locked">{SEASON_LOCK_NOTE}</p> : null}
       <div className="mt-4 space-y-6">
         <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
-          options={data.options} earliest={earliest} prefix="postseason" startLocked={Boolean(data.started)} />
+          options={data.options} earliest={earliest} prefix="postseason" startLocked={Boolean(data.started)} kept={data.best_of_kept} />
         <RelegationFields form={form.relegation} change={(patch) => setForm((current) => ({ ...current, relegation: { ...current.relegation, ...patch } }))}
-          options={data.options} earliest={earliest} prefix="postseason" />
+          options={data.options} earliest={earliest} prefix="postseason" startLocked={Boolean(data.started)} kept={data.best_of_kept} />
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField label="Meister aus" value={form.champion_source} onChange={(value) => setForm((current) => ({ ...current, champion_source: value }))}
             options={[["table", "der Tabelle"], ["playoffs", "den Playoffs"]]} testId="postseason-champion-source"
@@ -502,7 +508,7 @@ function DivisionSheet({ data, row, onClose, onDone }) {
             <CheckField label="Eigene Relegations-Einstellungen für diese Liga" checked={own.relegation} onChange={(value) => setOwn((current) => ({ ...current, relegation: value }))}
               testId="postseason-division-own-relegation" />
             {own.relegation ? <RelegationFields form={form.relegation} change={(patch) => setForm((current) => ({ ...current, relegation: { ...current.relegation, ...patch } }))}
-              options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division" /> : null}
+              options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division" startLocked={Boolean(data.started)} /> : null}
           </div>
         ) : null}
       </div>

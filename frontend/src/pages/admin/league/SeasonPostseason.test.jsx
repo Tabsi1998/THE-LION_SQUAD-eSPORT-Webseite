@@ -213,6 +213,10 @@ test("ab dem Season-Start sind Best of, Platz 3 und Heimrecht ausgegraut - mit H
   for (const id of ["postseason-best-of", "postseason-home", "postseason-third-place", "postseason-round-0", "postseason-round-best-of-0"]) {
     expect(screen.getByTestId(id)).toBeDisabled();
   }
+  // Der gesperrte Papierkorb der Zeile ist sichtbar deaktiviert, nicht nur tot.
+  const remove = screen.getByRole("button", { name: "Zeile 1 entfernen" });
+  expect(remove).toBeDisabled();
+  expect(remove).toHaveClass("disabled:opacity-40", "disabled:cursor-not-allowed");
   expect(screen.queryByTestId("postseason-round-add")).not.toBeInTheDocument();
   // Was nicht dazugehört, bleibt offen: Plätze je Staffel, Start, Relegation, Meister.
   for (const id of ["postseason-per-staffel", "postseason-start", "postseason-relegation-enabled", "postseason-champion-source"]) {
@@ -260,5 +264,35 @@ test("nach dem Season-Start gilt die Sperre auch in der Abweichung einer Liga oh
   expect(screen.getByTestId("postseason-division-start-locked")).toBeInTheDocument();
   for (const id of ["postseason-division-best-of", "postseason-division-home", "postseason-division-third-place"]) {
     expect(screen.getByTestId(id)).toBeDisabled();
+  }
+});
+
+test("ab dem Season-Start ist auch das Best of der Relegation ausgegraut - mit Hinweis (Nr. 255)", async () => {
+  const on = { ...SETTINGS, relegation: { enabled: true, best_of: null, start_date: null } };
+  renderPanel(cockpit([division({ settings: on })], { started: true, settings: on }));
+  fireEvent.click(await screen.findByTestId("postseason-settings"));
+  expect(screen.getByTestId("postseason-relegation-best-of")).toBeDisabled();
+  expect(screen.getByTestId("postseason-relegation-start-locked")).toHaveTextContent("Seit dem Season-Start steht das Best of der Relegation fest.");
+  // Termin und an/aus der Relegation gehören nicht dazu.
+  expect(screen.getByTestId("postseason-relegation-start")).toBeEnabled();
+  expect(screen.getByTestId("postseason-relegation-enabled")).toBeEnabled();
+});
+
+test("vor dem Season-Start ist das Best of der Relegation frei", async () => {
+  const on = { ...SETTINGS, relegation: { enabled: true, best_of: null, start_date: null } };
+  renderPanel(cockpit([division({ settings: on })], { started: false, settings: on }));
+  fireEvent.click(await screen.findByTestId("postseason-settings"));
+  expect(screen.getByTestId("postseason-relegation-best-of")).toBeEnabled();
+  expect(screen.queryByTestId("postseason-relegation-start-locked")).not.toBeInTheDocument();
+  expect(within(screen.getByTestId("postseason-relegation-best-of")).getByRole("option", { name: "Wie in der Season" })).toBeInTheDocument();
+});
+
+test("hat die Season ihr Best of nach dem Start geändert, heißt „wie in der Season“ wie zum Season-Start", async () => {
+  const follows = { ...SETTINGS, playoffs: { ...SETTINGS.playoffs, best_of: null }, relegation: { enabled: true, best_of: null, start_date: null } };
+  renderPanel(cockpit([division({ settings: follows })], { started: true, settings: follows, best_of_kept: 3 }));
+  fireEvent.click(await screen.findByTestId("postseason-settings"));
+  for (const id of ["postseason-best-of", "postseason-relegation-best-of"]) {
+    expect(within(screen.getByTestId(id)).getByRole("option", { name: "Wie zum Season-Start (Best of 3)" })).toBeInTheDocument();
+    expect(screen.getByTestId(id)).toHaveValue("");
   }
 });
