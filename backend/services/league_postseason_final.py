@@ -90,12 +90,12 @@ def playoff_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
         elif reached == total:
             # Im Finale gewertet verloren: Platz 2. Beide nicht erschienen: der Titel bleibt unvergeben, kein Platz 1 und 2.
             rank = 2 if winner_of(last) else 0
+        elif key in (last.get("double_forfeit_sides") or []):
+            # Beide nicht erschienen und ausgeschieden (Nr. 250): in jeder Runde einen Platz hinter den Verlierern dieser Runde, die
+            # gespielt haben - im Halbfinale Platz 4 (mit und ohne Spiel um Platz 3), im Viertelfinale Platz 6. Sie bleiben Teilnehmer.
+            rank = 2 ** (total - reached) + 2
         elif reached == total - 1 and bronze_winner and key in bronze_sides:
             rank = 3 if bronze_winner == key else 4
-        elif reached == total - 1 and key in (last.get("double_forfeit_sides") or []):
-            # Im Halbfinale beide nicht erschienen (Nr. 217): nie Platz 3 neben einem, der gespielt hat. Findet das Spiel um Platz 3
-            # statt (der andere Halbfinal-Verlierer gewinnt es kampflos), sind die beiden Vierte - sonst haben sie keinen Platz.
-            rank = 4 if bronze_winner else 0
         else:
             rank = 2 ** (total - reached) + 1
         row = {"registration_id": key, "team_id": registration.get("team_id"), "squad_id": registration.get("squad_id"),

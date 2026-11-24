@@ -453,8 +453,8 @@ async def test_both_absent_get_one_new_date_and_are_both_out_the_second_time(flo
     await settle(flow, tid)
     ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
     rows = (await flow.db.league_final_tables.find_one({"tournament_id": tid, "active": True}, {"_id": 0}))["rows"]
-    # Wer gespielt und verloren hat, ist Dritter - die beiden, die zweimal nicht erschienen sind, haben keinen Platz (kein Spiel um Platz 3).
-    assert [row["rank"] for row in rows] == [1, 3, 0, 0]
+    # Wer gespielt und verloren hat, ist Dritter - die beiden, die zweimal nicht erschienen sind, stehen einen Platz dahinter (Nr. 250).
+    assert [row["rank"] for row in rows] == [1, 3, 4, 4]
     assert {row["registration_id"] for row in rows if row["reached"] == "Halbfinale"} == set(first and stored["double_forfeit_sides"]) | {
         side for side in sides(second) if side != winner}
 
