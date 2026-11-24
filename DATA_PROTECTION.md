@@ -139,8 +139,12 @@ Betriebsdaten (`ops_errors`, `ops_slow_requests`, `ops_vitals`: über Besucher n
 laufen nach 30 Tagen ab; bei Fehlergruppen ist die Frist unter Betrieb → Alarme einstellbar (#1657). Der Fehler-Sammler
 (#1657) nimmt auch Fehler aus Website und App an (`POST /api/ops/client-errors`, ohne Anmeldung) und speichert dabei nur
 Quelle, Fehlerart, Code-Stellen ohne Werte, die Seite als Vorlage ohne Abfrage und Kennungen, die Version und die Anzahl –
-nie den Meldungstext, nie Namen, E-Mail-Adressen, Tokens, IP-Adressen oder Inhalte. Die Adresse des Absenders dient nur der
-Drosselung (wie bei den Web Vitals) und wird nicht bei der Gruppe gespeichert. Der Stand der Erreichbarkeitsprüfung
+nie den Meldungstext, nie Namen, E-Mail-Adressen, Tokens, IP-Adressen oder Inhalte. Der Sammler für Website und App ist ab Werk
+aus (Schalter unter Betrieb → Alarme). Die Adresse des Absenders wird nicht bei der Gruppe gespeichert; für die Drosselung
+(wie bei den Web Vitals) steht sie im Klartext im Zähler `rate_limits`, der nach 60 bis 180 Sekunden abläuft. Wie jede
+Anfrage an die Website erscheint sie außerdem in den Zugriffsprotokollen von nginx und uvicorn; diese laufen als
+Container-Logs (je Dienst höchstens 5 Dateien zu 10 MB, ältere werden überschrieben) – eine feste Frist in Tagen gibt es
+dafür nicht. Der Stand der Erreichbarkeitsprüfung
 (`settings/ops_reachability`) enthält keine Personendaten. Quittieren im Betrieb (#2447) hält fest, wer einen Eintrag gesehen bzw. gelöst hat - nur als
 Kennung der Person aus der Verwaltung, der Name kommt erst beim Lesen (gelöschtes Konto: „Gelöschter User“):
 `resolved_by` an `ops_errors` (30 Tage), `acknowledged_by` an `ops_alert_log` (ein Jahr), `ops_check_episodes`

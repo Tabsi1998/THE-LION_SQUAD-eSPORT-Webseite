@@ -66,7 +66,7 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 - Login-, Registrierungs- und Passwort-Routen
 - `/newsletter/abbestellen?token=…` (Abmeldelink aus dem Newsletter, #2119; `noindex, nofollow`, abgemeldet wird erst per Knopf - `POST /api/settings/newsletter/unsubscribe`, auch als One-Click aus `List-Unsubscribe`)
 - Fehleransichten `/403`, `/500` und der SPA-404-Fallback; sie setzen `noindex, nofollow`
-- `/status` (#1657): Statusseite mit zwei Zuständen („Alles läuft“, „Störung, wir sind dran“), `noindex, follow`; liest `GET /api/ops/status` (nur `state` und `checked_at`, `no-store`). Website und App melden Fehler an `POST /api/ops/client-errors` (ohne Anmeldung, höchstens 16 KB, 20 je Adresse und Minute; gespeichert werden nur Fehlerart, Code-Stellen, Seite als Vorlage und Version)
+- `/status` (#1657): Statusseite mit zwei Zuständen („Alles läuft“, „Störung, wir sind dran“), `noindex, follow`; liest `GET /api/ops/status` (nur `state` und `checked_at`, `no-store`). Verlinkt in der Fußzeile und auf den Fehlerseiten. Website und App melden Fehler an `POST /api/ops/client-errors` (ohne Anmeldung, höchstens 16 KB, 20 je Adresse und Minute; ist der Sammler unter Betrieb → Alarme aus - ab Werk -, antwortet er 204 und speichert nichts; sonst werden nur Fehlerart, Code-Stellen, Seite als Vorlage und Version gespeichert, mit einer Obergrenze neuer Gruppen je Tag)
 
 ## Private und betriebliche Routen
 

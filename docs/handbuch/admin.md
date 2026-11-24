@@ -370,7 +370,8 @@ geändert“ auf die Leitung; wird es günstiger, bleibt die Differenz beim Vere
 
 **Wo:** Admin → System → Betrieb & Logs → **Fehler**. Nur mit dem Bereich System und bestätigter Zwei-Faktor-Anmeldung.
 
-Hier landen Fehler vom **Server**, von der **Website** und später von der **App** – zusammengefasst zu Gruppen. Eine Zeile
+Hier landen Fehler vom **Server**, von der **Website** und später von der **App** – zusammengefasst zu Gruppen. Fehler aus
+Website und App kommen nur an, wenn unter **Alarme** „Fehler aus Website und App sammeln“ an ist (ab Werk aus). Eine Zeile
 zeigt: Quelle, Fehlerart, Seite, die Stelle im Code, wie oft, wann zuerst und zuletzt, und die Version.
 
 1. Oben steht die **Erreichbarkeit**: Website, API und Datenbank – „läuft“, „weg seit …“ oder „nicht geprüft“.
@@ -390,14 +391,19 @@ steht in der Zeile die Stelle im Code statt einer Meldung.
 
 | Ereignis | Was du einstellen kannst |
 | --- | --- |
-| Häufung von Fehlern | **Häufung ab** (Vorgabe 20) und **Zeitfenster** (Vorgabe 10 Minuten) – eine Warnung je Fenster |
+| Häufung von Fehlern | **Häufung ab** (Vorgabe 20) und **Zeitfenster** (Vorgabe 10 Minuten) – sofort nur beim Server; Website und App stehen in der Tageszusammenfassung |
 | Tageszusammenfassung | **um** wie viel Uhr (Vorgabe 8) – an ruhigen Tagen kommt nichts |
-| Erreichbarkeit | **Ausfall nach Fehlversuchen in Folge** (Vorgabe 2) – Meldung bei Ausfall und bei Wiederkehr |
+| Erreichbarkeit | **Ausfall nach Fehlversuchen in Folge** (Vorgabe 2) und **Wieder da nach Erfolgen in Folge** (Vorgabe 2) – Meldung bei Ausfall und bei Wiederkehr |
+| alle Arten | **Meldungen je Ereignisart und Stunde** (Vorgabe 10) – danach eine Sammelmeldung |
+
+**Obergrenze:** höchstens 200 neue Fehlergruppen aus Website und App je Tag (unter Alarme änderbar). Was darüber
+kommt, zählt in der Gruppe „Weitere Fehler (Obergrenze)“.
 
 **Aufbewahrung:** Fehlergruppen 30 Tage ab dem letzten Auftreten, unter Alarme änderbar.
 
-**Statusseite:** `lionsquad.at/status` zeigt allen nur **„Alles läuft“** oder **„Störung, wir sind dran“**. Sie schaltet
-von selbst um und nennt keine Einzelheiten. Grenze: Die Prüfung läuft auf demselben Server – fällt der ganze Server aus,
+**Statusseite:** `lionsquad.at/status` zeigt allen nur **„Alles läuft“** („Website und Server laufen.“) oder **„Störung,
+wir sind dran“**. Sie schaltet von selbst um und nennt keine Einzelheiten; geprüft werden Website, Server und Datenbank.
+Verlinkt ist sie klein in der Fußzeile und auf den Fehlerseiten. Grenze: Die Prüfung läuft auf demselben Server – fällt der ganze Server aus,
 meldet sie nichts. Dafür braucht es eine Prüfung von außen ([Betrieb](../BETRIEB.md#externe-überwachung)).
 
 ## 4. Wenn etwas nicht klappt

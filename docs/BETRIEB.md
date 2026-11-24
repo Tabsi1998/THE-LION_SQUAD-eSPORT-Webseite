@@ -13,7 +13,7 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
 | System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und „X auffällig“ (nur Offenes), darunter die offenen Probleme zum Quittieren – siehe [Quittieren](#quittieren-und-von-selbst-erledigt-2447) | Sammelsicht |
 | System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“; „Nur offene“ und „Quittierte zeigen“ (#2447). Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`, zugleich Sperre: bleibt er nach einem Abbruch länger als 10 Minuten auf „running“, übernimmt ihn der nächste Start; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
-| System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP (Gerät, Version, Stufe) mit Status und Notiz. Fehler der Website gehen seit #1657 an den Fehler-Sammler (Reiter **Fehler**); ältere Website-Einträge stehen hier, bis sie ablaufen | `mobile_client_logs`, 90 Tage |
+| System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP (Gerät, Version, Stufe) mit Status und Notiz. Fehler der Website gehen seit #1657 an den Fehler-Sammler (Reiter **Fehler**, nur mit eingeschaltetem Sammler); ältere Website-Einträge stehen hier, bis sie ablaufen | `mobile_client_logs`, 90 Tage |
 | E-Mail → Mail-Queue | Wartende und fehlgeschlagene Sendungen, neu einreihen | `mail_jobs` |
 
 Die früheren Seiten Logs, Audit Logs, App-Logs und Versandlogs leiten auf die passenden Reiter um
@@ -259,11 +259,13 @@ und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 | Discord-Bot offline | der Bot ist eingeschaltet, kommt aber nicht mehr auf den Server |
 | App: kritischer Fehler | die LionsAPP meldet einen kritischen Fehler (Absturz, Login, Push) |
 | Turnierabschluss unvollständig | beim Veröffentlichen der Ergebnisse ist ein Schritt gescheitert (Jahreswertung, Auszeichnungen, Erfolge, Gewinne) – beim Turnier **Abschluss nachholen** tippen (#2460) |
-| Häufung von Fehlern | eine Fehlergruppe (Server, Website, App) tritt im Zeitfenster öfter auf als die Schwelle (Vorgabe 20 in 10 Minuten) – genau eine Warnung je Fenster, dazu die Sperrfrist je Gruppe (#1657) |
-| Tageszusammenfassung | einmal am Tag ab der eingestellten Stunde (Vorgabe 8 Uhr Wien): aktive und neue Fehlergruppen der letzten 24 Stunden, die häufigsten fünf, offene Gruppen, Ausfälle. An ruhigen Tagen nichts; je Tag höchstens eine (#1657) |
-| Erreichbarkeit | Website, API oder Datenbank antworten nach der eingestellten Zahl von Fehlversuchen in Folge nicht (Vorgabe 2) – und wenn sie wieder da sind, mit Ausfallzeit. Je Wechsel genau eine Meldung, siehe [Erreichbarkeit](#erreichbarkeit-und-statusseite-1657) |
+| Häufung von Fehlern | eine Fehlergruppe **des Servers** tritt im Zeitfenster öfter auf als die Schwelle (Vorgabe 20 in 10 Minuten) – genau eine Warnung je Fenster, dazu die Sperrfrist je Gruppe. Häufungen aus Website und App melden sich nie sofort, sie stehen nur in der Tageszusammenfassung (#1657) |
+| Tageszusammenfassung | einmal am Tag ab der eingestellten Stunde (Vorgabe 8 Uhr Wien): aktive und neue Fehlergruppen der letzten 24 Stunden, die häufigsten fünf, offene Gruppen, Ausfälle und die Häufungen aus Website und App. An ruhigen Tagen nichts; je Tag höchstens eine (#1657) |
+| Erreichbarkeit | Website, API oder Datenbank antworten nach der eingestellten Zahl von Fehlversuchen in Folge nicht (Vorgabe 2) – und wenn sie nach der eingestellten Zahl von Erfolgen in Folge wieder da sind (Vorgabe 2), mit Ausfallzeit. Je Wechsel genau eine Meldung, siehe [Erreichbarkeit](#erreichbarkeit-und-statusseite-1657) |
 
-Vorgabe: Discord an, E-Mail aus. **Sperrfrist:** je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job,
+Vorgabe: Discord an, E-Mail aus. **Höchstzahl je Stunde (#1657):** Häufung, neue Serverfehler-Gruppe und kritischer
+App-Fehler melden sich höchstens so oft je Ereignisart und Stunde wie unter **Meldungen je Ereignisart und Stunde**
+eingestellt (Vorgabe 10); danach kommt genau eine Sammelmeldung, bis zur nächsten vollen Stunde nichts mehr. **Sperrfrist:** je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job,
 ein App-Fingerabdruck) meldet die Website höchstens einmal je Frist (Vorgabe 60 Minuten) – ein
 Dauerfehler flutet keinen Kanal. **Erinnerung bei Dauer-Rot** (Stunden, Vorgabe 24, 0 = aus): so lange
 wartet ein roter Auto-Check, bis er sich mit „weiterhin rot seit …“ wieder meldet (#2080). Die Sperrfrist wird
@@ -293,11 +295,23 @@ Der Job `ops_retention` läuft einmal am Tag.
 
 Server, Website und App melden Fehler in dieselbe Liste (**Fehler**), selbst gehostet, ohne Fremddienst.
 
+**Schalter:** Fehler aus Website und App nimmt der Server nur an, wenn unter **Alarme** „Fehler aus Website und App
+sammeln“ an ist – **ab Werk aus**, bis der Hinweis in der Datenschutzerklärung freigegeben ist. Aus heißt: Der Browser
+schickt weiter (er fragt den Schalter nicht ab, damit das Start-Bündel nicht wächst), der Server antwortet 204 und
+speichert nichts. Fehler des Servers sammelt die Website immer.
+
+**Obergrenze:** höchstens **200 neue Gruppen aus Website und App je Tag** (UTC, unter Alarme einstellbar, 10 bis 5000).
+Darüber zählt jeder Fehler, der eine neue Gruppe wäre, in der Sammelgruppe **„Weitere Fehler (Obergrenze)“**; bekannte
+Gruppen zählen weiter. Je Meldung bleiben höchstens 15 Code-Stellen. Die Zähler dafür (Häufungsfenster, Obergrenze je Tag,
+Meldungen je Stunde) stehen in `ops_alert_state` und verschwinden nach zwei Tagen mit dem täglichen Job.
+
 - **Server:** jede unbehandelte Ausnahme und jede 5xx-Antwort (Middleware `OpsMonitorMiddleware`, `services/ops_monitor.py`).
 - **Website:** die Fehlergrenzen (`AppErrorBoundary`, `OptionalBoundary`) und `window.onerror`/`unhandledrejection`
   (`frontend/src/lib/clientLog.js`) schicken an `POST /api/ops/client-errors` – ohne Anmeldung, damit auch Fehler von
   Gästen ankommen. Der Browser sendet höchstens 12 je Minute und gleiche Fehler nur einmal je 30 Sekunden; der Server
-  nimmt höchstens 16 KB je Meldung und 20 Meldungen je Adresse und Minute an (sonst 413 bzw. 429).
+  nimmt höchstens 16 KB je Meldung und 20 Meldungen je Adresse und Minute an (sonst 413 bzw. 429), auch während der
+  Backup-Schreibpause. Als Fehlerart geht nur der Name eines echten Fehlers mit, und nur als Bezeichner
+  (`TypeError`); alles andere wird `Error`. Vom Stack geht der Kopf mit der Meldung nicht mit.
 - **App:** derselbe Endpunkt mit `"source": "app"`. Die LionsAPP meldet noch nicht dorthin (Folgepunkt); bis dahin bleiben
   App-Fehler unter **App-Logs**.
 
@@ -328,16 +342,20 @@ Der Job `ops_reachability` prüft jede Minute:
 
 Ohne Adresse (leer) wird ein Ziel nicht geprüft. Die Adressen kommen bewusst nur aus der Umgebung, nicht aus der
 Verwaltung – der Server ruft sie selbst auf. Ein Ziel gilt nach **Ausfall nach Fehlversuchen in Folge** (unter Alarme,
-Vorgabe 2, also nach rund 2 Minuten) als ausgefallen und nach dem ersten Erfolg als wieder da. Jeder Wechsel meldet sich genau
-einmal (Ereignis **Erreichbarkeit**); die Wiederkehr nennt die Ausfallzeit und markiert den Ausfall unter Ereignisse als
-behoben. Ist die Datenbank selbst weg, läuft der Job ohne Sperre weiter und merkt sich den Stand im Speicher; die Meldung kommt
+Vorgabe 2, also nach rund 2 Minuten) als ausgefallen und nach **Wieder da nach Erfolgen in Folge** (Vorgabe 2) als wieder
+da – ein einzelner Erfolg zwischen Fehlversuchen meldet nichts. Jeder Wechsel meldet sich genau einmal (Ereignis
+**Erreichbarkeit**); der Stand wird vor dem Senden gespeichert, damit kein späterer Lauf dieselbe Meldung wiederholt. Die
+Wiederkehr nennt die Ausfallzeit und markiert den Ausfall unter Ereignisse als behoben. Ist die Datenbank selbst weg, läuft der Job ohne Sperre weiter und merkt sich den Stand im Speicher; die Meldung kommt
 dann mit der Wiederkehr („Ausfall seit …“), denn Discord-Kanal und Empfänger stehen in der Datenbank. Während der
 Schreibpause fürs Backup setzt der Job aus.
 
 **Statusseite** `/status` (öffentlich, `noindex`, nicht in der Sitemap): zwei Zustände, die die Prüfung selbst umstellt –
-**„Alles läuft“** und **„Störung, wir sind dran“**, ohne Einzelheiten. Sie liest `GET /api/ops/status` (nur `state` und
-`checked_at`) und fragt jede Minute neu. Störung heißt: ein Ziel ist ausgefallen, der letzte Lauf liegt mehr als 15 Minuten
-zurück, der Stand ist nicht lesbar oder der Server antwortet gar nicht. Wurde nie geprüft (frische Installation, Job aus),
+**„Alles läuft“** („Website und Server laufen.“) und **„Störung, wir sind dran“**, ohne Einzelheiten. Geprüft werden nur
+nginx (`/health`), die API und die Datenbank – nicht App, Anmeldung oder einzelne Seiten. Sie liest `GET /api/ops/status`
+(nur `state` und `checked_at`) und fragt jede Minute neu. Verlinkt ist sie klein in der Fußzeile und auf den Fehlerseiten.
+Störung heißt: ein Ziel ist ausgefallen, der letzte Lauf ist veraltet, der Stand ist nicht lesbar oder der Server antwortet
+gar nicht. **Veraltet** heißt: älter als die längste Backup-Schreibpause (`BACKUP_WRITE_PAUSE_MAX_SECONDS`, Vorgabe 900 s)
+plus die Lease (120 s) plus zwei Takte, mindestens 15 Minuten – in der Pause setzt die Prüfung ja aus. Wurde nie geprüft (frische Installation, Job aus),
 zeigt sie „Alles läuft“.
 
 **Grenze – wichtig:** Diese Prüfung läuft **auf demselben Server**. Fällt der ganze Server, Docker, der Backend-Prozess, das
