@@ -137,14 +137,15 @@ async def error_settings(db) -> dict:
     from services import ops_alerts
 
     cached = _settings_cache.get("ref")
-    if cached is not None and cached() is db and time.monotonic() - _settings_cache.get("at", 0.0) < SETTINGS_CACHE_SECONDS:
+    fresh = _settings_cache.get("version") == ops_alerts.SETTINGS_VERSION
+    if cached is not None and cached() is db and fresh and time.monotonic() - _settings_cache.get("at", 0.0) < SETTINGS_CACHE_SECONDS:
         return _settings_cache["value"]
     try:
         value = await ops_alerts.load_alert_settings(db)
     except Exception:  # noqa: BLE001 - ohne Einstellungen gelten die Vorgaben
         value = ops_alerts.merge_settings(None)
     try:
-        _settings_cache.update({"ref": weakref.ref(db), "at": time.monotonic(), "value": value})
+        _settings_cache.update({"ref": weakref.ref(db), "at": time.monotonic(), "value": value, "version": ops_alerts.SETTINGS_VERSION})
     except TypeError:
         _settings_cache.clear()
     return value

@@ -29,6 +29,8 @@ DEFAULT_RED_REMINDER_HOURS = 24
 MAX_RED_REMINDER_HOURS = 720
 RED = 0xFF3B30
 SETTINGS_ID = "ops_alerts"
+# Zählt jedes Speichern mit - ops_monitor.error_settings verwirft dann seinen Zwischenspeicher (ohne Rückimport).
+SETTINGS_VERSION = 0
 LOG_LIMIT = 200
 
 # Ereignisarten mit Vorgabe: Discord an, E-Mail aus. `email_allowed` False, wo eine Mail-Meldung sich
@@ -269,9 +271,9 @@ async def save_alert_settings(db, patch: dict) -> dict:
     if update:
         update["updated_at"] = now_utc().isoformat()
         await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"id": SETTINGS_ID, **update}}, upsert=True)
-        from services.ops_monitor import forget_settings
-
-        forget_settings()
+        # Der Zwischenspeicher des Fehler-Sammlers (ops_monitor.error_settings) liest beim nächsten Fehler frisch.
+        global SETTINGS_VERSION
+        SETTINGS_VERSION += 1
     return await load_alert_settings(db)
 
 
