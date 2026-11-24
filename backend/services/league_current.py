@@ -12,7 +12,7 @@
 """
 from __future__ import annotations
 
-from services import league_zones
+from services import league_badge, league_zones
 from services.league_scope import is_league_staffel
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
@@ -60,13 +60,8 @@ async def account_names(db, registrations) -> dict[str, str]:
     return out
 
 
-def badge(division: dict | None, *, champion: bool = False) -> dict | None:
-    """Was das Liga-Abzeichen braucht: ``{level, nickname, champion}`` - ``None`` ohne Liga N."""
-    level = (division or {}).get("level")
-    if not isinstance(level, int) or level < 1:
-        return None
-    nickname = " ".join(str((division or {}).get("nickname") or "").split()) or None
-    return {"level": level, "nickname": nickname, "champion": bool(champion)}
+# Das Abzeichen steht im Blatt-Modul services/league_badge.py (#2561) - hier bleibt der gewohnte Name.
+badge = league_badge.badge
 
 
 def _slot_ids(match: dict) -> list[str]:

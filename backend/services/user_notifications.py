@@ -39,6 +39,12 @@ NO_COOLDOWN_KINDS = {
 }
 # Erfolge II (#622): Erfolge, Level und Prestige schicken höchstens drei Pushes am Tag (Wien) - der Rest steht im
 # Postfach. Ein Paket ist schon eine Meldung (achievement_queue bündelt eine Minute).
+# Gebündelter App-Push (#2553, Fabian 24.11.): scheitert die Anfrage an Expo, holt die Nachhol-Stufe den Push nach - höchstens so
+# oft, danach gilt er als gescheitert (sonst versuchte es jede Minute endlos, wenn Expo weg ist). Frühestens nach dieser Pause.
+PUSH_RETRY_LIMIT = 5
+PUSH_RETRY_AFTER_SECONDS = 60
+# Wer eine Meldung zum Senden beansprucht hat und dann abbricht, hält sie nur so lange - danach darf ein anderer Lauf.
+PUSH_CLAIM_STALE_SECONDS = 300
 ACHIEVEMENT_PUSH_KINDS = ("achievement", "level", "prestige")
 ACHIEVEMENT_PUSH_DAILY_CAP = 3
 
@@ -86,7 +92,10 @@ async def create_user_notification(
     url: str = "",
     kind: str = "general",
     meta: dict[str, Any] | None = None,
+    push_batch: list[dict] | None = None,
 ) -> dict | None:
+    """``push_batch`` (#2553): statt sofort an Expo kommt die Meldung in diese Liste - ``send_collected_pushes`` schickt
+    sie dann gebündelt (bis zu 100 Nachrichten je Anfrage) und trägt ``push_sent_count`` nach."""
     if not user_id:
         return None
     db = get_db()
@@ -180,16 +189,8 @@ async def create_user_notification(
         # Liga-Erinnerungen (#1647): der Teilindex ``user_unique_dedupe`` lässt je Person und Schlüssel nur eine Zeile zu - laufen
         # zwei Jobs gleichzeitig, verliert der zweite hier und schickt weder Push noch Discord.
         doc["unique_dedupe_key"] = dedupe_key
-    try:
-        await db.notifications.insert_one(doc)
-    except DuplicateKeyError:
-        return None
-    doc.pop("_id", None)
-    if in_app_allowed:
-        # Only the recipient hears about it, and only that something is new.
-        from services.change_events import publish_user_change
-        await publish_user_change([user_id], "notifications")
-    # Die Tagesgrenze der Erfolgs-Pushes (#622) gilt für App und Browser zusammen.
+    # Die Tagesgrenze der Erfolgs-Pushes (#622) gilt für App und Browser zusammen - vor dem Anlegen geprüft, damit die Zeile
+    # schon beim Anlegen weiß, ob ihr Push gebündelt noch aussteht.
     capped = False
     if push_channel_allowed or browser_channel_allowed:
         try:
@@ -199,19 +200,41 @@ async def create_user_notification(
     if capped:
         push_channel_allowed = False
         browser_channel_allowed = False
+    batched = bool(push_channel_allowed and push_batch is not None)
+    if batched:
+        # Gebündelt (#2553): Der Push steht aus, bis ``send_collected_pushes`` ihn zugestellt hat - bricht der Lauf vorher ab,
+        # findet die Nachhol-Stufe genau diese Zeilen. Von Ruhezeit oder Tagesgrenze gehaltene Pushes stehen nie aus.
+        doc["push_pending"] = True
     try:
-        push_sent_count = 0
-        if push_channel_allowed:
-            from services.push_notifications import send_mobile_push_for_notification
-            push_sent_count = await send_mobile_push_for_notification(doc)
-        doc["push_sent_count"] = push_sent_count
-        doc["push_sent_at"] = now_utc().isoformat()
-        await db.notifications.update_one(
-            {"id": doc["id"]},
-            {"$set": {"push_sent_count": push_sent_count, "push_sent_at": doc["push_sent_at"]}},
-        )
-    except Exception:
-        logger.warning("[push] Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
+        await db.notifications.insert_one(doc)
+    except DuplicateKeyError:
+        return None
+    doc.pop("_id", None)
+    if in_app_allowed:
+        # Only the recipient hears about it, and only that something is new. Ein Fehler beim Signal bricht die Meldung nicht ab
+        # (#2553 K2) - sie steht schon in der Datenbank, und Push, Browser und Discord sollen trotzdem hinaus.
+        try:
+            from services.change_events import publish_user_change
+            await publish_user_change([user_id], "notifications")
+        except Exception:
+            logger.warning("[notifications] Änderungs-Signal zu %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
+    if batched:
+        # Gebündelt (#2553): Versand und ``push_sent_count`` übernimmt ``send_collected_pushes``.
+        push_batch.append(doc)
+    else:
+        try:
+            push_sent_count = 0
+            if push_channel_allowed:
+                from services.push_notifications import send_mobile_push_for_notification
+                push_sent_count = await send_mobile_push_for_notification(doc)
+            doc["push_sent_count"] = push_sent_count
+            doc["push_sent_at"] = now_utc().isoformat()
+            await db.notifications.update_one(
+                {"id": doc["id"]},
+                {"$set": {"push_sent_count": push_sent_count, "push_sent_at": doc["push_sent_at"]}},
+            )
+        except Exception:
+            logger.warning("[push] Push zur Benachrichtigung %s fehlgeschlagen", log_safe(doc["id"]), exc_info=True)
     try:
         browser_sent = 0
         if browser_channel_allowed:
@@ -234,3 +257,64 @@ async def create_user_notification(
     except Exception:
         doc.setdefault("discord_sent_count", 0)
     return doc
+
+
+async def send_collected_pushes(batch: list[dict]) -> int:
+    """Schickt die über ``push_batch`` gesammelten Meldungen gebündelt an Expo (#2553) und leert die Liste. Rückgabe: Zahl
+    der Geräte.
+
+    Vor dem Senden wird jede Zeile beansprucht (K1): nur, wessen Kennung danach an der Zeile steht, schickt. So schicken der
+    Hauptweg und die Nachhol-Stufe eines zweiten Laufs dieselbe Meldung nie beide. Danach:
+
+    - zugestellt (auch an 0 Geräte, etwa ohne gültiges Gerät): ``push_sent_count``, ``push_sent_at``, der Push steht nicht mehr aus;
+    - gescheitert (Fabian 24.11., F1): die Zeile bleibt offen und wird frühestens nach ``PUSH_RETRY_AFTER_SECONDS`` nachgeholt,
+      nach ``PUSH_RETRY_LIMIT`` Versuchen gilt sie als gescheitert (``push_failed``, 0 Geräte).
+    """
+    if not batch:
+        return 0
+    docs = list(batch)
+    batch.clear()
+    db = get_db()
+    claim = new_id()
+    moment = now_utc()
+    stamp = moment.isoformat()
+    stale = (moment - timedelta(seconds=PUSH_CLAIM_STALE_SECONDS)).isoformat()
+    ids = [doc["id"] for doc in docs]
+    await db.notifications.update_many(
+        {"id": {"$in": ids}, "push_pending": True,
+         "$or": [{"push_claim": {"$exists": False}}, {"push_claimed_at": {"$lt": stale}}]},
+        {"$set": {"push_claim": claim, "push_claimed_at": stamp}},
+    )
+    mine = set(await db.notifications.distinct("id", {"id": {"$in": ids}, "push_claim": claim}))
+    docs = [doc for doc in docs if doc["id"] in mine]
+    if not docs:
+        return 0
+    try:
+        from services.push_notifications import send_mobile_push_batch
+        counts = await send_mobile_push_batch(docs)
+    except Exception:
+        logger.warning("[push] Gebündelter Push für %s Meldungen fehlgeschlagen", len(docs), exc_info=True)
+        counts = {doc["id"]: None for doc in docs}
+    by_count: dict[int, list[str]] = {}
+    failed: list[str] = []
+    for doc in docs:
+        value = counts.get(doc["id"], 0)
+        if value is None:
+            failed.append(doc["id"])
+            continue
+        doc["push_sent_count"] = int(value or 0)
+        doc["push_sent_at"] = stamp
+        by_count.setdefault(doc["push_sent_count"], []).append(doc["id"])
+    done_unset = {"push_pending": "", "push_claim": "", "push_claimed_at": "", "push_retry_at": ""}
+    for sent, done in by_count.items():
+        await db.notifications.update_many({"id": {"$in": done}, "push_claim": claim},
+                                           {"$set": {"push_sent_count": sent, "push_sent_at": stamp}, "$unset": done_unset})
+    if failed:
+        retry_at = (moment + timedelta(seconds=PUSH_RETRY_AFTER_SECONDS)).isoformat()
+        await db.notifications.update_many({"id": {"$in": failed}, "push_claim": claim},
+                                           {"$set": {"push_retry_at": retry_at}, "$unset": {"push_claim": "", "push_claimed_at": ""},
+                                            "$inc": {"push_attempts": 1}})
+        await db.notifications.update_many(
+            {"id": {"$in": failed}, "push_pending": True, "push_attempts": {"$gte": PUSH_RETRY_LIMIT}},
+            {"$set": {"push_sent_count": 0, "push_sent_at": stamp, "push_failed": True}, "$unset": done_unset})
+    return sum(int(value or 0) for value in counts.values() if value is not None)

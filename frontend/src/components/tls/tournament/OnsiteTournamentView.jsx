@@ -3,11 +3,14 @@ import { resolveMediaUrl } from "@/lib/api";
 import { formatWhen, getRegistrationState } from "@/lib/datetime";
 import { gameLabel } from "@/lib/gameLabels";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
+import { NoticeBanner } from "@/components/tls/tournament/NoticeBanner";
 
 // Vor-Ort-Zugang (#1592): Die Turnierseite für alle, die den QR-Code am TV oder am Aushang gescannt haben, das Turnier
 // aber sonst nicht sehen (z. B. Begleitpersonen bei einem Mitglieder-Turnier). Am Handy, in der Halle: Titel, Termin,
 // Spiel, freie Plätze und ein großer Knopf „Mitspielen“. Mehr gibt der Server hier nicht her - nach der Anmeldung zeigt
 // dieselbe Adresse das ganze Turnier.
+// Hinweise der Turnierleitung (#2546) stehen als Banner über dem Titel - wer in der Halle scannt, sieht „Start verschiebt sich“
+// zuerst. Dasselbe Banner wie auf der vollen Turnierseite (NoticeBanner), mit seiner Bewegung und „Bewegung reduzieren“.
 
 const MAX_SEAT_BOXES = 64;
 
@@ -21,7 +24,7 @@ export function seatsLine(tournament) {
   return { text: `${free} von ${max} ${team ? "Teamplätzen" : "Plätzen"} frei`, free, max, taken };
 }
 
-export function OnsiteTournamentView({ tournament: t, user, loading = false, error = "", onRegister }) {
+export function OnsiteTournamentView({ tournament: t, user, loading = false, error = "", onRegister, notices = [] }) {
   const registration = getRegistrationState(t, "Anmeldung");
   const seats = seatsLine(t);
   const boxes = seats.max && seats.max <= MAX_SEAT_BOXES ? Array.from({ length: seats.max }, (_, index) => index < seats.taken) : [];
@@ -36,6 +39,7 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
         </div>
       ) : null}
       <div className="relative max-w-xl mx-auto px-4 sm:px-6 pt-10 pb-12">
+        <NoticeBanner items={notices} className="mb-6" />
         <h1 className="font-heading text-4xl sm:text-5xl font-black uppercase leading-[0.95] break-words [text-wrap:balance]" data-testid="tournament-title">
           {t.title}
         </h1>

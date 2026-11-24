@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, X } from "lucide-react";
 import { useTv, useTvArea } from "@/components/tv/TvScreen";
+import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 import { FINALE_TIMING, finaleColumns, fitFinaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, targetText } from "@/lib/tvFinale";
 
 // Saisonfinale (#1641): je Liga N die Auf- und Absteiger nach dem Sieger-Moment. Links steigt auf, rechts steigt ab bzw. scheidet aus.
@@ -11,6 +12,9 @@ import { FINALE_TIMING, finaleColumns, fitFinaleColumns, moreText, nameFit, rowD
 // eine Obergrenze (Nr. 238): Es kommen nur so viele, wie samt Kopf und Hinweis über der Fußleiste stehen - geschätzt aus den Umbrüchen
 // (lib/tvFinale `fitFinaleColumns`) auf der gemessenen Fläche. Läuft eine Spalte am TV trotzdem über (andere Schrift), wird sie um eine
 // Zeile kürzer, bis sie passt - nie wird etwas verdeckt oder abgeschnitten.
+// Liga-Abzeichen (#2561): im Titel vor „Liga N“ und im Ziel-Chip vor der Ziel-Liga - in TV-Größe, als Zierde (der Text steht daneben).
+// Ohne eigene Erst-Sicht-Bewegung: Im Titel setzt es sich mit den Spaltenköpfen leise auf, im Chip schiebt es sich mit ihm heran
+// (tv.css). Im Chip so hoch wie eine Textzeile - die Messung (lib/tvFinale `targetChipUnits`) rechnet nur die Breite dazu.
 
 const ICONS = { up: ArrowUp, down: ArrowDown, out: X };
 
@@ -30,7 +34,11 @@ function MoverRow({ row, index }) {
       </span>
       {target ? (
         <span className="tv-finale__target tv-t-info" aria-hidden="true" data-testid={`tv-finale-target-${row.registration_id}`}>
-          {row.move === "out" ? null : <ArrowRight className="tv-icon tv-finale__arrow" strokeWidth={3} />}{target}
+          {row.move === "out" ? null : <ArrowRight className="tv-icon tv-finale__arrow" strokeWidth={3} />}
+          {row.move !== "out" && row.target_badge ? (
+            <LeagueBadge badge={row.target_badge} size="tv" label={false} decorative play={false} testId={`tv-finale-target-badge-${row.registration_id}`} />
+          ) : null}
+          {target}
         </span>
       ) : null}
     </li>
@@ -92,6 +100,7 @@ export function TvFinaleMovers({ page, league = "", season = "" }) {
       <header className="tv-finale__head">
         {line ? <div className="tv-finale__line tv-t-info" data-testid="tv-finale-line">{line}</div> : null}
         <h2 className="tv-finale__title font-display" data-testid="tv-finale-title">
+          {page.badge ? <LeagueBadge badge={page.badge} size="tv" label={false} decorative play={false} className="tv-finale__badge" testId="tv-finale-badge" /> : null}
           <span className="tv-finale__league">{page.label}</span> <span className="tv-finale__what">Auf- und Absteiger</span>
         </h2>
         {page.count > 1 ? (

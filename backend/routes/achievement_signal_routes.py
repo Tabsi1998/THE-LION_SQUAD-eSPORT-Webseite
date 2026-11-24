@@ -178,16 +178,22 @@ async def post_commend(match_id: str, me: dict = Depends(get_current_user)):
 # ------------------------------------------------------------------ Gelesen und gesehen
 
 @router.post("/api/news/{slug}/read")
-async def mark_news_read(slug: str, me: dict = Depends(get_current_user)):
+async def mark_news_read(slug: str, request: Request, me: dict = Depends(get_current_user)):
     """Ein Aufruf mit Anmeldung zählt als gelesen - nur die Zahl, keine Liste in der API. Gezählt wird, was die
-    Person auf der Seite auch lesen kann: veröffentlicht, Zeitpunkt erreicht, für sie sichtbar."""
+    Person auf der Seite auch lesen kann: veröffentlicht, Zeitpunkt erreicht, für sie sichtbar - und auf der Website
+    keine News „nur App“ (#2553): dort steht statt des Inhalts nur der Hinweis auf die App. Die App öffnet per Link jede
+    News (``services/news_channels.py``), dort zählt also auch „nur Website“."""
     from routes.news_routes import _published_now
+    from services import news_channels
     from services.slug_utils import find_by_slug_or_history
     from services.visibility import user_can_see
 
     db = get_db()
-    post, _moved = await find_by_slug_or_history(db.news_posts, slug, {"_id": 0, "id": 1, "published": 1, "published_at": 1, "visibility": 1})
-    readable = bool(post) and post.get("published") is not False and _published_now(post) and await user_can_see(me, post.get("visibility") or "public")
+    post, _moved = await find_by_slug_or_history(
+        db.news_posts, slug, {"_id": 0, "id": 1, "published": 1, "published_at": 1, "visibility": 1, "channels": 1})
+    readable = (bool(post) and post.get("published") is not False and _published_now(post)
+                and (news_channels.request_channel(request) != "web" or news_channels.in_channel(post, "web"))
+                and await user_can_see(me, post.get("visibility") or "public"))
     if not readable:
         raise HTTPException(404, "Beitrag nicht gefunden.")
     result = await db.news_reads.update_one({"user_id": me["id"], "news_id": post["id"]}, {"$setOnInsert": {"user_id": me["id"], "news_id": post["id"], "read_at": now_utc().isoformat()}}, upsert=True)

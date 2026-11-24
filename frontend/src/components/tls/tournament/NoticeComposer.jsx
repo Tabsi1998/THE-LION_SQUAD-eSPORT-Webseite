@@ -203,6 +203,10 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
             {count == null ? "Empfänger werden gezählt …" : count === 0 ? "Gerade ist niemand angemeldet – der Hinweis steht nur als Banner." : `Geht an ${count === 1 ? "1 Person" : `${count} Personen`}: alle Angemeldeten, bei Teams alle Mitglieder.`}
             {!hasEvent ? " Dieses Turnier gehört zu keinem Event." : !canEvent && list ? " An das ganze Event schreibt, wer alle Turniere des Events leitet." : ""}
           </p>
+          {/* Vor-Ort-Zugang (#2546, Fabian 24.11.): Gäste mit dem QR-Code sehen das Banner auf ihrer schlanken Turnierseite. */}
+          {list?.onsite_access ? (
+            <p className="mt-1 text-xs text-white/50" data-testid="notice-onsite">Auch Gäste mit Vor-Ort-QR-Code sehen diesen Hinweis.</p>
+          ) : null}
         </fieldset>
 
         <fieldset className="mt-4">

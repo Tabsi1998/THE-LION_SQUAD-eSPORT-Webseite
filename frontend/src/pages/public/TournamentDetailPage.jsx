@@ -179,9 +179,10 @@ function TournamentDetailView() {
 
   // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
   useLiveRefresh(refresh, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
-  // Hinweis der Turnierleitung (#1166): oben auf der Seite, bis er abläuft oder entfernt wird. Nicht in der schlanken Vor-Ort-Ansicht:
-  // Sie zeigt keine Hinweise, und der Server gibt sie dem Gast ohne Sichtbarkeit nicht (403 bei jedem Laden, #2529).
-  const noticesPath = t?.id && !t.onsite_view ? `/tournaments/${encodeURIComponent(t.id)}/notices` : null;
+  // Hinweis der Turnierleitung (#1166): oben auf der Seite, bis er abläuft oder entfernt wird. Auch in der schlanken Vor-Ort-Ansicht
+  // (#2546): Der Server gibt sie dem Gast mit gültiger Freigabe für genau dieses Turnier heraus - nur Text und Zeit. Die schlanke
+  // Ansicht kennt kein Event (`event_id` fehlt bewusst); Hinweise ans ganze Event kommen trotzdem, nachgeladen im 30-s-Takt.
+  const noticesPath = t?.id ? `/tournaments/${encodeURIComponent(t.id)}/notices` : null;
   const notices = useNotices(noticesPath, { tournamentId: t?.id, eventId: t?.event_id });
   const countdownDays = useCountdownDays();
 
@@ -294,7 +295,8 @@ function TournamentDetailView() {
   if (t.onsite_view) {
     return (
       <PublicLayout>
-        <OnsiteTournamentView tournament={t} user={user} loading={loading} error={registerModal ? "" : actionError} onRegister={handleRegister} />
+        <OnsiteTournamentView tournament={t} user={user} loading={loading} error={registerModal ? "" : actionError} onRegister={handleRegister}
+          notices={notices} />
         {registerModal && (
           <RegistrationSheet
             tournament={t}

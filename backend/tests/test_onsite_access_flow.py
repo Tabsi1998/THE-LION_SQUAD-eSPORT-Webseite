@@ -467,3 +467,95 @@ async def test_active_registrations_see_their_tournament(flow, status):
     await flow.register(tournament, user, status=status)
     assert (await flow.get(f"/api/tournaments/{tournament['slug']}")).status_code == 200
     assert (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).status_code == 200
+
+
+# ------------------------------------------------------------------ Hinweise der Turnierleitung (#2546)
+
+
+async def notice(flow, tournament: dict, text: str, *, target: str = "tournament", minutes: int = 30, **fields) -> dict:
+    doc = {"id": new_id(), "target": target, "tournament_id": tournament["id"], "event_id": tournament.get("event_id"),
+           "text": text, "show_on_tv": False, "created_at": _iso(-0.1), "expires_at": _iso(minutes / 60),
+           "created_by": "leitung-geheim", **fields}
+    await flow.db.tournament_notices.insert_one(dict(doc))
+    return doc
+
+
+@pytest.mark.asyncio
+async def test_guest_without_access_gets_no_notices(flow):
+    tournament = await members_tournament(flow)
+    await notice(flow, tournament, "Start verschiebt sich um 30 Minuten")
+    await guest(flow)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/notices")).status_code == 403
+    flow.act_as(None)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/notices")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_guest_with_access_reads_the_notices_of_this_tournament_only_text_and_time(flow):
+    event = {"id": new_id(), "slug": "lan-hinweise", "name": "Interne LAN", "status": "published", "visibility": "members"}
+    await flow.db.events.insert_one(dict(event))
+    tournament = await members_tournament(flow, event_id=event["id"])
+    other = await members_tournament(flow, event_id=event["id"])
+    await notice(flow, tournament, "Start verschiebt sich um 30 Minuten")
+    await notice(flow, tournament, "Halle B ist offen", target="event")
+    await notice(flow, other, "Nur für das andere Turnier")
+    await notice(flow, tournament, "Schon vorbei", minutes=-5)
+    token = await onsite_token(flow, tournament)
+    await guest(flow)
+    assert (await redeem(flow, token)).status_code == 200
+
+    response = await flow.get(f"/api/tournaments/{tournament['id']}/notices")
+    assert response.status_code == 200, response.text
+    assert response.headers.get("cache-control") == "no-store"
+    items = response.json()["items"]
+    assert sorted(item["text"] for item in items) == ["Halle B ist offen", "Start verschiebt sich um 30 Minuten"]
+    # Nur Text, Zeit und Ziel - nie die Person, kein Turniername, keine Event-Kennung.
+    for item in items:
+        assert set(item) <= {"id", "text", "created_at", "expires_at", "target", "tv"}
+    assert "leitung-geheim" not in response.text and event["id"] not in response.text
+    # Auch über den Slug - die Ansicht ruft mit der Kennung, die Adresse kann beides sein.
+    assert (await flow.get(f"/api/tournaments/{tournament['slug']}/notices")).status_code == 200
+    # Nur dieses Turnier, nur lesend: das andere Turnier und die Leitungs-Ansicht bleiben zu.
+    assert (await flow.get(f"/api/tournaments/{other['id']}/notices")).status_code == 403
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/lead/notices")).status_code == 403
+    created = await flow.post(f"/api/tournaments/{tournament['id']}/lead/notices",
+                              json={"request_id": "gast-versuch-1", "text": "Hallo", "show_on_tv": False})
+    assert created.status_code == 403
+    assert (await flow.get(f"/api/events/{event['slug']}/notices")).status_code in {403, 404}
+
+
+@pytest.mark.asyncio
+async def test_expired_access_gets_no_notices(flow):
+    tournament = await members_tournament(flow)
+    await notice(flow, tournament, "Start verschiebt sich")
+    token = await onsite_token(flow, tournament)
+    await guest(flow)
+    assert (await redeem(flow, token)).status_code == 200
+    url = f"/api/tournaments/{tournament['id']}/notices"
+    assert (await flow.get(url)).status_code == 200
+    # Das Fenster ist vorbei (Turnier beendet): die Freigabe trägt nicht mehr.
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "completed"}})
+    assert (await flow.get(url)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_renewed_or_switched_off_access_gets_no_notices(flow):
+    tournament = await members_tournament(flow)
+    await notice(flow, tournament, "Start verschiebt sich")
+    token = await onsite_token(flow, tournament)
+    await guest(flow)
+    assert (await redeem(flow, token)).status_code == 200
+    url = f"/api/tournaments/{tournament['id']}/notices"
+    visitor = flow.user
+    flow.act_as(await flow.add_staff())
+    assert (await flow.post(f"/api/tournaments/{tournament['id']}/onsite-access/renew")).status_code == 200
+    flow.act_as(visitor)
+    assert (await flow.get(url)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_hidden_tournament_stays_404_without_access_and_unknown_stays_404(flow):
+    tournament = await members_tournament(flow, status="draft")
+    await guest(flow)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/notices")).status_code == 404
+    assert (await flow.get("/api/tournaments/gibt-es-nicht/notices")).status_code == 404

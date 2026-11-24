@@ -51,8 +51,9 @@ ALL = set(areas.AREAS)
         # Dokumentation braucht nur die Linkprüfung im Backend-Job.
         ("README.md", {"backend"}),
         ("mobile/RELEASES.md", {"backend"}),
-        # Das Prüftor (#1660) liest seine Grenzen aus dieser Datei: Wer nur sie ändert, muss durchs Tor.
-        ("frontend/PERFORMANCE_BUDGETS.md", {"backend", "frontend"}),
+        # Das Prüftor (#1660) liest seine Grenzen aus dieser Datei: Wer nur sie ändert, muss durchs Tor - aber nur
+        # durchs Tor und die Linkprüfung, nicht durch den ganzen Frontend-Bereich (#2556).
+        ("frontend/PERFORMANCE_BUDGETS.md", {"backend", "prueftor"}),
         ("frontend/motion-rules-allowlist.json", {"frontend", "container"}),
         ("frontend/e2e/prueftor-bekannt.json", {"frontend", "container"}),
         (".gitignore", set()),
@@ -92,3 +93,53 @@ def test_unreadable_history_falls_back_to_every_job(monkeypatch, capsys):
     monkeypatch.setattr(areas.sys, "argv", ["ci-changed-areas.py", "--base", "missing", "--head", "HEAD"])
     assert areas.main() == 0
     assert capsys.readouterr().out.splitlines() == [f"{area}=true" for area in areas.AREAS]
+
+
+# ---------------------------------------------------------------- Eigener Bereich fürs Prüftor (#2556)
+
+CI_YML = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+
+
+def _job_block(text: str, job: str) -> str:
+    """Der Text eines Jobs in ci.yml: von ``  <job>:`` bis zum nächsten Job auf derselben Ebene."""
+    lines = text.splitlines()
+    start = lines.index(f"  {job}:")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("  ") and not lines[i].startswith("   ")
+                and lines[i].strip() and not lines[i].lstrip().startswith("#")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def test_prueftor_area_reaches_the_gate_job():
+    """Der Bereich ``prueftor`` steht in den Ausgaben von „changes“ und startet den Job „Prüftor“ - der Frontend-Bereich
+    weiterhin auch."""
+    assert "prueftor" in areas.AREAS
+    text = CI_YML.read_text(encoding="utf-8")
+    assert "prueftor: ${{ steps.areas.outputs.prueftor }}" in _job_block(text, "changes")
+    gate = _job_block(text, "prueftor")
+    assert "needs.changes.outputs.frontend == 'true'" in gate
+    assert "needs.changes.outputs.prueftor == 'true'" in gate
+
+
+def test_prueftor_runs_the_budget_self_test():
+    """``check:bundle`` im Frontend-Job prüft die echten Werte aus PERFORMANCE_BUDGETS.md (check-bundle-budget.test.mjs).
+    Startet eine Änderung nur an der Datei nur das Tor, muss das Tor diesen Selbsttest mitlaufen lassen."""
+    gate = _job_block(CI_YML.read_text(encoding="utf-8"), "prueftor")
+    assert "node --test --test-reporter=dot scripts/check-bundle-budget.test.mjs" in gate
+
+
+def test_frontend_files_still_start_the_gate_through_the_frontend_area():
+    assert "prueftor" not in areas.areas_for("frontend/src/pages/HomePage.jsx")
+    assert "frontend" in areas.areas_for("frontend/motion-rules-allowlist.json")
+
+
+def test_gate_comment_reports_not_run_when_the_result_is_missing():
+    """Bricht das Tor per Zeitlimit ab, fehlt das Ergebnis-Artefakt (#2556). Der Kommentar-Job scheitert dann nicht am
+    Herunterladen, sondern ersetzt den alten Kommentar (alte SHA) durch „nicht gelaufen“ mit dem aktuellen Stand."""
+    job = _job_block(CI_YML.read_text(encoding="utf-8"), "prueftor-kommentar")
+    download = job[job.index("actions/download-artifact"):job.index("- name: Create or update the gate comment")]
+    assert "continue-on-error: true" in download
+    assert "HEAD_SHA: ${{ github.event.pull_request.head.sha }}" in job
+    assert "GATE_RESULT: ${{ needs.prueftor.result }}" in job
+    assert "**Ergebnis: nicht gelaufen**" in job
+    # Nur ein Artefakt mit der Marke in der ersten Zeile wird gepostet - sonst die Meldung „nicht gelaufen“.
+    assert "grep -qx \"$marker\"" in job

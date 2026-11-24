@@ -397,7 +397,8 @@ neuer Rechnung. Alles Weitere steht in [Abrechnung](../ABRECHNUNG.md).
   Anmelde-Bildschirm denselben QR-Code, solange der Zugang gilt.
 - **Neuer Code** macht den alten QR-Code und alle damit schon geöffneten Zugänge sofort ungültig – etwa, wenn ein Foto
   des Aushangs herumgeht. Danach den Aushang neu drucken; der TV zeigt den neuen Code von selbst.
-- Wer scannt, sieht eine schlanke Turnierseite (Titel, Termin, Spiel, freie Plätze, **Mitspielen**). Ohne Konto geht es
+- Wer scannt, sieht eine schlanke Turnierseite (Titel, Termin, Spiel, freie Plätze, **Mitspielen**), darüber die
+  stehenden **Hinweise der Turnierleitung** (3.17), etwa „Start verschiebt sich“ (#2546). Ohne Konto geht es
   über Anmelden oder Registrieren und danach zurück zum Turnier. Regeln, Datenschutz, Fristen, Plätze und Warteliste
   gelten wie immer.
 - Nach der Anmeldung sieht die Person das ganze Turnier – Baum, Spielplan, eigene Spiele, Ergebnis melden –, aber
@@ -1233,7 +1234,11 @@ Warteliste und gesperrte Konten bekommen nichts. Auch beim Ziel „Ganzes Event�
 der Turniere; wer nur für das Event selbst angemeldet ist (ohne Turnier), bekommt ihn nicht – dafür gibt es die Nachricht
 an alle Angemeldeten in „Anmeldungen & Einlass“ des Events (#1372). Oben auf der Turnierseite (beim Ziel „Ganzes Event“ auf der Event-Seite
 und allen Turnierseiten des Events) steht er als Banner mit Uhrzeit und Restzeit, bis er abläuft oder ihr ihn entfernt.
-Banner und TV zeigen nie, wer geschrieben hat.
+Banner und TV zeigen nie, wer geschrieben hat. Auch Gäste mit **Vor-Ort-Zugang** (QR-Code, 3.3) sehen das
+Banner über dem Titel ihrer schlanken Turnierseite – auch bei einem Mitglieder-Turnier (#2546). Sie lesen nur die Hinweise
+dieses Turniers (und die an sein ganzes Event), sonst nichts; eine Benachrichtigung bekommen sie erst, wenn sie angemeldet
+sind. Ist der Vor-Ort-Zugang eingeschaltet, steht das im Formular unter den Empfängern: „Auch Gäste mit Vor-Ort-QR-Code sehen
+diesen Hinweis.“
 
 <img src="../assets/turniere/hinweis-banner-pc.png" alt="Turnierseite am PC: oben unter dem Pfad ein goldenes Banner Hinweis der Turnierleitung mit Megafon, Text Pause bis 14:25 und darunter 14:07 Uhr, noch 2 Stunden" width="600">
 

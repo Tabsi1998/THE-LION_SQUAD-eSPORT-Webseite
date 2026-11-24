@@ -103,20 +103,35 @@ export function columnUnits(areaWidth, columns) {
   return columns > 1 ? (width - FINALE_BOX.colGap) / 2 : Math.min(FINALE_BOX.colOne, width);
 }
 
+// Liga-Abzeichen im Ziel-Chip (#2561): 1,1 em breit, das Wappen 1,25-mal so hoch (1,375 em) - aus der Distanz noch als Form zu
+// erkennen (Krone, doppelter Rand). Dasselbe Maß steht in tv.css (.tv-finale__target .tls-lbadge--tv). Der Chip wird um das Wappen
+// breiter und bei einer Textzeile etwas höher - beides rechnet die Messung hier mit.
+export const TARGET_BADGE_EM = 1.1;
+export const TARGET_BADGE_HEIGHT_EM = TARGET_BADGE_EM * 1.25;
+
+/** Der Ziel-Chip in Einheiten: `natural` (so breit, wie er gern wäre), `max` (Obergrenze), `width` (geschätzt), `height`. */
+export function targetChipUnits(row, { columnU, scale }) {
+  const box = FINALE_BOX;
+  const inner = columnU - box.edge - box.padX * 2 - box.line * 2;
+  const max = Math.min(inner * box.targetMax, box.targetMaxU);
+  const target = targetText(row);
+  if (!target) return { natural: 0, max, width: 0, height: 0 };
+  const arrow = row?.move === "out" ? 0 : scale.info + box.targetGap;
+  const badge = row?.move !== "out" && row?.target_badge?.level ? scale.info * TARGET_BADGE_EM + box.targetGap : 0;
+  const natural = [...target].length * scale.info * 0.5 + arrow + badge + box.targetPadX * 2 + box.line * 2;
+  const width = Math.min(natural, max);
+  const lines = wrapLines(target, charsPerLine(Math.max(4, width - arrow - badge - box.targetPadX * 2 - box.line * 2), scale.info));
+  const text = lines * scale.info * box.targetLine;
+  const art = badge ? scale.info * TARGET_BADGE_HEIGHT_EM : 0;
+  return { natural, max, width, height: Math.max(text, art) + box.targetPadY * 2 + box.line * 2 };
+}
+
 /** Die geschätzte Höhe einer Zeile in Einheiten: Name (umbrochen) mit Platz/Staffel daneben die Ziel-Liga (umbrochen) - mindestens U. */
 export function finaleRowUnits(row, { columnU, unitU, scale }) {
   const box = FINALE_BOX;
   const inner = columnU - box.edge - box.padX * 2 - box.line * 2;
   const target = targetText(row);
-  let targetU = 0;
-  let targetHeight = 0;
-  if (target) {
-    const arrow = row?.move === "out" ? 0 : scale.info + box.targetGap;
-    const natural = [...target].length * scale.info * 0.5 + arrow + box.targetPadX * 2 + box.line * 2;
-    targetU = Math.min(natural, inner * box.targetMax, box.targetMaxU);
-    const lines = wrapLines(target, charsPerLine(Math.max(4, targetU - arrow - box.targetPadX * 2 - box.line * 2), scale.info));
-    targetHeight = lines * scale.info * box.targetLine + box.targetPadY * 2 + box.line * 2;
-  }
+  const { width: targetU, height: targetHeight } = targetChipUnits(row, { columnU, scale });
   const nameU = Math.max(8, inner - unitU * box.sign - box.gap * (target ? 2 : 1) - targetU);
   const font = nameFit(row?.name) ? scale.nameMin : scale.name;
   const nameLines = wrapLines(row?.name || "Team", charsPerLine(nameU, font * NAME_WIDTH));

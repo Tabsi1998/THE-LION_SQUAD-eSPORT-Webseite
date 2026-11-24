@@ -138,6 +138,30 @@ test("ein veröffentlichter Beitrag: Änderungen ohne Rückfrage, Datum bleibt",
   expect(confirmMock).not.toHaveBeenCalled();
 });
 
+test("#2553: ein schon veröffentlichter Beitrag wird auf „Nur App“ gestellt - die Verteilen-Box kündigt keinen Push an", async () => {
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-publish-now")).toBeChecked();
+  fireEvent.change(screen.getByTestId("news-channels"), { target: { value: "app" } });
+  const line = await screen.findByTestId("distribute-app-push");
+  expect(line).toHaveTextContent("Kein App-Push – der Beitrag ist schon öffentlich.");
+  expect(line).not.toHaveTextContent("Beim Veröffentlichen geht ein App-Push");
+});
+
+test("#2553 Schlussrunde: veröffentlichte Mitglieder-News wird öffentlich und „Nur App“ - die Box sagt „schon veröffentlicht“", async () => {
+  const members = { ...POSTS[0], id: "n2", visibility: "members" };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [members]);
+    return { data: [] };
+  });
+  renderAt("/admin/news/n2");
+  expect(await screen.findByTestId("news-publish-now")).toBeChecked();
+  fireEvent.change(screen.getByTestId("news-visibility"), { target: { value: "public" } });
+  fireEvent.change(screen.getByTestId("news-channels"), { target: { value: "app" } });
+  const line = await screen.findByTestId("distribute-app-push");
+  expect(line).toHaveTextContent("Kein App-Push – der Beitrag ist schon veröffentlicht.");
+});
+
 test("Bearbeiten lädt den Beitrag aus der Admin-Liste und schickt nur die Änderung", async () => {
   apiMock.patch.mockResolvedValue({ data: { ...POSTS[0], excerpt: "Neuer Termin 2027." } });
   renderAt("/admin/news/n1");
