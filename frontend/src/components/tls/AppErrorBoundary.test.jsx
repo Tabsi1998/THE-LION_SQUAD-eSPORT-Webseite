@@ -112,7 +112,8 @@ describe("AppErrorBoundary", () => {
     expect(text).toHaveTextContent("Seite: /");
     expect(text).toHaveTextContent("Uhrzeit: 7.10.2026, 12:15:30");
     expect(text).toHaveTextContent("Kennung: log-4711");
-    expect(screen.getByTestId("page-error-log-link")).toHaveAttribute("href", "/admin/ops?tab=app&q=log-4711");
+    // #1657: die Kennung ist die Fehlergruppe unter Betrieb → Fehler.
+    expect(screen.getByTestId("page-error-log-link")).toHaveAttribute("href", "/admin/ops?tab=errors&q=log-4711");
     await act(async () => { fireEvent.click(screen.getByTestId("page-error-copy")); });
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Kennung: log-4711"));
     expect(screen.getByTestId("page-error-copied")).toHaveTextContent("Kopiert");

@@ -1,12 +1,15 @@
 import { api } from "./api";
 import { isAudioProblem } from "./audioSafe";
 import { chunkReloadPending, isChunkLoadError } from "./chunkReload";
+import { vitalsRoute } from "./vitals";
 
 const DEDUPE_MS = 30000;
 const MAX_LOGS_PER_MINUTE = 12;
 // Standardmäßig an: Fehler aus dem Browser kommen mit denselben Grenzen wie
 // bisher (Deduplizierung, 12 pro Minute, Tokens und E-Mail-Adressen entfernt)
 // im Adminbereich an. Nur VITE_CLIENT_LOGGING=false schaltet es ab (#233).
+// Fehler-Sammler (#1657): gemeldet wird ohne Anmeldung an /ops/client-errors - nur Fehlerart, Stack ohne Meldungstext,
+// die Seite als Vorlage (/u/:slug) und die Version. Der Server bereinigt noch einmal und speichert nur Code-Stellen.
 const CLIENT_LOGGING_ENABLED = import.meta.env.VITE_CLIENT_LOGGING !== "false";
 const sentAtByFingerprint = new Map();
 // Die Kennung der Meldung je Fingerabdruck (#1230): ein zweiter gleicher Fehler innerhalb der Sperrfrist zeigt
@@ -41,8 +44,16 @@ function fingerprintFor(payload) {
   ].join("|").toLowerCase();
 }
 
-/** Schickt die Meldung; zurück kommt die Kennung des Eintrags unter „Betrieb & Logs“ - oder null (nicht gesendet,
- *  ohne Anmeldung, Fehler beim Senden). */
+/** Der Stack ohne die Zeile mit dem Meldungstext („TypeError: …“) - darin können Namen stehen. */
+function stackWithoutMessage(stack, name, message) {
+  const text = String(stack || "");
+  const head = message ? `${name || "Error"}: ${message}` : "";
+  const rest = head && text.startsWith(head) ? text.slice(head.length) : text;
+  return message ? rest.split(String(message)).join("") : rest;
+}
+
+/** Schickt die Meldung; zurück kommt die Kennung der Fehlergruppe unter „Betrieb & Logs → Fehler“ - oder null (nicht
+ *  gesendet, gebremst, Fehler beim Senden). */
 function sendClientLog(payload) {
   if (!CLIENT_LOGGING_ENABLED) return Promise.resolve(null);
   const fingerprint = fingerprintFor(payload);
@@ -54,19 +65,12 @@ function sendClientLog(payload) {
   sentAtByFingerprint.set(fingerprint, now);
   recentSendTimes.push(now);
 
-  const reportId = api.post("/mobile/client-logs", {
-    level: payload.level || "error",
-    message: scrubClientLogText(payload.message || "Web client error", 2000),
+  const reportId = api.post("/ops/client-errors", {
     source: "web",
-    screen: clip(window.location?.pathname || "", 120),
-    error_name: scrubClientLogText(payload.error_name || "", 160),
-    stack: scrubClientLogText(payload.stack || "", 4000),
-    context: {
-      path: window.location?.pathname || "",
-    },
-    platform: "web",
-    app_version: import.meta.env.VITE_APP_VERSION || "",
-    created_at: new Date().toISOString(),
+    error_type: clip(payload.error_name || "Error", 80),
+    stack: scrubClientLogText(stackWithoutMessage(payload.stack, payload.error_name, payload.message), 8000),
+    route: vitalsRoute(window.location?.pathname || "/"),
+    version: clip(import.meta.env.VITE_APP_VERSION || "", 40),
   }).then(({ data } = {}) => (data && typeof data.id === "string" ? data.id : null)).catch(() => null);
   reportIdByFingerprint.set(fingerprint, reportId);
   return reportId;
@@ -80,10 +84,11 @@ function reportPayload(error, fallbackMessage, fallbackName, stack) {
   if (isAudioProblem(error)) return null;
   if (isChunkLoadError(error)) {
     if (chunkReloadPending()) return null;
+    // Als eigene Fehlerart, damit er nicht mit echten Fehlern zusammenfällt; die Adresse des Bausteins bleibt im Stack.
     return {
       level: "info",
-      message: "Veralteter Stand nach Update – automatisches Neuladen half nicht, Hinweis zum Neuladen gezeigt",
-      error_name: error?.name || fallbackName,
+      message: "",
+      error_name: "ChunkLoadError",
       stack: `${error?.message || error}\n${stack}`,
     };
   }

@@ -37,8 +37,8 @@ test("reportCaughtError liefert die Kennung der Meldung, ein gleicher Fehler gle
   await expect(reportCaughtError(error, "in Seite")).resolves.toBe("log-4711");
   expect(api.post).toHaveBeenCalledTimes(1);
 
-  // Ohne Anmeldung lehnt der Server ab - dann gibt es keine Kennung, und nichts bricht.
-  api.post.mockRejectedValueOnce(new Error("401"));
+  // Lehnt der Server ab (etwa die Bremse, 429), gibt es keine Kennung, und nichts bricht.
+  api.post.mockRejectedValueOnce(new Error("429"));
   await expect(reportCaughtError(new Error("anderer Fehler"))).resolves.toBeNull();
 });
 
@@ -77,9 +77,29 @@ test("ein veralteter Baustein kommt nur als Hinweis an, nicht als Fehler", async
   await reportCaughtError(new TypeError("Failed to fetch dynamically imported module: https://lionsquad.at/assets/ReferenceRoundPage-1.js"), "in Seite");
   expect(api.post).toHaveBeenCalledTimes(1);
   const [, body] = api.post.mock.calls[0];
-  expect(body.level).toBe("info");
-  expect(body.message).toMatch(/^Veralteter Stand nach Update/);
+  expect(body.error_type).toBe("ChunkLoadError");
   expect(body.stack).toContain("ReferenceRoundPage");
+});
+
+// #1657: gemeldet wird ohne Anmeldung an den Fehler-Sammler - Fehlerart, Stack, Seite als Vorlage, Version. Nie der
+// Meldungstext; Namen in der Adresse werden zum Platzhalter.
+test("ein Fehler geht ohne Meldungstext und mit der Seite als Vorlage an den Fehler-Sammler", async () => {
+  const { api } = await import("./api");
+  const { reportCaughtError } = await import("./clientLog");
+  window.history.pushState({}, "", "/u/maxmustermann?email=max@example.test#oben");
+  api.post.mockClear();
+  api.post.mockResolvedValueOnce({ data: { ok: true, id: "abc123" } });
+  const error = new RangeError("Kein Platz für Max Mustermann");
+  await expect(reportCaughtError(error, "in Profil")).resolves.toBe("abc123");
+  const [url, body] = api.post.mock.calls[0];
+  expect(url).toBe("/ops/client-errors");
+  expect(body.source).toBe("web");
+  expect(body.error_type).toBe("RangeError");
+  expect(body.route).toBe("/u/:slug");
+  expect(Object.keys(body).sort()).toEqual(["error_type", "route", "source", "stack", "version"]);
+  expect(JSON.stringify(body)).not.toContain("max@example.test");
+  expect(JSON.stringify(body)).not.toContain("Mustermann");
+  window.history.pushState({}, "", "/");
 });
 
 test("lädt die Seite schon neu, meldet ein veralteter Baustein gar nichts", async () => {
