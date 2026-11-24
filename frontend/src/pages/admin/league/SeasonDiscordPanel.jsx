@@ -2,12 +2,17 @@
 // auf fehlende Ergebnisse gewartet wird und wie viele Plätze der Tabellenausschnitt zeigt. Eigener Kasten mit eigenem Speichern im Reiter
 // „Termine“ (Sprungmarke `#discord`). Ohne Einstellung ist alles aus. Ändern darf „Season konfigurieren“ (der Server prüft). Wählbar
 // sind nur die freigegebenen Kanäle (Nr. 234): die öffentlichen „Kanäle je Zweck“ unter Verbindungen → Discord. Dazu die Hinweise zu
-// Meldungen, deren Zustellung unklar ist (nie wiederholt) oder die aufgegeben wurden.
-import { useEffect, useState } from "react";
+// Meldungen, deren Zustellung unklar ist (nie von selbst wiederholt) oder die aufgegeben wurden - je Hinweis „Noch einmal senden“
+// (Nr. 239), nachdem die Leitung im Kanal nachgesehen hat. Die Hinweise laden live nach (K5), ohne das Formular zu überschreiben.
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+
+const REFRESH_MS = 60000;
+const RELEASE_CONFIRM = "Ich habe im Kanal nachgesehen, die Meldung fehlt";
 
 /** Die Eingabe als Werte für den Server: Schalter an/aus, Zahlen ganz; ein leeres Zahlenfeld nimmt die Vorgabe. */
 export function discordPayload(form) {
@@ -38,6 +43,7 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [releasing, setReleasing] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -48,9 +54,34 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
     }).catch((failure) => alive && setError(formatApiError(failure.response?.data?.detail) || "Discord-Einstellung konnte nicht geladen werden."));
     return () => { alive = false; };
   }, [seasonId]);
+  // Live (K5): nur der Stand vom Server (Hinweise, Kanäle) - das Formular bleibt, wie die Leitung es gerade bearbeitet.
+  const refresh = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/admin/leagues/seasons/${seasonId}/discord`);
+      if (data?.settings) setState(data);
+    } catch {
+      // Beim nächsten Mal wieder - ein fehlgeschlagenes Nachladen ändert nichts am Kasten.
+    }
+  }, [seasonId]);
+  useLiveRefresh(refresh, ["leagues"], { fallbackMs: REFRESH_MS });
 
   if (!form) return error ? <p className="text-sm text-warn" role="alert" data-testid="season-discord-error">{error}</p> : null;
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const release = async () => {
+    if (!releasing?.confirmed) return;
+    setReleasing((current) => ({ ...current, busy: true }));
+    setError("");
+    try {
+      const { data } = await api.post(`/admin/leagues/seasons/${seasonId}/discord/release`, { key: releasing.key, confirm: true });
+      setState(data);
+      setReleasing(null);
+      toast.success("Freigegeben – die Meldung geht mit dem nächsten Lauf hinaus (spätestens in 15 Minuten), genau einmal.");
+    } catch (failure) {
+      setReleasing(null);
+      setError(formatApiError(failure.response?.data?.detail) || "Die Meldung konnte nicht freigegeben werden.");
+      if (failure.response?.status === 409 || failure.response?.status === 404) await refresh();
+    }
+  };
   const save = async () => {
     setSaving(true);
     setError("");
@@ -126,7 +157,32 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
           <p className="font-bold">Meldungen, die du prüfen solltest</p>
           <ul className="mt-1 space-y-1">
             {problems.map((row) => (
-              <li key={`${row.kind}-${row.label}-${row.at}`}><span className="font-semibold">{row.label}:</span> {row.text}</li>
+              <li key={row.key || `${row.kind}-${row.label}-${row.at}`} className="space-y-2">
+                <p><span className="font-semibold">{row.label}:</span> {row.text}</p>
+                {canEdit && row.key && releasing?.key !== row.key ? (
+                  <button type="button" onClick={() => setReleasing({ key: row.key, confirmed: false })} data-testid={`season-discord-release-${row.key}`}
+                    className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+                    Noch einmal senden
+                  </button>
+                ) : null}
+                {canEdit && row.key && releasing?.key === row.key ? (
+                  <div className="space-y-2 rounded-sm border border-white/15 bg-black/20 p-2" data-testid="season-discord-release-box">
+                    <CheckField label={RELEASE_CONFIRM} checked={releasing.confirmed} onChange={(value) => setReleasing((current) => ({ ...current, confirmed: Boolean(value) }))}
+                      testId="season-discord-release-confirm" className="min-h-[44px]"
+                      hint="Erst nachsehen: Steht sie doch im Kanal, nicht freigeben – sonst steht sie zweimal da." />
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={release} disabled={!releasing.confirmed || releasing.busy} data-testid="season-discord-release-go"
+                        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+                        {releasing.busy ? "Gebe frei …" : "Freigeben"}
+                      </button>
+                      <button type="button" onClick={() => setReleasing(null)} data-testid="season-discord-release-cancel"
+                        className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
             ))}
           </ul>
         </div>

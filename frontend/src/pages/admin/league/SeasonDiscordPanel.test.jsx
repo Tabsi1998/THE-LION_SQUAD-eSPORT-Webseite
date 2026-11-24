@@ -5,8 +5,10 @@ import { seasonTarget } from "@/lib/seasonTabs";
 // freigegebener bleibt sichtbar - mit Hinweis), Speichern schickt Schalter und ganze Zahlen, Hinweis bei nicht öffentlicher Season,
 // Hinweise zu unklaren bzw. aufgegebenen Meldungen, nur lesen ohne Recht. Erfundene Kanäle.
 
-const apiMock = { get: vi.fn(), put: vi.fn() };
+const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
+const live = { callback: null, options: null };
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, _resources, options) => { live.callback = callback; live.options = options; } }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { SeasonDiscordPanel, channelOptions, discordPayload } = await import("./SeasonDiscordPanel");
@@ -18,6 +20,7 @@ const CHANNELS = [{ id: "111", purpose: "Events und Turniere", name: "liga-ergeb
 beforeEach(() => {
   apiMock.get.mockReset();
   apiMock.put.mockReset();
+  apiMock.post.mockReset();
 });
 
 test("ohne Einstellung aus; Einschalten mit Kanal speichert Schalter und Zahlen", async () => {
@@ -83,4 +86,55 @@ test("Helfer: freigegebene Kanäle mit Zweck, ein nicht mehr freigegebener bleib
     .toEqual({ matchday: true, season_end: false, late: true, channel_id: "111", wait_hours: null, table_rows: 3 });
   expect(seasonTarget("#discord")).toEqual({ tab: "termine", section: "discord" });
   expect(seasonTarget("#tv-finale")).toEqual({ tab: "abschluss", section: "tv-finale" });
+});
+
+// ---------------------------------------------------------------- Runde 2: „Noch einmal senden“ (Nr. 239) und Nachladen (K5)
+
+const UNCLEAR = { key: "season_end:s1", kind: "season_end", label: "Saisonende", status: "unclear", at: "2026-11-24T10:00:00+00:00",
+  text: "Ob die Meldung ankam, ist unklar. Bitte im Kanal nachsehen." };
+const LIVE = { settings: { ...DEFAULTS, season_end: true, channel_id: "111" }, active: true, public: true, channels: CHANNELS, channel_approved: true };
+
+test("Nr. 239: je Hinweis „Noch einmal senden“ - erst nach der Bestätigung „Ich habe im Kanal nachgesehen, die Meldung fehlt“, mit Toast", async () => {
+  const { toast } = await import("sonner");
+  apiMock.get.mockResolvedValue({ data: { ...LIVE, problems: [UNCLEAR] } });
+  apiMock.post.mockResolvedValue({ data: { ...LIVE, problems: [] } });
+  render(<SeasonDiscordPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("season-discord-release-season_end:s1"));
+  const go = screen.getByTestId("season-discord-release-go");
+  expect(go).toBeDisabled();
+  fireEvent.click(screen.getByTestId("season-discord-release-confirm"));
+  expect(screen.getByText("Ich habe im Kanal nachgesehen, die Meldung fehlt")).toBeInTheDocument();
+  fireEvent.click(go);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/discord/release", { key: "season_end:s1", confirm: true }));
+  await waitFor(() => expect(screen.queryByTestId("season-discord-problems")).toBeNull());
+  expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("nächsten Lauf"));
+});
+
+test("Nr. 239: ohne Recht kein Knopf; schon freigegeben (409): Hinweis und neu geladen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...LIVE, problems: [UNCLEAR] } });
+  const { unmount } = render(<SeasonDiscordPanel seasonId="s1" canEdit={false} />);
+  await screen.findByTestId("season-discord-problems");
+  expect(screen.queryByTestId("season-discord-release-season_end:s1")).toBeNull();
+  unmount();
+  apiMock.get.mockReset();
+  apiMock.get.mockResolvedValueOnce({ data: { ...LIVE, problems: [UNCLEAR] } }).mockResolvedValue({ data: { ...LIVE, problems: [] } });
+  apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Diese Meldung ist schon freigegeben oder gesendet." } } });
+  render(<SeasonDiscordPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("season-discord-release-season_end:s1"));
+  fireEvent.click(screen.getByTestId("season-discord-release-confirm"));
+  fireEvent.click(screen.getByTestId("season-discord-release-go"));
+  expect(await screen.findByRole("alert")).toHaveTextContent("schon freigegeben");
+  await waitFor(() => expect(screen.queryByTestId("season-discord-problems")).toBeNull());
+});
+
+test("K5: die Hinweise laden live nach - ohne das Formular zu überschreiben, an dem gerade jemand tippt", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: { ...LIVE, problems: [] } });
+  render(<SeasonDiscordPanel seasonId="s1" />);
+  fireEvent.change(await screen.findByTestId("season-discord-rows"), { target: { value: "9" } });
+  expect(live.callback).toBeTypeOf("function");
+  expect(live.options.fallbackMs).toBeGreaterThan(0);
+  apiMock.get.mockResolvedValueOnce({ data: { ...LIVE, problems: [UNCLEAR] } });
+  await live.callback();
+  expect(await screen.findByTestId("season-discord-problems")).toHaveTextContent("Saisonende");
+  expect(screen.getByTestId("season-discord-rows")).toHaveValue(9);
 });
