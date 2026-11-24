@@ -87,12 +87,12 @@ async def test_a_flood_of_random_stacks_stops_at_the_daily_cap(flow, still_rate_
                 assert response.status_code == 202
                 sent += 1
     assert sent == 260
-    groups = await flow.db.ops_errors.count_documents({"fingerprint": {"$ne": ops_monitor.OVERFLOW_FINGERPRINT}})
+    groups = await flow.db.ops_errors.count_documents({"error_type": {"$ne": ops_monitor.OVERFLOW_TYPE}})
     assert groups == 200
-    overflow = await flow.db.ops_errors.find_one({"fingerprint": ops_monitor.OVERFLOW_FINGERPRINT}, {"_id": 0})
-    assert overflow["error_type"] == "Weitere Fehler (Obergrenze)" and overflow["count"] == 60
+    overflow = await flow.db.ops_errors.find_one({"fingerprint": "client-overflow:web"}, {"_id": 0})
+    assert overflow["error_type"] == "Weitere Fehler (Obergrenze)" and overflow["count"] == 60 and overflow["source"] == "web"
     # Eine bekannte Gruppe zählt auch über der Obergrenze weiter.
-    known = await flow.db.ops_errors.find_one({"fingerprint": {"$ne": ops_monitor.OVERFLOW_FINGERPRINT}}, {"_id": 0})
+    known = await flow.db.ops_errors.find_one({"error_type": {"$ne": ops_monitor.OVERFLOW_TYPE}}, {"_id": 0})
     async with client_from("198.51.100.99") as client:
         again = {"source": "web", "error_type": known["error_type"], "stack": "", "route": known["route"], "version": "2.3"}
         again["stack"] = "\n".join(f"at {line.split(' (')[0]} (https://lionsquad.at/assets/{line.split('(')[1].split(':')[0]}:1:2)" for line in known["stack"].splitlines())
@@ -105,7 +105,7 @@ async def test_the_cap_is_a_setting(flow):
     await enable(flow, client_group_cap=10)
     for _ in range(15):
         await flow.client.post("/api/ops/client-errors", json=random_error())
-    assert await flow.db.ops_errors.count_documents({"fingerprint": {"$ne": ops_monitor.OVERFLOW_FINGERPRINT}}) == 10
+    assert await flow.db.ops_errors.count_documents({"error_type": {"$ne": ops_monitor.OVERFLOW_TYPE}}) == 10
 
 
 @pytest.mark.asyncio
@@ -174,3 +174,33 @@ async def test_switch_cap_brake_and_recovery_are_saved_in_the_admin(flow):
     ops_monitor.forget_settings()
     response = await flow.client.post("/api/ops/client-errors", json=random_error())
     assert response.status_code == 202, "eingeschaltet nimmt der Sammler wieder an"
+
+
+@pytest.mark.asyncio
+async def test_the_daily_cap_counts_new_groups_not_requests(flow, still_rate_limit_clock):
+    """40 gleichzeitige Meldungen desselben neuen Fehlers sind eine neue Gruppe - der Tageszähler steht auf 1."""
+    await enable(flow)
+    same = random_error()
+
+    async def burst(address):
+        async with client_from(address) as client:
+            return await asyncio.gather(*(client.post("/api/ops/client-errors", json=same) for _ in range(20)))
+
+    replies = await asyncio.gather(burst("192.0.2.1"), burst("192.0.2.2"))
+    assert all(reply.status_code == 202 for group in replies for reply in group)
+    assert await flow.db.ops_errors.count_documents({}) == 1
+    counter = await flow.db.ops_alert_state.find_one({"key": {"$regex": "^client_groups:"}}, {"_id": 0, "count": 1})
+    assert counter["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_each_source_has_its_own_overflow_group(flow):
+    await enable(flow, client_group_cap=10)
+    for _ in range(12):
+        await flow.client.post("/api/ops/client-errors", json=random_error())
+    for _ in range(3):
+        await flow.client.post("/api/ops/client-errors", json=random_error(source="app"))
+    web = await flow.db.ops_errors.find_one({"fingerprint": "client-overflow:web"}, {"_id": 0})
+    app = await flow.db.ops_errors.find_one({"fingerprint": "client-overflow:app"}, {"_id": 0})
+    assert (web["source"], web["count"]) == ("web", 2)
+    assert (app["source"], app["count"]) == ("app", 3)

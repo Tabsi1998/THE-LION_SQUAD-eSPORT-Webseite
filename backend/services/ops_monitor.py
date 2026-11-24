@@ -151,7 +151,8 @@ async def error_settings(db) -> dict:
     return value
 
 
-async def upsert_group(db, *, fingerprint: str, fields: dict, status_code: int = 0, settings: dict | None = None) -> str | None:
+async def upsert_group(db, *, fingerprint: str, fields: dict, status_code: int = 0, settings: dict | None = None,
+                       on_new=None) -> str | None:
     """Eine Fehlergruppe zählen (#233, #1657) - für Server, Website und App derselbe Weg.
 
     ``fields`` sind schon bereinigt (``ops_error_scrub``): Quelle, Fehlerart, Stelle, Route, Version. Eine Meldung wird
@@ -181,7 +182,11 @@ async def upsert_group(db, *, fingerprint: str, fields: dict, status_code: int =
         )
         from services.ops_alerts import schedule_error_alert, schedule_spike_alert
 
-        if int(status_code) >= 500 and getattr(outcome, "upserted_id", None) is not None:
+        created = getattr(outcome, "upserted_id", None) is not None
+        if created and on_new is not None:
+            # Nur wer die Gruppe wirklich angelegt hat, zählt sie (Obergrenze je Tag) - nicht jede Anfrage.
+            await on_new(current)
+        if int(status_code) >= 500 and created:
             # Eine neue 5xx-Gruppe meldet sich per Discord (#265) - im Hintergrund.
             group = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0})
             if group:
@@ -305,22 +310,37 @@ def client_fingerprint(source: str, error_type: str, route: str, frames: str) ->
     return error_fingerprint(f"{source}:{error_type}", route, "", first)
 
 
-OVERFLOW_FINGERPRINT = "client-overflow"
+OVERFLOW_PREFIX = "client-overflow"
 OVERFLOW_TYPE = "Weitere Fehler (Obergrenze)"
 
 
-async def _room_for_new_group(db, settings: dict, current) -> bool:
-    """Obergrenze (#1657): höchstens ``client_group_cap`` neue Gruppen aus Website und App je Tag (UTC), atomar gezählt."""
+def overflow_fingerprint(source: str) -> str:
+    """Je Quelle eine eigene Sammelgruppe (``client-overflow:web``, ``client-overflow:app``)."""
+    return f"{OVERFLOW_PREFIX}:{source}"
+
+
+def _cap_key(current) -> str:
     from services.ops_alerts import helper_day
 
-    count = await _counter(db, f"client_groups:{helper_day(current)}", current)
-    return count <= int(settings["client_group_cap"])
+    return f"client_groups:{helper_day(current)}"
+
+
+async def _room_for_new_group(db, settings: dict, current) -> bool:
+    """Obergrenze (#1657): höchstens ``client_group_cap`` neue Gruppen aus Website und App je Tag (UTC). Hier wird nur
+    gelesen; gezählt wird erst, wenn eine Gruppe wirklich angelegt wurde (``_count_new_group``). Kommen viele neue Fehler
+    zugleich, kann die Grenze knapp überschritten werden - das ist hinnehmbar."""
+    row = await db.ops_alert_state.find_one({"key": _cap_key(current)}, {"_id": 0, "count": 1}) or {}
+    return int(row.get("count") or 0) < int(settings["client_group_cap"])
+
+
+async def _count_new_group(db, current) -> None:
+    await _counter(db, _cap_key(current), current)
 
 
 async def record_client_error(db, *, source: str, error_type: object, stack: str, route: str, version: str, settings: dict | None = None) -> str | None:
     """Ein Fehler aus Website oder App (#1657) - bereinigt wie ein Serverfehler, in derselben Liste. Ist die Obergrenze
-    neuer Gruppen für heute erreicht, zählt ein neuer Fehler in der Sammelgruppe „Weitere Fehler (Obergrenze)“; bekannte
-    Gruppen zählen weiter."""
+    neuer Gruppen für heute erreicht, zählt ein neuer Fehler in der Sammelgruppe „Weitere Fehler (Obergrenze)“ seiner
+    Quelle; bekannte Gruppen zählen weiter."""
     if source not in CLIENT_SOURCES:
         return None
     settings = settings or await error_settings(db)
@@ -329,15 +349,20 @@ async def record_client_error(db, *, source: str, error_type: object, stack: str
     page = client_route(route)
     fingerprint = client_fingerprint(source, kind, page, frames)
     fields = {"source": source, "error_type": kind, "stack": frames, "route": page, "method": "", "version": clean_version(version)}
+    on_new = None
     try:
         known = await db.ops_errors.find_one({"fingerprint": fingerprint}, {"_id": 0, "fingerprint": 1})
-        if not known and not await _room_for_new_group(db, settings, now_utc()):
-            fingerprint = OVERFLOW_FINGERPRINT
-            fields = {"source": source, "error_type": OVERFLOW_TYPE, "stack": "", "route": "/", "method": "", "version": clean_version(version)}
+        if not known:
+            if await _room_for_new_group(db, settings, now_utc()):
+                async def on_new(current):
+                    await _count_new_group(db, current)
+            else:
+                fingerprint = overflow_fingerprint(source)
+                fields = {"source": source, "error_type": OVERFLOW_TYPE, "stack": "", "route": "/", "method": "", "version": clean_version(version)}
     except Exception as exc:  # noqa: BLE001 - die Aufzeichnung darf die Antwort nie verhindern
         logger.debug("[ops] client error record failed: %s", type(exc).__name__)
         return None
-    return await upsert_group(db, fingerprint=fingerprint, fields=fields, settings=settings)
+    return await upsert_group(db, fingerprint=fingerprint, fields=fields, settings=settings, on_new=on_new)
 
 
 def is_multipart(request: Any) -> bool:
