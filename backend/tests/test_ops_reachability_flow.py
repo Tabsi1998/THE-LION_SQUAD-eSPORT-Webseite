@@ -126,7 +126,7 @@ async def test_a_target_without_address_is_not_checked(flow, discord_recorder):
 async def test_a_stale_or_unreadable_state_shows_a_disturbance(flow, monkeypatch):
     assert (await status(flow))["state"] == "ok", "nie geprüft (frische Installation): kein Alarm auf der Statusseite"
     await ops_reachability.run_reachability(flow.db, probes(Switch()))
-    old = (now_utc() - timedelta(minutes=ops_reachability.STALE_MINUTES + 5)).isoformat()
+    old = (now_utc() - timedelta(seconds=ops_reachability.stale_seconds() + 300)).isoformat()
     await flow.db.settings.update_one({"id": ops_reachability.STATE_ID}, {"$set": {"checked_at": old}})
     assert (await status(flow))["state"] == "disturbance", "prüft niemand mehr, ist etwas faul"
 
@@ -188,8 +188,8 @@ async def test_without_a_readable_state_the_run_keeps_its_own_memory(flow, disco
 
 @pytest.mark.asyncio
 async def test_a_database_outage_is_reported_when_the_database_is_back(flow, discord_recorder, monkeypatch):
-    """Ohne Datenbank kann nichts gemeldet und nichts gespeichert werden. Der Stand im Speicher trägt den Ausfall, und mit
-    der Wiederkehr kommt eine Meldung, die sagt, seit wann sie weg war."""
+    """Ohne Datenbank kann nichts gemeldet und nichts gespeichert werden. Der Stand im Speicher trägt den Ausfall; mit der
+    Wiederkehr gehen die Meldungen raus - die Wiederkehr sagt, seit wann sie weg war."""
     await ops_reachability.run_reachability(flow.db, probes(Switch()))
     database = Switch()
     database.up = False
@@ -207,7 +207,56 @@ async def test_a_database_outage_is_reported_when_the_database_is_back(flow, dis
 
     database.up = True
     await ops_reachability.run_reachability(flow.db, probes(Switch(), database=database))
+    await ops_reachability.run_reachability(flow.db, probes(Switch(), database=database))
     calls = reach_calls(discord_recorder)
-    assert [call["title"] for call in calls] == ["Betrieb: Datenbank wieder erreichbar"]
-    assert "Ausfall seit" in calls[0]["description"]
+    # Mit der Datenbank kommt erst die vorgemerkte Ausfallmeldung, nach dem zweiten Erfolg in Folge die Wiederkehr.
+    assert [call["title"] for call in calls] == ["Betrieb: Datenbank nicht erreichbar", "Betrieb: Datenbank wieder erreichbar"]
+    assert "Ausfall seit" in calls[1]["description"]
     assert (await status(flow))["state"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_back_only_after_two_successes_in_a_row(flow, discord_recorder):
+    """Hysterese (#1657): „wieder erreichbar“ erst nach der eingestellten Zahl von Erfolgen (Vorgabe 2) - ein einzelner
+    Erfolg zwischen Fehlversuchen meldet nichts."""
+    await ops_alerts.save_alert_settings(flow.db, {"reach_fail_threshold": 1})
+    web = Switch()
+    web.up = False
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    web.up = True
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    web.up = False
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    web.up = True
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    assert [call["title"] for call in reach_calls(discord_recorder)] == ["Betrieb: Website nicht erreichbar"]
+    assert (await status(flow))["state"] == "disturbance"
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    assert [call["title"] for call in reach_calls(discord_recorder)][-1] == "Betrieb: Website wieder erreichbar"
+
+
+@pytest.mark.asyncio
+async def test_a_notice_is_never_sent_twice_when_saving_fails(flow, discord_recorder, monkeypatch):
+    """Erst der Stand, dann die Meldung (#1657): Lässt sich der Stand nicht speichern, geht nichts raus - kein Versand,
+    den ein späterer Lauf wiederholen würde."""
+    await ops_alerts.save_alert_settings(flow.db, {"reach_fail_threshold": 1})
+    web = Switch()
+    web.up = False
+
+    async def cannot_save(db, state):
+        raise RuntimeError("Speichern geht nicht")
+
+    with monkeypatch.context() as broken:
+        broken.setattr(ops_reachability, "_save_state", cannot_save)
+        await ops_reachability.run_reachability(flow.db, probes(web))
+    assert reach_calls(discord_recorder) == []
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    await ops_reachability.run_reachability(flow.db, probes(web))
+    assert [call["title"] for call in reach_calls(discord_recorder)] == ["Betrieb: Website nicht erreichbar"]
+
+
+def test_the_stale_limit_covers_the_longest_backup_write_pause(monkeypatch):
+    monkeypatch.delenv("BACKUP_WRITE_PAUSE_MAX_SECONDS", raising=False)
+    assert ops_reachability.stale_seconds() >= 900 + 120
+    monkeypatch.setenv("BACKUP_WRITE_PAUSE_MAX_SECONDS", "1500")
+    assert ops_reachability.stale_seconds() >= 1500 + 120
