@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services.competition_read import load_competition_read_model, load_registration_matches
+from services.competition_read import CompetitionReadModel, load_registration_matches
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.team_colors import effective_color
 from services.visibility import user_can_see
@@ -181,7 +181,7 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     games = await _game_names(db, (row.get("game_id") for row in visible.values()))
     events = await _event_names(db, (row.get("event_id") for row in visible.values()))
 
-    league = await _league_entries(db, registrations, visible, viewer)
+    league = await _league_entries(db, registrations, visible, viewer, insider=insider)
     in_league = {row["registration_id"] for row in league}
     upcoming = []
     for reg in registrations:
@@ -212,8 +212,15 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
         for row in await db.tournament_registrations.find({"id": {"$in": other_ids}}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(len(other_ids)):
             names[row["id"]] = row.get("display_name") or row.get("ingame_name") or row.get("team_name") or "Gegner"
     labels: dict[str, str] = {}
-    for tid in sorted({m.get("tournament_id") for m in chosen}):
-        model = await load_competition_read_model(db, tid)
+    # Runden-Namen (#1630, kein N+1): Spiele und Phasen aller gezeigten Turniere in je einer Abfrage statt zwei je Turnier.
+    label_ids = sorted({m.get("tournament_id") for m in chosen if m.get("tournament_id")})
+    graph = await db.matches_v2.find({"tournament_id": {"$in": label_ids}}, {"_id": 0}).sort(
+        [("stage_number", 1), ("round", 1), ("order", 1)]).to_list(5000) if label_ids else []
+    phases = await db.tournament_stages.find({"tournament_id": {"$in": label_ids}}, {"_id": 0}).sort("number", 1).to_list(
+        len(label_ids) * 20 + 1) if label_ids else []
+    for tid in label_ids:
+        model = CompetitionReadModel(tournament_id=tid, stage_matches=[row for row in graph if row.get("tournament_id") == tid],
+                                     stages=[row for row in phases if row.get("tournament_id") == tid])
         snapshot = model.structure_snapshot()
         stage_types = {stage.get("id"): stage.get("stage_type") for stage in snapshot.get("stages") or []}
         rounds = rounds_by_section(snapshot.get("matches") or [])
@@ -239,7 +246,7 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     return {"header": header, "upcoming": upcoming, "recent": recent, "league": league}
 
 
-async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None) -> list[dict]:
+async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None, *, insider: bool = False) -> list[dict]:
     """Abschnitt „Liga“ der Teamseite (P5, #1625): die Co-Teams des Teams und ihre Staffel, solange die Staffel läuft
     (Turnierstatus, nicht der Stand der Season - wie „Angemeldet für“). Der Link geht auf die Ligaseite, wenn die
     Person die Season sehen darf, sonst auf das Staffel-Turnier."""
@@ -261,6 +268,18 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
     divisions = {row["id"]: row for row in await db.league_divisions.find(
         {"id": {"$in": sorted({c.get("division_id") for c in contexts if c.get("division_id")})}},
         {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
+    # Platz von N, Zone und nächstes Spiel (#1630): dieselbe Rechnung wie die Tabelle, für alle Staffeln auf einmal - die ganzen
+    # Staffel-Dokumente (Tabellenregeln, Entscheide) in einer Abfrage.
+    from services.league_current import badge, hidden_from_outsiders, live_places, sort_rows, status_note
+
+    staffel_ids = sorted({tournament["id"] for _reg, tournament in rows})
+    full = await db.tournaments.find({"id": {"$in": staffel_ids}}, {"_id": 0}).to_list(len(staffel_ids) + 1)
+    full_by_id = {row["id"]: row for row in full}
+    # Verborgene Teilnehmerliste: eine offene bzw. Wartelisten-Anmeldung sehen nur Team und Staff (Review #1638).
+    rows = [(reg, tournament) for reg, tournament in rows if insider or not hidden_from_outsiders(reg, full_by_id.get(tournament["id"]))]
+    if not rows:
+        return []
+    places = await live_places(db, full, [reg.get("id") for reg, _tournament in rows if reg.get("id")])
     out = []
     for reg, tournament in rows:
         context = tournament["league_context"]
@@ -282,12 +301,20 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "league": {"name": league.get("name"), "slug": league.get("slug")},
             "season": {"name": season.get("name"), "slug": season.get("slug")},
             "staffel_label": f"{division_label(division)} · Staffel {staffel}",
+            "division_label": division_label(division), "staffel": staffel,
+            # Liga-Abzeichen (#1638): Liga N und Beiname - die Stufe zeigt sich am Wappen.
+            "badge": badge(division),
             # Emblem der Season bzw. Liga (#2107), klein vor der Staffel - ohne steht das Liga-Zeichen.
             "emblem_url": (season.get("emblem_url") or league.get("emblem_url") or None),
             "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
             "link": link,
+            "status_note": status_note(reg),
+            # Co-Team-Kennung: Der Saisonverlauf stellt die Co-Teams, die gerade spielen, zuerst (Review #1638).
+            "squad_id": reg.get("squad_id"),
+            **(places.get(reg.get("id")) or {"rank": None, "of": None, "zone": None, "zone_label": None, "next_match": None}),
         })
-    return sorted(out, key=lambda row: (row["league"]["name"] or "", row["staffel_label"]))
+    # Beste Liga N oben (#1630, aus #1644), dann Liga, Season und Co-Team.
+    return sort_rows(out)
 
 
 # ------------------------------------------------------------------ Beitrittscode

@@ -766,6 +766,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     awards = []
     league_history = []
     league_overall = []
+    league_current = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
              "level": achievement_level["level"],
@@ -781,6 +782,10 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         # Season-Historie (F.2, #1627): wo die Person eingesetzt war - Liga N, Platz, Meister; nur Seasons, die der Betrachter sieht.
         from services.league_history import for_player
         league_history = await for_player(db, user_id, viewer, scope=profile_scope)
+        # Aktuelle Ligen (#1630): Co-Teams der Person in laufenden Staffeln mit Liga N, Platz von N, Zone und nächstem Spiel - nach
+        # derselben Regel (Gäste nur Öffentliches, Mitglieder bei eingeschaltetem Schalter dazu Internes mit Etikett).
+        from services import league_current as current_service
+        league_current = await current_service.for_player(db, user_id, viewer, scope=profile_scope)
         # Gesamtwertung über Seasons (F.5, #2215): Platz in der Spielerwertung je Zeitraum und Liga N.
         from services import league_overall as overall_service
         league_overall = await overall_service.for_player(db, user_id, viewer, scope=profile_scope)
@@ -907,6 +912,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "awards": awards,
         "league_history": league_history,
         "league_overall": league_overall,
+        "league_current": league_current,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
         # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Person gewählt hat.
         "featured_title": next((award for award in awards if award["id"] == u.get("featured_title_award_id")), None),

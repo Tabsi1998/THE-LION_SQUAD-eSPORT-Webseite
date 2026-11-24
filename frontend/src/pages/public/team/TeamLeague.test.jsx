@@ -1,7 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { TeamLeague } from "./TeamLeague";
-import { leagueLine } from "@/lib/teamPage";
 
 // Teamseite (docs/LIGA.md, P5, #1625): Abschnitt „Liga“ mit Co-Team und Staffel, Link auf die Ligaseite.
 
@@ -18,7 +17,6 @@ test("zeigt Co-Team, Staffel und führt zur Ligaseite", () => {
   expect(link).toHaveTextContent("Liga 1 · Staffel A");
   expect(link).toHaveTextContent("Probe B");
   expect(link).toHaveTextContent("Probe-Liga · Season 1");
-  expect(leagueLine({ league: { name: "A" } })).toBe("A");
 });
 
 test("Emblem der Season bzw. Liga klein vor der Staffel (#2107), ohne Bild das Liga-Zeichen", () => {

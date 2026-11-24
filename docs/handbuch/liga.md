@@ -1811,6 +1811,42 @@ Admins sehen sie dort nicht (in der Liga-Verwaltung weiter alles). Gäste und Ni
 die Gesamtwertung im Spielerprofil gilt das ebenso; zählt eine solche Season mit, trägt der Platz das Etikett. Eine eigene Season,
 deren Seite die Person nicht öffnen darf, steht ohne Link da.
 
+**Liga-Abzeichen (#1638):** Überall, wo eine Liga N steht, zeigt ein Wappen mit ihrer Zahl die Stufe: **Liga 1** trägt eine Krone,
+einen doppelten Rand und einen zarten Glanz, **Liga 2** den doppelten Rand, ab **Liga 3** nur die Kontur. Die Farbe ist Cyan; **Gold**
+tragen nur Wappen und das Wort „Meister“ beim Co-Team, das die Season gewonnen hat (Season-Historie); der Beiname bleibt Cyan. Der Beiname der Liga N (2.3, z. B. „Elite“)
+steht als Text daneben: „Liga 1 · Elite“. Zu sehen im Kopf jeder Liga N auf der Ligaseite, in **Aktuelle Ligen**, auf der Teamseite
+(Abschnitt *Liga*), in der Season-Historie und in der Gesamtwertung. Beim ersten Erscheinen setzt sich die Krone einmal auf und der
+Glanz läuft einmal darüber; mit „Bewegung reduzieren“ steht alles still.
+
+<img src="../assets/liga/liga-abzeichen-stufen.png" alt="Liga-Abzeichen in drei Größen: Liga 1 mit Krone, Liga 2 mit doppeltem Rand, Liga 3 schlicht, dazu zwei goldene Meister-Abzeichen und ein langer Beiname" width="720">
+
+**Aktuelle Ligen (#1630):** Das Spielerprofil zeigt je Co-Team, in dessen Kader die Person steht oder das sie als Captain bzw.
+Vertreter führt, die laufende Staffel (wer ein Co-Team nur angemeldet hat, sieht es dort nicht): Liga N mit
+Abzeichen, Staffel, **Platz von N**, Zone (Auf- oder Abstieg, Relegation) und das **nächste Spiel** mit Gegner und Termin (ohne
+Termin der Spieltag). Plätze gibt es ab dem ersten gewerteten Spiel der Staffel – vorher steht „Noch ohne Ergebnis“, auf der
+Warteliste bzw. vor der Zulassung „Warteliste“ bzw. „Anmeldung offen“. Verbirgt die Staffel ihre Teilnehmerliste, gibt es eine solche
+Anmeldung für Außenstehende gar nicht – wie in der Teilnehmerliste; sehen können sie nur die Person selbst bzw. auf der Teamseite das
+Team und der Staff. Ein Co-Team, das sich zurückgezogen hat, steht hier nicht. Lange
+Namen brechen um und werden nie mit „…“ gekürzt. Die beste Liga N steht oben. Sichtbar nach derselben Regel wie die Season-Historie: Gäste und Nicht-Mitglieder nur öffentliche Seasons, Mitglieder
+bei eingeschaltetem „Vereinsinterne Erfolge zeigen“ auch Seasons „Nur Mitglieder“ mit dem Etikett **Vereinsintern**, die Person
+selbst alles. Ein **privates Team** und seine Co-Teams stehen in „Aktuelle Ligen“ und in der Season-Historie nur für die Person
+selbst; die Teamseite eines privaten Teams öffnen das Team und der Staff des Vereins (dort gelten die Rechte des Teams). Die Teamseite zeigt im Abschnitt *Liga* dieselben Karten für alle Co-Teams des Teams, beste Liga N oben.
+
+<img src="../assets/liga/profil-aktuelle-ligen-390.png" alt="Spielerprofil am Handy: Aktuelle Ligen mit drei Co-Teams in Liga 1, 2 und 3, Platz, Aufstieg und nächstem Spiel, darunter der Saisonverlauf als Linie mit einem grauen Punkt „ausgetreten“ in Season 4" width="300">
+
+**Saisonverlauf:** Ab zwei abgeschlossenen Seasons zeigen Spielerprofil und Teamseite eine Linie: je Season ein Punkt, Liga N als
+Band, der Platz am Punkt, der Meister in Gold. Ein Aufstieg hebt die Linie, auch wenn der Platz in der höheren Liga N schlechter ist.
+Auf der Teamseite hat jedes Co-Team eine eigene Linie mit Legende – höchstens vier, die besten zuerst: Co-Teams, die gerade in einer
+laufenden Staffel spielen, vor den übrigen, dann nach der Liga N und dem Platz der letzten Season; gibt es mehr, steht darunter
+„und N weitere Co-Teams“. Hat sich ein Co-Team in einer Season **zurückgezogen**, steht die Season trotzdem auf der Achse: ein grauer
+Punkt „ausgetreten“ (bzw. „disqualifiziert“) ohne Platz, mit dem Rand in der Farbe seiner Linie, die Linie ist dort unterbrochen; ziehen
+sich zwei Co-Teams in derselben Season zurück, stehen ihre Punkte nebeneinander. Platz-Zahlen stehen nie auf dem Punkt einer anderen
+Linie – ist kein Platz frei, fehlt die Zahl im Bild, Screenreader lesen sie trotzdem vor. Season-Namen werden nie gekürzt – ein
+langer Name steht in zwei Zeilen („Herbst“ / „2026/27“), die Seasons rücken so weit auseinander, wie der längste Name braucht; den
+vollen Namen zeigt auch der Hinweis beim Darüberfahren. Reicht die Breite nicht (viele Seasons, Handy), wischt man die Linie seitlich.
+
+<img src="../assets/liga/teamseite-liga-1440.png" alt="Teamseite am PC: Abschnitt Liga mit drei Co-Teams nach Liga N sortiert, darunter der Saisonverlauf mit einer Linie je Co-Team" width="720">
+
 ### 3.12 Belohnungen
 
 **Wo:** **Admin → Ligen → Season → Reiter Belohnungen**. Ändern darf, wer **Season konfigurieren** hat; alle anderen
