@@ -6,6 +6,8 @@ const { mockTvApi } = require("./fixtures/tvMock");
 // Liga N, „Ende“ bringt das gewohnte Bild. Bei 1920 und 2560 px lesbar und ganz im Bild, mit „Bewegung reduzieren“ sofort das Endbild.
 // Viele Kandidaten (Nr. 235): höchstens 8 Zeilen je Spalte, darunter „und N weitere“ - sichtbar, über der Fußleiste, kein Name unter
 // der Untergrenze der TV-Namen (--tv-fs-name-min).
+// Liga-Abzeichen (#2561): im Titel vor „Liga N“ und im Ziel-Chip vor der Ziel-Liga, wie der Server sie schickt (badge, target_badge) -
+// alle Lage-Prüfungen laufen mit Abzeichen. Das Wappen trägt die Zahl als SVG-Text, deshalb prüfen die Texte das Ende („Liga 1“).
 // Feste Uhr, alle Namen erfunden, alle Antworten aus dem Test (page.route). Bilder in SHOT_DIR, wenn gesetzt.
 
 const SHOTS = process.env.SHOT_DIR || "";
@@ -34,6 +36,14 @@ const PAGES = [
     rows: [{ registration_id: "c1", name: "Almrausch Five", rank: 1, move: "up", target: "Liga 2 · Aufbau", staffel: null }] },
 ];
 
+/** Abzeichen wie vom Server (league_finale.build_pages): je Seite die eigene Liga N, je Zeile die Ziel-Liga. */
+const levelOf = (label) => Number(/^Liga (\d+)/.exec(String(label || ""))?.[1]) || null;
+const badgeOf = (label) => (levelOf(label) ? { level: levelOf(label), nickname: null, champion: false } : null);
+function withBadges(pages) {
+  return pages.map((page) => ({ ...page, badge: { level: page.level, nickname: null, champion: false },
+    rows: page.rows.map((row) => ({ ...row, target_badge: row.move === "out" ? null : badgeOf(row.target) })) }));
+}
+
 function staffel(finale = null) {
   return {
     tournament: { id: "t1", slug: "probe-liga-s3-a", title: "Probe-Liga · Season 3 · Liga 1 · Staffel A", status: "completed", format: "league", team_mode: "team" },
@@ -42,7 +52,7 @@ function staffel(finale = null) {
   };
 }
 
-const finale = (step, pages = PAGES) => ({ step, count: pages.length, league: "Probe-Liga", season: "Season 3", pages });
+const finale = (step, pages = PAGES) => ({ step, count: pages.length, league: "Probe-Liga", season: "Season 3", pages: withBadges(pages) });
 
 // Zwölf Kandidaten in einer Liga N, so wie der Server sie schickt: je Spalte höchstens 8 Zeilen, der Rest gezählt (more_up, more_down).
 const BIRDS = ["Ost", "Lux", "Elf", "Ara", "Ibis", "Ork", "Uhu", "Emu", "Gnu", "Yak", "Reh", "Hai"];
@@ -110,6 +120,15 @@ function inspectFinale(page) {
       nameWidth: Math.min(...rows.map((row) => box(row.querySelector(".tv-finale__who")).width)),
       cut: names.filter((element) => element.scrollWidth > element.clientWidth + 1).map((element) => element.textContent),
       targetsInside: targets.every((target) => box(target).right <= box(target.closest(".tv-finale__row")).right + 1),
+      // Das Abzeichen im Chip sprengt die Zeile nicht: ganz im Chip und in der Zeile, groß genug für die Form (mindestens 24 px hoch).
+      badgesInChip: targets.every((target) => [...target.querySelectorAll(".tls-lbadge__art")].every((art) => {
+        const chip = box(target);
+        const own = box(art);
+        const row = box(target.closest(".tv-finale__row"));
+        return own.left >= chip.left - 1 && own.right <= chip.right + 1 && own.top >= chip.top - 1 && own.bottom <= chip.bottom + 1
+          && own.top >= row.top - 1 && own.bottom <= row.bottom + 1 && own.height >= 24;
+      })),
+      chipBadges: targets.filter((target) => target.querySelector(".tls-lbadge")).length,
       small: names.filter((element) => parseFloat(getComputedStyle(element).fontSize) < minName - 0.5).map((element) => element.textContent),
       overlap,
       cols: [...root.querySelectorAll(".tv-finale__col")].map((col) => ({ key: col.dataset.col, x: box(col).left })),
@@ -123,7 +142,10 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       test.setTimeout(60_000);
       await page.setViewportSize(size);
       const state = await openFinale(page);
-      await expect(page.getByTestId("tv-finale-title")).toHaveText("Liga 2 · Aufbau Auf- und Absteiger");
+      await expect(page.getByTestId("tv-finale-title")).toHaveText(/Liga 2 · Aufbau Auf- und Absteiger$/);
+      // Das Abzeichen steht im Titel vor „Liga N“ - Liga 2 mit doppeltem Rand, ohne Krone.
+      await expect(page.getByTestId("tv-finale-badge")).toBeVisible();
+      await expect(page.getByTestId("tv-finale-badge")).toHaveAttribute("data-tier", "mid");
       // Die Kopfleiste trägt die Season, nicht die eigene Staffel.
       await expect(page.getByTestId("tv-header").locator("h1")).toHaveText("Saisonfinale");
       await expect(page.getByTestId("tv-header")).toContainText("Probe-Liga · Season 3");
@@ -139,8 +161,13 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       expect(early[0]).toBeGreaterThan(early[1]);
       await page.waitForTimeout(2600);
       for (const id of ["b1", "b2", "b3", "b4"]) await expect(page.getByTestId(`tv-finale-row-${id}`)).toHaveCSS("opacity", "1");
-      await expect(page.getByTestId("tv-finale-target-b1")).toHaveText("Liga 1");
-      await expect(page.getByTestId("tv-finale-target-b3")).toHaveText("Liga 3");
+      await expect(page.getByTestId("tv-finale-target-b1")).toHaveText(/Liga 1$/);
+      await expect(page.getByTestId("tv-finale-target-b3")).toHaveText(/Liga 3$/);
+      await expect(page.getByTestId("tv-finale-target-badge-b1")).toHaveAttribute("data-tier", "top");
+      await expect(page.getByTestId("tv-finale-target-badge-b3")).toHaveAttribute("data-tier", "base");
+      await expect(page.getByTestId("tv-finale-target-badge-b4")).toHaveCount(0);
+      // Nach dem Aufsetzen steht das Titel-Abzeichen ganz da.
+      await expect(page.getByTestId("tv-finale-badge").locator(".tls-lbadge__art")).toHaveCSS("opacity", "1");
       await expect(page.getByTestId("tv-finale-target-b4")).toHaveText("scheidet aus");
       await expect(page.getByTestId("tv-finale-row-b2")).toContainText(LONG);
       const seen = await inspectFinale(page);
@@ -149,6 +176,8 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       expect(seen.aboveFooter).toBe(true);
       expect(seen.cut).toEqual([]);
       expect(seen.targetsInside).toBe(true);
+      expect(seen.chipBadges).toBe(3);
+      expect(seen.badgesInChip).toBe(true);
       expect(seen.minName).toBeGreaterThan(0);
       expect(seen.small).toEqual([]);
       expect(seen.overlap).toBe(false);
@@ -159,7 +188,8 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       // Weiter: Liga 3. Ende: das gewohnte Bild, die Wiedergabeliste läuft wieder.
       state.bracket = staffel(finale(3));
       state.push();
-      await expect(page.getByTestId("tv-finale-title")).toHaveText("Liga 3 Auf- und Absteiger", { timeout: 8000 });
+      await expect(page.getByTestId("tv-finale-title")).toHaveText(/Liga 3 Auf- und Absteiger$/, { timeout: 8000 });
+      await expect(page.getByTestId("tv-finale-badge")).toHaveAttribute("data-tier", "base");
       await expect(page.getByTestId("tv-finale")).toHaveAttribute("data-columns", "1");
       state.bracket = staffel(null);
       state.push();
@@ -191,6 +221,7 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       // Die lange Ziel-Liga bricht um und verdrängt den Teamnamen nicht.
       expect(seen.targetsInside).toBe(true);
       expect(seen.targetsBesideName).toBe(true);
+      expect(seen.badgesInChip).toBe(true);
       expect(seen.nameWidth).toBeGreaterThan(size.width * 0.12);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/tv-saisonfinale-12-kandidaten-${size.width}.png` });
     });
@@ -217,6 +248,7 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
         expect(seen.small).toEqual([]);
         expect(seen.overlap).toBe(false);
         expect(seen.targetsBesideName).toBe(true);
+        expect(seen.badgesInChip).toBe(true);
         if (SHOTS) await page.screenshot({ path: `${SHOTS}/tv-saisonfinale-heavy${reduced ? "-reduziert" : ""}-${size.width}.png` });
       });
     }
@@ -228,6 +260,7 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       await expect(page.getByTestId("tv-screen")).toHaveAttribute("data-tv-motion", "off");
       for (const id of ["b1", "b2", "b3", "b4"]) await expect(page.getByTestId(`tv-finale-row-${id}`)).toHaveCSS("opacity", "1");
       await expect(page.getByTestId("tv-finale-target-b4")).toHaveCSS("opacity", "1");
+      await expect(page.getByTestId("tv-finale-badge").locator(".tls-lbadge__art")).toHaveCSS("opacity", "1");
       const running = await page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running"
         && animation.effect?.target?.closest?.("[data-testid='tv-finale']")).length);
       expect(running).toBe(0);

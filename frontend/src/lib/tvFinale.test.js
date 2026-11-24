@@ -1,4 +1,4 @@
-import { COLUMN_ROWS, FALLBACK_AREA, FINALE_TIMING, columnUnits, finaleColumns, finalePage, finaleRowUnits, fitFinaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetText } from "./tvFinale";
+import { COLUMN_ROWS, FALLBACK_AREA, FINALE_BOX, FINALE_TIMING, TARGET_BADGE_EM, TARGET_BADGE_HEIGHT_EM, columnUnits, finaleColumns, finalePage, finaleRowUnits, fitFinaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetChipUnits, targetText } from "./tvFinale";
 import { tvScale } from "./tvType";
 
 // Saisonfinale am TV (#1641): welche Seite dran ist, wer in welche Spalte gehört und wann jede Zeile kommt. Erfundene Namen.
@@ -111,4 +111,27 @@ test("fitFinaleColumns: ohne gemessene Fläche gilt ein 16:9-Bild; nie weniger a
   expect([up.rows.length, up.more]).toEqual([5, 3]);
   const [tiny] = fitFinaleColumns(finaleColumns(page), { area: { w: 173.4, h: 5 }, scale: NORMAL });
   expect(tiny.rows.length).toBe(1);
+});
+
+test("#2561: das Abzeichen im Ziel-Chip zählt bei der Messung mit - breiter und höher, Name rückt zusammen, nie weniger Höhe", () => {
+  const unit = rowUnits(8);
+  const columnU = columnUnits(FALLBACK_AREA.w, 2);
+  const plain = heavyRow(1);
+  const badged = { ...plain, target_badge: { level: 1, nickname: null, champion: false } };
+  expect(targetChipUnits(badged, { columnU, scale: NORMAL }).width)
+    .toBeCloseTo(Math.min(targetChipUnits(plain, { columnU, scale: NORMAL }).natural + NORMAL.info * TARGET_BADGE_EM + FINALE_BOX.targetGap,
+      targetChipUnits(plain, { columnU, scale: NORMAL }).max), 5);
+  expect(finaleRowUnits(badged, { columnU, unitU: unit, scale: NORMAL })).toBeGreaterThanOrEqual(finaleRowUnits(plain, { columnU, unitU: unit, scale: NORMAL }));
+  // Kurze Ziel-Liga: der Chip wird um das Abzeichen breiter und so hoch wie das Wappen - die Zeile bleibt bei ihrer Grundhöhe.
+  const short = { ...shortRow(1), target_badge: { level: 3, nickname: null, champion: false } };
+  const chip = targetChipUnits(short, { columnU, scale: NORMAL });
+  expect(chip.width - targetChipUnits(shortRow(1), { columnU, scale: NORMAL }).width).toBeCloseTo(NORMAL.info * TARGET_BADGE_EM + FINALE_BOX.targetGap, 5);
+  // Nie niedriger als der Text und nie niedriger als das Wappen samt Innenabstand.
+  expect(chip.height).toBeGreaterThanOrEqual(targetChipUnits(shortRow(1), { columnU, scale: NORMAL }).height);
+  expect(chip.height).toBeGreaterThanOrEqual(NORMAL.info * TARGET_BADGE_HEIGHT_EM + FINALE_BOX.targetPadY * 2 + FINALE_BOX.line * 2 - 1e-9);
+  // Ist der Text einzeilig, bestimmt das Wappen die Höhe des Chips.
+  const one = { ...short, target: "L3" };
+  expect(targetChipUnits(one, { columnU, scale: NORMAL }).height)
+    .toBeCloseTo(NORMAL.info * TARGET_BADGE_HEIGHT_EM + FINALE_BOX.targetPadY * 2 + FINALE_BOX.line * 2, 5);
+  expect(finaleRowUnits(short, { columnU, unitU: unit, scale: NORMAL })).toBe(5.9);
 });
