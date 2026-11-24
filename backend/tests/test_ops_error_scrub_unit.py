@@ -1,6 +1,8 @@
 """Fehler-Sammler (#1657): was vor dem Speichern übrig bleibt - Fehlerart, Code-Stellen ohne Werte, Pfad ohne Kennungen,
 Version. Namen, E-Mail-Adressen, Tokens, IP-Adressen und Inhalte kommen nie in die Datenbank."""
 from services.ops_error_scrub import (
+    CLIENT_FRAME_LIMIT,
+    clean_client_error_type,
     clean_error_type,
     clean_version,
     client_frames,
@@ -72,6 +74,22 @@ def test_the_error_type_is_a_code_name_only():
     assert "@" not in clean_error_type(MAIL)
     assert clean_error_type("") == "Error"
     assert len(clean_error_type("X" * 500)) == 80
+
+
+def test_a_client_error_type_is_one_identifier_or_just_error():
+    """Website und App schicken die Fehlerart selbst - nur ein Bezeichner bleibt, sonst „Error“ (kein freier Text)."""
+    assert clean_client_error_type("TypeError") == "TypeError"
+    assert clean_client_error_type("DOMException.AbortError") == "DOMException.AbortError"
+    assert clean_client_error_type("Max Mustermann wohnt in Wien 1010") == "Error"
+    assert clean_client_error_type(MAIL) == "Error"
+    assert clean_client_error_type("X" * 61) == "Error"
+    assert clean_client_error_type("") == "Error"
+    assert clean_client_error_type({"name": "Max"}) == "Error"
+
+
+def test_a_client_stack_keeps_at_most_15_places():
+    stack = "\n".join(f"at f{i} (https://x.test/a.js:{i}:1)" for i in range(100))
+    assert len(client_frames(stack, limit=CLIENT_FRAME_LIMIT).splitlines()) == 15
 
 
 def test_paths_lose_query_ids_and_slugs():

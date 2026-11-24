@@ -23,12 +23,16 @@ TYPE_LIMIT = 80
 VERSION_LIMIT = 40
 ROUTE_LIMIT = 120
 FRAME_LIMIT = 40
+# Website und App: weniger Stellen je Meldung - die oberste zaehlt, der Rest ist Beiwerk.
+CLIENT_FRAME_LIMIT = 15
+CLIENT_TYPE_LIMIT = 60
 LINE_SCAN_LIMIT = 400
 NAME_LIMIT = 80
 FILE_LIMIT = 80
 
 _IDENT = set(string.ascii_letters + string.digits + "_$.<>")
 _TYPE_CHARS = set(string.ascii_letters + string.digits + "_. ")
+_CLIENT_TYPE_CHARS = set(string.ascii_letters + string.digits + "_.$")
 _VERSION_CHARS = set(string.ascii_letters + string.digits + ".+-_")
 _FILE_CHARS = set(string.ascii_letters + string.digits + "._-")
 _SEGMENT_CHARS = set(string.ascii_lowercase + "-_")
@@ -61,6 +65,16 @@ def clean_error_type(value: object) -> str:
     """Die Fehlerart (``TypeError``, ``HTTP 500``) - nur Zeichen eines Namens, gekürzt."""
     text = " ".join(_keep(value, _TYPE_CHARS, TYPE_LIMIT * 2).split())[:TYPE_LIMIT]
     return text or "Error"
+
+
+def clean_client_error_type(value: object) -> str:
+    """Die Fehlerart aus Website oder App: genau ein Bezeichner (``TypeError``, ``DOMException.AbortError``), höchstens
+    ``CLIENT_TYPE_LIMIT`` Zeichen. Alles andere - Leerzeichen, freier Text, kein Text - wird ``Error``; es wird nichts
+    herausgeschnitten, damit aus einem Satz kein Wort übrig bleibt."""
+    text = value if isinstance(value, str) else ""
+    if not text or len(text) > CLIENT_TYPE_LIMIT or not set(text) <= _CLIENT_TYPE_CHARS:
+        return "Error"
+    return text
 
 
 def clean_version(value: object) -> str:
@@ -120,14 +134,14 @@ def _client_frame(line: str) -> str | None:
     return f"{clean_name} ({file_name}:{place})" if clean_name else f"{file_name}:{place}"
 
 
-def client_frames(stack: object) -> str:
-    """Nur die Code-Stellen eines Browser- oder App-Stacks, höchstens ``FRAME_LIMIT``."""
+def client_frames(stack: object, limit: int = FRAME_LIMIT) -> str:
+    """Nur die Code-Stellen eines Browser- oder App-Stacks, höchstens ``limit``."""
     frames: list[str] = []
     for line in str(stack or "").splitlines()[:LINE_SCAN_LIMIT]:
         frame = _client_frame(line[:2000])
         if frame:
             frames.append(frame)
-            if len(frames) >= FRAME_LIMIT:
+            if len(frames) >= limit:
                 break
     return "\n".join(frames)
 
