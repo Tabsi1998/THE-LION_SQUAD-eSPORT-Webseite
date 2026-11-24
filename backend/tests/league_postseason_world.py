@@ -109,7 +109,7 @@ async def win(flow, match: dict, winner: str, *, score: tuple[int, int] = (2, 0)
     assert answer.status_code == 200, answer.text
 
 
-async def play_round(flow, world: dict, tid: str, *, favourite: bool = True) -> list[dict]:
+async def play_round(flow, world: dict, tid: str, *, favourite: bool = True, score: tuple[int, int] = (2, 0)) -> list[dict]:
     """Spielt alle spielbereiten Duelle der Staffel: Es gewinnt der besser Gesetzte (``favourite``) bzw. der schlechter Gesetzte."""
     flow.act_as(world["lead"])
     seeds = {row["id"]: row.get("seed") or 0 async for row in flow.db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0})}
@@ -119,7 +119,7 @@ async def play_round(flow, world: dict, tid: str, *, favourite: bool = True) -> 
         if len(both) != 2 or match.get("status") in ("completed", "forfeit", "cancelled"):
             continue
         ordered = sorted(both, key=lambda value: seeds[value])
-        await win(flow, match, ordered[0] if favourite else ordered[1])
+        await win(flow, match, ordered[0] if favourite else ordered[1], score=score)
         done.append(match)
     return done
 

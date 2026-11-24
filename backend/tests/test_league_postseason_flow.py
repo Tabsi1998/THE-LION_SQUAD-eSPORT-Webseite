@@ -143,6 +143,9 @@ async def test_six_teams_from_two_staffeln_cross_and_the_best_two_get_a_bye(flow
     record = tournament["postseason"]
     # Das Los fiel beim Anlegen, einmal, und steht im Schnappschuss - nicht öffentlich.
     assert record["draw_count"] == 1 and len(record["draws"]) == 1 and len(record["draws"][0]["order"]) == 2
+    # Angelegt heißt gelost: Das Cockpit nennt keine offene Gruppe mehr, die Setzliste zeigt das Los als Grund.
+    created = division_of(await cockpit(flow, world), 1)["playoffs"]
+    assert created["open_lot"] == [] and created["seeds"][1]["tie"] == "lot"
     seeds = record["seeds"]
     assert [row["rank"] for row in seeds] == [1, 1, 2, 2, 3, 3]
     first, second = seeds[0]["from_staffel"], seeds[1]["from_staffel"]

@@ -863,6 +863,8 @@ async def _playoff_view(db, season: dict, division: dict, settings: dict, user: 
         out["seeds"] = [_seed_view(row) for row in record.get("seeds") or []]
         out["pairings"] = _pairings(record.get("seeds") or [])
         out["byes"] = seeding.byes(len(record.get("seeds") or []))
+        # Angelegt heißt gelost (Nr. 225): Die Setzliste des Schnappschusses gilt, offen ist nichts mehr.
+        out["open_lot"] = []
         out["stale"] = bool(plan["stamp"]) and plan["stamp"] != record.get("stamp")
         out["stale_note"] = STALE_NOTE if out["stale"] else None
         refusal = await reseed_refusal(db, existing)
@@ -894,6 +896,7 @@ async def _relegation_view(db, season: dict, divisions: list[dict], division: di
         out["staffel"] = await _staffel_view(db, existing)
         out["state"] = "closed" if is_closed(existing) else "created"
         out["pairs"] = [{"upper": _seed_view(pair["upper"]), "lower": _seed_view(pair["lower"])} for pair in record.get("pairs") or []]
+        out["open_lot"] = []
         out["stale"] = bool(plan["stamp"]) and plan["stamp"] != record.get("stamp")
         out["stale_note"] = STALE_NOTE if out["stale"] else None
         out["start_day"] = (record.get("week") or {}).get("start_day") or out["start_day"]

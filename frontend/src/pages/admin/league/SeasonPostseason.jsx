@@ -71,6 +71,9 @@ function StaffelLinks({ staffel, kind }) {
 
 function SeedList({ seeds, testId }) {
   if (!seeds?.length) return null;
+  // Warum eine Staffel vor der nächsten steht, gilt für alle ihre Teams - es steht einmal da, beim ersten Team der Staffel.
+  const first = new Map();
+  for (const row of seeds) if (!first.has(row.staffel)) first.set(row.staffel, row.seed);
   return (
     <ol className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]" data-testid={testId}>
       {seeds.map((row) => (
@@ -78,7 +81,7 @@ function SeedList({ seeds, testId }) {
           <span className="w-6 shrink-0 text-right font-display text-base font-bold tabular-nums text-white">{row.seed}</span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
-            <span className="block text-xs text-white/60">{[seedOrigin(row), tieText(row)].filter(Boolean).join(" · ")}</span>
+            <span className="block text-xs text-white/60">{[seedOrigin(row), first.get(row.staffel) === row.seed ? tieText(row) : ""].filter(Boolean).join(" · ")}</span>
           </span>
         </li>
       ))}
@@ -375,6 +378,7 @@ function RelegationFields({ form, change, options, locked, earliest, prefix }) {
 }
 
 const LOCK_NOTE = "In dieser Liga ist schon eine Staffel abgeschlossen: an/aus und die Plätze je Staffel stehen fest. Zum Ändern erst alle Staffeln der Liga wieder öffnen.";
+const SEASON_LOCK_NOTE = "In mindestens einer Liga ist schon eine Staffel abgeschlossen: Dort stehen an/aus, die Plätze je Staffel und „Meister aus“ fest. Zum Ändern erst alle Staffeln dieser Liga wieder öffnen. Best of, Platz 3, Heimrecht und Termine lassen sich bis zum Anlegen ändern.";
 
 function SettingsSheet({ data, seasonId, onClose, onDone }) {
   const [form, setForm] = useState(() => formOf(data.settings));
@@ -402,7 +406,7 @@ function SettingsSheet({ data, seasonId, onClose, onDone }) {
     <AdminSheet title="Playoffs und Relegation" eyebrow={data.season.name} size="lg" onClose={onClose} onSubmit={submit} saving={saving} noValidate
       submitTestId="postseason-settings-save" testId="postseason-settings-sheet">
       <p className="text-sm text-white/70">Die Vorlage für alle Ligen dieser Season. Jede Liga kann davon abweichen.</p>
-      {locked ? <p className="mt-3 rounded-sm border border-warn/40 bg-warn/5 p-3 text-xs text-white/80" role="note" data-testid="postseason-settings-locked">{LOCK_NOTE}</p> : null}
+      {locked ? <p className="mt-3 rounded-sm border border-warn/40 bg-warn/5 p-3 text-xs text-white/80" role="note" data-testid="postseason-settings-locked">{SEASON_LOCK_NOTE}</p> : null}
       <div className="mt-4 space-y-6">
         <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
           options={data.options} earliest={earliest} prefix="postseason" />
