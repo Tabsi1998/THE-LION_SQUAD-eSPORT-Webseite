@@ -1843,19 +1843,23 @@ der regulären Staffeln und ändern ihn nie.
   Aus- und Wiedereinschalten auch nicht. Schaltest du die Playoffs erst nach dem Start ein, gelten die Werte vom Start – gab es
   keine, die Vorgaben (Best of der Season, kein Spiel um Platz 3, Heimrecht für den besser Gesetzten). Stell sie also **vor dem
   Start** ein.
-- **Best of der Season nach dem Start ändern:** Steht bei den Playoffs „Wie in der Season“ und änderst du nach dem Start das Best
-  of der Season (oder das eigene Best of einer Liga), behalten die Playoffs den Wert vom Start – er steht danach ausdrücklich in
-  ihren Einstellungen. Beim Speichern sagt dir ein Hinweis, welche Liga welches Best of behält. Für die reguläre Season gilt der
-  neue Wert.
-- **Einmal gestartet bleibt gestartet:** Die Season merkt sich ihren Start. Verschiebst du den Beginn der ersten Spielwoche danach
-  noch – auch in die Zukunft –, bleibt alles gesperrt, was ab dem Start gesperrt ist; auch Nachmeldefrist und die Abmeldefrist
-  übernommener Teams zählen weiter vom ursprünglichen Start.
+- **Best of der Relegation:** Auch das steht ab dem Season-Start fest – das Feld ist dann ausgegraut.
+- **Best of der Season nach dem Start ändern:** Steht bei Playoffs oder Relegation „Wie in der Season“ und änderst du nach dem
+  Start das Best of der Season (oder das eigene Best of einer Liga), behalten beide den Wert vom Start – auch wenn sie gerade
+  ausgeschaltet sind. In den Einstellungen heißt die Auswahl dann **Wie zum Season-Start (Best of 3)**. Beim Speichern sagt dir
+  ein Hinweis, welche Liga welches Best of behält. Für die reguläre Season gilt der neue Wert, an den übrigen Einstellungen ändert
+  sich nichts. Die nächste Season beginnt wieder mit „Wie in der Season“.
+- **Einmal gestartet bleibt gestartet:** Die Season merkt sich ihren Start, sobald sie wirklich läuft – der Beginn ist erreicht
+  und eine Staffel ist live oder ein Spiel gewertet. Verschiebst du den Beginn der ersten Spielwoche danach noch – auch in die
+  Zukunft –, bleibt alles gesperrt, was ab dem Start gesperrt ist; auch Nachmeldefrist und die Abmeldefrist übernommener Teams
+  zählen weiter vom ursprünglichen Start. Ein vertipptes Datum, solange noch nichts läuft, kannst du einfach korrigieren.
 
   <img src="../assets/liga/playoffs-gesperrt-pc.png" alt="Fenster Playoffs und Relegation nach dem Season-Start: Hinweis Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest, die Felder Best of, Heimrecht, Spiel um Platz 3 und Best of je Runde sind ausgegraut" width="720">
 
 - **Fest ab dem ersten Abschluss:** Sobald eine Staffel einer Liga abgeschlossen ist, lassen sich dort an/aus, die Plätze je Staffel
   und „Meister aus“ nicht mehr ändern. Spielt die Liga Playoffs oder Relegation, lässt sich dort dann auch keine weitere Staffel
-  mehr anlegen – der Knopf **Staffel anlegen** im Reiter **Ligen und Staffeln** ist ausgegraut, darunter steht der Grund. Zum
+  mehr anlegen – der Knopf **Staffel anlegen** im Reiter **Ligen und Staffeln** ist ausgegraut, darunter steht der Grund. Bei
+  einer Relegation gilt das für beide Ligen des Paares, sobald eine von ihnen abgeschlossen hat. Zum
   Ändern erst alle Staffeln dieser Liga wieder öffnen. Termine bleiben bis zum Anlegen änderbar.
 - **Zu wenige Teams:** Für Playoffs braucht es zwei Teams. Kommen in einer Liga mit den Plätzen je Staffel und ihren Staffeln weniger
   zusammen (ein Platz bei nur einer Staffel), sagt das Speichern das und an der Liga steht **Keine Playoffs**. Diese Liga spielt dann
