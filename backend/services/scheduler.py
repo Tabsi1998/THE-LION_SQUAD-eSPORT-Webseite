@@ -532,18 +532,23 @@ async def _safe_billing_sync():
 
 
 async def _safe_member_announcements():
+    # Zwei eigene Versuche (#2553): ein Fehler bei den Mitglieder-News lässt den App-Push in diesem Takt nicht ausfallen.
     try:
-        from services.member_announcements import notify_app_news, notify_due
+        from services.member_announcements import notify_due
         res = await notify_due()
         if res.get("items"):
             logger.info(f"[scheduler] member_announcements {res}")
-        # Öffentliche News „nur App“ (#1532): App-Push an alle mit Zustimmung - einmal je Beitrag.
+    except Exception as exc:
+        _log_task_failure("member_announcements", exc)
+    try:
+        # Öffentliche News „nur App“ (#1532): App-Push an alle mit Zustimmung - einmal je Beitrag und Person.
         from database import get_db
+        from services.member_announcements import notify_app_news
         app_news = await notify_app_news(get_db())
         if app_news.get("items"):
             logger.info(f"[scheduler] member_announcements app_news {app_news}")
     except Exception as exc:
-        _log_task_failure("member_announcements", exc)
+        _log_task_failure("member_announcements_app_news", exc)
 
 
 async def _safe_event_photo_notices():
