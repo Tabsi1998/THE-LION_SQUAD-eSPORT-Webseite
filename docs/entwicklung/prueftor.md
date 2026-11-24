@@ -7,7 +7,10 @@ gibt es nur mit Begründung im PR-Text.
 [`scripts/ci-changed-areas.py`](../../scripts/ci-changed-areas.py) – also alles unter `frontend/` außer
 Markdown, Compose- und Env-Vorlagen sowie Änderungen an `.github/`. Markdown zählt sonst nur zur Linkprüfung;
 `frontend/PERFORMANCE_BUDGETS.md` ist die Ausnahme, weil das Tor seine Grenzen daraus liest
-(`PRUEFTOR_MARKDOWN`) – wer nur eine Grenze anhebt, läuft trotzdem durchs Tor. Die übrigen Listen des Tors
+(`PRUEFTOR_MARKDOWN`) – wer nur eine Grenze anhebt, läuft trotzdem durchs Tor. Dafür gibt es den eigenen Bereich
+`prueftor` (#2556): Er startet nur das Tor (und die Linkprüfung), nicht den ganzen Frontend-Bereich. Das Tor lässt
+dafür den Selbsttest der Grenzen (`check-bundle-budget.test.mjs`, sonst Teil von `check:bundle` im Job „Frontend“)
+vor der Bundle-Messung mitlaufen; ist er rot, fehlt die Messung, und das Tor ist rot. Die übrigen Listen des Tors
 (`motion-rules-allowlist.json`, `e2e/prueftor-bekannt.json`) liegen unter `frontend/` und zählen ohnehin dazu.
 
 ## Was geprüft wird
