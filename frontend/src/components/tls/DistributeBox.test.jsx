@@ -84,3 +84,10 @@ test("#2553 Nr. 230: nach einer Mitglieder-Meldung sagt die Box, dass Benachrich
   render(<DistributeBox kind="news" visibility="public" appOnly membersNotified />);
   expect(await screen.findByTestId("distribute-app-push")).toHaveTextContent("Wer die Mitglieder-Meldung schon bekam, bekommt keinen zweiten Push.");
 });
+
+test("#2553 Schlussrunde: eine schon veröffentlichte Mitglieder-News, die öffentlich und „Nur App“ wird, heißt „schon veröffentlicht“", async () => {
+  render(<DistributeBox kind="news" visibility="public" appOnly alreadyPublic wasMembersOnly />);
+  const line = await screen.findByTestId("distribute-app-push");
+  expect(line).toHaveTextContent("Kein App-Push – der Beitrag ist schon veröffentlicht. Wird er jetzt auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.");
+  expect(line).not.toHaveTextContent("schon öffentlich");
+});

@@ -363,7 +363,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
           </FormSection>
           <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility} appOnly={appOnly}
             appPush={post.app_push_notified_at ? { sent_at: post.app_push_notified_at, count: post.app_push_count, skipped: post.app_push_skipped_reason } : null}
-            alreadyPublic={initialMode === "now" && channelChoice(post.channels) !== "app"} membersNotified={Boolean(post.members_notified_count)}>
+            alreadyPublic={initialMode === "now" && channelChoice(post.channels) !== "app"}
+            wasMembersOnly={!["", "public", "community"].includes(post.visibility || "")} membersNotified={Boolean(post.members_notified_count)}>
             <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           </DistributeBox>
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} appOnly={appOnly} />

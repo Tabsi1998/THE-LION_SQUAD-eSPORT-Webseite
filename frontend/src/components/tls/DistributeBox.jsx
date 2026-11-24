@@ -31,12 +31,15 @@ const APP_PUSH_VISIBILITIES = new Set(["", "public", "community"]);
 
 // `alreadyPublic` (#2553): der gespeicherte Beitrag ist schon öffentlich und erscheint nicht nur in der App - stellt ihn
 // jemand jetzt auf „Nur App“, geht beim Speichern kein Push hinaus (der Server merkt sich das als „channel_changed“).
+// `wasMembersOnly`: veröffentlicht war er bisher nur für Mitglieder bzw. intern - dann heißt es „schon veröffentlicht“.
 // `membersNotified` (Nr. 230): zur News ging schon eine Mitglieder-Meldung - wer sie bekam, bekommt keinen zweiten Push.
-export function appPushLine({ appOnly = false, visibility = "", appPush = null, alreadyPublic = false, membersNotified = false } = {}) {
+export function appPushLine({ appOnly = false, visibility = "", appPush = null, alreadyPublic = false, wasMembersOnly = false,
+  membersNotified = false } = {}) {
   if (!appOnly || !APP_PUSH_VISIBILITIES.has(visibility || "")) return "";
   if (appPush?.skipped === "channel_changed") return "Kein App-Push – der Beitrag war schon öffentlich, als er auf „Nur App“ gestellt wurde.";
   if (appPush?.skipped === "too_old") return "Kein App-Push – der Beitrag war beim Veröffentlichen schon älter als 24 Stunden.";
   if (appPush?.sent_at) return `App-Push gesendet am ${viennaDateTime(appPush.sent_at)} an ${people(appPush.count)}.`;
+  if (alreadyPublic && wasMembersOnly) return "Kein App-Push – der Beitrag ist schon veröffentlicht. Wird er jetzt auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.";
   if (alreadyPublic) return "Kein App-Push – der Beitrag ist schon öffentlich. Wird er auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.";
   const line = "Beim Veröffentlichen geht ein App-Push an alle App-Nutzer mit Zustimmung für „News & Events“.";
   return membersNotified ? `${line} Wer die Mitglieder-Meldung schon bekam, bekommt keinen zweiten Push.` : line;
@@ -58,7 +61,7 @@ export function audienceLine(audience) {
 }
 
 export function DistributeBox({ kind, itemId, title = "", visibility = "", appOnly = false, appPush = null, alreadyPublic = false,
-  membersNotified = false, children }) {
+  wasMembersOnly = false, membersNotified = false, children }) {
   const [box, setBox] = useState(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(startsOpen);
@@ -185,12 +188,12 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
               )}
             </div>
           </div>
-          {appPushLine({ appOnly, visibility, appPush, alreadyPublic, membersNotified }) && (
+          {appPushLine({ appOnly, visibility, appPush, alreadyPublic, wasMembersOnly, membersNotified }) && (
             <div className="flex items-start gap-3" data-testid="distribute-app-push-row">
               <Smartphone className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-bold uppercase tracking-wider text-white/70">App-Push</div>
-                <p className="mt-1 text-sm text-white/75" data-testid="distribute-app-push">{appPushLine({ appOnly, visibility, appPush, alreadyPublic, membersNotified })}</p>
+                <p className="mt-1 text-sm text-white/75" data-testid="distribute-app-push">{appPushLine({ appOnly, visibility, appPush, alreadyPublic, wasMembersOnly, membersNotified })}</p>
               </div>
             </div>
           )}
