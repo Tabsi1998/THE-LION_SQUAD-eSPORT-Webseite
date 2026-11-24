@@ -929,3 +929,20 @@ test("Übernahme neu berechnen: nach dem Ausführen steht „Bitte von Hand prü
   await waitFor(() => expect(screen.queryByTestId("recompute-sheet")).toBeNull());
   await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => url === "/admin/leagues/seasons/s1").length).toBeGreaterThan(loads));
 });
+
+test("mit Playoffs oder Relegation stehen die Staffeln ab dem ersten Abschluss fest: „Staffel anlegen“ ist ausgegraut, mit Hinweis (#2404)", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln_locked: true }] };
+  renderPage("#ligen");
+  expect(await screen.findByTestId("staffel-add-1")).toBeDisabled();
+  expect(screen.getByTestId("staffeln-locked-1")).toHaveTextContent(
+    "Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Playoffs und Relegation rechnen mit den Staffeln, die es beim Abschluss gab – eine weitere Staffel geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.");
+  expect(screen.getByTestId("staffel-add-1")).toHaveAttribute("aria-describedby", "staffeln-locked-1");
+  fireEvent.click(screen.getByTestId("staffel-add-1"));
+  expect(apiMock.post).not.toHaveBeenCalledWith("/admin/leagues/divisions/d1/staffeln", {});
+});
+
+test("ohne das Kennzeichen des Servers bleibt „Staffel anlegen“ bedienbar, ohne Hinweis", async () => {
+  renderPage("#ligen");
+  expect(await screen.findByTestId("staffel-add-1")).toBeEnabled();
+  expect(screen.queryByTestId("staffeln-locked-1")).toBeNull();
+});

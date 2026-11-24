@@ -25,6 +25,8 @@ const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outl
 const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
 // Nr. 231: Sobald eine Staffel der Season abgeschlossen ist, stehen ihre Ligen fest - Auf- und Abstieg rechnen mit ihnen.
 export const DIVISIONS_LOCKED_HINT = "Gesperrt: In dieser Season ist schon eine Staffel abgeschlossen. Eine Liga anlegen, archivieren oder löschen geht erst, wenn alle abgeschlossenen Staffeln im Reiter „Abschluss“ wieder geöffnet sind.";
+// Staffeln stehen fest (#2404): In einer Liga mit Playoffs oder Relegation rechnet beides mit den Staffeln vom ersten Abschluss.
+const STAFFELN_LOCKED = "Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Playoffs und Relegation rechnen mit den Staffeln, die es beim Abschluss gab – eine weitere Staffel geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.";
 
 export function DivisionSheet({ division, season, nextLevel, divisionsLocked = false, onClose, onSaved }) {
   const [nickname, setNickname] = useState(division?.nickname || "");
@@ -232,13 +234,18 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                     aria-label={`${division.label} löschen`} data-testid={`division-delete-${division.level}`}>
                     <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
+                  {/* Mit Playoffs oder Relegation stehen die Staffeln ab dem ersten Abschluss fest (#2404) - der Server sagt es je Liga. */}
                   <button type="button" onClick={() => onCreateStaffel(division)} data-testid={`staffel-add-${division.level}`}
-                    className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    disabled={Boolean(division.staffeln_locked)} aria-describedby={division.staffeln_locked ? `staffeln-locked-${division.level}` : undefined}
+                    className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
                     <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Staffel anlegen
                   </button>
                 </div>
               ) : null}
             </div>
+            {canSeason && division.staffeln_locked ? (
+              <p className="mt-2 text-xs text-white/60" id={`staffeln-locked-${division.level}`} data-testid={`staffeln-locked-${division.level}`}>{STAFFELN_LOCKED}</p>
+            ) : null}
             {division.staffeln.length ? (
               <ul className="mt-3 divide-y divide-white/5 rounded-sm border border-white/10 bg-[#0A0A0A]">
                 {division.staffeln.map((staffel) => (
