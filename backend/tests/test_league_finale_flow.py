@@ -107,6 +107,9 @@ async def test_tv_finale_steps_through_each_league_with_next_and_end(flow):
     first, second = finale["pages"]
     assert [(row["name"], row["move"], row["target"]) for row in first["rows"]] == [("Probe 4", "down", "Liga 2")]
     assert [(row["name"], row["move"], row["target"]) for row in second["rows"]] == [("Probe b1", "up", "Liga 1")]
+    # Liga-Abzeichen am TV (#2561): Seite und Ziel tragen die Stufe.
+    assert (first["badge"]["level"], first["rows"][0]["target_badge"]["level"]) == (1, 2)
+    assert (second["badge"]["level"], second["rows"][0]["target_badge"]["level"]) == (2, 1)
     # Jeder TV der Season geht mit - auch der der anderen Staffel.
     assert (await display(flow, lower))["league_finale"]["step"] == 1
 
@@ -202,7 +205,8 @@ async def test_discord_matchdays_and_season_end_once_into_the_chosen_channel(flo
     assert end["embed"]["title"] == f"Saisonende · {season['name']}"
     assert "Meister: **Probe 1**" in end["embed"]["description"]
     fields = {field["name"]: field["value"] for field in end["embed"]["fields"]}
-    assert fields == {"Liga 1": "▼ Probe 4 → Liga 2", "Liga 2": "▲ Probe b1 → Liga 1"}
+    # Kennzeichnung je Stufe (#2561): Liga 1 mit Krone, Liga 2 mit Raute - im Feldnamen und vor der Ziel-Liga.
+    assert fields == {"👑 Liga 1": "▼ Probe 4 → 🔷 Liga 2", "🔷 Liga 2": "▲ Probe b1 → 👑 Liga 1"}
     assert end["buttons"][0]["label"] == "Zur Season" and end["buttons"][0]["url"].endswith("/liga/probe-shooter/season-1")
 
     # Eingeschaltet vor Saisonbeginn: alle drei Spieltage je Staffel liegen fertig da - nach Nr. 240 kommt je Staffel nur der neueste,
@@ -210,8 +214,8 @@ async def test_discord_matchdays_and_season_end_once_into_the_chosen_channel(flo
     await since_long_ago(flow, season)
     assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
     titles = sorted(sent["embed"]["title"] for sent in bot.sent[1:])
-    assert titles == sorted([f"Spieltag 3 · Liga {level}" for level in (1, 2)])
-    one = next(sent for sent in bot.sent if sent["embed"]["title"] == "Spieltag 3 · Liga 1")
+    assert titles == sorted(["Spieltag 3 · 👑 Liga 1", "Spieltag 3 · 🔷 Liga 2"])
+    one = next(sent for sent in bot.sent if sent["embed"]["title"] == "Spieltag 3 · 👑 Liga 1")
     assert "*Alle Spiele gewertet*" in one["embed"]["description"]
     assert one["embed"]["fields"][0]["value"].splitlines()[:3] == ["1. Probe 1 · 9 Pkt.", "2. Probe 2 · 6 Pkt.", "3. Probe 3 · 3 Pkt."]
     assert all(sent["channel_id"] == CHANNEL for sent in bot.sent)
@@ -238,7 +242,7 @@ async def test_discord_open_games_wait_for_the_deadline_then_say_how_many(flow, 
     await since_long_ago(flow, season)
     # Ohne „trotzdem melden“: Spieltag 3 wartet, bis alles gewertet ist. Von den fertigen 1 und 2 kommt nur der neueste (Nr. 240).
     assert await league_discord.sweep(flow.db) == {"matchday": 1, "season_end": 0}
-    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 2 · Liga 1"]
+    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 2 · 👑 Liga 1"]
     # Mit „trotzdem melden“ nach der Frist (Spielwoche längst vorbei): mit „1 Spiel offen“.
     await switch_on(flow, season, season_end=False, late=True)
     await since_long_ago(flow, season)
@@ -386,7 +390,7 @@ async def test_best_runner_up_across_staffeln_on_tv_control_and_discord(flow, bo
     assert (await league_discord.sweep(flow.db))["season_end"] == 1
     fields = {field["name"]: field["value"] for field in bot.sent[-1]["embed"]["fields"]}
     best_name = next(row["name"] for row in lower["rows"] if row["registration_id"] == best)
-    assert best_name in fields["Liga 2"]
+    assert best_name in fields["🔷 Liga 2"]
 
 
 @pytest.mark.asyncio
@@ -577,7 +581,7 @@ async def test_discord_after_an_outage_only_the_newest_matchday_per_staffel(flow
     await switch_on(flow, season, season_end=False)
     await since_long_ago(flow, season)
     assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
-    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 3 · Liga 1", "Spieltag 3 · Liga 2"]
+    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 3 · 👑 Liga 1", "Spieltag 3 · 🔷 Liga 2"]
     skipped = await flow.db.league_discord_posts.find({"status": "skipped"}, {"_id": 0}).to_list(10)
     assert sorted(row["dedupe_key"] for row in skipped) == sorted(f"matchday:{tid}:{n}" for tid in (staffel["id"], lower["id"]) for n in (1, 2))
     assert {row["reason"] for row in skipped} == {"missed"}
@@ -650,7 +654,7 @@ async def test_discord_release_wins_over_a_newer_matchday_in_the_same_run(flow, 
     before = len(bot.sent)
     assert (await league_discord.sweep(flow.db))["matchday"] == 2
     titles = sorted(sent["embed"]["title"] for sent in bot.sent[before:])
-    assert titles == ["Spieltag 2 · Liga 1", "Spieltag 3 · Liga 1"]
+    assert titles == ["Spieltag 2 · 👑 Liga 1", "Spieltag 3 · 👑 Liga 1"]
     assert (await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0}))["status"] == "sent"
     assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
     assert len(bot.sent) == before + 2
@@ -676,7 +680,7 @@ async def test_discord_skipped_matchdays_show_a_quiet_hint_and_can_be_sent_once(
     assert await flow.db.audit_logs.count_documents({"action": "league.season.discord_release", "data.key": key}) == 1
     before = len(bot.sent)
     assert (await league_discord.sweep(flow.db))["matchday"] == 1
-    assert [sent["embed"]["title"] for sent in bot.sent[before:]] == ["Spieltag 1 · Liga 1"]
+    assert [sent["embed"]["title"] for sent in bot.sent[before:]] == ["Spieltag 1 · 👑 Liga 1"]
     assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
     assert (await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0}))["status"] == "sent"
     left = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
