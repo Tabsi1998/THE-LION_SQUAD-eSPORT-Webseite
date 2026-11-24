@@ -28,7 +28,7 @@ READERS = {
     "services/league_eligibility.py": (2, ALL, "Spielberechtigung gilt der Season"),
     "services/league_final.py": (5, MIXED, "Abschluss zählt alle Arten; Tabelle, Zonen und Vergleich nur regulär"),
     "services/league_final_read.py": (1, ALL, "die geltende Fassung genau dieser Staffel"),
-    "services/league_finale.py": (3, MIXED, "Auf- und Absteiger nur aus Tabellen; der TV-Schritt an jeder Staffel"),
+    "services/league_finale.py": (4, MIXED, "Auf- und Absteiger nur aus Tabellen, dazu die Wirkung der Relegation; der TV-Schritt an jeder Staffel"),
     "services/league_games.py": (1, REGULAR, "Doppel-Einsatz: nur unter Staffeln derselben Art"),
     "services/league_history.py": (1, REGULAR, "Season-Historie: eine Zeile je Tabellen-Endstand"),
     "services/league_incidents.py": (1, ALL, "Vorfälle: jede Staffel"),

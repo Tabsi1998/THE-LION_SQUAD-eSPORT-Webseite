@@ -184,13 +184,33 @@ async def season_finals(db, season: dict, *, guests_only: bool = True) -> tuple[
     ids = [row["id"] for row in staffeln]
     finals = await db.league_final_tables.find({"tournament_id": {"$in": ids}, "active": True},
                                                {"_id": 0, "tournament_id": 1, "division_id": 1, "staffel": 1, "rows": 1, "champion": 1,
-                                                "champion_place": 1, "zones": 1}).to_list(len(ids) or 1) if ids else []
+                                                "champion_place": 1, "zones": 1, "sides": 1}).to_list(len(ids) or 1) if ids else []
     # Plätze über Staffeln hinweg (#1627, „beste Zweite“): Der Endstand trägt sie nicht - sie kommen beim Lesen dazu, sobald alle
     # Staffeln der Liga N abgeschlossen sind. So lesen TV, Steuerung und Discord dieselbe Zone wie Tabelle und Folge-Season.
     from services import league_cross_zones
 
     await league_cross_zones.overlay_finals(db, finals)
+    await _overlay_relegation(db, season["id"], finals)
     return staffeln, finals
+
+
+async def _overlay_relegation(db, season_id: str, finals: list[dict]) -> None:
+    """Wirkung der abgeschlossenen Relegation (#2404, Nr. 213) an den Zeilen der Tabellen-Endstände: Der Sieger aus der unteren Liga N
+    steht als Aufsteiger, der Verlierer aus der oberen als Absteiger - wie in der Folge-Season. Wer bleibt, bleibt ohne Bewegung.
+    Nichts wird zurückgeschrieben; ohne abgeschlossene Relegation ändert sich nichts."""
+    moved: dict[str, str] = {}
+    async for row in db.league_final_tables.find({"season_id": season_id, "active": True, "kind": "relegation"}, {"_id": 0, "outcome": 1}):
+        moved.update({str(key): value for key, value in (row.get("outcome") or {}).items()})
+    if not moved:
+        return
+    zone_of = {"up": "promotion", "down": "relegation"}
+    for final in finals:
+        sides = final.get("sides") or {}
+        for row in final.get("rows") or []:
+            squad = (sides.get(row.get("registration_id") or "") or {}).get("squad_id")
+            if moved.get(squad or "") in zone_of:
+                row["zone"] = zone_of[moved[squad]]
+                row["zone_relegation"] = True
 
 
 async def season_pages(db, season: dict, *, guests_only: bool = True, column_max: int | None = None) -> list[dict]:

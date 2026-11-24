@@ -270,7 +270,8 @@ def seat_summary(tournament: dict | None, registrations: list[dict] | None) -> d
 
 # Die Tabelle am TV (#2121): Liga, Jeder gegen jeden, Schweizer System und Gruppen - Platz, Name und die Zahlen der
 # Tabelle, nie Konto (user_id) oder Team-Kennung.
-STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "played", "won", "drawn", "lost",
+# ``playoff`` (#2404, F.6): das Kennzeichen „Playoff-Platz“ - nur an Zeilen, die es tragen.
+STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "played", "won", "drawn", "lost", "playoff",
                    "score_for", "score_against", "score_diff", "buchholz", "points", "form",
                    # Schweizer System (#1559): Median-Buchholz als Spalte, „weiter“ und „raus“ nach der Abschlussregel.
                    "median_buchholz", "swiss_status",
