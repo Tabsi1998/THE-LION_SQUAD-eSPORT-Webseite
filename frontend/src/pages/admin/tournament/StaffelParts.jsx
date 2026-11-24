@@ -64,6 +64,9 @@ export function staffelLabel(tournament) {
   const links = tournament?.league_links || {};
   const staffel = links.staffel || tournament?.league_context?.staffel;
   const head = links.division_label || "Liga";
+  // Playoffs und Relegation (#2404, F.6): eine eigene K.-o.-Staffel der Liga - nie "Staffel PO".
+  const kind = { playoff: "Playoffs", relegation: "Relegation" }[tournament?.league_context?.kind];
+  if (kind) return `${head} · ${kind}`;
   return staffel ? `${head} · Staffel ${staffel}` : head;
 }
 
