@@ -435,6 +435,11 @@ class OpsAlertSettingsBody(BaseModel):
     retention_days: dict[str, int] | None = None
     # Upload-Routen (#2447): höchstens 40 Zeilen zu je 210 Zeichen - als Liste oder Text mit einer Route je Zeile.
     upload_routes: Annotated[list[Annotated[str, Field(max_length=210)]], Field(max_length=40)] | Annotated[str, Field(max_length=9000)] | None = None
+    # Fehler-Sammler (#1657): Grenzen prüft ``save_alert_settings`` (Meldung auf Deutsch statt 422).
+    spike_threshold: int | None = None
+    spike_window_minutes: int | None = None
+    daily_summary_hour: int | None = None
+    reach_fail_threshold: int | None = None
 
 
 @router.get("/ops/alerts")
@@ -467,6 +472,20 @@ HREFS = {
     "checks": "/admin/ops?tab=checks", "alerts": "/admin/ops?tab=alerts", "sync": "/admin/dolibarr", "bot": "/admin/integrations/discord",
 }
 SEVERITY_FILTERS = {"problem": {"error", "warn"}, "error": {"error"}, "warn": {"warn"}, "info": {"info"}, "success": {"success"}}
+CLIENT_SOURCE_LABELS = {"web": "Website", "app": "App"}
+
+
+def _error_title(row: dict) -> str:
+    """Fehlergruppe in der Ereignisliste; Gruppen aus Website und App (#1657) tragen ihre Quelle vorn."""
+    title = f"{row.get('error_type') or 'Fehler'} · {row.get('method') or ''} {row.get('route') or ''}".strip()
+    label = CLIENT_SOURCE_LABELS.get(row.get("source") or "")
+    return " ".join(f"{label} · {title}".split()) if label else title
+
+
+def _error_subtitle(row: dict) -> str:
+    if row.get("source") in CLIENT_SOURCE_LABELS:
+        return f"{row.get('count') or 1}×"
+    return f"{row.get('count') or 1}× · HTTP {row.get('status_code') or '?'} · {row.get('actor') or ''}".strip(" ·")
 
 
 async def _discord_guild_names(db) -> dict[str, str]:
@@ -633,9 +652,9 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "", open_only: b
     server_items = [
         _with_state(_log_item("server", "Serverfehler", HREFS["server"], row, severity="info" if row.get("resolved_at") else "error",
                               status="gelöst" if row.get("resolved_at") else "offen",
-                              title=f"{row.get('error_type') or 'Fehler'} · {row.get('method') or ''} {row.get('route') or ''}".strip(),
-                              subtitle=f"{row.get('count') or 1}× · HTTP {row.get('status_code') or '?'} · {row.get('actor') or ''}".strip(" ·"),
-                              detail=row.get("message") or "", time_keys=("last_seen_at", "first_seen_at")),
+                              title=_error_title(row),
+                              subtitle=_error_subtitle(row),
+                              detail=row.get("message") or row.get("version") or "", time_keys=("last_seen_at", "first_seen_at")),
                     ack_id=row.get("fingerprint") or "", problem=True,
                     acknowledged={"at": row.get("resolved_at"), "by": row.get("resolved_by")} if row.get("resolved_at") else None)
         for row in error_rows

@@ -511,4 +511,16 @@ async def ops_summary(db) -> dict:
         "slowest_route_24h": {"route": slowest.get("route"), "duration_ms": slowest.get("duration_ms")} if slowest else None,
         "threshold_ms": SLOW_REQUEST_MS,
         "checks": await latest_checks_summary(db),
+        "reachability": await _reachability_summary(db),
     }
+
+
+async def _reachability_summary(db) -> dict | None:
+    """Erreichbarkeit (#1657) für Betrieb → Fehler: je Ziel Zustand und seit wann - nur für die Verwaltung."""
+    from services.ops_reachability import STATE_ID
+
+    doc = await db.settings.find_one({"id": STATE_ID}, {"_id": 0})
+    if not doc:
+        return None
+    targets = {key: {"state": row.get("state"), "since": row.get("since")} for key, row in (doc.get("targets") or {}).items()}
+    return {"overall": doc.get("overall") or "ok", "checked_at": doc.get("checked_at"), "targets": targets}

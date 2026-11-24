@@ -78,3 +78,12 @@ async def receive_client_error(request: Request, response: Response):
                                             route=body.route, version=body.version)
     response.headers["Cache-Control"] = "no-store"
     return {"ok": fingerprint is not None, "id": fingerprint}
+
+
+@router.get("/status")
+async def public_status_view(response: Response):
+    """Für die Statusseite ``/status`` (#1657): nur „ok“ oder „disturbance“ und wann zuletzt geprüft wurde."""
+    from services.ops_reachability import public_status
+
+    response.headers["Cache-Control"] = "no-store"
+    return await public_status(get_db())

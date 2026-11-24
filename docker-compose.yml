@@ -100,6 +100,11 @@ services:
       REFERENCE_ORIGINAL_RATE_WINDOW_SECONDS: "${REFERENCE_ORIGINAL_RATE_WINDOW_SECONDS:-600}"
       REFERENCE_ORIGINAL_CONCURRENCY: "${REFERENCE_ORIGINAL_CONCURRENCY:-2}"
       ALLOW_INSECURE_CORS: "${ALLOW_INSECURE_CORS:-false}"
+      # Fehler-Sammler und Erreichbarkeit (#1657): Stand an jeder Fehlergruppe; was der Server jede Minute prueft
+      # (leer = nicht pruefen). Die Pruefung laeuft auf demselben Server - siehe docs/BETRIEB.md.
+      APP_VERSION: "${APP_VERSION:-2.3}"
+      OPS_REACH_WEB_URL: "${OPS_REACH_WEB_URL:-http://frontend/health}"
+      OPS_REACH_API_URL: "${OPS_REACH_API_URL:-http://127.0.0.1:8001/api/health/live}"
     read_only: true
     tmpfs:
       - /tmp:size=128m,mode=1777

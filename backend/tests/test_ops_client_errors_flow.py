@@ -195,3 +195,44 @@ async def test_browser_errors_do_not_turn_the_server_check_yellow(flow):
     await flow.client.post("/api/ops/client-errors", json=web_error())
     check = await check_error_groups(flow.db)
     assert check["status"] == "ok", "Website und App haben eigene Gruppen - die Ampel zählt die des Servers"
+
+
+@pytest.mark.asyncio
+async def test_the_thresholds_are_saved_in_the_admin_and_checked(flow):
+    flow.act_as(await flow.add_user(role="superadmin", name="super"))
+    view = (await flow.get("/api/admin/ops/alerts")).json()
+    assert {view["settings"][key] for key in ("spike_threshold", "spike_window_minutes", "daily_summary_hour", "reach_fail_threshold")} >= {20, 10, 8, 2}
+    assert {"error_spike", "daily_summary", "reachability"} <= {kind["key"] for kind in view["kinds"]}
+    saved = await flow.put("/api/admin/ops/alerts", json={"spike_threshold": 50, "spike_window_minutes": 5, "daily_summary_hour": 7, "reach_fail_threshold": 3})
+    assert saved.status_code == 200
+    body = saved.json()
+    assert (body["spike_threshold"], body["spike_window_minutes"], body["daily_summary_hour"], body["reach_fail_threshold"]) == (50, 5, 7, 3)
+    refused = await flow.put("/api/admin/ops/alerts", json={"spike_threshold": 1})
+    assert refused.status_code == 400 and "zwischen 2 und 10000" in refused.json()["detail"]
+    assert (await flow.put("/api/admin/ops/alerts", json={"daily_summary_hour": 24})).status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_the_ops_summary_shows_reachability(flow):
+    from services import ops_reachability
+
+    ops_reachability._memory.clear()
+
+    async def fine():
+        return True
+
+    await ops_reachability.run_reachability(flow.db, {"web": fine, "api": None, "database": fine})
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    summary = (await flow.get("/api/admin/ops/summary")).json()
+    assert summary["reachability"]["overall"] == "ok"
+    assert summary["reachability"]["targets"]["web"]["state"] == "up"
+    assert summary["reachability"]["targets"]["api"]["state"] == "unchecked"
+
+
+@pytest.mark.asyncio
+async def test_the_event_list_names_the_source(flow):
+    await flow.client.post("/api/ops/client-errors", json=web_error())
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    events = (await flow.get("/api/admin/ops/events?source=server")).json()
+    titles = [item["title"] for item in events["items"]]
+    assert titles == ["Website · TypeError · /u/:slug"]
