@@ -167,7 +167,10 @@ App) – oder lasst einen Beitrag aus der App heraus.
 - **App-Push bei „Nur App“:** genau einmal, wenn der Beitrag erscheint (auch zum geplanten Termin), nur an Personen mit
   App und Push-Zustimmung für „News & Events“; die Ruhezeit gilt wie bei allen Meldungen. Erneutes Speichern, Zurückziehen
   und wieder Veröffentlichen schicken keinen zweiten Push. Wird ein schon öffentlicher Beitrag erst später auf „Nur App“
-  gestellt, geht kein Push hinaus. Mitglieder- und Vorstands-News „Nur App“ gehen wie bisher nur an Mitglieder bzw. Vorstand.
+  gestellt, geht kein Push hinaus – das sagt die Box schon beim Umstellen. Ist ein Beitrag beim Erscheinen älter als
+  24 Stunden (etwa ein alter Entwurf mit früherem Datum), geht ebenfalls kein Push hinaus; die Box nennt den Grund.
+  Mitglieder- und Vorstands-News „Nur App“ gehen wie bisher nur an Mitglieder bzw. Vorstand. Wird so eine News später
+  öffentlich, bekommt den App-Push nur, wer die Mitglieder-Meldung noch nicht hatte.
 - „Alle gelesen“ und „Gelesene löschen“ in der Glocke der Website lassen Meldungen, die nur in der App stehen, unberührt –
   und umgekehrt.
 - **Adventkalender:** Ein Türchen mit einer News „Nur App“ zeigt auf der Website nur seinen Text, in der App die News –
