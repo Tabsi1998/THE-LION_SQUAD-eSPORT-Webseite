@@ -6,6 +6,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 const apiMock = { get: vi.fn(), post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+const live = { callback: null, resources: null, options: null };
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { live.callback = callback; live.resources = resources; live.options = options; } }));
 
 const { SeasonTvFinaleControl, finaleStatus } = await import("./SeasonTvFinaleControl");
 
@@ -57,11 +59,23 @@ test("finaleStatus: Gründe und Stand in einem Satz", () => {
 
 test("zwei Leitungs-Fenster: hat ein anderes schon weitergeschaltet (409), lädt dieses den Stand neu und sagt es", async () => {
   apiMock.get.mockResolvedValueOnce({ data: STATE }).mockResolvedValue({ data: { ...STATE, step: 1 } });
-  apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Der TV-Schritt wurde inzwischen in einem anderen Fenster weitergeschaltet. Der aktuelle Stand ist geladen." } } });
+  apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Der Stand hat sich geändert – neu geladen." } } });
   render(<SeasonTvFinaleControl seasonId="s1" canSteer />);
   fireEvent.click(await screen.findByTestId("tv-finale-next"));
   expect(await screen.findByTestId("tv-finale-status")).toHaveTextContent("Der TV zeigt Liga 1 (1 von 2).");
   expect(apiMock.get).toHaveBeenCalledTimes(2);
-  expect(screen.getByTestId("tv-finale-stale")).toHaveTextContent("anderen Fenster");
+  expect(screen.getByTestId("tv-finale-stale")).toHaveTextContent("Der Stand hat sich geändert – neu geladen.");
   expect(screen.queryByTestId("tv-finale-error")).toBeNull();
+});
+
+test("K-b: der Kasten lädt live nach - schließt während des Finales eine Liga N ab, steht sie ohne Klick in der Reihenfolge", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: { ...STATE, step: 1 } });
+  render(<SeasonTvFinaleControl seasonId="s1" canSteer />);
+  expect(await screen.findByTestId("tv-finale-status")).toHaveTextContent("Der TV zeigt Liga 1 (1 von 2).");
+  expect(live.callback).toBeTypeOf("function");
+  expect(live.resources).toContain("tournaments");
+  expect(live.options.fallbackMs).toBeGreaterThan(0);
+  apiMock.get.mockResolvedValueOnce({ data: { ...STATE, step: 2, count: 3, labels: ["Liga 1", "Liga 2", "Liga 3"] } });
+  await live.callback();
+  expect(await screen.findByTestId("tv-finale-status")).toHaveTextContent("Der TV zeigt Liga 2 (2 von 3).");
 });

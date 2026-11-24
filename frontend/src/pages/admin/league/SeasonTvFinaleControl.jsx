@@ -7,7 +7,10 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, MonitorPlay, Square } from "lucide-react";
 import { FormSection } from "@/components/tls/AdminForm";
 import { api, formatApiError } from "@/lib/api";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+
+// Live (K-b): schließt während des Finales eine Staffel ab oder schaltet ein anderes Fenster, steht der neue Stand ohne Klick da.
+const REFRESH_MS = 30000;
 
 const REASONS = {
   season_hidden: "Diese Season ist nicht öffentlich – der TV zeigt das Saisonfinale nur bei öffentlichen Seasons.",
@@ -37,7 +40,7 @@ export function SeasonTvFinaleControl({ seasonId, canSteer = false }) {
     }
   }, [seasonId]);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["tournaments"]);
+  useLiveRefresh(load, ["tournaments", "leagues"], { fallbackMs: REFRESH_MS });
 
   const press = async (action) => {
     setBusy(action);
@@ -49,7 +52,7 @@ export function SeasonTvFinaleControl({ seasonId, canSteer = false }) {
       setState(data);
     } catch (failure) {
       if (failure.response?.status === 409) {
-        setStale(formatApiError(failure.response?.data?.detail) || "Ein anderes Fenster hat schon weitergeschaltet. Der aktuelle Stand ist geladen.");
+        setStale(formatApiError(failure.response?.data?.detail) || "Der Stand hat sich geändert – neu geladen.");
         await load();
       } else {
         setError(formatApiError(failure.response?.data?.detail) || "Der TV konnte nicht umgeschaltet werden.");
