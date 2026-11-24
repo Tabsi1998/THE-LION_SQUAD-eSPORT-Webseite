@@ -9,6 +9,9 @@
   und Tabellenausschnitt - lesen jede Zuständigkeit, ändern „Season konfigurieren“. Zur Wahl stehen nur die freigegebenen Kanäle
   (öffentliche „Kanäle je Zweck“ unter Verbindungen → Discord, Nr. 234); ein anderer Kanal gibt 422. Dazu die Hinweise zu Meldungen,
   deren Zustellung unklar ist oder die aufgegeben wurden.
+- ``POST /api/admin/leagues/seasons/{season_id}/discord/release``: ``{"key", "confirm": true}`` - „Noch einmal senden“ (Nr. 239) für
+  eine unklare, hängende oder aufgegebene Meldung, nachdem die Leitung im Kanal nachgesehen hat. Recht „Season konfigurieren“,
+  Protokoll ``league.season.discord_release``; ein zweiter Klick gibt 409.
 
 Logik in ``services/league_finale.py`` und ``services/league_discord.py``.
 """
@@ -17,7 +20,7 @@ from __future__ import annotations
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from database import get_db
 from models import new_id, now_utc
@@ -36,6 +39,13 @@ class FinaleBody(BaseModel):
 
     action: Literal["next", "end"]
     from_step: Optional[int] = None
+
+
+class ReleaseBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(min_length=1, max_length=200)
+    confirm: bool = False
 
 
 class DigestBody(BaseModel):
@@ -96,7 +106,7 @@ async def _digest_answer(db, season: dict, **extra) -> dict:
     allowed = await league_discord.approved(db)
     return {"settings": settings, "active": isinstance(stored, dict), "defaults": dict(league_discord.DEFAULTS),
             "public": public_season(season), "channel_approved": not settings["channel_id"] or settings["channel_id"] in allowed,
-            "problems": await league_discord.problems(db, season["id"]), **await _channels(allowed), **extra}
+            "problems": await league_discord.problems(db, season["id"], now_utc()), **await _channels(allowed), **extra}
 
 
 @admin_router.get("/seasons/{season_id}/discord")
@@ -120,4 +130,17 @@ async def put_discord_digest(season_id: str, body: DigestBody, me: dict = Depend
         await db.audit_logs.insert_one({"id": new_id(), "action": "league.season.discord_digest", "target_id": season_id,
                                         "actor_id": me.get("id"), "data": {"from": before, "to": settings}, "created_at": now.isoformat()})
     season[league_discord.FIELD] = settings
+    return await _digest_answer(db, season)
+
+
+@admin_router.post("/seasons/{season_id}/discord/release")
+async def release_discord_post(season_id: str, body: ReleaseBody, me: dict = Depends(require_season)):
+    db = get_db()
+    season = await _season(db, season_id)
+    if not body.confirm:
+        raise HTTPException(status_code=422, detail="Bitte bestätigen: Du hast im Kanal nachgesehen, die Meldung fehlt.")
+    try:
+        await league_discord.release(db, season_id, body.key, me)
+    except league_discord.DigestProblem as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
     return await _digest_answer(db, season)

@@ -20,7 +20,11 @@
   belegt, sendet. Ein zweiter Lauf des Jobs - auch gleichzeitig auf zwei Servern - findet ihn und sendet nichts. Ein Fehlschlag
   wird höchstens ``MAX_ATTEMPTS``-mal wiederholt, frühestens nach ``RETRY_MINUTES`` - aber nur, wenn sicher nichts hinausging
   (``retryable``). Nach einem unklaren Fehler (Zeitüberschreitung, Discord 5xx) bleibt der Merker „unclear“ stehen und die Leitung
-  sieht den Hinweis im Kasten (``problems``).
+  sieht den Hinweis im Kasten (``problems``) - ebenso bei einem „sending“, das länger als ``RETRY_MINUTES`` hängt (Lauf abgebrochen),
+  und bei einer Meldung, die sich nicht aufbauen ließ. Nach dem Nachsehen im Kanal gibt die Leitung sie mit „Noch einmal senden“
+  frei (``release``, Nr. 239): Der nächste Lauf sendet sie genau einmal.
+- **Nach einem Ausfall** (Nr. 240): Je Staffel geht nur der neueste fertige Spieltag hinaus; ältere, die liegen geblieben sind,
+  bekommen den Merker „skipped“ (Grund ``missed``) und gehen nie hinaus.
 - **Kein Rückfall**: ohne Kanal, ohne Bot oder mit Discord aus wird nichts gesendet und nichts belegt.
 """
 from __future__ import annotations
@@ -30,7 +34,7 @@ from datetime import datetime, timedelta
 
 from pymongo.errors import DuplicateKeyError
 
-from models import now_utc
+from models import new_id, now_utc
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_discord")
@@ -56,6 +60,11 @@ EMBED_MAX = 5900
 # Sicher nichts hinausgegangen: Bot nicht verbunden, Kanal unbekannt, keine Schreibrechte - und eine 4xx-Antwort (abgewiesen).
 SAFE_REASONS = frozenset({"bot_offline", "unknown_channel", "forbidden"})
 UNCLEAR = "unclear"
+SKIPPED = "skipped"
+# Discord nimmt höchstens 10 Felder je Embed: 9 Liga N und der Hinweis „Weitere Ligen“ (K1).
+MAX_LEAGUE_FIELDS = 9
+UNCLEAR_TEXT = "Ob die Meldung ankam, ist unklar. Bitte im Kanal nachsehen - fehlt sie dort, gibst du sie mit „Noch einmal senden“ frei."
+BUILD_TEXT = "Die Meldung ließ sich nicht aufbauen. Ist der Fehler behoben, gibst du sie mit „Noch einmal senden“ frei."
 NOT_APPROVED = ("Dieser Kanal ist nicht freigegeben. Wählbar sind die öffentlichen Kanäle unter Verbindungen → Discord → "
                 "Kanäle je Zweck (Community, News, Events und Turniere).")
 MOVE_SIGNS = {"up": "▲", "down": "▼", "out": "✕"}
@@ -332,13 +341,22 @@ async def claim(db, key: str, doc: dict, now: datetime) -> bool:
 
 
 async def _send(db, key: str, channel_id: str, message: dict, now: datetime) -> bool:
-    from services.discord_links import build_embed, resolve_buttons
+    from services import discord_links
     from services.discord_runtime import bot
 
-    embed = await build_embed(message["title"], message["description"], color=message["color"], url=message.get("url"),
-                              fields=message.get("fields"))
+    # Der Aufbau gehört mit ins try (M2): Wirft er, ging sicher nichts hinaus - die Meldung gilt sofort als aufgegeben und steht im
+    # Kasten, statt still als „sending“ zu hängen.
     try:
-        result = await bot.send_embed(channel_id, embed, await resolve_buttons(message.get("buttons")))
+        embed = await discord_links.build_embed(message["title"], message["description"], color=message["color"], url=message.get("url"),
+                                                fields=message.get("fields"))
+        buttons = await discord_links.resolve_buttons(message.get("buttons"))
+    except Exception:  # noqa: BLE001 - ein Fehler beim Aufbau darf den Job nicht abbrechen
+        logger.warning("[league_discord] Meldung %s nicht aufgebaut", log_safe(key), exc_info=True)
+        await db[COLLECTION].update_one({"dedupe_key": key}, {"$set": {"status": "failed", "attempts": MAX_ATTEMPTS, "channel_id": channel_id,
+                                                                       "error": "build"}})
+        return False
+    try:
+        result = await bot.send_embed(channel_id, embed, buttons)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf den Job nicht abbrechen
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
     if result.get("ok"):
@@ -545,12 +563,19 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
 PROBLEM_LIMIT = 20
 
 
-async def problems(db, season_id: str) -> list[dict]:
-    """Was die Leitung wissen muss: Meldungen, deren Zustellung unklar ist (nie wiederholt - bitte im Kanal nachsehen), und solche,
-    die nach ``MAX_ATTEMPTS`` Versuchen aufgegeben wurden. Neueste zuerst."""
+def _open_query(season_id: str, now: datetime) -> dict:
+    """Was die Leitung prüfen und freigeben kann: unklar, aufgegeben oder länger als ``RETRY_MINUTES`` „sending“ (Lauf abgebrochen)."""
+    cutoff = (now - timedelta(minutes=RETRY_MINUTES)).isoformat()
+    return {"season_id": season_id, "$or": [{"status": UNCLEAR}, {"status": "failed", "attempts": {"$gte": MAX_ATTEMPTS}},
+                                            {"status": "sending", "claimed_at": {"$lt": cutoff}}]}
+
+
+async def problems(db, season_id: str, now: datetime | None = None) -> list[dict]:
+    """Was die Leitung wissen muss: Meldungen, deren Zustellung unklar ist (auch ein hängendes „sending“ - nie von selbst wiederholt),
+    und solche, die aufgegeben wurden. Neueste zuerst; ``key`` ist der Schlüssel für „Noch einmal senden“."""
     from discord_service import REASON_TEXTS
 
-    query = {"season_id": season_id, "$or": [{"status": UNCLEAR}, {"status": "failed", "attempts": {"$gte": MAX_ATTEMPTS}}]}
+    query = _open_query(season_id, now or now_utc())
     rows = await db[COLLECTION].find(query, {"_id": 0}).sort("claimed_at", -1).to_list(PROBLEM_LIMIT)
     titles = {}
     ids = sorted({row["tournament_id"] for row in rows if row.get("tournament_id")})
@@ -560,10 +585,30 @@ async def problems(db, season_id: str) -> list[dict]:
     for row in rows:
         what = "Saisonende" if row.get("kind") == "season_end" else " · ".join(
             part for part in (f"Spieltag {row.get('matchday')}", titles.get(row.get("tournament_id"))) if part)
-        if row.get("status") == UNCLEAR:
-            text = "Unklar, ob die Meldung ankam - Discord meldete einen Fehler nach dem Senden. Bitte im Kanal nachsehen; sie geht nicht noch einmal hinaus."
+        status = UNCLEAR if row.get("status") in (UNCLEAR, "sending") else "failed"
+        if status == UNCLEAR:
+            text = UNCLEAR_TEXT
+        elif row.get("error") == "build":
+            text = BUILD_TEXT
         else:
             reason = REASON_TEXTS.get(row.get("error") or "") or "Discord hat die Meldung nicht angenommen."
             text = f"Nach {row.get('attempts')} Versuchen nicht gesendet. {reason}"
-        out.append({"kind": row.get("kind"), "label": what, "status": row.get("status"), "text": text, "at": row.get("claimed_at")})
+        out.append({"key": row["dedupe_key"], "kind": row.get("kind"), "label": what, "status": status, "text": text, "at": row.get("claimed_at")})
     return out
+
+
+async def release(db, season_id: str, key: str, actor: dict | None, now: datetime | None = None) -> None:
+    """„Noch einmal senden“ (Nr. 239): Die Leitung hat im Kanal nachgesehen, die Meldung fehlt. Atomar zurück auf „einen Versuch offen“
+    - der nächste Lauf sendet sie genau einmal; ein zweiter Klick (oder ein zweites Fenster) findet nichts mehr freizugeben (409)."""
+    current = now or now_utc()
+    stamp = current.isoformat()
+    freed = await db[COLLECTION].update_one(
+        {"dedupe_key": key, **_open_query(season_id, current)},
+        {"$set": {"status": "failed", "attempts": MAX_ATTEMPTS - 1, "claimed_at": "", "error": None,
+                  "released_by": (actor or {}).get("id"), "released_at": stamp}})
+    if not freed.modified_count:
+        exists = await db[COLLECTION].count_documents({"dedupe_key": key, "season_id": season_id}, limit=1)
+        raise DigestProblem("Diese Meldung ist schon freigegeben oder gesendet." if exists else "Diese Meldung gibt es nicht.",
+                            409 if exists else 404)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "league.season.discord_release", "target_id": season_id,
+                                    "actor_id": (actor or {}).get("id"), "data": {"key": key}, "created_at": stamp})
