@@ -22,7 +22,7 @@ import logging
 from datetime import date, timedelta
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
-from services import league_cross_zones, league_permissions, league_zones, map_pools
+from services import league_calendar, league_cross_zones, league_permissions, league_zones, map_pools
 from services import league_postseason_final as finals_mod
 from services import league_postseason_rules as rules
 from services import league_veto_rules as veto_rules
@@ -281,13 +281,16 @@ async def table_champion(db, season_id: str | None) -> dict | None:
 
 
 def season_started(season: dict | None, now=None) -> bool:
-    """Hat die Season begonnen? Im Entwurf nie, sonst ab dem Beginn der ersten Spielwoche."""
-    if not season or (season.get("status") or "draft") == "draft":
-        return False
-    from services.league_calendar import aware
+    """Hat die Season begonnen? Im Entwurf nie, sonst ab dem Beginn der ersten Spielwoche - und einmal gestartet bleibt gestartet
+    (Nr. 253): Ist der Start gemerkt (``started_at``), gilt er, auch wenn das Startdatum danach verschoben wird."""
+    return league_calendar.season_started(season, now or now_utc())
 
-    start = aware(season.get("start_date"))
-    return bool(start and (now or now_utc()) >= start)
+
+async def remember_start(db, season: dict | None) -> None:
+    """Den Start merken, sobald er erreicht ist (Nr. 253) - idempotent, bei jedem Schreiben der Playoff-Einstellungen."""
+    stamp = league_calendar.start_stamp(season)
+    if stamp:
+        await db.league_seasons.update_one({"id": season["id"], league_calendar.STARTED_AT: None}, {"$set": {league_calendar.STARTED_AT: stamp}})
 
 
 # ---------------------------------------------------------------- Plan: Setzliste und Paarungen
@@ -548,6 +551,7 @@ async def save_season(db, season: dict, body: dict, actor: dict) -> dict:
             cleaned = rules.clean_season(body, fresh)
             warnings = await _check_settings(db, {**fresh, rules.FIELD: cleaned}, divisions, before)
             await db.league_seasons.update_one({"id": fresh["id"]}, {"$set": {rules.FIELD: cleaned, "updated_at": now_utc().isoformat()}})
+            await remember_start(db, fresh)
     except MutationLockBusy:
         raise PostseasonProblem(BUSY, 409) from None
     await refresh_season_end(db, season["id"])
@@ -571,6 +575,7 @@ async def save_division(db, division: dict, body: dict, actor: dict) -> dict | N
             changed = [({**row, rules.FIELD: cleaned} if cleaned else {key: value for key, value in row.items() if key != rules.FIELD})
                        if row["id"] == fresh["id"] else row for row in divisions]
             warnings = await _check_settings(db, season, changed, before)
+            await remember_start(db, season)
             await db.league_divisions.update_one({"id": fresh["id"]}, {"$set": {rules.FIELD: cleaned, "updated_at": now_utc().isoformat()}}
                                                  if cleaned else {"$unset": {rules.FIELD: ""}, "$set": {"updated_at": now_utc().isoformat()}})
     except MutationLockBusy:

@@ -53,6 +53,13 @@ def late_days(season: dict | None) -> int:
     return min(max(days, 0), MAX_DAYS)
 
 
+def start_of(season: dict | None) -> datetime | None:
+    """Der Start, von dem die Frist zählt: der gemerkte Start der Season (``started_at``, #2404 Nr. 253: einmal gestartet bleibt
+    gestartet), sonst ihr eingestellter Beginn. Wird das Startdatum nach dem Start verschoben, wandert die Frist nicht mit."""
+    row = season or {}
+    return aware(row.get("started_at")) or aware(row.get("start_date"))
+
+
 def extension_until(season: dict | None) -> datetime | None:
     return aware(((season or {}).get(EXTENSION) or {}).get("until"))
 
@@ -61,7 +68,7 @@ def late_deadline(season: dict | None) -> datetime | None:
     """Bis wann eine Nachmeldung höchstens geht: Start plus Frist; eine Verlängerung verlängert nur, sie verkürzt nie (Review
     #2422: wird die Frist später länger als eine alte Verlängerung, gilt die Frist). ``None``: kein Start."""
     extended = extension_until(season)
-    start = aware((season or {}).get("start_date"))
+    start = start_of(season)
     regular = start + timedelta(days=late_days(season)) if start else None
     if extended and regular:
         return max(extended, regular)
@@ -73,7 +80,7 @@ def effective_closes(season: dict | None) -> datetime | None:
     closes = aware((season or {}).get("application_closes_at"))
     if not closes:
         return None
-    start = aware((season or {}).get("start_date"))
+    start = start_of(season)
     if not start or closes <= start:
         return closes
     deadline = late_deadline(season)
@@ -110,7 +117,7 @@ def clean_extension(season: dict, until, reason, now: datetime) -> tuple[dict | 
     if moment is None:
         raise ValueError("Bitte ein gültiges Ende angeben.")
     closes = aware(season.get("application_closes_at"))
-    start = aware(season.get("start_date"))
+    start = start_of(season)
     if not closes or not start:
         raise ValueError("Verlängern geht nur mit Anmeldefenster und Beginn der Season.")
     regular = start + timedelta(days=late_days(season))

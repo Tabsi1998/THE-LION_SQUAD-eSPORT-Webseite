@@ -522,11 +522,11 @@ CARRY_KEYS = ("from_label", "from_level", "from_staffel", "rank", "zone", "movem
 
 
 def started(season: dict, now: datetime | None = None) -> bool:
-    """Hat die neue Season begonnen? Im Entwurf nie, sonst ab ihrem ersten Tag."""
-    if (season.get("status") or "draft") == "draft":
-        return False
-    start = leagues._aware(season.get("start_date"))
-    return bool(start and (now or now_utc()) >= start)
+    """Hat die neue Season begonnen? Im Entwurf nie, sonst ab ihrem ersten Tag - und einmal gestartet bleibt gestartet (#2404,
+    Nr. 253, ``league_calendar.season_started``)."""
+    from services import league_calendar
+
+    return league_calendar.season_started(season, now or now_utc())
 
 
 def _carry_of(season: dict, team: dict, division: dict | None, label: str) -> dict:

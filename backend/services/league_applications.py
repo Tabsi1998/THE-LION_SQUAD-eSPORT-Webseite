@@ -112,7 +112,10 @@ def carry_deadline(application: dict | None, season: dict | None) -> datetime | 
     """Bis wann sich ein übernommenes Co-Team abmelden kann: der Start der Season (Nr. 160). ``None``: kein übernommener Antrag."""
     if not (application or {}).get("carry_over") or not season:
         return None
-    return league_service._aware(season.get("start_date"))
+    # Der gemerkte Start gilt (#2404, Nr. 253): Rückt das Startdatum nach dem Start in die Zukunft, geht die Frist nicht wieder auf.
+    from services import league_calendar
+
+    return league_calendar.start_moment(season)
 
 
 def carry_open(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
@@ -465,7 +468,7 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
                 raise LeagueProblem(DECIDED, 409)
             fresh = await league_service.get_season(db, season["id"])
             if not carry_open(application, fresh):
-                raise LeagueProblem(CARRY_DEADLINE.format(day=_day(fresh.get("start_date"))), 409)
+                raise LeagueProblem(CARRY_DEADLINE.format(day=_day(fresh.get("started_at") or fresh.get("start_date"))), 409)
             seat = await _auto_seat(db, season, application, locked_id, fixed_detail=WITHDRAW_ASSIGNED)
             if not seat and (application.get("assignment") or await _left_over(db, application)):
                 raise LeagueProblem(WITHDRAW_ASSIGNED, 409)

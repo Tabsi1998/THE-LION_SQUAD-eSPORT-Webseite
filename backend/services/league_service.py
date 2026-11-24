@@ -44,7 +44,7 @@ from services.scoring_rules import LEAGUE_TABLE_DEFAULTS, division_rules, league
 from services.slug_utils import slugify, unique_slug
 
 # Spielwochen und Zeitzone stehen im Blatt-Modul (auch für Aufbewahrung und Sperren, E.3) und werden hier weitergereicht.
-from services.league_calendar import VIENNA, aware as _aware, local_day as _local_day, week_days  # noqa: E402, F401
+from services.league_calendar import STARTED_AT, VIENNA, aware as _aware, local_day as _local_day, start_stamp, week_days  # noqa: E402, F401
 
 # Vorgaben einer neuen Season (docs/LIGA.md, Abschnitt 2 und 3).
 SEASON_DEFAULTS: dict = {
@@ -847,9 +847,14 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     # Gestaltung (#2107): wirkt sofort, braucht kein Übertragen - das Banner geht gleich auf die Staffeln (App).
     fields.update(await _look(db, body, league_look.SEASON_FIELDS))
     changed = sorted(key for key, value in fields.items() if season.get(key) != value)
+    # Einmal gestartet bleibt gestartet (#2404, Nr. 253): Hat die Season nach dem bisherigen Stand begonnen, merkt sich dieses
+    # Schreiben den Start - bevor Startdatum oder Stand sich ändern. Kein eigenes Feld der Leitung, darum nicht in ``changed``.
+    stamp = start_stamp(season)
+    if stamp:
+        fields[STARTED_AT] = stamp
     if before_write:
         await before_write({**season, **fields})
-    if changed:
+    if changed or stamp:
         fields["updated_at"] = _now()
         try:
             await db.league_seasons.update_one({"id": season["id"]}, {"$set": fields})
