@@ -343,7 +343,8 @@ function BestOfSelect({ label, value, onChange, options, fallback, testId, disab
     options={[["", fallback], ...options.map((item) => [String(item), `Best of ${item}`])]} />;
 }
 
-const START_LOCK_NOTE = "Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest. Das gilt auch nach einem Wiederöffnen.";
+// Nr. 249: ab dem Season-Start fest - auch wenn die Playoffs aus sind oder erst jetzt eingeschaltet werden (dann gelten die Werte vom Start).
+const START_LOCK_NOTE = "Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest. Das gilt auch nach einem Wiederöffnen und wenn die Playoffs erst jetzt eingeschaltet werden.";
 
 function PlayoffFields({ form, change, options, locked, startLocked = false, earliest, prefix }) {
   const rounds = form.best_of_rounds || [];
@@ -445,7 +446,7 @@ function SettingsSheet({ data, seasonId, onClose, onDone }) {
       {locked ? <p className="mt-3 rounded-sm border border-warn/40 bg-warn/5 p-3 text-xs text-white/80" role="note" data-testid="postseason-settings-locked">{SEASON_LOCK_NOTE}</p> : null}
       <div className="mt-4 space-y-6">
         <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
-          options={data.options} earliest={earliest} prefix="postseason" startLocked={Boolean(data.started && data.settings?.playoffs?.enabled)} />
+          options={data.options} earliest={earliest} prefix="postseason" startLocked={Boolean(data.started)} />
         <RelegationFields form={form.relegation} change={(patch) => setForm((current) => ({ ...current, relegation: { ...current.relegation, ...patch } }))}
           options={data.options} earliest={earliest} prefix="postseason" />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -494,7 +495,7 @@ function DivisionSheet({ data, row, onClose, onDone }) {
             testId="postseason-division-own-playoffs" />
           {own.playoffs ? <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
             options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division"
-            startLocked={Boolean(data.started && row.settings?.playoffs?.enabled)} /> : <p className="text-xs text-white/55">Season: {playoffLine({ playoffs: data.settings.playoffs })}</p>}
+            startLocked={Boolean(data.started)} /> : <p className="text-xs text-white/55">Season: {playoffLine({ playoffs: data.settings.playoffs })}</p>}
         </div>
         {row.has_lower ? (
           <div className="space-y-3">

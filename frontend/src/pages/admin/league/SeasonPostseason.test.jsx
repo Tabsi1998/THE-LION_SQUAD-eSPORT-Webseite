@@ -232,3 +232,33 @@ test("passt keine Veto-Vorlage zum Best of, steht das schon in der Vorschau", as
   renderPanel(cockpit([division({ playoffs: playoffs({ veto_notes: ["Veto für Best of 5: Für dieses Spiel gilt kein Map-Pool."] }) })]));
   expect(await screen.findByTestId("postseason-veto-note-d1")).toHaveTextContent("Veto für Best of 5");
 });
+
+test("nach dem Season-Start eingeschaltet: Best of, Platz 3 und Heimrecht zeigen die Vorgaben und sind ausgegraut", async () => {
+  const off = { ...SETTINGS, playoffs: { ...SETTINGS.playoffs, enabled: false, per_staffel: null, best_of: null } };
+  renderPanel(cockpit([division({ playoffs: null, settings: off })], { started: true, configured: false, settings: off }));
+  fireEvent.click(await screen.findByTestId("postseason-settings"));
+  // Aus: Die Felder stehen nicht da - der Haken selbst bleibt bedienbar.
+  expect(screen.queryByTestId("postseason-best-of")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("postseason-playoffs-enabled"));
+  expect(screen.getByTestId("postseason-start-locked")).toHaveTextContent("wenn die Playoffs erst jetzt eingeschaltet werden");
+  expect(screen.getByTestId("postseason-best-of")).toBeDisabled();
+  expect(screen.getByTestId("postseason-best-of")).toHaveValue("");
+  expect(screen.getByTestId("postseason-home")).toBeDisabled();
+  expect(screen.getByTestId("postseason-home")).toHaveValue("better_seed");
+  expect(screen.getByTestId("postseason-third-place")).toBeDisabled();
+  expect(screen.getByTestId("postseason-third-place")).not.toBeChecked();
+  expect(screen.queryByTestId("postseason-round-add")).not.toBeInTheDocument();
+  expect(screen.getByTestId("postseason-per-staffel")).toBeEnabled();
+});
+
+test("nach dem Season-Start gilt die Sperre auch in der Abweichung einer Liga ohne Playoffs", async () => {
+  const off = { ...SETTINGS, playoffs: { ...SETTINGS.playoffs, enabled: false } };
+  renderPanel(cockpit([division({ playoffs: null, settings: off })], { started: true, settings: off }));
+  fireEvent.click(await screen.findByTestId("postseason-division-edit-d1"));
+  fireEvent.click(screen.getByTestId("postseason-division-own-playoffs"));
+  fireEvent.click(screen.getByTestId("postseason-division-playoffs-enabled"));
+  expect(screen.getByTestId("postseason-division-start-locked")).toBeInTheDocument();
+  for (const id of ["postseason-division-best-of", "postseason-division-home", "postseason-division-third-place"]) {
+    expect(screen.getByTestId(id)).toBeDisabled();
+  }
+});
