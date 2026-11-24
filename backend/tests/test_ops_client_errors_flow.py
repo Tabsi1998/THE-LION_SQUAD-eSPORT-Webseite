@@ -93,7 +93,7 @@ async def test_the_app_can_report_too(flow):
 
 
 @pytest.mark.asyncio
-async def test_unknown_sources_too_large_bodies_and_floods_are_refused(flow):
+async def test_unknown_sources_too_large_bodies_and_floods_are_refused(flow, still_rate_limit_clock):
     wrong = await flow.client.post("/api/ops/client-errors", json=web_error(source="server"))
     assert wrong.status_code == 422, "nur web und app - der Server meldet sich selbst"
     huge = await flow.client.post("/api/ops/client-errors", content=b'{"stack": "' + b"x" * 40000 + b'"}', headers={"Content-Type": "application/json"})
