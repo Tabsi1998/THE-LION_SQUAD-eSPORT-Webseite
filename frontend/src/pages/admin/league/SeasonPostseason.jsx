@@ -501,14 +501,15 @@ function DivisionSheet({ data, row, onClose, onDone }) {
             testId="postseason-division-own-playoffs" />
           {own.playoffs ? <PlayoffFields form={form.playoffs} change={(patch) => setForm((current) => ({ ...current, playoffs: { ...current.playoffs, ...patch } }))}
             options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division"
-            startLocked={Boolean(data.started)} /> : <p className="text-xs text-white/55">Season: {playoffLine({ playoffs: data.settings.playoffs })}</p>}
+            startLocked={Boolean(data.started)} kept={row.best_of_kept} /> : <p className="text-xs text-white/55">Season: {playoffLine({ playoffs: data.settings.playoffs })}</p>}
         </div>
         {row.has_lower ? (
           <div className="space-y-3">
             <CheckField label="Eigene Relegations-Einstellungen für diese Liga" checked={own.relegation} onChange={(value) => setOwn((current) => ({ ...current, relegation: value }))}
               testId="postseason-division-own-relegation" />
             {own.relegation ? <RelegationFields form={form.relegation} change={(patch) => setForm((current) => ({ ...current, relegation: { ...current.relegation, ...patch } }))}
-              options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division" startLocked={Boolean(data.started)} /> : null}
+              options={data.options} locked={row.locked} earliest={earliest} prefix="postseason-division" startLocked={Boolean(data.started)}
+              kept={row.best_of_kept} /> : null}
           </div>
         ) : null}
       </div>

@@ -296,3 +296,17 @@ test("hat die Season ihr Best of nach dem Start geändert, heißt „wie in der 
     expect(screen.getByTestId(id)).toHaveValue("");
   }
 });
+
+test("auch im Fenster der Liga heißt „wie in der Season“ nach dem Start wie zum Season-Start - mit ihrem gemerkten Best of", async () => {
+  const follows = { ...SETTINGS, playoffs: { ...SETTINGS.playoffs, best_of: 1 }, relegation: { enabled: true, best_of: 1, start_date: null } };
+  renderPanel(cockpit([division({ settings: follows, has_lower: true, lower_label: "Liga 2", best_of_kept: 1 })], { started: true, best_of_kept: 3 }));
+  fireEvent.click(await screen.findByTestId("postseason-division-edit-d1"));
+  fireEvent.click(screen.getByTestId("postseason-division-own-playoffs"));
+  fireEvent.click(screen.getByTestId("postseason-division-own-relegation"));
+  // Der Wert der Liga gilt (Best of 1), nicht der der Season (Best of 3).
+  for (const id of ["postseason-division-best-of", "postseason-division-relegation-best-of"]) {
+    expect(within(screen.getByTestId(id)).getByRole("option", { name: "Wie zum Season-Start (Best of 1)" })).toBeInTheDocument();
+    expect(within(screen.getByTestId(id)).queryByRole("option", { name: "Wie in der Season" })).not.toBeInTheDocument();
+    expect(screen.getByTestId(id)).toBeDisabled();
+  }
+});
