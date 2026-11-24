@@ -347,7 +347,8 @@ async def test_tv_finale_second_tab_gets_409_when_the_step_moved(flow):
     first = await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next", "from_step": 0})
     assert first.status_code == 200 and first.json()["step"] == 1
     stale = await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next", "from_step": 0})
-    assert stale.status_code == 409 and "anderen" in stale.json()["detail"]
+    # K-b: neutraler Text - der Stand kann sich auch durch Abschluss oder Ende geaendert haben.
+    assert stale.status_code == 409 and stale.json()["detail"] == "Der Stand hat sich geändert – neu geladen."
     assert (await display(flow, staffel))["league_finale"]["step"] == 1
     fresh = await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next", "from_step": 1})
     assert fresh.status_code == 200 and fresh.json()["step"] == 2
@@ -478,7 +479,8 @@ async def test_discord_failed_matchday_is_not_rebuilt_while_it_waits_or_gave_up(
     assert (await league_discord.sweep(flow.db, now=later))["matchday"] == 0
     assert loaded == [], "aufgegeben"
     problems = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
-    assert len(problems) == 2 and {row["status"] for row in problems} == {"failed"}
+    # Zwei aufgegebene (je Staffel der neueste) und die vier verworfenen aelteren als leiser Hinweis (Nr. 243).
+    assert sorted(row["status"] for row in problems) == ["failed"] * 2 + ["skipped"] * 4
 
 
 # ---------------------------------------------------------------- Runde 2 (Nr. 238-241)
@@ -581,7 +583,10 @@ async def test_discord_after_an_outage_only_the_newest_matchday_per_staffel(flow
     assert {row["reason"] for row in skipped} == {"missed"}
     assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
     assert len(bot.sent) == 2
-    assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"] == []
+    # Nr. 243: die verworfenen stehen als leiser Hinweis im Kasten.
+    problems = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
+    assert sorted(row["key"] for row in problems) == sorted(row["dedupe_key"] for row in skipped)
+    assert {row["status"] for row in problems} == {"skipped"}
 
 
 @pytest.mark.asyncio
@@ -619,3 +624,118 @@ async def test_tv_finale_keeps_its_league_when_an_earlier_league_closes_later(fl
     # Wiederöffnen beendet das Finale weiterhin an allen TVs.
     await must_reopen(flow, staffel, emergency_reason="Niemand sonst erreichbar")
     assert (await display(flow, lower))["league_finale"] is None
+
+
+# ---------------------------------------------------------------- Runde 3 (Nr. 242-244)
+
+@pytest.mark.asyncio
+async def test_discord_release_wins_over_a_newer_matchday_in_the_same_run(flow, bot):
+    """M3, Nr. 242: Eine Freigabe geht vor Nr. 240. Wird im selben Lauf ein neuerer Spieltag derselben Staffel fertig, gehen beide genau
+    einmal hinaus - der freigegebene wird nicht verworfen."""
+    _admin, _league, season, staffel, _lower = await two_leagues(flow)
+    third = await matches_of(flow, staffel, 3)
+    saved = {match["id"]: {"status": match["status"], "results": match.get("results") or []} for match in third}
+    await flow.db.matches_v2.update_many({"id": {"$in": list(saved)}}, {"$set": {"status": "scheduled", "results": []}})
+    await discord_ready(flow)
+    await switch_on(flow, season, season_end=False, late=False)
+    await since_long_ago(flow, season)
+    bot.after_send = "error"
+    await league_discord.sweep(flow.db)
+    bot.after_send = None
+    key = f"matchday:{staffel['id']}:2"
+    assert (await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0}))["status"] == "unclear"
+    assert (await release(flow, season, key)).status_code == 200
+    for match_id, before in saved.items():
+        await flow.db.matches_v2.update_one({"id": match_id}, {"$set": before})
+    before = len(bot.sent)
+    assert (await league_discord.sweep(flow.db))["matchday"] == 2
+    titles = sorted(sent["embed"]["title"] for sent in bot.sent[before:])
+    assert titles == ["Spieltag 2 · Liga 1", "Spieltag 3 · Liga 1"]
+    assert (await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0}))["status"] == "sent"
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert len(bot.sent) == before + 2
+
+
+@pytest.mark.asyncio
+async def test_discord_skipped_matchdays_show_a_quiet_hint_and_can_be_sent_once(flow, bot):
+    """Nr. 243: Verworfene Spieltage (Nr. 240) stehen als leiser Hinweis im Kasten und lassen sich mit „Noch einmal senden“ nachholen -
+    genau einmal, mit Protokoll; ein Doppelklick gibt 409."""
+    _admin, _league, season, staffel, _lower = await two_leagues(flow)
+    await discord_ready(flow)
+    await switch_on(flow, season, season_end=False)
+    await since_long_ago(flow, season)
+    await league_discord.sweep(flow.db)
+    problems = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
+    skipped = [row for row in problems if row["status"] == "skipped"]
+    assert len(skipped) == 4 and len(problems) == 4
+    assert all(row["text"].startswith("Verworfen") for row in skipped)
+    key = f"matchday:{staffel['id']}:1"
+    assert any(row["key"] == key and row["label"].startswith("Spieltag 1") for row in skipped)
+    answers = await asyncio.gather(release(flow, season, key), release(flow, season, key))
+    assert sorted(answer.status_code for answer in answers) == [200, 409]
+    assert await flow.db.audit_logs.count_documents({"action": "league.season.discord_release", "data.key": key}) == 1
+    before = len(bot.sent)
+    assert (await league_discord.sweep(flow.db))["matchday"] == 1
+    assert [sent["embed"]["title"] for sent in bot.sent[before:]] == ["Spieltag 1 · Liga 1"]
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert (await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0}))["status"] == "sent"
+    left = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
+    assert len(left) == 3 and key not in {row["key"] for row in left}
+
+
+@pytest.mark.asyncio
+async def test_discord_a_late_send_result_never_overwrites_a_release(flow, bot):
+    """K-c: Kommt das Ergebnis eines Versands erst nach einer Freigabe zurück, bleibt die Freigabe stehen."""
+    _admin, _league, season, _staffel, _lower = await two_leagues(flow)
+    key = f"season_end:{season['id']}"
+    now = now_utc()
+    assert await league_discord.claim(flow.db, key, {"kind": "season_end", "season_id": season["id"]}, now - timedelta(minutes=40))
+    assert (await release(flow, season, key)).status_code == 200
+    await league_discord._send(flow.db, key, CHANNEL, {"title": "t", "description": "d", "color": 1, "fields": [], "buttons": []}, now)
+    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0})
+    assert stored["status"] == "failed" and stored["attempts"] == league_discord.MAX_ATTEMPTS - 1 and stored.get("released_by")
+
+
+@pytest.mark.asyncio
+async def test_tv_finale_end_always_wins_against_a_concurrent_next(flow, monkeypatch):
+    """Nr. 244: „Weiter“ liest den Stand, dann drückt jemand „Ende“, dann schreibt „Weiter“ - das Finale bleibt beendet, „Weiter“ gibt
+    409 mit neutralem Text."""
+    from services import league_finale
+
+    _admin, _league, season, staffel, lower = await two_leagues(flow)
+    assert (await step(flow, season, "next"))["step"] == 1
+    original = league_finale.closed_staffeln
+    reached, gate = asyncio.Event(), asyncio.Event()
+
+    async def held(db, season_id):
+        rows = await original(db, season_id)
+        if not reached.is_set():
+            reached.set()
+            await gate.wait()
+        return rows
+
+    monkeypatch.setattr(league_finale, "closed_staffeln", held)
+    pending = asyncio.create_task(flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next", "from_step": 1}))
+    await asyncio.wait_for(reached.wait(), 10)
+    ended = await flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "end"})
+    gate.set()
+    late = await pending
+    assert ended.status_code == 200 and ended.json()["step"] == 0
+    assert late.status_code == 409 and late.json()["detail"] == "Der Stand hat sich geändert – neu geladen."
+    assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).json()["step"] == 0
+    for tid in (staffel, lower):
+        assert (await display(flow, tid))["league_finale"] is None
+
+
+@pytest.mark.asyncio
+async def test_tv_finale_end_and_next_at_once_end_wins(flow):
+    """Nr. 244 ohne Haken: „Ende“ und „Weiter“ gleichzeitig (auf echtem MongoDB echt nebenläufig) - danach ist das Finale beendet."""
+    _admin, _league, season, staffel, _lower = await two_leagues(flow)
+    assert (await step(flow, season, "next"))["step"] == 1
+    for _ in range(3):
+        answers = await asyncio.gather(flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "end"}),
+                                       flow.post(f"{ADMIN}/seasons/{season['id']}/tv-finale", json={"action": "next", "from_step": 1}))
+        assert answers[0].status_code == 200
+        assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).json()["step"] == 0
+        assert (await display(flow, staffel))["league_finale"] is None
+        assert (await step(flow, season, "next"))["step"] == 1
