@@ -111,6 +111,26 @@ def _per_column(rows: list[dict], column_max: int | None) -> tuple[list[dict], d
     return shown, more
 
 
+def current_step(state: dict | None, pages: list[dict]) -> int:
+    """Welche Seite gerade dran ist: die Liga N, die die Leitung zuletzt geschaltet hat (``division_id``) - kommt durch einen späteren
+    Abschluss eine Liga N davor dazu, bleibt der TV bei seiner Liga N (Nr. 241). Ohne sie (älterer Stand) der gespeicherte Schritt."""
+    state = state or {}
+    if not clamp_step(state.get("step"), len(pages)):
+        return 0
+    division = state.get("division_id")
+    if division:
+        for index, page in enumerate(pages):
+            if page.get("division_id") == division:
+                return index + 1
+    return clamp_step(state.get("step"), len(pages))
+
+
+def running_state(staffeln: list[dict]) -> dict | None:
+    """Der zuletzt geschaltete Stand der Season (an den abgeschlossenen Staffeln) - ``None``, wenn das Finale nicht läuft."""
+    states = [row.get(FIELD) for row in staffeln if (row.get(FIELD) or {}).get("step")]
+    return max(states, key=lambda state: str(state.get("updated_at") or "")) if states else None
+
+
 def clamp_step(value, count: int) -> int:
     """Der Schritt der Leitung: 0 heißt aus, 1 bis ``count`` die Seite je Liga N."""
     if isinstance(value, bool):
@@ -195,7 +215,7 @@ async def tv_payload(db, tournament: dict | None) -> dict | None:
     if not public_season(season):
         return None
     pages = await season_pages(db, season, column_max=TV_COLUMN_ROWS)
-    step = clamp_step(state.get("step"), len(pages))
+    step = current_step(state, pages)
     if not step:
         return None
     return {"step": step, "count": len(pages), "league": (league or {}).get("name"), "season": season.get("name"), "pages": pages,
@@ -210,7 +230,7 @@ async def control_state(db, season: dict) -> dict:
 
     staffeln = await closed_staffeln(db, season["id"])
     pages = await season_pages(db, season)
-    step = max((clamp_step((row.get(FIELD) or {}).get("step"), len(pages)) for row in staffeln), default=0)
+    step = current_step(running_state(staffeln), pages)
     reason = None
     if not public_season(season):
         reason = "season_hidden"
@@ -233,10 +253,12 @@ async def control(db, season: dict, action: str, actor: dict | None, from_step: 
     step = 0 if action == "end" or state["reason"] else next_step(state["step"], state["count"])
     now = now_utc().isoformat()
     staffeln = await closed_staffeln(db, season["id"])
-    ids = [row["id"] for row in staffeln if clamp_step((row.get(FIELD) or {}).get("step"), state["count"]) != step]
+    pages = await season_pages(db, season) if step else []
+    division = pages[step - 1]["division_id"] if step and step <= len(pages) else None
+    ids = [row["id"] for row in staffeln if ((row.get(FIELD) or {}).get("step") or 0, (row.get(FIELD) or {}).get("division_id")) != (step, division)]
     if ids:
-        # Am Turnier nur Schritt und Zeit (die Turnier-Antworten sind öffentlich) - wer geschaltet hat, steht im Protokoll.
-        await db.tournaments.update_many({"id": {"$in": ids}}, {"$set": {FIELD: {"step": step, "updated_at": now}}})
+        # Am Turnier nur Schritt, Liga N und Zeit (die Turnier-Antworten sind öffentlich) - wer geschaltet hat, steht im Protokoll.
+        await db.tournaments.update_many({"id": {"$in": ids}}, {"$set": {FIELD: {"step": step, "division_id": division, "updated_at": now}}})
         await db.audit_logs.insert_one({"id": new_id(), "action": "league.season.tv_finale", "target_id": season["id"],
                                         "actor_id": (actor or {}).get("id"), "data": {"action": action, "step": step, "staffeln": ids},
                                         "created_at": now})
@@ -259,3 +281,19 @@ async def forget(db, season_id: str | None) -> None:
     await db.tournaments.update_many({"id": {"$in": ids}}, {"$unset": {FIELD: ""}})
     for tournament_id in ids:
         await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)
+
+
+async def join_running(db, season_id: str | None, tournament_id: str) -> None:
+    """Nr. 241: Schließt eine Staffel ab, während das Finale der Season läuft, übernimmt ihr TV sofort den laufenden Schritt (dieselbe
+    Liga N wie die anderen TVs), statt bis zum nächsten „Weiter“ nichts zu zeigen."""
+    from services.change_events import publish_api_change
+
+    if not season_id:
+        return
+    others = [row for row in await closed_staffeln(db, season_id) if row["id"] != tournament_id]
+    state = running_state(others)
+    if not state:
+        return
+    await db.tournaments.update_one({"id": tournament_id}, {"$set": {FIELD: {"step": state.get("step"), "division_id": state.get("division_id"),
+                                                                             "updated_at": state.get("updated_at")}}})
+    await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)

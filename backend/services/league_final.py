@@ -546,6 +546,13 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
 
 # ---------------------------------------------------------------- Abschließen
 
+async def _join_tv_finale(db, season_id: str | None, tournament_id: str) -> None:
+    """Abschluss während eines laufenden Saisonfinales (#1641, Nr. 241): Der TV dieser Staffel geht sofort mit."""
+    from services.league_finale import join_running
+
+    await join_running(db, season_id, tournament_id)
+
+
 async def _forget_tv_finale(db, season_id: str | None) -> None:
     """Wiederöffnen (#1641): Die Auf- und Absteiger der Season stehen nicht mehr fest - der TV-Schritt fällt an allen Staffeln weg."""
     from services.league_finale import forget
@@ -650,6 +657,7 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
     # Belohnungen (F.4, Nr. 165): sofort mit dem Abschluss, aus dem Endstand - mit Nachricht an alle, die etwas gewinnen oder verlieren.
     await _follow_up("Belohnungen", tid, lambda: league_rewards.grant_and_notify(db, {**tournament, "status": "completed"}, final, frame))
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
+    await _follow_up("TV-Saisonfinale", tid, lambda: _join_tv_finale(db, context.get("season_id"), tid))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, lambda: notify_captains(db, tournament, final, frame, "closed"))
     return {"final": final, "season_status": season_status}
