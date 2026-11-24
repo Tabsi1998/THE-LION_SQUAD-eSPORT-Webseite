@@ -2,13 +2,15 @@
 // K.-o.-Baum der Playoffs und die Paarungen der Relegation. Jede ist eine eigene Staffel - derselbe Baum wie auf der Turnierseite
 // (`BracketTree`, GET /api/tournaments/<id>/bracket), hier ohne Umweg. Zu sehen ist nur, was die Season-Antwort nennt: was angelegt
 // ist und was die Person auch als Turnier sähe. Eine Season ohne Playoffs zeigt hier nichts.
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Swords } from "lucide-react";
-import { BracketTree } from "@/components/tls/BracketTree";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { api } from "@/lib/api";
 import { kindLabel } from "@/lib/leaguePostseason";
+
+// Der Baum wird erst geladen, wenn eine Liga wirklich Playoffs oder eine Relegation hat - die Ligaseite ohne sie bleibt so leicht wie vorher.
+const BracketTree = lazy(() => import("@/components/tls/BracketTree").then((module) => ({ default: module.BracketTree })));
 
 const NOTE = {
   playoff: "Die besten Teams der Staffeln spielen im K.-o.-System. Gesetzt wird nach dem Endstand, über Kreuz.",
@@ -51,7 +53,7 @@ function PostseasonTree({ row, divisionLabel }) {
       <div className="mt-4 min-w-0">
         {failed && !data ? <p className="text-sm text-white/55" role="status">Der Baum ließ sich gerade nicht laden.</p> : null}
         {!data && !failed ? <p className="text-sm text-white/45" aria-busy="true">Lade {label} …</p> : null}
-        {data ? <BracketTree data={data} compact /> : null}
+        {data ? <Suspense fallback={<p className="text-sm text-white/45" aria-busy="true">Lade {label} …</p>}><BracketTree data={data} compact /></Suspense> : null}
       </div>
     </section>
   );

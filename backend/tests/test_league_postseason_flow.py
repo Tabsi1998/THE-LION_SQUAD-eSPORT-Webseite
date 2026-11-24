@@ -235,6 +235,10 @@ async def test_the_better_seed_is_home_in_every_round_and_rounds_are_weeks(flow)
     part = division_of(await cockpit(flow, world), 1)["playoffs"]
     assert tournament_matchday_window(tournament, 1).start.date().isoformat() <= part["rounds"][0]["start_day"]
     assert part["rounds"][1]["start_day"] > part["rounds"][0]["end_day"] and part["rounds"][1]["best_of"] == 5
+    # Jede Runde hat ihren Standardtermin in ihrer Woche - wie ein Spieltag der Season (H3).
+    for match in await matches_of(flow, tournament["id"]):
+        week = part["rounds"][match["round"] - 1]
+        assert match["schedule_source"] == "default" and week["start_day"] <= match["scheduled_at"][:10] <= week["end_day"], match["round_name"]
     seeds = {row["id"]: row["seed"] async for row in flow.db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0})}
     # Die Außenseiter gewinnen: Setzplatz 4 und 3 stehen im Finale - Heim ist dort Setzplatz 3, obwohl er aus dem unteren Halbfinale kommt.
     await play_round(flow, world, tournament["id"], favourite=False)
