@@ -543,8 +543,8 @@ def _mark_playoff(settings: dict, total: int, seeds: dict[str, int]):
         best_of = rules.best_of_for(playoffs, total if bronze else number)
         if best_of != int(playoffs["best_of"]):
             match["best_of"] = best_of
-        if playoffs["home"] == rules.BETTER_SEED:
-            match["postseason"] = {"home": rules.BETTER_SEED, "seeds": dict(seeds)}
+        # Die Art steht an jedem Spiel (Matchseite: „beide nicht erschienen“ im K.-o.); Heim und Setzplätze nur bei „besser Gesetzter“.
+        match["postseason"] = {"kind": PLAYOFF, **({"home": rules.BETTER_SEED, "seeds": dict(seeds)} if playoffs["home"] == rules.BETTER_SEED else {})}
     return mark
 
 
@@ -638,6 +638,7 @@ async def _build_relegation(db, season: dict, upper: dict, lower: dict, settings
 
     def mark(match: dict) -> None:
         match["round_name"] = KIND_LABELS[RELEGATION]
+        match["postseason"] = {"kind": RELEGATION}
 
     await _write_matches(db, tournament, _stage(tournament, RELEGATION, actor, schema="\n".join(lines)), registrations, actor, mark=mark)
     return tournament

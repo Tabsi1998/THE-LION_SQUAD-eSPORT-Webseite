@@ -48,15 +48,20 @@ def is_regular_staffel(tournament: dict | None) -> bool:
     return is_league_staffel(tournament) and staffel_kind(tournament) is None
 
 
+def context_label(context: dict | None) -> str | None:
+    """Wie ``staffel_label``, aber aus dem ``league_context`` allein - für Stellen, die nur ihn in der Hand haben."""
+    context = context if isinstance(context, dict) else {}
+    if context.get("kind") in POSTSEASON_KINDS:
+        return KIND_LABELS[context["kind"]]
+    staffel = str(context.get("staffel") or "").strip()
+    return f"Staffel {staffel}" if staffel else None
+
+
 def staffel_label(tournament: dict | None) -> str | None:
     """„Staffel A“, „Playoffs“ oder „Relegation“ - ``None`` für Turniere ohne Liga und für eine Staffel ohne Kennung."""
     if not is_league_staffel(tournament):
         return None
-    kind = staffel_kind(tournament)
-    if kind:
-        return KIND_LABELS[kind]
-    staffel = str(tournament["league_context"].get("staffel") or "").strip()
-    return f"Staffel {staffel}" if staffel else None
+    return context_label(tournament["league_context"])
 
 
 def league_label(tournament: dict | None) -> str | None:

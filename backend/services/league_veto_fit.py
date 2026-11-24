@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from services import league_games, league_veto_rules as rules_mod, map_pools
 from services.bracket_fill_in import has_started, is_auto_bye
+from services.league_scope import context_label
 
 SEASON, UNTIL_SYNC, KEEPS, BUSY, QUIET = "season", "until_sync", "keeps", "busy", "quiet"
 SEASON_MISFIT = "Die Veto-Vorlage passt noch nicht zur Season (siehe Kasten Veto) – die Staffeln behalten ihre bisherige."
@@ -45,7 +46,7 @@ async def staffel_name(db, tournament: dict) -> str:
     context = tournament.get("league_context") or {}
     division = await db.league_divisions.find_one({"id": context.get("division_id")}, {"_id": 0, "level": 1}) if context else None
     if division and context.get("staffel"):
-        return f"Liga {division.get('level')} · Staffel {context['staffel']}"
+        return f"Liga {division.get('level')} · {context_label(context)}"
     return tournament.get("title") or "Eine Staffel"
 
 

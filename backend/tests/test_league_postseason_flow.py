@@ -596,3 +596,59 @@ async def test_a_tie_at_the_playoff_boundary_blocks_the_close(flow):
     row = closing["staffeln"][0]
     assert any(blocker["code"] == "playoff_tie" for blocker in row["blockers"])
     assert [tie["kind"] for tie in row["ties"]] == ["playoff"]
+
+
+# ---------------------------------------------------------------- Flächen: Verwaltung, Ligaseite, Zuteilen
+
+@pytest.mark.asyncio
+async def test_season_views_list_the_playoff_staffel_apart_from_the_tables(flow):
+    world = await build(flow, postseason=PLAYOFFS_4, season={"visibility": "public", "status": "active"})
+    await close(flow, world)
+    ok(await create(flow, world, "playoffs"))
+    tournament = await playoff_tournament(flow, world)
+    flow.act_as(world["lead"])
+    admin = ok(await flow.get(f"{ADMIN}/seasons/{world['season']['id']}"))
+    division = admin["divisions"][0]
+    # Die Staffeln einer Liga sind die Tabellen - Playoffs und Relegation stehen daneben, mit Art und fertigem Wort.
+    assert [row["staffel"] for row in division["staffeln"]] == ["A"]
+    assert division["postseason"] == [{**division["postseason"][0], "tournament_id": tournament["id"], "kind": "playoff", "label": "Playoffs", "staffel": "PO"}]
+    season = await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0})
+    league = world["league"]
+    public = ok(await flow.get(f"/api/leagues/{league['slug']}/{season['slug']}"))
+    shown = public["divisions"][0]
+    assert [row["staffel"] for row in shown["staffeln"]] == ["A"]
+    assert [(row["kind"], row["label"], row["closed"]) for row in shown["postseason"]] == [("playoff", "Playoffs", False)]
+    # Der Baum kommt über die Turnier-Antwort der Playoff-Staffel - dieselbe wie bei jedem K.-o.-Turnier.
+    bracket = ok(await flow.get(f"/api/tournaments/{tournament['id']}/bracket"))
+    assert len(bracket["matches_v2"]) == 3
+    # Die Spiele tragen die Art: Die Matchseite weiß so, dass „beide nicht erschienen“ hier anders wirkt.
+    assert all(match["postseason"]["kind"] == "playoff" for match in await matches_of(flow, tournament["id"]))
+
+
+@pytest.mark.asyncio
+async def test_a_hidden_season_shows_no_playoffs_to_the_public(flow):
+    world = await build(flow, postseason=PLAYOFFS_4)
+    await close(flow, world)
+    ok(await create(flow, world, "playoffs"))
+    season = await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0})
+    # Die Season ist nur für die Verwaltung sichtbar: Gäste sehen weder die Ligaseite noch die Playoff-Staffel als Turnier.
+    flow.act_as(None)
+    assert (await flow.get(f"/api/leagues/{world['league']['slug']}/{season['slug']}")).status_code == 404
+    tournament = await playoff_tournament(flow, world)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).status_code in (403, 404)
+    stranger = await flow.add_user(name="Gast mit Konto")
+    flow.act_as(stranger)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/bracket")).status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_nobody_is_assigned_to_a_playoff_staffel_by_hand(flow):
+    world = await build(flow, staffeln={1: [5]}, postseason=PLAYOFFS_4)
+    await close(flow, world)
+    ok(await create(flow, world, "playoffs"))
+    tournament = await playoff_tournament(flow, world)
+    left_out = world["regs"][world["tids"][1][0]][4]
+    flow.act_as(world["lead"])
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/squad-registrations", json={"team_id": left_out["team_id"], "squad_id": left_out["squad_id"]})
+    assert refused.status_code == 409 and "aus dem Endstand" in refused.json()["detail"]
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": tournament["id"]}) == 4

@@ -19,7 +19,7 @@ from pymongo.errors import DuplicateKeyError
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_overall_rules as rules
 from services.league_final_read import is_closed
-from services.league_scope import ONLY_LEAGUE
+from services.league_scope import ONLY_LEAGUE, context_label
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_overall")
@@ -592,7 +592,7 @@ async def open_staffeln(db, period: dict, level: int) -> list[dict]:
         if is_closed(row) or row.get("status") in IGNORED_STAFFEL_STATUSES:
             continue
         season_id = (row.get("league_context") or {}).get("season_id")
-        out.append({"text": f"{(seasons.get(season_id) or {}).get('name') or 'Season'} · Staffel {(row.get('league_context') or {}).get('staffel')}",
+        out.append({"text": f"{(seasons.get(season_id) or {}).get('name') or 'Season'} · {context_label(row.get('league_context')) or 'Staffel'}",
                     "url": f"/admin/leagues/seasons/{season_id}#abschluss"})
     return out
 

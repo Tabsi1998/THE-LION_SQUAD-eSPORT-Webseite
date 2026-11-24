@@ -20,7 +20,7 @@ from services.competition_read import CompetitionReadModel, load_registration_ma
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.team_colors import effective_color
 from services.visibility import user_can_see
-from services.league_scope import is_league_staffel, league_label
+from services.league_scope import context_label, is_league_staffel, league_label
 
 INVITE_PARAM = "einladung"
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
@@ -300,7 +300,8 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "squad_name": reg.get("squad_name"),
             "league": {"name": league.get("name"), "slug": league.get("slug")},
             "season": {"name": season.get("name"), "slug": season.get("slug")},
-            "staffel_label": f"{division_label(division)} · Staffel {staffel}",
+            # Mit Playoffs und Relegation (#2404): das fertige Wort - „Liga 1 · Playoffs“ statt „Staffel PO“.
+            "staffel_label": f"{division_label(division)} · {context_label(context) or f'Staffel {staffel}'}",
             "division_label": division_label(division), "staffel": staffel,
             # Liga-Abzeichen (#1638): Liga N und Beiname - die Stufe zeigt sich am Wappen.
             "badge": badge(division),
