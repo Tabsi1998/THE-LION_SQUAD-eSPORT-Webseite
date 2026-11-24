@@ -116,9 +116,36 @@ async def app_push_user_ids(db) -> list[str]:
     return sorted(user["id"] for user in users if push_allowed(user, "news_app", "news_events"))
 
 
+# Eine Meldung ohne ``push_sent_at`` lag beim Abbruch eines Laufs gesammelt, aber noch nicht bei Expo (#2553). Ein Lauf
+# schickt höchstens 100 gesammelte auf einmal - nach einer Minute gehört so eine Zeile sicher keinem laufenden Lauf mehr.
+ORPHANED_PUSH_AFTER_SECONDS = 60
+
+
+async def _resend_orphaned_pushes(db, recipients: list[str], dedupe_key: str) -> bool:
+    """Holt Pushes nach, die ein abgebrochener Lauf angelegt, aber nicht mehr verschickt hat. Jede Zeile wird einzeln
+    übernommen (nur wer ``push_sent_at`` setzt, schickt), so schicken zwei Läufe nichts doppelt. Rückgabe: ``True``, wenn
+    keine Zeile mehr offen ist - sonst gehört eine noch einem laufenden Lauf, und der Beitrag bleibt unmarkiert."""
+    from services.user_notifications import send_collected_pushes
+
+    if not recipients:
+        return True
+    open_rows = {"user_id": {"$in": recipients}, "unique_dedupe_key": dedupe_key, "push_sent_at": {"$exists": False}}
+    stale_before = (now_utc() - timedelta(seconds=ORPHANED_PUSH_AFTER_SECONDS)).isoformat()
+    claim = now_utc().isoformat()
+    batch: list[dict] = []
+    async for row in db.notifications.find({**open_rows, "created_at": {"$lt": stale_before}}, {"_id": 0}):
+        taken = await db.notifications.update_one({"id": row["id"], "push_sent_at": {"$exists": False}}, {"$set": {"push_sent_at": claim}})
+        if taken.modified_count:
+            batch.append(row)
+    await send_collected_pushes(batch)
+    return not await db.notifications.count_documents(open_rows)
+
+
 async def notify_app_news(db, limit: int = 20) -> dict:
-    """Je öffentliche News „nur App“ genau einmal: der Beitrag wird zuerst als erledigt markiert (zwei Läufe gleichzeitig
-    schicken nichts doppelt), dann je Person eine Meldung mit eindeutigem Schlüssel - Ruhezeiten gelten wie überall."""
+    """Je öffentliche News „nur App“ ein App-Push je Person - mindestens einmal (#2553): je Person eine Meldung mit
+    eindeutigem Schlüssel (Teilindex ``user_unique_dedupe``), erst danach wird der Beitrag als erledigt markiert. Bricht
+    ein Lauf ab, holt der nächste die übrigen nach; laufen zwei gleichzeitig, bekommt trotzdem niemand etwas doppelt.
+    Ruhezeiten gelten wie überall."""
     from services.news_channels import notification_meta, only_channel
     from services.news_publish import published_now
     from services.push_notifications import EXPO_BATCH_SIZE
@@ -134,23 +161,23 @@ async def notify_app_news(db, limit: int = 20) -> dict:
     for post in posts:
         if not published_now(post) or only_channel(post) != "app":
             continue
-        claimed = await db.news_posts.update_one({"id": post["id"], "app_push_notified_at": {"$exists": False}},
-                                                 {"$set": {"app_push_notified_at": now_iso, "app_push_count": 0}})
-        if not claimed.modified_count:
-            continue
         if str(post.get("published_at") or "") < cutoff:
-            # Älter als einen Tag (#2553): kein Push - mit Grund, damit die Verteilen-Box nicht „an 0 Personen“ zeigt.
-            await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_skipped_reason": "too_old"}})
+            # Älter als einen Tag: kein Push - mit Grund, damit die Verteilen-Box nicht „an 0 Personen“ zeigt.
+            await db.news_posts.update_one(
+                {"id": post["id"], "app_push_notified_at": {"$exists": False}},
+                {"$set": {"app_push_notified_at": now_iso, "app_push_count": 0, "app_push_skipped_reason": "too_old"}})
             continue
-        sent = 0
         slug = post.get("slug") or post["id"]
-        # Gebündelt (#2553): je bis zu 100 Nachrichten eine Anfrage an Expo statt einer je Person.
+        dedupe_key = f"news_app:{post['id']}"
+        recipients = await app_push_user_ids(db)
+        sent = 0
+        # Gebündelt: je bis zu 100 Nachrichten eine Anfrage an Expo statt einer je Person.
         batch: list[dict] = []
-        for user_id in await app_push_user_ids(db):
+        for user_id in recipients:
             created = await create_user_notification(
                 user_id, "Neu in der LionsAPP", str(post.get("title") or "News"), url=f"/news/{slug}", kind="news_app",
                 meta={"category": "news_events", "news_id": post["id"], "slug": post.get("slug"),
-                      "dedupe_key": f"news_app:{post['id']}", "unique_dedupe": True, **notification_meta(post)},
+                      "dedupe_key": dedupe_key, "unique_dedupe": True, **notification_meta(post)},
                 push_batch=batch,
             )
             if created:
@@ -158,7 +185,13 @@ async def notify_app_news(db, limit: int = 20) -> dict:
             if len(batch) >= EXPO_BATCH_SIZE:
                 await send_collected_pushes(batch)
         await send_collected_pushes(batch)
-        await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_count": sent}})
+        if not await _resend_orphaned_pushes(db, recipients, dedupe_key):
+            # Ein paralleler Lauf hat noch Meldungen ohne Push in der Hand - der nächste Takt sieht wieder nach.
+            results.append({"news_id": post["id"], "sent": sent})
+            continue
+        # Gezählt wird, wer die Meldung hat - auch aus einem früheren, abgebrochenen oder parallelen Lauf.
+        total = await db.notifications.count_documents({"user_id": {"$in": recipients}, "unique_dedupe_key": dedupe_key}) if recipients else 0
+        await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_count": total}, "$min": {"app_push_notified_at": now_iso}})
         results.append({"news_id": post["id"], "sent": sent})
     return {"items": len(results), "sent": sum(row["sent"] for row in results)}
 
