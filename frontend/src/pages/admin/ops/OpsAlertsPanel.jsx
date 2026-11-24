@@ -24,6 +24,9 @@ const NUMBER_FIELDS = [
   { key: "spike_window_minutes", testId: "ops-alert-spike-window", label: "Zeitfenster für Häufung (Minuten)", min: 1, max: 1440 },
   { key: "daily_summary_hour", testId: "ops-alert-daily-hour", label: "Tageszusammenfassung um (Uhr, Wien)", min: 0, max: 23 },
   { key: "reach_fail_threshold", testId: "ops-alert-reach-fails", label: "Ausfall nach Fehlversuchen in Folge", min: 1, max: 10 },
+  { key: "reach_recover_threshold", testId: "ops-alert-reach-recover", label: "Wieder da nach Erfolgen in Folge", min: 1, max: 10 },
+  { key: "client_group_cap", testId: "ops-alert-client-cap", label: "Neue Fehlergruppen aus Website und App je Tag (höchstens)", min: 10, max: 5000 },
+  { key: "alert_hourly_cap", testId: "ops-alert-hourly-cap", label: "Meldungen je Ereignisart und Stunde (höchstens)", min: 1, max: 100 },
 ];
 
 // Formularstand: Empfänger mit Komma, Upload-Routen (#2447) eine je Zeile.
@@ -66,6 +69,7 @@ export function OpsAlertsPanel() {
     try {
       const payload = { emails: form.emails, cooldown_minutes: Number(form.cooldown_minutes), red_reminder_hours: Number(form.red_reminder_hours ?? 24), rules: form.rules, retention_days: Object.fromEntries(Object.entries(form.retention_days).map(([k, v]) => [k, Number(v)])) };
       if (form.upload_routes !== undefined) payload.upload_routes = form.upload_routes;
+      if (typeof form.client_errors_enabled === "boolean") payload.client_errors_enabled = form.client_errors_enabled;
       for (const field of NUMBER_FIELDS) {
         if (form[field.key] !== undefined && form[field.key] !== "") payload[field.key] = Number(form[field.key]);
       }
@@ -129,6 +133,18 @@ export function OpsAlertsPanel() {
             ))}
           </tbody>
         </table>
+        {/* Fehler-Sammler (#1657): ab Werk aus, bis der Datenschutz-Hinweis freigegeben ist. Aus = Meldungen kommen an,
+            werden aber nicht gespeichert. Fehler des Servers sammelt die Website immer. */}
+        {typeof form.client_errors_enabled === "boolean" ? (
+          <label className="mt-4 flex min-h-[44px] items-start gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3 cursor-pointer">
+            <input type="checkbox" checked={form.client_errors_enabled} onChange={(e) => setForm((c) => ({ ...c, client_errors_enabled: e.target.checked }))}
+              data-testid="ops-alert-client-errors" className="mt-0.5 h-5 w-5 accent-brand" />
+            <span>
+              <span className="block text-sm font-bold">Fehler aus Website und App sammeln</span>
+              <span className="block text-xs text-white/50">Aus: Meldungen aus Browser und App werden verworfen. Fehler des Servers stehen immer unter Fehler.</span>
+            </span>
+          </label>
+        ) : null}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
           <label className="block sm:col-span-2">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">E-Mail-Empfänger (mit Komma)</div>

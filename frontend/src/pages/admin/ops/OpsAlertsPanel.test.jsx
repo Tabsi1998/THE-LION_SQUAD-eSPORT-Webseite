@@ -93,3 +93,23 @@ test("Schwellen des Fehler-Sammlers und die Frist der Fehlergruppen werden mitge
     retention_days: expect.objectContaining({ ops_errors: 14 }),
   })));
 });
+
+// #1657 (Fabian, 24.11.): Sammler für Website und App mit Schalter, ab Werk aus; Obergrenze, Bremse, Hysterese.
+test("Schalter für den Sammler, Obergrenze, Bremse und Wiederkehr werden mitgespeichert", async () => {
+  const settings = { ...VIEW.settings, client_errors_enabled: false, client_group_cap: 200, alert_hourly_cap: 10, reach_recover_threshold: 2 };
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, settings } });
+  apiMock.put.mockResolvedValue({ data: { ...settings, client_errors_enabled: true } });
+  const user = userEvent.setup();
+  render(<OpsAlertsPanel />);
+  const toggle = await screen.findByTestId("ops-alert-client-errors");
+  expect(toggle).not.toBeChecked();
+  expect(screen.getByText(/Fehler aus Website und App sammeln/)).toBeInTheDocument();
+  expect(screen.getByTestId("ops-alert-client-cap")).toHaveValue(200);
+  expect(screen.getByTestId("ops-alert-hourly-cap")).toHaveValue(10);
+  expect(screen.getByTestId("ops-alert-reach-recover")).toHaveValue(2);
+  await user.click(toggle);
+  await user.click(screen.getByTestId("ops-alert-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/ops/alerts", expect.objectContaining({
+    client_errors_enabled: true, client_group_cap: 200, alert_hourly_cap: 10, reach_recover_threshold: 2,
+  })));
+});

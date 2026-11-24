@@ -217,7 +217,7 @@ export default function AdminOpsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1" data-testid="ops-title">Betrieb & Logs</h1>
           <p className="text-sm text-white/55 mt-2 max-w-2xl">
-            Alles, was der Betrieb meldet, an einem Ort: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand,
+            Alles, was der Betrieb meldet, an einem Ort: Fehler aus Server, Website und App, Auto-Checks, Alarme, App-Logs, E-Mail-Versand,
             Adminaktionen und Abgleiche. Ohne Namen, Adressen oder Tokens; Aufbewahrung unter Alarme.
           </p>
         </div>
@@ -395,7 +395,7 @@ export default function AdminOpsPage() {
             );
           })}
           {errors.length ? (
-            <p className="text-[11px] text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt die offenen Gruppen – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt.</p>
+            <p className="text-[11px] text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt nur die offenen Gruppen des Servers – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt. Website und App stehen hier, färben die Ampel aber nicht.</p>
           ) : null}
         </div>
       ) : (
