@@ -53,6 +53,15 @@ const MANY = [{ division_id: "d2", level: 2, label: "Liga 2", staffeln: 3, more:
     move: "down", target: "Liga 3", staffel: "ABC"[index % 3] })),
 ] }];
 
+// Nr. 238 („heavy“): acht lange Namen je Spalte (gut 50 Zeichen) und eine lange Ziel-Liga mit Beiname - die 8 sind nur eine Obergrenze.
+const HEAVY_NAME = (index) => `Probe Mannschaft Nummer ${index} mit sehr langem Vereinsnamen`;
+const HEAVY = [{ division_id: "d2", level: 2, label: "Liga 2 - Regionalliga Ost der Probe-Liga", staffeln: 3, more: 2, more_up: 0, more_down: 2, rows: [
+  ...Array.from({ length: 8 }, (_, index) => ({ registration_id: `hu${index}`, name: HEAVY_NAME(index), rank: 1 + (index % 2), move: "up",
+    target: "Liga 1 - Meisterklasse der Probe-Liga Oesterreich", staffel: "ABC"[index % 3] })),
+  ...Array.from({ length: 8 }, (_, index) => ({ registration_id: `hd${index}`, name: HEAVY_NAME(index + 10), rank: 4 + (index % 2), move: "down",
+    target: "Liga 3 - Nachwuchsliga der Probe-Liga Oesterreich", staffel: "ABC"[index % 3] })),
+] }];
+
 /** Die Staffel ist abgeschlossen, der Sieger steht - dann drückt die Leitung „Weiter“ (Stand über den Änderungsstrom). */
 async function openFinale(page, query = "", step = 2, pages = PAGES) {
   await page.clock.install({ time: new Date("2026-11-23T20:00:00+01:00") });
@@ -154,14 +163,17 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       await expect(page.getByTestId("tv-main")).toHaveAttribute("data-paused", "0");
     });
 
-    test("12 Kandidaten (Nr. 235): je Spalte 8 Zeilen und „und 4 weitere“, alles über der Fußleiste, kein Name zu klein", async ({ page }) => {
+    test("12 Kandidaten (Nr. 235/238): je Spalte höchstens 8 Zeilen und „und N weitere“, alles über der Fußleiste, kein Name zu klein", async ({ page }) => {
       test.setTimeout(60_000);
       await page.setViewportSize(size);
       await openFinale(page, "", 1, MANY);
       await page.waitForTimeout(3600);
+      // Nr. 238: 8 ist die Obergrenze - je Spalte so viele, wie samt Hinweis passen; der Rest der zwölf zählt zu „und N weitere“.
       for (const key of ["up", "down"]) {
-        await expect(page.getByTestId(`tv-finale-col-${key}`).locator(".tv-finale__row")).toHaveCount(8);
-        await expect(page.getByTestId(`tv-finale-more-${key}`)).toHaveText("und 4 weitere");
+        const shown = await page.getByTestId(`tv-finale-col-${key}`).locator(".tv-finale__row").count();
+        expect(shown).toBeLessThanOrEqual(8);
+        expect(shown).toBeGreaterThanOrEqual(6);
+        await expect(page.getByTestId(`tv-finale-more-${key}`)).toHaveText(`und ${12 - shown} weitere`);
         await expect(page.getByTestId(`tv-finale-more-${key}`)).toHaveCSS("opacity", "1");
       }
       const seen = await inspectFinale(page);
@@ -178,6 +190,32 @@ for (const size of [{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }
       expect(seen.nameWidth).toBeGreaterThan(size.width * 0.12);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/tv-saisonfinale-12-kandidaten-${size.width}.png` });
     });
+
+    for (const reduced of [false, true]) {
+      test(`Nr. 238 „heavy“${reduced ? " mit reduzierter Bewegung" : ""}: lange Namen und Ziel-Ligen - nur so viele Zeilen, wie über die Fußleiste passen`, async ({ page }) => {
+        test.setTimeout(60_000);
+        await page.setViewportSize(size);
+        await openFinale(page, reduced ? "&reduce_motion=1" : "", 1, HEAVY);
+        await page.waitForTimeout(reduced ? 400 : 3600);
+        const seen = await inspectFinale(page);
+        const counts = await page.evaluate(() => ["up", "down"].map((key) => document.querySelectorAll(`[data-testid='tv-finale-col-${key}'] .tv-finale__row`).length));
+        expect(counts[0]).toBeLessThan(8);
+        expect(counts[0]).toBeGreaterThanOrEqual(4);
+        await expect(page.getByTestId("tv-finale-more-up")).toHaveText(`und ${8 - counts[0]} weitere`);
+        await expect(page.getByTestId("tv-finale-more-down")).toHaveText(`und ${10 - counts[1]} weitere`);
+        for (const key of ["up", "down"]) await expect(page.getByTestId(`tv-finale-more-${key}`)).toHaveCSS("opacity", "1");
+        expect(seen.footer).toBe(true);
+        expect(seen.rowsInside).toBe(true);
+        expect(seen.aboveFooter).toBe(true);
+        expect(seen.mores.length).toBe(2);
+        expect(seen.mores.every((more) => more.inside && more.height > 0)).toBe(true);
+        expect(seen.cut).toEqual([]);
+        expect(seen.small).toEqual([]);
+        expect(seen.overlap).toBe(false);
+        expect(seen.targetsBesideName).toBe(true);
+        if (SHOTS) await page.screenshot({ path: `${SHOTS}/tv-saisonfinale-heavy${reduced ? "-reduziert" : ""}-${size.width}.png` });
+      });
+    }
 
     test("„Bewegung reduzieren“: der Schritt steht sofort, nichts bewegt sich", async ({ page }) => {
       test.setTimeout(60_000);

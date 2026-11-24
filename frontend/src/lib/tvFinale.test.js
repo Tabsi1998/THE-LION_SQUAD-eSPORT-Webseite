@@ -1,4 +1,5 @@
-import { COLUMN_ROWS, FINALE_TIMING, finaleColumns, finalePage, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetText, columnWeight } from "./tvFinale";
+import { COLUMN_ROWS, FINALE_TIMING, finaleColumns, finalePage, finaleRowUnits, fitFinaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetText } from "./tvFinale";
+import { tvScale } from "./tvType";
 
 // Saisonfinale am TV (#1641): welche Seite dran ist, wer in welche Spalte gehört und wann jede Zeile kommt. Erfundene Namen.
 
@@ -65,11 +66,52 @@ test("Nr. 235: höchstens 8 Zeilen je Spalte, der Rest zählt je Spalte - auch z
   expect(moreText(1)).toBe("und 1 weiteres Team");
 });
 
-test("columnWeight: lange Namen und lange Ziel-Ligen zählen eine halbe Zeile mehr - die Spalte bleibt über der Fußleiste", () => {
-  const plain = { rows: Array.from({ length: 8 }, (_, index) => ({ name: `Team ${index}`, move: "down", target: "Liga 3" })) };
-  expect(columnWeight(plain)).toBe(8);
-  const heavy = { rows: [...plain.rows.slice(0, 6), { name: "x".repeat(40), move: "down", target: "Liga 3" },
-    { name: "Kurz", move: "up", target: "Liga 1 - Meisterklasse der Probe-Liga" }] };
-  expect(columnWeight(heavy)).toBe(9);
-  expect(rowUnits(columnWeight(heavy))).toBeLessThan(rowUnits(8));
+// ---------------------------------------------------------------- Runde 2 (Nr. 238): 8 Zeilen sind eine Obergrenze
+
+const NORMAL = tvScale("normal");
+const HEAVY_TARGET = "Liga 1 - Meisterklasse der Probe-Liga Oesterreich";
+const heavyRow = (index, move = "up") => ({ registration_id: `h${index}`, name: `Probe Mannschaft Nummer ${index} mit sehr langem Vereinsnamen`,
+  rank: 1, move, target: HEAVY_TARGET, staffel: "ABC"[index % 3] });
+const shortRow = (index, move = "down") => ({ registration_id: `s${index}`, name: `Team ${index}`, rank: 4, move, target: "Liga 3", staffel: null });
+
+test("finaleRowUnits: eine kurze Zeile kaum höher als die Grundhöhe, eine mit zweizeiligem Namen und Ziel deutlich höher", () => {
+  const unit = rowUnits(8);
+  // Kurz: Name und Platz in je einer Zeile - kaum mehr als die Grundhoehe (am TV gemessen gut 6 Einheiten).
+  const short = finaleRowUnits(shortRow(1), { columnU: 84.7, unitU: unit, scale: NORMAL });
+  expect(short).toBeGreaterThanOrEqual(unit);
+  expect(short).toBeLessThanOrEqual(unit + 1);
+  const heavy = finaleRowUnits(heavyRow(1), { columnU: 84.7, unitU: unit, scale: NORMAL });
+  // Gemessen am TV (1920 px): knapp 10 Einheiten je Zeile (Name dreizeilig).
+  expect(heavy).toBeGreaterThanOrEqual(7.6);
+  expect(heavy).toBeLessThan(12);
+});
+
+test("fitFinaleColumns: acht schwere Zeilen - nur so viele, wie samt Kopf und „und N weitere“ über die Fußleiste passen", () => {
+  const page = { rows: [...Array.from({ length: 8 }, (_, index) => heavyRow(index)), ...Array.from({ length: 8 }, (_, index) => heavyRow(index + 10, "down"))],
+    more_up: 0, more_down: 2 };
+  const area = { w: 173.4, h: 61 };
+  const [up, down] = fitFinaleColumns(finaleColumns(page), { area, scale: NORMAL });
+  expect(up.rows.length).toBeLessThan(8);
+  expect(up.rows.length).toBeGreaterThanOrEqual(5);
+  expect(up.more).toBe(8 - up.rows.length);
+  expect(down.more).toBe(8 - down.rows.length + 2);
+  for (const column of [up, down]) expect(column.heightU).toBeLessThanOrEqual(area.h);
+});
+
+test("fitFinaleColumns: kurze Namen - alle acht Zeilen; trim kürzt eine Spalte, falls sie am TV trotzdem überläuft", () => {
+  const page = { rows: Array.from({ length: 8 }, (_, index) => shortRow(index)) };
+  const area = { w: 173.4, h: 61 };
+  const [down] = fitFinaleColumns(finaleColumns(page), { area, scale: NORMAL });
+  expect([down.rows.length, down.more]).toEqual([8, 0]);
+  const [trimmed] = fitFinaleColumns(finaleColumns(page), { area, scale: NORMAL, trim: { down: 2 } });
+  expect([trimmed.rows.length, trimmed.more]).toEqual([6, 2]);
+});
+
+test("fitFinaleColumns: ohne gemessene Fläche gilt ein 16:9-Bild; nie weniger als eine Zeile", () => {
+  const page = { rows: [...Array.from({ length: 8 }, (_, index) => heavyRow(index)), ...Array.from({ length: 8 }, (_, index) => heavyRow(index + 10, "down"))] };
+  const [up] = fitFinaleColumns(finaleColumns(page), { area: null, scale: NORMAL });
+  expect(up.rows.length).toBeGreaterThanOrEqual(5);
+  expect(up.rows.length).toBeLessThan(8);
+  const [tiny] = fitFinaleColumns(finaleColumns(page), { area: { w: 173.4, h: 5 }, scale: NORMAL });
+  expect(tiny.rows.length).toBe(1);
 });

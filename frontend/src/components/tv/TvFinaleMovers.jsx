@@ -1,11 +1,16 @@
+import { useEffect, useLayoutEffect, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, X } from "lucide-react";
-import { FINALE_TIMING, columnWeight, finaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, rowUnits, targetText } from "@/lib/tvFinale";
+import { useTv, useTvArea } from "@/components/tv/TvScreen";
+import { FINALE_TIMING, finaleColumns, fitFinaleColumns, moreText, nameFit, rowDelay, rowLabel, rowMeta, targetText } from "@/lib/tvFinale";
 
 // Saisonfinale (#1641): je Liga N die Auf- und Absteiger nach dem Sieger-Moment. Links steigt auf, rechts steigt ab bzw. scheidet aus.
 // Detail-Runde (tv.css „Saisonfinale“): Titel und Spaltenköpfe kommen zuerst, dann gleiten die Zeilen gestaffelt auf ihren Platz -
 // Aufsteiger von unten, Absteiger von oben -, danach schiebt sich die Ziel-Liga heran und der Pfeil leuchtet kurz auf; zuletzt zeichnet
 // sich die Linie unter dem Titel. Nur Verschieben und Deckkraft; „Bewegung aus“ (Regel für .tv-screen) zeigt sofort das Endbild.
-// Höchstens 8 Zeilen je Spalte (Nr. 235), darunter „und N weitere“ - es hebt sich, wenn die letzte Zeile ihrer Spalte steht.
+// Höchstens 8 Zeilen je Spalte (Nr. 235), darunter „und N weitere“ - es hebt sich, wenn die letzte Zeile ihrer Spalte steht. Die 8 sind
+// eine Obergrenze (Nr. 238): Es kommen nur so viele, wie samt Kopf und Hinweis über der Fußleiste stehen - geschätzt aus den Umbrüchen
+// (lib/tvFinale `fitFinaleColumns`) auf der gemessenen Fläche. Läuft eine Spalte am TV trotzdem über (andere Schrift), wird sie um eine
+// Zeile kürzer, bis sie passt - nie wird etwas verdeckt oder abgeschnitten.
 
 const ICONS = { up: ArrowUp, down: ArrowDown, out: X };
 
@@ -32,9 +37,48 @@ function MoverRow({ row, index }) {
   );
 }
 
+/** Wie weit jede Spalte über ihre Fläche hinausragt (Layout-Werte, unabhängig von laufenden Bewegungen) - `null` ohne Layout. */
+function overflowing(cols) {
+  if (!cols || !cols.clientHeight) return null;
+  const out = {};
+  for (const col of cols.querySelectorAll(".tv-finale__col")) {
+    const last = col.lastElementChild;
+    if (last && last.offsetTop + last.offsetHeight > cols.clientHeight + 1) out[col.dataset.col] = true;
+  }
+  return out;
+}
+
 export function TvFinaleMovers({ page, league = "", season = "" }) {
-  const columns = finaleColumns(page);
-  const longest = Math.max(1, ...columns.map(columnWeight));
+  const { scale } = useTv();
+  const [colsRef, area] = useTvArea(null);
+  const [cols, setCols] = useState(null);
+  const [fontsReady, setFontsReady] = useState(0);
+  const trimKey = `${page.label}|${page.step}|${area ? `${area.w}x${area.h}` : "-"}|${fontsReady}`;
+  const [trim, setTrim] = useState({ key: null, counts: {} });
+  const counts = trim.key === trimKey ? trim.counts : {};
+  const columns = fitFinaleColumns(finaleColumns(page), { area, scale, trim: counts });
+  const ref = (node) => {
+    colsRef(node);
+    setCols((current) => (current === node ? current : node));
+  };
+  useEffect(() => {
+    let alive = true;
+    document.fonts?.ready?.then(() => alive && setFontsReady((value) => value + 1));
+    return () => { alive = false; };
+  }, []);
+  // Sicherheitsnetz: Ragt eine Spalte trotz Rechnung über ihre Fläche, kommt sie mit einer Zeile weniger (vor dem Zeichnen).
+  useLayoutEffect(() => {
+    const over = overflowing(cols);
+    if (!over) return;
+    const keys = columns.filter((column) => over[column.key] && column.rows.length > 1).map((column) => column.key);
+    if (!keys.length) return;
+    setTrim((current) => {
+      const base = current.key === trimKey ? current.counts : {};
+      const next = { ...base };
+      for (const key of keys) next[key] = (next[key] || 0) + 1;
+      return { key: trimKey, counts: next };
+    });
+  }, [cols, columns, trimKey]);
   // Über dem Titel Liga und Season - nur, wenn sie mitkommen (am Turnierbaum-TV trägt die Kopfleiste „Saisonfinale“ und beides).
   const line = league || season ? ["Saisonfinale", league, season].filter(Boolean).join(" · ") : "";
   const total = columns.reduce((sum, column) => sum + column.rows.length, 0);
@@ -43,7 +87,7 @@ export function TvFinaleMovers({ page, league = "", season = "" }) {
   let counter = 0;
   return (
     <section className="tv-finale" data-columns={columns.length} data-more={columns.some((column) => column.more) ? "1" : undefined}
-      style={{ "--tv-finale-row": rowUnits(longest), "--tv-finale-end": `${end}s`, "--tv-finale-head-at": `${FINALE_TIMING.head}s` }}
+      style={{ "--tv-finale-row": columns[0]?.unitU || 8, "--tv-finale-end": `${end}s`, "--tv-finale-head-at": `${FINALE_TIMING.head}s` }}
       aria-label={`${page.label}: Auf- und Absteiger`} data-testid="tv-finale" data-step={page.step}>
       <header className="tv-finale__head">
         {line ? <div className="tv-finale__line tv-t-info" data-testid="tv-finale-line">{line}</div> : null}
@@ -59,7 +103,7 @@ export function TvFinaleMovers({ page, league = "", season = "" }) {
         ) : null}
         <span className="tv-finale__rule" aria-hidden="true" />
       </header>
-      <div className="tv-finale__cols">
+      <div className="tv-finale__cols" ref={ref}>
         {columns.map((column) => {
           const rows = column.rows.map((row) => {
             const index = counter;

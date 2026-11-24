@@ -58,15 +58,17 @@ test("Spaltenköpfe: Verzögerung aus FINALE_TIMING über eine Variable - keine 
   expect(screen.getByTestId("tv-finale").style.getPropertyValue("--tv-finale-head-at")).toBe(`${FINALE_TIMING.head}s`);
 });
 
-test("Nr. 235: zwölf Absteiger - acht Zeilen, darunter „und 4 weitere“ in der eigenen Spalte, nach der letzten Zeile", () => {
+test("Nr. 235/238: zwölf Absteiger - höchstens acht Zeilen (so viele, wie samt Hinweis passen), der Rest als „und N weitere“ nach der letzten Zeile", () => {
   const rows = Array.from({ length: 12 }, (_, index) => ({ registration_id: `x${index}`, name: `Probe ${index}`, rank: index + 3,
     move: "down", target: "Liga 3", staffel: null }));
   render(<TvFinaleMovers page={{ label: "Liga 2", step: 1, count: 1, rows }} />);
   const down = screen.getByTestId("tv-finale-col-down");
-  expect(within(down).getAllByRole("listitem")).toHaveLength(8);
+  const shown = within(down).getAllByRole("listitem");
+  expect(shown.length).toBeLessThanOrEqual(8);
+  expect(shown.length).toBeGreaterThanOrEqual(6);
   const more = within(down).getByTestId("tv-finale-more-down");
-  expect(more).toHaveTextContent("und 4 weitere");
-  const last = parseFloat(screen.getByTestId("tv-finale-row-x7").style.getPropertyValue("--tv-finale-at"));
+  expect(more).toHaveTextContent(`und ${12 - shown.length} weitere`);
+  const last = parseFloat(screen.getByTestId(`tv-finale-row-x${shown.length - 1}`).style.getPropertyValue("--tv-finale-at"));
   expect(parseFloat(more.style.getPropertyValue("--tv-finale-at"))).toBeGreaterThan(last);
   expect(screen.queryByTestId("tv-finale-more")).toBeNull();
 });
@@ -74,4 +76,18 @@ test("Nr. 235: zwölf Absteiger - acht Zeilen, darunter „und 4 weitere“ in d
 test("ohne Liga und Season keine Zeile über dem Titel - die Kopfleiste des TV trägt „Saisonfinale“", () => {
   render(<TvFinaleMovers page={PAGE} />);
   expect(screen.queryByTestId("tv-finale-line")).toBeNull();
+});
+
+test("Nr. 238: genau acht kurze Zeilen ohne Rest - alle acht, kein Hinweis; acht schwere - weniger, mit „und N weitere“", () => {
+  const short = Array.from({ length: 8 }, (_, index) => ({ registration_id: `s${index}`, name: `Probe ${index}`, rank: 4, move: "down", target: "Liga 3", staffel: null }));
+  const { unmount } = render(<TvFinaleMovers page={{ label: "Liga 2", step: 1, count: 1, rows: short }} />);
+  expect(within(screen.getByTestId("tv-finale-col-down")).getAllByRole("listitem")).toHaveLength(8);
+  expect(screen.queryByTestId("tv-finale-more-down")).toBeNull();
+  unmount();
+  const heavy = (index, move) => ({ registration_id: `${move}${index}`, name: `Probe Mannschaft Nummer ${index} mit sehr langem Vereinsnamen`, rank: 1, move,
+    target: move === "up" ? "Liga 1 - Meisterklasse der Probe-Liga Oesterreich" : "Liga 3 - Nachwuchsliga der Probe-Liga Oesterreich", staffel: "A" });
+  render(<TvFinaleMovers page={{ label: "Liga 2", step: 1, count: 1, rows: [...Array.from({ length: 8 }, (_, i) => heavy(i, "up")), ...Array.from({ length: 8 }, (_, i) => heavy(i, "down"))] }} />);
+  const up = within(screen.getByTestId("tv-finale-col-up")).getAllByRole("listitem");
+  expect(up.length).toBeLessThan(8);
+  expect(screen.getByTestId("tv-finale-more-up")).toHaveTextContent(`und ${8 - up.length} weitere`);
 });
