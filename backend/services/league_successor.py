@@ -49,6 +49,8 @@ COPIED_GROUPS = (
     "Gestaltung und Gewinne",
     # F.4 (#2214): Zusammenstellung der Season, „Spieler mit Einsatz“ bzw. Kader und die eigenen Belohnungen je Liga N.
     "Belohnungen je Season und Liga N",
+    # #1642, Nr. 236: Discord-Meldungen der Liga gehen samt „an“ und Kanal mit.
+    "Discord-Meldungen der Liga: an/aus, Kanal, Wartezeit, Tabellenausschnitt",
 )
 REASONS = {"withdrawn": "Ausgetreten", "disqualified": "Disqualifiziert", "dissolved": "Aufgelöst"}
 MOVEMENT_TEXT = {"up": "Aufstieg", "down": "Abstieg", "stay": "bleibt"}
