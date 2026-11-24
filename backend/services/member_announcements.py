@@ -116,36 +116,46 @@ async def app_push_user_ids(db) -> list[str]:
     return sorted(user["id"] for user in users if push_allowed(user, "news_app", "news_events"))
 
 
-# Eine Meldung ohne ``push_sent_at`` lag beim Abbruch eines Laufs gesammelt, aber noch nicht bei Expo (#2553). Ein Lauf
-# schickt höchstens 100 gesammelte auf einmal - nach einer Minute gehört so eine Zeile sicher keinem laufenden Lauf mehr.
+# Ein ausstehender Push (``push_pending``) lag beim Abbruch eines Laufs gesammelt, aber noch nicht bei Expo - oder die Anfrage an
+# Expo ist gescheitert (#2553, Fabian 24.11., F1). Ein Lauf schickt höchstens 100 gesammelte auf einmal - nach einer Minute gehört
+# so eine Zeile sicher keinem laufenden Lauf mehr. Je Takt höchstens so viele Zeilen.
 ORPHANED_PUSH_AFTER_SECONDS = 60
+ORPHANED_PUSH_LIMIT = 500
 
 
 async def _resend_orphaned_pushes(db, recipients: list[str], dedupe_key: str) -> bool:
-    """Holt Pushes nach, die ein abgebrochener Lauf angelegt, aber nicht mehr verschickt hat. Jede Zeile wird einzeln
-    übernommen (nur wer ``push_sent_at`` setzt, schickt), so schicken zwei Läufe nichts doppelt. Rückgabe: ``True``, wenn
-    keine Zeile mehr offen ist - sonst gehört eine noch einem laufenden Lauf, und der Beitrag bleibt unmarkiert."""
-    from services.user_notifications import send_collected_pushes
+    """Holt ausstehende Pushes nach: abgebrochene Läufe und gescheiterte Anfragen an Expo. Beansprucht und geschickt wird in
+    ``send_collected_pushes`` (K1) - treffen sich Hauptweg und Nachhol-Stufe, schickt nur einer. Pushes, die die Ruhezeit
+    hält, holt der Ruhezeit-Job nach, nicht diese Stufe (K2). Rückgabe: ``True``, wenn kein Push mehr aussteht - sonst bleibt
+    der Beitrag unmarkiert und der nächste Takt sieht wieder nach."""
+    from services.user_notifications import PUSH_CLAIM_STALE_SECONDS, send_collected_pushes
 
     if not recipients:
         return True
-    open_rows = {"user_id": {"$in": recipients}, "unique_dedupe_key": dedupe_key, "push_sent_at": {"$exists": False}}
-    stale_before = (now_utc() - timedelta(seconds=ORPHANED_PUSH_AFTER_SECONDS)).isoformat()
-    claim = now_utc().isoformat()
-    batch: list[dict] = []
-    async for row in db.notifications.find({**open_rows, "created_at": {"$lt": stale_before}}, {"_id": 0}):
-        taken = await db.notifications.update_one({"id": row["id"], "push_sent_at": {"$exists": False}}, {"$set": {"push_sent_at": claim}})
-        if taken.modified_count:
-            batch.append(row)
+    moment = now_utc()
+    open_rows = {"user_id": {"$in": recipients}, "unique_dedupe_key": dedupe_key, "push_pending": True,
+                 "quiet_hold_until": {"$exists": False}}
+    due = {
+        **open_rows,
+        "created_at": {"$lt": (moment - timedelta(seconds=ORPHANED_PUSH_AFTER_SECONDS)).isoformat()},
+        "$and": [
+            {"$or": [{"push_retry_at": {"$exists": False}}, {"push_retry_at": {"$lte": moment.isoformat()}}]},
+            {"$or": [{"push_claim": {"$exists": False}},
+                     {"push_claimed_at": {"$lt": (moment - timedelta(seconds=PUSH_CLAIM_STALE_SECONDS)).isoformat()}}]},
+        ],
+    }
+    batch = await db.notifications.find(due, {"_id": 0}).to_list(ORPHANED_PUSH_LIMIT)
     await send_collected_pushes(batch)
     return not await db.notifications.count_documents(open_rows)
 
 
 async def notify_app_news(db, limit: int = 20) -> dict:
     """Je öffentliche News „nur App“ ein App-Push je Person - mindestens einmal (#2553): je Person eine Meldung mit
-    eindeutigem Schlüssel (Teilindex ``user_unique_dedupe``), erst danach wird der Beitrag als erledigt markiert. Bricht
-    ein Lauf ab, holt der nächste die übrigen nach; laufen zwei gleichzeitig, bekommt trotzdem niemand etwas doppelt.
-    Ruhezeiten gelten wie überall."""
+    eindeutigem Schlüssel (Teilindex ``user_unique_dedupe``), erst wenn kein Push mehr aussteht, wird der Beitrag als
+    erledigt markiert. Bricht ein Lauf ab oder scheitert eine Anfrage an Expo, holt ein späterer Lauf den Push nach;
+    beansprucht wird jede Zeile vor dem Senden (``send_collected_pushes``) - laufen zwei gleichzeitig oder trifft der
+    Hauptweg die Nachhol-Stufe, bekommt trotzdem niemand etwas doppelt. Ruhezeiten gelten wie überall.
+    ``app_push_count`` zählt nur echte Zustellungen (Fabian 24.11.): wer den Push auf mindestens ein Gerät bekam."""
     from services.news_channels import notification_meta, only_channel
     from services.news_publish import published_now
     from services.push_notifications import EXPO_BATCH_SIZE
@@ -196,8 +206,9 @@ async def notify_app_news(db, limit: int = 20) -> dict:
             # Ein paralleler Lauf hat noch Meldungen ohne Push in der Hand - der nächste Takt sieht wieder nach.
             results.append({"news_id": post["id"], "sent": sent})
             continue
-        # Gezählt wird, wer die Meldung hat - auch aus einem früheren, abgebrochenen oder parallelen Lauf.
-        total = await db.notifications.count_documents({"user_id": {"$in": recipients}, "unique_dedupe_key": dedupe_key}) if recipients else 0
+        # Gezählt wird, wer den Push wirklich bekam - auch aus einem früheren, abgebrochenen oder parallelen Lauf.
+        total = await db.notifications.count_documents(
+            {"user_id": {"$in": recipients}, "unique_dedupe_key": dedupe_key, "push_sent_count": {"$gt": 0}}) if recipients else 0
         await db.news_posts.update_one({"id": post["id"]}, {"$set": {"app_push_count": total}, "$min": {"app_push_notified_at": now_iso}})
         results.append({"news_id": post["id"], "sent": sent})
     return {"items": len(results), "sent": sum(row["sent"] for row in results)}

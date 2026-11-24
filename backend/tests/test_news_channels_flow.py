@@ -709,3 +709,164 @@ async def test_member_news_made_public_skips_members_already_notified(flow, monk
     assert sent["push"].count("n-intern") == 2, "eine Mitglieder-Meldung an Paula, ein App-Push an Anna"
     row = await _app_news_row(flow, "intern")
     assert row.get("app_push_count") == 1
+
+
+# ---------------------------------------------------------------- Schlussrunde (Fabian 24.11.): F1, K1, K2
+
+def _fake_expo(monkeypatch, *, fail_first: int = 0):
+    """Expo als Attrappe: die ersten ``fail_first`` Anfragen scheitern (HTTP 503), danach nimmt sie alles an."""
+    from services import push_notifications
+
+    calls = {"posts": [], "failed": 0}
+
+    class FakeResponse:
+        def __init__(self, count, status=200):
+            self._count = count
+            self.status_code = status
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(f"Expo {self.status_code}")
+
+        def json(self):
+            return {"data": [{"status": "ok", "id": f"ticket-{i}"} for i in range(self._count)]}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, json=None):
+            if calls["failed"] < fail_first:
+                calls["failed"] += 1
+                return FakeResponse(0, 503)
+            calls["posts"].append(len(json))
+            return FakeResponse(len(json))
+
+    monkeypatch.setattr(push_notifications.httpx, "AsyncClient", FakeClient)
+    return calls
+
+
+async def _age_open_pushes(flow, seconds: int | None = None):
+    """Die offenen Meldungen eine Minute älter machen - so, als liefe der nächste Takt später."""
+    earlier = (now_utc() - timedelta(seconds=seconds or member_announcements.ORPHANED_PUSH_AFTER_SECONDS + 5)).isoformat()
+    await flow.db.notifications.update_many({"kind": "news_app"}, {"$set": {"created_at": earlier}})
+    # Auch die Pause nach einem gescheiterten Versuch ist dann vorbei.
+    await flow.db.notifications.update_many({"kind": "news_app", "push_retry_at": {"$exists": True}}, {"$set": {"push_retry_at": earlier}})
+
+
+@pytest.mark.asyncio
+async def test_failed_expo_bundle_is_retried_and_counts_only_delivered(flow, monkeypatch):
+    """F1 (Fabian 24.11.): Scheitert ein Bündel bei Expo, bleibt die Meldung offen und die Nachhol-Stufe schickt sie nach
+    einer Minute erneut. app_push_count zählt nur, wer den Push wirklich bekam - nicht, wer kein gültiges Gerät hat."""
+    calls = _fake_expo(monkeypatch, fail_first=1)
+    people = [await _app_user(flow, name) for name in ("anna", "ben", "carla")]
+    ohne = await _app_user(flow, "dora", token=False)
+    await flow.db.mobile_push_tokens.insert_one({"id": "t-dora", "user_id": ohne["id"], "token": "kein-expo-token", "enabled": True})
+    await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+
+    await member_announcements.notify_app_news(flow.db)
+    assert calls["failed"] == 1 and calls["posts"] == []
+    assert not (await _app_news_row(flow, "nurapp")).get("app_push_notified_at"), "gescheitert - noch nicht erledigt"
+    open_rows = await flow.db.notifications.count_documents({"kind": "news_app", "push_pending": True})
+    assert open_rows == 3, "die drei mit Expo-Gerät bleiben offen"
+
+    await member_announcements.notify_app_news(flow.db)
+    assert calls["posts"] == [], "vor Ablauf der Minute kein zweiter Versuch"
+    await _age_open_pushes(flow)
+    await member_announcements.notify_app_news(flow.db)
+    assert calls["posts"] == [3], "nachgeholt in einer Anfrage"
+    row = await _app_news_row(flow, "nurapp")
+    assert row.get("app_push_notified_at")
+    assert row.get("app_push_count") == 3, "dora ohne gültiges Gerät zählt nicht"
+    delivered = await flow.db.notifications.find({"kind": "news_app", "user_id": {"$in": [p["id"] for p in people]}}, {"_id": 0}).to_list(10)
+    assert all(item.get("push_sent_count") == 1 and not item.get("push_pending") for item in delivered)
+
+
+@pytest.mark.asyncio
+async def test_expo_down_for_good_gives_up_after_the_retry_limit(flow, monkeypatch):
+    """F1: Ist Expo dauerhaft weg, wird nicht jede Minute endlos versucht - nach der Grenze gilt der Push als gescheitert,
+    der Beitrag wird markiert und zählt 0."""
+    from services import user_notifications
+
+    _fake_expo(monkeypatch, fail_first=10**6)
+    await _app_user(flow, "anna")
+    await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    for _ in range(user_notifications.PUSH_RETRY_LIMIT + 1):
+        await member_announcements.notify_app_news(flow.db)
+        await _age_open_pushes(flow)
+    row = await _app_news_row(flow, "nurapp")
+    assert row.get("app_push_notified_at")
+    assert row.get("app_push_count") == 0
+    note = await flow.db.notifications.find_one({"kind": "news_app"}, {"_id": 0})
+    assert note.get("push_failed") is True
+    assert note.get("push_attempts") == user_notifications.PUSH_RETRY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_main_path_and_resend_meet_only_one_request(flow, monkeypatch):
+    """K1: Dauert ein Lauf länger als eine Minute, greift die Nachhol-Stufe eines zweiten Laufs dieselbe Meldung. Wer sie
+    zuerst beansprucht, schickt - es geht genau eine Anfrage hinaus."""
+    from services import user_notifications
+
+    calls = _fake_expo(monkeypatch)
+    anna = await _app_user(flow, "anna")
+    post = await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    batch: list[dict] = []
+    created = await user_notifications.create_user_notification(
+        anna["id"], "Neu in der LionsAPP", post["title"], url="/news/nurapp", kind="news_app",
+        meta={"category": "news_events", "news_id": post["id"], "dedupe_key": f"news_app:{post['id']}", "unique_dedupe": True,
+              "only_channel": "app", "no_browser": True, "no_discord": True},
+        push_batch=batch,
+    )
+    assert created and len(batch) == 1
+    await _age_open_pushes(flow)
+    # Ein zweiter Lauf holt die „verwaiste“ Meldung nach, während der erste sie noch gesammelt hält.
+    assert await member_announcements._resend_orphaned_pushes(flow.db, [anna["id"]], f"news_app:{post['id']}") is True
+    assert calls["posts"] == [1]
+    # Jetzt schickt der erste Lauf sein Bündel - die Meldung ist schon zugestellt, es geht nichts mehr hinaus.
+    await user_notifications.send_collected_pushes(batch)
+    assert calls["posts"] == [1], "genau eine Anfrage"
+    row = await flow.db.notifications.find_one({"id": created["id"]}, {"_id": 0})
+    assert row.get("push_sent_count") == 1
+
+
+@pytest.mark.asyncio
+async def test_resend_skips_pushes_held_by_quiet_hours(flow, monkeypatch):
+    """K2: Eine Meldung, deren Push die Ruhezeit hält, holt die Nachhol-Stufe nicht nach - das macht der Ruhezeit-Job."""
+    calls = _fake_expo(monkeypatch)
+    anna = await _app_user(flow, "anna")
+    post = await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    later = (now_utc() + timedelta(hours=2)).isoformat()
+    # Nachgestellt: ein Lauf hat die Meldung angelegt, als die Ruhezeit begann - und brach vor dem Vermerk ab.
+    await flow.db.notifications.insert_one({
+        "id": "held-1", "user_id": anna["id"], "kind": "news_app", "title": "Neu in der LionsAPP", "body": post["title"], "url": "/news/nurapp",
+        "read": False, "in_app_visible": True, "meta": {"news_id": post["id"], "dedupe_key": f"news_app:{post['id']}"},
+        "unique_dedupe_key": f"news_app:{post['id']}", "push_pending": True, "quiet_hold_until": later, "quiet_held_channels": ["push"],
+        "created_at": (now_utc() - timedelta(minutes=5)).isoformat(),
+    })
+    await member_announcements._resend_orphaned_pushes(flow.db, [anna["id"]], f"news_app:{post['id']}")
+    assert calls["posts"] == [], "die Ruhezeit gilt"
+
+
+@pytest.mark.asyncio
+async def test_failing_change_event_does_not_abort_the_notification(flow, monkeypatch):
+    """K2: Scheitert das Änderungs-Signal an die Glocke, bricht die Meldung nicht ab - der Push geht trotzdem in das Bündel."""
+    from services import change_events, user_notifications
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Signal kaputt")
+
+    monkeypatch.setattr(change_events, "publish_user_change", broken)
+    calls = _fake_expo(monkeypatch)
+    await _app_user(flow, "anna")
+    await news(flow, "nurapp", channels=["app"], published_at=(now_utc() - timedelta(minutes=2)).isoformat())
+    await member_announcements.notify_app_news(flow.db)
+    assert calls["posts"] == [1]
+    assert (await _app_news_row(flow, "nurapp")).get("app_push_count") == 1
+    assert user_notifications  # Modul geladen

@@ -195,13 +195,15 @@ EXPO_BATCH_SIZE = 100
 TOKENS_PER_USER = 20
 
 
-async def _deliver(db, items: list[tuple[str, str, dict[str, Any]]]) -> dict[str, int]:
+async def _deliver(db, items: list[tuple[str, str, dict[str, Any]]]) -> tuple[dict[str, int], set[str]]:
     """``items``: je Gerät (Kennung der Meldung, Token, Nachricht). Je bis zu ``EXPO_BATCH_SIZE`` eine Anfrage; ein
     Stück, das scheitert, lässt die anderen nicht ausfallen. Rückgabe: je Meldung die Zahl der Geräte, die Expo
-    angenommen hat (wie bisher: angenommen heißt, die Anfrage ging durch - Fehler je Gerät stehen am Token)."""
+    angenommen hat (wie bisher: angenommen heißt, die Anfrage ging durch - Fehler je Gerät stehen am Token), und die
+    Meldungen, deren Anfrage gescheitert ist (#2553 F1: die holt die Nachhol-Stufe später nach)."""
     counts: dict[str, int] = {}
+    failed: set[str] = set()
     if not items:
-        return counts
+        return counts, failed
     async with httpx.AsyncClient(timeout=8) as client:
         for begin in range(0, len(items), EXPO_BATCH_SIZE):
             chunk = items[begin:begin + EXPO_BATCH_SIZE]
@@ -212,6 +214,7 @@ async def _deliver(db, items: list[tuple[str, str, dict[str, Any]]]) -> dict[str
             except Exception:
                 logger.warning("Expo push delivery failed for notification %s (%s Geräte)", _log_safe(chunk[0][0], 80), len(chunk),
                                exc_info=True)
+                failed.update(notification_id for notification_id, _token, _payload in chunk)
                 continue
             try:
                 await _record_tickets(db, chunk, result)
@@ -219,7 +222,7 @@ async def _deliver(db, items: list[tuple[str, str, dict[str, Any]]]) -> dict[str
                 logger.warning("Expo push tickets not stored for notification %s", _log_safe(chunk[0][0], 80), exc_info=True)
             for notification_id, _token, _payload in chunk:
                 counts[notification_id] = counts.get(notification_id, 0) + 1
-    return counts
+    return counts, failed
 
 
 async def _record_tickets(db, chunk: list[tuple[str, str, dict[str, Any]]], result: Any) -> None:
@@ -295,16 +298,18 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
         return 0
     items = [(notification.get("id"), row.get("token"), _push_payload(notification, row)) for row in valid]
     try:
-        counts = await _deliver(db, items)
+        counts, _failed = await _deliver(db, items)
     except Exception:
         logger.warning("Expo push delivery failed for notification %s", _log_safe(notification.get("id"), 80), exc_info=True)
         return 0
     return counts.get(notification.get("id"), 0)
 
 
-async def send_mobile_push_batch(notifications: list[dict[str, Any]]) -> dict[str, int]:
+async def send_mobile_push_batch(notifications: list[dict[str, Any]]) -> dict[str, int | None]:
     """Viele Meldungen auf einmal (#2553): ein Abruf der Tokens für alle, dann Anfragen zu je bis zu 100 Nachrichten.
-    Rückgabe: je Kennung der Meldung die Zahl der Geräte - wie ``send_mobile_push_for_notification`` je Meldung."""
+    Rückgabe: je Kennung der Meldung die Zahl der Geräte - wie ``send_mobile_push_for_notification`` je Meldung. ``None``:
+    die Anfrage an Expo ist gescheitert und kein Gerät hat den Push (F1: später noch einmal). Fehlt eine Kennung, gab es
+    nichts zu schicken (kein gültiges Gerät, Abnahme-Sperre) - das ist erledigt, nicht gescheitert."""
     from services.outbound_guard import outbound_disabled
 
     wanted = [doc for doc in notifications if doc.get("user_id") and doc.get("id")]
@@ -322,10 +327,12 @@ async def send_mobile_push_batch(notifications: list[dict[str, Any]]) -> dict[st
             rows.append(row)
     items = [(doc["id"], row.get("token"), _push_payload(doc, row)) for doc in wanted for row in by_user.get(doc["user_id"], [])]
     try:
-        return await _deliver(db, items)
+        counts, failed = await _deliver(db, items)
     except Exception:
         logger.warning("Expo push batch failed (%s Meldungen)", len(wanted), exc_info=True)
-        return {}
+        return {notification_id: None for notification_id, _token, _payload in items}
+    # Ging für eine Meldung mindestens ein Gerät durch, gilt sie als zugestellt - ein zweiter Versuch träfe die Geräte doppelt.
+    return {**{notification_id: None for notification_id in failed if notification_id not in counts}, **counts}
 
 
 async def _check_receipts_for_tokens(tokens: list[dict[str, Any]]) -> dict[str, Any]:
