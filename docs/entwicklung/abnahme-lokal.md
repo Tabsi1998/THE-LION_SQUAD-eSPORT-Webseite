@@ -303,10 +303,13 @@ vor dem ersten Test ab.
 ```bash
 docker run -d --name flow-mongo -p 127.0.0.1:27217:27017 --tmpfs /data/db:size=4g \
   mongo:7.0.40-jammy --wiredTigerCacheSizeGB 1
-FLOW_MONGO_URL=mongodb://127.0.0.1:27217 APP_ENV=test DISABLE_SCHEDULER=true \
+FLOW_MONGO_URL=mongodb://127.0.0.1:27217 MONGO_URL=mongodb://127.0.0.1:27017 DB_NAME=tls_ci APP_ENV=test DISABLE_SCHEDULER=true \
   python scripts/flow_mongo_tests.py -n 4     # Liga, Squads, Spiele, Maps; --list zeigt die Dateien
 docker rm -f flow-mongo
 ```
+
+`MONGO_URL` und `DB_NAME` gehören dazu, wie im CI-Job (#2561): Ohne sie scheitert lokal etwa `test_migration_lease_flow`. Auf
+27017 muss dabei niemand antworten – die Abläufe schreiben nur in ihre eigene Testdatenbank auf `FLOW_MONGO_URL`.
 
 In der CI läuft das als Job „Backend-Abläufe auf MongoDB“, in `scripts/local_check.py` als Schritt `mongo-flows`. Einzelne
 Dateien gehen auch direkt mit `FLOW_MONGO_URL=… python -m pytest backend/tests/test_x_flow.py`.
