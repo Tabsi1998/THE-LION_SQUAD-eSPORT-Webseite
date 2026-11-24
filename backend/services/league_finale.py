@@ -23,11 +23,13 @@ ACTIONS = ("next", "end")
 # Mehr wird aus der Distanz unlesbar und rutscht unter die Fußleiste. Discord bekommt alle (dort kürzt das Feld ganze Zeilen).
 TV_COLUMN_ROWS = 8
 COLUMN_OF_MOVE = {UP: UP, DOWN: DOWN, OUT: DOWN}
-STALE_STEP = "Der TV-Schritt wurde inzwischen in einem anderen Fenster weitergeschaltet. Der aktuelle Stand ist geladen."
+# Neutral (K-b): Der Stand kann sich auch durch einen Abschluss oder „Ende“ geändert haben, nicht nur durch ein zweites Fenster.
+STALE_STEP = "Der Stand hat sich geändert – neu geladen."
 
 
 class FinaleConflict(ValueError):
-    """„Weiter“ aus einem Fenster mit altem Stand (zwei Leitungs-Tabs) - 409, damit der TV keine Liga N überspringt."""
+    """„Weiter“ auf einen Stand, der nicht mehr gilt (zweites Fenster, „Ende“ dazwischen, neuer Abschluss) - 409, damit der TV keine
+    Liga N überspringt und „Ende“ immer gewinnt (Nr. 244)."""
 
     def __init__(self, message: str = STALE_STEP):
         super().__init__(message)
@@ -226,10 +228,12 @@ async def tv_payload(db, tournament: dict | None) -> dict | None:
 
 async def control_state(db, season: dict) -> dict:
     """Was der Reiter „Abschluss“ zur TV-Steuerung zeigt: Schritt, Seiten (Liga N) und warum der TV gegebenenfalls nichts zeigt."""
+    return _state_of(season, await closed_staffeln(db, season["id"]), await season_pages(db, season))
+
+
+def _state_of(season: dict, staffeln: list[dict], pages: list[dict]) -> dict:
     from services.profile_visibility import public_season
 
-    staffeln = await closed_staffeln(db, season["id"])
-    pages = await season_pages(db, season)
     step = current_step(running_state(staffeln), pages)
     reason = None
     if not public_season(season):
@@ -247,24 +251,35 @@ async def control(db, season: dict, action: str, actor: dict | None, from_step: 
     der Stand, den das Fenster der Leitung zeigt - weicht er bei „Weiter“ ab (ein zweiter Tab hat schon geschaltet), gibt es 409."""
     from services.change_events import publish_api_change
 
-    state = await control_state(db, season)
+    # Ein Blick auf Staffeln und Seiten - Prüfen und Schreiben beziehen sich auf genau diesen Stand.
+    staffeln = await closed_staffeln(db, season["id"])
+    pages = await season_pages(db, season)
+    state = _state_of(season, staffeln, pages)
     if action == "next" and from_step is not None and clamp_step(from_step, state["count"]) != state["step"]:
         raise FinaleConflict()
     step = 0 if action == "end" or state["reason"] else next_step(state["step"], state["count"])
     now = now_utc().isoformat()
-    staffeln = await closed_staffeln(db, season["id"])
-    pages = await season_pages(db, season) if step else []
     division = pages[step - 1]["division_id"] if step and step <= len(pages) else None
     ids = [row["id"] for row in staffeln if ((row.get(FIELD) or {}).get("step") or 0, (row.get(FIELD) or {}).get("division_id")) != (step, division)]
     if ids:
+        query = {"id": {"$in": ids}}
+        if action == "next":
+            # Nr. 244: „Weiter“ schreibt nur auf den Stand, den es gelesen hat - hat inzwischen „Ende“ (oder ein zweites Fenster)
+            # geschrieben, trägt das Turnier einen anderen Zeitstempel und nichts wird überschrieben. „Ende“ schreibt immer.
+            running = running_state(staffeln)
+            untouched = [{FIELD: {"$exists": False}}, {FIELD: None}]
+            query["$or"] = untouched + ([{f"{FIELD}.updated_at": running.get("updated_at")}] if running else [{f"{FIELD}.step": 0}])
         # Am Turnier nur Schritt, Liga N und Zeit (die Turnier-Antworten sind öffentlich) - wer geschaltet hat, steht im Protokoll.
-        await db.tournaments.update_many({"id": {"$in": ids}}, {"$set": {FIELD: {"step": step, "division_id": division, "updated_at": now}}})
+        written = await db.tournaments.update_many(query, {"$set": {FIELD: {"step": step, "division_id": division, "updated_at": now}}})
+        if action == "next" and not written.modified_count:
+            raise FinaleConflict()
         await db.audit_logs.insert_one({"id": new_id(), "action": "league.season.tv_finale", "target_id": season["id"],
                                         "actor_id": (actor or {}).get("id"), "data": {"action": action, "step": step, "staffeln": ids},
                                         "created_at": now})
         for tournament_id in ids:
             await publish_api_change("POST", f"/api/tournaments/{tournament_id}/tv-finale", 200)
-    return {**state, "step": step if state["reason"] is None else 0}
+    # Frisch gelesen: Kam „Ende“ während „Weiter“ schrieb, zeigt die Antwort schon das Ende.
+    return await control_state(db, season)
 
 
 async def forget(db, season_id: str | None) -> None:
