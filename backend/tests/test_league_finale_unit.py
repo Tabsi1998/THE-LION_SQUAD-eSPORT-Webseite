@@ -98,3 +98,10 @@ def test_pages_unit_tv_at_most_eight_rows_per_column_rest_counted():
     assert (page["more_up"], page["more_down"], page["more"]) == (2, 5, 7)
     everything = finale.build_pages(DIVISIONS, finals)[0]
     assert len(everything["rows"]) == 23 and everything["more"] == 0
+
+
+def test_successor_unit_lists_discord_among_the_copied_settings():
+    """K6, Nr. 236: Die Folge-Season uebernimmt die Discord-Einstellung samt an - die Vorschau nennt das auch."""
+    from services.league_successor import COPIED_GROUPS
+
+    assert any(group.startswith("Discord-Meldungen der Liga") for group in COPIED_GROUPS)

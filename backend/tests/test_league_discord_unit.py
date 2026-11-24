@@ -196,3 +196,15 @@ def test_retry_unit_only_when_surely_nothing_went_out(result, again):
     """Wiederholt wird nur, wenn sicher nichts hinausging - nach einem unklaren Fehler (Zeitüberschreitung, 5xx) kann die Meldung
     schon im Kanal stehen; dann bleibt der Merker und die Leitung sieht den Hinweis."""
     assert digest.retryable(result) is again
+
+
+def test_text_unit_season_end_at_most_nine_leagues_then_the_rest_line():
+    """K1: Discord nimmt höchstens 10 Felder je Embed - 9 Liga N und der Hinweis „Weitere Ligen“, nie still weggefallene Felder."""
+    pages = [{"label": f"Liga {level}", "more": 0, "rows": [{"name": f"Probe {level}", "move": "down", "target": f"Liga {level + 1}", "staffel": None}]}
+             for level in range(1, 16)]
+    message = digest.season_end_message({"league": "Probe-Liga", "season": "Season 1", "champions": [], "pages": pages, "url": None})
+    assert len(message["fields"]) == 10
+    assert [field["name"] for field in message["fields"][:9]] == [f"Liga {level}" for level in range(1, 10)]
+    assert message["fields"][9] == {"name": "Weitere Ligen", "value": "… und 6 weitere Liga N auf der Season-Seite", "inline": False}
+    ten = digest.season_end_message({"league": "Probe-Liga", "season": "Season 1", "champions": [], "pages": pages[:10], "url": None})
+    assert len(ten["fields"]) == 10 and ten["fields"][9]["name"] == "Liga 10"

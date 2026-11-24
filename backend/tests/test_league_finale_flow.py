@@ -119,9 +119,9 @@ async def test_tv_finale_steps_through_each_league_with_next_and_end(flow):
     assert (await display(flow, lower))["league_finale"] is None
     logged = await flow.db.audit_logs.find({"action": "league.season.tv_finale"}, {"_id": 0}).to_list(10)
     assert [row["data"]["step"] for row in logged] == [1, 2, 0]
-    # Am Turnier steht nur Schritt und Zeit - keine Person.
+    # Am Turnier steht nur Schritt, Liga N und Zeit - keine Person (Nr. 241: die Liga N hält den TV bei seiner Seite).
     stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0, "tv_finale": 1})
-    assert set(stored["tv_finale"]) == {"step", "updated_at"}
+    assert set(stored["tv_finale"]) == {"step", "division_id", "updated_at"}
 
 
 @pytest.mark.asyncio
@@ -205,11 +205,12 @@ async def test_discord_matchdays_and_season_end_once_into_the_chosen_channel(flo
     assert fields == {"Liga 1": "▼ Probe 4 → Liga 2", "Liga 2": "▲ Probe b1 → Liga 1"}
     assert end["buttons"][0]["label"] == "Zur Season" and end["buttons"][0]["url"].endswith("/liga/probe-shooter/season-1")
 
-    # Eingeschaltet vor Saisonbeginn: jeder Spieltag je Staffel einmal (4 Teams: 3 Spieltage, 2 Staffeln).
+    # Eingeschaltet vor Saisonbeginn: alle drei Spieltage je Staffel liegen fertig da - nach Nr. 240 kommt je Staffel nur der neueste,
+    # die älteren werden verworfen.
     await since_long_ago(flow, season)
-    assert await league_discord.sweep(flow.db) == {"matchday": 6, "season_end": 0}
+    assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
     titles = sorted(sent["embed"]["title"] for sent in bot.sent[1:])
-    assert titles == sorted([f"Spieltag {n} · Liga {level}" for n in (1, 2, 3) for level in (1, 2)])
+    assert titles == sorted([f"Spieltag 3 · Liga {level}" for level in (1, 2)])
     one = next(sent for sent in bot.sent if sent["embed"]["title"] == "Spieltag 3 · Liga 1")
     assert "*Alle Spiele gewertet*" in one["embed"]["description"]
     assert one["embed"]["fields"][0]["value"].splitlines()[:3] == ["1. Probe 1 · 9 Pkt.", "2. Probe 2 · 6 Pkt.", "3. Probe 3 · 3 Pkt."]
@@ -220,8 +221,9 @@ async def test_discord_matchdays_and_season_end_once_into_the_chosen_channel(flo
     results = await asyncio.gather(league_discord.sweep(flow.db), league_discord.sweep(flow.db))
     assert results == [{"matchday": 0, "season_end": 0}] * 2
     assert len(bot.sent) == before
-    assert await flow.db.league_discord_posts.count_documents({"status": "sent"}) == 7
-    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": f"matchday:{staffel['id']}:1"}, {"_id": 0})
+    assert await flow.db.league_discord_posts.count_documents({"status": "sent"}) == 3
+    assert await flow.db.league_discord_posts.count_documents({"status": "skipped"}) == 4
+    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": f"matchday:{staffel['id']}:3"}, {"_id": 0})
     assert stored["status"] == "sent" and stored["channel_id"] == CHANNEL and stored["message_id"]
 
 
@@ -234,9 +236,9 @@ async def test_discord_open_games_wait_for_the_deadline_then_say_how_many(flow, 
     await discord_ready(flow)
     await switch_on(flow, season, season_end=False, late=False)
     await since_long_ago(flow, season)
-    # Ohne „trotzdem melden“: Spieltag 3 wartet, bis alles gewertet ist.
-    assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
-    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 1 · Liga 1", "Spieltag 2 · Liga 1"]
+    # Ohne „trotzdem melden“: Spieltag 3 wartet, bis alles gewertet ist. Von den fertigen 1 und 2 kommt nur der neueste (Nr. 240).
+    assert await league_discord.sweep(flow.db) == {"matchday": 1, "season_end": 0}
+    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 2 · Liga 1"]
     # Mit „trotzdem melden“ nach der Frist (Spielwoche längst vorbei): mit „1 Spiel offen“.
     await switch_on(flow, season, season_end=False, late=True)
     await since_long_ago(flow, season)
@@ -264,7 +266,7 @@ async def test_discord_never_for_internal_seasons_and_never_without_bot(flow, bo
     assert bot.sent == [] and await flow.db.league_discord_posts.count_documents({}) == 0
     # Gegenprobe: öffentlich - jetzt geht es hinaus.
     await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"visibility": "public"}})
-    assert await league_discord.sweep(flow.db) == {"matchday": 6, "season_end": 1}
+    assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 1}
 
 
 @pytest.mark.asyncio
@@ -446,9 +448,9 @@ async def test_discord_without_week_window_old_matchdays_do_not_come_at_once(flo
     await switch_on(flow, season, season_end=False)
     assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
     assert bot.sent == []
-    # Gegenprobe: eingeschaltet vor Saisonbeginn - jetzt gehen sie hinaus.
+    # Gegenprobe: eingeschaltet vor Saisonbeginn - jetzt geht je Staffel der neueste hinaus (Nr. 240).
     await since_long_ago(flow, season)
-    assert await league_discord.sweep(flow.db) == {"matchday": 6, "season_end": 0}
+    assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
 
 
 @pytest.mark.asyncio
@@ -460,7 +462,7 @@ async def test_discord_failed_matchday_is_not_rebuilt_while_it_waits_or_gave_up(
     await switch_on(flow, season, season_end=False)
     await since_long_ago(flow, season)
     bot.fail = True
-    assert (await league_discord.sweep(flow.db))["matchday"] == 6
+    assert (await league_discord.sweep(flow.db))["matchday"] == 2
     loaded = []
     original = league_discord._names
 
@@ -476,4 +478,144 @@ async def test_discord_failed_matchday_is_not_rebuilt_while_it_waits_or_gave_up(
     assert (await league_discord.sweep(flow.db, now=later))["matchday"] == 0
     assert loaded == [], "aufgegeben"
     problems = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
-    assert len(problems) == 6 and {row["status"] for row in problems} == {"failed"}
+    assert len(problems) == 2 and {row["status"] for row in problems} == {"failed"}
+
+
+# ---------------------------------------------------------------- Runde 2 (Nr. 238-241)
+
+RELEASE = "Ich habe im Kanal nachgesehen, die Meldung fehlt"
+
+
+async def release(flow, season, key, **body):
+    return await flow.post(f"{ADMIN}/seasons/{season['id']}/discord/release", json={"key": key, "confirm": True, **body})
+
+
+@pytest.mark.asyncio
+async def test_discord_build_error_shows_a_hint_and_never_blocks_silently(flow, bot, monkeypatch):
+    """M2: Wirft schon der Aufbau der Meldung (vor dem Senden), steht sie nicht still als „sending“ - sie ist sofort als nicht gesendet
+    im Kasten und lässt sich nach dem Beheben wieder freigeben."""
+    from services import discord_links
+
+    async def broken(*_args, **_kwargs):
+        raise ValueError("kaputt")
+
+    _admin, _league, season, _staffel, _lower = await two_leagues(flow)
+    await discord_ready(flow)
+    await switch_on(flow, season, matchday=False)
+    monkeypatch.setattr(discord_links, "build_embed", broken)
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 1}
+    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": f"season_end:{season['id']}"}, {"_id": 0})
+    assert stored["status"] == "failed" and stored["error"] == "build"
+    problems = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
+    assert [(row["key"], row["status"]) for row in problems] == [(f"season_end:{season['id']}", "failed")]
+    assert "aufbauen" in problems[0]["text"]
+    assert bot.sent == []
+
+
+@pytest.mark.asyncio
+async def test_discord_stuck_sending_turns_into_a_hint_after_30_minutes(flow, bot):
+    """M2: Bricht der Lauf zwischen Belegen und Ergebnis ab (Neustart), bleibt „sending“ stehen - nach 30 Minuten zeigt der Kasten ihn
+    als unklar. Gesendet wird er nicht noch einmal."""
+    _admin, _league, season, _staffel, _lower = await two_leagues(flow)
+    key = f"season_end:{season['id']}"
+    now = now_utc()
+    assert await league_discord.claim(flow.db, key, {"kind": "season_end", "season_id": season["id"]}, now - timedelta(minutes=10))
+    assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"] == []
+    await flow.db.league_discord_posts.update_one({"dedupe_key": key}, {"$set": {"claimed_at": (now - timedelta(minutes=31)).isoformat()}})
+    problems = (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"]
+    assert [(row["key"], row["status"]) for row in problems] == [(key, "unclear")]
+    assert problems[0]["text"].startswith("Ob die Meldung ankam, ist unklar")
+    await discord_ready(flow)
+    await switch_on(flow, season, matchday=False)
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert bot.sent == []
+
+
+@pytest.mark.asyncio
+async def test_discord_release_sends_exactly_once_with_rights_audit_and_no_double_click(flow, bot):
+    """Nr. 239: Nach dem Nachsehen im Kanal gibt die Leitung eine unklare Meldung frei - der nächste Lauf sendet sie genau einmal.
+    Rechte wie die Einstellung („Season konfigurieren“), mit Protokoll; zwei Klicks bzw. zwei Fenster geben nur einmal frei."""
+    _admin, league, season, _staffel, _lower = await two_leagues(flow)
+    await discord_ready(flow)
+    await switch_on(flow, season, matchday=False)
+    bot.after_send = "error"
+    assert (await league_discord.sweep(flow.db))["season_end"] == 1
+    bot.after_send = None
+    key = f"season_end:{season['id']}"
+    unconfirmed = await flow.post(f"{ADMIN}/seasons/{season['id']}/discord/release", json={"key": key})
+    assert unconfirmed.status_code == 422
+    reader = await lead(flow, league, "Nur Kader", "roster")
+    flow.act_as(reader)
+    assert (await release(flow, season, key)).status_code == 403
+    configurer = await lead(flow, league, "Season-Leitung", "season")
+    flow.act_as(configurer)
+    answers = await asyncio.gather(release(flow, season, key), release(flow, season, key))
+    assert sorted(answer.status_code for answer in answers) == [200, 409]
+    done = next(answer for answer in answers if answer.status_code == 200).json()
+    assert done["problems"] == []
+    logged = await flow.db.audit_logs.find({"action": "league.season.discord_release"}, {"_id": 0}).to_list(5)
+    assert len(logged) == 1 and logged[0]["actor_id"] == configurer["id"] and logged[0]["data"]["key"] == key
+    assert logged[0]["created_at"]
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 1}
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert len(bot.sent) == 2  # der unklare erste Versuch und genau ein neuer
+    stored = await flow.db.league_discord_posts.find_one({"dedupe_key": key}, {"_id": 0})
+    assert stored["status"] == "sent" and stored["released_by"] == configurer["id"]
+    # Eine gesendete Meldung lässt sich nicht freigeben, eine unbekannte auch nicht.
+    assert (await release(flow, season, key)).status_code == 409
+    assert (await release(flow, season, "season_end:fremd")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_discord_after_an_outage_only_the_newest_matchday_per_staffel(flow, bot):
+    """Nr. 240: Nach einem Ausfall (Bot offline, Kanal nicht freigegeben) kommt je Staffel nur der neueste Spieltag - die älteren
+    bekommen den Merker „verworfen“ und gehen nie hinaus. Sechs verpasste Spieltage, zwei Staffeln: zwei Meldungen."""
+    _admin, _league, season, staffel, lower = await two_leagues(flow)
+    await discord_ready(flow)
+    await switch_on(flow, season, season_end=False)
+    await since_long_ago(flow, season)
+    assert await league_discord.sweep(flow.db) == {"matchday": 2, "season_end": 0}
+    assert sorted(sent["embed"]["title"] for sent in bot.sent) == ["Spieltag 3 · Liga 1", "Spieltag 3 · Liga 2"]
+    skipped = await flow.db.league_discord_posts.find({"status": "skipped"}, {"_id": 0}).to_list(10)
+    assert sorted(row["dedupe_key"] for row in skipped) == sorted(f"matchday:{tid}:{n}" for tid in (staffel["id"], lower["id"]) for n in (1, 2))
+    assert {row["reason"] for row in skipped} == {"missed"}
+    assert await league_discord.sweep(flow.db) == {"matchday": 0, "season_end": 0}
+    assert len(bot.sent) == 2
+    assert (await flow.get(f"{ADMIN}/seasons/{season['id']}/discord")).json()["problems"] == []
+
+
+@pytest.mark.asyncio
+async def test_tv_finale_a_staffel_closing_during_the_finale_joins_it(flow):
+    """Nr. 241: Schließt eine Staffel ab, während das Finale läuft, zeigt ihr TV sofort den laufenden Schritt - dieselbe Liga N wie die
+    anderen TVs, auch wenn dadurch eine Liga N davor dazukommt. Die Steuerung zählt die neue Liga N mit."""
+    _admin, _league, season, staffel, lower = await two_leagues(flow, close_both=False)
+    # Erst schließt Liga 1 ab, die Leitung zeigt Liga 1. Dann kommt Liga 2 dazu: Ihr TV zeigt sofort Liga 1.
+    assert (await step(flow, season, "next"))["labels"] == ["Liga 1"]
+    await must_close(flow, lower)
+    finale = (await display(flow, lower))["league_finale"]
+    assert finale is not None and finale["count"] == 2 and finale["pages"][finale["step"] - 1]["label"] == "Liga 1"
+    state = (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).json()
+    assert state["count"] == 2 and state["labels"] == ["Liga 1", "Liga 2"] and state["step"] == 1
+    assert (await step(flow, season, "next"))["step"] == 2
+    assert (await display(flow, staffel))["league_finale"]["step"] == 2
+
+
+@pytest.mark.asyncio
+async def test_tv_finale_keeps_its_league_when_an_earlier_league_closes_later(flow):
+    """Nr. 241: Zeigt der TV Liga 2 und schließt Liga 1 erst danach ab, bleibt er bei Liga 2 (jetzt Seite 2 von 2) - er springt nicht."""
+    admin, _league, season, top, staffel = await setup(flow)
+    second = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={})).json()
+    lower = await add_staffel(flow, second, "b")
+    await play_all(flow, staffel)
+    await play_all(flow, lower)
+    await must_close(flow, lower)
+    assert (await step(flow, season, "next"))["labels"] == ["Liga 2"]
+    await must_close(flow, staffel)
+    for tid in (staffel, lower):
+        finale = (await display(flow, tid))["league_finale"]
+        assert finale["step"] == 2 and finale["pages"][1]["label"] == "Liga 2", tid["id"]
+    state = (await flow.get(f"{ADMIN}/seasons/{season['id']}/tv-finale")).json()
+    assert state["step"] == 2 and state["labels"] == ["Liga 1", "Liga 2"]
+    # Wiederöffnen beendet das Finale weiterhin an allen TVs.
+    await must_reopen(flow, staffel, emergency_reason="Niemand sonst erreichbar")
+    assert (await display(flow, lower))["league_finale"] is None
