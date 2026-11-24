@@ -309,6 +309,10 @@ async def test_the_playoff_final_decides_the_champion_when_the_season_says_so(fl
     assert len(awards) == 1 and awards[0]["tournament_id"] == tournament["id"] and awards[0]["league"]["staffel"] is None
     assert awards[0]["league"]["title"] == "Meister" and awards[0]["final_match_id"] == final["final_match_id"]
     assert closed["season_status"] == "completed"
+    # Discord: Die Abschluss-Meldung der Season nennt den Meister aus den Playoffs - kein Tabellen-Endstand trägt ihn.
+    from services import league_discord
+
+    assert await league_discord.playoff_champions(flow.db, world["season"]["id"]) == [{"name": order[1], "staffel": None}]
     # Die öffentliche Rangliste der Playoff-Staffel liest den Endstand.
     table = ok(await flow.get(f"/api/tournaments/{tournament['id']}/standings"))
     assert [item["rank"] for item in table] == [1, 2, 3, 3]
@@ -328,6 +332,9 @@ async def test_without_champion_from_playoffs_the_table_still_names_the_champion
     playoff = await flow.db.league_final_tables.find_one({"tournament_id": tournament["id"], "active": True}, {"_id": 0})
     # Der Playoff-Sieger steht im Endstand, Meister bleibt der Erste der Tabelle - nie zwei Meister.
     assert playoff["champion_place"] is False and playoff["champion"] is None and playoff["winner"]["display_name"]
+    from services import league_discord
+
+    assert await league_discord.playoff_champions(flow.db, world["season"]["id"]) == []
     awards = await flow.db.tournament_awards.find({"reward_key": None, "suspended": {"$ne": True}}, {"_id": 0}).to_list(None)
     assert [row["tournament_id"] for row in awards] == [world["tids"][1][0]]
 

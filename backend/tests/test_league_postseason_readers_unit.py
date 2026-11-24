@@ -23,7 +23,7 @@ READERS = {
     "services/league_applications.py": (4, REGULAR, "Zuteilen und Anträge: nie in Playoffs oder Relegation"),
     "services/league_cross_zones.py": (2, REGULAR, "Plätze über Staffeln hinweg: filtert ``kind`` nach dem Lesen"),
     "services/league_desk.py": (2, ALL, "Leitstand: jede Staffel"),
-    "services/league_discord.py": (1, REGULAR, "Spieltags-Meldung mit Tabelle"),
+    "services/league_discord.py": (2, MIXED, "Spieltags-Meldung mit Tabelle nur regulär; der Meister aus den Playoffs für die Abschluss-Meldung"),
     "services/league_draw.py": (1, REGULAR, "Los auf Staffeln: filtert ``kind`` nach dem Lesen"),
     "services/league_eligibility.py": (2, ALL, "Spielberechtigung gilt der Season"),
     "services/league_final.py": (5, MIXED, "Abschluss zählt alle Arten; Tabelle, Zonen und Vergleich nur regulär"),

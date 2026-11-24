@@ -549,6 +549,14 @@ def _before_switch_on(games: list[dict], window_end: datetime | None, settings: 
     return last is None or last < since
 
 
+async def playoff_champions(db, season_id: str) -> list[dict]:
+    """Der Meister aus den Playoffs der obersten Liga N - leer, solange die Season ihren Meister aus der Tabelle nimmt (dann trägt keine
+    Playoff-Fassung einen) oder die Playoffs nicht abgeschlossen sind."""
+    rows = await db.league_final_tables.find({"season_id": season_id, "active": True, "kind": "playoff", "champion": {"$type": "object"}},
+                                             {"_id": 0, "champion.display_name": 1}).to_list(10)
+    return [{"name": row["champion"]["display_name"], "staffel": None} for row in rows if (row.get("champion") or {}).get("display_name")]
+
+
 async def season_end_post(db, season: dict, league: dict, settings: dict, now: datetime) -> int:
     """Ist die Season beendet: einmal die Meldung mit Meister, Auf- und Absteigern."""
     from services.league_finale import season_finals, season_pages
@@ -566,6 +574,8 @@ async def season_end_post(db, season: dict, league: dict, settings: dict, now: d
     champions = [{"name": final["champion"]["display_name"],
                   "staffel": letters.get(final.get("tournament_id")) if len(with_champion) > 1 else None}
                  for final in sorted(with_champion, key=lambda final: str(letters.get(final.get("tournament_id")) or ""))]
+    # „Meister aus Playoffs“ (#2404, F.6): Dann trägt kein Tabellen-Endstand den Meister - er steht im Endstand der Playoffs.
+    champions += await playoff_champions(db, season["id"])
     message = season_end_message({"league": league.get("name"), "season": season.get("name"), "champions": champions,
                                   "pages": await season_pages(db, season), "url": season_url(league, season)})
     if not await claim(db, key, {"kind": "season_end", "season_id": season["id"]}, now):
