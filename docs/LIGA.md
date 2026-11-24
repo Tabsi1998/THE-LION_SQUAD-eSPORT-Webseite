@@ -4304,7 +4304,7 @@ Gesamtwertung (Belohnungen schicken ihre eigene), TV und die App (`mobile/`, Lis
 
 ### F.6 Playoffs und Relegation (#2404)
 
-Stand 24.11.2026: **Vertrag an die Entscheidungen Nr. 203 bis 232 und Nr. 245 bis 255 angeglichen; Kern gebaut** (Abschnitt „Bau-Stand“ unten sagt, was
+Stand 24.11.2026: **Vertrag an die Entscheidungen Nr. 203 bis 232 und Nr. 245 bis 256 angeglichen; Kern gebaut** (Abschnitt „Bau-Stand“ unten sagt, was
 steht und was Folgepaket ist). Entscheidungen Nr. 203 bis 219 (Fabian, 23.11.: alle 17 Empfehlungen des
 Entwurfs übernommen), Nr. 221 bis 224 (Fabian, 23.11.: offene Punkte des Vertrags, Vergleich über Staffeln aus #1627) und, soweit sie
 Playoffs und Relegation berühren, Nr. 225 bis 232 (Los, fester Endstand, Sperren), dazu Nr. 245 bis 249 (Fabian, 24.11., nach der
@@ -4312,7 +4312,8 @@ unabhängigen Prüfung: Nichtantritt, Termin der Relegation, bestätigte Vorgabe
 Season-Start), Nr. 250 und 251 (Fabian, 24.11., nach der Nachprüfung: Platz nach beidseitigem Nichtantritt, Meister ohne
 Playoffs), Nr. 252 und 253 (Fabian, 24.11.: Best of der Playoffs bleibt, einmal gestartet bleibt gestartet) und Nr. 254 und 255
 (Fabian, 24.11., nach der Schlussprüfung: Start erst merken, wenn die Season läuft; Rückfallwert fürs Best of, Relegation wie
-Playoffs). Hürden mit Fundstellen: Prüfbericht [liga/erweiterbarkeit.md](liga/erweiterbarkeit.md) (P1-P7). Baut auf F.1
+Playoffs) sowie Nr. 256 (Fabian, 24.11.: gesperrt wird erst, wenn die Season wirklich läuft; ein korrigiertes Startdatum zieht den
+gemerkten Start nach). Hürden mit Fundstellen: Prüfbericht [liga/erweiterbarkeit.md](liga/erweiterbarkeit.md) (P1-P7). Baut auf F.1
 (Endstand), F.2 (Zonen, Folge-Season), F.4 (Belohnungen), F.5 (Gesamtwertung), D.3 (Veto), E.3 (Strafen) und dem K.-o.-Baum des
 Turnierkerns (`services/custom_bracket.py`) auf. Wer diesen Vertrag ändern will, ändert zuerst diesen Abschnitt.
 
@@ -4348,7 +4349,7 @@ Turnierkerns (`services/custom_bracket.py`) auf. Wer diesen Vertrag ändern will
 | TV und Discord: Feld `playoff` an den Tabellenzeilen (`tv_display.STANDING_FIELDS`); Saisonfinale und Abschluss-Meldung lesen Sieger und Verlierer der abgeschlossenen Relegation als Auf- und Absteiger. Beim Lesen trägt die Zeile des Endstands `zone_relegation: true`, die Zeile der Seite (`build_pages`) `via: "relegation"`. Gäste (TV, Discord) sehen das nur, wenn sie auch die Relegations-Staffel als Turnier sähen (`guest_sees_staffel`) | gebaut (kleine Anbindung im Server) | `tv_display`, `league_finale._overlay_relegation`, `build_pages` |
 | Mail, Glocke, Push („qualifiziert“, „Relegation gegen …“), Historie an Profil und Team, PDF, das Kennzeichen „Playoff-Platz“ in der Tabellen-Szene am TV (`TvStandings.jsx`; das Feld liefert der Server schon), Discord-Meldungen je Playoff-Runde | **Folgepaket** | Tabelle „Gesamtpaket“ |
 
-#### Regeln (Nr. 203-219, 221-232, 245-255)
+#### Regeln (Nr. 203-219, 221-232, 245-256)
 
 | Nr. | Regel | Einstellung (Vorgabe) | Paket |
 | --- | --- | --- | --- |
@@ -4384,13 +4385,14 @@ Turnierkerns (`services/custom_bracket.py`) auf. Wer diesen Vertrag ändern will
 | 246 | **Termin der Relegation** (erweitert Nr. 222): Die Relegation liegt **immer hinter den Playoffs der oberen Liga N** - und wie bisher hinter denen der unteren. Kein Team spielt so je zwei Pflichtspiele in einer Woche; das gilt auch, wenn die untere Liga N keine Playoffs hat | `relegation.start_date` (Vorgabe: automatisch; ein früheres Datum rückt trotzdem dahinter) | E |
 | 247 | **Bestätigte Vorgaben** (vorher Fachfragen): `reopen_guard` mit der Vorgabe `hint`; Nachrücken nur vor dem ersten gespielten Playoff-Spiel, der Nächste derselben Staffel übernimmt den Platz; Reihung der Relegationspaarungen wie die Setzung, das Los entscheidet nur die Paarung; Sperre von an/aus, Plätzen und „Meister aus“ ab dem ersten Abschluss (Nr. 228); sind im Finale beide nicht erschienen, bleibt der Titel unvergeben | - | B, C, E |
 | 248 | **Bezeichnung auf der Ligaseite:** Der Baum heißt „Playoffs“, die Paarungen „Relegation“ - nie „Winner Bracket“. Hat der Baum nur einen Abschnitt, steht kein Abschnittstitel (auch nicht die Kennung „REL“ bzw. „PO“) | - | D, E |
-| 249 | **Fest ab dem Season-Start:** Best of (auch je Runde), Spiel um Platz 3 und Heimrecht der Playoffs lassen sich ab dem Beginn der ersten Spielwoche nicht mehr ändern - **gleich, ob die Playoffs an oder aus sind**. Wiederöffnen hebt das nicht auf, Aus- und Wiedereinschalten auch nicht; wer die Playoffs erst nach dem Start einschaltet, bekommt die Werte vom Start (gab es keine: die Vorgaben). Seit Nr. 255 gilt dasselbe für das **Best of der Relegation**. Der Server antwortet 422 mit Klartext, das Web zeigt die Felder ausgegraut mit Hinweis. Im Entwurf und vor dem Start ist alles frei; Termine, Plätze je Staffel und die Relegation folgen weiter Nr. 228 | - | B |
+| 249 | **Fest ab dem Season-Start:** Best of (auch je Runde), Spiel um Platz 3 und Heimrecht der Playoffs lassen sich nicht mehr ändern, sobald die Season wirklich läuft (Nr. 256: Beginn erreicht und eine reguläre Staffel live oder ein Spiel gewertet) - **gleich, ob die Playoffs an oder aus sind**. Wiederöffnen hebt das nicht auf, Aus- und Wiedereinschalten auch nicht; wer die Playoffs erst nach dem Start einschaltet, bekommt die Werte vom Start (gab es keine: die Vorgaben). Seit Nr. 255 gilt dasselbe für das **Best of der Relegation**. Der Server antwortet 422 mit Klartext, das Web zeigt die Felder ausgegraut mit Hinweis. Im Entwurf und vor dem Start ist alles frei; Termine, Plätze je Staffel und die Relegation folgen weiter Nr. 228 | - | B |
 | 250 | **Beidseitig abwesend ausgeschieden - eine Regel für alle K.-o.-Runden:** Wer nach dem zweiten „beide nicht erschienen“ ausscheidet (Nr. 217, 245), steht **einen Platz hinter den Verlierern dieser Runde, die gespielt haben**: im Halbfinale Platz 4 (mit und ohne Spiel um Platz 3), im Viertelfinale Platz 6, im Achtelfinale Platz 10. Die Betroffenen bleiben Teilnehmer (kein `exit` an der Zeile), etwa für Belohnungen. Im Finale bleibt es bei Nr. 247: Titel unvergeben, kein Platz 1 und 2 | - | D |
 | 251 | **Meister ohne Playoffs:** Spielt die oberste Liga N keine Playoffs - gleich warum: zu wenige Teams nach den Einstellungen oder nach Austritten - und steht „Meister aus Playoffs“ an, dann ist Meister das **beste verbliebene Team der Tabelle**. Ist keines übrig, bleibt der Titel unvergeben. Sonst bleibt „unvergeben“ nur für „im Finale fehlen beide“ (Nr. 247) | - | D |
 | 252 | **Best of der Playoffs bleibt** (schließt einen Umweg um Nr. 249): Wird nach dem Season-Start das Best of der Season geändert und steht bei den Playoffs „wie in der Season“, bleibt der **Wert vom Start** - er wird gemerkt (wie, sagt Nr. 255). Dasselbe gilt, wenn eine Liga N nach dem Start ein eigenes Best of bekommt oder verliert. Die reguläre Season ändert ihr Best of wie bisher; die Leitung bekommt beim Speichern den Hinweis, dass die Playoffs ihren Wert behalten | - | B |
 | 253 | **Einmal gestartet bleibt gestartet:** Die Season merkt sich ihren Start (`league_seasons.started_at`), sobald sie wirklich läuft (Nr. 254). Für alles, was am Start hängt, gilt danach der gemerkte Start statt des aktuellen Startdatums - das Datum lässt sich weiter verschieben, die Sperren bleiben | - | B |
 | 254 | **Der Start wird erst gemerkt, wenn die Season wirklich läuft** (schärft Nr. 253): ihr Beginn ist erreicht **und** mindestens eine reguläre Staffel ist live oder ein Spiel gewertet. Ein vertipptes Startdatum allein merkt nichts - es lässt sich korrigieren | - | B |
 | 255 | **Rückfallwert fürs Best of** (schärft Nr. 249, 252): Gemerkt wird, sobald es Playoff- oder Relegations-Einstellungen gibt - auch im Zustand „aus“. Die **Relegation wie die Playoffs**: ihr Best of steht ab dem Start fest und wird ebenso gemerkt. Eine Liga N merkt **nur das Best of vom Start** und bleibt an die Vorlage gekoppelt (keine eigene Playoff-Einstellung). Die Folge-Season beginnt wieder mit „wie in der Season“ | `league_seasons.postseason_best_of_kept`, `league_divisions.postseason_best_of_kept` (vom Server) | B |
+| 256 | **Gesperrt wird erst, wenn die Season wirklich läuft** (schärft Nr. 249, 252, 253): Die Sperre von Best of, Spiel um Platz 3 und Heimrecht (samt Best of der Relegation) und das Merken des Rückfallwerts greifen nach derselben Regel wie das Merken des Starts (Nr. 254) - das Startdatum allein sperrt und merkt nichts; im Web sind die Felder erst dann ausgegraut. Gab es zum Start keine Playoff-Einstellungen, gilt beim späteren Anlegen das Best of der Season von heute. Wird das Startdatum einer laufenden Season auf ein **schon erreichtes** Datum korrigiert, zieht der gemerkte Start nach und die Fristen zählen ab dem korrigierten Datum; liegt das neue Datum in der Zukunft, bleibt der gemerkte Start | - | B |
 
 #### Datenmodell
 
@@ -4444,8 +4446,9 @@ Alle Felder optional; ohne Feld bleibt alles wie heute.
 `playoff_points` (höchstens 32 Einträge, je 0-999) und das Best of des Finales für das Spiel um Platz 3. Der Termin der Relegation ist
 seit Nr. 246 entschieden.
 
-**Sperre ab dem Season-Start (Nr. 249, 255):** Sobald die Season begonnen hat (`league_postseason.season_started`, unten „Einmal
-gestartet bleibt gestartet“), antwortet das Speichern mit 422 und Klartext, wenn sich `playoffs.best_of`, `playoffs.best_of_rounds`,
+**Sperre ab dem Season-Start (Nr. 249, 255, 256):** Sobald die Season **wirklich läuft** (`league_postseason.really_started`: ihr
+Start ist gemerkt oder würde gemerkt, unten „Einmal gestartet bleibt gestartet“ - das Startdatum allein sperrt nichts, Nr. 256),
+antwortet das Speichern mit 422 und Klartext, wenn sich `playoffs.best_of`, `playoffs.best_of_rounds`,
 `playoffs.third_place`, `playoffs.home` oder `relegation.best_of` einer Liga N ändern würden - die **Relegation wie die Playoffs**
 (Nr. 255). Verglichen wird, was in der Liga N gilt (Vorlage der Season, Abweichung, Vorgaben) - **ohne Blick auf an/aus**, über beide
 Wege (`PUT …/seasons/{id}/postseason` und `PUT …/divisions/{id}/postseason`). Darum hilft weder Aus- und Wiedereinschalten noch ein
@@ -4456,8 +4459,10 @@ die Felder aus, sobald `started` gilt - auch das Best of der Relegation.
 **Das Best of von Playoffs und Relegation bleibt (Nr. 252, 255):** `playoffs.best_of` und `relegation.best_of` dürfen leer sein („wie
 in der Season“) und folgen dann dem Best of der Liga N (Season plus Abweichung). Ändert sich dieses nach dem Season-Start -
 `PATCH …/seasons/{id}` mit einem anderen `best_of`, oder `PATCH …/divisions/{id}` mit einem anderen `overrides.best_of` -, merkt
-`league_postseason.keep_best_of` den **Rückfallwert vom Start**, bevor Season bzw. Liga N schreiben, unter der Season-Sperre (wie
-`save_season`, Nr. 232):
+`league_postseason.keep_best_of` den **Rückfallwert vom Start** - nach allen Prüfungen und bevor Season bzw. Liga N schreiben
+(`before_write` von `update_season` bzw. `update_division`; eine abgelehnte Änderung merkt und protokolliert nichts), unter der
+Season-Sperre (wie `save_season`, Nr. 232). Nur wenn die Season wirklich läuft (Nr. 256); im selben Schritt wird der Start gemerkt -
+Rückfallwert und `started_at` entstehen immer zusammen:
 
 - an der Season (`league_seasons.postseason_best_of_kept`), wenn ihr eigenes Best of sich ändert;
 - an der Liga N (`league_divisions.postseason_best_of_kept`), wenn sie ein eigenes Best of bekommt oder verliert - oder sonst nach
@@ -4468,11 +4473,14 @@ Die **Einstellungen selbst bleiben unverändert**: Eine Liga N bekommt keine eig
 Reihenfolge: gemerkter Wert der Liga N, ihr eigenes Best of von heute, gemerkter Wert der Season, Best of der Season
 (`league_postseason._best_of`). Gemerkt wird, **sobald es Einstellungen gibt** (Vorlage der Season oder eigene einer Liga N), auch
 wenn Playoffs oder Relegation gerade aus sind (Nr. 255) - sonst ließe sich die Sperre über „aus, Best of der Season ändern, ein“
-umgehen. Vor dem Start und ganz ohne Einstellungen wird nichts geschrieben; die reguläre Season ändert ihr Best of wie bisher. Die
+umgehen. Solange die Season nicht läuft und ganz ohne Einstellungen wird nichts geschrieben; gab es zum Start keine
+Playoff-Einstellungen, gilt beim späteren Anlegen das Best of der Season von heute (Nr. 256). Die reguläre Season ändert ihr Best of
+wie bisher. Die
 Antwort trägt die Sätze dazu in `warnings` („Die Playoffs von Liga 1 behalten Best of 3 …“, „Die Relegation von Liga 1 behält
 Best of 3 …“) - nur für Ligen, deren eingeschaltete Playoffs oder Relegation sonst mitgewandert wären; das Web zeigt sie als Hinweis.
-Die Vorschau meldet den gemerkten Wert der Season als `best_of_kept` (das Feld fehlt ohne ihn), das Web nennt die Auswahl dann „Wie
-zum Season-Start (Best of 3)“. Die **Folge-Season** erbt den gemerkten Wert nicht (`league_successor.NOT_COPIED`, `_copy_divisions`):
+Die Vorschau meldet den gemerkten Wert als `best_of_kept` - an der Antwort den der Season, je Liga N den, der für sie gilt (ihr
+eigener, sonst der der Season; das Feld fehlt ohne ihn). Das Web nennt die Auswahl dann „Wie zum Season-Start (Best of 3)“, im Fenster
+der Season wie in dem der Liga N. Die **Folge-Season** erbt den gemerkten Wert nicht (`league_successor.NOT_COPIED`, `_copy_divisions`):
 Sie beginnt wieder mit „wie in der Season“.
 
 **Einmal gestartet bleibt gestartet (Nr. 253, 254):** `league_calendar.season_started(season)` ist die eine Antwort auf „hat die Season
@@ -4481,17 +4489,19 @@ Ohne das Feld gilt, was das Datum sagt (im Entwurf nie, sonst ab dem Beginn der 
 
 **Gemerkt wird erst, wenn die Season wirklich läuft (Nr. 254):** ihr Beginn ist erreicht **und** mindestens eine reguläre Staffel ist
 live (oder gelaufen: `live`, `paused`, `completed`, `results_published`) oder ein Spiel einer regulären Staffel ist gewertet
-(`league_service.start_to_remember`). Ein vertipptes Startdatum allein merkt nichts: Solange nichts läuft, gilt das Datum - es lässt
-sich korrigieren, und die Sperren gehen mit ihm wieder auf. Gemerkt wird beim Schreiben, nicht durch einen Job:
+(`league_service.start_to_remember`). Ein vertipptes Startdatum allein merkt nichts und sperrt nichts (Nr. 256): Solange nichts
+läuft, lässt es sich einfach korrigieren. Gemerkt wird beim Schreiben, nicht durch einen Job:
 `league_service.update_season` prüft die Bedingung am **bisherigen** Stand und hält den Start fest, **bevor** es Startdatum oder
 Stand ändert; ebenso das Speichern der Playoff-Einstellungen (`league_postseason.remember_start`). Das genügt, weil die Bedingung nur
 auf zwei Wegen wieder falsch werden kann - das Startdatum rückt in die Zukunft oder die Season wird Entwurf -, und beide führen durch
-`update_season`. Bis dahin sagt das Datum ohnehin „begonnen“. Idempotent: Ein gemerkter Start wird nie überschrieben und lässt sich
-von außen nicht setzen. Umgestellt sind die Stellen, die am Start **sperren, Fristen zählen oder den Stand zeigen**:
+`update_season`. Wer wissen muss, ob die Season läuft, bevor etwas geschrieben ist (die Sperre aus Nr. 249, die Vorschau), fragt
+dieselbe Bedingung (`league_postseason.really_started`). Der gemerkte Start lässt sich von außen nicht setzen und ändert sich nur auf
+einem Weg (Nr. 256): Wird das Startdatum auf ein **schon erreichtes** Datum korrigiert, zieht er nach - Fristen zählen dann ab dem
+korrigierten Datum. Liegt das neue Datum in der Zukunft, bleibt er, wie er war (Nr. 253). Umgestellt sind die Stellen, die am Start **sperren, Fristen zählen oder den Stand zeigen**:
 
 | Stelle | Was am Start hängt | Liest |
 | --- | --- | --- |
-| `league_postseason.season_started`, `started` in der Vorschau | Sperre von Best of, Spiel um Platz 3, Heimrecht und Best of der Relegation (Nr. 249, 255), Merken des Rückfallwerts (Nr. 252) | `league_calendar.season_started` |
+| `league_postseason.really_started`, `started` in der Vorschau | Sperre von Best of, Spiel um Platz 3, Heimrecht und Best of der Relegation (Nr. 249, 255), Merken des Rückfallwerts (Nr. 252) - erst wenn die Season wirklich läuft (Nr. 256) | `started_at`, sonst `league_service.start_to_remember` |
 | `league_successor.started` | „Übernahme neu berechnen“ nur vor dem Start (Nr. 162) | `league_calendar.season_started` |
 | `league_applications.carry_deadline`, `carry_open` | ein übernommenes Co-Team kann sich bis zum Start abmelden (Nr. 160) | `league_calendar.start_moment` |
 | `league_late.late_deadline`, `effective_closes`, `clean_extension` | Nachmeldefrist: Start plus Tage (Nr. 184) | `league_late.start_of` (der gemerkte Start, sonst das Datum) |
@@ -4852,7 +4862,7 @@ ausdrückliches `kind: "regular"` an alten Staffeln wäre eine Migration und ist
 Entschieden am 23.11. (vorher offen): Setzung mit einmal gereihten Staffeln (Nr. 221), Relegation automatisch hinter den Playoffs der
 unteren Liga N (Nr. 222), Relegationsspiele zählen für Sperren (Nr. 223), Vergleich über Staffeln aus #1627 ohne Los (Nr. 224).
 Entschieden am 24.11. nach der Prüfung: Nr. 245 bis 249, nach der Nachprüfung: Nr. 250 und 251, danach Nr. 252 und 253, nach der
-Schlussprüfung: Nr. 254 und 255 (Tabelle „Regeln“).
+Schlussprüfung: Nr. 254 und 255, zuletzt Nr. 256 (Tabelle „Regeln“).
 
 ### F.7 Saisonfinale am TV und Liga im Discord (#1641, #1642)
 

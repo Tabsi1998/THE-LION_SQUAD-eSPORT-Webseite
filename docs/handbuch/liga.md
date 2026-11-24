@@ -1845,8 +1845,9 @@ der regulären Staffeln und ändern ihn nie.
 
 - **Relegationsplätze** stellst du wie bisher bei den Zonen ein (Reiter **Ligen und Staffeln**: „Relegation unten“ in der oberen Liga,
   „Relegation oben“ in der Liga darunter). Die Zahl muss **aufgehen** – sonst sagt das Speichern, was nicht passt.
-- **Fest ab dem Season-Start:** Best of (auch je Runde), Spiel um Platz 3 und Heimrecht der Playoffs stehen fest, sobald die erste
-  Spielwoche begonnen hat. Die Felder sind dann ausgegraut, das Fenster sagt es. Wiederöffnen einer Staffel ändert daran nichts,
+- **Fest ab dem Season-Start:** Best of (auch je Runde), Spiel um Platz 3 und Heimrecht der Playoffs stehen fest, sobald die
+  Season wirklich läuft – der Beginn der ersten Spielwoche ist erreicht und eine Staffel ist live oder ein Spiel gewertet. Das
+  Datum allein sperrt noch nichts. Die Felder sind dann ausgegraut, das Fenster sagt es. Wiederöffnen einer Staffel ändert daran nichts,
   Aus- und Wiedereinschalten auch nicht. Schaltest du die Playoffs erst nach dem Start ein, gelten die Werte vom Start – gab es
   keine, die Vorgaben (Best of der Season, kein Spiel um Platz 3, Heimrecht für den besser Gesetzten). Stell sie also **vor dem
   Start** ein.
@@ -1860,6 +1861,8 @@ der regulären Staffeln und ändern ihn nie.
   und eine Staffel ist live oder ein Spiel gewertet. Verschiebst du den Beginn der ersten Spielwoche danach noch – auch in die
   Zukunft –, bleibt alles gesperrt, was ab dem Start gesperrt ist; auch Nachmeldefrist und die Abmeldefrist übernommener Teams
   zählen weiter vom ursprünglichen Start. Ein vertipptes Datum, solange noch nichts läuft, kannst du einfach korrigieren.
+  Läuft die Season schon und du korrigierst den Beginn auf ein Datum, das bereits erreicht ist, gilt das korrigierte Datum als
+  Start – auch für die Fristen.
 
   <img src="../assets/liga/playoffs-gesperrt-pc.png" alt="Fenster Playoffs und Relegation nach dem Season-Start: Hinweis Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest, die Felder Best of, Heimrecht, Spiel um Platz 3 und Best of je Runde sind ausgegraut" width="720">
 
