@@ -109,7 +109,7 @@ def test_successor_unit_lists_discord_among_the_copied_settings():
 
 def test_pages_unit_carry_the_league_badge_of_page_and_target():
     """#2561: Am TV steht das Liga-Abzeichen neben „Liga N“ und neben der Ziel-Liga - dafür tragen Seite und Zeile die Stufe
-    wie überall (``league_current.badge``: level, nickname, champion)."""
+    wie überall (``league_badge.badge``: level, nickname, champion)."""
     finals = [
         {"division_id": "d2", "staffel": "A", "rows": [row("b1", 1, "promotion"), row("b4", 4, "relegation"), row("b5", 5, "out")]},
     ]

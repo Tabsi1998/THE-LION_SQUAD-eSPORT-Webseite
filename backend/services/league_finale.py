@@ -64,7 +64,7 @@ def _label(division: dict) -> str:
 
 
 def league_badge(division: dict) -> dict | None:
-    from services.league_current import badge
+    from services.league_badge import badge
 
     return badge(division)
 
