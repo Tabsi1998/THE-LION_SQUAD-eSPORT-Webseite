@@ -37,6 +37,16 @@ async def discord_recorder(monkeypatch):
     return calls
 
 
+async def alert_of(flow, kind: str, timeout: float = 5.0):
+    """Ein angestoßener Alarm läuft im Hintergrund: warten, bis sein Eintrag oben im Verlauf steht (statt fester Pause)."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        rows = await ops_alerts.recent_alerts(flow.db)
+        if (rows and rows[0]["kind"] == kind) or asyncio.get_running_loop().time() > deadline:
+            return rows
+        await asyncio.sleep(0.01)
+
+
 async def mail_jobs(flow):
     return await flow.db.mail_jobs.find({"template_key": "ops_alert"}, {"_id": 0}).to_list(50)
 
@@ -127,8 +137,7 @@ async def test_test_alert_and_new_triggers(flow, discord_recorder, monkeypatch):
 
     # Abgebrochener Job → Alarm (angestoßen, nicht gewartet).
     scheduler._log_task_failure("mail_queue", RuntimeError("weg"))
-    await asyncio.sleep(0.05)
-    rows = await ops_alerts.recent_alerts(flow.db)
+    rows = await alert_of(flow, "job_failed")
     assert rows[0]["kind"] == "job_failed" and "mail_queue" in rows[0]["title"] and rows[0]["channels"] == ["discord", "email"]
 
     # Roter Dolibarr-Abgleich → Alarm mit dem Text des Fehlers.
@@ -151,8 +160,7 @@ async def test_test_alert_and_new_triggers(flow, discord_recorder, monkeypatch):
     paula = await flow.add_user(role="player", name="paula")
     flow.act_as(paula)
     assert (await flow.post("/api/mobile/client-logs", json={"level": "fatal", "message": "Absturz beim Start", "platform": "android", "app_version": "1.0.0", "context": {"screen": "Login"}})).status_code == 200
-    await asyncio.sleep(0.05)
-    rows = await ops_alerts.recent_alerts(flow.db)
+    rows = await alert_of(flow, "client_log_critical")
     assert rows[0]["kind"] == "client_log_critical" and "Absturz" in rows[0]["description"]
 
 

@@ -80,6 +80,9 @@ test("ein veralteter Baustein kommt nur als Hinweis an, nicht als Fehler", async
   expect(body.error_type).toBe("ChunkLoadError");
   // #1657: der Kopf mit der Meldung (hier die Adresse des Bausteins) geht nicht mit - der Server speichert nur Code-Stellen.
   expect(body.stack).not.toContain("Failed to fetch dynamically imported module");
+  // Die Code-Stellen kommen mit: erste Zeile ist eine „at …“-Stelle, die Komponenten-Angabe steht am Ende.
+  expect(body.stack.trimStart().startsWith("at ")).toBe(true);
+  expect(body.stack).toContain("in Seite");
 });
 
 // #1657: gemeldet wird ohne Anmeldung an den Fehler-Sammler - Fehlerart, Stack, Seite als Vorlage, Version. Nie der
