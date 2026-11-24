@@ -548,15 +548,21 @@ async def _season_done(db, season_id: str) -> bool:
     return not await league_postseason.missing(db, season_id)
 
 
-async def champion_without_playoffs(db, season_id: str | None) -> int:
+async def champion_without_playoffs(db, season_id: str | None) -> dict | None:
     """Meister ohne Playoffs (Nr. 251): Spielt die oberste Liga N keine Playoffs, obwohl der Meister aus ihnen kommen sollte, ist
     Meister das beste verbliebene Team der Tabelle - sobald die Season fertig ist. Der Eintrag steht am Endstand der Staffel dieses
     Teams (``champion`` mit ``champion_fallback``) und in ``tournament_awards``. Läuft die Season wieder (Wiederöffnen) oder gibt es
-    doch Playoffs, verschwindet er - nie ein Meister aus der Tabelle neben einem aus den Playoffs."""
+    doch Playoffs, verschwindet er - nie ein Meister aus der Tabelle neben einem aus den Playoffs. Antwort: der Meister
+    (``{tournament_id, registration_id, display_name, team_id}``) oder ``None``."""
     if not season_id:
-        return 0
+        return None
     from services import league_postseason
     from services.awards import forget_outcome
+
+    # Ohne „Meister aus Playoffs“ gibt es hier nichts zu tun - eine Season ohne Einstellungen kostet eine Abfrage, mehr nicht.
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "postseason": 1})
+    if (((season or {}).get("postseason") or {}).get("champion_source") if isinstance((season or {}).get("postseason"), dict) else None) != "playoffs":
+        return None
 
     wanted = await league_postseason.table_champion(db, season_id) if await _season_done(db, season_id) else None
     marked = await db.league_final_tables.find({"season_id": season_id, "active": True, "kind": None, "champion_fallback": True},
@@ -569,14 +575,15 @@ async def champion_without_playoffs(db, season_id: str | None) -> int:
         forget_outcome(db, final["tournament_id"])
         await db.tournament_awards.delete_many({"tournament_id": final["tournament_id"], "reward_key": None})
     if not wanted:
-        return 0
+        return None
     tournament = await db.tournaments.find_one({"id": wanted["tournament_id"]}, {"_id": 0})
     final = await active_final(db, wanted["tournament_id"])
     if not tournament or not final:
-        return 0
+        return None
     champion = {key: wanted.get(key) for key in ("registration_id", "display_name", "team_id")}
     await db.league_final_tables.update_one({"id": final["id"], "active": True}, {"$set": {"champion": champion, "champion_fallback": True}})
-    return await record_champion(db, tournament, {**final, "champion": champion}, await _frame(db, tournament))
+    await record_champion(db, tournament, {**final, "champion": champion}, await _frame(db, tournament))
+    return wanted
 
 
 async def _season_follows(db, season_id: str | None, actor_id: str | None, tournament_id: str) -> str | None:
@@ -769,8 +776,12 @@ async def _close(db, tournament: dict, actor: dict, *, conflict_reason: str | No
     if not kind:
         # Die Zusammenstellung der Season gilt dem Tabellenplatz (Nr. 214) - eine Playoff- oder Relegations-Fassung vergibt sie nicht.
         await _follow_up("Belohnungen", tid, lambda: league_rewards.grant_and_notify(db, {**tournament, "status": "completed"}, final, frame))
+    # Meister ohne Playoffs (Nr. 251) **vor** dem Stand der Season: Was auf „beendet“ wartet (Discord-Saisonende) und die Nachricht an
+    # die Captains kennen den Meister dann schon.
+    kept = await _follow_up("Meister ohne Playoffs", tid, lambda: champion_without_playoffs(db, context.get("season_id")))
+    if kept and kept.get("tournament_id") == tid:
+        final = {**final, "champion": {key: kept.get(key) for key in ("registration_id", "display_name", "team_id")}, "champion_fallback": True}
     season_status = await _follow_up("Stand der Season", tid, lambda: _season_follows(db, context.get("season_id"), actor.get("id"), tid))
-    await _follow_up("Meister ohne Playoffs", tid, lambda: champion_without_playoffs(db, context.get("season_id")))
     await _follow_up("TV-Saisonfinale", tid, lambda: _join_tv_finale(db, context.get("season_id"), tid))
     await _follow_up("Protokoll", tid, audit)
     await _follow_up("Nachricht an die Captains", tid, lambda: notify_captains(db, tournament, final, frame, "closed"))
