@@ -349,7 +349,7 @@ async def test_long_team_history_does_not_push_running_leagues_out_of_the_profil
         {"id": f"alt-{index}", "tournament_id": f"alt-turnier-{index}", "team_id": "team-1", "squad_id": "squad-1", "status": "approved",
          "registration_type": "team", "display_name": "Probe 1", "created_at": f"2024-01-01T00:00:{index % 60:02d}+00:00"}
         for index in range(240)])
-    await flow.db.tournaments.insert_many([{"id": f"alt-turnier-{index}", "title": "Altes Turnier", "status": "archived"} for index in range(240)])
+    await flow.db.tournaments.insert_many([{"id": f"alt-turnier-{index}", "slug": f"alt-turnier-{index}", "title": "Altes Turnier", "status": "archived"} for index in range(240)])
     season = await add_season(flow, world, levels=2)
     lower = await staffel(flow, world, season, 2, [1, 2, 3, 4], start=False)
     ok(await flow.post(f"/api/tournaments/{lower['id']}/status", json={"status": "live"}))
