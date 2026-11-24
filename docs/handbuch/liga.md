@@ -1839,14 +1839,16 @@ der regulären Staffeln und ändern ihn nie.
 - **Relegationsplätze** stellst du wie bisher bei den Zonen ein (Reiter **Ligen und Staffeln**: „Relegation unten“ in der oberen Liga,
   „Relegation oben“ in der Liga darunter). Die Zahl muss **aufgehen** – sonst sagt das Speichern, was nicht passt.
 - **Fest ab dem Season-Start:** Best of (auch je Runde), Spiel um Platz 3 und Heimrecht der Playoffs stehen fest, sobald die erste
-  Spielwoche begonnen hat. Die Felder sind dann ausgegraut, das Fenster sagt es. Wiederöffnen einer Staffel ändert daran nichts.
-  Stell sie also **vor dem Start** ein.
+  Spielwoche begonnen hat. Die Felder sind dann ausgegraut, das Fenster sagt es. Wiederöffnen einer Staffel ändert daran nichts,
+  Aus- und Wiedereinschalten auch nicht. Schaltest du die Playoffs erst nach dem Start ein, gelten die Werte vom Start – gab es
+  keine, die Vorgaben (Best of der Season, kein Spiel um Platz 3, Heimrecht für den besser Gesetzten). Stell sie also **vor dem
+  Start** ein.
 
   <img src="../assets/liga/playoffs-gesperrt-pc.png" alt="Fenster Playoffs und Relegation nach dem Season-Start: Hinweis Seit dem Season-Start stehen Best of, Spiel um Platz 3 und Heimrecht fest, die Felder Best of, Heimrecht, Spiel um Platz 3 und Best of je Runde sind ausgegraut" width="720">
 
 - **Fest ab dem ersten Abschluss:** Sobald eine Staffel einer Liga abgeschlossen ist, lassen sich dort an/aus, die Plätze je Staffel
-  und „Meister aus“ nicht mehr ändern. Zum Ändern erst alle Staffeln dieser Liga wieder öffnen. Termine bleiben bis zum Anlegen
-  änderbar.
+  und „Meister aus“ nicht mehr ändern. Spielt die Liga Playoffs oder Relegation, lässt sich dort dann auch keine weitere Staffel
+  mehr anlegen. Zum Ändern erst alle Staffeln dieser Liga wieder öffnen. Termine bleiben bis zum Anlegen änderbar.
 - **Zu wenige Teams:** Für Playoffs braucht es zwei Teams. Kommen in einer Liga mit den Plätzen je Staffel und ihren Staffeln weniger
   zusammen (ein Platz bei nur einer Staffel), sagt das Speichern das und an der Liga steht **Keine Playoffs**. Diese Liga spielt dann
   keine: Ihr Meister kommt aus der Tabelle, die Season wartet nicht darauf.
@@ -1886,7 +1888,8 @@ zählen nicht mit.
 - **Kampflos:** Tritt ein Team nicht an, kommt der Gegner weiter – wie gewohnt über „kampflos werten“.
 - **Beide nicht erschienen:** Beim ersten Mal wird **einmal neu angesetzt** – das Spiel wird nicht gewertet, du setzt den neuen
   Termin. Für beide Teams zählt es aber schon als **„nicht erschienen“** (Strafenkatalog, wie in der Season). War es ein Irrtum:
-  **Neuansetzung zurücknehmen** am Spiel, mit Grund – dann fallen auch die beiden Einträge weg. Kommt wieder niemand, scheiden
+  **Neuansetzung zurücknehmen** am Spiel, mit Grund – dann fallen auch die beiden Einträge weg; ein schon gesetzter neuer Termin
+  bleibt stehen. Kommt wieder niemand, scheiden
   **beide aus**: Der nächste Gegner kommt kampflos weiter, im Finale bleibt der Titel unvergeben, in der Relegation bleibt alles, wie
   es ist. Das Ausscheiden lässt sich nicht zurücknehmen.
 - **Team zieht sich zurück:** Austritt wie gewohnt auf der Staffel-Seite (Teilnehmer). Der Gegner kommt kampflos weiter.
@@ -1900,11 +1903,16 @@ zählen nicht mit.
 genauso abgeschlossen (Checkliste, Bestätigung, zweite Person beim Wiederöffnen). Statt einer Tabelle steht dort:
 
 - **Playoffs:** die Plätze aus dem Baum – 1 Sieger, 2 Finalist, 3 geteilt für beide Halbfinal-Verlierer (mit Spiel um Platz 3: Platz 3
-  und 4), dann je Runde geteilt (Platz 5 für die Viertelfinal-Verlierer). Sind in einem Halbfinale beide nicht erschienen und
-  ausgeschieden, stehen sie nie auf Platz 3: mit Spiel um Platz 3 sind sie Vierte, sonst ohne Platz.
+  und 4), dann je Runde geteilt (Platz 5 für die Viertelfinal-Verlierer). Sind in einem Spiel beide zweimal nicht erschienen und
+  ausgeschieden, stehen sie **einen Platz hinter den Verlierern dieser Runde**, die gespielt haben: im Halbfinale auf Platz 4, im
+  Viertelfinale auf Platz 6. Sie bleiben Teilnehmer der Playoffs.
 - **Relegation:** je Team das Ergebnis und was daraus folgt – „steigt auf“, „steigt ab“ oder „bleibt“.
 - **Meister:** Bei „Meister aus Playoffs“ entsteht der Meister-Eintrag beim Abschluss der Playoffs der obersten Liga. Es gibt nie
   zwei Meister. In unteren Ligen heißt der Sieger Playoff-Sieger.
+- **Meister ohne Playoffs:** Spielt die oberste Liga keine Playoffs – weil von vornherein zu wenige Teams hineinkämen oder weil
+  sich Teams zurückgezogen haben –, ist Meister das **beste verbliebene Team der Tabelle**. Der Eintrag entsteht, sobald die
+  Season beendet ist. Ist kein Team mehr übrig, bleibt der Titel unvergeben. Unvergeben bleibt er sonst nur, wenn im Finale beide
+  zweimal nicht erscheinen.
 - **Die Season ist erst beendet**, wenn auch Playoffs und Relegation abgeschlossen sind. Solange etwas Eingestelltes noch nicht
   angelegt ist, steht es oben im Reiter und die Season läuft weiter. Auf eine Liga, in der keine zwei Playoff-Teams zusammenkommen,
   wartet sie nicht.
@@ -1919,12 +1927,13 @@ spielen sie mit ihrer Setzliste weiter; weicht die neue Setzliste ab, sagt die K
 dem ersten gespielten Spiel.
 
 **Auf der Ligaseite** stehen Playoffs und Relegation unter den Tabellen ihrer Liga – nur bei einer sichtbaren Season. Die
-**Playoffs** als Baum, die **Relegation** als Paarungen: je Karte das Team der oberen Liga (Heim) und das der unteren, mit Ergebnis
-und was daraus folgt („steigt auf“, „steigt ab“, „bleibt“).
+**Playoffs** als Baum, die **Relegation** als Paarungen: je Karte das Team der oberen Liga (Heim) und das der unteren, mit Ergebnis.
+Solange die Relegation läuft, steht dort, wer gewonnen hat. Was daraus folgt („steigt auf“, „steigt ab“, „bleibt“), steht erst
+nach ihrem Abschluss da.
 
 <img src="../assets/liga/playoffs-ligaseite-pc.png" alt="Ligaseite am PC: Abschnitt Playoffs mit K.-o.-Baum aus Viertelfinale, Halbfinale und Finale, daneben der Link Alle Spiele" width="900">
 
-<img src="../assets/liga/playoffs-relegation-pc.png" alt="Ligaseite am PC: Abschnitt Relegation mit zwei Paarungen, je Karte das Team aus Liga 1 mit Heimrecht und das Team aus Liga 2, links mit Ergebnis 1 zu 2 und dem Satz, wer aufsteigt und wer absteigt, rechts noch nicht gespielt" width="900">
+<img src="../assets/liga/playoffs-relegation-pc.png" alt="Ligaseite am PC: Abschnitt Relegation nach dem Abschluss mit zwei Paarungen, je Karte das Team aus Liga 1 mit Heimrecht und das Team aus Liga 2 mit Ergebnis; links steigt das Team aus Liga 2 auf und das aus Liga 1 ab, rechts bleiben beide in ihrer Liga" width="900">
 
 **Noch nicht dabei:** eigene Belohnungen für die Playoffs, Zusatzpunkte in der Gesamtwertung, die Anlage im Regelwerk, Nachrichten
 „für die Playoffs qualifiziert“, Doppel-K.-o. und Wildcards. Belohnungen und Gesamtwertung zählen weiter den Tabellenplatz.
@@ -2114,6 +2123,7 @@ die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
 | --- | --- | --- |
 | „Mit bis zu 9 Teams (nur Hinrunde) braucht die Staffel 9 Spielwochen, die Season hat aber nur 8 aktive Wochen …“ | Die Staffel ist zu groß für die Spielwochen | **Teams je Staffel höchstens** senken und eine zweite Staffel anlegen – oder mehr Wochen |
 | „Staffel A gibt es in dieser Liga schon.“ | Buchstabe vergeben | **Staffel anlegen** nimmt von selbst den nächsten freien |
+| „In dieser Liga ist schon eine Staffel abgeschlossen. Eine weitere Staffel anlegen geht dann nicht mehr …“ | Die Liga spielt Playoffs oder Relegation – beides rechnet mit den Staffeln, die es beim Abschluss gab | Erst alle abgeschlossenen Staffeln dieser Liga im Reiter **Abschluss** wieder öffnen (3.10) |
 | „… hat 3 Spieler im Kader – die Liga verlangt mindestens 4.“ | Kader zu klein | Teamleitung ergänzt den Kader im Profil |
 | „… hat schon ein Co-Team in dieser Staffel – zwei Co-Teams desselben Teams spielen nie in derselben Staffel.“ | Gewollt | Zweites Co-Team in eine andere Staffel |
 | „… spielt in dieser Season schon in einer anderen Staffel.“ | Ein Co-Team spielt je Season nur eine Staffel | Andere Staffel wählen oder dort entfernen |
