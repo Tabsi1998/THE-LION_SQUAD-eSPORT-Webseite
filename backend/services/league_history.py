@@ -8,12 +8,13 @@ Quelle ist allein der geltende Endstand (``league_final_tables``, ``active``) - 
 from __future__ import annotations
 
 from services import league_cross_zones, league_zones
+from services.league_current import badge
 
 LIMIT = 100
 
 
-async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> list[tuple[dict, dict, dict, bool]]:
-    """(Endstand, Season, Liga, intern) je sichtbarer Staffel. ``scope`` (Profil, #2521, ``services/profile_visibility``): die Regel des
+async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> list[tuple[dict, dict, dict, bool, dict]]:
+    """(Endstand, Season, Liga, intern, Liga N) je sichtbarer Staffel. ``scope`` (Profil, #2521, ``services/profile_visibility``): die Regel des
     Profils statt ``user`` und ``hidden`` - je Season, Liga und Stufe einmal entschieden. Intern ist, was ein Gast nicht sähe."""
     from services.league_service import can_see_season
     from services.profile_visibility import PUBLIC, public_season, sees_listed_tournament, sees_season
@@ -26,6 +27,10 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
         len(league_ids) + 1)}
     tournament_ids = sorted({row.get("tournament_id") for row in finals if row.get("tournament_id")})
     tournaments = {row["id"]: row for row in await db.tournaments.find({"id": {"$in": tournament_ids}}, {"_id": 0}).to_list(len(tournament_ids) + 1)}
+    # Liga N je Endstand für das Abzeichen (#1638) - Stufe und Beiname, eine Abfrage für alle.
+    division_ids = sorted({row.get("division_id") for row in finals if row.get("division_id")})
+    divisions = {row["id"]: row for row in await db.league_divisions.find(
+        {"id": {"$in": division_ids}}, {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(len(division_ids) + 1)} if division_ids else {}
     visible: dict[str, bool] = {}
     out = []
     # Plätze über Staffeln hinweg (#1627): Die Zone steht nicht im Endstand, sondern ergibt sich aus allen Endständen der Liga N.
@@ -51,11 +56,11 @@ async def _rows(db, query: dict, user: dict | None, hidden=None, scope=None) -> 
         if guest_sees:
             guest_sees = await sees_listed_tournament(PUBLIC, tournament)
         internal = not guest_sees
-        out.append((final, season, leagues.get(season.get("league_id") or "") or {}, internal))
+        out.append((final, season, leagues.get(season.get("league_id") or "") or {}, internal, divisions.get(final.get("division_id") or "")))
     return out
 
 
-def _entry(final: dict, season: dict, league: dict, registration_id: str) -> dict | None:
+def _entry(final: dict, season: dict, league: dict, registration_id: str, division: dict | None = None, squad_id: str | None = None) -> dict | None:
     row = next((item for item in final.get("rows") or [] if item.get("registration_id") == registration_id), None)
     if not row:
         return None
@@ -67,10 +72,14 @@ def _entry(final: dict, season: dict, league: dict, registration_id: str) -> dic
         "league_name": league.get("name") or title.get("league"),
         "url": f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug") else None,
         "division_label": title.get("division"), "staffel": final.get("staffel"), "display_name": row.get("display_name"),
+        # Co-Team-Kennung (Review #1638): Der Saisonverlauf der Teamseite erkennt daran, wer gerade spielt.
+        "squad_id": squad_id,
         # Von wie vielen: wer in der Wertung blieb - ohne Ausgeschiedene (wie ``participants`` im Endstand).
         "rank": row.get("rank"), "of": int(final.get("participants") or len([item for item in final.get("rows") or [] if not item.get("exit")])),
         "points": row.get("points"),
         "champion": champion, "zone": zone, "zone_label": league_zones.LABELS.get(zone or ""),
+        # Liga-Abzeichen (#1638): Liga N, Beiname, Gold nur für den Meister. Ohne Liga N (alter Endstand ohne ``division_id``) ``None``.
+        "badge": badge(division, champion=champion),
         "exit": (row.get("exit") or {}).get("kind") if isinstance(row.get("exit"), dict) else None,
         "closed_at": final.get("closed_at"),
     }
@@ -83,10 +92,10 @@ def _order(rows: list[dict]) -> list[dict]:
 async def for_team(db, team_id: str, user: dict | None, *, hidden=None) -> list[dict]:
     """Die Seasons eines Hauptteams - je Co-Team und Staffel eine Zeile."""
     out = []
-    for final, season, league, _internal in await _rows(db, {"team_ids": team_id}, user, hidden):
+    for final, season, league, _internal, division in await _rows(db, {"team_ids": team_id}, user, hidden):
         for registration_id, side in (final.get("sides") or {}).items():
             if side.get("team_id") == team_id:
-                entry = _entry(final, season, league, registration_id)
+                entry = _entry(final, season, league, registration_id, division, side.get("squad_id"))
                 if entry:
                     out.append(entry)
     return _order(out)
@@ -102,10 +111,18 @@ async def for_player(db, user_id: str, viewer: dict | None, *, hidden=None, scop
 
     out = []
     opens: dict = {}
-    for final, season, league, internal in await _rows(db, {"player_ids": user_id}, viewer, hidden, scope):
+    found = await _rows(db, {"player_ids": user_id}, viewer, hidden, scope)
+    # Ein privates Team (``is_public: false``) zeigt das Profil nur der Person selbst - wie „Aktuelle Ligen“ (#1630) und die Teamseite (404).
+    private: set[str] = set()
+    if scope is not None and not scope.everything:
+        from services.league_current import private_team_ids
+
+        private = await private_team_ids(db, [side.get("team_id") for final, *_rest in found for side in (final.get("sides") or {}).values()
+                                              if user_id in (side.get("player_ids") or [])])
+    for final, season, league, internal, division in found:
         for registration_id, side in (final.get("sides") or {}).items():
-            if user_id in (side.get("player_ids") or []):
-                entry = _entry(final, season, league, registration_id)
+            if user_id in (side.get("player_ids") or []) and side.get("team_id") not in private:
+                entry = _entry(final, season, league, registration_id, division, side.get("squad_id"))
                 if not entry:
                     continue
                 if scope is not None:

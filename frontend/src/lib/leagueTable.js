@@ -19,7 +19,15 @@ export const EXIT_RULE_OPTIONS = [
   ["all_for_opponents", "Alle Spiele zählen für die Gegner, Team ans Tabellenende"],
   ["half", "50-%-Regel: annullieren oder Rest kampflos"],
 ];
-const EXIT_LABELS = { withdrawn: "Ausgetreten", disqualified: "Disqualifiziert" };
+// Wie ein Team aus der Staffel ausschied - eine Quelle für Tabelle, Season-Historie und Saisonverlauf (Review #1638).
+export const EXIT_TEXTS = { withdrawn: "ausgetreten", disqualified: "disqualifiziert" };
+
+/** „ausgetreten“ bzw. „disqualifiziert“; unbekannt `fallback`. */
+export function exitText(kind, fallback = "ausgeschieden") {
+  return EXIT_TEXTS[kind] || fallback;
+}
+
+const firstUpper = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 // Punkteart (#2312, docs/LIGA.md E.1): Sieg/Remis/Niederlage oder je gewonnene Map (Beispiel je Best of: ``mapPointsExample``).
 export const POINTS_MODE_OPTIONS = [
@@ -134,7 +142,7 @@ const DECISION_METHOD_NOTES = { playoff: "Platz durch Entscheidungsspiel", lot: 
 export function standingNotes(row, labels = TIEBREAK_LABELS) {
   const notes = [];
   if (!row) return notes;
-  if (row.exit?.kind) notes.push({ key: "exit", tone: "exit", text: EXIT_LABELS[row.exit.kind] || "Ausgeschieden" });
+  if (row.exit?.kind) notes.push({ key: "exit", tone: "exit", text: firstUpper(exitText(row.exit.kind)) });
   if (row.tiebreak === "lead_decision") {
     const reason = row.lead_decision?.reason;
     // Wie entschieden wurde (F.1, Nr. 156) - ohne Angabe wie bisher „Entscheid der Leitung“.

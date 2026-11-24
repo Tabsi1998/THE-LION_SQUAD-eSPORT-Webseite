@@ -1,0 +1,322 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { LeagueBadge } from "./LeagueBadge";
+import { LeagueCurrent } from "./LeagueCurrent";
+import { LeagueSeasonLine } from "./LeagueSeasonLine";
+
+// Liga-Abzeichen (#1638) und laufende Ligen (#1630). Nur erfundene Namen.
+
+function reduceMotion(reduce) {
+  vi.stubGlobal("matchMedia", (query) => ({ matches: reduce && query.includes("reduce"), media: query, addEventListener() {}, removeEventListener() {} }));
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("LeagueBadge", () => {
+  it.each([
+    [1, "top", true],
+    [2, "mid", false],
+    [3, "base", false],
+    [7, "base", false],
+  ])("Liga %i hat die Form %s, die Krone nur Liga 1", (level, tier, crown) => {
+    render(<LeagueBadge badge={{ level }} testId="b" />);
+    expect(screen.getByTestId("b")).toHaveAttribute("data-tier", tier);
+    expect(screen.queryByTestId("b-crown") !== null).toBe(crown);
+    expect(screen.getByTestId("b-art").querySelector("text")).toHaveTextContent(String(level));
+  });
+
+  it("ist Cyan, Gold nur für den Season-Meister", () => {
+    render(<><LeagueBadge badge={{ level: 2 }} testId="a" /><LeagueBadge badge={{ level: 2, champion: true }} testId="m" /></>);
+    expect(screen.getByTestId("a")).toHaveAttribute("data-metal", "cyan");
+    expect(screen.getByTestId("m")).toHaveAttribute("data-metal", "gold");
+    expect(screen.getByTestId("m-label")).toHaveTextContent("Meister");
+  });
+
+  it("schreibt den Beinamen als Text daneben", () => {
+    render(<LeagueBadge badge={{ level: 1, nickname: "Elite" }} testId="b" />);
+    expect(screen.getByTestId("b-label")).toHaveTextContent("Liga 1 · Elite");
+    expect(screen.getByTestId("b-art")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("trägt ohne Text die Beschreibung am Wappen - mit Meister", () => {
+    render(<LeagueBadge badge={{ level: 1, nickname: "Elite", champion: true }} label={false} testId="b" />);
+    expect(screen.getByRole("img", { name: "Liga 1 · Elite, Season-Meister" })).toBeInTheDocument();
+    expect(screen.queryByTestId("b-label")).toBeNull();
+  });
+
+  it.each(["list", "card", "hero"])("gibt es in der Größe %s", (size) => {
+    render(<LeagueBadge badge={{ level: 3 }} size={size} testId="b" />);
+    expect(screen.getByTestId("b").className).toContain(`tls-lbadge--${size}`);
+  });
+
+  it("zeichnet ohne gültige Liga N nichts", () => {
+    const { container } = render(<LeagueBadge badge={{ level: 0 }} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("steht mit „Bewegung reduzieren“ still und spielt sonst einmal", () => {
+    reduceMotion(true);
+    render(<LeagueBadge badge={{ level: 1 }} testId="still" />);
+    expect(screen.getByTestId("still")).toHaveAttribute("data-play", "done");
+    reduceMotion(false);
+    vi.stubGlobal("IntersectionObserver", undefined);
+    render(<LeagueBadge badge={{ level: 1 }} testId="run" />);
+    expect(screen.getByTestId("run")).toHaveAttribute("data-play", "run");
+  });
+});
+
+const ROW = {
+  registration_id: "r1", display_name: "Probe 1 · Kader B", squad_name: "Kader B", division_label: "Liga 1 · Elite", staffel: "A",
+  badge: { level: 1, nickname: "Elite", champion: false }, league: { name: "Probe-Liga" }, season: { name: "Season 2" },
+  link: "/liga/probe-liga/season-2#staffel-a", rank: 2, of: 6, zone: "playoff_promotion", zone_label: "Relegation um den Aufstieg",
+  next_match: { opponent: "Probe 4", scheduled_at: null, matchday: 5 }, internal: true,
+};
+
+describe("LeagueCurrent", () => {
+  it("zeigt Abzeichen, Staffel, Platz von N, Zone, nächstes Spiel und das Etikett", () => {
+    render(<MemoryRouter><LeagueCurrent rows={[ROW]} nameOf={(row) => row.display_name} testId="p" /></MemoryRouter>);
+    const row = screen.getByTestId("p-r1");
+    expect(row).toHaveAttribute("href", "/liga/probe-liga/season-2#staffel-a");
+    expect(screen.getByTestId("p-r1-label")).toHaveTextContent("Liga 1 · Elite · Staffel A");
+    expect(screen.getByTestId("p-r1-badge")).toHaveAttribute("data-tier", "top");
+    expect(screen.getByTestId("p-r1-place")).toHaveTextContent("Platz 2 von 6");
+    expect(screen.getByTestId("p-r1-zone")).toHaveTextContent("Relegation um den Aufstieg");
+    expect(screen.getByTestId("p-r1-next")).toHaveTextContent("gegen Probe 4 · Spieltag 5");
+    expect(screen.getByTestId("p-r1-internal")).toBeInTheDocument();
+    expect(row).toHaveTextContent("Probe 1 · Kader B");
+  });
+
+  it("vor dem ersten Ergebnis ohne Platz und ohne Zone", () => {
+    render(<MemoryRouter><LeagueCurrent rows={[{ ...ROW, rank: null, zone: null, internal: false }]} testId="p" /></MemoryRouter>);
+    expect(screen.getByTestId("p-r1-place")).toHaveTextContent("Noch ohne Ergebnis · 6 Teams");
+    expect(screen.queryByTestId("p-r1-zone")).toBeNull();
+    expect(screen.queryByTestId("p-r1-internal")).toBeNull();
+  });
+
+  it("ohne laufende Liga kein Abschnitt", () => {
+    const { container } = render(<MemoryRouter><LeagueCurrent rows={[]} /></MemoryRouter>);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+const HISTORY = [
+  { season_id: "s1", season_name: "Season 1", closed_at: "2026-03-01", rank: 1, of: 4, badge: { level: 2 }, display_name: "Kader A", zone: "promotion" },
+  { season_id: "s2", season_name: "Season 2", closed_at: "2026-06-01", rank: 1, of: 4, badge: { level: 1 }, display_name: "Kader A", champion: true },
+  { season_id: "s2", season_name: "Season 2", closed_at: "2026-06-01", rank: 3, of: 4, badge: { level: 2 }, display_name: "Kader B" },
+  { season_id: "s1", season_name: "Season 1", closed_at: "2026-03-01", rank: 4, of: 4, badge: { level: 2 }, display_name: "Kader B" },
+];
+
+describe("LeagueSeasonLine", () => {
+  it("zeichnet je Season einen Punkt, Meister in Gold, und beschreibt den Verlauf", () => {
+    render(<LeagueSeasonLine rows={HISTORY.slice(0, 2)} testId="l" />);
+    expect(screen.getByRole("img", { name: /Season 1: Liga 2, Platz 1 von 4; Season 2: Liga 1, Platz 1 von 4, Meister/ })).toBeInTheDocument();
+    expect(screen.getByTestId("l-point-0-1")).toHaveAttribute("data-champion", "true");
+    expect(screen.getByTestId("l-point-0-0")).not.toHaveAttribute("data-champion");
+    expect(screen.queryByTestId("l-legend")).toBeNull();
+  });
+
+  it("zeigt auf der Teamseite je Co-Team eine Linie mit Legende", () => {
+    render(<LeagueSeasonLine rows={HISTORY} byTeam testId="l" />);
+    expect(screen.getByTestId("l-legend")).toHaveTextContent("Kader A");
+    expect(screen.getByTestId("l-legend")).toHaveTextContent("Kader B");
+    expect(screen.getAllByText(/^Liga \d$/).map((node) => node.textContent)).toEqual(["Liga 1", "Liga 2"]);
+  });
+
+  it("zeigt unter zwei Seasons nichts", () => {
+    const { container } = render(<LeagueSeasonLine rows={HISTORY.slice(0, 1)} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Gold nur für Wappen und „Meister“ (Fabian 23.11.)", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/components/tls/league/leagueBadge.css"), "utf8");
+
+  it("der Beiname bleibt in seiner normalen Farbe, auch beim Meister", () => {
+    expect(css).toMatch(/\.tls-lbadge__nick \{[^}]*color: var\(--tls-brand, #29B6E8\)/);
+    expect(css).not.toMatch(/data-metal="gold"\][^{]*\.tls-lbadge__nick/);
+    expect(css).not.toMatch(/\.tls-lbadge__nick \{[^}]*--tls-lbadge-rgb/);
+    expect(css).toMatch(/\.tls-lbadge__champion \{[^}]*color: var\(--tls-honor\)/);
+  });
+
+  it("„Meister“ steht als eigener Teil neben dem Beinamen", () => {
+    render(<LeagueBadge badge={{ level: 1, nickname: "Elite", champion: true }} testId="m" />);
+    const label = screen.getByTestId("m-label");
+    expect(label.querySelector(".tls-lbadge__nick")).toHaveTextContent("Elite");
+    expect(label.querySelector(".tls-lbadge__nick")).not.toHaveTextContent("Meister");
+    expect(label.querySelector(".tls-lbadge__champion")).toHaveTextContent("Meister");
+  });
+});
+
+describe("Saisonverlauf: höchstens vier Co-Teams, der Rest als Text (Fabian 23.11.)", () => {
+  const team = (name, level, rank) => [1, 2].map((number) => ({ season_id: `s${number}`, season_name: `Season ${number}`,
+    closed_at: `2026-0${number}-01`, rank, of: 6, badge: { level }, display_name: name }));
+  const six = [team("Kader A", 1, 1), team("Kader B", 1, 3), team("Kader C", 2, 1), team("Kader D", 2, 2), team("Kader E", 3, 1),
+    team("Kader F", 3, 4)].flat();
+
+  it("zeigt die vier besten und nennt die übrigen", () => {
+    render(<LeagueSeasonLine rows={six} byTeam testId="l" />);
+    const legend = screen.getByTestId("l-legend");
+    expect([...legend.querySelectorAll("li")].map((node) => node.textContent)).toEqual(["Kader A", "Kader B", "Kader C", "Kader D"]);
+    expect(screen.getByTestId("l-more")).toHaveTextContent("und 2 weitere Co-Teams");
+  });
+
+  it("sagt es bei einem in der Einzahl", () => {
+    render(<LeagueSeasonLine rows={six.filter((row) => row.display_name !== "Kader F")} byTeam testId="l" />);
+    expect(screen.getByTestId("l-more")).toHaveTextContent("und 1 weiteres Co-Team");
+  });
+
+  it("ohne mehr als vier Co-Teams kein Hinweis", () => {
+    render(<LeagueSeasonLine rows={six.slice(0, 8)} byTeam testId="l" />);
+    expect(screen.queryByTestId("l-more")).toBeNull();
+  });
+});
+
+describe("Review #1638: Saisonlinie lesbar und per Tastatur erreichbar", () => {
+  const point = (name, number, level, rank) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
+    rank, of: 6, badge: { level }, display_name: name });
+
+  it("beschriftet den Platz nur am Anfang, am Ende und bei einem Wechsel, ohne Überdecken", () => {
+    const rows = [1, 2, 3, 4].map((number) => point("Kader A", number, 2, number === 3 ? 2 : 1))
+      .concat([1, 2, 3, 4].map((number) => point("Kader B", number, 2, 3)));
+    render(<LeagueSeasonLine rows={rows} byTeam testId="l" />);
+    expect(screen.getByTestId("l-rank-0-0")).toBeInTheDocument();
+    expect(screen.queryByTestId("l-rank-0-1")).toBeNull();
+    expect(screen.getByTestId("l-rank-0-2")).toHaveTextContent("2.");
+    expect(screen.getByTestId("l-rank-0-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("l-rank-1-1")).toBeNull();
+    const first = Number(screen.getByTestId("l-rank-0-0").getAttribute("y"));
+    const second = Number(screen.getByTestId("l-rank-1-0").getAttribute("y"));
+    expect(Math.abs(first - second)).toBeGreaterThanOrEqual(11);
+  });
+
+  it("überdeckt nie: auf demselben Punkt über, dann unter dem Punkt, ein drittes bleibt ohne Zahl", () => {
+    const same = ["Kader A", "Kader B", "Kader C"].flatMap((name) => [1, 2].map((number) => point(name, number, 2, 3)));
+    render(<LeagueSeasonLine rows={same} byTeam testId="l" />);
+    const above = Number(screen.getByTestId("l-rank-0-0").getAttribute("y"));
+    const below = Number(screen.getByTestId("l-rank-1-0").getAttribute("y"));
+    expect(below - above).toBeGreaterThanOrEqual(11);
+    expect(screen.queryByTestId("l-rank-2-0")).toBeNull();
+    expect(screen.getByRole("img", { name: /Kader C – Season 1: Liga 2, Platz 3/ })).toBeInTheDocument();
+  });
+
+  it("die Wischfläche ist per Tastatur erreichbar und benannt", () => {
+    render(<LeagueSeasonLine rows={[point("Kader A", 1, 1, 1), point("Kader A", 2, 1, 2)]} testId="l" />);
+    const region = screen.getByRole("region", { name: "Saisonverlauf, seitlich scrollbar" });
+    expect(region).toHaveAttribute("tabindex", "0");
+  });
+});
+
+describe("Review #1638: nichts mit „…“, nichts doppelt vorgelesen, Rückzug auf der Achse", () => {
+  const css = readFileSync(path.join(process.cwd(), "src/components/tls/league/leagueBadge.css"), "utf8");
+
+  it("die Bausteine kürzen nirgends mit „…“ - Namen, Beinamen und Legende brechen um (#1314)", () => {
+    const rules = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(rules).not.toMatch(/text-overflow\s*:\s*ellipsis/);
+    expect(rules).not.toMatch(/line-clamp/);
+    expect(rules).toMatch(/\.tls-lbadge__nick \{[^}]*overflow-wrap: anywhere/);
+    expect(rules).toMatch(/\.tls-season-line__legend li \{[^}]*overflow-wrap: anywhere/);
+    expect(rules).not.toMatch(/\.tls-lbadge__text \{[^}]*white-space: nowrap/);
+  });
+
+  it("der Co-Team-Name in „Aktuelle Ligen“ trägt den Umbruch-Baustein und steht ganz da", () => {
+    const long = "Donaudampfschifffahrtsgesellschaftskapitäne Nachwuchs";
+    render(<MemoryRouter><LeagueCurrent rows={[{ ...ROW, squad_name: long }]} nameOf={(row) => row.squad_name} testId="p" /></MemoryRouter>);
+    const name = screen.getByTestId("p-r1-name");
+    expect(name).toHaveTextContent(long);
+    expect(name.className).toContain("tls-wrap");
+  });
+
+  it("das Wappen neben dem Text schweigt für Screenreader - sonst hörte man „Liga 1 · Elite“ doppelt", () => {
+    render(<MemoryRouter><LeagueCurrent rows={[ROW]} testId="p" /></MemoryRouter>);
+    expect(screen.getByTestId("p-r1-badge")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("img", { name: /Liga 1/ })).toBeNull();
+    render(<LeagueBadge badge={{ level: 2 }} label={false} testId="alone" />);
+    expect(screen.getByTestId("alone")).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByRole("img", { name: "Liga 2" })).toBeInTheDocument();
+  });
+
+  const season = (number, name, level, rank, extra = {}) => ({ season_id: `s${number}`, season_name: name, closed_at: `2026-0${number}-01`, rank, of: 6,
+    badge: { level }, display_name: "Kader A", ...extra });
+  const ROWS = [season(1, "Herbst 2025/26", 2, 3), season(2, "Frühjahr 2026", 2, null, { exit: "withdrawn" }), season(3, "Herbst 2026/27", 1, 1, { champion: true })];
+
+  it("schreibt Season-Namen ungekürzt, lange in zwei Zeilen, den vollen Namen im title", () => {
+    render(<LeagueSeasonLine rows={ROWS} testId="l" />);
+    const label = screen.getByTestId("l-season-2");
+    expect(label.querySelector("title")).toHaveTextContent("Herbst 2026/27");
+    expect([...label.querySelectorAll("tspan")].map((node) => node.textContent)).toEqual(["Herbst", "2026/27"]);
+    expect(screen.getByTestId("l-svg").textContent).not.toContain("…");
+  });
+
+  it("rückt die Seasons so weit auseinander, wie der längste Name braucht", () => {
+    render(<LeagueSeasonLine rows={ROWS} testId="short" />);
+    const wide = ROWS.map((row, at) => (at === 1 ? { ...row, season_name: "Donaudampfschifffahrtssaison" } : row));
+    render(<LeagueSeasonLine rows={wide} testId="long" />);
+    expect(Number(screen.getByTestId("short-svg").getAttribute("data-step"))).toBe(75);
+    expect(Number(screen.getByTestId("long-svg").getAttribute("data-step"))).toBeGreaterThan(28 * 6);
+  });
+
+  it("zeigt den Rückzug als grauen Punkt „ausgetreten“ ohne Platz und unterbricht dort die Linie", () => {
+    render(<LeagueSeasonLine rows={ROWS} testId="l" />);
+    expect(screen.getAllByTestId(/^l-season-\d$/)).toHaveLength(3);
+    const exit = screen.getByTestId("l-exit-0-1");
+    expect(exit).toHaveAttribute("data-exit", "withdrawn");
+    expect(exit).toHaveTextContent("ausgetreten");
+    expect(screen.queryByTestId("l-rank-0-1")).toBeNull();
+    expect(screen.getByTestId("l-svg").querySelectorAll("polyline")).toHaveLength(2);
+    expect(screen.getByRole("img", { name: /Frühjahr 2026: Liga 2, ausgetreten; Herbst 2026\/27: Liga 1, Platz 1 von 6, Meister/ })).toBeInTheDocument();
+  });
+});
+
+describe("Review #1638 Runde 3: keine Beschriftung auf einem Kreis, Rückzüge nebeneinander", () => {
+  const row = (team, number, level, rank, extra = {}) => ({ season_id: `s${number}`, season_name: `Season ${number}`, closed_at: `2026-0${number}-01`,
+    rank, of: 12, badge: { level }, display_name: team, ...extra });
+  // Wie im Baustein: Grundlinie zwischen 9 px über und 16 px unter der Kreismitte trifft den Kreis.
+  const hits = (spot, cy) => spot > cy - 9 && spot < cy + 16;
+
+  function labelsOnCircles(svg) {
+    const out = [];
+    const circles = [...svg.querySelectorAll("circle")].map((node) => ({ cx: Number(node.getAttribute("cx")), cy: Number(node.getAttribute("cy")) }));
+    for (const text of svg.querySelectorAll(".tls-season-line__rank, .tls-season-line__exit")) {
+      const tx = Number(text.getAttribute("x"));
+      const ty = Number(text.getAttribute("y"));
+      for (const circle of circles) {
+        if (Math.abs(circle.cx - tx) <= 20 && hits(ty, circle.cy)) out.push(`${text.textContent} auf Kreis ${circle.cx},${circle.cy}`);
+      }
+    }
+    return out;
+  }
+
+  it("drei Co-Teams in Liga 3 auf Platz 1 bis 3 von 12: keine Platz-Zahl auf einem Kreis", () => {
+    const rows = ["Kader A", "Kader B", "Kader C"].flatMap((team, at) => [row(team, 1, 3, at + 1), row(team, 2, 3, 3 - at), row(team, 3, 3, at + 1)]);
+    render(<LeagueSeasonLine rows={rows} byTeam testId="l" />);
+    expect(labelsOnCircles(screen.getByTestId("l-svg"))).toEqual([]);
+    // Die oberste Zahl je Season steht trotzdem da.
+    expect(screen.getByTestId("l-svg").querySelectorAll(".tls-season-line__rank").length).toBeGreaterThan(0);
+  });
+
+  it("zwei Rückzüge in derselben Season und Liga N liegen nebeneinander, mit dem Rand in der Linienfarbe", () => {
+    const rows = [row("Kader A", 1, 2, 1), row("Kader A", 2, 2, null, { exit: "withdrawn" }), row("Kader A", 3, 2, 2),
+      row("Kader B", 1, 2, 3), row("Kader B", 2, 2, null, { exit: "disqualified" }), row("Kader B", 3, 2, 4)];
+    render(<LeagueSeasonLine rows={rows} byTeam testId="l" />);
+    const one = screen.getByTestId("l-exit-dot-0-1");
+    const two = screen.getByTestId("l-exit-dot-1-1");
+    expect(one.getAttribute("cy")).toBe(two.getAttribute("cy"));
+    expect(Math.abs(Number(one.getAttribute("cx")) - Number(two.getAttribute("cx")))).toBeGreaterThanOrEqual(10);
+    expect(one.getAttribute("stroke")).not.toBe(two.getAttribute("stroke"));
+    expect(labelsOnCircles(screen.getByTestId("l-svg"))).toEqual([]);
+  });
+});
+
+describe("Rückzugs-Texte aus einer Quelle (Review #1638)", () => {
+  it("Tabelle, Season-Historie und Saisonverlauf sagen dasselbe", async () => {
+    const { EXIT_TEXTS, exitText } = await import("@/lib/leagueTable");
+    const { exitLabel } = await import("@/lib/leagueBadge");
+    expect(exitText("withdrawn")).toBe(EXIT_TEXTS.withdrawn);
+    expect(exitLabel("disqualified")).toBe(EXIT_TEXTS.disqualified);
+    expect(exitText("unbekannt")).toBe("ausgeschieden");
+    expect(exitLabel("unbekannt")).toBe("ausgetreten");
+  });
+});

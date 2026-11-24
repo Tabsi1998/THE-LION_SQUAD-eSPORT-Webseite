@@ -336,11 +336,19 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     return await _standing_rows(db, t, user, is_staff)
 
 
+# Ohne vorgeladene Zonen fragt ``_standing_rows`` sie selbst ab (#1630).
+NO_ZONES = object()
+
+
 async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read_model=None,
-                        regs: list[dict] | None = None, own_ids: set[str] | None = None, live: bool = False) -> list[dict]:
+                        regs: list[dict] | None = None, own_ids: set[str] | None = None, live: bool = False,
+                        users: dict | None = None, zones=NO_ZONES) -> list[dict]:
     """Die Rangliste eines Turniers (#2121: nur wer dazugehört, Plätze erst mit dem ersten Ergebnis) - für die Seite,
     das Ergebnis-PDF und den TV. Der TV reicht Lesestand und Anmeldungen der Baum-Antwort weiter. Eine abgeschlossene
-    Liga-Staffel (F.1, #1645) liefert ihren Endstand statt einer Rechnung; ``live`` rechnet trotzdem (Verwaltung)."""
+    Liga-Staffel (F.1, #1645) liefert ihren Endstand statt einer Rechnung; ``live`` rechnet trotzdem (Verwaltung).
+
+    Laufende Ligen an Profil und Teamseite (#1630) rechnen viele Staffeln auf einmal: Sie reichen ``users`` (Personen je Kennung) und
+    ``zones`` (die geltenden Zonen der Liga N, ``None`` für keine) vorgeladen herein - dann fragt die Rechnung die Datenbank nicht."""
     tid = t["id"]
     if not live:
         from services.league_final_read import frozen_rows
@@ -375,9 +383,10 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     for r in regs:
         if removed_at.get(r.get("id")):
             r["removal_at"] = removed_at[r["id"]]
-    user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
-    users = {u["id"]: u for u in await db.users.find(
-        {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
+    if users is None:
+        user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
+        users = {u["id"]: u for u in await db.users.find(
+            {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) or 1)}
     for r in regs:
         u = users.get(r.get("user_id") or "", {})
         r["display_name"] = r.get("display_name") or u.get("display_name") or u.get("username")
@@ -396,9 +405,12 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read
     )
     if t.get("league_context"):
         # Zonen für Auf- und Abstieg (F.2, #1627): je Zeile ``zone`` - Website, TV, PDF und App lesen dieselbe Rechnung.
-        from services.league_zones import mark_rows
+        from services.league_zones import mark, mark_rows
 
-        await mark_rows(db, t, rows)
+        if zones is NO_ZONES:
+            await mark_rows(db, t, rows)
+        elif zones is not None:
+            mark(rows, zones)
         for row in rows:
             if row.get("registration_id") in late_from:
                 row["late_entry"] = True
