@@ -63,6 +63,12 @@ def _label(division: dict) -> str:
     return division_label(division)
 
 
+def league_badge(division: dict) -> dict | None:
+    from services.league_current import badge
+
+    return badge(division)
+
+
 def build_pages(divisions: list[dict], finals: list[dict], column_max: int | None = None) -> list[dict]:
     """Je Liga N (nach Stufe) eine Seite mit ihren Auf- und Absteigern - Liga N ohne Bewegung fallen weg.
 
@@ -81,19 +87,23 @@ def build_pages(divisions: list[dict], finals: list[dict], column_max: int | Non
         if not own:
             continue
         index = position[division["id"]]
-        targets = {UP: _label(ordered[index - 1]) if index > 0 else None,
-                   DOWN: _label(ordered[index + 1]) if index + 1 < len(ordered) else None, OUT: None}
+        neighbours = {UP: ordered[index - 1] if index > 0 else None,
+                      DOWN: ordered[index + 1] if index + 1 < len(ordered) else None, OUT: None}
+        targets = {move: _label(target) if target else None for move, target in neighbours.items()}
+        # Liga-Abzeichen (#2561): am TV neben „Liga N“ und neben der Ziel-Liga, in Discord als Zeichen je Stufe.
+        target_badges = {move: league_badge(target) if target else None for move, target in neighbours.items()}
         several = len(own) > 1
         rows = []
         for move in MOVE_ORDER:
             for final in own:
                 for row in movers(final.get("rows") or [])[move]:
                     rows.append({"registration_id": row["registration_id"], "name": row.get("display_name") or "Team",
-                                 "rank": row.get("rank"), "move": move, "target": targets[move],
+                                 "rank": row.get("rank"), "move": move, "target": targets[move], "target_badge": target_badges[move],
                                  "staffel": final.get("staffel") if several else None})
         if rows:
             shown, more = _per_column(rows, column_max)
-            pages.append({"division_id": division["id"], "level": division["level"], "label": _label(division), "staffeln": len(own),
+            pages.append({"division_id": division["id"], "level": division["level"], "label": _label(division),
+                          "badge": league_badge(division), "staffeln": len(own),
                           "rows": shown, "more_up": more[UP], "more_down": more[DOWN], "more": more[UP] + more[DOWN]})
     return pages
 

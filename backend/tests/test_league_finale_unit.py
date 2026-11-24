@@ -105,3 +105,16 @@ def test_successor_unit_lists_discord_among_the_copied_settings():
     from services.league_successor import COPIED_GROUPS
 
     assert any(group.startswith("Discord-Meldungen der Liga") for group in COPIED_GROUPS)
+
+
+def test_pages_unit_carry_the_league_badge_of_page_and_target():
+    """#2561: Am TV steht das Liga-Abzeichen neben „Liga N“ und neben der Ziel-Liga - dafür tragen Seite und Zeile die Stufe
+    wie überall (``league_current.badge``: level, nickname, champion)."""
+    finals = [
+        {"division_id": "d2", "staffel": "A", "rows": [row("b1", 1, "promotion"), row("b4", 4, "relegation"), row("b5", 5, "out")]},
+    ]
+    page = finale.build_pages(DIVISIONS, finals)[0]
+    assert page["badge"] == {"level": 2, "nickname": "Aufbau", "champion": False}
+    targets = {item["registration_id"]: item.get("target_badge") for item in page["rows"]}
+    assert targets == {"b1": {"level": 1, "nickname": None, "champion": False},
+                       "b4": {"level": 3, "nickname": None, "champion": False}, "b5": None}
