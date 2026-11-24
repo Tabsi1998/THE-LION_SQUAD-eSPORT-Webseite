@@ -516,7 +516,7 @@ function BracketTv() {
         <TvHeader
           className="tls-header-sweep"
           // Rot heißt „läuft gerade“ (#1116): der Punkt in der Kopfleiste nur, solange das Turnier läuft.
-          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : `THE LION SQUAD · ${words.kicker}`}
+          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : finale ? "THE LION SQUAD · LIGA" : `THE LION SQUAD · ${words.kicker}`}
           live={toneFor(t.status) === "live"}
           // Im Saisonfinale (#1641) geht es um die ganze Season, nicht um diese Staffel: „Saisonfinale“ als Kopf, Liga und Season darunter.
           title={finale ? "Saisonfinale" : t.title}
@@ -532,7 +532,7 @@ function BracketTv() {
           )}
         />
       ) : null}
-      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label={words.board} onRetry={load} />
+      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label={finale ? "Saisonfinale" : words.board} onRetry={load} />
       {/* Hinweis der Turnierleitung (#1166): nur mit „auch am TV zeigen“, solange er steht. */}
       <TvNoticeBand items={data?.notices} />
 
