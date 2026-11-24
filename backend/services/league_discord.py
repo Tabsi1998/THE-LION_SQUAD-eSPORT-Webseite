@@ -24,7 +24,9 @@
   und bei einer Meldung, die sich nicht aufbauen ließ. Nach dem Nachsehen im Kanal gibt die Leitung sie mit „Noch einmal senden“
   frei (``release``, Nr. 239): Der nächste Lauf sendet sie genau einmal.
 - **Nach einem Ausfall** (Nr. 240): Je Staffel geht nur der neueste fertige Spieltag hinaus; ältere, die liegen geblieben sind,
-  bekommen den Merker „skipped“ (Grund ``missed``) und gehen nie hinaus.
+  bekommen den Merker „skipped“ (Grund ``missed``) und gehen nicht von selbst hinaus. Sie stehen als leiser Hinweis im Kasten und
+  lassen sich mit „Noch einmal senden“ nachholen (Nr. 243). Eine Freigabe geht vor (Nr. 242): Ein freigegebener Spieltag wird nie
+  verworfen, auch wenn im selben Lauf ein neuerer fertig wird.
 - **Kein Rückfall**: ohne Kanal, ohne Bot oder mit Discord aus wird nichts gesendet und nichts belegt.
 """
 from __future__ import annotations
@@ -65,6 +67,7 @@ SKIPPED = "skipped"
 MAX_LEAGUE_FIELDS = 9
 UNCLEAR_TEXT = "Ob die Meldung ankam, ist unklar. Bitte im Kanal nachsehen - fehlt sie dort, gibst du sie mit „Noch einmal senden“ frei."
 BUILD_TEXT = "Die Meldung ließ sich nicht aufbauen. Ist der Fehler behoben, gibst du sie mit „Noch einmal senden“ frei."
+SKIPPED_TEXT = "Verworfen – nach einem Ausfall kam nur der neueste Spieltag. Mit „Noch einmal senden“ holst du ihn nach."
 NOT_APPROVED = ("Dieser Kanal ist nicht freigegeben. Wählbar sind die öffentlichen Kanäle unter Verbindungen → Discord → "
                 "Kanäle je Zweck (Community, News, Events und Turniere).")
 MOVE_SIGNS = {"up": "▲", "down": "▼", "out": "✕"}
@@ -606,7 +609,8 @@ def _open_query(season_id: str, now: datetime) -> dict:
     """Was die Leitung prüfen und freigeben kann: unklar, aufgegeben oder länger als ``RETRY_MINUTES`` „sending“ (Lauf abgebrochen)."""
     cutoff = (now - timedelta(minutes=RETRY_MINUTES)).isoformat()
     return {"season_id": season_id, "$or": [{"status": UNCLEAR}, {"status": "failed", "attempts": {"$gte": MAX_ATTEMPTS}},
-                                            {"status": "sending", "claimed_at": {"$lt": cutoff}}]}
+                                            {"status": "sending", "claimed_at": {"$lt": cutoff}},
+                                            {"status": SKIPPED, "reason": "missed"}]}
 
 
 async def problems(db, season_id: str, now: datetime | None = None) -> list[dict]:
@@ -624,9 +628,11 @@ async def problems(db, season_id: str, now: datetime | None = None) -> list[dict
     for row in rows:
         what = "Saisonende" if row.get("kind") == "season_end" else " · ".join(
             part for part in (f"Spieltag {row.get('matchday')}", titles.get(row.get("tournament_id"))) if part)
-        status = UNCLEAR if row.get("status") in (UNCLEAR, "sending") else "failed"
+        status = UNCLEAR if row.get("status") in (UNCLEAR, "sending") else SKIPPED if row.get("status") == SKIPPED else "failed"
         if status == UNCLEAR:
             text = UNCLEAR_TEXT
+        elif status == SKIPPED:
+            text = SKIPPED_TEXT
         elif row.get("error") == "build":
             text = BUILD_TEXT
         else:
