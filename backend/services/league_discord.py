@@ -155,18 +155,23 @@ def _esc(value) -> str:
     return escape_markdown(" ".join(str(value or "").split()))
 
 
+def discord_len(text) -> int:
+    """Länge wie Discord sie zählt (#2561 K5): in UTF-16 - 👑, 🔷 und 🔹 sind je zwei Zeichen."""
+    return len(str(text or "").encode("utf-16-le")) // 2
+
+
 def _fit(lines: list[str], limit: int, more: str) -> str:
     """Ganze Zeilen, bis das Feld voll ist - dann ein Satz, wie viele fehlen. Nie ein abgeschnittener Name."""
     out: list[str] = []
     used = 0
     for index, line in enumerate(lines):
         rest = len(lines) - index
-        tail = len(more.format(n=rest)) + 1 if rest > 1 else 0
-        if used + len(line) + 1 + tail > limit:
+        tail = discord_len(more.format(n=rest)) + 1 if rest > 1 else 0
+        if used + discord_len(line) + 1 + tail > limit:
             out.append(more.format(n=rest))
             break
         out.append(line)
-        used += len(line) + 1
+        used += discord_len(line) + 1
     return "\n".join(out)
 
 
@@ -218,7 +223,7 @@ def matchday_message(context: dict) -> dict:
     lines = [result_line(match) for match in context.get("matches") or []]
     opened = int(context.get("open") or 0)
     footer = open_text(opened) if opened else "Alle Spiele gewertet"
-    body = _fit(lines, DESCRIPTION_MAX - len(intro) - len(footer) - 4, "… und {n} weitere Spiele auf der Ligaseite")
+    body = _fit(lines, DESCRIPTION_MAX - discord_len(intro) - discord_len(footer) - 4, "… und {n} weitere Spiele auf der Ligaseite")
     fields = []
     rows = table_lines(context.get("table") or [], int(context.get("table_rows") or 0))
     if rows:
@@ -275,7 +280,7 @@ def season_end_message(context: dict) -> dict:
     fields = []
     rest = "Weitere Ligen"
     # Platz für den Hinweis auf weggefallene Liga N bleibt immer frei - der Rest geht an die Liga N der Reihe nach.
-    budget = EMBED_MAX - len(title) - len(description) - len(rest) - 60
+    budget = EMBED_MAX - discord_len(title) - discord_len(description) - discord_len(rest) - 60
     for index, page in enumerate(pages):
         # Höchstens 9 Liga N als Feld, wenn danach noch welche kommen - das zehnte Feld ist der Hinweis (K1).
         if index >= MAX_LEAGUE_FIELDS and len(pages) > MAX_LEAGUE_FIELDS + 1:
@@ -286,14 +291,14 @@ def season_end_message(context: dict) -> dict:
         if page.get("more"):
             lines.append(f"… und {page['more']} weitere auf der Season-Seite")
         name = marked(page["label"], page.get("level"))
-        value = _fit(lines, min(FIELD_MAX, budget - len(name)), "… und {n} weitere auf der Season-Seite")
-        if not value or len(name) + len(value) > budget:
+        value = _fit(lines, min(FIELD_MAX, budget - discord_len(name)), "… und {n} weitere auf der Season-Seite")
+        if not value or discord_len(name) + discord_len(value) > budget:
             left = len(pages) - index
             fields.append({"name": rest, "value": f"… und {left} weitere Liga N auf der Season-Seite" if left > 1
                            else "… und eine weitere Liga N auf der Season-Seite", "inline": False})
             break
         fields.append({"name": name, "value": value, "inline": False})
-        budget -= len(name) + len(value)
+        budget -= discord_len(name) + discord_len(value)
     if not fields:
         fields.append({"name": "Auf- und Abstieg", "value": "In dieser Season steigt niemand auf oder ab.", "inline": False})
     return {"title": title, "description": description, "fields": fields, "url": context.get("url"), "color": GOLD,
