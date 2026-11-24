@@ -428,9 +428,10 @@ async def _check_settings(db, season: dict, divisions: list[dict], before: dict[
         if division["id"] in closed and rules.sport_key(after[division["id"]]) != rules.sport_key(before[division["id"]]):
             raise PostseasonProblem(LOCKED.format(label=_label(division)), 409)
     if season_started(season):
+        # Ohne Blick auf an/aus (Nr. 249): Die Werte stehen auch im Zustand „aus“ fest. Wer die Playoffs nach dem Start aus- und
+        # wieder einschaltet oder erst einschaltet, bekommt die Werte vom Start - bzw. die Vorgaben, wenn es vorher keine gab.
         for division in divisions:
-            was, now_ = before[division["id"]], after[division["id"]]
-            if was["playoffs"]["enabled"] and now_["playoffs"]["enabled"] and _play_key(was) != _play_key(now_):
+            if _play_key(before[division["id"]]) != _play_key(after[division["id"]]):
                 raise PostseasonProblem(START_LOCKED.format(label=_label(division)))
     top = divisions[0] if divisions else None
     source = rules.stored(season)["champion_source"]
