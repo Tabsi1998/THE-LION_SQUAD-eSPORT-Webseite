@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.96.0 (24.11.2026)
+
+### Neu
+
+* Aufbewahrung der Fehlergruppen einstellbar, Vorgabe 30 Tage (#1657)
+* Betrieb → Fehler filtert nach Quelle und Text, die Kennung von der Fehlerseite sucht direkt (#1657)
+* Discord-Liga-Meldungen kennzeichnen jede Liga N mit einem Zeichen je Stufe (#2561)
+* Erreichbarkeit von Website, API und Datenbank wird jede Minute geprüft, Ausfall und Wiederkehr werden gemeldet (#1657)
+* Fehler aus Website und App stehen mit Quelle und Version unter Betrieb → Fehler, einschaltbar unter Alarme (ab Werk aus) (#1657)
+* Fehler werden ohne Meldungstext, Namen, Mails, Tokens und IP-Adressen gespeichert (#1657)
+* Hinweis-Formular sagt, dass auch Gäste mit Vor-Ort-QR-Code den Hinweis sehen (#2546)
+* Höchstzahl an Meldungen je Ereignisart und Stunde, danach eine Sammelmeldung (#1657)
+* Kein zweiter App-Push für Mitglieder, die zur News schon eine Mitglieder-Meldung bekamen (#2553)
+* Liga-Abzeichen am TV-Saisonfinale neben „Liga N“ und neben der Ziel-Liga (#2561)
+* Liga: „Beide nicht erschienen“ in Playoffs und Relegation – zählt beim ersten Mal, einmal neu ansetzen, dann scheiden beide aus und stehen einen Platz hinter den Verlierern ihrer Runde (#2404)
+* Liga: Best of, Spiel um Platz 3 und Heimrecht der Playoffs und das Best of der Relegation stehen fest, sobald die Season läuft, auch wenn die Season ihr Best of später ändert (#2404)
+* Liga: Einmal gestartet bleibt gestartet – läuft die Season, zählen Sperren und Fristen vom gemerkten Start, auch wenn das Startdatum verschoben wird (#2404)
+* Liga: In einer Liga mit Playoffs oder Relegation steht die Zahl der Staffeln ab dem ersten Abschluss fest, bei einer Relegation in beiden Ligen (#2404)
+* Liga: Meister wahlweise aus der Tabelle oder aus den Playoffs (#2404)
+* Liga: Ohne Playoffs in der obersten Liga ist Meister das beste verbliebene Team der Tabelle (#2404)
+* Liga: Playoffs je Liga aus dem Endstand – Setzliste über Kreuz, K.-o.-Baum mit Freilosen, Best of je Runde (#2404)
+* Liga: Relegation liegt immer hinter den Playoffs, kein Team spielt zweimal in einer Woche (#2404)
+* Liga: Relegation zwischen zwei Ligen mit Wirkung auf Auf- und Abstieg der nächsten Season (#2404)
+* Liga: Sperren für N Spiele zählen auch Playoff- und Relegationsspiele (#2404)
+* Ligaseite zeigt den Baum der Playoffs und die Paarungen der Relegation mit Ergebnis (#2404)
+* Obergrenze für neue Fehlergruppen aus Website und App je Tag, darüber eine Sammelgruppe (#1657)
+* Statusseite /status mit „Alles läuft“ und „Störung, wir sind dran“, verlinkt in der Fußzeile und auf den Fehlerseiten (#1657)
+* Tabelle kennzeichnet Playoff-Plätze, ein Gleichstand an der Grenze braucht vor dem Abschluss einen Entscheid (#2404)
+* Tägliche Zusammenfassung der Fehler an die Betreiber (#1657)
+* TV-Saisonfinale und Discord zeigen Auf- und Absteiger aus der Relegation (#2404)
+* Verwaltung: Playoffs und Relegation im Reiter „Abschluss“ einstellen, Setzung ansehen, anlegen und abschließen (#2404)
+* Vor-Ort-Ansicht zeigt die Hinweise der Turnierleitung als Banner (#2546)
+* Warnung bei Häufung von Serverfehlern mit einstellbarer Schwelle, Häufungen aus Website und App in der Tageszusammenfassung (#1657)
+
+### Fehlerbehebungen
+
+* App-Push zu News „Nur App“ erreicht nach einem Abbruch auch die übrigen Empfänger (#2553)
+* Discord-Liga-Meldungen zählen Längen wie Discord, auch mit Stufen-Zeichen (#2561)
+* Discord-Meldung zum Saisonende nennt den Meister aus den Playoffs (#2404)
+* Gescheiterte App-Pushes zu News „Nur App“ werden nachgeholt, gezählt wird nur Zugestelltes (#2553)
+* Mitglieder-News und App-Push fallen bei einem Fehler nicht mehr gemeinsam aus (#2553)
+* News „Nur App“ zählt auf der Website nicht mehr als gelesen (#2553)
+* News mit App-Push lässt sich nicht mehr löschen, sondern nur zurückziehen (#2553)
+* Prüftor verlangt einen bestandenen Test je Spec-Datei (#2556)
+* Prüftor-Ausnahme deckt keinen fehlenden Teilbericht mehr ab (#2556)
+* Prüftor-Kommentar entschärft Markdown-Links und -Bilder (#2556)
+* Prüftor-Kommentar meldet bei Abbruch „nicht gelaufen“ statt eines alten Stands (#2556)
+* Verteilen-Box kündigt bei schon veröffentlichten News „Nur App“ keinen App-Push mehr an (#2553)
+* Verteilen-Box nennt bei zu alten News den Grund statt „an 0 Personen“ (#2553)
+* Verteilen-Box sagt bei Mitglieder-News „schon veröffentlicht“ statt „schon öffentlich“ (#2553)
+
+### Schneller
+
+* Änderungen nur an PERFORMANCE_BUDGETS.md starten nur das Prüftor statt des ganzen Frontends (#2556)
+* App-Push zu News „Nur App“ geht gebündelt an Expo (#2553)
+
 ## 1.95.0 (24.11.2026)
 
 ### Neu
