@@ -221,9 +221,13 @@ for (const width of [320, 360, 390]) {
 
 // Dritte Prüfrunde (26.11.): Die Seiten mit Schlüssel in der Adresse schicken ihn nie als Referer weiter - weder an die eigene API
 // noch an Dritte. Im Betrieb setzt nginx „no-referrer“ schon für das Dokument; die Seite setzt es zusätzlich, bevor ein Abruf startet.
-for (const [path, ready] of [["/sammel-mail/einzeln?token=u1.sig", "digest-instant"], ["/newsletter/abbestellen?token=u1.sig", "newsletter-unsubscribe"]]) {
+for (const [path, ready, confirm, api] of [
+  ["/sammel-mail/einzeln?token=u1.sig", "digest-instant", "digest-instant-confirm", "/api/settings/notification-digest/instant"],
+  ["/newsletter/abbestellen?token=u1.sig", "newsletter-unsubscribe", "newsletter-unsubscribe-confirm", "/api/settings/newsletter/unsubscribe"],
+]) {
   test(`kein Schlüssel im Referer: ${path.split("?")[0]}`, async ({ page }) => {
     const leaked = [];
+    const posted = [];
     page.on("request", (request) => {
       const url = new URL(request.url());
       const referer = request.headers().referer || "";
@@ -231,14 +235,29 @@ for (const [path, ready] of [["/sammel-mail/einzeln?token=u1.sig", "digest-insta
         leaked.push(`${url.pathname} ← ${referer}`);
       }
     });
-    await page.route("**/api/**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, rhythm: "instant" }) }));
+    // Am Handy liegt der Cookie-Hinweis unten über dem Knopf (Pixel 5) - wie in den übrigen Specs vorher beantwortet.
+    await page.addInitScript(() => {
+      window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
+    });
+    // Die Seiten sind ohne Anmeldung gedacht: /auth/me sagt „nicht angemeldet“ (sonst stünde am Handy die Leiste der App
+    // davor). Der eigentliche Abruf wird mitgeschrieben - der Test prüft den echten Klick, nicht irgendeinen Knopf.
+    await page.route("**/api/**", (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.pathname === "/api/auth/me") return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Nicht angemeldet" }) });
+      if (url.pathname === api && request.method() === "POST") posted.push({ query: url.search, body: request.postDataJSON() });
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, rhythm: "instant" }) });
+    });
     await page.goto(path);
     await expect(page.getByTestId(ready)).toBeVisible();
     // Nach dem Entfernen des Schlüssels gibt die Seite die übliche Regel zurück (keine Navigation mit „no-referrer“).
     await expect(page).not.toHaveURL(/token=/);
     await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "strict-origin-when-cross-origin");
-    await page.getByRole("button").first().click();
-    await page.waitForTimeout(300);
+    await page.getByTestId(confirm).click();
+    await expect.poll(() => posted.length).toBe(1);
+    // Der Schlüssel geht im Body, nicht in der Adresse.
+    expect(posted[0]).toEqual({ query: "", body: { token: "u1.sig" } });
+    await expect(page.getByText(/Erledigt/)).toBeVisible();
     expect(leaked).toEqual([]);
   });
 }
