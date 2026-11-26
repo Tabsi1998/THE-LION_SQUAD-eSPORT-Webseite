@@ -23,8 +23,10 @@ async function mockServer(page, { user = member } = {}) {
   await page.route("**/api/users/me", (route) => route.fulfill(json(user)));
   await page.route("**/api/settings/public", (route) => route.fulfill(json({})));
   await page.route("**/api/membership/me", (route) => route.fulfill(json(MEMBERSHIP)));
-  await page.route("**/api/membership/me/self-service", (route) => route.fulfill(json(SELF_SERVICE)));
-  await page.route("**/api/membership/me/jersey-number", (route) => route.fulfill(json(JERSEY)));
+  // Die Karten laden wie im Betrieb etwas später als die Seite - der Sprung zum Anker muss darauf warten.
+  const later = (body) => async (route) => { await new Promise((resolve) => { setTimeout(resolve, 400); }); return route.fulfill(json(body)); };
+  await page.route("**/api/membership/me/self-service", later(SELF_SERVICE));
+  await page.route("**/api/membership/me/jersey-number", later(JERSEY));
   await page.route("**/api/membership/me/consents", (route) => route.fulfill(json({ available: true, consents: [] })));
   await page.route("**/api/membership/area-summary", (route) => route.fulfill(json({ meetings_open: 0, ballots_open: 0 })));
   await page.route("**/api/membership/me/helper-shifts", (route) => route.fulfill(json({ available: false })));
@@ -180,6 +182,33 @@ for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", {
         await page.getByTestId("mein-bereich-back").click();
         await expect.poll(() => new URL(page.url()).pathname).toBe("/mein-bereich");
       }
+    });
+
+    test("Häufig gebraucht: Wunschnummer und Anschrift springen zur Karte, auch wenn sie erst nach dem Laden kommt", async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await mockServer(page);
+      for (const [weg, ziel] of [["mein-bereich-schnell-nummer", "jersey-card"], ["mein-bereich-schnell-anschrift", "membership-self-form"]]) {
+        await page.goto("/mein-bereich");
+        await dismissCookies(page);
+        await page.getByTestId(weg).click();
+        await expect(page.getByTestId(ziel)).toBeVisible();
+        await expect.poll(async () => {
+          const box = await page.getByTestId(ziel).boundingBox();
+          return box && box.y >= 0 && box.y < viewport.height - 40;
+        }, { message: `${weg} springt zu ${ziel}` }).toBe(true);
+        expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+      }
+    });
+
+    test("Gruppenwechsel: der Fokus landet auf der Überschrift der neuen Gruppe", async ({ page }) => {
+      await mockServer(page);
+      await page.goto("/mein-bereich");
+      await dismissCookies(page);
+      if (form === "pc") await page.getByTestId("mein-bereich-nav-konto").click();
+      else await page.getByTestId("mein-bereich-liste-konto").click();
+      await expect(page.getByTestId("mein-bereich")).toHaveAttribute("data-gruppe", "konto");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Konto & Sicherheit");
+      await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
     });
 
     test("Tastatur: Seitenleiste und Reiter gehen ohne Maus, der Fokus landet auf der Überschrift", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -6,14 +6,8 @@ import { BEREICH } from "@/lib/meinBereich";
 import "./meinBereich.css";
 
 // Rahmen jeder Gruppe in „Mein Bereich“ (#2059): Überschrift, ein Satz, Aktionen rechts, darunter die Reiter der Gruppe.
-// Am Handy steht oben ein Knopf zurück zur Liste der Gruppen (oder zur übergeordneten Gruppe, `back`). Nach einem
-// Wechsel innerhalb von „Mein Bereich“ geht der Fokus auf die Überschrift - Tastatur und Vorleser landen im Inhalt.
-
-let focusWanted = false;
-/** Die Seitenleiste meldet einen Wechsel - die nächste Gruppe holt den Fokus auf ihre Überschrift. */
-export function requestHeadingFocus() {
-  focusWanted = true;
-}
+// Am Handy steht oben ein Knopf zurück zur Liste der Gruppen (oder zur übergeordneten Gruppe, `back`). Den Fokus auf
+// die Überschrift nach einem Wechsel setzt der Rahmen (MeinBereichLayout) - er wartet, bis sie da ist.
 
 export function BereichZurueck({ to = BEREICH, label = "Mein Bereich", className = "", testId = "mein-bereich-back" }) {
   return (
@@ -84,18 +78,13 @@ export function BereichSeite({ title, intro, actions, reiter, back, tabKey = "",
   // Beim ersten Zeichnen blendet schon der Rahmen ein (MeinBereichLayout) - hier nur beim Wechsel des Reiters.
   const [firstTab] = useState(tabKey);
   useDocumentTitle(`${docTitle || title} · Mein Bereich`, intro || "Mein Bereich", { robots: "noindex, nofollow" });
-  useEffect(() => {
-    if (!focusWanted) return;
-    focusWanted = false;
-    headingRef.current?.focus({ preventScroll: true });
-  }, []);
   return (
     <section aria-labelledby={headingId} data-testid={testId}>
       {back !== false ? <BereichZurueck {...(back || {})} className="mb-5 lg:hidden" /> : null}
       {back ? <BereichZurueck {...back} testId="mein-bereich-back-desktop" className="mb-5 hidden lg:inline-flex" /> : null}
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
-          <h1 id={headingId} ref={headingRef} tabIndex={-1} className="tls-wrap font-heading text-3xl md:text-4xl font-black uppercase focus:outline-none">{title}</h1>
+          <h1 id={headingId} ref={headingRef} tabIndex={-1} data-mein-bereich-titel="" className="tls-wrap font-heading text-3xl md:text-4xl font-black uppercase focus:outline-none">{title}</h1>
           {intro ? <p className="mt-2 max-w-2xl text-sm text-white/60">{intro}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

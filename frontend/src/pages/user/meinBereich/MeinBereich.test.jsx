@@ -26,6 +26,8 @@ const { default: MeinBereichLayout } = await import("./MeinBereichLayout");
 const { default: UebersichtSeite } = await import("./UebersichtSeite");
 const { RechnungenSeite, MitgliedschaftSeite } = await import("./GruppenSeiten");
 const { MeinBereichUmleitung } = await import("./Umleitung");
+const { BereichSeite } = await import("./BereichSeite");
+const { useEffect, useState } = await import("react");
 
 function Wo() {
   const location = useLocation();
@@ -139,4 +141,74 @@ test.each([
   const where = screen.getAllByTestId("wo").at(-1);
   expect(where).toHaveAttribute("data-search", search);
   expect(where).toHaveAttribute("data-hash", hash);
+});
+
+// Fokus nach einem Wechsel (Prüfung #2059): unabhängig davon, ob die Gruppe oder der Rahmen zuerst fertig ist - so wie
+// im Produktions-Build, wo Effekte der Seite vor denen des Rahmens laufen.
+function Gruppe({ title, children }) {
+  return <BereichSeite title={title} testId={`gruppe-${title}`}>{children}</BereichSeite>;
+}
+
+test("Wechsel in der Seitenleiste: der Fokus landet auf der Überschrift der neuen Gruppe", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={["/mein-bereich/profil"]}>
+      <Routes>
+        <Route path="/mein-bereich" element={<MeinBereichLayout />}>
+          <Route path="profil" element={<Gruppe title="Profil" />} />
+          <Route path="konto" element={<Gruppe title="Konto & Sicherheit" />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByRole("heading", { level: 1, name: "Profil" })).not.toHaveFocus();
+  await user.click(screen.getByTestId("mein-bereich-nav-konto"));
+  const heading = await screen.findByRole("heading", { level: 1, name: "Konto & Sicherheit" });
+  await waitFor(() => expect(heading).toHaveFocus());
+});
+
+test("ein Reiterwechsel ist kein Gruppenwechsel: der Fokus bleibt auf dem Reiter", async () => {
+  const user = userEvent.setup();
+  renderAt("/mein-bereich/rechnungen");
+  const strafen = await screen.findByTestId("mein-bereich-tab-strafen");
+  await user.click(strafen);
+  await waitFor(() => expect(screen.getByTestId("mein-bereich-tab-strafen")).toHaveAttribute("aria-current", "page"));
+  await new Promise((resolve) => { setTimeout(resolve, 150); });
+  expect(screen.getByRole("heading", { level: 1 })).not.toHaveFocus();
+  expect(screen.getByTestId("mein-bereich-tab-strafen")).toHaveFocus();
+});
+
+// Anker, deren Ziel erst nach dem Laden kommt (Prüfung #2059): #nummer steht in einer Karte, die ihre Daten selbst holt.
+function SpaeteKarte() {
+  const [da, setDa] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setDa(true), 120);
+    return () => clearTimeout(timer);
+  }, []);
+  return <Gruppe title="Mitgliedschaft">{da ? <div id="nummer" data-testid="spaete-karte">Meine Nummer</div> : <p>lädt</p>}</Gruppe>;
+}
+
+test("Wunschnummer aus „Häufig gebraucht“: der Sprung wartet, bis die Karte da ist", async () => {
+  const user = userEvent.setup();
+  authState.user = { ...authState.user, is_club_member: true };
+  const scrolled = [];
+  const original = window.Element.prototype.scrollIntoView;
+  window.Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this.id || this.tagName); };
+  try {
+    render(
+      <MemoryRouter initialEntries={["/mein-bereich"]}>
+        <Routes>
+          <Route path="/mein-bereich" element={<MeinBereichLayout />}>
+            <Route index element={<UebersichtSeite />} />
+            <Route path="mitgliedschaft" element={<SpaeteKarte />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByTestId("mein-bereich-schnell-nummer"));
+    expect(await screen.findByTestId("spaete-karte")).toBeInTheDocument();
+    await waitFor(() => expect(scrolled).toContain("nummer"));
+  } finally {
+    window.Element.prototype.scrollIntoView = original;
+  }
 });

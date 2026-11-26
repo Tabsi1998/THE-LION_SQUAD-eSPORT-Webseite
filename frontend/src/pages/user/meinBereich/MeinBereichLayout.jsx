@@ -1,5 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { motionAllowed } from "@/lib/motion";
+import { warteAufElement } from "@/lib/warteAufElement";
 import { Crown } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -11,7 +13,6 @@ import { isAnyAdmin } from "@/lib/permissions";
 import { BEREICH, gruppeZuPfad, gruppenFuer } from "@/lib/meinBereich";
 import { zuTun } from "@/lib/meinBereichZuTun";
 import { BereichSeitenleiste } from "./BereichNav";
-import { requestHeadingFocus } from "./BereichSeite";
 import "./meinBereich.css";
 
 // „Mein Bereich“ (#2059): ein Rahmen für alle acht Gruppen. Am PC links die Seitenleiste (steht still, nur der Inhalt
@@ -79,7 +80,7 @@ function Identitaet({ user }) {
 
 export default function MeinBereichLayout() {
   const { user, adminNeedsSecondFactor } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, hash, key } = useLocation();
   const mitglied = siehtVerein(user);
   const gruppen = useMemo(() => gruppenFuer({ mitglied }), [mitglied]);
   const aktiv = gruppeZuPfad(pathname);
@@ -87,15 +88,25 @@ export default function MeinBereichLayout() {
   // Die Zahl an der Gruppe zählt wie die Seite selbst (Sprungleiste „Versammlung · 3 offen“), nicht die Knöpfe.
   const offen = useMemo(() => todo.items.reduce((acc, item) => ({ ...acc, [item.gruppe]: (acc[item.gruppe] || 0) + (item.anzahl || 1) }), {}), [todo.items]);
 
-  // Nach einem Wechsel innerhalb von „Mein Bereich“ holt die neue Gruppe den Fokus auf ihre Überschrift.
-  const first = useRef(true);
+  // Nach einem Wechsel innerhalb von „Mein Bereich“: mit Anker (#nummer, #meine-daten, #passwort) zum Ziel, sonst der
+  // Fokus auf die Überschrift der neuen Gruppe. Beides wartet, bis das Ziel da ist - Karten und Gruppen laden nach, und
+  // im Produktions-Build ist die Gruppe nicht vor dem Rahmen fertig. Ohne Abhängigkeit von der Reihenfolge der Effekte.
+  // Ein Reiterwechsel (?tab=) ist kein Gruppenwechsel - der Fokus bleibt dann auf dem Reiter.
+  const letzterPfad = useRef(null);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
+    const neueGruppe = letzterPfad.current !== null && letzterPfad.current !== pathname;
+    letzterPfad.current = pathname;
+    const anker = hash ? decodeURIComponent(hash.slice(1)) : "";
+    if (anker) {
+      return warteAufElement(() => document.getElementById(anker), (ziel) => {
+        ziel.scrollIntoView({ block: "start", inline: "nearest", behavior: motionAllowed() ? "smooth" : "auto" });
+      });
     }
-    requestHeadingFocus();
-  }, [pathname]);
+    if (!neueGruppe) return undefined;
+    return warteAufElement(() => document.querySelector("[data-testid='mein-bereich-inhalt'] [data-mein-bereich-titel]"), (titel) => {
+      titel.focus({ preventScroll: true });
+    });
+  }, [pathname, hash, key]);
 
   const context = useMemo(() => ({ todo, offen, gruppen, mitglied, user }), [todo, offen, gruppen, mitglied, user]);
   if (!user) return null;
