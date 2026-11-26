@@ -120,7 +120,7 @@ test("das Paket holt sich den Moment vor dem Zeigen beim Server - nur, was diese
   // Läuft die Prüfung doppelt (React im Entwicklungsmodus), fragt sie nicht ein zweites Mal - sonst hielte sie sich selbst für „schon gesehen“.
   await expect(pkg.check()).resolves.toEqual({ moments: [moment("up")] });
   expect(client.post).toHaveBeenCalledTimes(1);
-  expect(client.post).toHaveBeenCalledWith("/me/league-moments/seen", { ids: ["m-up"] });
+  expect(client.post).toHaveBeenCalledWith("/me/league-moments/seen", { ids: ["m-up"], token: expect.any(String) });
   // Ein neues Paket (anderes Gerät, neu geladen) bekommt ihn nicht mehr.
   await expect(momentPackage(moment("up"), client).check()).resolves.toEqual({ moments: [] });
   const failing = momentPackage(moment("up"), { post: vi.fn().mockRejectedValue(new Error("offline")) });

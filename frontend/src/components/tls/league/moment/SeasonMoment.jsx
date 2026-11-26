@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
@@ -7,9 +7,12 @@ import { motionTransition } from "@/lib/motion";
 import { badgeTier } from "@/lib/leagueBadge";
 import { Crown, FIELD, LeagueBadge, SHIELD, Shield, paint } from "@/components/tls/league/LeagueBadge";
 import { TrophyCup } from "@/components/tls/TrophyShelf";
+import { RewardCardContent } from "@/components/tls/rewards/RewardMoment";
 import "./seasonMoment.css";
 
 const METALS = { champion: "gold", up: "lion", down: "calm" };
+// Das Wappen: Gold für den Meister, Cyan hinauf, ruhiges Grau-Blau hinunter (F.8).
+const CREST_METALS = { champion: "gold", up: "cyan", down: "calm" };
 
 function CrestNumber({ value, className }) {
   const text = String(value ?? "");
@@ -33,7 +36,7 @@ function MomentCrest({ moment }) {
   const tierBefore = badgeTier(before) || "base";
   const tierAfter = badgeTier(after) || "base";
   return (
-    <span className="tls-lbadge tls-season-moment__crest" data-metal={moment.outcome === "champion" ? "gold" : "cyan"}
+    <span className="tls-lbadge tls-season-moment__crest" data-metal={CREST_METALS[moment.outcome] || "cyan"}
       data-tier={tierAfter} data-testid="season-moment-crest">
       <span className="tls-season-moment__glow" aria-hidden="true" />
       <svg viewBox="0 0 64 80" className="tls-season-moment__svg" aria-hidden="true" focusable="false">
@@ -89,6 +92,9 @@ function ChampionStage({ moment }) {
  * - Abstieg: ruhig - das Wappen setzt sich, die Zahl wechselt ohne Nachfedern, kein Glanz; der Text schaut auf die nächste Season.
  * - Die Zeilen folgen gestaffelt. „Bewegung reduzieren“ oder „Zeremonien dezent“: gleich der Endzustand.
  *
+ * Meister mit Belohnungen (Fabian 26.11., A): ein Ablauf - „Weiter“ zeigt die Belohnungen als zweite Karte in derselben Karte, ohne
+ * neues Aufpoppen. Nach einer Korrektur steht oben „Endstand korrigiert“ (B).
+ *
  * Schließen mit X, Escape, Tipp daneben oder „Weiter“; der Fokus bleibt in der Karte (useModalBehavior). Läuft über den Zeremonie-Host -
  * nie zugleich mit einer anderen Zeremonie.
  */
@@ -97,10 +103,23 @@ export function SeasonMoment({ plan, onClose, reduced = false }) {
   const cardRef = useModalBehavior(true, onClose);
   const titleId = useId();
   const textId = useId();
+  const rewardTitleId = useId();
+  const rewards = plan.rewards || [];
+  const [step, setStep] = useState("moment");
+  const onRewardsShown = plan.onRewardsShown;
+  useEffect(() => {
+    if (step !== "rewards") return;
+    onRewardsShown?.();
+    // Der Inhalt wechselt in derselben Karte - der Fokus geht an ihren Anfang, Screenreader lesen den neuen Titel.
+    cardRef.current?.focus?.();
+  }, [step, onRewardsShown, cardRef]);
   if (!moment) return null;
   const outcome = moment.outcome;
   const texts = moment.texts || {};
+  const onRewards = step === "rewards";
+  const advance = () => (rewards.length && !onRewards ? setStep("rewards") : onClose());
   const lines = [
+    texts.notice ? <p key="notice" className="tls-season-moment__notice" data-testid="season-moment-notice">{texts.notice}</p> : null,
     <p key="kicker" className="tls-placement__label" data-testid="season-moment-kicker">{texts.kicker}</p>,
     <h2 key="title" id={titleId} className="tls-placement__title font-heading" data-testid="season-moment-title">{texts.title}</h2>,
     <p key="name" className="tls-placement__name" data-testid="season-moment-name">{texts.name}</p>,
@@ -114,8 +133,8 @@ export function SeasonMoment({ plan, onClose, reduced = false }) {
       className="tls-placement tls-season-moment"
       role="dialog"
       aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={textId}
+      aria-labelledby={onRewards ? rewardTitleId : titleId}
+      aria-describedby={onRewards ? undefined : textId}
       data-testid="season-moment"
       data-outcome={outcome}
       data-metal={METALS[outcome] || "lion"}
@@ -139,6 +158,18 @@ export function SeasonMoment({ plan, onClose, reduced = false }) {
         <button type="button" onClick={onClose} className="tls-placement__close" aria-label="Schließen" data-testid="season-moment-close">
           <X className="h-5 w-5" />
         </button>
+        {onRewards ? (
+          <div className="tls-season-moment__rewards" data-testid="season-moment-rewards">
+            <RewardCardContent awards={rewards} onClose={onClose} reduced={reduced} titleId={rewardTitleId} />
+            <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": 5 }}>
+              <button type="button" onClick={advance} data-testid="season-moment-done"
+                className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                Fertig
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="tls-season-moment__stage" aria-hidden="true">
           {outcome === "champion" ? <ChampionStage moment={moment} /> : <MomentCrest moment={moment} />}
         </div>
@@ -162,11 +193,13 @@ export function SeasonMoment({ plan, onClose, reduced = false }) {
               Endstand ansehen
             </Link>
           ) : null}
-          <button type="button" onClick={onClose} data-testid="season-moment-done"
+          <button type="button" onClick={advance} data-testid="season-moment-done"
             className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
             Weiter
           </button>
         </div>
+        </>
+        )}
       </motion.div>
     </motion.div>
   );

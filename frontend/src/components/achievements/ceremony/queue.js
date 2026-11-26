@@ -71,6 +71,7 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     let entry;
     if (pkg.moments?.length) {
       entry = { id: pkg.id || `moments-${pkg.moments.map((row) => row.id).join("-")}`, tiers: [], context: {}, levelUp: null, moments: pkg.moments,
+        rewards: pkg.rewards?.length ? pkg.rewards : null, onRewardsShown: pkg.onRewardsShown || null,
         onDone: pkg.onDone || null, check: pkg.check || null, checked: false };
     } else if (pkg.rewards?.length) {
       entry = { id: pkg.id || `rewards-${pkg.rewards.map((row) => row.id).join("-")}`, tiers: [], context: {}, levelUp: null, rewards: pkg.rewards, onDone: pkg.onDone || null };
@@ -126,6 +127,8 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     refine,
     clear,
     getCurrent: () => state.current,
+    // Steht ein Paket mit dieser Kennung schon an (läuft oder wartet)? „Moment ansehen“ legt ihn nur einmal hinein (#1639).
+    has: (id) => Boolean(id) && (state.current?.id === id || state.pending.some((item) => item.id === id)),
     getPendingCount: () => state.pending.length,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   };

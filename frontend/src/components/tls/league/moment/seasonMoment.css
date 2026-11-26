@@ -24,7 +24,10 @@
 }
 .tls-season-moment__stage { display: flex; justify-content: center; margin: 4px 0 18px; }
 
-/* Das Wappen: die Farben aus leagueBadge.css (.tls-lbadge), hier groß. */
+/* Das Wappen: die Farben aus leagueBadge.css (.tls-lbadge), hier groß. Abstieg in ruhigem Grau-Blau statt Cyan (F.8). */
+.tls-season-moment__crest[data-metal="calm"] {
+  --tls-lbadge-rgb: 148 163 184; --tls-lbadge-light: #D5DDE7; --tls-lbadge-base: #94A3B8; --tls-lbadge-dark: #475569;
+}
 .tls-season-moment__crest {
   --tls-lbadge-w: 96px;
   position: relative; display: inline-block; width: var(--tls-lbadge-w); height: calc(var(--tls-lbadge-w) * 1.25); line-height: 0;
@@ -49,6 +52,15 @@
 }
 .tls-season-moment__badge { position: relative; z-index: 1; display: inline-flex; padding-bottom: 6px; }
 
+/* Nach einer Korrektur (Fabian 26.11., B): ein ruhiges Schild über allem - keine Warnfarbe. */
+.tls-season-moment__notice {
+  display: inline-flex; margin-bottom: 8px; padding: 3px 10px; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.18);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.75);
+}
+/* Zweite Karte (Belohnungen des Meisters, A): Die Zeilen folgen gleich, nicht erst nach dem Wappen. */
+.tls-season-moment .tls-placement__card[data-play="run"] .tls-season-moment__rewards .tls-placement__line {
+  animation-delay: calc(var(--tls-i, 0) * var(--tls-stagger-step));
+}
 /* Ausgewogene Zeilen: „Nächste Season in Liga 2“ bricht nie so, dass die Zahl allein steht. */
 .tls-season-moment .tls-placement__title, .tls-season-moment__line, .tls-season-moment__next { text-wrap: balance; }
 /* Text: der Satz und der Blick auf die nächste Season. Lange Namen brechen um, nie „…“. */

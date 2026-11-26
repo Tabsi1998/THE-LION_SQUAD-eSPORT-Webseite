@@ -9,8 +9,11 @@ import { ceremonyQueue } from "@/components/achievements/ceremony/queue";
 const ICONS = { up: ArrowUp, down: ArrowDown, champion: Crown };
 const TONES = { up: "text-ok", down: "text-white/70", champion: "text-honor" };
 
+/** Noch einmal abspielen - ohne Zählung, und nur einmal in der Schlange, egal wie oft gedrückt. */
 export function replayMoment(moment, queue = ceremonyQueue) {
-  queue.enqueue({ id: `moment-replay-${moment.id}-${Date.now()}`, moments: [moment] });
+  const id = `moment-replay-${moment.id}`;
+  if (queue.has?.(id)) return;
+  queue.enqueue({ id, moments: [moment] });
 }
 
 export function LeagueMomentHint({ rows, canReplay = false, testId = "league-moments", queue = ceremonyQueue }) {

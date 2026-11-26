@@ -124,17 +124,19 @@ export function planCeremony(pkg) {
   if (pkg?.placement) {
     return { id: pkg.id || `placement-${pkg.placement.key}`, sequence: "placement", placement: pkg.placement, particles: 0, tiers: [], levelUp: null };
   }
+  // Saisonende-Moment (#1639): Aufstieg, Abstieg oder Meister - ruhig, ohne Partikel (components/tls/league/moment/SeasonMoment). Der
+  // Meister bringt seine Belohnungen als zweite Karte mit (Fabian 26.11., A).
+  if (pkg?.moments?.length) {
+    return { id: pkg.id || `moments-${pkg.moments[0].id}`, sequence: "season", moment: pkg.moments[0], moments: pkg.moments,
+      rewards: pkg.rewards || [], onRewardsShown: pkg.onRewardsShown || null, particles: 0, tiers: [], levelUp: null };
+  }
   // Belohnungen der Liga (F.4, #2214): ruhig wie der Sieger-Moment - eigener Ablauf ohne Partikel (components/tls/rewards/RewardMoment).
+  // Auch, wenn ein anderes Gerät den Moment davor schon hatte: Die Belohnungen bleiben.
   if (pkg?.rewards?.length) {
     return { id: pkg.id || `rewards-${pkg.rewards[0].id}`, sequence: "reward", rewards: pkg.rewards, particles: 0, tiers: [], levelUp: null };
   }
-  // Saisonende-Moment (#1639): Aufstieg, Abstieg oder Meister - ruhig, ohne Partikel (components/tls/league/moment/SeasonMoment). Hat die
-  // Prüfung vor dem Anzeigen nichts übrig gelassen (ein anderes Gerät war schneller), gibt es nichts zu zeigen.
-  if (pkg?.moments) {
-    if (!pkg.moments.length) return null;
-    return { id: pkg.id || `moments-${pkg.moments[0].id}`, sequence: "season", moment: pkg.moments[0], moments: pkg.moments, particles: 0,
-      tiers: [], levelUp: null };
-  }
+  // Hat die Prüfung vor dem Anzeigen keinen Moment übrig gelassen (ein anderes Gerät war schneller) und nichts mitgebracht: nichts zu zeigen.
+  if (pkg?.moments) return null;
   const levelUp = pkg?.levelUp || null;
   const tiers = sortByRank((pkg?.tiers || []).filter((t) => !isNegative(t)));
   if (!tiers.length && !levelUp) return null;
