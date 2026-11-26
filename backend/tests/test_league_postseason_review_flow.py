@@ -987,14 +987,17 @@ async def test_a_relegation_fixes_the_staffeln_of_both_divisions_once_one_is_clo
 
 @pytest.mark.asyncio
 async def test_the_captains_hear_who_is_champion_without_playoffs(flow):
-    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 2}, "champion_source": "playoffs"})
+    world = await build(flow, postseason={"playoffs": {"enabled": True, "per_staffel": 2}, "champion_source": "playoffs"},
+                        season={"visibility": "public"})
     tid = world["tids"][1][0]
     teams = world["regs"][tid]
     for index in (0, 1, 3):
         await remove(flow, world, tid, teams[index]["id"])
     await close(flow, world)
-    notes = await flow.db.notifications.find({"meta.reason": "league_final", "title": "Staffel abgeschlossen"}, {"_id": 0}).to_list(50)
-    assert notes and all(f"Meister: {teams[2]['display_name']}." in note["body"] for note in notes)
+    # Nur der Meister ist noch dabei: Er erfährt es mit seinem Saisonende-Moment - eine Nachricht, nicht zwei (#1639, Fabian 26.11., A).
+    assert await flow.db.notifications.count_documents({"meta.reason": "league_final", "title": "Staffel abgeschlossen"}) == 0
+    notes = await flow.db.notifications.find({"meta.reason": "league_moment"}, {"_id": 0}).to_list(50)
+    assert notes and all(note["title"] == f"Meister: {teams[2]['display_name']}" for note in notes)
 
 
 # ================================================================ Runde 6: Nr. 256 - gesperrt und gemerkt wird erst, wenn die Season
