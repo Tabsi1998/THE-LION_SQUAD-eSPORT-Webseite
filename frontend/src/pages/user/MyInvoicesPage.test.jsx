@@ -26,7 +26,11 @@ const DATA = {
   ],
 };
 
+// Die geteilte Anfrage (#2059) merkt sich Antworten kurz - jeder Test fragt frisch.
+const { gemeinsamVergessen } = await import("@/lib/gemeinsamLaden");
+
 beforeEach(() => {
+  gemeinsamVergessen();
   vi.clearAllMocks();
   apiMock.get.mockResolvedValue({ data: DATA });
 });

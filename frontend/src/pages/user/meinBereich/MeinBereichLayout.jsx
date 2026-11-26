@@ -11,7 +11,8 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { isAnyAdmin } from "@/lib/permissions";
 import { BEREICH, gruppeZuPfad, gruppenFuer } from "@/lib/meinBereich";
-import { zuTun } from "@/lib/meinBereichZuTun";
+import { zuTun, zuTunNachladen } from "@/lib/meinBereichZuTun";
+import { gemeinsamLaden } from "@/lib/gemeinsamLaden";
 import { BereichSeitenleiste } from "./BereichNav";
 import "./meinBereich.css";
 
@@ -27,16 +28,19 @@ export function siehtVerein(user) {
 function useZuTunDaten(user, mitglied, secondFactor) {
   const [state, setState] = useState({ items: [], loaded: false });
   const userId = user?.id || "";
-  const load = useCallback(() => {
-    if (!userId) return;
-    const member = (path) => (mitglied ? api.get(path) : Promise.resolve({ data: null }));
+  const load = useCallback((event) => {
+    if (!userId || !zuTunNachladen(event)) return;
+    // Rechnungen, Mitgliedschaft und Vereins-Übersicht holt die geöffnete Seite auch - eine Anfrage für beide.
+    const frisch = Boolean(event);
+    const geteilt = (path) => gemeinsamLaden(path, { frisch });
+    const member = (path, get = api.get) => (mitglied ? get(path) : Promise.resolve({ data: null }));
     Promise.allSettled([
-      api.get("/account/invoices"),
+      geteilt("/account/invoices"),
       api.get("/prizes/me/open-count"),
-      member("/membership/me"),
+      member("/membership/me", geteilt),
       member("/membership/me/consents"),
       member("/membership/me/jersey-number"),
-      member("/membership/area-summary"),
+      member("/membership/area-summary", geteilt),
     ]).then(([invoices, prizes, membership, consents, jersey, area]) => {
       const value = (result) => (result.status === "fulfilled" && result.value?.data && typeof result.value.data === "object" ? result.value.data : null);
       setState({

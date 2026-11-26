@@ -19,6 +19,7 @@ import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 import { DiscordVoice } from "@/components/tls/DiscordNow";
 import { viennaDate } from "@/lib/vienna";
+import { gemeinsamLaden } from "@/lib/gemeinsamLaden";
 import { BEREICH, vereinPfad } from "@/lib/meinBereich";
 
 // Der Mitgliederbereich (#284, #1336, #1257): oben die eigene Mitgliedskarte mit „Hallo“, „Mitglied seit“ und dem
@@ -100,15 +101,17 @@ export default function MemberAreaPage() {
   const [answering, setAnswering] = useState("");
   const [loaded, setLoaded] = useState(false);
 
-  const load = useCallback(() => {
+  const load = useCallback((event) => {
+    // Mitgliedschaft und Übersicht teilt sich die Seite mit „Zu tun“ im Rahmen (#2059) - nach einer Änderung frisch.
+    const frisch = Boolean(event);
     Promise.allSettled([
       api.get("/membership/benefits"),
-      api.get("/membership/me"),
+      gemeinsamLaden("/membership/me", { frisch }),
       api.get("/documents", { params: { scope: "club" } }),
       api.get("/news"),
       api.get("/board?active_only=true"),
       api.get("/settings/public"),
-      api.get("/membership/area-summary"),
+      gemeinsamLaden("/membership/area-summary", { frisch }),
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
       api.get("/membership/discord-servers"),

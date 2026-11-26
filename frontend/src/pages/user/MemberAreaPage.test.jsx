@@ -49,7 +49,11 @@ function renderPage() {
   return render(<MemoryRouter><MemberAreaPage /></MemoryRouter>);
 }
 
+// Die geteilte Anfrage (#2059) merkt sich Antworten kurz - jeder Test fragt frisch.
+const { gemeinsamVergessen } = await import("@/lib/gemeinsamLaden");
+
 beforeEach(() => {
+  gemeinsamVergessen();
   apiMock.get.mockReset();
   apiMock.put.mockReset();
 });
@@ -76,12 +80,14 @@ test("Kopf: offener Beitrag; ohne Dolibarr kein Schild; ohne gültige Mitgliedsc
   expect(screen.getByTestId("member-area-fee")).toHaveAttribute("data-tone", "warn");
   unmount();
 
+  gemeinsamVergessen();
   mockApi({ me: MEMBER });
   const second = renderPage();
   expect(await screen.findByTestId("member-area-card")).toBeInTheDocument();
   expect(screen.queryByTestId("member-area-fee")).toBeNull();
   second.unmount();
 
+  gemeinsamVergessen();
   mockApi({ me: { membership: { member_status: "pending" } } });
   renderPage();
   expect(await screen.findByTestId("member-area-greeting")).toHaveTextContent("Hallo, LunaByte");

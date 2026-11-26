@@ -4,6 +4,16 @@ import { BEREICH, vereinPfad, zweiFaktorPfad } from "@/lib/meinBereich";
 // „Zu tun“ in „Mein Bereich“ (#2059): eigene Datei, damit die Adressen in lib/meinBereich.js ohne Dolibarr-Helfer im
 // Start-JS bleiben (Menü, untere Leiste, Weiterleitungen).
 
+/**
+ * Ob eine Änderung „Zu tun“ betrifft (Prüfung #2059): Fast Lap meldet sich über den Alias f1 → prizes auch als „prizes“,
+ * ändert aber keine eigenen Gewinne - dann nicht nachladen. Ohne Ereignis (erstes Laden) immer.
+ */
+export function zuTunNachladen(event) {
+  if (!event) return true;
+  const quelle = String(event.resource || event.path || "").replace(/^\/+/, "");
+  return !/^(f1|fastlap)(\/|$)/.test(quelle);
+}
+
 function count(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;

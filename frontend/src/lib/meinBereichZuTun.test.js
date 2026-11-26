@@ -65,3 +65,14 @@ describe("Zu tun", () => {
     expect(items[0]).toMatchObject({ label: "Abstimmung offen", anzahl: 1 });
   });
 });
+
+// Nur Änderungen, die „Zu tun“ betreffen, laden nach (Prüfung #2059): eine öffentliche Fast-Lap-Änderung zählt über den
+// Alias f1 → prizes auch als „prizes“, ändert aber keine eigenen Gewinne.
+test("Nachladen: Rechnungen, Mitgliedschaft und eigene Gewinne ja, Fast Lap nein", async () => {
+  const { zuTunNachladen } = await import("./meinBereichZuTun");
+  expect(zuTunNachladen({ path: "f1/challenges/c-1", resource: "f1" })).toBe(false);
+  expect(zuTunNachladen({ path: "fastlap/monza", resource: "fastlap" })).toBe(false);
+  expect(zuTunNachladen({ path: "prizes/p-1", resource: "prizes" })).toBe(true);
+  expect(zuTunNachladen({ path: "account/invoices", resource: "account" })).toBe(true);
+  expect(zuTunNachladen(undefined)).toBe(true);
+});

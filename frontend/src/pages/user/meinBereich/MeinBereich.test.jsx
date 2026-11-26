@@ -27,6 +27,7 @@ const { default: UebersichtSeite } = await import("./UebersichtSeite");
 const { RechnungenSeite, MitgliedschaftSeite } = await import("./GruppenSeiten");
 const { MeinBereichUmleitung } = await import("./Umleitung");
 const { BereichSeite } = await import("./BereichSeite");
+const { gemeinsamVergessen } = await import("@/lib/gemeinsamLaden");
 const { useEffect, useState } = await import("react");
 
 function Wo() {
@@ -64,6 +65,7 @@ function serve(extra = {}) {
 }
 
 beforeEach(() => {
+  gemeinsamVergessen();
   vi.clearAllMocks();
   authState.user = { id: "u-1", username: "nachtfuchs", display_name: "Nachtfuchs", is_club_member: false };
   authState.adminNeedsSecondFactor = false;
@@ -211,4 +213,31 @@ test("Wunschnummer aus „Häufig gebraucht“: der Sprung wartet, bis die Karte
   } finally {
     window.Element.prototype.scrollIntoView = original;
   }
+});
+
+// Ein Abruf statt zwei (Prüfung #2059): Rahmen („Zu tun“) und Seite fragen beim Öffnen dasselbe.
+test("Rechnungen & Unterlagen: die Rechnungen kommen einmal, nicht für Rahmen und Seite je einmal", async () => {
+  renderAt("/mein-bereich/rechnungen");
+  expect(await screen.findByTestId("my-invoices")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/prizes/me/open-count"));
+  await new Promise((resolve) => { setTimeout(resolve, 300); });
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/account/invoices")).toHaveLength(1);
+});
+
+test("Verein: Mitgliedschaft und Übersicht des Vereins kommen einmal", async () => {
+  authState.user = { ...authState.user, is_club_member: true };
+  const { VereinSeite } = await import("./GruppenSeiten");
+  render(
+    <MemoryRouter initialEntries={["/mein-bereich/verein"]}>
+      <Routes>
+        <Route path="/mein-bereich" element={<MeinBereichLayout />}>
+          <Route path="verein" element={<VereinSeite />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("member-area")).toBeInTheDocument();
+  await new Promise((resolve) => { setTimeout(resolve, 300); });
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/membership/me")).toHaveLength(1);
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/membership/area-summary")).toHaveLength(1);
 });
