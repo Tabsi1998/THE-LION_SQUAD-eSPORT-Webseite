@@ -488,8 +488,11 @@ def test_the_link_pages_send_no_referrer_from_nginx():
     """Dritte Prüfrunde: Ohne Referer verlässt der Schlüssel die Seite nicht - nginx setzt für beide Seiten „no-referrer“."""
     root = pathlib.Path(__file__).resolve().parents[2]
     nginx = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
-    assert "map $uri $tls_referrer_policy" in nginx
-    assert '"~^/(sammel-mail/einzeln|newsletter/abbestellen)/?$" "no-referrer";' in nginx
+    # Vierte Prüfrunde: ``$uri`` steht nach ``try_files $uri /index.html`` schon auf /index.html - die map muss die Anfrage
+    # selbst lesen (``$request_uri``), sonst bekommt das Dokument nie „no-referrer“.
+    assert "map $request_uri $tls_referrer_policy" in nginx
+    assert "map $uri $tls_referrer_policy" not in nginx
+    assert '"~^/(sammel-mail/einzeln|newsletter/abbestellen)/?(\\?|$)" "no-referrer";' in nginx
     assert 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;' not in nginx
     assert nginx.count("add_header Referrer-Policy $tls_referrer_policy always;") >= 2
     # Auch kodierte Schlüssel-Namen landen nicht im Zugriffsprotokoll von nginx.
@@ -515,3 +518,21 @@ async def test_a_new_date_counts_the_earlier_of_old_and_new(flow, monkeypatch):
     await event_changes.announce_change(flow.db, before, after, {"id": paula["id"]})
     note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "event_message"}, {"_id": 0})
     assert note["meta"]["starts_at"] == "2026-11-27T07:00:00+00:00"
+
+
+
+def test_a_very_long_query_still_hides_the_token():
+    """Vierte Prüfrunde: Auch hinter mehr als 2048 Zeichen Abfrage bleibt der Schlüssel geschwärzt."""
+    from services import log_safe
+
+    line = "GET /sammel-mail/einzeln?pad=" + "x" * 3000 + "&token=u1.SIG HTTP/1.1"
+    assert log_safe.redact_secret_paths(line).endswith("&token=*** HTTP/1.1")
+
+
+def test_a_naive_appointment_counts_as_vienna_time():
+    """Vierte Prüfrunde: Ein Termin ohne Zone gilt wie in der Ruhezeit-Regel als Wiener Zeit, nicht als UTC."""
+    from services import event_changes
+
+    # 07:30 Wien ohne Zone = 06:30 UTC; um 06:45 UTC ist er vorbei - der neue Termin zählt.
+    assert event_changes.change_starts_at({"start_date": "2026-11-27T07:30:00"}, {"start_date": "2026-11-27T19:00:00+00:00"},
+                                          _utc("2026-11-27T06:45:00")) == "2026-11-27T19:00:00+00:00"

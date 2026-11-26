@@ -53,3 +53,15 @@ test("schon umgestellt, ungültiger und fehlender Schlüssel sagen es klar", asy
   expect(screen.getByText(/Im Link fehlt der Schlüssel/)).toBeInTheDocument();
   expect(screen.queryByTestId("digest-instant-confirm")).toBeNull();
 });
+
+// Vierte Prüfrunde: Das Meta „no-referrer“ bleibt nicht stehen, sobald der Schlüssel aus der Adresse ist (Navigation in der App).
+test("gibt die Referrer-Regel frei, sobald der Schlüssel aus der Adresse ist", async () => {
+  document.head.querySelectorAll('meta[name="referrer"]').forEach((node) => node.remove());
+  const guard = document.createElement("meta");
+  guard.name = "referrer";
+  guard.content = "no-referrer";
+  document.head.prepend(guard);
+  open("/sammel-mail/einzeln?token=u1.sig");
+  await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent(/^\/sammel-mail\/einzeln$/));
+  await waitFor(() => expect(document.querySelector('meta[name="referrer"]').getAttribute("content")).toBe("strict-origin-when-cross-origin"));
+});

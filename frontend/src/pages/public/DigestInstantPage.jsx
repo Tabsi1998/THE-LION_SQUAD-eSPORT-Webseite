@@ -4,6 +4,7 @@ import { api, formatApiError } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { releaseReferrer } from "@/lib/referrerGuard";
 
 // Zurück auf Einzelmails (#1662, Fabian 26.11.): der Link aus der Sammel-Mail führt hierher. Umgestellt wird erst mit dem
 // Knopf - Linkvorschauen und Virenscanner öffnen den Link, ohne etwas auszulösen. Kein Login nötig; der Schlüssel taugt nur
@@ -15,13 +16,18 @@ export default function DigestInstantPage() {
   // Den Schlüssel einmal lesen und dann aus der Adresse nehmen (Verlauf, Lesezeichen, Weitergeben); er geht im Body hinaus.
   const [token] = useState(() => params.get("token") || "");
   useEffect(() => {
-    if (!params.has("token")) return;
+    if (!params.has("token")) {
+      // Der Schlüssel ist aus der Adresse: „no-referrer“ wieder freigeben, damit es bei Navigation in der App nicht stehen bleibt.
+      releaseReferrer();
+      return;
+    }
     setParams((current) => {
       const next = new URLSearchParams(current);
       next.delete("token");
       return next;
     }, { replace: true });
   }, [params, setParams]);
+  useEffect(() => () => { releaseReferrer(); }, []);
   const [status, setStatus] = useState(token ? "ready" : "missing");
   const [message, setMessage] = useState("");
 

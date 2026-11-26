@@ -234,7 +234,9 @@ for (const [path, ready] of [["/sammel-mail/einzeln?token=u1.sig", "digest-insta
     await page.route("**/api/**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, rhythm: "instant" }) }));
     await page.goto(path);
     await expect(page.getByTestId(ready)).toBeVisible();
-    await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+    // Nach dem Entfernen des Schlüssels gibt die Seite die übliche Regel zurück (keine Navigation mit „no-referrer“).
+    await expect(page).not.toHaveURL(/token=/);
+    await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "strict-origin-when-cross-origin");
     await page.getByRole("button").first().click();
     await page.waitForTimeout(300);
     expect(leaked).toEqual([]);

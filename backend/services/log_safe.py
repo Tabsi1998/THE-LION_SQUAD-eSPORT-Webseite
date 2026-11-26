@@ -62,9 +62,10 @@ _SECRET_PATHS = (re.compile(r"(/api/calendar/personal/)[^/?#\s]{1,256}"),
                  re.compile(r"(/api/shop/print-files/)[^/?#\s]{1,256}"),
                  )
 # Seiten mit dem Schlüssel als Parameter ``token`` (Newsletter abbestellen #2119, Zurück auf Einzelmails #1662) - auch mit
-# Schrägstrich am Ende (Weiterleitung) und kodiertem Namen (``%74oken``). Die Abfrage wird ohne Regex zerlegt.
+# Schrägstrich am Ende (Weiterleitung) und kodiertem Namen (``%74oken``). Die Abfrage wird ohne Regex zerlegt, und zwar ganz:
+# ein einziger Zeichenklassen-Lauf ohne Rückverfolgung, also auch bei langen Abfragen linear.
 _TOKEN_PATHS = re.compile(r"(?:/api/settings/newsletter/unsubscribe|/newsletter/abbestellen|"
-                          r"/api/settings/notification-digest/instant|/sammel-mail/einzeln)/?\?([^#\s]{1,2048})")
+                          r"/api/settings/notification-digest/instant|/sammel-mail/einzeln)/?\?([^#\s]+)")
 
 
 def _redact_token_query(match: re.Match) -> str:

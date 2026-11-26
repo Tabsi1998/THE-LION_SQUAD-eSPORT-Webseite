@@ -80,14 +80,17 @@ async def _recipients(db, user_ids: list[str]) -> list[dict]:
 
 def change_starts_at(before: dict, after: dict, now) -> str | None:
     """Bei einer Terminänderung zählt für die Ruhezeit der frühere Termin (alt oder neu), solange er noch bevorsteht."""
-    from datetime import datetime, timezone
+    from datetime import datetime
+
+    from zoneinfo import ZoneInfo
 
     def parse(value):
         try:
             moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         except (TypeError, ValueError):
             return None
-        return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+        # Ohne Zone gilt Wiener Zeit - dieselbe Regel wie bei der Ruhezeit (services/quiet_hours._timely_now).
+        return moment if moment.tzinfo else moment.replace(tzinfo=ZoneInfo("Europe/Vienna"))
 
     upcoming = [(moment, value) for value in (before.get("start_date"), after.get("start_date"))
                 if value and (moment := parse(value)) and moment >= now]
