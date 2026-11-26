@@ -2149,14 +2149,19 @@ Nachrücker ab, lehnt ihr ihn im Eingang ab oder nimmt „Übernahme neu berechn
 der Platz, auf den er nachgerückt war, wieder frei – dann gilt wieder diese Regel.
 
 **Einen Platz gibt es nur, solange der Endstand ihn kennt.** Korrigiert ihr den Endstand so, dass das abgemeldete Team gar nicht mehr
-aufgestiegen wäre (ein anderes steigt jetzt aus eigenem Recht auf), **entfällt sein Platz ganz**: Niemand rückt dafür nach, und ein
+aufgestiegen wäre (ein anderes steigt jetzt aus eigenem Recht auf), **entfällt dieser Aufstiegsplatz**: Niemand rückt dafür nach, und ein
 Nachrücker, der schon darauf stand, geht mit „Übernahme neu berechnen“ zurück in seine Liga. Seine frühere Zusage gilt dann wieder;
 war sie noch offen, hat er dafür die restliche Frist, mindestens 3 Tage (einstellbar). Die Nachricht an ihn nennt den Grund. So
 steigen nie zwei Teams für einen Platz auf.
 
 Umgekehrt bleibt ein Platz, solange er im Endstand steht: **Löscht ein abgemeldetes Team sein Co-Team**, ist sein Platz trotzdem frei
-für den Nachrücker. Und macht eure Korrektur ein **abgemeldetes Team zum Aufsteiger**, zeigt „Übernahme neu berechnen“ es als
-**Platz frei**: Das Team bleibt abgemeldet, sein Aufstiegsplatz geht nach eurer Regel an den Nächsten.
+für den Nachrücker.
+
+**Ein Team, das nicht mitspielt, folgt seiner neuen Platzierung.** Sieht der korrigierte Endstand ein abgemeldetes, verfallenes
+oder von euch abgelehntes Team in einer anderen Liga (es wäre aufgestiegen, geblieben oder abgestiegen), zeigt „Übernahme neu
+berechnen“ es als **Platz frei**: Das Team bleibt, was es ist – es bekommt kein neues Angebot und keine Nachricht –, und sein Platz
+in der neuen Liga geht nach eurer Regel an den Nächsten. Drückt ihr vor dem Neuberechnen **Nachrücken lassen**, sagt die Seite,
+dass erst neu berechnet werden muss.
 
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht
