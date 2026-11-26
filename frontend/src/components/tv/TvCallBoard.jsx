@@ -46,7 +46,7 @@ export function TvCallCountdown({ call, small = false }) {
           <circle className="tv-call__ring-bg" cx="50" cy="50" r={radius} />
           <circle className="tv-call__ring-fg" cx="50" cy="50" r={radius} style={{ strokeDasharray: circumference, strokeDashoffset: circumference * (1 - share) }} />
         </svg>
-        <b className="font-heading" data-testid={`tv-call-clock-${call.matchId}`}>{left.done ? "Los" : left.text || "Jetzt"}</b>
+        <b className="tls-type-num" data-testid={`tv-call-clock-${call.matchId}`}>{left.done ? "Los" : left.text || "Jetzt"}</b>
       </div>
       {!small && !left.done ? <span className="tv-call__count-label tv-t-meta">{call.dueAt === null ? "Bitte gleich kommen" : "bis zum Start"}</span> : null}
     </div>

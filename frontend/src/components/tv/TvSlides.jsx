@@ -109,7 +109,7 @@ function PlayedRing({ played, total }) {
         <circle className="tv-stat__ring-bg" cx="50" cy="50" r={radius} />
         <circle className="tv-stat__ring-fg" cx="50" cy="50" r={radius} style={{ strokeDasharray: circumference, strokeDashoffset: circumference * (1 - share), "--tv-ring-from": circumference }} />
       </svg>
-      <b className="font-heading">{played}<small className="tv-t-info">von {total}</small></b>
+      <b className="tls-type-num">{played}<small className="tv-t-info">von {total}</small></b>
     </div>
   );
 }
@@ -133,7 +133,7 @@ export function TvStatsSlide({ tiles = [], avatarOf = () => "" }) {
           ) : null}
           {tile.kind === "closest" ? (
             <div className="tv-stat__who">
-              <b className="tv-stat__big font-heading">{tile.big}</b>
+              <b className="tv-stat__big tls-type-num">{tile.big}</b>
               <span className="tv-stat__text tv-t-info">{tile.text}</span>
             </div>
           ) : null}
