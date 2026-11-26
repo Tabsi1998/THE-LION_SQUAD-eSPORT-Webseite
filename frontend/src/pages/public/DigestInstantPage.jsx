@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
@@ -11,15 +11,24 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function DigestInstantPage() {
   useDocumentTitle("Zurück auf Einzelmails", "Mails von THE LION SQUAD wieder einzeln bekommen.", { robots: "noindex, nofollow" });
-  const [params] = useSearchParams();
-  const token = params.get("token") || "";
+  const [params, setParams] = useSearchParams();
+  // Den Schlüssel einmal lesen und dann aus der Adresse nehmen (Verlauf, Lesezeichen, Weitergeben); er geht im Body hinaus.
+  const [token] = useState(() => params.get("token") || "");
+  useEffect(() => {
+    if (!params.has("token")) return;
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("token");
+      return next;
+    }, { replace: true });
+  }, [params, setParams]);
   const [status, setStatus] = useState(token ? "ready" : "missing");
   const [message, setMessage] = useState("");
 
   const confirm = async () => {
     setStatus("busy");
     try {
-      const { data } = await api.post(`/settings/notification-digest/instant?token=${encodeURIComponent(token)}`);
+      const { data } = await api.post("/settings/notification-digest/instant", { token });
       setStatus("done");
       setMessage(data?.already ? "Das war schon so eingestellt – deine Mails kommen einzeln." : "Erledigt – jede Mail kommt wieder einzeln, sobald etwas passiert.");
     } catch (error) {

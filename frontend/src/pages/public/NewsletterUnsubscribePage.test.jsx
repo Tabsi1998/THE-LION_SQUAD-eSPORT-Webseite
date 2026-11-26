@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 // Newsletter abbestellen (#2119 ML4): erst der Knopf meldet ab - das Öffnen des Links allein nicht.
 
@@ -11,8 +11,13 @@ vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 
 const NewsletterUnsubscribePage = (await import("./NewsletterUnsubscribePage")).default;
 
+function Where() {
+  const location = useLocation();
+  return <div data-testid="where">{location.pathname + location.search}</div>;
+}
+
 function open(path) {
-  return render(<MemoryRouter initialEntries={[path]}><NewsletterUnsubscribePage /></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[path]}><NewsletterUnsubscribePage /><Where /></MemoryRouter>);
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -22,8 +27,10 @@ test("Öffnen allein meldet nicht ab; der Knopf schon", async () => {
   const user = userEvent.setup();
   open("/newsletter/abbestellen?token=u1.sig");
   expect(apiMock.post).not.toHaveBeenCalled();
+  // Prüfung 26.11.: Der Schlüssel verschwindet aus der Adresse und geht im Body - nicht als Query.
+  await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent(/^\/newsletter\/abbestellen$/));
   await user.click(screen.getByTestId("newsletter-unsubscribe-confirm"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/newsletter/unsubscribe?token=u1.sig"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/newsletter/unsubscribe", { token: "u1.sig" }));
   expect(await screen.findByText("Erledigt – du bekommst keinen Newsletter mehr.")).toBeInTheDocument();
 });
 
