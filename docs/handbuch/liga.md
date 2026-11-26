@@ -2243,8 +2243,10 @@ Beim nächsten Besuch der Website erscheint der Moment einmal:
 Wer „Bewegung reduzieren“ eingestellt hat (System oder **Zeremonien dezent** im Profil), sieht gleich das fertige Bild. Danach
 bleibt der Ausgang als Hinweis **Saisonende** im Profil und an der Teamseite; dort spielt **Moment ansehen** ihn noch einmal ab.
 
-**Nachricht:** eine je Person in der Glocke und als Push. Der Meister bekommt nur diese eine – mit seinen Belohnungen darin; „Neue
-Belohnung“ und „Staffel abgeschlossen“ entfallen für ihn. Captain und Vertreter von Auf- und Absteigern bekommen keine zweite, wenn
+**Nachricht:** eine je Person in der Glocke und als Push. Erreicht der Moment den Meister, bekommt er nur diese eine – mit seinen
+Belohnungen darin; „Neue Belohnung“ und „Staffel abgeschlossen“ entfallen für ihn. Steht die Season noch nicht ganz fest, sehen
+Mitglieder sie nicht oder hat die Anmeldung kein Co-Team, kommen Belohnung und Abschluss-Nachricht wie gewohnt – und der Moment
+später nennt nichts doppelt. Captain und Vertreter von Auf- und Absteigern bekommen keine zweite, wenn
 die Season schon „Aufstieg bestätigt“ zu den Startrechten schickt (3.11a).
 
 **Wie lange:** **Season → Reiter Belohnungen → „Saisonende-Moment beim nächsten Besuch (Tage)“**, Vorgabe 45. So lange nach dem

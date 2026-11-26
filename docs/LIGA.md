@@ -5212,14 +5212,25 @@ hintereinander ändert nichts.
 
 **Meister mit Belohnungen** (A): ein Ablauf. Zuerst der goldene Meister-Moment, mit **Weiter** die Belohnungen derselben Season als zweite
 Karte in derselben Karte (`RewardCardContent`), ohne neues Aufpoppen. Ohne eingestellte Belohnung bleibt es beim Meister-Moment.
-- Die Belohnungen des Meisters warten so lange auf ihn: `GET /api/me/rewards/unseen` hält sie zurück (`league_moment_rules.held_reward_ids`, Blatt-Modul ohne Import-Kreis),
-  solange der Endstand der Season nicht feststeht oder die Person den Moment noch sehen wird; `GET …/league-moments/unseen` bringt sie am
-  Meister-Moment mit (`rewards`). Gesehen sind sie, wenn die zweite Karte kam; schließt die Person vorher, kommen sie danach wie bisher.
-  Hatte ein anderes Gerät den Moment schon, zeigt dieses Gerät die Belohnungen allein.
-- **Eine Nachricht:** „Meister: <Co-Team>“ mit „Dazu: <Belohnungen>“. Dafür schweigen beim Abschluss „Neue Belohnung“ und „Belohnung für
-  euer Team“ für die Anmeldung des Meisters (`league_rewards.grant` → `held_people`, `held_team`) und „Staffel abgeschlossen“ für Captain
-  und Vertreter des Meisters (`league_final.notify_captains`). Bekam der Meister seine Nachricht schon (Belohnung erst nach einem
-  Wiederöffnen nachgetragen), meldet sich die Belohnung wieder selbst. Verluste nach einer Korrektur meldet die Belohnung wie bisher.
+Das gilt nur, **wenn der Moment die Person erreicht** (`league_moment_rules.reaches`, Prüfung M3): Es gibt einen Moment für das
+**Co-Team** (eine Anmeldung ohne Co-Team hat keinen), er gilt und ruht nicht, die Person ist unter seinen Empfängern, Mitglieder sehen
+die Season, die Person sieht sie selbst, und - frisch gefragt - alle Staffeln sind abgeschlossen (`league_final_read.all_closed`).
+- **Zeremonie:** `GET /api/me/rewards/unseen` hält die Belohnungen des Meisters nur zurück, solange der Moment die Person erreicht, sie
+  ihn noch nicht geschlossen hat und er frisch ist (höchstens `moment_days`; `league_moment_rules.held_reward_ids`, Blatt-Modul ohne
+  Import-Kreis). `GET …/league-moments/unseen` bringt sie am Meister-Moment mit (`rewards`). Gesehen sind sie, wenn die zweite Karte kam;
+  schließt die Person vorher, kommen sie danach wie bisher. Hatte ein anderes Gerät den Moment schon, zeigt dieses Gerät die Belohnungen
+  allein. In jedem anderen Fall feiern sie sich wie vor #1639.
+- **Nachricht:** Der Abschluss stellt „Neue Belohnung“ und „Belohnung für euer Team“ für die Anmeldung des Meisters (`league_rewards.grant`
+  → `notify`) und „Staffel abgeschlossen“ für Captain und Vertreter des Meisters (`league_final.notify_captains`) zurück und merkt sie
+  am Meister-Eintrag (`tournament_awards.moment_owed`: `{final_id, at, rewards: {gains, team_gains, team_leads, team_names}, close}`,
+  nie in einer Antwort). Gleich danach entscheidet der Abgleich (`league_moments.settle`, bei belegter Sperre der Job): Wen der Moment
+  erreicht, dem sagt es **eine** Nachricht „Meister: <Co-Team>“ mit „Dazu: <Belohnungen>“. Alle anderen - die Season ist noch nicht ganz
+  bestätigt, steht auf „Nur Liga-Leitung“, die Person sieht sie nicht, die Anmeldung hat kein Co-Team - bekommen die zurückgestellten
+  Nachrichten wie vor #1639, mit denselben Schlüsseln, also nie doppelt.
+- **Später sichtbar oder bestätigt:** Die Nachricht zum Moment sieht nach, was die Person zum Meister schon hörte (`_heard`, nach den
+  Schlüsseln): Kam „Staffel abgeschlossen … Meister“, schweigt sie; kam die Belohnung schon, nennt sie sie nicht noch einmal.
+- Bekam der Meister seine Nachricht schon (Belohnung erst nach einem Wiederöffnen nachgetragen), meldet sich die Belohnung wieder selbst.
+  Verluste nach einer Korrektur meldet die Belohnung wie bisher.
 
 **Nachricht:** je Person und Stand eine (`dedupe_key` `league-moment:<moment>:<seq>:<person>`, `unique_dedupe`; vorher wird die Person
 bedingt in `notified_ids` eingetragen - zwei Läufe zugleich schicken nicht doppelt). Titel „Aufstieg in Liga 1“, „Nächste Season in
@@ -5240,7 +5251,7 @@ Liga 3“ bzw. „Meister: <Co-Team>“, Text „Der Endstand von <Liga · Seaso
 - `POST /api/me/league-moments/seen` `{ids, token}` (höchstens 20; `token`: Schlüssel des Geräts, 8-80 Zeichen): holt den Moment für
   dieses Gerät, `{ok, claimed}`. Geholt bekommt ihn, wer ihn noch nicht geholt hat, dasselbe Gerät noch einmal (gleicher Schlüssel - nach
   einer verlorenen Antwort kommt er beim nächsten Besuch wieder) oder ein anderes Gerät, wenn das Holen über `CLAIM_HOURS` (12) zurückliegt.
-  Prüft ebenfalls „alle Staffeln abgeschlossen“. Die Website merkt sich den Schlüssel je Moment (`localStorage`, sonst je Sitzung).
+  Prüft ebenfalls „alle Staffeln abgeschlossen“. Die Website merkt sich den Schlüssel je Moment (`localStorage`, je Konto - `lib/momentMarks`, beim Abmelden geleert; sonst je Sitzung).
 - `POST /api/me/league-moments/done` `{ids}`: gezeigt und geschlossen - `seen_by`, danach kommt der Moment für die Person nirgends mehr.
   Geht diese Meldung verloren, merkt sich die Website das und meldet beim nächsten Besuch still nach, statt den Moment zu zeigen.
 - Profil (`GET /api/users/public/{name}`): `league_moments` - je Co-Team der jüngste Ausgang (höchstens 3), nach der Regel des Profils:
