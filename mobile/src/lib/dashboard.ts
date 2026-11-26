@@ -61,10 +61,16 @@ export function splitHomeTimeline(items: HomeItem[], now: Date = new Date(), { l
 // dem, was ansteht (#241).
 const DONE_STATUSES = new Set(["completed", "results_published", "archived", "cancelled", "finished", "closed"]);
 
-export type DatedItem = { status?: string | null; date?: string | null; endDate?: string | null };
+export type DatedItem = { kind?: string | null; status?: string | null; date?: string | null; endDate?: string | null };
 
 export function isStillRelevant(item: DatedItem, now: Date = new Date()) {
-  if (DONE_STATUSES.has(String(item.status || "").toLowerCase())) return false;
+  const status = String(item.status || "").toLowerCase();
+  // Ein abgesagtes Event (#2542, #2127 EV3) bleibt bis zu seinem Termin unter „Kommend“ - gedämpft, mit Kennzeichen (wie im Web).
+  if (status === "cancelled" && item.kind === "event") {
+    const last = viennaDay(item.endDate || item.date);
+    return Boolean(last) && last >= viennaDay(now);
+  }
+  if (DONE_STATUSES.has(status)) return false;
   const end = viennaDay(item.endDate || item.date);
   if (!end) return true;
   return end >= viennaDay(now);

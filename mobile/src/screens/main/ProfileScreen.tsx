@@ -32,6 +32,7 @@ import { profileStyles, WEB_BASE_URL, type ModerationStanding } from "./profile/
 import { ProfileReferences } from "./profile/ProfileReferences";
 import { LeagueSanctionsList } from "../../components/league/LeagueSanctionsList";
 import { useMemberPlacements } from "../../lib/memberPlacements";
+import { requestMoment } from "../../lib/leagueMoments";
 
 // Das eigene Profil (#1149): derselbe Aufbau wie das, was andere sehen (Kopf mit Level und Zahlenleiste, Reiter Übersicht,
 // Erfolge, Auszeichnungen, Referenzen, Teams, für Mitglieder Ehrungen). Was nur dich angeht, steht im Kasten „Nur für
@@ -213,6 +214,11 @@ function OwnProfile() {
   const missing = missingLabels(completeness.missing);
   const score = Number(completeness.score || 0);
   const requestedTab = (route?.params as { tab?: ProfileTabKey } | undefined)?.tab;
+  // Aus der Nachricht zum Saisonende (#2584): gleich nachsehen, ob der Moment noch offen ist - sonst steht er unter „Saisonende“.
+  const requestedMoment = (route?.params as { moment?: string } | undefined)?.moment;
+  useEffect(() => {
+    if (requestedMoment) requestMoment(requestedMoment);
+  }, [requestedMoment]);
 
   const privateBox = (
     // Versteck der Ostereiersuche (#647, „app:Profile“) und Platz für die Saison-Deko - wie die Karten der anderen Seiten.

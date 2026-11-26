@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { DissolvedTeams } from "../../components/team/DissolvedTeams";
 import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { useTabScrollToTop } from "../../components/TabHeader";
@@ -135,6 +136,9 @@ export function TeamsSection({ navigation }: Props) {
                 ))}
               </View>
             ) : null}
+
+            {/* Aufgelöste Teams (#2542, #2128): die frühere Teamleitung stellt sie innerhalb der Frist wieder her. */}
+            <DissolvedTeams onRestored={() => { void load(); }} />
           </View>
         }
         ListEmptyComponent={problem ? (

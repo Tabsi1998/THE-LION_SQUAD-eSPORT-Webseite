@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { clearRecentSearches } from "../lib/recentSearches";
 import { clearOfflineCard } from "../lib/memberCardOffline";
+import { clearMomentMarks } from "../lib/leagueMoments";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { api, configureAuthBridge, refreshSession } from "../lib/api";
@@ -71,6 +72,8 @@ function forgetAccountData() {
     clearRecentSearches(),
     // Die gespeicherte Mitgliedskarte (#1256) gehört dem Konto, das geht.
     clearOfflineCard(),
+    // Saisonende-Moment (#2584): der Geräte-Schlüssel des Kontos und die Marken „fertig, aber noch nicht gemeldet“.
+    clearMomentMarks(),
     // Die gemerkten Anmeldungen für die Frage nach Benachrichtigungen (#1208): Nach dem nächsten Login ist die Startseite
     // wieder nur Ausgangsstand - keine Frage gleich nach dem Anmelden.
     forgetPushPromptAccounts(),

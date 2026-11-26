@@ -126,7 +126,8 @@ async function renewAccess(refreshToken: string): Promise<string> {
 
 export const api = axios.create({
   baseURL: API_URL,
-  headers: { "Content-Type": "application/json" },
+  // News-Kanal (#1532, #2542): Jeder Aufruf nennt die App - der Server zeigt dann „Website und App“ und „Nur App“, nie „Nur Website“.
+  headers: { "Content-Type": "application/json", "X-LSW-Channel": "app" },
   timeout: 15000, // 15s Timeout – verhindert endloses Warten bei schlechtem Netz
 });
 

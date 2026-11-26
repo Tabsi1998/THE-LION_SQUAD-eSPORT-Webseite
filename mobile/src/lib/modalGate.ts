@@ -6,10 +6,13 @@ import { useEffect } from "react";
 
 const open = new Set<string>();
 const waiters = new Set<() => void>();
+const listeners = new Set<() => void>();
 
 export function setModalOpen(id: string, isOpen: boolean) {
+  const changed = isOpen ? !open.has(id) : open.has(id);
   if (isOpen) open.add(id);
   else open.delete(id);
+  if (changed) listeners.forEach((listener) => listener());
   if (!open.size) {
     const ready = [...waiters];
     waiters.clear();
@@ -19,6 +22,18 @@ export function setModalOpen(id: string, isOpen: boolean) {
 
 export function anyModalOpen(): boolean {
   return open.size > 0;
+}
+
+/** Ist ein anderes Fenster als `id` offen? Wer selbst von allein erscheint (Liga-Zeremonie, #2584), wartet darauf. */
+export function otherModalOpen(id: string): boolean {
+  for (const key of open) if (key !== id) return true;
+  return false;
+}
+
+/** Für useSyncExternalStore: meldet jede Änderung, welche Fenster offen sind. */
+export function subscribeModals(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
 }
 
 /** Erfüllt sich, sobald kein gemeldetes Fenster offen ist (sofort, wenn keins offen ist). */

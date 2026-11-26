@@ -106,6 +106,8 @@ export type DetailParamList = {
   ReferenceSeason: { lineage: string; season: string; view?: string };
   // Gesamtwertung über Seasons (F.5, #2215; App: #2173): /liga/<liga>/<season>/gesamtwertung, je Liga N Co-Teams und Spieler.
   LeagueOverall: { league: string; season: string; level?: number };
+  // Mit Co-Team anmelden (B.4, #2542): /liga/<liga>/<season>/anmelden - vier Schritte für Captain und Vertreter.
+  LeagueApply: { league: string; season: string };
   // Ergebnis einer Runde (#1950, #1974): Rennliga, Runde nach Nummer, optional mit Lauf (`session`, wie ?lauf= im Web).
   ReferenceRound: { lineage: string; season: string; round: number; session?: string };
   // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.
@@ -114,7 +116,7 @@ export type DetailParamList = {
   YearReview: { preview?: boolean } | undefined;
   // Das eigene Profil (#1149), wie andere es sehen - seit Mein Bereich (#2059) eine Seite darüber: aus Mein Bereich → Profil,
   // dem Kopf der Übersicht und /u/me. `tab` öffnet gleich einen Reiter (Erfolge, Trophäen …).
-  OwnProfile: { tab?: ProfileTabKey } | undefined;
+  OwnProfile: { tab?: ProfileTabKey; moment?: string } | undefined;
   // Eine Gruppe von Mein Bereich (#2059, #1677): die Einstellungen wohnen hier - flach, ohne Zahnrad. `ziel` springt zu einer
   // Stelle (Suchtreffer, /mein-bereich/<gruppe>#<ziel>).
   MeinBereichGruppe: { gruppe: Exclude<GruppeKey, "start">; ziel?: string };

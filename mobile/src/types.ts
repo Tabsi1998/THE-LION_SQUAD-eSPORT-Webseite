@@ -152,6 +152,8 @@ export type Team = {
   awards?: import("./lib/leagueRewards").RewardAward[];
   featured_title?: import("./lib/leagueRewards").RewardAward | null;
   league_history?: import("./lib/leagueTeam").LeagueHistoryRow[];
+  // Saisonende (#2584, F.8): je Co-Team der jüngste bestätigte Ausgang aus Seasons, die die Person sieht.
+  league_moments?: import("./lib/leagueMoments").LeagueMoment[];
   // Trophäen (#2425): Teambanner, bis zu drei Embleme neben dem Namen und die Rankingbanner je öffentlicher Season; dazu der Platz in der
   // Gesamtwertung (F.5, #2215). Alle optional - ältere Server liefern sie nicht.
   featured_award?: import("./lib/awards").Award | null;
