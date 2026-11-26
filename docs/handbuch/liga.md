@@ -2246,7 +2246,7 @@ bleibt der Ausgang als Hinweis **Saisonende** im Profil und an der Teamseite; do
 
 **Nachricht:** eine je Person in der Glocke und als Push. Erreicht der Moment den Meister, bekommt er nur diese eine – mit seinen
 Belohnungen darin; „Neue Belohnung“ und „Staffel abgeschlossen“ entfallen für ihn. Ist Liga 1 noch nicht ganz fertig (eine zweite
-Staffel läuft), sehen Mitglieder die Season nicht oder hat die Anmeldung kein Co-Team, kommen Belohnung und Abschluss-Nachricht wie
+Staffel läuft), sehen Mitglieder die Season nicht oder hat eine Team-Anmeldung kein Co-Team, kommen Belohnung und Abschluss-Nachricht wie
 gewohnt – und der Moment später nennt nichts doppelt. Captain und Vertreter von Auf- und Absteigern bekommen keine zweite, wenn
 die Season schon „Aufstieg bestätigt“ zu den Startrechten schickt (3.11a).
 

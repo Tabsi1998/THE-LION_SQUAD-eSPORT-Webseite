@@ -5218,8 +5218,9 @@ Meister-Eintrag, sonst alle Staffeln der Season).
 **Meister mit Belohnungen** (A): ein Ablauf. Zuerst der goldene Meister-Moment, mit **Weiter** die Belohnungen derselben Season als zweite
 Karte in derselben Karte (`RewardCardContent`), ohne neues Aufpoppen. Ohne eingestellte Belohnung bleibt es beim Meister-Moment.
 Das gilt nur, **wenn der Moment die Person erreicht** (`league_moment_rules.reaches`, Prüfung M3): Es gibt einen Moment für das
-**Co-Team** (eine Anmeldung ohne Co-Team hat keinen), er gilt und ruht nicht, die Person ist unter seinen Empfängern, Mitglieder sehen
-die Season, die Person sieht sie selbst, und - frisch gefragt - alle Staffeln sind abgeschlossen (`league_final_read.all_closed`).
+**Co-Team** bzw. in einer Einzel-Liga für die **Person** (`league_moment_rules.entrant_of`, Schlüssel `<season>:user:<person>`; eine
+Team-Anmeldung ohne Co-Team hat keinen), er gilt und ruht nicht, die Person ist unter seinen Empfängern, Mitglieder sehen die Season,
+die Person sieht sie selbst, und - frisch gefragt - seine Liga N ist fertig (`league_moment_rules.ready`).
 - **Zeremonie:** `GET /api/me/rewards/unseen` hält die Belohnungen des Meisters nur zurück, solange der Moment die Person erreicht, sie
   ihn noch nicht geschlossen hat und er frisch ist (höchstens `moment_days`; `league_moment_rules.held_reward_ids`, Blatt-Modul ohne
   Import-Kreis). `GET …/league-moments/unseen` bringt sie am Meister-Moment mit (`rewards`). Gesehen sind sie, wenn die zweite Karte kam;
@@ -5232,7 +5233,7 @@ die Season, die Person sieht sie selbst, und - frisch gefragt - alle Staffeln si
   das Gemerkte zuerst (bedingtes `$unset` auf `moment_owed.at`) und schickt nur dann - gleichzeitige Läufe schicken einmal; die
   Nachrichten tragen dazu `unique_dedupe`. Wem die Nachricht zum Moment ging (`notified_ids`), dem sagt es **eine** Nachricht „Meister:
   <Co-Team>“ mit „Dazu: <Belohnungen>“. Alle anderen - die Liga des Meisters ist noch nicht fertig (eine zweite Staffel läuft), die
-  Season steht auf „Nur Liga-Leitung“, die Person sieht sie nicht, die Anmeldung hat kein Co-Team, die Season wurde zwischendurch wieder
+  Season steht auf „Nur Liga-Leitung“, die Person sieht sie nicht, eine Team-Anmeldung hat kein Co-Team, die Season wurde zwischendurch wieder
   unsichtbar - bekommen die zurückgestellten Nachrichten wie vor #1639, mit denselben Schlüsseln, also nie doppelt.
 - **Später sichtbar oder bestätigt:** Die Nachricht zum Moment sieht nach, was die Person zum Meister schon hörte (`_heard`, nach den
   Schlüsseln): Kam „Staffel abgeschlossen … Meister“, schweigt sie; kam die Belohnung schon, nennt sie sie nicht noch einmal.
