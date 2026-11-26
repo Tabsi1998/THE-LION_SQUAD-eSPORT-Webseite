@@ -732,16 +732,18 @@ NO_REGISTRATION = {
 NO_FACT = "none"
 
 
-def _fact_text(fact: str, name: str, label: str | None, how: str, corrected: bool, title: str, note: str) -> tuple[str, str]:
-    """Titel und Text zu einem bestätigten Stand (``up:1``, ``down:2``, ``stay:2``, ``none``)."""
+def _fact_text(fact: str, name: str, label: str | None, how: str, corrected: bool, title: str, note: str, *,
+               gave_up: bool = False) -> tuple[str, str]:
+    """Titel und Text zu einem bestätigten Stand (``up:1``, ``down:2``, ``stay:2``, ``none``). ``gave_up``: Das Co-Team hat seinen
+    Platz in der schon angelegten Folge-Season aufgegeben (Nr. 271) - dann nur der Endstand, ohne Startrecht und ohne Aufforderung."""
     move = fact.split(":")[0]
-    phrase = {"up": f"steigt auf{how}: Startrecht für {label} in der nächsten Season",
-              "down": f"steigt ab{how}: Startrecht für {label} in der nächsten Season",
+    right = "" if gave_up else f": Startrecht für {label} in der nächsten Season"
+    phrase = {"up": f"steigt auf{how}{right}", "down": f"steigt ab{how}{right}",
               "stay": f"bleibt in {label}"}.get(move, "hat kein Startrecht für die nächste Season")
     if corrected:
         return "Endstand korrigiert", f"Die Liga-Leitung hat den Endstand von {title} korrigiert. {name} {phrase}."
     headline = "Aufstieg bestätigt" if move == "up" else "Abstieg bestätigt"
-    return headline, f"Der Endstand von {title} steht fest. {name} {phrase}. {note}"
+    return headline, " ".join(part for part in (f"Der Endstand von {title} steht fest. {name} {phrase}.", "" if gave_up else note) if part)
 
 
 async def announce(db, season_id: str | None) -> dict:
@@ -787,9 +789,16 @@ async def announce(db, season_id: str | None) -> dict:
     title = " ".join(part for part in (league.get("name"), season.get("name")) if part)
     url = f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug") else "/teams"
     sent = 0
+    # Gibt es die Folge-Season schon und hat das Co-Team seinen Platz dort aufgegeben (abgemeldet, verfallen, abgelehnt - nicht
+    # zurückgenommen), bekommt es kein Angebot mehr (Nr. 271): Die Nachricht nennt nur den Endstand.
+    follow_ids = [row["id"] async for row in db.league_seasons.find({"predecessor_id": season_id}, {"_id": 0, "id": 1})] if todo else []
+    gave_up = {row["squad_id"] async for row in db.league_applications.find(
+        {"season_id": {"$in": follow_ids}, "carry_over": {"$exists": True}, "status": {"$in": ["withdrawn", "rejected"]},
+         "carry_over.revoked_at": {"$exists": False}}, {"_id": 0, "squad_id": 1})} if follow_ids else set()
     for squad_id, fact, team, label, entry, corrected in todo:
         how = " über die Relegation" if team.get("via") == "relegation" else ""
-        headline, text = _fact_text(fact, team.get("display_name") or "Euer Co-Team", label, how, corrected, title, NO_REGISTRATION[settings["mode"]])
+        headline, text = _fact_text(fact, team.get("display_name") or "Euer Co-Team", label, how, corrected, title,
+                                    NO_REGISTRATION[settings["mode"]], gave_up=squad_id in gave_up)
         try:
             squad = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
             for user_id in sorted(await _responsible(db, squad)) if squad else []:
