@@ -49,7 +49,7 @@ test("privates Profil: Satz und wo die Privatsphäre liegt", async () => {
   mockGet.mockResolvedValue({ data: { shareable: false, reason: "private_profile", text: "Dein Profil ist privat." } });
   await render(<ResultShareCard tournamentId="t1" />);
   expect(await screen.findByText("Dein Profil ist privat.")).toBeTruthy();
-  expect(screen.getByText("In der App: Profil → Zahnrad → Privatsphäre.")).toBeTruthy();
+  expect(screen.getByText("In der App: Mein Bereich → Datenschutz → Öffentliches Profil.")).toBeTruthy();
 });
 
 test("ohne Teilnahme oder bei Fehlern bleibt die Karte weg", async () => {

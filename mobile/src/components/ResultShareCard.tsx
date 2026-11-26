@@ -9,7 +9,7 @@ import { colors, radius } from "../theme";
 
 // „Ergebnis teilen“ (#1194) nach dem Turnier - wie im Web in „Dein Stand“: das hohe Bild als Vorschau, „Bild teilen“
 // für WhatsApp-Status und Instagram-Story, „Link teilen“ für die Seite mit Vorschaubild. Ist das Profil privat oder
-// das Turnier nicht öffentlich, steht da, warum (die Privatsphäre liegt wie überall unter Profil → Zahnrad - kein
+// das Turnier nicht öffentlich, steht da, warum (die Privatsphäre liegt wie überall unter Mein Bereich → Datenschutz - kein
 // zweiter Weg dorthin, #1150); wer nicht mitgespielt hat, sieht nichts.
 
 export function ResultShareCard({ tournamentId }: { tournamentId: string }) {
@@ -32,7 +32,7 @@ export function ResultShareCard({ tournamentId }: { tournamentId: string }) {
       <Card style={styles.card} testID="result-share-hint">
         <Heading>Ergebnis teilen</Heading>
         <Muted>{options.text}</Muted>
-        {options.reason === "private_profile" ? <Muted>In der App: Profil → Zahnrad → Privatsphäre.</Muted> : null}
+        {options.reason === "private_profile" ? <Muted>In der App: Mein Bereich → Datenschutz → Öffentliches Profil.</Muted> : null}
       </Card>
     );
   }

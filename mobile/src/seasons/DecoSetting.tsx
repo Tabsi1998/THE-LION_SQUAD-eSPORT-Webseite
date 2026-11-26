@@ -8,7 +8,7 @@ import { appNamesSeason } from "./SeasonStage";
 import { useSoundsOn } from "./sound/player";
 
 // Der Schalter (#636): saisonale Deko an, dezent oder aus - angemeldet im Konto (gilt auch auf der Website), als Gast auf
-// dem Gerät. Seit #1146 steht er in den Einstellungen unter „Darstellung“ (Zahnrad im Profil; Gäste im Profil-Tab).
+// dem Gerät. Seit #2059 steht er in Mein Bereich → Konto & Sicherheit → Darstellung (Gäste: in der Übersicht von Mein Bereich).
 
 export const DECO_ITEMS: Array<{ key: SeasonPreference; label: string }> = [
   { key: "on", label: "An" },

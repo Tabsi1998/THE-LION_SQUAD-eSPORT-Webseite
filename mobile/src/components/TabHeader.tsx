@@ -16,7 +16,7 @@ import { Body, Title } from "./Text";
 
 type Props = {
   title: string;
-  /** Was rechts vor Lupe und Glocke steht (Profil: das Zahnrad zu den Einstellungen). */
+  /** Was rechts vor Lupe und Glocke steht (ein zusätzlicher Knopf der Übersicht). */
   extra?: React.ReactNode;
   /** Unter der Titelzeile, etwa Saison-Figuren oder eine Unterzeile. */
   children?: React.ReactNode;

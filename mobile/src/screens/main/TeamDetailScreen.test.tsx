@@ -268,7 +268,7 @@ test.each([
   expect(screen.queryByText("Entfernen")).toBeNull();
   expect(screen.queryByText("Verwaltung aktiv")).toBeNull();
   await fireEvent.press(screen.getByTestId("team-mfa-setup"));
-  expect(openURL).toHaveBeenCalledWith(expect.stringMatching(/\/profile\?tab=security&mfa=required&next=%2Fteams%2Ft1$/));
+  expect(openURL).toHaveBeenCalledWith(expect.stringMatching(/\/mein-bereich\/konto\?mfa=required&next=%2Fteams%2Ft1$/));
   openURL.mockRestore();
 });
 
