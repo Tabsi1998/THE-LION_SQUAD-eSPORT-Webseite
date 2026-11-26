@@ -14,7 +14,7 @@ jest.mock("../../live", () => ({ isGuestUser: (user: Record<string, unknown> | n
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 const mockRootNavigate = jest.fn();
 const mockTab = { current: "HomeTab" };
-jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockRootNavigate(...args), currentTab: () => mockTab.current }));
+jest.mock("../../navigation/rootNavigation", () => ({ openDetail: (...args: unknown[]) => mockRootNavigate(...args), currentTab: () => mockTab.current }));
 jest.mock("@expo/vector-icons", () => {
   const { Text } = require("react-native");
   return { Ionicons: ({ name }: { name: string }) => <Text>{`icon:${name}`}</Text> };
@@ -157,10 +157,10 @@ test("angemeldet: der eigene Fortschritt im Katalog, die eigenen Punkte und der 
   expect(screen.getByTestId("category-hidden-count")).toHaveTextContent("2 von 13 gefunden");
   expect((await screen.findByTestId("achievement-badge-matches_played")).props.accessibilityLabel).toBe("Holz I");
   await fireEvent.press(screen.getByTestId("my-achievement-summary"));
-  expect(mockRootNavigate).toHaveBeenCalledWith("Profile", { tab: "achievements" });
+  expect(mockRootNavigate).toHaveBeenCalledWith("OwnProfile", { tab: "achievements" });
 });
 
-test("im Tab Profil legt sich die eigene Übersicht obendrauf - „Zurück“ führt wieder zur Ruhmeshalle (#1296)", async () => {
+test("auch in Mein Bereich legt sich die eigene Übersicht obendrauf - „Zurück“ führt wieder zur Ruhmeshalle (#1296, #2059)", async () => {
   mockAuth.user = { id: "u1", username: "anna" };
   mockTab.current = "ProfileTab";
   const push = jest.fn();
@@ -168,7 +168,8 @@ test("im Tab Profil legt sich die eigene Übersicht obendrauf - „Zurück“ f�
   mockApi({ groups: GROUPS, hidden: { total: 13, earned: 0 } });
   await render(<AchievementShowcaseScreen navigation={{ navigate, push } as never} route={route} />);
   await fireEvent.press(await screen.findByTestId("my-achievement-summary"));
-  expect(push).toHaveBeenCalledWith("Profile", { tab: "achievements" });
-  expect(mockRootNavigate).not.toHaveBeenCalled();
+  // Das eigene Profil ist eine Seite über dem Tab, in dem man ist - kein Sprung zurück zur Übersicht des Tabs.
+  expect(mockRootNavigate).toHaveBeenCalledWith("OwnProfile", { tab: "achievements" });
+  expect(push).not.toHaveBeenCalled();
   mockTab.current = "HomeTab";
 });

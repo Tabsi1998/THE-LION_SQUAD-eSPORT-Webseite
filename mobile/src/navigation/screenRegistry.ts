@@ -16,6 +16,8 @@ import { GalleryScreen } from "../screens/main/GalleryScreen";
 import { GalleryViewerScreen } from "../screens/main/GalleryViewerScreen";
 import { InfoCenterScreen } from "../screens/main/InfoCenterScreen";
 import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
+import { MeinBereichGruppeScreen } from "../screens/main/MeinBereichGruppeScreen";
+import { MeinBereichScreen } from "../screens/main/MeinBereichScreen";
 import { MemberCardScreen } from "../screens/main/MemberCardScreen";
 import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
 import { MyDocumentsScreen } from "../screens/main/MyDocumentsScreen";
@@ -35,7 +37,6 @@ import { LeagueOverallScreen } from "../screens/main/LeagueOverallScreen";
 import { ReferenceSeasonScreen } from "../screens/main/ReferenceSeasonScreen";
 import { SearchScreen } from "../screens/main/SearchScreen";
 import { SeasonPassScreen } from "../screens/main/SeasonPassScreen";
-import { SettingsScreen } from "../screens/main/SettingsScreen";
 import { CalendarSubscriptionScreen } from "../screens/main/CalendarSubscriptionScreen";
 import { TeamChatScreen } from "../screens/main/TeamChatScreen";
 import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
@@ -57,7 +58,7 @@ export const TAB_ROOT_SCREENS: Record<keyof TabRootParamList, Screen> = {
   TournamentList: TournamentsScreen,
   CommunityHub: CommunityScreen,
   VereinHub: VereinScreen,
-  Profile: ProfileScreen,
+  MeinBereich: MeinBereichScreen,
 };
 
 export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
@@ -97,7 +98,8 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   LeagueOverall: LeagueOverallScreen,
   ClubAbout: ClubAboutScreen,
   YearReview: YearReviewScreen,
-  Settings: SettingsScreen,
+  OwnProfile: ProfileScreen,
+  MeinBereichGruppe: MeinBereichGruppeScreen,
   ProfileEdit: ProfileEditScreen,
   CalendarSubscription: CalendarSubscriptionScreen,
   Faq: FaqScreen,

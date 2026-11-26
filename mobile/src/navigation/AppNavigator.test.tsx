@@ -2,7 +2,7 @@ import React from "react";
 import { Text } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { AppNavigator, detailRouteId } from "./AppNavigator";
-import { currentTab, navigateToNotification, navigateToUrl, navigationRef, openSignIn, openTab } from "./rootNavigation";
+import { currentTab, navigateToNotification, navigateToUrl, navigationRef, openDetail, openSignIn, openTab } from "./rootNavigation";
 import type { LooseNavigation } from "./types";
 
 const nav = navigationRef as unknown as LooseNavigation;
@@ -18,11 +18,11 @@ jest.mock("./screenRegistry", () => {
   };
   const names = (keys: string[]) => Object.fromEntries(keys.map((key) => [key, page(key)]));
   return {
-    TAB_ROOT_SCREENS: names(["Dashboard", "TournamentList", "CommunityHub", "VereinHub", "Profile"]),
+    TAB_ROOT_SCREENS: names(["Dashboard", "TournamentList", "CommunityHub", "VereinHub", "MeinBereich"]),
     DETAIL_SCREENS: names(["TournamentDetail", "EventDetail", "FastLapDetail", "MatchDetail", "TournamentChat", "TeamDetail", "TeamChat", "PublicProfile",
       "DirectThread", "NewsList", "NewsDetail", "Gallery", "GalleryAlbum", "GalleryViewer", "Notifications", "Search", "SeasonPass", "AchievementShowcase",
       "AdventCalendar", "EasterHunt", "MyInvoices", "MyPrizes", "MyMembership", "MemberDocuments", "MemberMeetings", "MemberHelperShifts", "MemberCard",
-      "Admission", "InfoCenter", "ReferenceSeason", "ReferenceRound", "ClubAbout", "YearReview", "Settings", "ProfileEdit", "CalendarSubscription", "Faq"]),
+      "Admission", "InfoCenter", "ReferenceSeason", "ReferenceRound", "ClubAbout", "YearReview", "OwnProfile", "MeinBereichGruppe", "ProfileEdit", "CalendarSubscription", "Faq"]),
   };
 });
 const mockAuth = { user: { id: "u-1", username: "neonfalke", display_name: "NeonFalke", role: "player" } as Record<string, unknown> | null, loading: false };
@@ -66,10 +66,10 @@ beforeEach(() => {
   mockUnread.value = 3;
 });
 
-test("fünf Tabs in dieser Reihenfolge: Home · Events · Community · Verein · Profil - die Zahl an Community zählt ungelesene Chats", async () => {
+test("fünf Tabs in dieser Reihenfolge: Home · Events · Community · Verein · Mein Bereich - die Zahl an Community zählt ungelesene Chats", async () => {
   await renderApp();
   // Die Namen stehen in Großbuchstaben im Text selbst (#1296: so misst Android richtig, kein „COMMUNI…“).
-  const labels = ["HOME", "EVENTS", "COMMUNITY", "VEREIN", "PROFIL"];
+  const labels = ["HOME", "EVENTS", "COMMUNITY", "VEREIN", "MEIN BEREICH"];
   for (const label of labels) expect(screen.getByText(label)).toBeTruthy();
   for (const id of ["tab-home", "tab-events", "tab-community", "tab-verein", "tab-profile"]) expect(screen.getByTestId(id)).toBeTruthy();
   expect(screen.queryByText("Mehr")).toBeNull();
@@ -82,7 +82,7 @@ test("als Gast dieselben fünf Tabs - ohne Zahl", async () => {
   mockAuth.user = null;
   mockUnread.value = 0;
   await renderApp();
-  for (const label of ["HOME", "EVENTS", "COMMUNITY", "VEREIN", "PROFIL"]) expect(screen.getByText(label)).toBeTruthy();
+  for (const label of ["HOME", "EVENTS", "COMMUNITY", "VEREIN", "MEIN BEREICH"]) expect(screen.getByText(label)).toBeTruthy();
   expect(screen.queryByText("3")).toBeNull();
 });
 
@@ -133,11 +133,13 @@ test("Benachrichtigung bei offenem Tab Events: öffnet über Events; zweimal auf
   expect(currentTab()).toBe("EventsTab");
 });
 
-test("#994: im Profil öffnen Erfolge-Übersicht und Freundesprofile im Profil-Tab; „Erfolg freigeschaltet“ führt zu den Erfolgen", async () => {
+test("#994, #2059: in Mein Bereich öffnen Freundesprofile im Tab; „Erfolg freigeschaltet“ legt das eigene Profil über den Tab", async () => {
   await renderApp();
+  // Der fünfte Tab heißt jetzt „Mein Bereich“ (#2059) - seine Kennung bleibt.
+  expect(screen.getByTestId("tab-profile")).toHaveTextContent("MEIN BEREICH");
   await fireEvent.press(screen.getByTestId("tab-profile"));
   await settle();
-  expect(current()).toBe("Profile");
+  expect(current()).toBe("MeinBereich");
   await act(async () => {
     nav.navigate("PublicProfile", { username: "kiwikomet" });
   });
@@ -146,15 +148,43 @@ test("#994: im Profil öffnen Erfolge-Übersicht und Freundesprofile im Profil-T
   await act(async () => {
     navigationRef.goBack();
   });
-  expect(current()).toBe("Profile");
+  expect(current()).toBe("MeinBereich");
 
   await fireEvent.press(screen.getByTestId("tab-events"));
   await settle();
   await act(async () => {
-    openTab("Profile", { tab: "achievements" });
+    openDetail("OwnProfile", { tab: "achievements" });
   });
-  expect(currentTab()).toBe("ProfileTab");
-  expect(navigationRef.getCurrentRoute()).toMatchObject({ name: "Profile", params: { tab: "achievements" } });
+  // Über dem Tab, in dem man gerade ist - „Zurück“ führt dorthin.
+  expect(currentTab()).toBe("EventsTab");
+  expect(navigationRef.getCurrentRoute()).toMatchObject({ name: "OwnProfile", params: { tab: "achievements" } });
+  await act(async () => {
+    navigationRef.goBack();
+  });
+  expect(current()).toBe("TournamentList");
+  await act(async () => {
+    openTab("MeinBereich");
+  });
+  expect([currentTab(), current()]).toEqual(["ProfileTab", "MeinBereich"]);
+});
+
+test("#2059: jede Gruppe von Mein Bereich ist eine eigene Seite - ein neuer Anker bleibt auf ihr", async () => {
+  await renderApp();
+  await fireEvent.press(screen.getByTestId("tab-profile"));
+  await settle();
+  await act(async () => {
+    expect(navigateToUrl("/mein-bereich/konto")).toBe(true);
+  });
+  expect(navigationRef.getCurrentRoute()).toMatchObject({ name: "MeinBereichGruppe", params: { gruppe: "konto" } });
+  await act(async () => {
+    expect(navigateToUrl("/mein-bereich/datenschutz?tab=loeschung")).toBe(true);
+  });
+  expect(navigationRef.getCurrentRoute()).toMatchObject({ name: "MeinBereichGruppe", params: { gruppe: "datenschutz", ziel: "loeschung" } });
+  await act(async () => {
+    navigationRef.goBack();
+  });
+  expect(navigationRef.getCurrentRoute()).toMatchObject({ name: "MeinBereichGruppe", params: { gruppe: "konto" } });
+  expect(detailRouteId("MeinBereichGruppe", { gruppe: "konto", ziel: "passwort" })).toBe("konto");
 });
 
 test("alte Adressen öffnen den neuen Tab: /verein, /messages, /teams, /fastlap", async () => {
@@ -164,7 +194,7 @@ test("alte Adressen öffnen den neuen Tab: /verein, /messages, /teams, /fastlap"
     ["/messages", "CommunityTab", "CommunityHub"],
     ["/teams", "CommunityTab", "CommunityHub"],
     ["/fastlap", "EventsTab", "TournamentList"],
-    ["/u/me", "ProfileTab", "Profile"],
+    ["/mein-bereich", "ProfileTab", "MeinBereich"],
     ["/", "HomeTab", "Dashboard"],
   ];
   for (const [url, tabName, screenName] of cases) {
@@ -254,6 +284,6 @@ test("jeder Detail-Screen mit Kennung hat eine eigene Seite je Kennung (#1000)",
   expect(detailRouteId("ReferenceRound", { lineage: "prl", season: "2026", round: 3, session: "sprint" })).toBe("prl/2026/3");
   // Gesamtwertung (#2173): Liga und Season sind die Kennung, die Liga N ist ein Reiter derselben Seite.
   expect(detailRouteId("LeagueOverall", { league: "cod", season: "season-2", level: 2 })).toBe("cod/season-2");
-  expect(detailRouteId("Settings", undefined)).toBeUndefined();
+  expect(detailRouteId("OwnProfile", undefined)).toBeUndefined();
   expect(detailRouteId("NewsDetail", undefined)).toBeUndefined();
 });

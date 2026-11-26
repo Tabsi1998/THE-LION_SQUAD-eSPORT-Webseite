@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
+import { AnkerBereich, AnkerView, useAnker } from "../../components/Anker";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
 import { MemberCardArt } from "../../components/MemberCardArt";
-import { MemberConsents } from "../../components/MemberConsents";
 import { MemberFileAccounts } from "../../components/MemberFileAccounts";
 import { MemberJerseyNumber } from "../../components/MemberJerseyNumber";
 import { Screen } from "../../components/Screen";
@@ -16,6 +16,8 @@ import { formatDate, formatDateTime } from "../../lib/format";
 import { areaCard, feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type AreaCard, type DolibarrView } from "../../lib/memberArea";
 import type { InvoiceList } from "../../lib/memberDocuments";
 import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, changedWebsiteFields, websiteFieldText, websiteStateLine, type IdentityState, type SelfService, type WebsiteField, type WebsiteProfile } from "../../lib/selfService";
+import { BEREICH } from "../../lib/meinBereich";
+import { navigateToUrl } from "../../navigation/rootNavigation";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useAuth } from "../../auth/AuthContext";
 import { colors, radius } from "../../theme";
@@ -24,6 +26,8 @@ import { colors, radius } from "../../theme";
 // Nummer) - und wer noch nicht zugeordnet ist, kann es anfragen. Die Belege selbst stehen unter
 // „Meine Rechnungen“ (#320), erreichbar im Profil unter „Nur für dich“ (#1149): Rechnungen gehören zum Konto, der
 // Mitgliederbereich bleibt Verein.
+// Mein Bereich (#2059): Mein Bereich → Mitgliedschaft führt hierher; `ziel` (Wunschnummer, Meine Daten, Austritt …)
+// rollt gleich zur Stelle. Die Einwilligungen stehen wie im Web unter Mein Bereich → Datenschutz → Einwilligungen.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MyMembership">;
 
@@ -33,7 +37,7 @@ type MembershipMe = {
   dolibarr?: DolibarrView;
 };
 
-export function MyMembershipScreen({ navigation }: Props) {
+export function MyMembershipScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [me, setMe] = useState<MembershipMe | null>(null);
   const [invoices, setInvoices] = useState<InvoiceList | null>(null);
@@ -52,9 +56,8 @@ export function MyMembershipScreen({ navigation }: Props) {
   // Eigenes Website-Profil (#260): liegt in der Vereinsakte, sichtbar nur mit Einwilligung.
   const [website, setWebsite] = useState<WebsiteProfile | null>(null);
   const [websiteDraft, setWebsiteDraft] = useState<Record<string, unknown>>({});
-  // Meine Einwilligungen (#1537): der Hinweis im Website-Profil führt dorthin.
   const scrollRef = useRef<ScrollView>(null);
-  const consentsY = useRef<number | null>(null);
+  const anker = useAnker(scrollRef, route?.params?.ziel);
 
   const load = useCallback(async () => {
     setError("");
@@ -230,6 +233,7 @@ export function MyMembershipScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.gold} />}
       >
+        <AnkerBereich api={anker}>
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
         {/* Dieselbe Karte wie im Web (#1335): schwarz mit Gold - ein Tipp öffnet sie mit Prüfcode. */}
@@ -239,6 +243,7 @@ export function MyMembershipScreen({ navigation }: Props) {
           </Pressable>
         ) : null}
 
+        <AnkerView id="status">
         <Card style={styles.card} testID="membership-status">
           <View style={styles.rowBetween}>
             <Heading>{STATUS_LABELS[status] || status}</Heading>
@@ -254,11 +259,15 @@ export function MyMembershipScreen({ navigation }: Props) {
             <Body style={styles.inlineLinkText}>Mitgliedskarte anzeigen</Body>
           </Pressable>
         </Card>
+        </AnkerView>
 
         {/* Meine Nummer (#2050, wie im Web #2034): einmal wählen, danach nur über den Vorstand; der Server sagt, ob es sie gibt. */}
-        <MemberJerseyNumber />
+        <AnkerView id="nummer">
+          <MemberJerseyNumber />
+        </AnkerView>
 
         {fee ? (
+          <AnkerView id="beitrag">
           <Card style={[styles.card, fee.tone === "warn" ? styles.warn : fee.tone === "info" ? styles.info : styles.ok]} testID="membership-fee">
             <View style={styles.rowBetween}>
               <Heading>Beitrag</Heading>
@@ -268,6 +277,7 @@ export function MyMembershipScreen({ navigation }: Props) {
             {fee.lines.map((line) => <Muted key={line}>{line}</Muted>)}
             {fee.asOf ? <Muted style={styles.asOf}>Stand {formatDateTime(fee.asOf)}{fee.stale ? " · älterer Stand, die Mitgliederverwaltung antwortet gerade nicht" : ""}</Muted> : null}
           </Card>
+          </AnkerView>
         ) : null}
 
         {prompt === "ask" ? (
@@ -299,11 +309,21 @@ export function MyMembershipScreen({ navigation }: Props) {
           </Card>
         ) : null}
 
-        {/* Meine Einwilligungen (#1537): wie im Web nur mit Zuordnung - Stand, Text, Zustimmen und Widerrufen. */}
+        {/* Meine Einwilligungen (#1537): seit Mein Bereich (#2059) an einem Ort - Datenschutz → Einwilligungen, wie im Web. */}
         {view?.led_by_dolibarr ? (
-          <View onLayout={(event) => { consentsY.current = event.nativeEvent.layout.y; }}>
-            <MemberConsents />
-          </View>
+          <Pressable
+            onPress={() => { navigateToUrl(`${BEREICH}/datenschutz?tab=einwilligungen`); }}
+            accessibilityRole="button"
+            testID="membership-consents-link"
+            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+          >
+            <Ionicons name="shield-checkmark-outline" color={colors.gold} size={20} />
+            <View style={styles.linkCardText}>
+              <Body style={styles.linkCardTitle}>Einwilligungen</Body>
+              <Muted>Mein Bereich → Datenschutz: Stand, Text, Zustimmen und Widerrufen.</Muted>
+            </View>
+            <Ionicons name="chevron-forward" color={colors.muted} size={16} />
+          </Pressable>
         ) : null}
 
         {identity ? (
@@ -344,6 +364,7 @@ export function MyMembershipScreen({ navigation }: Props) {
         ) : null}
 
         {self && profile ? (
+          <AnkerView id="meine-daten">
           <Card style={styles.card} testID="membership-self">
             <Heading>Meine Daten</Heading>
             <Muted testID="membership-self-identity">
@@ -385,6 +406,7 @@ export function MyMembershipScreen({ navigation }: Props) {
                 ))}
               </View>
             ) : null}
+            <AnkerView id="austritt">
             {profile.exit ? (
               <Muted style={styles.exitPlanned} testID="membership-self-exit-planned">{exitLine(profile)}</Muted>
             ) : (
@@ -402,25 +424,28 @@ export function MyMembershipScreen({ navigation }: Props) {
                 <Button label="Austritt erklären" variant="secondary" onPress={askExit} disabled={busy !== ""} testID="membership-self-exit-button" />
               </View>
             )}
+            </AnkerView>
           </Card>
+          </AnkerView>
         ) : null}
 
         {/* Konten in der Mitgliederakte (#846): geprüfte Konten nur auf Wunsch in die Akte; verknüpft wird im Profil unter „Bearbeiten“. */}
         <MemberFileAccounts onLink={() => navigation.navigate("ProfileEdit")} />
 
         {website ? (
+          <AnkerView id="website-profil">
           <Card style={styles.card} testID="membership-website">
             <Heading>Mein Website-Profil</Heading>
             <Muted testID="membership-website-state">{websiteStateLine(website)}</Muted>
             {website.consent && !website.given && view?.led_by_dolibarr ? (
               <Pressable
-                onPress={() => scrollRef.current?.scrollTo({ y: Math.max(0, (consentsY.current ?? 0) - 12), animated: true })}
+                onPress={() => { navigateToUrl(`${BEREICH}/datenschutz?tab=einwilligungen`); }}
                 accessibilityRole="button"
                 testID="membership-website-to-consents"
                 style={({ pressed }) => [styles.inlineLink, pressed && styles.pressed]}
               >
                 <Ionicons name="shield-checkmark-outline" color={colors.gold} size={16} />
-                <Body style={styles.inlineLinkText}>Zu „Meine Einwilligungen“</Body>
+                <Body style={styles.inlineLinkText}>Zu den Einwilligungen</Body>
               </Pressable>
             ) : null}
             {!(website.fields ?? []).length ? <Muted testID="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</Muted> : null}
@@ -434,6 +459,7 @@ export function MyMembershipScreen({ navigation }: Props) {
               <Button label={busy === "website" ? "Sende …" : "Profil speichern"} onPress={saveWebsite} disabled={busy !== "" || !Object.keys(websiteChanged).length} testID="membership-website-save" />
             ) : null}
           </Card>
+          </AnkerView>
         ) : null}
 
         <Card style={styles.card} testID="membership-invoices">
@@ -444,9 +470,11 @@ export function MyMembershipScreen({ navigation }: Props) {
               {invoices.summary.overdue_count ? ` · ${invoices.summary.overdue_count} überfällig` : ""}
             </Muted>
           ) : null}
-          {/* Jedes Thema an genau einem Ort (#1150): die Rechnungen öffnet man im Profil unter „Nur für dich“. */}
-          <Muted testID="membership-invoices-hint">Beitrag, Events und Turniere – alle deine Rechnungen stehen im Profil unter „Nur für dich“.</Muted>
+          {/* Jedes Thema an genau einem Ort (#1150): die Rechnungen stehen in Mein Bereich (#2059) - der Knopf führt dorthin. */}
+          <Muted testID="membership-invoices-hint">Beitrag, Events und Turniere – alle deine Rechnungen stehen in Mein Bereich unter „Rechnungen & Unterlagen“.</Muted>
+          <Button label="Zu den Rechnungen" variant="secondary" onPress={() => { navigateToUrl(`${BEREICH}/rechnungen`); }} testID="membership-invoices-link" />
         </Card>
+        </AnkerBereich>
       </ScrollView>
     </Screen>
   );
@@ -529,6 +557,24 @@ const styles = StyleSheet.create({
   },
   inlineLinkText: {
     color: colors.gold,
+    fontWeight: "900",
+  },
+  linkCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 56,
+    padding: 14,
+  },
+  linkCardText: {
+    flex: 1,
+    gap: 2,
+  },
+  linkCardTitle: {
     fontWeight: "900",
   },
   input: {

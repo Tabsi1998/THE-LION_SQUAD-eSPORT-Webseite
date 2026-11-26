@@ -155,7 +155,8 @@ test("Aufklappen sagt den Zustand an; Links öffnen den Screen der App oder die 
   mockNavigateToUrl.mockImplementation(() => true);
   const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true as never);
   await fireEvent.press(screen.getByTestId("faq-frage-link-app-push-stufen-bereich"));
-  expect(mockNavigateToUrl).toHaveBeenLastCalledWith("/profile?tab=notifications");
+  // Seit Mein Bereich (#2059) die Gruppe Benachrichtigungen.
+  expect(mockNavigateToUrl).toHaveBeenLastCalledWith("/mein-bereich/benachrichtigungen");
   expect(open).not.toHaveBeenCalled();
 
   // Eine Anleitung mit Bildern: die Website im Browser, mit Anker auf den Schritt.

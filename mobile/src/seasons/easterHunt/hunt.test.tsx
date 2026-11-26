@@ -81,6 +81,9 @@ test("die Screens mit Verstecken heißen beim Server wie im Admin", () => {
   // Die Tabs seit #1143: Community und Verein statt Teams und Mehr.
   expect(huntRoute("CommunityHub")).toBe("app:Community");
   expect(huntRoute("VereinHub")).toBe("app:Verein");
+  // Seit Mein Bereich (#2059): „app:Profile“ ist das eigene Profil (Kasten „Nur für dich“ als Versteck).
+  expect(huntRoute("OwnProfile")).toBe("app:Profile");
+  expect(require("fs").readFileSync(require("path").join(__dirname, "../../screens/main/ProfileScreen.tsx"), "utf8")).toMatch(/perch="profile-private"/);
   expect(huntRoute("MoreHub")).toBeNull();
   expect(huntRoute("DirectThread")).toBeNull();
 });

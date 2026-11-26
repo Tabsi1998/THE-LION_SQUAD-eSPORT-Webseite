@@ -2,12 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Switch, TextInput, View, type LayoutChangeEvent } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import { AnkerView } from "../../../components/Anker";
 import { Card } from "../../../components/Card";
-import { Glow, Press, useReduceMotion } from "../../../components/motion";
+import { Glow, Press, selectFeedback, switchFeedback, useReduceMotion } from "../../../components/motion";
 import { Body, Muted } from "../../../components/Text";
 import {
-  CUSTOM_LEVEL, MODE_LABELS, MODE_ORDER, NOTIFICATION_TOPICS, levelOf, levelPatch, modePatch, normalizeClockInput, quietHoursProblem,
-  quietSummary, shiftClock, topicModes, type NotificationServerInfo, type NotificationTopic, type Prefs, type QuietHours, type TopicMode,
+  CUSTOM_LEVEL, DIGEST_FALLBACK, DIGEST_HINTS, MODE_LABELS, MODE_ORDER, NOTIFICATION_TOPICS, digestRhythm, levelOf, levelPatch, modePatch,
+  normalizeClockInput, quietHoursProblem, quietSummary, shiftClock, topicModes, type DigestInfo, type DigestRhythm, type NotificationServerInfo,
+  type NotificationTopic, type Prefs, type QuietHours, type TopicMode,
 } from "../../../lib/notificationLevels";
 import { colors, radius } from "../../../theme";
 import { MatrixToggle, notificationChannels, notificationPreferenceKey, profileStyles, Toggle } from "./parts";
@@ -19,6 +21,8 @@ import { MatrixToggle, notificationChannels, notificationPreferenceKey, profileS
 // Bewegung (Reanimated, nur transform und opacity): die Markierung gleitet zur gewählten Stufe bzw. Stellung, Knöpfe geben beim
 // Drücken nach, umgestellte Themen leuchten gestaffelt kurz auf, Ruhezeit und „Weitere Wege“ blenden ein, Mond und Pfeil drehen
 // sich. Mit „Bewegung reduzieren“ springt alles an seinen Platz; die Farben wechseln trotzdem.
+// Seit Mein Bereich (#2059, #1677): unter der Ruhezeit die Sammel-Mail (#1662, wie im Web unter E-Mail), jede Karte ist ein
+// Sprungziel der Suche, und eine Stellung rastet mit einem leisen Klicken ein.
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const LEVEL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = { all: "notifications", important: "notifications-outline", few: "notifications-off-outline" };
@@ -34,14 +38,19 @@ export type NotificationLevelsProps = {
   prefs: Prefs;
   newsletter: boolean;
   quiet: QuietHours;
+  /** Die eigene Wahl der Sammel-Mail (null = Vorgabe des Vereins). */
+  digest?: DigestRhythm | null;
   channelEnabled: (key: string) => boolean;
   topicEnabled: (channel: string, topic: string) => boolean;
   onPrefs: (patch: Prefs) => void;
   onNewsletter: (value: boolean) => void;
   onQuiet: (next: QuietHours) => void;
+  onDigest?: (next: DigestRhythm | null) => void;
+  /** „Weitere Wege“ gleich offen (Sprung zu Newsletter oder E-Mail je Thema). */
+  moreOpen?: boolean;
 };
 
-export function NotificationLevels({ info, prefs, newsletter, quiet, channelEnabled, topicEnabled, onPrefs, onNewsletter, onQuiet }: NotificationLevelsProps) {
+export function NotificationLevels({ info, prefs, newsletter, quiet, digest, channelEnabled, topicEnabled, onPrefs, onNewsletter, onQuiet, onDigest, moreOpen = false }: NotificationLevelsProps) {
   const topics = info.topics;
   const level = levelOf(info.levels, prefs, topics, newsletter);
   const modes = topicModes(prefs, topics, newsletter);
@@ -66,6 +75,7 @@ export function NotificationLevels({ info, prefs, newsletter, quiet, channelEnab
   };
   const pickMode = (topic: NotificationTopic, mode: TopicMode) => {
     if (modes[topic.k] === mode) return;
+    selectFeedback();
     onPrefs(modePatch(topic.k, mode));
   };
 
@@ -73,6 +83,7 @@ export function NotificationLevels({ info, prefs, newsletter, quiet, channelEnab
     <View style={styles.wrap} testID="notification-levels-view">
       <Muted>Wähle, wie viel bei dir ankommt. Konto- und Sicherheitsmails bleiben immer aktiv.</Muted>
 
+      <AnkerView id="stufe">
       <Card style={styles.card} testID="notification-levels">
         <View style={styles.titleRow}>
           <Body style={styles.cardTitle} accessibilityRole="header">Stufe</Body>
@@ -111,7 +122,9 @@ export function NotificationLevels({ info, prefs, newsletter, quiet, channelEnab
           {level === CUSTOM_LEVEL ? "Du hast einzelne Themen selbst gestellt. Tippe eine Stufe an, dann setzt sie alle Themen neu." : current?.description || ""}
         </Muted>
       </Card>
+      </AnkerView>
 
+      <AnkerView id="themen">
       <Card style={styles.card}>
         <Body style={styles.cardTitle} accessibilityRole="header">Themen</Body>
         <Muted style={styles.small}>Push heißt: aufs Handy in der LionsAPP und in den Browser, wenn du ihn angemeldet hast. „Nur App“ legt es still in die Glocke.</Muted>
@@ -150,10 +163,21 @@ export function NotificationLevels({ info, prefs, newsletter, quiet, channelEnab
           </View>
         ))}
       </Card>
+      </AnkerView>
 
-      <QuietHoursCard quiet={quiet} exceptions={info.exceptions} onQuiet={onQuiet} />
+      <AnkerView id="ruhezeit">
+        <QuietHoursCard quiet={quiet} exceptions={info.exceptions} onQuiet={onQuiet} />
+      </AnkerView>
 
-      <MoreWays info={info} newsletter={newsletter} channelEnabled={channelEnabled} topicEnabled={topicEnabled} onPrefs={onPrefs} onNewsletter={onNewsletter} />
+      {onDigest ? (
+        <AnkerView id="sammel-mail">
+          <DigestCard info={info.digest || DIGEST_FALLBACK} own={digest ?? null} emailOff={!channelEnabled("email")} onDigest={onDigest} />
+        </AnkerView>
+      ) : null}
+
+      <AnkerView id="weitere-wege">
+        <MoreWays info={info} newsletter={newsletter} channelEnabled={channelEnabled} topicEnabled={topicEnabled} onPrefs={onPrefs} onNewsletter={onNewsletter} initialOpen={moreOpen} />
+      </AnkerView>
     </View>
   );
 }
@@ -265,7 +289,7 @@ function QuietHoursCard({ quiet, exceptions, onQuiet }: { quiet: QuietHours; exc
         </View>
         <Switch
           value={quiet.enabled}
-          onValueChange={(enabled) => onQuiet({ ...quiet, enabled })}
+          onValueChange={(enabled) => { switchFeedback(); onQuiet({ ...quiet, enabled }); }}
           accessibilityLabel="Ruhezeit"
           testID="notification-quiet-toggle"
           trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
@@ -331,13 +355,76 @@ function ClockField({ label, value, invalid, onChange, onStep, onBlur, testID }:
   );
 }
 
+// ---------------------------------------------------------------- Sammel-Mail (#1662)
+
+/**
+ * Sammel-Mail wie im Web (NotificationsTab → E-Mail): Sofort, Täglich oder Wöchentlich; was gilt und wann sie kommt, sagt
+ * der Server (`mail_digest.options`). Ohne eigene Wahl gilt die Vorgabe des Vereins - mit eigener Wahl steht der Weg zurück
+ * dorthin. Gespeichert wird über PATCH /users/me (`mail_digest`, null = Vorgabe).
+ */
+function DigestCard({ info, own, emailOff, onDigest }: { info: DigestInfo; own: DigestRhythm | null; emailOff: boolean; onDigest: (next: DigestRhythm | null) => void }) {
+  const rhythm = digestRhythm(info, own);
+  const index = Math.max(0, info.options.findIndex((option) => option.key === rhythm));
+  const current = info.options[index] || DIGEST_FALLBACK.options[0];
+  const preset = info.options.find((option) => option.key === info.default);
+  const pick = (key: DigestRhythm) => {
+    if (key === rhythm) return;
+    selectFeedback();
+    onDigest(key);
+  };
+  return (
+    <Card style={styles.card} testID="notification-digest">
+      <View style={styles.quietHead}>
+        <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.45)" />
+        <View style={styles.flex}>
+          <Body style={styles.cardTitle} accessibilityRole="header">Sammel-Mail</Body>
+          <Muted style={styles.small}>Statt vieler Einzelmails eine am Tag oder in der Woche. Dringendes wie „Dein Spiel startet in 10 Minuten“ kommt immer sofort, Konto-Mails auch.</Muted>
+        </View>
+      </View>
+      <Segments count={info.options.length} index={index} label="Sammel-Mail" thumbStyle={styles.segThumb} rowStyle={styles.seg}>
+        {info.options.map((option) => {
+          const checked = option.key === rhythm;
+          return (
+            <Press
+              key={option.key}
+              scale={0.95}
+              onPress={() => pick(option.key)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked }}
+              accessibilityLabel={`Sammel-Mail: ${option.label}`}
+              style={styles.segOption}
+              testID={`notification-digest-${option.key}`}
+            >
+              <Muted style={[styles.segText, checked && styles.segTextChecked]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{option.label}</Muted>
+            </Press>
+          );
+        })}
+      </Segments>
+      <Body style={styles.summary} testID="notification-digest-summary">
+        <Body style={styles.summaryStrong}>{current.schedule}.</Body> {DIGEST_HINTS[rhythm] || ""}
+      </Body>
+      {!own && preset ? <Muted style={styles.small} testID="notification-digest-default">Vorgabe des Vereins: {preset.label}.</Muted> : null}
+      {own && preset ? (
+        <Pressable onPress={() => { selectFeedback(); onDigest(null); }} accessibilityRole="button" style={({ pressed }) => [styles.defaultButton, pressed && styles.pressed]} testID="notification-digest-use-default">
+          <Body style={styles.defaultButtonText}>Vorgabe des Vereins nutzen ({preset.label})</Body>
+        </Pressable>
+      ) : null}
+      {emailOff ? <Muted style={styles.warningText} testID="notification-digest-email-off">E-Mail ist bei dir unter „Weitere Wege“ ganz aus – dann kommt auch keine Sammel-Mail.</Muted> : null}
+    </Card>
+  );
+}
+
 // ---------------------------------------------------------------- Weitere Wege
 
-function MoreWays({ info, newsletter, channelEnabled, topicEnabled, onPrefs, onNewsletter }: {
+function MoreWays({ info, newsletter, channelEnabled, topicEnabled, onPrefs, onNewsletter, initialOpen = false }: {
   info: NotificationServerInfo; newsletter: boolean; channelEnabled: (key: string) => boolean; topicEnabled: (channel: string, topic: string) => boolean;
-  onPrefs: (patch: Prefs) => void; onNewsletter: (value: boolean) => void;
+  onPrefs: (patch: Prefs) => void; onNewsletter: (value: boolean) => void; initialOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
+  // Ein Sprung zu Newsletter oder E-Mail je Thema (Suche, Link) klappt die Wege auf.
+  useEffect(() => {
+    if (initialOpen) setOpen(true);
+  }, [initialOpen]);
   const discord = info.discord;
   const channels = notificationChannels.filter((channel) => channel.key !== "discord" || Boolean(discord?.linked));
   const columns = channels.filter((channel) => MORE_COLUMNS.includes(channel.key));
@@ -359,6 +446,7 @@ function MoreWays({ info, newsletter, channelEnabled, topicEnabled, onPrefs, onN
         </Turn>
       </Pressable>
       {open ? (
+        <AnkerView id="weitere-wege-panel">
         <Reveal style={styles.morePanel} testID="notification-more-panel">
           {channels.map((channel, index) => (
             <Toggle key={channel.key} first={index === 0} label={channel.label} detail={channel.detail} value={channelEnabled(channel.key)} onValueChange={(value) => onPrefs({ [channel.key]: value })} testID={`notification-channel-${channel.key}`} />
@@ -384,8 +472,11 @@ function MoreWays({ info, newsletter, channelEnabled, topicEnabled, onPrefs, onN
               </View>
             );
           })}
-          <Toggle label="Newsletter" detail="Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar." value={newsletter} onValueChange={onNewsletter} testID="notification-newsletter" />
+          <AnkerView id="newsletter">
+            <Toggle label="Newsletter" detail="Ich willige separat ein, Newsletter, Event-Hinweise und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar." value={newsletter} onValueChange={onNewsletter} testID="notification-newsletter" />
+          </AnkerView>
         </Reveal>
+        </AnkerView>
       ) : null}
     </Card>
   );
@@ -595,6 +686,20 @@ const styles = StyleSheet.create({
   },
   summary: {
     color: "rgba(255,255,255,0.75)",
+  },
+  summaryStrong: {
+    color: colors.white,
+    fontWeight: "800",
+  },
+  defaultButton: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  defaultButtonText: {
+    color: colors.cyan,
+    fontSize: 13,
+    fontWeight: "800",
   },
   overline: {
     fontSize: 11,

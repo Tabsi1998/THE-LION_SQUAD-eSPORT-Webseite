@@ -1,10 +1,11 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
+import type { GruppeKey } from "../lib/meinBereich";
 
 /** Hilfe beim Anmelden (#996): Link zum Zurücksetzen des Passworts oder neue Bestätigungs-Mail. */
 export type LoginHelpKind = "password" | "verification";
 
 // Gast zuerst (#918): Die App startet ohne Konto. Anmelden und Registrieren liegen im Stapel über den Tabs - erreichbar aus
-// dem Profil-Tab, dem Hinweis beim ersten Start und überall, wo man ein Konto braucht; danach geht es zurück, woher man kam.
+// dem Tab Mein Bereich, dem Hinweis beim ersten Start und überall, wo man ein Konto braucht; danach geht es zurück, woher man kam.
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Login: undefined;
@@ -13,8 +14,9 @@ export type RootStackParamList = {
   LoginHelp: { kind: LoginHelpKind; email?: string };
 };
 
-// Fünf Tabs für alle (#1143, Fabians Wahl B): Home · Events · Community · Verein · Profil. Jeder Tab ist ein eigener Stapel
-// mit denselben Detail-Screens (#1144) - was man öffnet, legt sich über den Tab, in dem man gerade ist.
+// Fünf Tabs für alle (#1143, Fabians Wahl B): Home · Events · Community · Verein · Mein Bereich (#2059, früher „Profil“; die
+// Kennung `ProfileTab` bleibt). Jeder Tab ist ein eigener Stapel mit denselben Detail-Screens (#1144) - was man öffnet, legt
+// sich über den Tab, in dem man gerade ist.
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<AppStackParamList> | undefined;
   EventsTab: NavigatorScreenParams<AppStackParamList> | undefined;
@@ -42,7 +44,8 @@ export type TabRootParamList = {
   TournamentList: { filter?: EventsFilter; scope?: "all" | "mine" } | undefined;
   CommunityHub: { section?: CommunitySection } | undefined;
   VereinHub: undefined;
-  Profile: { tab?: ProfileTabKey } | undefined;
+  // Mein Bereich (#2059, #1677): die Übersicht mit „Zu tun“, „Häufig gebraucht“, der Suche und allen Gruppen.
+  MeinBereich: undefined;
 };
 
 /** Detail-Screens, die in jedem Tab-Stapel liegen (#1144). */
@@ -61,7 +64,8 @@ export type DetailParamList = {
   TeamChat: { id: string; title?: string };
   PublicProfile: { username: string };
   DirectThread: { userId: string; title?: string };
-  NewsList: undefined;
+  // `scope: "club"` (#2059): gleich auf „Verein“ gestellt - die internen News (aus /mein-bereich/verein/news).
+  NewsList: { scope?: "club" } | undefined;
   NewsDetail: { id: string };
   // Galerie (#236): Alben, Album-Raster, Großansicht ab einem Bild.
   Gallery: undefined;
@@ -83,7 +87,8 @@ export type DetailParamList = {
   // Meine Gewinne (#1149): aus „Nur für dich“ im Profil.
   MyPrizes: undefined;
   // Mitgliederbereich (#340, #1147): oben im Tab Verein, nur für Vereinsmitglieder; der Server prüft jede Antwort.
-  MyMembership: undefined;
+  // `ziel` (#2059): die Stelle, die sich gleich zeigt (status, beitrag, nummer, meine-daten, website-profil, austritt).
+  MyMembership: { ziel?: string } | undefined;
   MemberDocuments: undefined;
   // Deine Unterlagen (#1255): die eigenen Schreiben aus der Vereinsakte - aus „Nur für dich“ im Profil.
   MyDocuments: undefined;
@@ -107,8 +112,12 @@ export type DetailParamList = {
   ClubAbout: undefined;
   // Jahresrückblick „Dein Jahr bei LION“ (#1195): ab Mitte Dezember; Vorschau für die Verwaltung.
   YearReview: { preview?: boolean } | undefined;
-  // Einstellungen an einem Ort (#1146): Zahnrad oben im Profil.
-  Settings: undefined;
+  // Das eigene Profil (#1149), wie andere es sehen - seit Mein Bereich (#2059) eine Seite darüber: aus Mein Bereich → Profil,
+  // dem Kopf der Übersicht und /u/me. `tab` öffnet gleich einen Reiter (Erfolge, Trophäen …).
+  OwnProfile: { tab?: ProfileTabKey } | undefined;
+  // Eine Gruppe von Mein Bereich (#2059, #1677): die Einstellungen wohnen hier - flach, ohne Zahnrad. `ziel` springt zu einer
+  // Stelle (Suchtreffer, /mein-bereich/<gruppe>#<ziel>).
+  MeinBereichGruppe: { gruppe: Exclude<GruppeKey, "start">; ziel?: string };
   ProfileEdit: undefined;
   // Mein Kalender-Abo (#1788): der persönliche Link - aus den Einstellungen und dem Hinweis nach einer Anmeldung.
   CalendarSubscription: undefined;

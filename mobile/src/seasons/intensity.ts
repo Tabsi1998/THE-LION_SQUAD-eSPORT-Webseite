@@ -58,6 +58,8 @@ const CALM = new Set([
   "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "FastLapDetail",
   // Seit #1143: Suche, Gewinne und „Profil bearbeiten“ wie die anderen Konto-Seiten ruhig.
   "TeamChat", "DirectThread", "Notifications", "Search", "Profile", "ProfileEdit", "MyMembership", "MyInvoices", "MyPrizes",
+  // Mein Bereich (#2059): Übersicht und eigenes Profil ruhig wie die Konto-Seiten.
+  "MeinBereich", "OwnProfile",
   "MemberCard", "MemberDocuments", "MyDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
   // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
   "AdventCalendar",
@@ -66,6 +68,8 @@ const CALM = new Set([
 ]);
 const QUIET = new Set([
   "Consent", "Lock", "Boot", "Settings", "Admin",
+  // Die Gruppen von Mein Bereich (#2059) tragen die Einstellungen - still wie früher die Einstellungen.
+  "MeinBereichGruppe",
   // Turniertag (#1169): Matchseite (mit der Aufruf-Karte), Turnierleitung (mit Cockpit) und der Reiter „Baum“ der
   // Turnierseite (`TournamentBracket`, hält die Bühne über useStillHold still) bleiben ganz ohne Deko - wie im Web.
   "MatchDetail", "TournamentLead", "TournamentBracket",

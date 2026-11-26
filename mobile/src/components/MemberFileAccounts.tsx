@@ -105,7 +105,7 @@ export function MemberFileAccounts({ onLink }: { onLink: (platform: string) => v
               />
             </View>
           ))}
-          {!(view.accounts || []).length ? <Muted testID="membership-accounts-empty">Noch kein Konto verknüpft – das geht im Profil unter „Bearbeiten“.</Muted> : null}
+          {!(view.accounts || []).length ? <Muted testID="membership-accounts-empty">Noch kein Konto verknüpft – das geht unter Mein Bereich → Profil → Profil bearbeiten.</Muted> : null}
           {error ? <Muted style={styles.error} testID="membership-accounts-error">{error}</Muted> : null}
         </>
       )}

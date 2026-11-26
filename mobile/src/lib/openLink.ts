@@ -8,6 +8,15 @@ import { navigateToUrl } from "../navigation/rootNavigation";
 
 export type LinkResult = "screen" | "browser" | "none";
 
+/**
+ * Eine Seite der eigenen Website immer im Browser öffnen (#2059) - für das, was nur die Website kann: Passwort, Zwei-Faktor
+ * und Google, Daten herunterladen, Einspruch. `openLink` nähme sonst den Screen der App, der hierher geführt hat. Die Adresse
+ * darf darum kein App-Link sein (app.json): /mein-bereich/konto, /privacy-account und /my/penalties sind keine.
+ */
+export function openWebsite(path: string): void {
+  Linking.openURL(`${WEB_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`).catch(() => {});
+}
+
 export function openLink(url?: string | null): LinkResult {
   const text = String(url || "").trim();
   const path = ownPath(text);

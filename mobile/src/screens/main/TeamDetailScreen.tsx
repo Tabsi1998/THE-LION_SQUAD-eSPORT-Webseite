@@ -415,7 +415,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
 
         {needsSecondFactor && team ? (
           <Card style={styles.card} testID="team-mfa-hint">
-            <Muted>Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung. Einrichten kannst du sie auf der Website unter Profil → Sicherheit.</Muted>
+            <Muted>Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung. Einrichten kannst du sie auf der Website unter Mein Bereich → Konto & Sicherheit.</Muted>
             <Button
               compact
               variant="secondary"
@@ -829,9 +829,10 @@ function normalizeLink(url?: string | null) {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
-/** Zwei-Faktor wohnt auf der Website unter Profil → Sicherheit (wie `mfaSetupPath` im Web); danach zurück zum Team. */
+/** Zwei-Faktor wohnt auf der Website unter Mein Bereich → Konto & Sicherheit (wie `mfaSetupPath` im Web); danach zurück zum Team. */
 export function mfaSetupUrl(teamId: string) {
-  return `${WEB_BASE_URL}/profile?tab=security&mfa=required&next=${encodeURIComponent(`/teams/${teamId}`)}`;
+  // Mein Bereich (#2059): /mein-bereich/konto ist kein App-Link - die Adresse öffnet die Website, nicht wieder die App.
+  return `${WEB_BASE_URL}/mein-bereich/konto?mfa=required&next=${encodeURIComponent(`/teams/${teamId}`)}`;
 }
 
 const styles = StyleSheet.create({

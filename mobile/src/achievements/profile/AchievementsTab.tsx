@@ -101,7 +101,7 @@ export function AchievementsTab({ data, onDataChange, guest = false, profileScor
   const shareIds = useMemo(() => shareIdsByCode(data), [data]);
   const onShare = useCallback((awardId: string, tier: AchievementTier) => {
     if (!isPublic) {
-      Alert.alert("Deine Erfolge sind privat", "Zum Teilen erst in den Einstellungen „Erfolge öffentlich“ einschalten.");
+      Alert.alert("Deine Erfolge sind privat", "Zum Teilen erst unter Mein Bereich → Datenschutz „Erfolge öffentlich“ einschalten.");
       return;
     }
     void shareAchievement({ awardId, name: tier.name, materialName: materialName(tier) });

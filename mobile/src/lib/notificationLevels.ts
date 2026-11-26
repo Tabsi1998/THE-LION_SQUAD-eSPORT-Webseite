@@ -194,7 +194,60 @@ export type NotificationServerInfo = {
   quietHours: QuietHours | null;
   exceptions: string[];
   discord: DiscordDmInfo | null;
+  /** Sammel-Mail (#1662) - null bei Servern, die sie noch nicht kennen. */
+  digest: DigestInfo | null;
 };
+
+// ---------------------------------------------------------------- Sammel-Mail (#1662)
+
+export type DigestRhythm = "instant" | "daily" | "weekly";
+export type DigestOption = { key: DigestRhythm; label: string; schedule: string };
+/** `rhythm`: was gilt; `own`: die eigene Wahl (null = Vorgabe des Vereins); `default`: die Vorgabe des Vereins. */
+export type DigestInfo = { rhythm: DigestRhythm; own: DigestRhythm | null; default: DigestRhythm; options: DigestOption[] };
+
+const RHYTHMS = new Set<string>(["instant", "daily", "weekly"]);
+const isRhythm = (value: unknown): value is DigestRhythm => typeof value === "string" && RHYTHMS.has(value);
+
+/** Gilt, bis der Server antwortet - dieselben Texte wie backend/services/mail_digest_rules.py und das Web. */
+export const DIGEST_FALLBACK: DigestInfo = {
+  rhythm: "instant",
+  own: null,
+  default: "instant",
+  options: [
+    { key: "instant", label: "Sofort", schedule: "Jede Mail sofort" },
+    { key: "daily", label: "Täglich", schedule: "Täglich um 07:00 Uhr" },
+    { key: "weekly", label: "Wöchentlich", schedule: "Montags um 07:00 Uhr" },
+  ],
+};
+
+/** Was der Rhythmus heißt - wie DIGEST_HINTS im Web (NotificationsTab). */
+export const DIGEST_HINTS: Record<DigestRhythm, string> = {
+  instant: "Jede Mail kommt einzeln, sobald etwas passiert.",
+  daily: "Eine Mail am Tag mit allem, was seit der letzten kam – nach Themen sortiert.",
+  weekly: "Eine Mail in der Woche mit allem, was seit der letzten kam – nach Themen sortiert.",
+};
+
+/** `mail_digest` aus GET /users/me/notification-preferences - null, wenn der Server es nicht schickt. */
+export function readDigest(value: unknown): DigestInfo | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const options = (Array.isArray(raw.options) ? raw.options : [])
+    .filter((option): option is Record<string, unknown> => Boolean(option) && typeof option === "object" && isRhythm((option as Record<string, unknown>).key))
+    .map((option) => {
+      const key = option.key as DigestRhythm;
+      const fallback = DIGEST_FALLBACK.options.find((item) => item.key === key) as DigestOption;
+      return { key, label: typeof option.label === "string" && option.label ? option.label : fallback.label, schedule: typeof option.schedule === "string" && option.schedule ? option.schedule : fallback.schedule };
+    });
+  if (!options.length) return null;
+  const fallbackDefault = isRhythm(raw.default) ? raw.default : "instant";
+  const own = isRhythm(raw.own) ? raw.own : null;
+  return { rhythm: isRhythm(raw.rhythm) ? raw.rhythm : own || fallbackDefault, own, default: fallbackDefault, options };
+}
+
+/** Was gerade gilt: die eigene Wahl - ohne sie die Vorgabe des Vereins. */
+export function digestRhythm(info: DigestInfo, own: DigestRhythm | null | undefined): DigestRhythm {
+  return own || info.default || "instant";
+}
 
 const MODES = new Set<string>(MODE_ORDER);
 
@@ -224,5 +277,6 @@ export function readNotificationServer(data: unknown): NotificationServerInfo {
     quietHours: raw.quiet_hours && typeof raw.quiet_hours === "object" ? quietHoursForm(raw.quiet_hours) : null,
     exceptions: exceptions.length ? exceptions : QUIET_EXCEPTIONS_FALLBACK,
     discord: raw.discord && typeof raw.discord === "object" ? raw.discord as DiscordDmInfo : null,
+    digest: readDigest(raw.mail_digest),
   };
 }

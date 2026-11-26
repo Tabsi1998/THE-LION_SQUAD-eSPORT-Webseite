@@ -22,7 +22,7 @@ jest.mock("./sounds", () => ({
   writeCeremonyMuted: (...args: unknown[]) => mockWriteMuted(...args),
 }));
 const mockNavigate = jest.fn();
-jest.mock("../../navigation/rootNavigation", () => ({ openTab: (...args: unknown[]) => mockNavigate(...args) }));
+jest.mock("../../navigation/rootNavigation", () => ({ openDetail: (...args: unknown[]) => mockNavigate(...args) }));
 
 // Der Rahmen im Aufstiegs-Moment ist für Vorleser Schmuck (die Überschrift sagt alles) - Tests sehen ihn trotzdem.
 const HIDDEN = { includeHiddenElements: true };
@@ -103,7 +103,8 @@ test("Gruppe abgeschlossen: Sockel mit allen sieben Stufen; erster Erfolg: Erkl�
   expect(screen.getByTestId("ceremony-first-text")).toBeTruthy();
   await fireEvent.press(screen.getByTestId("ceremony-showcase-link"));
   expect(first.onClose).toHaveBeenCalled();
-  expect(mockNavigate).toHaveBeenCalledWith("Profile", { tab: "achievements" });
+  // Das eigene Profil liegt seit Mein Bereich (#2059) über dem Tab.
+  expect(mockNavigate).toHaveBeenCalledWith("OwnProfile", { tab: "achievements" });
 });
 
 test("ein Stapel blättert alle 2,5 Sekunden weiter und lässt sich von Hand durchgehen", async () => {

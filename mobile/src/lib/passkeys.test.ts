@@ -93,7 +93,7 @@ test("still bleiben: kein Passkey auf dem Gerät oder keine App-Passkeys am Serv
   expect(silentPasskeyMiss({ response: { status: 503 } })).toBe("none");
   expect(silentPasskeyMiss({ error: "UserCancelled" })).toBe("cancelled");
   expect(silentPasskeyMiss(new Error("Network Error"))).toBe("failed");
-  expect(passkeyCreateError({ error: "UserCancelled" })).toContain("im Profil unter „Einstellungen“");
+  expect(passkeyCreateError({ error: "UserCancelled" })).toContain("unter Mein Bereich → Konto & Sicherheit");
   expect(passkeyCreateError({ response: { data: { detail: "Bitte bestätige dein aktuelles Passwort." } } })).toBe("Bitte bestätige dein aktuelles Passwort.");
   expect(passkeyCreateError(new Error("kaputt"))).toBe("Der Passkey konnte nicht angelegt werden. Bitte erneut versuchen.");
 });

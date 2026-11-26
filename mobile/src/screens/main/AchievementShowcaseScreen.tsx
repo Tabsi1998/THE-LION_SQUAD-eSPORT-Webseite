@@ -16,7 +16,7 @@ import { type AchievementGroup } from "../../lib/achievements";
 import { api } from "../../lib/api";
 import { useProgressiveCount } from "../../lib/progressive";
 import { isGuestUser } from "../../live";
-import { currentTab, openTab } from "../../navigation/rootNavigation";
+import { openDetail } from "../../navigation/rootNavigation";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -103,14 +103,10 @@ export function AchievementShowcaseScreen({ navigation }: Props) {
   const openUser = useCallback((username: string) => navigation.navigate("PublicProfile", { username }), [navigation]);
   const openCard = useCallback((awardId: string) => { Linking.openURL(achievementShareUrl(awardId)).catch(() => {}); }, []);
   const openOwn = useCallback(() => {
-    // Die eigenen Erfolge stehen im Tab Profil (#1149, #1150). Liegt die Ruhmeshalle schon im Tab Profil, kommt die
-    // Übersicht obendrauf - „Zurück“ führt dann wieder hierher statt nach Home (#1296).
-    if (currentTab() === "ProfileTab" && navigation && typeof (navigation as { push?: unknown }).push === "function") {
-      (navigation as unknown as { push: (name: string, params?: object) => void }).push("Profile", { tab: "achievements" });
-      return;
-    }
-    openTab("Profile", { tab: "achievements" });
-  }, [navigation]);
+    // Die eigenen Erfolge stehen im eigenen Profil (#1149, #1150) - seit Mein Bereich (#2059) eine Seite über dem Tab,
+    // in dem man gerade ist: „Zurück“ führt wieder hierher (#1296).
+    openDetail("OwnProfile", { tab: "achievements" });
+  }, []);
   const pickCategory = useCallback((key: string) => setCategory((current) => (current === key ? null : key)), []);
   const refresh = useCallback(() => {
     setRefreshing(true);

@@ -30,6 +30,7 @@ import { isGuestUser } from "../live";
 import { useAppLock } from "../lock/AppLockProvider";
 import { SeasonStage, useSeasonTabIcon } from "../seasons/SeasonStage";
 import { colors } from "../theme";
+import { gruppe as meinBereichGruppe } from "../lib/meinBereich";
 import { flushPendingNotification, navigationRef } from "./rootNavigation";
 import { flushPendingLink, listenForAppLinks } from "../lib/appLinks";
 import type { AppStackParamList, DetailScreenName, MainTabName, MainTabParamList, RootStackParamList, TabRootParamList } from "./types";
@@ -51,13 +52,14 @@ const theme = {
   },
 };
 
-/** Die fünf Tabs in ihrer Reihenfolge (#1143) - für alle gleich, damit Hilfe am Telefon funktioniert. */
+/** Die fünf Tabs in ihrer Reihenfolge (#1143) - für alle gleich, damit Hilfe am Telefon funktioniert. Der fünfte heißt seit
+ * #2059 „Mein Bereich“ wie im Web (vorher „Profil“); seine Kennung `ProfileTab` bleibt. */
 export const MAIN_TABS: Array<{ name: MainTabName; title: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { name: "HomeTab", title: "Home", icon: "home-outline" },
   { name: "EventsTab", title: "Events", icon: "calendar-outline" },
   { name: "CommunityTab", title: "Community", icon: "chatbubbles-outline" },
   { name: "VereinTab", title: "Verein", icon: "shield-checkmark-outline" },
-  { name: "ProfileTab", title: "Profil", icon: "person-circle-outline" },
+  { name: "ProfileTab", title: "Mein Bereich", icon: "person-circle-outline" },
 ];
 
 export function AppNavigator() {
@@ -176,7 +178,7 @@ function MainTabs() {
         }}
       />
       <Tabs.Screen name="VereinTab" component={VereinStackScreen} options={{ title: "Verein", tabBarButtonTestID: "tab-verein" }} />
-      <Tabs.Screen name="ProfileTab" component={ProfileStackScreen} options={{ title: "Profil", tabBarButtonTestID: "tab-profile" }} />
+      <Tabs.Screen name="ProfileTab" component={ProfileStackScreen} options={{ title: "Mein Bereich", tabBarButtonTestID: "tab-profile" }} />
     </Tabs.Navigator>
   );
 }
@@ -214,7 +216,7 @@ const detailOptions: NativeStackNavigationOptions = {
 const gold = { headerTintColor: colors.gold };
 
 /** Titel und Kopfzeile der Detail-Screens - in jedem Tab-Stapel dieselben (#1144). */
-export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptions | ((props: { route: { params?: { title?: string } } }) => NativeStackNavigationOptions)> = {
+export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptions | ((props: { route: { params?: { title?: string; gruppe?: string } } }) => NativeStackNavigationOptions)> = {
   TournamentDetail: { title: "Turnier" },
   EventDetail: { title: "Event" },
   FastLapDetail: { title: "Fast Lap" },
@@ -253,7 +255,9 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   LeagueOverall: { title: "Gesamtwertung" },
   ClubAbout: { title: "Über uns" },
   YearReview: { title: "Dein Jahr", ...gold },
-  Settings: { title: "Einstellungen" },
+  // Mein Bereich (#2059): das eigene Profil und je Gruppe eine Seite mit ihrem Namen wie im Web.
+  OwnProfile: { title: "Mein Profil" },
+  MeinBereichGruppe: ({ route }) => ({ title: meinBereichGruppe(route.params?.gruppe)?.label || "Mein Bereich" }),
   ProfileEdit: { title: "Profil bearbeiten" },
   CalendarSubscription: { title: "Mein Kalender-Abo" },
   Faq: { title: "FAQ" },
@@ -265,14 +269,15 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
  * keine zweite Seite. Gilt für jeden Detail-Screen, dessen Parameter eine Kennung tragen.
  */
 export function detailRouteId(_name: DetailScreenName, params?: object): string | undefined {
-  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown; lineage?: unknown; season?: unknown; round?: unknown; league?: unknown };
+  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown; lineage?: unknown; season?: unknown; round?: unknown; league?: unknown; gruppe?: unknown };
   // Saison einer Serie (#1945): Spur und Saison zusammen; eine Runde (#1974) dazu mit ihrer Nummer - der Lauf bleibt
   // ein Reiter derselben Seite.
   const round = typeof values.round === "number" || typeof values.round === "string" ? `/${values.round}` : "";
   const season = typeof values.lineage === "string" && typeof values.season === "string" ? `${values.lineage}/${values.season}${round}` : undefined;
   // Gesamtwertung (#2173): Liga und Season zusammen - die Liga N bleibt ein Reiter derselben Seite.
   const league = typeof values.league === "string" && typeof values.season === "string" ? `${values.league}/${values.season}` : undefined;
-  const id = values.id ?? values.username ?? values.userId ?? values.albumId ?? season ?? league;
+  // Mein Bereich (#2059): jede Gruppe ist eine eigene Seite - ein neuer Anker in derselben Gruppe bleibt auf ihr.
+  const id = values.id ?? values.username ?? values.userId ?? values.albumId ?? season ?? league ?? values.gruppe;
   return typeof id === "string" || typeof id === "number" ? String(id) : undefined;
 }
 
@@ -305,7 +310,7 @@ const HomeStackScreen = tabStack("Dashboard");
 const EventsStackScreen = tabStack("TournamentList");
 const CommunityStackScreen = tabStack("CommunityHub");
 const VereinStackScreen = tabStack("VereinHub");
-const ProfileStackScreen = tabStack("Profile");
+const ProfileStackScreen = tabStack("MeinBereich");
 
 function iconFor(route: MainTabName) {
   return MAIN_TABS.find((tab) => tab.name === route)?.icon || "ellipse-outline";

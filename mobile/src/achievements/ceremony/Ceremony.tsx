@@ -4,7 +4,7 @@ import { AccessibilityInfo, Image, Modal, Pressable, ScrollView, StyleSheet, Tex
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { type AscentMoment, ascentMoment } from "../../lib/loewenAufstieg";
-import { openTab } from "../../navigation/rootNavigation";
+import { openDetail } from "../../navigation/rootNavigation";
 import { useSeasonOverlay } from "../../seasons/anchors";
 import { colors, radius } from "../../theme";
 import { Badge } from "../Badge";
@@ -332,8 +332,8 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
   };
   const toAchievements = () => {
     onClose();
-    // Die eigenen Erfolge stehen im Tab Profil (#1149, #1150).
-    openTab("Profile", { tab: "achievements" });
+    // Die eigenen Erfolge stehen im eigenen Profil (#1149, #1150) - seit Mein Bereich (#2059) eine Seite über dem Tab.
+    openDetail("OwnProfile", { tab: "achievements" });
   };
 
   return (

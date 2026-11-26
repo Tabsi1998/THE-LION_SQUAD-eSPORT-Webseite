@@ -12,7 +12,7 @@ import { useModalGate } from "../lib/modalGate";
 // welche, lädt die App einmal ein. Hat das Konto schon welche anderswo (etwa am PC mit Windows Hello), aber dieses Handy
 // keinen, lädt sie auch ein (#939).
 // Angelegt wird mit dem Ticket der Anmeldung, ohne das Passwort noch einmal zu verlangen.
-// „Später“ blendet die Einladung für dieses Konto auf diesem Gerät aus; anlegen geht dann im Profil unter „Einstellungen“.
+// „Später“ blendet die Einladung für dieses Konto auf diesem Gerät aus; anlegen geht dann unter Mein Bereich → Konto & Sicherheit.
 
 export function inviteKey(userId: string) {
   return `tls.mobile.passkeyInviteDismissed.${userId.replace(/[^A-Za-z0-9._-]/g, "_")}`;

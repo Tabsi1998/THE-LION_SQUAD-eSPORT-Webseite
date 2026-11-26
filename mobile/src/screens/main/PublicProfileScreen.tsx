@@ -315,7 +315,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
       void run();
       return;
     }
-    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Einstellungen → Privatsphäre wieder aufheben.", [
+    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Mein Bereich → Datenschutz wieder aufheben.", [
       { text: "Abbrechen", style: "cancel" },
       { text: "Blockieren", style: "destructive", onPress: () => { void run(); } },
     ]);
@@ -417,7 +417,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
           {header}
           {ownSwitch}
           {own ? (
-            <EmptyState icon="lock-closed-outline" title="Dein Profil ist privat" detail="Andere sehen dein Profil nicht. Öffentlich stellst du es in den Einstellungen unter Privatsphäre." />
+            <EmptyState icon="lock-closed-outline" title="Dein Profil ist privat" detail="Andere sehen dein Profil nicht. Öffentlich stellst du es unter Mein Bereich → Datenschutz." />
           ) : (
             <ErrorState title="Profil nicht sichtbar" detail={error || "Dieses Profil ist privat oder wurde entfernt."} problem={problem} onRetry={() => { void load(); }} />
           )}

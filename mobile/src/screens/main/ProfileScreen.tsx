@@ -11,7 +11,6 @@ import { HonoursCard } from "../../components/Honours";
 import { EmptyState, ErrorState, PartialLoadNotice, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
-import { HeaderButton, TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { Body, Muted, Title } from "../../components/Text";
 import { onAchievementUnlocked } from "../../lib/achievements";
 import { api, errorMessage } from "../../lib/api";
@@ -23,12 +22,12 @@ import { documentsLine, type MemberDocument, type OwnDocuments } from "../../lib
 import { missingLabels } from "../../lib/profileCompleteness";
 import { isGuestUser } from "../../live";
 import { navigateToUrl, openSignIn, openTab, targetFromUrl } from "../../navigation/rootNavigation";
+import { BEREICH } from "../../lib/meinBereich";
 import type { LooseNavigation, ProfileTabKey } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup, Team } from "../../types";
 import { prizeCounts } from "./MyPrizesScreen";
 import { ProfileView, type PublicProfilePayload } from "./PublicProfileScreen";
-import { SettingsGroups } from "./SettingsScreen";
 import { profileStyles, WEB_BASE_URL, type ModerationStanding } from "./profile/parts";
 import { ProfileReferences } from "./profile/ProfileReferences";
 import { LeagueSanctionsList } from "../../components/league/LeagueSanctionsList";
@@ -38,8 +37,8 @@ import { useMemberPlacements } from "../../lib/memberPlacements";
 // Erfolge, Auszeichnungen, Referenzen, Teams, für Mitglieder Ehrungen). Was nur dich angeht, steht im Kasten „Nur für
 // dich“: Rechnungen, deine Unterlagen aus der Vereinsakte (#1255), Gewinne zum Abholen, was im Profil noch fehlt. Der
 // Schalter „So sehen dich andere“ blendet ihn aus.
-// Oben rechts das Zahnrad zu den Einstellungen (#1146). Gäste sehen den Weg zum Konto und darunter Darstellung und
-// „Über die App“.
+// Seit Mein Bereich (#2059) eine Seite über dem Tab („Mein Profil“): aus Mein Bereich → Profil, dem Kopf der Übersicht und
+// /u/me. Die Einstellungen (früher das Zahnrad, #1146) wohnen in den Gruppen von Mein Bereich.
 
 const EMPTY_REFERENCES: PersonalReferenceData = { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } };
 type InvoiceSummary = { open_count?: number; open_total?: number; overdue_count?: number } | null;
@@ -49,13 +48,11 @@ export function ProfileScreen() {
   return isGuestUser(user) ? <GuestProfile /> : <OwnProfile />;
 }
 
+/** Ein Gast kommt über einen Link (/u/me) hierher - dann der Weg zum Konto, kein leeres Profil. */
 function GuestProfile() {
-  const scrollRef = useRef<ScrollView>(null);
-  useTabScrollToTop(scrollRef);
   return (
     <Screen padded={false}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
-        <TabHeader title="Profil" testID="profile-header" />
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.guestWrap} testID="profile-guest">
           <View style={styles.guestIcon}><Ionicons name="person-circle-outline" color={colors.cyan} size={56} /></View>
           <Title style={styles.guestTitle}>Dein Profil</Title>
@@ -63,8 +60,6 @@ function GuestProfile() {
           <Button label="Anmelden" onPress={() => openSignIn("Login")} testID="profile-guest-login" />
           <Button label="Konto erstellen" variant="secondary" onPress={() => openSignIn("Register")} testID="profile-guest-register" />
         </View>
-        {/* Einstellungen für Gäste (#1146): unter dem Anmelde-Hinweis nur Darstellung und „Über die App“. */}
-        <SettingsGroups />
       </ScrollView>
     </Screen>
   );
@@ -99,7 +94,6 @@ function OwnProfile() {
   // Welche Listen beim letzten Laden nicht kamen (#1001): dort sagt der Reiter „nicht geladen“ statt „noch keine“.
   const [notLoaded, setNotLoaded] = useState<{ teams?: boolean; references?: boolean; awards?: boolean }>({});
   const scrollRef = useRef<ScrollView>(null);
-  useTabScrollToTop(scrollRef);
 
   const evaluatedRef = useRef(false);
   const load = useCallback(async () => {
@@ -221,7 +215,8 @@ function OwnProfile() {
   const requestedTab = (route?.params as { tab?: ProfileTabKey } | undefined)?.tab;
 
   const privateBox = (
-    <Card style={styles.privateBox} testID="profile-private-box">
+    // Versteck der Ostereiersuche (#647, „app:Profile“) und Platz für die Saison-Deko - wie die Karten der anderen Seiten.
+    <Card style={styles.privateBox} testID="profile-private-box" perch="profile-private">
       <Muted style={styles.privateTitle}>Nur für dich</Muted>
       {problem ? <PartialLoadNotice problem={problem} onRetry={() => { void refresh(); }} testID="profile-partial-load" /> : null}
       <PrivateRow
@@ -280,7 +275,8 @@ function OwnProfile() {
         profileScore={score}
         evaluating={evaluating}
         onEvaluate={evaluate}
-        onOpenPrivacy={() => go("Settings")}
+        // Erfolge öffentlich oder privat (#619): der Schalter in Mein Bereich → Datenschutz (#2059).
+        onOpenPrivacy={() => { navigateToUrl(`${BEREICH}/datenschutz#erfolge-oeffentlich`); }}
         canOpenLink={(link) => link.startsWith("/profile") || Boolean(targetFromUrl(link))}
         onOpenLink={(link) => (link.startsWith("/profile") ? go("ProfileEdit") : navigateToUrl(link))}
       />
@@ -374,19 +370,10 @@ function OwnProfile() {
     achievement_level: (achievements as any)?.level || undefined,
   };
 
-  const header = (
-    <TabHeader
-      title="Profil"
-      testID="profile-header"
-      extra={<HeaderButton icon="settings-outline" label="Einstellungen" onPress={() => go("Settings")} testID="profile-settings" />}
-    />
-  );
-
   return (
     <ProfileView
       username={user?.username || ""}
       navigation={{ navigate: (screen, params) => go(screen as string, params as object | undefined) }}
-      header={header}
       scrollRef={scrollRef}
       own={{
         privateBox,

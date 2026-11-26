@@ -71,7 +71,7 @@ test("abgebrochen am Gerät: ein ruhiger Satz mit dem Weg ins Profil; ohne Offer
   const first = await render(<PasskeyInvite />);
   await waitFor(() => expect(screen.getByTestId("passkey-invite-create")).toBeTruthy());
   await fireEvent.press(screen.getByTestId("passkey-invite-create"));
-  await waitFor(() => expect(screen.getByText(/Abgebrochen – anlegen kannst du den Passkey jederzeit im Profil unter „Einstellungen“/)).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/Abgebrochen – anlegen kannst du den Passkey jederzeit unter Mein Bereich → Konto & Sicherheit/)).toBeTruthy());
   expect(mockAuth.clearPasskeyOffer).not.toHaveBeenCalled();
   await first.unmount();
 

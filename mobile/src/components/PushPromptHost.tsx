@@ -125,7 +125,7 @@ function PushPromptSheet({ reason, busy, onYes, onLater }: { reason: PushPromptR
                 </View>
               ))}
             </StaggerIn>
-            <Muted style={styles.small}>Bei „Ja“ fragt Android einmal nach der Erlaubnis. Welche Meldungen kommen, stellst du unter Einstellungen → Benachrichtigungen ein.</Muted>
+            <Muted style={styles.small}>Bei „Ja“ fragt Android einmal nach der Erlaubnis. Welche Meldungen kommen, stellst du unter Mein Bereich → Benachrichtigungen ein.</Muted>
             <View style={styles.buttons}>
               <Button label="Ja, rufen" icon="notifications-outline" arrow={false} busy={busy} onPress={onYes} testID="push-prompt-yes" />
               <Button label="Später" variant="quiet" disabled={busy} onPress={later} testID="push-prompt-later" />

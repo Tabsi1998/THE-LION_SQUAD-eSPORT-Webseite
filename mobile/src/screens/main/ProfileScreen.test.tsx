@@ -7,7 +7,8 @@ import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Ein Profil, ein Aufbau (#1149): eigenes und fremdes Profil haben dieselben Reiter in derselben Reihenfolge. Was nur dich
 // angeht, steht im Kasten „Nur für dich“ (Rechnungen, Gewinne, was noch fehlt); der Schalter „So sehen dich andere“
-// blendet ihn aus und zeigt nur, was die Privatsphäre allen zeigt. Oben rechts das Zahnrad zu den Einstellungen (#1146).
+// blendet ihn aus und zeigt nur, was die Privatsphäre allen zeigt. Seit Mein Bereich (#2059) eine Seite über dem Tab - die
+// Einstellungen (früher das Zahnrad, #1146) wohnen in den Gruppen von Mein Bereich.
 
 const me = { id: "u-neon", username: "neonfalke", display_name: "NeonFalke", role: "player", is_club_member: true, created_at: "2023-03-01T10:00:00Z" };
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: me, refreshMe: jest.fn(async () => undefined) }) }));
@@ -114,10 +115,12 @@ test("Zahlenleiste: nur Kennzahlen über null", () => {
   ]);
 });
 
-test("eigenes Profil: Kopf mit Zahlen, Kasten „Nur für dich“, Zahnrad - Tipps führen zu Rechnungen, Gewinnen, Bearbeiten", async () => {
+test("eigenes Profil: Kopf mit Zahlen, Kasten „Nur für dich“ - Tipps führen zu Rechnungen, Gewinnen, Bearbeiten; kein Zahnrad", async () => {
   await renderOwn();
   await waitFor(() => expect(screen.getByTestId("profile-private-box")).toBeTruthy());
-  expect(screen.getByTestId("profile-header-title")).toHaveTextContent("Profil");
+  // Die Kopfzeile der Seite trägt den Titel „Mein Profil“ (Navigator) - kein zweiter Kopf, kein Zahnrad.
+  expect(screen.queryByTestId("profile-header-title")).toBeNull();
+  expect(screen.queryByTestId("profile-settings")).toBeNull();
   expect(within(screen.getByTestId("profile-stats")).getByText("3.420")).toBeTruthy();
   expect(screen.getByText("LVL 12")).toBeTruthy();
   await waitFor(() => expect(screen.getByText(/^1 offen · € 12,00/)).toBeTruthy());
@@ -134,8 +137,6 @@ test("eigenes Profil: Kopf mit Zahlen, Kasten „Nur für dich“, Zahnrad - Tip
   expect(navigate).toHaveBeenLastCalledWith("MyPrizes", undefined);
   await fireEvent.press(screen.getByTestId("profile-private-completeness"));
   expect(navigate).toHaveBeenLastCalledWith("ProfileEdit", undefined);
-  await fireEvent.press(screen.getByTestId("profile-settings"));
-  expect(navigate).toHaveBeenLastCalledWith("Settings", undefined);
 });
 
 test("eigenes Profil: eigene Teams (auch nicht öffentliche), eigene Erfolge, Ehrungen mit Schalter", async () => {
