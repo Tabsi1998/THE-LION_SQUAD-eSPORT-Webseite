@@ -27,6 +27,9 @@ jest.mock("../../lib/openLink", () => ({ openLink: jest.fn(() => "browser") }));
 jest.mock("../MediaImage", () => ({ MediaImage: () => null }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 
+// Der Zeremonie-Host fragt Belohnungen und Saisonende-Momente (#2584) zugleich ab - gezählt werden die Belohnungen.
+const rewardFetches = () => mockGet.mock.calls.filter(([path]) => path === "/me/rewards/unseen").length;
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockPost.mockResolvedValue({ data: {} });
@@ -169,22 +172,22 @@ test("Zeremonie: beim Zurückkommen in den Vordergrund neu nachfragen - gedrosse
   now.mockImplementation(() => clock);
   mockGet.mockResolvedValue({ data: { rewards: [] } });
   await render(<RewardMomentHost queue={createCeremonyQueue()} />);
-  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(rewardFetches()).toBe(1));
   // Kurz weg und wieder da: kein neuer Abruf.
   clock += 60 * 1000;
   listener.current?.("active");
-  expect(mockGet).toHaveBeenCalledTimes(1);
+  expect(rewardFetches()).toBe(1);
   // Nach der Drossel: neuer Abruf, die neue Belohnung wird gefeiert.
   clock += UNSEEN_THROTTLE_MS;
   mockGet.mockResolvedValue({ data: { rewards: [{ ...reward("n", "medal", "Neu"), tournament: { id: "t9" } }] } });
   listener.current?.("active");
   await waitFor(() => expect(screen.getByTestId("reward-moment-title")).toHaveTextContent("Neue Belohnung"));
-  expect(mockGet).toHaveBeenCalledTimes(2);
+  expect(rewardFetches()).toBe(2);
   expect(screen.getByTestId("reward-moment-scroll")).toBeTruthy();
   // Dieselbe Belohnung beim nächsten Abruf: nicht noch einmal eingereiht.
   clock += UNSEEN_THROTTLE_MS;
   listener.current?.("active");
-  await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(3));
+  await waitFor(() => expect(rewardFetches()).toBe(3));
   await fireEvent.press(screen.getByTestId("reward-moment-close"));
   await waitFor(() => expect(screen.queryByTestId("reward-moment")).toBeNull());
   now.mockRestore();

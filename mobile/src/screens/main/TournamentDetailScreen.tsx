@@ -437,12 +437,14 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 onOpenStandings={() => setTab("standings")}
               />
             ) : null}
-            {/* Liga-Staffel (#2173): Anmeldefenster der Season mit wirksamem Ende (Nachmeldefrist, #2422) und der Weg zur Gesamtwertung. */}
+            {/* Liga-Staffel (#2173): Anmeldefenster der Season mit wirksamem Ende (Nachmeldefrist, #2422), der Weg zur Gesamtwertung und
+                mit Co-Team anmelden (#2542). */}
             {isLeague ? (
               <LeagueSeasonCard
                 publicPath={tournament.league_links?.public_path}
                 title={[tournament.league_links?.league_name, tournament.league_links?.season_name].filter(Boolean).join(" · ")}
                 onOpenOverall={(target) => navigation.navigate("LeagueOverall", target)}
+                onApply={(target) => navigation.navigate("LeagueApply", target)}
               />
             ) : null}
             <Card style={styles.card}>

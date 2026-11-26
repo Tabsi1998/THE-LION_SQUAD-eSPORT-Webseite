@@ -16,6 +16,8 @@ const KIND_LABELS: Record<string, string> = {
   tournament_chat_mention: "Erwähnung",
   match_chat_mention: "Erwähnung",
   news_mention: "Erwähnung",
+  // News nur für die App (#1532, #2542).
+  news_app: "News",
   friend_request: "Freundschaftsanfrage",
   friend_accept: "Neue Freundschaft",
   team_invite: "Team-Einladung",

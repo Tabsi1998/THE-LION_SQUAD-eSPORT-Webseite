@@ -61,3 +61,22 @@ test("Spielart: Spiel und Einzel/Team, bei der Fast Lap „Fast Lap“", () => {
   expect(playLabel("tournament", { game_name: "Mario Kart 8", team_mode: "solo" })).toBe("Mario Kart 8 · Einzel");
   expect(playLabel("fastlap", {})).toBe("Fast Lap");
 });
+
+// Abgesagtes Event (#2542, #2127 EV3, Web: eventGroups.js): Ein Turnier, das trotzdem noch läuft, bleibt sichtbar - als eigene Karte mit
+// „gehört zu …“, nicht versteckt in der abgesagten. Beendete Turniere bleiben in ihrer Event-Karte.
+test("abgesagtes Event: ein laufendes Turnier behält seine eigene Karte, ein beendetes bleibt im Event", () => {
+  const cards = buildCards({
+    events: [{ id: "e1", status: "cancelled", start_date: "2026-12-01T10:00:00Z" }],
+    tournaments: [
+      { id: "t-live", event_id: "e1", status: "live", start_date: "2026-12-01T12:00:00Z" },
+      { id: "t-done", event_id: "e1", status: "completed", start_date: "2026-12-01T09:00:00Z" },
+    ],
+  });
+  const event = cards.find((card) => card.key === "event-e1");
+  expect(event?.children.map((row) => row.key)).toEqual(["tournament-t-done"]);
+  const own = cards.find((card) => card.key === "tournament-t-live");
+  expect(own?.event?.id).toBe("e1");
+  // Gegenprobe: im laufenden Event bleibt das Turnier in der Karte.
+  const normal = buildCards({ events: [{ id: "e2", status: "scheduled" }], tournaments: [{ id: "t2", event_id: "e2", status: "live" }] });
+  expect(normal.map((card) => card.key)).toEqual(["event-e2"]);
+});

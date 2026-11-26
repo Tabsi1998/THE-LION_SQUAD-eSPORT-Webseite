@@ -612,3 +612,8 @@ describe("Schreibpause", () => {
     expect(errorMessage(failure)).toBe("Text des Servers");
   });
 });
+
+// News-Kanal (#1532, Nachtrag in #2542): Jeder Aufruf der App nennt sich „app“ - der Server zeigt dann die News für die App.
+test("jeder Aufruf trägt X-LSW-Channel: app", () => {
+  expect(api.defaults.headers["X-LSW-Channel"]).toBe("app");
+});
