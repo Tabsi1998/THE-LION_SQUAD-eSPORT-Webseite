@@ -84,7 +84,8 @@ export default function MeinBereichLayout() {
   const gruppen = useMemo(() => gruppenFuer({ mitglied }), [mitglied]);
   const aktiv = gruppeZuPfad(pathname);
   const todo = useZuTunDaten(user, mitglied, Boolean(adminNeedsSecondFactor));
-  const offen = useMemo(() => todo.items.reduce((acc, item) => ({ ...acc, [item.gruppe]: (acc[item.gruppe] || 0) + 1 }), {}), [todo.items]);
+  // Die Zahl an der Gruppe zählt wie die Seite selbst (Sprungleiste „Versammlung · 3 offen“), nicht die Knöpfe.
+  const offen = useMemo(() => todo.items.reduce((acc, item) => ({ ...acc, [item.gruppe]: (acc[item.gruppe] || 0) + (item.anzahl || 1) }), {}), [todo.items]);
 
   // Nach einem Wechsel innerhalb von „Mein Bereich“ holt die neue Gruppe den Fokus auf ihre Überschrift.
   const first = useRef(true);

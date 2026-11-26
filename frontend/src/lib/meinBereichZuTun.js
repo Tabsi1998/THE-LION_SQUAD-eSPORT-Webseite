@@ -19,7 +19,7 @@ const plural = (n, one, many) => (n === 1 ? one : many);
 export function zuTun({ invoices = null, membership = null, consents = null, jersey = null, area = null, prizes = 0, secondFactor = false } = {}) {
   const items = [];
   if (secondFactor) {
-    items.push({ key: "zweifaktor", gruppe: "konto", tone: "warn", label: "Zwei-Faktor einrichten", detail: "Für die Verwaltung brauchst du die Zwei-Faktor-Anmeldung.", to: zweiFaktorPfad() });
+    items.push({ key: "zweifaktor", gruppe: "konto", anzahl: 1, tone: "warn", label: "Zwei-Faktor einrichten", detail: "Für die Verwaltung brauchst du die Zwei-Faktor-Anmeldung.", to: zweiFaktorPfad() });
   }
   const summary = invoices?.summary || {};
   const open = count(summary.open_count);
@@ -29,6 +29,7 @@ export function zuTun({ invoices = null, membership = null, consents = null, jer
     items.push({
       key: "rechnung",
       gruppe: "rechnungen",
+      anzahl: open,
       tone: overdue ? "warn" : "brand",
       label: open === 1 ? "Offene Rechnung bezahlen" : `${open} offene Rechnungen bezahlen`,
       detail: `${open} ${plural(open, "offener Beleg", "offene Belege")}${amount}${overdue ? `, davon ${overdue} überfällig` : ""}.`,
@@ -38,14 +39,17 @@ export function zuTun({ invoices = null, membership = null, consents = null, jer
   // Der Beitrag steht meist auch als Rechnung da - dann reicht die Rechnung.
   const fee = membership ? feeBadge(membership.dolibarr) : null;
   if (!open && fee?.tone === "warn") {
-    items.push({ key: "beitrag", gruppe: "mitgliedschaft", tone: "warn", label: "Mitgliedsbeitrag offen", detail: fee.text, to: `${BEREICH}/mitgliedschaft#beitrag` });
+    items.push({ key: "beitrag", gruppe: "mitgliedschaft", anzahl: 1, tone: "warn", label: "Mitgliedsbeitrag offen", detail: "Laut Mitgliederverwaltung noch nicht bezahlt.", to: `${BEREICH}/mitgliedschaft#beitrag` });
   }
+  // Nur Pflicht-Einwilligungen drängen (Entscheidung 26.11.): freiwillige, nie beantwortete oder mit neuem Text, stehen
+  // unter Datenschutz → Einwilligungen, aber nicht hier. Pflicht meldet die Mitgliederverwaltung mit `required`.
   const pending = (consents?.available === true && Array.isArray(consents.consents) ? consents.consents : [])
-    .filter((row) => row.can_give && (row.text_changed || !row.state || row.state === "none"));
+    .filter((row) => row.can_give && (row.required === true || row.mandatory === true) && (row.text_changed || !row.state || row.state === "none"));
   if (pending.length) {
     items.push({
       key: "einwilligung",
       gruppe: "datenschutz",
+      anzahl: pending.length,
       tone: "brand",
       label: pending.length === 1 ? "Einwilligung lesen" : `${pending.length} Einwilligungen lesen`,
       detail: pending.map((row) => row.label).filter(Boolean).join(", "),
@@ -53,19 +57,20 @@ export function zuTun({ invoices = null, membership = null, consents = null, jer
     });
   }
   if (jersey?.available === true && jersey.can_choose && (jersey.number === null || jersey.number === undefined)) {
-    items.push({ key: "nummer", gruppe: "mitgliedschaft", tone: "brand", label: "Nummer wählen", detail: "Deine Wunschnummer, zum Beispiel fürs Trikot.", to: `${BEREICH}/mitgliedschaft#nummer` });
+    items.push({ key: "nummer", gruppe: "mitgliedschaft", anzahl: 1, tone: "brand", label: "Nummer wählen", detail: "Deine Wunschnummer, zum Beispiel fürs Trikot.", to: `${BEREICH}/mitgliedschaft#nummer` });
   }
+  // meetings_open zählt die offenen Abstimmungen schon mit (backend/services/member_area.py) - wie die Sprungleiste.
   const ballots = count(area?.ballots_open);
   if (ballots) {
-    items.push({ key: "abstimmung", gruppe: "verein", tone: "brand", label: plural(ballots, "Abstimmung offen", `${ballots} Abstimmungen offen`), detail: "Jetzt abstimmen.", to: vereinPfad("versammlungen") });
+    items.push({ key: "abstimmung", gruppe: "verein", anzahl: ballots, tone: "brand", label: plural(ballots, "Abstimmung offen", `${ballots} Abstimmungen offen`), detail: "Jetzt abstimmen.", to: vereinPfad("versammlungen") });
   }
-  const meetings = count(area?.meetings_open);
-  if (meetings) {
-    items.push({ key: "versammlung", gruppe: "verein", tone: "brand", label: "Zur Versammlung antworten", detail: plural(meetings, "Eine Einladung wartet auf deine Antwort.", `${meetings} Einladungen warten auf deine Antwort.`), to: vereinPfad("versammlungen") });
+  const invitations = Math.max(0, count(area?.meetings_open) - ballots);
+  if (invitations) {
+    items.push({ key: "versammlung", gruppe: "verein", anzahl: invitations, tone: "brand", label: "Zur Versammlung antworten", detail: plural(invitations, "Eine Einladung wartet auf deine Antwort.", `${invitations} Einladungen warten auf deine Antwort.`), to: vereinPfad("versammlungen") });
   }
   const prizeCount = count(prizes);
   if (prizeCount) {
-    items.push({ key: "gewinn", gruppe: "rechnungen", tone: "brand", label: plural(prizeCount, "Gewinn abholen", `${prizeCount} Gewinne abholen`), detail: "Offen oder bereit zum Abholen.", to: `${BEREICH}/rechnungen?tab=gewinne` });
+    items.push({ key: "gewinn", gruppe: "rechnungen", anzahl: prizeCount, tone: "brand", label: plural(prizeCount, "Gewinn abholen", `${prizeCount} Gewinne abholen`), detail: "Offen oder bereit zum Abholen.", to: `${BEREICH}/rechnungen?tab=gewinne` });
   }
   return items;
 }

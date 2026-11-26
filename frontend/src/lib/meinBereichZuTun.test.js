@@ -18,21 +18,26 @@ describe("Zu tun", () => {
     expect(zuTun({ invoices: { summary: { open_count: 1 } } })[0]).toMatchObject({ label: "Offene Rechnung bezahlen", tone: "brand" });
   });
 
-  test("offener Beitrag nur, wenn keine offene Rechnung schon dasteht", () => {
+  test("offener Beitrag nur, wenn keine offene Rechnung schon dasteht - ohne doppeltes „offen“ im Text", () => {
     const membership = { dolibarr: { led_by_dolibarr: true, fee: { status: "due" } } };
     expect(zuTun({ membership }).map((item) => item.key)).toEqual(["beitrag"]);
+    const [beitrag] = zuTun({ membership });
+    expect(`${beitrag.label} ${beitrag.detail}`.match(/offen/g)).toHaveLength(1);
     expect(zuTun({ membership, invoices: { summary: { open_count: 1 } } }).map((item) => item.key)).toEqual(["rechnung"]);
   });
 
-  test("Einwilligung: nie beantwortet oder Text geändert - ein Widerruf ist eine Entscheidung", () => {
+  test("Einwilligung (Entscheidung 26.11.): nur Pflicht-Einwilligungen drängen - freiwillige bleiben unter Datenschutz", () => {
     const consents = { available: true, consents: [
       { code: "foto", label: "Fotos", state: "none", can_give: true },
       { code: "news", label: "Newsletter", state: "given", text_changed: true, can_give: true },
-      { code: "daten", label: "Daten", state: "withdrawn", can_give: true },
-      { code: "alt", label: "Alt", state: "none", can_give: false },
+      { code: "statuten", label: "Statuten", state: "none", can_give: true, required: true },
+      { code: "daten", label: "Datenverarbeitung", state: "given", text_changed: true, can_give: true, required: true },
+      { code: "ok", label: "Schon erledigt", state: "given", can_give: false, required: true },
     ] };
     const [item] = zuTun({ consents });
-    expect(item).toMatchObject({ key: "einwilligung", label: "2 Einwilligungen lesen", detail: "Fotos, Newsletter", to: "/mein-bereich/datenschutz?tab=einwilligungen" });
+    expect(item).toMatchObject({ key: "einwilligung", anzahl: 2, label: "2 Einwilligungen lesen", detail: "Statuten, Datenverarbeitung", to: "/mein-bereich/datenschutz?tab=einwilligungen" });
+    // Nur freiwillige, nie beantwortet oder mit neuem Text: nichts unter „Zu tun“.
+    expect(zuTun({ consents: { available: true, consents: consents.consents.slice(0, 2) } })).toEqual([]);
     expect(zuTun({ consents: { available: false, consents: [] } })).toEqual([]);
   });
 
@@ -42,12 +47,21 @@ describe("Zu tun", () => {
     expect(zuTun({ jersey: { available: true, can_choose: false, number: null } })).toEqual([]);
   });
 
-  test("Versammlung, Abstimmung, Gewinne und Zwei-Faktor - Zwei-Faktor zuerst", () => {
-    const items = zuTun({ area: { meetings_open: 1, ballots_open: 2 }, prizes: 1, secondFactor: true });
+  test("Versammlung und Abstimmung: meetings_open zählt die Abstimmungen schon mit (member_area.py) - nichts doppelt", () => {
+    // Wie der Server: 1 offene Einladung und 2 Abstimmungen ergeben meetings_open 3.
+    const items = zuTun({ area: { meetings_open: 3, ballots_open: 2 }, prizes: 1, secondFactor: true });
     expect(items.map((item) => item.key)).toEqual(["zweifaktor", "abstimmung", "versammlung", "gewinn"]);
-    expect(items[1].label).toBe("2 Abstimmungen offen");
-    expect(items[2].to).toBe("/mein-bereich/verein/versammlungen");
+    expect(items[1]).toMatchObject({ label: "2 Abstimmungen offen", anzahl: 2 });
+    expect(items[2]).toMatchObject({ detail: "Eine Einladung wartet auf deine Antwort.", anzahl: 1, to: "/mein-bereich/verein/versammlungen" });
+    // Zusammen so viele wie die Sprungleiste („Versammlung · 3 offen“).
+    expect(items.filter((item) => item.gruppe === "verein").reduce((sum, item) => sum + item.anzahl, 0)).toBe(3);
     expect(items[3]).toMatchObject({ label: "Gewinn abholen", to: "/mein-bereich/rechnungen?tab=gewinne" });
     expect(items[0].to).toBe("/mein-bereich/konto?mfa=required");
+  });
+
+  test("nur eine Abstimmung offen: ein Eintrag, nicht zwei", () => {
+    const items = zuTun({ area: { meetings_open: 1, ballots_open: 1 } });
+    expect(items.map((item) => item.key)).toEqual(["abstimmung"]);
+    expect(items[0]).toMatchObject({ label: "Abstimmung offen", anzahl: 1 });
   });
 });
