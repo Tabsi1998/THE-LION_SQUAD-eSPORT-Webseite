@@ -59,7 +59,7 @@
 
 ## Konto löschen: was mit welchen Daten passiert
 
-Ein Mitglied löscht sein Konto selbst (Website: Datenschutz → Meine Daten, App: Profil → Einstellungen); ein Superadmin
+Ein Mitglied löscht sein Konto selbst (Website: Mein Bereich → Datenschutz → Konto löschen, App: Profil → Einstellungen); ein Superadmin
 kann es für jemanden tun. Wer selbst löscht und noch Teamleitung, Co-Leitung oder Captain bzw. Vertreter eines Co-Teams ist,
 gibt die Rolle vorher ab (`services/erasure_blockers.py`, #2113); die Seite nennt den Weg. Die Löschung durch den Verein
 hält das nicht auf. Die vollständige Liste je Sammlung führt `backend/services/personal_data.py`: was beim Löschen
@@ -155,7 +155,7 @@ Kennung, Objektart, Zeitpunkt – ohne Mitgliedsnummer) laufen nach sieben Tagen
 
 ## Auskunft: was die Datei enthält
 
-`GET /api/dsgvo/export-my-data` (Website: Datenschutz → Meine Daten → Export) liefert eine JSON-Datei, Fassung 5. Je
+`GET /api/dsgvo/export-my-data` (Website: Mein Bereich → Datenschutz → Daten herunterladen) liefert eine JSON-Datei, Fassung 5. Je
 Sammlung aus `personal_data.py` steht ein Schlüssel drin; der Test vergleicht beide Listen. Jede Liste ist vollständig:
 Der Server liest seitenweise in der Reihenfolge des Anlegens und schreibt die Datei fortlaufend, ohne Obergrenze und
 ohne alles auf einmal im Speicher. Bewusst nicht enthalten:

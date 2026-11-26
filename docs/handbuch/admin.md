@@ -9,7 +9,7 @@ Kapitel ist der Einstieg: Alle anderen Kapitel setzen voraus, dass ihr hier einm
 - **Mein Dienst** (`/admin/dienst`) – der Eingang für Helfer und Moderation (3.7)
 - **Admin → Mitglieder → Alle Benutzer** (`/admin/users`) – Rollen und Freigaben vergeben (nur der Superadmin ändert sie)
 - **Admin → System → Einrichtung & FAQ** (`/admin/setup`) – Antworten auf „Wo stelle ich was ein?“ (nur Bereich System)
-- **Benutzermenü → Einstellungen → Sicherheit** (`/profile?tab=security`) – Zwei-Faktor-Anmeldung einrichten
+- **Benutzermenü → Konto & Sicherheit** (`/mein-bereich/konto`) – Zwei-Faktor-Anmeldung einrichten
 
 ---
 
@@ -31,7 +31,7 @@ Kapitel ist der Einstieg: Alle anderen Kapitel setzen voraus, dass ihr hier einm
 | **Menü** | Zeigt nur die Seiten, für die du einen Bereich hast; Gruppen lassen sich zuklappen | linke Leiste im Admin |
 | **Suche** | „Admin suchen …“ findet Seiten und Reiter, auch über Stichwörter | oben in der linken Leiste |
 | **Kommandozentrale** | Offene Aufgaben, Termine heute, Zahlen, Schnellzugriff | Admin |
-| **Zwei-Faktor** | Pflicht für jeden Bereich außer Moderation; ohne sie öffnet sich die Verwaltung nicht | Benutzermenü → Einstellungen → Sicherheit |
+| **Zwei-Faktor** | Pflicht für jeden Bereich außer Moderation; ohne sie öffnet sich die Verwaltung nicht | Benutzermenü → Konto & Sicherheit |
 | **Freigaben** | Einzelne Bereiche an eine Person geben, ohne die Rolle zu ändern | Admin → Mitglieder → Alle Benutzer → Bearbeiten |
 | **Helfer-Einsatz** | Eine Person hilft bei einem Turnier oder einer Fast Lap und sieht nur das | Turnier bzw. Fast Lap öffnen, Reiter „Helfer“ bzw. Kasten „Fast-Lap-Helfer“ |
 | **Einrichtung & FAQ** | Fragen und Antworten zur Einrichtung, mit Weg zur richtigen Seite | Admin → System → Einrichtung & FAQ |
@@ -46,7 +46,7 @@ Ohne bestätigte Zwei-Faktor-Anmeldung zeigt das Benutzermenü statt „Admin“
 Admin-Menü steht oben ein gelber Kasten **2FA einrichten**. Beide führen an dieselbe Stelle.
 
 1. Du brauchst eine **Authenticator-App** auf dem Handy (zum Beispiel Google Authenticator, Aegis oder 2FAS).
-2. **Benutzermenü (dein Name oben rechts) → Einstellungen → Sicherheit**. Dort steht der Kasten
+2. **Benutzermenü (dein Name oben rechts) → Konto & Sicherheit**. Dort steht der Kasten
    **Zwei-Faktor-Anmeldung**. (Kommst du über den Hinweis „2FA einrichten“, bist du schon da.)
 3. **Aktuelles Passwort** eintragen und **MFA einrichten** klicken.
 4. Den **QR-Code** mit der App scannen (oder den **Manuellen Schlüssel** eintippen).

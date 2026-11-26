@@ -70,7 +70,9 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 
 ## Private und betriebliche Routen
 
-`robots.txt` sperrt `/admin/`, `/dashboard`, `/profile`, `/privacy-account`, `/members/area`, die weiteren Mitglieder-Routen, `/my/`, `/setup`, `/display/` und `/api/`. Die Autorisierung bleibt die Sicherheitsgrenze; Robots-Regeln sind nur Hinweise fuer Crawler.
+`robots.txt` sperrt `/admin/`, `/dashboard`, `/mein-bereich`, `/profile`, `/privacy-account`, `/members/area`, die weiteren Mitglieder-Routen, `/my/`, `/setup`, `/display/` und `/api/`. Die Autorisierung bleibt die Sicherheitsgrenze; Robots-Regeln sind nur Hinweise fuer Crawler.
+
+Mein Bereich (#2059): `/mein-bereich` und seine Gruppen `/mein-bereich/<gruppe>` (profil, mitgliedschaft, rechnungen, verein mit `verein/<seite>`, benachrichtigungen, konto, datenschutz) verlangen eine Anmeldung, `verein` die Mitgliedschaft; keine neue API. Die alten Adressen leiten in der SPA weiter (`frontend/src/lib/meinBereich.js`, `legacyTarget`), mit Suche und Anker: `/profile?tab=…`, `/members/area|membership|meetings|helfen|documents|news|benefits`, `/mitgliederbereich`, `/member-area`, `/account/invoices|documents`, `/my/prizes|penalties`, `/privacy-account`. nginx leitet `/mitgliederbereich` und `/member-area` wie bisher auf `/members/area`; von dort geht es in der SPA weiter. `/u/<name>` bleibt das öffentliche Profil, `/members/<slug>` das Vereinsprofil.
 
 ## Permanente Weiterleitungen
 

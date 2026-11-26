@@ -1139,7 +1139,7 @@ bleiben Sperren.
 
 **Erinnerungen** (`services/league_open_points.py`, Art `tournament_registration`, `meta.reason` `league_open_points`, nur Postfach und Push): an jede
 betroffene Person mit behebbarem Stand („Für <Season> fehlt bei dir noch: <Grund>“, Link ins eigene Profil: Geburtsdatum `/profile?tab=basic`, sonst
-`/profile?tab=gaming`) und an Captain und Vertreter (ohne beide die Hauptteam-Leitung) eine Übersicht mit Namen, Ständen und `shortfall`, Link zur Ligaseite.
+`/profile?tab=gaming` - leiten seit #2059 nach Mein Bereich → Profil) und an Captain und Vertreter (ohne beide die Hauptteam-Leitung) eine Übersicht mit Namen, Ständen und `shortfall`, Link zur Ligaseite.
 Zweimal je Co-Team: beim Einreichen (Schlüssel `league-open-points:<antrag>:submit:player|team:<user>`) und vor dem ersten Spiel der Staffel
 (`league-open-points:<anmeldung>:first-match:player|team:<user>`). `player` ist die eigene Angabe, `team` die Übersicht - getrennt, damit ein Captain mit eigenem
 offenem Punkt beides bekommt. Das zweite läuft im Job `match_reminders` (alle fünf Minuten): Staffeln mit einem offenen Spiel der Seite

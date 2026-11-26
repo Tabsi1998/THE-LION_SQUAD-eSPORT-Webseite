@@ -44,49 +44,49 @@
       "schritte": [
         {
           "id": "einstellungen",
-          "titel": "Einstellungen öffnen",
-          "text": "Tippe oben rechts auf deinen Namen und dann auf Einstellungen. Am Handy findest du sie im Menü.",
+          "titel": "Mein Bereich öffnen",
+          "text": "Tippe oben rechts auf deinen Namen und dann auf Profil. Am Handy findest du es im Menü. Alles über dich steht dort in Mein Bereich.",
           "hinweis": "Es gibt keinen Speichern-Knopf. Alles, was du einträgst, speichert sich von selbst.",
           "bild": true,
           "clip": true,
-          "link": { "to": "/profile", "label": "Zu den Einstellungen" }
+          "link": { "to": "/mein-bereich/profil", "label": "Zu Mein Bereich → Profil" }
         },
         {
           "id": "grunddaten",
           "titel": "Grunddaten",
           "text": "Unter Grunddaten stehen dein Anzeigename, dein Bild und ein kurzer Text über dich. Unten siehst du, wenn alles gespeichert ist.",
           "bild": true,
-          "link": { "to": "/profile?tab=basic", "label": "Grunddaten öffnen" }
+          "link": { "to": "/mein-bereich/profil", "label": "Grunddaten öffnen" }
         },
         {
           "id": "geburtsdatum",
           "titel": "Geburtsdatum eintragen",
           "text": "Trag unter Grunddaten dein Geburtsdatum ein. Manche Ligen haben ein Mindestalter. Ohne Datum kannst du dort nicht spielen.",
           "bild": true,
-          "link": { "to": "/profile?tab=basic", "label": "Grunddaten öffnen" }
+          "link": { "to": "/mein-bereich/profil", "label": "Grunddaten öffnen" }
         },
         {
           "id": "plattform",
           "titel": "Plattform wählen",
-          "text": "Öffne Gaming. Tippe unter Plattformen alles an, worauf du spielst. Mehrere sind möglich.",
+          "text": "Öffne den Reiter Gaming & Spiel-IDs. Tippe unter Plattformen alles an, worauf du spielst. Mehrere sind möglich.",
           "bild": true,
-          "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+          "link": { "to": "/mein-bereich/profil?tab=gaming", "label": "Gaming & Spiel-IDs öffnen" }
         },
         {
           "id": "spiel-ids",
           "titel": "Spiel-IDs eintragen",
-          "text": "Unter Gaming stehen die Spiel-IDs. Trag deine ID genau so ein, wie sie im Spiel steht. Für Call of Duty ist das die Activision-ID mit # und Zahlen.",
+          "text": "Unter Gaming & Spiel-IDs stehen die Spiel-IDs. Trag deine ID genau so ein, wie sie im Spiel steht. Für Call of Duty ist das die Activision-ID mit # und Zahlen.",
           "hinweis": "Fragt eine Liga nach deiner Plattform, steht das Feld direkt bei der Spiel-ID. Felder mit * sind Pflicht.",
           "bild": true,
-          "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+          "link": { "to": "/mein-bereich/profil?tab=gaming", "label": "Gaming & Spiel-IDs öffnen" }
         },
         {
           "id": "liga-hinweis",
           "titel": "Fehlt noch etwas für die Liga?",
-          "text": "Spielst du in einer Liga, zeigt ein Hinweis unter Gaming, ob noch etwas fehlt. Trag es nach. Sonst kannst du nicht einchecken und nicht aufgestellt werden.",
+          "text": "Spielst du in einer Liga, zeigt ein Hinweis unter Gaming & Spiel-IDs, ob noch etwas fehlt. Trag es nach. Sonst kannst du nicht einchecken und nicht aufgestellt werden.",
           "hinweis": "Für die Liga gilt die ID, die bei der Anmeldung festgehalten wurde. Änderst du sie später, gibt die Liga-Leitung die neue frei.",
           "bild": true,
-          "link": { "to": "/profile?tab=gaming", "label": "Gaming öffnen" }
+          "link": { "to": "/mein-bereich/profil?tab=gaming", "label": "Gaming & Spiel-IDs öffnen" }
         }
       ]
     },
