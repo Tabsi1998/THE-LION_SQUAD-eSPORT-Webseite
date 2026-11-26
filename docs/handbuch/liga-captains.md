@@ -211,6 +211,16 @@ Liga 2). Abmelden bis zum Start …“.
 
 - **Nicht dabei sein?** **Abmelden** – unter Teams oder auf der Ligaseite, bis zum Start der Season. Danach geht es nur noch über
   die Liga-Leitung. Euer Platz geht an die Warteliste oder neue Anmeldungen.
+- **Startrecht mit Zusage:** Verlangt die Liga-Leitung eine Zusage, steht beim Co-Team statt „Angemeldet“ **Startrecht – Zusage
+  offen** mit der Frist. **Startrecht annehmen** drücken (Captain oder Vertreter) – sonst **verfällt** es, und der Platz geht an ein
+  anderes Team. Vor Fristende kommt eine Erinnerung. Die Zusage ist noch keine Zuteilung und keine Zustimmung zum Regelwerk.
+- **Nachgerückt?** Wird in einer höheren Liga ein Platz frei, kann euer Co-Team nachrücken. Ihr bekommt eine Nachricht und könnt
+  **annehmen** oder **Nachrücken ablehnen** – dann bleibt ihr in eurer Liga. Meldet ihr euch nicht, bleibt ihr ebenfalls dort.
+- **Vorher schon wissen, wohin es geht:** Während der Season steht beim Co-Team die **Prognose** nach der laufenden Tabelle – fest
+  ist sie nicht. Nach dem Abschluss der ganzen Season steht dort **Startrecht bestätigt**, und ihr bekommt die Nachricht „Aufstieg
+  bestätigt“ bzw. „Abstieg bestätigt“.
+
+<img src="../assets/liga/startrechte-teams-390.png" alt="Teams am Handy: beim Co-Team die neue Season mit dem orangen Stand Startrecht – Zusage offen, dem Satz Startrecht für Liga 1 bitte bis zum genannten Tag zusagen und den Knöpfen Startrecht annehmen und Abmelden" width="300">
 - **Regelwerk:** Gibt es eine neue Fassung, stimmt Captain oder Vertreter ihr vor dem ersten Spiel zu (Startseite oder
   Regelwerk). Ohne Zustimmung geht kein Check-in.
 - **Kader:** Die Kaderregeln der Season gelten weiter – prüft vor dem Start, ob alle Angaben stimmen.
