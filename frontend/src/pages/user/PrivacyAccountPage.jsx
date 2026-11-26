@@ -70,6 +70,7 @@ export function KontoLoeschen() {
       description: 'Das lässt sich nicht rückgängig machen. Tippe "LÖSCHEN", um dein Konto zu löschen.',
       placeholder: "LÖSCHEN",
       confirmLabel: "Konto löschen",
+      tone: "danger",
       multiline: false,
       required: true,
     });

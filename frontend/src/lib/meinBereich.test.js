@@ -1,4 +1,5 @@
-import { GRUPPEN, gruppeZuPfad, gruppenFuer, legacyTarget, reiterPfad, schnellwege, zweiFaktorPfad } from "./meinBereich";
+import { GRUPPEN, gruppeZuPfad, gruppenFuer, reiterPfad, schnellwege, zweiFaktorPfad } from "./meinBereich";
+import { legacyTarget } from "./meinBereichAlt";
 
 // „Mein Bereich“ (#2059): acht Gruppen wie im Issue, alte Adressen leiten mit Suche und Anker weiter, „Zu tun“ aus
 // vorhandenen Daten.

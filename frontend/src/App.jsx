@@ -31,7 +31,6 @@ import "@/lib/navigationGuard";
 import { gamePageUrl } from "@/lib/gameForm";
 import { HilfeUmleitung } from "@/hilfe/HilfeUmleitung";
 import { BEREICH, VEREIN_SEITEN } from "@/lib/meinBereich";
-import { MeinBereichUmleitung } from "@/pages/user/meinBereich/Umleitung";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -141,6 +140,8 @@ const MatchHubPage = lazyPage(() => import("@/pages/user/MatchHubPage"));
 const ConsentPage = lazyPage(() => import("@/pages/user/ConsentPage"));
 // „Mein Bereich“ (#2059): ein Rahmen, jede Gruppe ein eigener Teil.
 const MeinBereichLayout = lazyPage(() => import("@/pages/user/meinBereich/MeinBereichLayout"));
+// Alte Adressen (/profile?tab=…, /members/*, /account/*, /my/*, /privacy-account) - die Zuordnung lädt erst bei Bedarf.
+const MeinBereichUmleitung = lazyPage(() => import("@/pages/user/meinBereich/Umleitung").then((m) => ({ default: m.MeinBereichUmleitung })));
 const UebersichtSeite = lazyPage(() => import("@/pages/user/meinBereich/UebersichtSeite"));
 const gruppenSeite = (name) => lazyPage(() => import("@/pages/user/meinBereich/GruppenSeiten").then((m) => ({ default: m[name] })));
 const ProfilSeite = gruppenSeite("ProfilSeite");
