@@ -14,8 +14,19 @@ from services.league_scope import is_league_staffel
 CLOSED_LOCK = "Die Staffel ist abgeschlossen. Erst im Reiter „Abschluss“ wieder öffnen, dann korrigieren."
 
 
+# Staffeln in diesem Stand zählen für „Season abgeschlossen“ nicht mit (Entwurf, abgesagt, archiviert) - außer sie sind abgeschlossen.
+IGNORED_STAFFEL_STATUSES = frozenset({"cancelled", "archived", "draft"})
+
+
 def is_closed(tournament: dict | None) -> bool:
     return isinstance((tournament or {}).get("final_table"), dict)
+
+
+def all_closed(staffeln: list[dict]) -> bool:
+    """Alle zählenden Staffeln abgeschlossen - auch Playoffs und Relegation. Eine Stelle für ``league_final`` und den Saisonende-Moment
+    (#1639, ``league_moment_rules``), ohne Import-Kreis."""
+    counted = [row for row in staffeln if is_closed(row) or row.get("status") not in IGNORED_STAFFEL_STATUSES]
+    return bool(counted) and all(is_closed(row) for row in counted)
 
 
 async def active_final(db, tournament_id: str) -> dict | None:

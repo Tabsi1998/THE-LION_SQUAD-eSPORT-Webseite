@@ -112,7 +112,7 @@ async def admin_save_season_rewards(season_id: str, body: RewardsBody,
 
 @router.get("/me/rewards/unseen")
 async def my_unseen_rewards(user: dict = Depends(get_current_user)):
-    return {"rewards": await league_rewards.unseen_for(get_db(), user["id"])}
+    return {"rewards": await league_rewards.unseen_for(get_db(), user)}
 
 
 @router.post("/me/rewards/seen")

@@ -37,7 +37,7 @@ from datetime import timedelta
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services.league_moment_rules import champions, fresh, moment_key
+from services.league_moment_rules import MEMBER_VISIBLE, champions, fresh, member_visible, moment_key, reaches, season_closed
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_moments")
@@ -50,8 +50,8 @@ LIMIT = 500
 # Dauer je Season (D), Regeln für die Belohnungen des Meisters (A): ``services/league_moment_rules.py`` (Blatt-Modul, ohne Import-Kreis).
 # Merkmarke an der Season: ein Abgleich steht aus (Sperre belegt, Abbruch). Endet auf ``_at`` - geht nicht in die Folge-Season (F.2).
 PENDING_FIELD = "moments_pending_at"
-# Sichtbar für Mitglieder (Fabian 26.11., C): „Aus“ und „Nur Liga-Leitung“ zeigen nichts.
-MEMBER_VISIBLE = frozenset({"members", "public"})
+# Sichtbar für Mitglieder (Fabian 26.11., C): ``MEMBER_VISIBLE`` - „Aus“ und „Nur Liga-Leitung“ zeigen nichts.
+__all__ = ["MEMBER_VISIBLE"]
 # Ein geholter, aber nie geschlossener Moment darf nach so vielen Stunden auf ein anderes Gerät wechseln.
 CLAIM_HOURS = 12
 # Im Profil bzw. an der Teamseite: je Co-Team der jüngste Ausgang.
@@ -69,10 +69,6 @@ def _now() -> str:
 def fact_of(outcome: str, level) -> str:
     """Der Ausgang als Wert, den ein Wiederöffnen vergleicht: ``up:1``, ``down:3``, ``champion:1``."""
     return f"{outcome}:{level}"
-
-
-def member_visible(season: dict | None) -> bool:
-    return bool(season) and season.get("status") != "archived" and (season.get("visibility") or "off") in MEMBER_VISIBLE
 
 
 def level_label(step: dict | None) -> str:
@@ -144,13 +140,6 @@ def push_texts(doc: dict, title: str, *, corrected: bool = False, rewards: list[
         return NOTICE, f"Die Liga-Leitung hat den Endstand von {title} korrigiert. {phrase}"
     headline = {"champion": f"Meister: {name}", "up": f"Aufstieg in {after}"}.get(doc.get("outcome"), f"Nächste Season in {after}")
     return headline, f"Der Endstand von {title} steht fest: {phrase}"
-
-
-async def season_closed(db, season_id: str) -> bool:
-    """Alle Staffeln aller Arten abgeschlossen - die Lesestellen fragen das selbst, statt einem womöglich veralteten Abgleich zu trauen."""
-    from services import league_final
-
-    return league_final.all_closed(await league_final.season_staffeln(db, season_id))
 
 
 # ---------------------------------------------------------------- Bestätigter Ausgang
@@ -280,9 +269,12 @@ async def sync(db, season_id: str | None) -> dict:
     except MutationLockBusy:
         logger.warning("[league_moments] Abgleich der Season %s ausgelassen - der Job holt ihn nach", log_safe(season_id))
         return {"active": 0, "busy": True}
+    # Erst das Zurückgestellte des Meisters (M3), dann die Nachrichten zum Moment - beides außerhalb der Sperre. Scheitert etwas, bleibt
+    # die Marke stehen und der Job holt nach.
+    result["settled"] = await settle(db, season_id)
+    result["sent"] = await notify(db, season_id)
     # Nur die eigene Marke fällt weg: Kam inzwischen ein neuerer Auftrag, bleibt seine stehen.
     await db.league_seasons.update_one({"id": season_id, f"{PENDING_FIELD}.mark": mark}, {"$unset": {PENDING_FIELD: ""}})
-    result["sent"] = await notify(db, season_id)
     return result
 
 
@@ -353,6 +345,76 @@ async def _store(db, season: dict, key: str, item: dict, people: dict, before: d
     await db.league_moments.update_one({"key": key, "seq": before.get("seq")}, update)
 
 
+async def _sees(db, season: dict | None, people: list[str]) -> dict[str, bool]:
+    """Wer von diesen Personen die Season sieht (``can_see_season``) - eine Abfrage für die Konten, ohne private Felder."""
+    from services.league_service import can_see_season
+    from services.private_fields import private_projection
+
+    if not season or not people:
+        return {}
+    users = {row["id"]: row for row in await db.users.find({"id": {"$in": sorted(set(people))}}, private_projection()).to_list(len(people) + 1)}
+    return {person: bool(person in users and await can_see_season(users[person], season)) for person in set(people)}
+
+
+async def settle(db, season_id: str) -> int:
+    """M3: Was der Abschluss für den Moment des Meisters zurückstellte (``tournament_awards.moment_owed``: „Neue Belohnung“, „Belohnung
+    für euer Team“, „Staffel abgeschlossen“), geht an jede Person, die der Moment **nicht** erreicht (``league_moment_rules.reaches``) -
+    wie vor #1639, mit denselben Schlüsseln, also nie doppelt. Wen er erreicht, dem sagt es die Nachricht zum Moment. Danach ist es
+    erledigt; ein späteres Sichtbarwerden schickt nichts noch einmal (``notify`` sieht nach, was schon kam)."""
+    from services import league_final, league_rewards
+
+    awards = await db.tournament_awards.find({"league.season_id": season_id, "league.title": "Meister", "reward_key": None,
+                                              "moment_owed": {"$exists": True}}, {"_id": 0}).to_list(LIMIT)
+    if not awards:
+        return 0
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
+    closed = await season_closed(db, season_id)
+    sent = 0
+    for award in awards:
+        owed = award.get("moment_owed") or {}
+        registration = await db.tournament_registrations.find_one({"id": award.get("registration_id")}, {"_id": 0, "squad_id": 1}) or {}
+        doc = await db.league_moments.find_one({"key": moment_key(season_id, registration["squad_id"])}, {"_id": 0})             if registration.get("squad_id") else None
+        rewards = owed.get("rewards") or {}
+        people = [*(rewards.get("gains") or {}), *[person for leads in (rewards.get("team_leads") or {}).values() for person in leads],
+                  *(owed.get("close") or [])]
+        sees = await _sees(db, season, people)
+
+        def missed(person: str) -> bool:
+            return not reaches(doc, season, person, sees=sees.get(person, False), closed=closed)
+
+        gains = {person: names for person, names in (rewards.get("gains") or {}).items() if missed(person)}
+        leads = {team: [person for person in persons if missed(person)] for team, persons in (rewards.get("team_leads") or {}).items()}
+        close = {person for person in owed.get("close") or [] if missed(person)}
+        tournament = await db.tournaments.find_one({"id": award.get("tournament_id")}, {"_id": 0})
+        final = await db.league_final_tables.find_one({"id": owed.get("final_id")}, {"_id": 0}) if owed.get("final_id") else None
+        if tournament and final and (gains or any(leads.values()) or close):
+            frame = await league_final._frame(db, tournament)
+            if gains or any(leads.values()):
+                sent += await league_rewards.notify(db, tournament, final, frame, {
+                    "gains": gains, "team_gains": {team: names for team, names in (rewards.get("team_gains") or {}).items() if leads.get(team)},
+                    "team_leads": leads, "team_names": rewards.get("team_names") or {}})
+            if close:
+                sent += await league_final.notify_captains(db, tournament, final, frame, "closed", only=close)
+        await db.tournament_awards.update_one({"id": award["id"], "moment_owed.at": owed.get("at")}, {"$unset": {"moment_owed": ""}})
+    return sent
+
+
+async def _heard(db, doc: dict, person: str) -> tuple[bool, bool]:
+    """Was die Person zum Meister schon hörte (M3: nie doppelt): „Staffel abgeschlossen … Meister“ bzw. eine Belohnungs-Nachricht."""
+    finals = [(award.get("league") or {}).get("final_table_id") async for award in db.tournament_awards.find(
+        {"league.season_id": doc["season_id"], "league.title": "Meister", "reward_key": None,
+         "registration_id": {"$in": doc.get("registration_ids") or []}}, {"_id": 0, "league.final_table_id": 1})]
+    finals = [final for final in finals if final]
+    if not finals:
+        return False, False
+    close = await db.notifications.find_one({"user_id": person, "meta.dedupe_key": {"$in": [f"league-final:{final}:closed:{person}" for final in finals]}},
+                                            {"_id": 1})
+    keys = [f"league-reward:{final}:gain:{person}" for final in finals]
+    keys += [f"league-reward:{final}:team-gain:{doc.get('team_id')}:{person}" for final in finals]
+    reward = await db.notifications.find_one({"user_id": person, "meta.dedupe_key": {"$in": keys}}, {"_id": 1})
+    return bool(close), bool(reward)
+
+
 async def after_visibility(db, season_id: str | None) -> int:
     """Die Sichtbarkeit der Season hat sich geändert: Nachrichten, die warteten, gehen jetzt hinaus. Ohne Sperre - jede Nachricht wird je
     Person bedingt beansprucht."""
@@ -420,7 +482,13 @@ async def notify(db, season_id: str) -> int:
             if not claimed.modified_count:
                 continue
             corrected = person in told or bool(doc.get("corrected_at") and doc.get("active", True) and doc.get("seq", 1) > 1)
-            headline, text = push_texts(doc, title, corrected=corrected, rewards=rewards)
+            mine = rewards
+            if doc.get("outcome") == "champion" and doc.get("active", True):
+                heard_close, heard_rewards = await _heard(db, doc, person)
+                if heard_close and not corrected:
+                    continue  # „Staffel abgeschlossen … Meister“ kam schon (M3) - nie doppelt
+                mine = [] if heard_rewards else rewards
+            headline, text = push_texts(doc, title, corrected=corrected, rewards=mine)
             try:
                 if await create_user_notification(person, headline, text, url=url, kind=KIND, push_batch=batch, meta={
                         "reason": REASON, "season_id": season_id, "moment_id": doc["id"], "outcome": doc.get("outcome"),

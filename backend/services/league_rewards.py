@@ -394,8 +394,10 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
     for registration in registrations.values():
         if registration.get("team_id") in {*result["team_gains"], *result["team_losses"]}:
             leads.setdefault(registration["team_id"], set()).update(responsible_ids(registration, teams.get(registration["team_id"]) or None))
-    # Der Meister (Fabian 26.11., A): Seine Belohnungen kommen mit dem Saisonende-Moment - eine Nachricht, nicht zwei. Verluste nach
-    # einer Korrektur meldet die Belohnung weiter selbst.
+    # Der Meister (Fabian 26.11., A): Seine Belohnungen kommen mit dem Saisonende-Moment - eine Nachricht, nicht zwei. Zurückgestellt,
+    # nicht verschluckt (M3): ``notify`` merkt sie am Meister-Eintrag (``moment_owed``); erreicht der Moment eine Person nicht,
+    # schickt der Abgleich (``league_moments.settle``) ihr die Nachricht wie bisher. Verluste nach einer Korrektur meldet die Belohnung
+    # weiter selbst.
     champion = (final.get("champion") or {}).get("registration_id")
     held = {person for doc in after if champion and doc["registration_id"] == champion for person in [*doc["player_ids"], doc.get("user_id")]
             if person}
@@ -412,7 +414,7 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
             held_team = None
     return {**result, "team_leads": {key: sorted(value) for key, value in leads.items()},
             "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads},
-            "held_people": sorted(held), "held_team": held_team}
+            "held_people": sorted(held), "held_team": held_team, "held_registration": champion if (held or held_team) else None}
 
 
 async def store(db, scope: dict, before: list[dict], after: list[dict], wanted_prizes: list[dict]) -> dict:
@@ -455,10 +457,12 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *
     name = tournament.get("title") or "Die Staffel"
     sent = 0
     held = set(result.get("held_people") or [])
+    owed: dict = {"gains": {}, "team_gains": {}, "team_leads": {}, "team_names": {}}
     for event, people in (("gain", result.get("gains") or {}), ("loss", result.get("losses") or {})):
         for user_id in sorted(people):
             if event == "gain" and user_id in held:
-                continue  # kommt mit dem Saisonende-Moment des Meisters
+                owed["gains"][user_id] = list(people[user_id])  # zurückgestellt für den Saisonende-Moment des Meisters
+                continue
             rewards = ", ".join(people[user_id])
             if event == "gain":
                 title, text = "Neue Belohnung", f"{name}: {rewards}. Sie steht ab jetzt in deiner Sammlung."
@@ -471,7 +475,10 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *
     for event, teams in (("team-gain", result.get("team_gains") or {}), ("team-loss", result.get("team_losses") or {})):
         for team_id in sorted(teams):
             if event == "team-gain" and team_id == result.get("held_team"):
-                continue  # kommt mit dem Saisonende-Moment des Meisters
+                owed["team_gains"][team_id] = list(teams[team_id])  # zurückgestellt für den Saisonende-Moment des Meisters
+                owed["team_leads"][team_id] = list((result.get("team_leads") or {}).get(team_id) or [])
+                owed["team_names"][team_id] = (result.get("team_names") or {}).get(team_id) or "Euer Team"
+                continue
             rewards = ", ".join(teams[team_id])
             team_name = (result.get("team_names") or {}).get(team_id) or "Euer Team"
             if event == "team-gain":
@@ -481,7 +488,18 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *
             for user_id in (result.get("team_leads") or {}).get(team_id) or []:
                 sent += await _send(create_user_notification, user_id, title, text, url, tournament,
                                     f"league-reward:{final['id']}:{event}:{team_id}:{user_id}")
+    if result.get("held_registration") and (owed["gains"] or owed["team_gains"]):
+        await owe_to_moment(db, tournament["id"], result["held_registration"], final["id"], {"rewards": owed})
     return sent
+
+
+async def owe_to_moment(db, tournament_id: str, registration_id: str, final_id: str, parts: dict) -> None:
+    """Am Meister-Eintrag merken, was für den Saisonende-Moment zurückgestellt ist (#1639, M3) - der Abgleich schickt es, wenn der Moment
+    die Person nicht erreicht."""
+    now = now_utc().isoformat()
+    await db.tournament_awards.update_one({"tournament_id": tournament_id, "reward_key": None, "registration_id": registration_id},
+                                          {"$set": {**{f"moment_owed.{key}": value for key, value in parts.items()},
+                                                    "moment_owed.final_id": final_id, "moment_owed.at": now}})
 
 
 async def _send(create, user_id: str, title: str, text: str, url: str, tournament: dict, dedupe_key: str) -> int:
@@ -621,16 +639,19 @@ async def pdf_rows(db, tournament: dict) -> list[list[str]]:
     return rows
 
 
-async def unseen_for(db, user_id: str) -> list[dict]:
+async def unseen_for(db, user: dict) -> list[dict]:
     """Was die Person noch nicht gefeiert hat (Zeremonie, Nr. 165) - nur geltende Einträge."""
     from services.awards import award_view
 
     from services import league_moment_rules
+    from services.league_service import can_see_season
 
+    user_id = user["id"]
     docs = await db.tournament_awards.find({"audience_ids": user_id, "reward_key": {"$type": "string"}, "suspended": {"$ne": True},
                                             "seen_by": {"$ne": user_id}}, {"_id": 0}).sort("updated_at", -1).to_list(20)
-    # Saisonende-Moment (#1639, Fabian 26.11., A): Die Belohnungen des Meisters kommen als zweite Karte mit seinem Moment.
-    held = await league_moment_rules.held_reward_ids(db, user_id, docs)
+    # Saisonende-Moment (#1639, Fabian 26.11., A): Die Belohnungen des Meisters kommen als zweite Karte mit seinem Moment - nur, wenn er
+    # die Person erreicht (M3).
+    held = await league_moment_rules.held_reward_ids(db, user, docs, can_see_season)
     return [award_view(doc) for doc in docs if doc["id"] not in held]
 
 

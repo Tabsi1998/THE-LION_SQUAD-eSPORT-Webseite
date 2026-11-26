@@ -1,14 +1,21 @@
 """Saisonende-Moment (#1639): Regeln ohne Import von Liga-Diensten - ein Blatt-Modul.
 
-Die Belohnungen (``league_rewards``) fragen hier, ob die Belohnungen des Meisters auf seinen Moment warten (Fabian 26.11., A), und
-lesen die Dauer je Season (D) - ohne ``league_moments`` zu importieren, das seinerseits ``league_rewards.players_for`` nutzt. So entsteht
-kein Import-Kreis (tests/test_import_cycles_unit.py).
+Die Belohnungen (``league_rewards``) und der Abschluss (``league_final``) fragen hier, ob der Moment des Meisters eine Person erreicht
+(Fabian 26.11., A; M3 der Prüfung): Nur dann warten ihre Belohnungs-Zeremonie und ihre Nachrichten auf ihn. Dazu die Dauer je Season (D).
+Ohne ``league_moments`` zu importieren, das seinerseits ``league_rewards.players_for`` nutzt - kein Import-Kreis
+(tests/test_import_cycles_unit.py).
+
+**Erreicht** heißt: Es gibt einen Moment für das **Co-Team** (eine Anmeldung ohne Co-Team hat keinen), er gilt und ruht nicht, die
+Person ist unter seinen Empfängern, Mitglieder sehen die Season (``members``/``public``), die Person sieht sie selbst, und - frisch
+gefragt - alle Staffeln sind abgeschlossen. Sonst feiert und meldet sich die Belohnung wie vor #1639.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 
 from models import now_utc
+from services.league_final_read import all_closed
+from services.league_scope import ONLY_LEAGUE
 
 # So lange nach dem bestätigten Endstand erscheint der Moment beim nächsten Besuch - danach bleibt nur der Hinweis. Je Season
 # einstellbar (Reiter „Belohnungen“, ``league_seasons.moment_days``), Vorgabe 45 Tage.
@@ -16,6 +23,8 @@ DAYS_FIELD = "moment_days"
 DEFAULT_DAYS = 45
 DAYS_MIN, DAYS_MAX = 1, 365
 LIMIT = 500
+# Sichtbar für Mitglieder (Fabian 26.11., C): „Aus“ und „Nur Liga-Leitung“ zeigen nichts.
+MEMBER_VISIBLE = frozenset({"members", "public"})
 
 
 def moment_key(season_id: str, entrant: str) -> str:
@@ -37,6 +46,23 @@ def clean_days(value) -> int:
 def moment_days(season: dict | None) -> int:
     value = (season or {}).get(DAYS_FIELD)
     return value if isinstance(value, int) and DAYS_MIN <= value <= DAYS_MAX else DEFAULT_DAYS
+
+
+def member_visible(season: dict | None) -> bool:
+    return bool(season) and season.get("status") != "archived" and (season.get("visibility") or "off") in MEMBER_VISIBLE
+
+
+async def season_closed(db, season_id: str) -> bool:
+    """Alle Staffeln aller Arten abgeschlossen (``league_final_read.all_closed``) - frisch gefragt, nie einem veralteten Abgleich trauen."""
+    staffeln = await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE},
+                                         {"_id": 0, "id": 1, "status": 1, "final_table": 1}).to_list(LIMIT)
+    return all_closed(staffeln)
+
+
+def reaches(doc: dict | None, season: dict | None, person: str, *, sees: bool, closed: bool) -> bool:
+    """Erreicht der Moment diese Person? ``sees``: Die Person sieht die Season (``can_see_season``); ``closed``: alle Staffeln zu."""
+    return bool(doc and doc.get("squad_id") and doc.get("active", True) and not doc.get("suspended")
+                and person in (doc.get("audience_ids") or []) and member_visible(season) and sees and closed)
 
 
 def fresh(doc: dict, season: dict | None = None, now: datetime | None = None) -> bool:
@@ -76,9 +102,11 @@ def entrant_of(registration: dict | None) -> str | None:
     return f"user:{registration['user_id']}" if registration.get("user_id") else None
 
 
-async def held_reward_ids(db, user_id: str, awards: list[dict]) -> set[str]:
-    """Belohnungen des Meisters warten auf seinen Moment und kommen als zweite Karte mit: solange der Endstand der Season nicht feststeht,
-    und solange die Person den Moment noch sehen wird. Danach (oder ohne Moment für sie) kommen sie wie bisher."""
+async def held_reward_ids(db, user: dict, awards: list[dict], can_see) -> set[str]:
+    """Belohnungen des Meisters warten auf seinen Moment und kommen als zweite Karte mit - nur, solange der Moment die Person erreicht
+    (``reaches``), sie ihn noch nicht gesehen hat und er frisch ist (höchstens ``moment_days``). Sonst kommen sie wie vor #1639.
+    ``can_see``: ``league_service.can_see_season`` (vom Aufrufer, ohne Import-Kreis)."""
+    user_id = user["id"]
     awards = [award for award in awards if (award.get("league") or {}).get("season_id") and award.get("registration_id")]
     if not awards:
         return set()
@@ -90,6 +118,7 @@ async def held_reward_ids(db, user_id: str, awards: list[dict]) -> set[str]:
     seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}).to_list(len(season_ids) + 1)}
     held: set[str] = set()
     moments: dict[str, dict | None] = {}
+    open_to: dict[str, bool] = {}
     for award in awards:
         season_id = award["league"]["season_id"]
         entrant = entrant_of(registrations.get(award["registration_id"]))
@@ -99,9 +128,11 @@ async def held_reward_ids(db, user_id: str, awards: list[dict]) -> set[str]:
         if key not in moments:
             moments[key] = await db.league_moments.find_one({"key": key}, {"_id": 0})
         doc = moments[key]
-        if doc is None or doc.get("suspended"):
-            held.add(award["id"])  # der Endstand der Season steht noch nicht fest - sie kommen mit dem Moment
-        elif (doc.get("active", True) and user_id in (doc.get("audience_ids") or []) and user_id not in (doc.get("seen_by") or [])
-              and fresh(doc, seasons.get(season_id))):
+        season = seasons.get(season_id)
+        if not doc or user_id in (doc.get("seen_by") or []) or not fresh(doc, season):
+            continue
+        if season_id not in open_to:
+            open_to[season_id] = bool(member_visible(season) and await season_closed(db, season_id) and await can_see(user, season))
+        if reaches(doc, season, user_id, sees=open_to[season_id], closed=open_to[season_id]):
             held.add(award["id"])  # der Moment kommt noch - mit ihnen als zweiter Karte
     return held

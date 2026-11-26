@@ -475,22 +475,20 @@ async def test_captains_with_start_rights_announce_get_no_second_message(flow):
     # … zeigt ihnen den Moment aber trotzdem.
     assert [row["outcome"] for row in await unseen(flow, up["captain"])] == ["up"]
     champion = await people(flow, world, 1, 0)
-    assert len(await notes(flow, champion["captain"])) == 1
+    # Liga 1 schloss vor der ganzen Season: Der Captain des Meisters hörte „Staffel abgeschlossen … Meister“ schon - kein zweites Mal (M3).
+    assert await league_titles(flow, champion["captain"]) == ["Staffel abgeschlossen"]
 
 
 # ---------------------------------------------------------------- Meister mit Belohnungen: ein Ablauf, eine Nachricht (Fabian 26.11., A)
 
 @pytest.mark.asyncio
 async def test_champion_with_rewards_is_one_flow_and_one_message(flow):
-    world = await build(flow, levels=2, rewards=[GOLD])
+    # Eine Liga N: Der Abschluss bestätigt die Season - der Moment erreicht den Meister sofort.
+    world = await build(flow, levels=1, rewards=[GOLD])
     champion = await people(flow, world, 1, 0)
     other = await people(flow, world, 1, 1)
     player = champion["fielded"][1]
-    await close(flow, world, 1)
-    # Liga 1 ist abgeschlossen, die Season noch nicht: Die Goldmedaille steht in der Sammlung, gefeiert wird sie mit dem Moment.
-    flow.act_as(player)
-    assert ok(await flow.get("/api/me/rewards/unseen"))["rewards"] == []
-    await close(flow, world, 2)
+    await close(flow, world)
     moment = (await unseen(flow, player))[0]
     assert moment["outcome"] == "champion"
     assert [row["reward"]["name"] for row in moment["rewards"]] == ["Goldmedaille"]
@@ -498,10 +496,8 @@ async def test_champion_with_rewards_is_one_flow_and_one_message(flow):
     assert ok(await flow.get("/api/me/rewards/unseen"))["rewards"] == []
     # Eine Nachricht je Person: der Meister mit der Belohnung - keine eigene „Neue Belohnung“, kein „Staffel abgeschlossen“.
     for person in [player, champion["captain"], champion["vice"]]:
-        everything = await flow.db.notifications.find({"user_id": person["id"], "meta.reason": {"$in": ["league_moment", "league_reward", "league_final"]}},
-                                                      {"_id": 0}).to_list(None)
-        assert [row["title"] for row in everything] == ["Meister: " + world["regs"][1][0]["display_name"]], person["display_name"]
-        assert "Goldmedaille" in everything[0]["body"]
+        assert await league_titles(flow, person) == ["Meister: " + world["regs"][1][0]["display_name"]], person["display_name"]
+        assert "Goldmedaille" in (await notes(flow, person))[0]["body"]
     # Die anderen Captains erfahren den Abschluss wie bisher.
     assert [row["title"] for row in await notes(flow, other["captain"], "league_final")] == ["Staffel abgeschlossen"]
     # Gesehen: Moment und Belohnungen sind durch - nichts kommt noch einmal.
@@ -515,6 +511,82 @@ async def test_champion_with_rewards_is_one_flow_and_one_message(flow):
     await see(flow, other_player, other_moment["id"])
     flow.act_as(other_player)
     assert [row["reward"]["name"] for row in ok(await flow.get("/api/me/rewards/unseen"))["rewards"]] == ["Goldmedaille"]
+
+
+# ---------------------------------------------------------------- M3: nur zurückhalten, wenn der Moment die Person erreicht
+
+async def league_titles(flow, person: dict) -> list[str]:
+    rows = await flow.db.notifications.find({"user_id": person["id"], "meta.reason": {"$in": ["league_moment", "league_reward", "league_final"]}},
+                                            {"_id": 0}).sort("created_at", 1).to_list(None)
+    return [row["title"] for row in rows]
+
+
+async def rewards_unseen(flow, person: dict) -> list[str]:
+    flow.act_as(person)
+    return [row["reward"]["name"] for row in ok(await flow.get("/api/me/rewards/unseen"))["rewards"]]
+
+
+@pytest.mark.asyncio
+async def test_m3_a_season_not_yet_confirmed_celebrates_the_reward_as_before_and_never_twice(flow):
+    world = await build(flow, levels=2, rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    player = champion["fielded"][1]
+    name = world["regs"][1][0]["display_name"]
+    await close(flow, world, 1)
+    # Liga 2 ist noch offen: Ein Moment kann (noch) niemanden erreichen - Belohnung und Abschluss melden sich wie vor #1639.
+    assert await league_titles(flow, player) == ["Neue Belohnung"]
+    assert await rewards_unseen(flow, player) == ["Goldmedaille"]
+    assert sorted(await league_titles(flow, champion["captain"])) == ["Belohnung für euer Team", "Staffel abgeschlossen"]
+    await close(flow, world, 2)
+    # Später bestätigt: der Meister-Moment - ohne die Belohnung noch einmal zu nennen; der Captain hörte „Meister“ schon.
+    titles = await league_titles(flow, player)
+    assert titles == ["Neue Belohnung", f"Meister: {name}"]
+    assert "Goldmedaille" not in (await notes(flow, player))[0]["body"]
+    assert sorted(await league_titles(flow, champion["captain"])) == ["Belohnung für euer Team", "Staffel abgeschlossen"]
+
+
+@pytest.mark.asyncio
+async def test_m3_a_season_for_the_lead_only_celebrates_the_reward_as_before(flow):
+    world = await build(flow, levels=1, visibility="admins", rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    player = champion["fielded"][1]
+    name = world["regs"][1][0]["display_name"]
+    await close(flow, world)
+    assert await league_titles(flow, player) == ["Neue Belohnung"]
+    assert await rewards_unseen(flow, player) == ["Goldmedaille"]
+    assert "Staffel abgeschlossen" in await league_titles(flow, champion["captain"])
+    # Wird die Season sichtbar, kommt der Moment - ohne doppelte Nachricht.
+    flow.act_as(world["lead"])
+    ok(await flow.patch(f"{ADMIN}/seasons/{world['season']['id']}",
+                        json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"}))
+    assert await league_titles(flow, player) == ["Neue Belohnung", f"Meister: {name}"]
+    assert "Goldmedaille" not in (await notes(flow, player))[0]["body"]
+    assert sorted(await league_titles(flow, champion["captain"])) == ["Belohnung für euer Team", "Staffel abgeschlossen"]
+
+
+@pytest.mark.asyncio
+async def test_m3_a_player_who_cannot_see_a_members_season_gets_the_reward_as_before(flow):
+    world = await build(flow, levels=1, visibility="members", rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    player = champion["fielded"][1]
+    await close(flow, world)
+    # Kein Vereinsmitglied: Die Season „Nur Mitglieder“ sieht er nicht - also auch keinen Moment.
+    assert await unseen(flow, player) == []
+    assert await league_titles(flow, player) == ["Neue Belohnung"]
+    assert await rewards_unseen(flow, player) == ["Goldmedaille"]
+
+
+@pytest.mark.asyncio
+async def test_m3_a_champion_without_co_team_hears_as_before(flow):
+    world = await build(flow, levels=1, rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    player = champion["fielded"][1]
+    # Die Anmeldung des Meisters hat kein Co-Team: Es gibt keinen Moment für ihn.
+    await flow.db.tournament_registrations.update_one({"id": champion["registration_id"]}, {"$set": {"squad_id": None}})
+    await close(flow, world)
+    assert champion["squad_id"] not in await moments_of(flow, world)
+    assert await league_titles(flow, player) == ["Neue Belohnung"]
+    assert await rewards_unseen(flow, player) == ["Goldmedaille"]
 
 
 # ---------------------------------------------------------------- Dauer je Season (Fabian 26.11., D)
