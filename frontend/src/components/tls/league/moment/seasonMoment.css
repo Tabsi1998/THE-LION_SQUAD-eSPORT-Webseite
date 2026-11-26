@@ -11,7 +11,9 @@
    Nur transform und opacity; Wege hängen an --tls-motion-on. Ohne Bewegung („Bewegung reduzieren“, „Zeremonien dezent“) gibt es kein
    data-play - dann steht sofort der Endzustand da: nur die neue Zahl, die neue Form, die Krone. */
 
-.tls-placement[data-metal="calm"] { --tls-metal-rgb: 148 163 184; }
+/* Metall der Karte: Gold (Vorgabe von .tls-placement) für den Meister, Lionsquad-Blau hinauf, ruhiges Grau-Blau hinunter. */
+.tls-season-moment[data-metal="lion"] { --tls-metal-rgb: 41 182 232; }
+.tls-season-moment[data-metal="calm"] { --tls-metal-rgb: 148 163 184; }
 .tls-season-moment .tls-placement__card { max-width: 28rem; }
 .tls-season-moment__card {
   --sm-lift: var(--tls-motion-mid);

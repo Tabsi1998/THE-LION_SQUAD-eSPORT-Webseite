@@ -40,7 +40,7 @@ export function LeagueMomentHint({ rows, canReplay = false, testId = "league-mom
               </div>
               {canReplay ? (
                 <button type="button" onClick={() => replayMoment(row, queue)} data-testid={`${testId}-${row.id}-replay`}
-                  className="tls-moment-hint__replay inline-flex min-h-[44px] items-center gap-1.5 rounded-sm border border-white/15 px-3 text-[11px] font-bold uppercase tracking-wider text-white/75">
+                  className="tls-moment-hint__replay tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 text-[11px] font-bold uppercase tracking-wider">
                   <Play className="h-3.5 w-3.5" aria-hidden="true" /> Moment ansehen
                 </button>
               ) : null}
