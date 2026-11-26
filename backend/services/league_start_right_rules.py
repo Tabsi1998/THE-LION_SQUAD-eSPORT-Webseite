@@ -173,12 +173,20 @@ def _merged(spans: list[tuple[datetime, datetime | None]]) -> list[tuple[datetim
     return out
 
 
+def _fell_back_at(right: dict | None) -> datetime | None:
+    """Wann das letzte Nachrück-Angebot für dieses Co-Team endete (Rückfall auf das eigene Startrecht): Ab dann läuft die Restfrist."""
+    ends = [end for _begin, end in _rests(right) if end]
+    return max(ends) if ends else None
+
+
 def _deadline(application: dict | None, season: dict | None) -> tuple[datetime | None, bool]:
     """(Fristende, ruht). ``accept_days`` ab der Vergabe; jede Ruhezeit, die in die laufende Frist fällt, verlängert sie um ihre
     Dauer (ab der Vergabe gerechnet): die Pausen der Season (Vorgänger wieder geöffnet) und die Zeit, in der für dieses Co-Team ein
     Nachrück-Angebot offen war (``rests``). Fällt eine offene Pause in die Frist, ruht sie: kein Ende, nichts ist überfällig. Eine
     Ruhezeit nach dem Fristende ändert nichts mehr. Nach einem verstrichenen Nachrück-Angebot endet die Frist nicht vor
-    ``min_until`` (Restfrist, mindestens ``rest_days``). Äußerste Grenze bleibt das Startdatum der Season (das gemerkte, Nr. 253)."""
+    ``min_until`` (Restfrist, mindestens ``rest_days``) - und auch diese Restfrist ruht in jeder Pause, die nach dem Rückfall in sie
+    fällt (Regel A gilt für jedes Fristende, egal woher es kommt). Äußerste Grenze bleibt das Startdatum der Season (das gemerkte,
+    Nr. 253)."""
     right = right_of(application)
     offered = league_calendar.aware((right or {}).get("offered_at"))
     if not offered:
@@ -192,8 +200,17 @@ def _deadline(application: dict | None, season: dict | None) -> tuple[datetime |
         if end > offered:
             until += end - max(begin, offered)
     floor = league_calendar.aware(right.get("min_until"))
-    if floor and floor > until:
-        until = floor
+    if floor:
+        since = _fell_back_at(right) or offered
+        for begin, end in _merged(pauses(season)):
+            if end is not None and end <= since:
+                continue
+            if max(begin, since) >= floor:
+                break
+            if end is None:
+                return None, True
+            floor += end - max(begin, since)
+        until = max(until, floor)
     start = league_calendar.start_moment(season)
     return (min(until, start) if start else until), False
 
@@ -249,14 +266,15 @@ def waits_for_lead(application: dict | None, season: dict | None, now: datetime 
 
 def remind_at(application: dict | None, season: dict | None, settings: dict | None) -> datetime | None:
     """Wann die Erinnerung fällig ist: ``remind_hours`` vor Fristende - aber nie in der ersten Hälfte der Frist. Eine Erinnerung,
-    die länger zurückreicht als die Frist selbst, käme sonst sofort nach der Vergabe. ``None``: keine Erinnerung."""
+    die länger zurückreicht als die Frist selbst, käme sonst sofort nach der Vergabe. Nach einem verstrichenen Nachrück-Angebot
+    zählt die Hälfte ab dem Rückfall: Die Nachricht dazu nennt die Frist schon. ``None``: keine Erinnerung."""
     right = right_of(application) or {}
     offered = league_calendar.aware(right.get("offered_at"))
     until = accept_until(application, season)
     hours = int((settings or {}).get("remind_hours") or 0)
     if not hours or not offered or not until or right.get("status") != OFFERED:
         return None
-    return until - min(timedelta(hours=hours), (until - offered) / 2)
+    return until - min(timedelta(hours=hours), (until - (_fell_back_at(right) or offered)) / 2)
 
 
 def state(application: dict | None, season: dict | None, now: datetime | None = None) -> str | None:

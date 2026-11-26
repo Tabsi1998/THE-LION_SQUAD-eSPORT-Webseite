@@ -331,3 +331,36 @@ def test_back_from_the_waitlist_in_automatic_mode_nothing_waits_for_an_acceptanc
     assert rights.waitlist_problem(waiting, auto) is None
     assert rights.waitlist_problem(waiting, SEASON) and rights.reoffer_fields(waiting, NOW.isoformat(), SEASON) == {
         "carry_over.start_right": {"status": "offered", "offered_at": NOW.isoformat()}}
+
+
+# ---------------------------------------------------------------- Dritte Nachbesserung (P2): Auch die Mindest-Restfrist ruht in einer Pause
+
+FAR = {**TEN, "start_date": (NOW + 90 * DAY).isoformat()}
+
+
+def test_a_pause_also_rests_the_minimum_rest_after_an_offer_to_move_up():
+    # Angebot Tag 9 bis 29, eigene Frist danach am Tag 30 vorbei - Boden: drei Tage nach dem Rückfall, also Tag 32.
+    own = {"status": "offered", "offered_at": NOW.isoformat()}
+    back = application(**rights.restored_right(offer_to_move_up(own, NOW + 9 * DAY), TEN, NOW + 29 * DAY, None, declined=False))
+    span = lambda start, end=None: {"from": (NOW + start * DAY).isoformat(), "to": (NOW + end * DAY).isoformat() if end is not None else None}  # noqa: E731
+    assert rights.accept_until(back, FAR) == NOW + 32 * DAY
+    # Pause Tag 31 bis 40: Die Frist ruht neun Tage - Tag 41, nicht Tag 32.
+    assert rights.accept_until(back, {**FAR, "start_right_pauses": [span(31, 40)]}) == NOW + 41 * DAY
+    # Eine offene Pause ab Tag 31 ruht: kein Ende, nichts überfällig.
+    running = {**FAR, "start_right_pauses": [span(31)]}
+    assert rights.accept_until(back, running) is None and rights.resting(back, running)
+    assert not rights.overdue(back, running, NOW + 60 * DAY) and rights.state(back, running, NOW + 60 * DAY) == "offered"
+    # Eine Pause erst nach dem Boden ändert nichts; eine, die schon beim Rückfall läuft, zählt ab dem Rückfall.
+    assert rights.accept_until(back, {**FAR, "start_right_pauses": [span(33, 40)]}) == NOW + 32 * DAY
+    assert rights.accept_until(back, {**FAR, "start_right_pauses": [span(25, 35)]}) == NOW + 38 * DAY
+    # Das Startdatum bleibt die äußerste Grenze.
+    assert rights.accept_until(back, {**TEN, "start_right_pauses": [span(31, 40)], "start_date": (NOW + 35 * DAY).isoformat()}) == NOW + 35 * DAY
+
+
+def test_the_reminder_after_a_fall_back_waits_for_half_of_the_rest():
+    # Restfrist ein Tag, Erinnerung 48 Stunden: nicht sofort nach dem Rückfall - die Nachricht dazu nennt die Frist schon.
+    one = {**FAR, "start_rights": {"mode": "accept", "accept_days": 10, "rest_days": 1}}
+    own = {"status": "offered", "offered_at": NOW.isoformat()}
+    back = application(**rights.restored_right(offer_to_move_up(own, NOW + 9 * DAY), one, NOW + 12 * DAY, None, declined=False))
+    assert rights.accept_until(back, one) == NOW + 13 * DAY
+    assert rights.remind_at(back, one, {"remind_hours": 48}) == NOW + 12 * DAY + timedelta(hours=12)
