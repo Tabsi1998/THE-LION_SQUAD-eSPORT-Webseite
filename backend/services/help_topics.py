@@ -45,7 +45,7 @@ HELP_TOPICS: dict[str, tuple[str, str]] = {
     ),
     "datenschutz-und-konto": (
         "Datenschutz und Konto",
-        "Deine Daten herunterladen und das Konto anonymisieren.",
+        "Deine Daten herunterladen und das Konto löschen.",
     ),
 }
 
