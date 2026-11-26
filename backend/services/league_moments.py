@@ -79,7 +79,11 @@ def _step(level, divisions: dict[int, dict]) -> dict:
 
 
 def texts(doc: dict, title: str) -> dict:
-    """Die Texte des Moments - sachlich, Abstieg ruhig mit Blick auf die nächste Season. Web und App zeigen dieselben."""
+    """Die Texte des Moments - sachlich, Abstieg ruhig mit Blick auf die nächste Season. Web und App zeigen dieselben.
+
+    ``label``: der Ausgang in einem Wort (Hinweis an Profil und Teamseite), ``kicker``/``title``/``name``/``meta``/``line``/``next``: die
+    Zeilen der Karte von oben nach unten - jede Angabe nur einmal (Liga N steht im Titel, der Satz nennt den Weg dorthin), ``summary``:
+    ein Satz für den Hinweis, ``aria``: der ganze Satz für Screenreader."""
     name = doc.get("display_name") or "Euer Team"
     outcome = doc.get("outcome")
     after = level_label(doc.get("to"))
@@ -87,14 +91,15 @@ def texts(doc: dict, title: str) -> dict:
     via = " über die Relegation" if doc.get("via") == "relegation" else ""
     if outcome == "champion":
         line = "Sieger der Playoffs." if doc.get("playoffs") else "Platz 1 im Endstand der Season."
-        return {"kicker": "Meister", "title": "Meister", "name": name, "meta": f"{title} · {after}", "line": line,
-                "next": None, "aria": f"Meister: {name} ist Meister von {title} in {after}."}
+        return {"label": "Meister", "kicker": after, "title": "Meister", "name": name, "meta": title, "line": line, "next": None,
+                "summary": f"{name} ist Meister in {after}.", "aria": f"Meister: {name} ist Meister von {title} in {after}."}
     if outcome == "up":
-        return {"kicker": "Aufstieg", "title": after, "name": name, "meta": title,
-                "line": f"{name} steigt{via} von {before} in {after} auf.", "next": f"Nächste Season: {after}",
-                "aria": f"Aufstieg: {name} steigt{via} von {before} in {after} auf."}
-    return {"kicker": "Abstieg", "title": f"Nächste Season in {after}", "name": name, "meta": title,
-            "line": f"{name} spielt die nächste Season{via} in {after}.", "next": "Die neue Season beginnt für alle bei null.",
+        line = f"{name} steigt{via} von {before} in {after} auf."
+        return {"label": "Aufstieg", "kicker": "Aufstieg", "title": after, "name": name, "meta": title, "line": line, "next": None,
+                "summary": line, "aria": f"Aufstieg: {line}"}
+    line = f"{name} wechselt{via} von {before} in {after}."
+    return {"label": "Abstieg", "kicker": "Abstieg", "title": f"Nächste Season in {after}", "name": name, "meta": title, "line": line,
+            "next": "Die neue Season beginnt für alle bei null.", "summary": f"{name} spielt die nächste Season in {after}.",
             "aria": f"Abstieg: {name} spielt die nächste Season{via} in {after}."}
 
 

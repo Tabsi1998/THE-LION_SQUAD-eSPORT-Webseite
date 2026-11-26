@@ -16,11 +16,11 @@ const moment = (outcome = "up", extra = {}) => {
     from: { level: levels[0], label: `Liga ${levels[0]}` }, to: { level: levels[1], label: `Liga ${levels[1]}` },
     badge_from: { level: levels[0], nickname: null, champion: false }, badge_to: { level: levels[1], nickname: null, champion: outcome === "champion" },
     texts: {
-      up: { kicker: "Aufstieg", title: "Liga 1", name: "Nordlicht Eins", meta: "Probe-Liga · Season 1", line: "Nordlicht Eins steigt von Liga 2 in Liga 1 auf.",
-        next: "Nächste Season: Liga 1", aria: "Aufstieg: Nordlicht Eins steigt von Liga 2 in Liga 1 auf." },
-      down: { kicker: "Abstieg", title: "Nächste Season in Liga 3", name: "Nordlicht Eins", meta: "Probe-Liga · Season 1",
-        line: "Nordlicht Eins spielt die nächste Season in Liga 3.", next: "Die neue Season beginnt für alle bei null.", aria: "Abstieg: …" },
-      champion: { kicker: "Meister", title: "Meister", name: "Nordlicht Eins", meta: "Probe-Liga · Season 1 · Liga 1",
+      up: { label: "Aufstieg", kicker: "Aufstieg", title: "Liga 1", name: "Nordlicht Eins", meta: "Probe-Liga · Season 1",
+        line: "Nordlicht Eins steigt von Liga 2 in Liga 1 auf.", summary: "Nordlicht Eins steigt von Liga 2 in Liga 1 auf.", next: null, aria: "Aufstieg: Nordlicht Eins steigt von Liga 2 in Liga 1 auf." },
+      down: { label: "Abstieg", kicker: "Abstieg", title: "Nächste Season in Liga 3", name: "Nordlicht Eins", meta: "Probe-Liga · Season 1",
+        line: "Nordlicht Eins wechselt von Liga 2 in Liga 3.", summary: "Nordlicht Eins spielt die nächste Season in Liga 3.", next: "Die neue Season beginnt für alle bei null.", aria: "Abstieg: …" },
+      champion: { label: "Meister", kicker: "Liga 1", title: "Meister", name: "Nordlicht Eins", meta: "Probe-Liga · Season 1", summary: "Nordlicht Eins ist Meister in Liga 1.",
         line: "Platz 1 im Endstand der Season.", next: null, aria: "Meister: Nordlicht Eins ist Meister." },
     }[outcome],
     next_step: null,
@@ -62,7 +62,8 @@ test("Aufstieg: Wappen mit Zahlenwechsel, Krone in Liga 1, Texte vom Server, Dia
   expect(dialog).toHaveAccessibleName("Liga 1");
   expect(dialog).toHaveAccessibleDescription("Nordlicht Eins steigt von Liga 2 in Liga 1 auf.");
   expect(screen.getByTestId("season-moment-kicker")).toHaveTextContent("Aufstieg");
-  expect(screen.getByTestId("season-moment-next")).toHaveTextContent("Nächste Season: Liga 1");
+  // Liga N steht nur im Titel - keine dritte Zeile mit derselben Liga.
+  expect(screen.queryByTestId("season-moment-next")).toBeNull();
   const crest = screen.getByTestId("season-moment-crest");
   expect(crest.querySelector(".tls-season-moment__num--from")).toHaveTextContent("2");
   expect(crest.querySelector(".tls-season-moment__num--to")).toHaveTextContent("1");
@@ -116,8 +117,12 @@ test("das Paket holt sich den Moment vor dem Zeigen beim Server - nur, was diese
   const client = { post: vi.fn().mockResolvedValueOnce({ data: { claimed: ["m-up"] } }).mockResolvedValueOnce({ data: { claimed: [] } }) };
   const pkg = momentPackage(moment("up"), client);
   await expect(pkg.check()).resolves.toEqual({ moments: [moment("up")] });
-  await expect(pkg.check()).resolves.toEqual({ moments: [] });
+  // Läuft die Prüfung doppelt (React im Entwicklungsmodus), fragt sie nicht ein zweites Mal - sonst hielte sie sich selbst für „schon gesehen“.
+  await expect(pkg.check()).resolves.toEqual({ moments: [moment("up")] });
+  expect(client.post).toHaveBeenCalledTimes(1);
   expect(client.post).toHaveBeenCalledWith("/me/league-moments/seen", { ids: ["m-up"] });
+  // Ein neues Paket (anderes Gerät, neu geladen) bekommt ihn nicht mehr.
+  await expect(momentPackage(moment("up"), client).check()).resolves.toEqual({ moments: [] });
   const failing = momentPackage(moment("up"), { post: vi.fn().mockRejectedValue(new Error("offline")) });
   await expect(failing.check()).resolves.toEqual({ moments: [] });
 });

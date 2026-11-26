@@ -13,7 +13,7 @@ export function replayMoment(moment, queue = ceremonyQueue) {
   queue.enqueue({ id: `moment-replay-${moment.id}-${Date.now()}`, moments: [moment] });
 }
 
-export function LeagueMomentHint({ rows, canReplay = false, showTeam = true, testId = "league-moments", queue = ceremonyQueue }) {
+export function LeagueMomentHint({ rows, canReplay = false, testId = "league-moments", queue = ceremonyQueue }) {
   const list = (rows || []).filter((row) => row?.id && row.texts);
   if (!list.length) return null;
   return (
@@ -29,12 +29,12 @@ export function LeagueMomentHint({ rows, canReplay = false, showTeam = true, tes
               {row.badge_to ? <LeagueBadge badge={row.badge_to} size="card" label={false} decorative index={index} /> : null}
               <div className="min-w-0">
                 <p className={`flex flex-wrap items-center gap-x-2 text-xs font-bold uppercase tracking-widest ${TONES[row.outcome] || "text-white/70"}`}>
-                  <span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5" aria-hidden="true" /> {row.texts.kicker}</span>
+                  <span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5" aria-hidden="true" /> {row.texts.label || row.texts.kicker}</span>
                   {row.corrected ? <span className="font-semibold normal-case tracking-normal text-white/50">· Endstand korrigiert</span> : null}
                 </p>
-                <p className="mt-0.5 font-semibold text-white [overflow-wrap:anywhere]">{row.outcome === "champion" ? row.texts.meta : row.texts.line}</p>
+                <p className="mt-0.5 font-semibold text-white [overflow-wrap:anywhere]">{row.texts.summary || row.texts.line}</p>
                 <p className="mt-0.5 text-xs text-white/60 [overflow-wrap:anywhere]">
-                  {[showTeam && row.outcome === "champion" ? row.display_name : "", row.outcome === "champion" ? "" : row.title].filter(Boolean).join(" · ")}
+                  {row.title}
                   {row.url ? <> · <Link to={row.url} className="underline-offset-2 hover:text-[#29B6E8] hover:underline">Endstand</Link></> : null}
                 </p>
               </div>

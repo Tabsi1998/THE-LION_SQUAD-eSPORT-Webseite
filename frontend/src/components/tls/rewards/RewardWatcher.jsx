@@ -17,15 +17,20 @@ export function rewardPackages(rewards) {
 /**
  * Saisonende-Moment (#1639): ein Paket je Moment. Direkt vor dem Anzeigen holt die Seite ihn sich beim Server (``seen`` mit ``claimed``) -
  * nur was dieses Gerät bekommt, wird gezeigt. Neu laden, ein zweiter Tab, ein anderes Gerät: kein zweites Mal. Scheitert die Anfrage,
- * wartet der Moment auf den nächsten Besuch.
+ * wartet der Moment auf den nächsten Besuch. Die Prüfung fragt je Paket genau einmal - läuft sie doppelt (React im Entwicklungsmodus,
+ * ein neu gezeichneter Host), bekommt der zweite Aufruf dieselbe Antwort statt eines leeren „schon gesehen“.
  */
 export function momentPackage(moment, client = api) {
+  let answer = null;
   return {
     id: `moment-${moment.id}`,
     moments: [moment],
-    check: () => client.post("/me/league-moments/seen", { ids: [moment.id] })
-      .then(({ data }) => ({ moments: (data?.claimed || []).includes(moment.id) ? [moment] : [] }))
-      .catch(() => ({ moments: [] })),
+    check: () => {
+      answer ||= client.post("/me/league-moments/seen", { ids: [moment.id] })
+        .then(({ data }) => ({ moments: (data?.claimed || []).includes(moment.id) ? [moment] : [] }))
+        .catch(() => ({ moments: [] }));
+      return answer;
+    },
   };
 }
 

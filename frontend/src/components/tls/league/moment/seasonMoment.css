@@ -47,6 +47,8 @@
 }
 .tls-season-moment__badge { position: relative; z-index: 1; display: inline-flex; padding-bottom: 6px; }
 
+/* Ausgewogene Zeilen: „Nächste Season in Liga 2“ bricht nie so, dass die Zahl allein steht. */
+.tls-season-moment .tls-placement__title, .tls-season-moment__line, .tls-season-moment__next { text-wrap: balance; }
 /* Text: der Satz und der Blick auf die nächste Season. Lange Namen brechen um, nie „…“. */
 .tls-season-moment__line { margin-top: 12px; font-size: 14px; line-height: 1.45; color: rgb(255 255 255 / 0.82); overflow-wrap: anywhere; }
 .tls-season-moment__next {
@@ -54,6 +56,8 @@
   overflow-wrap: anywhere;
 }
 .tls-season-moment[data-outcome="down"] .tls-season-moment__next { color: rgb(255 255 255 / 0.7); letter-spacing: 0.08em; }
+/* Abstieg ruhig: der Titel eine Stufe leiser - er schaut nach vorn, er ruft nicht. */
+.tls-season-moment[data-outcome="down"] .tls-placement__title { font-size: clamp(1.25rem, 5.6vw, 1.6rem); }
 
 /* Die Zeilen kommen, während das Wappen noch arbeitet - gestaffelt. */
 .tls-season-moment .tls-placement__card[data-play="run"] .tls-placement__line {

@@ -32,7 +32,9 @@ def test_promotion_texts_name_both_leagues_and_the_next_season():
     assert texts["kicker"] == "Aufstieg"
     assert texts["title"] == "Liga 1 · Elite"
     assert texts["line"] == "Probe Alpha steigt von Liga 2 in Liga 1 · Elite auf."
-    assert texts["next"] == "Nächste Season: Liga 1 · Elite"
+    # Jede Angabe nur einmal: Liga N im Titel, der Weg dorthin im Satz - keine dritte Zeile mit derselben Liga.
+    assert texts["next"] is None
+    assert texts["label"] == "Aufstieg" and texts["summary"] == texts["line"]
     assert texts["aria"].startswith("Aufstieg: Probe Alpha")
     relegation = moments.texts(doc(via="relegation"), TITLE)
     assert "über die Relegation" in relegation["line"]
@@ -42,8 +44,9 @@ def test_relegation_texts_stay_calm_and_look_ahead():
     texts = moments.texts(doc("down", **{"from": {"level": 2}, "to": {"level": 3}}), TITLE)
     assert texts["kicker"] == "Abstieg"
     assert texts["title"] == "Nächste Season in Liga 3"
-    assert texts["line"] == "Probe Alpha spielt die nächste Season in Liga 3."
+    assert texts["line"] == "Probe Alpha wechselt von Liga 2 in Liga 3."
     assert texts["next"] == "Die neue Season beginnt für alle bei null."
+    assert texts["summary"] == "Probe Alpha spielt die nächste Season in Liga 3."
     # Kein Alarm: keine Ausrufezeichen, kein „leider“.
     joined = " ".join(str(value) for value in texts.values() if value)
     assert "!" not in joined and "leider" not in joined.lower()
@@ -51,9 +54,11 @@ def test_relegation_texts_stay_calm_and_look_ahead():
 
 def test_champion_texts_from_table_and_playoffs():
     table = moments.texts(doc("champion", **{"from": {"level": 1}, "to": {"level": 1}}), TITLE)
-    assert table["kicker"] == "Meister" and table["title"] == "Meister"
+    # „Meister“ steht einmal groß, darüber die Liga N.
+    assert table["kicker"] == "Liga 1" and table["title"] == "Meister" and table["label"] == "Meister"
     assert table["line"] == "Platz 1 im Endstand der Season."
-    assert table["meta"] == f"{TITLE} · Liga 1"
+    assert table["meta"] == TITLE
+    assert table["summary"] == "Probe Alpha ist Meister in Liga 1."
     playoffs = moments.texts(doc("champion", playoffs=True, **{"from": {"level": 1}, "to": {"level": 1}}), TITLE)
     assert playoffs["line"] == "Sieger der Playoffs."
 
