@@ -215,7 +215,8 @@ function OwnProfile() {
   const requestedTab = (route?.params as { tab?: ProfileTabKey } | undefined)?.tab;
 
   const privateBox = (
-    <Card style={styles.privateBox} testID="profile-private-box">
+    // Versteck der Ostereiersuche (#647, „app:Profile“) und Platz für die Saison-Deko - wie die Karten der anderen Seiten.
+    <Card style={styles.privateBox} testID="profile-private-box" perch="profile-private">
       <Muted style={styles.privateTitle}>Nur für dich</Muted>
       {problem ? <PartialLoadNotice problem={problem} onRetry={() => { void refresh(); }} testID="profile-partial-load" /> : null}
       <PrivateRow
