@@ -58,7 +58,7 @@ async function dismissCookies(page) {
 async function spaGehe(page, path) {
   await page.evaluate((to) => {
     window.history.pushState({}, "", to);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.dispatchEvent(new window.PopStateEvent("popstate"));
   }, path);
 }
 
