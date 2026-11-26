@@ -37,7 +37,9 @@ from datetime import timedelta
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services.league_moment_rules import MEMBER_VISIBLE, champions, fresh, member_visible, moment_key, reaches, season_closed
+from services.league_moment_rules import (
+    MEMBER_VISIBLE, champions, division_done, fresh, member_visible, moment_key, ready, season_closed,
+)
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_moments")
@@ -144,9 +146,9 @@ def push_texts(doc: dict, title: str, *, corrected: bool = False, rewards: list[
 
 # ---------------------------------------------------------------- Bestätigter Ausgang
 
-async def confirmed(db, season: dict) -> dict[str, dict] | None:
-    """Je Co-Team (bzw. Person in einer Einzel-Liga) der bestätigte Ausgang - ``None``, solange der Endstand der ganzen Season nicht
-    feststeht. Wer bleibt, steht nicht darin; der Meister geht vor."""
+async def confirmed_moves(db, season: dict) -> dict[str, dict] | None:
+    """Auf- und Abstieg je Co-Team - ``None``, solange der Endstand der ganzen Season nicht feststeht (samt Relegation). Wer bleibt,
+    steht nicht darin."""
     from services import league_successor
 
     season_id = season["id"]
@@ -155,29 +157,59 @@ async def confirmed(db, season: dict) -> dict[str, dict] | None:
     checked = await league_successor.plan(db, season)
     if checked["problems"]:
         return None
-    divisions = {row["level"]: row for row in await db.league_divisions.find(
+    divisions = await _levels(db, season_id)
+    found: dict[str, dict] = {}
+    for division in checked["divisions"]:
+        for team in division["teams"]:
+            if team.get("squad_id") and team.get("movement") in ("up", "down"):
+                found[team["squad_id"]] = _entry(team["movement"], team, divisions)
+    return found
+
+
+async def confirmed_champions(db, season: dict) -> dict[str, dict]:
+    """Der Meister - sobald **seine** Liga N fertig ist (alle Staffeln samt Playoffs, Meister-Eintrag gesetzt), nicht erst mit der ganzen
+    Season (Fabian 26.11.). Je Co-Team (bzw. Person in einer Einzel-Liga); eine Team-Anmeldung ohne Co-Team hat keinen Moment."""
+    from services import league_postseason
+
+    season_id = season["id"]
+    winners = await champions(db, season_id)
+    if not winners:
+        return {}
+    missing = {row.get("division_id") for row in await league_postseason.missing(db, season_id) if row.get("kind") == "playoff"}
+    divisions = await _levels(db, season_id)
+    by_id = {row["id"]: row for row in divisions.values()}
+    done: dict[str, bool] = {}
+    found: dict[str, dict] = {}
+    for champion in winners:
+        registration = champion["registration"]
+        tournament = await db.tournaments.find_one({"id": registration.get("tournament_id")}, {"_id": 0, "league_context": 1})
+        division_id = ((tournament or {}).get("league_context") or {}).get("division_id")
+        if not division_id or division_id in missing:
+            continue
+        if division_id not in done:
+            done[division_id] = await division_done(db, division_id)
+        if not done[division_id]:
+            continue
+        level = (by_id.get(division_id) or {}).get("level")
+        squad_id = registration.get("squad_id")
+        if squad_id:
+            entrant, user_id = squad_id, None
+        elif not registration.get("team_id") and registration.get("user_id"):
+            entrant, user_id = f"user:{registration['user_id']}", registration["user_id"]  # Einzel-Liga: die Person ist der Teilnehmer
+        else:
+            continue  # Team ohne Co-Team: kein Moment - Belohnung und Abschluss melden sich wie bisher (M3)
+        found[entrant] = {
+            "outcome": "champion", "squad_id": squad_id, "team_id": registration.get("team_id"), "user_id": user_id,
+            "registration_id": registration["id"], "display_name": champion["display_name"] or registration.get("display_name"),
+            "from": _step(level, divisions), "to": _step(level, divisions), "via": None, "staffel": champion["staffel"],
+            "playoffs": champion["playoffs"], "division_id": division_id}
+    return found
+
+
+async def _levels(db, season_id: str) -> dict[int, dict]:
+    return {row["level"]: row for row in await db.league_divisions.find(
         {"season_id": season_id}, {"_id": 0, "id": 1, "level": 1, "nickname": 1, "status": 1}).to_list(50)
         if row.get("status") != "archived" and isinstance(row.get("level"), int)}
-    teams = {team["squad_id"]: team for division in checked["divisions"] for team in division["teams"] if team.get("squad_id")}
-    found: dict[str, dict] = {}
-    for squad_id, team in teams.items():
-        if team.get("movement") in ("up", "down"):
-            found[squad_id] = _entry(team["movement"], team, divisions)
-    for champion in await champions(db, season_id):
-        registration = champion["registration"]
-        squad_id = registration.get("squad_id")
-        if squad_id and squad_id in teams:
-            # Meister ist die oberste Liga N - dort steigt niemand auf; der Meister geht jedem anderen Ausgang vor.
-            found[squad_id] = {**_entry("champion", teams[squad_id], divisions), "playoffs": champion["playoffs"]}
-        elif not registration.get("team_id") and registration.get("user_id"):
-            # Einzel-Liga (F.4): die Person ist der Teilnehmer - ein Startplatz für die Folge-Season entsteht hier nie.
-            level = await _level_of(db, registration.get("tournament_id"))
-            found[f"user:{registration['user_id']}"] = {
-                "outcome": "champion", "squad_id": None, "team_id": None, "user_id": registration["user_id"],
-                "registration_id": registration["id"], "display_name": champion["display_name"] or registration.get("display_name"),
-                "from": _step(level, divisions), "to": _step(level, divisions), "via": None, "staffel": champion["staffel"],
-                "playoffs": champion["playoffs"]}
-    return found
 
 
 def _entry(outcome: str, team: dict, divisions: dict[int, dict]) -> dict:
@@ -187,13 +219,6 @@ def _entry(outcome: str, team: dict, divisions: dict[int, dict]) -> dict:
             "registration_id": team.get("registration_id"), "display_name": team.get("display_name"),
             "from": _step(before, divisions), "to": _step(after, divisions),
             "via": team.get("via") if outcome != "champion" else None, "staffel": team.get("from_staffel"), "playoffs": False}
-
-
-async def _level_of(db, tournament_id: str | None):
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "league_context": 1}) if tournament_id else None
-    division_id = ((tournament or {}).get("league_context") or {}).get("division_id")
-    division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0, "level": 1}) if division_id else None
-    return (division or {}).get("level")
 
 
 async def audiences(db, season: dict, found: dict[str, dict]) -> dict[str, dict]:
@@ -269,10 +294,10 @@ async def sync(db, season_id: str | None) -> dict:
     except MutationLockBusy:
         logger.warning("[league_moments] Abgleich der Season %s ausgelassen - der Job holt ihn nach", log_safe(season_id))
         return {"active": 0, "busy": True}
-    # Erst das Zurückgestellte des Meisters (M3), dann die Nachrichten zum Moment - beides außerhalb der Sperre. Scheitert etwas, bleibt
-    # die Marke stehen und der Job holt nach.
-    result["settled"] = await settle(db, season_id)
+    # Erst die Nachrichten zum Moment, dann das Zurückgestellte des Meisters (M3) - abgedeckt ist nur, wem der Moment wirklich geschickt
+    # wurde. Beides außerhalb der Sperre und je Person bzw. je Merkzettel bedingt beansprucht. Scheitert etwas, bleibt die Marke stehen.
     result["sent"] = await notify(db, season_id)
+    result["settled"] = await settle(db, season_id)
     # Nur die eigene Marke fällt weg: Kam inzwischen ein neuerer Auftrag, bleibt seine stehen.
     await db.league_seasons.update_one({"id": season_id, f"{PENDING_FIELD}.mark": mark}, {"$unset": {PENDING_FIELD: ""}})
     return result
@@ -295,26 +320,33 @@ async def _sync(db, season_id: str) -> dict:
     if not season:
         return {"active": 0}
     now = _now()
-    found = await confirmed(db, season)
-    if found is None:
-        # Der Endstand steht nicht (mehr) fest: Jeder Moment der Season ruht - nichts wird gelöscht, nichts gezeigt.
-        result = await db.league_moments.update_many({"season_id": season_id, "suspended": {"$ne": True}},
-                                                     {"$set": {"suspended": True, "updated_at": now}})
-        return {"active": 0, "suspended": int(result.modified_count or 0)}
-    people = await audiences(db, season, found)
+    moves = await confirmed_moves(db, season)
+    winners = await confirmed_champions(db, season)
+    # Der Meister geht jedem anderen Ausgang vor (die oberste Liga N hat keinen Aufstieg).
+    found = {**(moves or {}), **winners}
+    people = await audiences(db, season, found) if found else {}
     existing = {row["key"]: row async for row in db.league_moments.find({"season_id": season_id}, {"_id": 0})}
     for entrant, item in found.items():
         key = moment_key(season_id, entrant)
         await _store(db, season, key, item, people[entrant], existing.get(key), now)
+    ready_divisions = {item.get("division_id") for item in winners.values()}
+    suspended = 0
     for key, doc in existing.items():
         if key[len(season_id) + 1:] in found or not doc.get("active", True):
             continue
-        # Der Ausgang ist weggefallen (etwa: bleibt nach der Korrektur) - der Eintrag bleibt, ohne Hinweis und ohne Moment.
+        champion = doc.get("outcome") == "champion"
+        # Ruhen: Der Endstand, auf dem der Moment beruht, steht gerade nicht fest (Liga des Meisters bzw. Season wieder offen).
+        if (champion and doc.get("division_id") not in ready_divisions) or (not champion and moves is None):
+            if not doc.get("suspended"):
+                await db.league_moments.update_one({"key": key, "seq": doc.get("seq")}, {"$set": {"suspended": True, "updated_at": now}})
+                suspended += 1
+            continue
+        # Der Ausgang ist weggefallen (ein anderer Meister, bleibt jetzt) - der Eintrag bleibt, ohne Hinweis und ohne Moment.
         await db.league_moments.update_one({"key": key, "seq": doc.get("seq")}, {
             "$set": {"active": False, "suspended": False, "corrected_at": now, "updated_at": now, "seq": int(doc.get("seq") or 1) + 1,
                      "previous": {"outcome": doc.get("outcome"), "fact": doc.get("fact")}, "notified_ids": [],
                      "told_ids": sorted(set(doc.get("told_ids") or []) | set(doc.get("notified_ids") or []))}})
-    return {"active": len(found)}
+    return {"active": len(found), "suspended": suspended}
 
 
 async def _store(db, season: dict, key: str, item: dict, people: dict, before: dict | None, now: str) -> None:
@@ -324,7 +356,7 @@ async def _store(db, season: dict, key: str, item: dict, people: dict, before: d
         "team_id": item.get("team_id"), "user_id": item.get("user_id"), "registration_id": item.get("registration_id"),
         "outcome": item["outcome"], "fact": fact, "from": item["from"], "to": item["to"], "via": item.get("via"),
         "playoffs": bool(item.get("playoffs")), "display_name": item.get("display_name"), "staffel": item.get("staffel"),
-        **people, "active": True, "suspended": False, "updated_at": now,
+        "division_id": item.get("division_id"), **people, "active": True, "suspended": False, "updated_at": now,
     }
     if before is None:
         try:
@@ -345,42 +377,33 @@ async def _store(db, season: dict, key: str, item: dict, people: dict, before: d
     await db.league_moments.update_one({"key": key, "seq": before.get("seq")}, update)
 
 
-async def _sees(db, season: dict | None, people: list[str]) -> dict[str, bool]:
-    """Wer von diesen Personen die Season sieht (``can_see_season``) - eine Abfrage für die Konten, ohne private Felder."""
-    from services.league_service import can_see_season
-    from services.private_fields import private_projection
-
-    if not season or not people:
-        return {}
-    users = {row["id"]: row for row in await db.users.find({"id": {"$in": sorted(set(people))}}, private_projection()).to_list(len(people) + 1)}
-    return {person: bool(person in users and await can_see_season(users[person], season)) for person in set(people)}
-
-
 async def settle(db, season_id: str) -> int:
     """M3: Was der Abschluss für den Moment des Meisters zurückstellte (``tournament_awards.moment_owed``: „Neue Belohnung“, „Belohnung
-    für euer Team“, „Staffel abgeschlossen“), geht an jede Person, die der Moment **nicht** erreicht (``league_moment_rules.reaches``) -
-    wie vor #1639, mit denselben Schlüsseln, also nie doppelt. Wen er erreicht, dem sagt es die Nachricht zum Moment. Danach ist es
-    erledigt; ein späteres Sichtbarwerden schickt nichts noch einmal (``notify`` sieht nach, was schon kam)."""
+    für euer Team“, „Staffel abgeschlossen“), geht an jede Person, der die Nachricht zum Moment **nicht** geschickt wurde - wie vor
+    #1639, mit denselben Schlüsseln (``unique_dedupe``). Erst beansprucht, dann gesendet: Laufen mehrere zugleich (Job und Routen),
+    schickt nur einer. Ein späteres Sichtbarwerden schickt nichts noch einmal (``notify`` sieht nach, was schon kam)."""
     from services import league_final, league_rewards
 
     awards = await db.tournament_awards.find({"league.season_id": season_id, "league.title": "Meister", "reward_key": None,
                                               "moment_owed": {"$exists": True}}, {"_id": 0}).to_list(LIMIT)
-    if not awards:
-        return 0
-    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
-    closed = await season_closed(db, season_id)
     sent = 0
     for award in awards:
         owed = award.get("moment_owed") or {}
+        # Erst beanspruchen, dann senden (Prüfung 3): Nur wer das Gemerkte wegnimmt, schickt - vier gleichzeitige Läufe schicken einmal.
+        claimed = await db.tournament_awards.update_one({"id": award["id"], "moment_owed.at": owed.get("at")}, {"$unset": {"moment_owed": ""}})
+        if not claimed.modified_count:
+            continue
         registration = await db.tournament_registrations.find_one({"id": award.get("registration_id")}, {"_id": 0, "squad_id": 1}) or {}
-        doc = await db.league_moments.find_one({"key": moment_key(season_id, registration["squad_id"])}, {"_id": 0})             if registration.get("squad_id") else None
+        doc = None
+        if registration.get("squad_id"):
+            doc = await db.league_moments.find_one({"key": moment_key(season_id, registration["squad_id"])}, {"_id": 0})
         rewards = owed.get("rewards") or {}
-        people = [*(rewards.get("gains") or {}), *[person for leads in (rewards.get("team_leads") or {}).values() for person in leads],
-                  *(owed.get("close") or [])]
-        sees = await _sees(db, season, people)
+        # Abgedeckt ist nur, wem die Nachricht zum Moment wirklich ging (``notified_ids``, ``notify`` lief davor) - wird die Season
+        # danach wieder unsichtbar, bleibt trotzdem niemand ohne Nachricht.
+        told = set(doc.get("notified_ids") or []) if doc and doc.get("active", True) and not doc.get("suspended") else set()
 
         def missed(person: str) -> bool:
-            return not reaches(doc, season, person, sees=sees.get(person, False), closed=closed)
+            return person not in told
 
         gains = {person: names for person, names in (rewards.get("gains") or {}).items() if missed(person)}
         leads = {team: [person for person in persons if missed(person)] for team, persons in (rewards.get("team_leads") or {}).items()}
@@ -395,7 +418,6 @@ async def settle(db, season_id: str) -> int:
                     "team_leads": leads, "team_names": rewards.get("team_names") or {}})
             if close:
                 sent += await league_final.notify_captains(db, tournament, final, frame, "closed", only=close)
-        await db.tournament_awards.update_one({"id": award["id"], "moment_owed.at": owed.get("at")}, {"$unset": {"moment_owed": ""}})
     return sent
 
 
@@ -450,8 +472,9 @@ async def notify(db, season_id: str) -> int:
     from services.user_notifications import create_user_notification, send_collected_pushes
 
     season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
-    if not member_visible(season) or not await season_closed(db, season_id):
+    if not member_visible(season):
         return 0
+    cache: dict = {}
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1, "slug": 1}) or {}
     title = season_title(league, season)
     url = f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug") else "/"
@@ -463,6 +486,10 @@ async def notify(db, season_id: str) -> int:
     users = {row["id"]: row for row in await db.users.find({"id": {"$in": wanted}}, private_projection()).to_list(len(wanted) + 1)} if wanted else {}
     allowed: dict[str, bool] = {}
     for doc in docs:
+        # Sein Endstand steht gerade nicht fest (veralteter Abgleich) - nichts melden. Ein weggefallener Ausgang meldet sich still mit
+        # „Endstand korrigiert“; der alte Meister hat keinen Meister-Eintrag mehr, darum hier ohne diese Prüfung.
+        if doc.get("active", True) and not await ready(db, doc, cache):
+            continue
         told = set(doc.get("told_ids") or [])
         done = set(doc.get("notified_ids") or [])
         targets = told if not doc.get("active", True) else set(doc.get("audience_ids") or [])
@@ -569,13 +596,9 @@ async def _next_step(db, doc: dict, user_id: str) -> dict | None:
     return None
 
 
-async def _readable(db, season: dict | None, closed: dict[str, bool]) -> bool:
-    """Für Mitglieder sichtbar und - frisch gefragt - alle Staffeln abgeschlossen."""
-    if not member_visible(season):
-        return False
-    if season["id"] not in closed:
-        closed[season["id"]] = await season_closed(db, season["id"])
-    return closed[season["id"]]
+async def _readable(db, season: dict | None, doc: dict, cache: dict) -> bool:
+    """Für Mitglieder sichtbar und - frisch gefragt - der Endstand des Moments steht (``league_moment_rules.ready``)."""
+    return member_visible(season) and await ready(db, doc, cache)
 
 
 async def unseen_for(db, user: dict) -> list[dict]:
@@ -593,7 +616,7 @@ async def unseen_for(db, user: dict) -> list[dict]:
     out = []
     for doc in docs:
         season = seasons.get(doc["season_id"])
-        if not fresh(doc, season) or not await _readable(db, season, closed) or not await can_see_season(user, season):
+        if not fresh(doc, season) or not await _readable(db, season, doc, closed) or not await can_see_season(user, season):
             continue
         out.append(view(doc, season, leagues.get(season.get("league_id") or "") or {}, next_step=await _next_step(db, doc, user_id),
                         rewards=await _rewards_for(db, doc, user_id)))
@@ -608,16 +631,14 @@ async def claim(db, user_id: str, ids: list[str], token: str) -> list[str]:
     ids = [str(value) for value in ids or [] if value][:20]
     if not ids or not token:
         return []
-    docs = await db.league_moments.find({"id": {"$in": ids}, "audience_ids": user_id}, {"_id": 0, "id": 1, "season_id": 1}).to_list(20)
+    docs = await db.league_moments.find({"id": {"$in": ids}, "audience_ids": user_id}, {"_id": 0}).to_list(20)
     closed: dict[str, bool] = {}
     now = now_utc()
     stale = (now - timedelta(hours=CLAIM_HOURS)).isoformat()
     claimed = []
     for doc in docs:
-        if doc["season_id"] not in closed:
-            closed[doc["season_id"]] = await season_closed(db, doc["season_id"])
-        if not closed[doc["season_id"]]:
-            continue  # ein veralteter Abgleich: Die Season ist wieder offen - nichts zeigen
+        if not await ready(db, doc, closed):
+            continue  # ein veralteter Abgleich: Der Endstand ist wieder offen - nichts zeigen
         field = f"claims.{user_id}"
         result = await db.league_moments.update_one(
             {"id": doc["id"], "audience_ids": user_id, "seen_by": {"$ne": user_id}, "active": True, "suspended": False,
@@ -664,7 +685,7 @@ async def for_player(db, user_id: str, viewer: dict | None, *, scope) -> list[di
     visible, opens, closed = [], {}, {}
     for doc in docs:
         season = seasons.get(doc["season_id"])
-        if doc.get("team_id") in private or not await _readable(db, season, closed) or not await sees_season(scope, season):
+        if doc.get("team_id") in private or not await _readable(db, season, doc, closed) or not await sees_season(scope, season):
             continue
         visible.append(doc)
     out = []
@@ -688,7 +709,7 @@ async def for_team(db, team_id: str, user: dict | None) -> list[dict]:
     visible, closed = [], {}
     for doc in docs:
         season = seasons.get(doc["season_id"])
-        if await _readable(db, season, closed) and await can_see_season(user, season):
+        if await _readable(db, season, doc, closed) and await can_see_season(user, season):
             visible.append(doc)
     return [view(doc, seasons[doc["season_id"]], leagues.get(seasons[doc["season_id"]].get("league_id") or "") or {})
             for doc in _latest_per_entrant(visible, TEAM_LIMIT)]

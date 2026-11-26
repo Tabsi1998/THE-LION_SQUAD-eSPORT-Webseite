@@ -70,7 +70,7 @@ async def play(flow, tid: str, *, order=None) -> list[dict]:
     return regs
 
 
-async def build(flow, *, levels: int = 3, visibility: str = "public", rewards: list | None = None) -> dict:
+async def build(flow, *, levels: int = 3, visibility: str = "public", rewards: list | None = None, second_top: bool = False) -> dict:
     lead = await flow.add_staff()
     flow.act_as(lead)
     game = ok(await flow.post("/api/games", json=GAME))
@@ -87,6 +87,13 @@ async def build(flow, *, levels: int = 3, visibility: str = "public", rewards: l
         world["divisions"].append(division)
         world["tids"].append(tid)
         world["regs"][level] = await play(flow, tid)
+        if second_top and level == 1:
+            # Eine zweite Staffel in Liga 1 - ihr Sieger ist ebenfalls Meister (je Staffel der obersten Liga N).
+            extra = await add_staffel(flow, lead, division["id"], 4, game=game, prefix="L1B")
+            flow.act_as(lead)
+            ok(await flow.post(f"/api/tournaments/{extra}/status", json={"status": "live"}))
+            world["extra_tid"] = extra
+            world["extra_regs"] = await play(flow, extra)
     return world
 
 
@@ -147,15 +154,16 @@ async def see(flow, user: dict, moment_id: str, token: str = "geraet-eins-1234")
 # ---------------------------------------------------------------- Quelle: der bestätigte Endstand der ganzen Season
 
 @pytest.mark.asyncio
-async def test_no_moment_until_the_whole_season_is_confirmed(flow):
+async def test_up_and_down_wait_for_the_whole_season_the_champion_does_not(flow):
     world = await build(flow)
     await close(flow, world, 1, 2)
     up = await people(flow, world, 2, 0)
     champion = await people(flow, world, 1, 0)
-    # Zwei von drei Staffeln abgeschlossen: Meister und Aufsteiger stehen in den Tabellen, aber die Season ist nicht bestätigt.
-    assert await moments_of(flow, world) == {}
+    # Zwei von drei Staffeln abgeschlossen: Auf- und Abstieg stehen noch nicht fest - der Meister schon (Liga 1 ist fertig,
+    # Fabian 26.11.).
+    assert list(await moments_of(flow, world)) == [champion["squad_id"]]
     assert await unseen(flow, up["fielded"][0]) == []
-    assert await unseen(flow, champion["fielded"][0]) == []
+    assert [row["outcome"] for row in await unseen(flow, champion["fielded"][0])] == ["champion"]
     await close(flow, world, 3)
     found = await moments_of(flow, world)
     outcomes = {squad_id: (row["outcome"], row["from"]["level"], row["to"]["level"]) for squad_id, row in found.items()}
@@ -386,7 +394,7 @@ async def test_a_skipped_sync_is_caught_up_and_reads_never_trust_a_stale_moment(
                         else real_lock(db, resource, **kwargs))
     await close(flow, world, 3)
     monkeypatch.setattr(mutation_lock, "mutation_lock", real_lock)
-    assert await moments_of(flow, world) == {}
+    assert len(await moments_of(flow, world)) == 1  # nur der Meister - Liga 1 war schon fertig
     assert (await flow.db.league_seasons.find_one({"id": season_id}, {"_id": 0}))[league_moments.PENDING_FIELD]
     await league_moments.sweep(flow.db)
     assert len(await moments_of(flow, world)) == 5
@@ -475,8 +483,8 @@ async def test_captains_with_start_rights_announce_get_no_second_message(flow):
     # … zeigt ihnen den Moment aber trotzdem.
     assert [row["outcome"] for row in await unseen(flow, up["captain"])] == ["up"]
     champion = await people(flow, world, 1, 0)
-    # Liga 1 schloss vor der ganzen Season: Der Captain des Meisters hörte „Staffel abgeschlossen … Meister“ schon - kein zweites Mal (M3).
-    assert await league_titles(flow, champion["captain"]) == ["Staffel abgeschlossen"]
+    # Der Meister kommt, sobald Liga 1 fertig ist - für den Captain genau eine Nachricht.
+    assert await league_titles(flow, champion["captain"]) == ["Meister: " + world["regs"][1][0]["display_name"]]
 
 
 # ---------------------------------------------------------------- Meister mit Belohnungen: ein Ablauf, eine Nachricht (Fabian 26.11., A)
@@ -527,18 +535,20 @@ async def rewards_unseen(flow, person: dict) -> list[str]:
 
 
 @pytest.mark.asyncio
-async def test_m3_a_season_not_yet_confirmed_celebrates_the_reward_as_before_and_never_twice(flow):
-    world = await build(flow, levels=2, rewards=[GOLD])
+async def test_m3_a_top_league_not_yet_done_celebrates_the_reward_as_before_and_never_twice(flow):
+    world = await build(flow, levels=1, rewards=[GOLD], second_top=True)
     champion = await people(flow, world, 1, 0)
     player = champion["fielded"][1]
     name = world["regs"][1][0]["display_name"]
     await close(flow, world, 1)
-    # Liga 2 ist noch offen: Ein Moment kann (noch) niemanden erreichen - Belohnung und Abschluss melden sich wie vor #1639.
+    # Die zweite Staffel von Liga 1 ist noch offen: Ein Moment kann (noch) niemanden erreichen - Belohnung und Abschluss melden sich wie
+    # vor #1639.
     assert await league_titles(flow, player) == ["Neue Belohnung"]
     assert await rewards_unseen(flow, player) == ["Goldmedaille"]
     assert sorted(await league_titles(flow, champion["captain"])) == ["Belohnung für euer Team", "Staffel abgeschlossen"]
-    await close(flow, world, 2)
-    # Später bestätigt: der Meister-Moment - ohne die Belohnung noch einmal zu nennen; der Captain hörte „Meister“ schon.
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{world['extra_tid']}/close", json={"confirm": True}))
+    # Liga 1 fertig: der Meister-Moment - ohne die Belohnung noch einmal zu nennen; der Captain hörte „Meister“ schon.
     titles = await league_titles(flow, player)
     assert titles == ["Neue Belohnung", f"Meister: {name}"]
     assert "Goldmedaille" not in (await notes(flow, player))[0]["body"]
@@ -648,3 +658,85 @@ async def test_hint_on_profile_and_team_page(flow):
     flow.act_as(None)
     team = ok(await flow.get(f"/api/teams/{up['team_id']}"))
     assert [(row["outcome"], row["squad_id"]) for row in team["league_moments"]] == [("up", up["squad_id"])]
+
+
+# ---------------------------------------------------------------- Meister sofort, einmalig auch bei Gleichzeitigkeit (Prüfung 3)
+
+@pytest.mark.asyncio
+async def test_the_champion_comes_as_soon_as_league_one_is_done_with_one_message(flow):
+    world = await build(flow, levels=2, rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    player = champion["fielded"][1]
+    name = world["regs"][1][0]["display_name"]
+    await close(flow, world, 1)
+    # Liga 2 läuft noch: Der Meister steht fest - ein Ablauf, eine Nachricht, sofort.
+    moment = (await unseen(flow, player))[0]
+    assert moment["outcome"] == "champion" and [row["reward"]["name"] for row in moment["rewards"]] == ["Goldmedaille"]
+    assert await rewards_unseen(flow, player) == []
+    for person in [player, champion["captain"], champion["vice"]]:
+        assert await league_titles(flow, person) == [f"Meister: {name}"], person["display_name"]
+    await close(flow, world, 2)
+    # Der Endstand der ganzen Season ändert für den Meister nichts.
+    for person in [player, champion["captain"]]:
+        assert await league_titles(flow, person) == [f"Meister: {name}"]
+
+
+@pytest.mark.asyncio
+async def test_two_last_closes_at_once_give_the_champion_one_message(flow):
+    world = await build(flow, levels=2, rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    flow.act_as(world["lead"])
+    answers = await asyncio.gather(*[flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}) for tid in world["tids"]])
+    assert all(answer.status_code == 200 for answer in answers), [answer.text for answer in answers]
+    for person in [champion["fielded"][1], champion["captain"]]:
+        assert await league_titles(flow, person) == ["Meister: " + world["regs"][1][0]["display_name"]]
+    rows = await flow.db.notifications.find({"meta.reason": {"$in": ["league_moment", "league_reward", "league_final"]}}, {"_id": 0}).to_list(None)
+    keys = [row["meta"]["dedupe_key"] for row in rows]
+    assert len(keys) == len(set(keys))
+
+
+@pytest.mark.asyncio
+async def test_settle_sends_what_waited_exactly_once_even_four_times_at_once(flow, monkeypatch):
+    from services import league_moments
+
+    world = await build(flow, levels=1, visibility="admins", rewards=[GOLD])
+    champion = await people(flow, world, 1, 0)
+    real_settle = league_moments.settle
+
+    async def later(*_args, **_kwargs):
+        return 0
+
+    # Der Abschluss stellt zurück, das Abrechnen fällt hier aus - dann laufen vier gleichzeitig (Job und Routen).
+    monkeypatch.setattr(league_moments, "settle", later)
+    await close(flow, world)
+    monkeypatch.setattr(league_moments, "settle", real_settle)
+    assert await league_titles(flow, champion["captain"]) == []
+    await asyncio.gather(*[league_moments.settle(flow.db, world["season"]["id"]) for _ in range(4)])
+    rows = await flow.db.notifications.find({"meta.reason": {"$in": ["league_reward", "league_final"]}}, {"_id": 0}).to_list(None)
+    keys = [row["meta"]["dedupe_key"] for row in rows]
+    assert keys and len(keys) == len(set(keys))
+    assert await league_titles(flow, champion["fielded"][1]) == ["Neue Belohnung"]
+    assert sorted(await league_titles(flow, champion["captain"])) == ["Belohnung für euer Team", "Staffel abgeschlossen"]
+
+
+@pytest.mark.asyncio
+async def test_a_new_champion_after_a_correction_comes_once_the_old_one_hears_it_quietly(flow):
+    world = await build(flow, levels=1, rewards=[GOLD])
+    old = await people(flow, world, 1, 0)
+    new = await people(flow, world, 1, 1)
+    await close(flow, world)
+    old_moment = (await unseen(flow, old["fielded"][1]))[0]
+    await see(flow, old["fielded"][1], old_moment["id"])
+    await reopen(flow, world, 1)
+    regs = world["regs"][1]
+    await play(flow, world["tids"][0], order=[regs[1]["id"], regs[0]["id"], regs[2]["id"], regs[3]["id"]])
+    await close(flow, world, 1)
+    found = await moments_of(flow, world)
+    assert found[old["squad_id"]]["active"] is False and found[new["squad_id"]]["outcome"] == "champion"
+    # Der alte Meister: „Belohnung entfällt“ und still „Endstand korrigiert“ - kein Moment, kein Hinweis.
+    assert await unseen(flow, old["fielded"][1]) == []
+    titles = await league_titles(flow, old["fielded"][1])
+    assert titles[0] == "Meister: " + regs[0]["display_name"] and "Belohnung entfällt" in titles and "Endstand korrigiert" in titles
+    # Der neue Meister: einmal, mit der Goldmedaille.
+    assert await league_titles(flow, new["fielded"][1]) == ["Meister: " + regs[1]["display_name"]]
+    assert "Goldmedaille" in (await notes(flow, new["fielded"][1]))[0]["body"]

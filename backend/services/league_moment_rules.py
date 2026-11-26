@@ -7,7 +7,9 @@ Ohne ``league_moments`` zu importieren, das seinerseits ``league_rewards.players
 
 **Erreicht** heißt: Es gibt einen Moment für das **Co-Team** (eine Anmeldung ohne Co-Team hat keinen), er gilt und ruht nicht, die
 Person ist unter seinen Empfängern, Mitglieder sehen die Season (``members``/``public``), die Person sieht sie selbst, und - frisch
-gefragt - alle Staffeln sind abgeschlossen. Sonst feiert und meldet sich die Belohnung wie vor #1639.
+gefragt - sein Endstand steht (``ready``): für Auf- und Abstieg alle Staffeln der Season, für den **Meister** nur seine Liga N samt
+Playoffs (Fabian 26.11.: der Meister sofort; die Relegation ändert an ihm nichts). Sonst feiert und meldet sich die Belohnung wie vor
+#1639.
 """
 from __future__ import annotations
 
@@ -15,7 +17,7 @@ from datetime import datetime, timedelta
 
 from models import now_utc
 from services.league_final_read import all_closed
-from services.league_scope import ONLY_LEAGUE
+from services.league_scope import ONLY_LEAGUE, RELEGATION
 
 # So lange nach dem bestätigten Endstand erscheint der Moment beim nächsten Besuch - danach bleibt nur der Hinweis. Je Season
 # einstellbar (Reiter „Belohnungen“, ``league_seasons.moment_days``), Vorgabe 45 Tage.
@@ -57,6 +59,34 @@ async def season_closed(db, season_id: str) -> bool:
     staffeln = await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE},
                                          {"_id": 0, "id": 1, "status": 1, "final_table": 1}).to_list(LIMIT)
     return all_closed(staffeln)
+
+
+async def division_done(db, division_id: str) -> bool:
+    """Die Liga N des Meisters ist fertig: alle ihre Staffeln abgeschlossen, auch die Playoffs - die Relegation zählt nicht (sie
+    entscheidet über Auf- und Abstieg, nie über den Meister)."""
+    staffeln = await db.tournaments.find({"league_context.division_id": division_id, **ONLY_LEAGUE},
+                                         {"_id": 0, "id": 1, "status": 1, "final_table": 1, "league_context.kind": 1}).to_list(LIMIT)
+    return all_closed([row for row in staffeln if (row.get("league_context") or {}).get("kind") != RELEGATION])
+
+
+async def ready(db, doc: dict, cache: dict | None = None) -> bool:
+    """Steht der Endstand, auf dem dieser Moment beruht? Frisch gefragt - nie einem veralteten Abgleich trauen. Der Meister: seine Liga N
+    fertig und sein Meister-Eintrag gilt; Auf- und Abstieg: alle Staffeln der Season. ``cache`` merkt sich die Antworten je Aufruf."""
+    cache = cache if cache is not None else {}
+    if doc.get("outcome") == "champion" and doc.get("division_id"):
+        key = ("division", doc["division_id"])
+        if key not in cache:
+            cache[key] = await division_done(db, doc["division_id"])
+        if not cache[key]:
+            return False
+        award = await db.tournament_awards.find_one({"league.season_id": doc["season_id"], "league.title": "Meister", "reward_key": None,
+                                                     "suspended": {"$ne": True}, "registration_id": {"$in": doc.get("registration_ids") or []}},
+                                                    {"_id": 1})
+        return bool(award)
+    key = ("season", doc["season_id"])
+    if key not in cache:
+        cache[key] = await season_closed(db, doc["season_id"])
+    return cache[key]
 
 
 def reaches(doc: dict | None, season: dict | None, person: str, *, sees: bool, closed: bool) -> bool:
@@ -118,7 +148,8 @@ async def held_reward_ids(db, user: dict, awards: list[dict], can_see) -> set[st
     seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}).to_list(len(season_ids) + 1)}
     held: set[str] = set()
     moments: dict[str, dict | None] = {}
-    open_to: dict[str, bool] = {}
+    sees: dict[str, bool] = {}
+    cache: dict = {}
     for award in awards:
         season_id = award["league"]["season_id"]
         entrant = entrant_of(registrations.get(award["registration_id"]))
@@ -131,8 +162,8 @@ async def held_reward_ids(db, user: dict, awards: list[dict], can_see) -> set[st
         season = seasons.get(season_id)
         if not doc or user_id in (doc.get("seen_by") or []) or not fresh(doc, season):
             continue
-        if season_id not in open_to:
-            open_to[season_id] = bool(member_visible(season) and await season_closed(db, season_id) and await can_see(user, season))
-        if reaches(doc, season, user_id, sees=open_to[season_id], closed=open_to[season_id]):
+        if season_id not in sees:
+            sees[season_id] = bool(member_visible(season) and await can_see(user, season))
+        if sees[season_id] and reaches(doc, season, user_id, sees=True, closed=await ready(db, doc, cache)):
             held.add(award["id"])  # der Moment kommt noch - mit ihnen als zweiter Karte
     return held

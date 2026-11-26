@@ -45,11 +45,44 @@ async def postseason_tournament(flow, world: dict, kind: str, level: int = 1) ->
 
 
 @pytest.mark.asyncio
+async def test_with_relegation_the_champion_comes_before_it_once(flow):
+    gold = {"kind": "medal", "name": "Goldmedaille", "places": {"mode": "rank", "rank": 1}, "recipients": ["team", "players"]}
+    world = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}}, season=PUBLIC)
+    flow.act_as(world["lead"])
+    ok(await flow.put(f"/api/admin/leagues/seasons/{world['season']['id']}/rewards", json={"items": [gold]}))
+    await close(flow, world)
+    champion = reg(world, 1, 0)
+    squad = await flow.db.team_squads.find_one({"id": champion["squad_id"]}, {"_id": 0})
+    captain = squad["captain_id"]
+
+    async def titles():
+        rows = await flow.db.notifications.find({"user_id": captain, "meta.reason": {"$in": ["league_moment", "league_reward", "league_final"]}},
+                                                {"_id": 0}).to_list(None)
+        return [row["title"] for row in rows]
+
+    # Liga 1 ist fertig, die Relegation noch nicht angelegt: Der Meister kommt jetzt - eine Nachricht, mit der Goldmedaille.
+    found = await moments_of(flow, world)
+    assert list(found) == [champion["squad_id"]] and found[champion["squad_id"]]["outcome"] == "champion"
+    assert await titles() == [f"Meister: {champion['display_name']}"]
+    ok(await create(flow, world, "relegation"))
+    tournament = await postseason_tournament(flow, world, "relegation")
+    flow.act_as(world["lead"])
+    for match in await matches_of(flow, tournament["id"]):
+        upper, lower = sides(match)
+        await win(flow, match, lower)
+    await settle(flow, tournament["id"])
+    ok(await flow.post(f"{STAFFELN}/{tournament['id']}/close", json={"confirm": True}))
+    # Die Relegation ändert am Meister nichts - keine zweite Nachricht.
+    assert await titles() == [f"Meister: {champion['display_name']}"]
+    assert len(await moments_of(flow, world)) == 5
+
+
+@pytest.mark.asyncio
 async def test_relegation_decides_who_moves_and_the_moment_waits_for_it(flow):
     world = await build(flow, levels=2, zones=ZONES, postseason={"relegation": {"enabled": True}}, season=PUBLIC)
     await close(flow, world)
-    # Alle regulären Staffeln sind zu, die Relegation fehlt noch: kein Moment.
-    assert await moments_of(flow, world) == {}
+    # Alle regulären Staffeln sind zu, die Relegation fehlt noch: kein Auf- und Abstieg - nur der Meister (Liga 1 ist fertig).
+    assert [row["outcome"] for row in (await moments_of(flow, world)).values()] == ["champion"]
     ok(await create(flow, world, "relegation"))
     tournament = await postseason_tournament(flow, world, "relegation")
     flow.act_as(world["lead"])

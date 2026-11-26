@@ -505,7 +505,9 @@ async def owe_to_moment(db, tournament_id: str, registration_id: str, final_id: 
 async def _send(create, user_id: str, title: str, text: str, url: str, tournament: dict, dedupe_key: str) -> int:
     try:
         done = await create(user_id, title, text, url=url, kind=NOTIFICATION_KIND,
-                            meta={"reason": "league_reward", "tournament_id": tournament["id"], "dedupe_key": dedupe_key})
+                            # Eindeutig je Person und Schlüssel (#1639, Prüfung 3): Holt der Saisonende-Moment Zurückgestelltes nach, während
+                            # ein zweiter Lauf dasselbe tut, entsteht trotzdem nur eine Nachricht.
+                            meta={"reason": "league_reward", "tournament_id": tournament["id"], "dedupe_key": dedupe_key, "unique_dedupe": True})
         return 1 if done else 0
     except Exception:  # noqa: BLE001 - die Vergabe steht, die Nachricht hält sie nicht auf
         logger.warning("[league_rewards] Nachricht für Staffel %s nicht verschickt", log_safe(tournament.get("id")), exc_info=True)

@@ -648,7 +648,9 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
         sent = 0
         for user_id in sorted(people):
             if await create_user_notification(user_id, title, text, url=url, kind=KIND,
-                                              meta={"reason": "league_final", "dedupe_key": f"league-final:{final['id']}:{event}:{user_id}"}):
+                                              meta={"reason": "league_final", "dedupe_key": f"league-final:{final['id']}:{event}:{user_id}",
+                                                    # Eindeutig je Person und Schlüssel (#1639, Prüfung 3) - auch beim Nachholen.
+                                                    "unique_dedupe": True}):
                 sent += 1
         return sent
     except Exception:  # noqa: BLE001 - der Abschluss steht, die Nachricht hält ihn nicht auf
