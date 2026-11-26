@@ -48,7 +48,7 @@ export function RewardWatcher({ queue = ceremonyQueue, client = api }) {
         return;
       }
       import("@/components/tls/league/moment/momentPackage")
-        .then(({ enqueueMoments }) => { if (alive) enqueueMoments(momentRows, { queue, client, queued: queued.current }); })
+        .then(({ enqueueMoments }) => { if (alive) enqueueMoments(momentRows, { queue, client, queued: queued.current, userId }); })
         // Bewusst still: Der Moment kommt beim nächsten Besuch - die Belohnungen kommen trotzdem.
         .catch(() => {})
         .finally(() => { if (alive) enqueueRewards(rewardRows); });
