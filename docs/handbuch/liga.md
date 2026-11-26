@@ -2090,9 +2090,9 @@ Tagen** und was geschieht, **wenn ein Platz frei wird**. Oder vorher und nachher
 
 | Einstellung | Vorgabe | Bedeutung |
 | --- | --- | --- |
-| **So bekommen die Teams ihren Platz** | mit Zusage | „Automatisch dabei“ ist das Verhalten aus 3.11 |
+| **So bekommen die Teams ihren Platz** | mit Zusage innerhalb der Frist | „Automatisch dabei“ ist das Verhalten aus 3.11 |
 | **Frist für die Zusage (Tage)** | 14 | zählt ab dem Anlegen der Season, für Nachrücker ab dem Nachrücken – und endet spätestens mit dem Start der Season. Eine geänderte Zahl gilt sofort für alle offenen Startrechte |
-| **Wird ein Platz frei** | automatisch nach der Regel | oder: „Die Leitung löst das Nachrücken aus“ – dann seht ihr den Vorschlag und drückt selbst |
+| **Wird ein Platz frei** | automatisch nach der Regel | oder: „Die Leitung löst es aus“ – dann seht ihr den Vorschlag und drückt selbst |
 | **Erinnerung vor Fristende (Stunden)** | 48 | einmal an Captain und Vertreter; 0 = keine |
 | **Nachricht „Aufstieg bestätigt“** | an | siehe unten |
 
@@ -2125,7 +2125,7 @@ wie für jedes neue Co-Team. Zusagen nach Fristende lehnt die Seite sofort ab, a
 
 Der Nachrücker bekommt eine Nachricht und – im Modus „mit Zusage“ – eine **eigene Frist**. Er kann **zusagen** oder **ablehnen**.
 Lehnt er ab oder meldet er sich nicht, **bleibt er in seiner Liga** (mit seiner früheren Zusage), und der Nächste ist dran. Mit „Die
-Leitung löst das Nachrücken aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben.
+Leitung löst es aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben.
 
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht

@@ -220,7 +220,8 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
           <>
             <FormGrid cols={2}>
               <SelectField label="So bekommen die Teams ihren Platz" value={form.mode} onChange={(value) => set("mode", value)} options={MODE_OPTIONS}
-                disabled={!canSeason} testId="start-rights-mode" />
+                disabled={!canSeason} testId="start-rights-mode"
+                hint="Mit Zusage: Das Team sagt innerhalb der Frist zu, sonst verfällt das Startrecht. Automatisch dabei: Wer nicht will, meldet sich ab." />
               <TextField label="Frist für die Zusage (Tage)" type="number" min={1} max={60} value={form.accept_days ?? ""} onChange={(value) => set("accept_days", value)}
                 disabled={!canSeason || !accept} testId="start-rights-days"
                 hint={`Vorgabe ${data.defaults.accept_days}. Zählt ab der Vergabe, für Nachrücker ab dem Nachrücken – und endet spätestens mit dem Start der Season.`} />

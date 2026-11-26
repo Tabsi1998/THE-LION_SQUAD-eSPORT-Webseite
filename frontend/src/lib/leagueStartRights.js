@@ -19,8 +19,9 @@ const COUNT_ORDER = [["offered", "Zusage offen"], ["accepted", "zugesagt"], ["co
 const WHY_TEXT = { declined: "abgemeldet", expired: "Frist verfallen", rejected: "von der Leitung abgelehnt" };
 const GROUP_TEXT = { non_promoted: "der beste Nicht-Aufsteiger", relegated: "der beste Absteiger bleibt" };
 
-export const MODE_OPTIONS = [["accept", "Mit Zusage – das Team sagt innerhalb der Frist zu"], ["auto", "Automatisch dabei – wer nicht will, meldet sich ab"]];
-export const SUCCESSOR_OPTIONS = [["next", "Automatisch – der Nächste nach der Regel rückt nach"], ["lead", "Die Leitung löst das Nachrücken aus"]];
+// Kurz gehalten: Die Auswahl muss am Handy (390 px) ganz lesbar sein - die Erklärung steht im Hinweis darunter.
+export const MODE_OPTIONS = [["accept", "Mit Zusage innerhalb der Frist"], ["auto", "Automatisch dabei"]];
+export const SUCCESSOR_OPTIONS = [["next", "Automatisch nach der Regel"], ["lead", "Die Leitung löst es aus"]];
 
 export const stateLabel = (state) => STATE_LABEL[state] || "";
 export const stateTone = (state) => STATE_TONE[state] || "muted";
