@@ -134,7 +134,9 @@ test("per Tastatur: Fokus im Popup, Tab bleibt drin, Leertaste wählt, Escape he
   const before = screen.getByRole("button", { name: "Vorher" });
   before.focus();
   const dialog = await screen.findByRole("dialog", { name: "Entlastung des Vorstands" });
-  expect(dialog).toContainElement(document.activeElement);
+  // Den Fokus setzt useModalBehavior im Effekt nach dem Zeichnen; unter CI-Last kam findByRole davor zurück (Release-PR
+  // #2583). Darum auf den Fokus warten statt ihn im selben Takt zu verlangen – geprüft wird weiter, dass er ins Popup geht.
+  await waitFor(() => expect(dialog).toContainElement(document.activeElement));
   for (let i = 0; i < 8; i += 1) {
     await user.tab();
     expect(dialog).toContainElement(document.activeElement);
