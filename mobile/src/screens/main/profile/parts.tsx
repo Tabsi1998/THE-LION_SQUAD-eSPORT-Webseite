@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Card } from "../../../components/Card";
-import { selectFeedback } from "../../../components/motion/Press";
+import { switchFeedback } from "../../../components/motion/Press";
 import { Body, Muted } from "../../../components/Text";
 import { API_BASE_URL } from "../../../config";
 import { formatDate, formatStatus } from "../../../lib/format";
@@ -102,7 +102,7 @@ export function Toggle({ label, detail, value, onValueChange, first = false, tes
         <Body style={profileStyles.strong}>{label}</Body>
         <Muted>{detail}</Muted>
       </View>
-      <Switch value={value} onValueChange={(next) => { selectFeedback(); onValueChange(next); }} accessibilityLabel={label} trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }} thumbColor={value ? colors.cyan : colors.muted} />
+      <Switch value={value} onValueChange={(next) => { switchFeedback(); onValueChange(next); }} accessibilityLabel={label} trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }} thumbColor={value ? colors.cyan : colors.muted} />
     </View>
   );
 }
@@ -114,7 +114,7 @@ export function MatrixToggle({ label, value, disabled, onValueChange }: { label:
       <Switch
         value={value}
         disabled={disabled}
-        onValueChange={(next) => { selectFeedback(); onValueChange(next); }}
+        onValueChange={(next) => { switchFeedback(); onValueChange(next); }}
         trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
         thumbColor={value ? colors.cyan : colors.muted}
       />

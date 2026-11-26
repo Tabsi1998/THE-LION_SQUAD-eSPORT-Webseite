@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, Switch, TextInput, View, type LayoutCh
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { AnkerView } from "../../../components/Anker";
 import { Card } from "../../../components/Card";
-import { Glow, Press, selectFeedback, useReduceMotion } from "../../../components/motion";
+import { Glow, Press, selectFeedback, switchFeedback, useReduceMotion } from "../../../components/motion";
 import { Body, Muted } from "../../../components/Text";
 import {
   CUSTOM_LEVEL, DIGEST_FALLBACK, DIGEST_HINTS, MODE_LABELS, MODE_ORDER, NOTIFICATION_TOPICS, digestRhythm, levelOf, levelPatch, modePatch,
@@ -289,7 +289,7 @@ function QuietHoursCard({ quiet, exceptions, onQuiet }: { quiet: QuietHours; exc
         </View>
         <Switch
           value={quiet.enabled}
-          onValueChange={(enabled) => { selectFeedback(); onQuiet({ ...quiet, enabled }); }}
+          onValueChange={(enabled) => { switchFeedback(); onQuiet({ ...quiet, enabled }); }}
           accessibilityLabel="Ruhezeit"
           testID="notification-quiet-toggle"
           trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}

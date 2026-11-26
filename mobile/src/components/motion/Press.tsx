@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import React, { useCallback } from "react";
-import { Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { PRESS_SCALE } from "../../lib/motion";
 import { motion } from "../../theme";
@@ -33,6 +33,12 @@ export function selectFeedback() {
   } catch {
     // ohne Vibration weiter
   }
+}
+
+/** Das Klicken für einen `Switch`: unter iOS gibt der Schalter selbst schon eins - dort nicht doppelt. */
+export function switchFeedback() {
+  if (Platform.OS === "ios") return;
+  selectFeedback();
 }
 
 type Props = Omit<PressableProps, "style"> & {
