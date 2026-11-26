@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Konto löschen mit Rollen in Teams (#2113, L-C5): die Karte nennt je Rolle den Weg und sperrt „Konto löschen“, bis die
 // Rollen abgegeben sind. Ohne Rolle geht es wie bisher über die Rückfrage. Seit #2059 ein Name für eine Sache: „Konto
@@ -7,11 +7,13 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "nachtfuchs", role: "tournament_admin" }, logout: vi.fn().mockResolvedValue(true) }) }));
+const logoutMock = vi.fn();
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "nachtfuchs", role: "tournament_admin" }, logout: logoutMock }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 const promptMock = vi.fn();
 vi.mock("@/components/tls/ConfirmDialog", () => ({ usePrompt: () => promptMock }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toastMock = { success: vi.fn(), error: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { DatenHerunterladen, KontoAngaben, KontoLoeschen } = await import("./PrivacyAccountPage");
 
@@ -23,6 +25,8 @@ function serve(check) {
 }
 
 beforeEach(() => {
+  logoutMock.mockReset();
+  logoutMock.mockResolvedValue(true);
   apiMock.get.mockReset();
   apiMock.post.mockReset();
   promptMock.mockReset();
@@ -83,6 +87,36 @@ test("Leerzeichen um das Wort: der Dialog lässt es durch, also löscht die Seit
   await waitFor(() => expect(promptMock).toHaveBeenCalled());
   expect(promptMock.mock.calls[0][0].validate(" LÖSCHEN ")).toBe("");
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/dsgvo/anonymize-me"));
+});
+
+// Prüfung #2059: nach dem Löschen die Startseite mit kurzer Bestätigung. Abmelden schließt die geschützte Seite sofort
+// (ProtectedRoute leitet zur Anmeldung weiter, sobald kein Konto mehr da ist) - deshalb steht die Startseite schon fest,
+// bevor abgemeldet wird.
+test("nach dem Löschen: erst die Startseite, dann abmelden - mit Bestätigung", async () => {
+  serve({ can_erase: true, blockers: [], message: null });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  promptMock.mockResolvedValue("LÖSCHEN");
+  let pfadBeimAbmelden = "";
+  logoutMock.mockImplementation(async () => {
+    pfadBeimAbmelden = window.location.pathname;
+    return true;
+  });
+  window.history.replaceState({}, "", "/mein-bereich/datenschutz?tab=loeschung");
+  render(
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<div data-testid="startseite" />} />
+        <Route path="/mein-bereich/datenschutz" element={<KontoLoeschen />} />
+      </Routes>
+    </BrowserRouter>,
+  );
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/dsgvo/anonymize-me/check", expect.anything()));
+  fireEvent.click(screen.getByTestId("dsgvo-anonymize-btn"));
+  expect(await screen.findByTestId("startseite")).toBeInTheDocument();
+  expect(logoutMock).toHaveBeenCalledTimes(1);
+  expect(pfadBeimAbmelden).toBe("/");
+  expect(toastMock.success).toHaveBeenCalledWith("Dein Konto ist gelöscht.");
+  window.history.replaceState({}, "", "/");
 });
 
 test("Daten herunterladen: ein Knopf mit dem neuen Namen", () => {

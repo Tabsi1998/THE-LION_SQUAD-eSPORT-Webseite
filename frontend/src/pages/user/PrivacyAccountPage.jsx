@@ -85,7 +85,11 @@ export function KontoLoeschen() {
     try {
       await api.post("/dsgvo/anonymize-me");
       toast.success("Dein Konto ist gelöscht.");
-      if (await logout()) nav("/");
+      // Erst zur Startseite, dann abmelden (#2059): ohne Konto leitet die geschützte Seite sonst sofort zur Anmeldung
+      // weiter, bevor der Weg zur Startseite ankommt. `replace`: Zurück führt nicht auf die Seite des gelöschten Kontos.
+      nav("/", { replace: true });
+      await logout();
+      return;
     } catch (err) {
       toast.error(formatRequestError(err, "Das Konto konnte nicht gelöscht werden."));
       // Inzwischen eine Rolle bekommen (#2113): die Liste der Rollen frisch holen, damit der Weg dasteht.
