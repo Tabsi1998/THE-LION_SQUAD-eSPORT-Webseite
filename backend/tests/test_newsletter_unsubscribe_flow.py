@@ -176,3 +176,19 @@ def test_the_key_is_derived_and_masked_in_the_access_log(monkeypatch):
     record = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d', ("127.0.0.1", "POST", "/api/settings/newsletter/unsubscribe?token=u1.SIG", "1.1", 200), None)
     log_safe.SecretPathFilter().filter(record)
     assert "u1.SIG" not in record.getMessage()
+
+@pytest.mark.asyncio
+async def test_the_page_sends_the_token_in_the_body_and_mail_clients_still_post_forms(flow):
+    """Prüfung 26.11.: Die Seite nimmt den Schlüssel aus der Adresse und schickt ihn im Body. Mail-Programme posten weiter
+    ein Formular mit dem Schlüssel in der Query (RFC 8058) - das darf nicht an einem Body-Modell scheitern."""
+    from services.mail_digest_link import API_PATH, token_for as digest_token
+    from services.newsletter_unsubscribe import token_for
+
+    paula = await flow.add_user(name="paula")
+    await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"newsletter_consent": True, "mail_digest": "weekly"}})
+    done = await flow.client.post("/api/settings/newsletter/unsubscribe", json={"token": token_for(paula["id"])})
+    assert done.status_code == 200 and done.json() == {"ok": True, "already": False}
+    form = await flow.client.post(f"{API_PATH}?token={digest_token(paula['id'])}", content="List-Unsubscribe=One-Click",
+                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert form.status_code == 200 and form.json()["rhythm"] == "instant"
+    assert (await flow.client.post("/api/settings/newsletter/unsubscribe", json={"token": "kaputt"})).status_code == 400

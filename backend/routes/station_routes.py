@@ -390,6 +390,9 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
             # Das erste Match an einer Station startet das Turnier - im Discord wie über den Knopf (#572).
             from services.discord_threads import status_written
             await status_written(db, match["tournament_id"], before.get("status"))
+            # Turnier-Meldungen (#1209): „Der Turnierbaum ist da“ auch hier.
+            from services import tournament_progress
+            await tournament_progress.status_changed(db, match["tournament_id"], before.get("status"), "live")
         started_match = {**match, **match_updates}
         await notify_match_started(db, started_match, station, collection_name)
     else:

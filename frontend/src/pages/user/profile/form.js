@@ -89,6 +89,8 @@ export function profileToForm(user) {
     notification_preferences: user.notification_preferences || {},
     // Ruhezeit (#1206): Standard aus, Vorschlag 22:00 bis 7:00 - ohne gespeicherten Wert genau dieser Stand.
     quiet_hours: quietHoursForm(user.quiet_hours),
+    // Sammel-Mail (#1662): sofort, täglich oder wöchentlich - ohne eigene Wahl gilt die Vorgabe des Vereins (null).
+    mail_digest: ["instant", "daily", "weekly"].includes(user.mail_digest) ? user.mail_digest : null,
     profile_visibility: user.profile_visibility || {},
     dm_privacy: user.dm_privacy || "everyone",
   };

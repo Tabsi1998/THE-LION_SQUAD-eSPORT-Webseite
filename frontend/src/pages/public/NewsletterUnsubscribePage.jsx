@@ -1,24 +1,39 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { releaseReferrer } from "@/lib/referrerGuard";
 
 // Newsletter mit einem Klick abbestellen (#2119 ML4): der Link aus der Mail führt hierher. Abgemeldet wird erst mit dem
 // Knopf - Linkvorschauen und Virenscanner öffnen den Link, ohne etwas auszulösen. Kein Login nötig.
 
 export default function NewsletterUnsubscribePage() {
   useDocumentTitle("Newsletter abbestellen", "Newsletter von THE LION SQUAD abbestellen.", { robots: "noindex, nofollow" });
-  const [params] = useSearchParams();
-  const token = params.get("token") || "";
+  const [params, setParams] = useSearchParams();
+  // Den Schlüssel einmal lesen und dann aus der Adresse nehmen (Verlauf, Lesezeichen, Weitergeben); er geht im Body hinaus.
+  const [token] = useState(() => params.get("token") || "");
+  useEffect(() => {
+    if (!params.has("token")) {
+      // Der Schlüssel ist aus der Adresse: „no-referrer“ wieder freigeben, damit es bei Navigation in der App nicht stehen bleibt.
+      releaseReferrer();
+      return;
+    }
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("token");
+      return next;
+    }, { replace: true });
+  }, [params, setParams]);
+  useEffect(() => () => { releaseReferrer(); }, []);
   const [status, setStatus] = useState(token ? "ready" : "missing");
   const [message, setMessage] = useState("");
 
   const unsubscribe = async () => {
     setStatus("busy");
     try {
-      const { data } = await api.post(`/settings/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
+      const { data } = await api.post("/settings/newsletter/unsubscribe", { token });
       setStatus("done");
       setMessage(data?.already ? "Du warst schon abgemeldet – es kommt kein Newsletter mehr." : "Erledigt – du bekommst keinen Newsletter mehr.");
     } catch (error) {

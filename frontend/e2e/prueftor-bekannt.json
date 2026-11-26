@@ -100,6 +100,12 @@
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
+      "ziel": "color-contrast: [Fuß] .md\\:justify-end > .hover\\:text-\\[\\#29B6E8\\][type=\"button\"]",
+      "grund": "Bestand vor dem Prüftor (#1660): derselbe Fuß-Knopf wie im Eintrag für alle Seiten - seit den Reitern der Benachrichtigungen (#1662) schreibt axe den Selektor hier ohne .transition. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+    },
+    {
+      "seite": "Benachrichtigungen einstellen",
+      "art": "kontrast",
       "ziel": "color-contrast: [Inhalt] label[for=\"profile-ceremony-volume\"] > .tracking-widest.text-white\\/45.text-\\[11px\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
@@ -112,37 +118,37 @@
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-about\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-about\"] > .pb-1.text-\\[10px\\].tracking-\\[0\\.25em\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-account\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-account\"] > .pb-1.text-\\[10px\\].tracking-\\[0\\.25em\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-appearance\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-appearance\"] > .pb-1.text-\\[10px\\].tracking-\\[0\\.25em\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-notifications\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-notifications\"] > .pb-1.text-\\[10px\\].tracking-\\[0\\.25em\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-privacy\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-privacy\"] > .pb-1.text-\\[10px\\].tracking-\\[0\\.25em\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-security\"] > .pb-1.tracking-\\[0\\.25em\\][data-testid=\"settings-group-title\"]",
+      "ziel": "color-contrast: [Navigation] div[data-testid=\"settings-group-security\"] > .pb-1.text-\\[10px\\].tracking-\\[0\\.25em\\]",
       "grund": "Bestand vor dem Prüftor (#1660): Kontrast unter WCAG AA (Farben aus der Zeit vor der Kontrast-Regel im Tor). Anpassung ändert die Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {

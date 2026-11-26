@@ -19,6 +19,7 @@ import { AccessSection } from "./settings/sections/AccessSection";
 import { ResendSection } from "./settings/sections/ResendSection";
 import { SmtpSection } from "./settings/sections/SmtpSection";
 import { NewsletterSection } from "./settings/sections/NewsletterSection";
+import { DigestSection } from "./settings/sections/DigestSection";
 import { MailQueueSection } from "./settings/sections/MailQueueSection";
 import { BrandSection } from "./settings/sections/BrandSection";
 import { SeoSection } from "./settings/sections/SeoSection";
@@ -582,6 +583,7 @@ export default function AdminSettingsPage() {
       {tab === "smtp" && <SmtpSection user={user} smtp={smtp} setSmtp={setSmtp} smtpTestEmail={smtpTestEmail} setSmtpTestEmail={setSmtpTestEmail} smtpDiag={smtpDiag} smtpDeliverability={smtpDeliverability} savingSmtp={savingSmtp} saveSmtp={saveSmtp} clearSmtpSecret={clearSmtpSecret} applySubmissionPreset={applySubmissionPreset} applyLocalIpPreset={applyLocalIpPreset} sendSmtpTest={sendSmtpTest} diagnoseSmtp={diagnoseSmtp} checkDeliverability={checkDeliverability} />}
 
       {tab === "newsletter" && <NewsletterSection />}
+      {tab === "digest" && <DigestSection />}
 
       {tab === "queue" && <MailQueueSection queue={queue} queueStats={queueStats} queueFilter={queueFilter} setQueueFilter={setQueueFilter} processQueueNow={processQueueNow} recoverQueue={recoverQueue} retryFailedQueue={retryFailedQueue} cleanupQueue={cleanupQueue} retryJob={retryJob} deleteJob={deleteJob} filteredQueue={filteredQueue} queueCounts={queueCounts} queueSearch={queueSearch} searchQueue={searchQueue} revealRecipient={revealRecipient} />}
 

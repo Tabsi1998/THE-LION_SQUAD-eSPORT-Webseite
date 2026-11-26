@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Check, Inbox, Trash2, X } from "lucide-react";
+import { Bell, Check, Trash2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -8,7 +8,7 @@ import { refreshCrowns } from "@/components/tls/LevelAvatarFrame";
 import { notReadMessage, useNotificationFeed } from "@/hooks/useNotificationFeed";
 import { LoadNotice } from "@/components/tls/LoadState";
 import { isExternalUrl, notificationTarget, previewText } from "@/lib/notifications";
-import { NotificationRow } from "@/components/tls/NotificationRow";
+import { NotificationGroupedList } from "@/components/tls/NotificationGroupedList";
 
 const TABS = [
   ["unread", "Ungelesen"],
@@ -128,7 +128,7 @@ export function NotificationBell() {
   useEffect(() => {
     markReadRef.current = feed.markRead;
   }, [feed.markRead]);
-  const { items, bundles, unread, read } = feed;
+  const { items, unread, read } = feed;
 
   useEffect(() => {
     if (user) handleCrownNotifications(items, user.id);
@@ -149,12 +149,6 @@ export function NotificationBell() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-
-  const visible = useMemo(() => {
-    if (tab === "unread") return bundles.filter((bundle) => !bundle.read);
-    if (tab === "read") return bundles.filter((bundle) => bundle.read);
-    return bundles;
-  }, [bundles, tab]);
 
   if (!user) return null;
 
@@ -248,7 +242,7 @@ export function NotificationBell() {
               ))}
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" aria-live="polite" aria-label="Benachrichtigungsliste">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" aria-label="Benachrichtigungsliste">
               {feed.actionError ? (
                 <LoadNotice testId="notification-action-error" className="m-2" message={feed.actionError.message} onRetry={feed.actionError.retry} />
               ) : null}
@@ -257,22 +251,19 @@ export function NotificationBell() {
                 <LoadNotice testId="notification-load-error" className="m-2" message={feed.problem === "offline" ? "Ohne Netz. Die Benachrichtigungen laden, sobald das Netz wieder da ist." : "Die Benachrichtigungen konnten nicht geladen werden."} onRetry={feed.load} />
               ) : feed.status === "loading" ? (
                 <div className="px-4 py-10 text-center text-sm text-white/40" role="status">Lade Benachrichtigungen …</div>
-              ) : visible.length === 0 ? (
-                <div className="px-4 py-10 text-center text-white/40">
-                  <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <div className="text-sm">{tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}</div>
-                </div>
               ) : (
-                visible.map((bundle, index) => (
-                  <motion.div
-                    key={bundle.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(index * 0.045, 0.4), duration: 0.2, ease: "easeOut" }}
-                  >
-                    <NotificationRow bundle={bundle} onOpen={openBundle} onDelete={feed.deleteBundle} pending={bundle.ids.some((id) => feed.pendingIds.has(id))} />
-                  </motion.div>
-                ))
+                // Nach Tagen und Themen, Gleichartiges gebündelt (#1205); neue Meldungen gleiten hinein.
+                <NotificationGroupedList
+                  rows={items}
+                  tab={tab}
+                  onOpen={openBundle}
+                  onDelete={feed.deleteBundle}
+                  pendingIds={feed.pendingIds}
+                  compact
+                  emptyText={tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}
+                  testId="notification-groups"
+                  announce
+                />
               )}
             </div>
             <div className="shrink-0 border-t border-white/10 px-4 py-2 text-right">

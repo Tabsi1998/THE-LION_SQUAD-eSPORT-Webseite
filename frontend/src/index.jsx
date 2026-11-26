@@ -1,3 +1,5 @@
+// Seiten mit Schlüssel in der Adresse: zuerst „no-referrer“ (#1662), vor jedem anderen Modul und Abruf.
+import "@/lib/referrerGuard";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/fonts.css";

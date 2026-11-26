@@ -55,6 +55,8 @@ export const SETTINGS_SECTIONS = {
   resend: { tab: "email", group: "Verbindungen", label: "Resend" },
   smtp: { tab: "smtp", group: "Verbindungen", label: "SMTP" },
   newsletter: { tab: "newsletter", group: "E-Mail", label: "Newsletter" },
+  // Sammel-Mail (#1662): Vorgabe-Rhythmus, Uhrzeit und Wochentag - mit Vorschau.
+  "sammel-mail": { tab: "digest", group: "E-Mail", label: "Sammel-Mail" },
   "mail-queue": { tab: "queue", group: "E-Mail", label: "Mail-Queue" },
   branding: { tab: "brand", group: "Auftritt", label: "Branding" },
   socials: { tab: "socials", group: "Auftritt", label: "Socials" },

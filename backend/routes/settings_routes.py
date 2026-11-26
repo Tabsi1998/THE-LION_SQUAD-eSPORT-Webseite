@@ -1319,6 +1319,87 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
     return {"ok": True, "changed": True}
 
 
+class NotificationDigestSettings(BaseModel):
+    """Vorgaben der Sammel-Mail (#1662): Rhythmus für alle ohne eigene Wahl, Uhrzeit täglich, Wochentag und Uhrzeit
+    wöchentlich - Wiener Zeit. Ein Teil-PUT ändert nur, was er schickt."""
+    model_config = ConfigDict(extra="forbid")
+
+    default_rhythm: Optional[Literal["instant", "daily", "weekly"]] = None
+    daily_time: Optional[str] = Field(default=None, max_length=5)
+    weekly_weekday: Optional[int] = Field(default=None, ge=0, le=6)
+    weekly_time: Optional[str] = Field(default=None, max_length=5)
+
+
+@settings_router.get("/notification-digest")
+async def get_notification_digest_settings(me: dict = Depends(require_club_admin())):
+    from services import mail_digest
+
+    db = get_db()
+    cfg = await mail_digest.load_settings(db)
+    return {"settings": cfg, "defaults": dict(mail_digest.DEFAULTS),
+            "schedules": {rhythm: mail_digest.schedule_text(rhythm, cfg) for rhythm in mail_digest.RHYTHMS}}
+
+
+@settings_router.put("/notification-digest")
+async def update_notification_digest_settings(body: NotificationDigestSettings, me: dict = Depends(require_club_admin())):
+    from services import mail_digest
+    from services.quiet_hours_rules import parse_time
+
+    db = get_db()
+    updates = body.model_dump(exclude_unset=True, exclude_none=True)
+    for field in ("daily_time", "weekly_time"):
+        if field in updates and parse_time(updates[field]) is None:
+            raise HTTPException(status_code=422, detail="Bitte eine Uhrzeit wie 07:00 angeben.")
+    current = await db.settings.find_one({"id": mail_digest.SETTINGS_ID}, {"_id": 0}) or {}
+    changed = _changed_setting_fields(current, updates, {})
+    if changed:
+        await db.settings.update_one({"id": mail_digest.SETTINGS_ID},
+                                     {"$set": {**updates, "updated_at": now_utc().isoformat()}, "$setOnInsert": {"id": mail_digest.SETTINGS_ID}},
+                                     upsert=True)
+        await _audit_settings_change(db, "settings.notification_digest.update", mail_digest.SETTINGS_ID, me["id"], changed)
+    return await get_notification_digest_settings(me)
+
+
+@settings_router.get("/notification-digest/preview")
+async def preview_notification_digest(me: dict = Depends(require_club_admin())):
+    """Die Sammel-Mail mit Beispielzeilen und dem Namen der ansehenden Person - es wird nichts verschickt."""
+    from services import mail_digest
+
+    return await mail_digest.preview(get_db(), me.get("display_name") or me.get("username") or "")
+
+
+async def _link_token(request: Request, token: str) -> str:
+    """Der Schlüssel eines Links ohne Login: aus der Query (Mail-Programme posten mit RFC 8058 ein Formular an die Adresse
+    aus der Kopfzeile) oder aus einem JSON-Body ``{"token": …}`` - so schickt ihn die Seite, nachdem sie ihn aus der Adresse
+    genommen hat (#1662). Ein Formular-Body wird nie als JSON gelesen."""
+    if token:
+        return token
+    if "application/json" not in (request.headers.get("content-type") or "").lower():
+        return ""
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001 - kaputter Body heißt: kein Schlüssel
+        return ""
+    value = data.get("token") if isinstance(data, dict) else None
+    return value[:200] if isinstance(value, str) else ""
+
+
+@settings_router.post("/notification-digest/instant")
+async def notification_digest_instant(request: Request, token: str = Query("", max_length=200)):
+    """Zurück auf Einzelmails mit einem Klick aus der Sammel-Mail (#1662) - ohne Login, nur mit dem signierten Schlüssel;
+    ändert nur den Rhythmus. Der Schlüssel kommt im Body (die Seite) oder als Query. Gezählt werden wie bei der
+    Newsletter-Abmeldung nur ungültige Versuche je Adresse."""
+    from services.mail_digest_link import switch_to_instant
+    from services.rate_limit import enforce_rate_limit
+
+    result = await switch_to_instant(get_db(), await _link_token(request, token))
+    if result is None:
+        await enforce_rate_limit(request, "mail_digest:instant:ip", limit=30, window_seconds=3600,
+                                 message="Zu viele ungültige Links. Bitte warte noch {wait}.")
+        raise HTTPException(400, "Der Link ist ungültig. Den Rhythmus stellst du auch im Profil unter Benachrichtigungen → E-Mail um.")
+    return result
+
+
 @settings_router.post("/email/test")
 async def send_test(body: TestEmailBody, me: dict = Depends(require_club_admin())):
     res = await send_template("test", body.to, branding="THE LION SQUAD", queue=False)
@@ -1429,7 +1510,7 @@ async def newsletter_unsubscribe(request: Request, token: str = Query("", max_le
     from services.newsletter_unsubscribe import unsubscribe
     from services.rate_limit import enforce_rate_limit
 
-    result = await unsubscribe(get_db(), token)
+    result = await unsubscribe(get_db(), await _link_token(request, token))
     if result is None:
         await enforce_rate_limit(request, "newsletter:unsubscribe:ip", limit=30, window_seconds=3600,
                                  message="Zu viele ungültige Abmeldelinks. Bitte warte noch {wait}.")

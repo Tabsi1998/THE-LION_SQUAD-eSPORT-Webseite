@@ -209,10 +209,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     test("Einstellungen: Kanal Browser und „Dieser Browser“ anmelden", async ({ page }) => {
       const seen = await mockServer(page, { storage: { "tls-web-push-ask": "declined" } });
       await page.goto("/profile?tab=notifications");
-      // Push je Thema gilt auch für den Browser (#1204); den Kanal „Browser“ ganz aus gibt es unter „Weitere Wege“.
+      // Push je Thema gilt auch für den Browser (#1204); den Kanal „Browser“ ganz aus gibt es im Reiter „Mehr“ (#1662).
       await expect(page.getByTestId("notification-topic-match_reminders-push")).toBeVisible();
-      await page.getByTestId("notification-more-ways").click();
+      await page.getByTestId("notification-section-mehr").click();
       await expect(page.getByTestId("profile-notification-channel-browser")).toBeVisible();
+      await page.getByTestId("notification-section-themen").click();
       const card = page.getByTestId("profile-browser-push");
       await expect(card).toHaveAttribute("data-status", "available");
       await page.getByTestId("profile-browser-push-enable").click();

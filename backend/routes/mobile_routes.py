@@ -727,7 +727,10 @@ async def mobile_profile_references(user: dict = Depends(get_current_user)):
 async def mobile_notifications(user: dict = Depends(get_current_user)):
     db = get_db()
     # Meldungen zu News nur für die Website (#1532) stehen nicht im Postfach der App.
-    return await db.notifications.find({"user_id": user["id"], "in_app_visible": {"$ne": False}, **news_channels.inbox_query("app")}, {"_id": 0}).sort("created_at", -1).to_list(80)
+    rows = await db.notifications.find({"user_id": user["id"], "in_app_visible": {"$ne": False}, **news_channels.inbox_query("app")}, {"_id": 0}).sort("created_at", -1).to_list(80)
+    # Thema und Wichtigkeit (#1662): die App kann danach gliedern, sobald sie es liest - ältere Zeilen beim Lesen nachgerechnet.
+    from services.user_notifications import with_topic
+    return [with_topic(row) for row in rows]
 
 
 @router.post("/notifications/{notification_id}/read")

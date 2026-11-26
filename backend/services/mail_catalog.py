@@ -66,6 +66,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "achievement_recap": {"name": "Wochenrückblick Erfolge", "purpose": "Montags 09:00 an alle, die in der Woche XP oder Erfolge gesammelt haben – abbestellbar.", "recipient": "das Konto", "category": "community"},
     "direct_message": {"name": "Neue Direktnachricht", "purpose": "Jemand hat eine Nachricht geschrieben (nur, wenn die Person Mails dazu zulässt).", "recipient": "der Empfänger der Nachricht", "category": "community"},
     "team_chat_mention": {"name": "Erwähnung im Team-Chat", "purpose": "Jemand hat die Person im Team-Chat erwähnt.", "recipient": "die erwähnte Person", "category": "community"},
+    "notification_digest": {"name": "Sammel-Mail", "purpose": "Statt vieler Einzelmails einmal am Tag oder in der Woche (#1662) – nur für Personen, die das so eingestellt haben; Dringendes kommt nie hinein.", "recipient": "das Konto", "category": "community"},
     "event_message": {"name": "Event: Nachricht an alle", "purpose": "Die Turnierleitung schreibt allen Angemeldeten eines Events (Seite „Anmeldungen & Einlass“, #1372) – nur, wenn die Person Mails zu Turnier-Updates zulässt.", "recipient": "die Angemeldeten des Events (je Person einmal)", "category": "tournament"},
     "newsletter_news": {"name": "Newsletter: News", "purpose": "Eine veröffentlichte News an alle mit Newsletter-Einwilligung.", "recipient": "Newsletter-Empfänger", "category": "newsletter"},
     "newsletter_event": {"name": "Newsletter: Event", "purpose": "Ein angekündigtes Event an alle mit Newsletter-Einwilligung.", "recipient": "Newsletter-Empfänger", "category": "newsletter"},
@@ -96,6 +97,10 @@ SAMPLES: dict[str, str] = {
     "source": "Weihnachtsfeier", "amount": "40,00 €", "due_on": "17.10.2026", "paid": "",
     # Wochenrückblick (#622)
     "week": "29.09. – 05.10.2026", "xp_week": "240", "level": "12", "level_title": "Rudel", "unlocked": "Champion III (Gold)\nFrühaufsteher I (Bronze)",
+    # Sammel-Mail (#1662)
+    "count": "3",
+    "instant_url": "{origin}/sammel-mail/einzeln?token=beispiel",
+    "items": "Anmeldung bestätigt: Mario Kart Winter Cup – Check-in ab 17:30 Uhr.",
     "next_up": "Turnierspieler II – noch 2", "bonus_hint": "Vereinsmitglieder bekommen 10 % mehr XP auf alles.",
 }
 

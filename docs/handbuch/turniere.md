@@ -76,6 +76,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Maps** | Map-Bibliothek je Spiel mit Bild und Modi; je Turnier und Phase ein eigener Map-Pool | Spielseite → Maps, im Turnier Reiter Maps |
 | **TV** | Turnierbaum, Aufrufe, Stationen auf Fernseher und Beamer | [TV und Beamer](tv.md) |
 | **Hinweis an alle** | Ein Satz wie „Pause bis 14:30“ an alle im Turnier oder Event: Benachrichtigung, Banner, auf Wunsch TV | Turnierleitung am Handy, Reiter **Hinweis** (3.17) |
+| **Meldungen an die Spieler** | Von selbst: Turnierbaum da, weiter, Loser Bracket, ausgeschieden, Pause – nur an Beteiligte | Spieler stellen es unter Turnier-Updates ab (3.18) |
 | **Abschluss** | Beendet, Ergebnisse veröffentlicht, Punkte, Erfolge, Gewinne | Statusauswahl im Turnier |
 
 ---
@@ -1248,6 +1249,34 @@ ein zweiter Versuch nach einem Netzfehler schickt nichts doppelt. Steht dort „
 **Fortsetzen**: Der Versand läuft mit demselben Hinweis weiter, wer ihn schon hat, bekommt ihn nicht noch einmal.
 
 ---
+
+### 3.18 Automatische Meldungen an die Spieler
+
+Während des Turniers schickt die Website von selbst (#1209) – nur an Beteiligte, bei Teams an jedes Mitglied, je Ereignis
+einmal, unter dem Thema **Turnier-Updates** (die Person kann es abschalten):
+
+| Wann | Meldung | Ein Tipp öffnet |
+| --- | --- | --- |
+| Beim Start (Status **Läuft**, nicht nach einer Pause; nicht bei Liga-Staffeln, die haben eigene Meldungen) | **Der Turnierbaum ist da** | das eigene erste Spiel |
+| Ergebnis gilt, Sieger kommt weiter | **Du bist weiter!** bzw. bei Durchgängen **Platz 2 im Durchgang C: weiter** | das nächste Spiel |
+| Ergebnis gilt, Verlierer im Double Elimination | **Weiter im Loser Bracket** | das nächste Spiel |
+| Ergebnis gilt, kein Weg weiter | **Ausgeschieden** bzw. **Ausgeschieden: Platz 5 von 8** im Durchgang | die Turnierseite |
+| Status **Pausiert** oder **Pause bis** geändert | **Kurze Pause** bzw. **Pause bis 14:30** | die Turnierseite |
+
+- Das Finale, Gruppen- und Liga-Spieltage melden nichts zusätzlich – dafür gibt es **Turnier beendet** und die Tabelle.
+- Wer nicht erschienen ist, ist nie „weiter“ über den Sieger-Weg.
+- Wird ein Ergebnis noch einmal gleich gemeldet, kommt nichts doppelt. Ändert eine Korrektur den Ausgang, bekommen beide die
+  passende neue Meldung; die alte ist als gelesen und überholt markiert.
+- **Nachgerückt** und **Turnier abgesagt** sind zeitkritisch: Die Mail kommt immer sofort, der Push in der Ruhezeit nur, wenn das
+  Turnier bis 2 Stunden nach dem Ende der Ruhezeit beginnt.
+- „Weiter“ heißt: im nächsten, tatsächlich gespielten Spiel. Gewinnt im Double Elimination der Erste das Grand Final und der Reset
+  entfällt, kommt keine Meldung – dafür kommt **Turnier beendet**. Gewinnt die Seite aus dem Loser Bracket, lesen beide
+  **Entscheidungsspiel** („gewonnen – jetzt kommt das Entscheidungsspiel“ bzw. „verloren – es gibt ein Entscheidungsspiel, du bist
+  noch dabei“).
+- Eine Korrektur meldet nur, wenn sich der Ausgang ändert; ein korrigierter Spielstand mit gleichem Sieger meldet nichts.
+- „Der Turnierbaum ist da“ kommt bei jedem Start: von der Turnierleitung, nach Zeitplan und mit dem ersten Spiel an einer Station.
+- Die Pausen-Meldung entfällt nur, wenn die Leitung in den fünf Minuten davor selbst einen Pausen-Hinweis an genau dieses Turnier
+  geschickt hat; andere Hinweise und solche ans ganze Event zählen nicht.
 
 ## 4. Wenn etwas nicht klappt
 

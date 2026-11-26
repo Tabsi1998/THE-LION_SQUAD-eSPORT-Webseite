@@ -194,6 +194,8 @@ class UserUpdate(BaseModel):
     newsletter_consent: Optional[bool] = None
     notification_preferences: Optional[Dict[str, bool]] = None
     quiet_hours: Optional[QuietHours] = None
+    # Sammel-Mail (#1662): sofort, täglich oder wöchentlich - ohne Angabe gilt die Vorgabe der Verwaltung.
+    mail_digest: Optional[Literal["instant", "daily", "weekly"]] = None
 
 
 AdminResettableField = Literal["display_name", "bio", "avatar_url", "banner_url"]

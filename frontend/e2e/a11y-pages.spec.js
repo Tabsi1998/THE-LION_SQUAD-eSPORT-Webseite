@@ -76,6 +76,8 @@ const PAGES = [
   { name: "FAQ-Anleitung Events", path: "/faq/events-und-kalender", ready: "help-topic", user: null },
   // Statusseite (#1657): öffentlich, für alle lesbar - auch bei Störung.
   { name: "Status", path: "/status", ready: "status-page", user: null },
+  // Zurück auf Einzelmails (#1662): der Ein-Klick-Link aus der Sammel-Mail, ohne Login.
+  { name: "Einzelmails", path: "/sammel-mail/einzeln?token=u1.sig", ready: "digest-instant", user: null },
 ];
 
 async function mockServer(page, user) {
