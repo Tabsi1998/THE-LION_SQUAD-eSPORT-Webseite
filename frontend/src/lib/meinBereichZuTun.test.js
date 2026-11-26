@@ -26,19 +26,23 @@ describe("Zu tun", () => {
     expect(zuTun({ membership, invoices: { summary: { open_count: 1 } } }).map((item) => item.key)).toEqual(["rechnung"]);
   });
 
-  test("Einwilligung (Entscheidung 26.11.): nur Pflicht-Einwilligungen drängen - freiwillige bleiben unter Datenschutz", () => {
+  test("Einwilligung: nur eine erteilte, deren Text sich geändert hat - die deckt den neuen Text nicht (Prüfung #2059)", () => {
+    // Wie der Server (membership_routes._consent_view): text_changed nur bei state given und alter Fassung.
     const consents = { available: true, consents: [
-      { code: "foto", label: "Fotos", state: "none", can_give: true },
-      { code: "news", label: "Newsletter", state: "given", text_changed: true, can_give: true },
-      { code: "statuten", label: "Statuten", state: "none", can_give: true, required: true },
-      { code: "daten", label: "Datenverarbeitung", state: "given", text_changed: true, can_give: true, required: true },
-      { code: "ok", label: "Schon erledigt", state: "given", can_give: false, required: true },
+      { code: "fotos", label: "Fotos auf der Website", state: "given", version: 1, current_version: 2, can_give: true, can_withdraw: true, text_changed: true },
+      { code: "newsletter", label: "Newsletter", state: "none", version: 0, current_version: 1, can_give: true, can_withdraw: false, text_changed: false },
+      { code: "statuten", label: "Statuten", state: "withdrawn", version: 1, current_version: 1, can_give: true, can_withdraw: false, text_changed: false },
+      { code: "daten", label: "Datenverarbeitung", state: "given", version: 3, current_version: 3, can_give: false, can_withdraw: true, text_changed: false },
     ] };
-    const [item] = zuTun({ consents });
-    expect(item).toMatchObject({ key: "einwilligung", anzahl: 2, label: "2 Einwilligungen lesen", detail: "Statuten, Datenverarbeitung", to: "/mein-bereich/datenschutz?tab=einwilligungen" });
-    // Nur freiwillige, nie beantwortet oder mit neuem Text: nichts unter „Zu tun“.
-    expect(zuTun({ consents: { available: true, consents: consents.consents.slice(0, 2) } })).toEqual([]);
-    expect(zuTun({ consents: { available: false, consents: [] } })).toEqual([]);
+    const [item, ...rest] = zuTun({ consents });
+    expect(rest).toEqual([]);
+    expect(item).toMatchObject({ key: "einwilligung", gruppe: "datenschutz", anzahl: 1, label: "Einwilligung geändert – bitte neu lesen", detail: "Fotos auf der Website", to: "/mein-bereich/datenschutz?tab=einwilligungen" });
+    // Zwei geänderte: die Zahl steht vorn.
+    const zwei = { available: true, consents: [consents.consents[0], { ...consents.consents[0], code: "chat", label: "Chat-Verlauf" }] };
+    expect(zuTun({ consents: zwei })[0]).toMatchObject({ anzahl: 2, label: "2 Einwilligungen geändert – bitte neu lesen", detail: "Fotos auf der Website, Chat-Verlauf" });
+    // Nie beantwortete oder widerrufene freiwillige Einwilligungen bleiben draußen - auch mit Feldern, die der Server nicht schickt.
+    expect(zuTun({ consents: { available: true, consents: [{ ...consents.consents[1], required: true }, consents.consents[2]] } })).toEqual([]);
+    expect(zuTun({ consents: { available: false, consents: consents.consents } })).toEqual([]);
   });
 
   test("Nummer wählen nur, solange keine gewählt ist und gewählt werden darf", () => {

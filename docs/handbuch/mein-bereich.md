@@ -43,7 +43,7 @@ untere Leiste). Der Test dafür steht in `frontend/e2e/mein-bereich.spec.js`.
 | --- | --- | --- |
 | Offene Rechnung bezahlen | eine Rechnung ist offen (gelb, wenn überfällig) | Rechnungen & Unterlagen |
 | Mitgliedsbeitrag offen | der Beitrag ist offen und es gibt dafür noch keine Rechnung | Mitgliedschaft → Beitrag |
-| Einwilligung lesen | eine Einwilligung des Vereins ist nie beantwortet oder ihr Text hat sich geändert (ein Widerruf zählt nicht) | Datenschutz → Einwilligungen |
+| Einwilligung geändert – bitte neu lesen | du hast einer Einwilligung zugestimmt und ihr Text hat sich seither geändert – die Zustimmung deckt den neuen Text nicht. Nie beantwortete oder widerrufene freiwillige Einwilligungen stehen nur unter Datenschutz → Einwilligungen | Datenschutz → Einwilligungen |
 | Nummer wählen | die Wunschnummer ist frei wählbar und noch nicht gewählt | Mitgliedschaft → Meine Nummer |
 | Abstimmung offen / Zur Versammlung antworten | eine Abstimmung läuft oder eine Einladung wartet auf Antwort | Verein → Versammlungen |
 | Gewinn abholen | ein Gewinn ist offen oder bereit | Rechnungen & Unterlagen → Gewinne |

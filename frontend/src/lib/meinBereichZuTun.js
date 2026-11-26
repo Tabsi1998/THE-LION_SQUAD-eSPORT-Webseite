@@ -52,17 +52,18 @@ export function zuTun({ invoices = null, membership = null, consents = null, jer
   if (!open && fee?.tone === "warn") {
     items.push({ key: "beitrag", gruppe: "mitgliedschaft", anzahl: 1, tone: "warn", label: "Mitgliedsbeitrag offen", detail: "Laut Mitgliederverwaltung noch nicht bezahlt.", to: `${BEREICH}/mitgliedschaft#beitrag` });
   }
-  // Nur Pflicht-Einwilligungen drängen (Entscheidung 26.11.): freiwillige, nie beantwortete oder mit neuem Text, stehen
-  // unter Datenschutz → Einwilligungen, aber nicht hier. Pflicht meldet die Mitgliederverwaltung mit `required`.
+  // Nur eine erteilte Einwilligung, deren Text sich seither geändert hat (Entscheidung 26.11., Prüfung #2059): die
+  // Zustimmung deckt den neuen Text nicht. Nie beantwortete oder widerrufene freiwillige stehen unter Datenschutz →
+  // Einwilligungen, aber nicht hier. `text_changed` setzt der Server (membership_routes._consent_view).
   const pending = (consents?.available === true && Array.isArray(consents.consents) ? consents.consents : [])
-    .filter((row) => row.can_give && (row.required === true || row.mandatory === true) && (row.text_changed || !row.state || row.state === "none"));
+    .filter((row) => row.can_give && row.state === "given" && row.text_changed === true);
   if (pending.length) {
     items.push({
       key: "einwilligung",
       gruppe: "datenschutz",
       anzahl: pending.length,
       tone: "brand",
-      label: pending.length === 1 ? "Einwilligung lesen" : `${pending.length} Einwilligungen lesen`,
+      label: pending.length === 1 ? "Einwilligung geändert – bitte neu lesen" : `${pending.length} Einwilligungen geändert – bitte neu lesen`,
       detail: pending.map((row) => row.label).filter(Boolean).join(", "),
       to: `${BEREICH}/datenschutz?tab=einwilligungen`,
     });
