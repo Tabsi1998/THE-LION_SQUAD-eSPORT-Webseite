@@ -38,7 +38,7 @@ export function JoinAction({ server, testId, size = "md" }) {
     );
   }
   if (!server.invite_url) return null;
-  const sizing = size === "sm" ? "px-2 py-1 tls-type-small" : "px-3 py-2 tls-type-small";
+  const sizing = size === "sm" ? "px-2 py-1 tls-type-label" : "px-3 py-2 tls-type-label";
   return (
     <a href={server.invite_url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-join`}
       className={`${sizing} bg-[#5865F2] text-white font-bold uppercase tracking-wider rounded-sm hover:bg-[#4752C4] transition shrink-0`}>

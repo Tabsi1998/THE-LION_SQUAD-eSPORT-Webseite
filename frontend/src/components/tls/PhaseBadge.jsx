@@ -87,7 +87,7 @@ export function PhaseBadge({ phase, status, size = "sm", className = "" }) {
   const when = targetMs && targetMs > now ? whenText(targetMs, { now, days }) : null;
   const remaining = when ? whenPhrase(COUNTDOWN_VERB[normalized.countdown_kind] || "", when) : "";
   const label = [normalized.label || fallbackPhase(status).label, remaining].filter(Boolean).join(" · ");
-  const sz = size === "lg" ? "tls-type-small px-3 py-1" : size === "md" ? "tls-type-small px-2.5 py-1" : "tls-type-small px-2 py-[3px]";
+  const sz = size === "lg" ? "tls-type-small px-3 py-1" : size === "md" ? "tls-type-label px-2.5 py-1" : "tls-type-label px-2 py-[3px]";
 
   return (
     <span className={`inline-flex max-w-full min-w-0 items-center gap-1 font-bold uppercase tracking-wider border rounded-sm tabular-nums whitespace-normal break-words leading-tight ${sz} ${PHASE_STYLES[state] || PHASE_STYLES.announced} ${className}`}>
