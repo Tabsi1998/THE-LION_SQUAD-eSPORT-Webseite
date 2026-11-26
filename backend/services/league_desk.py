@@ -27,6 +27,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import now_utc
+from services import league_start_right_rules
 from services.league_permissions import (
     CAPABILITY_LABELS,
     CONFLICT_DETAIL,
@@ -271,12 +272,18 @@ async def _applications(db, me, season, staffeln) -> list[dict]:
     for row in rows:
         own = belongs_to_side(me, side_of(row), teams.get(row.get("team_id") or ""))
         accepted = row.get("status") == "accepted"
+        # Startrechte (#1627, F.2a): Ein Co-Team ohne Zusage lässt sich noch nicht zuteilen - die Aufgabe führt zu den Startrechten,
+        # fällig ist die Frist der Zusage.
+        open_right = accepted and bool(league_start_right_rules.assign_problem(row, season))
+        until = league_start_right_rules.accept_until(row, season) if open_right else None
         out.append(_item(
             "applications", row["id"], title=row.get("display_name") or "Co-Team",
-            text=("Angenommen, aber noch keiner Staffel zugeteilt." if accepted else
+            text=("Das Startrecht wartet auf die Zusage des Teams. Zuteilen geht danach." if open_right else
+                  "Angenommen, aber noch keiner Staffel zugeteilt." if accepted else
                   "Die Anmeldung wartet auf die Entscheidung: annehmen, auf die Warteliste setzen oder ablehnen."),
-            url=f"/admin/leagues/seasons/{season['id']}#anmeldungen", action="Zuteilen" if accepted else "Entscheiden",
-            due_at=start if start and str(start) > now_utc().isoformat() else None, since=row.get("created_at"),
+            url=f"/admin/leagues/seasons/{season['id']}#{'startrechte' if open_right else 'anmeldungen'}",
+            action="Startrechte ansehen" if open_right else "Zuteilen" if accepted else "Entscheiden",
+            due_at=until.isoformat() if until else start if start and str(start) > now_utc().isoformat() else None, since=row.get("created_at"),
             conflict=SIDE_CONFLICT_DETAIL if own else None, me_id=me.get("id")))
     return out
 

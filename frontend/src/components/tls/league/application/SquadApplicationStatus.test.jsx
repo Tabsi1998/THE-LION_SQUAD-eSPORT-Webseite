@@ -12,11 +12,11 @@ const { TeamsPanel } = await import("@/pages/user/profile/TeamsPanel");
 const TEAM = { id: "t1", name: "Loewen", tag: "LOE", my_role: "leader", can_manage: true, members: [], member_ids: [], squad_count: 2 };
 const SQUADS = [{ id: "s-a", team_id: "t1", name: "Rudel A", status: "active", members: [] }, { id: "s-b", team_id: "t1", name: "Rudel B", status: "active", members: [] }];
 
-function answer(items) {
+function answer(items, startRights = []) {
   return (url) => {
     if (url === "/teams/my") return Promise.resolve({ data: [TEAM] });
     if (url === "/teams/t1/squads") return Promise.resolve({ data: SQUADS });
-    if (url === "/me/league-applications") return items === null ? Promise.reject(new Error("weg")) : Promise.resolve({ data: { items } });
+    if (url === "/me/league-applications") return items === null ? Promise.reject(new Error("weg")) : Promise.resolve({ data: { items, start_rights: startRights } });
     return Promise.resolve({ data: [] });
   };
 }
@@ -57,4 +57,60 @@ test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist, ohne 
   expect(row.querySelector("a")).toBeNull();
   screen.getByTestId("squad-application-withdraw-a3").click();
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a3/withdraw", {}));
+});
+
+// ---------------------------------------------------------------- Startrechte (#1627, docs/LIGA.md „F.2a“)
+
+const CARRY = { from_season_name: "Season 1", from_label: "Liga 2", division_label: "Liga 1", movement: "up", withdraw_until: "2027-01-04T23:00:00+00:00" };
+
+test("Startrecht mit Zusage: Frist, Knopf „Startrecht annehmen“ - und „Zusage offen“ statt „Angemeldet“", async () => {
+  apiMock.post.mockReset();
+  apiMock.get.mockImplementation(answer([
+    { id: "a4", squad_id: "s-a", status: "accepted", title: "Probe-Liga Season 2", url: null, can_withdraw: true,
+      carry_over: { ...CARRY, start_right: { state: "offered", accept_until: "2026-12-15T17:00:00+00:00", can_accept: true, can_decline: false, fills: null } } },
+  ]));
+  apiMock.post.mockResolvedValue({ data: { status: "accepted" } });
+  render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
+  const row = await screen.findByTestId("squad-application-a4");
+  expect(row).toHaveTextContent("Startrecht – Zusage offen");
+  expect(row).not.toHaveTextContent("Angemeldet");
+  expect(screen.getByTestId("squad-start-right-line-a4")).toHaveTextContent("Startrecht für Liga 1: bitte bis 15.12.2026, 18:00 Uhr zusagen. Ohne Zusage verfällt es.");
+  expect(screen.queryByTestId("squad-start-right-decline-a4")).toBeNull();
+  screen.getByTestId("squad-start-right-accept-a4").click();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a4/start-right", { action: "accept" }));
+});
+
+test("ein Nachrücker kann zusagen oder das Nachrücken ablehnen", async () => {
+  apiMock.post.mockReset();
+  apiMock.get.mockImplementation(answer([
+    { id: "a5", squad_id: "s-a", status: "accepted", title: "Probe-Liga Season 2", url: null, can_withdraw: true,
+      carry_over: { ...CARRY, start_right: { state: "offered", accept_until: "2026-12-15T17:00:00+00:00", can_accept: true, can_decline: true, fills: { from_label: "Liga 2" } } } },
+  ]));
+  apiMock.post.mockResolvedValue({ data: { status: "accepted" } });
+  render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
+  expect(await screen.findByTestId("squad-start-right-line-a5")).toHaveTextContent("ohne Antwort bleibt ihr in Liga 2");
+  screen.getByTestId("squad-start-right-decline-a5").click();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a5/start-right", { action: "decline" }));
+});
+
+test("ohne Recht zum Handeln (Kader) steht der Stand da, aber kein Knopf", async () => {
+  apiMock.get.mockImplementation(answer([
+    { id: "a6", squad_id: "s-a", status: "accepted", title: "Probe-Liga Season 2", url: null,
+      carry_over: { ...CARRY, start_right: { state: "accepted", accept_until: null, can_accept: false, can_decline: false, fills: null } } },
+  ]));
+  render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
+  expect(await screen.findByTestId("squad-application-a6")).toHaveTextContent("Zugesagt – Zuteilung folgt");
+  expect(screen.queryByTestId("squad-start-right-accept-a6")).toBeNull();
+});
+
+test("vor der Folge-Season: Prognose und bestätigtes Startrecht stehen beim richtigen Co-Team - mit dem Wort dafür", async () => {
+  apiMock.get.mockImplementation(answer([], [
+    { squad_id: "s-a", season_id: "s1", title: "Probe-Liga Season 1", url: "/liga/probe-liga/season-1", state: "forecast", movement: "up", rank: 1, zone_label: "Aufstieg", division_label: null },
+    { squad_id: "s-b", season_id: "s9", title: "Andere Liga Season 3", url: null, state: "confirmed", movement: "stay", rank: 2, division_label: "Liga 2" },
+  ]));
+  render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
+  const forecast = await screen.findByTestId("squad-start-right-outlook-s-a-s1");
+  expect(forecast).toHaveTextContent("Probe-Liga Season 1");
+  expect(forecast).toHaveTextContent("Prognose nach der laufenden Tabelle: Aufstieg (Platz 1). Fest ist das erst, wenn die Season abgeschlossen ist.");
+  expect(screen.getByTestId("squad-start-right-outlook-s-b-s9")).toHaveTextContent("Bestätigt: Startrecht für Liga 2 in der nächsten Season.");
 });

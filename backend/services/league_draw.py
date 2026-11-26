@@ -26,7 +26,7 @@ import secrets
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_applications as applications
-from services import league_roster, league_service, squad_registration
+from services import league_roster, league_service, league_start_right_rules, squad_registration
 from services import league_staffel_plan as plan
 from services.league_permissions import belongs_to_side, override_reason, record_override, side_of
 from services.league_scope import ONLY_LEAGUE
@@ -105,8 +105,11 @@ def _state(ctx: dict, division: dict, draft: dict | None = None) -> dict:
     wartend und nicht als Teilnehmer - so bleibt der Entwurf gültig, bis alle stehen."""
     label = league_service.division_label(division)
     done = {row["id"] for row in ctx["accepted"] if draft and (row.get("assignment") or {}).get("draw_id") == draft.get("id")}
-    waiting = [row for row in ctx["accepted"]
-               if (not row.get("assignment") or row["id"] in done) and applications.target_division_id(row, ctx["divisions"]) == division["id"]]
+    here = [row for row in ctx["accepted"]
+            if (not row.get("assignment") or row["id"] in done) and applications.target_division_id(row, ctx["divisions"]) == division["id"]]
+    # Startrechte (#1627, F.2a): Ins Los kommt nur, wer zugesagt hat - wer noch offen ist, steht daneben (``waiting_start_right``).
+    waiting = [row for row in here if not league_start_right_rules.assign_problem(row, ctx["season"])]
+    open_rights = [row for row in here if league_start_right_rules.assign_problem(row, ctx["season"])]
     staffeln, problem = [], None
     rows = sorted((row for row in ctx["tournaments"] if row["league_context"].get("division_id") == division["id"]),
                   key=lambda row: str(row["league_context"].get("staffel") or ""))
@@ -131,7 +134,7 @@ def _state(ctx: dict, division: dict, draft: dict | None = None) -> dict:
     elif len(staffeln) == 1:
         problem = ONE_STAFFEL.format(label=label)
     entries = [{"key": row["squad_id"], "team_id": row["team_id"]} for row in waiting]
-    return {"label": label, "waiting": waiting, "done": done, "staffeln": staffeln, "problem": problem, "entries": entries,
+    return {"label": label, "waiting": waiting, "open_rights": open_rights, "done": done, "staffeln": staffeln, "problem": problem, "entries": entries,
             "input_hash": plan.input_hash(entries, staffeln, siblings_allowed=ctx["siblings"])}
 
 
@@ -237,6 +240,7 @@ async def _division_view(db, ctx: dict, division: dict, user: dict, names: dict[
                       "max_participants": row["capacity"], "seats": row["seats"]} for row in state["staffeln"]],
         "waiting": [{"application_id": row["id"], "squad_id": row["squad_id"], "display_name": row.get("display_name"),
                      "carry_over": bool(row.get("carry_over"))} for row in still],
+        "waiting_start_right": [{"application_id": row["id"], "display_name": row.get("display_name")} for row in state["open_rights"]],
         "suggestion": _suggestion(ctx, division, state),
         "problem": state["problem"],
         "can_draw": not state["problem"] and bool(still),

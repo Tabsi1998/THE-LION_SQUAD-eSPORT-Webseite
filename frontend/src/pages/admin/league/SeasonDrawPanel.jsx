@@ -11,7 +11,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { ConflictReasonField, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatApiError } from "@/lib/api";
-import { DRAW_REASON_MIN, divisionNeedsDraw, drawLogLine, drawStatusLine, drawVisible, drawWhen, staffelnLine, swapPartners, waitingLine } from "@/lib/leagueDraw";
+import { DRAW_REASON_MIN, divisionNeedsDraw, drawLogLine, drawStatusLine, drawVisible, drawWhen, openRightsLine, staffelnLine, swapPartners, waitingLine } from "@/lib/leagueDraw";
 
 const BUTTON = "inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
 const HEADING = "text-[11px] font-bold uppercase tracking-[0.2em] text-white/50";
@@ -220,6 +220,7 @@ function DivisionRow({ division, superadmin, busy, onDraw, onOpen }) {
         ) : null}
       </div>
       <SeatCheck suggestion={division.suggestion} testId={`draw-seats-${division.level}`} />
+      {openRightsLine(division) ? <p className="text-xs text-warn [overflow-wrap:anywhere]" data-testid={`draw-open-rights-${division.level}`}>{openRightsLine(division)}</p> : null}
       {draw ? <p className={`text-xs ${draw.stale ? "text-warn" : "text-white/70"}`} data-testid={`draw-state-${division.level}`}>{drawStatusLine(draw)}</p> : null}
       {!draw && division.problem && division.waiting.length ? <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`draw-problem-${division.level}`}>{division.problem}</p> : null}
       {!draw && division.can_draw && blockedOwn ? <OwnTeamNote testId={`draw-own-team-${division.level}`} /> : null}
