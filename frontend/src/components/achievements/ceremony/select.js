@@ -128,6 +128,13 @@ export function planCeremony(pkg) {
   if (pkg?.rewards?.length) {
     return { id: pkg.id || `rewards-${pkg.rewards[0].id}`, sequence: "reward", rewards: pkg.rewards, particles: 0, tiers: [], levelUp: null };
   }
+  // Saisonende-Moment (#1639): Aufstieg, Abstieg oder Meister - ruhig, ohne Partikel (components/tls/league/moment/SeasonMoment). Hat die
+  // Prüfung vor dem Anzeigen nichts übrig gelassen (ein anderes Gerät war schneller), gibt es nichts zu zeigen.
+  if (pkg?.moments) {
+    if (!pkg.moments.length) return null;
+    return { id: pkg.id || `moments-${pkg.moments[0].id}`, sequence: "season", moment: pkg.moments[0], moments: pkg.moments, particles: 0,
+      tiers: [], levelUp: null };
+  }
   const levelUp = pkg?.levelUp || null;
   const tiers = sortByRank((pkg?.tiers || []).filter((t) => !isNegative(t)));
   if (!tiers.length && !levelUp) return null;

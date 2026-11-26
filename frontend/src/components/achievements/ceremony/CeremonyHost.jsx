@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { PlacementMoment } from "@/components/tls/podium/PlacementMoment";
 import { RewardMoment } from "@/components/tls/rewards/RewardMoment";
+import { SeasonMoment } from "@/components/tls/league/moment/SeasonMoment";
 import { Ceremony } from "./Ceremony";
 import { ceremonyQueue } from "./queue";
 import { planCeremony } from "./select";
@@ -38,7 +39,7 @@ export function CeremonyHost({ queue = ceremonyQueue, quietPrefixes = QUIET_PREF
   const plan = useMemo(() => (current && !pendingCheck ? planCeremony(current) : null), [current, pendingCheck]);
   const close = useCallback(() => queue.advance(), [queue]);
   // Die Zurück-Taste (Browser, Handy) schließt die Zeremonie wie X, Tipp daneben oder Escape - und zählt als gesehen.
-  const ceremonyOpen = Boolean(plan && !quiet && !["placement", "reward"].includes(plan.sequence));
+  const ceremonyOpen = Boolean(plan && !quiet && !["placement", "reward", "season"].includes(plan.sequence));
   useEffect(() => {
     if (!ceremonyOpen) return undefined;
     window.addEventListener("popstate", close);
@@ -48,6 +49,7 @@ export function CeremonyHost({ queue = ceremonyQueue, quietPrefixes = QUIET_PREF
     <AnimatePresence>
       {plan && !quiet && plan.sequence === "placement" ? <PlacementMoment key={plan.id} plan={plan} onClose={close} reduced={reduced} /> : null}
       {plan && !quiet && plan.sequence === "reward" ? <RewardMoment key={plan.id} plan={plan} onClose={close} reduced={reduced} /> : null}
+      {plan && !quiet && plan.sequence === "season" ? <SeasonMoment key={plan.id} plan={plan} onClose={close} reduced={reduced} /> : null}
       {ceremonyOpen ? <Ceremony key={plan.id} plan={plan} onClose={close} user={user} reduced={reduced} sound={sound} /> : null}
     </AnimatePresence>
   );
