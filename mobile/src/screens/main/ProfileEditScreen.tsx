@@ -12,13 +12,14 @@ import { platformLinkUrl } from "../../lib/platformLinks";
 import { ACCOUNT_CHANGED_MESSAGE, type SaveResult } from "../../lib/profileSaveQueue";
 import { useProfileSaveQueue } from "../../lib/useProfileSaveQueue";
 import { Field, labelFor, profileStyles, setField, Toggle, WEB_BASE_URL } from "./profile/parts";
-import { colors } from "../../theme";
+import { colors, radius } from "../../theme";
+import { selectFeedback } from "../../components/motion";
 
 // Profil bearbeiten (#1146): früher ein Reiter im Profil, jetzt eine eigene Seite - erreichbar über Einstellungen → Konto
 // und über „Nur für dich“ im Profil, wenn noch etwas fehlt. Gespeichert wird nur, was hier steht.
 
 const PROFILE_FIELDS = [
-  "display_name", "first_name", "last_name", "bio", "country", "city", "avatar_url", "banner_url", "main_platform", "preferred_role", "input_device",
+  "display_name", "first_name", "last_name", "bio", "country", "city", "avatar_url", "banner_url", "main_platform", "preferred_role",
   "discord_name", "twitch_handle", "youtube_handle", "tiktok_handle", "instagram_handle", "x_handle", "steam_id", "epic_id", "psn_id", "xbox_id",
   "nintendo_fc", "ea_id", "riot_id", "battlenet_id", "faceit_handle", "startgg_handle", "roblox_handle", "osu_handle", "lichess_handle",
   "github_handle", "kick_handle", "reddit_handle", "spotify_handle", "threads_handle", "facebook_handle", "linkedin_handle", "snapchat_handle",
@@ -31,6 +32,8 @@ export function profileEditForm(user: Record<string, any> | null | undefined): R
   PROFILE_FIELDS.forEach((key) => { form[key] = u[key] || ""; });
   form.nintendo_fc = u.nintendo_fc || u.switch_code || "";
   form.favorite_games = Array.isArray(u.favorite_games) ? u.favorite_games.join(", ") : "";
+  // Eingabegeräte (#2542, #2126): Mehrfachauswahl wie im Web - der alte Einzelwert `input_device` zählt als Vorauswahl.
+  form.input_devices = Array.isArray(u.input_devices) ? u.input_devices.map(String) : u.input_device ? [String(u.input_device)] : [];
   // Spiel-Rollen im Discord (#629): Vorgabe an - wie im Web.
   form.discord_game_roles = u.discord_game_roles !== false;
   return form;
@@ -42,6 +45,41 @@ export function profileEditPayload(form: Record<string, any>): Record<string, an
     ...form,
     favorite_games: String(form.favorite_games || "").split(",").map((value) => value.trim()).filter(Boolean),
   };
+}
+
+/** Die Eingabegeräte wie im Web (pages/user/profile/constants.js `INPUT_DEVICES`). */
+export const INPUT_DEVICES: Array<{ value: string; label: string }> = [
+  { value: "keyboard_mouse", label: "Tastatur + Maus" },
+  { value: "controller", label: "Controller" },
+  { value: "wheel", label: "Lenkrad" },
+  { value: "fightstick", label: "Fightstick" },
+  { value: "mobile_touch", label: "Touch / Mobile" },
+  { value: "arcade", label: "Arcade Stick" },
+];
+
+/** Mehrfachauswahl als Chips: antippen wählt, noch einmal antippen nimmt es weg. Die Reihenfolge bleibt die der Liste. */
+function InputDeviceChoice({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+  const chosen = new Set(value);
+  const toggle = (key: string) => {
+    selectFeedback();
+    onChange(INPUT_DEVICES.map((option) => option.value).filter((option) => (option === key ? !chosen.has(option) : chosen.has(option))));
+  };
+  return (
+    <View style={styles.devices}>
+      <Muted>Eingabegeräte</Muted>
+      <View style={styles.chips} accessibilityLabel="Eingabegeräte">
+        {INPUT_DEVICES.map((option) => {
+          const on = chosen.has(option.value);
+          return (
+            <Pressable key={option.value} onPress={() => toggle(option.value)} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={option.label}
+              hitSlop={4} style={[styles.chip, on && styles.chipOn]} testID={`profile-input-device-${option.value}`}>
+              <Body style={[styles.chipText, on && styles.chipTextOn]}>{option.label}</Body>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 function saveProblem(result: SaveResult) {
@@ -183,7 +221,7 @@ export function ProfileEditScreen() {
           <Field label="Lieblingsspiele, getrennt mit Komma" value={form.favorite_games} onChangeText={(v) => setField(setForm, "favorite_games", v)} />
           <Field label="Hauptplattform" value={form.main_platform} onChangeText={(v) => setField(setForm, "main_platform", v)} />
           <Field label="Bevorzugte Rolle" value={form.preferred_role} onChangeText={(v) => setField(setForm, "preferred_role", v)} />
-          <Field label="Eingabegerät" value={form.input_device} onChangeText={(v) => setField(setForm, "input_device", v)} />
+          <InputDeviceChoice value={form.input_devices || []} onChange={(next) => setField(setForm, "input_devices", next)} />
         </Card>
         <Card style={profileStyles.card}>
           <Heading>Konten</Heading>
@@ -220,6 +258,12 @@ export function ProfileEditScreen() {
 }
 
 const styles = StyleSheet.create({
+  devices: { gap: 6 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { borderColor: colors.border, borderRadius: radius.sm, borderWidth: 1, justifyContent: "center", minHeight: 40, paddingHorizontal: 12, paddingVertical: 8 },
+  chipOn: { backgroundColor: "rgba(41,182,232,0.14)", borderColor: colors.cyan },
+  chipText: { fontSize: 14 },
+  chipTextOn: { color: colors.white, fontWeight: "800" },
   initials: {
     color: colors.cyan,
     fontSize: 26,
