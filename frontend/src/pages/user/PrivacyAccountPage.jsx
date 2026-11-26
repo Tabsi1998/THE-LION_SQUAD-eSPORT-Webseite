@@ -50,6 +50,10 @@ export function DatenHerunterladen() {
   );
 }
 
+// Dialog und Seite prüfen gleich (#2059): Leerzeichen am Rand zählen nicht - sonst ließe der Dialog „ LÖSCHEN “ durch
+// und die Seite schlösse ihn still, ohne zu löschen.
+const bestaetigt = (value) => String(value ?? "").trim() === "LÖSCHEN";
+
 /** Konto löschen: unwiderruflich, mit Rückfrage. Rollen in Teams gibt man vorher ab (#2113) - der Weg steht dabei. */
 export function KontoLoeschen() {
   const { user, logout } = useAuth();
@@ -70,13 +74,13 @@ export function KontoLoeschen() {
       description: "Das lässt sich nicht rückgängig machen. Deine persönlichen Daten werden überschrieben.",
       // Sichtbare Beschriftung statt Platzhalter (#2059): ein leeres Feld sieht nicht wie schon ausgefüllt aus.
       label: "Tippe LÖSCHEN zur Bestätigung",
-      validate: (value) => (value.trim() === "LÖSCHEN" ? "" : "Bitte genau LÖSCHEN eintippen – in Großbuchstaben."),
+      validate: (value) => (bestaetigt(value) ? "" : "Bitte genau LÖSCHEN eintippen – in Großbuchstaben."),
       confirmLabel: "Konto löschen",
       tone: "danger",
       multiline: false,
       required: true,
     });
-    if (answer !== "LÖSCHEN") return;
+    if (!bestaetigt(answer)) return;
     setBusy(true);
     try {
       await api.post("/dsgvo/anonymize-me");

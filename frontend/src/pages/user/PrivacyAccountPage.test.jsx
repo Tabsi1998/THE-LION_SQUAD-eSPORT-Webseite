@@ -72,6 +72,19 @@ test("ohne Rolle: kein Hinweis, Löschen über die Rückfrage wie bisher", async
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/dsgvo/anonymize-me"));
 });
 
+// Prüfung #2059: Dialog und Seite vergleichen gleich - mit Leerzeichen am Rand geht es los, statt still zu schließen.
+test("Leerzeichen um das Wort: der Dialog lässt es durch, also löscht die Seite auch", async () => {
+  serve({ can_erase: true, blockers: [], message: null });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  promptMock.mockResolvedValue(" LÖSCHEN ");
+  render(<MemoryRouter><KontoLoeschen /></MemoryRouter>);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/dsgvo/anonymize-me/check", expect.anything()));
+  fireEvent.click(screen.getByTestId("dsgvo-anonymize-btn"));
+  await waitFor(() => expect(promptMock).toHaveBeenCalled());
+  expect(promptMock.mock.calls[0][0].validate(" LÖSCHEN ")).toBe("");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/dsgvo/anonymize-me"));
+});
+
 test("Daten herunterladen: ein Knopf mit dem neuen Namen", () => {
   render(<MemoryRouter><DatenHerunterladen /></MemoryRouter>);
   expect(screen.getByTestId("dsgvo-export-btn")).toHaveTextContent(/^Daten herunterladen$/);
