@@ -38,15 +38,15 @@ export function HonourCard({ honour, showReach = false }) {
           <Award className="w-5 h-5" />
         </span>
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FFD700]">{honour.kind_label || "Ehrung"}</div>
-          <div className="font-heading text-lg font-black leading-tight text-white">{honour.title}</div>
-          {honour.label ? <div className="text-sm text-white/65 mt-0.5">{honour.label}</div> : null}
-          <div className="text-xs text-white/45 mt-1">
+          <div className="tls-type-label text-[#FFD700]">{honour.kind_label || "Ehrung"}</div>
+          <div className="tls-type-card leading-tight text-white">{honour.title}</div>
+          {honour.label ? <div className="tls-type-small text-white/65 mt-0.5">{honour.label}</div> : null}
+          <div className="tls-type-small text-white/45 mt-1">
             {honour.given_on ? `Verliehen am ${honourDay(honour.given_on)}` : null}
             {honour.years ? ` · ${honour.years} Jahre im Verein` : null}
           </div>
           {showReach ? (
-            <div className={`text-[11px] mt-2 ${honour.publishable ? "text-[#00FF88]" : "text-white/40"}`}>
+            <div className={`tls-type-small mt-2 ${honour.publishable ? "text-[#00FF88]" : "text-white/40"}`}>
               {honour.publishable ? "Darf aufs Profil – mit deinem Schalter oben" : "Nur für dich – der Verein gibt sie nicht frei"}
             </div>
           ) : null}
@@ -61,31 +61,31 @@ function ParticipationsSection({ view }) {
   return (
     <section className="space-y-3" data-testid="participations-panel">
       <div>
-        <h2 className="font-heading text-xl font-black uppercase">Meine Teilnahmen</h2>
-        <p className="text-sm text-white/55 mt-1">
+        <h2 className="tls-type-section">Meine Teilnahmen</h2>
+        <p className="tls-type-body text-white/55 mt-1">
           Was deine Mitgliederakte als Teilnahme führt: Vereinsevents mit Check-in, Turniere, Helferdienste und was der Vorstand einträgt. Nur du siehst das.
         </p>
       </div>
       {view.participations_text ? (
-        <p className="text-sm text-white/60 border border-white/10 rounded-sm p-4" data-testid="participations-reason">{view.participations_text}</p>
+        <p className="tls-type-body text-white/60 border border-white/10 rounded-sm p-4" data-testid="participations-reason">{view.participations_text}</p>
       ) : groups.length ? (
         groups.map((group) => (
           <div key={group.year} className="space-y-1" data-testid={`participations-${group.year}`}>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">
+            <div className="tls-type-label text-white/45">
               {group.year} · {group.rows.length} {group.rows.length === 1 ? "Teilnahme" : "Teilnahmen"}
             </div>
             <ul className="divide-y divide-white/5 border border-white/10 rounded-sm">
               {group.rows.map((row, index) => (
                 <li key={`${row.day}-${row.title}-${index}`} className="px-3 py-2" data-testid="participation-row">
-                  <div className="text-sm font-bold text-white">{row.title}</div>
-                  <div className="text-xs text-white/45">{participationLine(row)}</div>
+                  <div className="tls-type-small font-bold text-white">{row.title}</div>
+                  <div className="tls-type-small text-white/45">{participationLine(row)}</div>
                 </li>
               ))}
             </ul>
           </div>
         ))
       ) : (
-        <p className="text-sm text-white/45" data-testid="participations-empty">In deiner Mitgliederakte steht noch keine Teilnahme.</p>
+        <p className="tls-type-small text-white/45" data-testid="participations-empty">In deiner Mitgliederakte steht noch keine Teilnahme.</p>
       )}
     </section>
   );
@@ -121,17 +121,17 @@ export function HonoursPanel() {
     }
   };
 
-  if (!view) return <div className="text-sm text-white/45" data-testid="honours-loading">Lade Ehrungen …</div>;
+  if (!view) return <div className="tls-type-small text-white/45" data-testid="honours-loading">Lade Ehrungen …</div>;
   const honours = view.honours || [];
   return (
     <div className="space-y-8">
       <section className="space-y-4" data-testid="honours-panel">
         <div>
-          <h2 className="font-heading text-xl font-black uppercase">Meine Ehrungen</h2>
-          <p className="text-sm text-white/55 mt-1">Ehrenmitgliedschaft, Verdienstnadel, Jubiläum – was der Vorstand in deiner Mitgliederakte als Ehrung einträgt.</p>
+          <h2 className="tls-type-section">Meine Ehrungen</h2>
+          <p className="tls-type-body text-white/55 mt-1">Ehrenmitgliedschaft, Verdienstnadel, Jubiläum – was der Vorstand in deiner Mitgliederakte als Ehrung einträgt.</p>
         </div>
         {!view.available ? (
-          <p className="text-sm text-white/60 border border-white/10 rounded-sm p-4" data-testid="honours-reason">{view.text}</p>
+          <p className="tls-type-body text-white/60 border border-white/10 rounded-sm p-4" data-testid="honours-reason">{view.text}</p>
         ) : (
           <>
             <SwitchRow
@@ -148,7 +148,7 @@ export function HonoursPanel() {
                 {honours.map((honour) => <HonourCard key={`${honour.kind}-${honour.given_on}-${honour.title}`} honour={honour} showReach />)}
               </ul>
             ) : (
-              <p className="text-sm text-white/45" data-testid="honours-empty">In deiner Mitgliederakte steht noch keine Ehrung.</p>
+              <p className="tls-type-small text-white/45" data-testid="honours-empty">In deiner Mitgliederakte steht noch keine Ehrung.</p>
             )}
           </>
         )}

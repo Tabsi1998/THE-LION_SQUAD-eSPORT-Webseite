@@ -46,36 +46,36 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
     <div id={`meeting-${id}`} className={`border rounded-sm bg-[#121212] p-5 scroll-mt-24 ${meeting.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`meeting-${id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">{meeting.kind_label}</div>
-          <h2 className="font-heading text-xl font-black uppercase mt-1">{meeting.title}</h2>
-          <div className="mt-1 text-sm text-white/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="tls-type-label text-[#FFD700]">{meeting.kind_label}</div>
+          <h2 className="tls-type-section mt-1">{meeting.title}</h2>
+          <div className="mt-1 tls-type-small text-white/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-[#FFD700]" /> {meetingWhen(meeting)}</span>
             <span>{meeting.format_label}</span>
             {meeting.place ? <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {meeting.place}</span> : null}
           </div>
         </div>
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${meeting.status === "invited" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`meeting-${id}-status`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${meeting.status === "invited" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`meeting-${id}-status`}>
           {meeting.status_label}
         </span>
       </div>
 
       {meeting.access ? (
-        <a href={meeting.access} target="_blank" rel="noreferrer" data-testid={`meeting-${id}-access`} className="mt-3 inline-flex items-center gap-1.5 text-sm text-[#29B6E8] hover:underline">
+        <a href={meeting.access} target="_blank" rel="noreferrer" data-testid={`meeting-${id}-access`} className="mt-3 inline-flex items-center gap-1.5 tls-type-small text-[#29B6E8] hover:underline">
           <Video className="w-4 h-4" /> Online teilnehmen
         </a>
       ) : null}
 
       {meeting.agenda.length ? (
         <div className="mt-4" data-testid={`meeting-${id}-agenda`}>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-1.5">Tagesordnung</div>
-          <ol className="list-decimal list-inside text-sm text-white/80 space-y-0.5">
+          <div className="tls-type-label text-white/45 mb-1.5">Tagesordnung</div>
+          <ol className="list-decimal list-inside tls-type-small text-white/80 space-y-0.5">
             {meeting.agenda.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
           </ol>
         </div>
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2" data-testid={`meeting-${id}-response`}>
-        <span className="text-sm text-white/70">Deine Antwort: <strong className="text-white">{meeting.response_label}</strong>{meeting.voting ? " · stimmberechtigt" : ""}</span>
+        <span className="tls-type-small text-white/70">Deine Antwort: <strong className="text-white">{meeting.response_label}</strong>{meeting.voting ? " · stimmberechtigt" : ""}</span>
         {meeting.can_respond ? RESPONSES.map(([code, label]) => (
           <button
             key={code}
@@ -83,20 +83,20 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
             onClick={() => onRespond(meeting, code)}
             disabled={busy === `respond-${id}` || meeting.response === code}
             data-testid={`meeting-${id}-respond-${code}`}
-            className={`px-3 py-1.5 rounded-sm border text-[11px] font-bold uppercase tracking-wider transition disabled:opacity-60 ${meeting.response === code ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/70 hover:border-[#FFD700]/60 hover:text-white"}`}
+            className={`px-3 py-1.5 rounded-sm border tls-type-label transition disabled:opacity-60 ${meeting.response === code ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/70 hover:border-[#FFD700]/60 hover:text-white"}`}
           >
             {label}
           </button>
         )) : null}
       </div>
-      <p className="mt-1 text-xs text-white/40">Zu- oder Absage ist keine Anwesenheit und keine Stimme – die Anwesenheitsliste führt der Verein in der Versammlung.</p>
+      <p className="mt-1 tls-type-small text-white/40">Zu- oder Absage ist keine Anwesenheit und keine Stimme – die Anwesenheitsliste führt der Verein in der Versammlung.</p>
 
       {calendarItem ? (
         askCalendar ? (
           <div className="mt-4 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 flex flex-wrap items-center gap-3" data-testid={`meeting-${id}-calendar-ask`}>
-            <span className="text-sm text-white/85 font-bold">Im Kalender eintragen?</span>
+            <span className="tls-type-small text-white/85 font-bold">Im Kalender eintragen?</span>
             <AddToCalendar item={calendarItem} testId={`meeting-${id}-calendar`} />
-            <button type="button" onClick={onAskDone} className="text-xs text-white/55 hover:text-white underline-offset-4 hover:underline" data-testid={`meeting-${id}-calendar-ask-no`}>Nein danke</button>
+            <button type="button" onClick={onAskDone} className="tls-type-small text-white/55 hover:text-white underline-offset-4 hover:underline" data-testid={`meeting-${id}-calendar-ask-no`}>Nein danke</button>
           </div>
         ) : (
           <AddToCalendar item={calendarItem} className="mt-4" testId={`meeting-${id}-calendar`} />
@@ -105,14 +105,14 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
 
       {(meeting.can_motion || meeting.motions.length) ? (
         <div className="mt-5 border-t border-white/10 pt-4">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-2">Anträge zur Tagesordnung</div>
+          <div className="tls-type-label text-white/45 mb-2">Anträge zur Tagesordnung</div>
           {meeting.motions.length ? (
             <ul className="space-y-2 mb-3" data-testid={`meeting-${id}-motions`}>
               {meeting.motions.map((motion) => (
-                <li key={motion.external_id} className="border border-white/10 rounded-sm p-3 text-sm" data-testid={`motion-${motion.external_id}`}>
+                <li key={motion.external_id} className="border border-white/10 rounded-sm p-3 tls-type-small" data-testid={`motion-${motion.external_id}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold text-white">{motion.title}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/55">{motion.status_label}{motion.late ? " · verspätet" : ""}</span>
+                    <span className="tls-type-label text-white/55">{motion.status_label}{motion.late ? " · verspätet" : ""}</span>
                   </div>
                   {motion.text ? <p className="mt-1 text-white/70 whitespace-pre-line">{motion.text}</p> : null}
                 </li>
@@ -122,7 +122,7 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
           {meeting.can_motion ? (
             <form onSubmit={submit} className="space-y-2" data-testid={`meeting-${id}-motion-form`}>
               {meeting.motion_deadline ? (
-                <p className={`text-xs ${meeting.motion_late ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`meeting-${id}-motion-deadline`}>
+                <p className={`tls-type-small ${meeting.motion_late ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`meeting-${id}-motion-deadline`}>
                   {meeting.motion_late
                     ? `Die Frist der Statuten (${formatDay(meeting.motion_deadline)}) ist vorbei – ein Antrag gilt als verspätet; ob er dennoch drankommt, entscheidet der Vorstand.`
                     : `Anträge bis ${formatDay(meeting.motion_deadline)} gelten als rechtzeitig.`}
@@ -130,7 +130,7 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
               ) : null}
               <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} placeholder="Titel des Antrags" data-testid={`meeting-${id}-motion-title`} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-sm" />
               <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={5000} rows={3} placeholder="Begründung (optional)" data-testid={`meeting-${id}-motion-text`} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-sm" />
-              <button type="submit" disabled={busy === `motion-${id}` || title.trim().length < 3} data-testid={`meeting-${id}-motion-submit`} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider text-xs rounded-sm disabled:opacity-50">
+              <button type="submit" disabled={busy === `motion-${id}` || title.trim().length < 3} data-testid={`meeting-${id}-motion-submit`} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">
                 <Send className="w-3.5 h-3.5" /> Antrag einreichen
               </button>
             </form>
@@ -148,16 +148,16 @@ function BallotCard({ ballot, busy, onVote }) {
     <div className={`border rounded-sm bg-[#121212] p-5 ${open ? "border-[#29B6E8]/50" : "border-white/10"}`} data-testid={`ballot-${id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">{ballot.kind_label} · {ballot.meeting}{ballot.item ? ` · TOP ${ballot.item}` : ""}</div>
-          <h3 className="font-heading text-lg font-black uppercase mt-1">{ballot.question}</h3>
-          <div className="mt-1 text-xs text-white/55">{formatDay(ballot.day)}{ballot.closes ? ` · offen bis ${ballot.closes} Uhr` : ""}</div>
+          <div className="tls-type-label text-[#29B6E8]">{ballot.kind_label} · {ballot.meeting}{ballot.item ? ` · TOP ${ballot.item}` : ""}</div>
+          <h3 className="tls-type-card mt-1">{ballot.question}</h3>
+          <div className="mt-1 tls-type-small text-white/55">{formatDay(ballot.day)}{ballot.closes ? ` · offen bis ${ballot.closes} Uhr` : ""}</div>
         </div>
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${open ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`} data-testid={`ballot-${id}-status`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${open ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`} data-testid={`ballot-${id}-status`}>
           {ballot.status_label}
         </span>
       </div>
       {ballot.secret ? (
-        <p className="mt-3 text-xs text-white/60" data-testid={`ballot-${id}-secret`}>
+        <p className="mt-3 tls-type-small text-white/60" data-testid={`ballot-${id}-secret`}>
           Geheime Wahl auf Papier: abgestimmt wird im Saal auf Stimmzetteln, nicht hier.
         </p>
       ) : null}
@@ -165,12 +165,12 @@ function BallotCard({ ballot, busy, onVote }) {
       <div className="mt-4 space-y-3">
         {ballot.rights.map((right) => (
           <div key={`${right.right_id}-${right.for}-${right.name}`} className="border border-white/10 rounded-sm p-3" data-testid={`ballot-${id}-right-${right.right_id}`}>
-            <div className="text-sm text-white/80">
+            <div className="tls-type-small text-white/80">
               {right.for === "proxy" ? `Vollmacht von ${right.name}` : "Dein Stimmrecht"}
               <span className="text-white/45"> · {right.reason_text}</span>
             </div>
             {right.state === "used" ? (
-              <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-[#00FF88]" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
+              <div className="mt-1 inline-flex items-center gap-1.5 tls-type-small text-[#00FF88]" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
                 <CheckCircle2 className="w-4 h-4" /> {ballot.secret ? "Stimmzettel erhalten" : `abgestimmt: ${right.option_label || right.option}`}
               </div>
             ) : open && right.can_use && !ballot.secret ? (
@@ -182,32 +182,32 @@ function BallotCard({ ballot, busy, onVote }) {
                     onClick={() => onVote(ballot, right, option)}
                     disabled={busy === `vote-${id}`}
                     data-testid={`ballot-${id}-vote-${right.right_id}-${option.code}`}
-                    className="px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] text-[11px] font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label hover:bg-[#29B6E8]/10 disabled:opacity-50"
                   >
                     {option.label}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="mt-1 text-xs text-white/45">
+              <div className="mt-1 tls-type-small text-white/45">
                 {right.state === "none" ? "Mit diesem Stimmrecht kannst du hier nicht abstimmen." : ballot.secret ? "Den Stimmzettel bekommst du im Saal."
                   : open ? "" : "Abstimmen geht nur, solange die Abstimmung offen ist."}
               </div>
             )}
           </div>
         ))}
-        {!ballot.rights.length ? <p className="text-xs text-white/45">Kein Stimmrecht für dich bei dieser Abstimmung.</p> : null}
+        {!ballot.rights.length ? <p className="tls-type-small text-white/45">Kein Stimmrecht für dich bei dieser Abstimmung.</p> : null}
       </div>
 
       {ballot.result ? (
-        <div className="mt-4 border-t border-white/10 pt-3 text-sm" data-testid={`ballot-${id}-result`}>
+        <div className="mt-4 border-t border-white/10 pt-3 tls-type-small" data-testid={`ballot-${id}-result`}>
           <div className="font-bold text-white">Ergebnis: {ballot.result.outcome_label}{ballot.result.winner_label ? ` – ${ballot.result.winner_label}` : ""}</div>
           <div className="mt-1 text-white/70">
             {ballot.result.counts.map((row) => `${row.label} ${row.count}`).join(" · ")} · gültig {ballot.result.valid}
           </div>
         </div>
       ) : ballot.status === "closed" || ballot.status === "evaluated" ? (
-        <p className="mt-3 text-xs text-white/45">Das Ergebnis erscheint, sobald die Versammlungsleitung es bestätigt hat.</p>
+        <p className="mt-3 tls-type-small text-white/45">Das Ergebnis erscheint, sobald die Versammlungsleitung es bestätigt hat.</p>
       ) : null}
     </div>
   );
@@ -291,30 +291,30 @@ export default function MemberMeetingsPage() {
   return (
     <>
       <section className="min-w-0" data-testid="meetings-page">
-        <p className="text-sm text-white/60 max-w-2xl">Einladungen, Tagesordnung, Anträge und Abstimmungen deiner Generalversammlungen – so, wie der Verein sie in der Mitgliederverwaltung führt.</p>
+        <p className="tls-type-body text-white/60 max-w-2xl">Einladungen, Tagesordnung, Anträge und Abstimmungen deiner Generalversammlungen – so, wie der Verein sie in der Mitgliederverwaltung führt.</p>
 
-        {view === null ? <p className="mt-8 text-sm text-white/45" data-testid="meetings-loading">Wird geladen …</p> : null}
+        {view === null ? <p className="mt-8 tls-type-small text-white/45" data-testid="meetings-loading">Wird geladen …</p> : null}
 
         {view && !view.available ? (
-          <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5 text-sm text-white/70" data-testid="meetings-unavailable">
+          <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5 tls-type-small text-white/70" data-testid="meetings-unavailable">
             {view.text || "Versammlungen sind hier noch nicht verfügbar."}
-            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/mein-bereich/mitgliedschaft" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Mitgliedschaft</Link></div> : null}
+            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/mein-bereich/mitgliedschaft" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">Zur Mitgliedschaft</Link></div> : null}
           </div>
         ) : null}
 
         {view && view.available ? (
           <>
-            <h2 className="mt-8 font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Vote className="w-4 h-4 text-[#29B6E8]" /> Abstimmungen</h2>
-            {view.ballots_reason ? <p className="mt-2 text-sm text-white/60" data-testid="ballots-reason">{view.ballots_text}</p> : null}
-            {!view.ballots_reason && !ballots.length ? <p className="mt-2 text-sm text-white/45" data-testid="ballots-empty">Derzeit keine Abstimmung freigegeben.</p> : null}
+            <h2 className="mt-8 tls-type-section inline-flex items-center gap-2"><Vote className="w-4 h-4 text-[#29B6E8]" /> Abstimmungen</h2>
+            {view.ballots_reason ? <p className="mt-2 tls-type-body text-white/60" data-testid="ballots-reason">{view.ballots_text}</p> : null}
+            {!view.ballots_reason && !ballots.length ? <p className="mt-2 tls-type-small text-white/45" data-testid="ballots-empty">Derzeit keine Abstimmung freigegeben.</p> : null}
             <div className="mt-3 space-y-4">
               {openBallots.map((ballot) => <BallotCard key={ballot.id} ballot={ballot} busy={busy} onVote={vote} />)}
               {doneBallots.map((ballot) => <BallotCard key={ballot.id} ballot={ballot} busy={busy} onVote={vote} />)}
             </div>
 
-            <h2 className="mt-10 font-heading text-lg font-black uppercase inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Versammlungen</h2>
-            {view.meetings_reason ? <p className="mt-2 text-sm text-white/60" data-testid="meetings-reason">{view.meetings_text}</p> : null}
-            {!view.meetings_reason && !meetings.length ? <p className="mt-2 text-sm text-white/45" data-testid="meetings-empty">Keine Einladung – sobald der Verein dich zu einer Versammlung einlädt, steht sie hier.</p> : null}
+            <h2 className="mt-10 tls-type-section inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Versammlungen</h2>
+            {view.meetings_reason ? <p className="mt-2 tls-type-body text-white/60" data-testid="meetings-reason">{view.meetings_text}</p> : null}
+            {!view.meetings_reason && !meetings.length ? <p className="mt-2 tls-type-body text-white/45" data-testid="meetings-empty">Keine Einladung – sobald der Verein dich zu einer Versammlung einlädt, steht sie hier.</p> : null}
             <div className="mt-3 space-y-4">
               {upcoming.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} busy={busy} onRespond={respond} onMotion={motion} askCalendar={askFor === meeting.id} onAskDone={() => setAskFor(0)} highlight={meeting.id === wanted} />)}
               {past.map((meeting) => <MeetingCard key={meeting.id} meeting={meeting} busy={busy} onRespond={respond} onMotion={motion} highlight={meeting.id === wanted} />)}

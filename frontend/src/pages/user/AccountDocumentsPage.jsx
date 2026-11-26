@@ -48,14 +48,14 @@ export default function AccountDocumentsPage() {
         ) : (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-10 text-center text-white/60" data-testid="account-documents-empty" data-reason={state.reason || ""}>
             <FolderOpen className="w-10 h-10 mx-auto opacity-40 mb-3" aria-hidden="true" />
-            <div className="font-heading font-bold text-lg text-white">{emptyHeading(state)}</div>
-            <p className="mt-2 text-sm max-w-xl mx-auto">
+            <div className="tls-type-card text-white">{emptyHeading(state)}</div>
+            <p className="mt-2 tls-type-body max-w-xl mx-auto">
               {state.reason === "not_bound"
                 ? "Dein Konto ist noch nicht mit deinem Eintrag in der Vereinsakte verbunden. Das geht über die bestätigte E-Mail-Adresse, durch den Vorstand – oder mit einem Einladungscode unter „Mitgliedschaft“."
                 : state.text || "Bestätigungen und Schreiben vom Verein erscheinen hier, sobald der Vorstand sie in der Vereinsakte für dich ablegt."}
             </p>
             {state.reason === "not_bound" ? (
-              <Link to="/mein-bereich/mitgliedschaft" data-testid="account-documents-bind" className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Einladungscode einlösen</Link>
+              <Link to="/mein-bereich/mitgliedschaft" data-testid="account-documents-bind" className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm tls-type-label">Einladungscode einlösen</Link>
             ) : null}
           </div>
         )}

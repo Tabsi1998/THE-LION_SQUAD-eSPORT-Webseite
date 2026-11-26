@@ -61,9 +61,9 @@ export default function MyMembershipPage() {
         <div className="border border-[#FFD700]/40 bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent rounded-sm p-6 md:p-8 relative overflow-hidden" data-testid="membership-status">
           <div className="absolute -right-8 -top-8 opacity-10" aria-hidden="true"><Crown className="w-48 h-48 text-[#FFD700]" /></div>
           <div className="relative">
-            <h2 className="tls-wrap font-heading text-2xl md:text-4xl font-black uppercase">{user?.display_name || user?.username}</h2>
+            <h2 className="tls-wrap tls-type-section">{user?.display_name || user?.username}</h2>
             {m?.member_number && (
-              <div className="mt-3 inline-flex items-center gap-2 text-[#FFD700] font-mono text-lg font-bold">
+              <div className="mt-3 inline-flex items-center gap-2 text-[#FFD700] font-mono tls-type-card">
                 <Hash className="w-4 h-4" /> {m.member_number}
               </div>
             )}
@@ -90,17 +90,17 @@ export default function MyMembershipPage() {
         {fee && (
           <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
-              <span className={`text-[10px] font-black uppercase tracking-widest ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-[#00FF88]"}`}>{fee.label}</span>
+              <h2 className="tls-type-section inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
+              <span className={`tls-type-label ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-[#00FF88]"}`}>{fee.label}</span>
             </div>
-            {fee.amount && <div className="mt-2 font-heading text-2xl font-black">{fee.amount} <span className="text-xs text-white/40 font-normal">je Beitragsperiode</span></div>}
-            <ul className="mt-2 space-y-1 text-sm text-white/75">
+            {fee.amount && <div className="mt-2 tls-type-section">{fee.amount} <span className="tls-type-small text-white/40 font-normal">je Beitragsperiode</span></div>}
+            <ul className="mt-2 space-y-1 tls-type-small text-white/75">
               {fee.lines.map((line) => <li key={line}>{line}</li>)}
             </ul>
             {!!erp.functions?.length && (
-              <div className="mt-3 text-sm text-white/75">Funktion im Verein: {erp.functions.map((fn) => fn.label).join(", ")}</div>
+              <div className="mt-3 tls-type-small text-white/75">Funktion im Verein: {erp.functions.map((fn) => fn.label).join(", ")}</div>
             )}
-            <div className={`mt-3 text-xs ${fee.stale ? "text-[#FFD700]" : "text-white/40"}`}>
+            <div className={`mt-3 tls-type-small ${fee.stale ? "text-[#FFD700]" : "text-white/40"}`}>
               Stand aus der Mitgliederverwaltung vom {formatDate(fee.asOf)}{fee.stale ? " – seither nicht mehr abgeglichen" : ""}. Stimmt etwas nicht, melde dich beim Vorstand.
             </div>
           </div>
@@ -116,13 +116,13 @@ export default function MyMembershipPage() {
         {erp?.connected && <WebsiteProfileCard />}
         {erp?.connected && !erp.led_by_dolibarr && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-link-card">
-            <h2 className="font-heading text-lg font-black uppercase">Bist du Vereinsmitglied?</h2>
+            <h2 className="tls-type-section">Bist du Vereinsmitglied?</h2>
             {erp.link?.status === "requested" ? (
-              <p className="mt-2 text-sm text-white/70">Deine Anfrage vom {formatDate(erp.link.requested_at)} liegt beim Vorstand. Sobald sie bestätigt ist, erscheint hier dein Beitragsstand.</p>
+              <p className="mt-2 tls-type-body text-white/70">Deine Anfrage vom {formatDate(erp.link.requested_at)} liegt beim Vorstand. Sobald sie bestätigt ist, erscheint hier dein Beitragsstand.</p>
             ) : erp.link?.status === "conflict" ? (
-              <p className="mt-2 text-sm text-white/70">Deine Zuordnung braucht eine Klärung durch den Vorstand (z. B. geteilte E-Mail-Adresse in der Familie). Du musst nichts tun.</p>
+              <p className="mt-2 tls-type-body text-white/70">Deine Zuordnung braucht eine Klärung durch den Vorstand (z. B. geteilte E-Mail-Adresse in der Familie). Du musst nichts tun.</p>
             ) : (
-              <p className="mt-2 text-sm text-white/70">Dein Konto ist noch keinem Mitglied in der Mitgliederverwaltung zugeordnet. Der Vorstand prüft und bestätigt die Zuordnung – eine Mitgliedsnummer allein reicht dafür nicht.</p>
+              <p className="mt-2 tls-type-body text-white/70">Dein Konto ist noch keinem Mitglied in der Mitgliederverwaltung zugeordnet. Der Vorstand prüft und bestätigt die Zuordnung – eine Mitgliedsnummer allein reicht dafür nicht.</p>
             )}
             {canAskForLink && <LinkRequest onDone={load} />}
           </div>
@@ -143,10 +143,10 @@ export default function MyMembershipPage() {
         {/* History */}
         {!!m?.history?.length && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5">
-            <h2 className="font-heading text-lg font-black uppercase mb-4 inline-flex items-center gap-2"><History className="w-4 h-4 text-[#FFD700]" /> Verlauf</h2>
+            <h2 className="tls-type-section mb-4 inline-flex items-center gap-2"><History className="w-4 h-4 text-[#FFD700]" /> Verlauf</h2>
             <div className="space-y-3">
               {m.history.slice().reverse().map((h, idx) => (
-                <div key={idx} className="flex items-start gap-3 text-sm border-l-2 border-[#FFD700]/40 pl-4">
+                <div key={idx} className="flex items-start gap-3 tls-type-small border-l-2 border-[#FFD700]/40 pl-4">
                   <div className="flex-1">
                     <div className="text-white">
                       Status:{" "}
@@ -155,8 +155,8 @@ export default function MyMembershipPage() {
                         <span className="text-white/40"> (vorher: {STATUS_LABELS[h.from_status] || h.from_status})</span>
                       )}
                     </div>
-                    <div className="text-xs text-white/40 mt-0.5">{viennaDateTime(h.at)}</div>
-                    {h.source === "dolibarr" && <div className="text-xs text-white/45 mt-1">aus der Mitgliederverwaltung übernommen</div>}
+                    <div className="tls-type-small text-white/40 mt-0.5">{viennaDateTime(h.at)}</div>
+                    {h.source === "dolibarr" && <div className="tls-type-small text-white/45 mt-1">aus der Mitgliederverwaltung übernommen</div>}
                   </div>
                 </div>
               ))}
@@ -166,9 +166,9 @@ export default function MyMembershipPage() {
 
         {/* Weiter in „Mein Bereich“: was zur Mitgliedschaft gehört, aber eine eigene Gruppe hat. */}
         <div className="mt-8 flex flex-wrap gap-3" data-testid="membership-more">
-          <Link to={vereinPfad("vorteile")} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Vorteile ansehen</Link>
-          {erp?.led_by_dolibarr && <Link to={`${BEREICH}/rechnungen`} data-testid="membership-invoices-link" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Rechnungen</Link>}
-          {erp?.led_by_dolibarr && <Link to={`${BEREICH}/datenschutz?tab=einwilligungen`} data-testid="membership-consents-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Einwilligungen</Link>}
+          <Link to={vereinPfad("vorteile")} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 tls-type-label rounded-sm">Vorteile ansehen</Link>
+          {erp?.led_by_dolibarr && <Link to={`${BEREICH}/rechnungen`} data-testid="membership-invoices-link" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 tls-type-label rounded-sm">Rechnungen</Link>}
+          {erp?.led_by_dolibarr && <Link to={`${BEREICH}/datenschutz?tab=einwilligungen`} data-testid="membership-consents-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 tls-type-label rounded-sm">Einwilligungen</Link>}
         </div>
     </div>
   );
@@ -230,19 +230,19 @@ function SimpleExitCard({ exitRequest, onChanged }) {
   };
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-exit-card">
-      <h2 className="font-heading text-lg font-black uppercase">Austritt</h2>
+      <h2 className="tls-type-section">Austritt</h2>
       {exitRequest ? (
         <div className="mt-2 space-y-3">
-          <p className="text-sm text-white/70" data-testid="membership-exit-declared">{exitLine(exitRequest, viennaDate)} Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.</p>
-          <button type="button" onClick={() => run(() => api.delete("/membership/me/exit"), "Du hast die Erklärung zurückgenommen.")} disabled={busy} data-testid="membership-exit-withdraw" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Erklärung zurücknehmen</button>
+          <p className="tls-type-body text-white/70" data-testid="membership-exit-declared">{exitLine(exitRequest, viennaDate)} Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.</p>
+          <button type="button" onClick={() => run(() => api.delete("/membership/me/exit"), "Du hast die Erklärung zurückgenommen.")} disabled={busy} data-testid="membership-exit-withdraw" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Erklärung zurücknehmen</button>
         </div>
       ) : (
         <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wunschtermin (optional)</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Wunschtermin (optional)</div>
             <input type="date" value={wishedDay} onChange={(event) => setWishedDay(event.target.value)} data-testid="membership-exit-date" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
-          <button type="button" onClick={declare} disabled={busy} data-testid="membership-exit-button" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Austritt erklären</button>
+          <button type="button" onClick={declare} disabled={busy} data-testid="membership-exit-button" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Austritt erklären</button>
         </div>
       )}
     </div>
@@ -285,23 +285,23 @@ function IdentityCard() {
       : "Sobald dein Konto deinem Mitgliedseintrag zugeordnet ist – von selbst über deine bestätigte E-Mail-Adresse oder durch den Vorstand –, siehst du unter Vereinsdokumente auch deine persönlichen Unterlagen aus der Vereinsakte. Alternativ geht ein Einladungscode vom Vorstand (gilt eine Stunde, genau einmal).";
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-identity-card">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Vereinsakte</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Vereinsakte</h2>
       {bound ? (
-        <div className="mt-2 text-sm text-white/70" data-testid="membership-identity-bound">
+        <div className="mt-2 tls-type-small text-white/70" data-testid="membership-identity-bound">
           {viaMember
             ? <>Dein Konto ist über deine Mitgliedsnummer{state.member_ref ? ` ${state.member_ref}` : ""} mit der Vereinsakte verbunden – Unterlagen, eigene Daten und dein Website-Profil kommen von selbst aus der Mitgliederverwaltung.</>
             : <>Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden{state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.</>}{" "}
-          <Link to={vereinPfad("dokumente")} className="tls-btn tls-btn--quiet mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
+          <Link to={vereinPfad("dokumente")} className="tls-btn tls-btn--quiet mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
           {viaMember && state.right_missing ? (
             <p className="mt-2 text-[#FFD700]/80" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
           ) : null}
         </div>
       ) : (
         <>
-          <p className="mt-2 text-sm text-white/70" data-testid="membership-identity-hint">{hint}</p>
+          <p className="mt-2 tls-type-body text-white/70" data-testid="membership-identity-hint">{hint}</p>
           <form onSubmit={submit} className="mt-3 flex flex-col sm:flex-row gap-2" data-testid="membership-identity-form">
             <input value={code} onChange={(e) => setCode(e.target.value)} maxLength={120} placeholder="Einladungscode" autoComplete="off" data-testid="membership-identity-code" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <button type="submit" disabled={busy || !code.trim()} data-testid="membership-identity-claim" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Prüfe…" : "Verbinden"}</button>
+            <button type="submit" disabled={busy || !code.trim()} data-testid="membership-identity-claim" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Prüfe…" : "Verbinden"}</button>
           </form>
         </>
       )}
@@ -332,7 +332,7 @@ export function websiteStateLine(view) {
 const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 function WebsiteFieldInput({ field, value, onChange }) {
-  const base = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm";
+  const base = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
   const testId = `membership-website-${field.code}`;
   if (field.type === "textarea") return <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={3} maxLength={field.max_length || 2000} data-testid={testId} className={base} />;
   if (field.type === "boolean") return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} data-testid={testId} className="w-4 h-4 accent-[#FFD700]" />;
@@ -349,7 +349,7 @@ function WebsiteFieldInput({ field, value, onChange }) {
     return (
       <div className="flex flex-wrap gap-2" data-testid={testId}>
         {(field.options || []).map((o) => (
-          <label key={o.code} className={`px-2 py-1 border rounded-sm text-xs cursor-pointer ${chosen.includes(o.code) ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/60"}`}>
+          <label key={o.code} className={`px-2 py-1 border rounded-sm tls-type-small cursor-pointer ${chosen.includes(o.code) ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/60"}`}>
             <input type="checkbox" className="sr-only" checked={chosen.includes(o.code)} onChange={(e) => onChange(e.target.checked ? [...chosen, o.code] : chosen.filter((c) => c !== o.code))} data-testid={`${testId}-${o.code}`} />
             {o.label}
           </label>
@@ -393,21 +393,21 @@ function WebsiteProfileCard() {
   };
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-website-card">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Crown className="w-4 h-4 text-[#FFD700]" /> Mein Website-Profil</h2>
-      <p className="mt-2 text-sm text-white/70" data-testid="membership-website-state">{websiteStateLine(view)}</p>
-      {!fields.length && <p className="mt-3 text-sm text-white/50" data-testid="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</p>}
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Crown className="w-4 h-4 text-[#FFD700]" /> Mein Website-Profil</h2>
+      <p className="mt-2 tls-type-small text-white/70" data-testid="membership-website-state">{websiteStateLine(view)}</p>
+      {!fields.length && <p className="mt-3 tls-type-small text-white/50" data-testid="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</p>}
       <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-website-form">
         {fields.map((field) => (
           <label key={field.code} className={`block ${field.type === "textarea" ? "sm:col-span-2" : ""}`}>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}{!field.editable && <span className="ml-2 normal-case tracking-normal text-white/35">pflegt der Verein</span>}</div>
+            <div className="tls-type-label text-white/60 mb-1.5">{field.label}{!field.editable && <span className="ml-2 normal-case tracking-normal text-white/35">pflegt der Verein</span>}</div>
             {field.editable
               ? <WebsiteFieldInput field={field} value={value(field)} onChange={(v) => setDraft((d) => ({ ...d, [field.code]: v }))} />
-              : <div className="text-sm text-white/80" data-testid={`membership-website-${field.code}`}>{websiteFieldText(field) || "–"}</div>}
+              : <div className="tls-type-small text-white/80" data-testid={`membership-website-${field.code}`}>{websiteFieldText(field) || "–"}</div>}
           </label>
         ))}
         {fields.some((f) => f.editable) && (
           <div className="sm:col-span-2">
-            <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
+            <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
           </div>
         )}
       </form>
@@ -483,51 +483,51 @@ function SelfServiceCard() {
   };
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-self-card">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Meine Daten</h2>
-      <p className="mt-2 text-sm text-white/70" data-testid="membership-self-identity">
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Meine Daten</h2>
+      <p className="mt-2 tls-type-small text-white/70" data-testid="membership-self-identity">
         {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
       </p>
       {/* Einmalige Freigabe (#329, Vereine 1.8.0): der Vorstand gibt das Mitglied in Dolibarr für eine direkte Änderung frei. */}
       {profile.direct_once ? (
-        <p className="mt-3 text-sm border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] rounded-sm p-3" data-testid="membership-self-once">
+        <p className="mt-3 tls-type-body border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] rounded-sm p-3" data-testid="membership-self-once">
           Der Vorstand hat dich für eine Änderung freigegeben: Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.
         </p>
       ) : null}
-      <p className="mt-1 text-xs text-white/45">Name und Geburtsdatum ändert nur der Vorstand. {profile.direct_once ? "" : `${directLabels.length ? `${directLabels.join(" und ")} übernimmt der Verein sofort; ` : ""}alles andere prüft der Vorstand. Eine neue E-Mail-Adresse braucht den Vorstand.`}</p>
+      <p className="mt-1 tls-type-small text-white/45">Name und Geburtsdatum ändert nur der Vorstand. {profile.direct_once ? "" : `${directLabels.length ? `${directLabels.join(" und ")} übernimmt der Verein sofort; ` : ""}alles andere prüft der Vorstand. Eine neue E-Mail-Adresse braucht den Vorstand.`}</p>
       <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-self-form">
         {changeable.map((key) => (
           <label key={key} className={`block ${key === "address" ? "sm:col-span-2" : ""}`}>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{SELF_FIELD_LABELS[key] || key}</div>
+            <div className="tls-type-label text-white/60 mb-1.5">{SELF_FIELD_LABELS[key] || key}</div>
             <input value={value(key)} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} maxLength={200} data-testid={`membership-self-field-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
         ))}
         <div className="sm:col-span-2">
-          <button type="submit" disabled={busy === "save" || !Object.keys(changed).length} data-testid="membership-self-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy === "save" ? "Sende…" : "Änderung senden"}</button>
+          <button type="submit" disabled={busy === "save" || !Object.keys(changed).length} data-testid="membership-self-save" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Sende…" : "Änderung senden"}</button>
         </div>
       </form>
       {requests.length > 0 && (
         <div className="mt-5 space-y-2" data-testid="membership-self-requests">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Eingereicht</div>
+          <div className="tls-type-label text-white/60">Eingereicht</div>
           {requests.slice().reverse().map((row) => (
-            <div key={row.external_id} className="text-sm border-l-2 border-[#FFD700]/40 pl-3" data-testid={`membership-self-request-${row.external_id}`}>
+            <div key={row.external_id} className="tls-type-small border-l-2 border-[#FFD700]/40 pl-3" data-testid={`membership-self-request-${row.external_id}`}>
               <div className="text-white/80">{selfRequestLine(row)}</div>
-              <div className="text-xs text-white/45">{row.status_label}{row.reason ? ` – ${row.reason}` : ""}{row.received_at ? ` · ${formatDate(row.received_at)}` : ""}</div>
+              <div className="tls-type-small text-white/45">{row.status_label}{row.reason ? ` – ${row.reason}` : ""}{row.received_at ? ` · ${formatDate(row.received_at)}` : ""}</div>
             </div>
           ))}
         </div>
       )}
       <div className="mt-5 border-t border-white/10 pt-4">
         {profile.exit ? (
-          <p className="text-sm text-white/70" data-testid="membership-self-exit-planned">
+          <p className="tls-type-small text-white/70" data-testid="membership-self-exit-planned">
             Austritt {profile.exit.status === "done" ? "vollzogen" : "geplant"}: letzter Tag der Mitgliedschaft {formatDate(profile.exit.last_day)}{profile.exit.notice_day ? ` (Eingang ${formatDate(profile.exit.notice_day)})` : ""}.
           </p>
         ) : (
           <div className="flex flex-col sm:flex-row sm:items-end gap-3" data-testid="membership-self-exit">
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Austritt – Wunschdatum (optional)</div>
+              <div className="tls-type-small font-bold text-white/60 mb-1.5">Austritt – Wunschdatum (optional)</div>
               <input type="date" value={wishedDay} onChange={(e) => setWishedDay(e.target.value)} data-testid="membership-self-exit-date" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
-            <button type="button" onClick={leave} disabled={busy === "exit"} data-testid="membership-self-exit-button" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Austritt erklären</button>
+            <button type="button" onClick={leave} disabled={busy === "exit"} data-testid="membership-self-exit-button" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] tls-type-label rounded-sm disabled:opacity-50">Austritt erklären</button>
           </div>
         )}
       </div>
@@ -559,8 +559,8 @@ function ConsentTexts({ row }) {
   if (row.state === "given" && !row.text_changed) {
     return (
       <div data-testid={`consent-given-text-${row.code}`}>
-        <div className="text-[11px] font-bold uppercase tracking-wider text-white/45">Deine Fassung {row.version}</div>
-        <p className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{row.given_text || row.text || "Der Text ist gerade nicht abrufbar."}</p>
+        <div className="tls-type-label text-white/45">Deine Fassung {row.version}</div>
+        <p className="mt-1 tls-type-body text-white/75 whitespace-pre-wrap">{row.given_text || row.text || "Der Text ist gerade nicht abrufbar."}</p>
       </div>
     );
   }
@@ -568,15 +568,15 @@ function ConsentTexts({ row }) {
     <div className="space-y-3">
       {row.state === "given" && (row.given_text ? (
         <div data-testid={`consent-given-text-${row.code}`}>
-          <div className="text-[11px] font-bold uppercase tracking-wider text-white/45">Zugestimmt hast du Fassung {row.version}</div>
-          <p className="mt-1 text-sm text-white/60 whitespace-pre-wrap">{row.given_text}</p>
+          <div className="tls-type-label text-white/45">Zugestimmt hast du Fassung {row.version}</div>
+          <p className="mt-1 tls-type-body text-white/60 whitespace-pre-wrap">{row.given_text}</p>
         </div>
       ) : (
-        <div className="text-xs text-white/45" data-testid={`consent-given-missing-${row.code}`}>{missingGivenText(row)}</div>
+        <div className="tls-type-small text-white/45" data-testid={`consent-given-missing-${row.code}`}>{missingGivenText(row)}</div>
       ))}
       <div data-testid={`consent-current-text-${row.code}`}>
-        {row.state === "given" && row.given_text && <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Neue Fassung {row.current_version}</div>}
-        <p className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{row.text || "Der Text ist gerade nicht abrufbar – bitte später noch einmal öffnen."}</p>
+        {row.state === "given" && row.given_text && <div className="tls-type-label text-[#FFD700]">Neue Fassung {row.current_version}</div>}
+        <p className="mt-1 tls-type-body text-white/75 whitespace-pre-wrap">{row.text || "Der Text ist gerade nicht abrufbar – bitte später noch einmal öffnen."}</p>
       </div>
     </div>
   );
@@ -625,13 +625,13 @@ export function ConsentsCard() {
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-consents-card">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#FFD700]" /> Meine Einwilligungen</h2>
-      <p className="mt-1 text-xs text-white/45">Jederzeit widerrufbar. Der Stand kommt aus der Mitgliederverwaltung; ein Widerruf gilt dort sofort.</p>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#FFD700]" /> Meine Einwilligungen</h2>
+      <p className="mt-1 tls-type-small text-white/45">Jederzeit widerrufbar. Der Stand kommt aus der Mitgliederverwaltung; ein Widerruf gilt dort sofort.</p>
       {problem && (
         <div className="mt-4 border border-[#FFD700]/30 rounded-sm p-3" role="alert" data-testid="consents-error">
-          <div className="text-sm text-white/80">Deine Einwilligungen wurden nicht geladen.</div>
-          {problem.text && <div className="mt-1 text-xs text-white/50">{problem.text}</div>}
-          <button type="button" onClick={load} data-testid="consents-retry" className="tls-btn tls-btn--secondary mt-3 inline-flex px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Nochmal versuchen</button>
+          <div className="tls-type-small text-white/80">Deine Einwilligungen wurden nicht geladen.</div>
+          {problem.text && <div className="mt-1 tls-type-small text-white/50">{problem.text}</div>}
+          <button type="button" onClick={load} data-testid="consents-retry" className="tls-btn tls-btn--secondary mt-3 inline-flex px-3 py-1.5 rounded-sm tls-type-label">Nochmal versuchen</button>
         </div>
       )}
       {state && (
@@ -641,15 +641,15 @@ export function ConsentsCard() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-bold text-white">{row.label}</div>
-                  <div className={`text-xs ${row.state === "given" ? "text-[#00FF88]" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
-                  {row.text_changed && <div className="mt-1 text-xs text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Text geändert – bitte die neue Fassung lesen.</div>}
+                  <div className={`tls-type-small ${row.state === "given" ? "text-[#00FF88]" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
+                  {row.text_changed && <div className="mt-1 tls-type-small text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Text geändert – bitte die neue Fassung lesen.</div>}
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
                   {open !== row.code && (
-                    <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">{!row.can_give ? "Text lesen" : row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
+                    <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm tls-type-label disabled:opacity-50">{!row.can_give ? "Text lesen" : row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
                   )}
                   {row.can_withdraw && (
-                    <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Widerrufen</button>
+                    <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/40 rounded-sm tls-type-label disabled:opacity-50">Widerrufen</button>
                   )}
                 </div>
               </div>
@@ -658,15 +658,15 @@ export function ConsentsCard() {
                   <ConsentTexts row={row} />
                   <div className="mt-3 flex flex-wrap gap-2">
                     {row.can_give && row.text && (
-                      <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Ich stimme zu</button>
+                      <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">Ich stimme zu</button>
                     )}
-                    <button type="button" onClick={() => setOpen(null)} disabled={busy} className="px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs font-bold uppercase tracking-wider">{row.can_give && row.text ? "Abbrechen" : "Schließen"}</button>
+                    <button type="button" onClick={() => setOpen(null)} disabled={busy} className="px-4 py-2 border border-white/15 text-white/60 rounded-sm tls-type-label">{row.can_give && row.text ? "Abbrechen" : "Schließen"}</button>
                   </div>
                 </div>
               )}
             </div>
           ))}
-          {!state.consents.length && <div className="text-sm text-white/45">Der Verein hat derzeit keine Einwilligungstexte hinterlegt.</div>}
+          {!state.consents.length && <div className="tls-type-small text-white/45">Der Verein hat derzeit keine Einwilligungstexte hinterlegt.</div>}
         </div>
       )}
     </div>
@@ -714,16 +714,16 @@ function DirectoryCard() {
     e.preventDefault();
     save({ gamertag: form.gamertag, games: splitList(form.games), platforms: splitList(form.platforms), bio: form.bio }, "Eintrag gespeichert.");
   };
-  const inputClass = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-white text-sm focus:outline-none";
+  const inputClass = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-white tls-type-small focus:outline-none";
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-directory-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Mitgliederverzeichnis</h2>
-        {entry.listed && entry.slug && <Link to={`/members/${entry.slug}`} data-testid="membership-directory-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Meinen Eintrag ansehen</Link>}
+        <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Mitgliederverzeichnis</h2>
+        {entry.listed && entry.slug && <Link to={`/members/${entry.slug}`} data-testid="membership-directory-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label">Meinen Eintrag ansehen</Link>}
       </div>
       {entry.blocked ? (
-        <p className="mt-3 text-sm text-[#FFD700]" data-testid="membership-directory-blocked">Dein Eintrag ist von der Vereinsverwaltung gesperrt. Wenn du meinst, das stimmt nicht, melde dich beim Vorstand.</p>
+        <p className="mt-3 tls-type-body text-[#FFD700]" data-testid="membership-directory-blocked">Dein Eintrag ist von der Vereinsverwaltung gesperrt. Wenn du meinst, das stimmt nicht, melde dich beim Vorstand.</p>
       ) : (
         <div className="mt-3">
           <SwitchRow
@@ -739,22 +739,22 @@ function DirectoryCard() {
       {entry.listed && !entry.blocked && (
         <form onSubmit={submit} className="mt-4 space-y-3" data-testid="membership-directory-form">
           <div className="grid sm:grid-cols-3 gap-3">
-            <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Gamertag
+            <label className="block tls-type-label text-white/65">Gamertag
               <input value={form.gamertag} onChange={(e) => set("gamertag", e.target.value)} maxLength={40} data-testid="membership-directory-gamertag" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
             </label>
-            <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Spiele
+            <label className="block tls-type-label text-white/65">Spiele
               <input value={form.games} onChange={(e) => set("games", e.target.value)} placeholder="F1 25, Rocket League" data-testid="membership-directory-games" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
             </label>
-            <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Plattformen
+            <label className="block tls-type-label text-white/65">Plattformen
               <input value={form.platforms} onChange={(e) => set("platforms", e.target.value)} placeholder="PC, PS5" data-testid="membership-directory-platforms" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
             </label>
           </div>
-          <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Kurze Bio
+          <label className="block tls-type-label text-white/65">Kurze Bio
             <textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} rows={3} maxLength={2000} data-testid="membership-directory-bio" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={busy} data-testid="membership-directory-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Eintrag speichern</button>
-            <span className="text-xs text-white/45">{entry.editorial ? "Name, Foto und Funktion pflegt die Vereinsverwaltung an deinem Profil." : "Name und Foto kommen von deinem Konto (Profil bearbeiten)."}</span>
+            <button type="submit" disabled={busy} data-testid="membership-directory-save" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">Eintrag speichern</button>
+            <span className="tls-type-small text-white/45">{entry.editorial ? "Name, Foto und Funktion pflegt die Vereinsverwaltung an deinem Profil." : "Name und Foto kommen von deinem Konto (Profil bearbeiten)."}</span>
           </div>
         </form>
       )}
@@ -783,7 +783,7 @@ function LinkRequest({ onDone }) {
       <input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={40} placeholder="Mitgliedsnummer (falls bekannt)" data-testid="membership-link-ref"
         className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm sm:w-64" />
       <button type="button" onClick={send} disabled={busy} data-testid="membership-link-request"
-        className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Zuordnung anfragen</button>
+        className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm disabled:opacity-40">Zuordnung anfragen</button>
     </div>
   );
 }
@@ -793,7 +793,7 @@ function Pill({ icon: Icon, label, variant }) {
     ? "border-[#FFD700]/50 text-[#FFD700] bg-[#FFD700]/10"
     : "border-white/15 text-white/80";
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-widest font-bold border rounded-sm ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 tls-type-label border rounded-sm ${cls}`}>
       {Icon && <Icon className="w-3 h-3" />} {label}
     </span>
   );
@@ -802,10 +802,10 @@ function Pill({ icon: Icon, label, variant }) {
 function Stat({ icon: Icon, label, value }) {
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/50 font-bold">
+      <div className="flex items-center gap-2 tls-type-label text-white/50">
         <Icon className="w-3 h-3" /> {label}
       </div>
-      <div className="mt-2 font-heading font-bold">{value}</div>
+      <div className="mt-2 tls-type-num">{value}</div>
     </div>
   );
 }

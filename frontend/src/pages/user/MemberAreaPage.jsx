@@ -203,8 +203,8 @@ export default function MemberAreaPage() {
             {nothingYet ? (
               <div data-testid="member-area-empty" className="mb-6 border border-white/10 rounded-sm bg-[#121212] p-8 text-center">
                 <Bell className="w-6 h-6 text-white/55 mx-auto" aria-hidden="true" />
-                <p className="mt-3 text-sm text-white/70">Neues erscheint hier, sobald der Verein etwas freischaltet: interne Events, Dokumente, Vorteile, interne News.</p>
-                <p className="mt-1 text-xs text-white/45">Bis dahin: deine Mitgliedschaft und Discord oben neben deiner Karte.</p>
+                <p className="mt-3 tls-type-body text-white/70">Neues erscheint hier, sobald der Verein etwas freischaltet: interne Events, Dokumente, Vorteile, interne News.</p>
+                <p className="mt-1 tls-type-small text-white/45">Bis dahin: deine Mitgliedschaft und Discord oben neben deiner Karte.</p>
               </div>
             ) : null}
 
@@ -214,7 +214,7 @@ export default function MemberAreaPage() {
                   <AreaSection id="versammlung" title="Versammlungen" icon={Vote} testId="member-area-meetings" more={{ to: vereinPfad("versammlungen"), label: "Alle Versammlungen" }}>
                     <div className="space-y-4">
                       {openBallots ? (
-                        <Link to={vereinPfad("versammlungen")} data-testid="member-area-open-ballots" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                        <Link to={vereinPfad("versammlungen")} data-testid="member-area-open-ballots" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">
                           {openBallots === 1 ? "Eine Abstimmung ist offen" : `${openBallots} Abstimmungen sind offen`} – jetzt abstimmen
                         </Link>
                       ) : null}
@@ -226,9 +226,9 @@ export default function MemberAreaPage() {
                 {helpingSomething ? (
                   <AreaSection id="helfen" title="Helferdienste" icon={HandHelping} testId="member-area-helping" more={{ to: vereinPfad("helfen"), label: "Alle Helferdienste" }}>
                     <div className="space-y-4">
-                      {helping.my_count ? <p data-testid="member-area-helping-mine" className="text-sm text-white">Du bist bei {helping.my_count === 1 ? "einem Dienst" : `${helping.my_count} Diensten`} eingetragen.</p> : null}
+                      {helping.my_count ? <p data-testid="member-area-helping-mine" className="tls-type-small text-white">Du bist bei {helping.my_count === 1 ? "einem Dienst" : `${helping.my_count} Diensten`} eingetragen.</p> : null}
                       {helping.open_places ? (
-                        <Link to={vereinPfad("helfen")} data-testid="member-area-helping-open" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                        <Link to={vereinPfad("helfen")} data-testid="member-area-helping-open" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">
                           {helping.open_places === 1 ? "Ein freier Platz" : `${helping.open_places} freie Plätze`} – der Verein braucht Hände
                         </Link>
                       ) : null}
@@ -237,7 +237,7 @@ export default function MemberAreaPage() {
                           <DateTile day={event.day} />
                           <span className="min-w-0">
                             <span className="block font-bold text-white break-words group-hover:text-[#29B6E8] transition">{event.label}</span>
-                            <span className="block text-xs text-white/55">{helperLine(event)}</span>
+                            <span className="block tls-type-small text-white/55">{helperLine(event)}</span>
                           </span>
                         </Link>
                       ))}
@@ -250,7 +250,7 @@ export default function MemberAreaPage() {
                     <div className="space-y-3">
                       {internalNews.map((post) => (
                         <Link key={post.id} to={`/news/${post.slug}`} className="group block border-l-2 border-white/15 pl-3 hover:border-[#29B6E8] transition">
-                          <div className="text-[10px] uppercase tracking-widest text-white/45">
+                          <div className="tls-type-label text-white/45">
                             {viennaDate(post.published_at || post.created_at)}
                             {isRecent(post.published_at || post.created_at) ? <span className="ml-2 font-bold text-[#29B6E8]" data-testid={`member-area-news-new-${post.id}`}>neu</span> : null}
                           </div>
@@ -268,13 +268,13 @@ export default function MemberAreaPage() {
                         <div key={doc.id} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm hover:border-white/25 transition">
                           <FileText className="w-4 h-4 text-white/55 shrink-0" aria-hidden="true" />
                           <div className="flex-1 min-w-0">
-                            <div className="font-bold text-sm text-white truncate">{doc.title}</div>
-                            <div className="text-[10px] text-white/45 uppercase tracking-wider truncate">
+                            <div className="font-bold tls-type-small text-white truncate">{doc.title}</div>
+                            <div className="tls-type-small text-white/45 truncate">
                               {isRecent(doc.created_at) ? <span className="mr-2 font-bold text-[#29B6E8]">neu</span> : null}
                               {doc.original_filename}
                             </div>
                           </div>
-                          <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center gap-1 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                          <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center gap-1 px-3 py-2 rounded-sm tls-type-label">
                             <Eye className="w-3 h-3" aria-hidden="true" /> ansehen
                           </a>
                         </div>
@@ -293,9 +293,9 @@ export default function MemberAreaPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-bold text-white break-words">{benefit.title}</div>
-                            {benefit.description ? <div className="text-xs text-white/60 mt-0.5 line-clamp-2">{benefit.description}</div> : null}
+                            {benefit.description ? <div className="tls-type-small text-white/60 mt-0.5 line-clamp-2">{benefit.description}</div> : null}
                           </div>
-                          {benefit.link_url ? <a href={benefit.link_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Öffnen</a> : null}
+                          {benefit.link_url ? <a href={benefit.link_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center px-3 py-2 rounded-sm tls-type-label">Öffnen</a> : null}
                         </div>
                       ))}
                     </div>
@@ -353,15 +353,15 @@ function AreaHead({ user, me, discordUrl }) {
         </Link>
       ) : null}
       <div className="min-w-0">
-        <h2 className="font-heading text-2xl md:text-3xl font-black uppercase break-words" data-testid="member-area-greeting">Hallo, {name}</h2>
+        <h2 className="tls-type-section break-words" data-testid="member-area-greeting">Hallo, {name}</h2>
         {since || membership.internal_role ? (
-          <p className="mt-2 text-sm text-white/70 flex flex-wrap gap-x-4 gap-y-1">
+          <p className="mt-2 tls-type-small text-white/70 flex flex-wrap gap-x-4 gap-y-1">
             {since ? <span data-testid="member-area-since">Mitglied seit <strong className="text-white">{since}</strong></span> : null}
             {membership.internal_role ? <span>Aufgabe: <strong className="text-white">{membership.internal_role}</strong></span> : null}
           </p>
         ) : null}
         {fee ? <FeeBadge badge={fee} /> : null}
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-bold uppercase tracking-wider">
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 tls-type-label">
           {/* Haupteinstieg für Mitglieder: ein Button, kein kleiner Textlink (#2059). */}
           <Link to={`${BEREICH}/mitgliedschaft`} data-testid="member-area-my-membership" className="inline-flex min-h-11 items-center gap-1.5 px-4 py-2 bg-[#29B6E8] text-black hover:bg-[#29B6E8]/85 rounded-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
             Mitgliedschaft
@@ -389,7 +389,7 @@ function FeeBadge({ badge }) {
   const tone = FEE_TONES[badge.tone] || FEE_TONES.plain;
   const Icon = tone.icon;
   return (
-    <span data-testid="member-area-fee" data-tone={badge.tone} className={`mt-3 inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${tone.className}`}>
+    <span data-testid="member-area-fee" data-tone={badge.tone} className={`mt-3 inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 tls-type-label ${tone.className}`}>
       {Icon ? <Icon className="w-3.5 h-3.5" aria-hidden="true" /> : null}
       {badge.text}
     </span>
@@ -452,11 +452,11 @@ function AreaSection({ id, title, icon: Icon, more, testId, children }) {
   return (
     <section id={id} tabIndex={id ? -1 : undefined} data-testid={testId} className="scroll-mt-32 xl:scroll-mt-28 border border-white/10 rounded-sm bg-[#121212] p-5 focus:outline-none">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="min-w-0 font-heading text-lg font-black uppercase inline-flex items-center gap-2" data-testid={testId ? `${testId}-title` : undefined}>
+        <h2 className="min-w-0 tls-type-section inline-flex items-center gap-2" data-testid={testId ? `${testId}-title` : undefined}>
           <Icon className="w-4 h-4 shrink-0 text-white/55" aria-hidden="true" /> {title}
         </h2>
         {more ? (
-          <Link to={more.to} data-testid={testId ? `${testId}-more` : undefined} className="shrink-0 text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] hover:underline">
+          <Link to={more.to} data-testid={testId ? `${testId}-more` : undefined} className="shrink-0 tls-type-label text-[#29B6E8] hover:underline">
             {more.label} →
           </Link>
         ) : null}
@@ -472,7 +472,7 @@ function DateTile({ day }) {
   return (
     <span className="tls-date-tile" data-testid="member-area-date-tile">
       <span className="tls-date-tile__month" aria-hidden="true">{parts?.month || "–"}</span>
-      <span className="tls-date-tile__day font-heading" aria-hidden="true">{parts?.day || "?"}</span>
+      <span className="tls-date-tile__day" aria-hidden="true">{parts?.day || "?"}</span>
       {parts ? <span className="sr-only">{parts.full}</span> : null}
     </span>
   );
@@ -495,9 +495,9 @@ function MeetingCard({ meeting, busy, onAnswer }) {
       <div className="flex gap-4">
         <DateTile day={meeting.day} />
         <div className="min-w-0 flex-1">
-          {meta ? <div className="text-[10px] uppercase tracking-widest text-white/45">{meta}</div> : null}
+          {meta ? <div className="tls-type-label text-white/45">{meta}</div> : null}
           <Link to={vereinPfad("versammlungen")} className="mt-0.5 block font-bold text-white break-words hover:text-[#29B6E8] transition">{meeting.title}</Link>
-          {meeting.place ? <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-white/50"><MapPin className="w-3 h-3" aria-hidden="true" /> {meeting.place}</div> : null}
+          {meeting.place ? <div className="mt-0.5 inline-flex items-center gap-1 tls-type-small text-white/50"><MapPin className="w-3 h-3" aria-hidden="true" /> {meeting.place}</div> : null}
         </div>
       </div>
       {/* Am Handy unter der Kachel über die ganze Breite (eine Zeile), ab Tablet bündig mit dem Text. */}
@@ -512,14 +512,14 @@ function MeetingCard({ meeting, busy, onAnswer }) {
                 disabled={busy}
                 onClick={() => { if (meeting.response !== code) onAnswer(meeting, code); }}
                 data-testid={`member-area-answer-${code}`}
-                className={`tls-btn ${meeting.response === code ? "tls-btn--primary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider`}
+                className={`tls-type-label tls-btn ${meeting.response === code ? "tls-btn--primary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm`}
               >
                 {label}
               </button>
             ))}
           </div>
         ) : null}
-        <p className="mt-2 text-xs text-white/50" data-testid="member-area-answer">Deine Antwort: <strong className="text-white">{meeting.response_label || "noch keine Antwort"}</strong></p>
+        <p className="mt-2 tls-type-small text-white/50" data-testid="member-area-answer">Deine Antwort: <strong className="text-white">{meeting.response_label || "noch keine Antwort"}</strong></p>
       </div>
     </div>
   );
@@ -535,8 +535,8 @@ export function BirthdayNote() {
     <div data-testid="member-area-birthday" className="mt-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
       <Cake className="w-7 h-7 text-[#29B6E8] shrink-0" aria-hidden="true" />
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Vereinsgeburtstag</div>
-        <p className="mt-1 text-sm text-white/80">{years > 0 ? `Heute vor ${years} ${years === 1 ? "Jahr" : "Jahren"} wurde der Verein gegründet.` : "Heute hat der Verein Geburtstag."} Als Mitglied bekommst du dazu einen Jahres-Sticker für den Chat – jedes Jahr einen anderen.</p>
+        <div className="tls-type-label text-[#29B6E8]">Vereinsgeburtstag</div>
+        <p className="mt-1 tls-type-body text-white/80">{years > 0 ? `Heute vor ${years} ${years === 1 ? "Jahr" : "Jahren"} wurde der Verein gegründet.` : "Heute hat der Verein Geburtstag."} Als Mitglied bekommst du dazu einen Jahres-Sticker für den Chat – jedes Jahr einen anderen.</p>
       </div>
       <StickerClaim testId="member-area-birthday-sticker" />
     </div>

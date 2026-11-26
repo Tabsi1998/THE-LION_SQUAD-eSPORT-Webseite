@@ -30,7 +30,7 @@ function MineBadge({ shift }) {
   if (!shift.mine) return null;
   const done = shift.mine === "done" || shift.mine === "confirmed";
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${done ? "border-[#00FF88]/40 text-[#00FF88]" : shift.mine === "requested" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`shift-${shift.id}-mine`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${done ? "border-[#00FF88]/40 text-[#00FF88]" : shift.mine === "requested" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`shift-${shift.id}-mine`}>
       {done ? <CheckCircle2 className="w-3 h-3" /> : null} {shift.mine_label}
     </span>
   );
@@ -42,15 +42,15 @@ function EventCard({ event, busy, onRequest, onWithdraw, highlight = false, askF
     <div className={`border rounded-sm bg-[#121212] p-5 ${event.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`helper-event-${event.id}`} data-highlight={highlight ? "true" : undefined}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">{event.visibility_label} · {event.status_label}</div>
-          <h2 className="font-heading text-xl font-black uppercase mt-1">{event.label}</h2>
-          <div className="mt-1 text-sm text-white/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="tls-type-label text-[#FFD700]">{event.visibility_label} · {event.status_label}</div>
+          <h2 className="tls-type-section mt-1">{event.label}</h2>
+          <div className="mt-1 tls-type-small text-white/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-[#FFD700]" /> {formatDay(event.day)}{event.end_day && event.end_day !== event.day ? ` – ${formatDay(event.end_day)}` : ""}</span>
             {event.place ? <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {event.place}</span> : null}
             <span className="text-white/45" data-testid={`helper-event-${event.id}-registration`}>{event.registration?.text}</span>
           </div>
         </div>
-        {event.open_places ? <span className="text-xs text-white/55" data-testid={`helper-event-${event.id}-open`}>{event.open_places} {event.open_places === 1 ? "freier Platz" : "freie Plätze"}</span> : null}
+        {event.open_places ? <span className="tls-type-small text-white/55" data-testid={`helper-event-${event.id}-open`}>{event.open_places} {event.open_places === 1 ? "freier Platz" : "freie Plätze"}</span> : null}
       </div>
 
       <div className="mt-4 space-y-2">
@@ -61,26 +61,26 @@ function EventCard({ event, busy, onRequest, onWithdraw, highlight = false, askF
                 <span className="font-bold text-white">{shift.label}</span>
                 <MineBadge shift={shift} />
               </div>
-              <div className="text-xs text-white/55 mt-0.5 inline-flex items-center gap-2">
+              <div className="tls-type-small text-white/55 mt-0.5 inline-flex items-center gap-2">
                 <span>{shiftWhen(shift)}</span>
                 <span className="inline-flex items-center gap-1" data-testid={`shift-${shift.id}-places`}><Users className="w-3 h-3" /> {shift.taken}/{shift.capacity}{shift.full ? " · voll" : ""}</span>
               </div>
             </div>
             {shift.can_request ? (
-              <button type="button" onClick={() => onRequest(event, shift)} disabled={busy === `shift-${shift.id}`} data-testid={`shift-${shift.id}-request`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+              <button type="button" onClick={() => onRequest(event, shift)} disabled={busy === `shift-${shift.id}`} data-testid={`shift-${shift.id}-request`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-50">
                 <HandHelping className="w-3.5 h-3.5" /> Ich helfe
               </button>
             ) : null}
             {shift.can_withdraw ? (
-              <button type="button" onClick={() => onWithdraw(event, shift)} disabled={busy === `shift-${shift.id}`} data-testid={`shift-${shift.id}-withdraw`} className="px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-50">
+              <button type="button" onClick={() => onWithdraw(event, shift)} disabled={busy === `shift-${shift.id}`} data-testid={`shift-${shift.id}-withdraw`} className="px-3 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-white disabled:opacity-50">
                 Anfrage zurückziehen
               </button>
             ) : null}
-            {shift.mine === "confirmed" ? <span className="text-[11px] text-white/45">Absagen bitte beim Vorstand.</span> : null}
+            {shift.mine === "confirmed" ? <span className="tls-type-small text-white/45">Absagen bitte beim Vorstand.</span> : null}
             <ShiftCalendar event={event} shift={shift} ask={askFor === `shift-${event.id}-${shift.id}`} onAskDone={onAskDone} />
           </div>
         ))}
-        {!event.shifts.length ? <p className="text-xs text-white/45">Für diese Veranstaltung sind keine Helferdienste ausgeschrieben.</p> : null}
+        {!event.shifts.length ? <p className="tls-type-small text-white/45">Für diese Veranstaltung sind keine Helferdienste ausgeschrieben.</p> : null}
       </div>
     </div>
   );
@@ -96,9 +96,9 @@ function ShiftCalendar({ event, shift, ask, onAskDone }) {
   if (!ask) return <AddToCalendar item={item} testId={testId} />;
   return (
     <div className="basis-full border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 flex flex-wrap items-center gap-3" data-testid={`shift-${shift.id}-calendar-ask`}>
-      <span className="text-sm text-white/85 font-bold">Im Kalender eintragen?</span>
+      <span className="tls-type-small text-white/85 font-bold">Im Kalender eintragen?</span>
       <AddToCalendar item={item} testId={testId} />
-      <button type="button" onClick={onAskDone} className="text-xs text-white/55 hover:text-white underline-offset-4 hover:underline" data-testid={`shift-${shift.id}-calendar-ask-no`}>Nein danke</button>
+      <button type="button" onClick={onAskDone} className="tls-type-small text-white/55 hover:text-white underline-offset-4 hover:underline" data-testid={`shift-${shift.id}-calendar-ask-no`}>Nein danke</button>
     </div>
   );
 }
@@ -165,24 +165,24 @@ export default function MemberHelperShiftsPage() {
   return (
     <>
       <section className="min-w-0" data-testid="helper-shifts-page">
-        <p className="text-sm text-white/60 max-w-2xl">Wo der Verein Hände braucht: Schichten mit Plätzen, dein Stand je Dienst. Angefragt heißt: der Vorstand bestätigt. Gezählt wird, was der Verein als geleistet bestätigt.</p>
+        <p className="tls-type-body text-white/60 max-w-2xl">Wo der Verein Hände braucht: Schichten mit Plätzen, dein Stand je Dienst. Angefragt heißt: der Vorstand bestätigt. Gezählt wird, was der Verein als geleistet bestätigt.</p>
 
         {/* Helfer-Aufruf (#1197): Vorstand - wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1479). */}
         {canUseArea(user, "club") ? <HelperCallPanel /> : null}
 
-        {view === null ? <p className="mt-8 text-sm text-white/45" data-testid="helper-shifts-loading">Wird geladen …</p> : null}
+        {view === null ? <p className="mt-8 tls-type-small text-white/45" data-testid="helper-shifts-loading">Wird geladen …</p> : null}
 
         {view && !view.available ? (
-          <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5 text-sm text-white/70" data-testid="helper-shifts-unavailable">
+          <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5 tls-type-small text-white/70" data-testid="helper-shifts-unavailable">
             {view.text || "Helferdienste sind hier noch nicht verfügbar."}
-            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/mein-bereich/mitgliedschaft" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Mitgliedschaft</Link></div> : null}
+            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/mein-bereich/mitgliedschaft" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">Zur Mitgliedschaft</Link></div> : null}
           </div>
         ) : null}
 
         {view && view.available ? (
           <>
-            {view.my_count ? <p className="mt-6 text-sm text-white/70" data-testid="helper-shifts-mine">Du bist bei {view.my_count === 1 ? "einem Dienst" : `${view.my_count} Diensten`} eingetragen.</p> : null}
-            {!events.length ? <p className="mt-6 text-sm text-white/45" data-testid="helper-shifts-empty">Derzeit keine Veranstaltung mit Helferdiensten.</p> : null}
+            {view.my_count ? <p className="mt-6 tls-type-small text-white/70" data-testid="helper-shifts-mine">Du bist bei {view.my_count === 1 ? "einem Dienst" : `${view.my_count} Diensten`} eingetragen.</p> : null}
+            {!events.length ? <p className="mt-6 tls-type-small text-white/45" data-testid="helper-shifts-empty">Derzeit keine Veranstaltung mit Helferdiensten.</p> : null}
             <div className="mt-4 space-y-4">
               {upcoming.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} highlight={event.id === wanted} askFor={askFor} onAskDone={() => setAskFor("")} />)}
               {rest.map((event) => <EventCard key={event.id} event={event} busy={busy} onRequest={request} onWithdraw={withdraw} />)}

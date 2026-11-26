@@ -54,16 +54,16 @@ function Einwilligungen() {
   return (
     <>
       <div className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="consents-site">
-        <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#29B6E8]" aria-hidden="true" /> Website</h2>
-        <p className="mt-2 text-sm text-white/70">
+        <h2 className="tls-type-section inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#29B6E8]" aria-hidden="true" /> Website</h2>
+        <p className="mt-2 tls-type-body text-white/70">
           Du hast der Datenschutzerklärung{user?.privacy_policy_version ? ` (Fassung ${user.privacy_policy_version})` : ""} und den Nutzungsbedingungen{user?.terms_version ? ` (Fassung ${user.terms_version})` : ""} zugestimmt{since ? ` – zuletzt am ${since}` : ""}.
           Ändert sich eine davon, fragt dich die Website beim nächsten Besuch.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link to="/privacy" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Datenschutzerklärung lesen</Link>
-          <Link to="/terms" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Nutzungsbedingungen lesen</Link>
+          <Link to="/privacy" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">Datenschutzerklärung lesen</Link>
+          <Link to="/terms" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">Nutzungsbedingungen lesen</Link>
         </div>
-        <p className="mt-3 text-xs text-white/45">Newsletter und Mails stellst du unter <Link to={`${BEREICH}/benachrichtigungen`} className="text-[#29B6E8] hover:underline">Benachrichtigungen</Link> ein.</p>
+        <p className="mt-3 tls-type-small text-white/45">Newsletter und Mails stellst du unter <Link to={`${BEREICH}/benachrichtigungen`} className="text-[#29B6E8] hover:underline">Benachrichtigungen</Link> ein.</p>
       </div>
       {/* Die Einwilligungen aus der Mitgliederverwaltung (#329) - nur mit bestätigter Zuordnung, sonst zeigt die Karte nichts. */}
       {mitglied ? <Inhalt><ConsentsCard /></Inhalt> : null}
@@ -91,10 +91,10 @@ export function MitgliedschaftSeite() {
       {mitglied ? <Inhalt><MyMembershipPage /></Inhalt> : (
         <div className="border border-[#FFD700]/30 bg-[#FFD700]/[0.04] rounded-sm p-6" data-testid="membership-join">
           <Crown className="w-6 h-6 text-[#FFD700]" aria-hidden="true" />
-          <h2 className="mt-3 font-heading text-xl font-black uppercase">Mitglied werden</h2>
-          <p className="mt-2 max-w-xl text-sm text-white/70">Als Mitglied bekommst du deinen Ausweis, wählst deine Nummer und bist bei Versammlungen, Helferdiensten und internen Events dabei.</p>
-          <Link to="/membership/join" data-testid="membership-join-cta" className="tls-btn tls-btn--honor mt-4 inline-flex min-h-11 items-center px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">Antrag stellen</Link>
-          <p className="mt-3 text-xs text-white/45">Schon Mitglied, aber hier steht nichts? Melde dich beim Vorstand – er verbindet dein Konto mit deinem Eintrag.</p>
+          <h2 className="mt-3 tls-type-section">Mitglied werden</h2>
+          <p className="mt-2 max-w-xl tls-type-body text-white/70">Als Mitglied bekommst du deinen Ausweis, wählst deine Nummer und bist bei Versammlungen, Helferdiensten und internen Events dabei.</p>
+          <Link to="/membership/join" data-testid="membership-join-cta" className="tls-btn tls-btn--honor mt-4 inline-flex min-h-11 items-center px-5 py-2.5 rounded-sm tls-type-label">Antrag stellen</Link>
+          <p className="mt-3 tls-type-small text-white/45">Schon Mitglied, aber hier steht nichts? Melde dich beim Vorstand – er verbindet dein Konto mit deinem Eintrag.</p>
         </div>
       )}
     </BereichSeite>

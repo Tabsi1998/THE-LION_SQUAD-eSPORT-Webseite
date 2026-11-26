@@ -43,9 +43,9 @@ function DashboardAvatar({ user, isClubMember }) {
 
   return (
     <div
-      className={`w-16 h-16 md:w-20 md:h-20 shrink-0 overflow-hidden border-2 ${
+      className={`tls-type-section w-16 h-16 md:w-20 md:h-20 shrink-0 overflow-hidden border-2 ${
         isClubMember ? "border-[#FFD700]/70 shadow-[0_0_28px_rgba(255,215,0,0.14)]" : "border-[#29B6E8]/60 shadow-[0_0_28px_rgba(41,182,232,0.12)]"
-      } rounded-sm bg-[#0A0A0A] flex items-center justify-center font-heading font-black text-2xl ${
+      } rounded-sm bg-[#0A0A0A] flex items-center justify-center ${
         isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"
       }`}
     >
@@ -64,7 +64,7 @@ function Pill({ children, tone = "cyan", testId }) {
     gold: "border-[#FFD700]/50 text-[#FFD700] bg-[#FFD700]/10",
     grey: "border-white/15 text-white/60 bg-white/5",
   };
-  return <span data-testid={testId} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border text-[10px] font-bold uppercase tracking-widest ${tones[tone] || tones.cyan}`}>{children}</span>;
+  return <span data-testid={testId} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${tones[tone] || tones.cyan}`}>{children}</span>;
 }
 
 function actionIcon(type) {
@@ -87,13 +87,13 @@ function TimelineRow({ item, live = false }) {
       className={`flex flex-wrap items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 transition hover:bg-white/[0.03] ${live ? "bg-[#29B6E8]/5" : ""}`}
     >
       <div className="shrink-0 w-14 text-center">
-        <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{item.kind === "event" ? "Event" : "Turnier"}</div>
-        <div className="text-xs text-white/80 mt-0.5">{formatVienna(item.date, { withTime: false })}</div>
+        <div className="tls-type-label text-white/40">{item.kind === "event" ? "Event" : "Turnier"}</div>
+        <div className="tls-type-small text-white/80 mt-0.5">{formatVienna(item.date, { withTime: false })}</div>
       </div>
       {/* Titel und Zeit brechen um (#1155); mit großer Schrift rutschen Status und Pfeil in die nächste Zeile. */}
       <div className="min-w-0 flex-1 basis-32">
-        <div className="font-bold text-sm text-white break-words">{item.title}</div>
-        <div className="text-xs text-white/50 break-words">
+        <div className="font-bold tls-type-small text-white break-words">{item.title}</div>
+        <div className="tls-type-small text-white/50 break-words">
           {[item.date ? `${formatVienna(item.date)} Uhr` : "", item.detail].filter(Boolean).join(" · ")}
         </div>
       </div>
@@ -182,16 +182,16 @@ export default function DashboardPage() {
           {/* Mit großer Schrift rutscht der Name unter das Bild, statt zu einem Strich zusammengedrückt zu werden (#1155). */}
           <div className="min-w-0 flex-1 basis-40">
             {/* Der Name bricht um (#1155, wie im Profilkopf): höchstens zwei Zeilen statt „…“ bei großer Schrift. */}
-            <h1 className="tls-head-name font-heading text-2xl md:text-4xl font-black uppercase">{user?.display_name || user?.username}</h1>
+            <h1 className="tls-head-name tls-type-title">{user?.display_name || user?.username}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               {isClubMember ? <Pill tone="gold" testId="dashboard-pill-member"><Crown className="w-3 h-3" /> Vereinsmitglied</Pill> : <Pill tone="grey" testId="dashboard-pill-community">Community</Pill>}
               {isModerator ? <Pill tone="cyan" testId="dashboard-pill-staff"><Shield className="w-3 h-3" /> Staff</Pill> : null}
-              {isClubMember && user?.membership?.member_number ? <span className="text-xs text-white/50 font-mono">{user.membership.member_number}</span> : null}
-              {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="text-xs font-bold text-[#FFD700] hover:underline">Mitglied werden</Link> : null}
+              {isClubMember && user?.membership?.member_number ? <span className="tls-type-small text-white/50 font-mono">{user.membership.member_number}</span> : null}
+              {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="tls-type-small font-bold text-[#FFD700] hover:underline">Mitglied werden</Link> : null}
             </div>
           </div>
           {/* „Mein Bereich“ (#2059): Profil, Mitgliedschaft, Rechnungen, Konto und Datenschutz an einem Ort - unten als Liste. */}
-          <Link to={BEREICH} data-testid="dashboard-mein-bereich" className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider">
+          <Link to={BEREICH} data-testid="dashboard-mein-bereich" className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-sm tls-type-label">
             <ListChecks className="w-3.5 h-3.5" aria-hidden="true" /> Mein Bereich
           </Link>
         </div>
@@ -208,19 +208,19 @@ export default function DashboardPage() {
                 <circle cx="18" cy="18" r="16" fill="none" stroke="#A855F7" strokeWidth="3" strokeDasharray={`${completeness.score} 100`} pathLength="100" strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="font-heading font-black text-sm">{completeness.score}%</span>
+                <span className="tls-type-small tls-type-num">{completeness.score}%</span>
               </div>
             </div>
             <div className="flex-1 min-w-0 basis-48">
-              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">
+              <div className="flex items-center gap-2 tls-type-label text-[#A855F7]">
                 <UserCheck className="w-3.5 h-3.5" /> Profil-Pflege
               </div>
-              <h3 className="font-heading text-lg md:text-xl font-bold uppercase mt-0.5">Profil zu {completeness.score}% komplett</h3>
+              <h3 className="tls-type-card mt-0.5">Profil zu {completeness.score}% komplett</h3>
               {missingLabels(completeness.missing).length > 0 && (
-                <p className="text-xs text-white/55 mt-1" data-testid="profile-completeness-missing">Fehlt: <span className="text-white/75">{missingLabels(completeness.missing, 4).join(", ")}{missingLabels(completeness.missing).length > 4 ? "…" : ""}</span></p>
+                <p className="tls-type-small text-white/55 mt-1" data-testid="profile-completeness-missing">Fehlt: <span className="text-white/75">{missingLabels(completeness.missing, 4).join(", ")}{missingLabels(completeness.missing).length > 4 ? "…" : ""}</span></p>
               )}
             </div>
-            <Link to={`${BEREICH}/profil`} data-testid="profile-completeness-cta" className="inline-flex min-h-11 items-center px-4 py-2 border border-[#A855F7]/40 text-[#A855F7] hover:bg-[#A855F7]/10 rounded-sm text-xs font-bold uppercase tracking-wider">Vervoll&shy;ständigen</Link>
+            <Link to={`${BEREICH}/profil`} data-testid="profile-completeness-cta" className="inline-flex min-h-11 items-center px-4 py-2 border border-[#A855F7]/40 text-[#A855F7] hover:bg-[#A855F7]/10 rounded-sm tls-type-label">Vervoll&shy;ständigen</Link>
           </div>
         )}
 
@@ -230,7 +230,7 @@ export default function DashboardPage() {
             <ModerationStandingCard compact />
             {actions.length > 0 && (
               <section className="border border-[#FFD700]/30 rounded-sm bg-[#121212] p-5" data-testid="dashboard-actions">
-                <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-[#FFD700]" /> Offene Aktionen</h2>
+                <h2 className="tls-type-section mb-3 flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-[#FFD700]" /> Offene Aktionen</h2>
                 <div className="border border-white/5 rounded-sm bg-[#0F0F10] overflow-hidden">
                   {actions.map((action) => {
                     const Icon = actionIcon(action.type);
@@ -239,8 +239,8 @@ export default function DashboardPage() {
                         <button key={action.id} type="button" onClick={() => setFeedbackTarget(action.target_id)} data-testid={`dashboard-action-${action.id}`} className="w-full text-left flex items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition">
                           <span className="w-9 h-9 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Star className="w-4 h-4" /></span>
                           <span className="min-w-0 flex-1">
-                            <span className="block font-bold text-sm text-white">{action.label}</span>
-                            {action.detail ? <span className="block text-xs text-white/50 break-words">{action.detail}</span> : null}
+                            <span className="block font-bold tls-type-small text-white">{action.label}</span>
+                            {action.detail ? <span className="block tls-type-small text-white/50 break-words">{action.detail}</span> : null}
                           </span>
                           <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
                         </button>
@@ -250,8 +250,8 @@ export default function DashboardPage() {
                       <Link key={action.id} to={action.href || "/dashboard"} data-testid={`dashboard-action-${action.id}`} className="flex items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition">
                         <span className="w-9 h-9 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
                         <span className="min-w-0 flex-1">
-                          <span className="block font-bold text-sm text-white">{action.label}</span>
-                          {action.detail ? <span className="block text-xs text-white/50 break-words">{action.detail}</span> : null}
+                          <span className="block font-bold tls-type-small text-white">{action.label}</span>
+                          {action.detail ? <span className="block tls-type-small text-white/50 break-words">{action.detail}</span> : null}
                         </span>
                         <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
                       </Link>
@@ -263,9 +263,9 @@ export default function DashboardPage() {
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-timeline">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
-                <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#29B6E8]" /> Nächste Termine</h2>
+                <h2 className="tls-type-section flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#29B6E8]" /> Nächste Termine</h2>
                 {hasDates ? (
-                  <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-3 tls-type-label">
                     <Link to="/tournaments" className="tls-hit text-[#29B6E8] hover:underline">Turniere</Link>
                     <Link to="/events" className="tls-hit text-[#29B6E8] hover:underline">Events</Link>
                   </div>
@@ -277,16 +277,16 @@ export default function DashboardPage() {
                   {timeline.next.map((item) => <TimelineRow key={`${item.kind}-${item.id}`} item={item} />)}
                 </div>
               ) : (
-                <div className="text-sm text-white/50">
+                <div className="tls-type-small text-white/50">
                   Keine Termine – <Link to="/events" className="text-[#29B6E8] hover:underline">zu den Events</Link> oder <Link to="/tournaments" className="text-[#29B6E8] hover:underline">zu den Turnieren</Link>.
                 </div>
               )}
-              {timeline.moreCount > 0 ? <div className="mt-2 text-xs text-white/40">{timeline.moreCount} weitere unter Turniere und Events.</div> : null}
+              {timeline.moreCount > 0 ? <div className="mt-2 tls-type-small text-white/40">{timeline.moreCount} weitere unter Turniere und Events.</div> : null}
             </section>
 
             {matches.length > 0 && (
               <section className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-matches">
-                <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#29B6E8]" /> Meine aktiven Matches</h2>
+                <h2 className="tls-type-section mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#29B6E8]" /> Meine aktiven Matches</h2>
                 <div className="space-y-3">
                   {matches.map((m) => <DashboardMatchCard key={m.id} match={m} testId={`dashboard-match-${m.id}`} />)}
                 </div>
@@ -295,7 +295,7 @@ export default function DashboardPage() {
 
             {staffMatches.length > 0 && (
               <section className="border border-[#FFD700]/25 rounded-sm bg-[#121212] p-5" data-testid="dashboard-staff-matches">
-                <h2 className="font-heading text-xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Turnierleitung · Ergebnisse</h2>
+                <h2 className="tls-type-section mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Turnierleitung · Ergebnisse</h2>
                 <div className="grid md:grid-cols-2 gap-3">
                   {staffMatches.map((match) => <DashboardMatchCard key={match.id} match={match} staff />)}
                 </div>
@@ -307,13 +307,13 @@ export default function DashboardPage() {
             {season ? (
               <Link to={`/seasons/${season.slug || "current"}`} data-testid="dashboard-season" className="block border border-[#FFD700]/30 hover:border-[#FFD700]/70 rounded-sm bg-gradient-to-br from-[#FFD700]/10 to-transparent p-5 transition">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Jahreswertung</div>
+                  <div className="tls-type-label text-[#FFD700]">Jahreswertung</div>
                   <Award className="w-4 h-4 text-[#FFD700]" />
                 </div>
-                <div className="mt-2 font-heading text-lg font-bold">{season.name || "Jahreswertung"}</div>
-                <div className="mt-1 text-sm text-white/70">{seasonLine(season)}</div>
+                <div className="mt-2 tls-type-card">{season.name || "Jahreswertung"}</div>
+                <div className="mt-1 tls-type-small text-white/70">{seasonLine(season)}</div>
                 {season.my_rank && season.leader?.display_name && season.my_rank > 1 ? (
-                  <div className="mt-1 text-xs text-white/45">Vorn: {season.leader.display_name} · {season.leader.points ?? 0} Punkte</div>
+                  <div className="mt-1 tls-type-small text-white/45">Vorn: {season.leader.display_name} · {season.leader.points ?? 0} Punkte</div>
                 ) : null}
               </Link>
             ) : null}
@@ -326,7 +326,7 @@ export default function DashboardPage() {
         {/* Mein Bereich (#2059): jede Gruppe ein Tipp weit - von hier aus ist jede Funktion höchstens zwei Klicks entfernt. */}
         <section className="mt-8" aria-labelledby="dashboard-mein-bereich-title" data-testid="dashboard-bereich">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 id="dashboard-mein-bereich-title" className="font-heading text-xl font-bold uppercase">Mein Bereich</h2>
+            <h2 id="dashboard-mein-bereich-title" className="tls-type-section">Mein Bereich</h2>
           </div>
           <BereichListe gruppen={gruppenFuer({ mitglied: Boolean(user?.is_club_member) || isAnyAdmin(user) }).filter((item) => item.key !== "start")} testId="dashboard-bereich-liste" />
         </section>
@@ -344,12 +344,12 @@ export default function DashboardPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className={`text-[11px] uppercase tracking-widest font-bold ${penaltyCount > 0 ? "text-[#FF3B30]" : "text-white/50"}`}>
+              <div className={`tls-type-label ${penaltyCount > 0 ? "text-[#FF3B30]" : "text-white/50"}`}>
                 Transparenz
               </div>
               <AlertTriangle className={`w-4 h-4 ${penaltyCount > 0 ? "text-[#FF3B30]" : "text-white/40"}`} />
             </div>
-            <div className="mt-2 font-heading text-lg font-bold">
+            <div className="mt-2 tls-type-card">
               Meine Strafen {penaltyCount > 0 && <span className="text-[#FF3B30]">({penaltyCount})</span>}
             </div>
           </Link>
@@ -388,12 +388,12 @@ function DashboardMatchCard({ match, staff = false, testId }) {
       className={`block border rounded-sm p-3 transition ${tone}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-white font-bold">{match.tournament_title || "Turniermatch"}</div>
+        <div className="tls-type-small text-white font-bold">{match.tournament_title || "Turniermatch"}</div>
         <StatusBadge status={match.status} />
       </div>
-      {details.length > 0 && <div className="text-xs text-white/50 mt-1">{details.join(" · ")}</div>}
-      {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
-      <div className={`mt-2 text-[10px] font-bold uppercase tracking-wider ${disputed ? "text-[#FF6B60]" : attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
+      {details.length > 0 && <div className="tls-type-small text-white/50 mt-1">{details.join(" · ")}</div>}
+      {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
+      <div className={`mt-2 tls-type-label ${disputed ? "text-[#FF6B60]" : attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
     </Link>
   );
 }

@@ -45,8 +45,8 @@ export default function MyPenaltiesPage() {
             empty={(
               <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
                 <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />
-                <div className="font-heading text-xl font-bold uppercase">Saubere Weste</div>
-                <p className="mt-2 text-white/60 text-sm">Keine Strafen, keine ungültigen Runden, keine kampflosen Niederlagen – weiter so!</p>
+                <div className="tls-type-card">Saubere Weste</div>
+                <p className="mt-2 text-white/60 tls-type-body">Keine Strafen, keine ungültigen Runden, keine kampflosen Niederlagen – weiter so!</p>
               </div>
             )}
           >
@@ -85,12 +85,12 @@ function PenaltyCard({ p }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="font-heading font-black uppercase text-white" style={{ color: meta.color }}>
+            <span className="font-black uppercase text-white" style={{ color: meta.color }}>
               {p.label}
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-white/40">{meta.label}</span>
+            <span className="tls-type-label text-white/40">{meta.label}</span>
           </div>
-          <div className="mt-1 text-sm text-white/80">
+          <div className="mt-1 tls-type-small text-white/80">
             {p.context_url ? (
               <Link to={p.context_url} className="hover:text-[#29B6E8] inline-flex items-center gap-1">
                 {p.context_title}
@@ -109,7 +109,7 @@ function PenaltyCard({ p }) {
             „{p.reason}"
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/45">
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 tls-type-small text-white/45">
             <span>Eintrag von: <span className="text-white/70">{p.issued_by_name}</span></span>
             <span>·</span>
             <span>{date}</span>
@@ -122,7 +122,7 @@ function PenaltyCard({ p }) {
           </div>
 
           {/* Rückfrage statt eigenem Einspruch (#2130): der Betreff nennt nur die Sache, keine Person. */}
-          <Link to={penaltyContactLink(p)} data-testid={`penalty-question-${p.ref_id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+          <Link to={penaltyContactLink(p)} data-testid={`penalty-question-${p.ref_id}`} className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8] hover:text-white">
             <MessageCircleQuestion className="w-3.5 h-3.5" aria-hidden="true" /> Rückfrage stellen
           </Link>
         </div>

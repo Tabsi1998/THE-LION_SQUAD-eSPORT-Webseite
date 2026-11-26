@@ -39,7 +39,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
 
   return (
     <Section>
-      <p className="text-sm text-white/60">Passwort, Passkeys, Zwei-Faktor, Google-Konto und angemeldete Geräte an einem Ort.</p>
+      <p className="tls-type-body text-white/60">Passwort, Passkeys, Zwei-Faktor, Google-Konto und angemeldete Geräte an einem Ort.</p>
 
       {/* Die Angaben zum Konto (#2059) - vorher unten auf „Meine Daten“. */}
       <KontoAngaben />
@@ -47,7 +47,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
       {sentHereForMfa && (
         <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
           <ShieldCheck className="w-5 h-5 text-[#FFD700] mt-0.5 shrink-0" />
-          <div className="text-sm text-white/80">
+          <div className="tls-type-small text-white/80">
             <strong>Für den Adminbereich brauchst du die Zwei-Faktor-Anmeldung.</strong> Richte sie unten ein (dauert zwei Minuten),
             melde dich danach einmal neu an – dann geht es weiter{params.get("next") ? ` zu ${params.get("next")}` : ""}.
           </div>
@@ -64,11 +64,11 @@ export function SecurityTab({ user, refresh, siteSettings }) {
         <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]" data-testid="profile-google-link">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-heading font-black uppercase mb-1">Google-Konto</h3>
+              <h3 className="tls-type-card mb-1">Google-Konto</h3>
               {googleLinked ? (
-                <p className="text-xs text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
+                <p className="tls-type-small text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
               ) : (
-                <p className="text-xs text-white/50" data-testid="profile-google-status">Verbinde dein Google-Konto, um dich künftig mit einem Klick anzumelden.</p>
+                <p className="tls-type-small text-white/50" data-testid="profile-google-status">Verbinde dein Google-Konto, um dich künftig mit einem Klick anzumelden.</p>
               )}
             </div>
             {googleLinked ? (
@@ -78,7 +78,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
                 disabled={googleOnly}
                 title={googleOnly ? "Setze zuerst ein Passwort, dann kannst du Google trennen." : undefined}
                 data-testid="profile-google-unlink"
-                className="px-4 py-2.5 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] text-xs font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className="px-4 py-2.5 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               >
                 Trennen
               </button>

@@ -38,12 +38,12 @@ export function DatenHerunterladen() {
       <div className="flex items-start gap-3">
         <Download className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0">
-          <h2 className="font-heading text-lg md:text-xl font-bold uppercase">Daten herunterladen</h2>
-          <p className="mt-1 text-sm text-white/60">Lade alle Daten herunter, die wir über dich gespeichert haben – Profil, Turnier-Anmeldungen, Fast-Lap-Zeiten, Teams und E-Mail-Protokolle. Du hast jederzeit das Recht auf Auskunft und Datenübertragbarkeit (DSGVO Artikel 15 und 20).</p>
+          <h2 className="tls-type-section">Daten herunterladen</h2>
+          <p className="mt-1 tls-type-body text-white/60">Lade alle Daten herunter, die wir über dich gespeichert haben – Profil, Turnier-Anmeldungen, Fast-Lap-Zeiten, Teams und E-Mail-Protokolle. Du hast jederzeit das Recht auf Auskunft und Datenübertragbarkeit (DSGVO Artikel 15 und 20).</p>
           <button type="button" onClick={exportData} disabled={busy} data-testid="dsgvo-export-btn" className="tls-btn tls-btn--primary mt-4 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
             {busy ? "Lade …" : "Daten herunterladen"}
           </button>
-          <p className="mt-2 text-xs text-white/45">Eine Datei im JSON-Format, lesbar mit jedem Texteditor.</p>
+          <p className="mt-2 tls-type-small text-white/45">Eine Datei im JSON-Format, lesbar mit jedem Texteditor.</p>
         </div>
       </div>
     </div>
@@ -106,23 +106,23 @@ export function KontoLoeschen() {
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-[#FF3B30] mt-1 shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0">
-          <h2 className="font-heading text-lg md:text-xl font-bold uppercase text-[#FF3B30]">Konto löschen</h2>
-          <p className="mt-1 text-sm text-white/60">Dein Konto wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Ergebnisse bleiben ohne Namen erhalten, damit Tabellen und Bäume stimmen. Das lässt sich <strong>nicht rückgängig machen</strong>.</p>
+          <h2 className="tls-type-section text-[#FF3B30]">Konto löschen</h2>
+          <p className="mt-1 tls-type-body text-white/60">Dein Konto wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Ergebnisse bleiben ohne Namen erhalten, damit Tabellen und Bäume stimmen. Das lässt sich <strong>nicht rückgängig machen</strong>.</p>
           {roleBlockers.length > 0 && (
             <div className="mt-4 border border-warn/35 bg-warn/5 rounded-sm p-4" data-testid="dsgvo-erasure-blockers">
-              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-warn"><Users className="w-3.5 h-3.5" aria-hidden="true" /> {onlySuperadmin ? "Erst deine Rolle abgeben" : "Erst deine Rollen in Teams abgeben"}</div>
-              <p className="mt-1 text-sm text-white/70">{onlySuperadmin ? "Als letzter Superadmin kannst du dein Konto nicht löschen – sonst vergibt niemand mehr Rollen. So geht es:" : "Solange du ein Team leitest oder in einem Co-Team Captain oder Vertreter bist, kannst du dein Konto nicht löschen – sonst stünde dort ein gelöschtes Konto. So geht es:"}</p>
+              <div className="flex items-center gap-2 tls-type-label text-warn"><Users className="w-3.5 h-3.5" aria-hidden="true" /> {onlySuperadmin ? "Erst deine Rolle abgeben" : "Erst deine Rollen in Teams abgeben"}</div>
+              <p className="mt-1 tls-type-small text-white/70">{onlySuperadmin ? "Als letzter Superadmin kannst du dein Konto nicht löschen – sonst vergibt niemand mehr Rollen. So geht es:" : "Solange du ein Team leitest oder in einem Co-Team Captain oder Vertreter bist, kannst du dein Konto nicht löschen – sonst stünde dort ein gelöschtes Konto. So geht es:"}</p>
               <ul className="mt-3 space-y-2">
                 {roleBlockers.map((row) => (
-                  <li key={`${row.team_id}:${row.squad_id || ""}:${row.role}`} className="border border-white/10 bg-black/20 rounded-sm p-3 text-sm" data-testid={`dsgvo-erasure-blocker-${row.role}`}>
+                  <li key={`${row.team_id}:${row.squad_id || ""}:${row.role}`} className="border border-white/10 bg-black/20 rounded-sm p-3 tls-type-small" data-testid={`dsgvo-erasure-blocker-${row.role}`}>
                     <div className="font-bold text-white break-words">{row.role_label} {row.squad ? `im Co-Team ${row.squad} von ${row.team}` : `bei ${row.team}`}</div>
                     <div className="mt-1 text-white/60">{row.way}</div>
-                    {row.link ? <Link to={row.link} className="tls-btn tls-btn--secondary mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">{row.role === "superadmin" ? "Zu Alle Benutzer" : row.squad ? "Zu deinen Teams" : "Zur Teamseite"}</Link> : null}
+                    {row.link ? <Link to={row.link} className="tls-btn tls-btn--secondary mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label">{row.role === "superadmin" ? "Zu Alle Benutzer" : row.squad ? "Zu deinen Teams" : "Zur Teamseite"}</Link> : null}
                   </li>
                 ))}
               </ul>
               {/* Kein Ende ohne Ausweg (#2113): der Löschanspruch hängt nie an einer Team-Rolle. */}
-              {erasure.data?.closing ? <p className="mt-3 text-sm text-white/70" data-testid="dsgvo-erasure-closing">{erasure.data.closing}</p> : null}
+              {erasure.data?.closing ? <p className="mt-3 tls-type-small text-white/70" data-testid="dsgvo-erasure-closing">{erasure.data.closing}</p> : null}
             </div>
           )}
           <button type="button" onClick={erase} disabled={busy || roleBlockers.length > 0} data-testid="dsgvo-anonymize-btn" className="tls-btn tls-btn--danger mt-4 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 disabled:cursor-not-allowed">
@@ -156,14 +156,14 @@ export function BlockierteBenutzer() {
       <div className="flex items-start gap-3">
         <ShieldOff className="w-5 h-5 text-[#FFD700] mt-1 shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0">
-          <h3 className="font-heading font-black uppercase mb-1">Blockierte Benutzer</h3>
-          <p className="text-xs text-white/50">Blockierte Konten können dir keine Nachrichten oder Freundschaftsanfragen senden.</p>
+          <h3 className="tls-type-card mb-1">Blockierte Benutzer</h3>
+          <p className="tls-type-small text-white/50">Blockierte Konten können dir keine Nachrichten oder Freundschaftsanfragen senden.</p>
           <div className="mt-4 divide-y divide-white/5 border border-white/10 rounded-sm">
             {blocks.map((row) => <div key={row.id} className="p-3 flex items-center justify-between gap-3">
-              <div className="min-w-0"><div className="font-bold tls-wrap">{row.user?.display_name || row.user?.username || "Gelöschter Benutzer"}</div>{row.user?.username && <div className="text-xs text-white/40 tls-wrap">@{row.user.username}</div>}</div>
-              <button type="button" onClick={() => unblock(row.blocked_id)} className="tls-btn tls-btn--quiet shrink-0 px-3 py-1.5 rounded-sm text-xs uppercase font-bold">Freigeben</button>
+              <div className="min-w-0"><div className="font-bold tls-wrap">{row.user?.display_name || row.user?.username || "Gelöschter Benutzer"}</div>{row.user?.username && <div className="tls-type-small text-white/40 tls-wrap">@{row.user.username}</div>}</div>
+              <button type="button" onClick={() => unblock(row.blocked_id)} className="tls-btn tls-btn--quiet shrink-0 px-3 py-1.5 rounded-sm tls-type-label">Freigeben</button>
             </div>)}
-            {blocks.length === 0 && <div className="p-4 text-sm text-white/45">Keine blockierten Benutzer.</div>}
+            {blocks.length === 0 && <div className="p-4 tls-type-small text-white/45">Keine blockierten Benutzer.</div>}
           </div>
         </div>
       </div>
@@ -175,8 +175,8 @@ export function BlockierteBenutzer() {
 export function KontoAngaben() {
   const { user } = useAuth();
   return (
-    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 text-sm" data-testid="account-facts">
-      <h3 className="font-heading font-black uppercase mb-3">Dein Konto</h3>
+    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 tls-type-small" data-testid="account-facts">
+      <h3 className="tls-type-card mb-3">Dein Konto</h3>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-2">
         <dt className="text-white/45">Benutzername</dt><dd className="tls-wrap">{user?.username}</dd>
         <dt className="text-white/45">E-Mail</dt><dd className="tls-wrap">{user?.email}</dd>

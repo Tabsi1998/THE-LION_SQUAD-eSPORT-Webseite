@@ -24,10 +24,10 @@ export const MATERIAL_OPTIONS = [
 export function AchievementStat({ icon: Icon, label, value, color, testId }) {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={testId}>
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold">
+      <div className="flex items-center gap-2 tls-type-label text-white/45">
         <Icon className="w-3.5 h-3.5" style={{ color }} /> {label}
       </div>
-      <div className="mt-2 font-heading text-2xl font-black tabular-nums" style={{ color }}>{value}</div>
+      <div className="mt-2 tls-type-section tls-type-num" style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -57,23 +57,23 @@ export function AchievementLevelHeader({ level, earnedPercent, onLevelChange, ch
             <circle cx="18" cy="18" r="16" fill="none" stroke="#A855F7" strokeWidth="3" strokeDasharray={`${earnedPercent ?? 0} 100`} pathLength="100" strokeLinecap="round" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-heading font-black text-sm">{earnedPercent ?? 0}%</span>
+            <span className="tls-type-small tls-type-num">{earnedPercent ?? 0}%</span>
           </div>
         </div>
         <div className="flex-1 min-w-0">
           {/* Einheitlich „Erfolge“ (#2123, ER14) - wie im Reiter, in der Verwaltung und im Handbuch. */}
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">Level & Erfolge</div>
-          <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1 flex items-center gap-2 flex-wrap">
+          <div className="tls-type-label text-[#A855F7]">Level & Erfolge</div>
+          <h2 className="tls-type-section mt-1 flex items-center gap-2 flex-wrap">
             <span>Deine Erfolge</span>
             {lvl.title && (
-              <span className="text-sm font-bold tracking-widest text-[#FFD700] inline-flex items-center gap-1" data-testid="achievement-level-title">
+              <span className="tls-type-label text-[#FFD700] inline-flex items-center gap-1" data-testid="achievement-level-title">
                 Level {lvl.level} · {lvl.title}
                 {prestige > 0 && <span className="inline-flex items-center gap-0.5 text-[#FFD700]" title={`Prestige ${prestige}`} data-testid="achievement-prestige">{Array.from({ length: Math.min(5, prestige) }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}</span>}
               </span>
             )}
           </h2>
           {lvl.next_title_at && lvl.level < lvl.next_title_at && (
-            <p className="text-xs text-white/45 mt-1">Nächster Titel ab Level {lvl.next_title_at}.</p>
+            <p className="tls-type-small text-white/45 mt-1">Nächster Titel ab Level {lvl.next_title_at}.</p>
           )}
         </div>
         {children}
@@ -138,17 +138,17 @@ export function PrestigePanel({ level, onLevelChange }) {
   return (
     <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 flex items-center gap-3 flex-wrap" data-testid="achievement-prestige-panel">
       <Star className="w-4 h-4 text-[#FFD700] fill-current shrink-0" aria-hidden="true" />
-      <p className="flex-1 min-w-[12rem] text-xs text-white/70">
+      <p className="flex-1 min-w-[12rem] tls-type-small text-white/70">
         {undoUntil
           ? `${stars}. Prestige-Stern – bis ${untilText} Uhr kannst du ihn zurücknehmen.`
           : "Level 60 erreicht. Mit Prestige startest du bei Level 1 neu und bekommst einen Stern – alle Erfolge bleiben."}
       </p>
       {undoUntil ? (
-        <button type="button" onClick={undo} disabled={busy} data-testid="achievement-prestige-undo" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/20 text-white/75 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:text-white hover:border-white/40 disabled:opacity-50">
+        <button type="button" onClick={undo} disabled={busy} data-testid="achievement-prestige-undo" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/20 text-white/75 rounded-sm tls-type-label hover:text-white hover:border-white/40 disabled:opacity-50">
           <Undo2 className="w-3.5 h-3.5" /> Zurücknehmen
         </button>
       ) : (
-        <button type="button" onClick={start} disabled={busy} data-testid="achievement-prestige-start" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm text-[10px] font-black uppercase tracking-widest hover:bg-[#ffe34d] disabled:opacity-50">
+        <button type="button" onClick={start} disabled={busy} data-testid="achievement-prestige-start" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label hover:bg-[#ffe34d] disabled:opacity-50">
           <Star className="w-3.5 h-3.5 fill-current" /> Prestige starten
         </button>
       )}
@@ -159,7 +159,7 @@ export function PrestigePanel({ level, onLevelChange }) {
 function MaterialChip({ tier }) {
   const color = tier.material_color || tier.level_color || "#29B6E8";
   return (
-    <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border" style={{ color, borderColor: `${color}66`, backgroundColor: `${color}12` }}>
+    <span className="tls-type-small font-bold px-1.5 py-0.5 rounded-sm border" style={{ color, borderColor: `${color}66`, backgroundColor: `${color}12` }}>
       {tier.material_name || tier.level_name}
     </span>
   );
@@ -171,8 +171,8 @@ export function NextUpPanel({ items = [] }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-next-up">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#00FF88]">Als Nächstes</div>
-          <h3 className="font-heading text-xl font-black uppercase mt-1">Was dem Ziel am nächsten ist</h3>
+          <div className="tls-type-label text-[#00FF88]">Als Nächstes</div>
+          <h3 className="tls-type-card mt-1">Was dem Ziel am nächsten ist</h3>
         </div>
         <Target className="w-5 h-5 text-[#00FF88]" />
       </div>
@@ -188,12 +188,12 @@ export function NextUpPanel({ items = [] }) {
                     <Badge material={tier.material} rank={tier.rank} art={tier.art} icon={tier.icon || tier.group_icon} earned={false} percent={percent} size="lg" title={tier.name} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[10px] uppercase tracking-widest font-bold truncate" style={{ color: accent }}>{tier.group_name}</div>
-                    <div className="font-heading font-bold text-base leading-tight truncate">{tier.name}</div>
+                    <div className="tls-type-small font-bold truncate" style={{ color: accent }}>{tier.group_name}</div>
+                    <div className="tls-type-card leading-tight truncate">{tier.name}</div>
                     <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                       <MaterialChip tier={tier} />
-                      <span className="text-[10px] text-white/40 uppercase tracking-widest">+{tier.points}</span>
-                      {tier.member_only && <span className="text-[9px] uppercase tracking-widest text-[#FFD700]">Verein</span>}
+                      <span className="tls-type-label text-white/40">+{tier.points}</span>
+                      {tier.member_only && <span className="tls-type-label text-[#FFD700]">Verein</span>}
                     </div>
                   </div>
                 </div>
@@ -201,14 +201,14 @@ export function NextUpPanel({ items = [] }) {
                   <div className="flex-1 h-1.5 bg-white/5 rounded-sm overflow-hidden">
                     <div className="h-full" style={{ width: `${percent}%`, backgroundColor: accent }} />
                   </div>
-                  <span className="text-[10px] text-white/45 tabular-nums">{tier.current}/{tier.target}</span>
+                  <span className="tls-type-small text-white/45 tabular-nums">{tier.current}/{tier.target}</span>
                 </div>
-                <p className="mt-3 text-xs text-white/60 flex-1">
-                  <span className="text-white/40 uppercase tracking-widest text-[9px] font-bold block mb-0.5">So schaffst du es</span>
+                <p className="mt-3 tls-type-small text-white/60 flex-1">
+                  <span className="text-white/40 tls-type-label block mb-0.5">So schaffst du es</span>
                   {tier.how_to || tier.description}{tier.missing ? ` Noch ${Number(tier.missing).toLocaleString("de-DE")}.` : ""}
                 </p>
                 {tier.link && (
-                  <Link to={tier.link} className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: accent }} data-testid={`next-achievement-link-${tier.code}`}>
+                  <Link to={tier.link} className="mt-3 inline-flex items-center gap-1 tls-type-label hover:underline" style={{ color: accent }} data-testid={`next-achievement-link-${tier.code}`}>
                     Dorthin <ArrowRight className="w-3 h-3" />
                   </Link>
                 )}
@@ -217,7 +217,7 @@ export function NextUpPanel({ items = [] }) {
           })}
         </div>
       ) : (
-        <div className="border border-dashed border-white/10 rounded-sm p-8 text-sm text-white/45 text-center">
+        <div className="border border-dashed border-white/10 rounded-sm p-8 tls-type-small text-white/45 text-center">
           Keine messbaren offenen Ziele – alles erreicht oder nur noch von Hand vergeben.
         </div>
       )}
@@ -236,9 +236,9 @@ function PinnedCard({ award, onRemove, dragging }) {
       <GripVertical className="w-4 h-4 text-white/25 shrink-0" aria-hidden="true" />
       <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size="lg" title={award.name} />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-widest font-bold truncate" style={{ color }}>{award.material_name || award.level_name}</div>
-        <div className="font-semibold text-sm truncate">{award.name}</div>
-        <div className="text-[10px] text-white/40 truncate">{award.group_name}</div>
+        <div className="tls-type-small font-bold truncate" style={{ color }}>{award.material_name || award.level_name}</div>
+        <div className="font-semibold tls-type-small truncate">{award.name}</div>
+        <div className="tls-type-small text-white/40 truncate">{award.group_name}</div>
       </div>
       <button
         type="button"
@@ -273,10 +273,10 @@ export function PinnedPanel({ pinned = [], codes = [], onChange }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-pinned">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Angeheftet</div>
-          <h3 className="font-heading text-xl font-black uppercase mt-1">Was dein Profil zuerst zeigt</h3>
+          <div className="tls-type-label text-[#FFD700]">Angeheftet</div>
+          <h3 className="tls-type-card mt-1">Was dein Profil zuerst zeigt</h3>
         </div>
-        <span className="text-[10px] uppercase tracking-widest text-white/40 tabular-nums" data-testid="achievement-pinned-count">{items.length} von {MAX_PINS}</span>
+        <span className="tls-type-label text-white/40 tabular-nums" data-testid="achievement-pinned-count">{items.length} von {MAX_PINS}</span>
       </div>
       {items.length ? (
         <Reorder.Group
@@ -294,7 +294,7 @@ export function PinnedPanel({ pinned = [], codes = [], onChange }) {
         </Reorder.Group>
       ) : null}
       {free > 0 && (
-        <p className={`text-xs text-white/45 border border-dashed border-white/10 rounded-sm px-4 py-3 ${items.length ? "mt-3" : ""}`} data-testid="achievement-pinned-hint">
+        <p className={`tls-type-small text-white/45 border border-dashed border-white/10 rounded-sm px-4 py-3 ${items.length ? "mt-3" : ""}`} data-testid="achievement-pinned-hint">
           <Pin className="w-3 h-3 inline mr-1 -mt-0.5" />
           {items.length ? `Noch ${free} ${free === 1 ? "Platz" : "Plätze"} frei` : "Bis zu sechs Erfolge anheften"} – unten an jeder erreichten Stufe über „Anheften“. Die Reihenfolge hier ist die im öffentlichen Profil; ziehen sortiert.
         </p>
@@ -329,11 +329,11 @@ export function CategoryShowcase({ progress = null, active = null, onPick }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-showcase">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Vitrinen</div>
-          <h3 className="font-heading text-xl font-black uppercase mt-1">Je Kategorie</h3>
+          <div className="tls-type-label text-[#29B6E8]">Vitrinen</div>
+          <h3 className="tls-type-card mt-1">Je Kategorie</h3>
         </div>
         {active && (
-          <button type="button" onClick={() => onPick(null)} className="text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white" data-testid="achievement-showcase-clear">
+          <button type="button" onClick={() => onPick(null)} className="tls-type-label text-white/60 hover:text-white" data-testid="achievement-showcase-clear">
             Alle Kategorien
           </button>
         )}
@@ -353,8 +353,8 @@ export function CategoryShowcase({ progress = null, active = null, onPick }) {
             >
               <div className="flex items-center gap-2">
                 <AchievementIcon name={row.icon} fallback="trophy" className="w-3.5 h-3.5 shrink-0" style={{ color: row.accent }} />
-                <span className="font-heading font-bold uppercase text-sm truncate">{row.label}</span>
-                <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50 tabular-nums shrink-0" data-complete={row.complete ? "true" : undefined}>{showcaseText(row)}</span>
+                <span className="tls-type-label truncate">{row.label}</span>
+                <span className="ml-auto tls-type-label text-white/50 tabular-nums shrink-0" data-complete={row.complete ? "true" : undefined}>{showcaseText(row)}</span>
               </div>
               <div className="mt-2 h-1 bg-white/5 rounded-sm overflow-hidden">
                 <div className="h-full" style={{ width: `${percent}%`, backgroundColor: row.accent }} />
@@ -370,7 +370,7 @@ export function CategoryShowcase({ progress = null, active = null, onPick }) {
 export function AchievementFilters({ filters, onChange, resultCount }) {
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="achievement-filters">
-      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-white/45 font-bold mr-1"><Filter className="w-3 h-3" /> Filter</span>
+      <span className="inline-flex items-center gap-1 tls-type-label text-white/45 mr-1"><Filter className="w-3 h-3" /> Filter</span>
       <div className="inline-flex border border-white/15 rounded-sm overflow-hidden" role="group" aria-label="Status">
         {STATUS_FILTERS.map(([key, label]) => {
           const active = (filters.status || "all") === key;
@@ -381,7 +381,7 @@ export function AchievementFilters({ filters, onChange, resultCount }) {
               onClick={() => onChange({ ...filters, status: key })}
               aria-pressed={active}
               data-testid={`achievement-filter-status-${key}`}
-              className={`px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest transition ${active ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
+              className={`px-2.5 py-1.5 tls-type-label transition ${active ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
             >
               {label}
             </button>
@@ -393,16 +393,16 @@ export function AchievementFilters({ filters, onChange, resultCount }) {
         onChange={(event) => onChange({ ...filters, material: event.target.value })}
         aria-label="Material"
         data-testid="achievement-filter-material"
-        className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-[10px] uppercase tracking-widest text-white/80"
+        className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 tls-type-label text-white/80"
       >
         <option value="">Jedes Material</option>
         {MATERIAL_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
       {typeof resultCount === "number" && (
-        <span className="text-[10px] uppercase tracking-widest text-white/40 tabular-nums" data-testid="achievement-filter-count">{resultCount} Gruppen</span>
+        <span className="tls-type-label text-white/40 tabular-nums" data-testid="achievement-filter-count">{resultCount} Gruppen</span>
       )}
       {(filters.material || (filters.status && filters.status !== "all")) && (
-        <button type="button" onClick={() => onChange({ status: "all", material: "" })} className="text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-white" data-testid="achievement-filter-reset">
+        <button type="button" onClick={() => onChange({ status: "all", material: "" })} className="tls-type-label text-white/60 hover:text-white" data-testid="achievement-filter-reset">
           Zurücksetzen
         </button>
       )}

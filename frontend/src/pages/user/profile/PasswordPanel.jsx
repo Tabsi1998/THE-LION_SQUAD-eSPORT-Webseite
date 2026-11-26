@@ -64,8 +64,8 @@ export function PasswordPanel({ googleOnly = false }) {
       <div className="flex items-start gap-3 mb-4">
         <KeyRound className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
         <div>
-          <h3 className="font-heading font-black uppercase mb-1">Passwort ändern</h3>
-          <p className="text-xs text-white/50">
+          <h3 className="tls-type-card mb-1">Passwort ändern</h3>
+          <p className="tls-type-small text-white/50">
             {googleOnly
               ? "Dein Konto meldet sich über Google an und hat kein Passwort. Ein Passwort setzt du über „Passwort vergessen“ auf der Anmeldeseite."
               : `${PASSWORD_RULE_HINT} Nach dem Wechsel werden alle Geräte abgemeldet, auch dieses.`}
@@ -75,18 +75,18 @@ export function PasswordPanel({ googleOnly = false }) {
       {googleOnly ? null : (
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aktuelles Passwort</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Aktuelles Passwort</div>
             <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} onKeyDown={onEnter} data-testid="profile-password-current" className={inputClass} />
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Neues Passwort</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Neues Passwort</div>
             <input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} onKeyDown={onEnter} data-testid="profile-password-new" className={inputClass} />
-            {problemText ? <div className="text-[11px] text-[#FFD700] mt-1">{problemText}</div> : null}
+            {problemText ? <div className="tls-type-small text-[#FFD700] mt-1">{problemText}</div> : null}
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Neues Passwort wiederholen</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Neues Passwort wiederholen</div>
             <input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} onKeyDown={onEnter} data-testid="profile-password-repeat" className={inputClass} />
-            {mismatch ? <div className="text-[11px] text-[#FFD700] mt-1">Die Passwörter stimmen nicht überein.</div> : null}
+            {mismatch ? <div className="tls-type-small text-[#FFD700] mt-1">Die Passwörter stimmen nicht überein.</div> : null}
           </label>
           <div className="sm:col-span-3">
             <button
@@ -94,7 +94,7 @@ export function PasswordPanel({ googleOnly = false }) {
               onClick={submit}
               disabled={!ready}
               data-testid="profile-password-submit"
-              className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs"
+              className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 tls-type-label rounded-sm disabled:opacity-50"
             >
               {busy ? "Ändere…" : "Passwort ändern"}
             </button>

@@ -20,8 +20,8 @@ function ZuTunKnopf({ item }) {
       className={`tls-card ${warn ? "tls-card--gold" : ""} group flex min-h-16 items-center gap-4 rounded-sm border bg-[#121212] px-4 py-3 ${warn ? "border-[#FFD700]/45" : "border-[#29B6E8]/35"}`}
     >
       <span className="min-w-0 flex-1">
-        <span className={`tls-card__title tls-wrap block font-heading text-lg font-black uppercase ${warn ? "text-[#FFD700]" : "text-white"}`}>{item.label}</span>
-        {item.detail ? <span className="tls-wrap mt-0.5 block text-sm text-white/60">{item.detail}</span> : null}
+        <span className={`tls-card__title tls-wrap block tls-type-card ${warn ? "text-[#FFD700]" : "text-white"}`}>{item.label}</span>
+        {item.detail ? <span className="tls-wrap mt-0.5 block tls-type-small text-white/60">{item.detail}</span> : null}
       </span>
       <ArrowRight className="tls-card__arrow w-5 h-5 shrink-0 text-white/40" aria-hidden="true" />
     </Link>
@@ -37,7 +37,7 @@ export default function UebersichtSeite() {
       <div className="lg:hidden mb-6"><Identitaet user={user} /></div>
 
       <section aria-labelledby="mein-bereich-todo-title" data-testid="mein-bereich-todo">
-        <h2 id="mein-bereich-todo-title" className="font-heading text-xl font-black uppercase">Zu tun</h2>
+        <h2 id="mein-bereich-todo-title" className="tls-type-section">Zu tun</h2>
         {!todo.loaded ? (
           <div className="mt-3 h-16 rounded-sm border border-white/10 bg-[#121212] animate-pulse motion-reduce:animate-none" data-testid="mein-bereich-todo-loading" />
         ) : items.length ? (
@@ -45,19 +45,19 @@ export default function UebersichtSeite() {
             {items.map((item) => <ZuTunKnopf key={item.key} item={item} />)}
           </StaggerIn>
         ) : (
-          <p className="mt-3 flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-4 py-4 text-sm text-white/70" data-testid="mein-bereich-todo-empty">
+          <p className="mt-3 flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-4 py-4 tls-type-small text-white/70" data-testid="mein-bereich-todo-empty">
             <CheckCircle2 className="w-4 h-4 shrink-0 text-[#00FF88]" aria-hidden="true" /> Alles erledigt – gerade ist nichts offen.
           </p>
         )}
       </section>
 
       <section aria-labelledby="mein-bereich-schnell-title" className="mt-8" data-testid="mein-bereich-schnell">
-        <h2 id="mein-bereich-schnell-title" className="font-heading text-xl font-black uppercase">Häufig gebraucht</h2>
+        <h2 id="mein-bereich-schnell-title" className="tls-type-section">Häufig gebraucht</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           {schnellwege({ mitglied }).map((item) => {
             const Icon = SCHNELL_ICONS[item.key];
             return (
-              <Link key={item.key} to={item.to} data-testid={`mein-bereich-schnell-${item.key}`} className={`tls-btn ${item.key === "loeschung" ? "tls-btn--quiet" : "tls-btn--secondary"} inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider`}>
+              <Link key={item.key} to={item.to} data-testid={`mein-bereich-schnell-${item.key}`} className={`tls-type-label tls-btn ${item.key === "loeschung" ? "tls-btn--quiet" : "tls-btn--secondary"} inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2`}>
                 {Icon ? <Icon className="w-3.5 h-3.5" aria-hidden="true" /> : null} {item.label}
               </Link>
             );
@@ -66,7 +66,7 @@ export default function UebersichtSeite() {
       </section>
 
       <section aria-labelledby="mein-bereich-alle-title" className="mt-8 lg:hidden">
-        <h2 id="mein-bereich-alle-title" className="font-heading text-xl font-black uppercase">Alle Bereiche</h2>
+        <h2 id="mein-bereich-alle-title" className="tls-type-section">Alle Bereiche</h2>
         <div className="mt-3"><BereichListe gruppen={gruppen.filter((item) => item.key !== "start")} offen={offen} /></div>
       </section>
     </BereichSeite>

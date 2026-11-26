@@ -128,7 +128,7 @@ afterEach(() => {
   urlSpies.forEach((spy) => spy.mockRestore());
 });
 
-const heading = (name) => screen.findByText(name, { selector: ".font-heading" });
+const heading = (name) => screen.findByText(name, { selector: "[data-testid='conversation-name']" });
 
 async function openPeer(peerId, name) {
   fireEvent.click(await screen.findByTestId(`conversation-item-${peerId}`));
@@ -214,7 +214,7 @@ test("eine verspätete Antwort für A ändert B nicht und markiert A nicht als g
 
   await act(async () => late.resolve(conversation("u-schatten", [message("m-a", "u-schatten", "Nachricht aus Chat A")])));
 
-  expect(screen.getByText("PixelPanther", { selector: ".font-heading" })).toBeInTheDocument();
+  expect(screen.getByText("PixelPanther", { selector: "[data-testid='conversation-name']" })).toBeInTheDocument();
   expect(screen.queryByTestId("conversation-message-m-a")).not.toBeInTheDocument();
   expect(apiMock.post).not.toHaveBeenCalledWith("/chats/direct/u-schatten/read");
 });
@@ -230,7 +230,7 @@ test("ein Nachladen, das noch zu A gehört, ändert B nicht", async () => {
 
   await act(async () => { await pollForA(); });
 
-  expect(screen.getByText("PixelPanther", { selector: ".font-heading" })).toBeInTheDocument();
+  expect(screen.getByText("PixelPanther", { selector: "[data-testid='conversation-name']" })).toBeInTheDocument();
   expect(screen.queryByTestId("conversation-message-m-a")).not.toBeInTheDocument();
   expect(apiMock.post).not.toHaveBeenCalledWith("/chats/direct/u-schatten/read");
 });

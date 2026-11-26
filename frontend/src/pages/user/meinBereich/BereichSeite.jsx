@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { BEREICH } from "@/lib/meinBereich";
 import "./meinBereich.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Rahmen jeder Gruppe in „Mein Bereich“ (#2059): Überschrift, ein Satz, Aktionen rechts, darunter die Reiter der Gruppe.
 // Am Handy steht oben ein Knopf zurück zur Liste der Gruppen (oder zur übergeordneten Gruppe, `back`). Den Fokus auf
@@ -11,7 +12,7 @@ import "./meinBereich.css";
 
 export function BereichZurueck({ to = BEREICH, label = "Mein Bereich", className = "", testId = "mein-bereich-back" }) {
   return (
-    <Link to={to} data-testid={testId} className={`tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider ${className}`.trim()}>
+    <Link to={to} data-testid={testId} className={`tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 rounded-sm px-3 py-2 tls-type-label ${className}`.trim()}>
       <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> {label}
     </Link>
   );
@@ -54,7 +55,7 @@ export function BereichReiter({ items, active, onSelect, label, testIdPrefix = "
               onClick={() => { if (!current) onSelect(item.k); }}
               aria-current={current ? "page" : undefined}
               data-testid={`${testIdPrefix}${item.k}`}
-              className={`shrink-0 inline-flex min-h-11 items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider transition-colors duration-fast ease-tls ${current ? "text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
+              className={`shrink-0 inline-flex min-h-11 items-center gap-2 px-3 py-2 tls-type-label transition-colors duration-fast ease-tls ${current ? "text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
             >
               {item.icon ? <item.icon className="w-3.5 h-3.5" aria-hidden="true" /> : null} {item.label}
             </button>
@@ -84,8 +85,8 @@ export function BereichSeite({ title, intro, actions, reiter, back, tabKey = "",
       {back ? <BereichZurueck {...back} testId="mein-bereich-back-desktop" className="mb-5 hidden lg:inline-flex" /> : null}
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 flex-1 basis-64">
-          <h1 id={headingId} ref={headingRef} tabIndex={-1} data-mein-bereich-titel="" className="tls-wrap font-heading text-3xl md:text-4xl font-black uppercase focus:outline-none">{title}</h1>
-          {intro ? <p className="mt-2 max-w-2xl text-sm text-white/60">{intro}</p> : null}
+          <h1 id={headingId} ref={headingRef} tabIndex={-1} data-mein-bereich-titel="" className="tls-wrap tls-type-title focus:outline-none"><ShortCaps>{title}</ShortCaps></h1>
+          {intro ? <p className="mt-2 max-w-2xl tls-type-body text-white/60">{intro}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </header>

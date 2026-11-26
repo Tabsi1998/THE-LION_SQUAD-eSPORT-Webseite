@@ -79,20 +79,20 @@ export function BrowserPushCard({ user, config, onChanged }) {
         <BellRing className={`w-5 h-5 mt-0.5 shrink-0 ${status === "subscribed" ? "text-[#29B6E8]" : "text-white/40"}`} aria-hidden="true" />
         <div className="min-w-0 flex-1 basis-[220px]">
           <div className="font-bold text-white">Dieser Browser</div>
-          <p className="text-sm text-white/60 mt-1" data-testid="profile-browser-push-text">{status === "loading" ? "Wird geprüft …" : TEXT[status]}</p>
+          <p className="tls-type-small text-white/60 mt-1" data-testid="profile-browser-push-text">{status === "loading" ? "Wird geprüft …" : TEXT[status]}</p>
           {count > 0 ? (
-            <p className="text-[11px] text-white/45 mt-1" data-testid="profile-browser-push-count">
+            <p className="tls-type-small text-white/45 mt-1" data-testid="profile-browser-push-count">
               Angemeldet {count === 1 ? "ist 1 Browser" : `sind ${count} Browser`} deines Kontos. Abmelden vom Konto meldet den Browser ab.
             </p>
           ) : null}
         </div>
         {status === "available" ? (
-          <button type="button" onClick={enable} disabled={busy} data-testid="profile-browser-push-enable" className="tls-btn tls-btn--primary shrink-0 ml-8 sm:ml-0 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-60">
+          <button type="button" onClick={enable} disabled={busy} data-testid="profile-browser-push-enable" className="tls-btn tls-btn--primary shrink-0 ml-8 sm:ml-0 px-3 py-2 rounded-sm tls-type-label disabled:opacity-60">
             {busy ? "Einen Moment …" : "Browser anmelden"}
           </button>
         ) : null}
         {status === "subscribed" ? (
-          <button type="button" onClick={disable} disabled={busy} data-testid="profile-browser-push-disable" className="tls-btn tls-btn--quiet shrink-0 ml-8 sm:ml-0 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-60">
+          <button type="button" onClick={disable} disabled={busy} data-testid="profile-browser-push-disable" className="tls-btn tls-btn--quiet shrink-0 ml-8 sm:ml-0 px-3 py-2 rounded-sm tls-type-label disabled:opacity-60">
             Browser abmelden
           </button>
         ) : null}

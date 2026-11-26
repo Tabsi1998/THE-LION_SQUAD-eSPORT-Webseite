@@ -84,12 +84,12 @@ export function InvoicesPanel() {
 
   return (
     <div data-testid="invoices-panel">
-      {error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" data-testid="invoices-error">{error}</div>}
+      {error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="invoices-error">{error}</div>}
       {!data && !error && <SkeletonTable rows={4} columns={4} className="mt-6" label="Lade Belege" />}
       {data && (
         <>
-          <div className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5 text-sm text-white/80" data-testid="invoices-summary">{summaryText(data)}</div>
-          {outage && <div className="mt-3 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 text-sm text-white/80" data-testid="invoices-outage">{outage}</div>}
+          <div className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5 tls-type-small text-white/80" data-testid="invoices-summary">{summaryText(data)}</div>
+          {outage && <div className="mt-3 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 tls-type-small text-white/80" data-testid="invoices-outage">{outage}</div>}
           {(sources.length > 0 || (data.invoices || []).length > 1) && (
             <div className="mt-5 flex flex-wrap items-center gap-2" data-testid="invoices-filters">
               {sources.map((item) => <Chip key={item.key} active={source === item.key} onClick={() => setSource(item.key)} testId={`invoices-source-${item.key}`}>{item.label}</Chip>)}
@@ -98,22 +98,22 @@ export function InvoicesPanel() {
             </div>
           )}
           {groups.open.length === 0 && groups.archive.length === 0 && (data.invoices || []).length > 0 && (
-            <div className="mt-6 text-sm text-white/50" data-testid="invoices-filter-empty">Nichts in dieser Auswahl – ändere den Filter oben.</div>
+            <div className="mt-6 tls-type-small text-white/50" data-testid="invoices-filter-empty">Nichts in dieser Auswahl – ändere den Filter oben.</div>
           )}
 
           {groups.open.length > 0 && (
             <div className="mt-8">
-              <h2 className="font-heading text-lg font-black uppercase mb-3">Offen</h2>
+              <h2 className="tls-type-section mb-3">Offen</h2>
               <div className="space-y-3">{groups.open.map((row) => <InvoiceRow key={row.key} row={row} currency={currency} onView={setViewing} onPay={pay} />)}</div>
             </div>
           )}
           {groups.archive.length > 0 && (
             <div className="mt-8">
-              <h2 className="font-heading text-lg font-black uppercase mb-3">Archiv</h2>
+              <h2 className="tls-type-section mb-3">Archiv</h2>
               <div className="space-y-3">{groups.archive.map((row) => <InvoiceRow key={row.key} row={row} currency={currency} onView={setViewing} onPay={pay} />)}</div>
             </div>
           )}
-          <p className="mt-8 text-xs text-white/40" data-testid="invoices-help">
+          <p className="mt-8 tls-type-small text-white/40" data-testid="invoices-help">
             Rechnungen kommen aus der Mitgliederverwaltung des Vereins. Stimmt etwas nicht?{" "}
             <Link to={INVOICE_QUESTION} className="text-[#29B6E8] hover:underline" data-testid="invoices-contact">Schreib dem Kassier</Link>.
           </p>
@@ -139,18 +139,18 @@ function InvoiceRow({ row, currency, onView, onPay }) {
       <div className="w-11 h-11 shrink-0 rounded-sm border border-white/10 flex items-center justify-center"><FileText className="w-5 h-5 text-white/60" /></div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-heading font-bold">{row.ref}</span>
-          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border rounded-sm ${tone}`}>{row.status_label}</span>
+          <span className="font-bold">{row.ref}</span>
+          <span className={`tls-type-label px-2 py-0.5 border rounded-sm ${tone}`}>{row.status_label}</span>
         </div>
-        <div className="text-xs text-white/55 mt-0.5">{invoiceLine(row)}</div>
-        {sourceLine(row) && <div className="text-xs text-white/75 mt-0.5" data-testid={`invoice-source-${row.key}`}>{sourceLine(row)}</div>}
-        <div className="text-sm text-white/85 mt-1">{amountLine(row, currency)}</div>
-        {dueLine(row) && <div className="text-xs text-white/45">{dueLine(row)}</div>}
+        <div className="tls-type-small text-white/55 mt-0.5">{invoiceLine(row)}</div>
+        {sourceLine(row) && <div className="tls-type-small text-white/75 mt-0.5" data-testid={`invoice-source-${row.key}`}>{sourceLine(row)}</div>}
+        <div className="tls-type-small text-white/85 mt-1">{amountLine(row, currency)}</div>
+        {dueLine(row) && <div className="tls-type-small text-white/45">{dueLine(row)}</div>}
       </div>
       <div className="flex gap-2 shrink-0">
-        <button type="button" onClick={() => onView(row)} data-testid={`invoice-view-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/80 hover:text-white font-bold uppercase tracking-wider text-xs rounded-sm"><Eye className="w-3.5 h-3.5" /> Ansehen</button>
+        <button type="button" onClick={() => onView(row)} data-testid={`invoice-view-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/80 hover:text-white tls-type-label rounded-sm"><Eye className="w-3.5 h-3.5" /> Ansehen</button>
         {row.can_pay && (
-          <button type="button" onClick={() => onPay(row)} data-testid={`invoice-pay-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider text-xs rounded-sm"><CreditCard className="w-3.5 h-3.5" /> Bezahlen</button>
+          <button type="button" onClick={() => onPay(row)} data-testid={`invoice-pay-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm"><CreditCard className="w-3.5 h-3.5" /> Bezahlen</button>
         )}
       </div>
     </div>
@@ -159,7 +159,7 @@ function InvoiceRow({ row, currency, onView, onPay }) {
 
 function Chip({ active, onClick, testId, children }) {
   return (
-    <button type="button" onClick={onClick} data-testid={testId} aria-pressed={active} className={`px-3 py-1.5 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${active ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
+    <button type="button" onClick={onClick} data-testid={testId} aria-pressed={active} className={`px-3 py-1.5 border rounded-sm tls-type-label ${active ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
       {children}
     </button>
   );
