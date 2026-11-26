@@ -2093,7 +2093,7 @@ Tagen** und was geschieht, **wenn ein Platz frei wird**. Oder vorher und nachher
 | **So bekommen die Teams ihren Platz** | mit Zusage innerhalb der Frist | „Automatisch dabei“ ist das Verhalten aus 3.11 |
 | **Frist für die Zusage (Tage)** | 14 | zählt ab dem Anlegen der Season, für Nachrücker ab dem Nachrücken – und endet spätestens mit dem Startdatum der Season. Eine geänderte Zahl gilt sofort für alle offenen Startrechte |
 | **Wird ein Platz frei** | automatisch nach der Regel | oder: „Die Leitung löst es aus“ – dann seht ihr den Vorschlag und drückt selbst |
-| **Erinnerung vor Fristende (Stunden)** | 48 | einmal an Captain und Vertreter; 0 = keine. Nie in der ersten Hälfte der Frist: Bei einem Tag Frist kommt sie zwölf Stunden vorher, nicht sofort |
+| **Erinnerung vor Fristende (Stunden)** | 48 | einmal an Captain und Vertreter; 0 = keine. Nie in der ersten Hälfte der Frist: Bei einem Tag Frist kommt sie zwölf Stunden vorher, nicht sofort. Fällt ein Nachrücker zurück, kommt sie nicht zusammen mit der Nachricht dazu – die nennt den Tag schon |
 | **Restfrist nach einem Nachrück-Angebot (Tage)** | 3 | siehe „Nachrücken“: so viele Tage hat ein Team mindestens für seine eigene Zusage, wenn es ein Nachrück-Angebot verstreichen lässt |
 | **Nachricht „Aufstieg bestätigt“** | an | siehe unten |
 
@@ -2144,8 +2144,14 @@ ist, **ruht seine Frist für die eigene Liga**. Er hat drei Möglichkeiten:
   dafür die restliche Frist, **mindestens 3 Tage** (einstellbar), aber nie über das Startdatum hinaus – die Nachricht nennt den Tag.
 
 Niemand verliert also sein eigenes Startrecht, nur weil er ein Angebot für die höhere Liga bekommen hat. Mit „Die Leitung löst es
-aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben. Nimmt „Übernahme neu
-berechnen“ einen Nachrücker zurück (etwa nach einer Disqualifikation), ist sein Platz wieder frei – dann gilt wieder diese Regel.
+aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben. Meldet sich ein
+Nachrücker ab, lehnt ihr ihn im Eingang ab oder nimmt „Übernahme neu berechnen“ ihn zurück (etwa nach einer Disqualifikation), ist
+der Platz, auf den er nachgerückt war, wieder frei – dann gilt wieder diese Regel.
+
+**Einen Platz gibt es nur, solange der Endstand ihn kennt.** Korrigiert ihr den Endstand so, dass das abgemeldete Team gar nicht mehr
+aufgestiegen wäre (ein anderes steigt jetzt aus eigenem Recht auf), **entfällt sein Platz ganz**: Niemand rückt dafür nach, und ein
+Nachrücker, der schon darauf stand, geht mit „Übernahme neu berechnen“ zurück in seine Liga. So steigen nie zwei Teams für einen
+Platz auf.
 
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht
@@ -2156,7 +2162,7 @@ sich das Ergebnis, kommt einmal „Endstand korrigiert“. Die Nachricht „Staf
 **7. Endstand nachträglich korrigiert.** Ist die alte Season wieder geöffnet (oder ein Entscheid zum „besten Zweiten“
 zurückgenommen), sagt die Übersicht das. Solange **stehen die Fristen still**: Nichts verfällt, niemand rückt nach, niemand wird
 erinnert – zusagen können die Teams trotzdem. Nach dem neuen Abschluss laufen die Fristen weiter und sind **um die Dauer der Pause
-länger**. Dann oben **Übernahme neu berechnen** (3.11): Wer dadurch die Liga wechselt, sagt neu zu (neue Frist); wer bleibt, behält
+länger** – auch die Restfrist eines Nachrückers, der gerade zurückgefallen ist. Dann oben **Übernahme neu berechnen** (3.11): Wer dadurch die Liga wechselt, sagt neu zu (neue Frist); wer bleibt, behält
 seine Zusage. Ändert ihr nach dem letzten Abschluss den Entscheid zum „besten Zweiten“, bekommt das bisher gewählte Team „Endstand
 korrigiert“ und das neue „Aufstieg bestätigt“.
 
