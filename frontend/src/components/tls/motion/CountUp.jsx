@@ -41,14 +41,22 @@ function useVisible(ref, wanted) {
   return visible;
 }
 
+// `split` (Text → [vorne, hinten] oder null) setzt das Ende in einen eigenen Teil `splitClassName` - etwa die Tausendstel
+// einer Rundenzeit eine Stufe kleiner (#1304). Gilt für jeden Zwischenstand, damit am Ende nichts springt.
+function SplitText({ text, split, className }) {
+  const parts = split ? split(text) : null;
+  if (!parts) return text;
+  return <>{parts[0]}<span className={className}>{parts[1]}</span></>;
+}
+
 export function CountUp({
   value, from, format, play = true, playKey = "", delay = 0, duration = COUNT_UP_MS, whenVisible = true, flash = true,
-  onDone, className = "", ...rest
+  onDone, split, splitClassName = "", className = "", ...rest
 }) {
   const shape = countShape(value, format);
   const text = shape ? shape.text : value === null || value === undefined ? "" : String(value);
-  const live = useRef({ value, format, from, onDone });
-  live.current = { value, format, from, onDone };
+  const live = useRef({ value, format, from, onDone, split });
+  live.current = { value, format, from, onDone, split };
   const ref = useRef(null);
   const digits = useRef(null);
   const finished = useRef(null);
@@ -91,7 +99,15 @@ export function CountUp({
       }
       const current = countShape(live.current.value, live.current.format);
       const node = digits.current?.firstChild;
-      if (current && node) node.nodeValue = countFrame(current, progress, countStart(current, live.current.from));
+      if (current && node) {
+        const shownText = countFrame(current, progress, countStart(current, live.current.from));
+        const parts = live.current.split ? live.current.split(shownText) : null;
+        const tail = digits.current.childNodes.length > 1 ? digits.current.lastChild?.firstChild : null;
+        if (parts && tail) {
+          node.nodeValue = parts[0];
+          tail.nodeValue = parts[1];
+        } else node.nodeValue = shownText;
+      }
       frame = window.requestAnimationFrame(step);
     };
     frame = window.requestAnimationFrame(step);
@@ -136,10 +152,10 @@ export function CountUp({
     >
       {counting ? (
         <>
-          <span ref={digits} aria-hidden="true">{countFrame(shape, 0, countStart(shape, from))}</span>
+          <span ref={digits} aria-hidden="true"><SplitText text={countFrame(shape, 0, countStart(shape, from))} split={split} className={splitClassName} /></span>
           <span className="sr-only">{text}</span>
         </>
-      ) : text}
+      ) : <SplitText text={text} split={split} className={splitClassName} />}
     </span>
   );
 }

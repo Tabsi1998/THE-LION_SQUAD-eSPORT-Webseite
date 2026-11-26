@@ -106,14 +106,14 @@ function ImagePreviewBox({ value, previewClass, onClear, testId }) {
           {state === "loading" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/35">
               <ImageIcon className="w-7 h-7 animate-pulse" />
-              <span className="text-[10px] uppercase tracking-widest font-bold">Lade Vorschau</span>
+              <span className="tls-type-label">Lade Vorschau</span>
             </div>
           )}
           {state === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center bg-[#0A0A0A]">
               <ImageIcon className="w-7 h-7 text-[#FF3B30]/70" />
-              <span className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]">Vorschau nicht ladbar</span>
-              <span className="text-[10px] text-white/45">Die Bild-URL ist gespeichert.</span>
+              <span className="tls-type-label text-[#FF3B30]">Vorschau nicht ladbar</span>
+              <span className="tls-type-small text-white/45">Die Bild-URL ist gespeichert.</span>
             </div>
           )}
           <button type="button" onClick={onClear} className="absolute top-1 right-1 p-1 bg-black/70 text-white/80 rounded-sm opacity-0 group-hover:opacity-100 transition" data-testid={`${testId}-clear`}>
@@ -135,7 +135,7 @@ function LibraryThumb({ item }) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
         <ImageIcon className="w-6 h-6" />
-        <span className="text-[9px] uppercase tracking-widest font-bold">Defekt</span>
+        <span className="tls-type-label">Defekt</span>
       </div>
     );
   }
@@ -570,7 +570,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     : "w-20 h-20";
   return (
     <div>
-      {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
+      {label && <div className="tls-type-label text-white/60 mb-1.5">{label}</div>}
       {/* Mit großer Schrift stehen die Knöpfe unter dem Bild statt daneben (#1155). */}
       <div className={variant === "wide" ? "" : "flex flex-wrap items-start gap-3"}>
         <ImagePreviewBox value={value} previewClass={previewClass} onClear={() => onChange("")} testId={testId} />
@@ -588,7 +588,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             data-testid={`${testId}-btn`}
-            className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 disabled:opacity-50"
+            className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] tls-type-label rounded-sm hover:bg-[#29B6E8]/10 disabled:opacity-50"
           >
             <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : value ? "Ändern" : "Bild hochladen"}
           </button>
@@ -597,7 +597,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               type="button"
               onClick={() => setLibraryOpen(true)}
               data-testid={`${testId}-library`}
-              className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
+              className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 tls-type-label rounded-sm hover:bg-white/5"
             >
               Medien wählen
             </button>
@@ -609,7 +609,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid={`${testId}-open`}
-                className="inline-flex min-h-11 items-center px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
+                className="inline-flex min-h-11 items-center px-3 py-2 border border-white/15 text-white/70 tls-type-label rounded-sm hover:bg-white/5"
               >
                 Ansehen
               </a>
@@ -617,13 +617,13 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 type="button"
                 onClick={() => onChange("")}
                 data-testid={`${testId}-remove`}
-                className="inline-flex min-h-11 items-center px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10"
+                className="inline-flex min-h-11 items-center px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10"
               >
                 Entfernen
               </button>
             </div>
           )}
-          <p className="text-[10px] text-white/40" data-testid={`${testId}-hint`}>
+          <p className="tls-type-small text-white/40" data-testid={`${testId}-hint`}>
             {logo ? `${LOGO_HINT} SVG bis ${limits.svg_mb} MB, Bilder bis ${maxMb} MB.` : `PNG/JPG/WebP bis ${maxMb} MB. SVG geht nicht.`}
           </p>
         </div>
@@ -633,7 +633,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid={`${testId}-library-backdrop`} onClick={(e) => { if (e.target === e.currentTarget) setLibraryOpen(false); }}>
           <div ref={libraryRef} role="dialog" aria-modal="true" aria-labelledby={`${dialogId}-library`} className="max-w-4xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" data-testid={`${testId}-library-dialog`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 id={`${dialogId}-library`} className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
+              <h3 id={`${dialogId}-library`} className="tls-type-card">Medienbibliothek</h3>
               <button type="button" onClick={() => setLibraryOpen(false)} className="text-white/50 hover:text-white" aria-label="Schließen">×</button>
             </div>
             <MediaLibrarySearch library={library} testId={`${testId}-library`} />
@@ -682,7 +682,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid={`${testId}-editor-backdrop`} onClick={(e) => { if (e.target === e.currentTarget) closeEditor(); }}>
           <div ref={editorRef} role="dialog" aria-modal="true" aria-labelledby={`${dialogId}-editor`} className="max-w-3xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" data-testid={`${testId}-editor-dialog`}>
             <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 id={`${dialogId}-editor`} className="font-heading text-xl font-black uppercase">Bild bearbeiten</h3>
+              <h3 id={`${dialogId}-editor`} className="tls-type-card">Bild bearbeiten</h3>
               <button type="button" onClick={closeEditor} className="text-white/50 hover:text-white" aria-label="Schließen"><X className="w-5 h-5" /></button>
             </div>
             <div
@@ -719,12 +719,12 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               {(!editorSource || !previewReady) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/45">
                   <ImageIcon className="w-8 h-8 animate-pulse" />
-                  <span className="text-[10px] uppercase tracking-widest font-bold">Lade Bildvorschau</span>
+                  <span className="tls-type-label">Lade Bildvorschau</span>
                 </div>
               )}
             </div>
             {editor.cropMode !== "original" && (
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 tls-type-small font-bold text-white/40">
                 <span>Ziehen zum Verschieben</span>
                 <span>·</span>
                 <span>Zoom unter 100% erzeugt Rand statt harten Anschnitt</span>
@@ -744,19 +744,19 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                     type="button"
                     onClick={() => setEditor((cur) => ({ ...cur, cropMode: mode, cropX: 0, cropY: 0, zoom: 1 }))}
                     aria-pressed={editor.cropMode === mode}
-                    className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider ${editor.cropMode === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
+                    className={`inline-flex min-h-11 items-center gap-2 px-3 py-2 border rounded-sm tls-type-label ${editor.cropMode === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
                   >
                     <Crop className="w-3.5 h-3.5" /> {text}
                   </button>
                 ))}
-                <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation - 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation - 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm tls-type-label">
                   <RotateCcw className="w-3.5 h-3.5" /> Links
                 </button>
-                <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation + 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => setEditor((cur) => ({ ...cur, rotation: normalizeRotation(cur.rotation + 90) }))} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm tls-type-label">
                   <RotateCw className="w-3.5 h-3.5" /> Rechts
                 </button>
                 {editor.cropMode !== "original" && (
-                  <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-xs text-white/70">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm tls-type-small text-white/70">
                     Zoom
                     <input
                       type="range"
@@ -772,7 +772,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 )}
                 {editor.cropMode !== "original" && (
                   <>
-                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-xs text-white/70">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm tls-type-small text-white/70">
                       X
                       <input
                         type="range"
@@ -784,7 +784,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                         className="w-24 accent-[#29B6E8]"
                       />
                     </label>
-                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-xs text-white/70">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm tls-type-small text-white/70">
                       Y
                       <input
                         type="range"
@@ -796,13 +796,13 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                         className="w-24 accent-[#29B6E8]"
                       />
                     </label>
-                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, cropY: -1 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, cropY: -1 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm tls-type-label">
                       Oben
                     </button>
-                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, cropX: 0, cropY: 0 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, cropX: 0, cropY: 0 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm tls-type-label">
                       Mitte
                     </button>
-                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, zoom: 0.75, cropX: 0, cropY: 0 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm text-xs font-bold uppercase tracking-wider">
+                    <button type="button" onClick={() => setEditor((cur) => ({ ...cur, zoom: 0.75, cropX: 0, cropY: 0 }))} className="inline-flex items-center px-3 py-2 border border-white/15 text-white/60 hover:text-white rounded-sm tls-type-label">
                       Mehr Rand
                     </button>
                   </>
@@ -816,7 +816,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                   const ok = await uploadFile(current.file, { rotation: current.rotation, cropMode: current.cropMode, cropX: current.cropX, cropY: current.cropY, zoom: current.zoom });
                   if (ok) closeEditor();
                 }}
-                className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50"
+                className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-5 py-2.5 tls-type-label rounded-sm disabled:opacity-50"
               >
                 <Check className="w-4 h-4" /> Übernehmen
               </button>

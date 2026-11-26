@@ -110,3 +110,28 @@ test("neue Bestzeit (#1585): mit from läuft die Zeit kurz von der alten zur neu
   act(() => { vi.advanceTimersByTime(LAP_COUNT_MS); });
   expect(cell).toHaveTextContent("1:23,412");
 });
+
+// Zahlen-Schrift (#1304): „1:24,“ groß, die Tausendstel „587“ eine Stufe kleiner (tls-lap__fraction) - auch während des
+// Hochzählens. Der ganze Text bleibt derselbe (Vorlesen, Kopieren).
+test("kleine Tausendstel: der Bruchteil steht in einem eigenen, kleineren Teil", () => {
+  render(<><LapTime value="1:24.587" data-testid="zeit" /><LapTime value="59.1" data-testid="kurz" /><LapTime value="DNF" data-testid="dnf" /></>);
+  const cell = screen.getByTestId("zeit");
+  expect(cell).toHaveTextContent("1:24,587");
+  expect(cell.querySelector(".tls-lap__fraction")).toHaveTextContent(/^587$/);
+  expect(screen.getByTestId("kurz").querySelector(".tls-lap__fraction")).toHaveTextContent(/^1$/);
+  expect(screen.getByTestId("dnf").querySelector(".tls-lap__fraction")).toBeNull();
+});
+
+test("kleine Tausendstel auch beim Hochzählen - ohne Sprung am Ende", () => {
+  vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"] });
+  render(<LapTime value="1:24.587" play data-testid="zeit" />);
+  const cell = screen.getByTestId("zeit");
+  const eyes = cell.querySelector("[aria-hidden='true']");
+  expect(eyes.querySelector(".tls-lap__fraction")).toHaveTextContent(/^000$/);
+  act(() => { vi.advanceTimersByTime(LAP_COUNT_MS / 2); });
+  expect(eyes.textContent).toMatch(/^\d:\d\d,\d{3}$/);
+  expect(eyes.querySelector(".tls-lap__fraction").textContent).toMatch(/^\d{3}$/);
+  act(() => { vi.advanceTimersByTime(LAP_COUNT_MS); });
+  expect(cell).toHaveTextContent("1:24,587");
+  expect(cell.querySelector(".tls-lap__fraction")).toHaveTextContent(/^587$/);
+});

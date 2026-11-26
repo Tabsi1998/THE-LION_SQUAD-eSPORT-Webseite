@@ -139,7 +139,7 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
    eckigen Initialen-Kästchen in Baum und Listen („DU“ für „Der unglaublich …“). */
 .tls-you-tag {
   flex: none; display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px;
-  font-size: 11px; font-weight: 700; line-height: 1.35; letter-spacing: 0.02em; text-transform: none;
+  font-size: var(--tls-type-label-size); font-weight: 700; line-height: 1.35; letter-spacing: 0.02em; text-transform: none;
   color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
 }
 
@@ -244,6 +244,12 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
     line-height: 1;
     letter-spacing: normal;
     text-transform: none;
+  }
+  /* Rundenzeiten (#1304, LapTime): „1:24,“ in der Größe der Stelle, die Tausendstel „587“ eine Stufe kleiner und ruhiger. */
+  .tls-lap__fraction {
+    font-size: max(var(--tls-type-label-size), 0.8em);
+    font-weight: 600;
+    opacity: 0.8;
   }
   /* Absätze höchstens etwa 70 Zeichen breit; ein `max-w-*` an der Stelle geht vor. Mittig gesetzter Text bleibt mittig. */
   :where(p).tls-type-body { max-width: 70ch; }

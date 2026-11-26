@@ -51,7 +51,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         <div className="absolute top-3 inset-x-3 flex flex-col items-start gap-1.5 sm:flex-row sm:items-start sm:justify-between">
           <PhaseBadge phase={t.public_phase} status={t.status} className="max-w-full sm:max-w-[68%]" />
           {formatLabel && formatLabel !== "—" ? (
-            <span className="max-w-full sm:max-w-[48%] text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] bg-black/55 border border-[#29B6E8]/40 px-2 py-1 rounded-sm leading-tight break-words" data-testid="tournament-card-format">
+            <span className="max-w-full sm:max-w-[48%] tls-type-label text-[#29B6E8] bg-black/55 border border-[#29B6E8]/40 px-2 py-1 rounded-sm leading-tight break-words" data-testid="tournament-card-format">
               {formatLabel}
             </span>
           ) : null}
@@ -61,18 +61,18 @@ export function TournamentCard({ tournament, index = 0 }) {
         {line.length ? (
           <div className="flex items-center gap-2 mb-2" data-testid="tournament-card-game">
             {t.game?.short_name && (
-              <span className="text-[11px] font-bold text-[#29B6E8] uppercase tracking-wider">
+              <span className="tls-type-small font-bold text-[#29B6E8]">
                 {t.game.short_name}
               </span>
             )}
-            {t.game?.short_name && t.platform ? <span className="text-white/25 text-xs" aria-hidden="true">·</span> : null}
-            {t.platform && <span className="text-white/40 text-xs">{t.platform}</span>}
+            {t.game?.short_name && t.platform ? <span className="text-white/25 tls-type-small" aria-hidden="true">·</span> : null}
+            {t.platform && <span className="text-white/40 tls-type-small">{t.platform}</span>}
           </div>
         ) : null}
-        <h3 className="tls-card__title font-heading font-bold text-xl text-white line-clamp-2">
+        <h3 className="tls-card__title tls-type-card text-white line-clamp-2">
           {t.title}
         </h3>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/60">
+        <div className="mt-3 flex flex-wrap items-center gap-3 tls-type-small text-white/60">
           {t.start_date && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
@@ -91,7 +91,7 @@ export function TournamentCard({ tournament, index = 0 }) {
           )}
         </div>
         {finished ? null : (
-          <div className={`mt-3 text-[11px] uppercase tracking-widest font-bold ${
+          <div className={`mt-3 tls-type-label ${
             registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
           }`} data-testid="tournament-card-registration">
             {registration.label}
@@ -99,7 +99,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         )}
         {/* Ein Knopf statt „Turnierdetails … Ansehen“ (#833). */}
         <div className="mt-4 flex items-center justify-end gap-3 border-t border-white/10 pt-3">
-          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid="tournament-card-action">
+          <span className="inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8]" data-testid="tournament-card-action">
             {cardAction(t, registration)} <ArrowRight className="tls-card__arrow w-3 h-3" />
           </span>
         </div>

@@ -5,7 +5,7 @@ import { ChevronDown, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 // Mit „Bewegung reduzieren“ stehen beide sofort (index.css). Zustand: hooks/useFold.
 
 const FOCUS = "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
-const ALL_BUTTON = `tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-2.5 py-2 text-[11px] font-bold uppercase tracking-wider ${FOCUS}`;
+const ALL_BUTTON = `tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-2.5 py-2 tls-type-label ${FOCUS}`;
 
 export function FoldButton({ open, onToggle, controls, testId, className = "", children }) {
   return (

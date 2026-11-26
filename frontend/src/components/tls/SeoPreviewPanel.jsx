@@ -76,23 +76,23 @@ export function SeoPreviewPanel({ path, fallback = {}, className = "" }) {
     <section className={`border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">So erscheint der Beitrag</div>
-          <div className="mt-1 text-xs text-white/45">Bei Google und beim Teilen – mit Link und ob Suchmaschinen ihn finden dürfen.</div>
+          <div className="tls-type-label text-[#29B6E8]">So erscheint der Beitrag</div>
+          <div className="mt-1 tls-type-small text-white/45">Bei Google und beim Teilen – mit Link und ob Suchmaschinen ihn finden dürfen.</div>
         </div>
-        <span className="rounded-sm border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/45">
+        <span className="rounded-sm border border-white/10 px-2 py-1 tls-type-label text-white/45">
           {statusLabel}
         </span>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-sm border border-white/10 bg-white p-4 text-[#202124]">
-          <div className="flex items-center gap-2 text-xs text-[#4d5156]">
+          <div className="flex items-center gap-2 tls-type-small text-[#4d5156]">
             <Search className="h-3.5 w-3.5 text-[#29B6E8]" />
             <span className="truncate">{hostLabel(urlLabel)}</span>
           </div>
-          <div className="mt-1 truncate text-[13px] text-[#3c4043]">{urlLabel}</div>
-          <h3 className="mt-2 line-clamp-2 text-lg leading-snug text-[#1a0dab]">{title}</h3>
-          <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-[#4d5156]">{description}</p>
+          <div className="mt-1 truncate tls-type-small text-[#3c4043]">{urlLabel}</div>
+          <h3 className="mt-2 line-clamp-2 tls-type-card leading-snug text-[#1a0dab]">{title}</h3>
+          <p className="mt-1 line-clamp-3 tls-type-body leading-relaxed text-[#4d5156]">{description}</p>
         </div>
 
         <div className="overflow-hidden rounded-sm border border-white/10 bg-[#121212]">
@@ -106,17 +106,17 @@ export function SeoPreviewPanel({ path, fallback = {}, className = "" }) {
             )}
           </div>
           <div className="space-y-1 p-3">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35">
+            <div className="flex items-center gap-1.5 tls-type-label text-white/35">
               <Share2 className="h-3 w-3 text-[#29B6E8]" />
               Beim Teilen
             </div>
-            <div className="line-clamp-2 text-sm font-bold text-white">{title}</div>
-            <p className="line-clamp-2 text-xs leading-relaxed text-white/50">{description}</p>
+            <div className="line-clamp-2 tls-type-small font-bold text-white">{title}</div>
+            <p className="line-clamp-2 tls-type-small leading-relaxed text-white/50">{description}</p>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-2 text-xs text-white/50 sm:grid-cols-2">
+      <div className="grid gap-2 tls-type-small text-white/50 sm:grid-cols-2">
         <div className="flex min-w-0 items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2">
           <Link2 className="h-3.5 w-3.5 shrink-0 text-[#29B6E8]" />
           <span className="truncate">{canonical || "Der Link steht nach dem ersten Speichern fest."}</span>

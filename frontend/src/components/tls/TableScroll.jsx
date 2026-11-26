@@ -22,7 +22,7 @@ export function TableScroll({ label, testId, className = "", children }) {
   return (
     <div className={className}>
       {overflow ? (
-        <p className="mb-2 text-[11px] text-white/45" data-testid={`${testId}-hint`}>
+        <p className="mb-2 tls-type-small text-white/45" data-testid={`${testId}-hint`}>
           Seitlich wischen: weitere Spalten und Aktionen liegen rechts.
         </p>
       ) : null}

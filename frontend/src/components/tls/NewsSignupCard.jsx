@@ -68,25 +68,25 @@ function SignupCard({ item }) {
           <Icon className="w-4 h-4" style={{ color: accent }} aria-hidden="true" />
         </span>
         <div className="min-w-0">
-          <div className="font-heading font-black text-lg leading-tight break-words">{item.title}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/65">
+          <div className="tls-type-card leading-tight break-words">{item.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/65">
             {signup.start_date && <span className="tabular-nums">{formatDateTime(signup.start_date)}</span>}
             {seats && <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5 text-white/40" aria-hidden="true" />{seats}</span>}
           </div>
-          {state && !open && <div className="mt-1 text-xs font-bold uppercase tracking-wider" style={{ color: stateColor }}>{state}</div>}
+          {state && !open && <div className="mt-1 tls-type-label" style={{ color: stateColor }}>{state}</div>}
         </div>
       </div>
       {open ? (
         <Link
           to={`${item.to}?anmelden=1`}
-          className="tls-btn tls-btn--primary tls-news-signup__go group inline-flex shrink-0 items-center justify-center gap-2 rounded-sm px-5 py-2.5 text-sm font-bold uppercase tracking-wider"
+          className="tls-btn tls-btn--primary tls-news-signup__go group inline-flex shrink-0 items-center justify-center gap-2 rounded-sm px-5 py-2.5 tls-type-small font-bold uppercase tracking-wider"
         >
           Anmelden <ArrowRight className="tls-news-signup__arrow w-4 h-4" aria-hidden="true" />
         </Link>
       ) : (
         <Link
           to={item.to}
-          className="tls-btn tls-btn--quiet inline-flex shrink-0 items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider"
+          className="tls-btn tls-btn--quiet inline-flex shrink-0 items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label"
         >
           {ACTION_TEXT[signup.state] || (item.kind === "event" ? "Zum Event" : "Zum Turnier")}
         </Link>

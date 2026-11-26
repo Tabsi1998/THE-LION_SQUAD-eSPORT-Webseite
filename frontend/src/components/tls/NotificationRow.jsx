@@ -48,7 +48,7 @@ function ConfirmResultButton({ bundle, onDone, testId }) {
     }
   };
   return (
-    <button type="button" disabled={busy} onClick={confirm} className="tls-btn tls-btn--primary shrink-0 self-center mx-2 inline-flex min-h-[36px] items-center gap-1 px-3 py-1 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50" data-testid={testId}>
+    <button type="button" disabled={busy} onClick={confirm} className="tls-btn tls-btn--primary shrink-0 self-center mx-2 inline-flex min-h-[36px] items-center gap-1 px-3 py-1 rounded-sm tls-type-label disabled:opacity-50" data-testid={testId}>
       <Check className="w-3 h-3" /> Stimmt
     </button>
   );
@@ -64,11 +64,11 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
       {leading}
       {badge ? <Badge material={badge.material} level={badge.level} rank={badge.rank} art={badge.art} icon={badge.icon} size={compact ? "xs" : "sm"} className="shrink-0" title={badge.name} testId={`${testIdPrefix}-badge-${bundle.id}`} /> : null}
       <div className="min-w-0 flex-1">
-        <div className="tls-wrap font-bold text-sm text-white">{bundle.title}</div>
+        <div className="tls-wrap font-bold tls-type-small text-white">{bundle.title}</div>
         {bundle.body ? (
-          <div className="mt-0.5 text-xs text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
+          <div className="mt-0.5 tls-type-small text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
         ) : null}
-        <div className="mt-1 text-[10px] uppercase tracking-widest text-quiet">
+        <div className="mt-1 tls-type-label text-quiet">
           {notificationDate(bundle.created_at)}
           {bundle.count > 1 ? ` · ${bundle.count} gebündelt` : ""}
         </div>

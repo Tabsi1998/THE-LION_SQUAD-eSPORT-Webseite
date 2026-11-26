@@ -73,13 +73,13 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
     <section className={`relative max-w-full overflow-hidden ${shellClass} ${className}`} aria-label={compact ? "Sponsoren" : undefined} data-testid="sponsor-ticker">
       {!compact && !spotlight && (
         <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
-          <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-white/35">Presented by our Partners</span>
+          <span className="tls-type-label text-white/35">Presented by our Partners</span>
         </div>
       )}
       {mainBanner ? (
         <div className="max-w-5xl mx-auto px-4 pt-7 pb-1" data-testid="sponsor-main-banner">
           <div className="pb-2 text-center">
-            <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-[#29B6E8]/70">Hauptsponsor</span>
+            <span className="tls-type-label text-[#29B6E8]/70">Hauptsponsor</span>
           </div>
           <a href={mainBanner.link || undefined} target={mainBanner.link ? "_blank" : undefined} rel="noreferrer" aria-label={mainBanner.name}
             className="block rounded-sm overflow-hidden border border-[#29B6E8]/20 hover:border-[#29B6E8]/50 transition">
@@ -89,7 +89,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
       ) : null}
       {spotlight && items.length > 0 && (
         <div className={`max-w-7xl mx-auto px-4 ${mainBanner ? "pt-5" : "pt-6"} pb-0 text-center`} data-testid="sponsor-ticker-title">
-          <span className="text-[11px] uppercase tracking-[0.35em] font-bold text-[#29B6E8]/80">Sponsoren</span>
+          <span className="tls-type-label text-[#29B6E8]/80">Sponsoren</span>
         </div>
       )}
       {compact && heading && items.length > 0 ? <div className={BAND_HEADING_CLASS} data-testid="sponsor-ticker-heading">{heading}</div> : null}

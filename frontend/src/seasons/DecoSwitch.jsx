@@ -43,7 +43,7 @@ export function MenuDecoSwitch() {
   return (
     <div className="flex items-center gap-2 rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2" data-testid="menu-deco-switch" role="group" aria-label="Saisonale Deko">
       <Sun aria-hidden="true" className="w-4 h-4 shrink-0 text-honor" />
-      <span className="text-sm font-semibold uppercase tracking-wider text-white/80" aria-hidden="true">Saison-Deko</span>
+      <span className="tls-type-label text-white/80" aria-hidden="true">Saison-Deko</span>
       <div className="ml-auto inline-flex shrink-0 overflow-hidden rounded-sm border border-white/15">
         {DECO_OPTIONS.map(([value, label]) => (
           <button
@@ -52,7 +52,7 @@ export function MenuDecoSwitch() {
             onClick={() => setPreference(value)}
             aria-pressed={preference === value}
             data-testid={`menu-deco-${value}`}
-            className={`min-h-10 px-3 text-[11px] font-bold uppercase tracking-wider transition ${preference === value ? "bg-[#29B6E8] text-[#04141B]" : "text-white/60 hover:text-white"}`}
+            className={`min-h-10 px-3 tls-type-label transition ${preference === value ? "bg-[#29B6E8] text-[#04141B]" : "text-white/60 hover:text-white"}`}
           >
             {label}
           </button>

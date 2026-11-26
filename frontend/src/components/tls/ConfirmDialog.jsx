@@ -76,10 +76,10 @@ export function ConfirmDialogProvider({ children }) {
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 id="confirm-title" className="font-heading font-black uppercase text-lg">{dialog.title}</h2>
-                <p id="confirm-description" className="mt-1 text-sm text-white/60 leading-relaxed">{dialog.description}</p>
+                <h2 id="confirm-title" className="tls-type-section">{dialog.title}</h2>
+                <p id="confirm-description" className="mt-1 tls-type-body text-white/60 leading-relaxed">{dialog.description}</p>
                 {dialog.kind === "prompt" && dialog.label ? (
-                  <label htmlFor="confirm-dialog-input" className="mt-4 block text-xs font-bold uppercase tracking-wider text-white/75">{dialog.label}</label>
+                  <label htmlFor="confirm-dialog-input" className="mt-4 block tls-type-label text-white/75">{dialog.label}</label>
                 ) : null}
                 {dialog.kind === "prompt" && (
                   dialog.multiline ? (
@@ -106,17 +106,17 @@ export function ConfirmDialogProvider({ children }) {
                     />
                   )
                 )}
-                {problem ? <p id="confirm-dialog-problem" role="alert" className="mt-2 text-xs text-[#FF8A80]" data-testid="confirm-dialog-problem">{problem}</p> : null}
+                {problem ? <p id="confirm-dialog-problem" role="alert" className="mt-2 tls-type-small text-[#FF8A80]" data-testid="confirm-dialog-problem">{problem}</p> : null}
               </div>
               <button type="button" onClick={() => close(false)} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="p-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-              <button type="button" onClick={() => close(false)} data-testid="confirm-dialog-cancel" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => close(false)} data-testid="confirm-dialog-cancel" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">
                 {dialog.cancelLabel}
               </button>
-              <button type="button" onClick={() => close(true)} disabled={promptInvalid} data-testid="confirm-dialog-confirm" className={`px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed ${dialog.tone === "danger" ? "tls-btn tls-btn--danger" : "tls-btn tls-btn--primary"}`}>
+              <button type="button" onClick={() => close(true)} disabled={promptInvalid} data-testid="confirm-dialog-confirm" className={`px-4 py-2 rounded-sm tls-type-label disabled:opacity-50 disabled:cursor-not-allowed ${dialog.tone === "danger" ? "tls-btn tls-btn--danger" : "tls-btn tls-btn--primary"}`}>
                 {dialog.confirmLabel}
               </button>
             </div>

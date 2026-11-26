@@ -57,7 +57,7 @@ export function useDiscordNow() {
 export function DiscordLiveLine({ discord, testId = "footer-discord-live" }) {
   if (!discord?.available) return null;
   return (
-    <span className="inline-flex items-center gap-2 text-sm text-white/75 whitespace-nowrap" data-testid={testId}>
+    <span className="inline-flex items-center gap-2 tls-type-small text-white/75 whitespace-nowrap" data-testid={testId}>
       <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse" aria-hidden="true" />
       {discordSummary(discord)}
     </span>
@@ -70,14 +70,14 @@ export function DiscordVoice({ data }) {
   const channels = Array.isArray(data.voice) ? data.voice : [];
   return (
     <div className="space-y-2" data-testid="member-area-discord-voice">
-      <div className="text-sm text-white/70" data-testid="member-area-discord-summary">{discordSummary(data)}</div>
+      <div className="tls-type-small text-white/70" data-testid="member-area-discord-summary">{discordSummary(data)}</div>
       {channels.length ? channels.map((channel) => (
-        <div key={channel.name} className="flex items-center justify-between gap-3 border-l-2 border-[#5865F2]/50 pl-3 text-sm">
+        <div key={channel.name} className="flex items-center justify-between gap-3 border-l-2 border-[#5865F2]/50 pl-3 tls-type-small">
           <span className="inline-flex items-center gap-2 min-w-0"><Volume2 className="w-3.5 h-3.5 text-[#5865F2] shrink-0" aria-hidden="true" /><span className="truncate">{channel.name}</span></span>
           <span className="font-bold tabular-nums text-white">{channel.count}</span>
         </div>
-      )) : <div className="text-xs text-white/40">Gerade ist niemand in einem Sprachkanal.</div>}
-      {data.invite ? <a href={data.invite} target="_blank" rel="noreferrer" className="inline-block text-[11px] font-bold uppercase tracking-widest text-[#B8C0FF] hover:text-white">Discord öffnen →</a> : null}
+      )) : <div className="tls-type-small text-white/40">Gerade ist niemand in einem Sprachkanal.</div>}
+      {data.invite ? <a href={data.invite} target="_blank" rel="noreferrer" className="inline-block tls-type-label text-[#B8C0FF] hover:text-white">Discord öffnen →</a> : null}
     </div>
   );
 }

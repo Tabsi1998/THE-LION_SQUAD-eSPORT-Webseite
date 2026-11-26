@@ -42,12 +42,12 @@ export function rightLabel(right) {
 function Choice({ ballot, right, chosen, onChoose, disabled }) {
   return (
     <div className="space-y-2" data-testid={`ballot-right-${right.right_id}`}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">{rightLabel(right)}</div>
+      <div className="tls-type-label text-white/55">{rightLabel(right)}</div>
       <div className="flex flex-wrap gap-2">
         {ballot.options.map((option) => (
           <button key={option.code} type="button" disabled={disabled} onClick={() => onChoose(option.code)}
             data-testid={`ballot-option-${right.right_id}-${option.code}`} aria-pressed={chosen === option.code}
-            className={`min-h-11 px-4 py-2 rounded-sm border text-sm font-bold transition disabled:opacity-40 ${chosen === option.code ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/80 hover:border-white/40"}`}>
+            className={`min-h-11 px-4 py-2 rounded-sm border tls-type-small font-bold transition disabled:opacity-40 ${chosen === option.code ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/80 hover:border-white/40"}`}>
             {option.label}
           </button>
         ))}
@@ -132,23 +132,23 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
             <div className="flex items-start gap-3">
               <Vote className="w-6 h-6 text-[#29B6E8] shrink-0 mt-0.5" aria-hidden="true" />
               <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Abstimmung offen{ballot.meeting ? ` · ${ballot.meeting}` : ""}</div>
-                <h2 id="ballot-popup-title" className="font-heading text-xl font-black leading-tight mt-1">{ballot.question}</h2>
-                {ballot.item ? <div className="text-xs text-white/45 mt-1">Tagesordnungspunkt {ballot.item} · {ballot.kind_label}</div> : null}
+                <div className="tls-type-label text-[#29B6E8]">Abstimmung offen{ballot.meeting ? ` · ${ballot.meeting}` : ""}</div>
+                <h2 id="ballot-popup-title" className="tls-type-section leading-tight mt-1">{ballot.question}</h2>
+                {ballot.item ? <div className="tls-type-small text-white/45 mt-1">Tagesordnungspunkt {ballot.item} · {ballot.kind_label}</div> : null}
               </div>
               <button type="button" onClick={() => postpone(ballot.id)} aria-label="Später" className="ml-auto text-white/50 hover:text-white" data-testid="ballot-popup-later-x">
                 <X className="w-5 h-5" />
               </button>
             </div>
             {ballot.secret ? (
-              <p className="text-sm text-white/75 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-3" data-testid="ballot-popup-secret">
+              <p className="tls-type-body text-white/75 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-3" data-testid="ballot-popup-secret">
                 Geheime Wahl auf Papier: Den Stimmzettel bekommst du im Saal. Über die Website wird hier nicht abgestimmt.
               </p>
             ) : (
               <>
-                <p className="text-xs text-white/55" data-testid="ballot-popup-open-note">Offene Abstimmung: Deine Stimme wird mit deinem Namen gespeichert. Eine Stimme lässt sich nicht ändern.</p>
+                <p className="tls-type-small text-white/55" data-testid="ballot-popup-open-note">Offene Abstimmung: Deine Stimme wird mit deinem Namen gespeichert. Eine Stimme lässt sich nicht ändern.</p>
                 {!usable ? (
-                  <p className="text-sm text-white/75" role="status" data-testid="ballot-popup-unusable">
+                  <p className="tls-type-body text-white/75" role="status" data-testid="ballot-popup-unusable">
                     Diese Abstimmung lässt sich hier gerade nicht anzeigen. Lade die Seite neu oder wende dich an die Versammlungsleitung.
                   </p>
                 ) : null}
@@ -160,14 +160,14 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
                 </div>
               </>
             )}
-            {message ? <p className="text-sm text-white/80" role="status" data-testid="ballot-popup-message">{message}</p> : null}
+            {message ? <p className="tls-type-body text-white/80" role="status" data-testid="ballot-popup-message">{message}</p> : null}
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => postpone(ballot.id)} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="ballot-popup-later">
+              <button type="button" onClick={() => postpone(ballot.id)} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label" data-testid="ballot-popup-later">
                 {ballot.secret ? "Verstanden" : "Später"}
               </button>
               {!ballot.secret ? (
                 <button type="button" onClick={cast} disabled={busy || !ballot.rights.some((right) => right.can_use && chosen[`${ballot.id}:${right.right_id}`])}
-                  data-testid="ballot-popup-cast" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+                  data-testid="ballot-popup-cast" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-40">
                   Stimme abgeben
                 </button>
               ) : null}
@@ -177,7 +177,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
       ) : null}
       {!ballot && waiting.length ? (
         <button type="button" onClick={() => reopen(waiting[0].id)} data-testid="ballot-band"
-          className="fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-[80] max-w-[calc(100%-2rem)] truncate rounded-full border border-[#29B6E8]/50 bg-[#0F1012]/95 px-4 py-2 text-sm font-bold text-[#29B6E8] shadow-lg">
+          className="fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-[80] max-w-[calc(100%-2rem)] truncate rounded-full border border-[#29B6E8]/50 bg-[#0F1012]/95 px-4 py-2 tls-type-small font-bold text-[#29B6E8] shadow-lg">
           Abstimmung offen: {waiting[0].question} – jetzt abstimmen
         </button>
       ) : null}

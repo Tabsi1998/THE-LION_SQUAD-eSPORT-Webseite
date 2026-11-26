@@ -115,7 +115,7 @@ export function BottomNav() {
                 ) : null}
               </span>
               <span
-                className={`text-[9px] uppercase tracking-wider font-bold leading-none ${
+                className={`tls-type-label leading-none ${
                   active ? "text-[#29B6E8]" : ""
                 }`}
               >

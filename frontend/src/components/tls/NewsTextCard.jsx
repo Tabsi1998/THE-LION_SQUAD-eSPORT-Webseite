@@ -13,19 +13,20 @@ import { textCardSentence } from "@/lib/newsCards";
 /** Löwe der großen Karten: 78 % hoch, unten um 24 % angeschnitten - oben bleibt gut ein Drittel der Fläche frei. */
 export const LION_PLACE = "-right-[8%] -bottom-[24%] h-[78%] w-auto";
 
+// Der Satz auf der Fläche bleibt unter dem Titel daneben (Aufmacher: Abschnitt), der Sieger ist das Größte darauf.
 const SENTENCE_SIZE = {
-  md: "text-lg sm:text-xl",
-  lg: "text-xl md:text-2xl xl:text-[1.75rem]",
+  md: "tls-type-card",
+  lg: "tls-type-card",
 };
 const WINNER_SIZE = {
-  md: "text-xl sm:text-2xl",
-  lg: "text-2xl md:text-3xl xl:text-4xl",
+  md: "tls-type-section",
+  lg: "tls-type-section",
 };
 // Lange Siegernamen (#1314) stehen ganz da statt mit „…“ - eine Stufe kleiner, damit Pokal, Name und Turnier auch am
 // schmalsten Handy (320 px) in die feste Fläche passen.
 const WINNER_SIZE_LONG = {
-  md: "text-base sm:text-xl",
-  lg: "text-xl md:text-2xl xl:text-3xl",
+  md: "tls-type-card",
+  lg: "tls-type-card",
 };
 export const LONG_WINNER = 18;
 
@@ -62,15 +63,15 @@ export function NewsTextCard({ news, size = "md", className = "" }) {
               <Trophy className={size === "lg" ? "w-9 h-9" : "w-7 h-7"} style={{ color: ROLE_COLORS.honor }} aria-hidden="true" />
               <div
                 data-testid="news-text-card-winner"
-                className={`tls-wrap tls-wrap--name mt-3 font-heading font-black leading-tight ${winnerSize(result.winner, size)}`}
+                className={`tls-wrap tls-wrap--name mt-3 font-black leading-tight ${winnerSize(result.winner, size)}`}
                 style={{ color: ROLE_COLORS.honor }}
               >
                 1. {result.winner}
               </div>
-              {result.tournament && <div className="tls-wrap mt-1 text-xs sm:text-sm font-semibold text-white/65">{result.tournament}</div>}
+              {result.tournament && <div className="tls-wrap mt-1 tls-type-small font-semibold text-white/65">{result.tournament}</div>}
             </>
           ) : (
-            <p className={`font-heading font-bold leading-snug text-white break-words line-clamp-4 ${SENTENCE_SIZE[size] || SENTENCE_SIZE.md}`}>
+            <p className={`font-bold leading-snug text-white break-words line-clamp-4 ${SENTENCE_SIZE[size] || SENTENCE_SIZE.md}`}>
               {textCardSentence(news)}
             </p>
           )}

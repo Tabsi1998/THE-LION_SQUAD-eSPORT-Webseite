@@ -141,10 +141,10 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
 
   const title = (
     <div>
-      <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">
+      <div className="inline-flex items-center gap-2 tls-type-label text-[#FFD700]">
         <Link2 className="w-3.5 h-3.5" /> Speziallinks
       </div>
-      <p className="mt-1 text-xs text-white/50">
+      <p className="mt-1 tls-type-small text-white/50">
         {accessLinksHint(kind || targetType)}
       </p>
     </div>
@@ -154,7 +154,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       type="button"
       onClick={create}
       disabled={busy}
-      className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
+      className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50"
     >
       <Plus className="w-3.5 h-3.5" /> Erstellen
     </button>
@@ -164,7 +164,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
     <>
       {collapsible && <div className="flex justify-end">{createButton}</div>}
       <div className="flex flex-wrap items-center justify-between gap-2 border border-white/10 bg-[#0A0A0A]/50 rounded-sm px-3 py-2">
-        <label className="inline-flex items-center gap-2 text-xs text-white/65">
+        <label className="inline-flex items-center gap-2 tls-type-small text-white/65">
           <input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} className="accent-[#FFD700]" />
           Deaktivierte anzeigen
         </label>
@@ -172,7 +172,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           type="button"
           onClick={cleanup}
           disabled={busy}
-          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Alte deaktivieren
         </button>
@@ -181,8 +181,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       {createdUrl && (
         <div className="flex flex-wrap items-center gap-2 border border-[#00FF88]/25 bg-[#00FF88]/10 rounded-sm p-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-widest font-bold text-[#00FF88]">Gerade erstellt</div>
-            <div className="mt-1 text-xs text-white/75 break-all">{createdUrl}</div>
+            <div className="tls-type-label text-[#00FF88]">Gerade erstellt</div>
+            <div className="mt-1 tls-type-small text-white/75 break-all">{createdUrl}</div>
           </div>
           <button
             type="button"
@@ -190,7 +190,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
               await copyText(createdUrl);
               toast.success("Link kopiert.");
             }}
-            className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold"
+            className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label"
           >
             <Copy className="w-3.5 h-3.5" /> Kopieren
           </button>
@@ -199,7 +199,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
 
       <div className="grid md:grid-cols-[1fr_8rem_8rem_auto] gap-2 items-end">
         <label className="block">
-          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Notiz</span>
+          <span className="block tls-type-label text-white/45 mb-1.5">Notiz</span>
           <input
             value={note}
             onChange={(event) => setNote(event.target.value)}
@@ -209,7 +209,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           />
         </label>
         <label className="block">
-          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Gültig Tage</span>
+          <span className="block tls-type-label text-white/45 mb-1.5">Gültig Tage</span>
           <input
             type="number"
             min="1"
@@ -221,7 +221,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           />
         </label>
         <label className="block">
-          <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">Max.</span>
+          <span className="block tls-type-label text-white/45 mb-1.5">Max.</span>
           <input
             type="number"
             min="1"
@@ -233,7 +233,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           />
         </label>
         {allowRegister && (
-          <label className="inline-flex items-center gap-2 text-xs text-white/70 pb-2">
+          <label className="inline-flex items-center gap-2 tls-type-small text-white/70 pb-2">
             <input type="checkbox" checked={includeRegister} onChange={(event) => setIncludeRegister(event.target.checked)} className="accent-[#FFD700]" />
             Anmeldung freigeben
           </label>
@@ -243,10 +243,10 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-end">
         <PersonPicker purpose="access_links" contextId={targetType === "tournament" ? targetId : null} value={person} onChange={setPerson} label="Person (optional)" placeholder="Name tippen …" testId={`access-link-person-${targetType}`} />
         {person ? (
-          <div className="text-xs text-white/50 pb-2">Der Link gilt nur für dieses Konto; die Adresse kommt aus dem Konto.</div>
+          <div className="tls-type-small text-white/50 pb-2">Der Link gilt nur für dieses Konto; die Adresse kommt aus dem Konto.</div>
         ) : (
           <label className="block">
-            <span className="block text-[11px] uppercase tracking-widest font-bold text-white/45 mb-1.5">E-Mail optional (ohne Konto)</span>
+            <span className="block tls-type-label text-white/45 mb-1.5">E-Mail optional (ohne Konto)</span>
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -255,7 +255,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
             />
           </label>
         )}
-        <label className="inline-flex items-center gap-2 text-xs text-white/70 pb-2">
+        <label className="inline-flex items-center gap-2 tls-type-small text-white/70 pb-2">
           <input type="checkbox" checked={notifyUser} disabled={!person} onChange={(event) => setNotifyUser(event.target.checked)} className="accent-[#FFD700] disabled:opacity-40" />
           Person benachrichtigen
         </label>
@@ -265,12 +265,12 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
         {links.map((link) => (
           <div key={link.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A]/70 rounded-sm px-3 py-2">
             <div className="min-w-0">
-              <div className="text-xs font-bold text-white/80">
+              <div className="tls-type-small font-bold text-white/80">
                 <span className={linkStateClass(link)}>{linkStateLabel(link)}</span>
                 <span className="text-white/30"> · </span>
                 {(link.grants || []).join(", ")} {link.note ? <span className="text-white/40 font-normal">- {link.note}</span> : null}
               </div>
-              <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">
+              <div className="mt-0.5 tls-type-small text-white/35">
                 {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Aktionen
                 {link.expires_at ? ` · bis ${viennaDate(link.expires_at)}` : " · ohne Ablauf"}
                 {link.last_used_at ? ` · zuletzt ${viennaDate(link.last_used_at)}` : " · nie geöffnet"}
@@ -299,8 +299,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
             </div>
           </div>
         ))}
-        {loadError ? <div role="alert" className="text-xs text-warn border border-warn/40 bg-warn/10 rounded-sm p-3" data-testid="access-links-error">{loadError}</div> : null}
-        {links.length === 0 && !loadError && <div className="text-xs text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven {word}.</div>}
+        {loadError ? <div role="alert" className="tls-type-small text-warn border border-warn/40 bg-warn/10 rounded-sm p-3" data-testid="access-links-error">{loadError}</div> : null}
+        {links.length === 0 && !loadError && <div className="tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven {word}.</div>}
       </div>
     </>
   );

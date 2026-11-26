@@ -52,7 +52,7 @@ export function statusBadgeLabel(status) {
 
 export function StatusBadge({ status, className = "", size = "sm", testId }) {
   const info = STATUS_MAP[status] || { label: status?.toUpperCase() || "—", cls: "bg-white/10 text-white border-white/20" };
-  const sz = size === "lg" ? "text-sm px-3 py-1" : "text-[10px] px-2 py-[3px]";
+  const sz = size === "lg" ? "tls-type-small px-3 py-1" : "tls-type-small px-2 py-[3px]";
   return (
     <span
       data-testid={testId || `status-${status}`}

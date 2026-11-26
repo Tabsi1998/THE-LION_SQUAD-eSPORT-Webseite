@@ -78,7 +78,7 @@ function TurnstileWidget({ turnstile, testId }) {
     <div data-testid={testId}>
       <div ref={containerRef} />
       {failed && (
-        <p className="mt-1 text-xs text-white/50" role="status">
+        <p className="mt-1 tls-type-small text-white/50" role="status">
           Die Sicherheitsprüfung von Cloudflare lässt sich gerade nicht laden – du kannst trotzdem senden, wir prüfen deine Nachricht dann selbst.
         </p>
       )}

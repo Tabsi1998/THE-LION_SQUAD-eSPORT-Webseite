@@ -40,7 +40,7 @@ export function rememberRecent(purpose, person) {
 export function PersonAvatar({ person, size = "w-8 h-8" }) {
   if (person?.avatar_url) return <img src={resolveMediaUrl(person.avatar_url)} alt="" className={`${size} rounded-sm object-cover shrink-0`} />;
   const letter = String(person?.name || "?").trim().charAt(0).toUpperCase() || "?";
-  return <span aria-hidden="true" className={`${size} rounded-sm bg-[#0A0A0A] border border-white/10 shrink-0 inline-flex items-center justify-center text-xs font-bold text-white/60`}>{letter}</span>;
+  return <span aria-hidden="true" className={`${size} rounded-sm bg-[#0A0A0A] border border-white/10 shrink-0 inline-flex items-center justify-center tls-type-small font-bold text-white/60`}>{letter}</span>;
 }
 
 /**
@@ -108,12 +108,12 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
   if (value) {
     return (
       <div className="min-w-0" data-testid={testId}>
-        {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
+        {label && <div className="tls-type-label text-white/60 mb-1.5">{label}</div>}
         <div className="flex items-center gap-3 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
           <PersonAvatar person={value} />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold tls-wrap">{value.name}</div>
-            {value.context && <div className="text-[11px] text-white/50 tls-wrap">{value.context}</div>}
+            <div className="tls-type-small font-semibold tls-wrap">{value.name}</div>
+            {value.context && <div className="tls-type-small text-white/50 tls-wrap">{value.context}</div>}
           </div>
           {!disabled && (
             <button type="button" onClick={() => onChange?.(null)} aria-label="Andere Person wählen" data-testid={`${testId}-clear`} className="p-1 text-white/50 hover:text-white">
@@ -129,7 +129,7 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
   const showHits = open && query.trim().length > 0;
   return (
     <div className="relative min-w-0" ref={boxRef} data-testid={testId}>
-      {label && <label htmlFor={`${listId}-input`} className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</label>}
+      {label && <label htmlFor={`${listId}-input`} className="block tls-type-label text-white/60 mb-1.5">{label}</label>}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" aria-hidden="true" />
         <input
@@ -148,11 +148,11 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
           className={`${INPUT_CLASS} pl-9`}
         />
       </div>
-      {hint && <div className="mt-1 text-xs text-white/45">{hint}</div>}
-      {state === "error" && <div className="mt-2 text-xs text-[#FFB4AE]" role="alert" data-testid={`${testId}-error`}>{error}</div>}
+      {hint && <div className="mt-1 tls-type-small text-white/45">{hint}</div>}
+      {state === "error" && <div className="mt-2 tls-type-small text-[#FFB4AE]" role="alert" data-testid={`${testId}-error`}>{error}</div>}
       {(showRecent || (showHits && state !== "error")) && (
         <div id={`${listId}-list`} role="listbox" className="mt-2 sm:absolute sm:inset-x-0 sm:top-full sm:mt-1 z-30 max-h-72 overflow-y-auto border border-white/10 bg-[#121212] rounded-sm shadow-2xl shadow-black/50 divide-y divide-white/5" data-testid={`${testId}-list`}>
-          {showRecent && <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-white/40">Zuletzt gewählt</div>}
+          {showRecent && <div className="px-3 pt-2 pb-1 tls-type-label text-white/40">Zuletzt gewählt</div>}
           {(showRecent ? recent : hits).map((person) => (
             <button
               key={person.id}
@@ -165,13 +165,13 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
             >
               <PersonAvatar person={person} size="w-7 h-7" />
               <span className="min-w-0">
-                <span className="block text-sm font-semibold tls-wrap">{person.name}</span>
-                {person.context && <span className="block text-[11px] text-white/45 tls-wrap">{person.context}</span>}
+                <span className="block tls-type-small font-semibold tls-wrap">{person.name}</span>
+                {person.context && <span className="block tls-type-small text-white/45 tls-wrap">{person.context}</span>}
               </span>
             </button>
           ))}
-          {showHits && state === "loading" && !hits.length && <div className="px-3 py-3 text-xs text-white/40" role="status">Suche …</div>}
-          {showHits && state === "ready" && !hits.length && <div className="px-3 py-3 text-xs text-white/40" data-testid={`${testId}-empty`}>{emptyText}</div>}
+          {showHits && state === "loading" && !hits.length && <div className="px-3 py-3 tls-type-small text-white/40" role="status">Suche …</div>}
+          {showHits && state === "ready" && !hits.length && <div className="px-3 py-3 tls-type-small text-white/40" data-testid={`${testId}-empty`}>{emptyText}</div>}
         </div>
       )}
     </div>

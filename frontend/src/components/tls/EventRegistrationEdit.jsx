@@ -58,7 +58,7 @@ export function EventRegistrationEdit({ event, own, onSaved }) {
   if (!open) {
     return (
       <button type="button" onClick={start} data-testid="event-edit-link"
-        className="tls-hit mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-white/55 underline-offset-4 hover:text-[#29B6E8] hover:underline">
+        className="tls-hit mt-2 inline-flex items-center gap-1.5 tls-type-small font-bold text-white/55 underline-offset-4 hover:text-[#29B6E8] hover:underline">
         <Pencil className="w-3.5 h-3.5" /> Anmeldung ändern
       </button>
     );
@@ -66,30 +66,30 @@ export function EventRegistrationEdit({ event, own, onSaved }) {
 
   return (
     <form onSubmit={save} className="mt-3 space-y-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-4" data-testid="event-edit-form">
-      <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold">Anmeldung ändern</div>
+      <div className="tls-type-label text-white/50">Anmeldung ändern</div>
       {maxCompanions > 0 && (
         <label className="block">
-          <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Begleitpersonen</div>
+          <div className="tls-type-label text-white/50 mb-1.5">Begleitpersonen</div>
           <input type="number" min="0" max={maxCompanions} value={companions} onChange={(ev) => { setCompanions(ev.target.value); setError(""); }}
             data-testid="event-edit-companions" className="w-full min-h-11 bg-[#121212] border border-white/10 px-3 py-2 rounded-sm" />
-          <div className="mt-1 text-xs text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
+          <div className="mt-1 tls-type-small text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
         </label>
       )}
       {seatsChanged && quote && !quote.free && (
-        <div className="border border-white/15 rounded-sm p-3 text-sm flex items-baseline justify-between gap-3" data-testid="event-edit-quote">
+        <div className="border border-white/15 rounded-sm p-3 tls-type-small flex items-baseline justify-between gap-3" data-testid="event-edit-quote">
           <span className="text-white/65">Neue Summe für {seatsNow} Person{seatsNow === 1 ? "" : "en"}</span>
-          <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
+          <strong className="tls-type-card text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
         </div>
       )}
       <label className="block">
-        <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>
+        <div className="tls-type-label text-white/50 mb-1.5">Hinweis optional</div>
         <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setError(""); }} rows={3} maxLength={500}
           data-testid="event-edit-note" className="w-full bg-[#121212] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
       </label>
       {error && <AuthFormAlert id="event-edit-error">{error}</AuthFormAlert>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-11 px-4 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-edit-cancel">Abbrechen</button>
-        <button type="submit" disabled={submitting} className="tls-btn tls-btn--primary min-h-11 px-4 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50" data-testid="event-edit-save">
+        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-11 px-4 tls-type-label rounded-sm" data-testid="event-edit-cancel">Abbrechen</button>
+        <button type="submit" disabled={submitting} className="tls-btn tls-btn--primary min-h-11 px-4 tls-type-label rounded-sm disabled:opacity-50" data-testid="event-edit-save">
           {submitting ? "Speichere…" : "Speichern"}
         </button>
       </div>

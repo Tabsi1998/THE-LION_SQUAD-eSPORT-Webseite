@@ -106,7 +106,7 @@ export function QrScanner({ onCode, paused = false }) {
       {state === "running" ? (
         <div className="pointer-events-none absolute inset-[18%] border-2 border-[#29B6E8]/70 rounded-sm" aria-hidden="true" />
       ) : (
-        <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white/70" data-testid="qr-scanner-state">{STATE_TEXTS[state]}</div>
+        <div className="absolute inset-0 grid place-items-center p-6 text-center tls-type-small text-white/70" data-testid="qr-scanner-state">{STATE_TEXTS[state]}</div>
       )}
     </div>
   );

@@ -129,17 +129,17 @@ export default function SetupWizardPage() {
       <div className="w-full max-w-2xl">
         <div className="flex flex-col items-center mb-8">
           <Logo size="lg" />
-          <span className="mt-3 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Setup-Assistent</span>
+          <span className="mt-3 tls-type-label text-[#29B6E8]">Setup-Assistent</span>
         </div>
 
         {/* Progress dots */}
         <div className="flex items-center justify-between mb-8 px-2">
           {STEPS.map((s, i) => (
             <div key={s.key} className="flex-1 flex flex-col items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${i <= step ? "bg-[#29B6E8] text-black" : "bg-white/10 text-white/40"}`} data-testid={`wizard-step-${i}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center tls-type-small font-bold ${i <= step ? "bg-[#29B6E8] text-black" : "bg-white/10 text-white/40"}`} data-testid={`wizard-step-${i}`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
               </div>
-              <span className="text-[10px] uppercase tracking-widest text-white/40 mt-1.5 hidden sm:block">{s.label}</span>
+              <span className="tls-type-label text-white/40 mt-1.5 hidden sm:block">{s.label}</span>
               {i < STEPS.length - 1 && <div className={`absolute h-0.5 ${i < step ? "bg-[#29B6E8]" : "bg-white/10"}`} style={{ width: "calc(100% / 5 - 2rem)", transform: "translateY(15px)", display: "none" }} />}
             </div>
           ))}
@@ -149,7 +149,7 @@ export default function SetupWizardPage() {
           {step === 0 && (
             <div className="text-center py-8" data-testid="wizard-welcome">
               <Sparkles className="w-12 h-12 text-[#29B6E8] mx-auto mb-4" />
-              <h2 className="font-heading text-3xl font-black uppercase mb-3">Willkommen, Löwe!</h2>
+              <h2 className="tls-type-section mb-3">Willkommen, Löwe!</h2>
               <p className="text-white/70 max-w-md mx-auto mb-6">
                 Lass uns deine Vereinsplattform in 4 schnellen Schritten einrichten. Du kannst alles
                 später jederzeit im Admin-Bereich ändern.
@@ -157,12 +157,12 @@ export default function SetupWizardPage() {
               {status && (
                 <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 text-left mb-6 max-w-md mx-auto">
                   <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold">Setup-Status</div>
-                    <div className="font-heading font-black text-[#29B6E8]">{status.health_score ?? 0}%</div>
+                    <div className="tls-type-label text-white/50">Setup-Status</div>
+                    <div className="tls-type-num text-[#29B6E8]">{status.health_score ?? 0}%</div>
                   </div>
                   <div className="space-y-1.5">
                     {(status.checks || []).map((check) => (
-                      <div key={check.key} className="flex items-center gap-2 text-xs">
+                      <div key={check.key} className="flex items-center gap-2 tls-type-small">
                         {check.ok ? <ShieldCheck className="w-3.5 h-3.5 text-[#00FF88]" /> : <AlertTriangle className="w-3.5 h-3.5 text-[#FFD700]" />}
                         <span className={check.ok ? "text-white/65" : "text-white/90"}>{check.label}</span>
                       </div>
@@ -175,7 +175,7 @@ export default function SetupWizardPage() {
 
           {step === 1 && (
             <div className="space-y-4" data-testid="wizard-branding">
-              <h2 className="font-heading text-2xl font-black uppercase mb-3">Vereinsdaten</h2>
+              <h2 className="tls-type-section mb-3">Vereinsdaten</h2>
               <Field label="Vereinsname *" testId="wizard-club-name" value={data.club_name} onChange={(v) => upd("club_name", v)} />
               <Field label="Tagline" testId="wizard-tagline" value={data.tagline} onChange={(v) => upd("tagline", v)} />
               <Field label="Website-/Browsertitel" testId="wizard-site-title" value={data.site_title} onChange={(v) => upd("site_title", v)} />
@@ -199,10 +199,10 @@ export default function SetupWizardPage() {
 
           {step === 2 && (
             <div className="space-y-4" data-testid="wizard-admin">
-              <h2 className="font-heading text-2xl font-black uppercase mb-3 flex items-center gap-2">
+              <h2 className="tls-type-section mb-3 flex items-center gap-2">
                 <Lock className="w-6 h-6 text-[#29B6E8]" />Admin-Passwort
               </h2>
-              <p className="text-white/60 text-sm mb-4">
+              <p className="text-white/60 tls-type-small mb-4">
                 Optional — leer lassen um das aktuelle Passwort beizubehalten.
               </p>
               <Field type="password" label="Neues Passwort" hint={PASSWORD_RULE_HINT} testId="wizard-new-pw" value={data.new_admin_password} onChange={(v) => upd("new_admin_password", v)} />
@@ -212,13 +212,13 @@ export default function SetupWizardPage() {
 
           {step === 3 && (
             <div className="space-y-4" data-testid="wizard-mail">
-              <h2 className="font-heading text-2xl font-black uppercase mb-3 flex items-center gap-2">
+              <h2 className="tls-type-section mb-3 flex items-center gap-2">
                 <Mail className="w-6 h-6 text-[#29B6E8]" />E-Mail-Versand
               </h2>
               <div className="flex gap-2">
                 {[["smtp", "Eigener SMTP", Server], ["resend", "Resend API", Mail]].map(([k, l, Icn]) => (
                   <button key={k} onClick={() => upd("mail_provider", k)} data-testid={`wizard-mail-${k}`}
-                    className={`flex-1 border px-4 py-3 rounded-sm text-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 ${data.mail_provider === k ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/20"}`}>
+                    className={`flex-1 border px-4 py-3 rounded-sm tls-type-small font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 ${data.mail_provider === k ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/20"}`}>
                     <Icn className="w-4 h-4" />{l}
                   </button>
                 ))}
@@ -229,18 +229,18 @@ export default function SetupWizardPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Port" testId="wizard-smtp-port" type="number" value={data.smtp_port} onChange={(v) => upd("smtp_port", parseInt(v, 10))} />
                     <div>
-                      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Sicherheit</div>
+                      <div className="tls-type-label text-white/60 mb-1.5">Sicherheit</div>
                       <select value={data.smtp_security} onChange={(e) => upd("smtp_security", e.target.value)} data-testid="wizard-smtp-sec" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                         <option value="starttls">STARTTLS</option><option value="tls">SSL/TLS</option><option value="none">Keine</option>
                       </select>
                     </div>
                   </div>
-                  <label className="flex items-center gap-2 text-sm">
+                  <label className="flex items-center gap-2 tls-type-small">
                     <input type="checkbox" checked={data.smtp_tls_verify !== false} onChange={(e) => upd("smtp_tls_verify", e.target.checked)} data-testid="wizard-smtp-tls-verify" className="accent-[#29B6E8]" />
                     <span>TLS Zertifikat prüfen</span>
                   </label>
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Anmeldung</div>
+                    <div className="tls-type-label text-white/60 mb-1.5">SMTP Anmeldung</div>
                     <select value={data.smtp_auth} onChange={(e) => upd("smtp_auth", e.target.value)} data-testid="wizard-smtp-auth" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                       <option value="auto">Automatisch</option>
                       <option value="login">Mit Benutzer/Passwort</option>
@@ -262,7 +262,7 @@ export default function SetupWizardPage() {
                 <Field label="Absender E-Mail" testId="wizard-sender-email" type="email" value={data.sender_email} onChange={(v) => upd("sender_email", v)} />
               </div>
               <Field label="Antworten an" testId="wizard-reply-to" type="email" value={data.reply_to_email} onChange={(v) => upd("reply_to_email", v)} placeholder="office@lionsquad.at" />
-              <p className="text-xs text-white/40">Du kannst das später unter <em>Einstellungen → SMTP</em> ändern oder leer lassen.</p>
+              <p className="tls-type-small text-white/40">Du kannst das später unter <em>Einstellungen → SMTP</em> ändern oder leer lassen.</p>
             </div>
           )}
 
@@ -271,7 +271,7 @@ export default function SetupWizardPage() {
               <div className="w-16 h-16 rounded-full bg-[#00FF88]/10 border-2 border-[#00FF88] flex items-center justify-center mx-auto mb-4">
                 <Check className="w-8 h-8 text-[#00FF88]" />
               </div>
-              <h2 className="font-heading text-3xl font-black uppercase mb-3">Setup abgeschlossen!</h2>
+              <h2 className="tls-type-section mb-3">Setup abgeschlossen!</h2>
               <p className="text-white/70 mb-6">Deine TLS-Plattform ist startklar. Du wirst weitergeleitet …</p>
             </div>
           )}
@@ -284,7 +284,7 @@ export default function SetupWizardPage() {
             </button>
           ) : <div />}
           <div className="flex gap-2">
-            {step === 0 && <button onClick={skip} data-testid="wizard-skip" className="px-4 py-2 text-white/40 hover:text-white text-sm">Überspringen</button>}
+            {step === 0 && <button onClick={skip} data-testid="wizard-skip" className="px-4 py-2 text-white/40 hover:text-white tls-type-small">Überspringen</button>}
             {step < STEPS.length - 2 && (
               <button onClick={next} data-testid="wizard-next" className="px-6 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
                 Weiter <ArrowRight className="w-4 h-4" />
@@ -305,10 +305,10 @@ export default function SetupWizardPage() {
 function Field({ label, value, onChange, testId, type = "text", placeholder = "", hint = "" }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder}
         className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-      {hint ? <div className="text-[11px] text-white/50 mt-1">{hint}</div> : null}
+      {hint ? <div className="tls-type-small text-white/50 mt-1">{hint}</div> : null}
     </label>
   );
 }
@@ -316,7 +316,7 @@ function Field({ label, value, onChange, testId, type = "text", placeholder = ""
 function TextArea({ label, value, onChange, testId, placeholder = "" }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder} rows={4}
         className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm resize-y" />
     </label>

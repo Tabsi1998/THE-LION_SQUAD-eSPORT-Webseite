@@ -83,17 +83,17 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
       <div className="bg-[#121212] border border-white/10 rounded-sm flex flex-col flex-1 min-h-0">
         <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 flex-wrap">
           <div className="min-w-0 flex-1">
-            <div className="font-heading font-bold truncate" data-testid="document-viewer-title">{title}</div>
-            {subtitle && <div className="text-xs text-white/45 truncate">{subtitle}</div>}
+            <div className="font-bold truncate" data-testid="document-viewer-title">{title}</div>
+            {subtitle && <div className="tls-type-small text-white/45 truncate">{subtitle}</div>}
           </div>
           <div className="flex items-center gap-1" data-testid="document-viewer-pages">
             <button type="button" onClick={() => go(-1)} disabled={page <= 1} aria-label="Vorherige Seite" className="p-2 text-white/70 hover:text-white disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="text-xs text-white/70 tabular-nums min-w-[4.5rem] text-center">{state.pages ? `${page} / ${state.pages}` : "–"}</span>
+            <span className="tls-type-small text-white/70 tabular-nums min-w-[4.5rem] text-center">{state.pages ? `${page} / ${state.pages}` : "–"}</span>
             <button type="button" onClick={() => go(1)} disabled={page >= state.pages} aria-label="Nächste Seite" className="p-2 text-white/70 hover:text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
           </div>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => setZoom((z) => nextZoom(z, -1))} aria-label="Verkleinern" className="p-2 text-white/70 hover:text-white"><ZoomOut className="w-4 h-4" /></button>
-            <span className="text-xs text-white/70 tabular-nums w-10 text-center" data-testid="document-viewer-zoom">{Math.round(zoom * 100)}%</span>
+            <span className="tls-type-small text-white/70 tabular-nums w-10 text-center" data-testid="document-viewer-zoom">{Math.round(zoom * 100)}%</span>
             <button type="button" onClick={() => setZoom((z) => nextZoom(z, 1))} aria-label="Vergrößern" className="p-2 text-white/70 hover:text-white"><ZoomIn className="w-4 h-4" /></button>
             <button type="button" onClick={() => setFullscreen((value) => !value)} aria-label={fullscreen ? "Vollbild beenden" : "Vollbild"} className="p-2 text-white/70 hover:text-white">{fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}</button>
             {downloadPath && (
@@ -103,16 +103,16 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-auto bg-[#0A0A0A] flex items-start justify-center p-2 sm:p-4">
-          {state.loading && <div className="text-sm text-white/50 py-20" data-testid="document-viewer-loading">Dokument wird geladen …</div>}
+          {state.loading && <div className="tls-type-small text-white/50 py-20" data-testid="document-viewer-loading">Dokument wird geladen …</div>}
           {state.error && (
             <div className="max-w-md text-center py-16 space-y-3" data-testid="document-viewer-error">
-              <div className="text-sm text-white/80">{state.error}</div>
-              {downloadPath && <a href={`${API}${downloadPath}`} download className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#FFD700]"><Download className="w-3.5 h-3.5" /> Herunterladen</a>}
+              <div className="tls-type-small text-white/80">{state.error}</div>
+              {downloadPath && <a href={`${API}${downloadPath}`} download className="inline-flex items-center gap-2 tls-type-label text-[#FFD700]"><Download className="w-3.5 h-3.5" /> Herunterladen</a>}
             </div>
           )}
           {!state.loading && !state.error && <canvas ref={canvasRef} className="bg-white shadow-lg max-w-full" data-testid="document-viewer-canvas" />}
         </div>
-        {state.sha256 && <div className="px-3 py-1 text-[10px] text-white/30 font-mono truncate border-t border-white/5" data-testid="document-viewer-hash">Original unverändert · SHA-256 {state.sha256.slice(0, 16)}…</div>}
+        {state.sha256 && <div className="px-3 py-1 tls-type-small text-white/30 font-mono truncate border-t border-white/5" data-testid="document-viewer-hash">Original unverändert · SHA-256 {state.sha256.slice(0, 16)}…</div>}
       </div>
     </div>
   );

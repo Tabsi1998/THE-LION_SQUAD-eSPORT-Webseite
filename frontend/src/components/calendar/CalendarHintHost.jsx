@@ -46,9 +46,9 @@ export function CalendarHintHost() {
       <div className="flex items-start gap-3 pr-8">
         <CalendarPlus className="mt-0.5 w-5 h-5 shrink-0 text-[#FFD700]" aria-hidden="true" />
         <div className="min-w-0">
-          <h2 id="calendar-hint-title" className="text-sm font-bold">Deine Termine automatisch im Kalender?</h2>
-          <p className="mt-1 text-xs text-white/60">Einmal abonnieren – danach erscheint jede Anmeldung von selbst in Google, Apple oder Outlook.</p>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <h2 id="calendar-hint-title" className="tls-type-small font-bold">Deine Termine automatisch im Kalender?</h2>
+          <p className="mt-1 tls-type-small text-white/60">Einmal abonnieren – danach erscheint jede Anmeldung von selbst in Google, Apple oder Outlook.</p>
+          <div className="mt-3 flex flex-wrap gap-2 tls-type-small">
             <Link to={`${MY_CALENDAR_PATH}#${SUBSCRIBE_ANCHOR}`} onClick={() => setOpen(false)} data-testid="calendar-hint-go" className="tls-btn tls-btn--honor px-3 py-2 rounded-sm font-bold uppercase tracking-wider">
               Einmal abonnieren
             </Link>

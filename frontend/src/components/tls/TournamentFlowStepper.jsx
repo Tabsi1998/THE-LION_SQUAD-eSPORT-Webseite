@@ -95,7 +95,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
       className="mb-5 rounded-lg border border-white/10 bg-gradient-to-br from-[#0E0E0E] to-[#0A0A0A] p-4"
     >
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{staffel ? "Liga-Ablauf" : "Turnier-Ablauf"}</span>
+        <span className="tls-type-label text-[#29B6E8]">{staffel ? "Liga-Ablauf" : "Turnier-Ablauf"}</span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
       <div className={stack ? "flex flex-col gap-1 sm:flex-row sm:items-stretch tls-swipe tls-swipe--room pb-1" : "flex items-stretch gap-1 tls-swipe tls-swipe--room pb-1"}>
@@ -127,13 +127,13 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
                   {state === "done" ? <Check className="w-5 h-5" /> : <Icon className="w-4 h-4" />}
                 </span>
                 <span
-                  className={`text-[11px] font-bold uppercase tracking-wider ${stack ? "flex-1 sm:flex-none sm:text-center" : "text-center"} transition-colors ${
+                  className={`tls-type-label ${stack ? "flex-1 sm:flex-none sm:text-center" : "text-center"} transition-colors ${
                     state === "current" ? "text-[#FFD700]" : state === "done" ? "text-white" : "text-white/45"
                   }`}
                 >
                   {step.label}
                 </span>
-                <span className="text-[10px] text-white/40 tabular-nums">{step.meta}</span>
+                <span className="tls-type-small text-white/40 tabular-nums">{step.meta}</span>
               </button>
               {i < steps.length - 1 && (
                 <span

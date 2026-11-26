@@ -13,10 +13,10 @@ function Pill({ id, label, count, active, onClick }) {
       onClick={onClick}
       aria-pressed={active}
       data-testid={`news-filter-${id}`}
-      className={`tls-news-pill shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold whitespace-nowrap ${active ? "bg-[#29B6E8] text-black" : "bg-white/[0.05] text-white/65 hover:bg-white/[0.09] hover:text-white"}`}
+      className={`tls-news-pill shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 tls-type-small font-bold whitespace-nowrap ${active ? "bg-[#29B6E8] text-black" : "bg-white/[0.05] text-white/65 hover:bg-white/[0.09] hover:text-white"}`}
     >
       {label}
-      <span className={`tabular-nums text-[11px] font-semibold ${active ? "text-black/60" : "text-white/40"}`}>{count}</span>
+      <span className={`tls-type-small tls-type-num ${active ? "text-black/60" : "text-white/40"}`}>{count}</span>
     </button>
   );
 }

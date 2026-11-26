@@ -37,8 +37,8 @@ export function SideSheet({ title, eyebrow, onClose, footer = null, testId = "si
       >
         <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-4 md:px-6">
           <div className="min-w-0">
-            {eyebrow ? <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow}</div> : null}
-            <h2 className="font-heading text-xl md:text-2xl font-black break-words">{title}</h2>
+            {eyebrow ? <div className="tls-type-label text-[#29B6E8]">{eyebrow}</div> : null}
+            <h2 className="tls-type-section break-words">{title}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" data-testid={`${testId}-close`} className="shrink-0 p-2 text-white/50 hover:text-white transition">
             <X className="w-5 h-5" />

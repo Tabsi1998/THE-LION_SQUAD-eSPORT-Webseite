@@ -83,8 +83,8 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
           <div className="absolute -bottom-20 -left-16 w-56 h-56 rounded-full bg-[#29B6E8] blur-[80px] opacity-15" />
 
           <div className="relative flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">The Lion Squad</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">{season}</span>
+            <span className="tls-type-label text-[#29B6E8]">The Lion Squad</span>
+            <span className="tls-type-label text-white/45">{season}</span>
           </div>
 
           <div className="relative mt-8 flex flex-col items-center">
@@ -92,17 +92,17 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
               {profile.avatar_url ? (
                 <img src={resolveMediaUrl(profile.avatar_url)} alt="" crossOrigin="anonymous" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-4xl text-[#29B6E8]">
+                <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center tls-type-title tls-type-num text-[#29B6E8]">
                   {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}
                 </div>
               )}
             </LevelAvatarFrame>
-            <h2 className="mt-7 font-heading text-2xl font-black uppercase text-center leading-tight">{profile.display_name || profile.username}</h2>
-            <div className="text-xs text-white/45">@{profile.username}</div>
-            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-sm text-[10px] font-bold uppercase tracking-widest" style={{ color: tier.color, borderColor: `${tier.color}66`, backgroundColor: `${tier.color}12` }}>
+            <h2 className="mt-7 tls-type-section text-center leading-tight">{profile.display_name || profile.username}</h2>
+            <div className="tls-type-small text-white/45">@{profile.username}</div>
+            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-sm tls-type-label" style={{ color: tier.color, borderColor: `${tier.color}66`, backgroundColor: `${tier.color}12` }}>
               <Zap className="w-3 h-3" /> Level {level?.level || 1} · {tier.title}
             </div>
-            {crown && <div className="mt-1.5 text-[10px] uppercase tracking-widest font-bold text-white/50">{CROWN_LABELS[crownVariant(crown)]}</div>}
+            {crown && <div className="mt-1.5 tls-type-label text-white/50">{CROWN_LABELS[crownVariant(crown)]}</div>}
           </div>
 
           <div className="relative mt-6 grid grid-cols-4 gap-2 text-center">
@@ -114,22 +114,22 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
             ].map((s) => (
               <div key={s.label} className="border border-white/10 rounded-sm bg-white/[0.03] px-1 py-2.5">
                 <s.icon className="w-3.5 h-3.5 mx-auto" style={{ color: s.color }} />
-                <div className="mt-1 font-display font-bold text-lg tabular-nums" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[8px] uppercase tracking-widest text-white/40 font-bold">{s.label}</div>
+                <div className="mt-1 tls-type-card tls-type-num" style={{ color: s.color }}>{s.value}</div>
+                <div className="tls-type-label text-white/40">{s.label}</div>
               </div>
             ))}
           </div>
 
           {best.length > 0 && (
             <div className="relative mt-5">
-              <div className="text-[9px] uppercase tracking-[0.25em] text-white/40 font-bold mb-2">Top-Erfolge</div>
+              <div className="tls-type-label text-white/40 mb-2">Top-Erfolge</div>
               <div className="space-y-1.5">
                 {best.map((a) => (
                   <div key={a.id || a.code} className="flex items-center gap-2.5 border border-white/8 rounded-sm bg-white/[0.03] px-2.5 py-1.5" style={{ boxShadow: `inset 2px 0 0 ${a.level_color || "#29B6E8"}` }}>
                     <Medal className="w-3.5 h-3.5 shrink-0" style={{ color: a.level_color || "#29B6E8" }} />
                     <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-white truncate">{a.name}</div>
-                      <div className="text-[8px] uppercase tracking-widest font-bold" style={{ color: a.level_color || "#29B6E8" }}>{a.level_name}</div>
+                      <div className="tls-type-small font-bold text-white truncate">{a.name}</div>
+                      <div className="tls-type-small font-bold" style={{ color: a.level_color || "#29B6E8" }}>{a.level_name}</div>
                     </div>
                   </div>
                 ))}
@@ -138,16 +138,16 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
           )}
 
           <div className="relative mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
-            <span className="text-[9px] uppercase tracking-[0.25em] text-white/35 font-bold">lionsquad · esports</span>
-            <span className="text-[9px] text-white/30">{viennaDate(new Date())}</span>
+            <span className="tls-type-label text-white/35">lionsquad · esports</span>
+            <span className="tls-type-small text-white/30">{viennaDate(new Date())}</span>
           </div>
         </div>
 
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={download} disabled={busy} data-testid="highlight-card-download" className="tls-btn tls-btn--primary flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={download} disabled={busy} data-testid="highlight-card-download" className="tls-btn tls-btn--primary flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm tls-type-label disabled:opacity-50">
             <Download className="w-3.5 h-3.5" /> PNG speichern
           </button>
-          <button type="button" onClick={share} disabled={busy} data-testid="highlight-card-share" className="tls-btn tls-btn--quiet flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={share} disabled={busy} data-testid="highlight-card-share" className="tls-btn tls-btn--quiet flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm tls-type-label disabled:opacity-50">
             <Share2 className="w-3.5 h-3.5" /> Teilen
           </button>
           <button type="button" onClick={onClose} data-testid="highlight-card-close" aria-label="Schließen" className="inline-flex items-center justify-center px-3 py-2.5 border border-white/15 text-white/60 rounded-sm hover:text-white">

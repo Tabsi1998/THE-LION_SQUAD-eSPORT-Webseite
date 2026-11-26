@@ -275,14 +275,14 @@ function NavDropdown({ item, isClubMember, signedIn, badge = 0 }) {
     onPointerDown: onTriggerPointerDown,
     onClick: onTriggerClick,
     onKeyDown: onTriggerKeyDown,
-    className: `tls-nav-link px-4 lg:px-1.5 min-[1440px]:px-4 py-2 text-sm font-semibold uppercase tracking-wider lg:tracking-wide min-[1440px]:tracking-wider transition rounded-sm inline-flex items-center gap-1.5 lg:gap-1 min-[1440px]:gap-1.5 ${
+    className: `tls-nav-link px-4 lg:px-1.5 min-[1440px]:px-4 py-2 tls-type-label lg:tracking-wide min-[1440px]:tracking-wider transition rounded-sm inline-flex items-center gap-1.5 lg:gap-1 min-[1440px]:gap-1.5 ${
       isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
     }`,
   };
   const triggerContent = (
     <>
       <span>{item.label}</span>
-      {badge ? <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white text-[9px] leading-4 text-center" data-testid={`nav-${key}-count`} aria-label={`${badge} ungelesene Chats`}>{badge > 99 ? "99+" : badge}</span> : null}
+      {badge ? <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white tls-type-small leading-4 text-center" data-testid={`nav-${key}-count`} aria-label={`${badge} ungelesene Chats`}>{badge > 99 ? "99+" : badge}</span> : null}
       <ChevronDown data-testid={`nav-${key}-chevron`} aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
     </>
   );
@@ -311,7 +311,7 @@ function NavDropdown({ item, isClubMember, signedIn, badge = 0 }) {
                 data-nav-entry=""
                 data-testid={`nav-sub-${navTestId(c.label)}`}
                 className={({ isActive }) =>
-                  `block px-4 py-2 text-sm transition ${
+                  `block px-4 py-2 tls-type-small transition ${
                     isActive ? "text-[#29B6E8] bg-[#29B6E8]/5" : "text-white/80 hover:text-[#29B6E8] hover:bg-white/5 focus-visible:text-[#29B6E8] focus-visible:bg-white/5"
                   }`
                 }
@@ -337,7 +337,7 @@ function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
         onClick={onClose}
         data-testid={`mobile-nav-${item.label.toLowerCase()}`}
         className={({ isActive }) =>
-          `block px-3 py-2.5 text-sm font-semibold uppercase tracking-wider rounded-sm ${
+          `block px-3 py-2.5 tls-type-label rounded-sm ${
             isActive ? "text-[#29B6E8] bg-[#29B6E8]/10" : "text-white/80"
           }`
         }
@@ -354,7 +354,7 @@ function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
         onClick={() => setOpen((v) => !v)}
         data-testid={`mobile-nav-${item.label.toLowerCase()}`}
         aria-expanded={open}
-        className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold uppercase tracking-wider rounded-sm text-white/80 hover:text-white`}
+        className="w-full flex items-center justify-between px-3 py-2.5 tls-type-small font-semibold uppercase tracking-wider rounded-sm text-white/80 hover:text-white"
       >
         {item.label}
         <ChevronDown data-testid={`mobile-nav-${item.label.toLowerCase()}-chevron`} className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -368,7 +368,7 @@ function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
               onClick={onClose}
               data-testid={`mobile-nav-sub-${navTestId(c.label)}`}
               className={({ isActive }) =>
-                `block px-3 py-2 text-xs uppercase tracking-wider transition ${
+                `block px-3 py-2 tls-type-label transition ${
                   isActive ? "text-[#29B6E8]" : "text-white/65 hover:text-[#29B6E8]"
                 }`
               }
@@ -486,7 +486,7 @@ export function MainNav({ isClubMember = false, signedIn = false, badges = {} })
             end={item.end}
             data-testid={`nav-${item.label.toLowerCase()}`}
             className={({ isActive }) =>
-              `tls-nav-link px-4 lg:px-1.5 min-[1440px]:px-4 py-2 text-sm font-semibold uppercase tracking-wider lg:tracking-wide min-[1440px]:tracking-wider transition rounded-sm ${
+              `tls-nav-link px-4 lg:px-1.5 min-[1440px]:px-4 py-2 tls-type-label lg:tracking-wide min-[1440px]:tracking-wider transition rounded-sm ${
                 isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
               }`
             }

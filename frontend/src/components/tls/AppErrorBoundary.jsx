@@ -7,6 +7,7 @@ import { scrubClientLogText } from "@/lib/clientLog";
 import { reportablePath } from "@/lib/reportPath";
 import { viennaDateTime } from "@/lib/vienna";
 import { Boundary } from "@/components/tls/OptionalBoundary";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Die stille bzw. optionale Grenze steht seit #936 in OptionalBoundary.jsx; hier bleibt sie für bestehende Importe.
 export { OptionalBoundary } from "@/components/tls/OptionalBoundary";
@@ -47,23 +48,23 @@ function TechnicalDetails({ error, report, canSeeLogs }) {
   };
   return (
     <details className="mt-5 border border-white/10 bg-[#0A0A0A] rounded-sm text-left" data-testid="page-error-details">
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white">
+      <summary className="cursor-pointer select-none px-3 py-2 tls-type-label text-white/60 hover:text-white">
         Technische Angaben (für Admins)
       </summary>
       <div className="border-t border-white/10 px-3 py-3 space-y-3">
-        <pre className="whitespace-pre-wrap break-words font-mono text-xs text-white/70" data-testid="page-error-technical">{text}</pre>
+        <pre className="whitespace-pre-wrap break-words font-mono tls-type-small text-white/70" data-testid="page-error-technical">{text}</pre>
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={copy}
-            className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-1.5 font-bold uppercase tracking-wider rounded-sm text-xs"
+            className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-1.5 tls-type-label rounded-sm"
             data-testid="page-error-copy"
           >
             <ClipboardCopy className="w-4 h-4" /> Kopieren
           </button>
-          {copied ? <span className="text-xs text-white/60" role="status" data-testid="page-error-copied">{copied}</span> : null}
+          {copied ? <span className="tls-type-small text-white/60" role="status" data-testid="page-error-copied">{copied}</span> : null}
           {canSeeLogs && report?.id ? (
-            <Link to={`/admin/ops?tab=errors&q=${encodeURIComponent(report.id)}`} className="text-xs text-[#29B6E8] hover:underline" data-testid="page-error-log-link">
+            <Link to={`/admin/ops?tab=errors&q=${encodeURIComponent(report.id)}`} className="tls-type-small text-[#29B6E8] hover:underline" data-testid="page-error-log-link">
               Unter „Betrieb &amp; Logs“ ansehen
             </Link>
           ) : null}
@@ -81,25 +82,25 @@ function ErrorCard({ error, report }) {
       <div className="mx-auto mb-5 w-14 h-14 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 flex items-center justify-center text-[#FF3B30]">
         <AlertTriangle className="w-7 h-7" />
       </div>
-      <h1 className="font-heading text-2xl md:text-3xl font-black uppercase">Diese Seite konnte nicht angezeigt werden</h1>
-      <p className="mt-3 text-sm text-white/60">
+      <h1 className="tls-type-title"><ShortCaps>Diese Seite konnte nicht angezeigt werden</ShortCaps></h1>
+      <p className="mt-3 tls-type-body text-white/60">
         Lade die Seite neu. Hilft das nicht, probier es später noch einmal – der Rest der Website funktioniert weiter.
       </p>
       {/* Statusseite (#1657): ob Website und Server gerade laufen. */}
-      <p className="mt-2 text-xs text-white/50">
+      <p className="mt-2 tls-type-small text-white/50">
         Läuft gerade etwas nicht? <Link to="/status" data-testid="page-error-status" className="font-semibold text-brand hover:text-white">Status ansehen</Link>
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+          className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm"
         >
           <RefreshCw className="w-4 h-4" /> Neu laden
         </button>
         <Link
           to="/"
-          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm"
         >
           <Home className="w-4 h-4" /> Startseite
         </Link>
@@ -107,7 +108,7 @@ function ErrorCard({ error, report }) {
         <Link
           to={`/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(reportablePath(report?.path) || "/")}`}
           data-testid="page-error-report"
-          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm"
         >
           <Bug className="w-4 h-4" /> Fehler melden
         </Link>
@@ -133,17 +134,17 @@ function RootCard() {
         <div className="mx-auto mb-5 w-14 h-14 rounded-sm border border-warn/40 bg-warn/10 flex items-center justify-center text-warn">
           <AlertTriangle className="w-7 h-7" />
         </div>
-        <h1 className="font-heading text-2xl md:text-3xl font-black uppercase">Die Website konnte nicht angezeigt werden</h1>
-        <p className="mt-3 text-sm text-white/60">Lade die Seite neu. Hilft das nicht, probier es später noch einmal.</p>
+        <h1 className="tls-type-title"><ShortCaps>Die Website konnte nicht angezeigt werden</ShortCaps></h1>
+        <p className="mt-3 tls-type-small text-white/60">Lade die Seite neu. Hilft das nicht, probier es später noch einmal.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+            className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm"
           >
             <RefreshCw className="w-4 h-4" /> Neu laden
           </button>
-          <a href="/" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">
+          <a href="/" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm">
             <Home className="w-4 h-4" /> Startseite
           </a>
         </div>

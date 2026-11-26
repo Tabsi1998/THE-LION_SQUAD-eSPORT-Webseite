@@ -130,13 +130,13 @@ export function GlobalSearch() {
                 {recent.length ? (
                   <section className="mb-3" data-testid="global-search-recent">
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/35">Letzte Suchen</span>
-                      <button type="button" onClick={() => { clearRecentSearches(); setRecent([]); }} className="text-[11px] font-bold text-[#29B6E8] hover:underline" data-testid="global-search-recent-clear">Alle löschen</button>
+                      <span className="tls-type-label text-white/35">Letzte Suchen</span>
+                      <button type="button" onClick={() => { clearRecentSearches(); setRecent([]); }} className="tls-type-small font-bold text-[#29B6E8] hover:underline" data-testid="global-search-recent-clear">Alle löschen</button>
                     </div>
                     <div className="space-y-1">
                       {recent.map((entry) => (
                         <div key={entry} className="flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3">
-                          <button type="button" onClick={() => setQuery(entry)} className="flex min-h-11 flex-1 items-center gap-2 text-left text-sm text-white/80 hover:text-white" data-testid={`global-search-recent-${entry}`}>
+                          <button type="button" onClick={() => setQuery(entry)} className="flex min-h-11 flex-1 items-center gap-2 text-left tls-type-small text-white/80 hover:text-white" data-testid={`global-search-recent-${entry}`}>
                             <Clock className="h-3.5 w-3.5 text-white/40" /> {entry}
                           </button>
                           <button type="button" onClick={() => setRecent(forgetSearch(entry))} className="p-2 text-white/40 hover:text-white" aria-label={`„${entry}“ aus den letzten Suchen löschen`} data-testid={`global-search-recent-remove-${entry}`}>
@@ -155,7 +155,7 @@ export function GlobalSearch() {
                         key={link.to}
                         to={link.to}
                         onClick={close}
-                        className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-sm border border-white/10 bg-white/[0.03] px-3 py-4 text-center text-xs font-bold uppercase tracking-wider text-white/70 transition hover:border-[#29B6E8]/45 hover:text-[#29B6E8]"
+                        className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-sm border border-white/10 bg-white/[0.03] px-3 py-4 text-center tls-type-label text-white/70 transition hover:border-[#29B6E8]/45 hover:text-[#29B6E8]"
                       >
                         <Icon className="h-4 w-4" />
                         {link.label}
@@ -165,11 +165,11 @@ export function GlobalSearch() {
                 </div>
                 </>
               ) : loading ? (
-                <div className="py-12 text-center text-xs font-display uppercase tracking-[0.3em] text-white/35" role="status">Suche läuft...</div>
+                <div className="py-12 text-center tls-type-label text-white/35" role="status">Suche läuft...</div>
               ) : error ? (
-                <div className="py-12 text-center text-sm" role="alert">
+                <div className="py-12 text-center tls-type-small" role="alert">
                   <p className="text-warn">{error}</p>
-                  <button type="button" onClick={search.reload} className="tls-hit mt-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">
+                  <button type="button" onClick={search.reload} className="tls-hit mt-3 inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8] hover:underline">
                     <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Nochmal versuchen
                   </button>
                 </div>
@@ -177,7 +177,7 @@ export function GlobalSearch() {
                 <div className="space-y-4">
                   {grouped.map(([kind, rows]) => (
                     <section key={kind}>
-                      <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.25em] text-white/35">{KIND_META[kind]?.label || "Treffer"}</div>
+                      <div className="mb-2 tls-type-label text-white/35">{KIND_META[kind]?.label || "Treffer"}</div>
                       <div className="space-y-1.5">
                         {rows.map((item) => (
                           <SearchResult key={`${item.kind}:${item.url}`} item={item} onClose={() => { remember(); close(); }} />
@@ -187,7 +187,7 @@ export function GlobalSearch() {
                   ))}
                 </div>
               ) : (
-                <div className="py-12 text-center text-sm text-white/45" role="status">Keine Treffer gefunden.</div>
+                <div className="py-12 text-center tls-type-small text-white/45" role="status">Keine Treffer gefunden.</div>
               )}
             </div>
           </div>
@@ -215,14 +215,14 @@ function SearchResult({ item, onClose }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="tls-wrap font-heading text-sm font-bold uppercase text-white">{item.title}</div>
+        <div className="tls-wrap tls-type-label text-white">{item.title}</div>
         {(item.subtitle || date) && (
-          <div className="tls-wrap mt-0.5 text-xs text-white/45">
+          <div className="tls-wrap mt-0.5 tls-type-small text-white/45">
             {[item.subtitle, date].filter(Boolean).join(" · ")}
           </div>
         )}
       </div>
-      <span className="hidden text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] sm:inline">{meta.label}</span>
+      <span className="hidden tls-type-label text-[#29B6E8] sm:inline">{meta.label}</span>
     </Link>
   );
 }

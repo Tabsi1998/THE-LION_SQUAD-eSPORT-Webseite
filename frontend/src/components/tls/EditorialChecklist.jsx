@@ -33,10 +33,10 @@ export function EditorialChecklist({ title = "Redaktions-Checkliste", items = []
     <section className={`rounded-sm border border-white/10 bg-[#0A0A0A] p-4 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">{title}</div>
-          <div className="mt-1 text-xs text-white/45">Vor dem Veröffentlichen kurz gegenprüfen.</div>
+          <div className="tls-type-label text-[#FFD700]">{title}</div>
+          <div className="mt-1 tls-type-small text-white/45">Vor dem Veröffentlichen kurz gegenprüfen.</div>
         </div>
-        <span className="rounded-sm border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/45">
+        <span className="rounded-sm border border-white/10 px-2 py-1 tls-type-label text-white/45">
           {done}/{total} erledigt
         </span>
       </div>
@@ -49,8 +49,8 @@ export function EditorialChecklist({ title = "Redaktions-Checkliste", items = []
               <div className="flex items-start gap-2">
                 <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${state.iconClass}`} />
                 <div className="min-w-0">
-                  <div className={`text-xs font-bold uppercase tracking-wider ${state.textClass}`}>{item.label}</div>
-                  {item.description && <div className="mt-0.5 text-xs leading-relaxed text-white/45">{item.description}</div>}
+                  <div className={`tls-type-label ${state.textClass}`}>{item.label}</div>
+                  {item.description && <div className="mt-0.5 tls-type-small leading-relaxed text-white/45">{item.description}</div>}
                 </div>
               </div>
             </div>

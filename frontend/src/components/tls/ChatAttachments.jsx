@@ -181,7 +181,7 @@ export function ChatAttachmentDrafts({ drafts, onRemove }) {
         ))}
       </div>
       {errors.length > 0 && (
-        <p role="alert" className="mt-2 text-xs text-[#FF6B61]">{errors.join(" ")}</p>
+        <p role="alert" className="mt-2 tls-type-small text-[#FF6B61]">{errors.join(" ")}</p>
       )}
     </div>
   );
@@ -191,7 +191,7 @@ export function ChatAttachmentDrafts({ drafts, onRemove }) {
 // Absender - alle anderen bekommen vom Server 404 und sehen „wird geprüft“.
 function ScanPlaceholder({ item, text }) {
   return (
-    <div className="flex h-24 items-center justify-center gap-2 rounded-sm border border-dashed border-white/15 bg-white/[0.03] px-3 text-center text-[11px] text-white/45" data-testid={`chat-attachment-${item.scan_state}-${item.id}`}>
+    <div className="flex h-24 items-center justify-center gap-2 rounded-sm border border-dashed border-white/15 bg-white/[0.03] px-3 text-center tls-type-small text-white/45" data-testid={`chat-attachment-${item.scan_state}-${item.id}`}>
       <ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" /> {text}
     </div>
   );

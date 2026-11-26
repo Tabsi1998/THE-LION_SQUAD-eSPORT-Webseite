@@ -183,7 +183,7 @@ export function NotificationBell() {
             <motion.span
               key={unread}
               data-testid="notification-unread-badge"
-              className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white text-[10px] font-black inline-flex items-center justify-center"
+              className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white tls-type-small font-black inline-flex items-center justify-center"
               aria-label={`${unread > 99 ? "99+" : unread} ungelesene Benachrichtigungen`}
               initial={{ scale: 0, rotate: -18 }}
               animate={{ scale: 1, rotate: 0 }}
@@ -207,12 +207,12 @@ export function NotificationBell() {
           >
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
               <div className="min-w-0">
-                <div className="tls-wrap font-heading font-black uppercase text-sm">Benachrichtigungen</div>
-                <div className="mt-0.5 text-[11px] text-white/40">{unread} ungelesen · {read} gelesen</div>
+                <div className="tls-wrap tls-type-label">Benachrichtigungen</div>
+                <div className="mt-0.5 tls-type-small text-white/40">{unread} ungelesen · {read} gelesen</div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {unread > 0 && (
-                  <button type="button" onClick={markAllRead} data-testid="notification-mark-all-read" className="inline-flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/55 hover:text-[#29B6E8]" title="Alle als gelesen markieren">
+                  <button type="button" onClick={markAllRead} data-testid="notification-mark-all-read" className="inline-flex items-center gap-1 px-2 py-1.5 tls-type-label text-white/55 hover:text-[#29B6E8]" title="Alle als gelesen markieren">
                     <Check className="w-3.5 h-3.5" /> Alle gelesen
                   </button>
                 )}
@@ -233,7 +233,7 @@ export function NotificationBell() {
                   key={key}
                   type="button"
                   onClick={() => setTab(key)}
-                  className={`px-2 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider transition ${
+                  className={`px-2 py-2 rounded-sm tls-type-label transition ${
                     tab === key ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/55 hover:text-white"
                   }`}
                 >
@@ -250,7 +250,7 @@ export function NotificationBell() {
               {feed.status === "error" ? (
                 <LoadNotice testId="notification-load-error" className="m-2" message={feed.problem === "offline" ? "Ohne Netz. Die Benachrichtigungen laden, sobald das Netz wieder da ist." : "Die Benachrichtigungen konnten nicht geladen werden."} onRetry={feed.load} />
               ) : feed.status === "loading" ? (
-                <div className="px-4 py-10 text-center text-sm text-white/40" role="status">Lade Benachrichtigungen …</div>
+                <div className="px-4 py-10 text-center tls-type-small text-white/40" role="status">Lade Benachrichtigungen …</div>
               ) : (
                 // Nach Tagen und Themen, Gleichartiges gebündelt (#1205); neue Meldungen gleiten hinein.
                 <NotificationGroupedList
@@ -267,7 +267,7 @@ export function NotificationBell() {
               )}
             </div>
             <div className="shrink-0 border-t border-white/10 px-4 py-2 text-right">
-              <Link to="/notifications" onClick={() => setOpen(false)} data-testid="notification-show-all" className="text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">
+              <Link to="/notifications" onClick={() => setOpen(false)} data-testid="notification-show-all" className="tls-type-label text-[#29B6E8] hover:underline">
                 Alle anzeigen
               </Link>
             </div>

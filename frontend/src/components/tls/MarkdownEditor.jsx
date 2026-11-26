@@ -195,7 +195,7 @@ function MediaThumb({ item, onSelect }) {
     >
       <div className="aspect-square">
         {error ? (
-          <div className="w-full h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-[#FF3B30]">
+          <div className="w-full h-full flex items-center justify-center tls-type-label text-[#FF3B30]">
             Defekt
           </div>
         ) : (
@@ -207,7 +207,7 @@ function MediaThumb({ item, onSelect }) {
           />
         )}
       </div>
-      <div className="px-2 py-1.5 text-[10px] text-white/45 truncate group-hover:text-white/75">{label}</div>
+      <div className="px-2 py-1.5 tls-type-small text-white/45 truncate group-hover:text-white/75">{label}</div>
     </button>
   );
 }
@@ -523,7 +523,7 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
                 key={key}
                 type="button"
                 onClick={() => setMode(key)}
-                className={`px-3 py-2 text-[10px] uppercase tracking-wider font-bold inline-flex items-center justify-center gap-1.5 ${mode === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+                className={`px-3 py-2 tls-type-label inline-flex items-center justify-center gap-1.5 ${mode === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
               >
                 <Icon className="w-3 h-3" /> {label}
               </button>
@@ -567,12 +567,12 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
           required={required}
           placeholder={placeholder}
           data-testid={testId ? `${testId}-markdown` : "markdown-editor-source"}
-          textareaClassName="w-full bg-[#0A0A0A] px-3 py-3 text-sm font-mono text-white focus:outline-none resize-y min-h-40"
+          textareaClassName="w-full bg-[#0A0A0A] px-3 py-3 tls-type-small font-mono text-white focus:outline-none resize-y min-h-40"
         />
       )}
 
       {mode === "preview" && (
-        <div className="min-h-48 p-4 prose-cms text-sm" dangerouslySetInnerHTML={{ __html: preview || '<p class="text-white/35">Keine Vorschau</p>' }} />
+        <div className="min-h-48 p-4 prose-cms tls-type-small" dangerouslySetInnerHTML={{ __html: preview || '<p class="text-white/35">Keine Vorschau</p>' }} />
       )}
 
       {mode === "html" && (
@@ -585,24 +585,24 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
             className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-3 text-sm font-mono text-white focus:outline-none resize-y"
           />
           <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-            <button type="button" onClick={() => importHtml(true)} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-white/5">
+            <button type="button" onClick={() => importHtml(true)} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:bg-white/5">
               In Editor einfügen
             </button>
-            <button type="button" onClick={() => importHtml(false)} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs font-black uppercase tracking-wider">
+            <button type="button" onClick={() => importHtml(false)} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm tls-type-label">
               HTML übernehmen
             </button>
           </div>
-          <p className="text-[11px] text-white/40">Scripts, iFrames und fremde Layout-Attribute werden nicht übernommen. Tabellen, Links, Bilder, Listen und Basisformatierungen werden konvertiert.</p>
+          <p className="tls-type-small text-white/40">Scripts, iFrames und fremde Layout-Attribute werden nicht übernommen. Tabellen, Links, Bilder, Listen und Basisformatierungen werden konvertiert.</p>
         </div>
       )}
 
-      {helperText && <div className="border-t border-white/10 px-3 py-2 text-[11px] text-white/40">{helperText}</div>}
+      {helperText && <div className="border-t border-white/10 px-3 py-2 tls-type-small text-white/40">{helperText}</div>}
 
       {mediaOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid="markdown-media-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMediaOpen(false); }}>
           <div ref={mediaDialogRef} role="dialog" aria-modal="true" aria-labelledby={mediaTitleId} className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-4 sm:p-5">
             <div className="flex items-center justify-between gap-4 mb-4">
-              <h3 id={mediaTitleId} className="font-heading text-xl font-black uppercase">Bild einfügen</h3>
+              <h3 id={mediaTitleId} className="tls-type-card">Bild einfügen</h3>
               <button type="button" onClick={() => setMediaOpen(false)} className="w-9 h-9 inline-flex items-center justify-center text-white/50 hover:text-white" aria-label="Schließen">
                 <X className="w-5 h-5" />
               </button>

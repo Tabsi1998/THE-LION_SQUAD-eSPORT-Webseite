@@ -157,7 +157,7 @@ function Smoke({ badge }) {
       {[[-70, 10, 120], [40, -20, 150], [-10, 30, 170], [70, 20, 110]].map(([x, y, size], i) => (
         <motion.span key={i} className="tls-ceremony__smoke" style={{ width: size, height: size, left: `calc(50% + ${x}px - ${size / 2}px)`, top: `calc(50% + ${y}px - ${size / 2}px)` }} initial={{ opacity: 0.9, scale: 0.6 }} animate={{ opacity: 0, scale: 1.9, x: (i - 1.5) * 40, y: -60 }} transition={{ duration: 1.6, delay: 0.2 + i * 0.1, ease: "easeOut" }} aria-hidden="true" />
       ))}
-      <motion.span className="absolute z-[2] font-heading font-black text-6xl text-[#c084fc]" initial={{ opacity: 1, rotateY: 0 }} animate={{ opacity: 0, rotateY: 90 }} transition={{ duration: 0.6, delay: 0.5 }} aria-hidden="true">?</motion.span>
+      <motion.span className="absolute z-[2] tls-type-title text-[#c084fc]" initial={{ opacity: 1, rotateY: 0 }} animate={{ opacity: 0, rotateY: 90 }} transition={{ duration: 0.6, delay: 0.5 }} aria-hidden="true">?</motion.span>
       <motion.div className="relative z-[1]" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.9, delay: 0.8 }}>
         {badge}
       </motion.div>
