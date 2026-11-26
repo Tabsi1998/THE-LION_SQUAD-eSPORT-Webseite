@@ -7,7 +7,8 @@ import { planCeremony } from "@/components/achievements/ceremony/select";
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "p1" } }) }));
 
 const { SeasonMoment } = await import("./SeasonMoment");
-const { RewardWatcher, momentPackage } = await import("@/components/tls/rewards/RewardWatcher");
+const { RewardWatcher } = await import("@/components/tls/rewards/RewardWatcher");
+const { momentPackage } = await import("./momentPackage");
 
 const moment = (outcome = "up", extra = {}) => {
   const levels = { up: [2, 1], down: [2, 3], champion: [1, 1] }[outcome];

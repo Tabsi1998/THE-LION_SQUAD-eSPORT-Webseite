@@ -14,94 +14,11 @@ export function rewardPackages(rewards) {
   return [...groups.values()];
 }
 
-// Saisonende-Moment (#1639): der Schlüssel dieses Geräts je Moment. Er überlebt das Neuladen - geht die Antwort auf das Holen verloren,
-// bekommt dasselbe Gerät den Moment beim nächsten Besuch wieder, ein anderes nicht. Ohne Speicher (privates Fenster) gilt er je Sitzung.
-const memory = new Map();
-const claimKey = (id) => `tls_moment_claim:${id}`;
-const doneKey = (id) => `tls_moment_done:${id}`;
-
-function stored(key) {
-  try {
-    return window.localStorage.getItem(key) ?? memory.get(key) ?? null;
-  } catch {
-    return memory.get(key) ?? null;
-  }
-}
-
-function store(key, value) {
-  if (value === null) memory.delete(key);
-  else memory.set(key, value);
-  try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, value);
-  } catch {
-    // Kein Speicher - der Schlüssel gilt dann je Sitzung.
-  }
-}
-
-function deviceToken(id) {
-  const known = stored(claimKey(id));
-  if (known) return known;
-  const fresh = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  store(claimKey(id), fresh);
-  return fresh;
-}
-
-/** Schon geschlossen, aber „fertig“ kam beim Server nicht an: still nachmelden, nicht noch einmal zeigen. */
-export function finishedHere(id) {
-  return stored(doneKey(id)) === "1";
-}
-
-function reportDone(id, client) {
-  store(doneKey(id), "1");
-  client.post("/me/league-moments/done", { ids: [id] })
-    .then(() => { store(doneKey(id), null); store(claimKey(id), null); })
-    // Bewusst still: Die Marke bleibt, der nächste Besuch meldet nach.
-    .catch(() => {});
-}
-
-/**
- * Saisonende-Moment (#1639): ein Paket je Moment. Direkt vor dem Anzeigen holt die Seite ihn für dieses Gerät (``seen`` mit Schlüssel,
- * Antwort ``claimed``) - nur dann wird er gezeigt. Erst nach dem Schließen gilt er als fertig (``done``) - danach kommt er nirgends mehr.
- * Die Prüfung fragt je Paket genau einmal (läuft sie doppelt, etwa durch React im Entwicklungsmodus, gibt es dieselbe Antwort).
- * Der Meister bringt seine Belohnungen mit (Fabian 26.11., A): als zweite Karte, gesehen nur, wenn sie kam - oder als eigener Ablauf,
- * wenn ein anderes Gerät den Moment schon hatte.
- */
-export function momentPackage(moment, client = api) {
-  let answer = null;
-  let claimed = false;
-  let rewardsShown = false;
-  const rewards = (moment.rewards || []).filter((award) => award?.reward);
-  return {
-    id: `moment-${moment.id}`,
-    moments: [moment],
-    rewards,
-    check: () => {
-      answer ||= client.post("/me/league-moments/seen", { ids: [moment.id], token: deviceToken(moment.id) })
-        .then(({ data }) => {
-          claimed = (data?.claimed || []).includes(moment.id);
-          return { moments: claimed ? [moment] : [] };
-        })
-        // Scheitert das Holen, wartet der Moment auf den nächsten Besuch.
-        .catch(() => ({ moments: [] }));
-      return answer;
-    },
-    onRewardsShown: () => { rewardsShown = true; },
-    onDone: () => {
-      if (claimed) reportDone(moment.id, client);
-      // Ohne Moment kamen die Belohnungen als eigener Ablauf - dann sind sie gesehen; mit Moment nur, wenn die zweite Karte kam.
-      if (rewards.length && (rewardsShown || !claimed)) {
-        // Bewusst still: nur die Gesehen-Marke - schlimmstenfalls kommen die Belohnungen noch einmal.
-        client.post("/me/rewards/seen", { ids: rewards.map((award) => award.id) }).catch(() => {});
-      }
-    },
-  };
-}
-
 /**
  * Still (F.4, #2214, Nr. 165): Nach dem Anmelden fragt die Seite einmal, welche Belohnungen noch nicht gefeiert wurden, und reiht je
  * Staffel eine Zeremonie ein. Erst wenn sie vorbei ist, gilt sie als gesehen - im Adminbereich wartet sie in der Schlange.
- * Dazu der Saisonende-Moment (#1639): zuerst der Ausgang der Season (Meister, Aufstieg, Abstieg), dann die Belohnungen dazu.
+ * Dazu der Saisonende-Moment (#1639): zuerst der Ausgang der Season (Meister, Aufstieg, Abstieg), dann die Belohnungen. Die Pakete für
+ * den Moment (``moment/momentPackage``) lädt die Seite erst nach, wenn es einen gibt - der Start bleibt schlank.
  */
 export function RewardWatcher({ queue = ceremonyQueue, client = api }) {
   const { user } = useAuth();
@@ -113,20 +30,7 @@ export function RewardWatcher({ queue = ceremonyQueue, client = api }) {
     // Bewusst still: Feiern sind eine Zugabe - die nächste Anmeldung fragt wieder.
     const moments = client.get("/me/league-moments/unseen").then(({ data }) => data?.moments || [], () => []);
     const rewards = client.get("/me/rewards/unseen").then(({ data }) => data?.rewards || [], () => []);
-    Promise.all([moments, rewards]).then(([momentRows, rewardRows]) => {
-      if (!alive) return;
-      for (const moment of momentRows) {
-        const key = `moment:${moment?.id}`;
-        if (!moment?.id || !moment.texts || queued.current.has(key)) continue;
-        queued.current.add(key);
-        if (finishedHere(moment.id)) {
-          reportDone(moment.id, client);
-          continue;
-        }
-        const pkg = momentPackage(moment, client);
-        pkg.rewards.forEach((award) => queued.current.add(award.id));
-        queue.enqueue(pkg);
-      }
+    const enqueueRewards = (rewardRows) => {
       const fresh = rewardRows.filter((award) => award?.reward && !queued.current.has(award.id));
       for (const group of rewardPackages(fresh)) {
         group.forEach((award) => queued.current.add(award.id));
@@ -136,6 +40,18 @@ export function RewardWatcher({ queue = ceremonyQueue, client = api }) {
           onDone: () => { client.post("/me/rewards/seen", { ids: group.map((award) => award.id) }).catch(() => {}); },
         });
       }
+    };
+    Promise.all([moments, rewards]).then(([momentRows, rewardRows]) => {
+      if (!alive) return;
+      if (!momentRows.length) {
+        enqueueRewards(rewardRows);
+        return;
+      }
+      import("@/components/tls/league/moment/momentPackage")
+        .then(({ enqueueMoments }) => { if (alive) enqueueMoments(momentRows, { queue, client, queued: queued.current }); })
+        // Bewusst still: Der Moment kommt beim nächsten Besuch - die Belohnungen kommen trotzdem.
+        .catch(() => {})
+        .finally(() => { if (alive) enqueueRewards(rewardRows); });
     });
     return () => { alive = false; };
   }, [userId, queue, client]);

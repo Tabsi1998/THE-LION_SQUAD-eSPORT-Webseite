@@ -9,7 +9,7 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "p1" } }
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { SeasonMoment } = await import("./SeasonMoment");
-const { momentPackage } = await import("@/components/tls/rewards/RewardWatcher");
+const { momentPackage } = await import("./momentPackage");
 const { replayMoment } = await import("@/components/tls/league/LeagueMomentHint");
 
 const gold = { id: "a-gold", tournament: { id: "t1" }, team: { name: "Nordlicht" },
