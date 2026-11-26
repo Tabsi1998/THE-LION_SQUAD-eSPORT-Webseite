@@ -1,7 +1,7 @@
 // Selbsttest des Umbaus auf die Schrift-Treppe (#1302): node --test scripts/type-codemod.test.mjs
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classify, rewriteTokens, transformSource } from "./type-codemod.mjs";
+import { classify, rewriteTokens, transformCss, transformSource } from "./type-codemod.mjs";
 
 const run = (code, file = "src/pages/public/X.jsx") => transformSource(code, { file });
 
@@ -101,7 +101,7 @@ test("Eingabefelder, SVG-Text, Zähler an Symbolen und sehr große Einzelwerte b
 test("Vorlagen: Zweige mit derselben Stufe werden umgebaut, sonst kommt die Stelle in den Bericht", () => {
   const same = run('<span className={`tls-card__title font-heading font-black leading-tight ${size === "lg" ? "text-lg md:text-xl" : "text-base"}`}>{names.primary}</span>');
   // Leer gewordene Zweige fallen ganz weg.
-  assert.equal(same.code, '<span className={`tls-card__title tls-type-card leading-tight`}>{names.primary}</span>');
+  assert.equal(same.code, '<span className="tls-card__title tls-type-card leading-tight">{names.primary}</span>');
   const mixed = run('<h3 className={`tls-card__title font-heading uppercase ${featured ? "text-2xl" : "text-sm"}`}>{news.title}</h3>');
   assert.equal(mixed.changed, 0);
   assert.equal(mixed.manual.length, 1);
@@ -126,4 +126,97 @@ test("schon umgebaute Stellen bleiben (zweiter Lauf ändert nichts)", () => {
 
 test("rewriteTokens setzt die Stufe an die Stelle der ersten entfernten Klasse", () => {
   assert.deepEqual(rewriteTokens(["mt-2", "text-xs", "text-white", "uppercase"], { step: "label" }), ["mt-2", "tls-type-label", "text-white"]);
+});
+
+test("TV-Bausteine (Klassen tv-…) behalten ihre Schrift - auch in geteilten Bausteinen", () => {
+  const source = '<h3 className="tv-tree__phase tv-t-head font-heading">{stage.name}</h3>';
+  assert.equal(run(source).code, source);
+});
+
+test("Zahl nur bei Zahlen: ein Text mit Zustand (state) oder festen Wörtern ist keine Zahl", () => {
+  assert.equal(run('<span className="font-heading font-black uppercase tracking-wider text-warn">{preview.state === "app_only" ? "Nur in der App" : "Noch nicht öffentlich"}</span>').code,
+    '<span className="font-black uppercase tracking-wider text-warn">{preview.state === "app_only" ? "Nur in der App" : "Noch nicht öffentlich"}</span>');
+  assert.equal(run('<span className="font-display tracking-widest font-bold text-sm">LIVE JETZT</span>').code, '<span className="tls-type-label">LIVE JETZT</span>');
+  assert.equal(run('<span className="font-display font-bold text-lg">{points} Pkt.</span>').code, '<span className="tls-type-card tls-type-num">{points} Pkt.</span>');
+});
+
+test("tabular-nums an kleinem Text: gleich breite Ziffern bleiben, die Schrift bleibt Outfit", () => {
+  assert.equal(run('<div className="mt-1 text-xs text-white/55 tabular-nums">{counts}</div>').code, '<div className="mt-1 tls-type-small text-white/55 tabular-nums">{counts}</div>');
+});
+
+test("Fließtext: text-sm mit leading-relaxed ist Text; ein Vorspann (p) bis 23 px auch; text-xs nie", () => {
+  assert.equal(run('<div className="mt-10 space-y-8 text-sm leading-relaxed text-white/75">{children}</div>').code, '<div className="mt-10 space-y-8 tls-type-body leading-relaxed text-white/75">{children}</div>');
+  assert.equal(run('<p className="mt-4 text-lg xl:text-xl text-white/70">{post.excerpt}</p>').code, '<p className="mt-4 tls-type-body text-white/70">{post.excerpt}</p>');
+  assert.equal(run('<p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>').code, '<p className="mt-2 tls-type-small text-white/60 line-clamp-3">{news.excerpt}</p>');
+});
+
+test("ein Titel im Etikett bleibt Etikett (Titel sind keine Namen)", () => {
+  assert.equal(run('<div className="text-[11px] uppercase tracking-[0.3em] font-bold flex">{title}</div>').code, '<div className="tls-type-label flex">{title}</div>');
+});
+
+test("der Import von ShortCaps kommt direkt unter die anderen Importe", () => {
+  const source = 'import { A } from "a";\nimport { B } from "b";\n\n// Kommentar\nexport const X = () => <h1 className="font-heading text-3xl uppercase">Turniere</h1>;\n';
+  const { code } = run(source);
+  assert.ok(code.startsWith('import { A } from "a";\nimport { B } from "b";\nimport { ShortCaps } from "@/components/tls/ShortCaps";\n\n// Kommentar\n'), code);
+});
+
+test("Seitentitel mit Symbol davor: ShortCaps nur um den Text", () => {
+  assert.match(run('<h1 className="font-heading text-3xl uppercase flex gap-3"><Mail className="w-6 h-6" /> E-Mail-Vorlagen</h1>').code,
+    /<h1 className="tls-type-title flex gap-3"><Mail className="w-6 h-6" \/> <ShortCaps>E-Mail-Vorlagen<\/ShortCaps><\/h1>/);
+  assert.match(run('<h1 className="font-heading text-3xl uppercase"><Bell className="w-6 h-6" /> <span className="min-w-0">Benachrichti&shy;gungen</span></h1>').code,
+    /<span className="min-w-0"><ShortCaps>Benachrichti&shy;gungen<\/ShortCaps><\/span><\/h1>/);
+});
+
+test("ein Name wird nie GROSS - auch ohne eigene Größe", () => {
+  assert.equal(run('<div className="font-heading font-black uppercase truncate">{activeName}</div>').code, '<div className="font-black truncate">{activeName}</div>');
+  assert.equal(run('<span className="uppercase tracking-wider font-bold">{player.display_name}</span>').code, '<span className="font-bold">{player.display_name}</span>');
+  assert.equal(run('<span className="uppercase tracking-wider font-bold">{item.status_label}</span>').code, '<span className="uppercase tracking-wider font-bold">{item.status_label}</span>');
+});
+
+test("beliebige Eigenschaften wie [overflow-wrap:anywhere] stören nicht", () => {
+  assert.match(run('<h1 className="font-heading text-3xl font-black uppercase [overflow-wrap:anywhere]">Turniere</h1>').code,
+    /<h1 className="tls-type-title \[overflow-wrap:anywhere\]"><ShortCaps>Turniere<\/ShortCaps><\/h1>/);
+});
+
+test("CSS: unter 12 px wird Klein (14 px), GROSS oder gesperrt das Etikett (12 px); 12 px und mehr bleibt", () => {
+  const css = [
+    ".a { font-size: 11px; line-height: 1.3; color: red; }",
+    ".b { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }",
+    ".c { font-size: 0.68rem; }",
+    ".d { font-size: 13px; }",
+    ".e { font-size: 12px; }",
+    ".f { font-size: 0.9em; }",
+    ".g { font-size: 16px; }",
+  ].join("\n");
+  assert.equal(transformCss(css).code, [
+    ".a { font-size: var(--tls-type-small-size); line-height: 1.3; color: red; }",
+    ".b { font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }",
+    ".c { font-size: var(--tls-type-small-size); }",
+    ".d { font-size: var(--tls-type-small-size); }",
+    ".e { font-size: 12px; }",
+    ".f { font-size: 0.9em; }",
+    ".g { font-size: 16px; }",
+  ].join("\n"));
+});
+
+test("CSS: Zahlen-Schrift - Etikett-Größe; kleine Punkte (bis 16 px breit) bleiben (Zähler an Symbolen)", () => {
+  assert.equal(transformCss(".n { font-family: 'Rajdhani', sans-serif; font-size: 11px; }").code, ".n { font-family: 'Rajdhani', sans-serif; font-size: var(--tls-type-label-size); }");
+  const dot = ".dot { width: 13px; height: 13px; font-size: 9px; }";
+  assert.equal(transformCss(dot).code, dot);
+});
+
+test("CSS: SVG-Beschriftungen (fill) bleiben", () => {
+  const svg = ".line__rank { font-size: 10px; font-weight: 800; fill: #fff; }";
+  assert.equal(transformCss(svg).code, svg);
+});
+
+test("Unbounded nur im Seitentitel: eine große h2 oder ein großer Text ohne Zahl wird Abschnitt", () => {
+  assert.equal(run('<h2 className="font-heading text-4xl md:text-5xl font-black uppercase">So sind wir gewachsen</h2>').code, '<h2 className="tls-type-section">So sind wir gewachsen</h2>');
+  assert.equal(run('<div className="font-heading text-4xl font-black">{spotlight.display_name}</div>').code, '<div className="tls-type-section">{spotlight.display_name}</div>');
+  assert.equal(run('const W = { lg: "text-2xl md:text-3xl xl:text-4xl" };').code, 'const W = { lg: "tls-type-section" };');
+});
+
+test("eine Kopfzeile mit kurzen Spalten bleibt Etikett - lang ist nur ein langer Block", () => {
+  const head = '<thead className="text-[10px] uppercase tracking-widest text-white/45"><tr><th>#</th><th>Fahrer</th><th>Beste Zeit</th><th>Abstand</th><th>Versuche</th></tr></thead>';
+  assert.equal(run(head).code, head.replace('text-[10px] uppercase tracking-widest', 'tls-type-label'));
 });

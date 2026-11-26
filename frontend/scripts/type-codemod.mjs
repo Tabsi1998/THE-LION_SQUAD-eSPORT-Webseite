@@ -24,15 +24,34 @@ const SIZE = /^((?:(?:sm|md|lg|xl|2xl):)?)text-(xs|sm|base|lg|[2-9]xl|xl|\[(?:[\
 const WEIGHT = /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/;
 const TRACKING = /^tracking-(tighter|tight|normal|wide|wider|widest|\[[^\]]+\])$/;
 const WIDE = /^tracking-(wide|wider|widest|\[(?:0?\.\d+|\d+(?:\.\d+)?)em\])$/;
-const CLASS_TOKEN = /^[!-]?[a-z0-9@][\w:./%#[\]()=,&>*+~'"-]*$/i;
+const CLASS_TOKEN = /^[!-]?[[a-z0-9@][\w:./%#[\]()=,&>*+~'"-]*$/i;
 const TYPE_TOKEN = /^(?:(?:sm|md|lg|xl|2xl):)?text-(?:xs|sm|base|lg|[2-9]?xl|\[[\d.]+(?:px|rem)\]|\[clamp)|^font-(?:heading|display)$|^uppercase$|^tabular-nums$|^tls-card__title$/;
 const STEP_CLASS = /^tls-type-/;
+// Schalter für Vergleichsläufe: blockText = ein langer Text zählt je Block, nicht über alle Spalten zusammen.
+export const OPTIONS = { blockText: true };
 
 // Was ein Name ist (Personen, Teams, Spiele, Titel): nie GROSS. Was ein Etikett ist (Zustand, Art, Rolle): darf GROSS.
-const NAME_LIKE = /name|nick|player|spieler|team|captain|author|winner|loser|opponent|gegner|member|mitglied|title|titel|game|user|person|owner|driver|fahrer|club|verein|partner|sponsor|series|tournament|turnier|event|location|venue|city|subject|headline|heading|album|track|map/i;
+// Titel sind keine Namen: ein Titel im Etikett darf GROSS bleiben (kurz, 1-3 Wörter).
+const NAME_LIKE = /name|nick|player|spieler|team|captain|author|winner|loser|opponent|gegner|member|mitglied|game|user|person|owner|driver|fahrer|club|verein|partner|sponsor|album|track/i;
 const LABEL_LIKE = /label|status|state|kind|type|phase|role|badge|tag|short|abbr|code|unit|caption|kicker|eyebrow/i;
-const NUMBER_LIKE = /count|total|points|pts|score|rank|place|platz|wins|losses|kills|deaths|value|sum|amount|number|num$|level|xp|delta|diff|stat|percent|rate|games|matches|length|^n$|^i$|^idx$|^index$|position|^pos$|seconds|minutes|hours|days|countdown|remaining|elapsed/i;
+// Zahlen erkennt man an einem Teil des Namens (participant_count, bestTime, rank) - nicht an Buchstabenfolgen darin
+// („state“ ist keine „stat“).
+const NUMBER_WORDS = new Set(["count", "total", "points", "pts", "punkte", "score", "scores", "rank", "place", "platz", "wins", "losses", "draws",
+  "kills", "deaths", "value", "sum", "amount", "number", "num", "nr", "level", "xp", "delta", "diff", "percent", "rate", "rating", "elo", "length",
+  "n", "i", "idx", "index", "position", "pos", "seconds", "minutes", "hours", "days", "countdown", "remaining", "elapsed", "time", "lap", "gap",
+  "best", "age", "year", "size", "capacity", "registered", "attempts", "goals", "round", "matchday", "spieltag"]);
 const BODY_LIKE = /excerpt|description|summary|teaser|intro|bio|about|body|content|text|message|note|hint|info|lead/i;
+// Einheiten neben einer Zahl machen sie nicht zum Text („412 Pkt.“, „3 von 8“).
+const UNITS = /(?:^|\s)(?:Pkt|Punkte?|Tage?|Std|Min|Sek|ms|km\/h|Siege?|Runden?|Versuche?|von|vs|Platz|Pl)\.?(?=\s|$)/gi;
+
+function numberLike(leaf) {
+  const parts = String(leaf).replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return parts.some((part) => NUMBER_WORDS.has(part));
+}
+
+function wordy(text) {
+  return /\p{L}{3,}/u.test(String(text || "").replace(UNITS, " "));
+}
 const INPUT_TAGS = new Set(["input", "textarea", "select", "option", "Input", "Textarea", "SelectTrigger", "SelectValue", "text", "tspan", "svg"]);
 const NUMBER_TAGS = new Set(["CountUp", "LapTime"]);
 const PAGE_TITLE_PROPS = new Set(["title", "heading", "pageTitle", "headline"]);
@@ -92,9 +111,12 @@ function words(text) {
 export function classify(tokens, ctx = {}) {
   const t = analyze(tokens);
   if (t.stepped) return null;
+  // TV-Bausteine (tv-…) haben eigene Beamer-Größen und Schriften (lib/tvType.js) - auch in geteilten Bausteinen.
+  if (tokens.some((token) => /^tv-/.test(token))) return null;
   const level = ctx.level || ((t.cardTitle) ? 3 : 0);
-  const children = ctx.children || { text: "", dynamic: false, leafs: [], tags: [], elements: false };
-  const typeWork = t.sizes.length || t.heading || t.display || (t.tabular && (t.sizes.length || t.heading)) || (t.upper && level >= 1 && level <= 3);
+  const children = ctx.children || { text: "", exprText: "", dynamic: false, leafs: [], tags: [], elements: false };
+  const namedCaps = (t.upper || t.wide) && (children.leafs || []).some((leaf) => NAME_LIKE.test(leaf) && !LABEL_LIKE.test(leaf));
+  const typeWork = t.sizes.length || t.heading || t.display || (t.tabular && (t.sizes.length || t.heading)) || (t.upper && level >= 1 && level <= 3) || namedCaps;
   if (!typeWork) return null;
   if (ctx.tag && INPUT_TAGS.has(ctx.tag)) return null;
   // Sehr große Einzelwerte (Fehlerseite) sind begründete Ausnahmen - bleiben stehen.
@@ -104,12 +126,18 @@ export function classify(tokens, ctx = {}) {
 
   const px = t.desktop;
   const staticWords = words(children.text || "");
-  const longStatic = staticWords.length > 4 || (children.text || "").length > 32;
+  // Lang ist ein Text, wenn ein Block für sich lang ist - eine Kopfzeile mit fünf kurzen Spalten („# Fahrer Zeit …“) nicht.
+  const blockText = OPTIONS.blockText && children.longestText !== undefined ? children.longestText : (children.text || "");
+  const longStatic = words(blockText).length > 4 || blockText.length > 32;
   const leafs = children.leafs || [];
   const nameLike = leafs.some((leaf) => NAME_LIKE.test(leaf) && !LABEL_LIKE.test(leaf));
+  const words_ = wordy(children.text) || wordy(children.exprText);
   const numberChildren = (children.tags || []).some((tag) => NUMBER_TAGS.has(tag))
-    || (children.dynamic && leafs.length > 0 && leafs.every((leaf) => NUMBER_LIKE.test(leaf)) && !/[\p{L}]{3,}/u.test(children.text || ""));
-  const num = t.display || t.tabular || (t.heading && numberChildren) || (px !== null && px >= 24 && numberChildren);
+    || (children.dynamic && leafs.length > 0 && leafs.every(numberLike) && !words_);
+  // Rajdhani nur für Zahlen: font-display ohne Wörter, tabular-nums ab Listengröße oder mit Zahl, Unbounded mit Zahl.
+  const num = (t.display && !words_)
+    || (t.tabular && !t.display && !words_ && ((px !== null && px >= 16) || numberChildren))
+    || (t.heading && numberChildren) || (px !== null && px >= 24 && numberChildren);
 
   if (num) {
     if (px === null) return { step: null, num: true };
@@ -125,21 +153,20 @@ export function classify(tokens, ctx = {}) {
       return { step: hero ? "hero" : "title", shortCaps: !hero };
     }
   } else if (level === 2) {
-    if (px !== null && px >= 36) return { step: "title", shortCaps: true };
+    // Unbounded nur für Bühne und Seitentitel (h1): auch eine große h2 ist ein Abschnitt.
     if ((px !== null && px >= 16) || (px === null && t.heading)) return { step: "section" };
   } else if (level >= 3) {
     if (px === null && t.heading) return { step: "card" };
     if (px !== null && px >= 24 && (t.heading || t.cardTitle)) return { step: "section" };
     if (px !== null && px >= 16) return { step: "card" };
   } else if (t.heading) {
-    if (px === null) return { step: null, headingOnly: true };
-    if (px >= 36) return { step: "title" };
+    if (px === null) return { step: null, headingOnly: true, dropCaps: nameLike || longStatic };
     if (px >= 24) return { step: "section" };
     if (px >= 16) return { step: "card" };
   }
   if (px === null) {
-    // Überschrift ohne eigene Größe: nur die GROSS-Schreibung fällt weg (#1303).
-    return level >= 1 && level <= 3 && (t.upper || t.wide) ? { step: null, dropCaps: true } : null;
+    // Überschrift oder Name ohne eigene Größe: nur die GROSS-Schreibung fällt weg (#1303).
+    return (level >= 1 && level <= 3 && (t.upper || t.wide)) || namedCaps ? { step: null, dropCaps: true } : null;
   }
 
   const caps = (t.upper || t.wide) && !t.normalCase;
@@ -149,14 +176,16 @@ export function classify(tokens, ctx = {}) {
     return { step: "label" };
   }
   if (px <= 15) {
-    const bodyText = ctx.tag === "p" && ((children.text || "").length >= 80 || leafs.some((leaf) => BODY_LIKE.test(leaf)));
-    return { step: bodyText ? "body" : "small", keepCaps: ctx.button && caps };
+    // Fließtext ab 14 px: ein Absatz mit langem Text oder Beschreibung, oder Text mit weitem Zeilenabstand.
+    const relaxed = tokens.some((token) => /^leading-(relaxed|loose|7|8)$/.test(token));
+    const paragraph = ctx.tag === "p" && ((children.text || "").length >= 80 || leafs.some((leaf) => BODY_LIKE.test(leaf)));
+    return { step: px >= 14 && (relaxed || paragraph) ? "body" : "small", keepCaps: ctx.button && caps };
   }
   if (px <= 16) return { step: "body", keepCaps: ctx.button && caps };
-  if (px <= 19) return { step: ctx.tag === "p" ? "body" : "card", keepCaps: ctx.button && caps };
+  if (px <= 23 && ctx.tag === "p") return { step: "body" };
+  if (px <= 19) return { step: "card", keepCaps: ctx.button && caps };
   if (px <= 23) return { step: "card", keepCaps: ctx.button && caps };
-  if (px <= 35) return { step: "section" };
-  return { step: "title" };
+  return { step: "section" };
 }
 
 const FIXED_WEIGHT = new Set(["hero", "title", "section", "card", "label"]);
@@ -176,8 +205,7 @@ export function rewriteTokens(tokens, decision, { insert = true } = {}) {
   };
   for (const token of tokens) {
     let drop = false;
-    if (headingOnly) drop = token === "font-heading";
-    else if (dropCaps) drop = token === "uppercase" || TRACKING.test(token);
+    if (headingOnly || (dropCaps && !step)) drop = (headingOnly && token === "font-heading") || (dropCaps && (token === "uppercase" || TRACKING.test(token)));
     else {
       if (SIZE.test(token) && pxOf(SIZE.exec(token)[2])) drop = true;
       else if (token === "font-heading" || token === "font-body" || (token === "font-display" && (num || step))) drop = true;
@@ -240,7 +268,7 @@ function decodeEntities(text) {
 
 /** Was in einem Element steht: fester Text, ob etwas Berechnetes dabei ist, welche Namen darin vorkommen. */
 function childrenInfo(element) {
-  const info = { text: "", dynamic: false, leafs: [], tags: [], elements: false };
+  const info = { text: "", exprText: "", dynamic: false, leafs: [], tags: [], elements: false };
   const collectLeafs = (expression) => {
     walk(expression, (node, parents) => {
       const parent = parents[parents.length - 1];
@@ -255,15 +283,22 @@ function childrenInfo(element) {
         } else if (!isCallee && !isObject && !isProperty) info.leafs.push(node.name);
       }
       if (node.type === "JSXElement") info.tags.push(tagName(node.openingElement.name));
+      if (node.type === "StringLiteral") info.exprText += ` ${node.value}`;
+      if (node.type === "TemplateElement") info.exprText += ` ${node.value.cooked || ""}`;
       return true;
     });
   };
-  const visitChildren = (children) => {
+  const blocks = [];
+  const visitChildren = (children, block) => {
+    const add = (text) => {
+      info.text += ` ${text}`;
+      block.text += ` ${text}`;
+    };
     for (const child of children) {
-      if (child.type === "JSXText") info.text += ` ${decodeEntities(child.value)}`;
+      if (child.type === "JSXText") add(decodeEntities(child.value));
       else if (child.type === "JSXExpressionContainer") {
-        if (child.expression.type === "StringLiteral") info.text += ` ${child.expression.value}`;
-        else if (child.expression.type === "TemplateLiteral" && !child.expression.expressions.length) info.text += ` ${child.expression.quasis[0].value.cooked}`;
+        if (child.expression.type === "StringLiteral") add(child.expression.value);
+        else if (child.expression.type === "TemplateLiteral" && !child.expression.expressions.length) add(child.expression.quasis[0].value.cooked);
         else if (child.expression.type !== "JSXEmptyExpression") {
           info.dynamic = true;
           collectLeafs(child.expression);
@@ -271,12 +306,17 @@ function childrenInfo(element) {
       } else if (child.type === "JSXElement") {
         info.elements = true;
         info.tags.push(tagName(child.openingElement.name));
-        visitChildren(child.children);
-      } else if (child.type === "JSXFragment") visitChildren(child.children);
+        const inner = { text: "" };
+        blocks.push(inner);
+        visitChildren(child.children, inner);
+      } else if (child.type === "JSXFragment") visitChildren(child.children, block);
     }
   };
-  visitChildren(element.children || []);
+  const top = { text: "" };
+  blocks.push(top);
+  visitChildren(element.children || [], top);
   info.text = info.text.replace(/\s+/g, " ").trim();
+  info.longestText = blocks.map((block) => block.text.replace(/\s+/g, " ").trim()).sort((a, b) => b.length - a.length)[0] || "";
   return info;
 }
 
@@ -413,13 +453,33 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
     }
     if (fixedTarget && !placed) editPiece(fixedTarget, decision, true);
     if (decision.shortCaps && element && element.type === "JSXElement" && element.closingElement) {
-      const kids = element.children.filter((child) => !(child.type === "JSXText" && !child.value.trim()));
-      const onlyText = kids.length > 0 && kids.every((child) => child.type === "JSXText");
+      const meaningful = (list) => list.filter((child) => !(child.type === "JSXText" && !child.value.trim()));
+      const isIcon = (child) => child.type === "JSXElement" && child.openingElement.selfClosing;
+      const textOnly = (list) => list.length > 0 && list.every((child) => child.type === "JSXText");
+      let kids = meaningful(element.children);
+      // Symbol vorne, Text dahinter („<Bell /> Benachrichtigungen“ oder „<Bell /> <span>…</span>“): nur der Text.
+      const lead = kids.findIndex((child) => !isIcon(child));
+      if (lead > 0) {
+        const rest = kids.slice(lead);
+        if (textOnly(rest)) kids = rest;
+        else if (rest.length === 1 && rest[0].type === "JSXElement" && rest[0].closingElement && textOnly(meaningful(rest[0].children))) kids = meaningful(rest[0].children);
+      }
+      const onlyText = textOnly(kids);
       const onlyProp = kids.length === 1 && kids[0].type === "JSXExpressionContainer"
         && ((kids[0].expression.type === "Identifier" && PAGE_TITLE_PROPS.has(kids[0].expression.name))
           || (kids[0].expression.type === "MemberExpression" && kids[0].expression.object.type === "Identifier" && /^(meta|page|config|props)$/.test(kids[0].expression.object.name)
             && PAGE_TITLE_PROPS.has(kids[0].expression.property.name)));
       if (onlyText || onlyProp) {
+        if (!wrapped) {
+          const eol = code.includes("\r\n") ? "\r\n" : "\n";
+          const imports = ast.program.body.filter((item) => item.type === "ImportDeclaration");
+          const already = imports.some((item) => item.source.value === "@/components/tls/ShortCaps");
+          if (!already) {
+            const line = 'import { ShortCaps } from "@/components/tls/ShortCaps";';
+            if (imports.length) edits.push({ start: imports[imports.length - 1].end, end: imports[imports.length - 1].end, text: `${eol}${line}` });
+            else edits.push({ start: 0, end: 0, text: `${line}${eol}` });
+          }
+        }
         const first = kids[0];
         const last = kids[kids.length - 1];
         const start = onlyText ? first.start + (first.value.length - first.value.trimStart().length) : first.start;
@@ -460,16 +520,40 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
   for (const edit of edits) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
   // Zweige, die nur noch leer sind (`${big ? "" : ""}`), fallen weg.
   out = out.replace(/\s*\$\{[^{}`]*\?\s*""\s*:\s*""\s*\}/g, "");
-  if (wrapped && !/import \{[^}]*\bShortCaps\b[^}]*\} from "@\/components\/tls\/ShortCaps"/.test(out)) {
-    const imports = [...out.matchAll(/^import[\s\S]*?from\s+["'][^"']+["'];?\s*$/gm)];
-    const line = 'import { ShortCaps } from "@/components/tls/ShortCaps";\n';
-    if (imports.length) {
-      const last = imports[imports.length - 1];
-      const at = last.index + last[0].length;
-      out = `${out.slice(0, at)}\n${line.trimEnd()}${out.slice(at)}`;
-    } else out = line + out;
-  }
+  // Eine Vorlage ohne Ausdruck ist wieder ein einfacher Text.
+  out = out.replace(/className=\{`([^`$\\"]*)`\}/g, (match, inner) => `className="${inner.trim().replace(/\s+/g, " ")}"`);
   return { code: out, changed: edits.length, manual, wrapped };
+}
+
+// ---------------------------------------------------------------- CSS der Bausteine
+
+// Kleine Größen in eigenen Bausteinen (index.css und die CSS-Dateien der Bereiche): unter 12 px und bis 13,5 px wird
+// „Klein“ (14 px), GROSS, gesperrt oder in der Zahlen-Schrift das Etikett (12 px). Kleine Punkte und Plaketten mit fester
+// Breite bis 16 px bleiben (Zähler an Symbolen, #1232). Relative Größen (em) und alles ab 14 px bleiben, wie sie sind.
+export const CSS_SKIP = ["components/tv/", "styles/printView.css", "seasons/", "advent/", "components/achievements/ceremony/", "fonts.css"];
+const FONT_SIZE = /font-size:\s*([\d.]+)(px|rem)\s*(?=;|\})/g;
+
+export function transformCss(css) {
+  let changed = 0;
+  const code = css.replace(/([^{}]*)\{([^{}]*)\}/g, (rule, selector, body) => {
+    // SVG-Beschriftungen (fill) rechnen in der Größe ihrer Grafik - sie bleiben.
+    if (!/font-size/.test(body) || /(?:^|[;\s])fill:/.test(body)) return rule;
+    const upper = /text-transform:\s*uppercase/.test(body);
+    const spaced = /letter-spacing:\s*0?\.(0[4-9]|[1-9])\d*em/.test(body);
+    // Zahlen-Schrift, Plaketten und Kürzel („Du“, Abzeichen, Rang) dürfen 12 px haben.
+    const digits = /Rajdhani|font-variant-numeric|tls-font-num/.test(body)
+      || /(?:tag|badge|pill|chip|count|flag|code|kbd|num|digit|score|rank)(?:__|-|\b)/i.test(selector);
+    const boxes = [...body.matchAll(/(?:^|[;\s])(?:width|height|min-width):\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+    const dot = boxes.length > 0 && Math.max(...boxes) <= 16;
+    const next = body.replace(FONT_SIZE, (decl, value, unit) => {
+      const px = Number(value) * (unit === "rem" ? 16 : 1);
+      if (px >= 14 || px === 12 || dot) return decl;
+      changed += 1;
+      return `font-size: var(${upper || spaced || digits ? "--tls-type-label-size" : "--tls-type-small-size"})`;
+    });
+    return `${selector}{${next}}`;
+  });
+  return { code, changed };
 }
 
 // ---------------------------------------------------------------- Aufruf von der Kommandozeile
@@ -480,6 +564,7 @@ function sourceFiles(dir, root) {
     const rel = path.relative(root, full).split(path.sep).join("/");
     if (SKIP_DIRS.some((skip) => rel === skip || rel.startsWith(`${skip}/`))) return [];
     if (statSync(full).isDirectory()) return sourceFiles(full, root);
+    if (name.endsWith(".css")) return CSS_SKIP.some((skip) => rel === skip || rel.startsWith(skip)) ? [] : [full];
     return /\.(jsx|js)$/.test(name) && !TEST_FILE.test(name) ? [full] : [];
   });
 }
@@ -498,7 +583,7 @@ function main(argv) {
   for (const file of files) {
     const code = readFileSync(file, "utf8");
     const rel = path.relative(process.cwd(), file).split(path.sep).join("/");
-    const result = transformSource(code, { file: rel });
+    const result = file.endsWith(".css") ? { ...transformCss(code), manual: [] } : transformSource(code, { file: rel });
     manual.push(...result.manual);
     if (!result.changed) continue;
     changed += result.changed;
