@@ -214,6 +214,8 @@ Liga 2). Abmelden bis zum Start …“.
 - **Startrecht mit Zusage:** Verlangt die Liga-Leitung eine Zusage, steht beim Co-Team statt „Angemeldet“ **Startrecht – Zusage
   offen** mit der Frist. **Startrecht annehmen** drücken (Captain oder Vertreter) – sonst **verfällt** es, und der Platz geht an ein
   anderes Team. Vor Fristende kommt eine Erinnerung. Die Zusage ist noch keine Zuteilung und keine Zustimmung zum Regelwerk.
+  Prüft die Liga-Leitung den Endstand der alten Season noch einmal, **ruht die Frist** und läuft danach entsprechend länger –
+  zusagen könnt ihr trotzdem. Hat die neue Season ihr Startdatum erreicht, entscheidet die Liga-Leitung über offene Zusagen.
 - **Nachgerückt?** Wird in einer höheren Liga ein Platz frei, kann euer Co-Team nachrücken. Ihr bekommt eine Nachricht und könnt
   **annehmen** oder **Nachrücken ablehnen** – dann bleibt ihr in eurer Liga. Meldet ihr euch nicht, bleibt ihr ebenfalls dort.
 - **Vorher schon wissen, wohin es geht:** Während der Season steht beim Co-Team die **Prognose** nach der laufenden Tabelle – fest

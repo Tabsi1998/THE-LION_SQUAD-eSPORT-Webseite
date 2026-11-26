@@ -4068,15 +4068,18 @@ Endstand (Zonen, TV, Discord-Saisonende); wer zugesagt hat, sehen nur die Leitun
 | Feld | Werte | Vorgabe | Bedeutung |
 | --- | --- | --- | --- |
 | `mode` | `auto` \| `accept` | `accept` | Wie Teams aus dem Vorgänger ihren Platz in **dieser** Season bekommen. `auto`: wie F.2 automatisch dabei. `accept`: Das Co-Team sagt innerhalb der Frist zu |
-| `accept_days` | 1–60 | 14 | Frist je Startrecht ab seiner Vergabe (`offered_at`) - auch für Nachrücker ab dem Nachrücken. Sie endet spätestens mit dem Start der Season (`league_calendar.start_moment`, Nr. 253). Gerechnet beim Lesen: Eine geänderte Zahl gilt sofort für alle offenen Startrechte |
+| `accept_days` | 1–60 | 14 | Frist je Startrecht ab seiner Vergabe (`offered_at`) - auch für Nachrücker ab dem Nachrücken. Sie endet spätestens mit dem Startdatum der Season (`league_calendar.start_moment`, Nr. 253 - auch im Entwurf). In einer Pause (unten) steht sie still und ist danach um die Dauer der Pause länger. Gerechnet beim Lesen: Eine geänderte Zahl gilt sofort für alle offenen Startrechte |
 | `successor` | `next` \| `lead` | `next` | Nachrückerregel. `next`: Wird ein Platz frei, rückt automatisch nach, wen die Regel unten nennt. `lead`: Die Verwaltung zeigt den Vorschlag, die Leitung löst aus |
-| `remind_hours` | 0–336 | 48 | Erinnerung so viele Stunden vor Fristende, einmal je Startrecht. 0: keine |
+| `remind_hours` | 0–336 | 48 | Erinnerung so viele Stunden vor Fristende, einmal je Startrecht. 0: keine. Auf die Frist gekappt: nie in ihrer ersten Hälfte (`remind_at`) - bei einem Tag Frist und 48 Stunden also zwölf Stunden vor Fristende statt sofort nach der Vergabe |
 | `announce` | bool | `true` | Nachricht „Aufstieg/Abstieg bestätigt“, sobald der Endstand **dieser** Season die Startrechte für die nächste bestätigt |
 
 Das Feld steht nicht in `NOT_COPIED`: Die neue Season übernimmt es vom Vorgänger (Nr. 161), `POST …/successor` nimmt es optional als
 `start_rights` entgegen (das Blatt „Neue Season aus …“ fragt es ab). `PUT` mit `{"active": false}` nimmt das Feld weg. Wechselt `mode`
-nach der Vergabe von `accept` auf `auto`, gelten offene Startrechte als zugesagt (`accepted_via: "mode"`); von `auto` auf `accept`
-verlangt nachträglich niemandem eine Zusage ab. Protokoll `league.season.start_rights`.
+nach der Vergabe von `accept` auf `auto` oder wird ausgeschaltet, gelten offene Startrechte als zugesagt (`accepted_via: "mode"`) -
+**nur nach Rückfrage** (Entscheidung 26.11.): Gibt es offene Startrechte, antwortet `PUT` ohne `confirm_open: true` mit 409 („7 offene
+Startrechte gelten dann als zugesagt …“) und ändert nichts; die Verwaltung fragt im Panel nach (`open_rights` in der Übersicht). Ein
+Nachrücker darf danach wie im Modus `auto` bis zum Start ablehnen; fällt er zurück, gilt auch sein früheres Startrecht als zugesagt.
+Von `auto` auf `accept` verlangt nachträglich niemandem eine Zusage ab. Protokoll `league.season.start_rights`.
 
 **Felder am Antrag** (`league_applications.carry_over`, alle optional):
 
@@ -4087,9 +4090,10 @@ verlangt nachträglich niemandem eine Zusage ab. Protokoll `league.season.start_
 | `filled_by` | am frei gewordenen Antrag: `{application_id, display_name, at}` - ein Platz wird nie zweimal vergeben |
 | `passed` | Kennungen frei gewordener Anträge, deren Platz das Co-Team abgelehnt hat oder verfallen ließ - es wird dafür nicht noch einmal gefragt |
 
-Die Frist steht nicht am Antrag: `accept_until = min(offered_at + accept_days, Start der Season)`. Dazu an der Season
-`start_right_notices` (`{<squad_id>: {fact, seq, at, sent_at}}`, der letzte gemeldete Stand je Co-Team) und
-`start_right_notices_open`; beide gehen nicht in die Folge-Season (`NOT_COPIED`). Keine neue Sammlung, kein neuer Index.
+Die Frist steht nicht am Antrag: `accept_until = min(offered_at + accept_days + Pausen, Startdatum der Season)`. Dazu an der Season
+`start_right_notices` (`{<squad_id>: {fact, seq, at, sent_at}}`, der letzte gemeldete Stand je Co-Team), `start_right_notices_open`
+und `start_right_pauses` (`[{from, to}]`, höchstens 50: wann die Fristen ruhten; `to: null` = die Pause läuft). Nichts davon geht in
+die Folge-Season (`NOT_COPIED`). Keine neue Sammlung, kein neuer Index.
 
 **Abläufe**
 
@@ -4097,16 +4101,19 @@ Die Frist steht nicht am Antrag: `accept_until = min(offered_at + accept_days, S
 | --- | --- |
 | Vergabe | Beim Anlegen der Folge-Season (F.2, `_carry_teams`) und bei „Übernahme neu berechnen“ (`added`, `reactivated`, `moved`): im Modus `accept` trägt der Antrag `start_right: {status: "offered", offered_at}`. Er belegt wie bisher einen Startplatz (`seat_stats`). Die Nachricht an Captain und Vertreter (derselbe `dedupe_key` wie F.2) sagt dann „Startrecht … bitte bis … zusagen“ statt „automatisch dabei“ |
 | Zusage | `POST /api/me/league-applications/{id}/start-right` `{action: "accept"}` - Captain oder Vertreter (`may_apply`, wie Anmelden und Abmelden), unter der Season-Sperre, nur solange `offered` und vor Fristende (sonst 409 mit Klartext). Ein zweiter Aufruf - auch gleichzeitig von Captain und Vertreter - antwortet mit demselben Stand (`replay: true`) und schreibt nichts doppelt. Die Zusage ist der bestehende Anmeldeweg (B.4): derselbe Antrag, dieselben Seiten (unter Teams, Ligaseite) |
-| Zusage durch die Leitung | `POST …/seasons/{id}/start-rights/{application_id}/accept` `{reason (≥ 5 Zeichen), conflict_reason?}` - etwa nach einer Zusage per Nachricht. Nie für das eigene Team (403, Superadmin als Notausnahme mit Grund). Die Frist gilt auch hier (409); danach bleiben der Sonderweg „Co-Team zuteilen“ oder eine neue Anmeldung |
+| Zusage durch die Leitung | `POST …/seasons/{id}/start-rights/{application_id}/accept` `{reason (≥ 5 Zeichen), conflict_reason?}` - etwa nach einer Zusage per Nachricht. Nie für das eigene Team (403, Superadmin als Notausnahme mit Grund). Vor dem Startdatum gilt die Frist auch hier (409); danach bleiben der Sonderweg „Co-Team zuteilen“ oder eine neue Anmeldung. Ab dem Startdatum entscheidet die Leitung (unten): Dann trägt sie die Zusage auch nach Fristende ein |
 | Absage | Abmelden wie in F.2 (`…/withdraw`, bis zum Start der Season): `start_right.status: "declined"`, der Platz ist frei |
-| Verfall | Der Job `league_start_rights.sweep` (alle 15 Minuten, einmal je Lauf und Replik): Frist vorbei ohne Zusage → Antrag `rejected` ohne `active_key`, `start_right.status: "expired"`, Grund „Startrecht verfallen: bis … keine Zusage.“, Nachricht an Captain und Vertreter. Schon vor dem Job gilt die Frist: Zusagen danach antworten 409 |
+| Verfall | Der Job `league_start_rights.sweep` (alle 15 Minuten, einmal je Lauf und Replik): Frist vorbei ohne Zusage → Antrag `rejected` ohne `active_key`, `start_right.status: "expired"`, Grund „Startrecht verfallen: bis … keine Zusage.“, Nachricht an Captain und Vertreter. Schon vor dem Job gilt die Frist: Zusagen danach antworten 409. **Reihenfolge je Lauf** (Entscheidung 26.11.): erst alle Verfälle (schweigende Nachrücker fallen zurück, überfällige Startrechte verfallen), dann das Nachrücken auf die frei gewordenen Plätze in fester Reihenfolge (Liga N, Herkunft, Platz), zuletzt die Erinnerungen - das Ergebnis hängt nicht davon ab, welchen Antrag der Lauf zuerst anfasst. Schweigen alle, verfallen alle, und niemand rückt nach |
+| Startdatum erreicht | Ab dem Startdatum der Folge-Season - **auch wenn sie noch Entwurf ist** (`start_reached`, Entscheidung 26.11.) - verfällt nichts mehr automatisch, rückt niemand mehr automatisch nach und wird nicht erinnert: Die Leitung entscheidet. Ein offenes Startrecht mit abgelaufener Frist bleibt `offered` (`waits_for_lead: true`), das Team kann nicht mehr selbst zusagen (409), die Leitung trägt die Zusage ein oder lehnt im Eingang ab. `…/fill` antwortet 409 („Die Season hat schon begonnen …“) |
+| Warteliste | Stuft die Leitung ein übernommenes Co-Team auf die Warteliste zurück (B.4), verfällt dort nichts (der Job fasst nur `accepted` an). Annehmen von der Warteliste **mit** Staffel antwortet bei offener Zusage 422 („… Bitte erst ohne Staffel annehmen …“) - kein Weg an der Zusage vorbei. Annehmen **ohne** Staffel vergibt das Startrecht neu: Die Frist beginnt neu (`reoffer_fields`) |
 | Erneut anmelden | Nach Verfall oder Absage geht nur der normale Weg: neue Anmeldung im Anmeldefenster (B.4) - als neue Anmeldung, über die die Leitung entscheidet (neue Co-Teams in der untersten Liga N, höher nur mit Grund, Nr. 226) |
 | Zuteilen | `…/assign` und das Los (`league_draw`) nehmen nur zugesagte Startrechte: bei `offered` 422 „… hat das Startrecht noch nicht angenommen …“ bzw. das Co-Team steht im Los unter `waiting_start_right`. Der Sonderweg „Co-Team zuteilen“ gilt als Zusage durch die Leitung (`accepted_via: "assignment"`) |
-| Pause | Solange der Vorgänger wieder geöffnet ist (`plan` hat `problems`), verfällt nichts, rückt niemand nach und wird nicht erinnert - der Endstand wird geprüft. Zusagen bleibt möglich. Nach dem neuen Abschluss rechnet „Übernahme neu berechnen“ (Nr. 162): `moved` setzt das Startrecht zurück auf `offered` mit neuer Frist (andere Liga N, neue Zusage), `updated` lässt die Zusage stehen, `revoked` nimmt es zurück. Ein Nachrücker, dessen Endstand sich nicht geändert hat, bleibt, wo er ist |
+| Pause | Solange der Vorgänger wieder geöffnet ist (`plan` hat `problems` - auch nach einem zurückgenommenen Entscheid über Staffeln hinweg), **steht die Frist still** und ist danach **um die Dauer der Pause länger** (Entscheidung 26.11.): `start_right_pauses` an der Folge-Season hält Beginn und Ende fest (`after_final_change` nach Wiederöffnen, Abschluss und Entscheid; der Job gleicht bei jedem Lauf ab, falls ein Schritt fehlte). Während der Pause verfällt nichts, rückt niemand nach und wird nicht erinnert; `accept_until` ist `null`, `paused: true`. **Zusagen bleibt möglich.** Eine Pause zählt nur, soweit sie in die laufende Frist fällt: War die Frist schon vor der Pause vorbei, bleibt sie vorbei. Nach dem neuen Abschluss rechnet „Übernahme neu berechnen“ (Nr. 162): `moved` setzt das Startrecht zurück auf `offered` mit neuer Frist (andere Liga N, neue Zusage), `updated` lässt die Zusage stehen, `revoked` nimmt es zurück. Ein Nachrücker, dessen Endstand sich nicht geändert hat, bleibt, wo er ist; sagt der Endstand für ihn jetzt etwas anderes als vor dem Nachrücken - etwa selbst den Aufstieg -, steht er ab da aus eigenem Recht dort (`fills` fällt weg, „Ablehnen“ gibt es nicht mehr) |
 
-**Nachrücken.** Frei wird ein Platz durch Absage, Verfall oder Ablehnung durch die Leitung. Nachgerückt wird nur vor dem Start der
-Season (danach von Hand im Eingang, wie Nr. 162) und nur bei abgeschlossenem Vorgänger. Wer nachrückt (`league_start_rights.candidates`,
-ohne Datenbank), für einen freien Platz in Liga N mit Stufe L:
+**Nachrücken.** Frei wird ein Platz durch Absage, Verfall oder Ablehnung durch die Leitung. Nachgerückt wird nur, solange das
+Startdatum der Season nicht erreicht ist - auch im Entwurf (danach von Hand im Eingang, wie Nr. 162; sonst bekäme der Nachrücker
+eine Frist, die schon vorbei ist) - und nur bei abgeschlossenem Vorgänger. Wer nachrückt (`league_start_right_rules.candidates`, ohne
+Datenbank), für einen freien Platz in Liga N mit Stufe L:
 
 1. War das frei gewordene Startrecht ein **Aufstieg**: zuerst **der beste Nicht-Aufsteiger** der Liga N darunter - Co-Teams, die von dort
    kommen und dort bleiben. Danach, wenn es keinen gibt, der beste Absteiger aus L (er bleibt).
@@ -4114,8 +4121,11 @@ ohne Datenbank), für einen freien Platz in Liga N mit Stufe L:
    beste Nicht-Aufsteiger der Liga N darunter.
 3. „Der beste“: je Staffel das bestplatzierte Co-Team der Gruppe, zwischen Staffeln der Vergleich aus F.2 (`league_cross_rank`: Punkte
    je Spiel, Map-Differenz je Spiel, aus dem gespeicherten Endstand). **Kein Los** (Nr. 156): Stehen die Besten gleich, rückt niemand
-   automatisch nach - die Leitung wählt mit Grund.
-4. Nicht in Frage kommt, wer schon zugeteilt ist, selbst gerade nachrückt, abgemeldet ist oder diesen Platz schon abgelehnt hat (`passed`).
+   automatisch nach - die Leitung wählt mit Grund. Das gilt auch **innerhalb einer Staffel**: Teilen sich dort mehrere den besten
+   Platz der Gruppe (im Endstand derselbe `rank`), ist das ein Gleichstand (`tied`), nie „der Erste in der Liste“.
+4. Nicht in Frage kommt, wer schon zugeteilt ist, selbst gerade nachrückt, abgemeldet ist oder diesen Platz schon abgelehnt hat (`passed`) -
+   und **wer überfällig ist** (Entscheidung 26.11.): Nachrücken kann nur, wer zugesagt hat oder dessen eigene Frist noch läuft. Nimmt
+   ein Team den Nachrückplatz an, gilt das zugleich als Zusage.
 5. **Keine Kette:** Der Platz, den der Nachrücker verlässt, wird nicht automatisch weitergegeben - er ist frei für Warteliste und
    Anmeldungen (B.4). Gibt es keinen Kandidaten, bleibt auch der freie Platz so.
 
@@ -4132,18 +4142,23 @@ Startrechte bestätigt (letzter Abschluss samt Playoffs und Relegation, `plan` o
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App-Postfach und Push, Mail; Discord-Direktnachricht nach den eigenen
 Einstellungen). Co-Teams, die bleiben, bekommen keine. Vorher - aus einer laufenden Tabelle oder einer einzelnen abgeschlossenen
 Staffel - wird nie gemeldet. Je Co-Team merkt sich die Season den zuletzt gemeldeten Stand (`fact`, etwa `up:1`): Ein Wiederöffnen mit
-gleichem Ergebnis meldet nichts noch einmal, ein geändertes Ergebnis meldet einmal „Endstand korrigiert“. `dedupe_key`
+gleichem Ergebnis meldet nichts noch einmal, ein geändertes Ergebnis meldet einmal „Endstand korrigiert“. Gemeldet wird nach jedem
+Schritt, der den Endstand ändert (`after_final_change` aus `routes/league_final_routes.py`): Abschluss, Wiederöffnen und der Entscheid
+über Staffeln hinweg (`PUT`/`DELETE …/zone-decision`) - wird ein Entscheid nach dem letzten Abschluss umgesetzt, bekommt das bisher
+gewählte Co-Team „Endstand korrigiert“ und das neue die Bestätigung. `dedupe_key`
 `league-start-right:<season>:<co-team>:<seq>:<person>` mit `unique_dedupe`. Die Nachricht ersetzt keine bestehende: „Staffel
 abgeschlossen“ (F.1) und die Discord-Saisonende-Meldung (F.7) bleiben, wie sie sind, und nennen den Auf- und Abstieg nicht je Person.
 
 **Lesen**
 
 - `GET /api/admin/leagues/seasons/{id}/start-rights` (jede Zuständigkeit): `{active, settings, defaults, predecessor, paused, started,
-  counts, rows[], open_places[]}`. `rows`: je übernommenem Antrag `{application_id, squad_id, display_name, division_label, movement,
-  from_label, rank, state, accept_until, accepted_at, accepted_via, fills, filled_by, own_team}`. `open_places`: frei gewordene Plätze
-  ohne Nachrücker mit `{application_id, display_name, division_label, why, candidates[], pick, tied, group}`.
+  open_rights, counts, rows[], open_places[]}`. `started`: Das Startdatum ist erreicht (auch im Entwurf). `open_rights`: wie viele
+  Startrechte noch `offered` sind (für die Rückfrage beim Umschalten). `rows`: je übernommenem Antrag `{application_id, squad_id,
+  display_name, division_label, movement, from_label, rank, state, accept_until, paused, waits_for_lead, accepted_at, accepted_via,
+  fills, filled_by, own_team}`. `open_places`: frei gewordene Plätze ohne Nachrücker mit `{application_id, display_name,
+  division_label, why, candidates[], pick, tied, group}`.
 - Eigenes Team: `carry_over.start_right` in `GET /api/me/league-applications` und der Ligaseite (`…/application`): `{state,
-  accept_until, accepted_at, fills: {from_label}?, can_accept, can_decline}` - nur, wenn die Season Startrechte führt oder der Antrag
+  accept_until, paused, waits_for_lead, accepted_at, fills: {from_label}?, can_accept, can_decline}` - nur, wenn die Season Startrechte führt oder der Antrag
   eines trägt. Wessen Platz frei wurde, erfährt das nachrückende Team nicht (kein Antrag eines anderen Teams ist sichtbar, B.4).
   `GET /api/me/league-applications` trägt zusätzlich `start_rights[]` (leer ohne die Einstellung) für Seasons mit `start_rights`,
   die die Person sehen darf (`can_see_season`) und aus denen es noch keine Folge-Season gibt: `{squad_id, season_id, title, url,
@@ -4152,7 +4167,9 @@ abgeschlossen“ (F.1) und die Discord-Saisonende-Meldung (F.7) bleiben, wie sie
   `waiting_start_right`, wer noch nicht zugesagt hat. Die Vorschau `GET …/successor` trägt `start_rights: {settings, defaults}`.
 - Der Leitstand (E.4, `league_desk._applications`) fragt bei offener Zusage nicht nach „Zuteilen“: Die Aufgabe heißt „Startrechte
   ansehen“, führt zu `#startrechte` und ist zur Frist der Zusage fällig.
-- Konto löschen (`league_applications.scrub_person`): `start_right.accepted_by` und `fills.by` fallen wie die übrigen Kennungen heraus.
+- Konto löschen (`league_applications.scrub_person`): `start_right.accepted_by`, `fills.by` und `revoked_by` (F.2, „Übernahme neu
+  berechnen“) fallen wie die übrigen Kennungen heraus.
+- Die Nachricht an die Leitung („Startrecht verfallen“) führt zu `#startrechte`.
 
 **Rechte**
 
