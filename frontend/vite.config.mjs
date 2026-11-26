@@ -6,6 +6,8 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+// Website-Version für die Fußzeile: release-please pflegt sie in package.json (extra-files).
+const websiteVersion = JSON.parse(readFileSync(path.resolve(rootDir, "package.json"), "utf8")).version;
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/;
 const EDITOR_MODULES = /[\\/]node_modules[\\/](@tiptap[\\/]|prosemirror-)/;
@@ -26,6 +28,7 @@ export function sharedWithHeavy(id, ctx) {
 }
 
 export default defineConfig({
+  define: { "import.meta.env.VITE_WEBSITE_VERSION": JSON.stringify(websiteVersion) },
   plugins: [react(), {
     name: "tls-release-version",
     apply: "build",

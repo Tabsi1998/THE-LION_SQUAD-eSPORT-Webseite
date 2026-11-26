@@ -162,3 +162,9 @@ test("Fußzeile: kleiner Link zur Statusseite", () => {
   expect(screen.getByTestId("footer-status")).toHaveAttribute("href", "/status");
   expect(screen.getByTestId("footer-status")).toHaveTextContent("Status");
 });
+// Ganz unten steht die Version der Website, wie sie in frontend/package.json steht.
+test("Fußzeile: Version der Website", async () => {
+  const { version } = (await import("../../../package.json")).default;
+  renderLayout();
+  expect(screen.getByTestId("footer-version")).toHaveTextContent(`Version ${version}`);
+});
