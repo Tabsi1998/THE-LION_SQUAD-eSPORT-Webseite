@@ -10,7 +10,7 @@ import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
-import { teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
+import { rightLine, teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
 import { StartRightBlock } from "./StartRightBlock";
 
 // ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
@@ -39,7 +39,8 @@ function OwnSquadRow({ row, onWithdraw, onChanged }) {
         {application?.carry_over ? <p className="mt-1 text-sm text-white/85" data-testid={`league-application-carry-${row.squad_id}`}>{carryLine(application.carry_over)}</p> : null}
         {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
         {startRight ? <StartRightBlock applicationId={application.id} carry={application.carry_over} onChanged={onChanged} testPrefix="league-start-right" /> : null}
-        {row.state === "accepted" && !application?.staffel && !startRight ? (
+        {/* Mit Startrecht steht dessen Satz da (Frist, zugesagt, nachgerückt) - im Modus „automatisch“ hat es keinen, dann bleibt dieser. */}
+        {row.state === "accepted" && !application?.staffel && !rightLine(application?.carry_over) ? (
           <p className="mt-1 text-sm text-white/75">{application?.carry_over ? "Ihr seid automatisch dabei. Die Staffel teilt die Liga-Leitung noch zu." : "Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu."}</p>
         ) : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}

@@ -1,7 +1,7 @@
 // Startrechte für die nächste Season (#1627, docs/LIGA.md „F.2a“): Wörter und Sätze für Verwaltung und Team-Seite.
 import { describe, expect, it } from "vitest";
 import {
-  countsLine, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge, teamBadgeTone,
+  countsLine, openRightsQuestion, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge, teamBadgeTone,
 } from "./leagueStartRights";
 
 const UNTIL = "2026-12-15T17:00:00+00:00";
@@ -50,6 +50,18 @@ describe("Das eigene Team", () => {
     expect(rightLine(carry)).toBe("");
   });
 
+  it("sagt, wenn die Frist ruht oder nach dem Startdatum die Leitung entscheidet", () => {
+    // Pause (Vorgänger wieder geöffnet): Die Frist steht still - zusagen geht trotzdem.
+    expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: null, paused: true } }))
+      .toBe("Startrecht für Liga 1: Die Frist ruht, solange der Endstand der Vorgänger-Season geprüft wird – danach läuft sie um diese Zeit länger. Zusagen geht trotzdem.");
+    expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: null, paused: true, fills: { from_label: "Liga 2" } } }))
+      .toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Die Frist ruht, solange der Endstand der Vorgänger-Season geprüft wird. Zusagen oder ablehnen geht trotzdem – ohne Antwort bleibt ihr in Liga 2.");
+    // Startdatum erreicht, Frist vorbei: nichts verfällt mehr von selbst.
+    expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, waits_for_lead: true } }))
+      .toBe("Die Frist für die Zusage zu Liga 1 ist vorbei. Jetzt entscheidet die Liga-Leitung – meldet euch dort.");
+    expect(teamBadge({ status: "accepted", carry_over: { start_right: { state: "offered", waits_for_lead: true } } })).toBe("Startrecht – Leitung entscheidet");
+  });
+
   it("zeigt am Abzeichen den Stand des Startrechts statt „Angemeldet“", () => {
     expect(teamBadge({ status: "accepted", carry_over: { start_right: { state: "offered" } } })).toBe("Startrecht – Zusage offen");
     expect(teamBadge({ status: "accepted", carry_over: { start_right: { state: "accepted" } } })).toBe("Zugesagt – Zuteilung folgt");
@@ -87,6 +99,23 @@ describe("Verwaltung", () => {
       .toBe("Liga 1: Platz von Team Alpha frei (Frist verfallen). Gleichstand zwischen Team Beta und Team Gamma – ein Los gibt es nicht, bitte wählen.");
     expect(placeLine({ ...place, pick: null, candidates: [], group: null }))
       .toBe("Liga 1: Platz von Team Alpha frei (Frist verfallen). Es gibt keinen Nachrücker – der Platz ist frei für Warteliste und Anmeldungen.");
+    // In der Pause und ab dem Startdatum rückt niemand nach - dann verspricht die Zeile auch keinen Vorschlag.
+    expect(placeLine(place, { paused: true }))
+      .toBe("Liga 1: Platz von Team Alpha frei (Frist verfallen). Solange der Endstand der Vorgänger-Season geprüft wird, rückt niemand nach.");
+    expect(placeLine(place, { started: true }))
+      .toBe("Liga 1: Platz von Team Alpha frei (Frist verfallen). Das Startdatum ist erreicht: Nachrücken geht nur noch von Hand im Eingang.");
+  });
+
+  it("fragt nach, bevor offene Startrechte durch Ausschalten oder Umschalten als zugesagt gelten", () => {
+    const accept = { active: true, mode: "accept" };
+    expect(openRightsQuestion({ active: false }, 3)).toBe("3 offene Startrechte gelten dann als zugesagt und brauchen keine Zusage mehr.");
+    expect(openRightsQuestion({ active: true, mode: "auto" }, 1)).toBe("1 offenes Startrecht gilt dann als zugesagt und braucht keine Zusage mehr.");
+    // Bleibt es bei „mit Zusage“ oder ist nichts offen, gibt es nichts zu fragen.
+    expect(openRightsQuestion(accept, 3)).toBe("");
+    expect(openRightsQuestion({ active: false }, 0)).toBe("");
+    expect(settingsPayload({ active: true, mode: "auto", accept_days: 14, successor: "next", remind_hours: 48, announce: true }, true))
+      .toEqual({ active: true, mode: "auto", accept_days: 14, successor: "next", remind_hours: 48, announce: true, confirm_open: true });
+    expect(settingsPayload({ active: false }, true)).toEqual({ active: false, confirm_open: true });
   });
 
   it("baut das Formular aus Einstellung und Vorgabe und schickt ganze Zahlen", () => {

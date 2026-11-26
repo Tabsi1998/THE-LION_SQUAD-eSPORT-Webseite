@@ -112,7 +112,52 @@ test("über das eigene Team entscheidet eine andere Person", async () => {
 test("wird der Endstand des Vorgängers geprüft, sagt die Übersicht das - und nachrücken wartet", async () => {
   show({ ...ON, paused: true });
   expect(await screen.findByTestId("start-rights-paused")).toHaveTextContent("Season 1 ist wieder geöffnet");
+  expect(screen.getByTestId("start-rights-paused")).toHaveTextContent("niemand rückt nach");
   expect(screen.queryByTestId("start-right-fill-a3")).toBeNull();
+});
+
+test("in der Pause sagt die Übersicht, dass die Fristen ruhen und sich verlängern, und die Zeile nennt keine Frist", async () => {
+  show({ ...ON, paused: true, rows: [row("a1", "Rudel Eins · Eins", { accept_until: null, paused: true })], open_places: [] });
+  expect(await screen.findByTestId("start-rights-paused")).toHaveTextContent("Die Fristen stehen still und laufen danach um die Dauer der Pause länger. Zusagen geht weiter");
+  expect(screen.getByTestId("start-right-a1")).toHaveTextContent("Frist ruht");
+  expect(screen.getByTestId("start-right-a1")).not.toHaveTextContent("Zusage bis");
+});
+
+test("ist das Startdatum erreicht, sagt die Übersicht, dass nichts mehr von selbst geschieht - die Leitung trägt die Zusage ein", async () => {
+  show({ ...ON, started: true, rows: [row("a1", "Rudel Eins · Eins", { waits_for_lead: true })] });
+  expect(await screen.findByTestId("start-rights-started")).toHaveTextContent("Das Startdatum ist erreicht: Ab jetzt verfällt kein Startrecht mehr von selbst, und niemand rückt automatisch nach.");
+  expect(screen.getByTestId("start-right-a1")).toHaveTextContent("Frist vorbei – jetzt entscheidest du");
+  expect(screen.getByTestId("start-right-accept-a1")).toBeInTheDocument();
+  expect(screen.queryByTestId("start-right-fill-a3")).toBeNull();
+});
+
+test("Umschalten auf „automatisch“ fragt im Panel nach, bevor offene Startrechte als zugesagt gelten", async () => {
+  show({ ...ON, open_rights: 3 });
+  fireEvent.change(await screen.findByTestId("start-rights-mode"), { target: { value: "auto" } });
+  fireEvent.click(screen.getByTestId("start-rights-save"));
+  // Erst die Rückfrage - gespeichert ist noch nichts.
+  const box = await screen.findByTestId("start-rights-confirm-open");
+  expect(box).toHaveTextContent("3 offene Startrechte gelten dann als zugesagt und brauchen keine Zusage mehr.");
+  expect(apiMock.put).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("start-rights-confirm-cancel"));
+  expect(screen.queryByTestId("start-rights-confirm-open")).toBeNull();
+  expect(apiMock.put).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("start-rights-save"));
+  apiMock.put.mockResolvedValue({ data: { ...ON, settings: { ...ON.settings, mode: "auto" }, open_rights: 0 } });
+  fireEvent.click(await screen.findByTestId("start-rights-confirm-yes"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s2/start-rights",
+    { active: true, mode: "auto", accept_days: 10, successor: "next", remind_hours: 48, announce: true, confirm_open: true }));
+  await waitFor(() => expect(screen.queryByTestId("start-rights-confirm-open")).toBeNull());
+});
+
+test("ohne offene Startrechte speichert Umschalten ohne Rückfrage", async () => {
+  show({ ...ON, open_rights: 0 });
+  fireEvent.change(await screen.findByTestId("start-rights-mode"), { target: { value: "auto" } });
+  apiMock.put.mockResolvedValue({ data: { ...ON, settings: { ...ON.settings, mode: "auto" } } });
+  fireEvent.click(screen.getByTestId("start-rights-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s2/start-rights",
+    { active: true, mode: "auto", accept_days: 10, successor: "next", remind_hours: 48, announce: true }));
+  expect(screen.queryByTestId("start-rights-confirm-open")).toBeNull();
 });
 
 test("ohne „Season konfigurieren“ ist die Einstellung nur zu lesen, ohne „Anmeldungen“ gibt es keine Knöpfe", async () => {

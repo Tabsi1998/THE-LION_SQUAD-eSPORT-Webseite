@@ -43,7 +43,7 @@ const right = (id, name, extra = {}) => ({ application_id: id, squad_id: `q${id.
   accept_reason: null, accepted_by_name: null, staffel: null, fills: null, filled_by: null, own_team: false, ...extra });
 const RIGHTS = {
   active: true, settings: { ...DEFAULTS, accept_days: 10, successor: "lead" }, defaults: DEFAULTS, predecessor: { id: "s1", name: "Season 1" }, paused: false,
-  started: false, superadmin: true, counts: { offered: 3, accepted: 2, participating: 1, expired: 1 },
+  started: false, superadmin: true, counts: { offered: 3, accepted: 2, participating: 1, expired: 1 }, open_rights: 3,
   rows: [
     right("a1", "Nordlicht · Nordlicht A", { state: "accepted", accept_until: null, accepted_at: "2027-01-06T18:00:00+00:00", accepted_via: "team" }),
     right("a2", "Sturmfalken · Falken Rot", { rank: 2 }),
@@ -165,6 +165,42 @@ test.describe("Liga: Startrechte für die nächste Season", () => {
       await acceptSheet.getByTestId("start-right-accept-confirm").click();
       await expect.poll(() => sent.accept).toEqual({ reason: "Zusage per Nachricht am 08.01." });
       await expect(acceptSheet).toHaveCount(0);
+
+      // Umschalten auf „automatisch“ fragt im Panel nach (Entscheidung 26.11.): Offene Startrechte gelten erst nach der Bestätigung als zugesagt.
+      await page.route("**/api/admin/leagues/seasons/s2/start-rights", (route) => {
+        if (route.request().method() !== "PUT") return route.fallback();
+        sent.settings = route.request().postDataJSON();
+        return json({ ...RIGHTS, settings: { ...RIGHTS.settings, mode: "auto" }, open_rights: 0 })(route);
+      });
+      await section.getByTestId("start-rights-mode").selectOption("auto");
+      await section.getByTestId("start-rights-save").click();
+      const box = section.getByTestId("start-rights-confirm-open");
+      await expect(box).toContainText("3 offene Startrechte gelten dann als zugesagt und brauchen keine Zusage mehr.");
+      expect(sent.settings).toBeUndefined();
+      await noSideScroll(page);
+      await box.getByTestId("start-rights-confirm-yes").click();
+      await expect.poll(() => sent.settings && sent.settings.confirm_open).toBe(true);
+      await expect(box).toHaveCount(0);
+    });
+
+    test(`Pause und Startdatum bei ${width} px: Die Übersicht sagt, warum gerade nichts verfällt`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await mockServer(page, ADMIN);
+      const rows = [right("a2", "Sturmfalken · Falken Rot", { rank: 2, accept_until: null, paused: true }),
+        right("a7", "Nebelkrähen · Krähen B", { division_level: 2, division_label: "Liga 2", from_label: "Liga 2", rank: 3, waits_for_lead: true })];
+      await page.route("**/api/admin/leagues/seasons/s2/start-rights", (route) => (route.request().method() === "GET"
+        ? json({ ...RIGHTS, paused: true, started: true, counts: { offered: 2 }, rows, open_places: RIGHTS.open_places })(route) : route.fallback()));
+      await page.goto("/admin/leagues/seasons/s2#startrechte");
+      const section = page.getByTestId("season-start-rights");
+      await expect(section.getByTestId("start-rights-paused")).toContainText("Die Fristen stehen still und laufen danach um die Dauer der Pause länger.");
+      await expect(section.getByTestId("start-rights-started")).toContainText("Ab jetzt verfällt kein Startrecht mehr von selbst");
+      await expect(section.getByTestId("start-right-a2")).toContainText("Frist ruht");
+      await expect(section.getByTestId("start-right-a7")).toContainText("Frist vorbei – jetzt entscheidest du");
+      // Weder in der Pause noch nach dem Startdatum rückt jemand nach.
+      await expect(section.getByTestId("start-right-fill-a5")).toHaveCount(0);
+      await noSideScroll(page);
+      await section.getByTestId("start-rights-paused").scrollIntoViewIfNeeded();
+      await shot(page, `startrechte-pause-${width}`);
     });
 
     test(`Neue Season aus … bei ${width} px: Startrechte mit Zusage gehen als Einstellung mit`, async ({ page }) => {

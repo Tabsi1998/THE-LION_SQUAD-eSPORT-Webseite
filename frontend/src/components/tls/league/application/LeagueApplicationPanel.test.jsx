@@ -210,3 +210,26 @@ test("ohne Startrecht bleibt ein übernommenes Co-Team „automatisch dabei“",
   expect(screen.getByTestId("league-application-state-s1")).toHaveTextContent("Angemeldet – Zuteilung folgt");
   expect(screen.queryByTestId("league-start-right-accept-a8")).toBeNull();
 });
+
+test("führt die Season Startrechte im Modus „automatisch“, bleibt der Satz „Ihr seid automatisch dabei“ stehen", async () => {
+  const carried = { ...SQUAD, state: "accepted", can_submit: false, application: { id: "a7", status: "accepted", can_withdraw: true,
+    carry_over: { from_season_name: "Season 1", from_label: "Liga 2", division_label: "Liga 1", movement: "up", withdraw_until: "2027-01-04T23:00:00+00:00",
+      start_right: { state: "confirmed", accept_until: null, paused: false, waits_for_lead: false, can_accept: false, can_decline: false, fills: null } } } };
+  apiMock.get.mockResolvedValue({ data: view([carried]) });
+  renderPanel();
+  const row = await screen.findByTestId("league-application-row-s1");
+  expect(row).toHaveTextContent("Ihr seid automatisch dabei. Die Staffel teilt die Liga-Leitung noch zu.");
+  expect(screen.getByTestId("league-application-state-s1")).toHaveTextContent("Angemeldet – Zuteilung folgt");
+});
+
+test("ein Nachrücker im Modus „automatisch“ liest seinen eigenen Satz - nicht beide", async () => {
+  const carried = { ...SQUAD, state: "accepted", can_submit: false, application: { id: "a6", status: "accepted", can_withdraw: true,
+    carry_over: { from_season_name: "Season 1", from_label: "Liga 2", division_label: "Liga 1", movement: "up", withdraw_until: "2027-01-04T23:00:00+00:00",
+      start_right: { state: "confirmed", accept_until: null, can_accept: false, can_decline: true, fills: { from_label: "Liga 2" } } } } };
+  apiMock.get.mockResolvedValue({ data: view([carried]) });
+  renderPanel();
+  const row = await screen.findByTestId("league-application-row-s1");
+  expect(row).toHaveTextContent("Nachgerückt in Liga 1. Wer lieber in Liga 2 bleibt, lehnt bis zum Start ab.");
+  expect(row).not.toHaveTextContent("Ihr seid automatisch dabei");
+  expect(screen.getByTestId("league-start-right-decline-a6")).toBeInTheDocument();
+});

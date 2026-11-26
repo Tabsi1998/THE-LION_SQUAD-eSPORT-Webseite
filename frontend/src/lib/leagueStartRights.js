@@ -44,6 +44,11 @@ export function rightLine(carry) {
   const label = carry.division_label;
   const back = right.fills?.from_label;
   if (right.state === "offered") {
+    // Startdatum erreicht und Frist vorbei: Es verfällt nicht mehr von selbst - die Leitung entscheidet.
+    if (right.waits_for_lead) return `Die Frist für die Zusage zu ${label} ist vorbei. Jetzt entscheidet die Liga-Leitung – meldet euch dort.`;
+    // Pause: Der Endstand der Vorgänger-Season wird geprüft, die Frist steht still und ist danach um diese Zeit länger.
+    if (right.paused && right.fills) return `Nachgerückt: In ${label} ist ein Platz frei geworden. Die Frist ruht, solange der Endstand der Vorgänger-Season geprüft wird. Zusagen oder ablehnen geht trotzdem – ohne Antwort bleibt ihr in ${back}.`;
+    if (right.paused) return `Startrecht für ${label}: Die Frist ruht, solange der Endstand der Vorgänger-Season geprüft wird – danach läuft sie um diese Zeit länger. Zusagen geht trotzdem.`;
     if (right.fills) return `Nachgerückt: In ${label} ist ein Platz frei geworden. Bitte bis ${untilText(right.accept_until)} zusagen oder ablehnen – ohne Antwort bleibt ihr in ${back}.`;
     return `Startrecht für ${label}: bitte bis ${untilText(right.accept_until)} zusagen. Ohne Zusage verfällt es.`;
   }
@@ -56,6 +61,7 @@ export function rightLine(carry) {
 /** Das Abzeichen am Antrag des eigenen Teams - leer heißt: wie bisher (`teamStateLabel`). */
 export function teamBadge(row) {
   const state = row?.carry_over?.start_right?.state;
+  if (state === "offered" && row.carry_over.start_right.waits_for_lead) return "Startrecht – Leitung entscheidet";
   if (state === "offered") return "Startrecht – Zusage offen";
   if (state === "accepted") return "Zugesagt – Zuteilung folgt";
   if (state === "expired") return "Startrecht verfallen";
@@ -81,9 +87,12 @@ export function outlookLine(item) {
 }
 
 /** Ein frei gewordener Platz in der Verwaltung: warum er frei ist und wer nach der Regel dran ist. */
-export function placeLine(place) {
+export function placeLine(place, { paused = false, started = false } = {}) {
   const names = Object.fromEntries((place.candidates || []).map((row) => [row.application_id, row.display_name]));
   const head = `${place.division_label}: Platz von ${place.display_name} frei (${whyText(place.why)}).`;
+  // In der Pause und ab dem Startdatum rückt niemand nach - dann nennt die Zeile keinen Vorschlag.
+  if (paused) return `${head} Solange der Endstand der Vorgänger-Season geprüft wird, rückt niemand nach.`;
+  if (started) return `${head} Das Startdatum ist erreicht: Nachrücken geht nur noch von Hand im Eingang.`;
   if (place.pick) return `${head} Nach der Regel rückt ${names[place.pick]} nach – ${GROUP_TEXT[place.group] || "der Nächste der Tabelle"}.`;
   if (place.tied?.length) return `${head} Gleichstand zwischen ${place.tied.map((key) => names[key]).join(" und ")} – ein Los gibt es nicht, bitte wählen.`;
   return `${head} Es gibt keinen Nachrücker – der Platz ist frei für Warteliste und Anmeldungen.`;
@@ -94,10 +103,21 @@ export function settingsForm(settings, defaults) {
   return { active: Boolean(settings), ...(defaults || {}), ...(settings || {}) };
 }
 
-/** Die Eingabe als Werte für den Server: ganze Zahlen, ein leeres Zahlenfeld nimmt die Vorgabe. Ausgeschaltet schickt nur das. */
-export function settingsPayload(form) {
-  if (!form.active) return { active: false };
+/** Die Eingabe als Werte für den Server: ganze Zahlen, ein leeres Zahlenfeld nimmt die Vorgabe. Ausgeschaltet schickt nur das.
+ * `confirmOpen`: die Rückfrage ist bestätigt - offene Startrechte dürfen als zugesagt gelten. */
+export function settingsPayload(form, confirmOpen = false) {
+  const confirmed = confirmOpen ? { confirm_open: true } : {};
+  if (!form.active) return { active: false, ...confirmed };
   const number = (value) => (value === "" || value == null ? null : Number.parseInt(String(value), 10));
   return { active: true, mode: form.mode, accept_days: number(form.accept_days), successor: form.successor, remind_hours: number(form.remind_hours),
-    announce: Boolean(form.announce) };
+    announce: Boolean(form.announce), ...confirmed };
+}
+
+/** Die Rückfrage vor dem Ausschalten bzw. Umschalten auf „automatisch“: Offene Startrechte gelten dann als zugesagt. Leer, wenn
+ * es bei „mit Zusage“ bleibt oder nichts offen ist - dann gibt es nichts zu fragen. */
+export function openRightsQuestion(form, openRights) {
+  const count = Number(openRights) || 0;
+  if (!count || (form.active && form.mode === "accept")) return "";
+  return count === 1 ? "1 offenes Startrecht gilt dann als zugesagt und braucht keine Zusage mehr."
+    : `${count} offene Startrechte gelten dann als zugesagt und brauchen keine Zusage mehr.`;
 }
