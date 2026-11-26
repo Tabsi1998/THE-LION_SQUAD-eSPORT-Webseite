@@ -23,6 +23,18 @@ export function tapFeedback() {
   }
 }
 
+/**
+ * Ein leises Klicken beim Umschalten (#1677): ein Schalter springt um, eine Stellung rastet ein (Segmente, Sammel-Mail).
+ * Leichter als `tapFeedback` - wie ein Raster am Drehknopf. Ohne Motor oder im Test passiert nichts.
+ */
+export function selectFeedback() {
+  try {
+    void Promise.resolve(Haptics.selectionAsync()).catch(() => {});
+  } catch {
+    // ohne Vibration weiter
+  }
+}
+
 type Props = Omit<PressableProps, "style"> & {
   style?: StyleProp<ViewStyle>;
   haptic?: boolean;
