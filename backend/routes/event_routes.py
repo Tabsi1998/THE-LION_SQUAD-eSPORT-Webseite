@@ -189,6 +189,21 @@ def _registration_seats(registration: dict) -> int:
     return event_registration.seats(registration)
 
 
+INTERNAL_NOTE_LEAD_ONLY = "Die interne Notiz gehört der Turnierleitung."
+
+
+def _sees_internal_note(user: dict | None, areas: set[str]) -> bool:
+    """Die eine Regel für die interne Notiz einer Anmeldung (#2127, #2591) - fürs Lesen und fürs Schreiben: nur die
+    Turnierleitung (Rolle, Freigabe oder Bereich, mit bestätigter Zwei-Faktor-Anmeldung). Der Vorstand (Bereich
+    Vereinsverwaltung) sieht die Teilnehmer, aber nicht die Notiz - und schreibt sie darum auch nicht."""
+    return is_confirmed_tournament_lead(user) or "tournaments" in areas
+
+
+async def _note_areas(user: dict | None) -> set[str]:
+    # Adminbereiche zählen nur mit bestätigter Zwei-Faktor-Anmeldung (#291) - wie in ``_attach_event_registrations``.
+    return await areas_for(user) if user and not needs_mfa(user) else set()
+
+
 def _public_event_registration(registration: dict, is_staff: bool = False, with_price: bool | None = None) -> dict:
     """Eine Anmeldung, wie andere sie sehen dürfen.
 
@@ -393,8 +408,8 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
         regs = await db.event_registrations.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
         rows = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
         # Die interne Notiz gehört der Turnierleitung (#2127): der Vorstand sieht die Teilnehmer, aber nicht sie - auch die
-        # Leitungsseite bleibt ihm verschlossen.
-        if not (is_staff or "tournaments" in areas):
+        # Leitungsseite bleibt ihm verschlossen. Dieselbe Regel gilt beim Schreiben (``_sees_internal_note``, #2591).
+        if not _sees_internal_note(user, areas):
             for row in rows:
                 row.pop("internal_note", None)
         # Öffentlich steht die Warteliste für sich (#2127, EV10): „Angemeldet“ nennt nur, wer einen Platz hat - auch in
@@ -757,10 +772,14 @@ async def list_event_registrations(event_id: str, me: dict = Depends(require_adm
         {"event_id": event["id"]},
         {"_id": 0},
     ).sort("created_at", 1).to_list(2000)
+    rows = [_public_event_registration(r, is_staff=True) for r in regs]
+    if not _sees_internal_note(me, await _note_areas(me)):
+        for row in rows:
+            row.pop("internal_note", None)  # dieselbe Regel wie auf der Event-Seite (#2591)
     return {
         "event": {"id": event["id"], "name": event.get("name"), "max_participants": event.get("max_participants")},
         "summary": await _event_registration_summary(event),
-        "registrations": [_public_event_registration(r, is_staff=True) for r in regs],
+        "registrations": rows,
     }
 
 
@@ -881,6 +900,12 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     event, _ = await _find_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    # Dieselbe Regel wie beim Lesen (#2591): Wer die interne Notiz nicht sieht, schreibt sie nicht - 403 mit Klartext wie bei
+    # anderen Feldern, die nur eine Rolle ändern darf (nicht still übergangen: die Verwaltung soll wissen, dass nichts gespeichert
+    # ist). Heute verlangt die Route schon die Turnierleitung; die Regel steht trotzdem hier, damit sie nie auseinanderläuft.
+    sees_note = _sees_internal_note(me, await _note_areas(me))
+    if "internal_note" in body.model_fields_set and not sees_note:
+        raise HTTPException(status_code=403, detail=INTERNAL_NOTE_LEAD_ONLY)
     # Dieselbe Platzsperre wie die Anmeldung (#1037): Nachrücken, Einchecken und mehr Begleitpersonen prüfen die Plätze
     # und schreiben in einem Zug - auch wenn sich im selben Moment jemand anmeldet.
     try:
@@ -890,7 +915,10 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
         raise HTTPException(status_code=409, detail=event_registration.SEAT_BUSY)
     # Bescheid an die Person (#2127, EV6, EV13) - nach der Sperre, damit sie nicht auf Mail und Push wartet.
     await event_notifications.notify_registration_status(db, event, updated, updated.get("status"), previous=current.get("status"), actor_id=me["id"])
-    return _public_event_registration(updated, is_staff=True)
+    view = _public_event_registration(updated, is_staff=True)
+    if not sees_note:
+        view.pop("internal_note", None)  # die Antwort verrät die Notiz nicht
+    return view
 
 
 AUDIT_SKIPPED_FIELDS = {"updated_at", "price_snapshot", "billing_status", "invoice_id", "invoice_ref", "invoice_status", "payment_state"}
