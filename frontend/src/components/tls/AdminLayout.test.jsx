@@ -157,7 +157,7 @@ test("statt der Verwaltung steht im Menü „2FA einrichten“ - mit dem Weg zur
   const view = renderLayout();
   const hint = screen.getByTestId("admin-nav-mfa-setup");
   expect(hint).toHaveTextContent("2FA einrichten");
-  expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin%2Fmoderation");
+  expect(hint).toHaveAttribute("href", "/mein-bereich/konto?mfa=required&next=%2Fadmin%2Fmoderation");
   expect(screen.queryByTestId("admin-nav-tournaments")).toBeNull();
   expect(screen.getByTestId("admin-nav-moderation")).toBeInTheDocument();
   view.unmount();

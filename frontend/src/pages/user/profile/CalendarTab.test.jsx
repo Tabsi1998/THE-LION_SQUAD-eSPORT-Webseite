@@ -1,19 +1,21 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { ProfileNav } from "./ProfileNav";
 
-// Mein Kalender-Abo (#1788): ein fester Eintrag unter „Konto“ in den Einstellungen, mit dem Abo-Kasten und dem Weg zu
+// Mein Kalender-Abo (#1788): ein fester Eintrag unter „Konto & Sicherheit“ in „Mein Bereich“ (#2059), mit dem Abo-Kasten und dem Weg zu
 // „Mein Kalender“.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock }));
+vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
 
 const { CalendarTab } = await import("./CalendarTab");
+const { ProfileNav } = await import("./ProfileNav");
+const { SETTINGS_GROUPS } = await import("./constants");
 
-test("der Eintrag steht unter Konto", () => {
-  render(<MemoryRouter><ProfileNav tab="calendar" onSelect={() => {}} /></MemoryRouter>);
-  const entry = within(screen.getByTestId("settings-group-account")).getByTestId("profile-tab-calendar");
-  expect(entry).toHaveTextContent("Mein Kalender-Abo");
+test("der Eintrag steht unter Konto & Sicherheit (#2059)", () => {
+  const konto = SETTINGS_GROUPS.find((group) => group.key === "konto").tabs;
+  render(<MemoryRouter><ProfileNav tabs={konto} tab="calendar" onSelect={() => {}} /></MemoryRouter>);
+  const entry = screen.getByTestId("profile-tab-calendar");
+  expect(entry).toHaveTextContent("Kalender-Abo");
   expect(entry).toHaveAttribute("aria-current", "page");
 });
 

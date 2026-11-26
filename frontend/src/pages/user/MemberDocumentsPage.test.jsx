@@ -40,15 +40,15 @@ test("verbunden: nur Vereinsdokumente, Unterlagen aus der Akte mit Herkunft, kei
   expect(screen.queryByTestId("docs-identity-hint")).not.toBeInTheDocument();
   expect(apiMock.get).toHaveBeenCalledWith("/documents", { params: { scope: "club" } });
   // Die eigenen Schreiben stehen im Profil - ein Satz führt dorthin.
-  expect(screen.getByTestId("docs-own-hint").querySelector("a")).toHaveAttribute("href", "/account/documents");
+  expect(screen.getByTestId("docs-own-hint").querySelector("a")).toHaveAttribute("href", "/mein-bereich/rechnungen?tab=unterlagen");
 });
 
 test("ohne Bindung: der Hinweis führt zum Einladungscode", async () => {
   mockApi({ available: true, status: "none", capabilities: [] });
   render(<MemoryRouter><MemberDocumentsPage /></MemoryRouter>);
   const hint = await screen.findByTestId("docs-identity-hint");
-  expect(hint).toHaveTextContent("Einladungscode unter Meine Mitgliedschaft");
-  expect(hint.querySelector("a")).toHaveAttribute("href", "/members/membership");
+  expect(hint).toHaveTextContent("Einladungscode unter Mitgliedschaft");
+  expect(hint.querySelector("a")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
 });
 
 test("ohne Live-Anbindung kein Hinweis; ein Filter fragt weiter nur die Vereinsdokumente", async () => {

@@ -766,7 +766,7 @@ test("Browser hat Benachrichtigungen abgelehnt: leise „Aufrufe sind aus – ei
     const { unmount } = renderPage();
     const hint = await screen.findByTestId("tournament-push-off");
     expect(hint).toHaveTextContent("Aufrufe sind aus – einschalten");
-    expect(hint).toHaveAttribute("href", "/profile?tab=notifications#dieser-browser");
+    expect(hint).toHaveAttribute("href", "/mein-bereich/benachrichtigungen#dieser-browser");
     unmount();
     authUser = null;
     renderPage();

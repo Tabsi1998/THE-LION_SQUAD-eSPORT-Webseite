@@ -329,7 +329,7 @@ test("eigenes Profil: „Nur für dich“, Zahnrad, eigene Erfolge - und „So s
     mockApi();
     renderPage();
     expect(await screen.findByTestId("profile-private-box")).toBeInTheDocument();
-    expect(screen.getByTestId("profile-settings")).toHaveAttribute("href", "/profile");
+    expect(screen.getByTestId("profile-settings")).toHaveAttribute("href", "/mein-bereich/profil");
     fireEvent.click(screen.getByTestId("profile-tab-badges"));
     expect(screen.getByTestId("profile-own-achievements")).toBeInTheDocument();
 

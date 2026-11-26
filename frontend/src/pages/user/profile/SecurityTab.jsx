@@ -9,6 +9,7 @@ import { PasskeysPanel } from "@/components/tls/PasskeysPanel";
 import { Section } from "./fields";
 import { PasswordPanel } from "./PasswordPanel";
 import { SessionsPanel } from "./SessionsPanel";
+import { KontoAngaben } from "../PrivacyAccountPage";
 
 // Reiter Sicherheit (#258): Passwort, Passkeys, Zwei-Faktor, Google-Konto und
 // angemeldete Geräte an einem Ort. Vorher standen Zwei-Faktor und Google
@@ -40,6 +41,9 @@ export function SecurityTab({ user, refresh, siteSettings }) {
     <Section>
       <p className="text-sm text-white/60">Passwort, Passkeys, Zwei-Faktor, Google-Konto und angemeldete Geräte an einem Ort.</p>
 
+      {/* Die Angaben zum Konto (#2059) - vorher unten auf „Meine Daten“. */}
+      <KontoAngaben />
+
       {sentHereForMfa && (
         <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
           <ShieldCheck className="w-5 h-5 text-[#FFD700] mt-0.5 shrink-0" />
@@ -50,7 +54,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
         </div>
       )}
 
-      <PasswordPanel googleOnly={googleOnly} />
+      <div id="passwort" className="scroll-mt-32"><PasswordPanel googleOnly={googleOnly} /></div>
 
       <PasskeysPanel />
 

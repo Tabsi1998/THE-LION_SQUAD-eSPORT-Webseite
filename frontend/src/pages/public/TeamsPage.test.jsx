@@ -496,7 +496,7 @@ describe("Admin-Rollen am fremden Team (#1479)", () => {
     renderAt("/teams/t-1");
     const hint = await screen.findByTestId("team-mfa-setup");
     expect(hint).toHaveTextContent("2FA einrichten");
-    expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fteams%2Ft-1");
+    expect(hint).toHaveAttribute("href", "/mein-bereich/konto?mfa=required&next=%2Fteams%2Ft-1");
     expect(screen.queryByTestId("team-edit-open")).toBeNull();
     expect(screen.queryByTestId("team-invite-open")).toBeNull();
     expect(screen.queryByTestId("team-manage-members")).toBeNull();

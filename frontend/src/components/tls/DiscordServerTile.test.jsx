@@ -70,7 +70,7 @@ test("Mitgliederbereich: alle Server mit eigenem Status; ohne Verknüpfung nur E
   rerender(<MemoryRouter><DiscordServerList data={{ linked: false, servers: [{ ...MAIN, member: null }, { ...RL, member: null }] }} /></MemoryRouter>);
   expect(screen.queryByTestId("discord-servers-1-joined")).toBeNull();
   expect(screen.getByTestId("discord-servers-1-join")).toBeInTheDocument();
-  expect(screen.getByTestId("discord-servers-link-hint").querySelector("a")).toHaveAttribute("href", "/profile?tab=socials");
+  expect(screen.getByTestId("discord-servers-link-hint").querySelector("a")).toHaveAttribute("href", "/mein-bereich/profil?tab=socials&link=discord");
 
   rerender(<MemoryRouter><DiscordServerList data={{ linked: true, servers: [] }} /></MemoryRouter>);
   expect(screen.queryByTestId("discord-servers")).toBeNull();

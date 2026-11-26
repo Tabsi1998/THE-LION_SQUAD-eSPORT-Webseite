@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Das Profil ist die Seite, die jedes Mitglied selbst bearbeitet. Getestet wird
@@ -57,11 +57,6 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 const ProfilePage = (await import("./ProfilePage")).default;
 const { FriendsPanel } = await import("./profile/FriendsPanel");
 const { AUTOSAVE_DELAY_MS, SAVED_VISIBLE_MS } = await import("./profile/useAutosave");
-
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="location-probe" data-path={location.pathname} data-search={location.search} />;
-}
 
 function pageTree(entries) {
   return (
@@ -122,7 +117,7 @@ async function waitForForm() {
 }
 
 async function openPrivacyTab(user) {
-  await user.click(screen.getByRole("button", { name: /Privatsphäre/i }));
+  await user.click(screen.getByRole("button", { name: /Sichtbarkeit/i }));
   return screen.findByTestId("profile-privacy");
 }
 
@@ -157,7 +152,7 @@ test("kein Knopf Speichern mehr - in keinem Reiter", async () => {
   const user = setupUser();
   renderPage();
   await waitForForm();
-  for (const name of [/Grunddaten/i, /Gaming/i, /Socials/i, /Privatsphäre/i, /Benachrichtigungen/i]) {
+  for (const name of [/Grunddaten/i, /Gaming/i, /Socials/i, /Sichtbarkeit/i, /Benachrichtigungen/i]) {
     await user.click(screen.getByRole("button", { name }));
     expect(screen.queryByTestId("profile-save")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Speicher/i })).toBeNull();
@@ -527,22 +522,6 @@ test("Socials: eine eingefuegte Adresse wird zum Nutzernamen mit Vorschau-Link",
   expect(screen.getByTestId("profile-instagram-preview")).toHaveAttribute("href", "https://instagram.com/tabsi.98");
 });
 
-test("?tab=inbox leitet zur eigenen Nachrichten-Seite weiter, mit to= direkt ins Gespraech", async () => {
-  render(
-    <ConfirmDialogProvider>
-      <MemoryRouter initialEntries={["/profile?tab=inbox&to=u-9"]}>
-        <Routes>
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/messages/:userId" element={<div data-testid="messages-page-stub" />} />
-        </Routes>
-      </MemoryRouter>
-    </ConfirmDialogProvider>
-  );
-
-  expect(await screen.findByTestId("messages-page-stub")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Inbox/i })).toBeNull();
-});
-
 // Speicher-Warteschlange (#1048): alle Läufe gehen hintereinander, nie gleichzeitig.
 test("ein zweiter Schalter wartet, bis der laufende Lauf fertig ist - nie zwei PATCH gleichzeitig", async () => {
   const user = setupUser();
@@ -748,33 +727,6 @@ test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet", async () => {
   expect(screen.getByTestId("friends-friend-f-1")).toHaveTextContent("Anna");
 });
 
-// Was keine Einstellung ist, hat seinen Ort woanders (#1146, #1150) - alte Links leiten dorthin weiter.
-test("alte Reiter leiten weiter: Ehrungen und Erfolge ins eigene Profil, Teams und Freunde zu Community, Rechnungen auf ihre Adresse", async () => {
-  const cases = [
-    ["/profile?tab=honours", "/u/lionfan", "honours"],
-    ["/profile?tab=achievements", "/u/lionfan", "achievements"],
-    ["/profile?tab=teams", "/teams", ""],
-    ["/profile?tab=friends", "/players", ""],
-    ["/profile?tab=invoices&invoice=d-501", "/account/invoices", "invoice=d-501"],
-  ];
-  for (const [from, path, query] of cases) {
-    const { unmount } = render(
-      <ConfirmDialogProvider>
-        <MemoryRouter initialEntries={[from]}>
-          <Routes>
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path={path} element={<LocationProbe />} />
-          </Routes>
-        </MemoryRouter>
-      </ConfirmDialogProvider>
-    );
-    const probe = await screen.findByTestId("location-probe");
-    expect([from, probe.getAttribute("data-path")]).toEqual([from, path]);
-    if (query) expect(probe.getAttribute("data-search")).toContain(query);
-    unmount();
-  }
-});
-
 test("Darstellung: Saison-Deko und Töne stehen in den Einstellungen", async () => {
   renderPage(["/profile?tab=appearance"]);
   expect(await screen.findByTestId("settings-appearance")).toBeInTheDocument();
@@ -782,7 +734,6 @@ test("Darstellung: Saison-Deko und Töne stehen in den Einstellungen", async () 
   expect(screen.getByTestId("settings-sound-off")).toBeInTheDocument();
   expect(screen.getByTestId("profile-tab-appearance")).toHaveAttribute("aria-current", "page");
 });
-
 
 // Seite verlassen mit offener Eingabe (#1048, nach Codex-Prüfung von #1535): beforeunload greift nur beim Entladen -
 // Links, Zurück und Abmelden in der Webseite halten an und fragen im Dialog der Seite.

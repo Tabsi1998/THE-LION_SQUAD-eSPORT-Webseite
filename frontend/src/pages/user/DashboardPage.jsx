@@ -11,13 +11,16 @@ import { AchievementsTile } from "@/components/tls/AchievementsTile";
 import { DashboardNotifications } from "./DashboardNotifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings, ScrollText, Star, Users } from "lucide-react";
+import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, LayoutGrid, ScrollText, Star, Users } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
 import { dashboardRegistrationKeys, dashboardTeamKeys, noteWebPushRegistrations, offerWebPush } from "@/lib/webPush";
 import { noteOwnMatches } from "@/lib/liveQueue";
+import { BEREICH, gruppenFuer } from "@/lib/meinBereich";
+import { isAnyAdmin } from "@/lib/permissions";
+import { BereichListe } from "./meinBereich/BereichNav";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -187,14 +190,9 @@ export default function DashboardPage() {
               {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="text-xs font-bold text-[#FFD700] hover:underline">Mitglied werden</Link> : null}
             </div>
           </div>
-          {/* Bis „Mein Bereich“ (#2059) kommt: die Mitgliedschaft (Wunschnummer, Daten ändern) direkt erreichbar. */}
-          {isClubMember ? (
-            <Link to="/members/membership" data-testid="dashboard-membership" aria-label="Meine Mitgliedschaft" title="Meine Mitgliedschaft" className="shrink-0 inline-flex min-h-11 min-w-11 justify-center items-center gap-1.5 px-3 py-2 border border-honor/40 text-honor hover:bg-honor/10 hover:border-honor/70 rounded-sm text-[11px] font-bold uppercase tracking-wider transition">
-              <Crown className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Meine Mitgliedschaft</span>
-            </Link>
-          ) : null}
-          <Link to="/profile" data-testid="dashboard-edit-profile" aria-label="Profil bearbeiten" title="Profil bearbeiten" className="shrink-0 inline-flex min-h-11 min-w-11 justify-center items-center gap-1.5 px-3 py-2 border border-white/15 text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider transition">
-            <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Profil bearbeiten</span>
+          {/* „Mein Bereich“ (#2059): Profil, Mitgliedschaft, Rechnungen, Konto und Datenschutz an einem Ort - unten als Liste. */}
+          <Link to={BEREICH} data-testid="dashboard-mein-bereich" className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider">
+            <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> Mein Bereich
           </Link>
         </div>
 
@@ -222,7 +220,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-white/55 mt-1" data-testid="profile-completeness-missing">Fehlt: <span className="text-white/75">{missingLabels(completeness.missing, 4).join(", ")}{missingLabels(completeness.missing).length > 4 ? "…" : ""}</span></p>
               )}
             </div>
-            <Link to="/profile" data-testid="profile-completeness-cta" className="inline-flex min-h-11 items-center px-4 py-2 border border-[#A855F7]/40 text-[#A855F7] hover:bg-[#A855F7]/10 rounded-sm text-xs font-bold uppercase tracking-wider">Vervoll&shy;ständigen</Link>
+            <Link to={`${BEREICH}/profil`} data-testid="profile-completeness-cta" className="inline-flex min-h-11 items-center px-4 py-2 border border-[#A855F7]/40 text-[#A855F7] hover:bg-[#A855F7]/10 rounded-sm text-xs font-bold uppercase tracking-wider">Vervoll&shy;ständigen</Link>
           </div>
         )}
 
@@ -325,11 +323,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Mein Bereich (#2059): jede Gruppe ein Tipp weit - von hier aus ist jede Funktion höchstens zwei Klicks entfernt. */}
+        <section className="mt-8" aria-labelledby="dashboard-mein-bereich-title" data-testid="dashboard-bereich">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 id="dashboard-mein-bereich-title" className="font-heading text-xl font-bold uppercase">Mein Bereich</h2>
+          </div>
+          <BereichListe gruppen={gruppenFuer({ mitglied: Boolean(user?.is_club_member) || isAnyAdmin(user) }).filter((item) => item.key !== "start")} testId="dashboard-bereich-liste" />
+        </section>
+
         <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="dashboard-tiles">
           <AchievementsTile />
           {/* Mitgliedervorteile stehen im Mitgliederbereich (#1150) - keine zweite Kachel hier. */}
           <Link
-            to="/my/penalties"
+            to={`${BEREICH}/rechnungen?tab=strafen`}
             data-testid="dashboard-penalties-link"
             className={`border rounded-sm p-5 transition ${
               penaltyCount > 0
@@ -346,10 +352,6 @@ export default function DashboardPage() {
             <div className="mt-2 font-heading text-lg font-bold">
               Meine Strafen {penaltyCount > 0 && <span className="text-[#FF3B30]">({penaltyCount})</span>}
             </div>
-          </Link>
-          <Link to="/privacy-account" data-testid="dashboard-privacy-link" className="border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 bg-[#121212] transition">
-            <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">DSGVO</div>
-            <div className="mt-2 font-heading text-lg font-bold">Meine Daten</div>
           </Link>
         </div>
       </div>

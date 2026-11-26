@@ -61,12 +61,12 @@ test("Kopf: die eigene Karte, Gruß, „Mitglied seit“ und „Beitrag bezahlt�
   expect(screen.getByTestId("member-area-card-name")).toHaveTextContent("LunaByte");
   expect(screen.getByTestId("member-area-card")).toHaveTextContent("Nr. TLS-031 · seit 2026");
   expect(screen.getByTestId("member-area-card")).toHaveTextContent("Ordentliches Mitglied · gültig bis 31.12.2026");
-  expect(screen.getByTestId("member-area-card-link")).toHaveAttribute("href", "/members/membership#mitgliedskarte");
+  expect(screen.getByTestId("member-area-card-link")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft#mitgliedskarte");
   expect(screen.getByTestId("member-area-greeting")).toHaveTextContent("Hallo, LunaByte");
   expect(screen.getByTestId("member-area-since")).toHaveTextContent("Mitglied seit Februar 2026");
   expect(screen.getByTestId("member-area-fee")).toHaveTextContent("Beitrag bezahlt");
   expect(screen.getByTestId("member-area-fee")).toHaveAttribute("data-tone", "ok");
-  expect(screen.getByTestId("member-area-my-membership")).toHaveAttribute("href", "/members/membership");
+  expect(screen.getByTestId("member-area-my-membership")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
 });
 
 test("Kopf: offener Beitrag; ohne Dolibarr kein Schild; ohne gültige Mitgliedschaft keine Karte", async () => {
@@ -108,8 +108,8 @@ test("Sprungleiste: Zahl nur, wo etwas offen ist; vorhandene Abschnitte als Spru
   await waitFor(() => expect(within(bar).getByTestId("member-area-jump-dokumente")).toHaveAttribute("href", "#dokumente"));
   expect(within(bar).getByTestId("member-area-jump-versammlung")).toHaveAttribute("href", "#versammlung");
   expect(within(bar).getByTestId("member-area-jump-karte")).toHaveAttribute("href", "#karte");
-  expect(within(bar).getByTestId("member-area-jump-helfen")).toHaveAttribute("href", "/members/helfen");
-  expect(within(bar).getByTestId("member-area-jump-news")).toHaveAttribute("href", "/members/news");
+  expect(within(bar).getByTestId("member-area-jump-helfen")).toHaveAttribute("href", "/mein-bereich/verein/helfen");
+  expect(within(bar).getByTestId("member-area-jump-news")).toHaveAttribute("href", "/mein-bereich/verein/news");
 
   // Ein Tipp: der Eintrag wird aktiv (goldener Strich), der Abschnitt bekommt den Fokus.
   fireEvent.click(within(bar).getByTestId("member-area-jump-versammlung"));

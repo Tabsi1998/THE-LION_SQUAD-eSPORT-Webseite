@@ -20,7 +20,7 @@ function renderAt(path, element) {
         <Route path={path} element={element} />
         <Route path="/403" element={<div>verboten</div>} />
         <Route path="/login" element={<div>anmelden</div>} />
-        <Route path="/profile" element={<MfaSetup />} />
+        <Route path="/mein-bereich/konto" element={<MfaSetup />} />
       </Routes>
     </MemoryRouter>
   );
@@ -97,7 +97,7 @@ test("die Turnierleitung ohne Zwei-Faktor geht zur Einrichtung - aus Rolle wie a
     const view = renderAt("/admin/f1", <ProtectedRoute requireTournamentStaff><div>fast lap</div></ProtectedRoute>);
     expect(screen.queryByText("fast lap")).toBeNull();
     const params = new URLSearchParams(screen.getByTestId("mfa-setup").dataset.search);
-    expect(Object.fromEntries(params)).toEqual({ tab: "security", mfa: "required", next: "/admin/f1" });
+    expect(Object.fromEntries(params)).toEqual({ mfa: "required", next: "/admin/f1" });
     view.unmount();
   }
 });
@@ -132,7 +132,7 @@ function renderEntrance(user) {
         <Route path="/admin/dienst" element={<ProtectedRoute requireDuty><div>mein dienst</div></ProtectedRoute>} />
         <Route path="/admin/moderation" element={<ProtectedRoute requireArea="moderation"><div>meldungen</div></ProtectedRoute>} />
         <Route path="/403" element={<NoDuty />} />
-        <Route path="/profile" element={<MfaSetup />} />
+        <Route path="/mein-bereich/konto" element={<MfaSetup />} />
       </Routes>
     </MemoryRouter>
   );

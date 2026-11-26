@@ -1,12 +1,11 @@
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLoad } from "@/hooks/useLoad";
 import { LoadState } from "@/components/tls/LoadState";
-import { Pin, ArrowLeft, Newspaper, Crown } from "lucide-react";
+import { Pin, Newspaper } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 
 export default function MemberNewsPage() {
@@ -18,14 +17,9 @@ export default function MemberNewsPage() {
   useApiInvalidation(news.reload, ["news"]);
 
   return (
-    <PublicLayout>
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to="/members/area" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#FFD700]">
-          <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
-        </Link>
-        <span className="mt-6 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700] flex items-center gap-1.5"><Crown className="w-3 h-3" /> EXKLUSIV</span>
-        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Interne News</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">
+    <>
+      <section className="min-w-0">
+        <p className="text-white/60 max-w-2xl">
           Vereinsinterne Ankündigungen, Vorstandsmitteilungen und Mitglieder-Nachrichten — nur für offizielle Vereinsmitglieder.
         </p>
 
@@ -65,6 +59,6 @@ export default function MemberNewsPage() {
           </LoadState>
         </div>
       </section>
-    </PublicLayout>
+    </>
   );
 }

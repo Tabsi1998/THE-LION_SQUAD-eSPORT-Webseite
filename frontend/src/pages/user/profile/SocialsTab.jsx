@@ -159,7 +159,7 @@ export function SocialsTab({ form, set, setNow = set, errors = {}, links = null,
         <strong className="text-white">Konto verknüpfen statt tippen:</strong> Einmal bei der Plattform anmelden – der Name kommt von dort und trägt „verifiziert“, sichtbar für alle, die dein Profil sehen dürfen.
         {" "}Die Plattform liefert nur, was hier steht: {Object.values(delivers).map((p) => p.delivers).filter(Boolean).join("; ") || "Kennung und Nutzername"}.
         {" "}<Lock className="inline w-3 h-3 align-[-2px] text-white/45" aria-hidden="true" /> Wer welches Konto sieht, regelst du unter{" "}
-        <Link to="/profile?tab=privacy" className="text-[#29B6E8] hover:underline" data-testid="profile-links-privacy">Privatsphäre</Link> – das gilt auch für verknüpfte Namen.
+        <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline" data-testid="profile-links-privacy">Datenschutz → Sichtbarkeit</Link> – das gilt auch für verknüpfte Namen.
       </div>
 
       <div className="space-y-2" data-testid="profile-link-rows">

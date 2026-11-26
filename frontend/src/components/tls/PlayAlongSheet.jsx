@@ -179,7 +179,7 @@ export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
                   <span className="text-white/70">Startgeld gesamt</span>
                   <strong className="font-heading text-xl text-white">{formatCents(result.total_cents, result.currency)}</strong>
                 </div>
-                <div className="mt-1 text-xs text-white/55">Die Rechnungen kommen wie gewohnt in dein Konto unter <Link to="/account/invoices" className="underline hover:text-white">„Meine Rechnungen“</Link>.</div>
+                <div className="mt-1 text-xs text-white/55">Die Rechnungen kommen wie gewohnt in dein Konto unter <Link to="/mein-bereich/rechnungen" className="underline hover:text-white">„Rechnungen & Unterlagen“</Link>.</div>
               </div>
             ) : null}
             <div className="mt-5 flex justify-end">

@@ -36,7 +36,7 @@ test("ein Ladefehler zeigt den Fehler mit „Nochmal versuchen“, nicht „Kein
 test("von der Liste führt ein Weg zu den Einstellungen (#2126)", async () => {
   apiMock.get.mockResolvedValue({ data: ROWS });
   renderPage();
-  expect(await screen.findByTestId("notifications-settings-link")).toHaveAttribute("href", "/profile?tab=notifications");
+  expect(await screen.findByTestId("notifications-settings-link")).toHaveAttribute("href", "/mein-bereich/benachrichtigungen");
 });
 
 test("„Alle als gelesen markieren“ scheitert: der Zähler bleibt, der Fehler steht da", async () => {

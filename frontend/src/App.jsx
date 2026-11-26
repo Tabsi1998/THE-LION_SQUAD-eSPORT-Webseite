@@ -30,6 +30,8 @@ import { RouteFallback, StartSplashGate } from "@/components/tls/RouteFallback";
 import "@/lib/navigationGuard";
 import { gamePageUrl } from "@/lib/gameForm";
 import { HilfeUmleitung } from "@/hilfe/HilfeUmleitung";
+import { BEREICH, VEREIN_SEITEN } from "@/lib/meinBereich";
+import { MeinBereichUmleitung } from "@/pages/user/meinBereich/Umleitung";
 
 function MeRedirect() {
   const { user } = useAuth();
@@ -132,12 +134,22 @@ const HelpTopicPage = lazyPage(() => import("@/pages/public/HelpTopicPage"));
 
 const DashboardPage = lazyPage(() => import("@/pages/user/DashboardPage"));
 const YearReviewPage = lazyPage(() => import("@/pages/user/YearReviewPage"));
-const ProfilePage = lazyPage(() => import("@/pages/user/ProfilePage"));
 const MessagesPage = lazyPage(() => import("@/pages/user/MessagesPage"));
 const NotificationsPage = lazyPage(() => import("@/pages/user/NotificationsPage"));
 const MatchHubPage = lazyPage(() => import("@/pages/user/MatchHubPage"));
-const PrivacyAccountPage = lazyPage(() => import("@/pages/user/PrivacyAccountPage"));
 const ConsentPage = lazyPage(() => import("@/pages/user/ConsentPage"));
+// „Mein Bereich“ (#2059): ein Rahmen, jede Gruppe ein eigener Teil.
+const MeinBereichLayout = lazyPage(() => import("@/pages/user/meinBereich/MeinBereichLayout"));
+const UebersichtSeite = lazyPage(() => import("@/pages/user/meinBereich/UebersichtSeite"));
+const gruppenSeite = (name) => lazyPage(() => import("@/pages/user/meinBereich/GruppenSeiten").then((m) => ({ default: m[name] })));
+const ProfilSeite = gruppenSeite("ProfilSeite");
+const MitgliedschaftSeite = gruppenSeite("MitgliedschaftSeite");
+const RechnungenSeite = gruppenSeite("RechnungenSeite");
+const VereinSeite = gruppenSeite("VereinSeite");
+const VereinUnterseite = gruppenSeite("VereinUnterseite");
+const BenachrichtigungenSeite = gruppenSeite("BenachrichtigungenSeite");
+const KontoSeite = gruppenSeite("KontoSeite");
+const DatenschutzSeite = gruppenSeite("DatenschutzSeite");
 
 const AdminDashboardPage = lazyPage(() => import("@/pages/admin/AdminDashboardPage"));
 // „Mein Dienst“ (#1352): eigene Einsätze und Aufgaben für Helfer und Moderation - statt „Kein Zugriff“.
@@ -226,15 +238,6 @@ const MemberCardVerifyPage = lazyPage(() => import("@/pages/public/MemberCardVer
 const NewsDetailPage = lazyPage(() => import("@/pages/public/NewsDetailPage"));
 const GalleryPage = lazyPage(() => import("@/pages/public/GalleryPage"));
 const GalleryAlbumPage = lazyPage(() => import("@/pages/public/GalleryAlbumPage"));
-const MemberAreaPage = lazyPage(() => import("@/pages/user/MemberAreaPage"));
-const MemberBenefitsPage = lazyPage(() => import("@/pages/user/MemberBenefitsPage"));
-const MemberDocumentsPage = lazyPage(() => import("@/pages/user/MemberDocumentsPage"));
-const MemberMeetingsPage = lazyPage(() => import("@/pages/user/MemberMeetingsPage"));
-const MemberHelperShiftsPage = lazyPage(() => import("@/pages/user/MemberHelperShiftsPage"));
-const MemberNewsPage = lazyPage(() => import("@/pages/user/MemberNewsPage"));
-const MyMembershipPage = lazyPage(() => import("@/pages/user/MyMembershipPage"));
-const MyInvoicesPage = lazyPage(() => import("@/pages/user/MyInvoicesPage"));
-const AccountDocumentsPage = lazyPage(() => import("@/pages/user/AccountDocumentsPage"));
 
 const F1TVPage = lazyPage(() => import("@/pages/display/F1TVPage"));
 const BracketTVPage = lazyPage(() => import("@/pages/display/BracketTVPage"));
@@ -243,8 +246,6 @@ const EventTVPage = lazyPage(() => import("@/pages/display/EventTVPage"));
 const EventCallsTVPage = lazyPage(() => import("@/pages/display/EventCallsTVPage"));
 // Map-Veto am TV (#1651): öffentlich wie Matchseite und Event-TV, mit Anzeige-Schlüssel auch für Staffeln „Nur Mitglieder“.
 const VetoTVPage = lazyPage(() => import("@/pages/display/VetoTVPage"));
-const MyPrizesPage = lazyPage(() => import("@/pages/user/MyPrizesPage"));
-const MyPenaltiesPage = lazyPage(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazyPage(() => import("@/pages/admin/AdminPrizesPage"));
 const AdminFeedbackPage = lazyPage(() => import("@/pages/admin/AdminFeedbackPage"));
 const AdminPenaltiesPage = lazyPage(() => import("@/pages/admin/AdminPenaltiesPage"));
@@ -384,29 +385,42 @@ function App() {
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/dein-jahr" element={<ProtectedRoute><YearReviewPage /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          {/* Mein Bereich (#2059): Übersicht, Profil, Mitgliedschaft, Rechnungen & Unterlagen, Verein, Benachrichtigungen,
+              Konto & Sicherheit, Datenschutz - die alten Adressen darunter leiten hierher. */}
+          <Route path={BEREICH} element={<ProtectedRoute><MeinBereichLayout /></ProtectedRoute>}>
+            <Route index element={<UebersichtSeite />} />
+            <Route path="profil" element={<ProfilSeite />} />
+            <Route path="mitgliedschaft" element={<MitgliedschaftSeite />} />
+            <Route path="rechnungen" element={<RechnungenSeite />} />
+            <Route path="verein" element={<ProtectedRoute requireMember><VereinSeite /></ProtectedRoute>} />
+            {VEREIN_SEITEN.map((seite) => (
+              <Route key={seite.k} path={`verein/${seite.k}`} element={<ProtectedRoute requireMember><VereinUnterseite seite={seite.k} /></ProtectedRoute>} />
+            ))}
+            <Route path="benachrichtigungen" element={<BenachrichtigungenSeite />} />
+            <Route path="konto" element={<KontoSeite />} />
+            <Route path="datenschutz" element={<DatenschutzSeite />} />
+            <Route path="*" element={<Navigate to={BEREICH} replace />} />
+          </Route>
+          <Route path="/profile" element={<MeinBereichUmleitung />} />
           <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
           <Route path="/messages/:userId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/hub/matches/:id" element={<ProtectedRoute><MatchHubPage /></ProtectedRoute>} />
-          <Route path="/privacy-account" element={<ProtectedRoute><PrivacyAccountPage /></ProtectedRoute>} />
+          <Route path="/privacy-account" element={<MeinBereichUmleitung />} />
           <Route path="/consent" element={<ProtectedRoute><ConsentPage /></ProtectedRoute>} />
 
-          {/* Member-only */}
-          <Route path="/members/area" element={<ProtectedRoute requireMember><MemberAreaPage /></ProtectedRoute>} />
-          {/* Alte und deutsche Adressen des Mitgliederbereichs (#364) */}
-          <Route path="/mitgliederbereich" element={<Navigate to="/members/area" replace />} />
-          <Route path="/member-area" element={<Navigate to="/members/area" replace />} />
-          <Route path="/members/benefits" element={<ProtectedRoute requireMember><MemberBenefitsPage /></ProtectedRoute>} />
-          <Route path="/members/documents" element={<ProtectedRoute requireMember><MemberDocumentsPage /></ProtectedRoute>} />
-          <Route path="/members/meetings" element={<ProtectedRoute requireMember><MemberMeetingsPage /></ProtectedRoute>} />
-          <Route path="/members/helfen" element={<ProtectedRoute requireMember><MemberHelperShiftsPage /></ProtectedRoute>} />
-          <Route path="/members/news" element={<ProtectedRoute requireMember><MemberNewsPage /></ProtectedRoute>} />
-          <Route path="/members/membership" element={<ProtectedRoute requireMember><MyMembershipPage /></ProtectedRoute>} />
-          {/* Eigene Rechnungen (#296): auch für Ehemalige - es zählt die Zuordnung, nicht die Mitgliedschaft. */}
-          <Route path="/account/invoices" element={<ProtectedRoute><MyInvoicesPage /></ProtectedRoute>} />
-          {/* Eigene Unterlagen aus der Vereinsakte (#1255): wie die Rechnungen über „Nur für dich“ im Profil. */}
-          <Route path="/account/documents" element={<ProtectedRoute><AccountDocumentsPage /></ProtectedRoute>} />
+          {/* Alte Adressen des Mitgliederbereichs und des Kontos (#364, #1255, #296) - seit #2059 in „Mein Bereich“. */}
+          <Route path="/members/area" element={<MeinBereichUmleitung />} />
+          <Route path="/mitgliederbereich" element={<MeinBereichUmleitung />} />
+          <Route path="/member-area" element={<MeinBereichUmleitung />} />
+          <Route path="/members/benefits" element={<MeinBereichUmleitung />} />
+          <Route path="/members/documents" element={<MeinBereichUmleitung />} />
+          <Route path="/members/meetings" element={<MeinBereichUmleitung />} />
+          <Route path="/members/helfen" element={<MeinBereichUmleitung />} />
+          <Route path="/members/news" element={<MeinBereichUmleitung />} />
+          <Route path="/members/membership" element={<MeinBereichUmleitung />} />
+          <Route path="/account/invoices" element={<MeinBereichUmleitung />} />
+          <Route path="/account/documents" element={<MeinBereichUmleitung />} />
 
           {/* Admin */}
           {/* Eingang (#1352): Startseite für die Verwaltung, sonst „Mein Dienst“ oder die Meldungen der Moderation. */}
@@ -519,9 +533,9 @@ function App() {
           {/* Setup wizard */}
           <Route path="/setup" element={<ProtectedRoute requireArea="system"><SetupWizardPage /></ProtectedRoute>} />
 
-          {/* User: Meine Gewinne */}
-          <Route path="/my/prizes" element={<ProtectedRoute><MyPrizesPage /></ProtectedRoute>} />
-          <Route path="/my/penalties" element={<ProtectedRoute><MyPenaltiesPage /></ProtectedRoute>} />
+          {/* Gewinne und Strafen - seit #2059 Reiter unter „Rechnungen & Unterlagen“. */}
+          <Route path="/my/prizes" element={<MeinBereichUmleitung />} />
+          <Route path="/my/penalties" element={<MeinBereichUmleitung />} />
 
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />

@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-// Konto löschen mit Rollen in Teams (#2113, L-C5): die Seite nennt je Rolle den Weg und sperrt „Konto anonymisieren“,
-// bis die Rollen abgegeben sind. Ohne Rolle geht es wie bisher über die Rückfrage. Erfundene Daten.
+// Konto löschen mit Rollen in Teams (#2113, L-C5): die Karte nennt je Rolle den Weg und sperrt „Konto löschen“, bis die
+// Rollen abgegeben sind. Ohne Rolle geht es wie bisher über die Rückfrage. Seit #2059 ein Name für eine Sache: „Konto
+// löschen“ (vorher „Konto anonymisieren“), „Daten herunterladen“ statt „Datenexport“. Erfundene Daten.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
@@ -12,7 +13,7 @@ const promptMock = vi.fn();
 vi.mock("@/components/tls/ConfirmDialog", () => ({ usePrompt: () => promptMock }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { default: PrivacyAccountPage } = await import("./PrivacyAccountPage");
+const { DatenHerunterladen, KontoAngaben, KontoLoeschen } = await import("./PrivacyAccountPage");
 
 function serve(check) {
   apiMock.get.mockImplementation(async (url) => {
@@ -27,7 +28,7 @@ beforeEach(() => {
   promptMock.mockReset();
 });
 
-test("mit Rollen in Teams: Weg je Rolle mit Link, „Konto anonymisieren“ gesperrt", async () => {
+test("mit Rollen in Teams: Weg je Rolle mit Link, „Konto löschen“ gesperrt", async () => {
   serve({
     can_erase: false,
     closing: "Kommst du so nicht weiter, schreib an datenschutz@verein.example – der Verein löscht dein Konto dann.",
@@ -36,7 +37,7 @@ test("mit Rollen in Teams: Weg je Rolle mit Link, „Konto anonymisieren“ gesp
       { team_id: "t-1", team: "[RDL] Rudel", squad_id: "s-1", squad: "Erste", role: "captain", role_label: "Captain", way: "Gib die Rolle … ab.", link: "/teams" },
     ],
   });
-  render(<MemoryRouter><PrivacyAccountPage /></MemoryRouter>);
+  render(<MemoryRouter><KontoLoeschen /></MemoryRouter>);
   expect(await screen.findByTestId("dsgvo-erasure-blockers")).toHaveTextContent("Erst deine Rollen in Teams abgeben");
   expect(screen.getByTestId("dsgvo-erasure-blocker-leader")).toHaveTextContent("Teamleitung bei [RDL] Rudel");
   expect(screen.getByTestId("dsgvo-erasure-blocker-captain")).toHaveTextContent("Captain im Co-Team Erste von [RDL] Rudel");
@@ -48,9 +49,8 @@ test("mit Rollen in Teams: Weg je Rolle mit Link, „Konto anonymisieren“ gesp
   expect(promptMock).not.toHaveBeenCalled();
 });
 
-test("„Meine Daten“ nennt die Rolle als Wort, nicht als Rohwert (#2126)", async () => {
-  serve({ can_erase: true, blockers: [], message: null });
-  render(<MemoryRouter><PrivacyAccountPage /></MemoryRouter>);
+test("„Dein Konto“ nennt die Rolle als Wort, nicht als Rohwert (#2126)", async () => {
+  render(<MemoryRouter><KontoAngaben /></MemoryRouter>);
   expect(await screen.findByTestId("privacy-account-role")).toHaveTextContent(/^Turnierleitung$/);
 });
 
@@ -58,10 +58,19 @@ test("ohne Rolle: kein Hinweis, Löschen über die Rückfrage wie bisher", async
   serve({ can_erase: true, blockers: [], message: null });
   apiMock.post.mockResolvedValue({ data: { ok: true } });
   promptMock.mockResolvedValue("LÖSCHEN");
-  render(<MemoryRouter><PrivacyAccountPage /></MemoryRouter>);
+  render(<MemoryRouter><KontoLoeschen /></MemoryRouter>);
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/dsgvo/anonymize-me/check", expect.anything()));
   expect(screen.queryByTestId("dsgvo-erasure-blockers")).toBeNull();
   expect(screen.getByTestId("dsgvo-anonymize-btn")).not.toBeDisabled();
+  expect(screen.getByTestId("dsgvo-anonymize-btn")).toHaveTextContent(/^Konto löschen$/);
   fireEvent.click(screen.getByTestId("dsgvo-anonymize-btn"));
+  await waitFor(() => expect(promptMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Konto löschen?", confirmLabel: "Konto löschen" })));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/dsgvo/anonymize-me"));
+});
+
+test("Daten herunterladen: ein Knopf mit dem neuen Namen", () => {
+  render(<MemoryRouter><DatenHerunterladen /></MemoryRouter>);
+  expect(screen.getByTestId("dsgvo-export-btn")).toHaveTextContent(/^Daten herunterladen$/);
+  expect(screen.getByRole("heading", { name: "Daten herunterladen" })).toBeInTheDocument();
+  expect(screen.queryByText(/anonymisieren|Datenexport/)).toBeNull();
 });

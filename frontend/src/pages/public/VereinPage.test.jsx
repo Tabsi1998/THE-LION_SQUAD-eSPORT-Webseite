@@ -45,14 +45,15 @@ beforeEach(() => {
   mockApi();
 });
 
-test("Mitglied: oben der Mitgliederbereich mit sechs Kacheln, internen News und dem Weg zu /members/area", async () => {
+test("Mitglied: oben der Mitgliederbereich mit sechs Kacheln, internen News und dem Weg nach Mein Bereich → Verein", async () => {
   authState.user = { id: "u-1", username: "neonfalke" };
   authState.isClubMember = true;
   renderPage();
   const area = await screen.findByTestId("verein-member-area");
   await waitFor(() => expect(within(area).getByTestId("verein-member-since")).toHaveTextContent("Seit 2023"));
   expect(within(area).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(expect.arrayContaining([
-    "/members/membership#mitgliedskarte", "/members/membership", "/members/meetings", "/members/helfen", "/members/documents", "/members/benefits", "/members/area",
+    "/mein-bereich/mitgliedschaft#mitgliedskarte", "/mein-bereich/mitgliedschaft", "/mein-bereich/verein/versammlungen", "/mein-bereich/verein/helfen",
+    "/mein-bereich/verein/dokumente", "/mein-bereich/verein/vorteile", "/mein-bereich/verein",
   ]));
   expect(within(screen.getByTestId("verein-internal-news")).getByText("Neue Vereinsfarben")).toBeInTheDocument();
   // Dieselben Zahlen wie in der Sprungleiste des Mitgliederbereichs (#1257): ohne Offenes keine Zahl.
