@@ -41,9 +41,20 @@ export function gruppenFuer({ mitglied = false }: { mitglied?: boolean } = {}): 
   return GRUPPEN.filter((item) => mitglied || !item.memberOnly);
 }
 
-/** Wer „Verein“ sieht: Vereinsmitglieder - wie die Kacheln im Tab Verein (der Server prüft jede Antwort). */
-export function siehtVerein(user: { is_club_member?: boolean | null } | null | undefined): boolean {
-  return Boolean(user?.is_club_member);
+/** Die Bereiche der Verwaltung - wie ADMIN_AREAS im Web (frontend/src/lib/permissions.js); Moderation gehört nicht dazu. */
+export const ADMIN_AREAS = ["tournaments", "leagues", "content", "club", "finance", "system"];
+
+/** Hat diese Person einen Bereich der Verwaltung (isAnyAdmin im Web)? */
+export function istVerwaltung(user: { areas?: unknown } | null | undefined): boolean {
+  return Array.isArray(user?.areas) && (user?.areas as unknown[]).some((area) => ADMIN_AREAS.includes(String(area)));
+}
+
+/**
+ * Wer „Verein“ sieht: Vereinsmitglieder und die Verwaltung - wie im Web (MeinBereichLayout, siehtVerein). Der Server prüft
+ * jede Antwort selbst.
+ */
+export function siehtVerein(user: { is_club_member?: boolean | null; areas?: unknown } | null | undefined): boolean {
+  return Boolean(user?.is_club_member) || istVerwaltung(user);
 }
 
 // Die Seiten unter „Verein“ - früher /members/<seite>, im Web /mein-bereich/verein/<seite>.

@@ -14,7 +14,7 @@ import { api, errorMessage } from "../../lib/api";
 import { friendsSharing } from "../../lib/eventRecap";
 import { availabilityText } from "../../lib/appLock";
 import { formatDateTime } from "../../lib/format";
-import { BEREICH, siehtVerein } from "../../lib/meinBereich";
+import { BEREICH } from "../../lib/meinBereich";
 import { openLink, openWebsite } from "../../lib/openLink";
 import { ACCOUNT_CHANGED_MESSAGE } from "../../lib/profileSaveQueue";
 import { useProfileSaveQueue } from "../../lib/useProfileSaveQueue";
@@ -331,7 +331,6 @@ function AccountSettings({ gruppe, ziel }: { gruppe: SettingsGruppe; ziel?: stri
   }
 
   if (gruppe === "datenschutz") {
-    const mitglied = siehtVerein(user);
     return (
       <View style={styles.groups}>
         <Group id="sichtbarkeit" title="Sichtbarkeit" testID="settings-group-privacy">
@@ -415,8 +414,9 @@ function AccountSettings({ gruppe, ziel }: { gruppe: SettingsGruppe; ziel?: stri
               <Row icon="document-text-outline" label="Nutzungsbedingungen lesen" onPress={() => openLink(`${WEB_BASE_URL}/terms`)} testID="settings-consents-terms" border external />
             </Card>
           </AnkerView>
-          {/* Die Einwilligungen aus der Mitgliederverwaltung (#1537) - die Karte zeigt nur mit Zuordnung etwas. */}
-          {mitglied ? <MemberConsents /> : null}
+          {/* Die Einwilligungen aus der Mitgliederverwaltung (#1537): auch nach dem Austritt sichtbar und widerrufbar - ob es
+              sie gibt, sagt der Server (ohne Zuordnung zeigt die Karte nichts), nicht die Mitgliedschaft. */}
+          <MemberConsents />
         </Group>
         <Group id="daten" title="Daten herunterladen">
           <Card style={styles.list}>

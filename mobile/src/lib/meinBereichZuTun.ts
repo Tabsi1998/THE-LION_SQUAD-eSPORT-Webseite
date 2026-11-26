@@ -1,6 +1,6 @@
 import type { ConsentRow } from "./consents";
 import { feeBadge, formatMoney, type AreaSummary, type DolibarrView } from "./memberArea";
-import { BEREICH, vereinPfad, type GruppeKey } from "./meinBereich";
+import { BEREICH, istVerwaltung, vereinPfad, type GruppeKey } from "./meinBereich";
 
 // „Zu tun“ in „Mein Bereich“ (#2059): dieselben Regeln wie im Web (frontend/src/lib/meinBereichZuTun.js). Nur Pflichtiges
 // (Entscheidung 26.11.): offene Rechnung bzw. Beitrag, eine erteilte Einwilligung mit geändertem Text, die Wunschnummer,
@@ -38,14 +38,12 @@ function count(value: unknown): number {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-// Wie ADMIN_AREAS und needsSecondFactor im Web (frontend/src/lib/permissions.js): jeder Bereich der Verwaltung gilt erst mit
-// bestätigter Zwei-Faktor-Anmeldung.
-const ADMIN_AREAS = ["tournaments", "leagues", "content", "club", "finance", "system"];
+// Wie needsSecondFactor im Web (frontend/src/lib/permissions.js): jeder Bereich der Verwaltung gilt erst mit bestätigter
+// Zwei-Faktor-Anmeldung.
 
 /** Braucht diese Person für die Verwaltung noch die Zwei-Faktor-Anmeldung? */
 export function brauchtZweiFaktor(user: { areas?: unknown; mfa_enabled?: unknown; auth_mfa_verified?: unknown } | null | undefined): boolean {
-  const areas = Array.isArray(user?.areas) ? (user?.areas as unknown[]) : [];
-  if (!areas.some((area) => ADMIN_AREAS.includes(String(area)))) return false;
+  if (!istVerwaltung(user)) return false;
   return !(user?.mfa_enabled && user?.auth_mfa_verified);
 }
 

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { targetFromUrl } from "../navigation/rootNavigation";
 import {
-  EINSTELLUNGEN, GRUPPEN, einstellungZiel, einstellungenDer, gruppenFuer, offenJeGruppe, offenText, schnellwege, sichtbar, sucheEinstellungen,
+  EINSTELLUNGEN, GRUPPEN, einstellungZiel, einstellungenDer, gruppenFuer, offenJeGruppe, offenText, schnellwege, sichtbar, siehtVerein, sucheEinstellungen,
 } from "./meinBereich";
 
 // Mein Bereich (#2059, #1677): dieselben Gruppen und Namen wie im Web, die Schnellwege der Abnahme und die Suche, die jede
@@ -158,4 +158,14 @@ test("jede Einstellung hat einen Ort in der App - ihre Adresse öffnet einen Scr
   }
   // Eine Stelle in der Gruppe führt in genau diese Gruppe.
   expect(targetFromUrl(einstellungZiel(EINSTELLUNGEN.find((item) => item.ziel === "ruhezeit")!))).toEqual({ kind: "detail", screen: "MeinBereichGruppe", params: { gruppe: "benachrichtigungen", ziel: "ruhezeit" } });
+});
+
+test("„Verein“ sehen Mitglieder und die Verwaltung - wie im Web (siehtVerein = Mitglied oder ein Bereich der Verwaltung)", () => {
+  expect(siehtVerein({ is_club_member: true })).toBe(true);
+  expect(siehtVerein({ is_club_member: false, areas: ["club"] })).toBe(true);
+  expect(siehtVerein({ areas: ["tournaments"] })).toBe(true);
+  // Moderation allein ist kein Bereich der Verwaltung (ADMIN_AREAS im Web).
+  expect(siehtVerein({ areas: ["moderation"] })).toBe(false);
+  expect(siehtVerein({})).toBe(false);
+  expect(siehtVerein(null)).toBe(false);
 });

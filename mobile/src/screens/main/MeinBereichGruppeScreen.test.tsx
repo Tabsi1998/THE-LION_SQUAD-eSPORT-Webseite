@@ -143,3 +143,16 @@ test("Sprung zu Newsletter: „Weitere Wege“ ist gleich offen", async () => {
   await waitFor(() => expect(screen.getByTestId("notification-newsletter")).toBeTruthy());
   expect(screen.getByTestId("mb-newsletter")).toBeTruthy();
 });
+
+test("Einwilligungen des Vereins bleiben nach dem Austritt sichtbar und widerrufbar - der Server entscheidet, nicht die Mitgliedschaft", async () => {
+  mockUser.value = { ...MEMBER, is_club_member: false };
+  await renderGruppe("datenschutz", "einwilligungen");
+  expect(screen.getByTestId("member-consents")).toBeTruthy();
+});
+
+test("die Verwaltung sieht „Verein“ wie im Web - auch ohne eigene Mitgliedschaft", async () => {
+  mockUser.value = { ...MEMBER, is_club_member: false, areas: ["club"] };
+  await renderGruppe("verein");
+  expect(screen.getByTestId("mb-versammlungen")).toBeTruthy();
+  expect(screen.queryByTestId("membership-join")).toBeNull();
+});
