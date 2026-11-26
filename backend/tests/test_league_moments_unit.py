@@ -20,7 +20,7 @@ def doc(outcome="up", **extra):
 
 def test_fact_and_labels():
     assert moments.fact_of("up", 1) == "up:1"
-    assert moments.level_label({"level": 1, "nickname": "  Elite  Klasse "}) == "Liga 1 · Elite Klasse"
+    assert moments.level_label({"level": 1, "nickname": "  Elite  Klasse "}) == "Liga 1 · Elite Klasse"
     assert moments.level_label({"level": 10}) == "Liga 10"
     assert moments.level_label(None) == "Liga"
     assert moments.season_title({"name": "Probe-Liga"}, {"name": "Season 1"}) == TITLE
@@ -30,8 +30,8 @@ def test_fact_and_labels():
 def test_promotion_texts_name_both_leagues_and_the_next_season():
     texts = moments.texts(doc(), TITLE)
     assert texts["kicker"] == "Aufstieg"
-    assert texts["title"] == "Liga 1 · Elite"
-    assert texts["line"] == "Probe Alpha steigt von Liga 2 in Liga 1 · Elite auf."
+    assert texts["title"] == "Liga 1 · Elite"
+    assert texts["line"] == "Probe Alpha steigt von Liga 2 in Liga 1 · Elite auf."
     # Jede Angabe nur einmal: Liga N im Titel, der Weg dorthin im Satz - keine dritte Zeile mit derselben Liga.
     assert texts["next"] is None
     assert texts["label"] == "Aufstieg" and texts["summary"] == texts["line"]
@@ -64,13 +64,13 @@ def test_champion_texts_from_table_and_playoffs():
 
 
 def test_push_texts_first_and_corrected():
-    assert moments.push_texts(doc(), TITLE) == ("Aufstieg in Liga 1 · Elite",
-                                              f"Der Endstand von {TITLE} steht fest: Probe Alpha steigt in Liga 1 · Elite auf.")
+    assert moments.push_texts(doc(), TITLE) == ("Aufstieg in Liga 1 · Elite",
+                                              f"Der Endstand von {TITLE} steht fest: Probe Alpha steigt in Liga 1 · Elite auf.")
     headline, text = moments.push_texts(doc("down", to={"level": 3}), TITLE)
     assert headline == "Nächste Season in Liga 3"
     assert moments.push_texts(doc("champion"), TITLE)[0] == "Meister: Probe Alpha"
     headline, text = moments.push_texts(doc(), TITLE, corrected=True)
-    assert headline == "Endstand korrigiert" and text.endswith("Probe Alpha steigt in Liga 1 · Elite auf.")
+    assert headline == "Endstand korrigiert" and text.endswith("Probe Alpha steigt in Liga 1 · Elite auf.")
     headline, text = moments.push_texts(doc(active=False), TITLE)
     assert headline == "Endstand korrigiert" and "Stand auf der Ligaseite" in text
 

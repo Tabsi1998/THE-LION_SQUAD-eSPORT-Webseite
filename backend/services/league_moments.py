@@ -65,7 +65,8 @@ def level_label(step: dict | None) -> str:
     if not isinstance(level, int):
         return "Liga"
     nickname = " ".join(str((step or {}).get("nickname") or "").split())
-    return f"Liga {level} · {nickname}" if nickname else f"Liga {level}"
+    # Festes Leerzeichen vor dem Punkt (wie LeagueBadge): Bricht der Text um, dann hinter dem Punkt - er steht nie am Zeilenanfang.
+    return f"Liga {level}\u00a0· {nickname}" if nickname else f"Liga {level}"
 
 
 def season_title(league: dict | None, season: dict | None) -> str:
