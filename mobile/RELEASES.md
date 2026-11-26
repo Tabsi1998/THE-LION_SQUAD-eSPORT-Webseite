@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.15`: Build 109, Liga in der App: Saisonende-Moment, Startrechte, Anmeldung mit Co-Team, Spieltag mit Maps, Vorfällen und Verfahren; Mein Bereich mit Suche; Ecken für „du“, Vereinsintern, ruhige Saison-Deko (#2584, #1627, #2542, #2173, #2059, #1677, #1316, #2516, #1169)
 - `1.7.14`: Build 108, FAQ in der App, Push-Frage im richtigen Moment, Hinweis bei zurückgezogenen Beiträgen (#2449, #1208, #2164)
 - `1.7.13`: Build 107, Benachrichtigungen in Stufen und Ruhezeit, Zeremonie je Konto, Installations-Kennung, zusammengelegte Läufe, Liga-Stand, Vereinsmitglied (#2444, #2450, #2470, #2459, #2453, #1267)
 - `1.7.12`: Build 106, Turniertag: Cockpit, Spielzeit-Uhr, Hinweis der Turnierleitung (#2393)

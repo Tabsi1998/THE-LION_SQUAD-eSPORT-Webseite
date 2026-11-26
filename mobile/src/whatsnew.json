@@ -1,15 +1,21 @@
 {
-  "version": "1.7.14",
-  "build": 108,
-  "date": "2026-11-17",
+  "version": "1.7.15",
+  "build": 109,
+  "date": "2026-11-27",
   "items": [
-    "Eigene FAQ unter Einstellungen › Über die App – Suche, häufige Fragen und Bereiche mit Rollen-Filter.",
-    "Bereich „LionsAPP“ in der FAQ mit Push-Stufen, Ruhezeit, Kanälen, Aufruf-Ton, Passkey, App-Sperre, ohne Netz und Updates.",
-    "Fragen für Mitglieder, Helfer und Turnierleitung kommen nach Prüfung vom Server; Links auf /faq öffnen die FAQ der App.",
-    "Keine Frage nach Benachrichtigungen mehr direkt nach dem Login.",
-    "Nach der ersten Turnier- oder Event-Anmeldung erst die Erklärung „Sollen wir dich rufen, wenn du dran bist?“, dann Android.",
-    "Leiser Hinweis „Aufrufe sind aus – einschalten“ auf Turnier- und Event-Seiten und in den Einstellungen.",
-    "Zurückgezogene News-Beiträge und Alben zeigen einen Hinweis statt eines Ladefehlers.",
-    "Filter-Chips der Referenzen mit größerer Tippfläche, „Spielst du auch mit?“ ohne Gleiten bei reduzierter Bewegung."
+    "Saisonende-Moment für Aufstieg, Abstieg und Meister – einmal je Person, der Meister mit seinen Belohnungen als zweite Karte; Hinweis „Saisonende“ an Profil und Team mit „Moment ansehen“, die Nachricht zum Saisonende öffnet ihn.",
+    "Startrechte am Team mit dem wirklichen Stand (Zusage offen, Frist ruht, Leitung entscheidet, Zugesagt, Verfallen, Nachgerückt) und den Knöpfen „Startrecht annehmen“ und „Nachrücken ablehnen“.",
+    "Mit Co-Team zur Liga anmelden in vier Schritten wie im Web; ein aufgelöstes Team lässt sich innerhalb der Frist wiederherstellen.",
+    "Liga-Spieltag in der App: Ergebnis mit Maps melden und bestätigen, Vorfälle klären, Beanstandung und Protest führen, Strafen im Profil mit Einspruch.",
+    "Events: Warteliste schon vor dem Absenden, abgesagte Events bleiben bis zum Termin unter „Kommend“, Einchecken mit Rückgängig.",
+    "„Mein Bereich“ statt „Profil“: acht Gruppen wie im Web, Einstellungen flach mit Suche, Sammel-Mail sofort, täglich oder wöchentlich.",
+    "Discord, Twitch und Steam lassen sich wieder verknüpfen.",
+    "Ecken-Rahmen „Du“ bzw. „Dein Team“ in Tabellen, Turnierbaum, Spielplan, Leaderboards und Kalender.",
+    "Etikett „Vereinsintern“ an Referenzen, Trophäen, Teilnahmen und Liga-Seasons; Schalter „Vereinsinterne Erfolge zeigen“ unter Mein Bereich › Datenschutz.",
+    "Die Glocke nennt „Onyx erreicht“ als Krone.",
+    "Am Turniertag bleibt die Saison-Deko ruhig; Saison-Grüße warten, bis die Deko wieder zu sehen ist.",
+    "Begriffe wie im Web: Captain in der Liga, sonst Teamleitung; Formatnamen und Benachrichtigungsarten.",
+    "FAQ-Texte aus der Website nachgezogen (Saisonende, Mein Bereich, Benachrichtigungen, Profil).",
+    "Expo 57.0.34 und aktuelle Paketstände, befristete Audit-Ausnahme für picomatch."
   ]
 }
