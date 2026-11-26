@@ -125,7 +125,7 @@ function Zeile({ item, detail, border }: { item: Einstellung; detail?: string; b
       <Ionicons name={ICONS[item.ziel] || "ellipse-outline"} color={item.ziel === "austritt" ? colors.muted : colors.cyan} size={20} />
       <View style={styles.flex}>
         <Body style={styles.strong}>{item.label}</Body>
-        {detail || item.detail ? <Muted numberOfLines={2}>{detail || item.detail}</Muted> : null}
+        {detail || item.detail ? <Muted>{detail || item.detail}</Muted> : null}
       </View>
       <Ionicons name="chevron-forward" color={colors.muted} size={16} />
     </Press>
@@ -196,7 +196,7 @@ function Strafen() {
           <Ionicons name="shield-outline" color={standing?.active || hits ? colors.live : colors.cyan} size={20} />
           <View style={styles.flex}>
             <Body style={styles.strong}>Moderation</Body>
-            <Muted numberOfLines={2}>{standing === undefined ? "Wird geladen …" : detail}</Muted>
+            <Muted>{standing === undefined ? "Wird geladen …" : detail}</Muted>
             <Muted style={styles.small}>Details und Einspruch auf der Website.</Muted>
           </View>
           <Ionicons name="open-outline" color={colors.muted} size={16} />

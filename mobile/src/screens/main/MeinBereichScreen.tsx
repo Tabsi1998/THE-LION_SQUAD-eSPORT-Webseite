@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { NavigationContext } from "@react-navigation/native";
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
@@ -128,6 +128,16 @@ function EigenerBereich() {
   const wide = width >= 700;
   const sucht = suchWoerter(suche).length > 0;
   const treffer = useMemo(() => (sucht ? sucheEinstellungen(suche, { mitglied }) : []), [mitglied, suche, sucht]);
+  // Staffelung und goldener Schein nur beim ersten Zeigen (#1677): kommt die Übersicht nach dem Leeren der Suche zurück, steht
+  // sie gleich da - nichts spielt ein zweites Mal.
+  const gespielt = useRef<Set<string>>(new Set());
+  const spielt = (key: string) => !gespielt.current.has(key);
+  useEffect(() => {
+    if (sucht) return;
+    gespielt.current.add("kacheln");
+    gespielt.current.add("liste");
+    if (todo.loaded && todo.items.length) gespielt.current.add("todo");
+  }, [sucht, todo.loaded, todo.items.length]);
 
   const open = (to: string) => { navigateToUrl(to); };
   const openGruppe = (key: Gruppe["key"]) => navigation?.navigate("MeinBereichGruppe", { gruppe: key });
@@ -161,8 +171,8 @@ function EigenerBereich() {
               {!todo.loaded ? (
                 <View style={styles.todoSkeleton} accessibilityLabel="Zu tun wird geladen" testID="mein-bereich-todo-loading" />
               ) : todo.items.length ? (
-                <StaggerIn style={styles.todoList}>
-                  {todo.items.map((item) => <ZuTunKnopf key={item.key} item={item} onPress={() => open(item.to)} />)}
+                <StaggerIn style={styles.todoList} play={spielt("todo")}>
+                  {todo.items.map((item) => <ZuTunKnopf key={item.key} item={item} leuchten={spielt("todo")} onPress={() => open(item.to)} />)}
                 </StaggerIn>
               ) : (
                 <View style={styles.todoEmpty} testID="mein-bereich-todo-empty">
@@ -174,11 +184,11 @@ function EigenerBereich() {
 
             <View style={styles.section} testID="mein-bereich-schnell">
               <Muted style={styles.sectionTitle} accessibilityRole="header">Häufig gebraucht</Muted>
-              <StaggerIn style={styles.tiles} itemStyle={wide ? styles.tileItemWide : styles.tileItem}>
+              <StaggerIn style={styles.tiles} itemStyle={wide ? styles.tileItemWide : styles.tileItem} play={spielt("kacheln")}>
                 {schnellwege({ mitglied }).map((item) => (
                   <Press key={item.key} onPress={() => open(item.to)} accessibilityRole="button" style={styles.tile} testID={`mein-bereich-schnell-${item.key}`}>
                     <Ionicons name={SCHNELL_ICONS[item.key] || "ellipse-outline"} color={item.key === "loeschung" ? colors.muted : colors.cyan} size={22} />
-                    <Body style={styles.tileLabel} numberOfLines={2}>{item.label}</Body>
+                    <Body style={styles.tileLabel}>{item.label}</Body>
                   </Press>
                 ))}
               </StaggerIn>
@@ -186,7 +196,7 @@ function EigenerBereich() {
 
             <View style={styles.section}>
               <Muted style={styles.sectionTitle} accessibilityRole="header">Alle Bereiche</Muted>
-              <StaggerIn style={styles.groupList} itemStyle={wide ? styles.groupItemWide : styles.groupItem} testID="mein-bereich-liste">
+              <StaggerIn style={styles.groupList} itemStyle={wide ? styles.groupItemWide : styles.groupItem} play={spielt("liste")} testID="mein-bereich-liste">
                 {gruppen.map((item) => (
                   <GruppenZeile key={item.key} item={item} count={offen[item.key] || 0} onPress={() => openGruppe(item.key)} />
                 ))}
@@ -207,7 +217,7 @@ function Identitaet({ user, onPress }: { user: Record<string, any> | null; onPre
     <Press onPress={onPress} accessibilityRole="button" accessibilityLabel={`${name}, dein Profil ansehen`} accessibilityHint="Öffnet dein Profil, wie andere es sehen" style={styles.identity} testID="mein-bereich-identity">
       <MediaImage uri={user?.avatar_url || undefined} style={styles.avatar} fallback={<Body style={styles.initials}>{initials}</Body>} />
       <View style={styles.flex}>
-        <Body style={styles.name} numberOfLines={2} testID="mein-bereich-name">{name}</Body>
+        <Body style={styles.name} testID="mein-bereich-name">{name}</Body>
         <View style={styles.identityMeta}>
           {user?.username ? <Muted style={styles.shrink}>@{user.username}</Muted> : null}
           {user?.is_club_member ? (
@@ -257,6 +267,20 @@ function Suchfeld({ value, onChange }: { value: string; onChange: (text: string)
  * der bleibt, bleibt stehen (eigener Schlüssel); ein neuer blendet sanft ein (Deckkraft, 4 Punkte) - nichts springt.
  */
 function Treffer({ items, anfrage, onOpen }: { items: Einstellung[]; anfrage: string; onOpen: (item: Einstellung) => void }) {
+  const zahl = items.length === 1 ? "1 Treffer" : `${items.length} Treffer`;
+  const ansage = items.length ? zahl : `Nichts gefunden zu „${anfrage.trim()}“`;
+  // Android sagt die Zahl über die Live-Region an, iOS kennt keine - dort einmal, wenn das Tippen kurz ruht.
+  useEffect(() => {
+    if (Platform.OS !== "ios") return undefined;
+    const timer = setTimeout(() => {
+      try {
+        AccessibilityInfo.announceForAccessibility(ansage);
+      } catch {
+        // ohne Ansage weiter
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [ansage]);
   if (!items.length) {
     return (
       <Erscheinen style={styles.noHits} testID="mein-bereich-suche-leer">
@@ -268,15 +292,15 @@ function Treffer({ items, anfrage, onOpen }: { items: Einstellung[]; anfrage: st
   }
   return (
     <View style={styles.hits} testID="mein-bereich-treffer">
-      <Muted style={styles.sectionTitle} accessibilityLiveRegion="polite" testID="mein-bereich-treffer-zahl">{items.length === 1 ? "1 Treffer" : `${items.length} Treffer`}</Muted>
+      <Muted style={styles.sectionTitle} accessibilityLiveRegion="polite" testID="mein-bereich-treffer-zahl">{zahl}</Muted>
       <View style={styles.hitList}>
         {items.map((item, index) => (
           <Erscheinen key={`${item.gruppe}:${item.ziel}`} delay={Math.min(index, 6) * 25}>
             <Press onPress={() => onOpen(item)} accessibilityRole="button" accessibilityLabel={`${item.label}, ${gruppeMeta(item.gruppe)?.label || ""}`} style={[styles.hit, index > 0 && styles.hitBorder]} testID={`mein-bereich-treffer-${item.gruppe}-${item.ziel}`}>
               <Ionicons name={gruppeMeta(item.gruppe)?.icon || "ellipse-outline"} color={colors.cyan} size={18} />
               <View style={styles.flex}>
-                <Body style={styles.strong} numberOfLines={2}>{item.label}</Body>
-                <Muted numberOfLines={2}>{gruppeMeta(item.gruppe)?.label}{item.detail ? ` · ${item.detail}` : ""}</Muted>
+                <Body style={styles.strong}>{item.label}</Body>
+                <Muted>{gruppeMeta(item.gruppe)?.label}{item.detail ? ` · ${item.detail}` : ""}</Muted>
               </View>
               <Ionicons name="chevron-forward" color={colors.muted} size={16} />
             </Press>
@@ -302,12 +326,12 @@ function Erscheinen({ children, delay = 0, style, testID }: { children: React.Re
   return <Animated.View style={[style, animated]} testID={testID}>{children}</Animated.View>;
 }
 
-function ZuTunKnopf({ item, onPress }: { item: ZuTunItem; onPress: () => void }) {
+function ZuTunKnopf({ item, onPress, leuchten = true }: { item: ZuTunItem; onPress: () => void; leuchten?: boolean }) {
   const warn = item.tone === "warn";
   return (
     <Press onPress={onPress} accessibilityRole="button" style={[styles.todo, warn && styles.todoWarn]} testID={`mein-bereich-todo-${item.key}`}>
       {/* Wie im Web: was drängt (überfällig, Beitrag, Zwei-Faktor), leuchtet beim Öffnen einmal golden auf. */}
-      {warn ? <Glow active tone="honor" radius={radius.lg} /> : null}
+      {warn ? <Glow active={leuchten} tone="honor" radius={radius.lg} /> : null}
       <View style={styles.flex}>
         <Body style={[styles.todoTitle, warn && styles.todoTitleWarn]}>{item.label}</Body>
         {item.detail ? <Muted>{item.detail}</Muted> : null}
@@ -329,7 +353,7 @@ function GruppenZeile({ item, count, onPress }: { item: Gruppe; count: number; o
       <View style={styles.groupIcon}><Ionicons name={item.icon} color={colors.cyan} size={18} /></View>
       <View style={styles.flex}>
         <Body style={styles.strong}>{item.label}</Body>
-        <Muted numberOfLines={2}>{item.text}</Muted>
+        <Muted>{item.text}</Muted>
       </View>
       {count ? <View style={styles.count}><Body style={styles.countText}>{offenText(count)}</Body></View> : null}
       <Ionicons name="chevron-forward" color={colors.muted} size={16} />

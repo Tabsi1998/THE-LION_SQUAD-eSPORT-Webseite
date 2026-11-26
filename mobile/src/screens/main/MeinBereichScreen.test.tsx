@@ -28,6 +28,17 @@ jest.mock("../../components/MediaImage", () => ({ MediaImage: ({ fallback }: { f
 jest.mock("../../seasons/SeasonStage", () => ({ SeasonBackdropSlot: () => null, appNamesSeason: () => true }));
 jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null }));
 jest.mock("../../update/AppUpdateProvider", () => ({ useOptionalAppUpdate: () => ({ openWhatsNew: jest.fn() }) }));
+// Was Staffelung und Schein abspielen - zum Prüfen, dass das Leeren der Suche nichts wiederholt.
+jest.mock("../../components/motion", () => {
+  const actual = jest.requireActual("../../components/motion");
+  const plays: Array<{ kind: string; play: boolean }> = [];
+  return {
+    ...actual,
+    __plays: plays,
+    StaggerIn: (props: { play?: boolean }) => { plays.push({ kind: "stagger", play: props.play !== false }); return jest.requireActual("react").createElement(actual.StaggerIn, props); },
+    Glow: (props: { active?: boolean }) => { plays.push({ kind: "glow", play: Boolean(props.active) }); return jest.requireActual("react").createElement(actual.Glow, props); },
+  };
+});
 
 const navigate = jest.fn();
 const navigation = { navigate, addListener: jest.fn(() => () => {}), isFocused: () => true } as never;
@@ -115,8 +126,8 @@ test("kein Mitglied, ohne Verein: drei Wege, kein „Verein“, keine Vereinsabf
   expect(screen.queryByTestId("mein-bereich-member")).toBeNull();
   const asked = mockGet.mock.calls.map(([path]) => String(path));
   expect(asked.filter((path) => path.startsWith("/membership"))).toEqual([]);
-  // Ein langer Name bricht höchstens auf zwei Zeilen um - er sprengt den Kopf nicht und bleibt mit großer Schrift lesbar.
-  expect(screen.getByTestId("mein-bereich-name").props.numberOfLines).toBe(2);
+  // Ein langer Name bricht um, nichts wird abgeschnitten - auch mit großer Schrift ganz lesbar.
+  expect(screen.getByTestId("mein-bereich-name").props.numberOfLines).toBeUndefined();
 });
 
 test("Server antwortet nicht: „Zu tun“ zeigt, was da ist - ohne Fehler im Gesicht", async () => {
@@ -187,4 +198,45 @@ test("Kontowechsel: eine späte Antwort des vorigen Kontos landet nicht in „Zu
   await act(async () => { late[1]({ data: { summary: { open_count: 0 } } }); });
   await waitFor(() => expect(screen.getByTestId("mein-bereich-todo-empty")).toBeTruthy());
   expect(screen.queryByTestId("mein-bereich-todo-rechnung")).toBeNull();
+});
+
+test("große Schrift: kein Text wird abgeschnitten - keine feste Zeilenzahl in der Übersicht und den Treffern", async () => {
+  await renderBereich();
+  await waitFor(() => expect(screen.getByTestId("mein-bereich-todo-rechnung")).toBeTruthy());
+  const clipped = screen.queryAllByText(/.+/).filter((node) => node.props.numberOfLines !== undefined).map((node) => String(node.props.children));
+  expect(clipped).toEqual([]);
+  await fireEvent.changeText(screen.getByTestId("mein-bereich-suche"), "passwort");
+  expect(screen.queryAllByText(/.+/).filter((node) => node.props.numberOfLines !== undefined)).toEqual([]);
+});
+
+test("iOS: die Zahl der Treffer wird angesagt (Android sagt sie über die Live-Region)", async () => {
+  const { AccessibilityInfo, Platform } = jest.requireActual<typeof import("react-native")>("react-native");
+  const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  const os = Platform.OS;
+  Object.defineProperty(Platform, "OS", { configurable: true, get: () => "ios" });
+  jest.useFakeTimers();
+  try {
+    await renderBereich();
+    await fireEvent.changeText(screen.getByTestId("mein-bereich-suche"), "Ruhezeit");
+    await act(async () => { jest.advanceTimersByTime(800); });
+    expect(announce).toHaveBeenLastCalledWith("1 Treffer");
+  } finally {
+    jest.useRealTimers();
+    Object.defineProperty(Platform, "OS", { configurable: true, get: () => os });
+    announce.mockRestore();
+  }
+});
+
+test("Suche leeren: die Übersicht steht gleich da - Staffelung und goldener Schein spielen nicht noch einmal", async () => {
+  const motion = jest.requireMock("../../components/motion") as { __plays: Array<{ kind: string; play: boolean }> };
+  answers({ "/account/invoices": { summary: { open_count: 1, overdue_count: 1 } } });
+  await renderBereich();
+  await waitFor(() => expect(screen.getByTestId("mein-bereich-todo-rechnung")).toBeTruthy());
+  expect(motion.__plays.some((entry) => entry.play)).toBe(true);
+  motion.__plays.length = 0;
+  await fireEvent.changeText(screen.getByTestId("mein-bereich-suche"), "passwort");
+  await fireEvent.press(screen.getByTestId("mein-bereich-suche-leeren"));
+  expect(screen.getByTestId("mein-bereich-start")).toBeTruthy();
+  expect(motion.__plays.length).toBeGreaterThan(0);
+  expect(motion.__plays.filter((entry) => entry.play)).toEqual([]);
 });
