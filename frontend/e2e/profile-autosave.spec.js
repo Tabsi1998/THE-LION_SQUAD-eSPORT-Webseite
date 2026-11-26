@@ -127,13 +127,13 @@ test("Verlassen mit leerem Namen: Link und Browser-Vor halten an, Dialog der Sei
   await page.getByTestId("settings-to-profile").click();
   await expect(page.getByTestId("confirm-dialog")).toContainText("Name ist leer oder zu lang.");
   await page.getByTestId("confirm-dialog-cancel").click();
-  await expect(page).toHaveURL(/\/profile/);
+  await expect(page).toHaveURL(/\/mein-bereich\/profil/);
   await expect(page.getByTestId("profile-display-name")).toBeFocused();
 
   // Browser-Vor: die Adresse bleibt, der Dialog kommt.
   await page.goForward();
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
-  await expect(page).toHaveURL(/\/profile/);
+  await expect(page).toHaveURL(/\/mein-bereich\/profil/);
   await expect(page.getByTestId("profile-display-name")).toHaveValue("");
   await page.getByTestId("confirm-dialog-confirm").click();
   await expect(page).toHaveURL(/\/u\/neonfalke/);

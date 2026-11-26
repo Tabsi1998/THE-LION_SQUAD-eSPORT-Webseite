@@ -144,3 +144,26 @@ test("Das Eingabefeld des Prompts bekommt den Fokus", async () => {
 
   await waitFor(() => expect(screen.getByPlaceholderText("Grund")).toHaveFocus());
 });
+
+// Rückfrage mit Pflicht-Wort (#2059, Konto löschen): sichtbare Beschriftung am Feld, Beschreibung per aria-describedby,
+// ein falsches Wort zeigt eine Meldung und lässt den Dialog offen.
+test("Eingabe mit Beschriftung und Prüfung: falsches Wort bleibt im Dialog mit Meldung", async () => {
+  const user = userEvent.setup();
+  renderPrompt({
+    title: "Konto löschen?", description: "Das lässt sich nicht rückgängig machen.", label: "Tippe LÖSCHEN zur Bestätigung",
+    multiline: false, required: true, validate: (value) => (value.trim() === "LÖSCHEN" ? "" : "Bitte genau LÖSCHEN eintippen."),
+  });
+  await user.click(screen.getByRole("button", { name: "Grund erfassen" }));
+  const field = screen.getByLabelText("Tippe LÖSCHEN zur Bestätigung");
+  expect(field).toHaveAttribute("aria-describedby", expect.stringContaining("confirm-description"));
+  expect(field).not.toHaveAttribute("placeholder", "LÖSCHEN");
+  await user.type(field, "loeschen");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("Bitte genau LÖSCHEN eintippen.");
+  expect(screen.getByTestId("result")).toHaveTextContent("offen");
+  await user.clear(field);
+  await user.type(field, "LÖSCHEN");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(screen.getByTestId("result")).toHaveTextContent("LÖSCHEN"));
+});

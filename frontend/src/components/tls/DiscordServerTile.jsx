@@ -100,7 +100,7 @@ export function DiscordServerList({ data, testId = "discord-servers" }) {
       })}
       {data.linked === false ? (
         <p className="text-[11px] text-white/45" data-testid={`${testId}-link-hint`}>
-          <Link to="/profile?tab=socials" className="text-[#8EA1FF] hover:text-white">Discord verknüpfen</Link>, dann steht hier, wo du schon dabei bist.
+          <Link to="/mein-bereich/profil?tab=socials&link=discord" className="text-[#8EA1FF] hover:text-white">Discord verknüpfen</Link>, dann steht hier, wo du schon dabei bist.
         </p>
       ) : null}
     </div>

@@ -18,7 +18,7 @@ function rewriteLegacyPath(url) {
     const to = new URLSearchParams(url.split("?")[1] || "").get("to");
     return to ? `/messages/${to}` : "/messages";
   }
-  if (url === "/me/prizes") return "/my/prizes";
+  if (url === "/me/prizes" || url === "/my/prizes") return "/mein-bereich/rechnungen?tab=gewinne";
   // Den Turnier-Chat zeigt die Turnierseite selbst; eine eigene /chat-Seite
   // gibt es im Web nicht.
   const tournamentChat = url.match(/^\/tournaments\/([^/?#]+)\/chat$/);
@@ -49,7 +49,7 @@ export function notificationTarget(item) {
 
   const challengeId = metaString(meta, "challenge_id") || metaString(meta, "fastlap_id");
   if (challengeId && (kind.includes("f1") || kind.includes("fast"))) return `/fastlap/${challengeId}`;
-  if (kind.includes("prize")) return "/my/prizes";
+  if (kind.includes("prize")) return "/mein-bereich/rechnungen?tab=gewinne";
 
   const tournamentId = metaString(meta, "tournament_id");
   if (tournamentId && kind.includes("tournament") && !url) return `/tournaments/${tournamentId}`;

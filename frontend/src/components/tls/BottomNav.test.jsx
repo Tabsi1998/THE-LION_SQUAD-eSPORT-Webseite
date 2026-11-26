@@ -32,12 +32,12 @@ test("Gast: fünf Einträge, Profil führt zur Anmeldung", () => {
   expect(screen.getByTestId("bottom-nav-home")).toHaveAttribute("aria-current", "page");
 });
 
-test("angemeldet: Home ist das Dashboard, Profil das eigene Profil, an Community die Zahl der ungelesenen Chats", () => {
+test("angemeldet: Home ist das Dashboard, Profil führt nach Mein Bereich, an Community die Zahl der ungelesenen Chats", () => {
   authState.user = { id: "u-1", username: "neonfalke" };
   unread.value = 3;
   renderAt("/dashboard");
   expect(screen.getByTestId("bottom-nav-home")).toHaveAttribute("href", "/dashboard");
-  expect(screen.getByTestId("bottom-nav-profile")).toHaveAttribute("href", "/u/me");
+  expect(screen.getByTestId("bottom-nav-profile")).toHaveAttribute("href", "/mein-bereich");
   expect(screen.getByTestId("bottom-nav-community-count")).toHaveTextContent("3");
   expect(screen.getByTestId("bottom-nav-community")).toHaveAttribute("aria-label", "Community, 3 ungelesene Chats");
 });
@@ -61,6 +61,8 @@ test("der aktive Eintrag je Adresse", () => {
     "/profile": "profile",
     "/account/invoices": "profile",
     "/u/me": "profile",
+    "/mein-bereich": "profile",
+    "/mein-bereich/verein/versammlungen": "profile",
   };
   for (const [path, key] of Object.entries(cases)) expect([path, activeSection(path)]).toEqual([path, key]);
   // Das eigene Profil gehört zu Profil, fremde Profile zu Community.

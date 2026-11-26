@@ -55,7 +55,7 @@ test("der Wunsch des Vereins führt zum Verknüpfen im Profil", async () => {
   show();
   const wish = await screen.findByTestId("membership-accounts-wish-discord");
   expect(wish).toHaveTextContent("Der Verein wünscht: Discord verknüpfen.");
-  expect(screen.getByTestId("membership-accounts-link-discord")).toHaveAttribute("href", "/profile?tab=socials&link=discord");
+  expect(screen.getByTestId("membership-accounts-link-discord")).toHaveAttribute("href", "/mein-bereich/profil?tab=socials&link=discord");
 });
 
 test("ohne Fähigkeit der Grund, ohne Verbindung zur Akte nichts", async () => {

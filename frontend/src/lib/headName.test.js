@@ -26,10 +26,13 @@ test("feste lange Wörter in den Überschriften tragen eine weiche Trennstelle",
     "src/pages/user/NotificationsPage.jsx": "Benachrichti&shy;gungen</span></h1>",
     "src/pages/admin/AdminDashboardPage.jsx": "Kommando&shy;zentrale</h1>",
     "src/pages/admin/AdminBenefitsPage.jsx": "Mitglieder&shy;vorteile</h1>",
-    "src/pages/user/MemberBenefitsPage.jsx": "Mitglieder&shy;vorteile</h1>",
-    "src/pages/user/MemberDocumentsPage.jsx": "Vereins&shy;dokumente</h1>",
+    // Seit „Mein Bereich“ (#2059) setzt der Rahmen die Überschrift - die Trennstelle steht bei den Gruppen und Seiten.
+    "src/lib/meinBereich.js": 'heading: "Mitglieder\\u00ADvorteile"',
+    "src/lib/meinBereich.js ": 'heading: "Vereins\\u00ADdokumente"',
+    "src/lib/meinBereich.js  ": 'heading: "Benachrichti\\u00ADgungen"',
+    "src/pages/user/meinBereich/GruppenSeiten.jsx": "title={meta.heading || meta.label}",
   };
-  for (const [file, heading] of Object.entries(headings)) expect(read(file), file).toContain(heading);
+  for (const [file, heading] of Object.entries(headings)) expect(read(file.trim()), file).toContain(heading);
 });
 
 test("Handy und Tablet trennen große Überschriften, am Handy wird die große Schrift kleiner", () => {

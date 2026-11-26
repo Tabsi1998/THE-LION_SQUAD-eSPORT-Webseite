@@ -44,8 +44,8 @@ test("Bereiche außer Moderation zählen erst mit bestätigter Zwei-Faktor-Anmel
   expect(adminWithoutSecondFactor({ role: "player", areas: [], is_tournament_staff: true, mfa_enabled: false })).toBe(false);
   expect(adminWithoutSecondFactor(null)).toBe(false);
 
-  expect(mfaSetupPath("/admin/f1")).toBe("/profile?tab=security&mfa=required&next=%2Fadmin%2Ff1");
-  expect(mfaSetupPath()).toBe("/profile?tab=security&mfa=required");
+  expect(mfaSetupPath("/admin/f1")).toBe("/mein-bereich/konto?mfa=required&next=%2Fadmin%2Ff1");
+  expect(mfaSetupPath()).toBe("/mein-bereich/konto?mfa=required");
 });
 
 // Derselbe Vertrag wie `require_area` im Server (#1479): enthält die Liste einen Bereich mit Zwei-Faktor, braucht es

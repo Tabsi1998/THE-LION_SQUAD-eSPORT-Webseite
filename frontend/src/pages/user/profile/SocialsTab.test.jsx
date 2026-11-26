@@ -49,7 +49,7 @@ test("nicht eingerichtet: Feld von Hand mit Hinweis; ohne Anmeldung: Textfeld mi
   await user.type(screen.getByTestId("profile-psn"), "p");
   expect(props.set).toHaveBeenCalledWith("psn_id", "p");
   expect(screen.getByTestId("profile-links-hint")).toHaveTextContent("Discord-Kennung und Nutzername; Twitch-Kennung, Login und Anzeigename; SteamID64");
-  expect(screen.getByTestId("profile-links-privacy")).toHaveAttribute("href", "/profile?tab=privacy");
+  expect(screen.getByTestId("profile-links-privacy")).toHaveAttribute("href", "/mein-bereich/datenschutz");
 });
 
 // „Gerade in Steam“ (#584): der Schalter nur mit verknüpftem Steam-Konto; er meldet den Wert nach oben.

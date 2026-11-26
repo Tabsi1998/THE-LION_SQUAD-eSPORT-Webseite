@@ -10,5 +10,5 @@
   { "id": "gewinne", "titel": "Gewinne & Trophäen", "kurz": "Preise, Urkunden und Erfolge.", "icon": "gift", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle" },
   { "id": "helferdienste", "titel": "Helferdienste", "kurz": "Schichten im Verein und Einsätze bei Turnieren.", "icon": "hand", "rollen": ["mitglied"], "sichtbar_fuer": "helfer" },
   { "id": "turnierleitung", "titel": "Turnierleitung", "kurz": "Check-in, Aufruf, Stationen und Ergebnisse vor Ort.", "icon": "clipboard", "rollen": ["turnierleitung"], "sichtbar_fuer": "turnierleitung" },
-  { "id": "datenschutz", "titel": "Datenschutz & Konto", "kurz": "Deine Daten herunterladen oder das Konto anonymisieren.", "icon": "shield", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle" }
+  { "id": "datenschutz", "titel": "Datenschutz & Konto", "kurz": "Deine Daten herunterladen oder das Konto löschen.", "icon": "shield", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle" }
 ]

@@ -130,7 +130,7 @@ export const FAQ_TOPICS = [
       { key: "betrieb", q: "Wo stehen Serverfehler und Auto-Checks?", a: "System → Betrieb & Logs: rote Auto-Checks und neue Serverfehler; mit Betriebskanal (Discord-Bot) auch als Alarm in einen privaten Discord-Kanal.", to: "/admin/ops", label: "System → Betrieb & Logs" },
       { key: "audit", q: "Wer hat was im Admin geändert?", a: "System → Betrieb & Logs → Ereignisse, Quelle „Adminaktionen“: jede Adminaktion mit Konto, Zeit und Details – mit Filter nach Aktion, Zeitraum und Text, als CSV exportierbar.", to: "/admin/ops?tab=events&source=audit", label: "System → Betrieb & Logs → Ereignisse" },
       { key: "moderation", q: "Wie moderiere ich Meldungen, Wortfilter und hochgeladene Bilder?", a: "System → Moderation: Meldungen, Wortfilter-Funde, Personen, Verwarnungsstufen und die Bildprüfung (automatisch geprüfte Uploads freigeben oder entfernen).", to: "/admin/moderation", label: "System → Moderation" },
-      { key: "zwei_faktor", q: "Warum verlangt der Adminbereich eine Zwei-Faktor-Anmeldung?", a: "Für jeden Adminbereich außer Moderation ist die bestätigte Zwei-Faktor-Anmeldung Pflicht, egal ob der Bereich aus Rolle, Freigabe oder Vorstandsposten kommt. Einrichten unter Benutzermenü → Einstellungen → Sicherheit.", to: "/profile?tab=security", label: "Einstellungen → Sicherheit" },
+      { key: "zwei_faktor", q: "Warum verlangt der Adminbereich eine Zwei-Faktor-Anmeldung?", a: "Für jeden Adminbereich außer Moderation ist die bestätigte Zwei-Faktor-Anmeldung Pflicht, egal ob der Bereich aus Rolle, Freigabe oder Vorstandsposten kommt. Einrichten unter Benutzermenü → Konto & Sicherheit.", to: "/mein-bereich/konto", label: "Mein Bereich → Konto & Sicherheit" },
     ],
   },
 ];

@@ -200,7 +200,7 @@ test("Gewinn: Gast, nur für Mitglieder, gezogen, gewonnen, Fehler", async () =>
   drawn.unmount();
 
   const won = show({ kind: "prize", prize: { ...PRIZE, status: "drawn", can_enter: false, won: true, hint: "Du hast gewonnen – schau unter „Meine Gewinne“." } });
-  expect(screen.getByTestId("advent-prize-mine")).toHaveAttribute("href", "/my/prizes");
+  expect(screen.getByTestId("advent-prize-mine")).toHaveAttribute("href", "/mein-bereich/rechnungen?tab=gewinne");
   won.unmount();
 
   const onRaffle = vi.fn().mockRejectedValue({ response: { data: { detail: "Die Teilnahme an dieser Verlosung ist vorbei." } } });
@@ -209,16 +209,16 @@ test("Gewinn: Gast, nur für Mitglieder, gezogen, gewonnen, Fehler", async () =>
   expect(await screen.findByTestId("advent-prize-problem")).toHaveTextContent("Die Teilnahme an dieser Verlosung ist vorbei.");
 });
 
-// #982: „Meine Gewinne“ führt auf die Seite, die es gibt (/my/prizes) - nicht auf eine 404.
+// #982: „Meine Gewinne“ führt auf die Seite, die es gibt - seit #2059 der Reiter Gewinne unter „Rechnungen & Unterlagen“.
 test("Meine Gewinne öffnet die Gewinne-Seite, die es in der App wirklich gibt", () => {
-  expect(appSource).toContain('<Route path="/my/prizes"');
+  expect(appSource).toContain('<Route path="rechnungen"');
   expect(appSource).not.toContain('path="/me/prizes"');
   const door = { day: 12, seed: 5, state: "opened", content: { kind: "prize", title: "Titel", body: "", media_url: null, link: null, prize: { ...PRIZE, status: "drawn", can_enter: false, won: true } } };
   render(
     <MemoryRouter initialEntries={["/"]}>
       <Routes>
         <Route path="/" element={<DoorDialog door={door} signedIn light={null} onClose={vi.fn()} onAnswer={vi.fn()} onRaffle={vi.fn()} />} />
-        <Route path="/my/prizes" element={<h1>Meine Gewinne – Seite</h1>} />
+        <Route path="/mein-bereich/rechnungen" element={<h1>Meine Gewinne – Seite</h1>} />
         <Route path="*" element={<h1>Seite nicht gefunden</h1>} />
       </Routes>
     </MemoryRouter>,

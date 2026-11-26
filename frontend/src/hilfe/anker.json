@@ -1,7 +1,7 @@
 {
   "datenschutz-und-konto": {
     "daten-herunterladen": "Daten herunterladen",
-    "konto-anonymisieren": "Konto anonymisieren",
+    "konto-anonymisieren": "Konto löschen",
     "rollen-abgeben": "Erst die Rollen abgeben"
   },
   "events-und-kalender": {
@@ -24,7 +24,7 @@
     "registrieren": "Registrieren",
     "zustimmen": "Zustimmen und Konto erstellen",
     "email-bestaetigen": "E-Mail bestätigen",
-    "einstellungen": "Einstellungen öffnen",
+    "einstellungen": "Mein Bereich öffnen",
     "grunddaten": "Grunddaten",
     "geburtsdatum": "Geburtsdatum eintragen",
     "plattform": "Plattform wählen",

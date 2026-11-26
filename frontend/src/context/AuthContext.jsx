@@ -2,6 +2,7 @@ import { adminWithoutSecondFactor, areasOf, canUseArea, hasArea, isAnyAdmin } fr
 import { clearRecentSearches } from "@/lib/recentSearches";
 import { clearOfflineCard, offlineCardOwner } from "@/lib/memberCardOffline";
 import { forgetWebPush } from "@/lib/webPush";
+import { gemeinsamKonto } from "@/lib/gemeinsamLaden";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
@@ -39,6 +40,13 @@ export function AuthProvider({ children }) {
     const owner = offlineCardOwner();
     if (user?.id && owner && owner !== user.id) clearOfflineCard();
   }, [user?.id]);
+
+  // Die geteilte Ablage von Mein Bereich (#2059) gilt nur für ein Konto: ein anderes oder keines leert sie, eine noch
+  // laufende Antwort für das vorige wird verworfen. Solange die Sitzung noch geprüft wird (undefined), bleibt sie.
+  const accountId = user === undefined ? undefined : user?.id || null;
+  useEffect(() => {
+    if (accountId !== undefined) gemeinsamKonto(accountId);
+  }, [accountId]);
 
   const googleAuthenticate = useCallback(async (credential, options = {}) => {
     setGoogleProcessing(true);
@@ -146,18 +154,31 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = async () => {
+  // Was das Konto auf diesem Gerät hinterlässt.
+  const clearDevice = () => {
+    setMfaTicket("");
+    setUser(null);
+    gemeinsamKonto(null);
+    // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
+    clearRecentSearches();
+    clearOfflineCard();
+    // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
+    void forgetWebPush();
+  };
+
+  // Scheitert das Abmelden am Server, bleibt die Sitzung sichtbar (mit Meldung): das Sitzungs-Cookie gilt dort weiter,
+  // ein leeres Gerät täuschte ein Abmelden nur vor. Anders nach „Konto löschen“ (`afterDelete`, #2059): da hat der
+  // Server alle Sitzungen schon beendet - das Gerät wird immer geleert, ohne zweite Meldung neben „Dein Konto ist gelöscht.“.
+  const logout = async ({ afterDelete = false } = {}) => {
     try {
       await api.post("/auth/logout");
-      setMfaTicket("");
-      setUser(null);
-      // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
-      clearRecentSearches();
-      clearOfflineCard();
-      // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
-      void forgetWebPush();
+      clearDevice();
       return true;
     } catch (e) {
+      if (afterDelete) {
+        clearDevice();
+        return true;
+      }
       const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";
       setError(msg);
       toast.error(msg);

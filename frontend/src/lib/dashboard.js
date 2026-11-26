@@ -123,7 +123,7 @@ export function actionHref(action) {
     case "tournament": return target ? `/tournaments/${target}` : "/tournaments";
     case "event": return target ? `/events/${target}` : "/events";
     case "match": return target ? `/matches/${target}` : "/dashboard";
-    case "prizes": return "/my/prizes";
+    case "prizes": return "/mein-bereich/rechnungen?tab=gewinne";
     // Kader auffüllen (#2202): `team_id` statt `target_id` - die App kennt das Ziel noch nicht und zeigt nur die Zeile.
     case "team": return action.team_id ? `/teams/${action.team_id}` : "/teams";
     // Regeln zustimmen (#1646): `rules_url` statt `target_id` - die App zeigt nur die Zeile.
@@ -139,9 +139,9 @@ export function dashboardActions(data, { openPrizes = 0 } = {}) {
       id: "prizes-open",
       type: "prize_pending",
       label: openPrizes === 1 ? "Gewinn abholen" : `${openPrizes} Gewinne abholen`,
-      detail: "Zeit und Ort unter Meine Gewinne",
+      detail: "Zeit und Ort unter Rechnungen & Unterlagen → Gewinne",
       target_type: "prizes",
-      href: "/my/prizes",
+      href: "/mein-bereich/rechnungen?tab=gewinne",
       priority: 9,
     });
   }

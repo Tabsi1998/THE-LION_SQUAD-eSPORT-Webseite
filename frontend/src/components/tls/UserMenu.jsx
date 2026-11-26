@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, ClipboardList, Crown, LogOut, Shield, ShieldCheck } from "lucide-react";
+import { ChevronDown, ClipboardList, Eye, LogOut, Shield, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
 import { useUserMenu } from "@/lib/mobileMenu";
-import { mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
+import { isAnyAdmin, mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
 
-// Das Benutzermenü im Kopf (#282, #516, #1150): ein Knopf mit Avatar und Name, dahinter die Liste aus
-// userMenuEntries (Dashboard, Mein Profil, Einstellungen), dann Mitgliederbereich (Mitglieder), Admin (Admins) und
-// Abmelden. Jedes Thema an genau einem Ort: Chats unter Community, Benachrichtigungen hinter der Glocke, Rechnungen und
-// Gewinne im eigenen Profil („Nur für dich“).
+// Das Benutzermenü im Kopf (#282, #516, #1150, #2059): ein Knopf mit Avatar und Name, dahinter oben der eigene Name als
+// Weg zum öffentlichen Profil („So sehen andere mich“), dann die Liste aus userMenuEntries - das Dashboard und „Mein
+// Bereich“ mit seinen Gruppen, direkt anspringbar -, Admin (Admins) und Abmelden. Jedes Thema an genau einem Ort: Chats
+// unter Community, die Liste der Benachrichtigungen hinter der Glocke.
 function Avatar({ user }) {
   const [failed, setFailed] = useState(false);
   const url = user?.avatar_url ? resolveMediaUrl(user.avatar_url) : "";
@@ -29,12 +29,11 @@ function Avatar({ user }) {
 // Abmelden kamen vorher als Zusatz zu `text-white/80` - und blieben im Browser weiß.
 const itemBase = "flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition";
 const itemClass = `${itemBase} text-white/80 hover:bg-white/5 hover:text-white`;
-const memberClass = `${itemBase} text-[#FFD700] bg-[#FFD700]/5 hover:bg-[#FFD700]/10`;
 const adminClass = `${itemBase} text-[#29B6E8] hover:bg-[#29B6E8]/10`;
 const logoutClass = `${itemBase} w-full text-left text-[#FF3B30] hover:bg-[#FF3B30]/10 border-t border-white/10`;
 
 export function UserMenu() {
-  const { user, logout, isAdmin, adminNeedsSecondFactor, isClubMember } = useAuth();
+  const { user, logout, isAdmin, adminNeedsSecondFactor } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   // Geteilt mit dem Kopf des Seitenwechsels (#1324): ein Klick auf den Namen, während die Seite lädt, geht nicht verloren.
@@ -87,19 +86,17 @@ export function UserMenu() {
       </button>
       {open ? (
         <div role="menu" data-testid="nav-user-menu" className="absolute right-0 top-full mt-2 w-60 border border-white/10 bg-[#0F0F10] rounded-sm shadow-2xl shadow-black/70 overflow-hidden z-[70]">
-          <div className="px-3 py-2.5 border-b border-white/10">
-            <div className="tls-wrap font-bold text-sm text-white" data-testid="nav-user-menu-name">{name}</div>
-            <div className="tls-wrap text-[11px] text-white/45">@{user.username}</div>
-          </div>
-          {userMenuEntries({ username: user.username }).map((entry) => (
-            <Link key={entry.key} to={entry.to} role="menuitem" onClick={close} data-testid={userMenuTestId(entry.key)} className={itemClass}>
-              <entry.icon className="w-3.5 h-3.5" /> {entry.label}
+          {/* Der eigene Name öffnet das öffentliche Profil (#2059) - so, wie andere es sehen. */}
+          <Link to={`/u/${encodeURIComponent(user.username)}`} role="menuitem" onClick={close} data-testid={userMenuTestId("profile")} className="block px-3 py-2.5 border-b border-white/10 hover:bg-white/5 transition-colors">
+            <span className="tls-wrap block font-bold text-sm text-white" data-testid="nav-user-menu-name">{name}</span>
+            <span className="tls-wrap flex items-center gap-1.5 text-[11px] text-white/45">@{user.username} · <Eye className="w-3 h-3 shrink-0" aria-hidden="true" /> So sehen andere mich</span>
+          </Link>
+          {userMenuEntries({ mitglied: Boolean(user.is_club_member) || isAnyAdmin(user) }).map((entry, index, list) => (
+            <Link key={entry.key} to={entry.to} role="menuitem" onClick={close} data-testid={userMenuTestId(entry.key)} className={`${itemClass} ${entry.bereich && !list[index - 1]?.bereich ? "border-t border-white/10" : ""}`.trim()}>
+              <entry.icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> <span className="tls-wrap min-w-0">{entry.label}</span>
             </Link>
           ))}
           <div className="border-t border-white/10" />
-          {isClubMember ? (
-            <Link to="/members/area" role="menuitem" onClick={close} data-testid="nav-member-area" className={memberClass}><Crown className="w-3.5 h-3.5" /> Mitgliederbereich</Link>
-          ) : null}
           {/* Ohne bestätigte Zwei-Faktor-Anmeldung (#1028) führt der Eintrag zur Einrichtung statt in die Verwaltung. */}
           {isAdmin && adminNeedsSecondFactor ? (
             <Link to={mfaSetupPath("/admin")} role="menuitem" onClick={close} data-testid="nav-mfa-setup" className={adminClass}><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>

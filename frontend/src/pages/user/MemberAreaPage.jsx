@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { API, api, formatApiError, formatMemberSince } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { MemberCardArt } from "@/components/tls/MemberCardArt";
 import { BoardAvatar } from "@/components/tls/BoardPortrait";
 import { SizedImage } from "@/components/tls/SizedImage";
@@ -20,13 +19,16 @@ import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 import { DiscordVoice } from "@/components/tls/DiscordNow";
 import { viennaDate } from "@/lib/vienna";
+import { gemeinsamLaden } from "@/lib/gemeinsamLaden";
+import { BEREICH, vereinPfad } from "@/lib/meinBereich";
 
 // Der Mitgliederbereich (#284, #1336, #1257): oben die eigene Mitgliedskarte mit „Hallo“, „Mitglied seit“ und dem
 // Beitragsstand, darunter die Sprungleiste mit dem, was offen ist („Versammlung · 1 offen“) - am Handy eine Zeile zum
 // Wischen, am PC links fest. Gold steht nur an der Karte und am Strich unter dem aktiven Eintrag; Verweise sind Cyan,
 // Symbole ruhig in Textfarbe. Darunter nur Abschnitte mit Inhalt - die Zusage zur Versammlung geht direkt in der Karte.
 // Die Zahlen kommen vom Server (/membership/area-summary) - dieselben wie an den Kacheln auf /verein und in der App.
-// Eigene Unterlagen und Rechnungen stehen nicht hier, sondern im Profil („Nur für dich“, #1255).
+// Eigene Unterlagen und Rechnungen stehen nicht hier, sondern unter „Rechnungen & Unterlagen“ (#1255, #2059). Seit #2059
+// ist das die Gruppe „Verein“ in „Mein Bereich“: die Seitenleiste steht links, die Sprungleiste deshalb immer als Zeile.
 
 // Bis zu dieser Linie unter dem oberen Rand (Kopf der Website plus Sprungleiste) gilt ein Abschnitt als erreicht.
 const SPY_LINE = 160;
@@ -99,15 +101,19 @@ export default function MemberAreaPage() {
   const [answering, setAnswering] = useState("");
   const [loaded, setLoaded] = useState(false);
 
-  const load = useCallback(() => {
+  const konto = user?.id || "";
+  const load = useCallback((event) => {
+    // Mitgliedschaft und Übersicht teilt sich die Seite mit „Zu tun“ im Rahmen (#2059) - nach einer Änderung frisch,
+    // geteilt nur innerhalb des Kontos.
+    const frisch = Boolean(event);
     Promise.allSettled([
       api.get("/membership/benefits"),
-      api.get("/membership/me"),
+      gemeinsamLaden("/membership/me", { frisch, konto }),
       api.get("/documents", { params: { scope: "club" } }),
       api.get("/news"),
       api.get("/board?active_only=true"),
       api.get("/settings/public"),
-      api.get("/membership/area-summary"),
+      gemeinsamLaden("/membership/area-summary", { frisch, konto }),
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
       api.get("/membership/discord-servers"),
@@ -126,7 +132,7 @@ export default function MemberAreaPage() {
       if (dv.status === "fulfilled" && dv.value.data?.available) setDiscordVoice(dv.value.data);
       setLoaded(true);
     });
-  }, []);
+  }, [konto]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "documents", "news", "users", "events", "board", "settings"]);
 
@@ -152,7 +158,7 @@ export default function MemberAreaPage() {
     }
   }, [pin]);
 
-  // Ein Link mit Anker (/members/area#versammlung) springt nach dem Laden dorthin.
+  // Ein Link mit Anker (/mein-bereich/verein#versammlung) springt nach dem Laden dorthin.
   useEffect(() => {
     if (!loaded) return;
     const key = window.location.hash.replace(/^#/, "");
@@ -185,31 +191,30 @@ export default function MemberAreaPage() {
   };
 
   return (
-    <PublicLayout>
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+    <div data-testid="member-area">
         <AreaHead user={user} me={me} discordUrl={discordUrl} />
 
         <BirthdayNote />
 
-        <div className="mt-6 xl:mt-10 xl:grid xl:grid-cols-[11rem_minmax(0,1fr)] xl:gap-10">
+        <div className="mt-6">
           <JumpBar entries={jumpEntries(summary)} present={present} active={active} onJump={jump} />
 
-          <div className="min-w-0 mt-6 xl:mt-0">
+          <div className="min-w-0 mt-6">
             {nothingYet ? (
               <div data-testid="member-area-empty" className="mb-6 border border-white/10 rounded-sm bg-[#121212] p-8 text-center">
                 <Bell className="w-6 h-6 text-white/55 mx-auto" aria-hidden="true" />
                 <p className="mt-3 text-sm text-white/70">Neues erscheint hier, sobald der Verein etwas freischaltet: interne Events, Dokumente, Vorteile, interne News.</p>
-                <p className="mt-1 text-xs text-white/45">Bis dahin: „Meine Mitgliedschaft“ und Discord oben neben deiner Karte.</p>
+                <p className="mt-1 text-xs text-white/45">Bis dahin: deine Mitgliedschaft und Discord oben neben deiner Karte.</p>
               </div>
             ) : null}
 
             <div className="grid lg:grid-cols-3 xl:grid-cols-5 gap-6">
               <div className="lg:col-span-2 xl:col-span-3 space-y-6 min-w-0">
                 {showMeetings ? (
-                  <AreaSection id="versammlung" title="Versammlungen" icon={Vote} testId="member-area-meetings" more={{ to: "/members/meetings", label: "Alle Versammlungen" }}>
+                  <AreaSection id="versammlung" title="Versammlungen" icon={Vote} testId="member-area-meetings" more={{ to: vereinPfad("versammlungen"), label: "Alle Versammlungen" }}>
                     <div className="space-y-4">
                       {openBallots ? (
-                        <Link to="/members/meetings" data-testid="member-area-open-ballots" className="block border-l-2 border-[#29B6E8] pl-3 text-sm font-bold text-[#29B6E8] hover:text-white transition">
+                        <Link to={vereinPfad("versammlungen")} data-testid="member-area-open-ballots" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                           {openBallots === 1 ? "Eine Abstimmung ist offen" : `${openBallots} Abstimmungen sind offen`} – jetzt abstimmen
                         </Link>
                       ) : null}
@@ -219,16 +224,16 @@ export default function MemberAreaPage() {
                 ) : null}
 
                 {helpingSomething ? (
-                  <AreaSection id="helfen" title="Helferdienste" icon={HandHelping} testId="member-area-helping" more={{ to: "/members/helfen", label: "Alle Helferdienste" }}>
+                  <AreaSection id="helfen" title="Helferdienste" icon={HandHelping} testId="member-area-helping" more={{ to: vereinPfad("helfen"), label: "Alle Helferdienste" }}>
                     <div className="space-y-4">
                       {helping.my_count ? <p data-testid="member-area-helping-mine" className="text-sm text-white">Du bist bei {helping.my_count === 1 ? "einem Dienst" : `${helping.my_count} Diensten`} eingetragen.</p> : null}
                       {helping.open_places ? (
-                        <Link to="/members/helfen" data-testid="member-area-helping-open" className="block text-sm font-bold text-[#29B6E8] hover:text-white transition">
+                        <Link to={vereinPfad("helfen")} data-testid="member-area-helping-open" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                           {helping.open_places === 1 ? "Ein freier Platz" : `${helping.open_places} freie Plätze`} – der Verein braucht Hände
                         </Link>
                       ) : null}
                       {helpingEvents.map((event) => (
-                        <Link key={event.id} to="/members/helfen" data-testid={`member-area-helping-event-${event.id}`} className="group flex items-center gap-4">
+                        <Link key={event.id} to={vereinPfad("helfen")} data-testid={`member-area-helping-event-${event.id}`} className="group flex items-center gap-4">
                           <DateTile day={event.day} />
                           <span className="min-w-0">
                             <span className="block font-bold text-white break-words group-hover:text-[#29B6E8] transition">{event.label}</span>
@@ -241,7 +246,7 @@ export default function MemberAreaPage() {
                 ) : null}
 
                 {internalNews.length ? (
-                  <AreaSection id="news" title="Interne News" icon={Bell} testId="member-area-news" more={{ to: "/members/news", label: "Alle" }}>
+                  <AreaSection id="news" title="Interne News" icon={Bell} testId="member-area-news" more={{ to: vereinPfad("news"), label: "Alle" }}>
                     <div className="space-y-3">
                       {internalNews.map((post) => (
                         <Link key={post.id} to={`/news/${post.slug}`} className="group block border-l-2 border-white/15 pl-3 hover:border-[#29B6E8] transition">
@@ -257,7 +262,7 @@ export default function MemberAreaPage() {
                 ) : null}
 
                 {docs.length ? (
-                  <AreaSection id="dokumente" title="Vereinsdokumente" icon={FileText} testId="member-area-documents" more={{ to: "/members/documents", label: "Alle Dokumente" }}>
+                  <AreaSection id="dokumente" title="Vereinsdokumente" icon={FileText} testId="member-area-documents" more={{ to: vereinPfad("dokumente"), label: "Alle Dokumente" }}>
                     <div className="space-y-2">
                       {docs.slice(0, 4).map((doc) => (
                         <div key={doc.id} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm hover:border-white/25 transition">
@@ -269,7 +274,7 @@ export default function MemberAreaPage() {
                               {doc.original_filename}
                             </div>
                           </div>
-                          <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs text-[#29B6E8] font-bold uppercase tracking-wider hover:underline">
+                          <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center gap-1 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                             <Eye className="w-3 h-3" aria-hidden="true" /> ansehen
                           </a>
                         </div>
@@ -279,7 +284,7 @@ export default function MemberAreaPage() {
                 ) : null}
 
                 {benefits.length ? (
-                  <AreaSection title="Mitgliedervorteile" icon={Gift} testId="member-area-benefits" more={{ to: "/members/benefits", label: "Alle Vorteile" }}>
+                  <AreaSection title="Mitgliedervorteile" icon={Gift} testId="member-area-benefits" more={{ to: vereinPfad("vorteile"), label: "Alle Vorteile" }}>
                     <div className="space-y-3">
                       {benefits.slice(0, 3).map((benefit) => (
                         <div key={benefit.id} className="flex items-start gap-4 p-3 border border-white/10 rounded-sm hover:border-white/25 transition">
@@ -290,7 +295,7 @@ export default function MemberAreaPage() {
                             <div className="font-bold text-white break-words">{benefit.title}</div>
                             {benefit.description ? <div className="text-xs text-white/60 mt-0.5 line-clamp-2">{benefit.description}</div> : null}
                           </div>
-                          {benefit.link_url ? <a href={benefit.link_url} target="_blank" rel="noreferrer" className="text-xs uppercase tracking-wider text-[#29B6E8] hover:underline shrink-0">öffnen →</a> : null}
+                          {benefit.link_url ? <a href={benefit.link_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Öffnen</a> : null}
                         </div>
                       ))}
                     </div>
@@ -329,8 +334,7 @@ export default function MemberAreaPage() {
             </div>
           </div>
         </div>
-      </section>
-    </PublicLayout>
+    </div>
   );
 }
 
@@ -344,13 +348,12 @@ function AreaHead({ user, me, discordUrl }) {
   return (
     <header id="karte" tabIndex={-1} data-testid="member-area-head" className={`scroll-mt-32 xl:scroll-mt-28 grid gap-5 md:items-center focus:outline-none ${card ? "md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] md:gap-8" : ""}`}>
       {card ? (
-        <Link to="/members/membership#mitgliedskarte" data-testid="member-area-card-link" aria-label="Mitgliedskarte mit Prüfcode öffnen" className="block w-full rounded-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#29B6E8]">
+        <Link to={`${BEREICH}/mitgliedschaft#mitgliedskarte`} data-testid="member-area-card-link" aria-label="Mitgliedskarte mit Prüfcode öffnen" className="block w-full rounded-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#29B6E8]">
           <MemberCardArt name={card.name} number={card.number} since={card.since} typeLabel={card.typeLabel} validUntil={card.validUntil} testId="member-area-card" />
         </Link>
       ) : null}
       <div className="min-w-0">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/50">Mitgliederbereich</span>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 break-words" data-testid="member-area-greeting">Hallo, {name}</h1>
+        <h2 className="font-heading text-2xl md:text-3xl font-black uppercase break-words" data-testid="member-area-greeting">Hallo, {name}</h2>
         {since || membership.internal_role ? (
           <p className="mt-2 text-sm text-white/70 flex flex-wrap gap-x-4 gap-y-1">
             {since ? <span data-testid="member-area-since">Mitglied seit <strong className="text-white">{since}</strong></span> : null}
@@ -360,12 +363,12 @@ function AreaHead({ user, me, discordUrl }) {
         {fee ? <FeeBadge badge={fee} /> : null}
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-bold uppercase tracking-wider">
           {/* Haupteinstieg für Mitglieder: ein Button, kein kleiner Textlink (#2059). */}
-          <Link to="/members/membership" data-testid="member-area-my-membership" className="inline-flex min-h-11 items-center gap-1.5 px-4 py-2 bg-[#29B6E8] text-black hover:bg-[#29B6E8]/85 rounded-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
-            Meine Mitgliedschaft
+          <Link to={`${BEREICH}/mitgliedschaft`} data-testid="member-area-my-membership" className="inline-flex min-h-11 items-center gap-1.5 px-4 py-2 bg-[#29B6E8] text-black hover:bg-[#29B6E8]/85 rounded-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
+            Mitgliedschaft
             <span className="normal-case font-semibold tracking-normal text-black/70">· Nummer, Daten, Beitrag</span>
           </Link>
           {discordUrl ? (
-            <a href={discordUrl} target="_blank" rel="noreferrer" data-testid="member-area-discord" className="inline-flex items-center gap-1.5 text-[#29B6E8] hover:underline">
+            <a href={discordUrl} target="_blank" rel="noreferrer" data-testid="member-area-discord" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-sm">
               <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Discord
             </a>
           ) : null}
@@ -411,7 +414,7 @@ function JumpBar({ entries, present, active, onJump }) {
     }
   }, [active]);
   return (
-    <nav aria-label="Mitgliederbereich" data-testid="member-area-links" className="tls-area-jump">
+    <nav aria-label="Verein" data-testid="member-area-links" className="tls-area-jump tls-area-jump--row">
       <ul ref={listRef} className="tls-area-jump__list tls-swipe pb-0">
         {entries.map((entry) => {
           const here = present.has(entry.key);
@@ -493,7 +496,7 @@ function MeetingCard({ meeting, busy, onAnswer }) {
         <DateTile day={meeting.day} />
         <div className="min-w-0 flex-1">
           {meta ? <div className="text-[10px] uppercase tracking-widest text-white/45">{meta}</div> : null}
-          <Link to="/members/meetings" className="mt-0.5 block font-bold text-white break-words hover:text-[#29B6E8] transition">{meeting.title}</Link>
+          <Link to={vereinPfad("versammlungen")} className="mt-0.5 block font-bold text-white break-words hover:text-[#29B6E8] transition">{meeting.title}</Link>
           {meeting.place ? <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-white/50"><MapPin className="w-3 h-3" aria-hidden="true" /> {meeting.place}</div> : null}
         </div>
       </div>

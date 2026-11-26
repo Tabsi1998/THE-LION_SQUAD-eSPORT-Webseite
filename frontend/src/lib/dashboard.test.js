@@ -70,7 +70,7 @@ test("heute ist der Wiener Tag: ein Termin kurz nach Mitternacht zählt schon, e
 
 test("Aktionen bekommen ihr Ziel, offene Gewinne kommen als erste Aktion dazu", () => {
   const actions = dashboardActions(payload(), { openPrizes: 2 });
-  expect(actions.map((action) => action.href)).toEqual(["/my/prizes", "/tournaments/heute-cup", "/matches/m-1"]);
+  expect(actions.map((action) => action.href)).toEqual(["/mein-bereich/rechnungen?tab=gewinne", "/tournaments/heute-cup", "/matches/m-1"]);
   expect(actions[0].label).toBe("2 Gewinne abholen");
   expect(dashboardActions({}, { openPrizes: 0 })).toEqual([]);
 });

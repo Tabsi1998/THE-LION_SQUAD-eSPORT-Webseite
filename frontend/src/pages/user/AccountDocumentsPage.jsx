@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, FileText, FolderOpen } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { api } from "@/lib/api";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { DocumentViewer } from "@/components/tls/DocumentViewer";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { CATEGORY_LABELS, DocumentGroup } from "./DocumentRows";
 
 // /account/documents (#1255): die eigenen Unterlagen aus der Vereinsakte - Bestätigungen und Schreiben, die nur dich
@@ -21,7 +19,6 @@ function emptyHeading(state) {
 }
 
 export default function AccountDocumentsPage() {
-  useDocumentTitle("Deine Unterlagen", "Deine persönlichen Unterlagen aus der Vereinsakte.", { robots: "noindex, nofollow" });
   const [state, setState] = useState(null);
   const [viewing, setViewing] = useState(null);
 
@@ -35,15 +32,11 @@ export default function AccountDocumentsPage() {
 
   const documents = Array.isArray(state?.documents) ? state.documents : [];
   return (
-    <PublicLayout>
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to="/u/me" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#FFD700]">
-          <ArrowLeft className="w-3.5 h-3.5" /> Mein Profil
-        </Link>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-6 flex items-center gap-3"><FileText className="w-7 h-7 shrink-0 text-[#FFD700]" aria-hidden="true" /> Deine Unterlagen</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">
-          Bestätigungen und Schreiben aus der Vereinsakte – nur für dich. Die Vereinsdokumente für alle (Statuten, Protokolle) stehen im{" "}
-          <Link to="/members/documents" className="text-[#29B6E8] hover:underline">Mitgliederbereich</Link>.
+    <>
+      <section className="min-w-0">
+        <p className="text-white/60 max-w-2xl">
+          Bestätigungen und Schreiben aus der Vereinsakte – nur für dich. Die Vereinsdokumente für alle (Statuten, Protokolle) stehen unter{" "}
+          <Link to="/mein-bereich/verein/dokumente" className="text-[#29B6E8] hover:underline">Verein → Vereinsdokumente</Link>.
         </p>
 
         {!state ? (
@@ -58,11 +51,11 @@ export default function AccountDocumentsPage() {
             <div className="font-heading font-bold text-lg text-white">{emptyHeading(state)}</div>
             <p className="mt-2 text-sm max-w-xl mx-auto">
               {state.reason === "not_bound"
-                ? "Dein Konto ist noch nicht mit deinem Eintrag in der Vereinsakte verbunden. Das geht über die bestätigte E-Mail-Adresse, durch den Vorstand – oder mit einem Einladungscode unter „Meine Mitgliedschaft“."
+                ? "Dein Konto ist noch nicht mit deinem Eintrag in der Vereinsakte verbunden. Das geht über die bestätigte E-Mail-Adresse, durch den Vorstand – oder mit einem Einladungscode unter „Mitgliedschaft“."
                 : state.text || "Bestätigungen und Schreiben vom Verein erscheinen hier, sobald der Vorstand sie in der Vereinsakte für dich ablegt."}
             </p>
             {state.reason === "not_bound" ? (
-              <Link to="/members/membership" data-testid="account-documents-bind" className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Einladungscode einlösen</Link>
+              <Link to="/mein-bereich/mitgliedschaft" data-testid="account-documents-bind" className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Einladungscode einlösen</Link>
             ) : null}
           </div>
         )}
@@ -76,6 +69,6 @@ export default function AccountDocumentsPage() {
           onClose={() => setViewing(null)}
         />
       ) : null}
-    </PublicLayout>
+    </>
   );
 }

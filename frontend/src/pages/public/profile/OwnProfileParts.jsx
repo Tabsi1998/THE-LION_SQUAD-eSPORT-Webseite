@@ -79,19 +79,19 @@ export function PrivateBox() {
     <section className="border border-[#FFD700]/40 bg-[#FFD700]/[0.05] rounded-sm px-4 py-3" data-testid="profile-private-box">
       <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700] pb-1">Nur für dich</div>
       <Row
-        to="/account/invoices"
+        to="/mein-bereich/rechnungen"
         icon={Receipt}
         title="Rechnungen"
         detail={summary.open_count ? `${summary.open_count} offen · ${money(summary.open_total, state.invoices?.currency)}${summary.overdue_count ? ` · ${summary.overdue_count} überfällig` : ""}` : "Keine offenen Rechnungen"}
         testId="profile-private-invoices"
       />
       {state.documents.length ? (
-        <Row to="/account/documents" icon={FileText} title="Deine Unterlagen" detail={documentsLine(state.documents)} testId="profile-private-documents" />
+        <Row to="/mein-bereich/rechnungen?tab=unterlagen" icon={FileText} title="Deine Unterlagen" detail={documentsLine(state.documents)} testId="profile-private-documents" />
       ) : null}
-      <Row to="/my/prizes" icon={Gift} title="Gewinne" detail={state.prizes ? `${state.prizes} offen oder bereit zum Abholen` : "Keine offenen Gewinne"} testId="profile-private-prizes" />
-      {state.penalties ? <Row to="/my/penalties" icon={ShieldAlert} title="Moderation" detail={`${state.penalties} Treffer – Details und Einspruch`} tone="danger" testId="profile-private-penalties" /> : null}
+      <Row to="/mein-bereich/rechnungen?tab=gewinne" icon={Gift} title="Gewinne" detail={state.prizes ? `${state.prizes} offen oder bereit zum Abholen` : "Keine offenen Gewinne"} testId="profile-private-prizes" />
+      {state.penalties ? <Row to="/mein-bereich/rechnungen?tab=strafen" icon={ShieldAlert} title="Moderation" detail={`${state.penalties} Treffer – Details und Einspruch`} tone="danger" testId="profile-private-penalties" /> : null}
       <Row
-        to="/profile?tab=basic"
+        to="/mein-bereich/profil"
         icon={UserCircle}
         title={score >= 100 ? "Profil vollständig" : `Profil zu ${score} % fertig`}
         detail={missing.length ? `Es fehlt: ${missing.slice(0, 3).join(", ")}` : "Alle wichtigen Felder sind gepflegt."}

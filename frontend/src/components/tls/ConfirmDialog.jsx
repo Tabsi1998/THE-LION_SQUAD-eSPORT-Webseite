@@ -7,6 +7,8 @@ const ConfirmContext = createContext(null);
 export function ConfirmDialogProvider({ children }) {
   const [dialog, setDialog] = useState(null);
   const [draft, setDraft] = useState("");
+  // Meldung unter dem Feld (#2059): `validate` sagt, warum die Eingabe noch nicht passt - der Dialog bleibt dann offen.
+  const [problem, setProblem] = useState("");
   const resolverRef = useRef(null);
 
   const confirm = useCallback((options) => new Promise((resolve) => {
@@ -25,8 +27,12 @@ export function ConfirmDialogProvider({ children }) {
   const prompt = useCallback((options) => new Promise((resolve) => {
     resolverRef.current = resolve;
     setDraft(options?.defaultValue || "");
+    setProblem("");
     setDialog({
       kind: "prompt",
+      // Sichtbare Beschriftung am Feld und eine Prüfung, die eine Meldung liefert (leer = passt).
+      label: options?.label || "",
+      validate: typeof options?.validate === "function" ? options.validate : null,
       title: options?.title || "Eingabe",
       description: options?.description || "",
       confirmLabel: options?.confirmLabel || "Übernehmen",
@@ -39,11 +45,19 @@ export function ConfirmDialogProvider({ children }) {
   }), []);
 
   const close = useCallback((result) => {
+    if (result && dialog?.kind === "prompt" && dialog.validate) {
+      const message = dialog.validate(draft);
+      if (message) {
+        setProblem(message);
+        return;
+      }
+    }
     resolverRef.current?.(dialog?.kind === "prompt" && result ? draft : result);
     resolverRef.current = null;
     setDialog(null);
     setDraft("");
-  }, [dialog?.kind, draft]);
+    setProblem("");
+  }, [dialog, draft]);
 
   const value = useMemo(() => ({ confirm, prompt }), [confirm, prompt]);
   const promptInvalid = dialog?.kind === "prompt" && dialog.required && !draft.trim();
@@ -63,24 +77,36 @@ export function ConfirmDialogProvider({ children }) {
               </div>
               <div className="min-w-0 flex-1">
                 <h2 id="confirm-title" className="font-heading font-black uppercase text-lg">{dialog.title}</h2>
-                <p className="mt-1 text-sm text-white/60 leading-relaxed">{dialog.description}</p>
+                <p id="confirm-description" className="mt-1 text-sm text-white/60 leading-relaxed">{dialog.description}</p>
+                {dialog.kind === "prompt" && dialog.label ? (
+                  <label htmlFor="confirm-dialog-input" className="mt-4 block text-xs font-bold uppercase tracking-wider text-white/75">{dialog.label}</label>
+                ) : null}
                 {dialog.kind === "prompt" && (
                   dialog.multiline ? (
                     <textarea
+                      id="confirm-dialog-input"
                       value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
+                      onChange={(e) => { setDraft(e.target.value); setProblem(""); }}
                       placeholder={dialog.placeholder}
-                      className="mt-4 input min-h-28 resize-y"
+                      aria-describedby={problem ? "confirm-description confirm-dialog-problem" : "confirm-description"}
+                      aria-invalid={problem ? "true" : undefined}
+                      data-testid="confirm-dialog-input"
+                      className={`${dialog.label ? "mt-2" : "mt-4"} input min-h-28 resize-y`}
                     />
                   ) : (
                     <input
+                      id="confirm-dialog-input"
                       value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
+                      onChange={(e) => { setDraft(e.target.value); setProblem(""); }}
                       placeholder={dialog.placeholder}
-                      className="mt-4 input"
+                      aria-describedby={problem ? "confirm-description confirm-dialog-problem" : "confirm-description"}
+                      aria-invalid={problem ? "true" : undefined}
+                      data-testid="confirm-dialog-input"
+                      className={`${dialog.label ? "mt-2" : "mt-4"} input`}
                     />
                   )
                 )}
+                {problem ? <p id="confirm-dialog-problem" role="alert" className="mt-2 text-xs text-[#FF8A80]" data-testid="confirm-dialog-problem">{problem}</p> : null}
               </div>
               <button type="button" onClick={() => close(false)} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
                 <X className="w-4 h-4" />
