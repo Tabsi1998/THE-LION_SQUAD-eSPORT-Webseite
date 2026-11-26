@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.97.0 (26.11.2026)
+
+### Neu
+
+* Absagen, neue Termine und Nachrücken kommen nie gesammelt, in der Ruhezeit nur bei Terminen bis 2 Stunden nach ihrem Ende sofort (#1662)
+* Benachrichtigungs-Einstellungen in Reitern mit Sammel-Mail (#1662)
+* Glocke und Postfach nach Tagen und Themen, Gleichartiges gebündelt (#1205)
+* Jede Benachrichtigung hat ein Thema und eine Wichtigkeit, auch bisher nicht abschaltbare Arten lassen sich jetzt einstellen (#1662)
+* Sammel-Mail – optionale Mails täglich oder wöchentlich gesammelt statt einzeln (#1662)
+* Sammel-Mail mit Ein-Klick-Link zurück auf Einzelmails und wählbarer Vorgabe des Vereins (#1662)
+* Turnier-Meldungen „Du bist weiter“, „Ausgeschieden“, Entscheidungsspiel, „Der Turnierbaum ist da“ und Pause (#1209)
+* Vorgaben der Sammel-Mail mit Vorschau in der Verwaltung (#1662)
+
+### Fehlerbehebungen
+
+* Ein-Klick-Abmeldung vom Newsletter gibt den Schlüssel nicht mehr in Adresse, Referer oder Protokoll weiter (#1662)
+
 ## 1.96.0 (24.11.2026)
 
 ### Neu
