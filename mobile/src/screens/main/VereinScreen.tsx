@@ -33,7 +33,7 @@ import type { NewsPost } from "../../types";
 // seit“ und dem Beitragsstand (#1336), darunter die Kacheln (Karte, Mitgliedschaft, Versammlungen, Helfen, Dokumente,
 // Vorteile) mit denselben Zahlen wie im Mitgliederbereich der Website (#1257) und interne News; alle anderen oben „Mitglied werden“ mit drei
 // Gründen. Darunter für alle: News, Galerie, Erfolge, Sponsoren, Partner und „Folge uns“. Der Einlass steht oben, nur
-// für den Vorstand. Rechnungen liegen im Profil („Nur für dich“), interne Termine im Events-Tab (gold markiert) - jedes
+// für den Vorstand. Rechnungen liegen in Mein Bereich (#2059), interne Termine im Events-Tab (gold markiert) - jedes
 // Thema an genau einem Ort (#1150). Was jemand sehen darf, entscheidet der Server; hier wird nur sortiert und verwiesen.
 
 type Props = NativeStackScreenProps<AppStackParamList, "VereinHub">;
@@ -323,7 +323,7 @@ export function VereinScreen({ navigation }: Props) {
                 </View>
               </Pressable>
             ))}
-            {steam.me && steam.me.linked && !steam.me.opted_in ? <Muted>Auch dabei sein: auf lionsquad.at unter Profil → Socials „Meinen Steam-Status im Mitgliederbereich zeigen“ einschalten.</Muted> : null}
+            {steam.me && steam.me.linked && !steam.me.opted_in ? <Muted>Auch dabei sein: auf lionsquad.at unter Mein Bereich → Profil → Socials „Meinen Steam-Status im Mitgliederbereich zeigen“ einschalten.</Muted> : null}
           </Section>
         ) : null}
 
@@ -365,7 +365,7 @@ export function VereinScreen({ navigation }: Props) {
                 ) : null}
               </View>
             ))}
-            {discordServers?.linked === false ? <Muted testID="member-area-discord-link-hint">Discord auf lionsquad.at unter Profil → Socials verknüpfen, dann steht hier, wo du schon dabei bist.</Muted> : null}
+            {discordServers?.linked === false ? <Muted testID="member-area-discord-link-hint">Discord auf lionsquad.at unter Mein Bereich → Profil → Socials verknüpfen, dann steht hier, wo du schon dabei bist.</Muted> : null}
           </Section>
         ) : null}
 

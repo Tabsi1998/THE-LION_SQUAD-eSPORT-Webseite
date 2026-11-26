@@ -13,7 +13,7 @@ import { passkeyError, passkeysSupported, silentPasskeyMiss, type PasskeyMiss } 
 import type { RootStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
-// Anmelden (#918, #919): die Seite erreicht man über Profil → Anmelden oder den Hinweis beim ersten Start - die App selbst
+// Anmelden (#918, #919): die Seite erreicht man über Mein Bereich → Anmelden oder den Hinweis beim ersten Start - die App selbst
 // läuft ohne Konto. Einen Passkey bietet die Seite beim Öffnen selbst an (Fingerabdruck oder Gesicht); gibt es keinen
 // oder bricht man ab, bleibt still das Formular. Nach der Anmeldung geht es zurück, woher man kam.
 // Wege aus der Anmeldung (#996): „Passwort vergessen?“ und „Keine Bestätigungs-Mail bekommen?“ führen zu „Hilfe beim

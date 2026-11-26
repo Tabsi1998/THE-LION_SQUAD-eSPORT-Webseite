@@ -6,7 +6,7 @@ import type { FaqBereich, FaqFrage } from "./types";
 // (lib/appLock.ts), ohne Netz (lib/cache.ts, lib/network.ts, lib/memberCardOffline.ts) und Updates über Google Play
 // (components/AppUpdateBanner.tsx). Ändert sich dort die Bedienung, gehört der Text hier mit.
 // Links auf Website-Adressen öffnen den passenden Screen der App (navigation/rootNavigation.ts → targetFromUrl):
-// /profile?tab=notifications und ?tab=security führen zu den Einstellungen.
+// /mein-bereich/benachrichtigungen und /mein-bereich/konto führen zu den Gruppen von Mein Bereich (#2059).
 
 export const APP_BEREICH: FaqBereich = {
   id: "lionsapp",
@@ -18,14 +18,14 @@ export const APP_BEREICH: FaqBereich = {
 };
 
 const ALLE = ["spieler", "captain", "mitglied", "turnierleitung"];
-const ZU_BENACHRICHTIGUNGEN = { to: "/profile?tab=notifications", label: "Zu den Einstellungen" };
-const ZU_SICHERHEIT = { to: "/profile?tab=security", label: "Zu den Einstellungen" };
+const ZU_BENACHRICHTIGUNGEN = { to: "/mein-bereich/benachrichtigungen", label: "Zu den Benachrichtigungen" };
+const ZU_SICHERHEIT = { to: "/mein-bereich/konto", label: "Zu Konto & Sicherheit" };
 
 export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-push-stufen",
     frage: "Wie stelle ich Push-Nachrichten in der App ein?",
-    antwort: "Öffne im Profil das Zahnrad und dann Benachrichtigungen. Wähl eine Stufe: Alles, Wichtiges oder Wenig. Darunter stellst du jedes Thema auf Push, Nur App oder Aus.",
+    antwort: "Öffne Mein Bereich und dann Benachrichtigungen. Wähl eine Stufe: Alles, Wichtiges oder Wenig. Darunter stellst du jedes Thema auf Push, Nur App oder Aus.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle",
     link: ZU_BENACHRICHTIGUNGEN,
   },
@@ -58,14 +58,14 @@ export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-passkey",
     frage: "Kann ich mich mit Fingerabdruck anmelden?",
-    antwort: "Ja, mit einem Passkey. Leg ihn unter Einstellungen bei Sicherheit an, dafür brauchst du einmal dein Passwort. Danach bietet die App beim Anmelden Fingerabdruck, Gesicht oder Displaysperre an.",
+    antwort: "Ja, mit einem Passkey. Leg ihn unter Mein Bereich → Konto & Sicherheit an, dafür brauchst du einmal dein Passwort. Danach bietet die App beim Anmelden Fingerabdruck, Gesicht oder Displaysperre an.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle",
     link: ZU_SICHERHEIT,
   },
   {
     id: "app-sperre",
     frage: "Kann ich die App mit Fingerabdruck sperren?",
-    antwort: "Ja. Schalte unter Einstellungen bei Sicherheit die App-Sperre ein. Dann fragt die App beim Start und nach einer Minute im Hintergrund nach Fingerabdruck, Gesicht oder Gerätesperre. Das gilt nur auf diesem Handy.",
+    antwort: "Ja. Schalte unter Mein Bereich → Konto & Sicherheit die App-Sperre ein. Dann fragt die App beim Start und nach einer Minute im Hintergrund nach Fingerabdruck, Gesicht oder Gerätesperre. Das gilt nur auf diesem Handy.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle",
     link: ZU_SICHERHEIT,
   },
@@ -78,7 +78,7 @@ export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-aktualisieren",
     frage: "Wie aktualisiere ich die App?",
-    antwort: "Updates kommen über Google Play. Ist die App von dort installiert, öffnet sich bei einer neuen Version das Update-Fenster von Google Play von selbst. Sonst zeigt die App einen Hinweis mit dem Knopf Play Store öffnen. Was neu ist, steht in den Einstellungen unter Über die App bei Was ist neu.",
+    antwort: "Updates kommen über Google Play. Ist die App von dort installiert, öffnet sich bei einer neuen Version das Update-Fenster von Google Play von selbst. Sonst zeigt die App einen Hinweis mit dem Knopf Play Store öffnen. Was neu ist, steht unter Mein Bereich → Konto & Sicherheit bei Über die App unter Was ist neu.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle", haeufig: true,
   },
 ];

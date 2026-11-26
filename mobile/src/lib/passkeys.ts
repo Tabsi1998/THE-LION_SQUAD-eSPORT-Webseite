@@ -153,7 +153,7 @@ export async function removePasskey(id: string, password: string): Promise<void>
 export function passkeyCreateError(error: unknown): string {
   const raised = error as { error?: string; message?: string; response?: { status?: number; data?: { detail?: unknown } } } | null;
   const code = String(raised?.error || raised?.message || "");
-  if (/UserCancelled|cancel/i.test(code)) return "Abgebrochen – anlegen kannst du den Passkey jederzeit im Profil unter „Einstellungen“.";
+  if (/UserCancelled|cancel/i.test(code)) return "Abgebrochen – anlegen kannst du den Passkey jederzeit unter Mein Bereich → Konto & Sicherheit.";
   if (/NotSupported|not supported/i.test(code)) return "Passkeys werden auf diesem Gerät nicht unterstützt.";
   const detail = raised?.response?.data?.detail;
   if (typeof detail === "string" && detail) return detail;

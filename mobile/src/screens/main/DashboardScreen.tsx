@@ -357,7 +357,7 @@ export function DashboardScreen({ navigation, route }: Props) {
             <EmptyState
               icon="calendar-outline"
               title={isGuest ? "Noch keine Termine" : "Keine anstehenden Termine"}
-              detail={isGuest ? "Sobald Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du im Profil unter Referenzen."}
+              detail={isGuest ? "Sobald Termine veröffentlicht sind, stehen sie hier." : "Sobald du dich für ein Turnier oder Event anmeldest, steht es hier. Vergangene Termine findest du in deinem Profil (Mein Bereich → Profil) bei Referenzen."}
               action={isGuest ? null : { label: "Termine ansehen", onPress: () => openTab("TournamentList"), testID: "dashboard-empty-events" }}
             />
           )}

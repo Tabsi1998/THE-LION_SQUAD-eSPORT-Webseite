@@ -218,7 +218,7 @@ export function PublicSeasonFindsCard({ userId, own = false }: { userId: string;
           </View>
         ))}
       </View>
-      {own ? <Text style={styles.footnote} testID="public-season-finds-note">{data.public ? "Andere sehen hier nur die Summen." : "Nur du siehst diese Karte – unter Profil → Privatsphäre kannst du sie zeigen."}</Text> : null}
+      {own ? <Text style={styles.footnote} testID="public-season-finds-note">{data.public ? "Andere sehen hier nur die Summen." : "Nur du siehst diese Karte – unter Mein Bereich → Datenschutz kannst du sie zeigen."}</Text> : null}
     </Card>
   );
 }

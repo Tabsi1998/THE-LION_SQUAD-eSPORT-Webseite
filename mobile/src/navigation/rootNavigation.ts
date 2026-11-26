@@ -7,7 +7,7 @@ import { isQuietDigest } from "../lib/notificationKinds";
 
 // Die Navigation von außen (#1144): Benachrichtigungen, Links von außen und Adressen aus Inhalten öffnen ihren Screen
 // über dem Tab, in dem man gerade ist - die Tab-Leiste springt nicht mit. Nur die Übersicht eines Tabs (Home, Events,
-// Community, Verein, Profil) wechselt den Tab. Eine Stelle für alle Wege: `openTarget`.
+// Community, Verein, Mein Bereich) wechselt den Tab. Eine Stelle für alle Wege: `openTarget`.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const navigationRef = createNavigationContainerRef<any>();
@@ -29,7 +29,7 @@ export const TAB_OF_ROOT: Record<TabRootName, MainTabName> = {
   TournamentList: "EventsTab",
   CommunityHub: "CommunityTab",
   VereinHub: "VereinTab",
-  Profile: "ProfileTab",
+  MeinBereich: "ProfileTab",
 };
 
 export const ROOT_OF_TAB: Record<MainTabName, TabRootName> = {
@@ -37,7 +37,7 @@ export const ROOT_OF_TAB: Record<MainTabName, TabRootName> = {
   EventsTab: "TournamentList",
   CommunityTab: "CommunityHub",
   VereinTab: "VereinHub",
-  ProfileTab: "Profile",
+  ProfileTab: "MeinBereich",
 };
 
 const tab = (screen: TabRootName, params?: Record<string, unknown>): AppTarget => ({ kind: "tab", tab: TAB_OF_ROOT[screen], screen, params });
@@ -67,7 +67,7 @@ export function navigateToUrl(url?: string | null): boolean {
 }
 
 /**
- * Gast zuerst (#918): Anmelden oder Registrieren öffnen - aus dem Profil-Tab, dem Hinweis beim ersten Start, einem Turnier,
+ * Gast zuerst (#918): Anmelden oder Registrieren öffnen - aus dem Tab Mein Bereich, dem Hinweis beim ersten Start, einem Turnier,
  * dem Adventkalender ... Die Seiten liegen im Stapel über den Tabs; nach der Anmeldung geht es dorthin zurück, woher man kam.
  */
 export function openSignIn(screen: "Login" | "Register" = "Login") {
@@ -232,14 +232,18 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   }
   if ((first === "galerie" || first === "gallery") && second) return detail("GalleryAlbum", { id: second });
   if (first === "messages" && second) return detail("DirectThread", { userId: second });
-  // Das eigene Profil (/u/me) ist der Tab Profil; jedes andere Profil legt sich über den aktuellen Tab.
-  if (first === "u" && second === "me") return tab("Profile");
+  // Mein Bereich (#2059): dieselben Adressen wie im Web, jede Gruppe mit Reitern und Ankern.
+  if (first === "mein-bereich") return meinBereichTarget(parts.slice(1), query, parsed.hash);
+  // Das eigene Profil (/u/me) liegt seit Mein Bereich über dem Tab (#2059) - `?tab=` öffnet einen Reiter wie im Web.
+  if (first === "u" && second === "me") return ownProfileTarget(query.get("tab") || "");
   if (["u", "users", "user", "players", "player", "profiles"].includes(first || "") && second) return detail("PublicProfile", { username: second });
   if (first === "profile" && second) return detail("PublicProfile", { username: second });
   if (first === "profile") return profileTarget(query);
   if (first === "account" && second === "invoices") return detail("MyInvoices", invoiceParams(query));
   if (first === "account" && second === "documents") return detail("MyDocuments");
   if ((first === "me" || first === "my") && second === "prizes") return detail("MyPrizes");
+  // Meine Strafen (#2059): im Web Mein Bereich → Rechnungen & Unterlagen → Strafen, in der App dieselbe Stelle.
+  if (first === "my" && second === "penalties") return gruppeTarget("rechnungen", "strafen");
   // Helfer-Aufruf (#1197): /members/helfen?event=5 öffnet die Helferdienste mit dieser Veranstaltung oben.
   if (first === "members" && second === "helfen" && Number(query.get("event"))) return detail("MemberHelperShifts", { event: Number(query.get("event")) });
   if (first === "members" && second) return memberTarget(second);
@@ -308,6 +312,9 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
     case "faq":
     case "hilfe":
       return detail("Faq", faqParams(parsed.hash, query));
+    // Datenschutz und Konto (#2059): im Web Mein Bereich → Datenschutz → Daten herunterladen.
+    case "privacy-account":
+      return gruppeTarget("datenschutz", "daten");
     default:
       return null;
   }
@@ -339,22 +346,102 @@ function profileTarget(query: URLSearchParams): AppTarget {
   if (wanted === "friends") return tab("CommunityHub", { section: "players" });
   // „Deine Rechnung ist da“ (#841): Meine Rechnungen - mit dem genannten Beleg, der sich gleich öffnet.
   if (wanted === "invoices") return detail("MyInvoices", invoiceParams(query));
-  // „Erfolg freigeschaltet“ (#301, #218) führt zu den Erfolgen im eigenen Profil.
-  if (wanted === "achievements") return tab("Profile", { tab: "achievements" });
-  if (wanted === "honours") return tab("Profile", { tab: "honours" });
-  // Trophäen (#2425): der Reiter im eigenen Profil (früher „Auszeichnungen“).
-  if (TROPHY_TABS.has(wanted)) return tab("Profile", { tab: "awards" });
-  // Einstellungen an einem Ort (#1146): was früher Reiter von /profile war, steht unter dem Zahnrad.
-  if (["notifications", "privacy", "security", "sessions", "appearance", "about"].includes(wanted)) return detail("Settings");
+  if (wanted === "prizes") return detail("MyPrizes");
+  // „Erfolg freigeschaltet“ (#301, #218) führt zu den Erfolgen im eigenen Profil, Trophäen (#2425) zum Reiter Trophäen.
+  if (wanted === "achievements" || wanted === "honours" || TROPHY_TABS.has(wanted)) return ownProfileTarget(wanted);
+  // Die Einstellungen wohnen seit #2059 in Mein Bereich - jeder alte Reiter an seiner Stelle (wie legacyTarget im Web).
+  // Der Link aus der Sammel-Mail (#1662) nennt ?bereich=mail - dann gleich zur Sammel-Mail (Themen, Ruhezeit, Mehr ebenso).
+  if (wanted === "notifications") return gruppeTarget("benachrichtigungen", BENACHRICHTIGUNG_BEREICHE[query.get("bereich") || ""]);
+  if (wanted === "privacy") return gruppeTarget("datenschutz");
+  if (wanted === "security") return gruppeTarget("konto");
+  if (wanted === "sessions") return gruppeTarget("konto", "geraete");
+  if (wanted === "appearance") return gruppeTarget("konto", "darstellung");
+  if (wanted === "about") return gruppeTarget("konto", "version");
+  if (wanted === "calendar") return detail("CalendarSubscription");
   if (["basic", "gaming", "socials", "edit"].includes(wanted)) return detail("ProfileEdit");
-  return tab("Profile");
+  // /profile ohne Reiter: im Web Mein Bereich → Profil, hier dieselbe Gruppe.
+  return gruppeTarget("profil");
+}
+
+/** Das eigene Profil mit Reiter - dieselben Namen wie im Web (achievements, honours, trophaeen/trophies/awards). */
+function ownProfileTarget(wanted: string): AppTarget {
+  if (wanted === "achievements" || wanted === "honours") return detail("OwnProfile", { tab: wanted });
+  if (TROPHY_TABS.has(wanted)) return detail("OwnProfile", { tab: "awards" });
+  return detail("OwnProfile");
+}
+
+type MeinBereichGruppe = AppStackParamList["MeinBereichGruppe"]["gruppe"];
+
+function gruppeTarget(gruppe: MeinBereichGruppe, ziel?: string): AppTarget {
+  return detail("MeinBereichGruppe", ziel ? { gruppe, ziel } : { gruppe });
+}
+
+/** Ein Anker (#nummer) ohne Raute - ein kaputter (#%E0%A4) zählt als keiner, nur Buchstaben, Ziffern und Bindestrich. */
+function ankerAus(hash: string): string {
+  try {
+    const anker = decodeURIComponent(String(hash || "").replace(/^#/, ""));
+    return /^[a-z0-9-]{1,40}$/.test(anker) ? anker : "";
+  } catch {
+    return "";
+  }
+}
+
+// Mein Bereich (#2059): die Reiter und Anker des Webs (frontend/src/lib/meinBereichSeiten.js, meinBereichAlt.js) und ihre
+// Stelle in der App. Ohne Reiter und Anker öffnet eine Gruppe ihre Seite in Mein Bereich - außer dort, wo die Website an
+// dieser Adresse eine Liste zeigt, die die App als eigenen Screen hat: Rechnungen (die Belege) und Verein (der Tab Verein).
+const MITGLIEDSCHAFT_ZIELE = new Set(["status", "beitrag", "nummer", "meine-daten", "website-profil", "austritt"]);
+const BENACHRICHTIGUNG_BEREICHE: Record<string, string> = { themen: "themen", mail: "sammel-mail", ruhezeit: "ruhezeit", mehr: "weitere-wege" };
+const KONTO_REITER: Record<string, string> = { sessions: "geraete", appearance: "darstellung", about: "version" };
+const DATENSCHUTZ_REITER: Record<string, string> = { einwilligungen: "einwilligungen", daten: "daten", loeschung: "loeschung" };
+
+function meinBereichTarget(segments: string[], query: URLSearchParams, hash: string): AppTarget {
+  const [gruppe, seite] = segments;
+  const anker = ankerAus(hash);
+  const reiter = query.get("tab") || "";
+  switch (gruppe) {
+    case "profil":
+      if (["basic", "gaming", "socials", "edit"].includes(reiter)) return detail("ProfileEdit");
+      return gruppeTarget("profil", anker || undefined);
+    case "mitgliedschaft":
+      if (anker === "mitgliedskarte") return detail("MemberCard");
+      if (MITGLIEDSCHAFT_ZIELE.has(anker)) return detail("MyMembership", { ziel: anker });
+      return gruppeTarget("mitgliedschaft", anker || undefined);
+    case "rechnungen":
+      if (reiter === "unterlagen") return detail("MyDocuments");
+      if (reiter === "gewinne") return detail("MyPrizes");
+      if (reiter === "strafen") return gruppeTarget("rechnungen", "strafen");
+      return detail("MyInvoices", invoiceParams(query));
+    case "verein":
+      if (seite === "versammlungen") return detail("MemberMeetings");
+      if (seite === "helfen") return Number(query.get("event")) ? detail("MemberHelperShifts", { event: Number(query.get("event")) }) : detail("MemberHelperShifts");
+      if (seite === "dokumente") return detail("MemberDocuments");
+      if (seite === "vorteile") return detail("InfoCenter", { section: "benefits" });
+      // Interne News: die News, gleich auf „Verein“ gestellt.
+      if (seite === "news") return detail("NewsList", { scope: "club" });
+      // Die Übersicht: der Tab Verein, wie bisher /members/area.
+      return tab("VereinHub");
+    case "benachrichtigungen":
+      return gruppeTarget("benachrichtigungen", BENACHRICHTIGUNG_BEREICHE[query.get("bereich") || ""] || anker || undefined);
+    case "konto":
+      if (reiter === "calendar") return detail("CalendarSubscription");
+      // `mfa=required` (#348): die Zwei-Faktor-Anmeldung richtet die Website ein - die Zeile dorthin.
+      if (query.get("mfa") === "required") return gruppeTarget("konto", "passwort");
+      return gruppeTarget("konto", KONTO_REITER[reiter] || anker || undefined);
+    case "datenschutz":
+      return gruppeTarget("datenschutz", DATENSCHUTZ_REITER[reiter] || anker || undefined);
+    default:
+      // /mein-bereich selbst - und eine Gruppe, die es nicht gibt, landet in der Übersicht statt im Leeren.
+      return tab("MeinBereich");
+  }
 }
 
 function memberTarget(page: string): AppTarget | null {
   switch (page) {
     case "area":
-    case "news":
       return tab("VereinHub");
+    // Interne News (#2059): wie /mein-bereich/verein/news - die News, gleich auf „Verein“ gestellt.
+    case "news":
+      return detail("NewsList", { scope: "club" });
     case "membership":
       return detail("MyMembership");
     case "documents":

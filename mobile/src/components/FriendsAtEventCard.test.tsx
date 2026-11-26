@@ -59,7 +59,7 @@ test("Hinweis: „Ausschalten“ schaltet sofort aus und sagt, wo man es wieder 
   expect(await screen.findByTestId("event-friends-hint")).toHaveTextContent(/^Deine Freunde sehen, zu welchen Events du angemeldet bist./);
   await fireEvent.press(screen.getByTestId("event-friends-hint-off"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/users/me/friends-hint", { turn_off: true }));
-  expect(await screen.findByTestId("event-friends-message")).toHaveTextContent(/Einstellungen → Privatsphäre/);
+  expect(await screen.findByTestId("event-friends-message")).toHaveTextContent(/Mein Bereich → Datenschutz/);
   expect(screen.queryByTestId("event-friends-hint")).toBeNull();
 });
 

@@ -4,7 +4,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { MyMembershipScreen } from "./MyMembershipScreen";
 
 // Meine Mitgliedschaft (#339): Stand aus der Mitgliederverwaltung, Zuordnung anfragen. Die Belege
-// selbst liegen seit #320 unter „Meine Rechnungen“ (im Profil, „Nur für dich“) - hier nur der Stand.
+// selbst liegen seit #320 unter „Meine Rechnungen“ (seit #2059 in Mein Bereich → Rechnungen & Unterlagen) - hier der Stand
+// und ein Knopf dorthin. Die Einwilligungen stehen an einem Ort: Mein Bereich → Datenschutz.
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
@@ -17,6 +18,8 @@ jest.mock("../../lib/api", () => ({
 jest.mock("../../lib/memberDocuments", () => ({ openInvoice: (...args: unknown[]) => mockOpenInvoice(...args) }));
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1" }, accessToken: "tok-1" }) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+const mockNavigateToUrl = jest.fn((_url: string) => true);
+jest.mock("../../navigation/rootNavigation", () => ({ navigateToUrl: (url: string) => mockNavigateToUrl(url) }));
 
 const navigate = jest.fn();
 const navigation = { navigate } as never;
@@ -62,9 +65,10 @@ test("Beitrag, Nummer, Funktion und der Stand der Belege; die Rechnungen selbst 
 
   expect(screen.getByText(/1 offen/)).toBeTruthy();
   expect(screen.queryByText("Rechnung RE-2026/0007")).toBeNull();
-  // Jedes Thema an genau einem Ort (#1150): kein zweiter Weg zu „Meine Rechnungen“, nur der Hinweis aufs Profil.
-  expect(screen.queryByTestId("membership-invoices-link")).toBeNull();
-  expect(screen.getByTestId("membership-invoices-hint")).toHaveTextContent(/Nur für dich/);
+  // Jedes Thema an genau einem Ort (#1150): die Rechnungen stehen in Mein Bereich - der Knopf führt über die Adresse dorthin.
+  expect(screen.getByTestId("membership-invoices-hint")).toHaveTextContent(/Mein Bereich unter „Rechnungen & Unterlagen“/);
+  await fireEvent.press(screen.getByTestId("membership-invoices-link"));
+  expect(mockNavigateToUrl).toHaveBeenLastCalledWith("/mein-bereich/rechnungen");
 
   await fireEvent.press(screen.getByTestId("membership-card-link"));
   expect(navigate).toHaveBeenCalledWith("MemberCard");
@@ -204,7 +208,7 @@ test("Mein Website-Profil (#260, Vereine 1.2): Felder des Vereins, nur Geändert
   alert.mockRestore();
 });
 
-test("Meine Einwilligungen (#1537): der Abschnitt steht in der Mitgliedschaft, das Website-Profil führt dorthin", async () => {
+test("Einwilligungen (#1537, #2059): an einem Ort - Mitgliedschaft und Website-Profil führen nach Datenschutz → Einwilligungen", async () => {
   const website = { available: true, consent: "profil", given: false, fields: [] };
   const consents = { available: true, consents: [{ code: "profil", label: "Nennung im Mitgliederverzeichnis", state: "none", version: 0, current_version: 1,
     moment: null, can_give: true, can_withdraw: false, text: "Ich bin mit der Nennung einverstanden.", given_text: null, text_changed: false }] };
@@ -215,21 +219,26 @@ test("Meine Einwilligungen (#1537): der Abschnitt steht in der Mitgliedschaft, d
     return Promise.reject(new Error("nope"));
   });
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(screen.getByTestId("membership-consents")).toBeTruthy());
-  expect(screen.getByTestId("consent-state-profil")).toHaveTextContent(/Noch nicht entschieden/);
-  expect(screen.getByTestId("membership-website-state")).toHaveTextContent(/Meine Einwilligungen/);
+  await waitFor(() => expect(screen.getByTestId("membership-consents-link")).toBeTruthy());
+  // Kein zweiter Abschnitt hier - die Karte steht in Datenschutz.
+  expect(screen.queryByTestId("membership-consents")).toBeNull();
+  expect(mockGet).not.toHaveBeenCalledWith("/membership/me/consents");
+  expect(screen.getByTestId("membership-website-state")).toHaveTextContent(/Datenschutz → Einwilligungen/);
   await fireEvent.press(screen.getByTestId("membership-website-to-consents"));
+  expect(mockNavigateToUrl).toHaveBeenLastCalledWith("/mein-bereich/datenschutz?tab=einwilligungen");
+  await fireEvent.press(screen.getByTestId("membership-consents-link"));
+  expect(mockNavigateToUrl).toHaveBeenCalledTimes(2);
 });
 
-test("Meine Einwilligungen (#1537): nicht geladen heißt sichtbar nicht geladen", async () => {
+test("Mein Bereich (#2059): ein Ziel rollt zur Stelle - Wunschnummer, Meine Daten, Austritt", async () => {
   mockGet.mockImplementation((path: string) => {
     if (path === "/membership/me") return Promise.resolve({ data: ledByDolibarr });
-    if (path === "/membership/me/consents") return Promise.resolve({ data: { available: false, reason: "timeout", text: "Die Mitgliederverwaltung antwortet gerade nicht." } });
     return Promise.reject(new Error("nope"));
   });
-  await render(<MyMembershipScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(screen.getByTestId("consents-error")).toHaveTextContent(/nicht geladen/));
-  expect(screen.getByTestId("consents-retry")).toBeTruthy();
+  await render(<MyMembershipScreen navigation={navigation} route={{ key: "m", name: "MyMembership", params: { ziel: "nummer" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("mb-nummer")).toBeTruthy());
+  expect(screen.getByTestId("mb-status")).toBeTruthy();
+  expect(screen.getByTestId("mb-beitrag")).toBeTruthy();
 });
 
 test("Meine Nummer (#2050): steht im eigenen Mitgliederbereich, gleich unter dem Mitgliedsstatus", async () => {

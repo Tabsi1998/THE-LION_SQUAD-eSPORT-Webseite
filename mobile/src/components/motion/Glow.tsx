@@ -48,6 +48,8 @@ export function Glow({ active = false, trigger, tone = "brand", color, peak = 0.
     const opening = first.current;
     first.current = false;
     if (still.current || (opening && !active)) return undefined;
+    // Ein Anstoß, der wegfällt (Wert wird leer), ist keiner (#2059): sonst leuchtete ein altes Sprungziel noch einmal nach.
+    if (!opening && (trigger === undefined || trigger === null)) return undefined;
     level.value = 0;
     level.value = glowSequence(delay);
     return () => cancelAnimation(level);

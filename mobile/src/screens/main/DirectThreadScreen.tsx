@@ -53,7 +53,7 @@ export function DirectThreadScreen({ navigation, route }: Props) {
       void run();
       return;
     }
-    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Profil → Privatsphäre wieder aufheben.", [
+    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Mein Bereich → Datenschutz wieder aufheben.", [
       { text: "Abbrechen", style: "cancel" },
       { text: "Blockieren", style: "destructive", onPress: () => { void run(); } },
     ]);

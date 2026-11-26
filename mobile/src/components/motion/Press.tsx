@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import React, { useCallback } from "react";
-import { Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, type GestureResponderEvent, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { PRESS_SCALE } from "../../lib/motion";
 import { motion } from "../../theme";
@@ -21,6 +21,24 @@ export function tapFeedback() {
   } catch {
     // ohne Vibration weiter
   }
+}
+
+/**
+ * Ein leises Klicken beim Umschalten (#1677): ein Schalter springt um, eine Stellung rastet ein (Segmente, Sammel-Mail).
+ * Leichter als `tapFeedback` - wie ein Raster am Drehknopf. Ohne Motor oder im Test passiert nichts.
+ */
+export function selectFeedback() {
+  try {
+    void Promise.resolve(Haptics.selectionAsync()).catch(() => {});
+  } catch {
+    // ohne Vibration weiter
+  }
+}
+
+/** Das Klicken für einen `Switch`: unter iOS gibt der Schalter selbst schon eins - dort nicht doppelt. */
+export function switchFeedback() {
+  if (Platform.OS === "ios") return;
+  selectFeedback();
 }
 
 type Props = Omit<PressableProps, "style"> & {
