@@ -22,7 +22,7 @@ async function acceptCookies(page) {
   if (await consent.count()) await consent.click();
 }
 
-test("das Benutzermenü führt in die Einstellungen; ein Mitglied sieht den Mitgliederbereich dort statt als Knopf", async ({ page, isMobile }) => {
+test("das Benutzermenü führt in die Gruppen von Mein Bereich; ein Mitglied sieht Verein dort statt als Knopf (#2059)", async ({ page, isMobile }) => {
   await mockServer(page, { id: "user-1", username: "tabsi98", display_name: "Tabsi98", role: "player", is_club_member: true });
   await page.goto("/dashboard");
   await acceptCookies(page);
@@ -30,39 +30,41 @@ test("das Benutzermenü führt in die Einstellungen; ein Mitglied sieht den Mitg
   if (isMobile) {
     await page.getByTestId("nav-mobile-toggle").click();
     await expect(page.getByTestId("nav-profile-mobile")).toHaveAttribute("href", "/u/tabsi98");
-    await expect(page.getByTestId("nav-account-settings-mobile")).toHaveAttribute("href", "/profile");
-    await expect(page.getByTestId("nav-member-area-mobile")).toHaveAttribute("href", "/members/area");
-    await page.getByTestId("nav-account-settings-mobile").click();
+    await expect(page.getByTestId("nav-account-profil-mobile")).toHaveAttribute("href", "/mein-bereich/profil");
+    await expect(page.getByTestId("nav-account-verein-mobile")).toHaveAttribute("href", "/mein-bereich/verein");
+    await expect(page.getByTestId("nav-member-area-mobile")).toHaveCount(0);
+    await page.getByTestId("nav-account-profil-mobile").click();
   } else {
     await expect(page.getByTestId("nav-member-area-button")).toHaveCount(0);
     await expect(page.getByTestId("nav-admin")).toHaveCount(0);
     // Chats stehen unter Community, nicht als eigener Knopf im Kopf (#1148).
     await expect(page.getByTestId("nav-messages")).toHaveCount(0);
     await page.getByTestId("nav-user").click();
-    await expect(page.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
+    await expect(page.getByTestId("nav-account-verein")).toHaveAttribute("href", "/mein-bereich/verein");
     await expect(page.getByTestId("nav-profile")).toHaveAttribute("href", "/u/tabsi98");
-    for (const gone of ["nav-account-membership", "nav-account-notifications", "nav-account-invoices", "nav-messages-menu", "nav-public-profile", "nav-account-penalties", "nav-account-join"]) {
+    await expect(page.getByTestId("nav-account-rechnungen")).toHaveAttribute("href", "/mein-bereich/rechnungen");
+    for (const gone of ["nav-member-area", "nav-account-settings", "nav-messages-menu", "nav-public-profile", "nav-account-penalties", "nav-account-join"]) {
       await expect(page.getByTestId(gone)).toHaveCount(0);
     }
     await expect(page.getByTestId("nav-logout")).toBeVisible();
-    await page.getByTestId("nav-account-settings").click();
+    await page.getByTestId("nav-account-profil").click();
   }
-  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page).toHaveURL(/\/mein-bereich\/profil$/);
   await expect(page.getByTestId("profile-tab-basic")).toBeVisible();
 });
 
-test("ohne Mitgliedschaft gibt es keinen Mitgliederbereich im Menü, und das Dashboard verlinkt auf die Einstellungen", async ({ page, isMobile }) => {
+test("ohne Mitgliedschaft gibt es kein „Verein“ im Menü, und das Dashboard verlinkt nach Mein Bereich", async ({ page, isMobile }) => {
   await mockServer(page, { id: "user-2", username: "gast", display_name: "Gast", role: "player", is_club_member: false });
   await page.goto("/dashboard");
   await acceptCookies(page);
 
-  await expect(page.getByTestId("dashboard-edit-profile")).toHaveAttribute("href", "/profile");
+  await expect(page.getByTestId("dashboard-mein-bereich")).toHaveAttribute("href", "/mein-bereich");
   if (isMobile) {
     await page.getByTestId("nav-mobile-toggle").click();
-    await expect(page.getByTestId("nav-member-area-mobile")).toHaveCount(0);
+    await expect(page.getByTestId("nav-account-verein-mobile")).toHaveCount(0);
   } else {
     await page.getByTestId("nav-user").click();
-    await expect(page.getByTestId("nav-member-area")).toHaveCount(0);
+    await expect(page.getByTestId("nav-account-verein")).toHaveCount(0);
     await expect(page.getByTestId("nav-admin")).toHaveCount(0);
     // „Mitglied werden“ steht unter Verein (#1150) - kein zweiter Weg im Menü.
     await expect(page.getByTestId("nav-account-join")).toHaveCount(0);

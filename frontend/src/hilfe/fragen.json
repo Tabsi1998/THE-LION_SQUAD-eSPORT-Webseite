@@ -16,14 +16,14 @@
   {
     "id": "activision-id",
     "frage": "Wo trage ich meine Activision-ID ein?",
-    "antwort": "In den Einstellungen unter Gaming bei den Spiel-IDs. Trag sie genau so ein, wie sie im Spiel steht, mit # und Zahlen.",
+    "antwort": "In Mein Bereich unter Profil, Reiter Gaming & Spiel-IDs. Trag sie genau so ein, wie sie im Spiel steht, mit # und Zahlen.",
     "bereich": "konto-profil", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle", "haeufig": true,
     "link": { "to": "/faq/konto-und-profil#spiel-ids", "label": "Zur Anleitung" }
   },
   {
     "id": "weniger-push",
     "frage": "Wie bekomme ich weniger Benachrichtigungen?",
-    "antwort": "Öffne in den Einstellungen Benachrichtigungen und wähl die Stufe Wichtiges oder Wenig. Mit der Ruhezeit kommt nachts kein Push.",
+    "antwort": "Öffne in Mein Bereich die Benachrichtigungen und wähl die Stufe Wichtiges oder Wenig. Mit der Ruhezeit kommt nachts kein Push.",
     "bereich": "benachrichtigungen", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle", "haeufig": true,
     "link": { "to": "/faq/konto-und-profil#stufe", "label": "Zur Anleitung" }
   },
@@ -79,7 +79,7 @@
   {
     "id": "daten-und-konto",
     "frage": "Wie lade ich meine Daten herunter oder lösche mein Konto?",
-    "antwort": "Unter Meine Daten lädst du alles als JSON herunter. Dort kannst du dein Konto auch anonymisieren. Das lässt sich nicht rückgängig machen.",
+    "antwort": "In Mein Bereich unter Datenschutz: Daten herunterladen lädt alles als Datei herunter, Konto löschen löscht dein Konto. Das lässt sich nicht rückgängig machen.",
     "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
     "link": { "to": "/faq/datenschutz-und-konto#daten-herunterladen", "label": "Zur Anleitung" }
   },
@@ -123,7 +123,7 @@
     "frage": "Wo finde ich meine Rechnungen?",
     "antwort": "Unter Meine Rechnungen stehen deine Belege, etwa für den Mitgliedsbeitrag oder ein Event. Offene stehen oben, bezahlte im Archiv.",
     "bereich": "verein-mitgliedschaft", "rollen": ["mitglied", "spieler"], "sichtbar_fuer": "alle",
-    "link": { "to": "/account/invoices", "label": "Zu Meine Rechnungen" }
+    "link": { "to": "/account/invoices", "label": "Zu deinen Rechnungen" }
   },
   {
     "id": "event-begleitung",
@@ -193,26 +193,26 @@
     "frage": "Wer sieht meine vereinsinternen Turniere und Zeiten?",
     "antwort": "Du selbst und angemeldete Vereinsmitglieder, Gäste und angemeldete Nicht-Mitglieder nie, auch nicht bei Trophäen, Liga-Seasons und den Zahlen im Profil. Interne Einträge sind im Profil als Vereinsintern gekennzeichnet. Schaltest du unter Privatsphäre Vereinsinterne Erfolge zeigen aus, sehen Mitglieder nur Öffentliches.",
     "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
-    "link": { "to": "/profile?tab=privacy", "label": "Privatsphäre öffnen" }
+    "link": { "to": "/profile?tab=privacy", "label": "Sichtbarkeit öffnen" }
   },
   {
     "id": "anonymisieren-was-passiert",
-    "frage": "Was passiert, wenn ich mein Konto anonymisiere?",
-    "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben. Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen.",
+    "frage": "Was passiert, wenn ich mein Konto lösche?",
+    "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben, Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen. Früher hieß das „Konto anonymisieren“.",
     "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
     "link": { "to": "/faq/datenschutz-und-konto#konto-anonymisieren", "label": "Zur Anleitung" }
   },
   {
     "id": "konto-loeschen-gesperrt",
     "frage": "Warum kann ich mein Konto nicht löschen?",
-    "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Meine Daten steht je Rolle, wo das geht.",
+    "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Datenschutz → Konto löschen steht je Rolle, wo das geht.",
     "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
     "link": { "to": "/faq/datenschutz-und-konto#rollen-abgeben", "label": "Zur Anleitung" }
   },
   {
     "id": "was-bekomme-ich-zugeschickt",
     "frage": "Wo stelle ich ein, was ich zugeschickt bekomme?",
-    "antwort": "In den Einstellungen unter Benachrichtigungen. Wie das geht, steht in der Anleitung zu Konto und Profil.",
+    "antwort": "In Mein Bereich unter Benachrichtigungen. Wie das geht, steht in der Anleitung zu Konto und Profil.",
     "bereich": "datenschutz", "rollen": ["spieler", "captain", "mitglied"], "sichtbar_fuer": "alle",
     "link": { "to": "/faq/konto-und-profil#stufe", "label": "Zur Anleitung" }
   }

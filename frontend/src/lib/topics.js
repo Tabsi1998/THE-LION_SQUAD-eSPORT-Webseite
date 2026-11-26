@@ -3,18 +3,18 @@
 // Wächter-Test (topics.test.js) prüft das Hauptmenü, das Benutzermenü und die Handy-Leiste gegen diese Liste.
 
 export const WEB_TOPICS = [
-  { topic: "Rechnungen", place: "Mein Profil → Nur für dich", path: "/account/invoices", menu: null },
+  { topic: "Rechnungen", place: "Mein Bereich → Rechnungen & Unterlagen", path: "/mein-bereich/rechnungen", menu: null },
   // #1255: die eigenen Schreiben aus der Vereinsakte - nicht mehr zwischen den Vereinsdokumenten.
-  { topic: "Persönliche Unterlagen", place: "Mein Profil → Nur für dich", path: "/account/documents", menu: null },
+  { topic: "Persönliche Unterlagen", place: "Mein Bereich → Rechnungen & Unterlagen → Unterlagen", path: "/mein-bereich/rechnungen?tab=unterlagen", menu: null },
   { topic: "Nachrichten", place: "Community → Chats", path: "/messages", menu: "Community" },
   { topic: "Benachrichtigungen", place: "die Glocke", path: "/notifications", menu: null },
-  { topic: "Meine Mitgliedschaft", place: "Mitgliederbereich", path: "/members/membership", menu: null },
-  { topic: "Öffentliches Profil", place: "Mein Profil → Schalter „So sehen dich andere“", path: null, menu: null },
+  { topic: "Meine Mitgliedschaft", place: "Mein Bereich → Mitgliedschaft", path: "/mein-bereich/mitgliedschaft", menu: null },
+  { topic: "Öffentliches Profil", place: "Mein Bereich → Profil → „So sehen andere mich“", path: null, menu: null },
   { topic: "Erfolge", place: "deine im Profil, die Bestenliste unter Community", path: "/achievements", menu: "Community" },
   { topic: "Galerie", place: "Verein", path: "/galerie", menu: "Verein" },
-  { topic: "Saison-Deko und Einstellungen", place: "Einstellungen → Darstellung (Gäste: am Handy im Menü, am PC in der Fußzeile)", path: "/profile", menu: null },
+  { topic: "Saison-Deko und Einstellungen", place: "Mein Bereich → Konto & Sicherheit → Darstellung (Gäste: am Handy im Menü, am PC in der Fußzeile)", path: "/mein-bereich/konto?tab=appearance", menu: null },
   { topic: "Fast Laps", place: "eSports → Fast Lap", path: "/fastlap", menu: "eSports" },
-  { topic: "Mitgliedervorteile", place: "Mitgliederbereich", path: "/members/benefits", menu: null },
+  { topic: "Mitgliedervorteile", place: "Mein Bereich → Verein → Vorteile", path: "/mein-bereich/verein/vorteile", menu: null },
   { topic: "Interne Termine", place: "Events, gold markiert", path: null, menu: null },
   // Dazu aus #1150 (Web): „Teams entdecken“ nur noch unter Community.
   { topic: "Teams", place: "Community → Teams", path: "/teams", menu: "Community" },

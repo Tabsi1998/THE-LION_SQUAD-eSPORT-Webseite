@@ -2697,6 +2697,24 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-area-jump__dot { display: none; }
 }
 
+/* Sprungleiste unter „Verein“: in „Mein Bereich“ (#2059) steht links schon die Seitenleiste - die Leiste bleibt deshalb
+   auch am breiten PC eine Zeile über dem Inhalt (sonst steht sie ab 1280 px links als Spalte). */
+@media (min-width: 1280px) {
+  .tls-area-jump.tls-area-jump--row {
+    top: 5rem;
+    margin: 0;
+    padding: 0;
+    background: var(--tls-black);
+    border-bottom: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 -1rem 0 0 var(--tls-black);
+  }
+  .tls-area-jump--row .tls-area-jump__list { flex-direction: row; align-items: stretch; gap: 0.25rem; }
+  .tls-area-jump--row .tls-area-jump__item { flex-direction: row; align-items: center; justify-content: flex-start; padding: 0 0.75rem; white-space: nowrap; }
+  .tls-area-jump--row .tls-area-jump__item::after { left: 0.75rem; right: 0.75rem; }
+  .tls-area-jump--row .tls-area-jump__count { font-size: inherit; letter-spacing: inherit; }
+  .tls-area-jump--row .tls-area-jump__dot { display: inline; }
+}
+
 /* Datums-Kachel für Termine im Mitgliederbereich (#1336): Monat in Cyan, Tag groß - ein Ersatz, bis die gemeinsame
    Datums-Kachel der Bausteine kommt. */
 .tls-date-tile {

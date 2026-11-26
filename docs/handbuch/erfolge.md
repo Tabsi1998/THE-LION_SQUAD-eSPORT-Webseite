@@ -120,7 +120,7 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
 Ein einmal freigeschalteter Erfolg bleibt, auch wenn ein Ergebnis später korrigiert wird.
 
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
-Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
+Kategorie); jede Person stellt unter **Mein Bereich → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
 [Mails und Benachrichtigungen](mails.md)). Jede Zeremonie kommt **einmal je Konto**, nicht einmal je Gerät: Wer sie in der App, am
 PC oder im Handy-Browser schließt (X, Tipp daneben, Escape, Zurück-Taste oder sie läuft zu Ende), bekommt sie auf den anderen Geräten
 nicht mehr. Dazu kommt eine Meldung im Thema **Erfolge** (In-App, Push, Discord; **nie** per Mail).
@@ -141,7 +141,7 @@ Montags gibt es auf Wunsch den **Wochenrückblick** per Mail. Jeder Erfolg läss
 - **Events:** „Eventgänger“ und „Vereinsleben“ zählen, wer unter **Anmeldungen & Einlass** eingecheckt ist (**Da**), je Event einmal;
   **abgesagte Events** zählen nicht. Vereinsintern sind Events mit der Sichtbarkeit **Mitglieder** oder **intern** und Events der Art
   **Vereinsabend** oder **intern**. Einen Kartenscan am Event-Einlass gibt es nicht.
-- **Datenbewusst:** erst, wenn die Person unter Einstellungen → Privatsphäre selbst etwas einstellt oder ihren Datenexport holt –
+- **Datenbewusst:** erst, wenn die Person unter Mein Bereich → Datenschutz selbst etwas einstellt oder ihre Daten herunterlädt –
   die Voreinstellung bei der Registrierung zählt nicht.
 - **Twitch** (Streamer, Sendezeit, Clip-Macher): nur mit **per Anmeldung verknüpftem** Twitch-Kanal; ein getippter Name zeigt den
   Stream auf der Seite, zählt aber nicht. **Verifizierter Streamer** kommt von selbst, wenn Twitch so verknüpft ist und der Verein

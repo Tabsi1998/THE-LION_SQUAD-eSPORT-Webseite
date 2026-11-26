@@ -174,7 +174,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("web-push-hint")).toHaveCount(0);
       await off.click();
       // Direkt zur Karte „Dieser Browser“, die erklärt, wie man es im Browser erlaubt.
-      await expect(page).toHaveURL(/\/profile\?tab=notifications#dieser-browser$/);
+      await expect(page).toHaveURL(/\/mein-bereich\/benachrichtigungen#dieser-browser$/);
       await expect(page.getByTestId("profile-browser-push")).toHaveAttribute("data-status", "denied");
       await expect(page.getByTestId("profile-browser-push")).toBeInViewport();
       if (SHOTS) {

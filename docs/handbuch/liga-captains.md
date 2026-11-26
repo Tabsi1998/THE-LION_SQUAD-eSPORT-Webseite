@@ -131,7 +131,7 @@ eingeschaltet hat und ihr Discord in den Einstellungen aktiviert habt:
 - **Map-Veto wartet:** wenn ihr am Zug seid und die Matchseite nicht offen habt.
 
 Die Zeiten legt die Liga-Leitung je Season fest; hier stehen die Vorgaben. Jede Erinnerung kommt nur einmal. Wer keine will, schaltet
-das Thema **Match-Erinnerungen** ab: auf der Website **Benutzermenü → Einstellungen → Benachrichtigungen einstellen**, in der App
+das Thema **Match-Erinnerungen** ab: auf der Website **Benutzermenü → Benachrichtigungen**, in der App
 **Profil → Zahnrad → Benachrichtigungen** (dort „Spiel-Erinnerungen“). Es gilt für Web und App gemeinsam.
 
 ## Tabelle
@@ -276,7 +276,7 @@ Check-in, kein Start und keine erste Ergebnismeldung** – Bestätigen und Nacht
 
 ## Activision-ID
 
-- **Jeder im Kader** braucht die **Activision-ID** (inklusive `#`) im Profil: **Einstellungen → Gaming → Spiel-IDs**
+- **Jeder im Kader** braucht die **Activision-ID** (inklusive `#`) im Profil: **Mein Bereich → Profil → Gaming & Spiel-IDs**
   (gilt für alle CoD-Teile). Wer keine hat, steht beim Aufstellen **grau mit Grund** da und kann nicht spielen.
 - Beim Zuteilen bzw. beim ersten Aufstellen wird die ID **für die Season festgehalten**. Ändert jemand sie später im
   Profil, gilt in der Liga weiter die gemeldete – das Profil sagt das. Eine neue ID gibt nur die **Liga-Leitung** frei;

@@ -17,7 +17,7 @@ const invalidation = { reload: null };
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (callback, resources = []) => { if (resources.includes("users")) invalidation.reload = callback; } }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const MyMembershipPage = (await import("./MyMembershipPage")).default;
+const { default: MyMembershipPage, ConsentsCard } = await import("./MyMembershipPage");
 const membership = {
   member_status: "active", membership_type: "ordinary", member_number: "12", member_since: "2023-01-01",
   // Käme vom Server je wieder eine interne Notiz mit, zeigt die Seite sie trotzdem nicht (#345).
@@ -28,6 +28,8 @@ const membership = {
 beforeEach(() => vi.clearAllMocks());
 
 const renderPage = () => render(<MemoryRouter><MyMembershipPage /></MemoryRouter>);
+// Die Einwilligungen stehen seit „Mein Bereich“ (#2059) unter Datenschutz → Einwilligungen - dieselbe Karte.
+const renderConsents = () => render(<MemoryRouter><ConsentsCard /></MemoryRouter>);
 
 test("mit bestätigter Zuordnung steht der Beitragsstand samt Stand-Datum da", async () => {
   apiMock.get.mockResolvedValue({ data: { membership, is_active_member: true, dolibarr: {
@@ -98,7 +100,7 @@ test("Einwilligungen aus der Mitgliederverwaltung: Stand, Zustimmen nur nach dem
     consents = consents.map((row) => (row.code === body.code ? { ...row, state: body.decision, version: body.decision === "given" ? body.version : row.version, can_give: body.decision !== "given", can_withdraw: body.decision === "given", text_changed: false } : row));
     return { data: { ok: true, result: { code: body.code, state: body.decision, version: body.version || 0, recorded: true }, consents } };
   });
-  renderPage();
+  renderConsents();
   const card = await screen.findByTestId("membership-consents-card");
   expect(card).toHaveTextContent("Meine Einwilligungen");
   expect(screen.getByTestId("consent-state-fotos")).toHaveTextContent("Zugestimmt");
@@ -131,7 +133,7 @@ test("Einwilligungen (#1537): der Text der zugestimmten Fassung bleibt lesbar, b
     { code: "spiel", label: "Spielberichte", state: "given", version: 1, current_version: 2, moment: "2026-01-10T10:00:00+01:00", can_give: true, can_withdraw: true, text: "Spielberichte, Fassung 2.", given_text: null, text_changed: true },
   ];
   apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
-  renderPage();
+  renderConsents();
   const card = await screen.findByTestId("membership-consents-card");
   // Solange das Modul kein Pflicht-Kennzeichen liefert, sagt die Karte nichts über Pflicht oder Freiwilligkeit.
   expect(card).not.toHaveTextContent(/freiwillig|Pflicht/i);
@@ -160,7 +162,7 @@ test("Einwilligungen (Codex-Prüfung #1547): auch „Ich stimme zu“ fragt nach
   const consents = [{ code: "fotos", label: "Fotos", state: "none", version: 0, current_version: 2, moment: null, can_give: true, can_withdraw: false, text: "Fotos, Fassung 2.", given_text: null, text_changed: false }];
   apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
   apiMock.post.mockResolvedValue({ data: { ok: true, result: { code: "fotos", state: "given", version: 2, recorded: true }, consents: [{ ...consents[0], state: "given", version: 2, can_give: false, can_withdraw: true, given_text: "Fotos, Fassung 2." }] } });
-  renderPage();
+  renderConsents();
   await user.click(await screen.findByTestId("consent-open-fotos"));
   confirmMock.mockResolvedValueOnce(false);
   await user.click(screen.getByTestId("consent-give-fotos"));
@@ -177,7 +179,7 @@ test("Einwilligungen (#1537): antwortet die Mitgliederverwaltung nicht, steht da
   const user = userEvent.setup();
   let answer = { available: false, reason: "unavailable", text: "Die Mitgliederverwaltung antwortet gerade nicht (nicht erreichbar)." };
   apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? answer : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
-  renderPage();
+  renderConsents();
   const card = await screen.findByTestId("membership-consents-card");
   expect(screen.getByTestId("consents-error")).toHaveTextContent("nicht geladen");
   expect(screen.getByTestId("consents-error")).toHaveTextContent("antwortet gerade nicht");
@@ -194,12 +196,12 @@ test("Einwilligungen (#1537): ein Netzfehler ist ein Fehler, keine verschwundene
     if (url === "/membership/me/consents") throw new Error("Network Error");
     return { data: url === "/membership/me/directory" ? { eligible: false } : ledMe };
   });
-  const { unmount } = renderPage();
+  const { unmount } = renderConsents();
   expect(await screen.findByTestId("consents-error")).toHaveTextContent("nicht geladen");
   unmount();
 
   apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: false, reason: "not_linked" } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
-  renderPage();
+  renderConsents();
   await screen.findByTestId("membership-fee-card").catch(() => null);
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/membership/me/consents"));
   expect(screen.queryByTestId("membership-consents-card")).toBeNull();
@@ -239,7 +241,7 @@ test("Vereinsakte (#324): mit dem Einladungscode wird das Konto gebunden, danach
   await user.click(screen.getByTestId("membership-identity-claim"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/identity", { code: "LION-1234" }));
   expect(await screen.findByTestId("membership-identity-bound")).toHaveTextContent("Dokumente");
-  expect(screen.getByTestId("membership-identity-documents")).toHaveAttribute("href", "/members/documents");
+  expect(screen.getByTestId("membership-identity-documents")).toHaveAttribute("href", "/mein-bereich/verein/dokumente");
   expect(toastMock.success).toHaveBeenCalled();
 });
 
@@ -406,4 +408,15 @@ test("ein gescheitertes Nachladen lässt die Mitgliedschaft stehen und sagt es (
   expect(screen.getByTestId("load-stale")).toHaveTextContent("letzten Stand");
   expect(screen.queryByTestId("public-error-state")).toBeNull();
   expect(document.body.textContent.length).toBeGreaterThanOrEqual(before.length);
+});
+
+test("Mitgliedschaft (#2059): ohne Einwilligungen auf der Seite, dafür der Weg dorthin; Nummer, Beitrag und Meine Daten mit Anker", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents: [] } : url === "/membership/me/directory" ? { eligible: false } : ledMe }));
+  const { container } = renderPage();
+  expect(await screen.findByTestId("membership-fee-card")).toHaveAttribute("id", "beitrag");
+  expect(screen.queryByTestId("membership-consents-card")).toBeNull();
+  expect(screen.getByTestId("membership-consents-link")).toHaveAttribute("href", "/mein-bereich/datenschutz?tab=einwilligungen");
+  expect(screen.getByTestId("membership-invoices-link")).toHaveAttribute("href", "/mein-bereich/rechnungen");
+  expect(container.querySelector("#nummer")).not.toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/membership/me/consents");
 });

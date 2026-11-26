@@ -48,17 +48,17 @@ async function konto(page, cam, state) {
     "/me/league-eligibility": D.ELIGIBILITY,
     "PATCH /users/me": ({ body }) => { state.user = { ...state.user, ...body }; return state.user; },
   };
-  await page.goto("/profile");
-  await expect(shown(page, "settings-nav")).toBeVisible();
+  // Mein Bereich (#2059): das Profil ist eine Gruppe mit Reitern; der Weg dorthin am PC über den Namen oben rechts,
+  // am Handy über das Menü. Die Kopfzeile ist hier selbst zu sehen (keepBars).
+  await page.goto("/mein-bereich/profil");
+  await expect(page.getByTestId("mein-bereich-reiter")).toBeVisible();
   await noSideScroll(page);
-  // Der Weg zu den Einstellungen: am PC über den Namen oben rechts, am Handy über das Menü. Die Kopfzeile ist hier
-  // selbst zu sehen (keepBars).
   if (cam.form === "pc") {
-    await cam.clip("einstellungen", page.getByTestId("nav-account-settings"), (act) => act.click(page.getByTestId("nav-user")),
+    await cam.clip("einstellungen", page.getByTestId("nav-account-profil"), (act) => act.click(page.getByTestId("nav-user")),
       { area: [page.getByTestId("nav-user"), page.getByTestId("nav-user-menu")], start: page.getByTestId("nav-user"), keepBars: true });
     await page.keyboard.press("Escape");
   } else {
-    await cam.clip("einstellungen", page.getByTestId("nav-account-settings-mobile"), (act) => act.click(page.getByTestId("nav-mobile-toggle")),
+    await cam.clip("einstellungen", page.getByTestId("nav-account-profil-mobile"), (act) => act.click(page.getByTestId("nav-mobile-toggle")),
       { area: [page.getByTestId("nav-dashboard-mobile"), page.getByTestId("nav-logout-mobile")], start: page.getByTestId("nav-mobile-toggle"), keepBars: true });
     await page.getByTestId("nav-mobile-toggle").click();
   }
@@ -73,7 +73,7 @@ async function konto(page, cam, state) {
 
   // Benachrichtigungen (#1204, #1206, #1662): Stufe, ein Thema selbst, Ruhezeit, E-Mail mit Sammel-Mail - in Reitern.
   state.routes["/users/me/notification-preferences"] = D.NOTIFICATION_SETTINGS;
-  await shown(page, "profile-tab-notifications").click();
+  await page.goto("/mein-bereich/benachrichtigungen");
   await expect(page.getByTestId("notification-levels")).toBeVisible();
   await cam.clip("stufe", page.getByTestId("notification-level-important"), (act) => act.click(page.getByTestId("notification-level-important")),
     { area: page.getByTestId("notification-levels") });
@@ -514,7 +514,7 @@ async function gewinne(page, cam, state) {
     "/users/me/level": { level: 9, title: "Jäger", prestige: 0 },
     "/achievements/award/a2": B.SHARE_AWARD,
   };
-  await page.goto("/my/prizes");
+  await page.goto("/mein-bereich/rechnungen?tab=gewinne");
   await expect(page.getByTestId("my-prize-p-ready")).toBeVisible();
   await noSideScroll(page);
   await cam.shot("meine-gewinne", page.getByTestId("my-prize-p-ready"));
@@ -551,10 +551,12 @@ async function datenschutz(page, cam, state) {
   let check = B.ERASE_OK;
   state.user = { ...B.NEON };
   state.routes = { "/dsgvo/anonymize-me/check": () => check, "/moderation/blocks": [] };
-  await page.goto("/privacy-account");
+  // Mein Bereich → Datenschutz (#2059): „Daten herunterladen“ und „Konto löschen“ sind je ein Reiter.
+  await page.goto("/mein-bereich/datenschutz?tab=daten");
   await expect(page.getByTestId("dsgvo-export-btn")).toBeVisible();
   await noSideScroll(page);
   await cam.shot("daten-herunterladen", page.getByTestId("dsgvo-export-btn"));
+  await page.getByTestId("profile-tab-loeschung").click();
   await page.getByTestId("dsgvo-anonymize-btn").click();
   const dialog = page.getByTestId("confirm-dialog");
   await expect(dialog).toBeVisible();

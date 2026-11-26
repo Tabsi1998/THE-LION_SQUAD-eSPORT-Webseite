@@ -77,7 +77,7 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
               ? "Deine Erfolge sind privat: andere sehen weder Angeheftete noch Stufen, und du stehst auf keiner Rangliste."
               : "Deine Erfolge sind öffentlich: Angeheftete und erreichte Stufen stehen in deinem Profil, die Verein-Kategorie sehen nur Mitglieder."}
           </span>
-          <Link to="/profile?tab=privacy" className="shrink-0 font-bold uppercase tracking-widest text-[10px] hover:underline">Ändern</Link>
+          <Link to="/mein-bereich/datenschutz" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center px-3 py-2 rounded-sm font-bold uppercase tracking-widest text-[10px]">Ändern</Link>
         </div>
       )}
 

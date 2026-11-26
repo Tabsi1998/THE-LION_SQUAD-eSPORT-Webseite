@@ -34,7 +34,7 @@ test("Browser hat abgelehnt: die leise Zeile führt zu den Einstellungen", async
   expect(hint).toHaveTextContent(`${WEB_PUSH_OFF_TEXT} – ${WEB_PUSH_OFF_ACTION}`);
   expect(hint).toHaveTextContent("Aufrufe sind aus – einschalten");
   // Direkt zur Karte „Dieser Browser“, die erklärt, wie man es im Browser erlaubt.
-  expect(hint).toHaveAttribute("href", "/profile?tab=notifications#dieser-browser");
+  expect(hint).toHaveAttribute("href", "/mein-bereich/benachrichtigungen#dieser-browser");
   expect(hint.className).toContain("min-h-[44px]");
 });
 

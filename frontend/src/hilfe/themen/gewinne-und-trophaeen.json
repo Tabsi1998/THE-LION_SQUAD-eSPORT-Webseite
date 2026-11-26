@@ -18,7 +18,7 @@
           "text": "Unter Meine Gewinne stehen deine Preise und Urkunden. Bei jedem Preis steht, ob er noch vorbereitet wird oder abholbereit ist.",
           "hinweis": "Einen abholbereiten Preis holst du beim nächsten Vereinsabend ab. Ab dann hast du 90 Tage Zeit.",
           "bild": true,
-          "link": { "to": "/my/prizes", "label": "Zu Meine Gewinne" }
+          "link": { "to": "/mein-bereich/rechnungen?tab=gewinne", "label": "Zu deinen Gewinnen" }
         }
       ]
     },

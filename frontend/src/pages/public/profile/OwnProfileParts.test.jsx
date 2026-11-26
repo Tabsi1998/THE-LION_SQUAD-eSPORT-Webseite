@@ -38,7 +38,7 @@ test("die Zeile „Deine Unterlagen“ mit Anzahl und neuestem Datum", async () 
   mockApi({ available: true, reason: null, documents: OWN });
   renderBox();
   const row = await screen.findByTestId("profile-private-documents");
-  expect(row).toHaveAttribute("href", "/account/documents");
+  expect(row).toHaveAttribute("href", "/mein-bereich/rechnungen?tab=unterlagen");
   expect(row).toHaveTextContent("Deine Unterlagen");
   expect(row).toHaveTextContent("2 Dokumente · neuestes vom 01.09.2026");
 });

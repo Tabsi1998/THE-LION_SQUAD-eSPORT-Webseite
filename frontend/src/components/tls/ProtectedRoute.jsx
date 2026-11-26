@@ -33,7 +33,9 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
       </div>
     );
   }
-  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
+  // Das ganze Ziel mit Reiter und Anker (#2059): /mein-bereich/rechnungen?tab=gewinne kommt nach dem Login wieder dort an.
+  // safeNextPath (lib/returnPath.js) lässt beim Login nur Pfade dieser Website durch.
+  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`${loc.pathname}${loc.search}${loc.hash}`)}`} replace />;
   if (user.consent_required && loc.pathname !== "/consent") {
     return <Navigate to="/consent" replace />;
   }

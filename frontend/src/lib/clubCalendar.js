@@ -29,7 +29,7 @@ export function meetingTitle(meeting) {
 export function meetingCalendarItem(meeting) {
   if (!meeting?.id || !DAY.test(String(meeting.day || ""))) return null;
   const start = wallTime(meeting.day, meeting.time);
-  const path = `/members/meetings?meeting=${meeting.id}`;
+  const path = `/mein-bereich/verein/versammlungen?meeting=${meeting.id}`;
   return {
     id: `meeting-${meeting.id}`,
     kind: "club",
@@ -39,7 +39,7 @@ export function meetingCalendarItem(meeting) {
     allDay: !start,
     day: meeting.day,
     location: meeting.place || meeting.format_label || null,
-    detail: "Versammlung – Details im Mitgliederbereich",
+    detail: "Versammlung – Details in Mein Bereich unter Verein",
     url: siteUrl(path),
     icsPath: `/api/calendar/meetings/${meeting.id}.ics`,
   };
@@ -52,7 +52,7 @@ export function shiftCalendarItem(event, shift) {
   if (!event?.id || !shift?.id || !start) return null;
   let end = wallTime(day, shift.end);
   if (end && end.getTime() <= start.getTime()) end = new Date(end.getTime() + 24 * HOUR_MS);
-  const path = `/members/helfen?event=${event.id}`;
+  const path = `/mein-bereich/verein/helfen?event=${event.id}`;
   return {
     id: `shift-${event.id}-${shift.id}`,
     kind: "club",

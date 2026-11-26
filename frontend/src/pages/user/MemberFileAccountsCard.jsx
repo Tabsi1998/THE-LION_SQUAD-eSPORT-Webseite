@@ -57,7 +57,7 @@ export function MemberFileAccountsCard() {
           {(view.wishes || []).map((wish) => (
             <div key={wish.network} className="mt-3 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm px-3 py-2 text-sm flex flex-wrap items-center justify-between gap-2" data-testid={`membership-accounts-wish-${wish.network}`}>
               <span>Der Verein wünscht: <b>{wish.label}</b> verknüpfen.</span>
-              <Link to={`/profile?tab=socials&link=${encodeURIComponent(wish.platform)}`} className="text-[#FFD700] font-bold uppercase tracking-wider text-xs hover:underline" data-testid={`membership-accounts-link-${wish.network}`}>
+              <Link to={`/mein-bereich/profil?tab=socials&link=${encodeURIComponent(wish.platform)}`} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-3 py-2 rounded-sm font-bold uppercase tracking-wider text-xs" data-testid={`membership-accounts-link-${wish.network}`}>
                 Jetzt verknüpfen
               </Link>
             </div>

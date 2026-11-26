@@ -1,0 +1,371 @@
+const { test, expect } = require("@playwright/test");
+
+// „Mein Bereich“ (#2059): alte Adressen leiten weiter (mit Suche und Anker), jede Funktion ist ab dem Start („Start“ in
+// der unteren Leiste = Dashboard für Angemeldete) mit höchstens zwei Klicks erreichbar, jede Gruppe über Benutzermenü
+// bzw. untere Leiste mit höchstens zwei, und alles geht mit der Tastatur. Bei 390 px (Handy) und 1440 px (PC). API über
+// page.route nachgestellt, erfundene Namen.
+
+const member = { id: "user-1", username: "nachtfalke", display_name: "Nachtfalke", role: "player", is_club_member: true, email: "falke@example.test", created_at: "2025-01-10T10:00:00Z" };
+
+const MEMBERSHIP = {
+  membership: { member_status: "active", member_number: "TLS-077", member_since: "2025-02-01", member_since_precision: "month", membership_type: "ordinary" },
+  dolibarr: { connected: true, led_by_dolibarr: true, type_label: "Ordentliches Mitglied", fee: { status: "paid", required: true, amount: 36, currency: "EUR" }, as_of: "2026-10-01T08:00:00Z", link: { status: "verified" }, functions: [] },
+};
+const SELF_SERVICE = { available: true, profile: { address: "Musterweg 1", zip: "1010", town: "Wien", phone: "", version: 1, direct: [] }, changeable: ["address", "zip", "town", "phone"], requests: [] };
+const JERSEY = { available: true, number: null, can_choose: true, again: false, free_count: 9, free_numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9], range: { min: 1, max: 9 }, reserved: [], dolibarr: null, open_request: null, requests: [] };
+
+const json = (body) => ({ contentType: "application/json", body: JSON.stringify(body) });
+
+async function mockServer(page, { user = member } = {}) {
+  if (process.env.MB_DEBUG) page.on("console", (msg) => { if (msg.type() === "error") console.log("CONSOLE", msg.text().slice(0, 400)); });
+  await page.route("**/api/**", (route) => route.fulfill(json([])));
+  await page.route("**/api/auth/me", (route) => route.fulfill(json(user)));
+  await page.route("**/api/users/me", (route) => route.fulfill(json(user)));
+  await page.route("**/api/settings/public", (route) => route.fulfill(json({})));
+  await page.route("**/api/membership/me", (route) => route.fulfill(json(MEMBERSHIP)));
+  // Die Karten laden wie im Betrieb etwas später als die Seite - der Sprung zum Anker muss darauf warten.
+  const later = (body) => async (route) => { await new Promise((resolve) => { setTimeout(resolve, 400); }); return route.fulfill(json(body)); };
+  await page.route("**/api/membership/me/self-service", later(SELF_SERVICE));
+  await page.route("**/api/membership/me/jersey-number", later(JERSEY));
+  await page.route("**/api/membership/me/consents", (route) => route.fulfill(json({ available: true, consents: [] })));
+  await page.route("**/api/membership/area-summary", (route) => route.fulfill(json({ meetings_open: 0, ballots_open: 0 })));
+  await page.route("**/api/membership/me/helper-shifts", (route) => route.fulfill(json({ available: false })));
+  await page.route("**/api/account/invoices", (route) => route.fulfill(json({ connected: true, currency: "EUR", summary: { count: 1, open_count: 1, open_total: 36, overdue_count: 0 }, invoices: [] })));
+  await page.route("**/api/account/documents", (route) => route.fulfill(json({ available: true, documents: [] })));
+  await page.route("**/api/documents/meta", (route) => route.fulfill(json({ categories: [] })));
+  await page.route("**/api/prizes/me/open-count", (route) => route.fulfill(json({ count: 0 })));
+  await page.route("**/api/penalties/me", (route) => route.fulfill(json({ count: 0, items: [] })));
+  await page.route("**/api/dsgvo/anonymize-me/check", (route) => route.fulfill(json({ can_erase: true, blockers: [] })));
+  await page.route("**/api/mobile/dashboard", (route) => route.fulfill(json({ me: { matches: [], actions: [] } })));
+  await page.route("**/api/users/me/profile-completeness", (route) => route.fulfill(json({ score: 100, missing: [] })));
+  await page.route("**/api/me/platform-links", (route) => route.fulfill(json({ links: [], available: {}, platforms: {} })));
+  await page.route("**/api/users/me/notification-preferences", (route) => route.fulfill(json({ topics: [], levels: [], discord: { linked: false } })));
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, analytics: false, saved_at: Date.now(), expires_at: Date.now() + 864e5 }));
+    } catch {
+      // ohne Speicher bleibt der Hinweis - die Tests klicken ihn dann weg
+    }
+  });
+}
+
+async function dismissCookies(page) {
+  const allow = page.getByRole("button", { name: /nur notwendige|ablehnen|alle erlauben/i }).first();
+  if (await allow.isVisible().catch(() => false)) await allow.click();
+}
+
+// Wechsel innerhalb der Seite, ohne sie neu zu laden - so bleibt im Speicher, was die Seite schon geholt hat.
+async function spaGehe(page, path) {
+  await page.evaluate((to) => {
+    window.history.pushState({}, "", to);
+    window.dispatchEvent(new window.PopStateEvent("popstate"));
+  }, path);
+}
+
+// Die Sitzung wie am Server: wer angemeldet ist, bestimmt die Antworten; Abmelden und Anmelden schalten um.
+async function mockSitzung(page, start) {
+  const sitzung = { wer: start };
+  const ich = (route) => route.fulfill(json(sitzung.wer));
+  await page.route("**/api/auth/me", ich);
+  await page.route("**/api/users/me", ich);
+  await page.route("**/api/auth/logout", (route) => { sitzung.wer = null; return route.fulfill(json({ ok: true })); });
+  return sitzung;
+}
+
+// Was ein Konto auf dem Gerät hinterlässt: gespeicherte Mitgliedskarte, letzte Suchen, Browser-Benachrichtigungen.
+const GERAET = ["tls-member-card-v1", "tls-recent-searches", "tls-web-push-owner"];
+async function geraetBefuellen(page) {
+  await page.evaluate((keys) => {
+    window.localStorage.setItem(keys[0], JSON.stringify({ owner: "user-1", card: { name: "Nachtfalke", member_number: "TLS-077" } }));
+    window.localStorage.setItem(keys[1], JSON.stringify(["turnier"]));
+    window.localStorage.setItem(keys[2], "user-1");
+  }, GERAET);
+}
+const geraetReste = (page) => page.evaluate((keys) => keys.filter((key) => window.localStorage.getItem(key)), GERAET);
+
+async function abmelden(page, form) {
+  if (form === "handy") {
+    await page.getByTestId("nav-mobile-toggle").click();
+    await page.getByTestId("nav-logout-mobile").click();
+  } else {
+    await page.getByTestId("nav-user").click();
+    await page.getByTestId("nav-logout").click();
+  }
+}
+
+for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", { width: 1440, height: 900 }]]) {
+  test.describe(`Mein Bereich (${form})`, () => {
+    test.use({ viewport });
+
+    test("alte Adressen leiten in ihre Gruppe weiter - Suche und Anker gehen mit", async ({ page }) => {
+      test.setTimeout(180_000);
+      await mockServer(page);
+      const cases = [
+        ["/profile", "/mein-bereich/profil"],
+        ["/profile?tab=gaming", "/mein-bereich/profil?tab=gaming"],
+        ["/profile?tab=socials&link=steam", "/mein-bereich/profil?tab=socials&link=steam"],
+        ["/profile?tab=notifications#dieser-browser", "/mein-bereich/benachrichtigungen#dieser-browser"],
+        ["/profile?tab=security&mfa=required", "/mein-bereich/konto?mfa=required"],
+        ["/profile?tab=appearance", "/mein-bereich/konto?tab=appearance"],
+        ["/profile?tab=privacy", "/mein-bereich/datenschutz"],
+        ["/profile?tab=invoices&invoice=d-31", "/mein-bereich/rechnungen?invoice=d-31"],
+        ["/privacy-account", "/mein-bereich/datenschutz?tab=daten"],
+        ["/members/area", "/mein-bereich/verein"],
+        ["/mitgliederbereich", "/mein-bereich/verein"],
+        ["/members/membership#mitgliedskarte", "/mein-bereich/mitgliedschaft#mitgliedskarte"],
+        ["/members/meetings?meeting=7", "/mein-bereich/verein/versammlungen?meeting=7"],
+        ["/members/helfen?event=5", "/mein-bereich/verein/helfen?event=5"],
+        ["/members/documents", "/mein-bereich/verein/dokumente"],
+        ["/members/news", "/mein-bereich/verein/news"],
+        ["/members/benefits", "/mein-bereich/verein/vorteile"],
+        ["/account/invoices?invoice=d-31", "/mein-bereich/rechnungen?invoice=d-31"],
+        ["/account/documents", "/mein-bereich/rechnungen?tab=unterlagen"],
+        ["/my/prizes", "/mein-bereich/rechnungen?tab=gewinne"],
+        ["/my/penalties", "/mein-bereich/rechnungen?tab=strafen"],
+      ];
+      for (const [from, to] of cases) {
+        await page.goto(from);
+        await expect.poll(() => { const url = new URL(page.url()); return `${url.pathname}${url.search}${url.hash}`; }, { message: from }).toBe(to);
+        await expect(page.getByTestId("mein-bereich")).toBeVisible();
+      }
+      // Das öffentliche Profil bleibt öffentlich - /u/me führt dorthin, nicht nach Mein Bereich.
+      await page.goto("/u/me");
+      await expect.poll(() => new URL(page.url()).pathname).toBe("/u/nachtfalke");
+    });
+
+    // Funktion → Gruppe (Klick 1) und, wo sie hinter einem Reiter liegt, der Reiter (Klick 2).
+    const FUNCTIONS = [
+      ["Gamertag", "profil", null, "profile-display-name"],
+      ["Bild und Banner", "profil", null, "profile-banner-preview"],
+      ["So sehen andere mich", "profil", null, "settings-to-profile"],
+      ["Spiel-IDs", "profil", "profile-tab-gaming", "profile-fav-games"],
+      ["Socials", "profil", "profile-tab-socials", "profile-link-rows"],
+      ["Ausweis", "mitgliedschaft", null, "membership-status"],
+      ["Beitrag", "mitgliedschaft", null, "membership-fee-card"],
+      ["Wunschnummer", "mitgliedschaft", null, "jersey-choose-form"],
+      ["Anschrift ändern", "mitgliedschaft", null, "membership-self-form"],
+      ["Rechnungen", "rechnungen", null, "my-invoices"],
+      ["Unterlagen", "rechnungen", "mein-bereich-tab-unterlagen", "account-documents-empty"],
+      ["Strafen", "rechnungen", "mein-bereich-tab-strafen", "my-penalties-list"],
+      ["Verein", "verein", null, "member-area"],
+      ["Benachrichtigungen", "benachrichtigungen", null, "mein-bereich-benachrichtigungen"],
+      ["Passwort", "konto", null, "profile-password-panel"],
+      ["Zwei-Faktor", "konto", null, "profile-mfa-panel"],
+      ["Geräte", "konto", null, "profile-sessions-panel"],
+      ["Darstellung", "konto", "profile-tab-appearance", "settings-appearance"],
+      ["Kalender-Abo", "konto", "profile-tab-calendar", "settings-calendar"],
+      ["Sichtbarkeit", "datenschutz", null, "profile-privacy"],
+      ["Einwilligungen", "datenschutz", "profile-tab-einwilligungen", "consents-site"],
+      ["Daten herunterladen", "datenschutz", "profile-tab-daten", "dsgvo-export-btn"],
+      ["Konto löschen", "datenschutz", "profile-tab-loeschung", "dsgvo-anonymize-btn"],
+    ];
+
+    test("jede Funktion ab dem Start mit höchstens zwei Klicks", async ({ page }) => {
+      test.setTimeout(240_000);
+      await mockServer(page);
+      for (const [name, group, tab, target] of FUNCTIONS) {
+        await page.goto("/dashboard");
+        await dismissCookies(page);
+        let clicks = 0;
+        await page.getByTestId(`dashboard-bereich-liste-${group}`).click();
+        clicks += 1;
+        await expect(page.getByTestId("mein-bereich")).toHaveAttribute("data-gruppe", group);
+        if (tab) {
+          await page.getByTestId(tab).click();
+          clicks += 1;
+        }
+        await expect(page.getByTestId(target).first(), name).toBeVisible();
+        expect(clicks, name).toBeLessThanOrEqual(2);
+      }
+    });
+
+    test("jede Gruppe über Benutzermenü bzw. untere Leiste mit höchstens zwei Klicks - von jeder Seite", async ({ page }) => {
+      test.setTimeout(120_000);
+      await mockServer(page);
+      for (const group of ["profil", "mitgliedschaft", "rechnungen", "verein", "benachrichtigungen", "konto", "datenschutz"]) {
+        await page.goto("/events");
+        await dismissCookies(page);
+        if (form === "pc") {
+          await page.getByTestId("nav-user").click();
+          await page.getByTestId(`nav-account-${group}`).click();
+        } else {
+          await page.getByTestId("bottom-nav-profile").click();
+          await expect(page.getByTestId("mein-bereich-liste")).toBeVisible();
+          await page.getByTestId(`mein-bereich-liste-${group}`).click();
+        }
+        await expect(page.getByTestId("mein-bereich")).toHaveAttribute("data-gruppe", group);
+      }
+    });
+
+    test("Zu tun als große Knöpfe, ohne seitliches Scrollen; am Handy die Liste, am PC die Seitenleiste", async ({ page }) => {
+      await mockServer(page);
+      await page.goto("/mein-bereich");
+      await dismissCookies(page);
+      await expect(page.getByTestId("mein-bereich-todo-rechnung")).toHaveAttribute("href", "/mein-bereich/rechnungen");
+      await expect(page.getByTestId("mein-bereich-todo-nummer")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft#nummer");
+      const box = await page.getByTestId("mein-bereich-todo-rechnung").boundingBox();
+      expect(box.height).toBeGreaterThanOrEqual(56);
+      if (form === "pc") {
+        await expect(page.getByTestId("mein-bereich-nav")).toBeVisible();
+        await expect(page.getByTestId("mein-bereich-liste")).toBeHidden();
+        await expect(page.getByTestId("mein-bereich-nav-rechnungen")).toHaveAttribute("aria-label", "Rechnungen & Unterlagen, 1 offen");
+      } else {
+        await expect(page.getByTestId("mein-bereich-nav")).toBeHidden();
+        await expect(page.getByTestId("mein-bereich-liste")).toBeVisible();
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+      // Am Handy führt jede Gruppe zurück zur Liste.
+      if (form === "handy") {
+        await page.getByTestId("mein-bereich-liste-konto").click();
+        await page.getByTestId("mein-bereich-back").click();
+        await expect.poll(() => new URL(page.url()).pathname).toBe("/mein-bereich");
+      }
+    });
+
+    test("Häufig gebraucht: Wunschnummer und Anschrift springen zur Karte, auch wenn sie erst nach dem Laden kommt", async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await mockServer(page);
+      for (const [weg, ziel] of [["mein-bereich-schnell-nummer", "jersey-card"], ["mein-bereich-schnell-anschrift", "membership-self-form"]]) {
+        await page.goto("/mein-bereich");
+        await dismissCookies(page);
+        await page.getByTestId(weg).click();
+        await expect(page.getByTestId(ziel)).toBeVisible();
+        await expect.poll(async () => {
+          const box = await page.getByTestId(ziel).boundingBox();
+          return box && box.y >= 0 && box.y < viewport.height - 40;
+        }, { message: `${weg} springt zu ${ziel}` }).toBe(true);
+        expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+      }
+    });
+
+    test("Gruppenwechsel: der Fokus landet auf der Überschrift der neuen Gruppe", async ({ page }) => {
+      await mockServer(page);
+      await page.goto("/mein-bereich");
+      await dismissCookies(page);
+      if (form === "pc") await page.getByTestId("mein-bereich-nav-konto").click();
+      else await page.getByTestId("mein-bereich-liste-konto").click();
+      await expect(page.getByTestId("mein-bereich")).toHaveAttribute("data-gruppe", "konto");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Konto & Sicherheit");
+      await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+    });
+
+    test("Tastatur: Seitenleiste und Reiter gehen ohne Maus, der Fokus landet auf der Überschrift", async ({ page }) => {
+      test.skip(form === "handy", "Die Seitenleiste gibt es am PC; am Handy führen Liste und Zurück-Knopf (oben geprüft).");
+      await mockServer(page);
+      await page.goto("/mein-bereich");
+      await dismissCookies(page);
+      const konto = page.getByTestId("mein-bereich-nav-konto");
+      await konto.focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByTestId("mein-bereich")).toHaveAttribute("data-gruppe", "konto");
+      await expect(page.getByTestId("mein-bereich-nav-konto")).toHaveAttribute("aria-current", "page");
+      await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+      // Mit Tab zum Reiter „Darstellung“, Enter öffnet ihn.
+      const darstellung = page.getByTestId("profile-tab-appearance");
+      for (let i = 0; i < 30 && !(await darstellung.evaluate((node) => node === document.activeElement)); i += 1) await page.keyboard.press("Tab");
+      await expect(darstellung).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(darstellung).toHaveAttribute("aria-current", "page");
+      await expect(page.getByTestId("settings-appearance")).toBeVisible();
+      await expect.poll(() => new URL(page.url()).search).toBe("?tab=appearance");
+    });
+
+    // Prüfung #2059: A wartet auf seine Rechnungen, meldet sich ab, B meldet sich an - ohne Neuladen der Seite. Die
+    // Antwort für A kommt erst, wenn B schon auf „Rechnungen & Unterlagen“ steht; B sieht nur die eigenen Belege.
+    test("Abmelden und ein anderes Konto: die Rechnungen von A kommen bei B nie an", async ({ page }) => {
+      test.setTimeout(120_000);
+      await mockServer(page);
+      const b = { id: "user-2", username: "morgentau", display_name: "Morgentau", role: "player", is_club_member: false, email: "tau@example.test", created_at: "2025-03-01T10:00:00Z" };
+      const sitzung = await mockSitzung(page, member);
+      await page.route("**/api/auth/login", (route) => { sitzung.wer = b; return route.fulfill(json(b)); });
+      const belege = (key, ref) => ({ connected: true, currency: "EUR", summary: { count: 1, open_count: 1, open_total: 36, overdue_count: 0 }, invoices: [{ key, ref, status: "open", type: "invoice", type_label: "Rechnung", total: 36, date: "2026-10-01" }] });
+      let gibA;
+      const aFrei = new Promise((resolve) => { gibA = resolve; });
+      let aGeliefert = false;
+      await page.route("**/api/account/invoices", async (route) => {
+        if (sitzung.wer?.id !== member.id) return route.fulfill(json(belege("d-b2", "RE-B-0002")));
+        // Langsamer Server: die Antwort für A dauert (höchstens 20 s, sonst gibt sie der Test frei).
+        await Promise.race([aFrei, new Promise((resolve) => { setTimeout(resolve, 20_000); })]);
+        await route.fulfill(json(belege("d-a1", "RE-A-0001")));
+        aGeliefert = true;
+        return undefined;
+      });
+      const anfrageA = page.waitForRequest("**/api/account/invoices");
+      await page.goto("/mein-bereich/rechnungen");
+      await dismissCookies(page);
+      await anfrageA;
+      await abmelden(page, form);
+      await expect.poll(() => sitzung.wer).toBeNull();
+      await spaGehe(page, "/login?next=%2Fmein-bereich%2Frechnungen");
+      await page.getByTestId("login-email").fill("tau@example.test");
+      await page.getByTestId("login-password").fill("nur-ein-test");
+      await page.getByTestId("login-submit").click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe("/mein-bereich/rechnungen");
+      await expect(page.getByTestId("my-invoices")).toBeVisible();
+      // Jetzt erst kommt die Antwort für A.
+      gibA();
+      await expect.poll(() => aGeliefert).toBe(true);
+      await expect(page.getByTestId("invoice-d-b2")).toBeVisible();
+      await page.waitForTimeout(500);
+      await expect(page.getByText("RE-A-0001")).toHaveCount(0);
+      await expect(page.getByTestId("invoice-d-b2")).toBeVisible();
+    });
+
+    // Prüfung #2059: nach „Konto löschen“ die Startseite mit kurzer Bestätigung, nicht die Anmeldung. Mit Leerzeichen
+    // am Rand: Dialog und Seite vergleichen gleich.
+    test("Konto löschen: danach die Startseite mit Bestätigung - auch mit Leerzeichen um das Wort", async ({ page }) => {
+      test.setTimeout(90_000);
+      await mockServer(page);
+      await mockSitzung(page, member);
+      let geloescht = false;
+      await page.route("**/api/dsgvo/anonymize-me", (route) => { geloescht = true; return route.fulfill(json({ ok: true })); });
+      await page.goto("/mein-bereich/datenschutz?tab=loeschung");
+      await dismissCookies(page);
+      await page.getByTestId("dsgvo-anonymize-btn").click();
+      await page.getByTestId("confirm-dialog-input").fill(" LÖSCHEN ");
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => geloescht).toBe(true);
+      await expect.poll(() => { const url = new URL(page.url()); return `${url.pathname}${url.search}`; }).toBe("/");
+      await expect(page.getByText("Dein Konto ist gelöscht.")).toBeVisible();
+    });
+
+    // Geteilte Geräte (#2059): scheitert das Abmelden nach dem Löschen am Netz, ist das Gerät trotzdem leer - und es
+    // bleibt bei einer Meldung.
+    test("Konto löschen, Abmelden scheitert am Netz: Gerät leer, nur „Dein Konto ist gelöscht.“", async ({ page }) => {
+      test.setTimeout(90_000);
+      await mockServer(page);
+      await mockSitzung(page, member);
+      await page.route("**/api/auth/logout", (route) => route.abort("failed"));
+      await page.route("**/api/dsgvo/anonymize-me", (route) => route.fulfill(json({ ok: true })));
+      await page.goto("/mein-bereich/datenschutz?tab=loeschung");
+      await dismissCookies(page);
+      await geraetBefuellen(page);
+      await page.getByTestId("dsgvo-anonymize-btn").click();
+      await page.getByTestId("confirm-dialog-input").fill("LÖSCHEN");
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+      await expect(page.getByText("Dein Konto ist gelöscht.")).toBeVisible();
+      await expect.poll(() => geraetReste(page)).toEqual([]);
+      await expect(page.getByTestId("nav-user")).toHaveCount(0);
+      await page.waitForTimeout(500);
+      await expect(page.locator('[data-sonner-toast][data-type="error"]')).toHaveCount(0);
+    });
+
+    // Normales Abmelden ohne Netz: die Sitzung bleibt sichtbar, mit Meldung - das Cookie gilt am Server weiter, ein
+    // leeres Gerät täuschte ein Abmelden nur vor (wie public.spec „logout keeps the visible session …“).
+    test("Abmelden scheitert am Netz: die Sitzung bleibt sichtbar, eine Meldung sagt es", async ({ page }) => {
+      test.setTimeout(90_000);
+      await mockServer(page);
+      await mockSitzung(page, member);
+      await page.route("**/api/auth/logout", (route) => route.abort("failed"));
+      await page.goto("/mein-bereich");
+      await dismissCookies(page);
+      await geraetBefuellen(page);
+      await abmelden(page, form);
+      await expect(page.locator('[data-sonner-toast][data-type="error"]')).toHaveCount(1);
+      await expect(page.getByTestId("mein-bereich")).toBeVisible();
+      expect(await geraetReste(page)).toEqual(GERAET);
+    });
+  });
+}

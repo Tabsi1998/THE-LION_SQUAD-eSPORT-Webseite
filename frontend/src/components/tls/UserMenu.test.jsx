@@ -2,10 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
-// Das Benutzermenü im Kopf (#282, #516, #1150): Dashboard, Mein Profil, Einstellungen - jedes Thema an genau einem Ort.
-// Chats stehen unter Community, Benachrichtigungen hinter der Glocke, Rechnungen, Gewinne und Strafen im eigenen Profil
-// („Nur für dich“), „Mitglied werden“ unter Verein, Hilfe & Kontakt im Hauptmenü. Mitgliederbereich nur für Mitglieder,
-// Admin nur für Admins, Abmelden ruft die Sitzung ab.
+// Das Benutzermenü im Kopf (#282, #516, #1150, #2059): oben der eigene Name als Weg zum öffentlichen Profil, dann das
+// Dashboard und die Gruppen von „Mein Bereich“ - direkt anspringbar. Chats stehen unter Community, die Liste der
+// Benachrichtigungen hinter der Glocke, „Mitglied werden“ unter Verein. „Verein“ nur für Mitglieder, Admin nur für Admins,
+// Abmelden ruft die Sitzung ab.
 
 const authState = { user: { id: "u-1", username: "lionfan", display_name: "Lion Fan" }, logout: vi.fn(), isAdmin: false, isClubMember: false };
 const apiMock = { get: vi.fn() };
@@ -35,36 +35,41 @@ beforeEach(() => {
   apiMock.get.mockReset();
 });
 
-test("drei Einträge: Dashboard, Mein Profil, Einstellungen - kein zweiter Weg zu Chats, Glocke oder Rechnungen", async () => {
+test("Name, Dashboard und die Gruppen von „Mein Bereich“ - kein zweiter Weg zu Chats, Glocke oder Teams", async () => {
   const user = userEvent.setup();
   renderMenu();
 
   expect(screen.queryByTestId("nav-user-menu")).toBeNull();
   await user.click(screen.getByTestId("nav-user"));
   const items = screen.getAllByRole("menuitem").map((el) => el.getAttribute("data-testid"));
-  expect(items).toEqual(["nav-dashboard", "nav-profile", "nav-account-settings", "nav-logout"]);
+  expect(items).toEqual([
+    "nav-profile", "nav-dashboard", "nav-account-start", "nav-account-profil", "nav-account-mitgliedschaft", "nav-account-rechnungen",
+    "nav-account-benachrichtigungen", "nav-account-konto", "nav-account-datenschutz", "nav-logout",
+  ]);
   expect(screen.getByTestId("nav-profile")).toHaveAttribute("href", "/u/lionfan");
-  expect(screen.getByTestId("nav-account-settings")).toHaveAttribute("href", "/profile");
-  for (const href of ["/messages", "/notifications", "/profile?tab=invoices", "/account/invoices", "/membership/join", "/my/prizes", "/teams"]) {
+  expect(screen.getByTestId("nav-profile")).toHaveTextContent("So sehen andere mich");
+  expect(screen.getByTestId("nav-account-start")).toHaveAttribute("href", "/mein-bereich");
+  expect(screen.getByTestId("nav-account-konto")).toHaveTextContent("Konto & Sicherheit");
+  expect(screen.getByTestId("nav-account-datenschutz")).toHaveAttribute("href", "/mein-bereich/datenschutz");
+  for (const href of ["/messages", "/notifications", "/profile", "/account/invoices", "/membership/join", "/my/prizes", "/teams", "/members/area"]) {
     expect(document.querySelector(`[data-testid="nav-user-menu"] a[href="${href}"]`)).toBeNull();
   }
   // Das Menü fragt keine Zähler mehr ab - Strafen und Gewinne stehen im Profil.
   expect(apiMock.get).not.toHaveBeenCalled();
 });
 
-test("Mitglieder sehen den Mitgliederbereich, Admins den Adminbereich", async () => {
+test("Mitglieder sehen „Verein“ in „Mein Bereich“, Admins den Adminbereich", async () => {
   const user = userEvent.setup();
+  authState.user = { ...authState.user, is_club_member: true };
   authState.isClubMember = true;
   authState.isAdmin = true;
   renderMenu();
 
   await user.click(screen.getByTestId("nav-user"));
-  expect(screen.queryByTestId("nav-account-membership")).toBeNull();
-  expect(screen.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
+  expect(screen.queryByTestId("nav-member-area")).toBeNull();
+  expect(screen.getByTestId("nav-account-verein")).toHaveAttribute("href", "/mein-bereich/verein");
   expect(screen.getByTestId("nav-admin")).toHaveAttribute("href", "/admin");
-  // Gold, Blau und Rot ohne das weisse `text-white/80` daneben (#431) - sonst bleibt alles weiss.
-  expect(screen.getByTestId("nav-member-area").className).toMatch(/text-\[#FFD700\]/);
-  expect(screen.getByTestId("nav-member-area").className).not.toMatch(/text-white/);
+  // Blau und Rot ohne das weisse `text-white/80` daneben (#431) - sonst bleibt alles weiss.
   expect(screen.getByTestId("nav-admin").className).toMatch(/text-\[#29B6E8\]/);
   expect(screen.getByTestId("nav-logout").className).toMatch(/text-\[#FF3B30\]/);
   expect(screen.getByTestId("nav-logout").className).not.toMatch(/text-white/);
@@ -91,7 +96,7 @@ test("ein Admin ohne Zwei-Faktor (#1028) sieht statt „Admin“ den Hinweis „
   expect(screen.queryByTestId("nav-admin")).toBeNull();
   const hint = screen.getByTestId("nav-mfa-setup");
   expect(hint).toHaveTextContent("2FA einrichten");
-  expect(hint).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin");
+  expect(hint).toHaveAttribute("href", "/mein-bereich/konto?mfa=required&next=%2Fadmin");
 });
 
 test("offen bleibt offen, wenn während des Ladens der Kopf der Seite den des Seitenwechsels ablöst (#1324)", async () => {

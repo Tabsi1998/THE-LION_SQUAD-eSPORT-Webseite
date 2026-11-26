@@ -33,5 +33,5 @@ test("eigenes Profil ohne Schalter: Karte mit dem Hinweis auf die Privatsphäre"
   apiMock.get.mockResolvedValue({ data: { ...SHOWN, public: false } });
   render(<MemoryRouter><PublicSeasonFinds userId="u1" own /></MemoryRouter>);
   expect(await screen.findByTestId("public-season-finds-note")).toHaveTextContent("Nur du siehst diese Karte.");
-  expect(screen.getByRole("link", { name: "Unter Privatsphäre kannst du sie zeigen." }).getAttribute("href")).toBe("/profile?tab=privacy");
+  expect(screen.getByRole("link", { name: "Unter Datenschutz → Sichtbarkeit kannst du sie zeigen." }).getAttribute("href")).toBe("/mein-bereich/datenschutz");
 });

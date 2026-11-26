@@ -2,12 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { calendarAskDue, meetingCalendarItem, rememberCalendarAsked } from "@/lib/clubCalendar";
-import { ArrowLeft, Calendar, CheckCircle2, FileText, MapPin, Send, Vote, Video } from "lucide-react";
+import { Calendar, CheckCircle2, FileText, MapPin, Send, Vote, Video } from "lucide-react";
 
 // Versammlungen und Abstimmungen (#327): alles kommt aus der Vereinsakte (Vereine 1.4) - Einladung,
 // Tagesordnung, Anträge, Stimmrechte, Ergebnis. Die Website zeigt und reicht durch; sie hat keine eigene
@@ -290,19 +289,16 @@ export default function MemberMeetingsPage() {
   const doneBallots = ballots.filter((b) => !(b.status === "open" || b.status === "released"));
 
   return (
-    <PublicLayout>
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="meetings-page">
-        <Link to="/members/area" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-white/50 hover:text-[#FFD700]"><ArrowLeft className="w-3 h-3" /> Mitgliederbereich</Link>
-        <span className="block mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitgliederbereich</span>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Versammlungen & Abstimmungen</h1>
-        <p className="mt-2 text-sm text-white/60 max-w-2xl">Einladungen, Tagesordnung, Anträge und Abstimmungen deiner Generalversammlungen – so, wie der Verein sie in der Mitgliederverwaltung führt.</p>
+    <>
+      <section className="min-w-0" data-testid="meetings-page">
+        <p className="text-sm text-white/60 max-w-2xl">Einladungen, Tagesordnung, Anträge und Abstimmungen deiner Generalversammlungen – so, wie der Verein sie in der Mitgliederverwaltung führt.</p>
 
         {view === null ? <p className="mt-8 text-sm text-white/45" data-testid="meetings-loading">Wird geladen …</p> : null}
 
         {view && !view.available ? (
           <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5 text-sm text-white/70" data-testid="meetings-unavailable">
             {view.text || "Versammlungen sind hier noch nicht verfügbar."}
-            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/members/membership" className="text-[#FFD700] hover:underline">Zu Meine Mitgliedschaft</Link></div> : null}
+            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/mein-bereich/mitgliedschaft" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Mitgliedschaft</Link></div> : null}
           </div>
         ) : null}
 
@@ -326,6 +322,6 @@ export default function MemberMeetingsPage() {
           </>
         ) : null}
       </section>
-    </PublicLayout>
+    </>
   );
 }

@@ -39,7 +39,7 @@ test("Mitglieder sehen den Weg zu ihrem eigenen Eintrag", async () => {
   authState.isClubMember = true;
   render(<MemoryRouter><MembersDirectoryPage /></MemoryRouter>);
   await screen.findByTestId("member-card-paula");
-  expect(screen.getByTestId("members-own-entry")).toHaveAttribute("href", "/members/membership");
+  expect(screen.getByTestId("members-own-entry")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
   expect(screen.queryByTestId("members-join-cta")).toBeNull();
 });
 

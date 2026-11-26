@@ -1,14 +1,20 @@
-import { Bell, CalendarPlus, Eye, Gamepad2, Globe, Info, LayoutDashboard, Settings, ShieldCheck, Sparkles, User, UserCircle } from "lucide-react";
+import { Bell, CalendarPlus, Eye, Gamepad2, Globe, Info, LayoutDashboard, ShieldCheck, Sparkles, User } from "lucide-react";
+import { gruppe, gruppenFuer } from "@/lib/meinBereich";
 
-// Das Benutzermenü (#282, #516, #1150): eine Liste für den Kopf am PC und das Handy-Menü - jedes Thema an genau einem
-// Ort. Nachrichten stehen unter Community → Chats, Benachrichtigungen hinter der Glocke, Rechnungen, Gewinne und Strafen
-// im eigenen Profil („Nur für dich“), „Mitglied werden“ unter Verein, Hilfe & Kontakt im Hauptmenü. Hier bleiben das
-// Dashboard, das eigene Profil und die Einstellungen; Mitgliederbereich, Admin und Abmelden hängt das Menü selbst an.
-export function userMenuEntries({ username = "" } = {}) {
+// Das Benutzermenü (#282, #516, #1150, #2059): eine Liste für den Kopf am PC und das Handy-Menü - das Dashboard, dann
+// „Mein Bereich“ mit seinen Gruppen, direkt anspringbar. Nachrichten stehen unter Community → Chats, die Liste der
+// Benachrichtigungen hinter der Glocke, „Mitglied werden“ unter Verein. Das eigene öffentliche Profil öffnet der Kopf des
+// Menüs (Name, „So sehen andere mich“); Admin und Abmelden hängt das Menü selbst an.
+export function userMenuEntries({ mitglied = false } = {}) {
   return [
     { key: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { key: "profile", to: `/u/${encodeURIComponent(username)}`, label: "Mein Profil", icon: UserCircle },
-    { key: "settings", to: "/profile", label: "Einstellungen", icon: Settings },
+    ...gruppenFuer({ mitglied }).map((item) => ({
+      key: item.key,
+      to: item.path,
+      label: item.key === "start" ? "Mein Bereich" : item.label,
+      icon: item.icon,
+      bereich: true,
+    })),
   ];
 }
 
@@ -19,50 +25,35 @@ export function userMenuTestId(key, suffix = "") {
   return suffix ? `${base}${suffix}` : base;
 }
 
-// Einstellungen an einem Ort (#1146): /profile hat dieselben Gruppen in derselben Reihenfolge wie die App - Darstellung,
-// Benachrichtigungen, Sicherheit, Privatsphäre, Konto, Über die App. Was keine Einstellung ist, hat seinen Ort woanders:
-// Teams unter Community → Teams, Freunde unter Community → Spieler, Erfolge, Ehrungen, Rechnungen und Gewinne im eigenen
-// Profil (/u/me). Alte Adressen (?tab=teams …) leiten dorthin weiter (TAB_REDIRECTS).
+// Die Einstellungen in „Mein Bereich“ (#2059): vier Gruppen mit je ihren Reitern - dieselben Formulare, die vorher unter
+// /profile standen, jetzt dort, wo man sie sucht. Darstellung, Kalender-Abo und „App & Rechtliches“ gehören zum Konto.
+// Was keine Einstellung ist (Teams, Freunde, Erfolge, Ehrungen, Rechnungen), hat seinen Ort woanders; alte Adressen
+// leiten dorthin weiter (lib/meinBereich.js, legacyTarget).
+const settingsGroup = (key, tabs) => ({ key, label: gruppe(key).label, tabs });
 export const SETTINGS_GROUPS = [
-  { key: "appearance", label: "Darstellung", tabs: [{ k: "appearance", label: "Saison-Deko und Töne", icon: Sparkles }] },
-  // „Benachrichtigungen“ ist die Liste hinter der Glocke; hier werden sie eingestellt (#516).
-  { key: "notifications", label: "Benachrichtigungen", tabs: [{ k: "notifications", label: "Benachrichtigungen einstellen", icon: Bell }] },
-  // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und die Geräte (?tab=sessions landet hier).
-  { key: "security", label: "Sicherheit", tabs: [{ k: "security", label: "Sicherheit", icon: ShieldCheck }] },
-  { key: "privacy", label: "Privatsphäre", tabs: [{ k: "privacy", label: "Privatsphäre", icon: Eye }] },
-  { key: "account", label: "Konto", tabs: [
+  settingsGroup("profil", [
     { k: "basic", label: "Grunddaten", icon: User },
-    { k: "gaming", label: "Gaming", icon: Gamepad2 },
+    { k: "gaming", label: "Gaming & Spiel-IDs", icon: Gamepad2 },
     { k: "socials", label: "Socials", icon: Globe },
+  ]),
+  // „Benachrichtigungen“ ist die Liste hinter der Glocke; hier werden sie eingestellt (#516).
+  settingsGroup("benachrichtigungen", [{ k: "notifications", label: "Benachrichtigungen einstellen", icon: Bell }]),
+  // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und die Geräte (?tab=sessions landet hier).
+  settingsGroup("konto", [
+    { k: "security", label: "Sicherheit", icon: ShieldCheck },
+    { k: "appearance", label: "Darstellung", icon: Sparkles },
     // Mein Kalender-Abo (#1788): der feste Ort für den persönlichen Abo-Link - die App bekommt denselben Eintrag.
-    { k: "calendar", label: "Mein Kalender-Abo", icon: CalendarPlus },
-  ] },
-  { key: "about", label: "Über die App", tabs: [{ k: "about", label: "App und Rechtliches", icon: Info }] },
+    { k: "calendar", label: "Kalender-Abo", icon: CalendarPlus },
+    { k: "about", label: "App & Rechtliches", icon: Info },
+  ]),
+  settingsGroup("datenschutz", [{ k: "privacy", label: "Sichtbarkeit", icon: Eye }]),
 ];
 
 export const TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs.map((tab) => ({ ...tab, group: group.key })));
 
-/** Frühere Reiter von /profile, die keine Einstellungen sind - sie haben einen eigenen Ort (#1150). */
-export function tabRedirect(tab, params, username = "") {
-  const me = username ? `/u/${encodeURIComponent(username)}` : "/u/me";
-  switch (tab) {
-    case "teams":
-      return "/teams";
-    case "friends":
-      return "/players";
-    case "achievements":
-      return `${me}?tab=achievements`;
-    case "honours":
-      return `${me}?tab=honours`;
-    case "invoices": {
-      const invoice = params?.get?.("invoice") || "";
-      return `/account/invoices${/^d-\d{1,12}$/.test(invoice) ? `?invoice=${invoice}` : ""}`;
-    }
-    case "inbox":
-      return `/messages${params?.get?.("to") ? `/${params.get("to")}` : ""}`;
-    default:
-      return null;
-  }
+/** Zu welcher Gruppe ein Einstellungs-Reiter gehört. */
+export function settingsGroupOf(tab) {
+  return TABS.find((item) => item.k === tab)?.group || null;
 }
 
 export const PLATFORMS = [

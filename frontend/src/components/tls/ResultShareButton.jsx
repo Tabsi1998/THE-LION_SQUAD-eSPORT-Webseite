@@ -36,7 +36,7 @@ export function ResultShareButton({ tournamentId, options: given = null, showPag
     return (
       <p className="text-xs text-white/55" data-testid={`${testId}-hint`}>
         {options.text}
-        {options.reason === "private_profile" ? <> <Link to="/profile?tab=privacy" className="text-[#29B6E8] hover:underline">Zur Privatsphäre</Link></> : null}
+        {options.reason === "private_profile" ? <> <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Zur Sichtbarkeit</Link></> : null}
       </p>
     );
   }

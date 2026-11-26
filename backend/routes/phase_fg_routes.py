@@ -742,6 +742,8 @@ DEFAULT_NAV = {
             {"key": "join", "to": "/membership/join", "label": "Mitglied werden", "visible": True},
             {"key": "gallery", "to": "/galerie", "label": "Galerie", "visible": True},
             {"key": "references", "to": "/references", "label": "Referenzen", "visible": True},
+            # Vereinsinhalte wohnen seit #2059 in „Mein Bereich“ - unter Verein steht für Mitglieder nur der Weg dorthin.
+            {"key": "my-club", "to": "/mein-bereich/verein", "label": "Mein Bereich", "visible": True, "member_only": True},
         ]},
         {"key": "esports", "to": "/esports", "label": "eSports", "visible": True, "order": 4, "children": [
             {"key": "esports_overview", "to": "/esports", "label": "Übersicht", "visible": True},
@@ -959,6 +961,7 @@ async def robots():
         "Disallow: /members/documents",
         "Disallow: /members/membership",
         "Disallow: /members/news",
+        "Disallow: /mein-bereich",
         "Disallow: /my/",
         "Disallow: /privacy-account",
         "Disallow: /profile",

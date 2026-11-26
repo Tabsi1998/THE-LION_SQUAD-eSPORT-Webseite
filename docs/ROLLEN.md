@@ -483,7 +483,7 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
   Konto und unter Alle Benutzer.
 - **Aufgabe im Verein** (`internal_role`, früher „Interne Rolle“): sehen das Mitglied selbst und die Verwaltung; die
   CSV-Spalte heißt gleich.
-- **Felder und Stufen:** Die Stufen unter Einstellungen → Privatsphäre gelten für Kontakt, Website, Gaming-Abos und die
+- **Felder und Stufen:** Die Stufen unter Mein Bereich → Datenschutz → Sichtbarkeit gelten für Kontakt, Website, Gaming-Abos und die
   bevorzugte Rolle. TikTok und die bevorzugte Rolle sind ohne gewählte Stufe privat, weil beide früher nirgends erschienen.
   Die E-Mail ist nie öffentlich und hat darum keinen Schalter.
 - **Profiltexte:** Anzeigename höchstens 50, Bio 1000, bevorzugte Rolle 40 Zeichen, ohne Leerzeichen am Rand. Geprüft wird nur,
@@ -495,28 +495,26 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
 
 ## Benutzermenü und Konto-Seiten (#516)
 
-Das Benutzermenü im Kopf (am Handy im Hauptmenü, in der App unter „Mehr → Konto“) hat je Eintrag
-genau ein Ziel, in der Reihenfolge, wie oft man es braucht:
+Das Benutzermenü im Kopf (am Handy im Hauptmenü) führt seit #2059 direkt in die Gruppen von **Mein Bereich**
+([Handbuch](handbuch/mein-bereich.md)); jedes Ziel genau einmal:
 
 | Eintrag | Ziel | Wer |
 | --- | --- | --- |
+| eigener Name („So sehen andere mich“) | `/u/<name>` – das öffentliche Profil | jedes Konto |
 | Dashboard | `/dashboard` | jedes Konto |
-| Mein Profil | `/profile` (Reiter, darunter „Benachrichtigungen einstellen“) | jedes Konto |
-| Öffentliches Profil | `/u/<name>` – so, wie andere es sehen | jedes Konto |
-| Nachrichten | `/messages` | jedes Konto |
-| Benachrichtigungen | `/notifications` (die Liste, mit dem Weg zu „Benachrichtigungen einstellen“) | jedes Konto |
-| Meine Mitgliedschaft | `/members/membership` | Mitglieder |
-| Mitglied werden | `/membership/join` | wer kein Mitglied ist |
-| Rechnungen | `/profile?tab=invoices` | jedes Konto |
-| Meine Strafen (n) | `/my/penalties` – nur, wenn es Strafen oder eine laufende Maßnahme gibt | betroffene Konten |
-| Gewinne (n) | `/my/prizes` – nur mit offenem Gewinn | Gewinner |
-| Hilfe & Kontakt | `/contact` | jedes Konto |
-| Mitgliederbereich | `/members/area` (Mitgliedschaft, Karte, Vorteile, Dokumente, interne News, Vorstand, Discord) | Mitglieder |
-| Admin | `/admin` | wer einen Verwaltungsbereich hat (nicht Moderation allein) |
+| Mein Bereich | `/mein-bereich` – Übersicht mit „Zu tun“ | jedes Konto |
+| Profil | `/mein-bereich/profil` | jedes Konto |
+| Mitgliedschaft | `/mein-bereich/mitgliedschaft` (ohne Mitgliedschaft der Weg zum Antrag) | jedes Konto |
+| Rechnungen & Unterlagen | `/mein-bereich/rechnungen` (Reiter Rechnungen, Unterlagen, Gewinne, Strafen) | jedes Konto |
+| Verein | `/mein-bereich/verein` (Versammlungen, Helfen, Dokumente, News, Vorteile) | Mitglieder und Verwaltung |
+| Benachrichtigungen | `/mein-bereich/benachrichtigungen` (die Liste selbst steht hinter der Glocke) | jedes Konto |
+| Konto & Sicherheit | `/mein-bereich/konto` | jedes Konto |
+| Datenschutz | `/mein-bereich/datenschutz` | jedes Konto |
+| Admin bzw. Mein Dienst | `/admin` | wer einen Verwaltungsbereich oder einen Dienst hat |
 | Abmelden | – | jedes Konto |
 
-Gäste sehen statt des Menüs „Anmelden“ und „Mitglied werden“. Die Profil-Seitenleiste führt nur
-die Reiter des Profils - die Konto-Seiten stehen nicht ein zweites Mal dort.
+Gäste sehen statt des Menüs „Anmelden“ und „Mitglied werden“. Die alten Adressen (`/profile?tab=…`, `/members/*`,
+`/account/*`, `/my/*`, `/privacy-account`) leiten in ihre Gruppe weiter.
 
 ## Wer sieht was im Adminbereich
 

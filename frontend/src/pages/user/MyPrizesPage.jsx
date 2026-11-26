@@ -1,5 +1,4 @@
 import { API_BASE, api } from "@/lib/api";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLoad } from "@/hooks/useLoad";
@@ -53,10 +52,8 @@ export default function MyPrizesPage() {
   useApiInvalidation(prizes.reload, ["prizes", "tournaments", "f1"]);
 
   return (
-    <PublicLayout>
-      <div className="max-w-5xl mx-auto px-4 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spieler</span>
-        <h1 className="font-heading text-3xl md:text-5xl font-black uppercase mt-1 mb-4">Meine Gewinne</h1>
+    <>
+      <div className="min-w-0">
         <p className="text-white/60 max-w-2xl mb-8">
           Hier siehst du deine Preise aus TLS-Turnieren, Fast-Lap-Challenges und Verlosungen, deine Urkunden und ob Gewinne schon zur Abholung bereit sind.
         </p>
@@ -76,7 +73,7 @@ export default function MyPrizesPage() {
           {(data) => <PrizesView data={data} onRetry={prizes.reload} />}
         </LoadState>
       </div>
-    </PublicLayout>
+    </>
   );
 }
 

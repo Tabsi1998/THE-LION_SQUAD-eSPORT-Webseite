@@ -142,11 +142,11 @@ export function showsDutyEntry(user) {
   return ["duty", "moderation"].includes(adminHome(user));
 }
 
-/** Zwei-Faktor wohnt unter Profil → Sicherheit (#258); `mfa=required` erklärt dort, warum (#348). */
+/** Zwei-Faktor wohnt unter Mein Bereich → Konto & Sicherheit (#258, #2059); `mfa=required` erklärt dort, warum (#348). */
 export function mfaSetupPath(next = "") {
-  const params = new URLSearchParams({ tab: "security", mfa: "required" });
+  const params = new URLSearchParams({ mfa: "required" });
   if (next) params.set("next", next);
-  return `/profile?${params.toString()}`;
+  return `/mein-bereich/konto?${params.toString()}`;
 }
 
 export function roleLabel(role) {

@@ -233,7 +233,7 @@
           "titel": "Strafen im Blick",
           "text": "Verhängt die Liga-Leitung eine Strafe, bekommst du eine Nachricht. Unter Meine Strafen steht sie mit Grund und Frist.",
           "hinweis": "Eine gesperrte Person ist beim Check-in grau. Die Sperre gilt auch während eines Einspruchs.",
-          "link": { "to": "/my/penalties", "label": "Meine Strafen" },
+          "link": { "to": "/mein-bereich/rechnungen?tab=strafen", "label": "Zu deinen Strafen" },
           "bild": false
         }
       ]

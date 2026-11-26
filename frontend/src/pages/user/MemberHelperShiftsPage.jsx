@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useAuth } from "@/context/AuthContext";
@@ -10,7 +9,7 @@ import { canUseArea } from "@/lib/permissions";
 import { HelperCallPanel } from "@/pages/user/helper/HelperCallPanel";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { calendarAskDue, rememberCalendarAsked, shiftCalendarItem } from "@/lib/clubCalendar";
-import { ArrowLeft, Calendar, CheckCircle2, HandHelping, MapPin, Users } from "lucide-react";
+import { Calendar, CheckCircle2, HandHelping, MapPin, Users } from "lucide-react";
 
 // Helferdienste (#331): Veranstaltungen mit Schichten aus der Vereinsakte (Vereine 1.4). Plätze, Bestätigung und
 // Anmeldestelle kommen vom Verein; die Website zeigt und reicht Anfrage und Rücknahme durch. Selbst eingetragen
@@ -164,12 +163,9 @@ export default function MemberHelperShiftsPage() {
   const rest = events.filter((e) => !e.upcoming);
 
   return (
-    <PublicLayout>
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="helper-shifts-page">
-        <Link to="/members/area" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-white/50 hover:text-[#FFD700]"><ArrowLeft className="w-3 h-3" /> Mitgliederbereich</Link>
-        <span className="block mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitgliederbereich</span>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Helferdienste</h1>
-        <p className="mt-2 text-sm text-white/60 max-w-2xl">Wo der Verein Hände braucht: Schichten mit Plätzen, dein Stand je Dienst. Angefragt heißt: der Vorstand bestätigt. Gezählt wird, was der Verein als geleistet bestätigt.</p>
+    <>
+      <section className="min-w-0" data-testid="helper-shifts-page">
+        <p className="text-sm text-white/60 max-w-2xl">Wo der Verein Hände braucht: Schichten mit Plätzen, dein Stand je Dienst. Angefragt heißt: der Vorstand bestätigt. Gezählt wird, was der Verein als geleistet bestätigt.</p>
 
         {/* Helfer-Aufruf (#1197): Vorstand - wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1479). */}
         {canUseArea(user, "club") ? <HelperCallPanel /> : null}
@@ -179,7 +175,7 @@ export default function MemberHelperShiftsPage() {
         {view && !view.available ? (
           <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5 text-sm text-white/70" data-testid="helper-shifts-unavailable">
             {view.text || "Helferdienste sind hier noch nicht verfügbar."}
-            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/members/membership" className="text-[#FFD700] hover:underline">Zu Meine Mitgliedschaft</Link></div> : null}
+            {view.reason === "not_bound" ? <div className="mt-3"><Link to="/mein-bereich/mitgliedschaft" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Mitgliedschaft</Link></div> : null}
           </div>
         ) : null}
 
@@ -194,6 +190,6 @@ export default function MemberHelperShiftsPage() {
           </>
         ) : null}
       </section>
-    </PublicLayout>
+    </>
   );
 }

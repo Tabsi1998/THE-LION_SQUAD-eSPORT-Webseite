@@ -39,3 +39,12 @@ test("der Satz je Ziel - ohne Ziel keiner", () => {
   expect(purposeSentence({ kind: "membership" })).toBe("Melde dich an, um deinen Mitgliedsantrag zu stellen.");
   expect(purposeSentence(null, "egal")).toBe("");
 });
+
+// #2059: ProtectedRoute gibt jetzt Pfad, Suche und Anker mit - das bleibt ein Pfad dieser Website, nie eine fremde Adresse.
+test("Suche und Anker gehen mit, fremde Ziele bleiben draußen", () => {
+  expect(safeNextPath("/mein-bereich/rechnungen?tab=gewinne#oben")).toBe("/mein-bereich/rechnungen?tab=gewinne#oben");
+  expect(safeNextPath("/mein-bereich?next=//boese.example")).toBe("/mein-bereich?next=//boese.example");
+  for (const evil of ["//boese.example/x?tab=1", "/\boese.example?x", "https://boese.example/#x", "/a\u0000?x", "javascript:alert(1)#x"]) {
+    expect(safeNextPath(evil)).toBe("/dashboard");
+  }
+});

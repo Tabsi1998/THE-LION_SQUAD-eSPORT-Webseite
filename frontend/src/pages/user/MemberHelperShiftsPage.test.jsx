@@ -71,7 +71,7 @@ test("ohne Weg zur Akte steht der Grund", async () => {
   apiMock.get.mockResolvedValue({ data: { available: false, reason: "not_bound", text: "Dafür muss dein Konto verbunden sein.", events: [] } });
   render(<MemoryRouter><MemberHelperShiftsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("helper-shifts-unavailable")).toHaveTextContent("verbunden sein"));
-  expect(screen.getByText("Zu Meine Mitgliedschaft")).toBeInTheDocument();
+  expect(screen.getByText("Zur Mitgliedschaft")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
 });
 
 test("Helfer-Aufruf (#1197): der Vorstand sendet mit einem Knopf, einmal am Tag; die Meldung hebt die Veranstaltung hervor", async () => {

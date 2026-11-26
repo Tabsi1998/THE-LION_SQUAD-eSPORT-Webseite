@@ -1,15 +1,14 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { gameLabel, isArchivedGame } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useNavigationGuard } from "@/lib/navigationGuard";
-import { Crown, UserCircle } from "lucide-react";
+import { Eye, LogOut } from "lucide-react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
-import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, tabRedirect } from "./profile/constants";
+import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, SETTINGS_GROUPS, TABS } from "./profile/constants";
 import { applyGroupLevel } from "./profile/visibility";
 import { useProfileSave } from "./profile/useAutosave";
 import { ProfileNav } from "./profile/ProfileNav";
@@ -25,16 +24,20 @@ import { CalendarTab } from "./profile/CalendarTab";
 import { AutosaveStatus } from "./profile/SwitchRow";
 import { channelTopicValue } from "@/lib/notificationLevels";
 import { lazyPage } from "@/lib/chunkReload";
+import { BereichSeite } from "./meinBereich/BereichSeite";
+import { gruppe } from "@/lib/meinBereich";
 
 // Benachrichtigungen (#1204) kommen erst beim Öffnen des Reiters - Stufen, Themen und Ruhezeit laden nicht mit jeder Einstellung.
 // Über lazyPage wie überall: Nach einem Deploy fehlt der alte Teil, dann lädt die Seite einmal neu statt leer zu bleiben.
 const NotificationsTab = lazyPage(() => import("./profile/NotificationsTab").then((module) => ({ default: module.NotificationsTab })));
 
-// Die Einstellungen (#1146): Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine eigene Datei unter ./profile
-// (#253, Regel aus #223). Dieselben Gruppen in derselben Reihenfolge wie in der App - Darstellung, Benachrichtigungen,
-// Sicherheit, Privatsphäre, Konto, Über die App. Was keine Einstellung ist (Teams, Freunde, Erfolge, Ehrungen,
-// Rechnungen), hat seinen Ort woanders; alte Links leiten dorthin weiter. Am PC steht das Menü links und der Inhalt nutzt
-// die Breite; am Tablet und Handy bleibt die Reiterreihe oben.
+// Die Einstellungen (#1146, seit #2059 in „Mein Bereich“): Formularzustand und Speichern für eine Gruppe - Profil,
+// Benachrichtigungen, Konto & Sicherheit oder Datenschutz (`group`). Jeder Reiter ist eine eigene Datei unter ./profile
+// (#253, Regel aus #223); die Reiter der Gruppe stehen oben, die Gruppen selbst in der Seitenleiste von „Mein Bereich“.
+// `extraTabs` hängt Reiter ohne Formular an (Datenschutz: Einwilligungen, Daten herunterladen, Konto löschen) - sie
+// stehen außerhalb des Formulars, das Speichern läuft trotzdem weiter. Ohne `group` stehen alle Einstellungs-Reiter da.
+// Was keine Einstellung ist (Teams, Freunde, Erfolge, Ehrungen, Rechnungen), hat seinen Ort woanders; alte Adressen
+// leiten dorthin weiter (lib/meinBereich.js).
 //
 // Alles speichert von selbst (#257, #1048), einen Knopf „Speichern“ gibt es nicht: Textfelder nach einer kurzen Pause
 // oder beim Verlassen des Felds, Schalter und Auswahlfelder sofort. Reiter mit Textfeldern zeigen den Stand unten in
@@ -63,28 +66,35 @@ function leaveDescription(issue) {
 // „Sicherheit“, alte Links landen dort.
 const TAB_ALIASES = { sessions: "security" };
 
-export default function ProfilePage() {
-  const { user, refresh, isClubMember, logout } = useAuth();
+// Ein Satz je Gruppe unter der Überschrift.
+const GROUP_INTROS = {
+  profil: "So erscheinst du auf der Website. Alles speichert von selbst.",
+  benachrichtigungen: "Was wie zu dir kommt – in der Glocke, als Push, per Mail oder über Discord.",
+  konto: "Anmelden und absichern, dazu Darstellung, Kalender-Abo und die App.",
+  datenschutz: "Wer was von dir sieht, deine Einwilligungen und deine Daten.",
+};
+
+export default function ProfilePage({ group = null, extraTabs = [] }) {
+  const { user, refresh, logout } = useAuth();
   const siteSettings = usePublicSiteSettings();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const requestedParam = params.get("tab") || "basic";
-  // Alte Reiter, die keine Einstellungen sind (#1150): die Inbox ist /messages (mit ?to= direkt im Gespräch), Teams und
-  // Freunde stehen unter Community, Erfolge, Ehrungen und Rechnungen im eigenen Profil bzw. unter /account/invoices.
-  const redirectTarget = tabRedirect(requestedParam, params, user?.username);
-  useEffect(() => {
-    if (redirectTarget) navigate(redirectTarget, { replace: true });
-  }, [redirectTarget, navigate]);
+  const meta = SETTINGS_GROUPS.find((item) => item.key === group) || null;
+  const groupTabs = [...(meta ? meta.tabs : TABS), ...extraTabs];
+  const requestedParam = params.get("tab") || "";
   const requestedTab = TAB_ALIASES[requestedParam] || requestedParam;
-  const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
+  const tab = groupTabs.some((item) => item.k === requestedTab) ? requestedTab : groupTabs[0].k;
+  const extra = extraTabs.find((item) => item.k === tab) || null;
+  const firstTab = groupTabs[0].k;
   // Der Reiter steht in der Adresse (?tab=…, wie in Mails und Benachrichtigungen
   // verlinkt) und wird als eigener Verlaufseintrag gesetzt, damit „Zurück“ zum
-  // vorigen Reiter führt statt aus dem Profil hinaus.
+  // vorigen Reiter führt statt aus der Gruppe hinaus. Der erste Reiter braucht kein ?tab=.
   const setTab = useCallback((nextTab) => {
     const next = new URLSearchParams(params);
-    next.set("tab", nextTab);
+    if (nextTab === firstTab) next.delete("tab");
+    else next.set("tab", nextTab);
     setParams(next);
-  }, [params, setParams]);
+  }, [params, setParams, firstTab]);
   // Formular und Speichern über eine Speicher-Warteschlange (#1048): jede Änderung speichert von selbst, nacheinander.
   const autosave = useProfileSave({ user, refresh });
   const { form, setForm, saveSoon, saveNow } = autosave;
@@ -285,83 +295,92 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
+  const hasProfile = groupTabs.some((item) => item.k === "basic");
+  const hasSecurity = groupTabs.some((item) => item.k === "security");
+  const title = meta?.label || "Einstellungen";
+  const heading = (group && gruppe(group)?.heading) || title;
+  const logoutNow = async () => {
+    // Offenes geht noch ins richtige Konto, danach wird abgemeldet - Ungültiges oder Gescheitertes erst nach Rückfrage.
+    if (!(await confirmLeave())) return;
+    if (autosave.pending || autosave.dirty) await saveNow();
+    if (await logout?.()) navigate("/");
+  };
+  const actions = hasProfile || hasSecurity ? (
+    <>
+      {/* „So sehen andere mich“ (#1149, #2059): das eigene öffentliche Profil - es bleibt unter /u/<name>. */}
+      {hasProfile ? (
+        <Link to={`/u/${encodeURIComponent(user.username)}`} data-testid="settings-to-profile" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+          <Eye className="w-3.5 h-3.5" aria-hidden="true" /> So sehen andere mich
+        </Link>
+      ) : null}
+      {hasSecurity ? (
+        <button type="button" onClick={logoutNow} data-testid="settings-logout" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+          <LogOut className="w-3.5 h-3.5" aria-hidden="true" /> Abmelden
+        </button>
+      ) : null}
+    </>
+  ) : null;
+
   return (
-    <PublicLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">KONTO</span>
-            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">Einstellungen</h1>
-          </div>
-          <div className="text-sm text-white/60">
-            {isClubMember ? (
-              <span className="inline-flex items-center gap-1.5"><Crown className="w-3.5 h-3.5 text-[#FFD700]" /> Vereinsmitglied</span>
-            ) : (
-              <span>Community-Spieler</span>
-            )}
-            <span className="mx-2 text-white/20">·</span>
-            <span>@{user.username}</span>
-            {/* Zurück zum eigenen Profil (#1149) - dort steht auch „So sehen dich andere“. */}
-            <Link to={`/u/${encodeURIComponent(user.username)}`} data-testid="settings-to-profile" className="tls-hit ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
-          </div>
-        </div>
-
-        <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-          <ProfileNav tab={tab} onSelect={setTab} onLogout={async () => {
-            // Offenes geht noch ins richtige Konto, danach wird abgemeldet - Ungültiges oder Gescheitertes erst nach Rückfrage.
-            if (!(await confirmLeave())) return;
-            if (autosave.pending || autosave.dirty) await saveNow();
-            if (await logout?.()) navigate("/");
-          }} />
-
-          {/* Enter in einem Feld und das Verlassen eines Felds speichern sofort - es gibt keinen Speichern-Knopf. */}
-          <form
-            onSubmit={(e) => { e.preventDefault(); void saveNow(); }}
-            onBlur={() => { void autosave.savePending(); }}
-            noValidate
-            className="mt-6 lg:mt-0 space-y-5 min-w-0"
-          >
-            {tab === "basic" && <BasicTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} />}
-            {tab === "gaming" && <GamingTab form={form} set={set} setNow={setNow} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
-            {tab === "socials" && <SocialsTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
-            {tab === "appearance" && <AppearanceTab />}
-            {tab === "about" && <AboutTab />}
-            {tab === "calendar" && <CalendarTab />}
-            {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
-            {tab === "privacy" && (
-              <PrivacyTab
+    <BereichSeite
+      title={heading}
+      docTitle={groupTabs.length > 1 ? groupTabs.find((item) => item.k === tab)?.label : title}
+      intro={GROUP_INTROS[group] || "Alles speichert von selbst."}
+      actions={actions}
+      tabKey={tab}
+      reiter={<ProfileNav tabs={groupTabs} tab={tab} onSelect={setTab} label={title} />}
+      testId={`mein-bereich-${group || "einstellungen"}`}
+    >
+      {extra ? (
+        <div className="space-y-5 min-w-0" data-testid={`settings-extra-${extra.k}`}>{extra.render()}</div>
+      ) : (
+        /* Enter in einem Feld und das Verlassen eines Felds speichern sofort - es gibt keinen Speichern-Knopf. */
+        <form
+          onSubmit={(e) => { e.preventDefault(); void saveNow(); }}
+          onBlur={() => { void autosave.savePending(); }}
+          noValidate
+          className="space-y-5 min-w-0"
+        >
+          {tab === "basic" && <BasicTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} />}
+          {tab === "gaming" && <GamingTab form={form} set={set} setNow={setNow} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
+          {tab === "socials" && <SocialsTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
+          {tab === "appearance" && <AppearanceTab />}
+          {tab === "about" && <AboutTab />}
+          {tab === "calendar" && <CalendarTab />}
+          {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
+          {tab === "privacy" && (
+            <PrivacyTab
+              form={form}
+              set={setSetting}
+              setVisibility={setVisibility}
+              setVisibilityGroup={setVisibilityGroup}
+              autosave={autosave}
+              disabled={platformLinks.disabled || []}
+            />
+          )}
+          {tab === "notifications" && (
+            <Suspense fallback={<div className="h-64 border border-white/10 rounded-sm bg-[#0A0A0A] animate-pulse" data-testid="profile-notifications-loading" />}>
+              <NotificationsTab
                 form={form}
                 set={setSetting}
-                setVisibility={setVisibility}
-                setVisibilityGroup={setVisibilityGroup}
+                setLater={set}
+                setNotificationPreference={setNotificationPreference}
+                setNotificationPreferences={setNotificationPreferences}
+                notificationEnabled={notificationEnabled}
+                notificationTopicEnabled={notificationTopicEnabled}
                 autosave={autosave}
-                disabled={platformLinks.disabled || []}
+                user={user}
               />
-            )}
-            {tab === "notifications" && (
-              <Suspense fallback={<div className="h-64 border border-white/10 rounded-sm bg-[#0A0A0A] animate-pulse" data-testid="profile-notifications-loading" />}>
-                <NotificationsTab
-                  form={form}
-                  set={setSetting}
-                  setLater={set}
-                  setNotificationPreference={setNotificationPreference}
-                  setNotificationPreferences={setNotificationPreferences}
-                  notificationEnabled={notificationEnabled}
-                  notificationTopicEnabled={notificationTopicEnabled}
-                  autosave={autosave}
-                  user={user}
-                />
-              </Suspense>
-            )}
+            </Suspense>
+          )}
 
-            {FORM_TABS.has(tab) && (
-              <div className="sticky bottom-0 z-10 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex min-h-11 flex-wrap items-center gap-3" data-testid="profile-autosave-bar">
-                <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
-              </div>
-            )}
-          </form>
-        </div>
-      </div>
-    </PublicLayout>
+          {FORM_TABS.has(tab) && (
+            <div className="sticky bottom-0 z-10 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex min-h-11 flex-wrap items-center gap-3" data-testid="profile-autosave-bar">
+              <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
+            </div>
+          )}
+        </form>
+      )}
+    </BereichSeite>
   );
 }
