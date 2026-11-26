@@ -152,6 +152,46 @@
             {
               "scheme": "https",
               "host": "lionsquad.at",
+              "path": "/mein-bereich"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/mein-bereich/profil"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/mein-bereich/mitgliedschaft"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/mein-bereich/rechnungen"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/mein-bereich/verein"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/mein-bereich/verein/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/mein-bereich/benachrichtigungen"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/mein-bereich/datenschutz"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
               "path": "/gallery"
             },
             {
@@ -313,6 +353,46 @@
               "scheme": "https",
               "host": "www.lionsquad.at",
               "pathPrefix": "/profile/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich/profil"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich/mitgliedschaft"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich/rechnungen"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich/verein"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/mein-bereich/verein/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich/benachrichtigungen"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/mein-bereich/datenschutz"
             },
             {
               "scheme": "https",

@@ -77,3 +77,19 @@ test("gemeinsame Herkunfts-Matrix (#998): nur die eigene Website öffnet einen S
   for (const url of FOREIGN_ARTICLE_LINKS) expect([url, handleIncomingUrl(url)]).toEqual([url, "none"]);
   expect(mockRef.navigate).not.toHaveBeenCalled();
 });
+
+// Mein Bereich (#2059): die Gruppen öffnen die App - nur Konto & Sicherheit nicht. Passwort, Zwei-Faktor und Google ändert
+// die Website; öffnete /mein-bereich/konto die App, käme der Knopf „Auf der Website ändern“ nie im Browser an.
+test("app.json: Mein Bereich ist ein App-Link, Konto & Sicherheit bleibt im Browser", () => {
+  const { expo } = require("../../app.json");
+  const data = expo.android.intentFilters[0].data as Array<{ host: string; path?: string; pathPrefix?: string }>;
+  const covers = (host: string, path: string) => data.some((entry) => entry.host === host && (entry.path === path || Boolean(entry.pathPrefix && path.startsWith(entry.pathPrefix))));
+  for (const host of ["lionsquad.at", "www.lionsquad.at"]) {
+    for (const path of ["/mein-bereich", "/mein-bereich/profil", "/mein-bereich/mitgliedschaft", "/mein-bereich/rechnungen", "/mein-bereich/verein",
+      "/mein-bereich/verein/versammlungen", "/mein-bereich/benachrichtigungen", "/mein-bereich/datenschutz"]) {
+      expect([host, path, covers(host, path)]).toEqual([host, path, true]);
+    }
+    // Was die App im Browser öffnet, darf kein App-Link sein.
+    for (const path of ["/mein-bereich/konto", "/privacy-account", "/my/penalties"]) expect([host, path, covers(host, path)]).toEqual([host, path, false]);
+  }
+});
