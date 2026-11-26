@@ -1,4 +1,4 @@
-import { Bell, Crown, KeyRound, LayoutGrid, Lock, Receipt, Shield, UserCircle } from "lucide-react";
+import { Bell, Crown, KeyRound, ListChecks, Lock, Receipt, Shield, UserCircle } from "lucide-react";
 
 // „Mein Bereich“ (#2059): alles, was mich betrifft, an einem Ort - Profil, Mitgliedschaft, Rechnungen, Verein, Konto und
 // Datenschutz. Dieselben acht Gruppen in derselben Reihenfolge wie in der App (#1677). Am PC eine Seitenleiste, am Handy
@@ -9,7 +9,7 @@ import { Bell, Crown, KeyRound, LayoutGrid, Lock, Receipt, Shield, UserCircle } 
 export const BEREICH = "/mein-bereich";
 
 export const GRUPPEN = [
-  { key: "start", path: BEREICH, label: "Übersicht", text: "Was gerade zu tun ist.", icon: LayoutGrid },
+  { key: "start", path: BEREICH, label: "Übersicht", text: "Was gerade zu tun ist.", icon: ListChecks },
   { key: "profil", path: `${BEREICH}/profil`, label: "Profil", text: "Gamertag, Bild, Banner, Spiel-IDs und Socials.", icon: UserCircle },
   { key: "mitgliedschaft", path: `${BEREICH}/mitgliedschaft`, label: "Mitgliedschaft", text: "Status, Ausweis, Beitrag, Wunschnummer, Anschrift und Austritt.", icon: Crown },
   { key: "rechnungen", path: `${BEREICH}/rechnungen`, label: "Rechnungen & Unterlagen", text: "Rechnungen, Unterlagen, Gewinne und Strafen.", icon: Receipt },

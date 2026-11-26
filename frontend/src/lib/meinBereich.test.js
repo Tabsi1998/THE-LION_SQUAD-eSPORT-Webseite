@@ -96,3 +96,10 @@ test("Schnellwege: Wunschnummer und Anschrift nur für Mitglieder, Rechnungen, P
   expect(schnellwege({ mitglied: false }).map((item) => item.key)).toEqual(["rechnungen", "passwort", "loeschung"]);
   expect(schnellwege({ mitglied: true }).map((item) => item.label)).toEqual(["Wunschnummer", "Anschrift ändern", "Rechnungen", "Passwort ändern", "Konto löschen"]);
 });
+
+test("im Menü sind Dashboard und Mein Bereich auf einen Blick verschieden: Mein Bereich trägt die Liste mit Häkchen", async () => {
+  const { ListChecks, LayoutDashboard } = await import("lucide-react");
+  const start = GRUPPEN.find((item) => item.key === "start");
+  expect(start.icon).toBe(ListChecks);
+  expect(start.icon).not.toBe(LayoutDashboard);
+});

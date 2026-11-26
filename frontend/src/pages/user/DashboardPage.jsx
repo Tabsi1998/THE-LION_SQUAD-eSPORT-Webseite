@@ -11,7 +11,7 @@ import { AchievementsTile } from "@/components/tls/AchievementsTile";
 import { DashboardNotifications } from "./DashboardNotifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, LayoutGrid, ScrollText, Star, Users } from "lucide-react";
+import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, ListChecks, ScrollText, Star, Users } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
@@ -192,7 +192,7 @@ export default function DashboardPage() {
           </div>
           {/* „Mein Bereich“ (#2059): Profil, Mitgliedschaft, Rechnungen, Konto und Datenschutz an einem Ort - unten als Liste. */}
           <Link to={BEREICH} data-testid="dashboard-mein-bereich" className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider">
-            <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" /> Mein Bereich
+            <ListChecks className="w-3.5 h-3.5" aria-hidden="true" /> Mein Bereich
           </Link>
         </div>
 
