@@ -602,8 +602,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
                       {entry.email ? ` · ${entry.email}` : ""}
                     </Muted>
                     {entry.note ? <Muted>Hinweis: {entry.note}</Muted> : null}
-                    {/* Interne Notiz (EV15): die Verwaltung schreibt sie hier - leer gespeichert löscht sie. */}
-                    {entry.id ? (
+                    {/* Interne Notiz (EV15): die Verwaltung schreibt sie hier - leer gespeichert löscht sie. Nur, wenn der Server sie mitschickt
+                        (Schlüssel da, auch leer): Der Vereinsverwaltung ohne Turnierleitung nimmt er sie weg - dann gibt es kein Feld, sonst
+                        überschriebe Speichern eine Notiz, die man nicht sieht. */}
+                    {entry.id && Object.prototype.hasOwnProperty.call(entry, "internal_note") ? (
                       <>
                         <FormInput
                           label="Interne Notiz"

@@ -472,3 +472,17 @@ test("EV15: interne Notiz bearbeiten - leer gespeichert löscht sie", async () =
   await waitFor(() => expect(mockPatch).toHaveBeenLastCalledWith("/events/e1/registrations/r1", { internal_note: null }));
   await waitFor(() => expect(screen.getByTestId("event-staff-message")).toHaveTextContent("Notiz gelöscht."));
 });
+
+// Nachbesserung (#2542): Der Server entfernt `internal_note` für die Vereinsverwaltung ohne Turnierleitung, schickt aber
+// `participant_view: "staff"`. Dann kein Notizfeld - sonst überschriebe Speichern eine Notiz, die man nicht sieht.
+test("EV15: ohne `internal_note` in der Antwort kein Notizfeld; mit leerem Feld schon", async () => {
+  mockGet.mockResolvedValue({ data: { ...EVENT, participant_view: "staff", can_check_in: true, registrations: [
+    { id: "r1", display_name: "Paula B.", status: "registered", seat_count: 1 },
+    { id: "r2", display_name: "Max M.", status: "registered", seat_count: 1, internal_note: null },
+  ] } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-participants-toggle")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("event-participants-toggle"));
+  expect(screen.queryByTestId("event-internal-note-r1")).toBeNull();
+  expect(screen.getByTestId("event-internal-note-r2").props.value).toBe("");
+});
