@@ -815,6 +815,19 @@ async def _safe_league_discord():
         _log_task_failure("league_discord", exc)
 
 
+async def _safe_league_start_rights():
+    """Startrechte der Liga (#1627, F.2a): Fristen für die Zusage, Nachrücken, Erinnerung - nur für Seasons mit der Einstellung."""
+    try:
+        from database import get_db
+        from services.league_start_rights import sweep
+        result = await sweep(get_db())
+        if any(result.values()):
+            logger.info(f"[scheduler] league_start_rights expired={result['expired']} filled={result['filled']} "
+                        f"restored={result['restored']} reminded={result['reminded']} announced={result['announced']}")
+    except Exception as exc:
+        _log_task_failure("league_start_rights", exc)
+
+
 async def _safe_proof_photo_retention():
     """Nachweise zu Spielen (#1157, #2360): nie verwendete nach 24 Stunden; Turniere 30 Tage nach dem Hochladen, Liga-Staffeln
     nach Season-Ende plus Frist, MOSS nach Verfahrensende plus Einspruchsfrist (``match_proof_retention.purge``)."""
@@ -1367,6 +1380,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Liga im Discord (#1642): fertige Spieltage und das Saisonende melden - alle 15 Minuten, nie doppelt (league_discord_posts).
     sched.add_job(_single_replica("league_discord", _safe_league_discord, lease_seconds=300.0), IntervalTrigger(minutes=15),
                   id="league_discord", max_instances=1, coalesce=True)
+    # Startrechte der Liga (#1627, F.2a): Fristen und Nachrücken - alle 15 Minuten, jede Season unter ihrer eigenen Sperre.
+    sched.add_job(_single_replica("league_start_rights", _safe_league_start_rights, lease_seconds=300.0), IntervalTrigger(minutes=15),
+                  id="league_start_rights", max_instances=1, coalesce=True)
     # Veto der Liga (#1618, D.3): 60 Sekunden je Schritt - alle 10 Sekunden nachsehen, ob eine Frist abgelaufen ist.
     sched.add_job(_single_replica("league_veto", _safe_league_veto, lease_seconds=60.0), IntervalTrigger(seconds=10),
                   id="league_veto", max_instances=1, coalesce=True)

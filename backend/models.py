@@ -2973,6 +2973,9 @@ class LeagueSuccessorCreate(BaseModel):
     start_date: datetime
     name: Optional[str] = Field(default=None, max_length=80)
     confirm: bool = False
+    # Startrechte der neuen Season (#1627, F.2a): fehlt das Feld, gilt die Einstellung des Vorgängers. Geprüft in
+    # ``league_start_rights.normalize`` (deutsche Meldung).
+    start_rights: Optional[dict] = None
 
 
 class LeagueSuccessorRecompute(BaseModel):

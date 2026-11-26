@@ -4030,8 +4030,13 @@ Season automatisch anlegen und Teams zuteilen. Startrechte als eigener Zustand m
 ### F.2a Startrechte für die nächste Season (#1627)
 
 Rest aus #1627 („Saisonabschluss und Folge-Season“ Punkt 5, „Sonderfälle“ letzter Punkt). Entscheidungen Nr. 159, 160, 162, 213, 224,
-253/254/256. Logik in `services/league_start_rights.py`, Routen in `routes/league_start_right_routes.py`; Oberfläche:
-`SeasonStartRightsPanel.jsx` (Reiter „Anmeldung und Kader“), `SquadApplicationStatus.jsx` (unter Teams), `lib/leagueStartRights.js`.
+253/254/256. Regeln ohne Datenbank in `services/league_start_right_rules.py` (Blatt-Modul: Einstellung, Frist, Zustände,
+Nachrückerregel - `league_applications`, `league_successor` und `league_draw` lesen dort), alles Schreibende in
+`services/league_start_rights.py`, Routen in `routes/league_start_right_routes.py`. Das Abmelden bekommt `released` von der Route
+mitgegeben (`on_released`), die Nachricht nach dem Abschluss stößt `routes/league_final_routes.py` an - so importiert nichts im Kreis.
+Oberfläche: `SeasonStartRightsPanel.jsx` (Reiter „Anmeldung und Kader“, `#startrechte`), das Blatt „Neue Season aus …“
+(`SeasonSuccessorSheet.jsx`), `StartRightBlock.jsx` (unter Teams in `SquadApplicationStatus.jsx` und auf der Ligaseite in
+`LeagueApplicationPanel.jsx`), `lib/leagueStartRights.js`.
 
 **Grundsatz: kein zweites System.** Ein Startrecht ist der übernommene Antrag der Folge-Season (`league_applications` mit `carry_over`,
 F.2) - derselbe Eintrag, derselbe Eingang, dieselbe Abmeldung, dieselbe Sperre. Neu sind nur optionale Felder. **Ohne das Feld
@@ -4137,11 +4142,14 @@ abgeschlossen“ (F.1) und die Discord-Saisonende-Meldung (F.7) bleiben, wie sie
   from_label, rank, state, accept_until, accepted_at, accepted_via, fills, filled_by, own_team}`. `open_places`: frei gewordene Plätze
   ohne Nachrücker mit `{application_id, display_name, division_label, why, candidates[], pick, tied, group}`.
 - Eigenes Team: `carry_over.start_right` in `GET /api/me/league-applications` und der Ligaseite (`…/application`): `{state,
-  accept_until, accepted_at, fills: {for_name, from_label}?, can_accept, can_decline}` - nur, wenn die Season Startrechte führt oder
-  der Antrag eines trägt. `GET /api/me/league-applications` trägt zusätzlich `start_rights[]` für Seasons mit `start_rights`, aus
-  denen es noch keine Folge-Season gibt: `{squad_id, season_id, title, state: forecast | confirmed, movement, division_label,
-  zone_label, rank}`.
-- Der Eingang (`…/applications`) trägt an übernommenen Zeilen dasselbe `carry_over.start_right`.
+  accept_until, accepted_at, fills: {from_label}?, can_accept, can_decline}` - nur, wenn die Season Startrechte führt oder der Antrag
+  eines trägt. Wessen Platz frei wurde, erfährt das nachrückende Team nicht (kein Antrag eines anderen Teams ist sichtbar, B.4).
+  `GET /api/me/league-applications` trägt zusätzlich `start_rights[]` (leer ohne die Einstellung) für Seasons mit `start_rights`,
+  die die Person sehen darf (`can_see_season`) und aus denen es noch keine Folge-Season gibt: `{squad_id, season_id, title, url,
+  state: forecast | confirmed, movement, division_label, zone_label, rank}`; eine Prognose nennt keine Liga N (`division_label: null`).
+- Der Eingang (`…/applications`) trägt an übernommenen Zeilen dasselbe `carry_over.start_right`; `GET …/draws` nennt je Liga N unter
+  `waiting_start_right`, wer noch nicht zugesagt hat. Die Vorschau `GET …/successor` trägt `start_rights: {settings, defaults}`.
+- Konto löschen (`league_applications.scrub_person`): `start_right.accepted_by` und `fills.by` fallen wie die übrigen Kennungen heraus.
 
 **Rechte**
 

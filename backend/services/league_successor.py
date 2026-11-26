@@ -21,7 +21,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_cross_zones, league_final, league_staffel_plan, league_zones, loadout_bans, map_pools, squad_registration
-from services import league_postseason, league_postseason_rules
+from services import league_postseason, league_postseason_rules, league_start_right_rules
 from services import league_service as leagues
 from services.league_final_read import active_final, is_closed
 from services.league_scope import ONLY_LEAGUE, RELEGATION, staffel_kind
@@ -45,6 +45,8 @@ NOT_COPIED = frozenset({
     # Der gemerkte Rückfallwert fürs Best of von Playoffs und Relegation (#2404, Nr. 255): Die neue Season beginnt wieder mit „wie in
     # der Season“ - an der Season und an jeder Liga N (``_copy_divisions``).
     league_postseason.KEPT,
+    # Startrechte (#1627, F.2a): Die Einstellung ``start_rights`` geht mit - was die alte Season schon gemeldet hat, gehört zu ihr.
+    league_start_right_rules.NOTICES, league_start_right_rules.NOTICES_OPEN,
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (
@@ -208,6 +210,8 @@ async def plan(db, season: dict) -> dict:
             zone = zones.get(row.get("registration_id"))
             entry = {"registration_id": row.get("registration_id"), "squad_id": registration.get("squad_id"),
                      "display_name": row.get("display_name") or registration.get("display_name") or "Team",
+                     # Für den Vergleich über Staffeln hinweg beim Nachrücken (#1627, F.2a): Punkte und Map-Differenz je Spiel.
+                     "points": row.get("points"), "played": row.get("played"), "score_diff": row.get("score_diff"),
                      "from_level": division.get("level"), "from_label": from_label, "from_staffel": context.get("staffel"),
                      "rank": row.get("rank"), "zone": zone, "zone_label": league_zones.LABELS.get(zone or ""),
                      # Über den Vergleich der Staffeln (#1627): „bester Nächstplatzierter“ bzw. spiegelbildlich beim Abstieg.
@@ -298,6 +302,8 @@ async def preview(db, season: dict) -> dict:
         "capacity_hints": [f"{row['label']}: {row['capacity']['text']}" for row in found["divisions"] if not row["capacity"]["fits"]],
         "dropped": found["dropped"],
         "carried": found["carried"],
+        # Startrechte (#1627, F.2a): die Einstellung dieser Season als Vorgabe für die neue - ``settings: null`` heißt wie bisher.
+        "start_rights": {"settings": league_start_right_rules.stored(season), "defaults": league_start_right_rules.defaults()},
         "relegation_note": RELEGATION_APPLIED if found.get("relegation") else
         "Relegationsplätze sind vorbereitet: Sie stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.",
     }
@@ -338,6 +344,11 @@ async def _create(db, season: dict, body: dict, actor: dict) -> dict:
     if not body.get("confirm"):
         raise SuccessorProblem("Bitte das Anlegen bestätigen.")
     start = _start(body.get("start_date"))
+    # Startrechte (#1627, F.2a): Die neue Season übernimmt die Einstellung des Vorgängers - oder nimmt sie aus dem Blatt entgegen.
+    try:
+        start_rights = league_start_right_rules.normalize(body["start_rights"]) if isinstance(body.get("start_rights"), dict) else None
+    except league_start_right_rules.StartRightProblem as problem:
+        raise SuccessorProblem(problem.detail) from None
     checked = await plan(db, season)
     if checked["problems"]:
         raise SuccessorProblem(checked["problems"][0], 409)
@@ -351,6 +362,8 @@ async def _create(db, season: dict, body: dict, actor: dict) -> dict:
             doc[league_postseason_rules.FIELD] = league_postseason_rules.without_dates(doc[league_postseason_rules.FIELD])
         doc.update({"predecessor_id": season["id"], "status": "draft", "visibility": "off",
                     "predecessor": {"id": season["id"], "name": season.get("name"), "number": season.get("number"), "slug": season.get("slug")}})
+        if start_rights is not None:
+            doc[league_start_right_rules.FIELD] = start_rights
 
     request = {"start_date": start.isoformat(), "visibility": "off", "status": "draft"}
     if str(body.get("name") or "").strip():
@@ -455,7 +468,9 @@ async def _carry_teams(db, league: dict, season: dict, doc: dict, actor: dict, c
                      "from_label": team["from_label"], "from_staffel": team.get("from_staffel"), "rank": team.get("rank"),
                      "zone": team.get("zone"), "movement": team["movement"], "division_id": target.get("id"),
                      "division_level": division["level"], "division_label": division["label"],
-                     **({"via": team["via"]} if team.get("via") else {})}
+                     **({"via": team["via"]} if team.get("via") else {}),
+                     # Startrecht mit Zusage (#1627, F.2a): nur, wenn die neue Season es so einstellt - sonst wie bisher automatisch dabei.
+                     **({"start_right": league_start_right_rules.offer()} if league_start_right_rules.needs_accept(doc) else {})}
             row = {
                 "id": new_id(), "league_id": league["id"], "season_id": doc["id"], "team_id": team["team_id"], "squad_id": team["squad_id"],
                 "team_name": team.get("team_name"), "squad_name": team.get("squad_name"), "display_name": team["display_name"],
@@ -497,10 +512,20 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
             carry = row["carry_over"]
             how = " über die Relegation" if carry.get("via") == "relegation" else ""
             way = {"up": f" - Aufstieg{how} aus {carry['from_label']}", "down": f" - Abstieg{how} aus {carry['from_label']}"}.get(carry["movement"], "")
+            offered = league_start_right_rules.accept_until(row, season) if (carry.get("start_right") or {}).get("status") == "offered" else None
             if kind == "revoked":
                 headline = "Neue Season: Übernahme zurückgenommen"
                 text = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
                         f"{row['display_name']} ist danach nicht mehr in {title}. Fragen beantwortet die Liga-Leitung.")
+            elif offered:
+                # Startrecht mit Zusage (#1627, F.2a): keine automatische Anmeldung - das Team sagt innerhalb der Frist zu.
+                headline = "Neue Season: neue Liga" if kind == "moved" else "Neue Season: euer Startrecht"
+                lead = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
+                        if kind == "moved" else "")
+                until = offered.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr")
+                text = (f"{lead}{row['display_name']} hat ein Startrecht für {carry['division_label']} der neuen Season {title}{way}. "
+                        f"Bitte bis {until} zusagen: {where}. Ohne Zusage verfällt das Startrecht. Es ist noch keine Anmeldung zu einer "
+                        "Staffel und keine Zustimmung zum Regelwerk.")
             else:
                 headline = "Neue Season: neue Liga" if kind == "moved" else "Neue Season: ihr seid dabei"
                 lead = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
@@ -575,6 +600,12 @@ async def _recompute_plan(db, season: dict) -> dict:
             continue
         free = row["status"] == ACCEPTED and not row.get("assignment")
         new = _carry_of(predecessor, wanted[0], wanted[1], wanted[2]) if wanted else None
+        # Ein Nachrücker (#1627, F.2a) steht mit Absicht in einer anderen Liga N: Sagt der Endstand für ihn dasselbe wie vor dem
+        # Nachrücken, bleibt er, wo er ist.
+        back = (carry.get("fills") or {}).get("back") if isinstance(carry.get("fills"), dict) else None
+        if free and new and back and new["division_level"] == back.get("division_level"):
+            unchanged += 1
+            continue
         if not free:
             if not wanted or new["division_level"] != carry.get("division_level"):
                 why = "zugeteilt" if row.get("assignment") else {"withdrawn": "abgemeldet"}.get(row["status"], "nicht mehr angenommen")
@@ -653,6 +684,8 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
     now = now_utc().isoformat()
     who = actor.get("id")
     done = []
+    # Startrecht mit Zusage (#1627, F.2a): Wer neu dazukommt oder in eine andere Liga N wechselt, sagt (neu) zu - mit neuer Frist.
+    fresh_right = {"start_right": league_start_right_rules.offer()} if league_start_right_rules.needs_accept(season) else {}
     for change in found["changes"]:
         kind = change["kind"]
         if kind == "added":
@@ -661,7 +694,7 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
                 "id": new_id(), "league_id": season["league_id"], "season_id": season["id"], "team_id": team["team_id"], "squad_id": team["squad_id"],
                 "team_name": team.get("team_name"), "squad_name": team.get("squad_name"), "display_name": team["display_name"],
                 "status": ACCEPTED, "active_key": f"{season['id']}:{team['squad_id']}", "applied_by": None, "submitted_at": now,
-                "decided_by": who, "decided_at": now, "decision_reason": None, "carry_over": change["carry_over"],
+                "decided_by": who, "decided_at": now, "decision_reason": None, "carry_over": {**change["carry_over"], **fresh_right},
                 "history": [{"status": ACCEPTED, "by": who, "at": now, "carry_over": True, "recomputed": True}], "created_at": now, "updated_at": now,
             }
             try:
@@ -679,13 +712,19 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
                       "$push": {"history": {"status": REJECTED, "by": who, "at": now, "reason": REVOKED_REASON, "carry_over": True, "recomputed": True}}}
         elif kind == "reactivated":
             query.update({"status": REJECTED, "carry_over.revoked_at": {"$exists": True}})
-            carry = dict(change["carry_over"])
+            carry = {**change["carry_over"], **fresh_right}
             update = {"$set": {"status": ACCEPTED, "active_key": f"{season['id']}:{change['squad_id']}", "decision_reason": None, "decided_by": who,
                                "decided_at": now, "updated_at": now, "carry_over": carry},
                       "$push": {"history": {"status": ACCEPTED, "by": who, "at": now, "carry_over": True, "recomputed": True}}}
         else:
             query.update({"status": ACCEPTED, "assignment": {"$exists": False}})
             update = {"$set": {**{f"carry_over.{key}": value for key, value in change["carry_over"].items()}, "updated_at": now}}
+            if kind == "moved":
+                # Andere Liga N: Ein früheres Nachrücken ist überholt, und im Zusage-Modus gilt die alte Zusage nicht für die neue Liga.
+                update["$set"].update({f"carry_over.{key}": value for key, value in fresh_right.items()})
+                update["$unset"] = {"carry_over.fills": ""}
+                await db.league_applications.update_one({"season_id": season["id"], "carry_over.filled_by.application_id": change["application_id"]},
+                                                        {"$unset": {"carry_over.filled_by": ""}})
         try:
             result = await db.league_applications.update_one(query, update)
         except DuplicateKeyError:

@@ -12,17 +12,21 @@ Den Gleichstand auf Platz 1 entscheidet die Leitung über ``PUT …/staffeln/{ti
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from database import get_db
-from services import league_cross_decisions, league_cross_zones, league_final
+from services import league_cross_decisions, league_cross_zones, league_final, league_start_rights
 from services.change_events import publish_api_change
 from services.league_permissions import ANY, require_league
 from services.league_scope import ONLY_LEAGUE
+from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
+logger = logging.getLogger("tls.league_final_routes")
 
 require_close = require_league(league_final.CLOSE_CAPABILITY, via="tournament_id")
 
@@ -102,6 +106,12 @@ async def admin_close_staffel(tournament_id: str, body: CloseBody, me: dict = De
         raise HTTPException(status_code=409, detail=league_final.BUSY) from None
     await _published(tournament_id)
     final = result["final"]
+    # Startrechte (#1627, F.2a): Bestätigt dieser Abschluss den Endstand der ganzen Season, erfahren Auf- und Absteiger es einmal -
+    # nur mit der Einstellung ``start_rights`` an der Season. Der Abschluss steht; eine Nachricht hält ihn nicht auf.
+    try:
+        await league_start_rights.announce(db, final.get("season_id"))
+    except Exception:  # noqa: BLE001 - siehe oben
+        logger.warning("[league_final] Nachricht zum Startrecht nicht verschickt: %s", log_safe(tournament_id), exc_info=True)
     return {"ok": True, "version": final["version"], "closed_at": final["closed_at"],
             "champion": (final.get("champion") or {}).get("display_name"), "season_status": result["season_status"]}
 
