@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { motionAllowed } from "@/lib/motion";
-import { warteAufElement } from "@/lib/warteAufElement";
+import { bleibAmZiel, warteAufElement } from "@/lib/warteAufElement";
 import { Crown } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -106,9 +106,16 @@ export default function MeinBereichLayout() {
     letzterPfad.current = pathname;
     const anker = hash ? decodeURIComponent(hash.slice(1)) : "";
     if (anker) {
-      return warteAufElement(() => document.getElementById(anker), (ziel) => {
+      let halten = () => {};
+      const warten = warteAufElement(() => document.getElementById(anker), (ziel) => {
         ziel.scrollIntoView({ block: "start", inline: "nearest", behavior: motionAllowed() ? "smooth" : "auto" });
+        // Karten darüber laden nach und werden höher - das Ziel bleibt trotzdem oben.
+        halten = bleibAmZiel(ziel);
       });
+      return () => {
+        warten();
+        halten();
+      };
     }
     if (!neueGruppe) return undefined;
     return warteAufElement(() => document.querySelector("[data-testid='mein-bereich-inhalt'] [data-mein-bereich-titel]"), (titel) => {
