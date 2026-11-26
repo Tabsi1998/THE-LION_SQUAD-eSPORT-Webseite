@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.15 - 2026-11-27
+
+- Mobile: Saisonende-Moment für Aufstieg, Abstieg und Meister – einmal je Person, der Meister mit seinen Belohnungen als zweite Karte; Hinweis „Saisonende“ an Profil und Team mit „Moment ansehen“, die Nachricht zum Saisonende öffnet ihn. (#2584)
+- Mobile: Startrechte am Team mit dem wirklichen Stand (Zusage offen, Frist ruht, Leitung entscheidet, Zugesagt, Verfallen, Nachgerückt) und den Knöpfen „Startrecht annehmen“ und „Nachrücken ablehnen“. (#1627)
+- Mobile: Mit Co-Team zur Liga anmelden in vier Schritten wie im Web; ein aufgelöstes Team lässt sich innerhalb der Frist wiederherstellen. (#2542)
+- Mobile: Liga-Spieltag in der App: Ergebnis mit Maps melden und bestätigen, Vorfälle klären, Beanstandung und Protest führen, Strafen im Profil mit Einspruch. (#2173)
+- Mobile: Events: Warteliste schon vor dem Absenden, abgesagte Events bleiben bis zum Termin unter „Kommend“, Einchecken mit Rückgängig. (#2542)
+- Mobile: „Mein Bereich“ statt „Profil“: acht Gruppen wie im Web, Einstellungen flach mit Suche, Sammel-Mail sofort, täglich oder wöchentlich. (#2059, #1677, #1662)
+- Mobile: Discord, Twitch und Steam lassen sich wieder verknüpfen. (#2059)
+- Mobile: Ecken-Rahmen „Du“ bzw. „Dein Team“ in Tabellen, Turnierbaum, Spielplan, Leaderboards und Kalender. (#1316)
+- Mobile: Etikett „Vereinsintern“ an Referenzen, Trophäen, Teilnahmen und Liga-Seasons; Schalter „Vereinsinterne Erfolge zeigen“ unter Mein Bereich › Datenschutz. (#2516, #2531)
+- Mobile: Die Glocke nennt „Onyx erreicht“ als Krone. (#2506)
+- Mobile: Am Turniertag bleibt die Saison-Deko ruhig; Saison-Grüße warten, bis die Deko wieder zu sehen ist. (#1169)
+- Mobile: Begriffe wie im Web: Captain in der Liga, sonst Teamleitung; Formatnamen und Benachrichtigungsarten. (#2173, #2542)
+- Mobile: FAQ-Texte aus der Website nachgezogen (Saisonende, Mein Bereich, Benachrichtigungen, Profil). (#1639, #2059, #1662, #2521)
+- Mobile: Expo 57.0.34 und aktuelle Paketstände, befristete Audit-Ausnahme für picomatch. (#2566, #2545, #2536, #2523)
+
 ## 1.7.14 - 2026-11-17
 
 - Mobile: Eigene FAQ unter Einstellungen › Über die App – Suche, häufige Fragen und Bereiche mit Rollen-Filter. (#2449)
