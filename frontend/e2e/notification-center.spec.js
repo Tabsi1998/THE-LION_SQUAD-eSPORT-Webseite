@@ -218,3 +218,25 @@ for (const width of [320, 360, 390]) {
     });
   });
 }
+
+// Dritte Prüfrunde (26.11.): Die Seiten mit Schlüssel in der Adresse schicken ihn nie als Referer weiter - weder an die eigene API
+// noch an Dritte. Im Betrieb setzt nginx „no-referrer“ schon für das Dokument; die Seite setzt es zusätzlich, bevor ein Abruf startet.
+for (const [path, ready] of [["/sammel-mail/einzeln?token=u1.sig", "digest-instant"], ["/newsletter/abbestellen?token=u1.sig", "newsletter-unsubscribe"]]) {
+  test(`kein Schlüssel im Referer: ${path.split("?")[0]}`, async ({ page }) => {
+    const leaked = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      const referer = request.headers().referer || "";
+      if ((url.pathname.startsWith("/api/") || url.host !== new URL(page.url() || "http://x").host) && referer.includes("u1.sig")) {
+        leaked.push(`${url.pathname} ← ${referer}`);
+      }
+    });
+    await page.route("**/api/**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, rhythm: "instant" }) }));
+    await page.goto(path);
+    await expect(page.getByTestId(ready)).toBeVisible();
+    await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+    await page.getByRole("button").first().click();
+    await page.waitForTimeout(300);
+    expect(leaked).toEqual([]);
+  });
+}

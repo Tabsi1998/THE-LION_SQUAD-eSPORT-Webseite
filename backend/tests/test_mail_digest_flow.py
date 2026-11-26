@@ -466,3 +466,52 @@ async def test_the_link_page_may_send_the_token_in_the_body(flow, monkeypatch):
     assert done.status_code == 200 and done.json()["rhythm"] == "instant"
     assert (await flow.client.post(mail_digest_link.API_PATH, json={"token": "kaputt"})).status_code == 400
     assert (await flow.client.post(mail_digest_link.API_PATH, json={})).status_code == 400
+
+
+
+def test_the_access_log_also_hides_encoded_names_and_trailing_slashes():
+    """Dritte Prüfrunde: ``%74oken`` (kodierter Name) und ``…/instant/?token=`` (Weiterleitung 307) - beim Newsletter genauso."""
+    from services import log_safe
+
+    for line, expected in (
+        ("POST /api/settings/notification-digest/instant?%74oken=u1.SIG HTTP/1.1", "POST /api/settings/notification-digest/instant?%74oken=*** HTTP/1.1"),
+        ("POST /api/settings/notification-digest/instant/?token=u1.SIG HTTP/1.1", "POST /api/settings/notification-digest/instant/?token=*** HTTP/1.1"),
+        ("GET /sammel-mail/einzeln/?a=1&TOKEN=u1.SIG", "GET /sammel-mail/einzeln/?a=1&TOKEN=***"),
+        ("POST /api/settings/newsletter/unsubscribe/?%74%6Fken=u1.SIG HTTP/1.1", "POST /api/settings/newsletter/unsubscribe/?%74%6Fken=*** HTTP/1.1"),
+        ("GET /newsletter/abbestellen/?token=u1.SIG", "GET /newsletter/abbestellen/?token=***"),
+        ("GET /newsletter/abbestellen?tokens=nicht-gemeint", "GET /newsletter/abbestellen?tokens=nicht-gemeint"),
+    ):
+        assert log_safe.redact_secret_paths(line) == expected
+
+
+def test_the_link_pages_send_no_referrer_from_nginx():
+    """Dritte Prüfrunde: Ohne Referer verlässt der Schlüssel die Seite nicht - nginx setzt für beide Seiten „no-referrer“."""
+    root = pathlib.Path(__file__).resolve().parents[2]
+    nginx = (root / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    assert "map $uri $tls_referrer_policy" in nginx
+    assert '"~^/(sammel-mail/einzeln|newsletter/abbestellen)/?$" "no-referrer";' in nginx
+    assert 'add_header Referrer-Policy "strict-origin-when-cross-origin" always;' not in nginx
+    assert nginx.count("add_header Referrer-Policy $tls_referrer_policy always;") >= 2
+    # Auch kodierte Schlüssel-Namen landen nicht im Zugriffsprotokoll von nginx.
+    assert '"~*[?&](t|%74)(o|%6f)(k|%6b)(e|%65)(n|%6e)=" 0;' in nginx
+
+
+@pytest.mark.asyncio
+async def test_a_new_date_counts_the_earlier_of_old_and_new(flow, monkeypatch):
+    """Dritte Prüfrunde: Bei einer Terminänderung zählt der frühere Termin (alt oder neu), wenn er noch nicht vorbei ist."""
+    from services import event_changes
+
+    assert event_changes.change_starts_at({"start_date": "2026-11-27T07:00:00+00:00"}, {"start_date": "2026-11-27T19:00:00+00:00"},
+                                          _utc("2026-11-26T22:00:00")) == "2026-11-27T07:00:00+00:00"
+    assert event_changes.change_starts_at({"start_date": "2026-11-26T10:00:00+00:00"}, {"start_date": "2026-11-27T19:00:00+00:00"},
+                                          _utc("2026-11-26T22:00:00")) == "2026-11-27T19:00:00+00:00"
+    _clock(monkeypatch, "2026-11-26T10:00:00")
+    monkeypatch.setattr("services.event_changes.now_utc", lambda: _utc("2026-11-26T22:00:00"))
+    paula = await _person(flow, "instant")
+    before = {"id": "ev-2", "name": "Herbst-LAN", "slug": "herbst-lan", "start_date": "2026-11-27T07:00:00+00:00"}
+    after = {**before, "start_date": "2026-11-27T19:00:00+00:00"}
+    await flow.db.events.insert_one(dict(after))
+    await flow.db.event_registrations.insert_one({"id": "er-9", "event_id": "ev-2", "user_id": paula["id"], "status": "registered"})
+    await event_changes.announce_change(flow.db, before, after, {"id": paula["id"]})
+    note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "event_message"}, {"_id": 0})
+    assert note["meta"]["starts_at"] == "2026-11-27T07:00:00+00:00"
