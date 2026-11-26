@@ -44,9 +44,10 @@ test("Seitentitel mit Inhalt (Titel einer News, Name) bleibt, wie er eingetippt 
   assert.equal(code, '<h1 className="mt-3 tls-type-title leading-[1.02] break-words">{post.title}</h1>');
 });
 
-test("Seitentitel aus einer Eigenschaft `title` bekommt ShortCaps", () => {
+test("Seitentitel aus einer Eigenschaft `title` bleibt, wie er kommt - er kann ein Name oder ein Titel aus Daten sein", () => {
   const { code } = run('function A({ title }) { return <h1 className="font-heading text-4xl font-black uppercase">{title}</h1>; }');
-  assert.match(code, /<h1 className="tls-type-title"><ShortCaps>\{title\}<\/ShortCaps><\/h1>/);
+  assert.match(code, /<h1 className="tls-type-title">\{title\}<\/h1>/);
+  assert.doesNotMatch(code, /ShortCaps/);
 });
 
 test("auch eine sehr große h1 ist Seitentitel - die Bühne setzt man von Hand", () => {
@@ -242,4 +243,21 @@ test("Größe nur in einem Zweig: die Stufe kommt nur in diesen Zweig, die ander
 test("Zahl am Handy klein gedacht (Kachel-Reihe): höchstens Abschnitt", () => {
   assert.equal(run('<div className="font-display text-lg sm:text-2xl md:text-3xl font-black tabular-nums truncate">{value}</div>').code,
     '<div className="tls-type-section tls-type-num truncate">{value}</div>');
+});
+
+test("Größe in einer Variablen für ein GROSSES Schild: bis 12 px Etikett, darüber Klein", () => {
+  const source = 'const sz = size === "lg" ? "text-sm px-3 py-1" : "text-[10px] px-2 py-[3px]";\nconst a = <span className={`font-bold uppercase tracking-wider ${sz}`}>x</span>;';
+  const { code } = run(source);
+  assert.match(code, /const sz = size === "lg" \? "tls-type-small px-3 py-1" : "tls-type-label px-2 py-\[3px\]";/);
+});
+
+test("Rajdhani mit Wörtern daneben: die Stelle steht im Bericht (Zahl von Hand in tls-type-num)", () => {
+  const { manual } = run('<div className="font-display text-sm uppercase tracking-wider">{remaining} verbleibend</div>');
+  assert.equal(manual.length, 1);
+  assert.match(manual[0], /Zahl in Rajdhani von Hand/);
+});
+
+test("CSS: Zahlen ohne GROSS mit 13 px werden nicht kleiner (Klein, 14 px) - unter 12 px kommen sie auf 12 px", () => {
+  assert.equal(transformCss(".facts { font-size: 13px; font-variant-numeric: tabular-nums; }").code, ".facts { font-size: var(--tls-type-small-size); font-variant-numeric: tabular-nums; }");
+  assert.equal(transformCss(".n { font-family: 'Rajdhani', sans-serif; font-size: 11px; }").code, ".n { font-family: 'Rajdhani', sans-serif; font-size: var(--tls-type-label-size); }");
 });

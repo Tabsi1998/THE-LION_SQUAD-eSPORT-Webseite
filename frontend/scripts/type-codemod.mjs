@@ -28,7 +28,7 @@ const CLASS_TOKEN = /^[!-]?[[a-z0-9@][\w:./%#[\]()=,&>*+~'"-]*$/i;
 const TYPE_TOKEN = /^(?:(?:sm|md|lg|xl|2xl):)?text-(?:xs|sm|base|lg|[2-9]?xl|\[[\d.]+(?:px|rem)\]|\[clamp)|^font-(?:heading|display)$|^uppercase$|^tabular-nums$|^tls-card__title$/;
 const STEP_CLASS = /^tls-type-/;
 // Schalter für Vergleichsläufe: blockText = ein langer Text zählt je Block, nicht über alle Spalten zusammen.
-export const OPTIONS = { blockText: true, branchOnly: true, numCap: true };
+export const OPTIONS = { blockText: true, branchOnly: true, numCap: true, cssNoShrink: true };
 
 // Was ein Name ist (Personen, Teams, Spiele, Titel): nie GROSS. Was ein Etikett ist (Zustand, Art, Rolle): darf GROSS.
 // Titel sind keine Namen: ein Titel im Etikett darf GROSS bleiben (kurz, 1-3 Wörter).
@@ -54,7 +54,6 @@ function wordy(text) {
 }
 const INPUT_TAGS = new Set(["input", "textarea", "select", "option", "Input", "Textarea", "SelectTrigger", "SelectValue", "text", "tspan", "svg"]);
 const NUMBER_TAGS = new Set(["CountUp", "LapTime"]);
-const PAGE_TITLE_PROPS = new Set(["title", "heading", "pageTitle", "headline"]);
 
 function pxOf(value) {
   if (NAMED[value] !== undefined) return { px: NAMED[value], mobile: NAMED[value] };
@@ -454,6 +453,11 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
       return true;
     }
     if (!decision) return true;
+    // Rajdhani mit Wörtern daneben („{points} Punkte gesamt“): Die Stelle wird Outfit - die Zahl selbst braucht von Hand
+    // ein eigenes <span className="tls-type-num"> (#1304). Steht im Bericht, damit keine Zahl ihre Schrift verliert.
+    if (tokensOf(all).includes("font-display") && !decision.num) {
+      manual.push(`${file}:${node.loc.start.line} <${tag}> Zahl in Rajdhani von Hand (font-display mit Wörtern)`);
+    }
     // Die Stufe kommt ins erste feste Stück; gibt es keins, in jeden Zweig mit Größe.
     const fixedTarget = fixed.find((piece) => pieceText(code, piece).trim() || piece.kind === "string");
     let placed = false;
@@ -479,11 +483,8 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
         else if (rest.length === 1 && rest[0].type === "JSXElement" && rest[0].closingElement && textOnly(meaningful(rest[0].children))) kids = meaningful(rest[0].children);
       }
       const onlyText = textOnly(kids);
-      const onlyProp = kids.length === 1 && kids[0].type === "JSXExpressionContainer"
-        && ((kids[0].expression.type === "Identifier" && PAGE_TITLE_PROPS.has(kids[0].expression.name))
-          || (kids[0].expression.type === "MemberExpression" && kids[0].expression.object.type === "Identifier" && /^(meta|page|config|props)$/.test(kids[0].expression.object.name)
-            && PAGE_TITLE_PROPS.has(kids[0].expression.property.name)));
-      if (onlyText || onlyProp) {
+      // Nur fester Text bekommt <ShortCaps>: ein berechneter Titel kann ein Name oder ein Titel aus Daten sein (#1303).
+      if (onlyText) {
         if (!wrapped) {
           const eol = code.includes("\r\n") ? "\r\n" : "\n";
           const imports = ast.program.body.filter((item) => item.type === "ImportDeclaration");
@@ -496,8 +497,8 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
         }
         const first = kids[0];
         const last = kids[kids.length - 1];
-        const start = onlyText ? first.start + (first.value.length - first.value.trimStart().length) : first.start;
-        const end = onlyText ? last.end - (last.value.length - last.value.trimEnd().length) : last.end;
+        const start = first.start + (first.value.length - first.value.trimStart().length);
+        const end = last.end - (last.value.length - last.value.trimEnd().length);
         edits.push({ start, end: start, text: "<ShortCaps>" });
         edits.push({ start: end, end, text: "</ShortCaps>" });
         wrapped += 1;
@@ -506,6 +507,12 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
     return true;
   });
 
+  // Variablen, die in einem className neben GROSS-Klassen stehen (`${sz}` in „… uppercase …“).
+  const capsVars = new Set();
+  for (const match of code.matchAll(/className=\{`([^`]*)`\}/g)) {
+    if (!/(?<![\w-])(uppercase|tracking-(?:wider|widest))(?![\w-])/.test(match[1])) continue;
+    for (const use of match[1].matchAll(/\$\{(\w+)\}/g)) capsVars.add(use[1]);
+  }
   // Klassen-Texte außerhalb von className (Vorlagen in Objekten, Konstanten): ohne Element, nur nach Größe.
   walk(ast.program, (node, parents) => {
     if (node.type !== "StringLiteral" && node.type !== "TemplateElement") return true;
@@ -522,7 +529,11 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
     if (!isClassList(original)) return true;
     const tokens = original.trim().split(/\s+/);
     if (tokens.length < 2 && !analyze(tokens).sizes.length) return true;
-    const decision = classify(tokens, {});
+    // Eine Größe in einer Variablen, die ein GROSSES Schild benutzt (`const sz = … "text-[10px] px-2"` und
+    // className={`font-bold uppercase ${sz}`}): wie ein Knopf - bis 12 px das Etikett, darüber Klein mit GROSS.
+    const owner = [...parents].reverse().find((item) => item.type === "VariableDeclarator");
+    const capsVar = owner && owner.id.type === "Identifier" && capsVars.has(owner.id.name);
+    const decision = capsVar ? classify([...tokens, "uppercase"], { button: true }) : classify(tokens, {});
     if (!decision) return true;
     editPiece(piece, decision, true);
     return true;
@@ -565,7 +576,7 @@ export function quietSmallText(code) {
 // Kleine Größen in eigenen Bausteinen (index.css und die CSS-Dateien der Bereiche): unter 12 px und bis 13,5 px wird
 // „Klein“ (14 px), GROSS, gesperrt oder in der Zahlen-Schrift das Etikett (12 px). Kleine Punkte und Plaketten mit fester
 // Breite bis 16 px bleiben (Zähler an Symbolen, #1232). Relative Größen (em) und alles ab 14 px bleiben, wie sie sind.
-export const CSS_SKIP = ["components/tv/", "styles/printView.css", "seasons/", "advent/", "components/achievements/ceremony/", "fonts.css"];
+export const CSS_SKIP = ["components/tv/", "styles/printView.css", "fonts.css"];
 const FONT_SIZE = /font-size:\s*([\d.]+)(px|rem)\s*(?=;|\})/g;
 
 export function transformCss(css) {
@@ -584,7 +595,9 @@ export function transformCss(css) {
       const px = Number(value) * (unit === "rem" ? 16 : 1);
       if (px >= 14 || px === 12 || dot) return decl;
       changed += 1;
-      return `font-size: var(${upper || spaced || digits ? "--tls-type-label-size" : "--tls-type-small-size"})`;
+      // Zahlen und Kürzel unter 12 px kommen auf die Etikett-Größe; ab 12,5 px wird ohne GROSS nicht verkleinert.
+      const label = upper || spaced || (digits && (px < 12 || !OPTIONS.cssNoShrink));
+      return `font-size: var(${label ? "--tls-type-label-size" : "--tls-type-small-size"})`;
     });
     return `${selector}{${next}}`;
   });

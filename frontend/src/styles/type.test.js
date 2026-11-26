@@ -127,8 +127,10 @@ test("keine neue freie Schriftgröße - neue Stellen nehmen eine der acht Stufen
 });
 
 // CSS der Bausteine: nichts unter 12 px (#1232). Kleine Punkte mit fester Breite (Zähler an Symbolen) und SVG-Grafiken
-// rechnen anders und stehen hier mit Grund.
-const CSS_SKIP = /^(components\/tv\/|styles\/printView\.css|seasons\/|advent\/|components\/achievements\/ceremony\/)/;
+// rechnen anders und stehen hier mit Grund. Fabians Entscheidung vom 26.11.: Auch Saison-Deko, Adventkalender und
+// Zeremonien haben Text ab 12 px - nur reine Schmuckzeichen ohne Text dürfen kleiner sein (gezählt, mit Grund).
+// Ausgenommen sind nur die TV-Seiten (Beamer-Größen) und der Druck (pt).
+const CSS_SKIP = /^(components\/tv\/|styles\/printView\.css)/;
 const CSS_TINY = /font-size:\s*(?:(?:[0-9]|1[01])(?:\.\d+)?px|0?\.(?:[0-6]\d*|7[0-4]\d*)rem)\s*[;}]/g;
 const CSS_TINY_EXCEPTIONS = {
   "components/tls/league/leagueBadge.css": 4, // Saisonverlauf als SVG-Grafik (fill) - Größe in Einheiten der Grafik
@@ -189,6 +191,32 @@ test("Großbuchstaben nur für Kurzes (#1303): kein uppercase an h1-h3 und an Ka
     }
   }
   expect(found).toEqual([]);
+});
+
+// Namen werden nie umgeschrieben (#1303): <ShortCaps> um einen berechneten Wert nur, wo der Wert ein fester Seitentitel
+// aus dem Code ist - nie um Namen, Titel aus Daten (Liga, Serie, Runde) oder Eingaben („Jo gegen Max“ würde GROSS).
+const SHORT_CAPS_DYNAMIC = /<ShortCaps>\{[^}]+\}<\/ShortCaps>/g;
+const SHORT_CAPS_FIXED = {
+  "advent/AdventCalendarPanel.jsx": 1, // feste Sätze („Bald ist es so weit“)
+  "components/tls/AdminForm.jsx": 1, // „Neues Event“, „Event bearbeiten“ - aus den Formularen
+  "pages/public/LegalPages.jsx": 1, // „Impressum“, „Datenschutz“, „Nutzungsbedingungen“
+  "pages/public/PasswordRecoveryPage.jsx": 1, // „Passwort vergessen“ und die übrigen Schritte
+  "pages/user/meinBereich/BereichSeite.jsx": 1, // Gruppen von „Mein Bereich“ aus lib/meinBereich.js
+};
+
+test("ShortCaps nie um Namen oder Titel aus Daten - nur um feste Seitentitel", () => {
+  expect(countIn(SOURCES, SHORT_CAPS_DYNAMIC)).toEqual(SHORT_CAPS_FIXED);
+});
+
+// Zahlen bleiben in Rajdhani (#1304): Stellen mit der Zahlen-Schrift (tls-type-num, NumText, das alte font-display)
+// werden nicht weniger. Steht neben einer Zahl ein Wort, bekommt die Zahl ihr eigenes <span className="tls-type-num">
+// oder <NumText> - die Stelle verliert die Zahlen-Schrift nicht (das Umbau-Skript meldet solche Stellen).
+const NUMBER_FONT = /(?<![\w-])(?:tls-type-num|font-display)(?![\w-])|<NumText\b/g;
+const NUMBER_FONT_BASELINE = 234; // nach dem Umbau und den Nachbesserungen aus der Prüfung (vorher 225) - nur nach oben anpassen
+
+test("die Zahlen-Schrift wird nicht weniger - Zahlen neben Wörtern bekommen tls-type-num oder NumText", () => {
+  const total = Object.values(countIn(SOURCES, NUMBER_FONT)).reduce((sum, count) => sum + count, 0);
+  expect(total, `${total} Stellen mit Zahlen-Schrift, mindestens ${NUMBER_FONT_BASELINE} - neue Zahlen nehmen tls-type-num`).toBeGreaterThanOrEqual(NUMBER_FONT_BASELINE);
 });
 
 // Dauern ausgeschrieben (#1304): „154 Tage 16 Std.“, nie „154T 16h“ oder „3 T.“ - lib/datetime formatDuration.
