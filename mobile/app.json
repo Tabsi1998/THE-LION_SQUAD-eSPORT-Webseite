@@ -157,11 +157,6 @@
             {
               "scheme": "https",
               "host": "lionsquad.at",
-              "path": "/mein-bereich/profil"
-            },
-            {
-              "scheme": "https",
-              "host": "lionsquad.at",
               "path": "/mein-bereich/mitgliedschaft"
             },
             {
@@ -358,11 +353,6 @@
               "scheme": "https",
               "host": "www.lionsquad.at",
               "path": "/mein-bereich"
-            },
-            {
-              "scheme": "https",
-              "host": "www.lionsquad.at",
-              "path": "/mein-bereich/profil"
             },
             {
               "scheme": "https",

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -8,6 +8,7 @@ import { LINKABLE_PLATFORMS, PlatformLinkRows, type LinkedAccount } from "../../
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { platformLinkUrl } from "../../lib/platformLinks";
 import { ACCOUNT_CHANGED_MESSAGE, type SaveResult } from "../../lib/profileSaveQueue";
 import { useProfileSaveQueue } from "../../lib/useProfileSaveQueue";
 import { Field, labelFor, profileStyles, setField, Toggle, WEB_BASE_URL } from "./profile/parts";
@@ -71,7 +72,7 @@ export function ProfileEditScreen() {
   // Abgehakt vom Verein (#558): weder Zeile noch Textfeld.
   const [linkDisabled, setLinkDisabled] = useState<string[]>([]);
 
-  useEffect(() => {
+  const loadLinks = useCallback(() => {
     api.get<{ links?: LinkedAccount[]; available?: Record<string, boolean>; disabled?: string[] }>("/me/platform-links")
       .then(({ data }) => {
         setLinks(Array.isArray(data?.links) ? data.links : []);
@@ -80,6 +81,18 @@ export function ProfileEditScreen() {
       })
       .catch(() => {});
   }, []);
+  useEffect(() => { loadLinks(); }, [loadLinks]);
+  // Zurück von der Website (#2059): wer verknüpfen war, sieht gleich das neue Konto - einmal, sobald die App wieder vorn ist
+  // (auch wenn der Rücksprung der Plattform über /profile?tab=socials&linked=… die App öffnet).
+  const linking = useRef(false);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next !== "active" || !linking.current) return;
+      linking.current = false;
+      loadLinks();
+    });
+    return () => subscription?.remove?.();
+  }, [loadLinks]);
 
   const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
   // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
@@ -92,8 +105,11 @@ export function ProfileEditScreen() {
     return [...notReady, ...manual, "website"];
   }, [linkAvailable, linkDisabled, linkedPlatforms]);
 
+  // Verknüpfen läuft auf der Website (#521) - über eine Adresse, die kein App-Link ist (lib/platformLinks.ts), sonst käme
+  // wieder die App statt der Plattform.
   const startPlatformLink = useCallback((platform: string) => {
-    Linking.openURL(`${WEB_BASE_URL}/profile?tab=socials&link=${encodeURIComponent(platform)}`).catch(() => {});
+    linking.current = true;
+    Linking.openURL(platformLinkUrl(platform)).catch(() => {});
   }, []);
   const unlinkPlatform = useCallback((platform: string) => {
     Alert.alert("Verknüpfung lösen?", "Der Name bleibt im Profil, das Häkchen „verifiziert“ ist weg.", [
@@ -171,7 +187,7 @@ export function ProfileEditScreen() {
         </Card>
         <Card style={profileStyles.card}>
           <Heading>Konten</Heading>
-          <Muted>Verknüpfen läuft im Browser: die Plattform bestätigt dein Konto, der Name kommt von dort. Wer welches Konto sieht, regelst du in den Einstellungen unter Privatsphäre.</Muted>
+          <Muted>Verknüpfen läuft im Browser: die Plattform bestätigt dein Konto, der Name kommt von dort. Wer welches Konto sieht, regelst du unter Mein Bereich → Datenschutz.</Muted>
           <PlatformLinkRows links={links} available={linkAvailable} disabled={linkDisabled} onLink={startPlatformLink} onUnlink={unlinkPlatform} />
           {/* Spiel-Rollen im Discord (#629): wie im Web nur mit verknüpftem Discord; der Schalter speichert sofort. */}
           {linkedPlatforms.has("discord") ? (
