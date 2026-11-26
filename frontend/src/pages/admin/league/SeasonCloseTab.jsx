@@ -420,6 +420,8 @@ export function SeasonCloseTab({ seasonId, canResults = false, canMatches = fals
       <div className="mt-4"><SeasonTvFinaleControl seasonId={seasonId} canSteer={canMatches} /></div>
       <p className="mt-4 text-[11px] text-white/45">
         Auf- und Abstieg ergeben sich aus dem Endstand (Zonen je Liga im Reiter „Ligen und Staffeln“). Ist alles abgeschlossen, legt „Neue Season aus …“ oben die nächste Season an.
+        {" "}Sollen Auf- und Absteiger eine Nachricht bekommen, sobald der Endstand feststeht, oder die Teams ihren Platz erst zusagen:{" "}
+        <Link to="#startrechte" className="text-[#29B6E8] hover:underline" data-testid="season-close-start-rights">Startrechte</Link> im Reiter „Anmeldung und Kader“.
       </p>
       {sheet?.kind === "close" ? <CloseSheet row={sheet.row} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
       {sheet?.kind === "reopen" ? <ReopenSheet row={sheet.row} superadmin={data.superadmin} successor={data.successor} onClose={() => setSheet(null)} onDone={done} /> : null}

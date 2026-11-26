@@ -7,12 +7,16 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { teamStateLabel } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
+import { outlookLine, teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
 import { ApplicationStateBadge } from "./LeagueApplicationPanel";
+import { StartRightBlock } from "./StartRightBlock";
 
-export function SquadApplicationStatus({ items = [], onChanged }) {
+// ``outlook`` (#1627, F.2a): vor der Folge-Season die Prognose aus der laufenden Tabelle bzw. das bestätigte Startrecht aus dem
+// Endstand - je Season ein Satz, ohne Knopf. Mit der Folge-Season steht das Startrecht am Antrag (``carry_over.start_right``).
+export function SquadApplicationStatus({ items = [], outlook = [], onChanged }) {
   const confirm = useConfirm();
   const [busy, setBusy] = useState("");
-  if (!items.length) return null;
+  if (!items.length && !outlook.length) return null;
   const withdraw = async (row) => {
     const sure = await confirm({
       title: "Von der Season abmelden?",
@@ -32,14 +36,25 @@ export function SquadApplicationStatus({ items = [], onChanged }) {
   };
   return (
     <ul className="mt-3 space-y-2 border-t border-white/10 pt-3" aria-label="Liga-Anmeldungen">
+      {outlook.map((row) => (
+        <li key={`${row.squad_id}-${row.season_id}`} data-testid={`squad-start-right-outlook-${row.squad_id}-${row.season_id}`} data-state={row.state}>
+          <div className="flex flex-wrap items-center gap-2">
+            {row.url ? <Link to={row.url} className="min-w-0 text-sm font-semibold text-[#29B6E8] hover:underline [overflow-wrap:anywhere]">{row.title}</Link>
+              : <span className="min-w-0 text-sm font-semibold text-white [overflow-wrap:anywhere]">{row.title}</span>}
+            <ApplicationStateBadge state="none" tone={row.state === "confirmed" ? "ok" : "quiet"} label={row.state === "confirmed" ? "Startrecht bestätigt" : "Prognose"} />
+          </div>
+          <p className="mt-0.5 text-xs text-white/75 [overflow-wrap:anywhere]">{outlookLine(row)}</p>
+        </li>
+      ))}
       {items.map((row) => (
         <li key={row.id} data-testid={`squad-application-${row.id}`}>
           <div className="flex flex-wrap items-center gap-2">
             {row.url ? <Link to={row.url} className="min-w-0 text-sm font-semibold text-[#29B6E8] hover:underline [overflow-wrap:anywhere]">{row.title}</Link>
               : <span className="min-w-0 text-sm font-semibold text-white [overflow-wrap:anywhere]">{row.title}</span>}
-            <ApplicationStateBadge state={row.status} label={teamStateLabel(row.status, row)} />
+            <ApplicationStateBadge state={row.status} label={teamBadge(row) || teamStateLabel(row.status, row)} tone={teamBadgeTone(row)} />
           </div>
           {row.carry_over ? <p className="mt-0.5 text-xs text-white/75 [overflow-wrap:anywhere]" data-testid={`squad-application-carry-${row.id}`}>{carryLine(row.carry_over)}</p> : null}
+          <StartRightBlock applicationId={row.id} carry={row.carry_over} onChanged={onChanged} testPrefix="squad-start-right" />
           {row.staffel ? <p className="mt-0.5 text-xs text-white/65">{row.staffel_left ? `Nicht mehr in ${row.staffel}.` : `Spielt in ${row.staffel}.`}</p> : null}
           {row.decision_reason ? <p className="mt-0.5 text-xs text-white/65 [overflow-wrap:anywhere]">Grund: {row.decision_reason}</p> : null}
           {row.carry_over && row.can_withdraw ? (

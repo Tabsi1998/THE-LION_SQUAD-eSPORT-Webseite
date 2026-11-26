@@ -21,7 +21,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_cross_zones, league_final, league_staffel_plan, league_zones, loadout_bans, map_pools, squad_registration
-from services import league_postseason, league_postseason_rules
+from services import league_postseason, league_postseason_rules, league_start_right_rules
 from services import league_service as leagues
 from services.league_final_read import active_final, is_closed
 from services.league_scope import ONLY_LEAGUE, RELEGATION, staffel_kind
@@ -45,6 +45,8 @@ NOT_COPIED = frozenset({
     # Der gemerkte Rückfallwert fürs Best of von Playoffs und Relegation (#2404, Nr. 255): Die neue Season beginnt wieder mit „wie in
     # der Season“ - an der Season und an jeder Liga N (``_copy_divisions``).
     league_postseason.KEPT,
+    # Startrechte (#1627, F.2a): Die Einstellung ``start_rights`` geht mit - was die alte Season schon gemeldet hat, gehört zu ihr.
+    league_start_right_rules.NOTICES, league_start_right_rules.NOTICES_OPEN, league_start_right_rules.PAUSES,
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (
@@ -208,32 +210,36 @@ async def plan(db, season: dict) -> dict:
             zone = zones.get(row.get("registration_id"))
             entry = {"registration_id": row.get("registration_id"), "squad_id": registration.get("squad_id"),
                      "display_name": row.get("display_name") or registration.get("display_name") or "Team",
+                     # Für den Vergleich über Staffeln hinweg beim Nachrücken (#1627, F.2a): Punkte und Map-Differenz je Spiel.
+                     "points": row.get("points"), "played": row.get("played"), "score_diff": row.get("score_diff"),
                      "from_level": division.get("level"), "from_label": from_label, "from_staffel": context.get("staffel"),
                      "rank": row.get("rank"), "zone": zone, "zone_label": league_zones.LABELS.get(zone or ""),
                      # Über den Vergleich der Staffeln (#1627): „bester Nächstplatzierter“ bzw. spiegelbildlich beim Abstieg.
                      **({"zone_cross": True} if row.get("registration_id") in crossed else {})}
             exit_kind = (row.get("exit") or {}).get("kind") if isinstance(row.get("exit"), dict) else None
             squad = squads.get(registration.get("squad_id") or "")
+            level = division.get("level")
+            # Die Relegation überlagert die Bewegung aus der Zone - vor Zielregel und Platzprüfung (F.6).
+            outcome = relegated.get(registration.get("squad_id") or "")
+            move = RELEGATION_MOVES[outcome] if outcome in RELEGATION_MOVES else league_zones.MOVES.get(zone, 0)
+            there = target_level(levels, level, move)
+            moving = {"target_level": there, **({"via": "relegation", "relegation": outcome} if outcome in RELEGATION_MOVES else {}),
+                      "movement": "up" if isinstance(level, int) and there < level else "down" if isinstance(level, int) and there > level else "stay"}
             if exit_kind or zone == league_zones.OUT:
                 dropped.append({**entry, "reason": REASONS.get(exit_kind or "", "Ausgeschieden")})
             elif not registration.get("squad_id"):
                 dropped.append({**entry, "reason": "Ohne Co-Team - kein Startplatz für die neue Season"})
             elif not squad or squad.get("status") == "archived" or squad.get("team_id") not in teams:
-                dropped.append({**entry, "reason": "Das Co-Team gibt es nicht mehr"})
+                # Der Platz im Endstand bleibt (#1627, F.2a, ``placed_levels``): Ob es einen Startplatz gibt, hängt an der
+                # Platzierung - nicht daran, ob es das Co-Team noch gibt.
+                dropped.append({**entry, "reason": "Das Co-Team gibt es nicht mehr", **moving})
             elif squad["id"] in seen:
                 continue
             else:
                 seen.add(squad["id"])
-                level = division.get("level")
-                # Die Relegation überlagert die Bewegung aus der Zone - vor Zielregel und Platzprüfung (F.6).
-                outcome = relegated.get(squad["id"])
-                move = RELEGATION_MOVES[outcome] if outcome in RELEGATION_MOVES else league_zones.MOVES.get(zone, 0)
-                there = target_level(levels, level, move)
                 team = teams[squad["team_id"]]
                 carried.append({**entry, "squad_id": squad["id"], "team_id": team["id"], "team_name": team.get("name"),
-                                "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad),
-                                "target_level": there, **({"via": "relegation", "relegation": outcome} if outcome in RELEGATION_MOVES else {}),
-                                "movement": "up" if isinstance(level, int) and there < level else "down" if isinstance(level, int) and there > level else "stay"})
+                                "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad), **moving})
     # Umzug innerhalb der Season (in Staffel A ausgetreten, in Staffel B aktiv): Das Co-Team steht nur einmal da, bei den Übernommenen.
     dropped = [row for row in dropped if not row.get("squad_id") or row["squad_id"] not in seen]
     out_divisions = []
@@ -252,6 +258,15 @@ async def plan(db, season: dict) -> dict:
     stamp = hashlib.sha1("|".join(sorted(finals) + sorted(decided) + sorted(relegation_finals)).encode("utf-8")).hexdigest()[:12] if finals else ""
     return {"problems": problems, "divisions": out_divisions, "dropped": dropped, "carried": len(carried), "stamp": stamp,
             "relegation": bool(relegation_finals)}
+
+
+def placed_levels(checked: dict) -> dict[str, int]:
+    """In welcher Liga N der Folge-Season der Endstand jedes Co-Team sieht (``plan``) - auch eines, das es inzwischen nicht mehr gibt
+    (``dropped`` mit ``target_level``). Daran hängt, ob ein frei gewordener Startplatz besteht (#1627, F.2a): an der Platzierung im
+    Endstand, nicht am Co-Team. Ausgeschiedene und Disqualifizierte fehlen - sie haben keinen Platz."""
+    out = {row["squad_id"]: row["target_level"] for row in checked["dropped"] if row.get("squad_id") and isinstance(row.get("target_level"), int)}
+    out.update({team["squad_id"]: team["target_level"] for division in checked["divisions"] for team in division["teams"]})
+    return out
 
 
 # ---------------------------------------------------------------- Vorschau
@@ -298,6 +313,8 @@ async def preview(db, season: dict) -> dict:
         "capacity_hints": [f"{row['label']}: {row['capacity']['text']}" for row in found["divisions"] if not row["capacity"]["fits"]],
         "dropped": found["dropped"],
         "carried": found["carried"],
+        # Startrechte (#1627, F.2a): die Einstellung dieser Season als Vorgabe für die neue - ``settings: null`` heißt wie bisher.
+        "start_rights": {"settings": league_start_right_rules.stored(season), "defaults": league_start_right_rules.defaults()},
         "relegation_note": RELEGATION_APPLIED if found.get("relegation") else
         "Relegationsplätze sind vorbereitet: Sie stehen farbig in der Tabelle, die Teams bleiben vorerst in ihrer Liga.",
     }
@@ -338,6 +355,11 @@ async def _create(db, season: dict, body: dict, actor: dict) -> dict:
     if not body.get("confirm"):
         raise SuccessorProblem("Bitte das Anlegen bestätigen.")
     start = _start(body.get("start_date"))
+    # Startrechte (#1627, F.2a): Die neue Season übernimmt die Einstellung des Vorgängers - oder nimmt sie aus dem Blatt entgegen.
+    try:
+        start_rights = league_start_right_rules.normalize(body["start_rights"]) if isinstance(body.get("start_rights"), dict) else None
+    except league_start_right_rules.StartRightProblem as problem:
+        raise SuccessorProblem(problem.detail) from None
     checked = await plan(db, season)
     if checked["problems"]:
         raise SuccessorProblem(checked["problems"][0], 409)
@@ -351,6 +373,8 @@ async def _create(db, season: dict, body: dict, actor: dict) -> dict:
             doc[league_postseason_rules.FIELD] = league_postseason_rules.without_dates(doc[league_postseason_rules.FIELD])
         doc.update({"predecessor_id": season["id"], "status": "draft", "visibility": "off",
                     "predecessor": {"id": season["id"], "name": season.get("name"), "number": season.get("number"), "slug": season.get("slug")}})
+        if start_rights is not None:
+            doc[league_start_right_rules.FIELD] = start_rights
 
     request = {"start_date": start.isoformat(), "visibility": "off", "status": "draft"}
     if str(body.get("name") or "").strip():
@@ -455,7 +479,9 @@ async def _carry_teams(db, league: dict, season: dict, doc: dict, actor: dict, c
                      "from_label": team["from_label"], "from_staffel": team.get("from_staffel"), "rank": team.get("rank"),
                      "zone": team.get("zone"), "movement": team["movement"], "division_id": target.get("id"),
                      "division_level": division["level"], "division_label": division["label"],
-                     **({"via": team["via"]} if team.get("via") else {})}
+                     **({"via": team["via"]} if team.get("via") else {}),
+                     # Startrecht mit Zusage (#1627, F.2a): nur, wenn die neue Season es so einstellt - sonst wie bisher automatisch dabei.
+                     **({"start_right": league_start_right_rules.offer()} if league_start_right_rules.needs_accept(doc) else {})}
             row = {
                 "id": new_id(), "league_id": league["id"], "season_id": doc["id"], "team_id": team["team_id"], "squad_id": team["squad_id"],
                 "team_name": team.get("team_name"), "squad_name": team.get("squad_name"), "display_name": team["display_name"],
@@ -477,9 +503,12 @@ def withdraw_until(season: dict) -> str | None:
     return season.get("start_date")
 
 
-async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, kind: str = "new", stamp: str = "") -> int:
+async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, kind: str = "new", stamp: str = "",
+                         gone: dict[str, str] | None = None) -> int:
     """„Ihr seid in Liga N der neuen Season, abmelden bis …“ an Captain und Vertreter - je Season, Co-Team und Person einmal, nach
-    „Übernahme neu berechnen“ einmal je Fassung des Endstands (``stamp``). Danach steht ``carry_over.notified_at`` am Antrag."""
+    „Übernahme neu berechnen“ einmal je Fassung des Endstands (``stamp``). Danach steht ``carry_over.notified_at`` am Antrag.
+    ``kind: "back"`` (#1627, F.2a): ein Nachrücker, dessen Platz nach dem korrigierten Endstand entfällt - ``gone`` nennt je Antrag
+    die Liga N dieses Platzes."""
     from services.league_applications import _responsible
     from services.league_mail import send_league_mail
     from services.user_notifications import create_user_notification
@@ -497,10 +526,34 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
             carry = row["carry_over"]
             how = " über die Relegation" if carry.get("via") == "relegation" else ""
             way = {"up": f" - Aufstieg{how} aus {carry['from_label']}", "down": f" - Abstieg{how} aus {carry['from_label']}"}.get(carry["movement"], "")
+            offered = league_start_right_rules.accept_until(row, season) if (carry.get("start_right") or {}).get("status") == "offered" else None
             if kind == "revoked":
                 headline = "Neue Season: Übernahme zurückgenommen"
                 text = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
                         f"{row['display_name']} ist danach nicht mehr in {title}. Fragen beantwortet die Liga-Leitung.")
+            elif kind == "back":
+                # Wie jeder Rückfall eines Nachrückers (Nr. 260, Nr. 265): Die frühere Zusage gilt wieder, sonst die Restfrist.
+                headline = "Neue Season: Nachrücken entfällt"
+                right = carry.get("start_right") if isinstance(carry.get("start_right"), dict) else None
+                if offered:
+                    follow = (f"Eure Zusage dort ist noch offen: bitte bis {offered.astimezone(LOCAL_TZ).strftime('%d.%m.%Y, %H:%M Uhr')} "
+                              f"zusagen: {where}. Ohne Zusage verfällt das Startrecht.")
+                elif right:
+                    follow = "Eure Zusage dort gilt weiter."
+                else:
+                    follow = f"Ihr seid automatisch dabei. Wer nicht mitspielen will, meldet sich bis zum Start ({day}) ab: {where}."
+                text = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
+                        f"Der Platz in {(gone or {}).get(row['id']) or 'der höheren Liga'} entfällt nach dem korrigierten Endstand. "
+                        f"{row['display_name']} bleibt in {carry['division_label']} der neuen Season {title}. {follow}")
+            elif offered:
+                # Startrecht mit Zusage (#1627, F.2a): keine automatische Anmeldung - das Team sagt innerhalb der Frist zu.
+                headline = "Neue Season: neue Liga" if kind == "moved" else "Neue Season: euer Startrecht"
+                lead = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
+                        if kind == "moved" else "")
+                until = offered.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr")
+                text = (f"{lead}{row['display_name']} hat ein Startrecht für {carry['division_label']} der neuen Season {title}{way}. "
+                        f"Bitte bis {until} zusagen: {where}. Ohne Zusage verfällt das Startrecht. Es ist noch keine Anmeldung zu einer "
+                        "Staffel und keine Zustimmung zum Regelwerk.")
             else:
                 headline = "Neue Season: neue Liga" if kind == "moved" else "Neue Season: ihr seid dabei"
                 lead = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
@@ -522,6 +575,8 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
 # ---------------------------------------------------------------- Übernahme neu berechnen (Entscheidung Nr. 162)
 
 CARRY_KEYS = ("from_label", "from_level", "from_staffel", "rank", "zone", "movement", "division_level", "via")
+# Aufgegebene Anträge (#1627, F.2a): abgemeldet bzw. abgelehnt - auch verfallen; zurückgenommene tragen ``carry_over.revoked_at``.
+GAVE_UP = ("withdrawn", "rejected")
 
 
 def started(season: dict, now: datetime | None = None) -> bool:
@@ -559,6 +614,17 @@ async def _recompute_plan(db, season: dict) -> dict:
             target[team["squad_id"]] = (team, own, division_label(own) if own else division["label"])
     rows = await db.league_applications.find({"season_id": season["id"]}, {"_id": 0}).sort("created_at", 1).to_list(1000)
     carried = {row["squad_id"]: row for row in rows if row.get("carry_over")}
+    by_id = {row["id"]: row for row in rows}
+    placed = placed_levels(checked)
+    # Startrechte (#1627, F.2a) - nur mit der Einstellung der Season; ohne sie bleibt alles wie in Nr. 162. Ein aufgegebener Antrag
+    # folgt dann seiner Platzierung, auch wenn es das Co-Team nicht mehr gibt (``dropped`` mit ``target_level``).
+    rights_on = league_start_right_rules.stored(season) is not None
+    labels = {division["level"]: division["label"] for division in checked["divisions"]}
+    gone = {}
+    for entry in checked["dropped"] if rights_on else []:
+        if entry.get("squad_id") and isinstance(entry.get("target_level"), int):
+            own = divisions.get(entry["target_level"])
+            gone[entry["squad_id"]] = (entry, own, division_label(own) if own else labels.get(entry["target_level"], ""))
     others = {row["squad_id"]: row for row in rows if not row.get("carry_over") and row.get("active_key")}
     changes, manual = [], []
     unchanged = 0
@@ -575,9 +641,41 @@ async def _recompute_plan(db, season: dict) -> dict:
             continue
         free = row["status"] == ACCEPTED and not row.get("assignment")
         new = _carry_of(predecessor, wanted[0], wanted[1], wanted[2]) if wanted else None
+        # Ein Nachrücker (#1627, F.2a) steht mit Absicht in einer anderen Liga N: Sagt der Endstand für ihn dasselbe wie vor dem
+        # Nachrücken, bleibt er, wo er ist - solange es den Platz noch gibt, auf den er nachgerückt war. Sieht der korrigierte
+        # Endstand das abgemeldete Co-Team nicht mehr in dieser Liga N, geht der Nachrücker zurück (``moved``): Sonst stiege einer
+        # zu viel auf.
+        back = (carry.get("fills") or {}).get("back") if isinstance(carry.get("fills"), dict) else None
+        if free and new and back and new["division_level"] == back.get("division_level"):
+            if placed.get((by_id.get(carry["fills"].get("for_application_id")) or {}).get("squad_id")) == carry.get("division_level"):
+                unchanged += 1
+                continue
+            # Rückfall wie bei jedem Nachrücker (Nr. 260, Nr. 265): frühere Zusage bzw. Restfrist statt einer neuen vollen Frist.
+            changes.append({"kind": "moved", "application_id": row["id"], "squad_id": squad_id, "display_name": name,
+                            "from_label": carry.get("division_label"), "to_label": wanted[2], "carry_over": new, "place_gone": True})
+            continue
         if not free:
-            if not wanted or new["division_level"] != carry.get("division_level"):
+            # Aufgegeben (Entscheidung 26.11.): abgemeldet, verfallen oder von der Leitung abgelehnt - nicht zurückgenommen (oben) und
+            # kein Nachrücker (dessen Antrag steht in der Liga des Platzes, auf den er nachgerückt war). Der Antrag folgt seiner
+            # neuen Platzierung, in jeder Richtung; damit ist sein Platz dort frei, und es gilt die Nachrückerregel
+            # (``released_places``). Er bleibt, was er ist: kein neues Angebot, keine Nachricht, kein Fall für „von Hand“.
+            seen_at = (wanted or gone.get(squad_id)) if rights_on and row["status"] in GAVE_UP and not isinstance(carry.get("fills"), dict) else None
+            if seen_at:
+                place = _carry_of(predecessor, seen_at[0], seen_at[1], seen_at[2])
+                if place["division_level"] != carry.get("division_level"):
+                    changes.append({"kind": "place", "application_id": row["id"], "squad_id": squad_id, "display_name": name,
+                                    "from_label": carry.get("division_label"), "to_label": seen_at[2], "carry_over": place,
+                                    "status": row["status"]})
+                else:
+                    # Die Liga stimmt: Der Platz steht schon als frei oder vergeben da - auch wenn es das Co-Team nicht mehr gibt.
+                    unchanged += 1
+            elif not wanted or new["division_level"] != carry.get("division_level"):
                 why = "zugeteilt" if row.get("assignment") else {"withdrawn": "abgemeldet"}.get(row["status"], "nicht mehr angenommen")
+                fills = carry.get("fills") if isinstance(carry.get("fills"), dict) else None
+                if row.get("assignment") and fills and placed.get((by_id.get(fills.get("for_application_id")) or {}).get("squad_id")) != carry.get("division_level"):
+                    # Zugeteilter Nachrücker (#1627, F.2a), dessen Platz nach dem korrigierten Endstand entfallen ist: Die Leitung
+                    # liest, warum er hier steht - er spielt in einer Liga N, für die es seinen Platz nicht mehr gibt.
+                    why = "zugeteilt, der Nachrückplatz ist entfallen"
                 manual.append({"application_id": row["id"], "display_name": name, "status": row["status"], "why": why,
                                "from_label": carry.get("division_label"), "to_label": wanted[2] if wanted else None})
             else:
@@ -636,15 +734,23 @@ async def recompute(db, season: dict, body: dict, actor: dict) -> dict:
     league = await leagues.get_league(db, fresh["league_id"])
     notified = 0
     for kind in ("moved", "added", "reactivated", "revoked"):
-        rows = [row for change, row in done if change["kind"] == kind]
+        rows = [row for change, row in done if change["kind"] == kind and not change.get("place_gone")]
         notified += await _tell_captains(db, league, fresh, rows, kind="moved" if kind in ("moved", "reactivated") else kind,
                                          stamp=found["stamp"]) if rows else 0
-    counts = {kind: len([1 for change, _row in done if change["kind"] == kind]) for kind in ("moved", "updated", "added", "reactivated", "revoked")}
+    # Nachrücker, deren Platz nach dem korrigierten Endstand entfällt (#1627, F.2a): eigene Nachricht mit dem Grund.
+    back = [(change, row) for change, row in done if change.get("place_gone")]
+    if back:
+        notified += await _tell_captains(db, league, fresh, [row for _change, row in back], kind="back", stamp=found["stamp"],
+                                         gone={row["id"]: change.get("from_label") for change, row in back})
+    counts = {kind: len([1 for change, _row in done if change["kind"] == kind])
+              for kind in ("moved", "updated", "added", "reactivated", "revoked", "place")}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "league.season.successor.recompute", "actor_id": actor.get("id"), "target_id": fresh["id"],
         "data": {"predecessor_id": fresh["predecessor_id"], "stamp": found["stamp"], **counts, "manual": len(found["manual"])},
         "created_at": now_utc().isoformat()})
-    return {"changed": len(done), **counts, "manual": found["manual"], "notified": notified, "stamp": found["stamp"]}
+    return {"changed": len(done), **counts, "manual": found["manual"], "notified": notified, "stamp": found["stamp"],
+            # Plätze, die wieder frei sind, weil ein Nachrücker zurückgenommen wurde (#1627, F.2a) - die Route lässt nachrücken.
+            "released_places": sorted({key for change, _row in done for key in change.get("released") or []})}
 
 
 async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[tuple[dict, dict]]:
@@ -653,6 +759,8 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
     now = now_utc().isoformat()
     who = actor.get("id")
     done = []
+    # Startrecht mit Zusage (#1627, F.2a): Wer neu dazukommt oder in eine andere Liga N wechselt, sagt (neu) zu - mit neuer Frist.
+    fresh_right = {"start_right": league_start_right_rules.offer()} if league_start_right_rules.needs_accept(season) else {}
     for change in found["changes"]:
         kind = change["kind"]
         if kind == "added":
@@ -661,7 +769,7 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
                 "id": new_id(), "league_id": season["league_id"], "season_id": season["id"], "team_id": team["team_id"], "squad_id": team["squad_id"],
                 "team_name": team.get("team_name"), "squad_name": team.get("squad_name"), "display_name": team["display_name"],
                 "status": ACCEPTED, "active_key": f"{season['id']}:{team['squad_id']}", "applied_by": None, "submitted_at": now,
-                "decided_by": who, "decided_at": now, "decision_reason": None, "carry_over": change["carry_over"],
+                "decided_by": who, "decided_at": now, "decision_reason": None, "carry_over": {**change["carry_over"], **fresh_right},
                 "history": [{"status": ACCEPTED, "by": who, "at": now, "carry_over": True, "recomputed": True}], "created_at": now, "updated_at": now,
             }
             try:
@@ -671,25 +779,61 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
             done.append((change, row))
             continue
         query = {"id": change["application_id"]}
-        if kind == "revoked":
+        if kind == "place":
+            # Aufgegeben, und der korrigierte Endstand sieht das Co-Team in einer anderen Liga N: Der Antrag zeigt auf den Platz,
+            # den es dort hätte. Wer auf seinem früheren Platz nachgerückt war, hält den neuen nicht (``filled_by`` fällt weg).
+            query.update({"status": change["status"], "carry_over.revoked_at": {"$exists": False}})
+            update = {"$set": {**{f"carry_over.{key}": value for key, value in change["carry_over"].items()}, "updated_at": now},
+                      "$unset": {"carry_over.filled_by": ""},
+                      "$push": {"history": {"status": change["status"], "by": who, "at": now, "carry_over": True, "recomputed": True}}}
+        elif kind == "revoked":
             query.update({"status": ACCEPTED, "assignment": {"$exists": False}})
             update = {"$set": {"status": REJECTED, "decision_reason": REVOKED_REASON, "decided_by": who, "decided_at": now, "updated_at": now,
                                "carry_over.revoked_at": now, "carry_over.revoked_by": who},
-                      "$unset": {"active_key": ""},
+                      # War es ein Nachrücker (#1627, F.2a), ist er es nicht mehr - sein Platz wird unten wieder frei.
+                      "$unset": {"active_key": "", "carry_over.fills": ""},
                       "$push": {"history": {"status": REJECTED, "by": who, "at": now, "reason": REVOKED_REASON, "carry_over": True, "recomputed": True}}}
         elif kind == "reactivated":
             query.update({"status": REJECTED, "carry_over.revoked_at": {"$exists": True}})
-            carry = dict(change["carry_over"])
+            carry = {**change["carry_over"], **fresh_right}
             update = {"$set": {"status": ACCEPTED, "active_key": f"{season['id']}:{change['squad_id']}", "decision_reason": None, "decided_by": who,
                                "decided_at": now, "updated_at": now, "carry_over": carry},
                       "$push": {"history": {"status": ACCEPTED, "by": who, "at": now, "carry_over": True, "recomputed": True}}}
         else:
             query.update({"status": ACCEPTED, "assignment": {"$exists": False}})
             update = {"$set": {**{f"carry_over.{key}": value for key, value in change["carry_over"].items()}, "updated_at": now}}
+            # Ein Nachrücker, für den der Endstand jetzt etwas anderes sagt als vor dem Nachrücken (sonst wäre er oben „unverändert“
+            # geblieben): Er steht ab jetzt aus eigenem Recht dort, wo der Endstand ihn sieht - „Ablehnen“ führte sonst in die
+            # falsche Liga. ``fills`` fällt weg, bei ``updated`` wie bei ``moved``.
+            update["$unset"] = {"carry_over.fills": ""}
+            if change.get("place_gone"):
+                # Der Platz, auf den er nachgerückt war, entfällt: zurück auf das frühere Startrecht - Zusage bzw. Restfrist,
+                # mindestens ``rest_days`` (``restored_right``, wie beim verstrichenen Nachrück-Angebot).
+                before = await db.league_applications.find_one({"id": change["application_id"]}, {"_id": 0, "carry_over.fills": 1}) or {}
+                own = league_start_right_rules.restored_right((before.get("carry_over") or {}).get("fills"), season, now_utc(), who, declined=False)
+                if own is not None:
+                    update["$set"]["carry_over.start_right"] = own
+                else:
+                    update["$unset"]["carry_over.start_right"] = ""
+            elif kind == "moved":
+                # Andere Liga N: Im Zusage-Modus gilt die alte Zusage nicht für die neue Liga.
+                update["$set"].update({f"carry_over.{key}": value for key, value in fresh_right.items()})
         try:
             result = await db.league_applications.update_one(query, update)
         except DuplicateKeyError:
             continue
         if result.modified_count:
+            if kind == "place":
+                change["released"] = [change["application_id"]]
+            if kind in ("revoked", "moved", "updated"):
+                # War es ein Nachrücker (Entscheidung 26.11.) - zurückgenommen, in eine andere Liga N geschickt oder jetzt aus
+                # eigenem Recht dort -, hält er den Platz nicht mehr, auf den er nachgerückt war: ``filled_by`` fällt weg. Ob es
+                # diesen Platz nach dem korrigierten Endstand noch gibt und wer nachrückt, entscheidet ``fill_places``
+                # (``league_start_rights``, die Route ruft es mit ``released_places`` auf).
+                freed = await db.league_applications.find({"season_id": season["id"], "carry_over.filled_by.application_id": change["application_id"]},
+                                                          {"_id": 0, "id": 1}).to_list(10)
+                change["released"] = [row["id"] for row in freed]
+                if freed:
+                    await db.league_applications.update_many({"id": {"$in": change["released"]}}, {"$unset": {"carry_over.filled_by": ""}})
             done.append((change, await db.league_applications.find_one({"id": change["application_id"]}, {"_id": 0})))
     return done

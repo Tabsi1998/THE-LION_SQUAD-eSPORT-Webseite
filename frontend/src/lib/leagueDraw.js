@@ -18,6 +18,16 @@ export function waitingLine(division) {
   return count === 1 ? "1 Co-Team wartet auf eine Staffel" : `${count} Co-Teams warten auf eine Staffel`;
 }
 
+/** Startrechte (#1627, F.2a): wer noch nicht zugesagt hat, steht nicht im Los - der Satz dazu, leer ohne solche Co-Teams. */
+export function openRightsLine(division) {
+  const rows = division?.waiting_start_right || [];
+  if (!rows.length) return "";
+  const names = rows.map((row) => row.display_name).join(", ");
+  return rows.length === 1
+    ? `1 Co-Team hat sein Startrecht noch nicht angenommen und kommt erst nach der Zusage ins Los: ${names}.`
+    : `${rows.length} Co-Teams haben ihr Startrecht noch nicht angenommen und kommen erst nach der Zusage ins Los: ${names}.`;
+}
+
 /** „Staffel A 2 von 8 · Staffel B 0 von 8“. */
 export function staffelnLine(staffeln = []) {
   if (!staffeln.length) return "Noch keine Staffel";

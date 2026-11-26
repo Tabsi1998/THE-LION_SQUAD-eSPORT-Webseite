@@ -380,3 +380,11 @@ test("fehlen eingestellte Playoffs noch, ist die Season nicht beendet", async ()
     { postseason_missing: [{ kind: "playoff", division_id: "d1", text: "Die Playoffs von Liga 1 sind noch nicht angelegt." }] }));
   expect(await screen.findByTestId("season-close-summary")).toHaveTextContent("Die Playoffs von Liga 1 sind noch nicht angelegt. Solange läuft die Season weiter.");
 });
+
+// Startrechte (#1627, docs/LIGA.md „F.2a“): Die Nachricht zum bestätigten Auf- und Abstieg stellt man vor dem Abschluss ein - der Weg dorthin.
+test("der Abschluss zeigt den Weg zu den Startrechten", async () => {
+  renderTab(data([staffel()]));
+  const link = await screen.findByTestId("season-close-start-rights");
+  expect(link).toHaveAttribute("href", "/#startrechte");
+  expect(link).toHaveTextContent("Startrechte");
+});

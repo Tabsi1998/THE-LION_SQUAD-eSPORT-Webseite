@@ -9,11 +9,14 @@ import { api, formatApiError } from "@/lib/api";
 
 const KIND_TEXT = {
   moved: "Neue Liga", updated: "Platz oder Zone neu", added: "Kommt dazu", reactivated: "Wieder dabei", revoked: "Übernahme zurückgenommen",
+  // Aufgegeben (abgemeldet, verfallen, abgelehnt) und laut korrigiertem Endstand in einer anderen Liga: Der Platz dort ist frei (F.2a).
+  place: "Platz frei",
 };
 
 function changeLine(change) {
   if (change.kind === "moved") return `${change.from_label} → ${change.to_label}`;
   if (change.kind === "revoked") return `bisher ${change.from_label} – nicht mehr in der neuen Season`;
+  if (change.kind === "place") return `spielt nicht mit – der Platz in ${change.to_label} ist frei`;
   return change.to_label || change.from_label || "";
 }
 

@@ -10,29 +10,37 @@ import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
+import { rightLine, teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
+import { StartRightBlock } from "./StartRightBlock";
 
 // ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
-export function ApplicationStateBadge({ state, testId, label }) {
+// ``tone`` (#1627, F.2a): eigene Farbe bei eigenem Text - ein Startrecht mit offener Zusage ist noch nicht „grün“.
+export function ApplicationStateBadge({ state, testId, label, tone }) {
   const info = APPLICATION_STATES[state] || APPLICATION_STATES.none;
   return (
-    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[info.tone]}`}>{label || info.label}</span>
+    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[tone] || STATE_CLASS[info.tone]}`}>{label || info.label}</span>
   );
 }
 
-function OwnSquadRow({ row, onWithdraw }) {
+function OwnSquadRow({ row, onWithdraw, onChanged }) {
   const application = row.application;
+  // Startrecht (#1627, F.2a): Mit der Einstellung der Season sagt das Team zu - dann steht hier der Stand statt „automatisch dabei“.
+  const startRight = application?.carry_over?.start_right || null;
   return (
     <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-t border-white/10 py-3 first:border-t-0" data-testid={`league-application-row-${row.squad_id}`}>
       <div className="min-w-0 flex-1 basis-64">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
-          <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, application)} testId={`league-application-state-${row.squad_id}`} />
+          <ApplicationStateBadge state={row.state} label={teamBadge(application) || teamStateLabel(row.state, application)} tone={teamBadgeTone(application)}
+            testId={`league-application-state-${row.squad_id}`} />
         </div>
         {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 text-sm text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
         {/* Aus der Vorgänger-Season übernommen (F.2, #1627): woher, welche Liga, bis wann Abmelden geht. */}
         {application?.carry_over ? <p className="mt-1 text-sm text-white/85" data-testid={`league-application-carry-${row.squad_id}`}>{carryLine(application.carry_over)}</p> : null}
         {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
-        {row.state === "accepted" && !application?.staffel ? (
+        {startRight ? <StartRightBlock applicationId={application.id} carry={application.carry_over} onChanged={onChanged} testPrefix="league-start-right" /> : null}
+        {/* Mit Startrecht steht dessen Satz da (Frist, zugesagt, nachgerückt) - im Modus „automatisch“ hat es keinen, dann bleibt dieser. */}
+        {row.state === "accepted" && !application?.staffel && !rightLine(application?.carry_over) ? (
           <p className="mt-1 text-sm text-white/75">{application?.carry_over ? "Ihr seid automatisch dabei. Die Staffel teilt die Liga-Leitung noch zu." : "Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu."}</p>
         ) : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
@@ -138,7 +146,7 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
       {view?.hint ? <p className="mt-3 text-sm text-white/70" data-testid="league-application-hint">{view.hint}</p> : null}
       {rows.length ? (
         <ul className="mt-3" aria-label="Deine Co-Teams" data-testid="league-application-squads">
-          {rows.map((row) => <OwnSquadRow key={row.squad_id} row={row} onWithdraw={withdraw} />)}
+          {rows.map((row) => <OwnSquadRow key={row.squad_id} row={row} onWithdraw={withdraw} onChanged={load} />)}
         </ul>
       ) : null}
     </section>

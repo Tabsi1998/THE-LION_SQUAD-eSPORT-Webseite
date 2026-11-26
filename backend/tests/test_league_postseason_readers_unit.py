@@ -45,6 +45,9 @@ READERS = {
     "services/league_sanctions.py": (2, ALL, "Strafen: jede Staffel"),
     "services/league_schedule.py": (2, ALL, "Termine: jede Staffel"),
     "services/league_service.py": (12, MIXED, "Verwaltung; die Ligaseite trennt Staffeln und ``postseason``; ob die Season läuft (Nr. 254), sagen nur reguläre Staffeln"),
+    # Startrechte (#1627, F.2a): Seit wann der Endstand des Vorgängers nicht mehr steht - auch eine wieder geöffnete Playoff- oder
+    # Relegations-Staffel hält die Fristen an.
+    "services/league_start_rights.py": (2, ALL, "Pausenbeginn: jüngstes Wiederöffnen einer offenen Staffel, jede Art"),
     "services/league_veto.py": (2, REGULAR, "Vorlage der Season geht nur an reguläre Staffeln"),
     "services/league_veto_fit.py": (2, REGULAR, "Passt die Vorlage: reguläre Staffeln der Liga N"),
     "services/league_veto_sweep.py": (1, ALL, "wartende Vetos: jede Staffel"),

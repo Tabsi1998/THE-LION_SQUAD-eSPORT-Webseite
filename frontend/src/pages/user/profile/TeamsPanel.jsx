@@ -38,6 +38,7 @@ export function TeamsPanel() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [applications, setApplications] = useState([]);
+  const [startRights, setStartRights] = useState([]);
   const confirm = useConfirm();
   const myId = useOptionalAuth()?.user?.id || "";
   // „Co-Teams verwalten“ auf der Teamseite (#2110) öffnet hier genau dieses Team (?team=<id>).
@@ -67,8 +68,13 @@ export function TeamsPanel() {
 
   // Stand der Liga-Anmeldungen (#2205): nur die eigenen Co-Teams, kein Fehler, wenn er nicht kommt.
   const loadApplications = useCallback(() => {
+    const keep = (answer) => {
+      setApplications(answer?.data?.items || []);
+      // Startrechte (#1627, F.2a): Prognose bzw. bestätigtes Startrecht, solange es die Folge-Season noch nicht gibt.
+      setStartRights(answer?.data?.start_rights || []);
+    };
     // Bewusst still: der Stand der Liga-Anmeldungen ist eine Zugabe; ohne ihn steht die Teamliste wie bisher.
-    Promise.resolve(api.get("/me/league-applications")).then((answer) => setApplications(answer?.data?.items || [])).catch(() => {});
+    Promise.resolve(api.get("/me/league-applications")).then(keep).catch(() => {});
   }, []);
 
   const loadMeta = useCallback(() => {
@@ -344,7 +350,8 @@ export function TeamsPanel() {
                           );
                         })}
                       </div>
-                      <SquadApplicationStatus items={applications.filter((row) => row.squad_id === squad.id)} onChanged={loadApplications} />
+                      <SquadApplicationStatus items={applications.filter((row) => row.squad_id === squad.id)}
+                        outlook={startRights.filter((row) => row.squad_id === squad.id)} onChanged={loadApplications} />
                       {squad.league_requirement ? <SquadEligibilityPanel teamId={activeId} squad={squad} /> : null}
                     </div>
                   ))}

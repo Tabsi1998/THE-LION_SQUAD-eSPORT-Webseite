@@ -278,7 +278,7 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 | **Leitstand** | alles Offene der Season, Protokoll, Rundnachricht (3.0) | `#leitstand` |
 | **Spielbetrieb** | Modi der Season mit Maps, Mindestgröße, Ergebnisregeln, Serie (Best of, Teamgröße, Modus je Map, Map-Wiederholung), Fristen nach dem Spiel, Check-in (2.7b), Veto (2.7d), Vorfälle (2.7e) | `#spielbetrieb` |
 | **Termine** | Kalender, Standardtermin, Sperrzeiten, Antwortfrist, Terminregeln (2.7a), Erinnerungen (2.7f) | `#termine` |
-| **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7c), Eingang der Anmeldungen, Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#kader` |
+| **Anmeldung und Kader** | Selbstanmeldung (2.5a), Kader und Spielberechtigung (3.9), Plattform und Eingabegerät (2.7c), Eingang der Anmeldungen, Startrechte (3.11a), Kaderübersicht (3.7) | `#anmeldung`, `#anmeldungen`, `#startrechte`, `#kader` |
 | **Tabelle** | Punkte, Gleichstand, Ausscheiden; je Staffel **Tabelle öffnen** zur Staffel-Seite mit Tabelle und Gleichstand-Entscheid (3.5) | `#tabelle` |
 | **Proteste** | Eingang der Verfahren und ihre Fristen (3.4) | `#proteste` |
 | **Strafen** | verhängen, bestätigen, widerrufen, Einsprüche (3.4a) | `#strafen` |
@@ -1991,6 +1991,7 @@ alle Staffeln abgeschlossen sind (3.10) – sonst sagt die Vorschau, was fehlt.
 
 **2. Anlegen.** **Beginn der ersten Spielwoche** wählen, Name freiwillig (leer: „Season 2“) → **Season anlegen**. Die neue
 Season ist ein **Entwurf** mit Sichtbarkeit **Aus**, bis ihr sie veröffentlicht. Ein zweiter Klick legt nichts doppelt an.
+Sollen die Teams erst zusagen, setzt ihr hier den Haken **Startrechte mit Zusage** (3.11a) – ohne ihn sind sie automatisch dabei.
 
 **3. Danach.** Die Teams stehen im Reiter **Anmeldung und Kader** im Eingang als **angenommen**, mit „Übernommen aus Season 1:
 Liga 1 (Aufstieg aus Liga 2)“. Staffeln anlegen und zuteilen wie immer (2.3, 2.5) – die Auswahl zeigt nur die Staffeln der
@@ -2059,6 +2060,129 @@ langer Name steht in zwei Zeilen („Herbst“ / „2026/27“), die Seasons rü
 vollen Namen zeigt auch der Hinweis beim Darüberfahren. Reicht die Breite nicht (viele Seasons, Handy), wischt man die Linie seitlich.
 
 <img src="../assets/liga/teamseite-liga-1440.png" alt="Teamseite am PC: Abschnitt Liga mit drei Co-Teams nach Liga N sortiert, darunter der Saisonverlauf mit einer Linie je Co-Team" width="720">
+
+### 3.11a Startrechte: Zusage, Frist und Nachrücker
+
+Ohne weitere Einstellung sind die Teams der alten Season in der neuen **automatisch dabei** (3.11). Wollt ihr vorher wissen, wer
+wirklich mitspielt, schaltet ihr **Startrechte** ein: Dann bekommt jedes Co-Team ein Startrecht für seine Liga und **sagt innerhalb
+einer Frist zu**. Wer nicht zusagt, gibt den Platz frei – und nach eurer Regel rückt jemand nach.
+
+**Was ein Startrecht ist – und was nicht.** Es hält dem Co-Team einen Platz in seiner Liga frei. Es ist **keine Zuteilung** zu einer
+Staffel, **keine Zustimmung zum Regelwerk** (die holt das Regelwerk vor dem ersten Spiel nach, 2.11), keine Rechnung und keine
+Pflicht mitzuspielen.
+
+**Die Zustände – jeder heißt anders, damit nichts verwechselt wird:**
+
+| Zustand | Bedeutung | Wer sieht es |
+| --- | --- | --- |
+| **Prognose** | Stand der laufenden Tabelle („Aufstiegsplatz“). Nur Anzeige, nichts ist fest | wie bisher an jeder Tabelle; das eigene Team unter Teams mit dem Wort „Prognose“ |
+| **Startrecht bestätigt** | Der Endstand der ganzen Season steht – samt Playoffs und Relegation (3.10, 3.10a) | Leitung, eigenes Team, dazu die Nachricht unten |
+| **Zusage offen** | Die neue Season ist angelegt, die Frist läuft | Leitung, eigenes Team |
+| **Zugesagt** | Das Team hat zugesagt (oder ihr habt die Zusage eingetragen) | Leitung, eigenes Team |
+| **Abgemeldet**, **Verfallen**, **Zurückgenommen** | abgesagt, Frist ohne Zusage vorbei, nach korrigiertem Endstand nicht mehr dabei | Leitung, eigenes Team |
+| **Spielt mit** | einer Staffel zugeteilt – erst das ist die Teilnahme | wie jede Teilnahme |
+
+Öffentlich ändert sich nichts: Wer auf- und absteigt, steht wie bisher im Endstand. Wer zugesagt hat, sehen nur ihr und das eigene Team.
+
+**1. Einschalten.** Am einfachsten im Blatt **Neue Season aus …** (3.11): Haken **Startrechte mit Zusage**, dazu die **Frist in
+Tagen** und was geschieht, **wenn ein Platz frei wird**. Oder vorher und nachher in der Season: Reiter **Anmeldung und Kader** →
+**Startrechte** (`#startrechte`), Recht **Season konfigurieren**. Die nächste Season übernimmt die Einstellung als Vorgabe.
+
+| Einstellung | Vorgabe | Bedeutung |
+| --- | --- | --- |
+| **So bekommen die Teams ihren Platz** | mit Zusage innerhalb der Frist | „Automatisch dabei“ ist das Verhalten aus 3.11 |
+| **Frist für die Zusage (Tage)** | 14 | zählt ab dem Anlegen der Season, für Nachrücker ab dem Nachrücken – und endet spätestens mit dem Startdatum der Season. Eine geänderte Zahl gilt sofort für alle offenen Startrechte |
+| **Wird ein Platz frei** | automatisch nach der Regel | oder: „Die Leitung löst es aus“ – dann seht ihr den Vorschlag und drückt selbst |
+| **Erinnerung vor Fristende (Stunden)** | 48 | einmal an Captain und Vertreter; 0 = keine. Nie in der ersten Hälfte der Frist: Bei einem Tag Frist kommt sie zwölf Stunden vorher, nicht sofort. Fällt ein Nachrücker zurück, kommt sie nicht zusammen mit der Nachricht dazu – die nennt den Tag schon |
+| **Restfrist nach einem Nachrück-Angebot (Tage)** | 3 | siehe „Nachrücken“: so viele Tage hat ein Team mindestens für seine eigene Zusage, wenn es ein Nachrück-Angebot verstreichen lässt |
+| **Nachricht „Aufstieg bestätigt“** | an | siehe unten |
+
+<img src="../assets/liga/startrechte-verwaltung-1440.png" alt="Abschnitt Startrechte am PC: oben die Einstellung mit Frist in Tagen, Nachrückerregel und Erinnerung, darunter die Übersicht Startrechte aus Season 1 mit der Zeile 3 Zusage offen, 2 zugesagt, 1 spielen mit, 1 verfallen, einem frei gewordenen Platz mit Vorschlag und Knopf Nachrücken lassen und je Liga die Co-Teams mit Stand, Frist und Knopf Zusage eintragen" width="720">
+
+**2. Die Übersicht lesen.** In der neuen Season zeigt derselbe Abschnitt **Startrechte aus Season 1**: je Liga jedes Co-Team mit
+Stand und **Zusage bis …**. Die Zeile darüber zählt („3 Zusage offen · 2 zugesagt · 1 verfallen“). Im **Eingang** steht derselbe
+Stand am Antrag.
+
+**3. Zuteilen und Los warten auf die Zusage.** Ein Co-Team mit offener Zusage lässt sich nicht zuteilen („… hat das Startrecht noch
+nicht angenommen …“), und im Los (2.5b) steht es als Hinweis daneben. Hat euch das Team auf anderem Weg zugesagt, drückt ihr
+**Zusage eintragen** und gebt einen **Grund** an (mindestens fünf Zeichen, etwa „Zusage per Nachricht am 03.12.“) – er steht im
+Verlauf, das Team bekommt eine Nachricht. Für das **eigene Team** entscheidet eine andere Person. Der Sonderweg „Co-Team zuteilen“
+auf der Staffel-Seite gilt ebenfalls als Zusage durch die Leitung.
+
+**4. Frist vorbei.** Alle 15 Minuten prüft die Website die Fristen: Ohne Zusage ist das Startrecht **verfallen**, der Platz frei,
+Captain und Vertreter bekommen eine Nachricht. Mitspielen geht dann nur noch über eine **neue Anmeldung** im Anmeldefenster (2.5a) –
+wie für jedes neue Co-Team. Zusagen nach Fristende lehnt die Seite sofort ab, auch wenn der Prüflauf noch nicht dran war. Sagt
+niemand zu, verfallen alle Startrechte – dann rückt auch niemand nach.
+
+**Ab dem Startdatum entscheidet ihr.** Ist das Startdatum der neuen Season erreicht – auch wenn sie noch Entwurf ist –, verfällt
+nichts mehr von selbst, und niemand rückt mehr automatisch nach. Offene Startrechte stehen mit „Frist vorbei – jetzt entscheidest
+du“ da: **Zusage eintragen** (geht dann auch nach Fristende) oder im Eingang ablehnen. Das Team selbst kann nicht mehr zusagen.
+
+**Warteliste.** Setzt ihr ein Co-Team mit offener Zusage im Eingang auf die Warteliste, verfällt dort nichts. Nehmt ihr es wieder
+an, beginnt die Frist neu; gleich mit Staffel annehmen geht erst nach der Zusage.
+
+**5. Nachrücken.** Wird ein Platz frei (abgemeldet, verfallen, von euch abgelehnt), gilt diese Regel – nur, solange das Startdatum der Season nicht erreicht ist:
+
+- War es ein **Aufsteiger**, rückt **der beste Nicht-Aufsteiger** der Liga darunter nach. Gibt es dort niemanden, bleibt der beste
+  Absteiger.
+- Sonst (das Team wäre geblieben oder kam von oben) bleibt **der beste Absteiger** dieser Liga. Gibt es keinen, rückt der beste
+  Nicht-Aufsteiger von unten nach.
+- Bei mehreren Staffeln zählt je Staffel das bestplatzierte Co-Team, dazwischen **Punkte je Spiel**, dann **Map-Differenz je Spiel**
+  (wie beim „besten Zweiten“, 2.3). Stehen sie gleich, rückt niemand von selbst nach: **Ein Los gibt es nicht**, ihr wählt mit Grund.
+- Dasselbe gilt **in einer Staffel**: Teilen sich mehrere den Platz (punkt- und differenzgleich, etwa dreimal Platz 2), wählt ihr.
+- **Nur wer rechtzeitig ist:** Nachrücken kann nur ein Co-Team, das zugesagt hat oder dessen eigene Frist noch läuft. Wer seine
+  Frist verpasst hat, rückt nie nach. Nimmt ein Team den Nachrückplatz an, gilt das zugleich als seine Zusage.
+- **Keine Kette:** Der Platz, den der Nachrücker verlässt, wird nicht automatisch weitergegeben – er ist frei für Warteliste und
+  neue Anmeldungen.
+
+Der Nachrücker bekommt eine Nachricht und – im Modus „mit Zusage“ – eine **eigene Frist** für das Angebot. Solange das Angebot offen
+ist, **ruht seine Frist für die eigene Liga**. Er hat drei Möglichkeiten:
+
+- **Zusagen:** Er spielt in der höheren Liga – das ist zugleich seine Zusage.
+- **Nachrücken ablehnen:** Er bleibt in seiner Liga, und das **gilt als Zusage** für sie. Der Nächste ist dran.
+- **Nicht antworten:** Er bleibt in seiner Liga. Hatte er dort schon zugesagt, gilt das weiter. War seine Zusage noch offen, hat er
+  dafür die restliche Frist, **mindestens 3 Tage** (einstellbar), aber nie über das Startdatum hinaus – die Nachricht nennt den Tag.
+
+Niemand verliert also sein eigenes Startrecht, nur weil er ein Angebot für die höhere Liga bekommen hat. Mit „Die Leitung löst es
+aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben. Meldet sich ein
+Nachrücker ab, lehnt ihr ihn im Eingang ab oder nimmt „Übernahme neu berechnen“ ihn zurück (etwa nach einer Disqualifikation), ist
+der Platz, auf den er nachgerückt war, wieder frei – dann gilt wieder diese Regel.
+
+**Einen Platz gibt es nur, solange der Endstand ihn kennt.** Korrigiert ihr den Endstand so, dass das abgemeldete Team gar nicht mehr
+aufgestiegen wäre (ein anderes steigt jetzt aus eigenem Recht auf), **entfällt dieser Aufstiegsplatz**: Niemand rückt dafür nach, und ein
+Nachrücker, der schon darauf stand, geht mit „Übernahme neu berechnen“ zurück in seine Liga. Seine frühere Zusage gilt dann wieder;
+war sie noch offen, hat er dafür die restliche Frist, mindestens 3 Tage (einstellbar). Die Nachricht an ihn nennt den Grund. So
+steigen nie zwei Teams für einen Platz auf.
+
+Umgekehrt bleibt ein Platz, solange er im Endstand steht: **Löscht ein abgemeldetes Team sein Co-Team**, ist sein Platz trotzdem frei
+für den Nachrücker.
+
+**Ein Team, das nicht mitspielt, folgt seiner neuen Platzierung.** Sieht der korrigierte Endstand ein abgemeldetes, verfallenes
+oder von euch abgelehntes Team in einer anderen Liga (es wäre aufgestiegen, geblieben oder abgestiegen), zeigt „Übernahme neu
+berechnen“ es als **Platz frei**: Das Team bleibt, was es ist – es bekommt kein neues Angebot und keine Nachricht –, und sein Platz
+in der neuen Liga geht nach eurer Regel an den Nächsten. Drückt ihr vor dem Neuberechnen **Nachrücken lassen**, sagt die Seite,
+dass erst neu berechnet werden muss. Auch „Aufstieg bestätigt“ nennt so einem Team nur den Endstand, ohne Aufforderung zuzusagen.
+
+Ist ein Nachrücker schon **einer Staffel zugeteilt** und sein Platz entfällt, ändert „Übernahme neu berechnen“ nichts an ihm: Er
+steht unter **Bitte von Hand prüfen** mit „zugeteilt, der Nachrückplatz ist entfallen“ – dann entscheidet ihr, ob er zurück in
+seine Liga geht.
+
+**6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
+auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht
+für Teams, die bleiben. Öffnet ihr eine Staffel wieder und schließt sie mit demselben Ergebnis ab, kommt nichts noch einmal; ändert
+sich das Ergebnis, kommt einmal „Endstand korrigiert“. Die Nachricht „Staffel abgeschlossen“ und die Saisonende-Meldung im Discord
+(2.7g) bleiben, wie sie sind.
+
+**7. Endstand nachträglich korrigiert.** Ist die alte Season wieder geöffnet (oder ein Entscheid zum „besten Zweiten“
+zurückgenommen), sagt die Übersicht das. Solange **stehen die Fristen still**: Nichts verfällt, niemand rückt nach, niemand wird
+erinnert – zusagen können die Teams trotzdem. Nach dem neuen Abschluss laufen die Fristen weiter und sind **um die Dauer der Pause
+länger** – auch die Restfrist eines Nachrückers, der gerade zurückgefallen ist. Dann oben **Übernahme neu berechnen** (3.11): Wer dadurch die Liga wechselt, sagt neu zu (neue Frist); wer bleibt, behält
+seine Zusage. Ändert ihr nach dem letzten Abschluss den Entscheid zum „besten Zweiten“, bekommt das bisher gewählte Team „Endstand
+korrigiert“ und das neue „Aufstieg bestätigt“.
+
+**Umschalten.** Stellt ihr später auf „automatisch dabei“ oder schaltet die Startrechte aus, gelten alle offenen Startrechte als
+zugesagt – niemand verliert seinen Platz durch das Umschalten. Vorher fragt die Seite nach und nennt die Zahl („3 offene
+Startrechte gelten dann als zugesagt …“); ohne euer **Ja** ändert sich nichts.
 
 ### 3.12 Belohnungen
 

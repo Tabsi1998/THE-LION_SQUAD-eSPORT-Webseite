@@ -9,6 +9,7 @@ import { FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
+import { stateLabel, untilText } from "@/lib/leagueStartRights";
 import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
 import { viennaDateTime } from "@/lib/vienna";
@@ -158,6 +159,13 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
       </div>
       {row.carry_over ? (
         <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
+      ) : null}
+      {/* Startrecht (#1627, F.2a): Zugeteilt wird erst nach der Zusage - der Stand steht hier, die Übersicht unter „Startrechte“. */}
+      {row.carry_over?.start_right && row.status === "accepted" && !row.assignment ? (
+        <p className={`mt-1 text-xs font-semibold ${row.carry_over.start_right.state === "offered" ? "text-warn" : "text-white/70"}`} data-testid={`application-start-right-${row.id}`}>
+          Startrecht: {stateLabel(row.carry_over.start_right.state)}
+          {row.carry_over.start_right.state === "offered" ? ` bis ${untilText(row.carry_over.start_right.accept_until)} – zuteilen geht nach der Zusage` : ""}
+        </p>
       ) : null}
       <p className="mt-1 text-xs text-white/60 [overflow-wrap:anywhere]">
         {row.carry_over ? "Übernommen" : "Eingereicht"} {when(row.submitted_at)} {row.carry_over ? "" : `von ${row.applied_by_name} `}· {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}

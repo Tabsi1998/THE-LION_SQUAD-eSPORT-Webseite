@@ -7,7 +7,8 @@ import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, Minus } from "lucide-reac
 import { toast } from "sonner";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
-import { TextField } from "@/components/tls/FormFields";
+import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
+import { SUCCESSOR_OPTIONS } from "@/lib/leagueStartRights";
 import { api, formatApiError } from "@/lib/api";
 import { fromViennaInput } from "@/lib/vienna";
 import { movementText, rulesLine, teamFrom } from "@/lib/leagueSuccessor";
@@ -46,10 +47,19 @@ export function SeasonSuccessorSheet({ season, onClose, onCreated }) {
   const [startDay, setStartDay] = useState("");
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  // Startrechte der neuen Season (#1627, F.2a): vorbelegt mit der Einstellung dieser Season - ohne sie „automatisch dabei“ wie bisher.
+  const [rights, setRights] = useState(null);
   useEffect(() => {
     let alive = true;
     api.get(`/admin/leagues/seasons/${season.id}/successor`)
-      .then(({ data: body }) => alive && setData(body))
+      .then(({ data: body }) => {
+        if (!alive) return;
+        setData(body);
+        if (body.start_rights) {
+          const base = body.start_rights.settings || body.start_rights.defaults;
+          setRights({ accept: body.start_rights.settings?.mode === "accept", accept_days: base.accept_days, successor: base.successor });
+        }
+      })
       .catch((failure) => alive && setError(formatApiError(failure.response?.data?.detail) || "Die Vorschau konnte nicht geladen werden."));
     return () => { alive = false; };
   }, [season.id]);
@@ -60,7 +70,7 @@ export function SeasonSuccessorSheet({ season, onClose, onCreated }) {
     setSaving(true);
     try {
       const { data: answer } = await api.post(`/admin/leagues/seasons/${season.id}/successor`, {
-        start_date: fromViennaInput(`${startDay}T00:00`), confirm: true, ...(name.trim() ? { name: name.trim() } : {}),
+        start_date: fromViennaInput(`${startDay}T00:00`), confirm: true, ...(name.trim() ? { name: name.trim() } : {}), ...rightsPayload(),
       });
       toast.success(answer.replay ? `${answer.season.name} gibt es schon.` : `${answer.season.name} angelegt – ${answer.carried} Teams übernommen.`);
       onCreated(answer.season);
@@ -69,6 +79,18 @@ export function SeasonSuccessorSheet({ season, onClose, onCreated }) {
       setSaving(false);
     }
   };
+
+  // Mit Zusage: die ganze Einstellung für die neue Season. Ohne: nichts - außer diese Season hatte eine, dann ausdrücklich „automatisch“.
+  function rightsPayload() {
+    if (!rights || !data?.start_rights) return {};
+    const { settings, defaults } = data.start_rights;
+    if (rights.accept) {
+      const days = Number.parseInt(String(rights.accept_days), 10);
+      return { start_rights: { ...(settings || defaults), mode: "accept", accept_days: Number.isFinite(days) ? days : defaults.accept_days, successor: rights.successor } };
+    }
+    return settings ? { start_rights: { ...settings, mode: "auto" } } : {};
+  }
+  const setRight = (key, value) => setRights((current) => ({ ...current, [key]: value }));
 
   return (
     <AdminSheet title={`Neue Season aus ${season.name}`} eyebrow="Season übernehmen" size="lg" onClose={onClose} onSubmit={submit} saving={saving}
@@ -112,7 +134,26 @@ export function SeasonSuccessorSheet({ season, onClose, onCreated }) {
 
           <section aria-labelledby="successor-teams" className="space-y-3">
             <h3 id="successor-teams" className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Teams in der neuen Season ({data.carried})</h3>
-            <p className="text-xs text-white/55">Auf- und Abstieg ergeben sich aus dem Endstand. Die Teams sind automatisch dabei und bekommen eine Nachricht; wer nicht will, meldet sich bis zum Start ab.</p>
+            <p className="text-xs text-white/55" data-testid="successor-teams-note">
+              Auf- und Abstieg ergeben sich aus dem Endstand. {rights?.accept
+                ? `Die Teams bekommen ein Startrecht und sagen innerhalb von ${rights.accept_days} Tagen zu – ohne Zusage verfällt es, und der Platz wird frei.`
+                : "Die Teams sind automatisch dabei und bekommen eine Nachricht; wer nicht will, meldet sich bis zum Start ab."}
+            </p>
+            {rights && data.can_create ? (
+              <div className="space-y-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="successor-rights">
+                <CheckField label="Startrechte mit Zusage" checked={rights.accept} onChange={(value) => setRight("accept", value)} testId="successor-rights-accept"
+                  className="min-h-[44px]"
+                  hint="Ein Startrecht ist keine Anmeldung zu einer Staffel und keine Zustimmung zum Regelwerk. Später änderbar in der neuen Season unter „Anmeldung und Kader“ → Startrechte." />
+                {rights.accept ? (
+                  <FormGrid>
+                    <TextField label="Frist für die Zusage (Tage)" type="number" min={1} max={60} value={rights.accept_days ?? ""} onChange={(value) => setRight("accept_days", value)}
+                      hint="Zählt ab dem Anlegen und endet spätestens mit dem Start der Season." testId="successor-rights-days" />
+                    <SelectField label="Wird ein Platz frei" value={rights.successor} onChange={(value) => setRight("successor", value)} options={SUCCESSOR_OPTIONS}
+                      testId="successor-rights-successor" />
+                  </FormGrid>
+                ) : null}
+              </div>
+            ) : null}
             {data.capacity_hints?.length ? (
               <div className="space-y-1 rounded-sm border border-warn/40 p-3 text-sm" role="status" data-testid="successor-capacity">
                 <p className="flex gap-2 font-semibold text-warn"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span>Platzprüfung: Nicht jede Liga kommt mit ihren bisherigen Staffeln aus.</span></p>

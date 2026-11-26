@@ -52,6 +52,8 @@ export const SEASON_SECTIONS = {
   spielberechtigung: "anmeldung",
   plattform: "anmeldung",
   anmeldungen: "anmeldung",
+  // Startrechte (#1627, F.2a): Einstellung und Übersicht der Startrechte aus der Vorgänger-Season, zwischen Eingang und Los.
+  startrechte: "anmeldung",
   // Staffeln auslosen (#1623): Los auf mehrere Staffeln einer Liga N und die Platzprüfung, gleich unter dem Eingang.
   auslosung: "anmeldung",
   // Nachmeldungen (#2422): Spiele für Teams, die nach dem Start in eine Staffel kamen.

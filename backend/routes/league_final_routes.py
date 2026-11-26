@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from database import get_db
-from services import league_cross_decisions, league_cross_zones, league_final
+from services import league_cross_decisions, league_cross_zones, league_final, league_start_rights
 from services.change_events import publish_api_change
 from services.league_permissions import ANY, require_league
 from services.league_scope import ONLY_LEAGUE
@@ -106,6 +106,9 @@ async def admin_close_staffel(tournament_id: str, body: CloseBody, me: dict = De
         raise HTTPException(status_code=409, detail=league_final.BUSY) from None
     await _published(tournament_id)
     final = result["final"]
+    # Startrechte (#1627, F.2a): Bestätigt dieser Abschluss den Endstand der ganzen Season, erfahren Auf- und Absteiger es einmal -
+    # nur mit der Einstellung ``start_rights`` an der Season. Der Abschluss steht; eine Nachricht hält ihn nicht auf.
+    await _start_rights_follow(db, final.get("season_id"), tournament_id)
     # Saisonende-Moment (#1639): Bestätigt dieser Abschluss den Endstand der ganzen Season, entstehen die Momente für Aufstieg, Abstieg
     # und Meister. Der Abschluss steht; ein Fehler hier hält ihn nicht auf.
     await _moments_follow(db, final.get("season_id"), tournament_id)
@@ -125,6 +128,8 @@ async def admin_reopen_staffel(tournament_id: str, body: ReopenBody, me: dict = 
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=league_final.BUSY) from None
     await _published(tournament_id)
+    # Startrechte (#1627, F.2a): Gibt es schon die Folge-Season, ruhen ihre Fristen ab jetzt, bis der Endstand wieder steht.
+    await _start_rights_follow(db, result["final"].get("season_id"), tournament_id)
     # Saisonende-Moment (#1639): Der Endstand steht nicht mehr fest - die Momente der Season ruhen.
     await _moments_follow(db, result["final"].get("season_id"), tournament_id)
     return {"ok": True, "version": result["final"]["version"], "season_status": result["season_status"]}
@@ -143,6 +148,16 @@ async def admin_final_table_version(tournament_id: str, version: int, _me: dict 
 # ---------------------------------------------------------------- Plätze über Staffeln hinweg (#1627)
 
 require_zone_decision = require_league("results", via="division_id")
+
+
+async def _start_rights_follow(db, season_id: str | None, ref: str) -> None:
+    """Nach einem Schritt, der den Endstand ändert (Abschluss, Wiederöffnen, Entscheid über Staffeln hinweg): Nachricht zum
+    bestätigten Auf- und Abstieg und die Pause der Fristen der Folge-Season (``league_start_rights.after_final_change``). Der
+    Schritt steht; ein Fehler hier hält ihn nicht auf - der Job holt die Pause nach."""
+    try:
+        await league_start_rights.after_final_change(db, season_id)
+    except Exception:  # noqa: BLE001 - siehe oben
+        logger.warning("[league_final] Startrechte nach Änderung des Endstands nicht nachgezogen: %s", log_safe(ref), exc_info=True)
 
 
 async def _moments_follow(db, season_id: str | None, ref: str) -> None:
@@ -169,6 +184,8 @@ async def admin_set_zone_decision(division_id: str, body: ZoneDecisionBody, me: 
         decision = await league_cross_decisions.decide(get_db(), division_id, body.model_dump(), me)
     except league_cross_zones.CrossProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    # Ein Entscheid nach dem letzten Abschluss ändert, wer aufsteigt (#1627, F.2a): „Endstand korrigiert“ und die neue Bestätigung.
+    await _start_rights_follow(get_db(), await _division_season(get_db(), division_id), division_id)
     # Ein Entscheid nach dem letzten Abschluss ändert, wer auf- oder absteigt (#1639): der Moment zieht ruhig nach.
     await _moments_follow(get_db(), await _division_season(get_db(), division_id), division_id)
     return {"ok": True, "decision": {key: decision[key] for key in ("id", "registration_ids", "method", "reason", "at")}}
@@ -180,5 +197,7 @@ async def admin_clear_zone_decision(division_id: str, kind: str, body: ZoneDecis
         await league_cross_decisions.clear(get_db(), division_id, kind, body.reason, me, conflict_reason=body.conflict_reason)
     except league_cross_zones.CrossProblem as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    # Ohne Entscheid ist der Gleichstand wieder offen: Der Endstand steht nicht mehr - die Fristen einer Folge-Season ruhen.
+    await _start_rights_follow(get_db(), await _division_season(get_db(), division_id), division_id)
     await _moments_follow(get_db(), await _division_season(get_db(), division_id), division_id)
     return {"ok": True}

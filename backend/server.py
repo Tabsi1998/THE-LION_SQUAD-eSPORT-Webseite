@@ -52,6 +52,7 @@ from routes.league_draw_routes import admin_router as league_draw_admin_router
 from routes.league_sanction_routes import admin_router as league_sanction_admin_router
 from routes.league_final_routes import admin_router as league_final_admin_router
 from routes.league_successor_routes import admin_router as league_successor_admin_router
+from routes.league_start_right_routes import admin_router as league_start_right_admin_router, me_router as league_start_right_me_router
 from routes.league_postseason_routes import admin_router as league_postseason_admin_router
 from routes.league_reward_routes import admin_router as league_reward_admin_router, router as league_reward_router
 from routes.league_moment_routes import router as league_moment_router
@@ -444,6 +445,8 @@ app.include_router(league_draw_admin_router)  # Los auf mehrere Staffeln einer L
 app.include_router(league_sanction_admin_router)  # Strafen im Wettbewerb: verhängen, bestätigen, widerrufen, Einspruch (E.3)
 app.include_router(league_final_admin_router)  # Saisonabschluss: Cockpit, abschließen, wieder öffnen (F.1, #1645)
 app.include_router(league_successor_admin_router)  # Neue Season aus dem Vorgänger mit Auf- und Abstieg (F.2, #1627)
+app.include_router(league_start_right_admin_router)  # Startrechte: Einstellung, Übersicht, Zusage eintragen, Nachrücken (F.2a, #1627)
+app.include_router(league_start_right_me_router)  # Startrechte: Captain sagt zu bzw. lehnt das Nachrücken ab (F.2a, #1627)
 app.include_router(league_postseason_admin_router)  # Playoffs und Relegation aus dem Endstand (F.6, #2404)
 app.include_router(league_reward_admin_router)  # Belohnungen je Season und Liga N (F.4, #2214)
 app.include_router(league_reward_router)  # Zeremonie und Teilen-Bild der Belohnungen (F.4, #2214)

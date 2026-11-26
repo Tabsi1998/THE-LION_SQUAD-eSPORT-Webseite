@@ -22,6 +22,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import checkin_rules, league_eligibility, league_late, league_platform, league_roster, league_rules, league_service, squad_registration
+from services import league_start_right_rules
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
 from services.league_permissions import CAPABILITIES, belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
@@ -453,9 +454,12 @@ async def _move(db, application: dict, status: str, actor_id: str | None, *, fie
     return out
 
 
-async def withdraw(db, league: dict, season: dict, application_id: str, user: dict, *, refresh_previews=None) -> dict:
+async def withdraw(db, league: dict, season: dict, application_id: str, user: dict, *, refresh_previews=None, on_released=None) -> dict:
     """Zurückziehen. Eine automatische Zuteilung (#2348) nimmt es mit aus der Staffel, solange kein fester Spielplan steht (``_auto_seat`` unter der
-    Staffel-Sperre). Die Warteliste bleibt unberührt: Über den frei gewordenen Platz entscheidet die Leitung."""
+    Staffel-Sperre). Die Warteliste bleibt unberührt: Über den frei gewordenen Platz entscheidet die Leitung.
+
+    ``on_released`` (#1627, F.2a): ``league_start_rights.released`` - die Route gibt es mit (kein Import von hier nach dort). Führt
+    die Season Startrechte, rückt damit unter derselben Sperre nach ihrer Regel jemand nach."""
     application = await _load(db, season["id"], application_id)
     _team, squad = await _load_side(db, application["squad_id"])
     if not squad or not await may_apply(db, user, squad):
@@ -475,16 +479,33 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
             if seat and not _team_may_leave(*seat):
                 raise LeagueProblem(WITHDRAW_STARTED, 409)
             now = now_utc().isoformat()
-            done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False,
-                               drop_assignment=bool(seat))
+            # Startrechte (#1627, F.2a): Das Abmelden ist die Absage - im selben Schreibvorgang wie der Statuswechsel.
+            done = await _move(db, application, WITHDRAWN, user["id"],
+                               fields={"withdrawn_by": user["id"], "withdrawn_at": now, **league_start_right_rules.decline_fields(application, now)},
+                               keep_active=False, drop_assignment=bool(seat))
             await _unseat(db, seat)
+            # Führt die Season Startrechte, rückt nach ihrer Regel jemand nach (unter derselben Sperre). Sonst geschieht hier nichts.
+            moved_up = await _released(db, fresh, done, on_released)
         await _after_unseat(db, seat, user, refresh_previews)
     await _audit(db, "withdraw", done, user["id"], **_unseat_data(seat))
-    await _tell_status(db, league, season, done, WITHDRAWN, squad=squad)
+    await _tell_status(db, league, season, done, WITHDRAWN, squad=squad,
+                       follow=f"{moved_up.get('display_name')} rückt nach." if moved_up else None)
     return done
 
 
-async def withdraw_own(db, application_id: str, user: dict, *, refresh_previews=None) -> dict:
+async def _released(db, season: dict, application: dict, on_released) -> dict | None:
+    """Nach dem Abmelden eines übernommenen Antrags (``league_start_rights.released``). Ein Fehler beim Nachrücken nimmt das Abmelden
+    nicht zurück - der Platz bleibt dann frei, die Leitung sieht ihn bei den Startrechten."""
+    if not on_released or not application.get("carry_over"):
+        return None
+    try:
+        return await on_released(db, season, await db.league_applications.find_one({"id": application["id"]}, {"_id": 0}) or application)
+    except Exception:  # noqa: BLE001 - siehe oben
+        logger.warning("[liga] Nachrücken nach dem Abmelden nicht ausgeführt: %s", log_safe(application.get("id")), exc_info=True)
+        return None
+
+
+async def withdraw_own(db, application_id: str, user: dict, *, refresh_previews=None, on_released=None) -> dict:
     """Zurückziehen bzw. abmelden von der Team-Seite (F.2): ohne Umweg über die Ligaseite - eine übernommene Season ist oft noch nicht
     veröffentlicht. Dieselben Regeln wie ``withdraw``: nur Captain und Vertreter, Frist bis zum Start."""
     application = await db.league_applications.find_one({"id": application_id}, {"_id": 0, "season_id": 1, "squad_id": 1, "carry_over": 1})
@@ -496,7 +517,7 @@ async def withdraw_own(db, application_id: str, user: dict, *, refresh_previews=
         raise LeagueProblem(NOT_RESPONSIBLE, 403)
     season = await league_service.get_season(db, application["season_id"])
     league = await league_service.get_league(db, season["league_id"])
-    return await withdraw(db, league, season, application_id, user, refresh_previews=refresh_previews)
+    return await withdraw(db, league, season, application_id, user, refresh_previews=refresh_previews, on_released=on_released)
 
 
 async def review(db, league: dict, season: dict, application_id: str, actor: dict, *, conflict_reason: str | None = None) -> dict:
@@ -685,6 +706,11 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
             override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
+            # Startrechte (#1627, F.2a): Die Warteliste ist kein Weg an der Zusage vorbei - gleich mit Staffel annehmen geht erst,
+            # wenn das Co-Team zugesagt hat. Ohne Staffel wird das Startrecht neu vergeben (``reoffer_fields``): Die Frist beginnt neu.
+            waits = league_start_right_rules.waitlist_problem(application, fresh) if tournament_id else None
+            if waits:
+                raise LeagueProblem(waits, 422)
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
             if not left_over and (await seat_stats(db, fresh))["full"]:
                 raise LeagueProblem(SEATS_TAKEN, 409)
@@ -698,7 +724,8 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
             if problems:
                 raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
-            fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
+            fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None,
+                      **league_start_right_rules.reoffer_fields(application, now, fresh)}
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over, override)
             if deviation:
                 await db.league_applications.update_one({"id": done["id"]}, {"$set": {"assignment.deviation_reason": deviation}})
@@ -766,6 +793,10 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
                 raise LeagueProblem(ASSIGNED_ALREADY, 409)
+            # Startrechte (#1627, F.2a): Zugeteilt wird erst nach der Zusage - ein Startrecht ist keine Teilnahme.
+            waits = league_start_right_rules.assign_problem(application, fresh)
+            if waits:
+                raise LeagueProblem(waits, 422)
             deviation = await division_deviation(db, fresh, application, await _load_staffel(db, fresh, tournament_id), deviation_reason)
             # Der Kader kann sich seit dem Annehmen geändert haben: dieselbe Prüfung wie beim Einreichen, dazu die der Staffel.
             team, squad = await _load_side(db, application["squad_id"])
@@ -988,7 +1019,9 @@ async def link_admin_assignment(db, tournament: dict, registration: dict, actor:
         raise
     actor_id = actor.get("id")
     now = now_utc().isoformat()
-    fields = {"assignment": await _assignment(db, tournament, registration, actor_id), "decided_by": actor_id, "decided_at": now}
+    # Ein offenes Startrecht (#1627, F.2a) gilt mit dem Zuteilen als von der Leitung zugesagt.
+    fields = {"assignment": await _assignment(db, tournament, registration, actor_id), "decided_by": actor_id, "decided_at": now,
+              **league_start_right_rules.link_fields(application, actor_id, now)}
     try:
         done = await _move(db, application, ACCEPTED, actor_id, fields=fields, override=override)
     except LeagueProblem:
@@ -1037,7 +1070,7 @@ def _texts(application: dict, title: str, status: str) -> tuple[str, str]:
     return "Anmeldung zurückgezogen", f"Die Anmeldung von {name} für {title} ist zurückgezogen."
 
 
-def _lead_texts(application: dict, title: str, status: str, auto: bool) -> tuple[str, str] | None:
+def _lead_texts(application: dict, title: str, status: str, auto: bool, follow: str | None = None) -> tuple[str, str] | None:
     """Was die Leitung hört: neue und zurückgezogene Anmeldungen, und was die Season automatisch entschieden hat (#2348)."""
     name = application.get("display_name")
     # Der Grund, warum die Season nicht (ganz) entscheiden konnte (Review #2348): Staffel voll, gesperrt, Geschwister-Co-Team, Fehler.
@@ -1053,14 +1086,16 @@ def _lead_texts(application: dict, title: str, status: str, auto: bool) -> tuple
         why = f" Automatisch annehmen ging nicht: {problem}" if problem else ""
         return "Neue Anmeldung", f"{name} möchte in {title} mitspielen.{why} Bitte prüfen."
     if status == WITHDRAWN and application.get("carry_over"):
+        # ``follow`` (#1627, F.2a): Nach der Regel der Season ist schon jemand nachgerückt - dann sagt die Nachricht, wer.
         return "Abmeldung aus der neuen Season", (f"{name} hat sich von {title} abgemeldet ({(application.get('carry_over') or {}).get('division_label')}). "
-                                                  "Der Platz ist frei - wer nachrückt, entscheidest du.")
+                                                  + (follow or "Der Platz ist frei - wer nachrückt, entscheidest du."))
     if status == WITHDRAWN:
         return "Anmeldung zurückgezogen", f"{name} hat die Anmeldung für {title} zurückgezogen. Rückt jemand nach, entscheidest du das."
     return None
 
 
-async def _tell_status(db, league: dict, season: dict, application: dict, status: str, *, squad: dict | None = None, auto: bool = False) -> None:
+async def _tell_status(db, league: dict, season: dict, application: dict, status: str, *, squad: dict | None = None, auto: bool = False,
+                       follow: str | None = None) -> None:
     """Eine Nachricht hält nie etwas auf: Der Antrag ist dann schon gespeichert. ``auto``: Die Season hat entschieden (#2348) - die Leitung hört es auch."""
     from services.user_notifications import create_user_notification
 
@@ -1076,7 +1111,7 @@ async def _tell_status(db, league: dict, season: dict, application: dict, status
             key = f"league-application:{application['id']}:{status}:{step}:{user_id}"
             await create_user_notification(user_id, headline, text, url=page, kind="tournament_registration", meta={**meta, "dedupe_key": key})
             await send_league_mail(db, user_id, headline, text, page, f"{key}:mail")
-        lead = _lead_texts(application, title, status, auto)
+        lead = _lead_texts(application, title, status, auto, follow)
         if not lead:
             return
         lead_title, lead_text = lead
@@ -1108,15 +1143,17 @@ async def team_answer(db, application: dict) -> dict:
     return {**own_view(application, responsible=True, can_act=True, withdrawable=withdrawable, season=season), "rule_consent": application.get("rule_consent")}
 
 
-def carry_view(application: dict | None, season: dict | None) -> dict | None:
-    """Woher ein übernommenes Co-Team kommt und bis wann es sich abmelden kann (F.2) - ohne Kennungen."""
+def carry_view(application: dict | None, season: dict | None, *, can_act: bool = False) -> dict | None:
+    """Woher ein übernommenes Co-Team kommt und bis wann es sich abmelden kann (F.2) - ohne Kennungen. Führt die Season Startrechte
+    (#1627, F.2a), dazu ``start_right`` mit Zustand und Frist; ``can_act``: Captain oder Vertreter darf zusagen bzw. ablehnen."""
     carry = (application or {}).get("carry_over")
     if not carry:
         return None
     until = carry_deadline(application, season)
+    right = league_start_right_rules.view(application, season, can_act=can_act)
     return {"from_season_name": carry.get("from_season_name"), "from_label": carry.get("from_label"), "rank": carry.get("rank"),
             "movement": carry.get("movement"), "division_label": carry.get("division_label"),
-            "withdraw_until": until.isoformat() if until else None}
+            "withdraw_until": until.isoformat() if until else None, **({"start_right": right} if right else {})}
 
 
 def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False, withdrawable: bool = False,
@@ -1128,7 +1165,7 @@ def own_view(application: dict | None, *, responsible: bool, can_act: bool = Fal
         return None
     out = {"id": application["id"], "status": application["status"], "submitted_at": application.get("submitted_at"),
            "staffel": (application.get("assignment") or {}).get("label"), "staffel_left": left,
-           "carry_over": carry_view(application, season)}
+           "carry_over": carry_view(application, season, can_act=can_act)}
     if responsible:
         out.update(decided_at=application.get("decided_at"), decision_reason=application.get("decision_reason"),
                    rules_label=f"Version {(application.get('rule_consent') or {}).get('version')}" if application.get("rule_consent") else None,
@@ -1341,13 +1378,25 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
 async def scrub_person(db, user_id: str) -> int:
     """Der Antrag gehört dem Co-Team und bleibt. Die Kennung der Person fällt überall heraus."""
     query = {"$or": [{"applied_by": user_id}, {"decided_by": user_id}, {"withdrawn_by": user_id}, {"rule_consent.user_id": user_id},
-                     {"privacy_consent.user_id": user_id}, {"assignment.assigned_by": user_id}, {"history.by": user_id}]}
+                     {"privacy_consent.user_id": user_id}, {"assignment.assigned_by": user_id}, {"history.by": user_id},
+                     # Startrechte (#1627, F.2a): wer zugesagt bzw. das Nachrücken ausgelöst hat.
+                     {"carry_over.start_right.accepted_by": user_id}, {"carry_over.fills.by": user_id},
+                     {"carry_over.fills.back.start_right.accepted_by": user_id},
+                     # „Übernahme neu berechnen“ (F.2, Nr. 162): wer ein Startrecht zurückgenommen hat.
+                     {"carry_over.revoked_by": user_id}]}
     done = 0
     async for row in db.league_applications.find(query, {"_id": 0}):
         update = {key: None for key in ("applied_by", "decided_by", "withdrawn_by") if row.get(key) == user_id}
         for key, field in (("rule_consent", "user_id"), ("privacy_consent", "user_id"), ("assignment", "assigned_by")):
             if (row.get(key) or {}).get(field) == user_id:
                 update[f"{key}.{field}"] = None
+        carry = row.get("carry_over") or {}
+        for path in (("start_right", "accepted_by"), ("fills", "by"), ("fills", "back", "start_right", "accepted_by"), ("revoked_by",)):
+            value = carry
+            for part in path:
+                value = value.get(part) if isinstance(value, dict) else None
+            if value == user_id:
+                update["carry_over." + ".".join(path)] = None
         update["history"] = [{**step, "by": None if step.get("by") == user_id else step.get("by")} for step in row.get("history") or []]
         await db.league_applications.update_one({"id": row["id"]}, {"$set": update})
         done += 1
