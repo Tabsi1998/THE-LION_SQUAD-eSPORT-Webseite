@@ -307,7 +307,6 @@ async def test_the_grand_final_loser_reads_about_the_decider_not_a_win(flow):
     tournament, users, registrations = await flow.with_participants(4, format="double_elim", title="Winter Cup")
     assert (await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")).status_code == 200
     await flow.start(tournament)
-    player = {reg["id"]: users[index] for index, reg in enumerate(registrations)}
     seeds = {reg["id"]: reg.get("seed") or 99 for reg in registrations}
 
     def is_grand_final(row):
