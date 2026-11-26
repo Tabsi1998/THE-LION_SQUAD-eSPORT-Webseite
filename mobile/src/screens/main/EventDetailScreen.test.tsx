@@ -399,3 +399,76 @@ test("Was läuft beim Event: Ecken nur an deinen Zeilen, „Du“ nur ohne „Du
   expect(within(screen.getByTestId("event-row-tournament-t3")).getByTestId("event-row-you")).toHaveTextContent("Du");
   expect(screen.getAllByTestId("event-row-you")).toHaveLength(1);
 });
+
+// Events (#2542, #2127): EV7 Warteliste vor dem Absenden, EV14 Einchecken mit Rückgängig (10 s), EV15 interne Notiz bearbeiten.
+test("EV7: voll - der Knopf sagt „Auf die Warteliste“, ohne Preis und ohne Kostenhaken; danach sagt die App, was der Server entschied", async () => {
+  mockGet.mockResolvedValue({ data: { ...EVENT, max_participants: 2, registration_summary: { ...EVENT.registration_summary, reserved_seats: 2 } } });
+  mockPost.mockResolvedValue({ data: { status: "waitlist" } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-waitlist-notice")).toHaveTextContent("Das Event ist voll – du kommst auf die Warteliste. Bezahlt wird erst, wenn du nachrückst."));
+  expect(screen.queryByTestId("event-accept-costs")).toBeNull();
+  expect(screen.getByTestId("event-register-submit")).toHaveTextContent("Auf die Warteliste");
+  await fireEvent.press(screen.getByTestId("event-register-submit"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalled());
+  await waitFor(() => expect(screen.getByTestId("event-register-message")).toHaveTextContent("Du stehst auf der Warteliste. Wird ein Platz frei, bekommst du Bescheid."));
+});
+
+test("EV7: nur noch ein Platz, mit Begleitung zu viele - der Satz nennt es", async () => {
+  mockGet.mockResolvedValue({ data: { ...EVENT, offer: null, max_participants: 3, registration_summary: { ...EVENT.registration_summary, reserved_seats: 2 } } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-register-submit")).toBeTruthy());
+  expect(screen.queryByTestId("event-waitlist-notice")).toBeNull();
+  expect(screen.getByTestId("event-register-submit")).toHaveTextContent("Zum Event anmelden");
+});
+
+test("EV14: Einchecken zeigt 10 Sekunden „Rückgängig“ - das setzt den Stand zurück", async () => {
+  jest.useFakeTimers();
+  const data = {
+    ...EVENT,
+    registrations: [{ id: "r1", display_name: "Paula B.", status: "registered", seat_count: 1 }],
+    participant_view: "staff",
+    can_check_in: true,
+  };
+  mockGet.mockResolvedValue({ data });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-participants-toggle")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("event-participants-toggle"));
+  mockGet.mockResolvedValue({ data: { ...data, registrations: [{ ...data.registrations[0], status: "checked_in" }] } });
+  await fireEvent.press(screen.getByTestId("event-checkin-r1"));
+  await waitFor(() => expect(screen.getByTestId("event-checkin-undo")).toHaveTextContent(/Paula B\. ist da\./));
+  mockGet.mockResolvedValue({ data });
+  await fireEvent.press(screen.getByTestId("event-checkin-undo-button"));
+  await waitFor(() => expect(mockPatch).toHaveBeenLastCalledWith("/events/e1/registrations/r1", { status: "registered" }));
+  await waitFor(() => expect(screen.queryByTestId("event-checkin-undo")).toBeNull());
+  // Gegenprobe: ohne Tippen ist „Rückgängig“ nach 10 Sekunden weg.
+  mockGet.mockResolvedValue({ data: { ...data, registrations: [{ ...data.registrations[0], status: "checked_in" }] } });
+  await fireEvent.press(screen.getByTestId("event-checkin-r1"));
+  await waitFor(() => expect(screen.getByTestId("event-checkin-undo")).toBeTruthy());
+  await act(async () => { jest.advanceTimersByTime(10_000); });
+  expect(screen.queryByTestId("event-checkin-undo")).toBeNull();
+  jest.useRealTimers();
+});
+
+test("EV15: interne Notiz bearbeiten - leer gespeichert löscht sie", async () => {
+  const data = {
+    ...EVENT,
+    registrations: [{ id: "r1", display_name: "Paula B.", status: "registered", seat_count: 1, internal_note: "zahlt bar" }],
+    participant_view: "staff",
+    can_check_in: true,
+  };
+  mockGet.mockResolvedValue({ data });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-participants-toggle")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("event-participants-toggle"));
+  const field = screen.getByTestId("event-internal-note-r1");
+  expect(field.props.value).toBe("zahlt bar");
+  expect(screen.queryByTestId("event-internal-note-save-r1")).toBeNull();
+  await fireEvent.changeText(field, "zahlt bar, kommt später");
+  await fireEvent.press(screen.getByTestId("event-internal-note-save-r1"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/events/e1/registrations/r1", { internal_note: "zahlt bar, kommt später" }));
+  await waitFor(() => expect(screen.getByTestId("event-staff-message")).toHaveTextContent("Notiz gespeichert."));
+  await fireEvent.changeText(screen.getByTestId("event-internal-note-r1"), "   ");
+  await fireEvent.press(screen.getByTestId("event-internal-note-save-r1"));
+  await waitFor(() => expect(mockPatch).toHaveBeenLastCalledWith("/events/e1/registrations/r1", { internal_note: null }));
+  await waitFor(() => expect(screen.getByTestId("event-staff-message")).toHaveTextContent("Notiz gelöscht."));
+});

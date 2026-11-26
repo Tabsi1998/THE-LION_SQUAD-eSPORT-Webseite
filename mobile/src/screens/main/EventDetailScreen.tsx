@@ -25,6 +25,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import { CHECKIN_UNDO_MS, checkInText, registeredText, waitlistNotice } from "../../lib/eventSeats";
 import type { ContentTarget } from "../../lib/contentLinks";
 import { openLink } from "../../lib/openLink";
 import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
@@ -99,6 +100,18 @@ export function EventDetailScreen({ navigation, route }: Props) {
   // Teilnehmer (#397): für die Verwaltung ausklappbar; wer gerade eingecheckt wird.
   const [showParticipants, setShowParticipants] = useState(false);
   const [checkingIn, setCheckingIn] = useState("");
+  // Was der Server zur eigenen Anmeldung entschied (EV7) und was die Verwaltung gerade tat (EV14, EV15).
+  const [message, setMessage] = useState("");
+  const [staffMessage, setStaffMessage] = useState("");
+  // Einchecken mit Rückgängig (#2542, #2127 EV14): 10 Sekunden lang lässt sich der Check-in zurücknehmen.
+  const [undo, setUndo] = useState<{ id: string; name: string; previous: string } | null>(null);
+  // Interne Notiz (EV15): Entwurf je Anmeldung - leer gespeichert löscht sie.
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!undo) return undefined;
+    const timer = setTimeout(() => setUndo(null), CHECKIN_UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [undo]);
   const guest = isGuestUser(user);
   // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events. Kam man von einem Turnier mit
   // Event-Pflicht (#875), geht es danach dorthin zurück.
@@ -126,6 +139,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
     setSelectedPositions([]);
     setAcceptCosts(false);
     setShowParticipants(false);
+    setMessage("");
+    setStaffMessage("");
+    setUndo(null);
+    setNoteDrafts({});
   }, [event?.id]);
 
   const hasRegistration = Boolean(event?.has_registration || event?.registration_url);
@@ -136,6 +153,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const offer = event?.offer?.enabled ? event.offer : null;
   const seats = 1 + companionNumber;
   const total = offer ? quoteTotal(offer, seats, selectedPositions) : 0;
+  // Kommt die Anmeldung auf die Warteliste (EV7)? Dieselbe Rechnung wie der Server - auch wenn es nur an den Begleitpersonen liegt.
+  const waitlisted = waitlistNotice(event, seats);
   const currency = offer?.currency || "EUR";
   const participants = event?.registrations || [];
   const staffView = event?.participant_view === "staff";
@@ -185,7 +204,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null, selected_positions: selectedPositions });
+      const response = await api.post<{ status?: string }>(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null, selected_positions: selectedPositions });
+      // Was der Server entschieden hat (EV7) - in der Zwischenzeit kann der letzte Platz weg sein.
+      setMessage(registeredText(response?.data?.status));
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
       const friends = offerFriendsHint();
@@ -212,8 +233,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
     if (!event || !entry.id || checkingIn) return;
     setCheckingIn(entry.id);
     setError("");
+    setStaffMessage("");
     try {
       await api.patch(`/events/${event.id}/registrations/${entry.id}`, { status: "checked_in" });
+      setUndo({ id: entry.id, name: entry.display_name || "", previous: String(entry.status || "registered") });
       await load();
     } catch (err) {
       setError(errorMessage(err, "Check-in konnte nicht gespeichert werden."));
@@ -221,6 +244,44 @@ export function EventDetailScreen({ navigation, route }: Props) {
       setCheckingIn("");
     }
   }, [checkingIn, event, load]);
+
+  const undoCheckIn = useCallback(async () => {
+    if (!event || !undo || checkingIn) return;
+    const last = undo;
+    setUndo(null);
+    setCheckingIn(last.id);
+    try {
+      await api.patch(`/events/${event.id}/registrations/${last.id}`, { status: last.previous });
+      setStaffMessage(checkInText(last.name, "registered"));
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Zurücknehmen hat nicht geklappt."));
+    } finally {
+      setCheckingIn("");
+    }
+  }, [checkingIn, event, load, undo]);
+
+  const saveNote = useCallback(async (entry: EventRegistration) => {
+    if (!event || !entry.id || checkingIn) return;
+    const value = String(noteDrafts[entry.id] ?? entry.internal_note ?? "").trim();
+    setCheckingIn(entry.id);
+    setError("");
+    setStaffMessage("");
+    try {
+      await api.patch(`/events/${event.id}/registrations/${entry.id}`, { internal_note: value || null });
+      setStaffMessage(value ? "Notiz gespeichert." : "Notiz gelöscht.");
+      setNoteDrafts((current) => {
+        const next = { ...current };
+        delete next[entry.id as string];
+        return next;
+      });
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Notiz konnte nicht gespeichert werden."));
+    } finally {
+      setCheckingIn("");
+    }
+  }, [checkingIn, event, load, noteDrafts]);
 
   const openExternalRegistration = useCallback(async () => {
     if (!event?.registration_url) return;
@@ -310,6 +371,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
         </View>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+        {message ? <Muted style={styles.success} accessibilityLiveRegion="polite" testID="event-register-message">{message}</Muted> : null}
 
         {/* Fakten-Kasten (#1346): Wann, Wo, Eintritt, Mitbringen - direkt unter dem Titel, wie im Web; darunter „Anmelden“
             bzw. der eigene Stand und „In den Kalender“ (nach dem Ende kein Kalender-Knopf mehr, #1221). */}
@@ -461,7 +523,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
                   onChangeText={setNote}
                   placeholder="z.B. komme etwas später"
                 />
-                {offer ? (
+                {/* Voll, auch nur wegen der Begleitpersonen (EV7): vor dem Absenden sagen, dass es die Warteliste wird - ohne Preis. */}
+                {waitlisted ? <Muted style={styles.success} testID="event-waitlist-notice">{waitlisted}{offer && total > 0 ? " Bezahlt wird erst, wenn du nachrückst." : ""}</Muted> : null}
+                {offer && !waitlisted ? (
                   <View style={styles.feeBox}>
                     <View style={styles.feeTotalRow}>
                       <Muted>Summe für {seats} Person{seats === 1 ? "" : "en"}</Muted>
@@ -483,9 +547,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
                   </View>
                 ) : null}
                 <Button
-                  label={busy ? "Wird angemeldet ..." : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Zum Event anmelden"}
+                  label={busy ? "Wird angemeldet ..." : waitlisted ? "Auf die Warteliste" : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Zum Event anmelden"}
                   onPress={register}
-                  disabled={busy || Boolean(offer && total > 0 && !acceptCosts)}
+                  disabled={busy || Boolean(!waitlisted && offer && total > 0 && !acceptCosts)}
                   testID="event-register-submit"
                 />
               </>
@@ -497,6 +561,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {participants.length && (staffView || event.participant_view === "public") ? (
           <Card style={styles.card} testID="event-participants">
+            {staffMessage ? <Muted style={styles.success} accessibilityLiveRegion="polite" testID="event-staff-message">{staffMessage}</Muted> : null}
+            {/* Einchecken mit Rückgängig (EV14): 10 Sekunden lang, danach ändert man den Stand wie bisher. */}
+            {staffView && undo ? (
+              <View style={styles.undoBar} testID="event-checkin-undo">
+                <Body style={styles.flex} accessibilityLiveRegion="polite">{checkInText(undo.name, "checked_in")}</Body>
+                <Button compact variant="secondary" icon="arrow-undo" arrow={false} label="Rückgängig" accessibilityLabel={`Check-in von ${undo.name || "der Person"} zurücknehmen`}
+                  disabled={Boolean(checkingIn)} onPress={() => { void undoCheckIn(); }} testID="event-checkin-undo-button" />
+              </View>
+            ) : null}
             {staffView ? (
               <>
                 <Pressable
@@ -529,7 +602,24 @@ export function EventDetailScreen({ navigation, route }: Props) {
                       {entry.email ? ` · ${entry.email}` : ""}
                     </Muted>
                     {entry.note ? <Muted>Hinweis: {entry.note}</Muted> : null}
-                    {entry.internal_note ? <Muted>Intern: {entry.internal_note}</Muted> : null}
+                    {/* Interne Notiz (EV15): die Verwaltung schreibt sie hier - leer gespeichert löscht sie. */}
+                    {entry.id ? (
+                      <>
+                        <FormInput
+                          label="Interne Notiz"
+                          value={noteDrafts[entry.id] ?? entry.internal_note ?? ""}
+                          multiline
+                          maxLength={500}
+                          autoCapitalize="sentences"
+                          onChangeText={(text) => setNoteDrafts((current) => ({ ...current, [entry.id as string]: text }))}
+                          testID={`event-internal-note-${entry.id}`}
+                        />
+                        {entry.id in noteDrafts && noteDrafts[entry.id].trim() !== String(entry.internal_note || "").trim() ? (
+                          <Button compact variant="secondary" arrow={false} label={checkingIn === entry.id ? "Speichert ..." : "Notiz speichern"} disabled={Boolean(checkingIn)}
+                            onPress={() => { void saveNote(entry); }} testID={`event-internal-note-save-${entry.id}`} />
+                        ) : null}
+                      </>
+                    ) : entry.internal_note ? <Muted>Intern: {entry.internal_note}</Muted> : null}
                     {event.can_check_in && entry.status === "registered" && entry.id ? (
                       <Button
                         label={checkingIn === entry.id ? "Wird eingecheckt ..." : "Einchecken"}
@@ -781,6 +871,7 @@ function openSponsor(sponsor: { url?: string | null; link?: string | null }) {
 }
 
 const styles = StyleSheet.create({
+  undoBar: { alignItems: "center", backgroundColor: "rgba(41,182,232,0.1)", borderColor: "rgba(41,182,232,0.35)", borderRadius: 2, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 10, padding: 10 },
   content: {
     gap: 16,
     paddingBottom: 30,
