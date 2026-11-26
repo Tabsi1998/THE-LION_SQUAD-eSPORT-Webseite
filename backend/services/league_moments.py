@@ -322,6 +322,7 @@ async def notify(db, season: dict) -> int:
     sie eingeschaltet, holt der nächste Abgleich die Nachricht nach. Wer schon vom früheren Ausgang erfuhr, bekommt still „Endstand
     korrigiert“ (nur Postfach)."""
     from services.league_service import can_see_season
+    from services.private_fields import private_projection
     from services.user_notifications import create_user_notification
 
     if (season.get("visibility") or "off") == "off":
@@ -332,7 +333,8 @@ async def notify(db, season: dict) -> int:
     sent = 0
     docs = await db.league_moments.find({"season_id": season["id"], "suspended": {"$ne": True}}, {"_id": 0}).to_list(LIMIT)
     wanted = sorted({person for doc in docs for person in [*(doc.get("audience_ids") or []), *(doc.get("told_ids") or [])]})
-    users = {row["id"]: row for row in await db.users.find({"id": {"$in": wanted}}, {"_id": 0}).to_list(len(wanted) + 1)} if wanted else {}
+    # Für die Sichtbarkeit (Rolle, Bereiche, Mitgliedschaft) - nie private Felder.
+    users = {row["id"]: row for row in await db.users.find({"id": {"$in": wanted}}, private_projection()).to_list(len(wanted) + 1)} if wanted else {}
     allowed: dict[str, bool] = {}
     for doc in docs:
         told = set(doc.get("told_ids") or [])
