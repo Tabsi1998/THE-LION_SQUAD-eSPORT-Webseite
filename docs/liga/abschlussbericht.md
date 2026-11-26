@@ -1,7 +1,7 @@
 # Abschlussbericht Liga-Ausbau (G.3)
 
 Paket G.3 des Liga-Masterplans (#2211), Abschnitt 26 I des Auftrags vom 02.11.2026. Erster Stand 15.11.2026 (`main` 4f59cfcb6,
-mit G.1, #2423); **fortgeschrieben am 26.11.2026 zur Betriebsfreigabe (#1632)**, `main` 96fde3cce (nach Website 1.99.0). Der Bericht ist
+mit G.1, #2423); **fortgeschrieben am 26.11.2026 zur Betriebsfreigabe (#1632)**, `main` 398b4ecfa (Website 1.100.0). Der Bericht ist
 eine überprüfbare Aufstellung: Jede Aussage nennt PR, Issue, Datei oder Test.
 
 **Stand 26.11. in drei Sätzen:** Seit G.1 sind Playoffs und Relegation, Startrechte, der Saisonende-Moment und die übrigen
@@ -133,7 +133,7 @@ G.1 („Altdaten“). Neue Vorgaben gelten nur für neu angelegte Seasons.
 | Prüfung | Ausgeführt | Ergebnis |
 | --- | --- | --- |
 | Gesamtabnahme erweitert: `liga-saisonende.spec.js` (5 Szenarien), `liga-betrieb.spec.js` (3 Szenarien), dazu alle bisherigen Specs | lokal nach `docs/liga/abnahme.md`, eigenes MongoDB (`mongo:7.0.40-jammy`), je frisch geseedet, 4 volle Läufe | 4 von 4 grün, je 29 Tests in 5,3 bis 5,8 Minuten (Saisonende rund 40 s, Betrieb rund 45 s) |
-| Saisonende-Moment am Meisterprofil: die Prüfung wartete auf die alte Belohnungs-Zeremonie und war nach #2581 auf `main` rot | lokal, Spec angepasst (Moment, zweite Karte mit der Goldmedaille, Reiter Trophäen) | grün |
+| Saisonende-Moment am Meisterprofil: die Prüfung wartete auf die alte Belohnungs-Zeremonie und wäre ab #2581 auf `main` jede Nacht rot (lokal belegt) | lokal, Spec angepasst (Moment, zweite Karte mit der Goldmedaille, Reiter Trophäen) | grün |
 | Backup-Probelauf `scripts/liga_backup_probe.sh`: eigener Docker-Stand, Liga-Daten über die Seeds, `backup.sh` mit Schreibpause, frischer Stand, `restore.sh`, Vergleich | lokal, zwei vollständige Läufe (`PROBE_RUNS=2`) | 2 von 2 gleich: 200 Sammlungen, 144 Konten, 4 Endstände, 12 Startrechte, 5 Momente, 766 Indizes, 26 Uploads mit gleichem Inhalt; Schreibversuch in der Pause `503`; Zahlen in `BACKUP_RESTORE.md`, „Probelauf“ |
 | ESLint der Abnahme-Specs | lokal | grün |
 
@@ -207,9 +207,10 @@ Noch offen:
 Der Reihe nach abhaken. Gebaut ist alles; hier geht es um Einspielen, Einrichten und die erste echte Probe. Den echten
 Versand an Teilnehmer macht der Betreiber in Season 1 - davor nur die Probe mit einem Testkonto (Schritt 3).
 
-1. [ ] **Release einspielen.** Den gesammelten release-please-PR bewusst mergen (die nächste Version nach 1.99.0 bringt den
-   Saisonende-Moment #1639 und die Versionsanzeige #2585; Playoffs #2404 und Startrechte #1627 stecken schon in 1.96.0 und 1.98.0), auf dem Server einspielen, Migrationen laufen beim Start von selbst. Prüfen: `/api/health/ready` grün, die Fußzeile zeigt
-   die neue Version (#2585), die nächste nächtliche Gesamtabnahme auf `main` grün.
+1. [ ] **Release einspielen.** Mindestens Website 1.100.0 (Saisonende-Moment #1639, Versionsanzeige #2585; Playoffs #2404 und
+   Startrechte #1627 stecken schon in 1.96.0 und 1.98.0) auf dem Server einspielen, Migrationen laufen beim Start von selbst.
+   Prüfen: `/api/health/ready` grün, die Fußzeile zeigt die Version (#2585), die nächste nächtliche Gesamtabnahme auf `main`
+   grün - die erweiterte Abnahme dieses Pakets ist ein Test-PR und ändert am Release nichts.
 2. [ ] **Bereich „Ligen“ vergeben.** Allen Liga-Leitungen den Bereich **Ligen** geben, Zwei-Faktor bei jedem Konto prüfen,
    Zuständige je Liga eintragen (B.1). Eine zweite Person mit Bereich Ligen ist Pflicht: Wiederöffnen, Einsprüche und
    Befangenheit brauchen sie.
