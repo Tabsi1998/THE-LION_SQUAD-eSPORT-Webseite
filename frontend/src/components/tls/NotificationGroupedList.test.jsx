@@ -56,3 +56,28 @@ test("ein leeres Thema sagt es, ohne Themen-Leiste bei nur einem Thema", () => {
   expect(screen.queryByTestId("notification-groups-topics")).toBeNull();
   expect(screen.getByText("Keine ungelesenen Benachrichtigungen.")).toBeInTheDocument();
 });
+
+// Prüfung 26.11.: Ein Wechsel „Ungelesen“ → „Alle“ zeigt alte Zeilen - die gleiten nicht als neu herein.
+test("ein Reiterwechsel lässt alte Zeilen nicht hineingleiten", () => {
+  const { rerender, container } = render(view(rows, { tab: "unread" }));
+  rerender(view(rows, { tab: "all" }));
+  expect(container.querySelectorAll('[data-fresh="true"]')).toHaveLength(0);
+  expect(screen.getByText("Deine Rechnung ist da")).toBeInTheDocument();
+});
+
+// Prüfung 26.11.: keine Ansage der ganzen Liste - nur eine ruhige Zeile für eben eingetroffene dringende Meldungen.
+test("angesagt wird nur eine neue dringende Meldung, ein Filterwechsel sagt nichts Neues", () => {
+  const { rerender } = render(view(rows, { announce: true }));
+  const live = screen.getByTestId("notification-groups-announce");
+  expect(live).toHaveAttribute("aria-live", "polite");
+  expect(live).toHaveTextContent("");
+  const normal = { ...rows[0], id: "n-new", title: "Ergebnis bestätigt", created_at: new Date().toISOString() };
+  rerender(view([normal, ...rows], { announce: true }));
+  expect(live).toHaveTextContent("");
+  const urgent = { ...rows[3], id: "call-new", title: "Du bist dran: Station 2", created_at: new Date().toISOString() };
+  rerender(view([urgent, normal, ...rows], { announce: true }));
+  expect(live).toHaveTextContent("Dringend: Du bist dran: Station 2");
+  fireEvent.click(screen.getByTestId("notification-groups-topic-billing_updates"));
+  expect(live).toHaveTextContent("Dringend: Du bist dran: Station 2");
+  expect(document.querySelectorAll("[aria-live]")).toHaveLength(1);
+});

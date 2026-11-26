@@ -36,7 +36,8 @@ export function TopicIcon({ bundle, compact = false }) {
   );
 }
 
-/** Merkt sich, wann eine Zeile zum ersten Mal da war - was bei offener Liste dazukommt, gilt kurz als „neu“. */
+/** Merkt sich, wann eine Meldung zum ersten Mal da war - was bei offener Liste dazukommt, gilt kurz als „neu“. Gezählt wird
+ * über alle Meldungen, nicht über die sichtbaren: Ein Wechsel von „Ungelesen“ auf „Alle“ zeigt alte Zeilen, keine neuen. */
 function useFreshness(ids) {
   const firstSeen = useRef(null);
   if (firstSeen.current === null) firstSeen.current = new Map(ids.map((id) => [id, 0]));
@@ -50,16 +51,23 @@ function useFreshness(ids) {
 
 export function NotificationGroupedList({
   rows, tab = "all", onOpen, onDelete, pendingIds, compact = false, testIdPrefix = "notification-row", emptyText, testId = "notification-groups",
+  announce = false,
 }) {
   const [topic, setTopic] = useState("");
   const topics = useMemo(() => topicCounts(rows), [rows]);
   const activeTopic = topics.some((entry) => entry.key === topic) ? topic : "";
   const groups = useMemo(() => groupNotifications(rows, { tab, topic: activeTopic }), [rows, tab, activeTopic]);
-  const isFresh = useFreshness(groups.flatMap((group) => group.bundles.map((bundle) => bundle.id)));
+  const isFresh = useFreshness((rows || []).map((row) => row.id));
+  const bundleFresh = (bundle) => bundle.ids.some(isFresh);
+  // Eine ruhige Ansage nur für dringende Meldungen, die eben eingetroffen sind - nicht die ganze Liste bei jedem Filter.
+  const spoken = useRef("");
+  const freshUrgent = (rows || []).find((row) => row.importance === "urgent" && isFresh(row.id));
+  if (freshUrgent) spoken.current = `Dringend: ${freshUrgent.title || "Benachrichtigung"}`;
   const pad = compact ? "px-3" : "px-4";
 
   return (
     <div data-testid={testId}>
+      {announce ? <div className="sr-only" role="status" aria-live="polite" data-testid={`${testId}-announce`}>{spoken.current}</div> : null}
       {topics.length > 1 ? (
         <div className={`tls-swipe tls-note-topics ${pad} py-2 border-b border-white/5`} role="group" aria-label="Nach Thema filtern" data-testid={`${testId}-topics`}>
           {[{ key: "", label: "Alle", count: rows.length }, ...topics].map((entry) => (
@@ -89,7 +97,7 @@ export function NotificationGroupedList({
           <section key={group.key} aria-label={group.label} data-testid={`${testId}-day-${group.key}`}>
             <h3 className={`tls-note-day ${pad}`}>{group.label}</h3>
             {group.bundles.map((bundle) => (
-              <div key={bundle.id} className="tls-note-row" data-fresh={isFresh(bundle.id) ? "true" : undefined}>
+              <div key={bundle.id} className="tls-note-row" data-fresh={bundleFresh(bundle) ? "true" : undefined}>
                 <NotificationRow
                   bundle={bundle}
                   onOpen={onOpen}

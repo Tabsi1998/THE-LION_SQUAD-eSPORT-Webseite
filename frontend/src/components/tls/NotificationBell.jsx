@@ -242,7 +242,7 @@ export function NotificationBell() {
               ))}
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" aria-live="polite" aria-label="Benachrichtigungsliste">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" aria-label="Benachrichtigungsliste">
               {feed.actionError ? (
                 <LoadNotice testId="notification-action-error" className="m-2" message={feed.actionError.message} onRetry={feed.actionError.retry} />
               ) : null}
@@ -262,6 +262,7 @@ export function NotificationBell() {
                   compact
                   emptyText={tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}
                   testId="notification-groups"
+                  announce
                 />
               )}
             </div>

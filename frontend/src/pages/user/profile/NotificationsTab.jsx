@@ -170,7 +170,9 @@ export function NotificationsTab({
   const otherChannels = channels.filter((channel) => channel.k !== "email");
   const pushOff = !notificationEnabled("push");
   const digest = server?.mail_digest && Array.isArray(server.mail_digest.options) ? server.mail_digest : DIGEST_FALLBACK;
-  const rhythm = form.mail_digest || digest.own || digest.rhythm || "instant";
+  // Ohne eigene Wahl (null) gilt die Vorgabe des Vereins (#1662, Fabian 26.11.) - auch direkt nach „Vorgabe des Vereins nutzen“.
+  const ownRhythm = "mail_digest" in form ? form.mail_digest : digest.own;
+  const rhythm = ownRhythm || digest.default || "instant";
   const rhythmIndex = Math.max(0, digest.options.findIndex((option) => option.key === rhythm));
   const rhythmOption = digest.options[rhythmIndex] || DIGEST_FALLBACK.options[0];
   const defaultOption = digest.options.find((option) => option.key === digest.default);
@@ -352,7 +354,7 @@ export function NotificationsTab({
                             data-mode-option={option}
                             onClick={() => pickMode(topic, option)}
                             onKeyDown={(event) => onModeKey(event, topic)}
-                            className="tls-seg__option"
+                            className="tls-seg__option tls-wrap"
                             data-testid={`notification-topic-${topic.k}-${option}`}
                           >
                             {MODE_LABELS[option]}
@@ -394,7 +396,7 @@ export function NotificationsTab({
                     data-rhythm-option={option.key}
                     onClick={() => pickRhythm(option.key)}
                     onKeyDown={onRhythmKey}
-                    className="tls-seg__option"
+                    className="tls-seg__option tls-wrap"
                     data-testid={`notification-digest-${option.key}`}
                   >
                     {option.label}
@@ -404,8 +406,13 @@ export function NotificationsTab({
               <p className="text-sm text-white/75 mt-3" data-testid="notification-digest-summary">
                 <span className="font-bold text-white">{rhythmOption.schedule}.</span> {DIGEST_HINTS[rhythm] || ""}
               </p>
-              {!form.mail_digest && !digest.own && defaultOption ? (
+              {!ownRhythm && defaultOption ? (
                 <p className="text-xs text-white/45 mt-1" data-testid="notification-digest-default">Vorgabe des Vereins: {defaultOption.label}.</p>
+              ) : null}
+              {ownRhythm && defaultOption ? (
+                <button type="button" onClick={() => set("mail_digest", null)} className="tls-hit mt-2 min-h-11 text-xs font-bold text-[#29B6E8] hover:underline" data-testid="notification-digest-use-default">
+                  Vorgabe des Vereins nutzen ({defaultOption.label})
+                </button>
               ) : null}
               {emailOff ? (
                 <p className="text-xs text-warn mt-2" data-testid="notification-digest-email-off">E-Mail ist bei dir unten ganz aus – dann kommt auch keine Sammel-Mail.</p>

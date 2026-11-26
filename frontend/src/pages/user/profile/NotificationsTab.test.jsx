@@ -273,3 +273,25 @@ test("eine ungültige Ruhezeit holt den Reiter „Ruhezeit“ nach vorn", async 
   await waitFor(() => expect(screen.getByTestId("notification-section-ruhezeit")).toHaveAttribute("aria-selected", "true"));
   expect(screen.getByTestId("notification-quiet-error")).toHaveTextContent("Uhrzeit wie 22:00");
 });
+
+// Fabian 26.11. (D): „Vorgabe des Vereins“ ist ein wählbarer Rückweg - mail_digest null.
+test("Sammel-Mail: zurück zur Vorgabe des Vereins", async () => {
+  const digest = { rhythm: "weekly", own: "weekly", default: "instant", options: [
+    { key: "instant", label: "Sofort", schedule: "Jede Mail sofort" },
+    { key: "daily", label: "Täglich", schedule: "Täglich um 07:00 Uhr" },
+    { key: "weekly", label: "Wöchentlich", schedule: "Montags um 07:00 Uhr" },
+  ] };
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/web-push/config" ? { enabled: false } : { discord: { linked: false }, mail_digest: digest } }));
+  const set = vi.fn();
+  const props = { set, setNotificationPreference: vi.fn(), setNotificationPreferences: vi.fn(), notificationEnabled: () => true,
+    notificationTopicEnabled: () => true, autosave: { status: "idle", message: "" } };
+  const { rerender } = render(inRouter(<NotificationsTab form={{ notification_preferences: {}, mail_digest: "weekly" }} {...props} />, "mail"));
+  await waitFor(() => expect(screen.getByTestId("notification-digest-use-default")).toHaveTextContent("Vorgabe des Vereins nutzen (Sofort)"));
+  fireEvent.click(screen.getByTestId("notification-digest-use-default"));
+  expect(set).toHaveBeenLastCalledWith("mail_digest", null);
+  // Danach (Formular ohne eigene Wahl) gilt sofort die Vorgabe - auch wenn der Server-Stand noch „weekly“ sagt.
+  rerender(inRouter(<NotificationsTab form={{ notification_preferences: {}, mail_digest: null }} {...props} />, "mail"));
+  expect(screen.getByTestId("notification-digest-instant")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("notification-digest-default")).toHaveTextContent("Vorgabe des Vereins: Sofort.");
+  expect(screen.queryByTestId("notification-digest-use-default")).toBeNull();
+});
