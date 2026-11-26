@@ -1,4 +1,4 @@
-/* Benachrichtigungen (#1204, #1206): drei Stufen, Themen mit Push / Nur App / Aus, Ruhezeit und „Weitere Wege“.
+/* Benachrichtigungen (#1204, #1206, #1662): Reiter, drei Stufen, Themen mit Push / Nur App / Aus, Sammel-Mail, Ruhezeit.
    Bewegung nur, wo sie etwas zeigt: Der Rahmen der Stufe gleitet zur neuen Stufe, der Daumen einer Stellung gleitet mit,
    Themen, die eine Stufe umstellt, leuchten kurz nacheinander auf. Alles über transform und opacity; bei reduzierter
    Bewegung bleiben nur Farbe und Deckkraft. */
@@ -75,11 +75,15 @@
 .tls-seg[data-mode="off"] .tls-seg__thumb { background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
 .tls-seg__option {
   position: relative; z-index: 1; min-height: 2.75rem; padding: 0 0.4rem; border-radius: 1px; background: transparent;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.15;
   color: rgba(255, 255, 255, 0.55); transition: color 200ms ease, transform 140ms var(--tls-ease-out);
   -webkit-tap-highlight-color: transparent;
 }
 .tls-seg__option:active { transform: scale(0.95); }
+/* Nichts abschneiden (#1662): „Wöchentlich“ passt bei 320 px nicht in ein Drittel - etwas engere Laufweite, sonst Trennung. */
+@media (max-width: 400px) {
+  .tls-seg__option { padding: 0.25rem 0.2rem; letter-spacing: 0.03em; }
+}
 .tls-seg__option:focus-visible { outline: 2px solid #29b6e8; outline-offset: 1px; }
 .tls-seg__option[aria-checked="true"] { color: #fff; }
 .tls-seg[data-mode="push"] .tls-seg__option[aria-checked="true"] { color: #050505; }
@@ -87,17 +91,31 @@
   .tls-seg__option[aria-checked="false"]:hover { color: #fff; }
 }
 
-/* ---- Aufklappen (Ruhezeit, Weitere Wege): Höhe über grid-template-rows, Inhalt blendet mit ---- */
+/* ---- Aufklappen (Ruhezeit): Höhe über grid-template-rows, Inhalt blendet mit ---- */
 .tls-notify-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 260ms var(--tls-ease-out); }
 .tls-notify-reveal[data-open="true"] { grid-template-rows: 1fr; }
 /* Zu heißt auch unsichtbar (visibility nach dem Zuklappen) - dann springt die Tab-Taste nicht in verborgene Felder. */
 .tls-notify-reveal__inner { min-height: 0; overflow: hidden; opacity: 0; transform: translateY(-4px); visibility: hidden; transition: opacity 180ms ease, transform 260ms var(--tls-ease-out), visibility 0s linear 260ms; }
 .tls-notify-reveal[data-open="true"] > .tls-notify-reveal__inner { opacity: 1; transform: none; visibility: visible; transition: opacity 180ms ease 40ms, transform 260ms var(--tls-ease-out) 40ms, visibility 0s linear 0s; }
 
-.tls-more__toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; text-align: left; -webkit-tap-highlight-color: transparent; }
-.tls-more__toggle:focus-visible { outline: 2px solid #29b6e8; outline-offset: -2px; }
-.tls-more__chevron { flex: none; width: 1.25rem; height: 1.25rem; color: rgba(255, 255, 255, 0.55); transition: transform 220ms var(--tls-ease-out), color 200ms ease; }
-.tls-more__toggle[aria-expanded="true"] .tls-more__chevron { transform: rotate(180deg); color: #29b6e8; }
+/* ---- Reiter (#1662): Themen · E-Mail · Ruhezeit · Mehr - der Strich gleitet zum gewählten Reiter ---- */
+.tls-notify-tabs { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.tls-notify-tabs__bar {
+  position: absolute; left: 0; bottom: -1px; width: 25%; height: 2px; background: #29b6e8; pointer-events: none;
+  transform: translateX(calc(var(--tab-i, 0) * 100%));
+  transition: transform var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-notify-tabs__tab {
+  min-height: 2.75rem; padding: 0 0.25rem; color: rgba(255, 255, 255, 0.55); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; overflow-wrap: anywhere; -webkit-tap-highlight-color: transparent;
+  transition: color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-notify-tabs__tab:active { transform: scale(0.97); }
+.tls-notify-tabs__tab[aria-selected="true"] { color: #fff; }
+.tls-notify-tabs__tab:focus-visible { outline: 2px solid #29b6e8; outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-notify-tabs__tab[aria-selected="false"]:hover { color: #fff; }
+}
 
 .tls-quiet__time { width: 100%; min-height: 2.75rem; padding: 0 0.75rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 2px; background: #050505; color: #fff; font-variant-numeric: tabular-nums; color-scheme: dark; transition: border-color 200ms ease; }
 .tls-quiet__time:focus { outline: none; border-color: #29b6e8; }
@@ -110,8 +128,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tls-level__glide, .tls-seg__thumb { transition: opacity 120ms ease, background-color 120ms ease; }
-  .tls-level__card, .tls-seg__option, .tls-level__icon, .tls-more__chevron, .tls-quiet__moon { transition: color 120ms ease, border-color 120ms ease; }
-  .tls-level__card:active, .tls-seg__option:active { transform: none; }
+  .tls-level__card, .tls-seg__option, .tls-level__icon, .tls-quiet__moon { transition: color 120ms ease, border-color 120ms ease; }
+  .tls-level__card:active, .tls-seg__option:active, .tls-notify-tabs__tab:active { transform: none; }
+  .tls-notify-tabs__bar { transition: opacity var(--tls-motion-fast) var(--tls-ease); }
+  .tls-notify-tabs__tab { transition: color var(--tls-motion-fast) var(--tls-ease); }
   .tls-level__card[aria-checked="true"] .tls-level__icon, .tls-notify-card[data-enabled="true"] .tls-quiet__moon { transform: none; }
   .tls-notify-reveal, .tls-notify-reveal__inner { transition: none; transform: none; }
   .tls-notify-chip { animation: none; }

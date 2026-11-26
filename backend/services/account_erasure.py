@@ -60,6 +60,8 @@ PURGED = (
     "league_transfers",
     # Seit #1646: Zustimmung zu einer Regelversion - das Co-Team wird danach neu gefragt.
     "league_rule_consents",
+    # Seit #1662: gesammelte Mails und die Läufe der Sammel-Mail.
+    "mail_digest_items", "mail_digest_runs",
 )
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",

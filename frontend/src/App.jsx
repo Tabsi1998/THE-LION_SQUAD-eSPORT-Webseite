@@ -119,6 +119,7 @@ const ForgotPasswordPage = lazyPage(() => import("@/pages/public/PasswordRecover
 const ResetPasswordPage = lazyPage(() => import("@/pages/public/PasswordRecoveryPage").then((m) => ({ default: m.ResetPasswordPage })));
 const EmailVerificationPage = lazyPage(() => import("@/pages/public/EmailVerificationPage"));
 const NewsletterUnsubscribePage = lazyPage(() => import("@/pages/public/NewsletterUnsubscribePage"));
+const DigestInstantPage = lazyPage(() => import("@/pages/public/DigestInstantPage"));
 const PrivacyPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const ImprintPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.ImprintPage })));
 // Statusseite (#1657): zwei Zustände aus der Überwachung, nicht im Index.
@@ -380,6 +381,7 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
           <Route path="/newsletter/abbestellen" element={<NewsletterUnsubscribePage />} />
+          <Route path="/sammel-mail/einzeln" element={<DigestInstantPage />} />
 
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

@@ -320,6 +320,9 @@ async def set_pause_until(tid: str, body: PauseUntilUpdate, me: dict = Depends(g
     pause_set, pause_unset = _pause_change(tournament, "paused", "paused", {"paused_until": body.paused_until})
     if pause_set or pause_unset:
         await _save_pause(db, me, tid, pause_set, pause_unset)
+        # „Pause bis“ geändert (#1209): eine Meldung je Uhrzeit.
+        from services import tournament_progress
+        await tournament_progress.status_changed(db, tid, "paused", "paused")
     return {"paused_until": pause_set.get("paused_until")}
 
 
@@ -626,6 +629,12 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         )
     elif pause_set or pause_unset:
         await _save_pause(db, me, tid, pause_set, pause_unset)
+
+    # Turnier-Meldungen (#1209): „Der Turnierbaum ist da“ beim ersten Start, Pause mit Uhrzeit - dieselbe Stelle wie Zeitplan
+    # und Station (services/tournament_progress.status_changed).
+    if prev != status or pause_set or pause_unset:
+        from services import tournament_progress
+        await tournament_progress.status_changed(db, tid, prev, status)
 
     if prev != status and status == "live":
         # Liga (#2201): der Start der ersten Staffel stellt die Season auf „Läuft“. Der Start gilt auch ohne das.

@@ -52,6 +52,12 @@ PUSH_CHANNELS = {
     "league_reward": "lion_achievements",
     # Hinweis der Turnierleitung (#1166).
     "tournament_notice": "lion_tournaments",
+    # Weiter, ausgeschieden, Turnierbaum da, Pause (#1209).
+    "tournament_progress": "lion_tournaments",
+    "tournament_bracket": "lion_tournaments",
+    "tournament_pause": "lion_tournaments",
+    # Lauf unvollständig (#2044) an die Turnierleitung - bisher ohne Thema im Rückfall-Kanal „Verein“.
+    "tournament_heat_rebuild": "lion_tournaments",
     "match_result": "lion_tournaments",
     "match_report": "lion_tournaments",
     "match_dispute": "lion_tournaments",

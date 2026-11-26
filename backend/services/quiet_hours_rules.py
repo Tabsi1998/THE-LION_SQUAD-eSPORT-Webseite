@@ -22,6 +22,7 @@ EXEMPTION_TEXTS = (
     "Aufruf zu deinem Spiel und „Match startet jetzt“",
     "Liga: Check-in offen und Veto – ihr seid am Zug, für dein eigenes Spiel",
     "Für die Turnierleitung: „Braucht Aufmerksamkeit“, solange dein Turnier läuft",
+    "Absage, neuer Termin oder Nachrücken – nur, wenn der Termin bis 2 Stunden nach dem Ende deiner Ruhezeit beginnt",
 )
 
 

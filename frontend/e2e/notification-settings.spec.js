@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
-// Einstellungen → Benachrichtigungen (#1204, #1206) bei 390 und 1440 px: oben drei Stufen, darunter je Thema Push, Nur App
-// oder Aus, die Ruhezeit und eingeklappt „Weitere Wege“. Eine Stufe setzt alle Themen in einem Speichern; eine eigene
+// Einstellungen → Benachrichtigungen (#1204, #1206, #1662) bei 390 und 1440 px: Reiter Themen · E-Mail · Ruhezeit · Mehr.
+// Unter „Themen“ drei Stufen und je Thema Push, Nur App oder Aus; die Ruhezeit und die E-Mail-Wege in eigenen Reitern. Eine Stufe setzt alle Themen in einem Speichern; eine eigene
 // Stellung zeigt „Eigene Auswahl“. Der Server ist nachgestellt (Stufen wie in backend/services/notification_preferences.py).
 // Bilder:  NOTIFY_SHOTS=<ordner> npx playwright test e2e/notification-settings.spec.js --project=chromium --workers=1
 
@@ -84,11 +84,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       expect(await noSidewaysScroll(page)).toBe(true);
     });
 
-    test("Ruhezeit 22:00 bis 7:00 einschalten, „Weitere Wege“ auf- und zuklappen", async ({ page }) => {
+    test("Ruhezeit 22:00 bis 7:00 einschalten, Reiter „E-Mail“ und zurück", async ({ page }) => {
       const seen = await mockServer(page);
       await page.goto("/profile?tab=notifications");
       await page.getByTestId("notification-level-important").click();
       await expect.poll(() => seen.patches.length).toBe(1);
+      await page.getByTestId("notification-section-ruhezeit").click();
+      await expect(page).toHaveURL(/bereich=ruhezeit/);
       await expect(page.getByTestId("notification-quiet-start")).toBeHidden();
       await page.getByTestId("notification-quiet-toggle").click();
       await expect(page.getByTestId("notification-quiet-start")).toBeVisible();
@@ -97,15 +99,16 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("notification-quiet-summary")).toContainText("über Mitternacht");
       await expect.poll(() => seen.patches.at(-1)?.quiet_hours).toEqual({ enabled: true, start: "22:00", end: "07:00" });
 
-      const more = page.getByTestId("notification-more-ways");
+      const mail = page.getByTestId("notification-section-mail");
       await expect(page.getByTestId("profile-notification-channel-email")).toBeHidden();
-      await more.click();
-      await expect(more).toHaveAttribute("aria-expanded", "true");
+      await mail.click();
+      await expect(mail).toHaveAttribute("aria-selected", "true");
       await expect(page.getByTestId("profile-notification-channel-email")).toBeVisible();
       await expect(page.getByTestId("profile-notification-email-achievement_recap")).toBeVisible();
       expect(await noSidewaysScroll(page)).toBe(true);
-      await more.click();
+      await page.getByTestId("notification-section-themen").click();
       await expect(page.getByTestId("profile-notification-channel-email")).toBeHidden();
+      await expect(page.getByTestId("notification-levels")).toBeVisible();
       if (SHOTS) {
         await page.waitForTimeout(450);
         await page.evaluate(() => document.activeElement?.blur());
@@ -121,6 +124,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       const seen = await mockServer(page, { failFirst: true });
       await page.goto("/profile?tab=notifications");
       await expect(page.getByTestId("notification-load-failed")).toBeVisible();
+      await page.getByTestId("notification-section-ruhezeit").click();
       // Ruhezeit an: erst wenn die Antwort da ist, weiter. (Früher ging es schon weiter, sobald der Server die Anfrage hatte -
       // eine Eingabe währenddessen drehte den Schalter mit einem zweiten Lauf zurück; behoben in useAutosave, #1208.)
       const firstSaved = page.waitForResponse((response) => response.request().method() === "PATCH" && new URL(response.url()).pathname === "/api/users/me");
@@ -148,6 +152,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await page.setViewportSize({ width, height });
       }
       seen.fail = false;
+      await page.getByTestId("notification-section-themen").click();
       await page.getByTestId("notification-load-retry").click();
       await expect(page.getByTestId("notification-level-all")).toBeVisible();
       await expect(page.getByTestId("notification-load-failed")).toHaveCount(0);
@@ -174,7 +179,8 @@ test("danach im selben Tab: die FAQ-Antworten bleiben zu", async ({ page, isMobi
   await mockServer(page);
   await page.goto("/profile?tab=notifications");
   await expect(page.getByTestId("notification-level-custom")).toBeVisible();
-  await expect(page.getByTestId("notification-more-panel")).toHaveAttribute("data-open", "false");
+  await page.getByTestId("notification-section-ruhezeit").click();
+  await expect(page.getByTestId("notification-quiet-start")).toBeHidden();
   await page.getByTestId("nav-faq").click();
   await expect(page).toHaveURL(/\/faq$/);
   const knopf = page.getByTestId("faq-frage-knopf-team-beitreten");

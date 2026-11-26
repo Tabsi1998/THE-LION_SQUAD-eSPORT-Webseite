@@ -60,8 +60,23 @@ def mask_addresses_deep(value: Any) -> Any:
 # langen Pfaden schnell bleibt.
 _SECRET_PATHS = (re.compile(r"(/api/calendar/personal/)[^/?#\s]{1,256}"),
                  re.compile(r"(/api/shop/print-files/)[^/?#\s]{1,256}"),
-                 # Newsletter abbestellen (#2119): der Schlüssel steht als ``?token=`` in der Adresse.
-                 re.compile(r"((?:/api/settings/newsletter/unsubscribe|/newsletter/abbestellen)\?(?:[^#\s&]{0,256}&){0,8}token=)[^&#\s]{1,256}"))
+                 )
+# Seiten mit dem Schlüssel als Parameter ``token`` (Newsletter abbestellen #2119, Zurück auf Einzelmails #1662) - auch mit
+# Schrägstrich am Ende (Weiterleitung) und kodiertem Namen (``%74oken``). Die Abfrage wird ohne Regex zerlegt, und zwar ganz:
+# ein einziger Zeichenklassen-Lauf ohne Rückverfolgung, also auch bei langen Abfragen linear.
+_TOKEN_PATHS = re.compile(r"(?:/api/settings/newsletter/unsubscribe|/newsletter/abbestellen|"
+                          r"/api/settings/notification-digest/instant|/sammel-mail/einzeln)/?\?([^#\s]+)")
+
+
+def _redact_token_query(match: re.Match) -> str:
+    from urllib.parse import unquote
+
+    parts = []
+    for part in match.group(1).split("&"):
+        name, sep, _value = part.partition("=")
+        parts.append(f"{name}=***" if sep and unquote(name).lower() == "token" else part)
+    head = match.group(0)[: match.start(1) - match.start(0)]
+    return head + "&".join(parts)
 
 
 def redact_secret_paths(value: Any) -> str:
@@ -70,7 +85,7 @@ def redact_secret_paths(value: Any) -> str:
     text = "" if value is None else str(value)
     for pattern in _SECRET_PATHS:
         text = pattern.sub(lambda match: f"{match.group(1)}***", text)
-    return text
+    return _TOKEN_PATHS.sub(_redact_token_query, text)
 
 
 class SecretPathFilter(logging.Filter):

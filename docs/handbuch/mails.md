@@ -11,6 +11,7 @@ abschalten können.
 - **Admin → E-Mail → E-Mail-Vorlagen** (`/admin/email-templates`) – alle Mails mit Text und Vorschau
 - **Admin → E-Mail → Mail-Queue** (`/admin/settings/mail-queue`) – die Warteschlange
 - **Admin → E-Mail → Newsletter** (`/admin/settings/newsletter`) – der Verlauf der verschickten Newsletter
+- **Admin → E-Mail → Sammel-Mail** (`/admin/settings/sammel-mail`) – Vorgaben der Sammel-Mail mit Vorschau (3.7)
 - **Admin → System → Push-Tests** (`/admin/mobile-push`) – Push an ein Konto testen
 - **Admin → System → Betrieb & Logs → Ereignisse** – jede Mail und jede Discord-Meldung mit Stand
 - **Admin → System → Status** – Ampeln für Mail und Scheduler
@@ -40,7 +41,8 @@ Kasten **Verteilen** am Beitrag ([Inhalte](inhalte.md)).
 | **Mail-Vorlagen** | Betreff und Text jeder Mail, mit Vorschau und Testmail | E-Mail → E-Mail-Vorlagen |
 | **Mail-Queue** | Jede Mail wartet erst, wird dann gesendet; Fehler lassen sich wiederholen | E-Mail → Mail-Queue |
 | **Newsletter** | Beim Veröffentlichen von News und Events an alle mit Zustimmung | Kasten „Verteilen“, Verlauf unter E-Mail → Newsletter |
-| **Benachrichtigungen** | Eine Meldung, fünf mögliche Kanäle: E-Mail, Push, Browser, In-App, Discord | Einstellungen → Benachrichtigungen (Mitglied) |
+| **Benachrichtigungen** | Eine Meldung, fünf mögliche Kanäle: E-Mail, Push, Browser, In-App, Discord – jede mit Thema und Wichtigkeit | Einstellungen → Benachrichtigungen (Mitglied) |
+| **Sammel-Mail** | Optionale Mails gesammelt einmal am Tag oder in der Woche statt einzeln; Dringendes kommt sofort | Mitglied im Reiter **E-Mail**; Vorgaben unter E-Mail → Sammel-Mail |
 | **Push in der App** | Mitteilungen aufs Handy, in fünf Kanälen mit eigener Lautstärke | App-Einstellungen am Handy; Test unter Push-Tests |
 | **Discord-Direktnachricht** | Dieselbe Meldung als Nachricht vom Vereins-Bot | Mitglied schaltet den Kanal ein |
 
@@ -152,9 +154,13 @@ im Protokoll.
 
 Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Person, über die Kanäle:
 
-- **In-App:** die **Glocke** im Kopf und **/notifications**. Gleichartige Meldungen innerhalb einer Stunde (Chat-Nachrichten desselben
-  Absenders, desselben Team-, Turnier- oder Match-Chats) werden zu einer Zeile gebündelt („3 neue Nachrichten von …“). Ein Tipp führt zur
-  passenden Seite.
+- **In-App:** die **Glocke** im Kopf und **/notifications** (#1205). Beide gliedern nach **Heute**, **Gestern** und **Früher** und haben
+  oben die Themen zum Antippen (etwa nur **Turnier-Updates**). Gleichartiges eines Tages steht in einer Zeile: Nachrichten desselben
+  Absenders oder Chats („3 neue Nachrichten von …“), Ergebnisse desselben Turniers („3 neue Ergebnisse in Liga 1“) und Erfolge („2 neue
+  Erfolge“). Vor jeder Meldung steht ein Symbol für ihr Thema; **dringende** Meldungen (Aufruf, Match startet jetzt) sind rot. Was bei
+  offener Glocke neu ankommt, gleitet sanft in die Liste. Ein Tipp führt zur passenden Seite und markiert das ganze Bündel als gelesen.
+
+  <img src="bilder/glocke-gegliedert.png" alt="Glocke am Handy: Themen zum Antippen, darunter Heute mit „3 neue Ergebnisse in Liga 1“ und dem roten Aufruf, dann Gestern und Früher" width="300">
 - **Push:** auf registrierten Handys mit der LionsAPP. Android kennt fünf **Kanäle**, die jede Person in den Handy-Einstellungen einzeln stumm
   schalten kann: **Aufrufe & Spielstart** (wichtig, mit Gong: Du bist dran, Match startet jetzt, Erinnerung vor dem Spiel; für die Turnierleitung
   „Braucht Aufmerksamkeit“), **Turniere & Events**, **Chats**, **Verein** (Vereinsintern, News, Mitgliedschaft, Rechnungen) und **Erfolge**.
@@ -188,6 +194,10 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 stehen auch in der FAQ unter [Konto und Profil → Benachrichtigungen](../../frontend/src/hilfe/themen/konto-und-profil.json)
 (`/faq/konto-und-profil#stufe`).
 
+Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sammel-Mail, E-Mail je Thema, Newsletter),
+**Ruhezeit** und **Mehr** (Discord, Kanäle ganz aus, Zeremonien). Der Reiter steht in der Adresse, etwa
+`/profile?tab=notifications&bereich=mail` – dorthin führt auch der Link in jeder Sammel-Mail.
+
 <img src="../../frontend/src/hilfe/bilder/konto-und-profil/stufe-handy.webp" alt="Stufe am Handy: drei Karten Alles, Wichtiges und Wenig, Wichtiges ist gewählt" width="300"> <img src="../../frontend/src/hilfe/bilder/konto-und-profil/themen-handy.webp" alt="Themen am Handy: je Thema die Wahl Push, Nur App oder Aus, bei Erfolge ist Aus gewählt" width="300">
 
 - **Stufe** (#1204): oben drei Karten zum Antippen.
@@ -214,21 +224,79 @@ stehen auch in der FAQ unter [Konto und Profil → Benachrichtigungen](../../fro
   - Trotzdem sofort kommen: der **Aufruf zum eigenen Spiel**, **Match startet jetzt**, in der Liga **Check-in offen** und **Veto – ihr seid am
     Zug** fürs eigene Spiel, und für die Turnierleitung **Braucht Aufmerksamkeit**, solange ihr Turnier läuft. Leitungs-Meldungen einer
     Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung. Der **Push-Test** der Verwaltung kommt ebenfalls sofort.
+  - **Zeitkritisches** – Absage von Turnier oder Event, neuer Termin oder Ort eines Events, Nachrücken von der Warteliste – kommt
+    nur dann sofort, wenn der Termin noch bevorsteht und bis 2 Stunden nach dem Ende der Ruhezeit beginnt (bei 22 bis 7 Uhr also vor
+    9 Uhr; bei einer Mittagsruhe 13 bis 15 Uhr ein Termin um 14 Uhr sofort). Bei einem neuen Termin zählt der frühere von altem und
+    neuem, solange er noch bevorsteht. Ein vergangener Termin weckt niemanden. Sonst wartet der Push bis zum Ende der
+    Ruhezeit (Fabians Entscheidung 26.11.). Die Mail dazu geht immer sofort.
   - E-Mails sind davon nicht betroffen.
 - **Dieser Browser** (unter den Themen, nur wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat): ob der Browser, in dem die Seite
   gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw. **Browser abmelden**. Blockiert der Browser die Benachrichtigungen,
   steht dort, wo man sie wieder erlaubt. Mit **Inhalt verbergen** zeigt dieser Browser nur „Neue Benachrichtigung“. Chat-Texte und Beträge
   (Rechnungen, Kostenbeiträge) stehen nie in einer Browser-Meldung.
-- **Weitere Wege** (eingeklappt):
-  - die Kanäle **E-Mail**, **Push**, **Browser**, **In-App** und **Discord** (nur mit verknüpftem Konto) ganz an oder aus;
-  - je Thema **E-Mail** und **Discord**. Ein Strich heißt: Dieses Thema gibt es auf dem Weg nicht;
+- **Reiter E-Mail** (#1662):
+  - **Sammel-Mail:** **Sofort**, **Täglich** oder **Wöchentlich**. Sofort heißt: jede Mail einzeln wie bisher. Täglich bzw. wöchentlich
+    heißt: eine Mail mit allem, was seit der letzten kam, nach Themen sortiert, mit Link zu jeder Sache. Darunter steht, wann sie kommt
+    („Täglich um 07:00 Uhr“), und solange die Person nichts gewählt hat, die **Vorgabe des Vereins**. Wer selbst gewählt hat, kommt
+    mit **Vorgabe des Vereins nutzen** wieder zurück. Dringendes (Spiel in 10 Minuten, Check-in schließt, Ergebnis bestätigen,
+    Dispute), Zeitkritisches (Absage, neuer Termin, Nachrücken) und Konto-Mails kommen immer sofort. Ist E-Mail ganz aus, sagt die
+    Karte das.
+  - In jeder Sammel-Mail steht **Zurück auf Einzelmails**: ein Klick, ohne Anmeldung, dann ein Knopf auf der Seite – danach kommt
+    jede Mail wieder einzeln. Der Link gehört zu genau diesem Konto und ändert nur den Rhythmus.
+  - der Kanal **E-Mail** ganz an oder aus und je Thema **E-Mail**. Ein Strich heißt: Dieses Thema gibt es per Mail nicht;
   - der **Newsletter**. **News & Events** per E-Mail geht nur mit dieser Einwilligung: „Ich willige separat ein, Newsletter, Event-Hinweise
-    und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar.“
-  - Ist Push ganz aus, zeigen die Themen einen Hinweis mit **Push einschalten**.
+    und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar.“ Newsletter kommen nie in die Sammel-Mail.
+- **Reiter Mehr:** die Kanäle **Push**, **Browser**, **In-App** und **Discord** (nur mit verknüpftem Konto) ganz an oder aus, je Thema
+  **Discord**, und die Zeremonien. Ist Push ganz aus, zeigen die Themen einen Hinweis mit **Push einschalten**.
 - Account- und Sicherheitsmails bleiben immer aktiv.
 - Dieselbe Seite regelt, wie Erfolge gefeiert werden (mit Klang oder dezent).
 
 <img src="../../frontend/src/hilfe/bilder/konto-und-profil/ruhezeit-pc.webp" alt="Ruhezeit am PC: Schalter an, von 22:00 bis 07:00, darunter was trotzdem sofort kommt" width="600">
+
+<img src="../../frontend/src/hilfe/bilder/konto-und-profil/weitere-wege-pc.webp" alt="Reiter E-Mail am PC: Karte Sammel-Mail mit Sofort, Täglich und Wöchentlich" width="600">
+
+### 3.7 Sammel-Mail: Vorgaben und Regeln (Verwaltung)
+
+**Admin → E-Mail → Sammel-Mail** (`/admin/settings/sammel-mail`), Bereich **System**.
+
+1. **Vorgabe für alle ohne eigene Wahl:** Sofort, Täglich oder Wöchentlich. Ohne Entscheidung gilt **Sofort** – dann ändert sich für
+   niemanden etwas, bis er es selbst umstellt.
+2. **Täglich um** und **Wöchentlich am … um**: Wiener Zeit. Vorgabe 07:00 Uhr und Montag 07:00 Uhr.
+3. **Speichern.** Rechts steht die **Vorschau** mit Beispielzeilen und deinem Namen; verschickt wird dabei nichts.
+
+<img src="bilder/sammel-mail-vorschau.png" alt="Sammel-Mail: Hallo Paula, nach Themen Turnier-Updates, Gewinne und Nachrichten je mit Link und einer Zeile, unten Rhythmus ändern und Zurück auf Einzelmails" width="420">
+
+So arbeitet sie:
+
+- **Was gesammelt wird:** optionale Mails einer Person mit Rhythmus Täglich oder Wöchentlich – Anmeldungen, Turnier- und Liga-Hinweise,
+  Gewinne, Rechnungen, Nachrichten, Vereinsinternes. Nur Themen, die sie per Mail an hat.
+- **Was nie gesammelt wird:** Konto- und Sicherheitsmails, Entscheidungen zur Mitgliedschaft, Dringendes (Spiel in 10 Minuten, Erinnerung
+  vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute), Zeitkritisches (Absage von Turnier oder Event, neuer Termin oder
+  Ort eines Events, Nachrücken von der Warteliste), Newsletter, Geburtstagsgruß und Wochenrückblick.
+- **Wann:** Der Job `mail_digest` sieht alle 10 Minuten nach. Je Person geht **genau eine** Mail je Zeitraum hinaus, mit allem, was vor dem
+  Termin kam; was danach kommt, wartet auf den nächsten. Zwei Läufe gleichzeitig schicken trotzdem nur eine.
+- **Sichtbarkeit:** Beim Versand wird jede Zeile neu geprüft: Konto aktiv und nicht gesperrt, Thema per Mail noch an, Vereinsinternes
+  nur, solange die Person Mitglied ist. Was nicht mehr passt, fällt still heraus.
+- **Zurück auf Sofort** (in den Einstellungen oder mit dem Link **Zurück auf Einzelmails** aus der Mail): Was noch wartet, kommt beim
+  nächsten Lauf als eine Mail.
+- **Viel auf einmal:** Es geht immer alles hinaus. Bis 200 Neuigkeiten stehen einzeln in der Mail, darüber steht „… und N weitere“.
+- In der **Mail-Queue** steht jede Sammel-Mail als `notification_digest`; die Vorlage lässt sich unter **E-Mail-Vorlagen** anpassen
+  (Platzhalter `{{items}}` ist die fertige Liste).
+- Gesammelte Zeilen stehen in der Datenauskunft der Person und werden mit dem Konto gelöscht; Verschicktes räumt der Job nach 90 Tagen weg.
+
+### 3.8 Thema und Wichtigkeit jeder Meldung
+
+Jede Art von Meldung hat ein **Thema** (die Themen der Einstellungen) und eine **Wichtigkeit** (#1662):
+
+| Wichtigkeit | Bedeutung | Beispiele |
+| --- | --- | --- |
+| **Dringend** | kommt auch in der Ruhezeit sofort, nie in eine Sammlung, in der Glocke rot und als einzige angesagt | Du bist dran, Match startet jetzt, Push-Test |
+| **Zeitkritisch** (Merkmal zu „wichtig“) | nie in eine Sammlung; in der Ruhezeit sofort nur, wenn der Termin bis 2 Stunden nach dem Ende der Ruhezeit beginnt | Turnier oder Event abgesagt, Event verschoben, Nachgerückt |
+| **Wichtig** | verlangt meist etwas von dir | Termin, Check-in, Anmeldung, Weiter/Ausgeschieden, Pause, Rechnung, Nachricht an dich |
+| **Normal** | zur Kenntnis | Ergebnisse, Erfolge, News, Galerie, Team-Änderungen |
+
+Rechte, Entscheidungen zur Mitgliedschaft, Moderation und der Push-Test stehen unter **Konto & System** – das lässt sich nicht abschalten.
+Ein Wächter-Test sorgt dafür, dass jede neue Art ein Thema und eine Wichtigkeit bekommt.
 
 ---
 

@@ -143,3 +143,13 @@ async def test_discord_direct_message_only_with_opt_in(monkeypatch):
     monkeypatch.setattr("services.user_notifications.get_db", lambda: quiet)
     created = await create_user_notification("u2", "Match", kind="match_reminder", meta={"dedupe_key": "dm-2"})
     assert created["discord_sent_count"] == 0 and len(calls) == 1
+
+
+def test_old_rows_get_topic_and_importance_when_read():
+    """#1662: Zeilen von vor dem Benachrichtigungs-Zentrum tragen kein ``topic`` - die Listen rechnen es beim Lesen nach."""
+    from services.user_notifications import with_topic
+
+    old = {"id": "n1", "kind": "match_result", "meta": {}}
+    assert with_topic(old) == {**old, "topic": "match_reminders", "importance": "normal"}
+    stored = {"id": "n2", "kind": "match_result", "topic": "tournament_updates", "importance": "important", "meta": {}}
+    assert with_topic(stored) == stored

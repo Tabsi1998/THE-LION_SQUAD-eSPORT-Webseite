@@ -1,0 +1,36 @@
+/* Glocke und Postfach (#1205, #1662): Tage, Themen-Chips und neue Meldungen, die sanft hineingleiten.
+   Nur transform und opacity, Dauern und Kurven aus den Tokens (index.css); bei weniger Bewegung nur Einblenden. */
+
+.tls-note-topics { display: flex; gap: 0.375rem; overflow-x: auto; scrollbar-width: none; }
+.tls-note-topics::-webkit-scrollbar { display: none; }
+
+.tls-note-chip {
+  display: inline-flex; flex: none; align-items: center; gap: 0.375rem; min-height: 2rem; padding: 0 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 2px; color: rgba(255, 255, 255, 0.6);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap;
+  transition: transform var(--tls-motion-fast) var(--tls-ease), color var(--tls-motion-fast) var(--tls-ease),
+    border-color var(--tls-motion-fast) var(--tls-ease), background-color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-note-chip:active { transform: scale(0.97); }
+.tls-note-chip[data-active="true"] { border-color: rgba(41, 182, 232, 0.6); background-color: rgba(41, 182, 232, 0.12); color: #fff; }
+.tls-note-chip[data-active="true"] .tls-note-chip__count { color: #29b6e8; }
+.tls-note-chip__count { color: rgba(255, 255, 255, 0.4); font-variant-numeric: tabular-nums; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-note-chip:hover { color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+}
+
+.tls-note-day {
+  position: sticky; top: 0; z-index: 1; margin: 0; padding-top: 0.625rem; padding-bottom: 0.375rem;
+  background: rgba(15, 15, 16, 0.96); border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.45); font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
+}
+
+.tls-note-row[data-fresh="true"] { animation: tls-note-in var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tls-note-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes tls-note-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-note-chip { transition: color var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease); }
+  .tls-note-chip:active { transform: none; }
+  .tls-note-row[data-fresh="true"] { animation-name: tls-note-fade; }
+}

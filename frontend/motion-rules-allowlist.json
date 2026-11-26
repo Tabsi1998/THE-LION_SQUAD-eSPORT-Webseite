@@ -151,11 +151,11 @@
     },
     "src/components/tls/NotificationBell.jsx": {
       "token-duration": {
-        "anzahl": 3,
+        "anzahl": 2,
         "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
       },
       "token-easing": {
-        "anzahl": 2,
+        "anzahl": 1,
         "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
       }
     },
@@ -745,11 +745,11 @@
         "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
       },
       "token-duration": {
-        "anzahl": 14,
+        "anzahl": 13,
         "grund": "Bestand vor dem Prüftor (#1660): feste Dauer aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-motion-* bzw. duration-fast/mid/slow steht aus."
       },
       "token-easing": {
-        "anzahl": 12,
+        "anzahl": 11,
         "grund": "Bestand vor dem Prüftor (#1660): feste Kurve aus der Zeit vor den Bewegungs-Tokens (#1070). Umstellung auf --tls-ease bzw. ease-tls steht aus."
       }
     },
