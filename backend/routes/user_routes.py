@@ -767,6 +767,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     league_history = []
     league_overall = []
     league_current = []
+    league_moments = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
              "level": achievement_level["level"],
@@ -786,6 +787,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         # derselben Regel (Gäste nur Öffentliches, Mitglieder bei eingeschaltetem Schalter dazu Internes mit Etikett).
         from services import league_current as current_service
         league_current = await current_service.for_player(db, user_id, viewer, scope=profile_scope)
+        # Saisonende-Moment (#1639): je Co-Team der jüngste bestätigte Ausgang (Aufstieg, Abstieg, Meister) als Hinweis.
+        from services import league_moments as moment_service
+        league_moments = await moment_service.for_player(db, user_id, viewer, scope=profile_scope)
         # Gesamtwertung über Seasons (F.5, #2215): Platz in der Spielerwertung je Zeitraum und Liga N.
         from services import league_overall as overall_service
         league_overall = await overall_service.for_player(db, user_id, viewer, scope=profile_scope)
@@ -913,6 +917,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "league_history": league_history,
         "league_overall": league_overall,
         "league_current": league_current,
+        "league_moments": league_moments,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
         # Titel neben dem Namen (F.4, #2214): eine Belohnung der Art „Titel“, die die Person gewählt hat.
         "featured_title": next((award for award in awards if award["id"] == u.get("featured_title_award_id")), None),

@@ -33,6 +33,7 @@ READERS = {
     "services/league_history.py": (1, REGULAR, "Season-Historie: eine Zeile je Tabellen-Endstand"),
     "services/league_incidents.py": (1, ALL, "Vorfälle: jede Staffel"),
     "services/league_late_entry.py": (1, REGULAR, "Nachmeldung nur in regulären Staffeln"),
+    "services/league_moments.py": (1, ALL, "Saisonende-Moment: Einsatz zählt in jeder Staffel der Season, auch Playoffs und Relegation"),
     "services/league_overall.py": (3, MIXED, "Punkte nur aus Tabellen-Endständen; offene Staffeln zählen alle Arten"),
     "services/league_pool_check.py": (1, ALL, "Map-Pool: jede Staffel"),
     "services/league_postseason.py": (5, MIXED, "liest reguläre Endstände und findet die eigenen Staffeln"),

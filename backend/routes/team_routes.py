@@ -682,6 +682,9 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     # Season-Historie (F.2, #1627): je abgeschlossener Liga-Staffel Liga N, Platz, Meister - nur Seasons, die die Person sieht.
     from services.league_history import for_team
     out["league_history"] = await for_team(db, team_id, user, hidden=tournament_hidden_reason)
+    # Saisonende-Moment (#1639): je Co-Team der jüngste bestätigte Ausgang (Aufstieg, Abstieg, Meister) als Hinweis.
+    from services import league_moments
+    out["league_moments"] = await league_moments.for_team(db, team_id, user)
     # Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N - nach derselben Sichtbarkeit wie die Ligaseite.
     from services import league_overall
     out["league_overall"] = await league_overall.for_team(db, team_id, user, hidden=tournament_hidden_reason)

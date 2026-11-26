@@ -276,6 +276,10 @@ CLUB_CONTENT = frozenset({
     # Gesamtwertung über Seasons (F.5, #2215): die abgeschlossene Fassung je Zeitraum und Liga N - Co-Teams und Spieler mit Punkten je
     # Season (Kennungen wie ``player_ids`` am Endstand), dazu nur die Kennung, wer abgeschlossen bzw. wieder geöffnet hat.
     "league_overall_finals",
+    # Saisonende-Moment (#1639): je Season und Co-Team der bestätigte Ausgang (Aufstieg, Abstieg, Meister) - Co-Team und Liga N; an der
+    # Person hängen nur Kennungen (``player_ids``, ``responsible_ids``, ``audience_ids``, ``seen_by``, ``notified_ids``, ``told_ids``),
+    # wie ``audience_ids`` und ``seen_by`` an den Belohnungen in ``tournament_awards``.
+    "league_moments",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",

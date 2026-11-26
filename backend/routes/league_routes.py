@@ -11,6 +11,7 @@ Die Logik steht in ``services/league_service.py``.
 """
 from __future__ import annotations
 
+import logging
 from contextlib import AsyncExitStack
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -62,11 +63,13 @@ from services.change_events import reset_scope_cache
 from services.game_maps import MapProblem
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
+from services.log_safe import log_safe
 from services.map_pools import MapPoolSave
 from services.mutation_lock import MutationLockBusy, league_season_pool_resource, mutation_lock, tournament_write_resource
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
+logger = logging.getLogger("tls.league_routes")
 
 # Bereich Ligen: Liga anlegen und löschen; alles andere prüft ``require_league`` gegen die Liga aus der Adresse.
 require_leagues_area = require_area("leagues")
@@ -383,6 +386,16 @@ async def admin_create_season(league_id: str, body: LeagueSeasonCreate, me: dict
     return doc
 
 
+async def _moments_follow(db, season_id: str) -> None:
+    """Nachrichten zum Saisonende-Moment nachholen (``league_moments.after_visibility``) - ein Fehler hält die Änderung nicht auf."""
+    from services import league_moments
+
+    try:
+        await league_moments.after_visibility(db, season_id)
+    except Exception:  # noqa: BLE001 - die Season ist gespeichert; der nächste Abgleich holt es nach
+        logger.warning("[liga] Saisonende-Moment nach Sichtbarkeit nicht nachgezogen: %s", log_safe(season_id), exc_info=True)
+
+
 @admin_router.patch("/seasons/{season_id}")
 async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
                               me: dict = Depends(require_league(("season", "rules"), via="season_id"))):
@@ -437,6 +450,8 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
         reset_scope_cache()
         await _audit(db, "league.staffel.sync", me, season_id,
                      {"season_id": season_id, "visibility": doc.get("visibility"), "staffeln": visibility_applied})
+        # Saisonende-Moment (#1639): Eine Season „Aus“ verrät nichts - wird sie sichtbar, kommen die Nachrichten jetzt.
+        await _moments_follow(db, season_id)
     if {"game_mode_order", "best_of"} & set(changed):
         followed = await _follow_veto(db, season_id, doc, me, warnings, best_of_changed="best_of" in changed)
         if followed.rules:
