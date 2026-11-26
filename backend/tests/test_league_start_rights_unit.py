@@ -22,9 +22,9 @@ def application(**start_right) -> dict:
 # ---------------------------------------------------------------- Einstellung
 
 def test_defaults_fill_what_is_missing_and_wrong_values_are_refused():
-    assert rights.normalize({}) == {"mode": "accept", "accept_days": 14, "successor": "next", "remind_hours": 48, "announce": True}
-    assert rights.normalize({"mode": "auto", "accept_days": 3, "successor": "lead", "remind_hours": 0, "announce": False}) == {
-        "mode": "auto", "accept_days": 3, "successor": "lead", "remind_hours": 0, "announce": False}
+    assert rights.normalize({}) == {"mode": "accept", "accept_days": 14, "successor": "next", "remind_hours": 48, "announce": True, "rest_days": 3}
+    assert rights.normalize({"mode": "auto", "accept_days": 3, "successor": "lead", "remind_hours": 0, "announce": False, "rest_days": 5}) == {
+        "mode": "auto", "accept_days": 3, "successor": "lead", "remind_hours": 0, "announce": False, "rest_days": 5}
     for wrong in ({"mode": "invite"}, {"accept_days": 0}, {"accept_days": 61}, {"accept_days": True}, {"successor": "lot"},
                   {"remind_hours": -1}, {"announce": "ja"}, {"unknown": 1}):
         with pytest.raises(rights.StartRightProblem):
@@ -243,8 +243,91 @@ def test_after_switching_to_automatic_a_successor_may_still_decline_until_the_st
 
 def test_back_from_the_waitlist_the_deadline_starts_again():
     waiting = {**application(status="offered", offered_at=(NOW - timedelta(days=30)).isoformat(), reminded_at=NOW.isoformat()), "status": "waitlist"}
-    fields = rights.reoffer_fields(waiting, NOW.isoformat())
+    fields = rights.reoffer_fields(waiting, NOW.isoformat(), SEASON)
     assert fields == {"carry_over.start_right": {"status": "offered", "offered_at": NOW.isoformat()}}
     # Schon zugesagt oder ohne Startrecht: nichts zu tun.
-    assert rights.reoffer_fields({**application(status="accepted", offered_at=NOW.isoformat()), "status": "waitlist"}, NOW.isoformat()) == {}
-    assert rights.reoffer_fields({"id": "x", "status": "waitlist"}, NOW.isoformat()) == {}
+    assert rights.reoffer_fields({**application(status="accepted", offered_at=NOW.isoformat()), "status": "waitlist"}, NOW.isoformat(), SEASON) == {}
+    assert rights.reoffer_fields({"id": "x", "status": "waitlist"}, NOW.isoformat(), SEASON) == {}
+
+
+# ---------------------------------------------------------------- Nachbesserung 26.11. (N1): die eigene Frist ruht, solange ein Nachrück-Angebot offen ist
+
+TEN = {**SEASON, "start_rights": {"mode": "accept", "accept_days": 10}}
+DAY = timedelta(days=1)
+
+
+def offer_to_move_up(own: dict | None, at: datetime) -> dict:
+    return {"for_application_id": "x", "at": at.isoformat(), "back": {"division_level": 2, "division_label": "Liga 2", **({"start_right": own} if own else {})}}
+
+
+def test_silence_on_an_offer_to_move_up_leaves_the_rest_of_the_own_deadline_at_least_three_days():
+    # Frist zehn Tage. Am Tag 9 rückt das Team nach, am Tag 12 ist das Angebot vorbei: Die eigene Frist ruhte drei Tage - es bliebe
+    # ein Tag, mindestens aber drei (``rest_days``).
+    own = {"status": "offered", "offered_at": NOW.isoformat(), "reminded_at": NOW.isoformat()}
+    back = rights.restored_right(offer_to_move_up(own, NOW + 9 * DAY), TEN, NOW + 12 * DAY, None, declined=False)
+    assert back["status"] == "offered" and back["offered_at"] == NOW.isoformat() and "reminded_at" not in back
+    assert back["rests"] == [{"from": (NOW + 9 * DAY).isoformat(), "to": (NOW + 12 * DAY).isoformat()}]
+    assert rights.accept_until(application(**back), TEN) == NOW + 15 * DAY
+    assert not rights.overdue(application(**back), TEN, NOW + 12 * DAY)
+    # Bleibt mehr als die Mindestfrist, gilt der Rest: Angebot von Tag 2 bis Tag 5, die Frist endet am Tag 13 statt am Tag 10.
+    early = rights.restored_right(offer_to_move_up(own, NOW + 2 * DAY), TEN, NOW + 5 * DAY, None, declined=False)
+    assert rights.accept_until(application(**early), TEN) == NOW + 13 * DAY
+    # Nie über das Startdatum der Season hinaus.
+    soon = {**TEN, "start_date": (NOW + 14 * DAY).isoformat()}
+    assert rights.accept_until(application(**back), soon) == NOW + 14 * DAY
+    # Die Mindestfrist ist einstellbar (Vorgabe 3 Tage).
+    week = {**TEN, "start_rights": {"mode": "accept", "accept_days": 10, "rest_days": 7}}
+    longer = rights.restored_right(offer_to_move_up(own, NOW + 9 * DAY), week, NOW + 12 * DAY, None, declined=False)
+    assert rights.accept_until(application(**longer), week) == NOW + 19 * DAY
+    # Ruhte in derselben Zeit auch die Pause der Season, zählt die Zeit nur einmal.
+    paused = {**TEN, "start_right_pauses": [{"from": (NOW + 2 * DAY).isoformat(), "to": (NOW + 5 * DAY).isoformat()}]}
+    assert rights.accept_until(application(**early), paused) == NOW + 13 * DAY
+
+
+def test_declining_the_offer_to_move_up_is_the_acceptance_for_the_own_division():
+    own = {"status": "offered", "offered_at": NOW.isoformat()}
+    back = rights.restored_right(offer_to_move_up(own, NOW + 9 * DAY), TEN, NOW + 12 * DAY, "captain", declined=True)
+    assert back["status"] == "accepted" and back["accepted_via"] == "team" and back["accepted_by"] == "captain"
+    assert back["accepted_at"] == (NOW + 12 * DAY).isoformat()
+    # Wer schon zugesagt hatte, behält seine Zusage; ohne eigenes Startrecht (Modus „automatisch“) gibt es keines.
+    kept = {"status": "accepted", "offered_at": NOW.isoformat(), "accepted_at": NOW.isoformat(), "accepted_via": "team"}
+    assert rights.restored_right(offer_to_move_up(kept, NOW + 9 * DAY), TEN, NOW + 12 * DAY, None, declined=False) == kept
+    assert rights.restored_right(offer_to_move_up(None, NOW + 9 * DAY), TEN, NOW + 12 * DAY, None, declined=False) is None
+    # Braucht die Season inzwischen keine Zusage mehr, gilt das frühere Startrecht wie alle anderen als zugesagt.
+    auto = {**SEASON, "start_rights": {"mode": "auto"}}
+    switched = rights.restored_right(offer_to_move_up(own, NOW + 9 * DAY), auto, NOW + 12 * DAY, None, declined=False)
+    assert switched["status"] == "accepted" and switched["accepted_via"] == "mode"
+
+
+def test_the_minimum_rest_is_a_setting_with_three_days_as_default():
+    assert rights.normalize({})["rest_days"] == 3 and rights.normalize({"rest_days": 0})["rest_days"] == 0
+    with pytest.raises(rights.StartRightProblem):
+        rights.normalize({"rest_days": 31})
+    assert rights.stored({"start_rights": {"mode": "accept"}})["rest_days"] == 3
+
+
+def test_the_own_team_reads_whether_its_own_right_is_still_open_behind_the_offer():
+    own = {"status": "offered", "offered_at": NOW.isoformat()}
+    moved = {"id": "a1", "status": "accepted", "carry_over": {"division_level": 1, "fills": offer_to_move_up(own, NOW + DAY),
+                                                              "start_right": {"status": "offered", "offered_at": (NOW + DAY).isoformat()}}}
+    assert rights.view(moved, TEN, can_act=True, now=NOW + DAY)["fills"] == {"from_label": "Liga 2", "own_open": True, "rest_days": 3}
+    kept = {**moved, "carry_over": {**moved["carry_over"], "fills": offer_to_move_up({**own, "status": "accepted"}, NOW + DAY)}}
+    assert rights.view(kept, TEN, can_act=True, now=NOW + DAY)["fills"] == {"from_label": "Liga 2", "own_open": False, "rest_days": 3}
+
+
+def test_assigning_during_a_pause_says_that_the_deadline_rests():
+    offered = application(status="offered", offered_at=NOW.isoformat())
+    running = {**SEASON, "start_right_pauses": [{"from": (NOW + DAY).isoformat(), "to": None}]}
+    text = rights.assign_problem({**offered, "display_name": "Rudel Eins"}, running)
+    assert "die Frist ruht" in text and "Frist bis" not in text
+    assert "Frist bis" in rights.assign_problem({**offered, "display_name": "Rudel Eins"}, SEASON)
+
+
+def test_back_from_the_waitlist_in_automatic_mode_nothing_waits_for_an_acceptance():
+    waiting = {**application(status="offered", offered_at=NOW.isoformat()), "status": "waitlist", "display_name": "Rudel Eins"}
+    auto = {**SEASON, "start_rights": {"mode": "auto"}}
+    fields = rights.reoffer_fields(waiting, NOW.isoformat(), auto)
+    assert fields["carry_over.start_right"]["status"] == "accepted" and fields["carry_over.start_right"]["accepted_via"] == "mode"
+    assert rights.waitlist_problem(waiting, auto) is None
+    assert rights.waitlist_problem(waiting, SEASON) and rights.reoffer_fields(waiting, NOW.isoformat(), SEASON) == {
+        "carry_over.start_right": {"status": "offered", "offered_at": NOW.isoformat()}}

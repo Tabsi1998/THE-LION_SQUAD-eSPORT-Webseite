@@ -41,6 +41,7 @@ class StartRightsBody(BaseModel):
     accept_days: Optional[int] = None
     successor: Optional[str] = Field(default=None, max_length=20)
     remind_hours: Optional[int] = None
+    rest_days: Optional[int] = None
     announce: Optional[bool] = None
     # Rückfrage (Entscheidung 26.11.): Ausschalten oder Umschalten auf „automatisch“ lässt offene Startrechte als zugesagt gelten -
     # nur mit dieser Bestätigung, sonst 409 mit der Zahl.

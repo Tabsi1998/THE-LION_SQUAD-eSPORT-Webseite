@@ -402,11 +402,13 @@ async def test_an_expired_right_moves_on_and_a_silent_successor_falls_back(flow)
     moved = after[third["squad_id"]]
     assert moved["carry_over"]["division_level"] == 1 and moved["carry_over"]["fills"]["for_application_id"] == promoted["id"]
     assert after[promoted["squad_id"]]["carry_over"]["filled_by"]["application_id"] == third["id"]
-    # Der Dritte lehnt das Nachrücken ab: zurück in seine Liga mit seiner noch offenen Frist, der Vierte rückt nach.
+    # Der Dritte lehnt das Nachrücken ab: zurück in seine Liga - das gilt zugleich als Zusage dort (Entscheidung 26.11.) -, der
+    # Vierte rückt nach.
     declined = ok(await answer(flow, third["squad_id"], third["id"], action="decline"))
-    assert declined["carry_over"]["division_label"].startswith("Liga 2") and declined["carry_over"]["start_right"]["state"] == "offered"
+    assert declined["carry_over"]["division_label"].startswith("Liga 2") and declined["carry_over"]["start_right"]["state"] == "accepted"
     after = await carried(flow, season["id"])
-    assert after[third["squad_id"]]["carry_over"]["start_right"] == third["carry_over"]["start_right"]
+    kept = after[third["squad_id"]]["carry_over"]["start_right"]
+    assert kept["status"] == "accepted" and kept["accepted_via"] == "team" and kept["offered_at"] == third["carry_over"]["start_right"]["offered_at"]
     assert after[fourth["squad_id"]]["carry_over"]["division_level"] == 1
     ok(await answer(flow, fourth["squad_id"], fourth["id"]))
     # Wiederholt ändert der Job nichts mehr.
@@ -680,7 +682,7 @@ async def test_settings_are_checked_stored_logged_and_can_be_switched_off(flow):
     assert (await flow.put(url, json={"active": True, "accept_days": 0})).status_code == 422
     assert (await flow.put(url, json={"active": True, "mode": "invite"})).status_code == 422
     saved = ok(await flow.put(url, json={"active": True, "mode": "accept", "accept_days": 21, "successor": "lead", "remind_hours": 0, "announce": False}))
-    assert saved["settings"] == {"mode": "accept", "accept_days": 21, "successor": "lead", "remind_hours": 0, "announce": False}
+    assert saved["settings"] == {"mode": "accept", "accept_days": 21, "successor": "lead", "remind_hours": 0, "announce": False, "rest_days": 3}
     assert (await flow.db.league_seasons.find_one({"id": world["season"]["id"]}, {"_id": 0}))["start_rights"]["accept_days"] == 21
     assert await flow.db.audit_logs.count_documents({"action": "league.season.start_rights"}) == 1
     # Das Blatt „Neue Season aus …“ bekommt die Einstellung als Vorgabe für die neue Season.
@@ -1031,3 +1033,220 @@ async def test_deleting_an_account_also_clears_who_revoked_a_right(flow):
 
     assert await scrub_person(flow.db, "person-x") == 1
     assert (await carried(flow, season["id"]))[row["squad_id"]]["carry_over"]["revoked_by"] is None
+
+
+# ---------------------------------------------------------------- Nachbesserung 26.11. (N1): Nachrück-Angebot und die eigene Frist
+
+async def moved_up_late(flow, world: dict, *, offer_days_ago: int = 3) -> tuple[dict, dict, dict]:
+    """Frist zehn Tage. Der Aufsteiger meldet sich ab, der Zweite rückt nach - sein eigenes Startrecht ist noch offen. Rückdatiert: Das
+    Angebot kam vor ``offer_days_ago`` Tagen, damals hatte die eigene Frist (vergeben vor zwölf Tagen) noch einen Tag.
+    Antwort: (neue Season, frei gewordener Antrag, Nachrücker)."""
+    season, rows = await ready(flow, world)
+    promoted, second = rows[squad_id(world, 2, 0)], rows[squad_id(world, 2, 1)]
+    flow.act_as(await person(flow, promoted["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{promoted['id']}/withdraw"))
+    moved = (await carried(flow, season["id"]))[second["squad_id"]]["carry_over"]
+    assert moved["fills"]["back"]["start_right"]["status"] == "offered"
+    at = (now_utc() - timedelta(days=offer_days_ago)).isoformat()
+    await flow.db.league_applications.update_one({"id": second["id"]}, {"$set": {
+        "carry_over.fills.at": at, "carry_over.start_right.offered_at": at,
+        "carry_over.fills.back.start_right.offered_at": (now_utc() - timedelta(days=offer_days_ago + 9)).isoformat()}})
+    return season, promoted, second
+
+
+@pytest.mark.asyncio
+async def test_declining_to_move_up_counts_as_acceptance_for_the_own_division(flow):
+    """N1: Tag 9 nachgerückt, Tag 12 abgelehnt. Vorher verfiel das eigene Startrecht sofort - jetzt gilt das Ablehnen als Zusage
+    für die eigene Liga."""
+    world = await build(flow, levels=2)
+    season, _promoted, second = await moved_up_late(flow, world)
+    told = await notes(flow, "league_start_right_fill", (await person(flow, second["squad_id"]))["id"])
+    assert len(told) == 1 and "gilt das als Zusage für Liga 2" in told[0]["body"] and "mindestens 3 Tage" in told[0]["body"]
+    item = await own_item(flow, second["squad_id"], second["id"])
+    assert item["carry_over"]["start_right"]["fills"] == {"from_label": item["carry_over"]["start_right"]["fills"]["from_label"],
+                                                         "own_open": True, "rest_days": 3}
+    back = ok(await answer(flow, second["squad_id"], second["id"], action="decline"))
+    assert back["carry_over"]["division_label"].startswith("Liga 2") and back["carry_over"]["start_right"]["state"] == "accepted"
+    stored = (await carried(flow, season["id"]))[second["squad_id"]]
+    assert stored["status"] == "accepted" and stored["carry_over"]["start_right"]["status"] == "accepted"
+    assert stored["carry_over"]["start_right"]["accepted_via"] == "team" and "fills" not in stored["carry_over"]
+    done = await league_start_rights.sweep(flow.db)
+    assert done["expired"] == 0
+    assert (await carried(flow, season["id"]))[second["squad_id"]]["status"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_silence_on_the_offer_falls_back_with_the_rest_of_the_own_deadline(flow):
+    """N1: Der Nachrücker schweigt. Vorher fiel er zurück und verfiel im selben Lauf - jetzt ruhte seine eigene Frist, und er hat
+    in der eigenen Liga die Restfrist, mindestens drei Tage."""
+    world = await build(flow, levels=2)
+    season, _promoted, second = await moved_up_late(flow, world, offer_days_ago=11)
+    before = now_utc()
+    done = await league_start_rights.sweep(flow.db)
+    assert done["restored"] == 1 and done["expired"] == 0
+    fresh_season = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
+    stored = (await carried(flow, season["id"]))[second["squad_id"]]
+    assert stored["status"] == "accepted" and stored["carry_over"]["division_level"] == 2
+    assert stored["carry_over"]["start_right"]["status"] == "offered" and "fills" not in stored["carry_over"]
+    until = league_start_rights.accept_until(stored, fresh_season)
+    assert before + timedelta(days=3) <= until <= now_utc() + timedelta(days=3)
+    told = await notes(flow, "league_start_right_back", (await person(flow, second["squad_id"]))["id"])
+    assert len(told) == 1 and "bleibt in Liga 2" in told[0]["body"] and "zusagen" in told[0]["body"]
+    # Ein zweiter Lauf lässt es stehen; zusagen geht.
+    assert (await league_start_rights.sweep(flow.db))["expired"] == 0
+    ok(await answer(flow, second["squad_id"], second["id"]))
+    assert (await carried(flow, season["id"]))[second["squad_id"]]["carry_over"]["start_right"]["status"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_after_the_rest_the_own_right_expires_like_any_other(flow):
+    world = await build(flow, levels=2)
+    season, _promoted, second = await moved_up_late(flow, world, offer_days_ago=11)
+    assert (await league_start_rights.sweep(flow.db))["restored"] == 1
+    await flow.db.league_applications.update_one({"id": second["id"]}, {"$set": {
+        "carry_over.start_right.min_until": (now_utc() - timedelta(hours=1)).isoformat(),
+        "carry_over.start_right.offered_at": (now_utc() - timedelta(days=40)).isoformat()}})
+    done = await league_start_rights.sweep(flow.db)
+    assert done["expired"] == 1
+    assert (await carried(flow, season["id"]))[second["squad_id"]]["carry_over"]["start_right"]["status"] == "expired"
+
+
+@pytest.mark.asyncio
+async def test_the_rest_never_reaches_beyond_the_start_date_and_then_the_lead_decides(flow):
+    """N1 mit B: Fällt das Startdatum in die Restfrist, endet sie dort - verfallen tut danach nichts mehr, die Leitung entscheidet."""
+    world = await build(flow, levels=2)
+    season, _promoted, second = await moved_up_late(flow, world, offer_days_ago=11)
+    start = now_utc() + timedelta(days=1)
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"start_date": start.isoformat()}})
+    assert (await league_start_rights.sweep(flow.db))["restored"] == 1
+    fresh_season = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
+    stored = (await carried(flow, season["id"]))[second["squad_id"]]
+    assert league_start_rights.accept_until(stored, fresh_season) == league_calendar.aware(start.isoformat())
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"start_date": (now_utc() - timedelta(minutes=5)).isoformat()}})
+    assert await league_start_rights.sweep(flow.db) == {"expired": 0, "restored": 0, "filled": 0, "reminded": 0, "announced": 0, "paused": 0}
+    item = await own_item(flow, second["squad_id"], second["id"])
+    assert item["carry_over"]["start_right"]["state"] == "offered" and item["carry_over"]["start_right"]["waits_for_lead"] is True
+
+
+@pytest.mark.asyncio
+async def test_an_open_offer_at_the_start_date_stays_with_the_lead(flow):
+    """N1 mit B: Das Startdatum ist erreicht, während das Nachrück-Angebot noch offen ist - nichts fällt von selbst zurück."""
+    world = await build(flow, levels=2)
+    season, _promoted, second = await moved_up_late(flow, world, offer_days_ago=11)
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"start_date": (now_utc() - timedelta(minutes=5)).isoformat()}})
+    assert await league_start_rights.sweep(flow.db) == {"expired": 0, "restored": 0, "filled": 0, "reminded": 0, "announced": 0, "paused": 0}
+    stored = (await carried(flow, season["id"]))[second["squad_id"]]["carry_over"]
+    assert stored["division_level"] == 1 and stored["fills"] and stored["start_right"]["status"] == "offered"
+
+
+# ---------------------------------------------------------------- Zurückgenommener Nachrücker (Prüfer-Frage 2)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rule", ["next", "lead"])
+async def test_a_revoked_successor_frees_the_place_again(flow, rule):
+    """Der Nachrücker ist nach dem korrigierten Endstand nicht mehr dabei („Übernahme neu berechnen“ nimmt ihn zurück): Der Platz ist
+    wieder frei, und es gilt die Nachrückerregel der Season - automatisch oder als Vorschlag für die Leitung."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world, successor=rule)
+    promoted, second, third = (rows[squad_id(world, 2, index)] for index in range(3))
+    flow.act_as(await person(flow, promoted["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{promoted['id']}/withdraw"))
+    if rule == "lead":
+        flow.act_as(world["lead"])
+        ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/start-rights/{promoted['id']}/fill",
+                           json={"candidate_id": second["id"], "reason": "Platz 2 der Tabelle rückt nach"}))
+    assert (await carried(flow, season["id"]))[promoted["squad_id"]]["carry_over"]["filled_by"]["application_id"] == second["id"]
+    # Wieder öffnen, der Zweite wird disqualifiziert, neu abschließen, neu berechnen.
+    tid = world["tids"][2][0]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Disqualifikation nachgetragen"}))
+    await flow.db.tournament_registrations.update_one({"id": world["regs"][tid][1]["id"]}, {"$set": {
+        "status": "disqualified", "removal": {"at": LONG_AGO, "mode": "forfeit"}}})
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    assert {change["squad_id"]: change["kind"] for change in preview["changes"]}[second["squad_id"]] == "revoked"
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]}))
+    after = await carried(flow, season["id"])
+    gone = after[second["squad_id"]]
+    assert gone["status"] == "rejected" and gone["carry_over"]["revoked_at"] and "fills" not in gone["carry_over"]
+    freed = after[promoted["squad_id"]]["carry_over"]
+    if rule == "next":
+        # Die Regel greift sofort: Der Nächste rückt nach.
+        assert freed["filled_by"]["application_id"] == third["id"]
+        assert after[third["squad_id"]]["carry_over"]["division_level"] == 1 and after[third["squad_id"]]["carry_over"]["fills"]
+    else:
+        assert "filled_by" not in freed
+        place = (await overview(flow, world, season["id"]))["open_places"][0]
+        assert place["application_id"] == promoted["id"] and place["pick"] == third["id"]
+
+
+# ---------------------------------------------------------------- Pause: verpasster Beginn, Reihenfolge, früher Ausstieg
+
+@pytest.mark.asyncio
+async def test_a_missed_pause_starts_at_the_reopening_not_at_the_job(flow):
+    """Fehlte der Schritt in der Route (etwa durch einen Absturz), holt der Job die Pause nach - ab dem Wiederöffnen, nicht ab jetzt."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    tid = world["tids"][2][0]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    reopened = (now_utc() - timedelta(days=2)).isoformat()
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$unset": {"start_right_pauses": ""}})
+    await flow.db.league_final_tables.update_many({"tournament_id": tid, "reopened_at": {"$ne": None}}, {"$set": {"reopened_at": reopened}})
+    assert (await league_start_rights.sweep(flow.db))["paused"] == 1
+    pauses = (await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0}))["start_right_pauses"]
+    assert pauses == [{"from": reopened, "to": None}]
+
+
+@pytest.mark.asyncio
+async def test_the_pause_is_recorded_even_when_the_announcement_fails(flow, monkeypatch):
+    """Erst der Pausenabgleich, dann die Nachricht: Ein Fehler beim Melden lässt keine Frist weiterlaufen."""
+    world = await build(flow, levels=2)
+    season, _rows = await ready(flow, world)
+
+    async def broken(_db, _season_id):
+        raise RuntimeError("Nachricht kaputt")
+
+    monkeypatch.setattr(league_start_rights, "announce", broken)
+    tid = world["tids"][2][0]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    paused = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
+    assert len(paused["start_right_pauses"]) == 1 and paused["start_right_pauses"][0]["to"] is None
+
+
+@pytest.mark.asyncio
+async def test_after_the_start_date_the_job_does_not_even_read_the_final_standings(flow, monkeypatch):
+    world = await build(flow, levels=2)
+    season, _rows = await ready(flow, world)
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"start_date": (now_utc() - timedelta(minutes=5)).isoformat()}})
+    calls = []
+
+    async def counted(_db, _season):
+        calls.append(1)
+        raise AssertionError("nach dem Startdatum wird der Endstand nicht mehr gelesen")
+
+    monkeypatch.setattr(league_start_rights, "_context", counted)
+    assert await league_start_rights.sweep(flow.db) == {"expired": 0, "restored": 0, "filled": 0, "reminded": 0, "announced": 0, "paused": 0}
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_back_from_the_waitlist_in_automatic_mode_nothing_is_offered_again(flow):
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    row = rows[squad_id(world, 1, 0)]
+    base = f"{ADMIN}/seasons/{season['id']}/applications/{row['id']}"
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{base}/waitlist", json={"reason": "Kader wird noch geklärt"}))
+    # Umschalten auf „automatisch“: Auf der Warteliste bleibt das Startrecht offen (es zählt nicht zu den offenen Zusagen) ...
+    ok(await flow.put(f"{ADMIN}/seasons/{season['id']}/start-rights", json={"active": True, "mode": "auto", "confirm_open": True}))
+    assert (await carried(flow, season["id"]))[row["squad_id"]]["carry_over"]["start_right"]["status"] == "offered"
+    # ... und beim Annehmen entsteht daraus kein neues „Zusage offen“, auch gleich mit Staffel.
+    division = await flow.db.league_divisions.find_one({"season_id": season["id"], "level": 1}, {"_id": 0})
+    staffel = ok(await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={}))
+    ok(await flow.post(f"{base}/accept", json={"tournament_id": staffel["tournament_id"]}))
+    back = (await carried(flow, season["id"]))[row["squad_id"]]
+    assert back["status"] == "accepted" and back["assignment"] and back["carry_over"]["start_right"]["status"] == "accepted"
+    assert back["carry_over"]["start_right"]["accepted_via"] == "mode"

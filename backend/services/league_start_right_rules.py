@@ -28,12 +28,16 @@ PAUSES = "start_right_pauses"
 PAUSE_LIMIT = 50
 AUTO, ACCEPT = "auto", "accept"
 NEXT, LEAD = "next", "lead"
-DEFAULTS: dict = {"mode": ACCEPT, "accept_days": 14, "successor": NEXT, "remind_hours": 48, "announce": True}
+DEFAULTS: dict = {"mode": ACCEPT, "accept_days": 14, "successor": NEXT, "remind_hours": 48, "announce": True,
+                  # Restfrist (Entscheidung 26.11.): Wer ein Nachrück-Angebot verstreichen lässt, hat in der eigenen Liga mindestens so
+                  # viele Tage für die Zusage.
+                  "rest_days": 3}
 CHOICES: dict[str, tuple[str, ...]] = {"mode": (AUTO, ACCEPT), "successor": (NEXT, LEAD)}
 # Feld → (kleinster, größter Wert, Bezeichnung für die Meldung)
 NUMBERS: dict[str, tuple[int, int, str]] = {
     "accept_days": (1, 60, "Die Frist für die Zusage (Tage)"),
     "remind_hours": (0, 336, "Die Erinnerung vor Fristende (Stunden)"),
+    "rest_days": (0, 30, "Die Restfrist nach einem Nachrück-Angebot (Tage)"),
 }
 OFFERED, ACCEPTED, DECLINED, EXPIRED = "offered", "accepted", "declined", "expired"
 FORECAST, CONFIRMED, REVOKED, PARTICIPATING = "forecast", "confirmed", "revoked", "participating"
@@ -146,24 +150,78 @@ def open_pause(season: dict | None) -> bool:
     return any(end is None for _begin, end in pauses(season))
 
 
+def _rests(right: dict | None) -> list[tuple[datetime, datetime | None]]:
+    """Die Zeiten, in denen die Frist dieses Startrechts ruhte, weil ein Nachrück-Angebot offen war (``start_right.rests``)."""
+    out = []
+    for row in (right or {}).get("rests") or []:
+        begin = league_calendar.aware((row or {}).get("from")) if isinstance(row, dict) else None
+        end = league_calendar.aware(row.get("to")) if begin else None
+        if begin and end:
+            out.append((begin, end))
+    return out
+
+
+def _merged(spans: list[tuple[datetime, datetime | None]]) -> list[tuple[datetime, datetime | None]]:
+    """Überlappende Ruhezeiten zusammengelegt - dieselbe Zeit zählt nur einmal, auch wenn Pause und Angebot zusammenfallen."""
+    out: list[tuple[datetime, datetime | None]] = []
+    for begin, end in sorted(spans, key=lambda pair: pair[0]):
+        if out and (out[-1][1] is None or begin <= out[-1][1]):
+            last_begin, last_end = out[-1]
+            out[-1] = (last_begin, None if last_end is None or end is None else max(last_end, end))
+        else:
+            out.append((begin, end))
+    return out
+
+
 def _deadline(application: dict | None, season: dict | None) -> tuple[datetime | None, bool]:
-    """(Fristende, ruht). ``accept_days`` ab der Vergabe; jede Pause, die in die laufende Frist fällt, verlängert sie um ihre Dauer
-    (ab der Vergabe gerechnet). Fällt eine offene Pause in die Frist, ruht sie: kein Ende, nichts ist überfällig. Eine Pause nach
-    dem Fristende ändert nichts mehr. Äußerste Grenze bleibt der Start der Season (der gemerkte, Nr. 253)."""
+    """(Fristende, ruht). ``accept_days`` ab der Vergabe; jede Ruhezeit, die in die laufende Frist fällt, verlängert sie um ihre
+    Dauer (ab der Vergabe gerechnet): die Pausen der Season (Vorgänger wieder geöffnet) und die Zeit, in der für dieses Co-Team ein
+    Nachrück-Angebot offen war (``rests``). Fällt eine offene Pause in die Frist, ruht sie: kein Ende, nichts ist überfällig. Eine
+    Ruhezeit nach dem Fristende ändert nichts mehr. Nach einem verstrichenen Nachrück-Angebot endet die Frist nicht vor
+    ``min_until`` (Restfrist, mindestens ``rest_days``). Äußerste Grenze bleibt das Startdatum der Season (das gemerkte, Nr. 253)."""
     right = right_of(application)
     offered = league_calendar.aware((right or {}).get("offered_at"))
     if not offered:
         return None, False
     until = offered + timedelta(days=int((stored(season) or DEFAULTS)["accept_days"]))
-    for begin, end in pauses(season):
+    for begin, end in _merged([*pauses(season), *_rests(right)]):
         if begin >= until:
             break
         if end is None:
             return None, True
         if end > offered:
             until += end - max(begin, offered)
+    floor = league_calendar.aware(right.get("min_until"))
+    if floor and floor > until:
+        until = floor
     start = league_calendar.start_moment(season)
     return (min(until, start) if start else until), False
+
+
+def restored_right(fills: dict | None, season: dict | None, now: datetime, actor_id: str | None, *, declined: bool) -> dict | None:
+    """Das eigene Startrecht eines Nachrückers, wenn das Nachrück-Angebot endet (Entscheidung 26.11.). Solange das Angebot offen
+    war, ruhte die eigene Frist - genau wie in der Pause.
+
+    - **Abgelehnt** (``declined``): Das gilt als Zusage für die eigene Liga.
+    - **Geschwiegen**: zurück in die eigene Liga mit der restlichen Frist - mindestens ``rest_days`` -, nie über das Startdatum
+      hinaus (das begrenzt ``accept_until``). Die Erinnerung beginnt neu.
+    - Wer schon zugesagt hatte, behält seine Zusage. Braucht die Season inzwischen keine Zusage mehr (umgeschaltet), gilt das
+      frühere Startrecht wie alle anderen als zugesagt. ``None``: Es gab kein eigenes Startrecht (Modus „automatisch“)."""
+    back = (fills or {}).get("back") or {}
+    own = back.get("start_right") if isinstance(back.get("start_right"), dict) else None
+    if own is None:
+        return None
+    if own.get("status") != OFFERED:
+        return own
+    stamp = now.isoformat()
+    if not needs_accept(season):
+        return {**own, "status": ACCEPTED, "accepted_at": stamp, "accepted_by": actor_id, "accepted_via": "mode"}
+    if declined:
+        return {**own, "status": ACCEPTED, "accepted_at": stamp, "accepted_by": actor_id, "accepted_via": "team"}
+    since = (fills or {}).get("at") or stamp
+    rest = int((stored(season) or DEFAULTS)["rest_days"])
+    out = {key: value for key, value in own.items() if key != "reminded_at"}
+    return {**out, "rests": [*(own.get("rests") or []), {"from": since, "to": stamp}], "min_until": (now + timedelta(days=rest)).isoformat()}
 
 
 def accept_until(application: dict | None, season: dict | None) -> datetime | None:
@@ -288,7 +346,7 @@ def candidates(place: dict, rights: list[dict], levels: list[int]) -> dict:
 
 # ---------------------------------------------------------------- Eingang, Zuteilen, das eigene Team
 
-ASSIGN_WAITS = ("{name} hat das Startrecht noch nicht angenommen (Frist bis {day}). Zuteilen geht nach der Zusage. Liegt sie dir schon "
+ASSIGN_WAITS = ("{name} hat das Startrecht noch nicht angenommen ({when}). Zuteilen geht nach der Zusage. Liegt sie dir schon "
                 "vor, trag sie bei den Startrechten mit Grund ein.")
 
 
@@ -296,19 +354,23 @@ WAITLIST_FIRST = ("{name} hat das Startrecht noch nicht angenommen. Bitte erst o
                   "Zusage neu, und zuteilen geht nach der Zusage.")
 
 
-def reoffer_fields(application: dict | None, now: str) -> dict:
-    """Zurück von der Warteliste (B.4): Ein noch nicht zugesagtes Startrecht wird neu vergeben - die Frist beginnt neu. Die Felder
-    für denselben Schreibvorgang wie das Annehmen; leer, wenn es nichts neu zu vergeben gibt."""
+def reoffer_fields(application: dict | None, now: str, season: dict | None) -> dict:
+    """Zurück von der Warteliste (B.4): Ein noch nicht zugesagtes Startrecht wird neu vergeben - die Frist beginnt neu. Braucht die
+    Season keine Zusage (mehr) - Modus „automatisch“ oder ausgeschaltet -, entsteht kein neues „Zusage offen“: Das Startrecht gilt
+    dann wie alle anderen als zugesagt. Die Felder für denselben Schreibvorgang wie das Annehmen; leer, wenn nichts zu tun ist."""
     right = right_of(application)
     if not right or right.get("status") != OFFERED:
         return {}
+    if not needs_accept(season):
+        return {"carry_over.start_right": {**right, "status": ACCEPTED, "accepted_at": now, "accepted_by": None, "accepted_via": "mode"}}
     return {"carry_over.start_right": {"status": OFFERED, "offered_at": now}}
 
 
-def waitlist_problem(application: dict | None) -> str | None:
-    """Annehmen von der Warteliste gleich mit Staffel geht nur mit Zusage: der Satz für 422 - ``None``, wenn nichts dagegen spricht."""
+def waitlist_problem(application: dict | None, season: dict | None) -> str | None:
+    """Annehmen von der Warteliste gleich mit Staffel geht nur mit Zusage: der Satz für 422 - ``None``, wenn nichts dagegen spricht
+    (zugesagt, kein Startrecht, oder die Season braucht keine Zusage)."""
     right = right_of(application)
-    if not right or right.get("status") != OFFERED:
+    if not right or right.get("status") != OFFERED or not needs_accept(season):
         return None
     return WAITLIST_FIRST.format(name=(application or {}).get("display_name") or "Das Co-Team")
 
@@ -331,7 +393,7 @@ def assign_problem(application: dict | None, season: dict | None) -> str | None:
         return None
     until = accept_until(application, season)
     return ASSIGN_WAITS.format(name=(application or {}).get("display_name") or "Das Co-Team",
-                               day=day_text(until) if until else "die Frist ruht")
+                               when=f"Frist bis {day_text(until)}" if until else "die Frist ruht gerade")
 
 
 def may_pass(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
@@ -367,7 +429,11 @@ def view(application: dict | None, season: dict | None, *, can_act: bool = False
             "paused": resting(application, season),
             # Startdatum erreicht und Frist vorbei: Es verfällt nicht mehr von selbst, die Leitung entscheidet.
             "waits_for_lead": waits_for_lead(application, season, now),
-            "fills": {"from_label": (fills.get("back") or {}).get("division_label")} if fills else None,
+            # ``own_open``: Hinter dem Nachrück-Angebot wartet noch die eigene Zusage - ihre Frist ruht so lange; Ablehnen gilt als
+            # Zusage für die eigene Liga, Schweigen lässt die Restfrist (mindestens ``rest_days``).
+            "fills": ({"from_label": (fills.get("back") or {}).get("division_label"),
+                       "own_open": ((fills.get("back") or {}).get("start_right") or {}).get("status") == OFFERED and needs_accept(season),
+                       "rest_days": int((stored(season) or DEFAULTS)["rest_days"])} if fills else None),
             "can_accept": bool(can_act and current == OFFERED and not overdue(application, season, now)),
             "can_decline": bool(can_act and may_pass(application, season, now))}
 

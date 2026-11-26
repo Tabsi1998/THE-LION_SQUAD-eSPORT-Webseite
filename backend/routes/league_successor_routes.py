@@ -11,17 +11,21 @@ Zuständigkeit „Liga verwalten“ wie beim Anlegen einer Season (B.1). Logik i
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from database import get_db
 from models import LeagueSuccessorCreate, LeagueSuccessorRecompute
 from services import league_service as leagues
-from services import league_successor
+from services import league_start_rights, league_successor
+from services.log_safe import log_safe
 from services.change_events import publish_api_change
 from services.league_permissions import require_league
 from services.league_service import LeagueProblem
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
+logger = logging.getLogger("tls.league_successor_routes")
 
 require_manage = require_league(league_successor.CAPABILITY, via="season_id")
 
@@ -69,5 +73,12 @@ async def admin_recompute(season_id: str, body: LeagueSuccessorRecompute, me: di
         result = await league_successor.recompute(db, await _season(db, season_id), body.model_dump(), me)
     except (league_successor.SuccessorProblem, LeagueProblem) as problem:
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
+    # Startrechte (#1627, F.2a): Nahm das Neuberechnen einen Nachrücker zurück, ist sein Platz wieder frei - dort gilt die
+    # Nachrückerregel der Season. Das Neuberechnen steht; ein Fehler hier hält es nicht auf (der Platz steht dann unter „frei“).
+    if result.get("released_places"):
+        try:
+            await league_start_rights.fill_places(db, season_id, result["released_places"])
+        except Exception:  # noqa: BLE001 - siehe oben
+            logger.warning("[league_successor] Nachrücken nach dem Neuberechnen nicht ausgeführt: %s", log_safe(season_id), exc_info=True)
     await publish_api_change("POST", f"/api/admin/leagues/seasons/{season_id}", 200)
     return {"ok": True, **result}

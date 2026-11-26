@@ -708,7 +708,7 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(DECIDED, 409)
             # Startrechte (#1627, F.2a): Die Warteliste ist kein Weg an der Zusage vorbei - gleich mit Staffel annehmen geht erst,
             # wenn das Co-Team zugesagt hat. Ohne Staffel wird das Startrecht neu vergeben (``reoffer_fields``): Die Frist beginnt neu.
-            waits = league_start_right_rules.waitlist_problem(application) if tournament_id else None
+            waits = league_start_right_rules.waitlist_problem(application, fresh) if tournament_id else None
             if waits:
                 raise LeagueProblem(waits, 422)
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
@@ -725,7 +725,7 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
             fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None,
-                      **league_start_right_rules.reoffer_fields(application, now)}
+                      **league_start_right_rules.reoffer_fields(application, now, fresh)}
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over, override)
             if deviation:
                 await db.league_applications.update_one({"id": done["id"]}, {"$set": {"assignment.deviation_reason": deviation}})

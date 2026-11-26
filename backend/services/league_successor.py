@@ -675,7 +675,9 @@ async def recompute(db, season: dict, body: dict, actor: dict) -> dict:
         "id": new_id(), "action": "league.season.successor.recompute", "actor_id": actor.get("id"), "target_id": fresh["id"],
         "data": {"predecessor_id": fresh["predecessor_id"], "stamp": found["stamp"], **counts, "manual": len(found["manual"])},
         "created_at": now_utc().isoformat()})
-    return {"changed": len(done), **counts, "manual": found["manual"], "notified": notified, "stamp": found["stamp"]}
+    return {"changed": len(done), **counts, "manual": found["manual"], "notified": notified, "stamp": found["stamp"],
+            # Plätze, die wieder frei sind, weil ein Nachrücker zurückgenommen wurde (#1627, F.2a) - die Route lässt nachrücken.
+            "released_places": sorted({key for change, _row in done for key in change.get("released") or []})}
 
 
 async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[tuple[dict, dict]]:
@@ -708,7 +710,8 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
             query.update({"status": ACCEPTED, "assignment": {"$exists": False}})
             update = {"$set": {"status": REJECTED, "decision_reason": REVOKED_REASON, "decided_by": who, "decided_at": now, "updated_at": now,
                                "carry_over.revoked_at": now, "carry_over.revoked_by": who},
-                      "$unset": {"active_key": ""},
+                      # War es ein Nachrücker (#1627, F.2a), ist er es nicht mehr - sein Platz wird unten wieder frei.
+                      "$unset": {"active_key": "", "carry_over.fills": ""},
                       "$push": {"history": {"status": REJECTED, "by": who, "at": now, "reason": REVOKED_REASON, "carry_over": True, "recomputed": True}}}
         elif kind == "reactivated":
             query.update({"status": REJECTED, "carry_over.revoked_at": {"$exists": True}})
@@ -734,5 +737,13 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
         except DuplicateKeyError:
             continue
         if result.modified_count:
+            if kind == "revoked":
+                # Zurückgenommener Nachrücker (Entscheidung 26.11.): Der Platz, auf den er nachgerückt war, ist wieder frei -
+                # ``filled_by`` fällt weg, er steht wieder unter den freien Plätzen, und es gilt die Nachrückerregel der Season.
+                freed = await db.league_applications.find({"season_id": season["id"], "carry_over.filled_by.application_id": change["application_id"]},
+                                                          {"_id": 0, "id": 1}).to_list(10)
+                change["released"] = [row["id"] for row in freed]
+                if freed:
+                    await db.league_applications.update_many({"id": {"$in": change["released"]}}, {"$unset": {"carry_over.filled_by": ""}})
             done.append((change, await db.league_applications.find_one({"id": change["application_id"]}, {"_id": 0})))
     return done
