@@ -78,7 +78,21 @@ export function crestTier(level?: number | null): "top" | "mid" | "base" | null 
 
 // ---------------------------------------------------------------- Marken je Gerät und Konto
 
-type AccountMarks = { token?: string; done?: string[] };
+/** Eine „fertig“-Marke: Kennung und Stand des Moments (`momentVersion`). Eine Marke ohne Stand (ältere Fassung) gilt für keinen. */
+export type DoneMark = { id: string; v: string };
+type AccountMarks = { token?: string; done?: Array<DoneMark | string> };
+
+/**
+ * Der Stand eines Moments (Nr. 277): Eine Korrektur des Endstands bringt einen neuen Moment - der Server setzt dann `confirmed_at` neu und
+ * `corrected`, oft auch einen anderen Ausgang. Eine alte „fertig“-Marke darf einen korrigierten Moment nie still als fertig melden.
+ */
+export function momentVersion(moment: Pick<LeagueMoment, "outcome" | "confirmed_at" | "corrected" | "to">): string {
+  return [moment.confirmed_at || "", moment.corrected ? "k" : "", moment.outcome, moment.to?.level ?? ""].join("|");
+}
+
+function marksOf(account: AccountMarks): DoneMark[] {
+  return (account.done || []).filter((mark): mark is DoneMark => typeof mark === "object" && Boolean(mark?.id));
+}
 type Marks = { accounts: Record<string, AccountMarks> };
 
 async function readMarks(): Promise<Marks> {
@@ -120,25 +134,26 @@ export function momentToken(userId: string): Promise<string> {
   });
 }
 
-/** Geschlossen, „fertig“ ist aber noch nicht beim Server - bis es ankommt, zeigt dieses Gerät den Moment nicht mehr. */
-export function markMomentDone(userId: string, id: string): Promise<void> {
+/** Geschlossen, „fertig“ ist aber noch nicht beim Server - bis es ankommt, zeigt dieses Gerät den Moment in diesem Stand nicht mehr. */
+export function markMomentDone(userId: string, id: string, version = ""): Promise<void> {
   return changeMarks(userId, (account) => {
-    const done = (account.done || []).filter((known) => known !== id);
-    done.push(id);
+    const done = marksOf(account).filter((mark) => mark.id !== id);
+    done.push({ id, v: version });
     account.done = done.slice(-MAX_DONE_MARKS);
   });
 }
 
-/** „Fertig“ ist beim Server angekommen - die Marke kann weg. */
+/** „Fertig“ ist beim Server angekommen (oder die Marke ist veraltet) - sie kann weg. */
 export function forgetMomentDone(userId: string, id: string): Promise<void> {
   return changeMarks(userId, (account) => {
-    account.done = (account.done || []).filter((known) => known !== id);
+    account.done = marksOf(account).filter((mark) => mark.id !== id);
   });
 }
 
-export async function momentsDoneHere(userId: string): Promise<string[]> {
+/** Die „fertig“-Marken dieses Kontos auf diesem Gerät: Kennung → Stand. */
+export async function momentsDoneHere(userId: string): Promise<Map<string, string>> {
   const marks = await withKeyLock(MOMENT_MARKS_KEY, readMarks);
-  return [...(marks.accounts[userId]?.done || [])];
+  return new Map(marksOf(marks.accounts[userId] || {}).map((mark) => [mark.id, mark.v]));
 }
 
 /** Beim Abmelden und beim Kontowechsel: alle Marken des Moments weg. */
@@ -160,18 +175,23 @@ export type CeremonyItem =
 export function planCeremonies(
   moments: Array<LeagueMoment | null | undefined> | null | undefined,
   rewards: Array<RewardAward | null | undefined> | null | undefined,
-  { queued, doneHere }: { queued: Set<string>; doneHere: Set<string> },
-): { items: CeremonyItem[]; reportDone: string[] } {
+  { queued, doneHere }: { queued: Set<string>; doneHere: Map<string, string> },
+): { items: CeremonyItem[]; reportDone: LeagueMoment[]; stale: string[] } {
   const items: CeremonyItem[] = [];
-  const reportDone: string[] = [];
+  const reportDone: LeagueMoment[] = [];
+  const stale: string[] = [];
   for (const row of moments || []) {
     if (!isLeagueMoment(row)) continue;
     const key = `moment:${row.id}`;
     if (queued.has(key)) continue;
     queued.add(key);
     if (doneHere.has(row.id)) {
-      reportDone.push(row.id);
-      continue;
+      // Nur derselbe Stand gilt als fertig - nach einer Korrektur ist die Marke veraltet und der Moment kommt (Nr. 277).
+      if (doneHere.get(row.id) && doneHere.get(row.id) === momentVersion(row)) {
+        reportDone.push(row);
+        continue;
+      }
+      stale.push(row.id);
     }
     const own = (row.rewards || []).filter((award): award is RewardAward => Boolean(award?.id && award.reward));
     own.forEach((award) => queued.add(award.id));
@@ -182,7 +202,7 @@ export function planCeremonies(
     group.forEach((award) => queued.add(award.id));
     items.push({ kind: "rewards", key: `rewards:${group.map((award) => award.id).join("-")}`, rewards: group });
   }
-  return { items, reportDone };
+  return { items, reportDone, stale };
 }
 
 // ---------------------------------------------------------------- Noch einmal ansehen, Push

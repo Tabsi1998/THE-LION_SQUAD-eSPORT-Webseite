@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import {
-  MAX_DONE_MARKS, MOMENT_MARKS_KEY, clearMomentMarks, crestTier, forgetMomentDone, isLeagueMoment, markMomentDone, momentToken, momentsDoneHere,
+  MAX_DONE_MARKS, MOMENT_MARKS_KEY, clearMomentMarks, crestTier, forgetMomentDone, isLeagueMoment, markMomentDone, momentToken, momentVersion, momentsDoneHere,
   planCeremonies, type LeagueMoment,
 } from "./leagueMoments";
 
@@ -34,32 +34,32 @@ describe("Geräte-Schlüssel je Gerät und Konto", () => {
     await markMomentDone("u1", "m1");
     await clearMomentMarks();
     expect(await SecureStore.getItemAsync(MOMENT_MARKS_KEY)).toBeNull();
-    expect(await momentsDoneHere("u1")).toEqual([]);
+    expect((await momentsDoneHere("u1")).size).toBe(0);
     expect(await momentToken("u1")).not.toBe(before);
   });
 
   test("kaputter Speicher zählt als leer", async () => {
     await SecureStore.setItemAsync(MOMENT_MARKS_KEY, "{kaputt");
-    expect(await momentsDoneHere("u1")).toEqual([]);
+    expect((await momentsDoneHere("u1")).size).toBe(0);
     expect(await momentToken("u1")).toMatch(/^[A-Za-z0-9-]{8,80}$/);
   });
 });
 
 describe("fertig, aber noch nicht beim Server", () => {
   test("je Konto: die Marke von u1 gilt für u2 nicht", async () => {
-    await markMomentDone("u1", "m1");
-    expect(await momentsDoneHere("u1")).toEqual(["m1"]);
-    expect(await momentsDoneHere("u2")).toEqual([]);
+    await markMomentDone("u1", "m1", "stand-1");
+    expect([...(await momentsDoneHere("u1")).entries()]).toEqual([["m1", "stand-1"]]);
+    expect((await momentsDoneHere("u2")).size).toBe(0);
     await forgetMomentDone("u1", "m1");
-    expect(await momentsDoneHere("u1")).toEqual([]);
+    expect((await momentsDoneHere("u1")).size).toBe(0);
   });
 
   test("doppelt gemerkt zählt einmal, höchstens MAX_DONE_MARKS (die ältesten gehen)", async () => {
-    await markMomentDone("u1", "m1");
-    await markMomentDone("u1", "m1");
-    expect(await momentsDoneHere("u1")).toEqual(["m1"]);
+    await markMomentDone("u1", "m1", "a");
+    await markMomentDone("u1", "m1", "b");
+    expect([...(await momentsDoneHere("u1")).entries()]).toEqual([["m1", "b"]]);
     for (let index = 2; index <= MAX_DONE_MARKS + 3; index += 1) await markMomentDone("u1", `m${index}`);
-    const done = await momentsDoneHere("u1");
+    const done = [...(await momentsDoneHere("u1")).keys()];
     expect(done).toHaveLength(MAX_DONE_MARKS);
     expect(done).not.toContain("m1");
     expect(done).toContain(`m${MAX_DONE_MARKS + 3}`);
@@ -70,25 +70,34 @@ describe("planCeremonies: Reihenfolge und Einmaligkeit", () => {
   test("Momente in der Reihenfolge des Servers vor den Belohnungen; was der Meister mitbringt, kommt nicht noch einmal", () => {
     const queued = new Set<string>();
     const champion = moment("c", { outcome: "champion", rewards: [award("r1") as never, { id: "leer" } as never] });
-    const plan = planCeremonies([champion, moment("u")], [award("r1") as never, award("r2", "t2") as never], { queued, doneHere: new Set() });
+    const plan = planCeremonies([champion, moment("u")], [award("r1") as never, award("r2", "t2") as never], { queued, doneHere: new Map() });
     expect(plan.items.map((item) => item.key)).toEqual(["moment:c", "moment:u", "rewards:r2"]);
     expect(plan.items[0]).toMatchObject({ kind: "moment", rewards: [{ id: "r1" }] });
     expect(plan.reportDone).toEqual([]);
     // Ein zweiter Abruf reiht nichts doppelt ein.
-    const again = planCeremonies([champion, moment("u")], [award("r1") as never, award("r2", "t2") as never], { queued, doneHere: new Set() });
+    const again = planCeremonies([champion, moment("u")], [award("r1") as never, award("r2", "t2") as never], { queued, doneHere: new Map() });
     expect(again.items).toEqual([]);
   });
 
   test("auf diesem Gerät schon geschlossen: still nachmelden, nicht noch einmal zeigen", () => {
-    const plan = planCeremonies([moment("m1"), moment("m2")], [], { queued: new Set(), doneHere: new Set(["m1"]) });
+    const plan = planCeremonies([moment("m1"), moment("m2")], [], { queued: new Set(), doneHere: new Map([["m1", momentVersion(moment("m1"))]]) });
     expect(plan.items.map((item) => item.key)).toEqual(["moment:m2"]);
-    expect(plan.reportDone).toEqual(["m1"]);
+    expect(plan.reportDone.map((row) => row.id)).toEqual(["m1"]);
+    expect(plan.stale).toEqual([]);
+  });
+
+  test("Gegenprobe Nr. 277: eine Marke mit altem Stand (oder ohne Stand) zeigt den korrigierten Moment und gilt als veraltet", () => {
+    const corrected = moment("m1", { corrected: true, confirmed_at: "2026-11-24T18:00:00Z" });
+    const plan = planCeremonies([corrected, moment("m2")], [], { queued: new Set(), doneHere: new Map([["m1", momentVersion(moment("m1"))], ["m2", ""]]) });
+    expect(plan.items.map((item) => item.key)).toEqual(["moment:m1", "moment:m2"]);
+    expect(plan.reportDone).toEqual([]);
+    expect(plan.stale).toEqual(["m1", "m2"]);
   });
 
   test("ohne Texte oder Kennung, mit fremdem Ausgang: kein Moment", () => {
     const plan = planCeremonies([
       moment("ohne", { texts: undefined }), { ...moment("x"), id: "" }, moment("seltsam", { outcome: "bleibt" as never }), null as never,
-    ], [], { queued: new Set(), doneHere: new Set() });
+    ], [], { queued: new Set(), doneHere: new Map() });
     expect(plan.items).toEqual([]);
     expect(isLeagueMoment(moment("ok"))).toBe(true);
   });
@@ -102,4 +111,11 @@ test("Stufe des Wappens wie das Liga-Abzeichen: Liga 1 mit Krone, Liga 2 doppelt
   expect(crestTier(0)).toBeNull();
   expect(crestTier(null)).toBeNull();
   expect(crestTier("2" as never)).toBe("mid");
+});
+
+test("Stand eines Moments: eine Korrektur (neuer Endstand, neuer Ausgang) gibt einen neuen Stand", () => {
+  const before = moment("m1", { confirmed_at: "2026-11-20T10:00:00Z" });
+  expect(momentVersion(before)).toBe(momentVersion({ ...before }));
+  expect(momentVersion({ ...before, confirmed_at: "2026-11-24T18:00:00Z", corrected: true })).not.toBe(momentVersion(before));
+  expect(momentVersion({ ...before, outcome: "down", to: { level: 3 } })).not.toBe(momentVersion(before));
 });

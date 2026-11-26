@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { createCeremonyQueue } from "../../achievements/ceremony/queue";
 import { MOMENT_MARKS_KEY, replayMoment, requestMoment, type LeagueMoment } from "../../lib/leagueMoments";
+import { setModalOpen } from "../../lib/modalGate";
 import { LeagueMomentHint } from "./LeagueMomentHint";
 import { RewardMomentHost } from "./RewardMomentHost";
 
@@ -277,4 +278,85 @@ test("break-ui: sehr langer Teamname und Liga 12 - nichts wird abgeschnitten", a
   expect(screen.getByTestId("season-moment-name").props.numberOfLines).toBeUndefined();
   expect(screen.getByTestId("season-moment-title").props.numberOfLines).toBeUndefined();
   expect(screen.getByTestId("season-moment-num-to", HIDDEN)).toHaveTextContent("12");
+});
+
+// Nachbesserung nach der Prüfung (#2584).
+test("Kontowechsel: eine späte Antwort für Konto A landet nie in der Schlange von B", async () => {
+  let release: (value: unknown) => void = () => {};
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/me/rewards/unseen" && mockUser.id === "u1") return new Promise((resolve) => { release = resolve; });
+    if (path === "/me/league-moments/unseen") return Promise.resolve({ data: { moments: [] } });
+    return Promise.resolve({ data: { rewards: [] } });
+  });
+  const queue = createCeremonyQueue();
+  const view = await render(<RewardMomentHost queue={queue} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/me/rewards/unseen"));
+  mockUser = { id: "u2" };
+  await view.rerender(<RewardMomentHost queue={queue} />);
+  await waitFor(() => expect(mockGet.mock.calls.filter(([path]) => path === "/me/rewards/unseen")).toHaveLength(2));
+  await act(async () => { release({ data: { rewards: [award("a1", "Gold von Konto A")] } }); });
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.queryByText("Gold von Konto A")).toBeNull();
+  expect(screen.queryByTestId("reward-moment")).toBeNull();
+});
+
+test("wartet auf andere offene Fenster (Abstimmung, Passkey-Einladung …) - Moment und Belohnung gleich", async () => {
+  setModalOpen("ballot-popup", true);
+  serve({ moments: [moment("m1", "up")], rewards: [award("r9", "Banner")] });
+  await render(<RewardMomentHost queue={createCeremonyQueue()} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/me/league-moments/unseen"));
+  await act(async () => { await Promise.resolve(); });
+  expect(posts("/me/league-moments/seen")).toEqual([]);
+  expect(screen.queryByTestId("season-moment")).toBeNull();
+  await act(async () => { setModalOpen("ballot-popup", false); });
+  await waitFor(() => expect(screen.getByTestId("season-moment")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("season-moment-done"));
+  // Die Belohnung danach wartet ebenso, solange ein anderes Fenster offen ist.
+  await act(async () => { setModalOpen("ballot-popup", true); });
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.queryByTestId("reward-moment")).toBeNull();
+  await act(async () => { setModalOpen("ballot-popup", false); });
+  await waitFor(() => expect(screen.getByTestId("reward-moment")).toBeTruthy());
+});
+
+test("nicht geholt (anderes Gerät, Netz): beim nächsten Nachsehen kommt er wieder in Frage, nicht erst nach einem Neustart", async () => {
+  let claimable = false;
+  serve({ moments: [moment("m1", "up")], claimed: (ids) => (claimable ? ids : []) });
+  await render(<RewardMomentHost queue={createCeremonyQueue()} />);
+  await waitFor(() => expect(posts("/me/league-moments/seen")).toHaveLength(1));
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.queryByTestId("season-moment")).toBeNull();
+  claimable = true;
+  await act(async () => { requestMoment("m1"); });
+  await waitFor(() => expect(screen.getByTestId("season-moment")).toBeTruthy());
+  expect(posts("/me/league-moments/seen")).toHaveLength(2);
+});
+
+test("eine alte „fertig“-Marke meldet einen korrigierten Moment nie still als fertig (Nr. 277)", async () => {
+  serve({ moments: [moment("m1", "up", { confirmed_at: "2026-11-20T10:00:00Z" })] });
+  mockPost.mockImplementation(async (path: string, body: { ids: string[] }) => {
+    if (path === "/me/league-moments/seen") return { data: { claimed: body.ids } };
+    if (path === "/me/league-moments/done") throw new Error("offline");
+    return { data: {} };
+  });
+  const first = await render(<RewardMomentHost queue={createCeremonyQueue()} />);
+  await waitFor(() => expect(screen.getByTestId("season-moment")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("season-moment-done"));
+  await waitFor(() => expect(stored()).toContain("m1"));
+  await first.unmount();
+
+  // Die Leitung korrigiert den Endstand: derselbe Moment, neuer Stand, „Endstand korrigiert“.
+  jest.clearAllMocks();
+  serve({ moments: [moment("m1", "down", { corrected: true, confirmed_at: "2026-11-24T18:00:00Z", texts: { ...texts("down"), notice: "Endstand korrigiert" } as never })] });
+  await render(<RewardMomentHost queue={createCeremonyQueue()} />);
+  await waitFor(() => expect(screen.getByTestId("season-moment-notice")).toHaveTextContent("Endstand korrigiert"));
+  expect(posts("/me/league-moments/done")).toEqual([]);
+  expect(posts("/me/league-moments/seen")).toHaveLength(1);
+});
+
+test("Hinweis „Saisonende“: die Tippfläche „Endstand“ ist mindestens 44 pt hoch", async () => {
+  await render(<LeagueMomentHint rows={[moment("m1", "up")]} testID="profile-league-moments" />);
+  const link = screen.getByTestId("profile-league-moments-m1-final");
+  const style = Object.assign({}, ...[link.props.style].flat(5).filter(Boolean));
+  expect(style.minHeight).toBeGreaterThanOrEqual(44);
 });

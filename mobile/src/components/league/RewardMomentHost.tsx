@@ -6,7 +6,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
 import { momentSubtitle, momentTitle, type RewardAward } from "../../lib/leagueRewards";
 import {
-  forgetMomentDone, markMomentDone, momentToken, momentsDoneHere, planCeremonies, subscribeMomentRequests, type CeremonyItem, type LeagueMoment,
+  forgetMomentDone, markMomentDone, momentToken, momentVersion, momentsDoneHere, planCeremonies, subscribeMomentRequests, type CeremonyItem, type LeagueMoment,
 } from "../../lib/leagueMoments";
 import { openLink } from "../../lib/openLink";
 import { playMoment } from "../../lib/tournamentHaptics";
@@ -17,7 +17,7 @@ import { useReduceMotion } from "../motion";
 import { Muted } from "../Text";
 import { RewardMomentList } from "./RewardMomentList";
 import { SeasonMomentCard } from "./SeasonMoment";
-import { useModalGate } from "../../lib/modalGate";
+import { otherModalOpen, subscribeModals, useModalGate } from "../../lib/modalGate";
 
 // Zeremonien der Liga (#2173, #2584; Web: components/tls/rewards/RewardWatcher.jsx, RewardMoment.jsx, league/moment/SeasonMoment.jsx,
 // docs/LIGA.md F.4 und F.8): Nach dem Anmelden fragt die App, welche Saisonende-Momente und Belohnungen noch nicht gefeiert wurden, und
@@ -59,21 +59,28 @@ function MomentCard({ rewards, onClose }: { rewards: RewardAward[]; onClose: () 
 /** Beim Zurückkommen in den Vordergrund höchstens so oft nach neuen Momenten und Belohnungen fragen. */
 export const UNSEEN_THROTTLE_MS = 5 * 60 * 1000;
 
-/** Fertig melden: erst die Marke auf dem Gerät, dann der Server - kommt er an, geht die Marke wieder. Bewusst still. */
-function reportDone(userId: string, id: string) {
-  void markMomentDone(userId, id)
-    .then(() => api.post("/me/league-moments/done", { ids: [id] }))
-    .then(() => forgetMomentDone(userId, id))
+/** Fertig melden: erst die Marke auf dem Gerät (mit dem Stand des Moments, Nr. 277), dann der Server - kommt er an, geht die Marke
+ * wieder. Bewusst still. */
+function reportDone(userId: string, moment: LeagueMoment) {
+  void markMomentDone(userId, moment.id, momentVersion(moment))
+    .then(() => api.post("/me/league-moments/done", { ids: [moment.id] }))
+    .then(() => forgetMomentDone(userId, moment.id))
     .catch(() => {});
 }
+
+const MODAL_ID = "reward-moment";
+const otherOpen = () => otherModalOpen(MODAL_ID);
 
 export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQueue }) {
   const { user } = useAuth();
   const userId = user?.id;
   const [items, setItems] = useState<HostItem[]>([]);
   const queued = useRef(new Set<string>());
-  // Läuft eine Erfolgs-Zeremonie, wartet die Liga - nie zwei Momente übereinander.
-  const busy = useSyncExternalStore(queue.subscribe, () => Boolean(queue.getCurrent()), () => false);
+  // Läuft eine Erfolgs-Zeremonie oder ist ein anderes Fenster offen (Abstimmung, Passkey-Einladung, „Spielst du auch mit?“), wartet die
+  // Liga - nie zwei Fenster übereinander. Erst wenn alles zu ist, wird ein Moment für dieses Gerät geholt.
+  const ceremony = useSyncExternalStore(queue.subscribe, () => Boolean(queue.getCurrent()), () => false);
+  const blocked = useSyncExternalStore(subscribeModals, otherOpen, () => false);
+  const busy = ceremony || blocked;
 
   // Nachfragen beim Anmelden und beim Zurückkommen in den Vordergrund - dort höchstens alle UNSEEN_THROTTLE_MS, damit ein
   // kurzes Wechseln der App keinen Abruf auslöst. Schon Eingereihtes kommt nie ein zweites Mal. Bewusst still: Feiern sind eine Zugabe.
@@ -85,22 +92,24 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
       .then(({ data }) => (Array.isArray(data?.moments) ? data.moments : []), () => [] as LeagueMoment[]);
     const rewards = api.get<{ rewards?: RewardAward[] }>("/me/rewards/unseen")
       .then(({ data }) => (Array.isArray(data?.rewards) ? data.rewards : []), () => [] as RewardAward[]);
-    const done = momentsDoneHere(userId).catch(() => [] as string[]);
+    const done = momentsDoneHere(userId).catch(() => new Map<string, string>());
     void Promise.all([moments, rewards, done]).then(([momentRows, rewardRows, doneHere]) => {
+      // Eine späte Antwort für ein anderes Konto (Kontowechsel) oder nach dem Abmelden zählt nie.
       if (!isCurrent()) return;
-      const plan = planCeremonies(momentRows, rewardRows, { queued: queued.current, doneHere: new Set(doneHere) });
-      plan.reportDone.forEach((id) => reportDone(userId, id));
+      const plan = planCeremonies(momentRows, rewardRows, { queued: queued.current, doneHere });
+      plan.reportDone.forEach((moment) => reportDone(userId, moment));
+      plan.stale.forEach((id) => { void forgetMomentDone(userId, id).catch(() => {}); });
       if (plan.items.length) setItems((rest) => [...rest, ...plan.items]);
     });
   }, [userId]);
 
-  const alive = useRef(false);
   useEffect(() => {
     setItems([]);
     queued.current = new Set();
     if (!userId) return undefined;
-    alive.current = true;
-    const isCurrent = () => alive.current;
+    // Je Konto ein eigenes Flag: Nach einem Kontowechsel bleibt das alte auf „vorbei“ - eine späte Antwort für A landet nie bei B.
+    let alive = true;
+    const isCurrent = () => alive;
     fetchUnseen(isCurrent);
     const subscription = AppState.addEventListener?.("change", (state) => {
       if (state === "active" && Date.now() - lastFetch.current >= UNSEEN_THROTTLE_MS) fetchUnseen(isCurrent);
@@ -115,7 +124,7 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
       setItems((rest) => (rest.some((item) => item.key === key) ? rest : [...rest, { kind: "moment", key, moment: request.moment, rewards: [], replay: true }]));
     });
     return () => {
-      alive.current = false;
+      alive = false;
       subscription?.remove?.();
       unsubscribe();
     };
@@ -138,6 +147,8 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
           const first = rest[0];
           if (!first || first.key !== head.key || first.kind !== "moment") return rest;
           if (claimed) return [{ ...first, claimed: true }, ...rest.slice(1)];
+          // Nicht geholt: Beim nächsten Nachsehen (Vordergrund nach der Drossel, Push) kommt er wieder in Frage, nicht erst nach einem Neustart.
+          queued.current.delete(first.key);
           const alone: HostItem[] = first.rewards.length ? [{ kind: "rewards", key: `rewards:${first.rewards.map((award) => award.id).join("-")}`, rewards: first.rewards }] : [];
           return [...alone, ...rest.slice(1)];
         });
@@ -148,7 +159,7 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
   const close = useCallback((rewardsShown = true) => {
     if (!head) return;
     if (head.kind === "moment") {
-      if (!head.replay && head.claimed && userId) reportDone(userId, head.moment.id);
+      if (!head.replay && head.claimed && userId) reportDone(userId, head.moment);
       // Die Belohnungen des Meisters sind gesehen, wenn die zweite Karte kam - schließt die Person vorher, kommen sie später wie bisher.
       if (!head.replay && rewardsShown && head.rewards.length) api.post("/me/rewards/seen", { ids: head.rewards.map((award) => award.id) }).catch(() => {});
     } else {
@@ -159,7 +170,7 @@ export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQu
 
   const visible = Boolean(head && !busy && (head.kind === "rewards" || head.replay || head.claimed));
   // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
-  useModalGate("reward-moment", visible);
+  useModalGate(MODAL_ID, visible);
 
   if (!head || !visible) return null;
   return (

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { isLeagueMoment, replayMoment, type LeagueMoment } from "../../lib/leagueMoments";
 import { openLink } from "../../lib/openLink";
 import { colors, roles } from "../../theme";
@@ -44,9 +44,11 @@ export function LeagueMomentHint({ rows, canReplay = false, testID = "league-mom
                 <View style={styles.where}>
                   <Muted style={styles.small}>{row.title}</Muted>
                   {row.url ? (
-                    <Text style={[styles.small, styles.link]} onPress={() => { openLink(row.url); }} accessibilityRole="link" accessibilityLabel={`Endstand von ${row.title}`} suppressHighlighting>
-                      Endstand
-                    </Text>
+                    // Mindestens 44 pt Tippfläche - auch wenn der Text klein ist.
+                    <Pressable onPress={() => { openLink(row.url); }} accessibilityRole="link" accessibilityLabel={`Endstand von ${row.title}`} hitSlop={4}
+                      style={styles.linkArea} testID={`${testID}-${row.id}-final`}>
+                      <Text style={[styles.small, styles.link]}>Endstand</Text>
+                    </Pressable>
                   ) : null}
                 </View>
                 {canReplay ? (
@@ -74,5 +76,6 @@ const styles = StyleSheet.create({
   summary: { fontWeight: "700" },
   where: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
   small: { fontSize: 12 },
-  link: { color: roles.brand, fontWeight: "700", minHeight: 24, paddingVertical: 2 },
+  linkArea: { justifyContent: "center", minHeight: 44, minWidth: 44, paddingHorizontal: 4 },
+  link: { color: roles.brand, fontWeight: "700" },
 });
