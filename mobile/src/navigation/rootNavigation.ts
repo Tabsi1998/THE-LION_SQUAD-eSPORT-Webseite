@@ -350,7 +350,8 @@ function profileTarget(query: URLSearchParams): AppTarget {
   // „Erfolg freigeschaltet“ (#301, #218) führt zu den Erfolgen im eigenen Profil, Trophäen (#2425) zum Reiter Trophäen.
   if (wanted === "achievements" || wanted === "honours" || TROPHY_TABS.has(wanted)) return ownProfileTarget(wanted);
   // Die Einstellungen wohnen seit #2059 in Mein Bereich - jeder alte Reiter an seiner Stelle (wie legacyTarget im Web).
-  if (wanted === "notifications") return gruppeTarget("benachrichtigungen");
+  // Der Link aus der Sammel-Mail (#1662) nennt ?bereich=mail - dann gleich zur Sammel-Mail (Themen, Ruhezeit, Mehr ebenso).
+  if (wanted === "notifications") return gruppeTarget("benachrichtigungen", BENACHRICHTIGUNG_BEREICHE[query.get("bereich") || ""]);
   if (wanted === "privacy") return gruppeTarget("datenschutz");
   if (wanted === "security") return gruppeTarget("konto");
   if (wanted === "sessions") return gruppeTarget("konto", "geraete");
@@ -415,7 +416,9 @@ function meinBereichTarget(segments: string[], query: URLSearchParams, hash: str
       if (seite === "helfen") return Number(query.get("event")) ? detail("MemberHelperShifts", { event: Number(query.get("event")) }) : detail("MemberHelperShifts");
       if (seite === "dokumente") return detail("MemberDocuments");
       if (seite === "vorteile") return detail("InfoCenter", { section: "benefits" });
-      // Übersicht und interne News: der Tab Verein, wie bisher /members/area und /members/news.
+      // Interne News: die News, gleich auf „Verein“ gestellt.
+      if (seite === "news") return detail("NewsList", { scope: "club" });
+      // Die Übersicht: der Tab Verein, wie bisher /members/area.
       return tab("VereinHub");
     case "benachrichtigungen":
       return gruppeTarget("benachrichtigungen", BENACHRICHTIGUNG_BEREICHE[query.get("bereich") || ""] || anker || undefined);
@@ -435,8 +438,10 @@ function meinBereichTarget(segments: string[], query: URLSearchParams, hash: str
 function memberTarget(page: string): AppTarget | null {
   switch (page) {
     case "area":
-    case "news":
       return tab("VereinHub");
+    // Interne News (#2059): wie /mein-bereich/verein/news - die News, gleich auf „Verein“ gestellt.
+    case "news":
+      return detail("NewsList", { scope: "club" });
     case "membership":
       return detail("MyMembership");
     case "documents":

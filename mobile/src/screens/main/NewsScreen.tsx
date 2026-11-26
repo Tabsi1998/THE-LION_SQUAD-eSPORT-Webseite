@@ -23,7 +23,7 @@ import type { NewsPost } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsList">;
 
-export function NewsScreen({ navigation }: Props) {
+export function NewsScreen({ navigation, route }: Props) {
   const { clubName } = useBranding();
   const [items, setItems] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,8 @@ export function NewsScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [scope, setScope] = useState<ScopeFilter>("all");
+  // Aus Mein Bereich → Verein → Interne News (#2059) gleich auf „Verein“.
+  const [scope, setScope] = useState<ScopeFilter>(route?.params?.scope === "club" ? "club" : "all");
   // Die Beiträge blenden gestaffelt ein (#1085): der große oben zuerst, dann die Liste - jeder nur beim ersten
   // Erscheinen, nicht wieder beim Ziehen, Suchen oder Filtern.
   const entrance = useListEntrance();

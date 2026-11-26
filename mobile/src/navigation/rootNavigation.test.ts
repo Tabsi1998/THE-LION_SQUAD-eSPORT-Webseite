@@ -63,7 +63,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/verein", tab("VereinTab", "VereinHub")],
   ["/members/area", tab("VereinTab", "VereinHub")],
   ["/mitgliederbereich", tab("VereinTab", "VereinHub")],
-  ["/members/news", tab("VereinTab", "VereinHub")],
+  // Interne News (#2059): im Web Mein Bereich → Verein → News - in der App die News, gleich auf „Verein“ gestellt.
+  ["/members/news", detail("NewsList", { scope: "club" })],
   // Mein Bereich (#2059): /profile ist im Web Mein Bereich → Profil; das eigene Profil liegt über dem Tab.
   ["/profile", detail("MeinBereichGruppe", { gruppe: "profil" })],
   ["/u/me", detail("OwnProfile")],
@@ -98,6 +99,9 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/my/prizes", detail("MyPrizes")],
   // Die alten Reiter der Einstellungen (#1146) an ihrer Stelle in Mein Bereich (#2059).
   ["/profile?tab=notifications", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen" })],
+  // Der Link aus der Sammel-Mail (#1662) nennt den Bereich E-Mail - die App springt zur Sammel-Mail.
+  ["/profile?tab=notifications&bereich=mail", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "sammel-mail" })],
+  ["/profile?tab=notifications&bereich=ruhezeit", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "ruhezeit" })],
   ["/profile?tab=privacy", detail("MeinBereichGruppe", { gruppe: "datenschutz" })],
   ["/profile?tab=security", detail("MeinBereichGruppe", { gruppe: "konto" })],
   ["/profile?tab=sessions", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "geraete" })],
@@ -181,7 +185,7 @@ const MEIN_BEREICH: Array<[string, unknown]> = [
   ["/mein-bereich/verein/helfen", detail("MemberHelperShifts")],
   ["/mein-bereich/verein/helfen?event=5", detail("MemberHelperShifts", { event: 5 })],
   ["/mein-bereich/verein/dokumente", detail("MemberDocuments")],
-  ["/mein-bereich/verein/news", tab("VereinTab", "VereinHub")],
+  ["/mein-bereich/verein/news", detail("NewsList", { scope: "club" })],
   ["/mein-bereich/verein/vorteile", detail("InfoCenter", { section: "benefits" })],
   // Benachrichtigungen: ?bereich= aus dem Web (Themen, E-Mail, Ruhezeit, Mehr) oder ein Anker.
   ["/mein-bereich/benachrichtigungen", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen" })],

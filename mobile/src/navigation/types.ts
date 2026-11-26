@@ -64,7 +64,8 @@ export type DetailParamList = {
   TeamChat: { id: string; title?: string };
   PublicProfile: { username: string };
   DirectThread: { userId: string; title?: string };
-  NewsList: undefined;
+  // `scope: "club"` (#2059): gleich auf „Verein“ gestellt - die internen News (aus /mein-bereich/verein/news).
+  NewsList: { scope?: "club" } | undefined;
   NewsDetail: { id: string };
   // Galerie (#236): Alben, Album-Raster, Großansicht ab einem Bild.
   Gallery: undefined;
