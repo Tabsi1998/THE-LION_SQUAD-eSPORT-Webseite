@@ -150,3 +150,101 @@ def test_an_archived_level_is_skipped():
     rows = [right("l3p2", 3, 3, 2), right("l3p3", 3, 3, 3)]
     found = rights.candidates({"application_id": "gone", "division_level": 1, "from_level": 3}, rows, [1, 3])
     assert found["pick"] == "l3p2"
+
+
+# ---------------------------------------------------------------- Nachbesserung 26.11.: Pause, Start erreicht, Kandidaten, Erinnerung
+
+def test_who_is_overdue_never_moves_up():
+    # Nur wer zugesagt hat oder dessen eigene Frist noch läuft, kommt in Frage (Entscheidung 26.11., C).
+    rows = [{**row, "overdue": True} if row["application_id"] == "l2p2" else row for row in without("l2p1")]
+    found = rights.candidates({"application_id": "l2p1", "division_level": 1, "from_level": 2}, rows, [1, 2])
+    assert found["pick"] == "l2p3" and "l2p2" not in found["candidates"]
+    silent = [{**row, "overdue": True} for row in without("l2p1")]
+    assert rights.candidates({"application_id": "l2p1", "division_level": 1, "from_level": 2}, silent, [1, 2]) == {
+        "group": None, "candidates": [], "pick": None, "tied": []}
+
+
+def test_a_shared_place_inside_one_staffel_is_a_tie_for_the_lead():
+    # Platz 2 bis 4 punkt- und differenzgleich (Platz 1, 2, 2, 2): Niemand rückt von selbst nach - kein Los (Nr. 156).
+    rows = [right("l2p2", 2, 2, 2, points=3, played=3), right("l2p3", 2, 2, 2, points=3, played=3), right("l2p4", 2, 2, 2, points=3, played=3)]
+    found = rights.candidates({"application_id": "l2p1", "division_level": 1, "from_level": 2}, rows, [1, 2])
+    assert found["pick"] is None and sorted(found["tied"]) == ["l2p2", "l2p3", "l2p4"] and sorted(found["candidates"]) == ["l2p2", "l2p3", "l2p4"]
+    # Der geteilte Platz zählt auch dann, wenn eine andere Staffel einen klar schlechteren Kandidaten hat.
+    other = [*rows, right("b2", 2, 2, 2, staffel="B", points=1, played=3)]
+    found = rights.candidates({"application_id": "l2p1", "division_level": 1, "from_level": 2}, other, [1, 2])
+    assert found["pick"] is None and sorted(found["tied"]) == ["l2p2", "l2p3", "l2p4"]
+    # Liegt der geteilte Platz hinter dem Besten, stört er nicht.
+    clear = [right("l2p2", 2, 2, 2, points=6, played=3), right("l2p3", 2, 2, 3, points=3, played=3), right("l2p4", 2, 2, 3, points=3, played=3)]
+    assert rights.candidates({"application_id": "l2p1", "division_level": 1, "from_level": 2}, clear, [1, 2])["pick"] == "l2p2"
+
+
+def test_the_deadline_rests_during_a_pause_and_is_longer_by_its_length_afterwards():
+    offered = application(status="offered", offered_at=NOW.isoformat())
+    day = timedelta(days=1)
+    pause = lambda start, end=None: {"from": (NOW + start).isoformat(), "to": (NOW + end).isoformat() if end is not None else None}  # noqa: E731
+    # Abgeschlossene Pause von drei Tagen mitten in der Frist: drei Tage länger.
+    done = {**SEASON, "start_right_pauses": [pause(2 * day, 5 * day)]}
+    assert rights.accept_until(offered, done) == NOW + 17 * day
+    assert not rights.resting(offered, done)
+    # Offene Pause: Die Frist steht still - nichts ist überfällig, wie lange sie auch dauert.
+    running = {**SEASON, "start_right_pauses": [pause(2 * day)]}
+    assert rights.accept_until(offered, running) is None and rights.resting(offered, running)
+    assert not rights.overdue(offered, running, NOW + 400 * day)
+    assert rights.state(offered, running, NOW + 400 * day) == "offered"
+    # Eine Pause vor der Vergabe zählt nicht, eine nach dem Fristende auch nicht - und zwei Pausen zählen beide.
+    assert rights.accept_until(offered, {**SEASON, "start_right_pauses": [pause(-9 * day, -2 * day)]}) == NOW + 14 * day
+    assert rights.accept_until(offered, {**SEASON, "start_right_pauses": [pause(15 * day, 20 * day)]}) == NOW + 14 * day
+    assert rights.overdue(offered, {**SEASON, "start_right_pauses": [pause(15 * day)]}, NOW + 16 * day)
+    assert rights.accept_until(offered, {**SEASON, "start_right_pauses": [pause(1 * day, 2 * day), pause(4 * day, 6 * day)]}) == NOW + 17 * day
+    # Begann die Pause vor der Vergabe und endete danach, zählt nur der Teil ab der Vergabe.
+    assert rights.accept_until(offered, {**SEASON, "start_right_pauses": [pause(-3 * day, 2 * day)]}) == NOW + 16 * day
+    # Der Start der Season bleibt die äußerste Grenze.
+    assert rights.accept_until(offered, {**SEASON, "start_right_pauses": [pause(1 * day, 25 * day)]}) == NOW + 30 * day
+
+
+def test_once_the_start_date_is_reached_nothing_expires_by_itself_and_the_lead_decides():
+    offered = application(status="offered", offered_at=NOW.isoformat())
+    # Auch im Entwurf gilt das Startdatum (Entscheidung 26.11., B).
+    reached = {**SEASON, "start_date": (NOW + timedelta(days=5)).isoformat()}
+    later = NOW + timedelta(days=6)
+    assert rights.start_reached(reached, later) and not rights.start_reached(reached, NOW)
+    assert rights.overdue(offered, reached, later)
+    # Nicht „verfallen“: Das Startrecht bleibt offen, bis die Leitung entscheidet - das Team kann nicht mehr selbst zusagen.
+    assert rights.state(offered, reached, later) == "offered"
+    seen = rights.view(offered, reached, can_act=True, now=later)
+    assert seen["waits_for_lead"] is True and seen["can_accept"] is False
+    # Vor dem Start bleibt es beim Verfall nach der Frist.
+    assert rights.state(offered, SEASON, NOW + timedelta(days=15)) == "expired"
+    assert rights.view(offered, SEASON, can_act=True, now=NOW)["waits_for_lead"] is False
+
+
+def test_the_reminder_never_comes_in_the_first_half_of_the_deadline():
+    offered = application(status="offered", offered_at=NOW.isoformat())
+    # 48 Stunden vor Fristende - bei 14 Tagen Frist also am zwölften Tag.
+    assert rights.remind_at(offered, SEASON, {"remind_hours": 48}) == NOW + timedelta(days=12)
+    # Frist ein Tag, Erinnerung 48 Stunden: gekappt auf die Hälfte der Frist statt sofort nach der Vergabe.
+    short = {**SEASON, "start_rights": {"mode": "accept", "accept_days": 1}}
+    assert rights.remind_at(offered, short, {"remind_hours": 48}) == NOW + timedelta(hours=12)
+    assert rights.remind_at(offered, SEASON, {"remind_hours": 0}) is None
+    assert rights.remind_at(application(), SEASON, {"remind_hours": 48}) is None
+
+
+def test_after_switching_to_automatic_a_successor_may_still_decline_until_the_start():
+    auto = {**SEASON, "start_rights": {"mode": "auto"}}
+    fills = {"for_application_id": "x", "back": {"division_level": 2, "division_label": "Liga 2"}}
+    by_mode = {"id": "a1", "status": "accepted", "carry_over": {"division_level": 1, "fills": fills, "start_right": {
+        "status": "accepted", "offered_at": NOW.isoformat(), "accepted_via": "mode"}}}
+    assert rights.may_pass(by_mode, auto, NOW)
+    assert not rights.may_pass(by_mode, auto, NOW + timedelta(days=31))
+    # Wer selbst zugesagt hat, hat den Platz angenommen - da gibt es nichts mehr abzulehnen.
+    by_team = {**by_mode, "carry_over": {**by_mode["carry_over"], "start_right": {**by_mode["carry_over"]["start_right"], "accepted_via": "team"}}}
+    assert not rights.may_pass(by_team, auto, NOW)
+
+
+def test_back_from_the_waitlist_the_deadline_starts_again():
+    waiting = {**application(status="offered", offered_at=(NOW - timedelta(days=30)).isoformat(), reminded_at=NOW.isoformat()), "status": "waitlist"}
+    fields = rights.reoffer_fields(waiting, NOW.isoformat())
+    assert fields == {"carry_over.start_right": {"status": "offered", "offered_at": NOW.isoformat()}}
+    # Schon zugesagt oder ohne Startrecht: nichts zu tun.
+    assert rights.reoffer_fields({**application(status="accepted", offered_at=NOW.isoformat()), "status": "waitlist"}, NOW.isoformat()) == {}
+    assert rights.reoffer_fields({"id": "x", "status": "waitlist"}, NOW.isoformat()) == {}

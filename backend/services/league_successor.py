@@ -46,7 +46,7 @@ NOT_COPIED = frozenset({
     # der Season“ - an der Season und an jeder Liga N (``_copy_divisions``).
     league_postseason.KEPT,
     # Startrechte (#1627, F.2a): Die Einstellung ``start_rights`` geht mit - was die alte Season schon gemeldet hat, gehört zu ihr.
-    league_start_right_rules.NOTICES, league_start_right_rules.NOTICES_OPEN,
+    league_start_right_rules.NOTICES, league_start_right_rules.NOTICES_OPEN, league_start_right_rules.PAUSES,
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (
@@ -719,10 +719,14 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
         else:
             query.update({"status": ACCEPTED, "assignment": {"$exists": False}})
             update = {"$set": {**{f"carry_over.{key}": value for key, value in change["carry_over"].items()}, "updated_at": now}}
+            # Ein Nachrücker, für den der Endstand jetzt etwas anderes sagt als vor dem Nachrücken (sonst wäre er oben „unverändert“
+            # geblieben): Er steht ab jetzt aus eigenem Recht dort, wo der Endstand ihn sieht - „Ablehnen“ führte sonst in die
+            # falsche Liga. ``fills`` fällt weg, bei ``updated`` wie bei ``moved``.
+            update["$unset"] = {"carry_over.fills": ""}
             if kind == "moved":
-                # Andere Liga N: Ein früheres Nachrücken ist überholt, und im Zusage-Modus gilt die alte Zusage nicht für die neue Liga.
+                # Andere Liga N: Im Zusage-Modus gilt die alte Zusage nicht für die neue Liga, und der Platz, auf den er nachgerückt
+                # war, ist wieder frei.
                 update["$set"].update({f"carry_over.{key}": value for key, value in fresh_right.items()})
-                update["$unset"] = {"carry_over.fills": ""}
                 await db.league_applications.update_one({"season_id": season["id"], "carry_over.filled_by.application_id": change["application_id"]},
                                                         {"$unset": {"carry_over.filled_by": ""}})
         try:

@@ -23,6 +23,9 @@ from services import league_calendar, league_cross_rank
 FIELD = "start_rights"
 NOTICES = "start_right_notices"
 NOTICES_OPEN = "start_right_notices_open"
+# Pausen der Fristen (Entscheidung 26.11.): ``[{from, to}]`` an der Folge-Season - solange der Vorgänger wieder geöffnet ist.
+PAUSES = "start_right_pauses"
+PAUSE_LIMIT = 50
 AUTO, ACCEPT = "auto", "accept"
 NEXT, LEAD = "next", "lead"
 DEFAULTS: dict = {"mode": ACCEPT, "accept_days": 14, "successor": NEXT, "remind_hours": 48, "announce": True}
@@ -121,23 +124,81 @@ def right_of(application: dict | None) -> dict | None:
     return value if isinstance(value, dict) else None
 
 
-def accept_until(application: dict | None, season: dict | None) -> datetime | None:
-    """Bis wann die Zusage geht: ``accept_days`` ab der Vergabe, spätestens der Start der Season (der gemerkte, Nr. 253).
-    ``None``: Der Antrag trägt kein Startrecht mit Frist."""
+def start_reached(season: dict | None, now: datetime | None = None) -> bool:
+    """Ist das Startdatum der Season erreicht - auch wenn sie noch Entwurf ist (Entscheidung 26.11.)? Ab dann verfällt nichts mehr
+    automatisch und niemand rückt automatisch nach: Die Leitung entscheidet."""
+    start = league_calendar.start_moment(season)
+    return bool(start and (now or now_utc()) >= start)
+
+
+def pauses(season: dict | None) -> list[tuple[datetime, datetime | None]]:
+    """Die Pausen der Fristen, der Reihe nach - eine offene (``to`` leer) steht am Ende."""
+    out = []
+    for row in (season or {}).get(PAUSES) or []:
+        begin = league_calendar.aware((row or {}).get("from")) if isinstance(row, dict) else None
+        if begin:
+            out.append((begin, league_calendar.aware(row.get("to"))))
+    return sorted(out, key=lambda pair: pair[0])
+
+
+def open_pause(season: dict | None) -> bool:
+    """Läuft gerade eine Pause (der Vorgänger ist wieder geöffnet)?"""
+    return any(end is None for _begin, end in pauses(season))
+
+
+def _deadline(application: dict | None, season: dict | None) -> tuple[datetime | None, bool]:
+    """(Fristende, ruht). ``accept_days`` ab der Vergabe; jede Pause, die in die laufende Frist fällt, verlängert sie um ihre Dauer
+    (ab der Vergabe gerechnet). Fällt eine offene Pause in die Frist, ruht sie: kein Ende, nichts ist überfällig. Eine Pause nach
+    dem Fristende ändert nichts mehr. Äußerste Grenze bleibt der Start der Season (der gemerkte, Nr. 253)."""
     right = right_of(application)
     offered = league_calendar.aware((right or {}).get("offered_at"))
     if not offered:
-        return None
+        return None, False
     until = offered + timedelta(days=int((stored(season) or DEFAULTS)["accept_days"]))
+    for begin, end in pauses(season):
+        if begin >= until:
+            break
+        if end is None:
+            return None, True
+        if end > offered:
+            until += end - max(begin, offered)
     start = league_calendar.start_moment(season)
-    return min(until, start) if start else until
+    return (min(until, start) if start else until), False
+
+
+def accept_until(application: dict | None, season: dict | None) -> datetime | None:
+    """Bis wann die Zusage geht - ``None`` ohne Startrecht mit Frist und solange die Frist ruht (``resting``)."""
+    return _deadline(application, season)[0]
+
+
+def resting(application: dict | None, season: dict | None) -> bool:
+    """Ruht die Frist dieses Startrechts gerade (Pause, solange der Vorgänger wieder geöffnet ist)?"""
+    right = right_of(application)
+    return bool(right and right.get("status") == OFFERED and _deadline(application, season)[1])
 
 
 def overdue(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
-    """Offen und die Frist ist vorbei - gilt schon, bevor der Job den Antrag anfasst."""
+    """Offen und die Frist ist vorbei - gilt schon, bevor der Job den Antrag anfasst. Nie, solange die Frist ruht."""
     right = right_of(application)
     until = accept_until(application, season)
     return bool(right and right.get("status") == OFFERED and until and (now or now_utc()) >= until)
+
+
+def waits_for_lead(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
+    """Offen, die Frist ist vorbei und das Startdatum erreicht: Es verfällt nicht mehr von selbst - die Leitung entscheidet."""
+    return (application or {}).get("status") == "accepted" and overdue(application, season, now) and start_reached(season, now)
+
+
+def remind_at(application: dict | None, season: dict | None, settings: dict | None) -> datetime | None:
+    """Wann die Erinnerung fällig ist: ``remind_hours`` vor Fristende - aber nie in der ersten Hälfte der Frist. Eine Erinnerung,
+    die länger zurückreicht als die Frist selbst, käme sonst sofort nach der Vergabe. ``None``: keine Erinnerung."""
+    right = right_of(application) or {}
+    offered = league_calendar.aware(right.get("offered_at"))
+    until = accept_until(application, season)
+    hours = int((settings or {}).get("remind_hours") or 0)
+    if not hours or not offered or not until or right.get("status") != OFFERED:
+        return None
+    return until - min(timedelta(hours=hours), (until - offered) / 2)
 
 
 def state(application: dict | None, season: dict | None, now: datetime | None = None) -> str | None:
@@ -159,7 +220,8 @@ def state(application: dict | None, season: dict | None, now: datetime | None = 
     if application.get("assignment"):
         return PARTICIPATING
     if right.get("status") == OFFERED:
-        return EXPIRED if overdue(application, season, now) else OFFERED
+        # Nach dem Startdatum verfällt nichts mehr von selbst: offen, bis die Leitung entscheidet (``waits_for_lead``).
+        return EXPIRED if overdue(application, season, now) and not start_reached(season, now) else OFFERED
     if right.get("status") == ACCEPTED:
         return ACCEPTED
     return CONFIRMED
@@ -167,30 +229,40 @@ def state(application: dict | None, season: dict | None, now: datetime | None = 
 
 # ---------------------------------------------------------------- Nachrückerregel (ohne Datenbank)
 
-def _heads(rows: list[dict]) -> list[dict]:
-    """Je Staffel das bestplatzierte Co-Team der Gruppe."""
-    best: dict[str, dict] = {}
+def _rank(row: dict) -> int:
+    return int(row.get("rank") or 999)
+
+
+def _heads(rows: list[dict]) -> dict[str, list[dict]]:
+    """Je Staffel die bestplatzierten Co-Teams der Gruppe - mehrere, wenn sie sich den Platz teilen (Gleichstand in der Tabelle)."""
+    best: dict[str, list[dict]] = {}
     for row in rows:
         key = str(row.get("from_staffel") or "")
-        if key not in best or int(row.get("rank") or 999) < int(best[key].get("rank") or 999):
-            best[key] = row
-    return [best[key] for key in sorted(best)]
+        if key not in best or _rank(row) < _rank(best[key][0]):
+            best[key] = [row]
+        elif _rank(row) == _rank(best[key][0]):
+            best[key].append(row)
+    return {key: best[key] for key in sorted(best)}
 
 
 def candidates(place: dict, rights: list[dict], levels: list[int]) -> dict:
     """Wer für einen frei gewordenen Platz nachrückt. ``place``: ``{application_id, division_level, from_level}`` des frei gewordenen
     Startrechts. ``rights``: die offenen Startrechte der Season (``application_id``, ``from_level``, ``from_staffel``,
-    ``division_level``, ``rank``, ``points``, ``played``, ``score_diff``, ``passed``, ``fills``). ``levels``: die aktiven Liga N.
+    ``division_level``, ``rank``, ``points``, ``played``, ``score_diff``, ``passed``, ``fills``, ``overdue``). ``levels``: die
+    aktiven Liga N.
 
     Aufstieg frei geworden: zuerst der beste Nicht-Aufsteiger der Liga darunter, sonst der beste Absteiger (er bleibt). Sonst
     umgekehrt („der Nächste der Tabelle“). Zwischen Staffeln Punkte je Spiel, dann Map-Differenz je Spiel; bei Gleichstand ``tied``
-    und kein ``pick`` - ein Los gibt es nicht (Nr. 156)."""
+    und kein ``pick`` - ein Los gibt es nicht (Nr. 156). Teilen sich in einer Staffel mehrere den besten Platz, ist auch das ein
+    Gleichstand. **Nie Kandidat** ist, wessen eigene Frist vorbei ist (``overdue``, Entscheidung 26.11.): Nachrücken kann nur, wer
+    zugesagt hat oder dessen Frist noch läuft."""
     level = place.get("division_level")
     freed = place.get("application_id")
     if not isinstance(level, int):
         return {"group": None, "candidates": [], "pick": None, "tied": []}
     below = min((item for item in levels if item > level), default=None)
-    free = [row for row in rights if row.get("application_id") != freed and not row.get("fills") and freed not in (row.get("passed") or [])]
+    free = [row for row in rights if row.get("application_id") != freed and not row.get("fills") and not row.get("overdue")
+            and freed not in (row.get("passed") or [])]
     groups = {
         # Kommt aus der Liga darunter und bleibt dort: der Nächste nach den Aufsteigern.
         NON_PROMOTED: [row for row in free if below is not None and row.get("from_level") == below and row.get("division_level") == below],
@@ -203,11 +275,14 @@ def candidates(place: dict, rights: list[dict], levels: list[int]) -> dict:
         heads = _heads(groups[group])
         if not heads:
             continue
-        found = league_cross_rank.pick(heads, 1)
+        found = league_cross_rank.pick([row for rows in heads.values() for row in rows], 1)
         order = [item["row"]["application_id"] for item in found["order"]]
-        if found["tied"]:
-            return {"group": group, "candidates": order, "pick": None, "tied": [row["application_id"] for row in found["tied"]]}
-        return {"group": group, "candidates": order, "pick": found["chosen"][0]["application_id"], "tied": []}
+        best = found["tied"] or found["chosen"]
+        # Wer vorn liegt, bringt alle mit, die sich in seiner Staffel den Platz mit ihm teilen - auch das entscheidet die Leitung.
+        shared = {row["application_id"] for top in best for row in heads[str(top.get("from_staffel") or "")]}
+        if len(shared) > 1:
+            return {"group": group, "candidates": order, "pick": None, "tied": [key for key in order if key in shared]}
+        return {"group": group, "candidates": order, "pick": best[0]["application_id"], "tied": []}
     return {"group": None, "candidates": [], "pick": None, "tied": []}
 
 
@@ -215,6 +290,27 @@ def candidates(place: dict, rights: list[dict], levels: list[int]) -> dict:
 
 ASSIGN_WAITS = ("{name} hat das Startrecht noch nicht angenommen (Frist bis {day}). Zuteilen geht nach der Zusage. Liegt sie dir schon "
                 "vor, trag sie bei den Startrechten mit Grund ein.")
+
+
+WAITLIST_FIRST = ("{name} hat das Startrecht noch nicht angenommen. Bitte erst ohne Staffel annehmen - dann beginnt die Frist für die "
+                  "Zusage neu, und zuteilen geht nach der Zusage.")
+
+
+def reoffer_fields(application: dict | None, now: str) -> dict:
+    """Zurück von der Warteliste (B.4): Ein noch nicht zugesagtes Startrecht wird neu vergeben - die Frist beginnt neu. Die Felder
+    für denselben Schreibvorgang wie das Annehmen; leer, wenn es nichts neu zu vergeben gibt."""
+    right = right_of(application)
+    if not right or right.get("status") != OFFERED:
+        return {}
+    return {"carry_over.start_right": {"status": OFFERED, "offered_at": now}}
+
+
+def waitlist_problem(application: dict | None) -> str | None:
+    """Annehmen von der Warteliste gleich mit Staffel geht nur mit Zusage: der Satz für 422 - ``None``, wenn nichts dagegen spricht."""
+    right = right_of(application)
+    if not right or right.get("status") != OFFERED:
+        return None
+    return WAITLIST_FIRST.format(name=(application or {}).get("display_name") or "Das Co-Team")
 
 
 def decline_fields(application: dict | None, now: str) -> dict:
@@ -233,7 +329,9 @@ def assign_problem(application: dict | None, season: dict | None) -> str | None:
     right = right_of(application)
     if not right or right.get("status") != OFFERED:
         return None
-    return ASSIGN_WAITS.format(name=(application or {}).get("display_name") or "Das Co-Team", day=day_text(accept_until(application, season)))
+    until = accept_until(application, season)
+    return ASSIGN_WAITS.format(name=(application or {}).get("display_name") or "Das Co-Team",
+                               day=day_text(until) if until else "die Frist ruht")
 
 
 def may_pass(application: dict | None, season: dict | None, now: datetime | None = None) -> bool:
@@ -243,10 +341,12 @@ def may_pass(application: dict | None, season: dict | None, now: datetime | None
     if not isinstance(carry.get("fills"), dict) or application.get("status") != "accepted" or application.get("assignment"):
         return False
     right = right_of(application)
-    if right:
-        return right.get("status") == OFFERED and not overdue(application, season, now)
-    start = league_calendar.start_moment(season)
-    return not start or (now or now_utc()) < start
+    if right and right.get("status") == OFFERED:
+        return not overdue(application, season, now)
+    # Ohne Zusage-Modus - auch nach dem Umschalten auf „automatisch“ (``accepted_via: "mode"``): bis zum Start der Season.
+    if right and right.get("accepted_via") != "mode":
+        return False
+    return not start_reached(season, now)
 
 
 def view(application: dict | None, season: dict | None, *, can_act: bool = False, now: datetime | None = None) -> dict | None:
@@ -263,8 +363,12 @@ def view(application: dict | None, season: dict | None, *, can_act: bool = False
     until = accept_until(application, season)
     return {"state": current, "accept_until": until.isoformat() if until and (right or {}).get("status") == OFFERED else None,
             "accepted_at": (right or {}).get("accepted_at"),
+            # Die Frist ruht, solange der Endstand des Vorgängers geprüft wird - zusagen geht trotzdem.
+            "paused": resting(application, season),
+            # Startdatum erreicht und Frist vorbei: Es verfällt nicht mehr von selbst, die Leitung entscheidet.
+            "waits_for_lead": waits_for_lead(application, season, now),
             "fills": {"from_label": (fills.get("back") or {}).get("division_label")} if fills else None,
-            "can_accept": bool(can_act and current == OFFERED),
+            "can_accept": bool(can_act and current == OFFERED and not overdue(application, season, now)),
             "can_decline": bool(can_act and may_pass(application, season, now))}
 
 

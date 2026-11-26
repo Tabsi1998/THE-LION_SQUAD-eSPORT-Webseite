@@ -12,20 +12,20 @@ Abmelden bekommt ``released`` von der Route mitgegeben, die Nachricht nach dem A
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from models import new_id, now_utc
 from services.league_start_right_rules import (
-    ACCEPT, ACCEPTED, AUTO, CONFIRMED, DECLINED, DEFAULTS, EXPIRED, FIELD, FORECAST, NEXT, NOTICES, NOTICES_OPEN, OFFERED, REASON_MIN,
-    StartRightProblem, accept_until, candidates, day_text, defaults, may_pass, needs_accept, normalize, offer, overdue, right_of, state,
-    stored,
+    ACCEPT, ACCEPTED, AUTO, CONFIRMED, DECLINED, DEFAULTS, EXPIRED, FIELD, FORECAST, NEXT, NOTICES, NOTICES_OPEN, OFFERED, PAUSE_LIMIT,
+    PAUSES, REASON_MIN, StartRightProblem, accept_until, candidates, day_text, defaults, may_pass, needs_accept, normalize, offer,
+    open_pause, overdue, remind_at, resting, right_of, start_reached, state, stored, waits_for_lead,
 )
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_start_rights")
 
-__all__ = ["StartRightProblem", "accept", "accept_for", "announce", "decline", "defaults", "fill", "outlook", "overview", "released",
-           "row_of", "save_settings", "sweep"]
+__all__ = ["StartRightProblem", "accept", "accept_for", "after_final_change", "announce", "decline", "defaults", "fill", "outlook",
+           "overview", "released", "row_of", "save_settings", "sweep"]
 
 
 # ---------------------------------------------------------------- Texte
@@ -35,6 +35,9 @@ GONE = "Dieses Startrecht gibt es nicht."
 NO_RIGHT = "Für dieses Co-Team gibt es kein Startrecht, das eine Zusage braucht."
 NOT_OPEN = "Dieses Startrecht ist nicht mehr offen. Bitte neu laden."
 LATE = "Die Frist für die Zusage ist am {day} abgelaufen. Jetzt hilft nur eine neue Anmeldung oder die Liga-Leitung."
+LATE_STARTED = "Die Frist für die Zusage ist vorbei, und die Season hat ihr Startdatum erreicht. Jetzt entscheidet die Liga-Leitung."
+CONFIRM_OPEN_ONE = "1 offenes Startrecht gilt dann als zugesagt und braucht keine Zusage mehr. Bitte bestätigen."
+CONFIRM_OPEN_MANY = "{count} offene Startrechte gelten dann als zugesagt und brauchen keine Zusage mehr. Bitte bestätigen."
 NOT_RESPONSIBLE = "Zusagen und ablehnen dürfen nur Captain und Vertreter des Co-Teams."
 NOTHING_TO_PASS = "Hier gibt es nichts abzulehnen. Wer nicht mitspielen will, meldet sich ab."
 REASON_SHORT = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen)."
@@ -113,7 +116,7 @@ async def _tell_lead(db, season: dict, application: dict, headline: str, text: s
     try:
         squad = await db.team_squads.find_one({"id": application.get("squad_id")}, {"_id": 0}) or {}
         own = await _responsible(db, squad) if squad else set()
-        url = f"/admin/leagues/seasons/{season['id']}#anmeldung"
+        url = f"/admin/leagues/seasons/{season['id']}#startrechte"
         for user_id in sorted(await staff_user_ids(db, season.get("league_id"), ("applications",)) - own):
             await create_user_notification(user_id, headline, text, url=url, kind=KIND, meta={
                 "reason": REASONS["lead"], "application_id": application.get("id"), "dedupe_key": f"{key}:{user_id}", "unique_dedupe": True})
@@ -144,7 +147,9 @@ async def _application(db, application_id: str, season_id: str | None = None) ->
 # ---------------------------------------------------------------- Zusage
 
 async def _accept(db, application_id: str, actor_id: str | None, via: str, *, reason: str | None = None) -> dict:
-    """Die Zusage unter der Season-Sperre, mit Bedingung auf den offenen Stand. Ein zweiter Aufruf antwortet mit ``replay``."""
+    """Die Zusage unter der Season-Sperre, mit Bedingung auf den offenen Stand. Ein zweiter Aufruf antwortet mit ``replay``.
+    Die Frist gilt für Team und Leitung. Ist das Startdatum der Season erreicht, verfällt nichts mehr von selbst: Dann - und nur
+    dann - trägt die Leitung die Zusage auch nach Fristende ein (Entscheidung 26.11.)."""
     application = await _application(db, application_id)
     right = right_of(application)
     if not right:
@@ -154,8 +159,8 @@ async def _accept(db, application_id: str, actor_id: str | None, via: str, *, re
     season = await _season_of(db, application.get("season_id"))
     if application.get("status") != "accepted" or right.get("status") != OFFERED:
         raise StartRightProblem(NOT_OPEN, 409)
-    if overdue(application, season):
-        raise StartRightProblem(LATE.format(day=day_text(accept_until(application, season))), 409)
+    if overdue(application, season) and not (via == "lead" and start_reached(season)):
+        raise StartRightProblem(LATE_STARTED if start_reached(season) else LATE.format(day=day_text(accept_until(application, season))), 409)
     now = now_utc().isoformat()
     step = {"status": "accepted", "by": actor_id, "at": now, "start_right": ACCEPTED, "via": via, **({"reason": reason} if reason else {})}
     written = await db.league_applications.update_one(
@@ -258,7 +263,9 @@ async def _suggest(db, season: dict, freed: dict, ctx: dict) -> dict:
         rights.append({"application_id": row["id"], "squad_id": row["squad_id"], "from_level": carry.get("from_level"),
                        "from_staffel": carry.get("from_staffel"), "division_level": carry.get("division_level"),
                        "rank": table.get("rank") or carry.get("rank"), "points": table.get("points"), "played": table.get("played"),
-                       "score_diff": table.get("score_diff"), "passed": carry.get("passed") or [], "fills": bool(carry.get("fills"))})
+                       "score_diff": table.get("score_diff"), "passed": carry.get("passed") or [], "fills": bool(carry.get("fills")),
+                       # Nachrücken kann nur, wer zugesagt hat oder dessen eigene Frist noch läuft (Entscheidung 26.11.).
+                       "overdue": overdue(row, season)})
     carry = freed["carry_over"]
     place = {"application_id": freed["id"], "division_level": carry.get("division_level"), "from_level": carry.get("from_level")}
     found = candidates(place, rights, ctx["levels"])
@@ -317,11 +324,10 @@ async def _fill(db, season: dict, freed: dict, candidate: dict, *, group: str | 
 
 
 async def _fill_by_rule(db, season: dict, freed: dict | None, ctx: dict | None = None) -> dict | None:
-    """Nachrücken nach der Regel der Season (``successor: "next"``) - nur vor dem Start und bei abgeschlossenem Vorgänger."""
-    from services import league_successor
-
+    """Nachrücken nach der Regel der Season (``successor: "next"``) - nur solange das Startdatum nicht erreicht ist (auch im Entwurf,
+    Entscheidung 26.11.: Sonst bekäme der Nachrücker eine Frist, die schon vorbei ist) und bei abgeschlossenem Vorgänger."""
     settings = stored(season)
-    if not settings or settings["successor"] != NEXT or not freed or not _is_free(freed) or league_successor.started(season):
+    if not settings or settings["successor"] != NEXT or not freed or not _is_free(freed) or start_reached(season):
         return None
     ctx = ctx or await _context(db, season)
     if ctx["paused"] or not ctx["predecessor"]:
@@ -345,9 +351,12 @@ async def _restore(db, season: dict, application: dict, why: str, actor_id: str 
     """Der Nachrücker fällt auf sein früheres Startrecht zurück (``fills.back``) und wird für diesen Platz nicht noch einmal gefragt.
     Gibt den wieder frei gewordenen Antrag zurück - ``None``, wenn sich inzwischen etwas geändert hat."""
     fills = application["carry_over"]["fills"]
-    back = fills.get("back") or {}
+    back = dict(fills.get("back") or {})
     kept = isinstance(back.get("start_right"), dict)
     now = now_utc().isoformat()
+    if kept and back["start_right"].get("status") == OFFERED and not needs_accept(season):
+        # Inzwischen braucht die Season keine Zusage mehr (umgeschaltet): Das frühere Startrecht gilt wie alle anderen als zugesagt.
+        back["start_right"] = {**back["start_right"], "status": ACCEPTED, "accepted_at": now, "accepted_by": actor_id, "accepted_via": "mode"}
     update: dict = {
         "$set": {"carry_over.division_id": back.get("division_id"), "carry_over.division_level": back.get("division_level"),
                  "carry_over.division_label": back.get("division_label"), "carry_over.movement": back.get("movement"), "updated_at": now,
@@ -386,7 +395,6 @@ async def fill(db, season: dict, application_id: str, candidate_id: str | None, 
                conflict_reason: str | None = None) -> dict:
     """Die Leitung löst das Nachrücken aus (Regel ``lead``, Gleichstand, Ablehnung durch die Leitung): mit Grund, nur ein
     vorgeschlagener Kandidat, nie für das eigene Team."""
-    from services import league_successor
     from services.league_permissions import record_override, require_no_side_conflict, side_of
 
     reason = " ".join(str(reason or "").split())
@@ -402,7 +410,7 @@ async def fill(db, season: dict, application_id: str, candidate_id: str | None, 
             raise StartRightProblem(PLACE_TAKEN, 409)
         if not _is_free(freed):
             raise StartRightProblem(NO_PLACE, 409)
-        if league_successor.started(fresh):
+        if start_reached(fresh):
             raise StartRightProblem(FILL_STARTED, 409)
         ctx = await _context(db, fresh)
         if ctx["paused"]:
@@ -445,11 +453,10 @@ async def _expire(db, season: dict, application: dict) -> dict | None:
 
 
 def _reminder_due(application: dict, season: dict, settings: dict, now: datetime) -> bool:
-    right = right_of(application) or {}
+    """Ist die Erinnerung fällig? ``remind_at`` kappt sie auf die Frist: nie in ihrer ersten Hälfte."""
     until = accept_until(application, season)
-    hours = int(settings.get("remind_hours") or 0)
-    return bool(hours and until and right.get("status") == OFFERED and not right.get("reminded_at")
-                and until - timedelta(hours=hours) <= now < until)
+    when = remind_at(application, season, settings)
+    return bool(when and until and not (right_of(application) or {}).get("reminded_at") and when <= now < until)
 
 
 async def _remind(db, season: dict, application: dict, now: datetime) -> int:
@@ -467,52 +474,108 @@ async def _remind(db, season: dict, application: dict, now: datetime) -> int:
     return 1
 
 
+async def _sync_pause(db, season: dict, paused: bool, now: datetime) -> dict:
+    """Hält an der Folge-Season fest, seit wann die Fristen ruhen bzw. dass sie wieder laufen (``start_right_pauses``,
+    Entscheidung 26.11.): Solange der Vorgänger wieder geöffnet ist, steht jede laufende Frist still und ist danach um die Dauer
+    der Pause länger. Schreibt nur bei einem Wechsel, mit Bedingung auf den gelesenen Stand - zwei gleichzeitige Aufrufe öffnen nie
+    zwei Pausen. Gibt die Season mit dem geltenden Stand zurück."""
+    current = season.get(PAUSES) if isinstance(season.get(PAUSES), list) else []
+    if paused == open_pause(season):
+        return season
+    stamp = now.isoformat()
+    if paused:
+        fresh = [*current, {"from": stamp, "to": None}][-PAUSE_LIMIT:]
+    else:
+        fresh = [{**row, "to": stamp} if isinstance(row, dict) and not row.get("to") else row for row in current]
+    query = {"id": season["id"], PAUSES: current} if current else {"id": season["id"], "$or": [{PAUSES: {"$exists": False}}, {PAUSES: []}]}
+    await db.league_seasons.update_one(query, {"$set": {PAUSES: fresh}})
+    return await _season_of(db, season["id"])
+
+
+async def after_final_change(db, season_id: str | None) -> None:
+    """Nach jedem Schritt, der den Endstand einer Season ändert - Abschluss, Wiederöffnen, Entscheid über Staffeln hinweg (gesetzt
+    oder zurückgenommen): die Nachricht zum bestätigten Auf- und Abstieg (``announce``: neuer Stand einmal, geänderter Stand einmal
+    „Endstand korrigiert“) und, wenn es schon eine Folge-Season mit Startrechten gibt, Beginn bzw. Ende der Pause ihrer Fristen.
+    Die Routen rufen das auf; nichts davon hält den Schritt selbst auf."""
+    if not season_id:
+        return
+    await announce(db, season_id)
+    successor = await db.league_seasons.find_one({"predecessor_id": season_id, FIELD: {"$type": "object"}}, {"_id": 0})
+    if successor:
+        ctx = await _context(db, successor)
+        await _sync_pause(db, successor, ctx["paused"], now_utc())
+
+
+OFFERED_QUERY = {"status": "accepted", "carry_over.start_right.status": OFFERED}
+
+
 async def _sweep_season(db, season_id: str, now: datetime, out: dict) -> None:
-    """Eine Folge-Season unter ihrer Sperre: verfallene Startrechte schließen, Nachrücker zurückfallen lassen, nachrücken, erinnern."""
+    """Eine Folge-Season unter ihrer Sperre. Reihenfolge (Entscheidung 26.11.): erst **alle** Verfälle dieses Laufs - Nachrücker, die
+    schweigen, fallen zurück, überfällige Startrechte verfallen -, **dann** das Nachrücken auf die frei gewordenen Plätze, zuletzt
+    die Erinnerungen. So hängt das Ergebnis nicht davon ab, in welcher Reihenfolge der Lauf die Anträge anfasst, und ein
+    Überfälliger rückt nie nach. In der Pause (Vorgänger wieder geöffnet) und ab dem Startdatum der Season geschieht nichts davon."""
     season = await _season_of(db, season_id)
     settings = stored(season)
     if not settings:
         return
-    rows = await db.league_applications.find({"season_id": season_id, "status": "accepted", "carry_over.start_right.status": OFFERED},
-                                             {"_id": 0}).sort("created_at", 1).to_list(1000)
-    due = [row for row in rows if overdue(row, season, now) or _reminder_due(row, season, settings, now)]
-    if not due:
+    query = {"season_id": season_id, **OFFERED_QUERY}
+    if not await db.league_applications.count_documents(query):
         return
     ctx = await _context(db, season)
+    season = await _sync_pause(db, season, ctx["paused"], now)
     if ctx["paused"]:
-        # Der Vorgänger ist wieder geöffnet: Der Endstand wird geprüft - nichts verfällt, niemand rückt nach, niemand wird erinnert.
+        # Der Vorgänger ist wieder geöffnet: Der Endstand wird geprüft - die Fristen ruhen, nichts verfällt, niemand rückt nach.
         out["paused"] += 1
         return
-    for row in due:
-        fresh = await db.league_applications.find_one({"id": row["id"]}, {"_id": 0})
-        if not fresh or fresh.get("status") != "accepted" or (right_of(fresh) or {}).get("status") != OFFERED:
-            continue
-        if not overdue(fresh, season, now):
-            out["reminded"] += await _remind(db, season, fresh, now) if _reminder_due(fresh, season, settings, now) else 0
-            continue
-        successor = isinstance(fresh["carry_over"].get("fills"), dict)
-        if successor:
-            freed = await _restore(db, season, fresh, EXPIRED, None)
-            if freed is None:
+    if start_reached(season, now):
+        # Ab dem Startdatum - auch im Entwurf - verfällt nichts mehr von selbst und rückt niemand mehr nach: Die Leitung entscheidet.
+        return
+    freed: dict[str, dict] = {}
+    expired: set[str] = set()
+    for _round in range(2):
+        rows = await db.league_applications.find(query, {"_id": 0}).sort("created_at", 1).to_list(1000)
+        late = [row for row in rows if overdue(row, season, now)]
+        if not late:
+            break
+        for row in late:
+            if not isinstance(row["carry_over"].get("fills"), dict):
+                continue
+            place = await _restore(db, season, row, EXPIRED, None)
+            if place is None:
                 continue
             out["restored"] += 1
-            back = (fresh["carry_over"]["fills"].get("back") or {}).get("division_label")
-            await _tell(db, fresh, "Nachrücken abgelaufen",
-                        f"Für den frei gewordenen Platz in {fresh['carry_over'].get('division_label')} kam keine Zusage. "
-                        f"{fresh.get('display_name') or 'Euer Co-Team'} bleibt in {back}.",
-                        REASONS["back"], f"league-start-right:back:{fresh['id']}:{fresh['carry_over']['fills'].get('for_application_id')}")
-        else:
-            freed = await _expire(db, season, fresh)
-            if freed is None:
+            freed[place["id"]] = place
+            back = (row["carry_over"]["fills"].get("back") or {}).get("division_label")
+            await _tell(db, row, "Nachrücken abgelaufen",
+                        f"Für den frei gewordenen Platz in {row['carry_over'].get('division_label')} kam keine Zusage. "
+                        f"{row.get('display_name') or 'Euer Co-Team'} bleibt in {back}.",
+                        REASONS["back"], f"league-start-right:back:{row['id']}:{row['carry_over']['fills'].get('for_application_id')}")
+        # Wer eben zurückgefallen ist, kann mit seinem früheren Startrecht selbst überfällig sein - darum neu lesen.
+        for row in await db.league_applications.find(query, {"_id": 0}).sort("created_at", 1).to_list(1000):
+            if isinstance(row["carry_over"].get("fills"), dict) or not overdue(row, season, now):
+                continue
+            place = await _expire(db, season, row)
+            if place is None:
                 continue
             out["expired"] += 1
-        moved = await _fill_by_rule(db, season, freed, ctx)
+            freed[place["id"]] = place
+            expired.add(place["id"])
+    # Erst jetzt nachrücken - auf jeden frei gewordenen Platz, in fester Reihenfolge (Liga N, Herkunft, Platz).
+    order = sorted(freed.values(), key=lambda row: (row["carry_over"].get("division_level") or 99, row["carry_over"].get("from_level") or 99,
+                                                    str(row["carry_over"].get("from_staffel") or ""), int(row["carry_over"].get("rank") or 0),
+                                                    row["id"]))
+    for place in order:
+        fresh = await db.league_applications.find_one({"id": place["id"]}, {"_id": 0})
+        moved = await _fill_by_rule(db, season, fresh, ctx)
         out["filled"] += 1 if moved else 0
-        if not successor:
+        if place["id"] in expired:
             follow = f"{moved.get('display_name')} rückt nach." if moved else "Der Platz ist frei."
-            await _tell_lead(db, season, freed, "Startrecht verfallen",
-                             f"{freed.get('display_name')} hat für {freed['carry_over'].get('division_label')} nicht zugesagt. {follow}",
-                             f"league-start-right:lead:{freed['id']}:{(right_of(freed) or {}).get('offered_at')}")
+            await _tell_lead(db, season, place, "Startrecht verfallen",
+                             f"{place.get('display_name')} hat für {place['carry_over'].get('division_label')} nicht zugesagt. {follow}",
+                             f"league-start-right:lead:{place['id']}:{(right_of(place) or {}).get('offered_at')}")
+    for row in await db.league_applications.find(query, {"_id": 0}).sort("created_at", 1).to_list(1000):
+        if _reminder_due(row, season, settings, now):
+            out["reminded"] += await _remind(db, season, row, now)
 
 
 async def sweep(db, *, now: datetime | None = None) -> dict:
@@ -637,6 +700,11 @@ async def save_settings(db, season: dict, body: dict, actor: dict) -> dict | Non
     rules = normalize({**(before or {}), **fields}) if body.get("active", True) else None
     async with _Lock(db, season["id"]):
         now = now_utc().isoformat()
+        # Rückfrage (Entscheidung 26.11.): Braucht danach niemand mehr eine Zusage, gelten offene Startrechte als zugesagt - das
+        # geschieht nur mit ausdrücklicher Bestätigung (``confirm_open``), nie nebenbei.
+        waiting = await db.league_applications.count_documents({"season_id": season["id"], **OFFERED_QUERY})
+        if waiting and (rules or {}).get("mode") != ACCEPT and not body.get("confirm_open"):
+            raise StartRightProblem(CONFIRM_OPEN_ONE if waiting == 1 else CONFIRM_OPEN_MANY.format(count=waiting), 409)
         if rules is None:
             await db.league_seasons.update_one({"id": season["id"]}, {"$unset": {FIELD: ""}, "$set": {"updated_at": now}})
         elif rules != before or not isinstance(season.get(FIELD), dict):
@@ -669,6 +737,8 @@ def _row(application: dict, season: dict, names: dict[str, str], own_team: bool,
         "from_label": carry.get("from_label"), "from_staffel": carry.get("from_staffel"), "rank": carry.get("rank"), "via": carry.get("via"),
         "state": state(application, season, now),
         "accept_until": until.isoformat() if until and right.get("status") == OFFERED else None,
+        # Die Frist ruht (Vorgänger wieder geöffnet) bzw. ist vorbei und das Startdatum erreicht: Dann entscheidet die Leitung.
+        "paused": resting(application, season), "waits_for_lead": waits_for_lead(application, season, now),
         "accepted_at": right.get("accepted_at"), "accepted_via": right.get("accepted_via"), "accept_reason": right.get("accept_reason"),
         "accepted_by_name": names.get(right.get("accepted_by") or ""),
         "staffel": (application.get("assignment") or {}).get("label"),
@@ -683,7 +753,6 @@ def _row(application: dict, season: dict, names: dict[str, str], own_team: bool,
 
 async def overview(db, season: dict, user: dict, *, now: datetime | None = None) -> dict:
     """Die Übersicht der Verwaltung: Einstellung, je übernommenem Co-Team der Stand mit Frist, frei gewordene Plätze mit Vorschlag."""
-    from services import league_successor
     from services.league_applications import _names
     from services.league_permissions import belongs_to_side, is_superadmin, side_of
     from services.match_audience import teams_by_id
@@ -691,14 +760,18 @@ async def overview(db, season: dict, user: dict, *, now: datetime | None = None)
     now = now or now_utc()
     settings = stored(season)
     out: dict = {"active": settings is not None, "settings": settings, "defaults": defaults(), "predecessor": None, "paused": False,
-                 "started": league_successor.started(season), "superadmin": is_superadmin(user), "counts": {}, "rows": [], "open_places": []}
+                 # ``started``: Das Startdatum ist erreicht (auch im Entwurf) - ab dann verfällt und rückt nichts mehr von selbst.
+                 "started": start_reached(season, now), "superadmin": is_superadmin(user), "counts": {}, "rows": [], "open_places": [],
+                 # Offene Zusagen: Beim Ausschalten oder Umschalten auf „automatisch“ gelten sie als zugesagt - die Verwaltung fragt nach.
+                 "open_rights": 0}
     if not season.get("predecessor_id"):
         return out
     rows = await db.league_applications.find({"season_id": season["id"], "carry_over": {"$exists": True}}, {"_id": 0}).to_list(1000)
     ctx = await _context(db, season)
     if ctx["predecessor"]:
         out["predecessor"] = {"id": ctx["predecessor"]["id"], "name": ctx["predecessor"].get("name")}
-    out["paused"] = ctx["paused"]
+    out["paused"] = ctx["paused"] or open_pause(season)
+    out["open_rights"] = len([row for row in rows if row.get("status") == "accepted" and (right_of(row) or {}).get("status") == OFFERED])
     people = {(right_of(row) or {}).get("accepted_by") for row in rows} | {(row["carry_over"].get("fills") or {}).get("by") for row in rows}
     names = await _names(db, {uid for uid in people if uid})
     sides = {row["id"]: side_of(row) for row in rows}

@@ -706,6 +706,11 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
             override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
+            # Startrechte (#1627, F.2a): Die Warteliste ist kein Weg an der Zusage vorbei - gleich mit Staffel annehmen geht erst,
+            # wenn das Co-Team zugesagt hat. Ohne Staffel wird das Startrecht neu vergeben (``reoffer_fields``): Die Frist beginnt neu.
+            waits = league_start_right_rules.waitlist_problem(application) if tournament_id else None
+            if waits:
+                raise LeagueProblem(waits, 422)
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
             if not left_over and (await seat_stats(db, fresh))["full"]:
                 raise LeagueProblem(SEATS_TAKEN, 409)
@@ -719,7 +724,8 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
             if problems:
                 raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
-            fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
+            fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None,
+                      **league_start_right_rules.reoffer_fields(application, now)}
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over, override)
             if deviation:
                 await db.league_applications.update_one({"id": done["id"]}, {"$set": {"assignment.deviation_reason": deviation}})
@@ -1375,7 +1381,9 @@ async def scrub_person(db, user_id: str) -> int:
                      {"privacy_consent.user_id": user_id}, {"assignment.assigned_by": user_id}, {"history.by": user_id},
                      # Startrechte (#1627, F.2a): wer zugesagt bzw. das Nachrücken ausgelöst hat.
                      {"carry_over.start_right.accepted_by": user_id}, {"carry_over.fills.by": user_id},
-                     {"carry_over.fills.back.start_right.accepted_by": user_id}]}
+                     {"carry_over.fills.back.start_right.accepted_by": user_id},
+                     # „Übernahme neu berechnen“ (F.2, Nr. 162): wer ein Startrecht zurückgenommen hat.
+                     {"carry_over.revoked_by": user_id}]}
     done = 0
     async for row in db.league_applications.find(query, {"_id": 0}):
         update = {key: None for key in ("applied_by", "decided_by", "withdrawn_by") if row.get(key) == user_id}
@@ -1383,7 +1391,7 @@ async def scrub_person(db, user_id: str) -> int:
             if (row.get(key) or {}).get(field) == user_id:
                 update[f"{key}.{field}"] = None
         carry = row.get("carry_over") or {}
-        for path in (("start_right", "accepted_by"), ("fills", "by"), ("fills", "back", "start_right", "accepted_by")):
+        for path in (("start_right", "accepted_by"), ("fills", "by"), ("fills", "back", "start_right", "accepted_by"), ("revoked_by",)):
             value = carry
             for part in path:
                 value = value.get(part) if isinstance(value, dict) else None
