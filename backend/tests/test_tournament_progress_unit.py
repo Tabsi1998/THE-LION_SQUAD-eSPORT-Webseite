@@ -60,3 +60,13 @@ def test_the_texts():
 def test_pause_texts():
     assert progress.pause_message("Winter Cup", "2026-11-26T13:30:00+00:00") == ("Pause bis 14:30", "Winter Cup: Es geht um 14:30 Uhr weiter.")
     assert progress.pause_message("Winter Cup", None) == ("Kurze Pause", "Winter Cup: Kurze Pause – es geht gleich weiter.")
+
+
+def test_round_names_read_as_german():
+    """„Platz 1 im Runde 1“ war falsch (Prüfung 26.11.): in Runde 1, im Durchgang C, ohne Namen nur der Platz."""
+    assert progress.message("Cup", {"match_type": "ffa", "round": 1}, "advanced", 1, 4)[0] == "Platz 1 in Runde 1: weiter"
+    assert progress.message("Cup", {"match_type": "ffa", "round_name": "Durchgang C"}, "advanced", 2, 8)[0] == "Platz 2 im Durchgang C: weiter"
+    assert progress.message("Cup", {"match_type": "ffa", "round_name": "Gruppe B"}, "advanced", 2, 8)[0] == "Platz 2 in Gruppe B: weiter"
+    assert progress.message("Cup", {"match_type": "ffa", "round_name": "Viertelfinale"}, "advanced", 1, 4)[0] == "Platz 1 im Viertelfinale: weiter"
+    assert progress.message("Cup", {"match_type": "ffa"}, "advanced", 2, 8) == ("Platz 2: weiter", "Cup: Du bist in der nächsten Runde.")
+    assert progress.message("Cup", {"match_type": "duel"}, "eliminated", 2, 2) == ("Ausgeschieden", "Cup: leider raus. Danke fürs Mitspielen!")

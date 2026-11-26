@@ -1173,6 +1173,9 @@ async def _transition_tournament(db, stale: dict, now: datetime, now_iso: str) -
         logger.info("[scheduler] status tournament %s skipped, tournament busy", stale.get("id"))
         return False
     await _discord_status_changed(db, doc, nxt)
+    # Turnier-Meldungen (#1209): auch der Start nach Zeitplan sagt „Der Turnierbaum ist da“.
+    from services import tournament_progress
+    await tournament_progress.status_changed(db, doc["id"], doc.get("status"), nxt)
     return True
 
 

@@ -12,6 +12,8 @@ Ereignis höchstens einmal (``meta.dedupe_key``):
 - **Turnierbaum da** beim Start (``notify_bracket_ready``): einmal je Turnier, mit dem eigenen ersten Spiel als Ziel - nicht
   bei Liga-Staffeln (eigene Meldungen der Liga).
 - **Pause** beim Pausieren und wenn sich „Pause bis“ ändert (``notify_pause``): einmal je Pause und Uhrzeit.
+- Alle Startwege (Leitung, Zeitplan, erstes Spiel an einer Station) rufen ``status_changed``.
+- Eine Korrektur erzeugt die passende neue Meldung (Schlüssel mit Ergebnis-Stand), die überholte wird als überholt markiert.
 """
 from __future__ import annotations
 
@@ -80,23 +82,34 @@ def outcomes(match: dict) -> dict[str, tuple[str, int]]:
     return found
 
 
+# Runden, vor denen „in“ steht („in Runde 1“, „in Gruppe B“) - sonst „im“ („im Viertelfinale“, „im Durchgang C“).
+IN_WORDS = frozenset({"Runde", "Gruppe", "Phase", "Vorrunde", "Zwischenrunde", "Hauptrunde", "Finalrunde", "Qualifikation", "Staffel"})
+
+
 def _round(match: dict) -> str:
-    return str(match.get("round_name") or (f"Runde {match['round']}" if match.get("round") else "Dein Spiel"))
+    """Der Name der Runde - ohne Namen „Runde N“, ohne beides leer."""
+    return str(match.get("round_name") or (f"Runde {match['round']}" if match.get("round") else ""))
+
+
+def _in(where: str) -> str:
+    first = where.split(" ", 1)[0]
+    return f"in {where}" if first in IN_WORDS or first.endswith("runde") else f"im {where}"
 
 
 def message(tournament_title: str, match: dict, outcome: str, rank: int, size: int) -> tuple[str, str]:
     title = tournament_title or "Turnier"
     where = _round(match)
+    prefix = f"{title} · {where}" if where else title
     heat = match.get("match_type") == "ffa"
     if outcome == "advanced":
         if heat:
-            return f"Platz {rank} im {where}: weiter", f"{title}: Du bist in der nächsten Runde."
-        return "Du bist weiter!", f"{title} · {where}: gewonnen – du bist in der nächsten Runde."
+            return (f"Platz {rank} {_in(where)}: weiter" if where else f"Platz {rank}: weiter"), f"{title}: Du bist in der nächsten Runde."
+        return "Du bist weiter!", f"{prefix}: gewonnen – du bist in der nächsten Runde."
     if outcome == "lower":
-        return "Weiter im Loser Bracket", f"{title} · {where}: verloren – du spielst im Loser Bracket weiter."
+        return "Weiter im Loser Bracket", f"{prefix}: verloren – du spielst im Loser Bracket weiter."
     if heat:
-        return f"Ausgeschieden: Platz {rank} von {size}", f"{title} · {where}: leider nicht weiter. Danke fürs Mitspielen!"
-    return "Ausgeschieden", f"{title} · {where}: leider raus. Danke fürs Mitspielen!"
+        return f"Ausgeschieden: Platz {rank} von {size}", f"{prefix}: leider nicht weiter. Danke fürs Mitspielen!"
+    return "Ausgeschieden", f"{prefix}: leider raus. Danke fürs Mitspielen!"
 
 
 def _clock(value: str | None) -> str | None:
@@ -150,14 +163,69 @@ async def _tell(user_ids, title: str, body: str, url: str, kind: str, meta: dict
     return sent
 
 
+def result_token(match: dict) -> str:
+    """Der Stand des Ergebnisses - dieselbe Kennung wie bei „Ergebnis bestätigt“ (services/match_notifications.py). Eine
+    Korrektur hat einen neuen Stand und damit eine neue Meldung."""
+    return str((match.get("result_meta") or {}).get("report_id") or match.get("admin_decision_at") or match.get("updated_at") or "")
+
+
+async def _targets(db, match: dict) -> list[dict]:
+    """Die Spiele, in die dieses Spiel weiterleitet - nach Kennung oder Schlüssel in derselben Phase."""
+    ids = {edge.get("to_match_id") for edge in match.get("advancement") or [] if edge.get("to_match_id")}
+    keys = {edge.get("to_match_key") for edge in match.get("advancement") or [] if edge.get("to_match_key")}
+    ids |= {match.get(field) for field in ("next_match_id", "next_loser_match_id") if match.get(field)}
+    if not ids and not keys:
+        return []
+    ors: list[dict] = []
+    if ids:
+        ors.append({"id": {"$in": sorted(ids)}})
+    if keys:
+        ors.append({"match_key": {"$in": sorted(keys)}, "stage_id": match.get("stage_id")})
+    return await db.matches_v2.find({"tournament_id": match.get("tournament_id"), "$or": ors},
+                                    {"_id": 0, "id": 1, "status": 1, "slots": 1}).to_list(50)
+
+
+def checked_against_targets(found: dict[str, tuple[str, int]], targets: list[dict]) -> dict[str, tuple[str, int]]:
+    """Weiter ist nur, wer im tatsächlichen, nicht abgesagten Zielspiel steht (Prüfung 26.11.): Ist jedes Zielspiel abgesagt
+    (Reset des Grand Finals entfällt), war dieses Spiel das letzte - keine Meldung. Wer in keinem Zielspiel sitzt, obwohl
+    dort kein Platz mehr frei ist, ist ausgeschieden. Ein noch freier Platz (Auslosung steht aus) lässt die Rechnung nach Platz."""
+    if not targets:
+        return found
+    live = [target for target in targets if target.get("status") != "cancelled"]
+    if not live:
+        return {}
+    seated = {slot.get("registration_id") for target in live for slot in target.get("slots") or [] if slot.get("registration_id")}
+    open_seat = any(not slot.get("registration_id") and slot.get("status") != "bye" for target in live for slot in target.get("slots") or [])
+    checked: dict[str, tuple[str, int]] = {}
+    for registration_id, (outcome, rank) in found.items():
+        if outcome in ("advanced", "lower") and registration_id not in seated and not open_seat:
+            outcome = "eliminated"
+        checked[registration_id] = (outcome, rank)
+    return checked
+
+
+async def _supersede(db, match_id: str, registration_id: str, token: str) -> None:
+    """Ältere Meldungen zu diesem Spiel und dieser Anmeldung gelten als überholt - gelesen und markiert."""
+    await db.notifications.update_many(
+        {"kind": KIND_PROGRESS, "meta.source_match_id": match_id, "meta.registration_id": registration_id,
+         "meta.result_token": {"$ne": token}, "meta.superseded": {"$ne": True}},
+        {"$set": {"meta.superseded": True, "read": True}},
+    )
+
+
 async def notify_match_progress(db, match: dict) -> int:
-    """Nach einem bestätigten Ergebnis: weiter, Loser Bracket oder ausgeschieden - je Anmeldung und Ausgang einmal."""
+    """Nach einem bestätigten Ergebnis: weiter, Loser Bracket oder ausgeschieden - je Anmeldung, Ausgang und Ergebnis-Stand
+    einmal. Nach einer Korrektur kommt die passende neue Meldung, die überholte wird als überholt markiert."""
     found = outcomes(match)
+    if not found:
+        return 0
+    found = checked_against_targets(found, await _targets(db, match))
     if not found:
         return 0
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "id": 1, "slug": 1, "title": 1}) or {}
     if not tournament:
         return 0
+    token = result_token(match)
     registrations = await db.tournament_registrations.find(
         {"id": {"$in": sorted(found)}, "status": {"$in": list(ACTIVE_REGISTRATIONS)}}, {"_id": 0}).to_list(len(found))
     size = len([row for row in match.get("results") or [] if row.get("registration_id")])
@@ -167,8 +235,12 @@ async def notify_match_progress(db, match: dict) -> int:
         title, body = message(tournament.get("title") or "", match, outcome, rank, size)
         url = _tournament_url(tournament) if outcome == "eliminated" else await _next_match_url(db, tournament, registration["id"], match)
         meta = {"tournament_id": tournament["id"], "registration_id": registration["id"], "source_match_id": match.get("id"),
-                "reason": outcome, "rank": rank, "dedupe_key": f"progress:{match.get('id')}:{registration['id']}:{outcome}"}
-        sent += await _tell(await _people(db, registration), title, body, url, KIND_PROGRESS, meta)
+                "reason": outcome, "rank": rank, "result_token": token,
+                "dedupe_key": f"progress:{match.get('id')}:{registration['id']}:{outcome}:{token}"}
+        added = await _tell(await _people(db, registration), title, body, url, KIND_PROGRESS, meta)
+        if added:
+            await _supersede(db, match.get("id"), registration["id"], token)
+        sent += added
     return sent
 
 
@@ -200,12 +272,12 @@ async def notify_pause(db, tournament: dict) -> int:
     fresh = await db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}) or tournament
     if fresh.get("status") != "paused":
         return 0
-    # Hat die Turnierleitung eben selbst einen Hinweis geschickt („Pause bis 14:30“ mit „Turnier gleich pausieren“, #1166),
-    # sagt die automatische Meldung dasselbe nicht noch einmal.
-    from services.tournament_notices import _query_for
-
+    # Hat die Turnierleitung eben selbst „Pause bis 14:30“ an dieses Turnier geschickt (mit „Turnier gleich pausieren“, #1166),
+    # sagt die automatische Meldung dasselbe nicht noch einmal. Andere Hinweise und solche ans ganze Event zählen nicht.
     recent = (now_utc() - timedelta(minutes=NOTICE_COVERS_MINUTES)).isoformat()
-    if await db.tournament_notices.find_one({**_query_for([fresh["id"]], fresh.get("event_id")), "created_at": {"$gte": recent}}, {"_id": 1}):
+    notices = await db.tournament_notices.find(
+        {"target": "tournament", "tournament_id": fresh["id"], "created_at": {"$gte": recent}}, {"_id": 0, "text": 1}).to_list(20)
+    if any("pause" in str(notice.get("text") or "").lower() for notice in notices):
         return 0
     until = fresh.get("paused_until")
     title, body = pause_message(fresh.get("title") or "", until)
@@ -215,3 +287,18 @@ async def notify_pause(db, tournament: dict) -> int:
         people |= await _people(db, registration)
     meta = {"tournament_id": fresh["id"], "paused_until": until, "dedupe_key": f"pause:{fresh['id']}:{stamp}"}
     return await _tell(people, title, body, _tournament_url(fresh), KIND_PAUSE, meta)
+
+
+async def status_changed(db, tournament_id: str, prev: str | None, status: str | None) -> None:
+    """Die eine Stelle für alle Statuswechsel (Leitung, Zeitplan, erstes Spiel an einer Station): Beim ersten Start „Der
+    Turnierbaum ist da“, beim Pausieren die Pause. Doppeltes hält der ``dedupe_key`` auf. Ein Fehler hält nichts auf."""
+    try:
+        fresh = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+        if not fresh:
+            return
+        if status == "live" and prev not in ("paused", "live"):
+            await notify_bracket_ready(db, fresh)
+        if status == "paused":
+            await notify_pause(db, fresh)
+    except Exception:  # noqa: BLE001
+        logger.warning("[turnier] Meldung zum Statuswechsel nicht verschickt: %s", log_safe(tournament_id), exc_info=True)

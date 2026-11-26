@@ -321,11 +321,8 @@ async def set_pause_until(tid: str, body: PauseUntilUpdate, me: dict = Depends(g
     if pause_set or pause_unset:
         await _save_pause(db, me, tid, pause_set, pause_unset)
         # „Pause bis“ geändert (#1209): eine Meldung je Uhrzeit.
-        try:
-            from services.tournament_progress import notify_pause
-            await notify_pause(db, {"id": tid})
-        except Exception:  # noqa: BLE001
-            logger.warning("Pausen-Meldung nicht verschickt tournament=%s", log_safe(tid), exc_info=True)
+        from services import tournament_progress
+        await tournament_progress.status_changed(db, tid, "paused", "paused")
     return {"paused_until": pause_set.get("paused_until")}
 
 
@@ -633,15 +630,11 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     elif pause_set or pause_unset:
         await _save_pause(db, me, tid, pause_set, pause_unset)
 
-    # Turnier-Meldungen (#1209): „Der Turnierbaum ist da“ beim ersten Start (nicht nach einer Pause), Pause mit Uhrzeit.
-    try:
+    # Turnier-Meldungen (#1209): „Der Turnierbaum ist da“ beim ersten Start, Pause mit Uhrzeit - dieselbe Stelle wie Zeitplan
+    # und Station (services/tournament_progress.status_changed).
+    if prev != status or pause_set or pause_unset:
         from services import tournament_progress
-        if prev != status and status == "live" and prev != "paused":
-            await tournament_progress.notify_bracket_ready(db, {**t, "status": status})
-        if status == "paused" and (prev != "paused" or pause_set or pause_unset):
-            await tournament_progress.notify_pause(db, t)
-    except Exception:  # noqa: BLE001 - der Statuswechsel gilt auch ohne Meldung
-        logger.warning("Turnier-Meldung zum Status nicht verschickt tournament=%s", log_safe(tid), exc_info=True)
+        await tournament_progress.status_changed(db, tid, prev, status)
 
     if prev != status and status == "live":
         # Liga (#2201): der Start der ersten Staffel stellt die Season auf „Läuft“. Der Start gilt auch ohne das.

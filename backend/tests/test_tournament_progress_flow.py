@@ -158,3 +158,117 @@ async def test_a_league_staffel_gets_no_extra_schedule_message(flow):
     assert await notify_bracket_ready(flow.db, staffel) == 0
     assert await notify_bracket_ready(flow.db, {**tournament, "league_context": {"season_id": "s1"}}) == 0
     assert await flow.db.notifications.count_documents({"kind": "tournament_bracket"}) == 0
+
+
+# ---------------------------------------------------------------- Nachbesserung (Prüfung 26.11.)
+
+def _staff_duel(winner, loser, **extra):
+    return {"results": [{"registration_id": winner, "rank": 1, "score": 2}, {"registration_id": loser, "rank": 2, "score": 1}], **extra}
+
+
+async def _latest(flow, user_id):
+    rows = await flow.db.notifications.find({"kind": "tournament_progress", "user_id": user_id}, {"_id": 0}).to_list(20)
+    rows.sort(key=lambda row: row["created_at"])
+    return rows
+
+
+@pytest.mark.asyncio
+async def test_corrections_leave_the_right_last_message(flow):
+    """A schlägt B, Korrektur: B gewinnt, Korrektur: A gewinnt. Die letzte Meldung stimmt, überholte sind als überholt markiert."""
+    staff, tournament, player = await _bracket(flow)
+    await flow.start(tournament)
+    semi = sorted(await flow.matches(tournament), key=lambda row: (row.get("round") or 0, row.get("match_key") or ""))[0]
+    a, b = [slot["registration_id"] for slot in semi["slots"]]
+    flow.act_as(staff)
+    first = await flow.post(f"/api/matches/{semi['id']}/result", json=_staff_duel(a, b))
+    assert first.status_code == 200, first.text
+    for winner, loser in ((b, a), (a, b)):
+        corrected = await flow.post(f"/api/matches/{semi['id']}/result?force=true", json=_staff_duel(winner, loser, reason="vertauscht"))
+        assert corrected.status_code == 200, corrected.text
+    rows_a, rows_b = await _latest(flow, player[a]["id"]), await _latest(flow, player[b]["id"])
+    assert [row["title"] for row in rows_a] == ["Du bist weiter!", "Ausgeschieden", "Du bist weiter!"]
+    assert [row["title"] for row in rows_b] == ["Ausgeschieden", "Du bist weiter!", "Ausgeschieden"]
+    for rows in (rows_a, rows_b):
+        assert not rows[-1]["meta"].get("superseded")
+        assert all(row["meta"].get("superseded") is True and row["read"] is True for row in rows[:-1])
+
+
+async def _play_out(flow, tournament, player, staff):
+    """Spielt alles, was spielbar ist; immer gewinnt der kleinere Setzplatz."""
+    seeds = {reg["id"]: reg.get("seed") or 99 for reg in await flow.db.tournament_registrations.find(
+        {"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)}
+    flow.act_as(staff)
+    for _round in range(20):
+        open_matches = [row for row in await flow.matches(tournament)
+                        if row.get("status") not in ("completed", "forfeit", "cancelled")
+                        and len([slot for slot in row.get("slots") or [] if slot.get("registration_id")]) == 2]
+        if not open_matches:
+            return
+        row = sorted(open_matches, key=lambda item: (item.get("round") or 0, item.get("match_key") or ""))[0]
+        first, second = sorted([slot["registration_id"] for slot in row["slots"]], key=lambda rid: seeds[rid])
+        res = await flow.post(f"/api/matches/{row['id']}/result", json=_staff_duel(first, second))
+        assert res.status_code == 200, res.text
+
+
+@pytest.mark.asyncio
+async def test_double_elimination_grand_final_won_by_the_top_seed_says_nothing(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, users, registrations = await flow.with_participants(4, format="double_elim", title="Winter Cup")
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
+    assert response.status_code == 200, response.text
+    await flow.start(tournament)
+    player = {reg["id"]: users[index] for index, reg in enumerate(registrations)}
+    await _play_out(flow, tournament, player, staff)
+    matches = await flow.matches(tournament)
+    reset = [row for row in matches if row.get("status") == "cancelled"]
+    assert reset, "der Reset des Grand Finals entfällt"
+    finals = [row for row in matches if any(edge.get("to_match_id") == reset[0]["id"] or edge.get("to_match_key") == reset[0].get("match_key")
+                                            for edge in row.get("advancement") or [])]
+    assert finals
+    for final in finals:
+        assert await flow.db.notifications.count_documents({"kind": "tournament_progress", "meta.source_match_id": final["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_scheduler_start_tells_the_bracket_too(flow):
+    staff, tournament, player = await _bracket(flow)
+    past = (now_utc() - timedelta(minutes=5)).isoformat()
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
+        "status": "registration_closed", "auto_start_enabled": True, "start_date": past,
+        "end_date": (now_utc() + timedelta(hours=4)).isoformat()}})
+    from services import scheduler
+    await scheduler._safe_status_transitions()
+    assert (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0, "status": 1}))["status"] == "live"
+    assert await flow.db.notifications.count_documents({"kind": "tournament_bracket"}) == len(player)
+
+
+@pytest.mark.asyncio
+async def test_the_first_match_at_a_station_tells_the_bracket_too(flow):
+    staff, tournament, player = await _bracket(flow)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "registration_closed"}})
+    station = {"id": "st-1", "name": "Switch 1", "status": "free", "tournament_id": tournament["id"]}
+    await flow.db.stations.insert_one(dict(station))
+    match = sorted(await flow.matches(tournament), key=lambda row: (row.get("round") or 0, row.get("match_key") or ""))[0]
+    flow.act_as(staff)
+    res = await flow.post(f"/api/stations/st-1/assign/{match['id']}?start_now=true")
+    assert res.status_code == 200, res.text
+    assert (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0, "status": 1}))["status"] == "live"
+    assert await flow.db.notifications.count_documents({"kind": "tournament_bracket"}) == len(player)
+
+
+@pytest.mark.asyncio
+async def test_only_a_pause_notice_for_this_tournament_replaces_the_pause_message(flow):
+    staff, tournament, player = await _bracket(flow)
+    await flow.start(tournament)
+    stamp = now_utc().isoformat()
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"event_id": "ev-1"}})
+    await flow.db.tournament_notices.insert_many([
+        {"_id": "n-1", "id": "n-1", "target": "event", "event_id": "ev-1", "text": "Pause bis 14:30", "created_at": stamp},
+        {"_id": "n-2", "id": "n-2", "target": "tournament", "tournament_id": tournament["id"], "text": "Finale an PC 1", "created_at": stamp},
+        {"_id": "n-3", "id": "n-3", "target": "tournament", "tournament_id": "anderes", "text": "Pause bis 14:30", "created_at": stamp},
+    ])
+    flow.act_as(staff)
+    res = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "paused"})
+    assert res.status_code == 200, res.text
+    assert await flow.db.notifications.count_documents({"kind": "tournament_pause"}) == len(player)
