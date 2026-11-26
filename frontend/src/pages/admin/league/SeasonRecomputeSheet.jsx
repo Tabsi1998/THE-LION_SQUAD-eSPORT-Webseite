@@ -9,11 +9,14 @@ import { api, formatApiError } from "@/lib/api";
 
 const KIND_TEXT = {
   moved: "Neue Liga", updated: "Platz oder Zone neu", added: "Kommt dazu", reactivated: "Wieder dabei", revoked: "Übernahme zurückgenommen",
+  // Abgemeldet und laut korrigiertem Endstand Aufsteiger: Der Aufstiegsplatz ist frei, es gilt die Nachrückerregel (F.2a).
+  place: "Platz frei",
 };
 
 function changeLine(change) {
   if (change.kind === "moved") return `${change.from_label} → ${change.to_label}`;
   if (change.kind === "revoked") return `bisher ${change.from_label} – nicht mehr in der neuen Season`;
+  if (change.kind === "place") return `abgemeldet – der Platz in ${change.to_label} ist frei`;
   return change.to_label || change.from_label || "";
 }
 
