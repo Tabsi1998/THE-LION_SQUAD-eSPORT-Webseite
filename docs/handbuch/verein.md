@@ -113,12 +113,14 @@ Ohne Mitgliedschaft schickt eine Seite des Mitgliederbereichs auf **Mitglied wer
 ### 3.3 Mein Bereich → Verein (früher Mitgliederbereich)
 
 Für aktive Mitglieder und Ehrenmitglieder: Benutzermenü → **Verein** in Mein Bereich (`/mein-bereich/verein`, die alte
-Adresse `/members/area` leitet weiter). Oben die Karte mit
-Name, Nummer, „Mitglied seit“ und Beitragsstand, darunter die **Sprungleiste**: **Karte**, **Versammlung**, **Helfen**,
+Adresse `/members/area` leitet weiter). Ganz oben steht die **Sprungleiste**: **Versammlung**, **Helfen**,
 **News**, **Dokumente**, mit der Zahl dessen, was offen oder neu ist („Versammlung · 1 offen“). „Neu“ heißt: in den letzten
 zwei Wochen erschienen. Weiter unten stehen nur Abschnitte, in denen etwas ist: Versammlung, offene Abstimmung, freie
 Helferdienste, Vereinsdokumente, Mitgliedervorteile, Ansprechpartner, „Gerade in Steam“ (nur Mitglieder mit verknüpftem Konto
 und Einwilligung), „Discord jetzt“ (nur Zahlen, nie Namen) und die Discord-Server des Vereins.
+
+Die Mitgliedskarte, „Mitglied seit“ und der Beitragsstand stehen nur unter **Mein Bereich → Mitgliedschaft**, hier nicht
+doppelt.
 
 Dieselben Zahlen stehen an den Kacheln auf **/verein** und im Tab „Verein“ der App. Interne Events stehen nicht hier, sondern
 unter Events (gold markiert) und im Kalender. Eigene Rechnungen und eigene Unterlagen gehören zum Konto (Mein Bereich →

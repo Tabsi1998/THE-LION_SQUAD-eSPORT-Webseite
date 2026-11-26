@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { API, api, formatApiError, formatMemberSince } from "@/lib/api";
+import { API, api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { MemberCardArt } from "@/components/tls/MemberCardArt";
 import { BoardAvatar } from "@/components/tls/BoardPortrait";
 import { SizedImage } from "@/components/tls/SizedImage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { feeBadge } from "@/lib/dolibarr";
 import { motionAllowed } from "@/lib/motion";
 import {
-  AREA_JUMPS, MEETING_ANSWERS, areaCard, boardContacts, dateTileParts, helperEvents, isRecent, jumpEntries, memberNews,
+  AREA_JUMPS, MEETING_ANSWERS, boardContacts, dateTileParts, helperEvents, isRecent, jumpEntries, memberNews,
 } from "@/lib/memberArea";
-import { AlertCircle, Bell, Cake, CheckCircle2, Eye, FileText, Gamepad2, Gift, HandHelping, MapPin, MessageCircle, Users, Vote } from "lucide-react";
+import { Bell, Cake, Eye, FileText, Gamepad2, Gift, HandHelping, MapPin, MessageCircle, Users, Vote } from "lucide-react";
 import { SteamPresence } from "@/components/tls/SteamPresence";
 import { useSeason } from "@/seasons/SeasonContext";
 import { StickerClaim } from "@/seasons/birthday/StickerClaim";
@@ -20,7 +18,7 @@ import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 import { DiscordVoice } from "@/components/tls/DiscordNow";
 import { viennaDate } from "@/lib/vienna";
 import { gemeinsamLaden } from "@/lib/gemeinsamLaden";
-import { BEREICH, vereinPfad } from "@/lib/meinBereich";
+import { vereinPfad } from "@/lib/meinBereich";
 
 // Der Mitgliederbereich (#284, #1336, #1257): oben die eigene Mitgliedskarte mit „Hallo“, „Mitglied seit“ und dem
 // Beitragsstand, darunter die Sprungleiste mit dem, was offen ist („Versammlung · 1 offen“) - am Handy eine Zeile zum
@@ -81,12 +79,10 @@ function useActiveSection(keys) {
 export default function MemberAreaPage() {
   const { user } = useAuth();
   const [benefits, setBenefits] = useState([]);
-  const [me, setMe] = useState(null);
   const [docs, setDocs] = useState([]);
   const [internalNews, setInternalNews] = useState([]);
   // Interne Events stehen seit #1190 nur noch im Events-Bereich (gold markiert) und im Kalender - nicht doppelt hier.
   const [contacts, setContacts] = useState([]);
-  const [discordUrl, setDiscordUrl] = useState("");
   // Was offen ist (#1257): offene Versammlungen und Abstimmungen, freie Plätze, neue News und Dokumente, die nächste
   // Versammlung mit meiner Antwort.
   const [summary, setSummary] = useState(null);
@@ -108,23 +104,19 @@ export default function MemberAreaPage() {
     const frisch = Boolean(event);
     Promise.allSettled([
       api.get("/membership/benefits"),
-      gemeinsamLaden("/membership/me", { frisch, konto }),
       api.get("/documents", { params: { scope: "club" } }),
       api.get("/news"),
       api.get("/board?active_only=true"),
-      api.get("/settings/public"),
       gemeinsamLaden("/membership/area-summary", { frisch, konto }),
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
       api.get("/membership/discord-servers"),
       api.get("/membership/discord-voice"),
-    ]).then(([b, m, d, n, p, s, sm, hs, sp, ds, dv]) => {
+    ]).then(([b, d, n, p, sm, hs, sp, ds, dv]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
-      if (m.status === "fulfilled") setMe(m.value.data && typeof m.value.data === "object" ? m.value.data : null);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
       if (n.status === "fulfilled") setInternalNews(memberNews(n.value.data));
       if (p.status === "fulfilled") setContacts(boardContacts(p.value.data));
-      if (s.status === "fulfilled") setDiscordUrl(s.value.data?.discord_invite_url || "");
       if (sm.status === "fulfilled" && sm.value.data && typeof sm.value.data === "object" && !Array.isArray(sm.value.data)) setSummary(sm.value.data);
       if (hs.status === "fulfilled" && hs.value.data?.available) setHelping(hs.value.data);
       if (sp.status === "fulfilled" && sp.value.data?.available) setSteam(sp.value.data);
@@ -141,7 +133,7 @@ export default function MemberAreaPage() {
   const helpingEvents = helperEvents(helping);
   const helpingSomething = Boolean(helping && (helping.my_count || helping.open_places));
   const showMeetings = Boolean(nextMeeting || openBallots);
-  const present = new Set(["karte", showMeetings && "versammlung", helpingSomething && "helfen", internalNews.length && "news", docs.length && "dokumente"].filter(Boolean));
+  const present = new Set([showMeetings && "versammlung", helpingSomething && "helfen", internalNews.length && "news", docs.length && "dokumente"].filter(Boolean));
   const [active, pin] = useActiveSection(AREA_ORDER.filter((key) => present.has(key)));
   const nothingYet = loaded && !docs.length && !benefits.length && !internalNews.length && !showMeetings && !helpingSomething;
 
@@ -192,8 +184,6 @@ export default function MemberAreaPage() {
 
   return (
     <div data-testid="member-area">
-        <AreaHead user={user} me={me} discordUrl={discordUrl} />
-
         <BirthdayNote />
 
         <div className="mt-6">
@@ -335,64 +325,6 @@ export default function MemberAreaPage() {
           </div>
         </div>
     </div>
-  );
-}
-
-/** Oben: die eigene Karte (ein Tipp öffnet sie mit Prüfcode), daneben Gruß, „Mitglied seit“ und der Beitragsstand. */
-function AreaHead({ user, me, discordUrl }) {
-  const card = areaCard(user, me);
-  const fee = feeBadge(me?.dolibarr);
-  const membership = me?.membership || {};
-  const since = membership.member_since ? formatMemberSince(membership.member_since, membership.member_since_precision || "day") : "";
-  const name = user?.display_name || user?.username || "";
-  return (
-    <header id="karte" tabIndex={-1} data-testid="member-area-head" className={`scroll-mt-32 xl:scroll-mt-28 grid gap-5 md:items-center focus:outline-none ${card ? "md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] md:gap-8" : ""}`}>
-      {card ? (
-        <Link to={`${BEREICH}/mitgliedschaft#mitgliedskarte`} data-testid="member-area-card-link" aria-label="Mitgliedskarte mit Prüfcode öffnen" className="block w-full rounded-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#29B6E8]">
-          <MemberCardArt name={card.name} number={card.number} since={card.since} typeLabel={card.typeLabel} validUntil={card.validUntil} testId="member-area-card" />
-        </Link>
-      ) : null}
-      <div className="min-w-0">
-        <h2 className="tls-type-section break-words" data-testid="member-area-greeting">Hallo, {name}</h2>
-        {since || membership.internal_role ? (
-          <p className="mt-2 tls-type-small text-white/70 flex flex-wrap gap-x-4 gap-y-1">
-            {since ? <span data-testid="member-area-since">Mitglied seit <strong className="text-white">{since}</strong></span> : null}
-            {membership.internal_role ? <span>Aufgabe: <strong className="text-white">{membership.internal_role}</strong></span> : null}
-          </p>
-        ) : null}
-        {fee ? <FeeBadge badge={fee} /> : null}
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 tls-type-label">
-          {/* Haupteinstieg für Mitglieder: ein Button, kein kleiner Textlink (#2059). */}
-          <Link to={`${BEREICH}/mitgliedschaft`} data-testid="member-area-my-membership" className="inline-flex min-h-11 items-center gap-1.5 px-4 py-2 bg-[#29B6E8] text-black hover:bg-[#29B6E8]/85 rounded-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
-            Mitgliedschaft
-            <span className="normal-case font-semibold tracking-normal text-black/70">· Nummer, Daten, Beitrag</span>
-          </Link>
-          {discordUrl ? (
-            <a href={discordUrl} target="_blank" rel="noreferrer" data-testid="member-area-discord" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1.5 px-4 py-2 rounded-sm">
-              <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Discord
-            </a>
-          ) : null}
-        </div>
-      </div>
-    </header>
-  );
-}
-
-const FEE_TONES = {
-  ok: { icon: CheckCircle2, className: "border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88]" },
-  warn: { icon: AlertCircle, className: "border-[#FF3B30]/50 bg-[#FF3B30]/10 text-[#FF8A80]" },
-  plain: { icon: null, className: "border-white/15 bg-white/5 text-white/70" },
-};
-
-/** Das Schild „Beitrag bezahlt“ / „Beitrag offen“ - dieselben Daten wie „Meine Mitgliedschaft“. */
-function FeeBadge({ badge }) {
-  const tone = FEE_TONES[badge.tone] || FEE_TONES.plain;
-  const Icon = tone.icon;
-  return (
-    <span data-testid="member-area-fee" data-tone={badge.tone} className={`mt-3 inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 tls-type-label ${tone.className}`}>
-      {Icon ? <Icon className="w-3.5 h-3.5" aria-hidden="true" /> : null}
-      {badge.text}
-    </span>
   );
 }
 
