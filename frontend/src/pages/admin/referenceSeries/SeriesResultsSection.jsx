@@ -47,19 +47,19 @@ export function SeriesResultsSection({ series, onChanged }) {
   const weekends = series.lineage?.kind === "racing" && hasSessions(rounds) ? groupWeekends(rounds) : null;
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="series-results" aria-labelledby="series-results-title">
-      <h2 id="series-results-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnisse</h2>
-      {error && <p className="mt-3 text-sm text-red-300" role="alert">{error}</p>}
+      <h2 id="series-results-title" className="tls-type-label text-[#29B6E8]">Ergebnisse</h2>
+      {error && <p className="mt-3 tls-type-small text-red-300" role="alert">{error}</p>}
       {calendar && rounds.length === 0 && (
-        <p className="mt-3 text-sm text-white/55" data-testid="results-empty">Noch keine Termine – Ergebnisse gibt es je Termin im Kalender.</p>
+        <p className="mt-3 tls-type-small text-white/55" data-testid="results-empty">Noch keine Termine – Ergebnisse gibt es je Termin im Kalender.</p>
       )}
       {weekends && (
         <>
-          <p className="mt-1 text-xs text-white/50">Je Lauf ein Ergebnis – den Lauf antippen.</p>
+          <p className="mt-1 tls-type-small text-white/50">Je Lauf ein Ergebnis – den Lauf antippen.</p>
           <ol className="mt-2 divide-y divide-white/5" data-testid="results-weekends">
             {weekends.map((weekend) => (
               <li key={weekend.key} className="py-2.5 flex items-start gap-3" data-testid="results-weekend" data-state={weekend.state}>
-                <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
-                <div className="min-w-0 flex-1 text-sm">
+                <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 tls-type-small font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
+                <div className="min-w-0 flex-1 tls-type-small">
                   <span className="tabular-nums text-white">{dayLabel(weekend.lead.club_day) || "Termin offen"}</span>
                   {(weekend.title || weekend.venue || weekend.country_code) && <span className="text-white/60"> · <VenueWithFlag round={weekend} /></span>}
                   <SessionChips rounds={weekend.rounds} admin showTime onOpen={setOpen} className="mt-2" testId="results-sessions" />
@@ -75,17 +75,17 @@ export function SeriesResultsSection({ series, onChanged }) {
             const scored = round.state === "scored";
             return (
               <li key={round.id} className="py-2.5 flex items-center gap-3 flex-wrap sm:flex-nowrap" data-testid="results-round" data-state={round.state}>
-                <div className="min-w-12 shrink-0 whitespace-nowrap text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
-                <div className="min-w-0 flex-1 text-sm">
+                <div className="min-w-12 shrink-0 whitespace-nowrap tls-type-small tls-type-num text-white/80">{roundLabel(round)}</div>
+                <div className="min-w-0 flex-1 tls-type-small">
                   <span className="tabular-nums text-white">{roundWhen(round)}</span>
                   {(round.title || round.venue || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}
                   {round.opponent && <span className="text-white/60"> · {opponentText(round)}</span>}
                 </div>
-                <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
+                <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
                   {STATE_LABELS[round.state] || round.state}
                 </span>
                 <button type="button" onClick={() => setOpen(round)} data-testid="results-open"
-                  className={`tls-btn ${scored ? "tls-btn--quiet" : "tls-btn--secondary"} px-3 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ml-auto sm:ml-0`}>
+                  className={`tls-type-label tls-btn ${scored ? "tls-btn--quiet" : "tls-btn--secondary"} px-3 py-2 rounded-sm inline-flex items-center gap-1.5 ml-auto sm:ml-0`}>
                   {scored ? <PenLine className="w-3.5 h-3.5" /> : <ListOrdered className="w-3.5 h-3.5" />}
                   {scored ? "Ergebnis ändern" : "Ergebnis eintragen"}
                 </button>

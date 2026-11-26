@@ -3,11 +3,11 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { LOSER_BRACKET_FORMATS } from "@/lib/tournamentFormFields";
 
 export function Fld({ label, value, onChange, type="text", testId, min, max, placeholder }) {
-  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} min={min} max={max} placeholder={placeholder} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
+  return (<label className="block"><div className="tls-type-label text-white/60 mb-1.5">{label}</div><input type={type} min={min} max={max} placeholder={placeholder} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
 }
 
 export function Txt({ label, value, onChange, testId }) {
-  return (<div className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><MarkdownEditor value={value ?? ""} onChange={onChange} rows={5} testId={testId} /></div>);
+  return (<div className="block"><div className="tls-type-label text-white/60 mb-1.5">{label}</div><MarkdownEditor value={value ?? ""} onChange={onChange} rows={5} testId={testId} /></div>);
 }
 
 export function PrizeEditor({ value = [], onChange, format = "" }) {
@@ -24,12 +24,12 @@ export function PrizeEditor({ value = [], onChange, format = "" }) {
   return (
     <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Platzierungs-Preise</div>
+        <div className="tls-type-label text-[#FFD700]">Platzierungs-Preise</div>
         <div className="flex flex-wrap justify-end gap-3">
-          {LOSER_BRACKET_FORMATS.has(format) && <button type="button" onClick={() => addTop3("winner")} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8]">+ Siegerrunde Top 3</button>}
-          {LOSER_BRACKET_FORMATS.has(format) && <button type="button" onClick={() => addTop3("loser")} data-testid="tr-edit-prize-loser-top3" className="text-xs font-bold uppercase tracking-wider text-[#CD7F32]">+ Verliererrunde Top 3</button>}
-          <button type="button" onClick={() => add((value?.length || 0) + 1)} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8]">+ Platz</button>
-          <button type="button" onClick={() => add("last")} className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">+ Letzter</button>
+          {LOSER_BRACKET_FORMATS.has(format) && <button type="button" onClick={() => addTop3("winner")} className="tls-type-label text-[#29B6E8]">+ Siegerrunde Top 3</button>}
+          {LOSER_BRACKET_FORMATS.has(format) && <button type="button" onClick={() => addTop3("loser")} data-testid="tr-edit-prize-loser-top3" className="tls-type-label text-[#CD7F32]">+ Verliererrunde Top 3</button>}
+          <button type="button" onClick={() => add((value?.length || 0) + 1)} className="tls-type-label text-[#29B6E8]">+ Platz</button>
+          <button type="button" onClick={() => add("last")} className="tls-type-label text-[#FFD700]">+ Letzter</button>
         </div>
       </div>
       {(value || []).map((p, i) => (

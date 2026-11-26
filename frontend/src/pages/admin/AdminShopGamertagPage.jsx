@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Gamertag-Druckdatei (#1711) - Verwaltung → Finanzen → Shop → Gamertag. Der Server prüft und rendert den Namen als PNG
 // mit Transparenz; hier stehen Regeln und Maße (mit Grund, Protokoll) und ein Test-Gamertag mit Live-Vorschau auf
@@ -13,7 +14,7 @@ import ShopTabs from "./ShopTabs";
 const BASE = "/admin/shop/gamertag";
 const PREVIEW_DELAY_MS = 350;
 const CM_PER_INCH = 2.54;
-const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 text-sm placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50";
+const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tls-type-small placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50";
 const SHIRTS = [
   { key: "dark", label: "Dunkles Shirt", className: "bg-black" },
   { key: "light", label: "Helles Shirt", className: "bg-white" },
@@ -38,7 +39,7 @@ const NUMBER_FIELDS = [
 function Section({ title, icon: Icon, children, testId }) {
   return (
     <section className="border border-white/10 bg-surface-1 rounded-sm p-4 space-y-3" data-testid={testId}>
-      <h2 className="text-xs font-bold uppercase tracking-wider text-white/70 inline-flex items-center gap-2">
+      <h2 className="tls-type-label text-white/70 inline-flex items-center gap-2">
         {Icon && <Icon className="w-3.5 h-3.5 text-white/50" aria-hidden="true" />} {title}
       </h2>
       {children}
@@ -48,10 +49,10 @@ function Section({ title, icon: Icon, children, testId }) {
 
 function Field({ label, hint, children }) {
   return (
-    <label className="block text-sm">
+    <label className="block tls-type-small">
       <span className="text-white/70">{label}</span>
       {children}
-      {hint && <span className="block text-xs text-white/45 mt-1">{hint}</span>}
+      {hint && <span className="block tls-type-small text-white/45 mt-1">{hint}</span>}
     </label>
   );
 }
@@ -76,7 +77,7 @@ function ColorPicker({ colors, value, onChange }) {
     <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Farbe des Namens">
       {colors.map((color) => (
         <button key={color.key} type="button" role="radio" aria-checked={value === color.key} onClick={() => onChange(color.key)}
-          className={`min-h-9 px-3 text-xs border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 ${value === color.key ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+          className={`min-h-9 px-3 tls-type-small border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 ${value === color.key ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
           data-testid={`shop-gamertag-color-${color.key}`}>
           <Swatch hex={color.hex} /> {color.label}
           {color.garment_colors?.length > 0 && <span className="text-white/45">· {color.garment_colors.join(", ")}</span>}
@@ -168,29 +169,29 @@ function TestName({ data, onStored }) {
                 ? <img src={result.image} alt={`Vorschau der Druckdatei auf ${shirt.label.toLowerCase()}`} className="max-w-full max-h-full object-contain" />
                 : <FileImage className="w-8 h-8 text-white/30" aria-hidden="true" />}
             </div>
-            <figcaption className="text-xs text-white/50">{shirt.label}</figcaption>
+            <figcaption className="tls-type-small text-white/50">{shirt.label}</figcaption>
           </figure>
         ))}
       </div>
-      {loading && <p className="text-xs text-white/45" role="status">Vorschau wird gerendert …</p>}
+      {loading && <p className="tls-type-small text-white/45" role="status">Vorschau wird gerendert …</p>}
       {refused && (
-        <p className="border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm text-warn inline-flex gap-2" role="alert" data-testid="shop-gamertag-refused">
+        <p className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-warn inline-flex gap-2" role="alert" data-testid="shop-gamertag-refused">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" /> Abgelehnt: {refused}
         </p>
       )}
       {meta && (
-        <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2" data-testid="shop-gamertag-measures">
-          <div><dt className="text-white/50 text-xs">Texthöhe</dt><dd className="tabular-nums">{meta.measures.text_height}</dd></div>
-          <div><dt className="text-white/50 text-xs">Breite des Namens</dt><dd className="tabular-nums">{meta.measures.text_width} von {meta.measures.max_width}</dd></div>
-          <div><dt className="text-white/50 text-xs">Druckdatei</dt><dd className="tabular-nums">{meta.width_px} × {meta.height_px} px · {meta.dpi} DPI · {meta.measures.canvas}</dd></div>
-          <div><dt className="text-white/50 text-xs">Anker (Mitte des Löwen)</dt><dd className="tabular-nums">{inches(meta.anchor_y_in)} von oben</dd></div>
+        <dl className="grid gap-x-6 gap-y-1 tls-type-small sm:grid-cols-2" data-testid="shop-gamertag-measures">
+          <div><dt className="text-white/50 tls-type-small">Texthöhe</dt><dd className="tabular-nums">{meta.measures.text_height}</dd></div>
+          <div><dt className="text-white/50 tls-type-small">Breite des Namens</dt><dd className="tabular-nums">{meta.measures.text_width} von {meta.measures.max_width}</dd></div>
+          <div><dt className="text-white/50 tls-type-small">Druckdatei</dt><dd className="tabular-nums">{meta.width_px} × {meta.height_px} px · {meta.dpi} DPI · {meta.measures.canvas}</dd></div>
+          <div><dt className="text-white/50 tls-type-small">Anker (Mitte des Löwen)</dt><dd className="tabular-nums">{inches(meta.anchor_y_in)} von oben</dd></div>
         </dl>
       )}
-      {meta?.notice && <p className="text-xs text-warn" data-testid="shop-gamertag-notice">{meta.notice}</p>}
-      {(result?.warnings || []).map((warning) => <p key={warning} className="text-xs text-warn" data-testid="shop-gamertag-warning">{warning}</p>)}
+      {meta?.notice && <p className="tls-type-small text-warn" data-testid="shop-gamertag-notice">{meta.notice}</p>}
+      {(result?.warnings || []).map((warning) => <p key={warning} className="tls-type-small text-warn" data-testid="shop-gamertag-warning">{warning}</p>)}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ReasonInput id="shop-gamertag-file-reason" value={reason} onChange={setReason} disabled={saving} />
-        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid="shop-gamertag-save-file">
+        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40" data-testid="shop-gamertag-save-file">
           {saving ? "Speichert …" : "Als Testdatei speichern"}
         </button>
       </div>
@@ -215,7 +216,7 @@ function ColorRows({ colors, onChange }) {
         </div>
       ))}
       <button type="button" onClick={() => onChange([...colors, { key: "", label: "", hex: "", garment_colors: [] }])}
-        className="tls-btn tls-btn--secondary min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5" data-testid="shop-gamertag-color-add">
+        className="tls-btn tls-btn--secondary min-h-9 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5" data-testid="shop-gamertag-color-add">
         <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Farbe
       </button>
     </div>
@@ -277,19 +278,19 @@ function RulesForm({ data, busy, onSave }) {
           <input value={values.allowed_chars} onChange={(event) => set("allowed_chars", event.target.value)} maxLength={60} className={`${INPUT} font-mono`} data-testid="shop-gamertag-rule-allowed_chars" />
         </Field>
         {select("default_color", "Vorgabefarbe", values.colors.map((color) => ({ key: color.key, label: color.label || color.key })))}
-        <label className="flex items-center gap-2 text-sm min-h-10 sm:mt-6">
+        <label className="flex items-center gap-2 tls-type-small min-h-10 sm:mt-6">
           <input type="checkbox" checked={values.block_flagged} onChange={(event) => set("block_flagged", event.target.checked)} className="w-4 h-4 accent-brand" data-testid="shop-gamertag-rule-block_flagged" />
           Auch „nur markierte“ Wörter des Wortfilters ablehnen
         </label>
       </div>
       <div>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-white/60 mb-2">Farben des Namens je Shirtfarbe</h3>
+        <h3 className="tls-type-small font-bold text-white/60 mb-2">Farben des Namens je Shirtfarbe</h3>
         <ColorRows colors={values.colors} onChange={(colors) => set("colors", colors)} />
       </div>
-      {!numbersValid && <p className="text-xs text-warn" data-testid="shop-gamertag-rules-invalid">Maße und Längen als Zahlen größer 0.</p>}
+      {!numbersValid && <p className="tls-type-small text-warn" data-testid="shop-gamertag-rules-invalid">Maße und Längen als Zahlen größer 0.</p>}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ReasonInput id="shop-gamertag-rules-reason" value={reason} onChange={setReason} disabled={busy} />
-        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid="shop-gamertag-rules-save">
+        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40" data-testid="shop-gamertag-rules-save">
           {busy ? "Speichert …" : "Regeln speichern"}
         </button>
       </div>
@@ -323,16 +324,16 @@ export default function AdminShopGamertagPage() {
   }, []);
 
   if (error) {
-    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 text-sm" data-testid="shop-gamertag-error">{error}</div></AdminLayout>;
+    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="shop-gamertag-error">{error}</div></AdminLayout>;
   }
-  if (!data) return <AdminLayout><div className="text-sm text-white/45" role="status">Lade Gamertag-Regeln …</div></AdminLayout>;
+  if (!data) return <AdminLayout><div className="tls-type-small text-white/45" role="status">Lade Gamertag-Regeln …</div></AdminLayout>;
 
   return (
     <AdminLayout>
       <div>
-        <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> Shop</h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
-        <p className="mt-4 text-sm text-white/60 max-w-2xl">
+        <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Der Gamertag wird auf dem Server als PNG mit durchsichtigem Hintergrund erzeugt - dieselbe Datei für den Testentwurf und jede Bestellung.
           Jeder Name hat dieselbe Leinwand ({data.canvas.size}, {data.canvas.dpi} DPI); die senkrechte Mitte der Großbuchstaben liegt bei {inches(data.canvas.anchor_y_in)} von oben und kommt auf die Mitte des Löwen.
         </p>
@@ -345,28 +346,28 @@ export default function AdminShopGamertagPage() {
 
         <Section title="Testdateien" icon={FileImage} testId="shop-gamertag-files">
           {data.test_files.length === 0
-            ? <p className="text-sm text-white/55">Noch keine Testdatei.</p>
+            ? <p className="tls-type-small text-white/55">Noch keine Testdatei.</p>
             : (
               <ul className="space-y-1.5">
                 {data.test_files.map((file) => (
-                  <li key={file.sha256} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70" data-testid={`shop-gamertag-file-${file.sha256_short}`}>
+                  <li key={file.sha256} className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/70" data-testid={`shop-gamertag-file-${file.sha256_short}`}>
                     <Swatch hex={file.color_hex} />
                     <code className="font-mono" title={file.sha256}>{file.sha256_short}…</code>
                     <span className="tabular-nums">{file.measures.text_height} · {file.width_px} × {file.height_px} px · {file.dpi} DPI</span>
                     {file.scaled && <span className="text-warn">verkleinert</span>}
                     <span>{viennaDateTime(file.last_used_at)}</span>
-                    <button type="button" onClick={() => copy(fullUrl(file))} className="tls-btn tls-btn--quiet min-h-8 px-2 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5" data-testid={`shop-gamertag-file-${file.sha256_short}-copy`}>
+                    <button type="button" onClick={() => copy(fullUrl(file))} className="tls-btn tls-btn--quiet min-h-8 px-2 tls-type-label rounded-sm inline-flex items-center gap-1.5" data-testid={`shop-gamertag-file-${file.sha256_short}-copy`}>
                       <Copy className="w-3.5 h-3.5" aria-hidden="true" /> Adresse für Printful
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          <p className="text-xs text-white/45">Testdateien, die 30 Tage niemand benutzt und keine Bestellung braucht, dürfen später weg (nur vermerkt, nichts wird gelöscht).</p>
+          <p className="tls-type-small text-white/45">Testdateien, die 30 Tage niemand benutzt und keine Bestellung braucht, dürfen später weg (nur vermerkt, nichts wird gelöscht).</p>
         </Section>
 
         <Section title="Regeln und Maße" icon={Ruler} testId="shop-gamertag-rules">
-          <p className="text-xs text-white/55">
+          <p className="tls-type-small text-white/55">
             Printful rechnet in Zoll; 1 Zoll = 2,54 cm. Passt ein Name nicht in die Höchstbreite, wird er bis zur Mindesthöhe verkleinert, sonst abgelehnt. Platzierung: {data.placement.label}, Druckbereich {data.placement.area_width} × {data.placement.area_height}.
           </p>
           <RulesForm data={data} busy={busy} onSave={saveRules} />

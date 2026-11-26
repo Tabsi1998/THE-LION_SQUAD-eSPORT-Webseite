@@ -7,6 +7,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle, ShieldCheck, Search, Send } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABEL = {
   new: { l: "Neu", c: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
@@ -43,16 +44,16 @@ function SpamCounter({ stats }) {
       <div className="flex items-center gap-3">
         <ShieldCheck className="w-5 h-5 text-ok shrink-0" />
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Spamschutz – abgefangen</div>
-          <div className="text-sm text-white/85">
-            <strong className="text-lg font-black" data-testid="contact-spam-today">{stats.today?.caught || 0}</strong> heute ·{" "}
-            <strong className="text-lg font-black" data-testid="contact-spam-week">{stats.week?.caught || 0}</strong> in 7 Tagen
+          <div className="tls-type-label text-white/50">Spamschutz – abgefangen</div>
+          <div className="tls-type-small text-white/85">
+            <strong className="tls-type-card" data-testid="contact-spam-today">{stats.today?.caught || 0}</strong> heute ·{" "}
+            <strong className="tls-type-card" data-testid="contact-spam-week">{stats.week?.caught || 0}</strong> in 7 Tagen
             {stats.quote_week != null && <span className="text-white/50"> · Quote {String(stats.quote_week).replace(".", ",")} %</span>}
           </div>
         </div>
       </div>
       {reasons.length > 0 && (
-        <ul className="flex flex-wrap gap-2 text-xs" aria-label="Gründe der letzten 7 Tage" data-testid="contact-spam-reasons">
+        <ul className="flex flex-wrap gap-2 tls-type-small" aria-label="Gründe der letzten 7 Tage" data-testid="contact-spam-reasons">
           {reasons.map(([reason, count]) => (
             <li key={reason} className="px-2 py-1 rounded-sm border border-white/10 text-white/70">{labels[reason] || reason}: {count}</li>
           ))}
@@ -77,18 +78,18 @@ function ReplyHistory({ message }) {
   if (!replies.length && !answeredByHand) return null;
   return (
     <div className="mt-5 border-t border-white/10 pt-4" data-testid="contact-history">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Verlauf</div>
+      <div className="tls-type-label text-white/60 mb-3">Verlauf</div>
       {answeredByHand && (
-        <p className="text-sm text-white/70" data-testid="contact-answered-by">Als beantwortet markiert von {message.answered_by_name || "der Verwaltung"} · {viennaDateTime(message.answered_at)}</p>
+        <p className="tls-type-small text-white/70" data-testid="contact-answered-by">Als beantwortet markiert von {message.answered_by_name || "der Verwaltung"} · {viennaDateTime(message.answered_at)}</p>
       )}
       <ol className="space-y-3">
         {replies.map((reply) => (
           <li key={reply.id} className="border-l-2 border-ok/40 pl-3" data-testid={`contact-reply-${reply.id}`}>
-            <div className="text-xs text-white/50">
+            <div className="tls-type-small text-white/50">
               Antwort von {reply.by_name || "der Verwaltung"} · {viennaDateTime(reply.at)}
               {REPLY_DELIVERY[reply.delivery] && <span className={REPLY_DELIVERY[reply.delivery].tone} data-testid={`contact-reply-delivery-${reply.id}`}> · {REPLY_DELIVERY[reply.delivery].text}</span>}
             </div>
-            <pre className="mt-1 whitespace-pre-wrap text-sm text-white/85 font-sans leading-relaxed">{reply.text}</pre>
+            <pre className="mt-1 whitespace-pre-wrap tls-type-body text-white/85 font-sans leading-relaxed">{reply.text}</pre>
           </li>
         ))}
       </ol>
@@ -102,7 +103,7 @@ function ReportContext({ context }) {
   const rows = [["Seite", context.page], ["Gerät", context.device], ["Version", context.version]].filter(([, value]) => value);
   if (!rows.length) return null;
   return (
-    <dl className="mt-4 border border-white/10 rounded-sm p-3 text-xs grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" data-testid="contact-context">
+    <dl className="mt-4 border border-white/10 rounded-sm p-3 tls-type-small grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" data-testid="contact-context">
       {rows.map(([label, value]) => (
         <div key={label} className="contents">
           <dt className="text-white/45 uppercase tracking-wider font-bold">{label}</dt>
@@ -245,37 +246,37 @@ export default function AdminContactPage() {
       ? [...assignees, { id: active.assigned_to, name: active.assigned_to_name || "Nicht mehr in der Vereinsverwaltung" }] : assignees;
     return (
       <AdminLayout>
-        <button onClick={() => setActive(null)} className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8] mb-4">
+        <button onClick={() => setActive(null)} className="inline-flex items-center gap-2 tls-type-label text-white/50 hover:text-[#29B6E8] mb-4">
           <ArrowLeft className="w-3.5 h-3.5" /> Inbox
         </button>
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 min-w-0 border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-sm border ${s.c}`} data-testid="contact-detail-status">{s.l}</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-sm border border-white/10 text-white/60" data-testid="contact-detail-topic">{topics[active.topic] || active.topic}</span>
+              <span className={`tls-type-label px-2 py-1 rounded-sm border ${s.c}`} data-testid="contact-detail-status">{s.l}</span>
+              <span className="tls-type-label px-2 py-1 rounded-sm border border-white/10 text-white/60" data-testid="contact-detail-topic">{topics[active.topic] || active.topic}</span>
             </div>
-            <h1 className="font-heading text-2xl font-black uppercase mb-3 break-words">{active.subject}</h1>
-            <div className="text-sm text-white/60 mb-4 break-words">
+            <h1 className="tls-type-title mb-3 break-words">{active.subject}</h1>
+            <div className="tls-type-small text-white/60 mb-4 break-words">
               <strong>{active.name}</strong> &lt;<a href={`mailto:${active.email}`} className="text-[#29B6E8] hover:underline">{active.email}</a>&gt; · {viennaDateTime(active.created_at)}
             </div>
             <div className="border-t border-white/10 pt-4">
-              <pre className="whitespace-pre-wrap break-words text-sm text-white/85 font-sans leading-relaxed">{active.message}</pre>
+              <pre className="whitespace-pre-wrap break-words tls-type-body text-white/85 font-sans leading-relaxed">{active.message}</pre>
             </div>
             <ReportContext context={active.context} />
             <ReplyHistory message={active} />
             {canReply ? (
               <div className="mt-5 border-t border-white/10 pt-4" data-testid="contact-reply-form">
-                <label htmlFor="contact-reply-text" className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Antwort an {active.email}</label>
+                <label htmlFor="contact-reply-text" className="block tls-type-label text-white/60 mb-2">Antwort an {active.email}</label>
                 <textarea id="contact-reply-text" value={reply.text} maxLength={REPLY_MAX} rows={5} data-testid="contact-reply-text"
                   onChange={(e) => setReply({ text: e.target.value, request_id: newRequestId() })}
                   className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 <button type="button" onClick={sendReply} disabled={sending || reply.text.trim().length < 2} data-testid="contact-reply-send"
-                  className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 bg-[#29B6E8] text-black tls-type-label rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
                   <Send className="w-3.5 h-3.5" /> {sending ? "Wird gesendet …" : "Antwort senden"}
                 </button>
               </div>
             ) : (
-              <p className="mt-5 border-t border-white/10 pt-4 text-xs text-white/50" data-testid="contact-reply-blocked">
+              <p className="mt-5 border-t border-white/10 pt-4 tls-type-small text-white/50" data-testid="contact-reply-blocked">
                 {active.status === "spam" ? "Spam bekommt keine Antwort. Ist es eine echte Anfrage? Dann zuerst „Kein Spam“." : "Zu dieser Nachricht gibt es keine Adresse mehr."}
               </p>
             )}
@@ -283,28 +284,28 @@ export default function AdminContactPage() {
           <div className="space-y-3 min-w-0">
             {flagged && (
               <div className="border border-warn/30 bg-warn/5 rounded-sm p-4" data-testid="contact-spam-box">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-warn mb-2">Vom Spamschutz markiert</div>
-                <p className="text-xs text-white/70 mb-2">Gründe: {active.spam.reasons.map((r) => reasonLabels[r] || r).join(", ")}. Bisher ging keine Mail hinaus – weder an den Absender noch an den Vorstand.</p>
+                <div className="tls-type-label text-warn mb-2">Vom Spamschutz markiert</div>
+                <p className="tls-type-small text-white/70 mb-2">Gründe: {active.spam.reasons.map((r) => reasonLabels[r] || r).join(", ")}. Bisher ging keine Mail hinaus – weder an den Absender noch an den Vorstand.</p>
                 <button type="button" onClick={() => notSpam(active.id)} disabled={releasing} data-testid="contact-not-spam"
-                  className="w-full px-4 py-2 border border-ok/40 text-ok font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-ok/10 disabled:opacity-50">
+                  className="w-full px-4 py-2 border border-ok/40 text-ok tls-type-label rounded-sm hover:bg-ok/10 disabled:opacity-50">
                   Kein Spam – einordnen und Mails nachholen
                 </button>
               </div>
             )}
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Status setzen</div>
+              <div className="tls-type-label text-white/60 mb-2">Status setzen</div>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(STATUS_LABEL).map((k) => (
                   <button key={k} onClick={() => setStatus(active.id, k)}
                     data-testid={`contact-status-${k}`}
-                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-sm border ${active.status === k ? STATUS_LABEL[k].c : "border-white/10 text-white/60 hover:border-white/30"}`}>
+                    className={`px-3 py-1.5 tls-type-label rounded-sm border ${active.status === k ? STATUS_LABEL[k].c : "border-white/10 text-white/60 hover:border-white/30"}`}>
                     {STATUS_LABEL[k].l}
                   </button>
                 ))}
               </div>
             </div>
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-              <label htmlFor="contact-assignee" className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Zuständig</label>
+              <label htmlFor="contact-assignee" className="block tls-type-label text-white/60 mb-2">Zuständig</label>
               <select id="contact-assignee" value={active.assigned_to || ""} onChange={(e) => assign(active.id, e.target.value)} data-testid="contact-assignee"
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                 <option value="">Niemand</option>
@@ -312,12 +313,12 @@ export default function AdminContactPage() {
               </select>
             </div>
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-              <label htmlFor="contact-note" className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Interne Notiz</label>
+              <label htmlFor="contact-note" className="block tls-type-label text-white/60 mb-2">Interne Notiz</label>
               <textarea id="contact-note" key={active.id} defaultValue={active.internal_note || ""} maxLength={4000} onBlur={(e) => saveNote(active, e.target.value)} data-testid="contact-note"
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" rows={4} />
-              <p className="mt-1 text-[11px] text-white/40">Geht nie an die Person.</p>
+              <p className="mt-1 tls-type-small text-white/40">Geht nie an die Person.</p>
             </div>
-            <button onClick={() => remove(active.id)} className="w-full px-4 py-2 border border-[#FF3B30]/30 text-[#FF3B30] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center justify-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
+            <button onClick={() => remove(active.id)} className="w-full px-4 py-2 border border-[#FF3B30]/30 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center justify-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
           </div>
         </div>
       </AdminLayout>
@@ -326,12 +327,12 @@ export default function AdminContactPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-4">Kontakt-Inbox</h1>
+      <span className="tls-type-label text-[#29B6E8]">Verein</span>
+      <h1 className="tls-type-title mt-1 mb-4"><ShortCaps>Kontakt-Inbox</ShortCaps></h1>
       <SpamCounter stats={spamStats} />
       {suspicious > 0 && view !== "spam" && (
         <button type="button" onClick={() => pick("spam")} data-testid="contact-suspicious-hint"
-          className="mb-6 w-full text-left border border-warn/40 bg-warn/5 rounded-sm px-4 py-3 text-sm text-white/85 hover:bg-warn/10 inline-flex items-center gap-2">
+          className="mb-6 w-full text-left border border-warn/40 bg-warn/5 rounded-sm px-4 py-3 tls-type-small text-white/85 hover:bg-warn/10 inline-flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-warn shrink-0" />
           <span><strong>{suspicious === 1 ? "1 verdächtige Nachricht" : `${suspicious} verdächtige Nachrichten`}</strong> im Spam-Ordner – bitte kurz prüfen. Echte Anfragen holt „Kein Spam“ zurück.</span>
         </button>
@@ -342,8 +343,8 @@ export default function AdminContactPage() {
           <button key={k} onClick={() => pick(k)} aria-pressed={view === k} data-testid={`contact-stat-${k}`}
             className={`border rounded-sm p-3 text-left ${view === k ? v.c : "border-white/10 bg-[#121212] text-white/70 hover:border-white/20"}`}>
             <Inbox className="w-4 h-4 mb-1" />
-            <div className="text-2xl font-black">{counts[k] || 0}</div>
-            <div className="text-[10px] uppercase tracking-widest">{v.l}</div>
+            <div className="tls-type-section">{counts[k] || 0}</div>
+            <div className="tls-type-label">{v.l}</div>
           </button>
         ))}
       </div>
@@ -352,7 +353,7 @@ export default function AdminContactPage() {
         <div className="flex gap-1" role="group" aria-label="Ansicht">
           {VIEWS.map(([key, label]) => (
             <button key={key} type="button" aria-pressed={view === key} onClick={() => { setView(key); setPage(1); }} data-testid={`contact-view-${key}`}
-              className={`px-3 py-2 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${view === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
+              className={`px-3 py-2 border rounded-sm tls-type-label ${view === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
               {label}
             </button>
           ))}
@@ -369,12 +370,12 @@ export default function AdminContactPage() {
         </select>
       </div>
 
-      {loadError && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 text-sm" data-testid="contact-load-error">{loadError}</div>}
+      {loadError && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 tls-type-small" data-testid="contact-load-error">{loadError}</div>}
 
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
         <div className="tls-swipe pb-0">
-          <table className="w-full text-sm min-w-[800px]">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+          <table className="w-full tls-type-small min-w-[800px]">
+            <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">Datum</th>
                 <th className="text-left px-4 py-3">Von</th>
@@ -394,12 +395,12 @@ export default function AdminContactPage() {
                 const s = STATUS_LABEL[m.status] || STATUS_LABEL.new;
                 return (
                   <tr key={m.id} onClick={() => openMessage(m)} data-testid={`contact-row-${m.id}`} className="cursor-pointer hover:bg-white/5">
-                    <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{viennaDate(m.created_at)}</td>
-                    <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="text-xs text-white/40">{m.email}</div></td>
-                    <td className="px-4 py-3 text-xs text-[#29B6E8]" data-testid={`contact-topic-${m.id}`}>{topics[m.topic] || m.topic}</td>
+                    <td className="px-4 py-3 text-white/50 tls-type-small whitespace-nowrap">{viennaDate(m.created_at)}</td>
+                    <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="tls-type-small text-white/40">{m.email}</div></td>
+                    <td className="px-4 py-3 tls-type-small text-[#29B6E8]" data-testid={`contact-topic-${m.id}`}>{topics[m.topic] || m.topic}</td>
                     <td className="px-4 py-3"><div className="font-semibold tls-wrap max-w-md">{m.subject}</div></td>
-                    <td className="px-4 py-3 text-xs text-white/60">{m.assigned_to_name || "–"}</td>
-                    <td className="px-4 py-3"><span className={`inline-flex text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm border ${s.c}`}>{s.l}</span></td>
+                    <td className="px-4 py-3 tls-type-small text-white/60">{m.assigned_to_name || "–"}</td>
+                    <td className="px-4 py-3"><span className={`inline-flex tls-type-label px-2 py-1 rounded-sm border ${s.c}`}>{s.l}</span></td>
                   </tr>
                 );
               })}
@@ -408,7 +409,7 @@ export default function AdminContactPage() {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-white/50" data-testid="contact-paging">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 tls-type-small text-white/50" data-testid="contact-paging">
         <span data-testid="contact-total">{total === 1 ? "1 Nachricht" : `${total} Nachrichten`} in dieser Ansicht</span>
         {pages > 1 && (
           <div className="flex items-center gap-2">
@@ -421,7 +422,7 @@ export default function AdminContactPage() {
 
       <div className="mt-6 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" />
-        <div className="text-sm text-white/80" data-testid="contact-note-hint">
+        <div className="tls-type-small text-white/80" data-testid="contact-note-hint">
           <strong>Hinweis:</strong> Jede Nachricht löst automatisch eine Bestätigungsmail an den Absender und eine Benachrichtigung an die Vereins-E-Mail aus (über die Mail-Queue). Ausnahme: Nachrichten, die der Spamschutz als „Spam“ markiert – sie stehen unter dem Filter „Spam“, und „Kein Spam“ holt die Mails nach. Sicher erkannte Bots werden gar nicht gespeichert, nur gezählt.
           {inbox?.retention && <> Erledigte Anfragen werden {inbox.retention.done_days} Tage nach dem letzten Statuswechsel gelöscht, Spam nach {inbox.retention.spam_days} Tagen – einstellbar unter Betrieb → Alarme.</>}
         </div>

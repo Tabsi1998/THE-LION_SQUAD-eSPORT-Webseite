@@ -64,8 +64,8 @@ export default function AdminNewsEditPage() {
     return (
       <AdminLayout>
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50" data-testid="news-missing">
-          <div className="font-heading font-bold text-white">Beitrag nicht gefunden</div>
-          <p className="mt-2 text-sm">Vielleicht wurde er gelöscht. <Link to="/admin/news" className="text-[#29B6E8] hover:underline">Zurück zur Liste</Link></p>
+          <div className="font-bold text-white">Beitrag nicht gefunden</div>
+          <p className="mt-2 tls-type-small">Vielleicht wurde er gelöscht. <Link to="/admin/news" className="text-[#29B6E8] hover:underline">Zurück zur Liste</Link></p>
         </div>
       </AdminLayout>
     );
@@ -326,7 +326,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
       testId="news-form"
       headerExtra={!isNew && post.slug ? (
         // Vorschau (#2122 NW2): die echte Seite - mit Band „Noch nicht öffentlich“, solange Besucher sie nicht sehen.
-        <Link to={`/news/${post.slug}`} target="_blank" rel="noreferrer" data-testid="news-preview-link" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition">
+        <Link to={`/news/${post.slug}`} target="_blank" rel="noreferrer" data-testid="news-preview-link" className="inline-flex items-center gap-1.5 tls-type-label text-white/60 hover:text-[#29B6E8] transition">
           Vorschau ansehen <ExternalLink className="w-3.5 h-3.5" />
         </Link>
       ) : undefined}
@@ -334,10 +334,10 @@ function NewsForm({ post, meta, onDone, onReload }) {
         <>
           {post.withdrawn_at && (
             <div role="status" className="border border-[#FF6B6B]/40 bg-[#FF6B6B]/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
-              <p className="text-sm text-white/85">
+              <p className="tls-type-small text-white/85">
                 <strong className="text-[#FF6B6B]">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
               </p>
-              <button type="button" onClick={restore} disabled={saving} data-testid="news-restore" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Wiederherstellen (als Entwurf)</button>
+              <button type="button" onClick={restore} disabled={saving} data-testid="news-restore" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Wiederherstellen (als Entwurf)</button>
             </div>
           )}
           <FormSection title="Veröffentlichung">
@@ -354,7 +354,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
               <>
                 <TextField label="Angepinnt bis" type="date" value={form.pinned_until} onChange={(v) => set("pinned_until", v)} min={pinFirstDay} required testId="news-pinned-until" hint={`Einschließlich dieses Tages. Vorschlag: ${PIN_DEFAULT_DAYS} Tage ab dem Erscheinen.`} />
                 {pinTooEarly ? (
-                  <p role="alert" className="text-xs text-warn" data-testid="news-pinned-until-early">
+                  <p role="alert" className="tls-type-small text-warn" data-testid="news-pinned-until-early">
                     Das Ende liegt vor dem Tag, an dem der Beitrag erscheint ({pinUntilText(pinFirstDay).replace("bis ", "")}) – so wäre er nie angeheftet.
                   </p>
                 ) : null}
@@ -372,7 +372,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
             <FormSection title="Autor und Verlauf" testId="news-history-section">
               <PersonPicker purpose="news_author" value={author} onChange={setAuthor} label="Autor" placeholder="Name tippen …" hint="Steht auf der News-Seite unter „Von“." testId="news-author" />
               {post.updated_at && (
-                <p className="text-xs text-white/55" data-testid="news-last-change">
+                <p className="tls-type-small text-white/55" data-testid="news-last-change">
                   Zuletzt geändert {post.updated_by_name ? <>von <strong className="text-white/80">{post.updated_by_name}</strong> </> : ""}am {viennaDateTime(post.updated_at, { dateStyle: "medium", timeStyle: "short" })}.
                 </p>
               )}
@@ -421,7 +421,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
             {selectedUsers.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {selectedUsers.map((user) => (
-                  <span key={user.id} className="inline-flex items-center gap-1.5 px-2 py-1 border border-[#29B6E8]/30 text-[#29B6E8] rounded-sm text-xs">
+                  <span key={user.id} className="inline-flex items-center gap-1.5 px-2 py-1 border border-[#29B6E8]/30 text-[#29B6E8] rounded-sm tls-type-small">
                     <AtSign className="w-3 h-3" /> {userLabel(user)}
                     <button type="button" onClick={() => removeMention(user.id)} className="text-white/45 hover:text-[#FF3B30]" aria-label={`${userLabel(user)} entfernen`}>
                       <X className="w-3 h-3" />
@@ -437,12 +437,12 @@ function NewsForm({ post, meta, onDone, onReload }) {
                     key={user.id}
                     type="button"
                     onClick={() => insertMention(user)}
-                    className="min-w-0 flex items-center gap-2 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm px-3 py-2 text-left text-sm"
+                    className="min-w-0 flex items-center gap-2 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm px-3 py-2 text-left tls-type-small"
                   >
                     <AtSign className="w-4 h-4 text-[#29B6E8] shrink-0" />
                     <span className="min-w-0">
                       <span className="block tls-wrap text-white">{userLabel(user)}</span>
-                      <span className="block tls-wrap text-xs text-white/40">@{user.username}</span>
+                      <span className="block tls-wrap tls-type-small text-white/40">@{user.username}</span>
                     </span>
                   </button>
                 ))}
@@ -499,16 +499,16 @@ export const WITHDRAW_QUESTION = (title) => ({
 export function PublishChoice({ mode, initialMode, onChange, withdrawInstead = false, appOnly = false }) {
   return (
     <fieldset className="space-y-1.5" data-testid="news-publish-choice">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wann erscheint der Beitrag?</legend>
+      <legend className="tls-type-label text-white/60 mb-1.5">Wann erscheint der Beitrag?</legend>
       {PUBLISH_MODES.map((key) => {
         const [label, hint] = PUBLISH_CHOICES[key](initialMode, withdrawInstead, appOnly);
         const active = mode === key;
         return (
           <label key={key} className={`flex items-start gap-3 rounded-sm border px-3 py-2.5 cursor-pointer transition-colors duration-150 ${active ? "border-[#29B6E8]/60 bg-[#29B6E8]/[0.07]" : "border-white/10 hover:border-white/25"}`}>
             <input type="radio" name="news-publish-mode" value={key} checked={active} onChange={() => onChange(key)} className="mt-1 accent-[#29B6E8]" data-testid={`news-publish-${key}`} />
-            <span className="min-w-0 block text-sm font-semibold text-white">
+            <span className="min-w-0 block tls-type-small font-semibold text-white">
               {label}
-              <span className="block text-xs font-normal text-white/50">{hint}</span>
+              <span className="block tls-type-small font-normal text-white/50">{hint}</span>
             </span>
           </label>
         );
@@ -521,7 +521,7 @@ export function PublishChoice({ mode, initialMode, onChange, withdrawInstead = f
 export function NewsHistory({ rows }) {
   if (!rows.length) return null;
   return (
-    <details className="text-xs" data-testid="news-history">
+    <details className="tls-type-small" data-testid="news-history">
       <summary className="cursor-pointer select-none font-bold uppercase tracking-wider text-white/60 hover:text-white">Verlauf ({rows.length})</summary>
       <ol className="mt-2 space-y-1.5">
         {rows.map((row, index) => (
@@ -557,17 +557,17 @@ function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Ic
         </div>
       )}
       <div className="max-h-40 overflow-y-auto space-y-1">
-      {rows.length === 0 && <p className="px-2 py-1 text-xs text-white/45">Nichts gefunden.</p>}
+      {rows.length === 0 && <p className="px-2 py-1 tls-type-small text-white/45">Nichts gefunden.</p>}
       {rows.map((o) => (
-        <div key={o[valueKey]} className="flex items-center gap-2 text-sm hover:bg-white/5 px-2 py-1 rounded-sm">
+        <div key={o[valueKey]} className="flex items-center gap-2 tls-type-small hover:bg-white/5 px-2 py-1 rounded-sm">
           <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
             <input type="checkbox" checked={selected.includes(o[valueKey])} onChange={() => toggle(o[valueKey])} className="accent-[#29B6E8]" />
             {Icon && <Icon className="w-3 h-3 text-[#29B6E8] shrink-0" />}
             <span className="tls-wrap">{o[labelKey]}</span>
-            {o.status === "draft" && <span className="shrink-0 rounded-sm border border-white/15 px-1.5 text-[10px] uppercase tracking-wider text-white/50" title="Besucher sehen die Karte erst, wenn es veröffentlicht ist.">Entwurf</span>}
+            {o.status === "draft" && <span className="shrink-0 rounded-sm border border-white/15 px-1.5 tls-type-label text-white/50" title="Besucher sehen die Karte erst, wenn es veröffentlicht ist.">Entwurf</span>}
           </label>
           {onEmbed && (
-            <button type="button" onClick={() => onEmbed(o)} className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:text-white">
+            <button type="button" onClick={() => onEmbed(o)} className="shrink-0 tls-type-label text-[#29B6E8] hover:text-white">
               Einbetten
             </button>
           )}

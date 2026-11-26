@@ -17,11 +17,11 @@ const CHECK_ICON = { ok: [CheckCircle2, "text-[#00FF88]"], fail: [XCircle, "text
 function SecretInput({ label, value, masked, onChange, onClear, testId, placeholder }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">
+      <div className="tls-type-label text-white/60 mb-1.5">
         {label} {masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}
       </div>
       <input type="password" value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} autoComplete="off" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={masked ? "Leer lassen, um das Gespeicherte zu behalten" : placeholder} />
-      {masked && <button type="button" onClick={onClear} className="mt-2 text-[10px] uppercase font-bold text-[#FF6B6B]">Gespeichertes entfernen</button>}
+      {masked && <button type="button" onClick={onClear} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes entfernen</button>}
     </label>
   );
 }
@@ -31,7 +31,7 @@ function SecretInput({ label, value, masked, onChange, onClear, testId, placehol
 function CheckResult({ platform, result }) {
   if (!result) return null;
   return (
-    <ul className="mt-2 space-y-1 text-xs" data-testid={`platform-check-result-${platform}`}>
+    <ul className="mt-2 space-y-1 tls-type-small" data-testid={`platform-check-result-${platform}`}>
       {result.checks.map((check) => {
         const [Icon, tone] = CHECK_ICON[check.state] || CHECK_ICON.warn;
         return (
@@ -85,24 +85,24 @@ export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSa
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={`platform-app-${app.key}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="font-bold text-sm">{app.label}</div>
+        <div className="font-bold tls-type-small">{app.label}</div>
         <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${appStateClass(app, isReady)}`} data-testid={`platform-link-${app.key}-state`}>{appStateLabel(app, isReady)}</span>
-          <button type="button" onClick={runCheck} disabled={checking} data-testid={`platform-check-${app.key}`} className="px-3 py-1 border border-white/20 text-white/80 rounded-sm text-[10px] font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8] disabled:opacity-40">
+          <span className={`tls-type-label ${appStateClass(app, isReady)}`} data-testid={`platform-link-${app.key}-state`}>{appStateLabel(app, isReady)}</span>
+          <button type="button" onClick={runCheck} disabled={checking} data-testid={`platform-check-${app.key}`} className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label hover:border-[#29B6E8]/60 hover:text-[#29B6E8] disabled:opacity-40">
             {checking ? "Prüfe …" : "prüfen"}
           </button>
         </div>
       </div>
-      {app.note && <p className="text-xs text-white/45">{app.note}</p>}
+      {app.note && <p className="tls-type-small text-white/45">{app.note}</p>}
       {!showFields ? (
-        <p className="text-xs text-white/55" data-testid={`platform-app-${app.key}-elsewhere`}>{fieldsNote || "Client ID und Secret stehen weiter unten auf dieser Seite."}</p>
+        <p className="tls-type-small text-white/55" data-testid={`platform-app-${app.key}-elsewhere`}>{fieldsNote || "Client ID und Secret stehen weiter unten auf dieser Seite."}</p>
       ) : app.tab && !onSave ? (
-        <p className="text-xs text-white/55">Client ID und Secret stehen auf der Seite <Link to={app.tab} className="text-[#29B6E8] hover:text-white">{app.tabLabel}</Link>.</p>
+        <p className="tls-type-small text-white/55">Client ID und Secret stehen auf der Seite <Link to={app.tab} className="text-[#29B6E8] hover:text-white">{app.tabLabel}</Link>.</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-3">
           {app.idField && (
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{app.idLabel || `${app.label} Client ID`}</div>
+              <div className="tls-type-label text-white/60 mb-1.5">{app.idLabel || `${app.label} Client ID`}</div>
               <input value={brand[app.idField] || ""} onChange={(e) => setBrandField(app.idField, e.target.value)} data-testid={app.idField.replaceAll("_", "-")} autoComplete="off" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={app.idPlaceholder || "aus der Entwickler-Konsole"} />
             </label>
           )}
@@ -114,13 +114,13 @@ export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSa
           )}
         </div>
       )}
-      <div className="text-[11px] text-white/45 flex flex-wrap gap-x-2">
+      <div className="tls-type-small text-white/45 flex flex-wrap gap-x-2">
         <span>Rückrufadresse:</span>
         <code className="text-[#29B6E8] break-all">{origin}/api/platform-links/{app.key}/callback</code>
       </div>
       <CheckResult platform={app.key} result={result} />
       {onSave && showFields && (
-        <button type="button" onClick={onSave} disabled={saving} data-testid={`platform-app-save-${app.key}`} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
+        <button type="button" onClick={onSave} disabled={saving} data-testid={`platform-app-save-${app.key}`} className="px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
       )}
       {showGuide && <SetupGuide guideKey={app.guideKey} open={guideOpen} />}
     </div>
@@ -135,10 +135,10 @@ export function PlatformLinkOverview({ brand }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="platform-link-overview">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-[#29B6E8]" /> Konten verknüpfen</div>
-          <p className="text-xs text-white/50 mt-1">Mitglieder melden sich im Profil einmal bei der Plattform an – der Eintrag wird befüllt und als „verifiziert“ markiert. Client ID, Secret, Rückrufadresse, „prüfen“ und die Anleitung stehen je Plattform auf ihrer Seite unter <Link to="/admin/integrations/discord" className="text-[#29B6E8] hover:text-white">Admin → Verbindungen</Link>. PlayStation, Nintendo und EA bieten keine Anmeldung für Websites, Instagram nur für Business-Konten über eine geprüfte Meta-App.</p>
+          <div className="tls-type-label inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-[#29B6E8]" /> Konten verknüpfen</div>
+          <p className="tls-type-small text-white/50 mt-1">Mitglieder melden sich im Profil einmal bei der Plattform an – der Eintrag wird befüllt und als „verifiziert“ markiert. Client ID, Secret, Rückrufadresse, „prüfen“ und die Anleitung stehen je Plattform auf ihrer Seite unter <Link to="/admin/integrations/discord" className="text-[#29B6E8] hover:text-white">Admin → Verbindungen</Link>. PlayStation, Nintendo und EA bieten keine Anmeldung für Websites, Instagram nur für Business-Konten über eine geprüfte Meta-App.</p>
         </div>
-        <div className="text-[10px] font-bold uppercase tracking-wider text-right shrink-0" data-testid="platform-link-ready-count">
+        <div className="tls-type-label text-right shrink-0" data-testid="platform-link-ready-count">
           <span className="text-[#00FF88]">{readyCount}</span><span className="text-white/40"> / {PLATFORM_APPS.length} bereit</span>
         </div>
       </div>
@@ -147,9 +147,9 @@ export function PlatformLinkOverview({ brand }) {
           const ready = appReady(app, brand);
           return (
             <Link key={app.key} to={`/admin/integrations/${app.key}`} data-testid={`platform-link-open-${app.key}`} className="flex items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
-              <span className="font-bold text-sm">{app.label}</span>
+              <span className="font-bold tls-type-small">{app.label}</span>
               <span className="inline-flex items-center gap-2">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${appStateClass(app, ready)}`} data-testid={`platform-link-${app.key}-state`}>{appStateLabel(app, ready)}</span>
+                <span className={`tls-type-label ${appStateClass(app, ready)}`} data-testid={`platform-link-${app.key}-state`}>{appStateLabel(app, ready)}</span>
                 <ArrowRight className="w-3.5 h-3.5 text-white/40" />
               </span>
             </Link>

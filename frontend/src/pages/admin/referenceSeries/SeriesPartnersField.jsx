@@ -14,9 +14,9 @@ export function SeriesPartnersField({ partners = [], value, onChange, inherited 
   const archived = (value?.partner_ids || []).filter((id) => !shown.has(id));
   return (
     <fieldset className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] min-w-0" data-testid={`${testPrefix}-picker`}>
-      <legend className="px-1 text-[11px] uppercase tracking-widest font-bold text-white/60">Partner</legend>
+      <legend className="px-1 tls-type-label text-white/60">Partner</legend>
       {inherited.length > 0 && (
-        <p className="mb-3 text-xs text-white/55 break-words" data-testid={`${testPrefix}-inherited`}>
+        <p className="mb-3 tls-type-small text-white/55 break-words" data-testid={`${testPrefix}-inherited`}>
           Von der Spur: {inherited.map((item) => `${item.name} (${PARTNER_ROLE_LABELS[item.role]})`).join(", ")}
         </p>
       )}
@@ -49,7 +49,7 @@ export function SeriesPartnersField({ partners = [], value, onChange, inherited 
         })}
       </ul>
       <ArchivedPartnersNote count={archived.length} onRemove={() => onChange(archived.reduce((next, id) => togglePartner(next, id, false), value))} testId={`${testPrefix}-archived`} />
-      {hint && <p className="mt-2 text-[11px] text-white/40">{hint}</p>}
+      {hint && <p className="mt-2 tls-type-small text-white/40">{hint}</p>}
     </fieldset>
   );
 }

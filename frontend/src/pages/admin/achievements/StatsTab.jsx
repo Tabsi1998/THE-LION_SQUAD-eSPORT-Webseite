@@ -36,12 +36,12 @@ export function StatsTab() {
     }
   };
 
-  if (!data) return <div className="text-sm text-white/40">Lädt …</div>;
+  if (!data) return <div className="tls-type-small text-white/40">Lädt …</div>;
   const maxWeek = Math.max(1, ...data.weekly.map((w) => w.unlocks));
   return (
     <div className="space-y-6" data-testid="ach-stats">
       <div className="flex justify-end">
-        <button type="button" onClick={exportCsv} data-testid="stats-csv" className="px-3 py-2 border border-white/20 text-white/70 text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:text-white">
+        <button type="button" onClick={exportCsv} data-testid="stats-csv" className="px-3 py-2 border border-white/20 text-white/70 tls-type-label rounded-sm inline-flex items-center gap-2 hover:text-white">
           <Download className="w-3.5 h-3.5" /> Als CSV
         </button>
       </div>
@@ -50,9 +50,9 @@ export function StatsTab() {
           <div className="flex items-end gap-1.5 h-40" role="img" aria-label="Freischaltungen je Woche">
             {data.weekly.map((w) => (
               <div key={w.week} className="flex-1 flex flex-col items-center justify-end gap-1 h-full" data-testid={`stats-week-${w.week}`}>
-                <span className="text-[9px] tabular-nums text-white/55">{w.unlocks || ""}</span>
+                <span className="tls-type-small tabular-nums text-white/55">{w.unlocks || ""}</span>
                 <span className="w-full rounded-t-sm bg-[#29B6E8]" style={{ height: `${Math.max(2, Math.round((w.unlocks / maxWeek) * 100))}%`, opacity: w.unlocks ? 1 : 0.25 }} />
-                <span className="text-[8px] text-white/40 whitespace-nowrap">{weekLabel(w.week)}</span>
+                <span className="tls-type-small text-white/40 whitespace-nowrap">{weekLabel(w.week)}</span>
               </div>
             ))}
           </div>
@@ -60,14 +60,14 @@ export function StatsTab() {
         <Panel title="Die Besten" icon={Trophy} hint="Erfolgspunkte – nur öffentliche Profile, wie auf der Seite." testId="stats-top">
           <ol className="divide-y divide-white/5">
             {data.top.map((row) => (
-              <li key={row.id || row.user_id || row.rank} className="py-1.5 flex items-center gap-3 text-sm">
-                <span className="w-6 font-heading font-black tabular-nums" style={{ color: row.rank === 1 ? "#FFD700" : "rgba(255,255,255,0.5)" }}>{row.rank}</span>
+              <li key={row.id || row.user_id || row.rank} className="py-1.5 flex items-center gap-3 tls-type-small">
+                <span className="w-6 tls-type-num" style={{ color: row.rank === 1 ? "#FFD700" : "rgba(255,255,255,0.5)" }}>{row.rank}</span>
                 <span className="flex-1 tls-wrap">{personName(row)}</span>
-                <span className="text-[11px] text-white/45 tabular-nums">{row.count} Erfolge · Level {row.level}</span>
+                <span className="tls-type-small text-white/45 tabular-nums">{row.count} Erfolge · Level {row.level}</span>
                 <span className="font-bold tabular-nums text-[#FFD700]">{Number(row.points || 0).toLocaleString("de-DE")}</span>
               </li>
             ))}
-            {!data.top.length && <li className="py-6 text-center text-xs text-white/40">Noch niemand mit öffentlichem Profil.</li>}
+            {!data.top.length && <li className="py-6 text-center tls-type-small text-white/40">Noch niemand mit öffentlichem Profil.</li>}
           </ol>
         </Panel>
       </div>
@@ -89,8 +89,8 @@ export function StatsTab() {
         testId="stats-rarity"
       >
         <div className="tls-swipe pb-0">
-          <table className="w-full text-xs min-w-[640px]">
-            <thead className="text-[10px] uppercase tracking-widest text-white/45">
+          <table className="w-full tls-type-small min-w-[640px]">
+            <thead className="tls-type-label text-white/45">
               <tr><th className="text-left py-2 pr-3">Stufe</th><th className="text-left py-2 pr-3">Gruppe</th><th className="text-left py-2 pr-3">Kategorie</th><th className="text-right py-2 pr-3">Personen</th><th className="text-left py-2 w-1/4">Anteil</th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -99,7 +99,7 @@ export function StatsTab() {
                   <td className="py-1.5 pr-3">
                     {r.name} <MaterialChip tier={r} className="ml-1" />
                     {/* Review N7: nicht mehr Erreichbares bleibt in der Statistik - mit Vermerk. */}
-                    {r.retired && <span className="ml-1 text-[9px] uppercase tracking-widest text-white/45" data-testid={`stats-retired-${r.code}`}>nicht mehr erreichbar</span>}
+                    {r.retired && <span className="ml-1 tls-type-label text-white/45" data-testid={`stats-retired-${r.code}`}>nicht mehr erreichbar</span>}
                   </td>
                   <td className="py-1.5 pr-3 text-white/60">{r.group_name}</td>
                   <td className="py-1.5 pr-3 text-white/50">{categoryLabel(r.category)}</td>
@@ -117,7 +117,7 @@ export function StatsTab() {
           </table>
         </div>
         {rows.length > shown && (
-          <button type="button" onClick={() => setShown((n) => n + PAGE * 3)} data-testid="stats-more" className="mt-3 text-[10px] uppercase tracking-widest text-[#29B6E8] hover:underline">Mehr zeigen ({rows.length - shown} weitere)</button>
+          <button type="button" onClick={() => setShown((n) => n + PAGE * 3)} data-testid="stats-more" className="mt-3 tls-type-label text-[#29B6E8] hover:underline">Mehr zeigen ({rows.length - shown} weitere)</button>
         )}
       </Panel>
     </div>

@@ -80,29 +80,29 @@ export function AccountBox({ form, set, profile, profiles = [] }) {
   const initials = String(account?.display_name || account?.username || "?").slice(0, 2).toUpperCase();
   return (
     <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 space-y-2" data-testid="club-member-account">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] inline-flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" /> Konto</div>
+      <div className="tls-type-label text-[#29B6E8] inline-flex items-center gap-1.5"><Link2 className="w-3.5 h-3.5" /> Konto</div>
       {form.user_id && account ? (
         <div className="flex flex-wrap items-center gap-3">
-          <span className="w-10 h-10 shrink-0 rounded-sm border border-white/15 bg-[#0A0A0A] overflow-hidden inline-flex items-center justify-center font-heading font-black text-xs text-[#29B6E8]">
+          <span className="w-10 h-10 shrink-0 rounded-sm border border-white/15 bg-[#0A0A0A] overflow-hidden inline-flex items-center justify-center tls-type-small font-black text-[#29B6E8]">
             {account.avatar_url ? <img src={resolveMediaUrl(account.avatar_url)} alt="" className="w-full h-full object-cover" /> : initials}
           </span>
-          <div className="min-w-0 flex-1 text-sm">
+          <div className="min-w-0 flex-1 tls-type-small">
             <div className="font-bold text-white truncate" data-testid="club-member-account-name">{account.display_name || account.username}</div>
-            <div className="text-xs text-white/50 truncate">@{account.username}{account.email ? ` · ${account.email}` : ""}</div>
+            <div className="tls-type-small text-white/50 truncate">@{account.username}{account.email ? ` · ${account.email}` : ""}</div>
           </div>
-          <Link to={`/u/${encodeURIComponent(account.username)}`} target="_blank" data-testid="club-member-account-profile" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+          <Link to={`/u/${encodeURIComponent(account.username)}`} target="_blank" data-testid="club-member-account-profile" className="inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white">
             <ExternalLink className="w-3.5 h-3.5" /> Spielerprofil
           </Link>
-          <button type="button" onClick={takeOver} data-testid="club-member-account-takeover" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white">
+          <button type="button" onClick={takeOver} data-testid="club-member-account-takeover" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-white">
             <Wand2 className="w-3.5 h-3.5" /> Bild, Spiele, Plattformen übernehmen
           </button>
-          <button type="button" onClick={unlink} data-testid="club-member-account-unlink" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-[#FF3B30]/35 rounded-sm text-xs font-bold uppercase tracking-wider text-[#FF3B30] hover:bg-[#FF3B30]/10">
+          <button type="button" onClick={unlink} data-testid="club-member-account-unlink" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-[#FF3B30]/35 rounded-sm tls-type-label text-[#FF3B30] hover:bg-[#FF3B30]/10">
             <Unlink className="w-3.5 h-3.5" /> Konto lösen
           </button>
         </div>
       ) : (
         <>
-          <p className="text-xs text-white/55">
+          <p className="tls-type-small text-white/55">
             Ohne Konto ist das Profil rein redaktionell. Mit Konto pflegt das Mitglied sein Profil unter Meine Mitgliedschaft, und der Abgleich findet es wieder.
             {profile?.account_unlinked_at ? " Zuletzt hat der Vorstand ein Konto gelöst – der Abgleich hängt es nicht von selbst wieder an." : ""}
           </p>
@@ -111,25 +111,25 @@ export function AccountBox({ form, set, profile, profiles = [] }) {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Konto suchen: Name, E-Mail oder Benutzername" data-testid="club-member-account-search"
               className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] pl-9 pr-3 py-2 rounded-sm text-sm text-white" />
           </label>
-          {searching ? <p className="text-xs text-white/40">Suche …</p> : null}
+          {searching ? <p className="tls-type-small text-white/40">Suche …</p> : null}
           {results.length > 0 ? (
             <ul className="divide-y divide-white/5 border border-white/10 rounded-sm bg-[#0A0A0A]" data-testid="club-member-account-results">
               {results.map((user) => {
                 const other = otherProfileOf(user.id);
                 return (
                   <li key={user.id} className="flex items-center gap-3 px-3 py-2">
-                    <div className="min-w-0 flex-1 text-sm">
+                    <div className="min-w-0 flex-1 tls-type-small">
                       <div className="font-bold text-white truncate">{user.display_name || user.username}</div>
-                      <div className="text-xs text-white/50 truncate">@{user.username}{user.email ? ` · ${user.email}` : ""}{other ? ` · hat schon das Profil „${other.display_name}“` : ""}</div>
+                      <div className="tls-type-small text-white/50 truncate">@{user.username}{user.email ? ` · ${user.email}` : ""}{other ? ` · hat schon das Profil „${other.display_name}“` : ""}</div>
                     </div>
                     <button type="button" disabled={Boolean(other)} onClick={() => link(user)} data-testid={`club-member-account-link-${user.username}`}
-                      className="px-2.5 py-1.5 border border-[#29B6E8]/50 rounded-sm text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10 disabled:opacity-40">Verknüpfen</button>
+                      className="px-2.5 py-1.5 border border-[#29B6E8]/50 rounded-sm tls-type-label text-[#29B6E8] hover:bg-[#29B6E8]/10 disabled:opacity-40">Verknüpfen</button>
                   </li>
                 );
               })}
             </ul>
           ) : null}
-          {query.trim().length >= 2 && !searching && results.length === 0 ? <p className="text-xs text-white/40">Kein Konto gefunden.</p> : null}
+          {query.trim().length >= 2 && !searching && results.length === 0 ? <p className="tls-type-small text-white/40">Kein Konto gefunden.</p> : null}
         </>
       )}
     </div>

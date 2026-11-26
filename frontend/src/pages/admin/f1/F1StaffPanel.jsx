@@ -67,30 +67,30 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
 
   return (
     <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="f1-staff-panel">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Fast-Lap-Helfer</div>
+      <div className="tls-type-label text-[#29B6E8]">Fast-Lap-Helfer</div>
       <div className="mt-4 grid lg:grid-cols-3 gap-5">
         <form onSubmit={add} className="space-y-3">
           <PersonPicker purpose="fastlap" contextId={challengeId} value={person} onChange={setPerson} label="Person" testId="f1-staff-person" />
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Rolle</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Rolle</div>
             <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="f1-staff-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {F1_STAFF_ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Notiz</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Notiz</div>
             <input value={form.notes} onChange={(e) => set("notes", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. Beamer-Station Samstag" />
           </label>
-          <button disabled={saving} data-testid="f1-staff-add" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Hinzufügen</button>
+          <button disabled={saving} data-testid="f1-staff-add" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm tls-type-small disabled:opacity-50">Hinzufügen</button>
         </form>
         <div className="lg:col-span-2 border border-white/10 rounded-sm overflow-hidden">
           {staffError ? (
-            <div className="px-4 py-8 text-center text-sm text-white/55" data-testid="f1-staff-error">{staffError}</div>
+            <div className="px-4 py-8 text-center tls-type-small text-white/55" data-testid="f1-staff-error">{staffError}</div>
           ) : (
             // Am Handy (#1941): die Tabelle scrollt seitlich statt Status und Aktionen abzuschneiden.
             <div className="tls-swipe pb-0" data-testid="f1-staff-table">
-            <table className="w-full text-sm min-w-[560px]">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <table className="w-full tls-type-small min-w-[560px]">
+              <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Person</th>
                   <th className="text-left px-4 py-3">Rolle</th>
@@ -103,16 +103,16 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
                   <tr key={assignment.id}>
                     <td className="px-4 py-3">
                       <div className="font-semibold">{assignment.user?.display_name || assignment.user?.username || "-"}</div>
-                      {assignment.user?.username && <div className="text-xs text-white/40">@{assignment.user.username}</div>}
+                      {assignment.user?.username && <div className="tls-type-small text-white/40">@{assignment.user.username}</div>}
                     </td>
                     <td className="px-4 py-3">{roleLabel(assignment.role)}</td>
                     <td className="px-4 py-3"><StatusBadge status={assignment.is_active === false ? "paused" : "approved"} /></td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => toggle(assignment)} className="px-2 py-1 border border-white/15 text-white/70 rounded-sm text-[10px] font-bold uppercase">
+                        <button type="button" onClick={() => toggle(assignment)} className="px-2 py-1 border border-white/15 text-white/70 rounded-sm tls-type-label">
                           {assignment.is_active === false ? "Aktivieren" : "Pausieren"}
                         </button>
-                        <button type="button" onClick={() => remove(assignment)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">
+                        <button type="button" onClick={() => remove(assignment)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label">
                           Entfernen
                         </button>
                       </div>

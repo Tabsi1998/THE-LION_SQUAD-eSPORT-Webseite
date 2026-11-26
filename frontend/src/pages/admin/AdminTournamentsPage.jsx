@@ -19,6 +19,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { endText, liveAfterEnd } from "@/lib/endedLive";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const EVENT_MODE_LABELS = {
   hybrid: "Hybrid",
@@ -181,8 +182,8 @@ function TournamentList() {
       {/* Kopf (#2463): Er bricht als Ganzes um - der Knopf rutscht unter die Überschrift, statt „Turniere“ mitten im Wort zu teilen. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mb-8" data-testid="admin-tournaments-head">
         <div className="min-w-0">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase [overflow-wrap:normal]">Turniere</h1>
+          <span className="tls-type-label text-[#29B6E8]">Turniere</span>
+          <h1 className="tls-type-title [overflow-wrap:normal]"><ShortCaps>Turniere</ShortCaps></h1>
         </div>
         {isTournamentLead && (
           <Link to="/admin/tournaments/new" data-testid="admin-new-tournament" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
@@ -210,20 +211,20 @@ function TournamentList() {
           <option value="">Alle außer Archiv ({list.length - (statusCounts.archived || 0)})</option>
           {TOURNAMENT_STATUS_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label} ({statusCounts[value] || 0})</option>)}
         </select>
-        <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
+        <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 tls-type-label text-white/55">
           {filteredList.length} / {list.length} sichtbar
         </div>
         <button
           type="button"
           onClick={exportCsv}
           disabled={filteredList.length === 0}
-          className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
+          className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
         >
           <Download className="h-3.5 w-3.5" /> CSV
         </button>
       </div>
       {list.length >= LIST_LIMIT && (
-        <p className="mb-3 text-xs text-[#FFD700]" data-testid="admin-tournament-list-limit">
+        <p className="mb-3 tls-type-small text-[#FFD700]" data-testid="admin-tournament-list-limit">
           Die Liste zeigt die {LIST_LIMIT} zuletzt angelegten Turniere – ältere stehen hier nicht.
         </p>
       )}
@@ -234,11 +235,11 @@ function TournamentList() {
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
-                  <div className="mt-1 text-xs text-white/55">{[gameLabel(t.game), formatTournamentDisplay(t)].filter(Boolean).join(" · ") || "—"}</div>
+                  <div className="mt-1 tls-type-small text-white/55">{[gameLabel(t.game), formatTournamentDisplay(t)].filter(Boolean).join(" · ") || "—"}</div>
                 </div>
                 <div className="shrink-0 text-right" data-testid={`admin-tr-participants-${t.slug}`}>
-                  <div className="text-sm font-bold tabular-nums">{t.participant_count}/{t.max_participants}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-white/55">Teilnehmer</div>
+                  <div className="tls-type-small font-bold tabular-nums">{t.participant_count}/{t.max_participants}</div>
+                  <div className="tls-type-label text-white/55">Teilnehmer</div>
                 </div>
               </div>
               <div className="mt-3">
@@ -262,8 +263,8 @@ function TournamentList() {
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="tls-swipe pb-0">
         {/* Tablet und schmales Fenster (#2463): ohne Mindestbreite, die Regeln unter dem Titel - die Aktionen bleiben ohne Wischen im Bild. */}
-        <table className="w-full text-sm xl:min-w-[860px]">
-          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+        <table className="w-full tls-type-small xl:min-w-[860px]">
+          <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
             <tr>
               <th className="text-left px-4 py-3">Titel</th>
               <th className="text-left px-4 py-3">Spiel</th>
@@ -320,7 +321,7 @@ function StatusCell({ tournament: t, leads, endedClassName }) {
       {/* Nach dem Ende noch „Live“ (#2194): Hinweis mit Weg, umgestellt wird nie von selbst. */}
       {leads && liveAfterEnd(t) ? (
         <Link to={`/admin/tournaments/${t.id}`} data-testid={`admin-tr-ended-live-${t.slug}`} title={`Ende war am ${endText(t.end_date)}`}
-          className={`${endedClassName} text-[11px] leading-snug text-warn hover:text-white`}>
+          className={`${endedClassName} tls-type-small leading-snug text-warn hover:text-white`}>
           Läuft laut Stand noch, Ende war am {endText(t.end_date)} – beenden?
         </Link>
       ) : null}
@@ -363,7 +364,7 @@ function RulePills({ tournament, compact = false }) {
   if (compact) {
     // Am Handy (#2463) eine Zeile statt drei Schilder.
     return (
-      <p className="text-[11px] leading-snug text-white/50">
+      <p className="tls-type-small leading-snug text-white/50">
         {[EVENT_MODE_LABELS[eventMode] || eventMode, RESULT_ENTRY_MODE_LABELS[resultMode] || resultMode, SCHEDULE_MODE_LABELS[scheduleMode] || scheduleMode].filter(Boolean).join(" · ")}
       </p>
     );
@@ -385,5 +386,5 @@ function RulePill({ label, tone = "default" }) {
       : tone === "purple"
         ? "border-[#9F7AEA]/35 bg-[#9F7AEA]/10 text-[#C4B5FD]"
         : "border-white/15 bg-white/5 text-white/60";
-  return <span className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${cls}`}>{label}</span>;
+  return <span className={`rounded-sm border px-2 py-1 tls-type-label ${cls}`}>{label}</span>;
 }

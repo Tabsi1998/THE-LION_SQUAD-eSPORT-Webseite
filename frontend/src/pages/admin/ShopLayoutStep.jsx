@@ -17,10 +17,10 @@ import { techniqueLabel } from "@/lib/shopTechniques";
 // Platzhalter: ihre Datei entsteht je Bestellung. Prüfen und Erzeugen tut der Server.
 
 const BASE = "/admin/shop/products";
-const SELECT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-2 text-sm focus:border-brand outline-none disabled:opacity-50";
-const SMALL_SELECT = "mt-0.5 block min-h-9 bg-black/40 border border-white/15 rounded-sm px-2 text-xs focus:border-brand outline-none disabled:opacity-50";
-const SMALL_BTN = "tls-btn tls-btn--secondary min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
-const QUIET_BTN = "tls-btn tls-btn--quiet min-h-9 px-2 text-xs rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
+const SELECT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-2 tls-type-small focus:border-brand outline-none disabled:opacity-50";
+const SMALL_SELECT = "mt-0.5 block min-h-9 bg-black/40 border border-white/15 rounded-sm px-2 tls-type-small focus:border-brand outline-none disabled:opacity-50";
+const SMALL_BTN = "tls-btn tls-btn--secondary min-h-9 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
+const QUIET_BTN = "tls-btn tls-btn--quiet min-h-9 px-2 tls-type-small rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
 const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text-warn", outdated: "text-honor", invalid: "text-warn", no_area: "text-warn" };
 const STATE_TEXT = { ok: "aktuell", not_needed: "Platzhalter", missing: "fehlt", outdated: "veraltet", invalid: "passt nicht", no_area: "Fläche fehlt" };
 const DRAFT_PREVIEW_DELAY_MS = 350;
@@ -338,7 +338,7 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
               : item.kind !== "motif" && sampleFor
                 // Der Name in echter Texthöhe; die Leinwand (Höchstbreite) ist nur der feine Rahmen drumherum (#2105).
                 ? <SampleImage sample={sampleFor(item.kind, layer)} onProblem={(text) => onSampleProblem?.(item.index, text)} testId={`${testId}-layer-${item.index}-sample`} />
-                : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : item.kind === "text" ? "Text" : "Nr."}</span>}
+                : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 tls-type-label text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : item.kind === "text" ? "Text" : "Nr."}</span>}
           </button>
         );
       })}
@@ -357,7 +357,7 @@ function LiveReadout({ area, resolved, live, measure, testId, className = "" }) 
   const item = live ? resolved.find((entry) => entry.index === live.index) : null;
   if (!item?.box) return null;
   return (
-    <span role="status" className={`pointer-events-none z-30 whitespace-nowrap rounded-sm border border-white/15 bg-black/85 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150 ${className}`}
+    <span role="status" className={`pointer-events-none z-30 whitespace-nowrap rounded-sm border border-white/15 bg-black/85 px-2 py-0.5 tls-type-small font-bold tabular-nums text-white shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150 ${className}`}
       data-testid={`${testId}-live`}>
       {positionText(positionCm(area, item, measure), measure)}
     </span>
@@ -390,18 +390,18 @@ function LayoutPreview({ area, preview, colorCode, testId, stale = false, live, 
 function SnapSettings({ settings, onChange, testId }) {
   return (
     <div className="flex flex-wrap items-end gap-x-3 gap-y-2" data-testid={testId}>
-      <label className="inline-flex items-center gap-2 text-xs min-h-9 cursor-pointer">
+      <label className="inline-flex items-center gap-2 tls-type-small min-h-9 cursor-pointer">
         <input type="checkbox" checked={settings.snap} onChange={(event) => onChange({ snap: event.target.checked })} className="w-4 h-4 accent-brand" data-testid={`${testId}-snap`} />
         Einrasten (Hilfslinien und Raster)
       </label>
       {/* Ohne Einrasten wirkt auch das Raster nicht - darum dann ausgegraut. */}
-      <label className={`block text-xs min-w-0 transition-opacity duration-150 ${settings.snap ? "" : "opacity-50"}`}><span className="text-white/60">Raster beim Ziehen</span>
+      <label className={`block tls-type-small min-w-0 transition-opacity duration-150 ${settings.snap ? "" : "opacity-50"}`}><span className="text-white/60">Raster beim Ziehen</span>
         <select value={String(settings.grid)} disabled={!settings.snap} onChange={(event) => onChange({ grid: Number(event.target.value) })}
           className={`${SMALL_SELECT} w-28`} data-testid={`${testId}-grid`}>
           {GRID_CHOICES_CM.map((grid) => <option key={grid} value={String(grid)}>{grid ? `${formatCm(grid)} cm` : "ohne"}</option>)}
         </select>
       </label>
-      <label className="block text-xs min-w-0"><span className="text-white/60">Waagrecht gemessen ab</span>
+      <label className="block tls-type-small min-w-0"><span className="text-white/60">Waagrecht gemessen ab</span>
         <select value={settings.measure} onChange={(event) => onChange({ measure: event.target.value })}
           className={`${SMALL_SELECT} w-40`} data-testid={`${testId}-measure`}>
           <option value="center">Mitte der Fläche</option>
@@ -434,7 +434,7 @@ function CmField({ label, value, editable, onValue, testId, signed = false, min 
   );
   return (
     <div className="min-w-0">
-      <label htmlFor={testId} className="block text-xs text-white/70">{label}</label>
+      <label htmlFor={testId} className="block tls-type-small text-white/70">{label}</label>
       <div className="mt-1 flex items-stretch min-w-0">
         {stepButton(-1)}
         {/* Mit Vorzeichen braucht das Handy die volle Tastatur - der Ziffernblock hat oft kein Minus. */}
@@ -475,7 +475,7 @@ function PositionFields({ area, item, layer, measure, editable, onChange, testId
         editable={editable} onValue={(value) => set("x", value)} testId={`${testId}-x`} {...bounds(position.x, layer?.offset_x_cm)} />
       {/* Bei Text ist der linke Rand der Rahmen der Höchstbreite, nicht der erste Buchstabe - das sagen wir dazu. */}
       {measure === "left" && item.kind !== "motif" && (
-        <p className="text-xs text-white/50 min-[440px]:col-span-2" data-testid={`${testId}-x-hint`}>
+        <p className="tls-type-small text-white/50 min-[440px]:col-span-2" data-testid={`${testId}-x-hint`}>
           Bei Text zählt der Rahmen der Höchstbreite - der Name steht mittig darin. Für Text ist „Mitte der Fläche“ meist klarer.
         </p>
       )}
@@ -562,7 +562,7 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
 
   const width = Math.max(fit * size.width * zoom, 1);
   const height = Math.max(fit * size.height * zoom, 1);
-  const iconButton = "tls-btn tls-btn--secondary min-h-9 min-w-9 px-2 rounded-sm inline-flex items-center justify-center gap-1.5 text-xs disabled:opacity-40";
+  const iconButton = "tls-btn tls-btn--secondary min-h-9 min-w-9 px-2 rounded-sm inline-flex items-center justify-center gap-1.5 tls-type-small disabled:opacity-40";
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -571,10 +571,10 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
           className="fixed inset-2 sm:inset-5 z-50 flex flex-col overflow-hidden rounded-sm border border-white/15 bg-[#0b0d12] text-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-safe:data-[state=open]:zoom-in-[0.98] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:zoom-out-[0.98] duration-200 ease-out"
           data-testid={testId}>
           <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2">
-            <DialogPrimitive.Title className="text-sm font-bold mr-auto tls-wrap">{title}</DialogPrimitive.Title>
+            <DialogPrimitive.Title className="tls-type-small font-bold mr-auto tls-wrap">{title}</DialogPrimitive.Title>
             <div className="flex items-center gap-1" role="group" aria-label="Zoom">
               <button type="button" onClick={() => zoomTo(-1)} disabled={zoom <= ZOOM_LIMITS.min} aria-label="Verkleinern" className={iconButton} data-testid={`${testId}-zoom-out`}><ZoomOut className="w-4 h-4" aria-hidden="true" /></button>
-              <span className="w-14 text-center text-xs tabular-nums" aria-live="polite" data-testid={`${testId}-zoom`}>{Math.round(zoom * 100)} %</span>
+              <span className="w-14 text-center tls-type-small tabular-nums" aria-live="polite" data-testid={`${testId}-zoom`}>{Math.round(zoom * 100)} %</span>
               <button type="button" onClick={() => zoomTo(1)} disabled={zoom >= ZOOM_LIMITS.max} aria-label="Vergrößern" className={iconButton} data-testid={`${testId}-zoom-in`}><ZoomIn className="w-4 h-4" aria-hidden="true" /></button>
               <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} className={iconButton} data-testid={`${testId}-fit`}><Scan className="w-4 h-4" aria-hidden="true" /> Einpassen</button>
             </div>
@@ -592,7 +592,7 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
             <LiveReadout area={area} resolved={canvas.resolved} live={live} measure={settings.measure} testId={testId} className="absolute left-1/2 bottom-3 -translate-x-1/2" />
           </div>
           <div className="border-t border-white/10 px-3 py-2 space-y-2 max-h-[45vh] overflow-y-auto">
-            <p id={`${testId}-help`} className="text-xs text-white/55" data-testid={`${testId}-help`}>
+            <p id={`${testId}-help`} className="tls-type-small text-white/55" data-testid={`${testId}-help`}>
               <span className="sm:hidden">Ziehen rastet ein, + und − zoomen. Genau geht es mit den Zahlen.</span>
               <span className="hidden sm:inline">Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Mausrad zoomt, Umschalt + Mausrad oder Ziehen auf freier Fläche verschiebt die Ansicht.</span>
             </p>
@@ -621,21 +621,21 @@ function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth,
   return (
     <div className="space-y-2" data-testid={testId}>
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="block text-sm"><span className="text-white/70">Motiv</span>
+        <label className="block tls-type-small"><span className="text-white/70">Motiv</span>
           <select value={layer.motif?.key || ""} disabled={!editable} onChange={(event) => onChange({ motif: { ...(layer.motif || {}), key: event.target.value } })} className={SELECT} data-testid={`${testId}-motif`}>
             <option value="">– Motiv wählen –</option>
             {motifs.map((motif) => <option key={motif.key} value={motif.key}>{motif.title}</option>)}
           </select>
         </label>
-        <label className="block text-sm"><span className="text-white/70">Position</span>
+        <label className="block tls-type-small"><span className="text-white/70">Position</span>
           <select value={layer.preset} disabled={!editable} onChange={(event) => onChange({ preset: event.target.value, offset_x_cm: 0, offset_y_cm: 0 })} className={SELECT} data-testid={`${testId}-preset`}>
             {presets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
           </select>
         </label>
       </div>
-      {presets.find((preset) => preset.key === layer.preset)?.hint && <p className="text-xs text-white/50">{presets.find((preset) => preset.key === layer.preset).hint}</p>}
+      {presets.find((preset) => preset.key === layer.preset)?.hint && <p className="tls-type-small text-white/50">{presets.find((preset) => preset.key === layer.preset).hint}</p>}
       <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex items-center justify-between gap-2 tls-type-small">
           <label htmlFor={`${testId}-width`} className="text-white/70">Breite</label>
           <span className="tabular-nums" data-testid={`${testId}-width-text`}>{cmText(width)}</span>
         </div>
@@ -650,7 +650,7 @@ function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth,
             }}
             className={`${SELECT} mt-0 w-24 tabular-nums`} data-testid={`${testId}-width-cm`} />
         </div>
-        <p className="text-xs text-white/45">Höchstens {cmText(max)} - die Fläche begrenzt die Größe, die Höhe folgt aus dem Motiv.</p>
+        <p className="tls-type-small text-white/45">Höchstens {cmText(max)} - die Fläche begrenzt die Größe, die Höhe folgt aus dem Motiv.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {colors.length > 1 && <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={QUIET_BTN} data-testid={`${testId}-exceptions-toggle`}>Ausnahme je Farbe{exceptions.length ? ` (${exceptions.length})` : ""}</button>}
@@ -658,9 +658,9 @@ function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth,
       </div>
       {open && colors.length > 1 && (
         <div className="grid gap-2 sm:grid-cols-2 border-t border-white/10 pt-2" data-testid={`${testId}-exceptions`}>
-          <p className="sm:col-span-2 text-xs text-white/50">Ohne Ausnahme nimmt jede Farbe automatisch die passende Fassung (hell oder dunkel).</p>
+          <p className="sm:col-span-2 tls-type-small text-white/50">Ohne Ausnahme nimmt jede Farbe automatisch die passende Fassung (hell oder dunkel).</p>
           {colors.map((color) => (
-            <label key={color} className="block text-sm"><span className="text-white/70">{colorName(color)}</span>
+            <label key={color} className="block tls-type-small"><span className="text-white/70">{colorName(color)}</span>
               <select value={layer.motif?.by_color?.[color] || ""} disabled={!editable}
                 onChange={(event) => onChange({ motif: { ...(layer.motif || {}), by_color: { ...(layer.motif?.by_color || {}), [color]: event.target.value } } })}
                 className={SELECT} data-testid={`${testId}-exception-${color}`}>
@@ -683,7 +683,7 @@ function SizeField({ label, value, placeholder, editable, onChange, testId }) {
     setTyped((now) => (cmNumber(now) === (value || null) ? now : (value ? String(value).replace(".", ",") : "")));
   }, [value]);
   return (
-    <label className="block text-sm min-w-0"><span className="text-white/70">{label}</span>
+    <label className="block tls-type-small min-w-0"><span className="text-white/70">{label}</span>
       <input type="text" inputMode="decimal" value={typed} disabled={!editable} placeholder={placeholder}
         onChange={(event) => {
           setTyped(event.target.value);
@@ -716,17 +716,17 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
   return (
     <div className="space-y-2" data-testid={testId}>
       {fixed && (
-        <label className="block text-sm"><span className="text-white/70">Text</span>
+        <label className="block tls-type-small"><span className="text-white/70">Text</span>
           <input type="text" value={layer.text ?? ""} disabled={!editable} maxLength={40} onChange={(event) => onChange({ text: event.target.value })}
             className={SELECT} data-testid={`${testId}-text`} placeholder="z. B. Vereinsname" />
         </label>
       )}
-      <label className="block text-sm"><span className="text-white/70">{kindLabel} - Position</span>
+      <label className="block tls-type-small"><span className="text-white/70">{kindLabel} - Position</span>
         <select value={layer.preset} disabled={!editable} onChange={(event) => onChange({ preset: event.target.value, offset_x_cm: 0, offset_y_cm: 0 })} className={SELECT} data-testid={`${testId}-preset`}>
           {presets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}
         </select>
       </label>
-      <p className="text-xs text-white/50">{presets.find((preset) => preset.key === layer.preset)?.hint || TEXT_HINTS[layer.kind]}</p>
+      <p className="tls-type-small text-white/50">{presets.find((preset) => preset.key === layer.preset)?.hint || TEXT_HINTS[layer.kind]}</p>
       <div className="grid gap-2 grid-cols-2">
         <SizeField label="Texthöhe (cm)" value={height} placeholder={defaultCm(canvas?.text_height_cm)} editable={editable}
           onChange={(next) => onChange({ text_height_cm: next })} testId={`${testId}-text-height`} />
@@ -735,12 +735,12 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
         <SizeField label="Mindesthöhe (cm)" value={smallest} placeholder="Vorgabe" editable={editable}
           onChange={(next) => onChange({ min_text_height_cm: next })} testId={`${testId}-min-height`} />
       </div>
-      <p className={`text-xs ${bad ? "text-warn" : "text-white/45"}`} data-testid={`${testId}-size-hint`}>
+      <p className={`tls-type-small ${bad ? "text-warn" : "text-white/45"}`} data-testid={`${testId}-size-hint`}>
         Leer = Vorgabe aus den Gamertag-Regeln. Auf dieser Fläche (mit Sicherheitsrand): Texthöhe {cmText(limits.min_text_height_cm)} bis {cmText(bounds.height)}, Höchstbreite bis {cmText(bounds.width)}. {layer.kind === "member_number" ? "Gemessen an den Ziffern." : "Was nicht in die Höchstbreite passt, wird bis zur Mindesthöhe verkleinert."}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {fonts.length > 0 && (
-          <label className="block text-sm min-w-0"><span className="text-white/70">Schrift</span>
+          <label className="block tls-type-small min-w-0"><span className="text-white/70">Schrift</span>
             <select value={layer.font || ""} disabled={!editable} onChange={(event) => onChange({ font: event.target.value || null })} className={SELECT} data-testid={`${testId}-font`}>
               <option value="">Vorgabe (Gamertag-Regeln)</option>
               {fonts.map((font) => <option key={font.key} value={font.key}>{font.label}</option>)}
@@ -749,7 +749,7 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
         )}
         {inks.length > 0 && (
           // Farbe (#2141): automatisch nach Kontrast zum Untergrund oder fest eine Farbe der Gamertag-Regeln.
-          <label className="block text-sm min-w-0"><span className="text-white/70">Farbe</span>
+          <label className="block tls-type-small min-w-0"><span className="text-white/70">Farbe</span>
             <select value={layer.ink || ""} disabled={!editable} onChange={(event) => onChange({ ink: event.target.value || null })} className={SELECT} data-testid={`${testId}-ink`}>
               <option value="">automatisch (Kontrast)</option>
               {inks.map((ink) => <option key={ink.key} value={ink.key}>{ink.label}</option>)}
@@ -759,7 +759,7 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
         <SizeField label="Kontur (cm)" value={outline} placeholder="keine" editable={editable}
           onChange={(next) => onChange({ outline_cm: next, ...(next ? {} : { outline_ink: null }) })} testId={`${testId}-outline`} />
         {outline && inks.length > 0 && (
-          <label className="block text-sm min-w-0"><span className="text-white/70">Farbe der Kontur</span>
+          <label className="block tls-type-small min-w-0"><span className="text-white/70">Farbe der Kontur</span>
             <select value={layer.outline_ink || ""} disabled={!editable} onChange={(event) => onChange({ outline_ink: event.target.value || null })} className={SELECT} data-testid={`${testId}-outline-ink`}>
               <option value="">automatisch (Kontrast zur Schrift)</option>
               {inks.map((ink) => <option key={ink.key} value={ink.key}>{ink.label}</option>)}
@@ -767,9 +767,9 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
           </label>
         )}
       </div>
-      {badOutline && <p className="text-xs text-warn" data-testid={`${testId}-outline-hint`}>Kontur {cmText(limits.min_outline_cm ?? 0.05)} bis {cmText(limits.max_outline_cm ?? 2)}.</p>}
-      {problem && <p className="text-xs text-warn" role="alert">{problem}</p>}
-      {hint && <p className="text-xs text-honor" role="status" data-testid={`${testId}-hint`}>{hint}</p>}
+      {badOutline && <p className="tls-type-small text-warn" data-testid={`${testId}-outline-hint`}>Kontur {cmText(limits.min_outline_cm ?? 0.05)} bis {cmText(limits.max_outline_cm ?? 2)}.</p>}
+      {problem && <p className="tls-type-small text-warn" role="alert">{problem}</p>}
+      {hint && <p className="tls-type-small text-honor" role="status" data-testid={`${testId}-hint`}>{hint}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={!editable} onClick={onRemove} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-remove`}><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> {fixed ? "Ebene entfernen" : "Platzhalter entfernen"}</button>
       </div>
@@ -798,8 +798,8 @@ function PlaceTools({ area, item, above, layer, others = [], measure, maxOffset,
   return (
     <div className="space-y-2 border-t border-white/10 pt-2 mt-2" data-testid={`${testId}-align`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-xs font-bold uppercase tracking-wider text-white/60">Position</span>
-        <span className="text-xs text-white/55 tabular-nums" data-testid={`${testId}-offset`}>
+        <span className="tls-type-label text-white/60">Position</span>
+        <span className="tls-type-small text-white/55 tabular-nums" data-testid={`${testId}-offset`}>
           {offset ? `Feinjustiert: ${formatCm(layer.offset_x_cm || 0)} / ${formatCm(layer.offset_y_cm || 0)} cm` : "wie die Vorgabe"}
         </span>
         <button type="button" disabled={!editable || !offset} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-reset`}>
@@ -817,7 +817,7 @@ function PlaceTools({ area, item, above, layer, others = [], measure, maxOffset,
       </div>
       {other && (
         <div className="flex flex-wrap items-end gap-2" data-testid={`${testId}-align-to`}>
-          <label className="block text-sm min-w-0 w-full min-[440px]:w-auto"><span className="text-white/70 text-xs">Ausrichten an</span>
+          <label className="block tls-type-small min-w-0 w-full min-[440px]:w-auto"><span className="text-white/70 tls-type-small">Ausrichten an</span>
             <select value={other.item.index} disabled={!editable} onChange={(event) => setTarget(Number(event.target.value))}
               className={`${SELECT} min-[440px]:w-44`} data-testid={`${testId}-align-target`}>
               {others.map((entry) => <option key={entry.item.index} value={entry.item.index}>{entry.label}</option>)}
@@ -831,7 +831,7 @@ function PlaceTools({ area, item, above, layer, others = [], measure, maxOffset,
       )}
       {above && (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="block text-sm w-44 shrink-0"><span className="text-white/70 text-xs">Abstand zur Ebene darüber (cm)</span>
+          <label className="block tls-type-small w-44 shrink-0"><span className="text-white/70 tls-type-small">Abstand zur Ebene darüber (cm)</span>
             <input type="text" inputMode="decimal" value={wanted} disabled={!editable} placeholder={now === null ? "" : String(Math.round(now * 10) / 10).replace(".", ",")}
               onChange={(event) => setWanted(event.target.value)} className={`${SELECT} tabular-nums`} data-testid={`${testId}-gap`} />
           </label>
@@ -839,7 +839,7 @@ function PlaceTools({ area, item, above, layer, others = [], measure, maxOffset,
             onClick={() => { onChange({ offset_y_cm: gapOffsetCm(area, above, item, layer, value) }); setWanted(""); }}>
             Abstand setzen
           </button>
-          <span className="text-xs text-white/50 tabular-nums pb-2.5" data-testid={`${testId}-gap-now`}>jetzt {now === null ? "–" : cmText(now)}</span>
+          <span className="tls-type-small text-white/50 tabular-nums pb-2.5" data-testid={`${testId}-gap-now`}>jetzt {now === null ? "–" : cmText(now)}</span>
         </div>
       )}
     </div>
@@ -863,11 +863,11 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
     const from = info?.ink?.fixed ? "fest" : SURFACE_FROM[surface?.source] || SURFACE_FROM.garment;
     return (
       <div className="border-t border-white/10 pt-2 mt-2 space-y-2">
-        <p className={`text-xs ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
+        <p className={`tls-type-small ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
           {info?.ink?.label ? `Farbe: ${info.ink.label} (${from})` : `Farbe ${from}.`}
         </p>
         {value !== "auto" && (
-          <label className="block text-sm max-w-xs"><span className="text-white/70">Untergrund für die Farbe</span>
+          <label className="block tls-type-small max-w-xs"><span className="text-white/70">Untergrund für die Farbe</span>
             <select value={value} disabled={!editable} onChange={(event) => onChange({ variant: event.target.value === "auto" ? null : event.target.value })}
               className={SELECT} data-testid={`${testId}-variant`}>
               {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -880,13 +880,13 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
   const ink = info?.ink?.label && (info.ink.fixed || surface?.variant) ? ` · Farbe: ${info.ink.label}${info.ink.fixed ? " (fest)" : ""}` : "";
   return (
     <div className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:items-end border-t border-white/10 pt-2 mt-2">
-      <label className="block text-sm"><span className="text-white/70">Fassung</span>
+      <label className="block tls-type-small"><span className="text-white/70">Fassung</span>
         <select value={value} disabled={!editable} onChange={(event) => onChange({ variant: event.target.value === "auto" ? null : event.target.value })}
           className={SELECT} data-testid={`${testId}-variant`}>
           {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{VARIANT_HINTS[key] ? `${label} (${VARIANT_HINTS[key]})` : label}</option>)}
         </select>
       </label>
-      <p className={`text-xs sm:pb-2.5 ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
+      <p className={`tls-type-small sm:pb-2.5 ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
         {surface?.text ? `${surface.text}${ink}` : `Fassung nach der Shirtfarbe.${ink}`}
       </p>
     </div>
@@ -898,13 +898,13 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
 function FileStates({ productId, row, mode, editable, busy, onUpload }) {
   const files = row?.files || [];
   const [chosen, setChosen] = useState({});
-  if (!files.length) return <p className="text-xs text-white/50">Nach dem Speichern steht hier je Farbe die Druckdatei.</p>;
+  if (!files.length) return <p className="tls-type-small text-white/50">Nach dem Speichern steht hier je Farbe die Druckdatei.</p>;
   return (
     <ul className="space-y-1.5" data-testid={`shop-files-${row.key}`}>
       {files.map((state) => {
         const key = `${state.color}|${state.group || "all"}`;
         return (
-          <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid={`shop-file-${row.key}-${state.color}`} data-state={state.state}>
+          <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small" data-testid={`shop-file-${row.key}-${state.color}`} data-state={state.state}>
             <span className="font-bold min-w-[5rem]">{state.color_label || state.color}</span>
             <span className={`inline-flex items-center gap-1 ${STATE_TONES[state.state] || "text-white/60"}`}>
               {state.state === "ok" ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> : <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -1053,33 +1053,33 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   return (
     <li className={`border rounded-sm p-3 bg-black/20 space-y-3 scroll-mt-24 transition-colors duration-150 ${problem ? "border-warn/70" : "border-white/10"}`} data-testid={`shop-area-${available.key}`} data-blocked={problem ? "true" : undefined}>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="inline-flex items-center gap-2 text-sm font-bold min-h-10 cursor-pointer">
+        <label className="inline-flex items-center gap-2 tls-type-small font-bold min-h-10 cursor-pointer">
           <input type="checkbox" checked={used} disabled={!editable} onChange={(event) => onToggle(event.target.checked)} className="w-4 h-4 accent-brand" data-testid={`shop-area-use-${available.key}`} />
           {available.label}
         </label>
-        {available.label_translated === false && <span className="text-xs text-honor" data-testid={`shop-area-label-english-${available.key}`}>Bezeichnung von Printful (englisch) - keine Übersetzung bekannt</span>}
-        <span className="text-xs text-white/50 tabular-nums" data-testid={`shop-area-size-${available.key}`}>Druckdatei {sizeText(available.file)}{surcharge}</span>
-        {available.groups.length > 1 && <span className="text-xs text-honor">Je Größe eine eigene Fläche ({available.groups.length})</span>}
+        {available.label_translated === false && <span className="tls-type-small text-honor" data-testid={`shop-area-label-english-${available.key}`}>Bezeichnung von Printful (englisch) - keine Übersetzung bekannt</span>}
+        <span className="tls-type-small text-white/50 tabular-nums" data-testid={`shop-area-size-${available.key}`}>Druckdatei {sizeText(available.file)}{surcharge}</span>
+        {available.groups.length > 1 && <span className="tls-type-small text-honor">Je Größe eine eigene Fläche ({available.groups.length})</span>}
       </div>
-      {problem && <p className="text-xs text-warn inline-flex items-center gap-1" role="alert" data-testid={`shop-area-problem-${available.key}`}><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {problem}</p>}
+      {problem && <p className="tls-type-small text-warn inline-flex items-center gap-1" role="alert" data-testid={`shop-area-problem-${available.key}`}><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {problem}</p>}
       {used && (
         <>
           <div className="space-y-1.5">
             <div role="radiogroup" aria-label={`Art von ${available.label}`} className="flex flex-wrap gap-2">
               {Object.entries(view.labels.modes || {}).map(([key, label]) => (
                 <button key={key} type="button" role="radio" aria-checked={mode === key} disabled={!editable} onClick={() => onChange({ ...state, mode: key })}
-                  className={`min-h-9 px-3 text-xs border rounded-sm transition-colors duration-150 ${mode === key ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+                  className={`min-h-9 px-3 tls-type-small border rounded-sm transition-colors duration-150 ${mode === key ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
                   data-testid={`shop-area-mode-${available.key}-${key}`}>{label}</button>
               ))}
             </div>
-            {view.labels.mode_hints?.[mode] && <p className="text-xs text-white/55 max-w-2xl" data-testid={`shop-area-mode-hint-${available.key}`}>{view.labels.mode_hints[mode]}</p>}
+            {view.labels.mode_hints?.[mode] && <p className="tls-type-small text-white/55 max-w-2xl" data-testid={`shop-area-mode-hint-${available.key}`}>{view.labels.mode_hints[mode]}</p>}
             {saveFirst && (
-              <p className="text-xs text-honor inline-flex items-center gap-1" role="status" data-testid={`shop-area-save-first-${available.key}`}>
+              <p className="tls-type-small text-honor inline-flex items-center gap-1" role="status" data-testid={`shop-area-save-first-${available.key}`}>
                 <Upload className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Erst speichern, dann je Farbe hochladen.
               </p>
             )}
             {hiddenBefore && (
-              <p className="text-xs text-honor" role="status" data-testid={`shop-area-motifs-hidden-${available.key}`}>
+              <p className="tls-type-small text-honor" role="status" data-testid={`shop-area-motifs-hidden-${available.key}`}>
                 Diese Motive wurden bisher nicht gedruckt (gespeichert vor dem Hintergrund-Modus). Nach dem Speichern liegen sie auf dem Hintergrund.
               </p>
             )}
@@ -1088,11 +1088,11 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
             <div className="space-y-1.5 min-w-0">
               <LayoutPreview stale={stale} area={placeArea} preview={preview} colorCode={codes[previewColor]} live={live} canvas={canvas}
                 testId={`shop-preview-${available.key}`} />
-              {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
-              {mode === "upload" && !background && <p className="text-xs text-white/50" data-testid={`shop-preview-${available.key}-no-backdrop`}>Für {colorName(previewColor)} ist noch kein Hintergrund hochgeladen.</p>}
-              {mode === "upload" && background && background.ok === false && <p className="text-xs text-honor" role="status" data-testid={`shop-preview-${available.key}-backdrop-outdated`}>Dieser Hintergrund passt nicht mehr zur Vorlage von Printful - bis er neu hochgeladen ist, richten sich Fassung und Farbe nach der Shirtfarbe.</p>}
+              {!preview?.image_path && <p className="tls-type-small text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
+              {mode === "upload" && !background && <p className="tls-type-small text-white/50" data-testid={`shop-preview-${available.key}-no-backdrop`}>Für {colorName(previewColor)} ist noch kein Hintergrund hochgeladen.</p>}
+              {mode === "upload" && background && background.ok === false && <p className="tls-type-small text-honor" role="status" data-testid={`shop-preview-${available.key}-backdrop-outdated`}>Dieser Hintergrund passt nicht mehr zur Vorlage von Printful - bis er neu hochgeladen ist, richten sich Fassung und Farbe nach der Shirtfarbe.</p>}
               {/* Die Bedienung sichtbar (#2117) - nicht nur im aria-label. */}
-              <p className="text-xs text-white/50 flex items-start gap-1" data-testid={`shop-preview-${available.key}-help`}>
+              <p className="tls-type-small text-white/50 flex items-start gap-1" data-testid={`shop-preview-${available.key}-help`}>
                 <Move className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" />
                 {/* Am Handy gibt es weder Alt noch Pfeiltasten - dort nur, was mit dem Finger geht. */}
                 <span className="sm:hidden">Ziehen rastet ein. Genau geht es mit den Zahlen bei jeder Ebene.</span>
@@ -1108,20 +1108,20 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                 canvas={canvas} settings={settings} onSettings={onSettings} testId={`shop-big-${available.key}`}
                 tools={selectedItem?.box ? (
                   <div className="space-y-1" data-testid={`shop-big-${available.key}-selected`}>
-                    <div className="text-xs text-white/60">{layerLabel(selectedItem, selectedItem.kind === "motif" ? motifFor(layers[selected], selected) : null)}</div>
+                    <div className="tls-type-small text-white/60">{layerLabel(selectedItem, selectedItem.kind === "motif" ? motifFor(layers[selected], selected) : null)}</div>
                     <PositionFields area={area} item={selectedItem} layer={layers[selected]} measure={settings.measure} maxOffset={maxOffset} editable={editable}
                       onChange={(patch) => update(selected, patch)} testId={`shop-big-${available.key}-field`} />
                   </div>
-                ) : <p className="text-xs text-white/50">Eine Ebene antippen, dann lässt sie sich ziehen oder als Zahl setzen.</p>} />
+                ) : <p className="tls-type-small text-white/50">Eine Ebene antippen, dann lässt sie sich ziehen oder als Zahl setzen.</p>} />
             </div>
             <div className="space-y-3">
-              {mode === "upload" && <p className="text-xs text-white/60" data-testid={`shop-area-upload-hint-${available.key}`}>Je Farbe eine fertige Datei der ganzen Fläche als Hintergrund: genau {available.file.width_px} × {available.file.height_px} px (oder größer im selben Seitenverhältnis). Motive, Gamertag und Vereinsnummer kommen als Ebenen darüber. Ob die Datei echte Details hat oder nur hochskaliert ist, misst keine Prüfung - am Muster prüfen.</p>}
+              {mode === "upload" && <p className="tls-type-small text-white/60" data-testid={`shop-area-upload-hint-${available.key}`}>Je Farbe eine fertige Datei der ganzen Fläche als Hintergrund: genau {available.file.width_px} × {available.file.height_px} px (oder größer im selben Seitenverhältnis). Motive, Gamertag und Vereinsnummer kommen als Ebenen darüber. Ob die Datei echte Details hat oder nur hochskaliert ist, misst keine Prüfung - am Muster prüfen.</p>}
               {layers.map((layer, index) => {
                 const found = resolvedFor(index);
                 const motif = motifsByKey[layer.motif?.key];
                 return (
                   <div key={index} className={`border rounded-sm p-3 transition-colors duration-150 ${selected === index ? "border-brand/60" : "border-white/10"}`} onFocusCapture={() => setSelected(index)}>
-                    <div className="text-xs font-bold uppercase tracking-wider text-white/60 mb-2">{kinds[layer.kind] || layer.kind}</div>
+                    <div className="tls-type-label text-white/60 mb-2">{kinds[layer.kind] || layer.kind}</div>
                     {layer.kind === "motif" ? (
                       <MotifLayer layer={layer} area={area} presets={motifPresets} motifs={view.motif_options || []} colors={colors} colorName={colorName}
                         minWidth={view.limits?.min_width_cm || 1} rules={rules} aspect={motif?.width_px ? motif.height_px / motif.width_px : 1} editable={editable}
@@ -1138,7 +1138,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                       editable={editable} onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
                     <SurfaceField layer={layer} info={infoFor(index)} labels={view.labels.layer_variants} editable={editable} stale={stale}
                       onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
-                    {found?.outside?.length > 0 && <p className="text-xs text-warn mt-2" role="alert" data-testid={`shop-layer-${available.key}-${index}-outside`}>Ragt {found.outside.join(" und ")} aus der Fläche - kleiner setzen oder zurück auf die Vorgabe.</p>}
+                    {found?.outside?.length > 0 && <p className="tls-type-small text-warn mt-2" role="alert" data-testid={`shop-layer-${available.key}-${index}-outside`}>Ragt {found.outside.join(" und ")} aus der Fläche - kleiner setzen oder zurück auf die Vorgabe.</p>}
                   </div>
                 );
               })}
@@ -1150,7 +1150,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
               </div>
               {sets.length > 0 && (
                 <div className="space-y-1.5" data-testid={`shop-area-sets-${available.key}`}>
-                  <div className="text-xs text-white/60">Vorlage mit einem Klick - ersetzt die Ebenen dieser Fläche:</div>
+                  <div className="tls-type-small text-white/60">Vorlage mit einem Klick - ersetzt die Ebenen dieser Fläche:</div>
                   <div className="flex flex-wrap gap-2">
                     {sets.map((set) => (
                       <button key={set.key} type="button" disabled={!editable} onClick={() => applySet(set)} title={set.hint || undefined} className={SMALL_BTN} data-testid={`shop-area-set-${available.key}-${set.key}`}>
@@ -1158,11 +1158,11 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                       </button>
                     ))}
                   </div>
-                  {setNotice && <p className="text-xs text-honor" role="status" data-testid={`shop-area-set-notice-${available.key}`}>{setNotice}</p>}
+                  {setNotice && <p className="tls-type-small text-honor" role="status" data-testid={`shop-area-set-notice-${available.key}`}>{setNotice}</p>}
                 </div>
               )}
               <div className="border-t border-white/10 pt-2">
-                <div className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1.5">Druckdateien je Farbe</div>
+                <div className="tls-type-label text-white/60 mb-1.5">Druckdateien je Farbe</div>
                 <FileStates productId={view.product.id} row={savedRow} mode={savedRow?.mode || mode} editable={editable} busy={busy} onUpload={onUpload} />
               </div>
             </div>
@@ -1179,7 +1179,7 @@ export function TemplateStatus({ view, busy, run }) {
   const template = view.print_template;
   if (!view.product.printful) return null;
   return (
-    <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="shop-template-status">
+    <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="shop-template-status">
       <span className={!template?.loaded || template?.last_error ? "text-warn" : "text-white/60"}>
         {!template?.loaded ? "Noch keine Druckvorlage von Printful." : `Druckvorlage von Printful, abgeglichen ${viennaDateTime(template.checked_at)}.`}
         {template?.last_error ? ` Letzter Versuch gescheitert: ${template.last_error.detail}` : ""}
@@ -1288,8 +1288,8 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const shownInfos = draftReady ? draftPreview.infos : infos;
   // Hintergründe hängen an Fläche und Farbe, nicht am Aufbau - bis die Antwort da ist, gelten die gespeicherten.
   const shownBackgrounds = draftReady ? { ...backgrounds, ...draftPreview.backgrounds } : backgrounds;
-  if (!product.printful) return <p className="text-sm text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
-  if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="text-sm text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
+  if (!product.printful) return <p className="tls-type-small text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
+  if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="tls-type-small text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
 
   const onUpload = (placement, color, group, file, key) => {
     const form = new FormData();
@@ -1307,27 +1307,27 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   return (
     <div className="space-y-4" data-testid="shop-layout">
       <TemplateStatus view={view} busy={busy} run={run} />
-      {view.layout_converted && <p className="text-xs text-honor" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
+      {view.layout_converted && <p className="tls-type-small text-honor" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
       {view.layout_blocked?.length > 0 && (
-        <div className="border border-live/50 bg-live/10 text-live rounded-sm p-2 text-xs" role="alert" data-testid="shop-layout-blocked">
+        <div className="border border-live/50 bg-live/10 text-live rounded-sm p-2 tls-type-small" role="alert" data-testid="shop-layout-blocked">
           <div className="font-bold">Nicht bestellbar: diese alten Platzierungen lassen sich nicht abbilden. Bitte die Flächen hier neu setzen und speichern.</div>
           <ul className="mt-1 space-y-0.5">{view.layout_blocked.map((line) => <li key={line}>{line}</li>)}</ul>
         </div>
       )}
       {pending && (
-        <p className="text-xs text-honor" role="status" data-testid="shop-layout-draft-preview">
+        <p className="tls-type-small text-honor" role="status" data-testid="shop-layout-draft-preview">
           {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
         </p>
       )}
-      {available[0]?.technique && <p className="text-xs text-white/55" data-testid="shop-layout-technique">Flächen für {techniqueLabel(available[0].technique)} - die Technik wird in Schritt 2 gewählt.</p>}
-      <p className="text-xs text-white/55 max-w-3xl">Je Fläche: Motiv, Position aus der Liste und Größe in cm. Die Website erzeugt die Druckdatei in der exakten Größe von Printful - das Motiv an seiner Stelle, der Rest durchsichtig. Positionen „vom Träger aus“: Brust rechts liegt von vorne gesehen links.</p>
+      {available[0]?.technique && <p className="tls-type-small text-white/55" data-testid="shop-layout-technique">Flächen für {techniqueLabel(available[0].technique)} - die Technik wird in Schritt 2 gewählt.</p>}
+      <p className="tls-type-small text-white/55 max-w-3xl">Je Fläche: Motiv, Position aus der Liste und Größe in cm. Die Website erzeugt die Druckdatei in der exakten Größe von Printful - das Motiv an seiner Stelle, der Rest durchsichtig. Positionen „vom Träger aus“: Brust rechts liegt von vorne gesehen links.</p>
       {colors.length > 0 && (
         <div className="space-y-1">
-          <div className="text-sm text-white/70">Vorschau auf</div>
+          <div className="tls-type-small text-white/70">Vorschau auf</div>
           <div role="radiogroup" aria-label="Shirtfarbe der Vorschau" className="flex flex-wrap gap-2">
             {colors.map((color) => (
               <button key={color} type="button" role="radio" aria-checked={previewColor === color} onClick={() => setPreviewColor(color)}
-                className={`min-h-9 px-3 text-xs border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 ${previewColor === color ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+                className={`min-h-9 px-3 tls-type-small border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 ${previewColor === color ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
                 data-testid={`shop-preview-color-${color}`}>
                 <span className="w-3.5 h-3.5 rounded-sm border border-white/25" style={{ backgroundColor: codes[color] }} aria-hidden="true" /> {colorName(color)}
               </button>
@@ -1351,15 +1351,15 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
         ))}
       </ul>
       <div className="space-y-1 max-w-xl">
-        <label className="block text-sm"><span className="text-white/70">Untergrund gilt als</span>
+        <label className="block tls-type-small"><span className="text-white/70">Untergrund gilt als</span>
           <select value={surface} disabled={!view.editable} onChange={(event) => setSurface(event.target.value)} className={SELECT} data-testid="shop-layout-surface">
             {Object.entries(view.labels.surfaces || { garment: "wie Printful-Farbe", light: "hell", dark: "dunkel" }).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </label>
-        <p className="text-xs text-white/45">Entscheidet über die Fassung der Motive (hell oder dunkel) und die Farbe von Gamertag und Vereinsnummer, wo kein Hintergrund darunter liegt - etwa bei Allover mit Grundfarbe „weiß“. Liegt ein Hintergrund darunter, zählt dessen Helligkeit unter der Ebene.</p>
+        <p className="tls-type-small text-white/45">Entscheidet über die Fassung der Motive (hell oder dunkel) und die Farbe von Gamertag und Vereinsnummer, wo kein Hintergrund darunter liegt - etwa bei Allover mit Grundfarbe „weiß“. Liegt ein Hintergrund darunter, zählt dessen Helligkeit unter der Ebene.</p>
       </div>
       {blocked && blockedAreas.length > 0 && (
-        <div className="border border-warn/50 bg-warn/10 rounded-sm p-2 text-xs space-y-1.5" role="alert" data-testid="shop-layout-blocked-areas">
+        <div className="border border-warn/50 bg-warn/10 rounded-sm p-2 tls-type-small space-y-1.5" role="alert" data-testid="shop-layout-blocked-areas">
           <p>{blocked}</p>
           <div className="flex flex-wrap gap-2">
             {blockedAreas.map((row) => (
@@ -1370,10 +1370,10 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
       )}
       {usedKeys.length > 1 && (
         <div className="space-y-1">
-          <div className="text-sm text-white/70">Im Grundpreis von Printful enthalten</div>
+          <div className="tls-type-small text-white/70">Im Grundpreis von Printful enthalten</div>
           <ChoiceGroup label="Im Grundpreis enthalten" testId="shop-layout-included" value={includedValue} onChange={setIncluded}
             options={used.map((row) => ({ value: row.key, label: row.label }))} />
-          <p className="text-xs text-white/45">Jede weitere Fläche kostet ihren Aufpreis (etwa die Rückseite). Mit der Kostenschätzung im Testentwurf (#2062) gegenprüfen.</p>
+          <p className="tls-type-small text-white/45">Jede weitere Fläche kostet ihren Aufpreis (etwa die Rückseite). Mit der Kostenschätzung im Testentwurf (#2062) gegenprüfen.</p>
         </div>
       )}
       <ReasonedButton id="shop-layout" label="Druckflächen speichern" busy={busy === "layout"} disabled={!view.editable || !!blocked || !changed}
@@ -1381,7 +1381,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
         onBlocked={view.editable ? jump : undefined}
         onSubmit={(reason) => run("layout", () => api.put(`${BASE}/${product.id}/layout`, { placements: payload, included_placement: includedValue, print_surface: surface, reason }), "Druckflächen gespeichert.")} />
       <div className="border-t border-white/10 pt-3 space-y-2" data-testid="shop-generate">
-        <p className="text-xs text-white/55">{failedFiles.length ? `${failedFiles.length} Druckdatei${failedFiles.length === 1 ? "" : "en"} fehlen oder sind veraltet.` : "Alle Druckdateien sind aktuell."}</p>
+        <p className="tls-type-small text-white/55">{failedFiles.length ? `${failedFiles.length} Druckdatei${failedFiles.length === 1 ? "" : "en"} fehlen oder sind veraltet.` : "Alle Druckdateien sind aktuell."}</p>
         <ReasonedButton id="shop-generate" label="Druckdateien erzeugen" variant="secondary" busy={busy === "generate"} disabled={view.product.status === "archived" || edited}
           blockedHint={edited ? "Erst die Druckflächen speichern, dann erzeugen." : "Archiviert: erst wieder als Entwurf öffnen."}
           hint="Erzeugt je Fläche und Farbe nur, was fehlt oder veraltet ist - exakt in der Pixelgröße von Printful."
@@ -1390,7 +1390,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
             const failed = result.failed?.length || 0;
             return `${result.created?.length || 0} Druckdatei${result.created?.length === 1 ? "" : "en"} erzeugt${failed ? `, ${failed} nicht möglich - siehe Prüfung` : ""}.`;
           })} />
-        <p className="text-xs text-white/45 inline-flex items-center gap-1"><Wand2 className="w-3 h-3" aria-hidden="true" /> Motive kommen aus dem Reiter „Designs“.</p>
+        <p className="tls-type-small text-white/45 inline-flex items-center gap-1"><Wand2 className="w-3 h-3" aria-hidden="true" /> Motive kommen aus dem Reiter „Designs“.</p>
       </div>
     </div>
   );

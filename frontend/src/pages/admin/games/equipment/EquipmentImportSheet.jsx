@@ -105,35 +105,35 @@ export function EquipmentImportSheet({ game, onClose, onDone, onDirtyChange }) {
     <AdminSheet title={source ? `Aus ${source.name} übernehmen` : "Ausrüstung übernehmen"} eyebrow={game.name} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={`${countText(picked.length, "Eintrag", "Einträge")} übernehmen`} savingLabel="Übernehme …" submitDisabled={!picked.length}
       submitTestId="equipment-import-save" testId="equipment-import-sheet">
-      {sources === null ? <p className="text-sm text-white/60">Lade Spiele …</p> : null}
-      {sources && !sources.length ? <p className="text-sm text-white/60" data-testid="equipment-import-none">Kein anderes Spiel hat aktive Ausrüstung.</p> : null}
+      {sources === null ? <p className="tls-type-small text-white/60">Lade Spiele …</p> : null}
+      {sources && !sources.length ? <p className="tls-type-small text-white/60" data-testid="equipment-import-none">Kein anderes Spiel hat aktive Ausrüstung.</p> : null}
       {sources?.length ? (
         <>
           <SelectField label="Aus welchem Spiel?" value={sourceId} onChange={setSourceId}
             options={sources.map((row) => [row.id, `${row.name} (${row.items})`])} testId="equipment-import-source" />
-          <p className="text-xs text-white/60">Es entstehen eigene Einträge dieses Spiels. Fehlende Kategorien und Unterkategorien kommen dazu („neu“), Aufsätze bekommen die Waffen und Waffenklassen gleichen Namens – darum Waffen mit übernehmen. Die Quelle bleibt unverändert.</p>
-          {candidates === null ? <p className="text-sm text-white/60">Lade Einträge …</p> : (
+          <p className="tls-type-small text-white/60">Es entstehen eigene Einträge dieses Spiels. Fehlende Kategorien und Unterkategorien kommen dazu („neu“), Aufsätze bekommen die Waffen und Waffenklassen gleichen Namens – darum Waffen mit übernehmen. Die Quelle bleibt unverändert.</p>
+          {candidates === null ? <p className="tls-type-small text-white/60">Lade Einträge …</p> : (
             <div className="space-y-4" data-testid="equipment-import-list">
               {groups.map((group) => (
                 <fieldset key={group.label} className="space-y-1">
-                  <legend className="flex w-full items-center justify-between gap-2 pb-1 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+                  <legend className="flex w-full items-center justify-between gap-2 pb-1 tls-type-label text-[#29B6E8]">
                     <span className="tls-wrap">{group.label}</span>
-                    <button type="button" onClick={() => toggleGroup(group.rows)} className="tls-btn tls-btn--quiet shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Alle</button>
+                    <button type="button" onClick={() => toggleGroup(group.rows)} className="tls-btn tls-btn--quiet shrink-0 rounded-sm px-2 py-0.5 tls-type-label">Alle</button>
                   </legend>
                   {group.rows.map((row) => (
                     <label key={row.id} data-testid={`equipment-import-row-${row.id}`}
-                      className={`flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-2.5 py-2 text-sm ${row.exists ? "text-white/45" : "cursor-pointer text-white/85"}`}>
+                      className={`flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-2.5 py-2 tls-type-small ${row.exists ? "text-white/45" : "cursor-pointer text-white/85"}`}>
                       <input type="checkbox" disabled={row.exists} checked={picked.includes(row.id)} onChange={() => toggle(row.id)} className="accent-[#29B6E8]" aria-label={row.name} />
                       <span className="min-w-0 flex-1 break-words">
                         {row.name}
                         {/* Unterkategorie (#2287): wohin der Eintrag kommt - „neu“, wenn sie im Ziel erst angelegt wird. */}
                         {row.subcategory_label ? (
-                          <span className="ml-1.5 text-[11px] text-white/50" data-testid={`equipment-import-sub-${row.id}`}>
+                          <span className="ml-1.5 tls-type-small text-white/50" data-testid={`equipment-import-sub-${row.id}`}>
                             · {row.subcategory_label}{row.subcategory_new ? <span className="ml-1 font-semibold text-[#29B6E8]">neu</span> : null}
                           </span>
                         ) : null}
                       </span>
-                      {row.exists ? <span className="shrink-0 text-[11px] text-white/50">schon da</span> : null}
+                      {row.exists ? <span className="shrink-0 tls-type-small text-white/50">schon da</span> : null}
                     </label>
                   ))}
                 </fieldset>

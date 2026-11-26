@@ -9,7 +9,7 @@ export function SystemSection({ systemStatus, load }) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
         <button onClick={load} data-testid="system-refresh" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Aktualisieren</button>
-        <span className="text-xs text-white/50">Live-Status für Versand, Uploads, Scheduler und Queue.</span>
+        <span className="tls-type-small text-white/50">Live-Status für Versand, Uploads, Scheduler und Queue.</span>
       </div>
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         <SystemCard title="Datenbank" ok={systemStatus?.database?.ok} detail={systemStatus?.database?.error || "MongoDB Ping"} />
@@ -21,8 +21,8 @@ export function SystemSection({ systemStatus, load }) {
       </div>
       {systemStatus?.uploads?.checks?.length > 0 && (
         <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
-          <div className="font-heading font-bold uppercase mb-3">Upload-Pfade</div>
-          <div className="space-y-2 text-xs">
+          <div className="font-bold uppercase mb-3">Upload-Pfade</div>
+          <div className="space-y-2 tls-type-small">
             {systemStatus.uploads.checks.map((c) => (
               <div key={c.label} className="grid md:grid-cols-[120px_1fr_120px] gap-2 border-b border-white/5 pb-2">
                 <span className="text-white/70">{c.label}</span>

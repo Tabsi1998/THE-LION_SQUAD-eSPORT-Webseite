@@ -20,13 +20,13 @@ function CapabilityChoice({ value, onChange, idPrefix }) {
   const toggle = (key) => onChange(value.includes(key) ? value.filter((row) => row !== key) : [...value, key]);
   return (
     <fieldset className="grid gap-2 sm:grid-cols-2" data-testid={`${idPrefix}-capabilities`}>
-      <legend className="mb-2 text-[11px] font-bold uppercase tracking-widest text-white/60">Zuständig für</legend>
+      <legend className="mb-2 tls-type-label text-white/60">Zuständig für</legend>
       {LEAGUE_CAPABILITIES.map((row) => (
-        <label key={row.key} className="flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-sm border border-white/10 px-3 py-2 text-sm has-[:checked]:border-[#29B6E8]/60 has-[:checked]:bg-[#29B6E8]/5 has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:outline-[#29B6E8]">
+        <label key={row.key} className="flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-sm border border-white/10 px-3 py-2 tls-type-small has-[:checked]:border-[#29B6E8]/60 has-[:checked]:bg-[#29B6E8]/5 has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:outline-[#29B6E8]">
           <input type="checkbox" className="mt-0.5 accent-[#29B6E8]" checked={value.includes(row.key)} onChange={() => toggle(row.key)} data-testid={`${idPrefix}-${row.key}`} />
           <span className="min-w-0 font-semibold text-white">
             {row.label}
-            <span className="block text-[11px] font-normal leading-snug text-white/55">{row.hint}</span>
+            <span className="block tls-type-small font-normal leading-snug text-white/55">{row.hint}</span>
           </span>
         </label>
       ))}
@@ -44,9 +44,9 @@ function StaffRow({ row, canGrant, busy, onSave, onRemove }) {
         <PersonAvatar person={person} />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</div>
-          <div className="text-xs leading-relaxed text-white/60">{capabilityWords(row.capabilities)}</div>
+          <div className="tls-type-small leading-relaxed text-white/60">{capabilityWords(row.capabilities)}</div>
           {!row.second_factor ? (
-            <div className="mt-1 flex items-start gap-1.5 text-xs text-warn" data-testid={`league-staff-no-mfa-${row.user_id}`}>
+            <div className="mt-1 flex items-start gap-1.5 tls-type-small text-warn" data-testid={`league-staff-no-mfa-${row.user_id}`}>
               <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               Gilt erst, wenn die Person die Zwei-Faktor-Anmeldung eingerichtet hat.
             </div>
@@ -55,7 +55,7 @@ function StaffRow({ row, canGrant, busy, onSave, onRemove }) {
         {canGrant ? (
           <div className="flex shrink-0 items-center gap-1">
             <button type="button" onClick={() => { setCapabilities(row.capabilities); setEditing((open) => !open); }} aria-expanded={editing}
-              className="tls-btn tls-btn--quiet min-h-[44px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" data-testid={`league-staff-edit-${row.user_id}`}>
+              className="tls-btn tls-btn--quiet min-h-[44px] rounded-sm px-3 py-1.5 tls-type-label" data-testid={`league-staff-edit-${row.user_id}`}>
               Ändern
             </button>
             <button type="button" onClick={() => onRemove(row)} disabled={busy} aria-label={`${row.display_name} entfernen`}
@@ -69,7 +69,7 @@ function StaffRow({ row, canGrant, busy, onSave, onRemove }) {
         <div className="mt-3 space-y-3">
           <CapabilityChoice value={capabilities} onChange={setCapabilities} idPrefix={`league-staff-${row.user_id}`} />
           <button type="button" disabled={busy || !capabilities.length} onClick={async () => { if (await onSave(row.user_id, capabilities)) setEditing(false); }}
-            className="tls-btn tls-btn--primary min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`league-staff-save-${row.user_id}`}>
+            className="tls-btn tls-btn--primary min-h-[44px] rounded-sm px-4 py-2 tls-type-label disabled:opacity-50" data-testid={`league-staff-save-${row.user_id}`}>
             Zuständigkeiten speichern
           </button>
         </div>
@@ -143,13 +143,13 @@ export function LeagueStaffSheet({ league, onClose }) {
   return (
     <AdminSheet title="Zuständige" eyebrow={league.name} size="lg" onClose={onClose} cancelLabel="Schließen" testId="league-staff-sheet">
 
-      <p className="text-sm leading-relaxed text-white/65">
+      <p className="tls-type-body leading-relaxed text-white/65">
         Zuständige arbeiten nur in dieser Liga und nur an dem, was hier angehakt ist. Der Bereich „Ligen“ darf alle Ligen. In einem Spiel, an dem jemand selbst beteiligt ist, entscheidet eine zweite Person.
       </p>
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="league-staff-error">{error}</p> : null}
-      {!data && !error ? <p className="text-sm text-white/50" data-testid="league-staff-loading">Lade Zuständige …</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="league-staff-error">{error}</p> : null}
+      {!data && !error ? <p className="tls-type-small text-white/50" data-testid="league-staff-loading">Lade Zuständige …</p> : null}
       {data && !rows.length ? (
-        <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 text-sm text-white/60" data-testid="league-staff-empty">
+        <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 tls-type-body text-white/60" data-testid="league-staff-empty">
           Noch niemand zuständig. Bis dahin arbeitet hier nur, wer den Bereich „Ligen“ hat.
         </p>
       ) : null}
@@ -160,14 +160,14 @@ export function LeagueStaffSheet({ league, onClose }) {
       ) : null}
       {canGrant ? (
         <section className="space-y-3 border-t border-white/10 pt-4" aria-label="Person hinzufügen" data-testid="league-staff-add">
-          <h3 className="font-heading text-lg font-bold uppercase">Person hinzufügen</h3>
+          <h3 className="tls-type-card">Person hinzufügen</h3>
           <PersonPicker purpose="league_staff" value={person} onChange={setPerson} label="Person" placeholder="Name tippen …" testId="league-staff-person" emptyText="Niemand mit diesem Namen." />
           <CapabilityChoice value={capabilities} onChange={setCapabilities} idPrefix="league-staff-new" />
           <button type="button" disabled={busy || !person || !capabilities.length} onClick={add}
-            className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50" data-testid="league-staff-grant">
+            className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50" data-testid="league-staff-grant">
             <UserPlus className="h-4 w-4" aria-hidden="true" /> Zuständig machen
           </button>
-          <p className="text-xs text-white/50">Steht im Protokoll, die Person bekommt eine Meldung.</p>
+          <p className="tls-type-small text-white/50">Steht im Protokoll, die Person bekommt eine Meldung.</p>
         </section>
       ) : null}
     </AdminSheet>

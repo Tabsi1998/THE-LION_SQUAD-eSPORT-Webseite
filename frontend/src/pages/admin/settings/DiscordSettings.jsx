@@ -118,15 +118,15 @@ export function DiscordSettings({ initialTab = "messages" }) {
   return (
     <div className="space-y-4" data-testid="discord-settings">
       {loadError && (
-        <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/10 rounded-sm p-3 text-xs text-white/70" data-testid="discord-load-error">
+        <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/10 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-load-error">
           Die Discord-Einstellungen konnten nicht geladen werden. Die Felder zeigen deshalb nicht den gespeicherten Stand.
         </div>
       )}
       {notConfigured && (
         <div className="flex items-start gap-3 border border-[#5865F2]/30 bg-[#5865F2]/10 rounded-sm p-4" data-testid="discord-not-configured">
           <MessageSquare className="w-5 h-5 text-[#5865F2] shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <div className="font-bold text-[#5865F2] uppercase tracking-wider text-xs">Noch kein Kanal gewählt</div>
+          <div className="tls-type-small">
+            <div className="tls-type-label text-[#5865F2]">Noch kein Kanal gewählt</div>
             <p className="text-white/70 mt-1">Der Bot schickt News, Events, Turnier-Meldungen und Alarme in Kanäle deines Servers. Unten den Bot einrichten und verbinden, dann je Zweck einen Kanal wählen – der Bot braucht dort „Nachrichten senden“ und „Links einbetten“.</p>
           </div>
         </div>
@@ -134,7 +134,7 @@ export function DiscordSettings({ initialTab = "messages" }) {
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Discord">
         {DISCORD_TABS.map((entry) => (
           <button key={entry.key} type="button" role="tab" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)} data-testid={`discord-tab-${entry.key}`}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${tab === entry.key ? "border-[#5865F2] text-[#b8c0ff] bg-[#5865F2]/15" : "border-white/10 text-white/60 hover:text-white"}`}>
+            className={`px-4 py-2 tls-type-label rounded-sm border transition ${tab === entry.key ? "border-[#5865F2] text-[#b8c0ff] bg-[#5865F2]/15" : "border-white/10 text-white/60 hover:text-white"}`}>
             {entry.label}
           </button>
         ))}
@@ -142,15 +142,15 @@ export function DiscordSettings({ initialTab = "messages" }) {
       {tab === "messages" && <>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="font-heading font-bold uppercase">Discord-Meldungen</div>
-          <label className="flex items-center gap-2 text-sm">
+          <div className="font-bold uppercase">Discord-Meldungen</div>
+          <label className="flex items-center gap-2 tls-type-small">
             <input type="checkbox" checked={!!discord.enabled} disabled={saving} onChange={(e) => toggleEnabled(e.target.checked)} className="accent-[#29B6E8]" data-testid="discord-enabled" />
             <span>Versand aktiv</span>
           </label>
         </div>
-        <p className="text-xs text-white/50">Alles geht über den Bot – ist er aus oder nicht verbunden, wird nichts gesendet; einen anderen Weg gibt es nicht. Der Versand-Log steht unter System → Betrieb &amp; Logs.</p>
+        <p className="tls-type-small text-white/50">Alles geht über den Bot – ist er aus oder nicht verbunden, wird nichts gesendet; einen anderen Weg gibt es nicht. Der Versand-Log steht unter System → Betrieb &amp; Logs.</p>
         {discord.last_status && (
-          <div className={`border rounded-sm p-3 text-xs ${discord.last_status === "sent" ? "border-[#00FF88]/25 bg-[#00FF88]/5 text-white/60" : "border-[#FF3B30]/25 bg-[#FF3B30]/5 text-white/60"}`} data-testid="discord-last-status">
+          <div className={`border rounded-sm p-3 tls-type-small ${discord.last_status === "sent" ? "border-[#00FF88]/25 bg-[#00FF88]/5 text-white/60" : "border-[#FF3B30]/25 bg-[#FF3B30]/5 text-white/60"}`} data-testid="discord-last-status">
             <div className="font-bold uppercase tracking-widest mb-1">Letzte Meldung: {discord.last_status}</div>
             <div>{discord.last_checked_at ? viennaDateTime(discord.last_checked_at) : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
             {discord.last_error && <div className="mt-1 text-[#FF3B30] break-words">{discord.last_error}</div>}
@@ -176,8 +176,8 @@ export function DiscordSettings({ initialTab = "messages" }) {
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <div className="font-heading font-bold uppercase">Discord-Aktivität</div>
-            <p className="mt-1 text-xs text-white/45">Der Bot zählt Nachrichten verknüpfter Konten von selbst (nur die Zahl, für die Erfolge „Discord-Aktiv“). Hier korrigierst du einen Zähler von Hand – etwa für Zeiten, in denen der Bot aus war.</p>
+            <div className="font-bold uppercase">Discord-Aktivität</div>
+            <p className="mt-1 tls-type-small text-white/45">Der Bot zählt Nachrichten verknüpfter Konten von selbst (nur die Zahl, für die Erfolge „Discord-Aktiv“). Hier korrigierst du einen Zähler von Hand – etwa für Zeiten, in denen der Bot aus war.</p>
           </div>
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
@@ -193,29 +193,29 @@ export function DiscordSettings({ initialTab = "messages" }) {
                   {entry.avatar_url ? (
                     <img src={resolveMediaUrl(entry.avatar_url)} alt="" className="w-10 h-10 rounded-sm object-cover border border-white/10" />
                   ) : (
-                    <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center text-xs font-black text-white/40">
+                    <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center tls-type-small font-black text-white/40">
                       {(entry.display_name || entry.username || "?").slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
                     <div className="font-bold tls-wrap">{entry.display_name || entry.username}</div>
-                    <div className="text-xs text-white/40 tls-wrap">@{entry.username}{entry.discord_name ? ` · ${entry.discord_name}` : ""}</div>
+                    <div className="tls-type-small text-white/40 tls-wrap">@{entry.username}{entry.discord_name ? ` · ${entry.discord_name}` : ""}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
-                  <div className="px-3 py-2 border border-[#5865F2]/30 bg-[#5865F2]/10 text-[#b8c0ff] text-xs font-bold uppercase tracking-widest rounded-sm">
+                  <div className="px-3 py-2 border border-[#5865F2]/30 bg-[#5865F2]/10 text-[#b8c0ff] tls-type-label rounded-sm">
                     {total.toLocaleString("de-DE")} Nachrichten
                   </div>
-                  <button type="button" onClick={() => changeCounter(entry, 1)} disabled={!!savingCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 text-xs font-bold uppercase tracking-wider rounded-sm">+1</button>
-                  <button type="button" onClick={() => changeCounter(entry, 10)} disabled={!!savingCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 text-xs font-bold uppercase tracking-wider rounded-sm">+10</button>
+                  <button type="button" onClick={() => changeCounter(entry, 1)} disabled={!!savingCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 tls-type-label rounded-sm">+1</button>
+                  <button type="button" onClick={() => changeCounter(entry, 10)} disabled={!!savingCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 tls-type-label rounded-sm">+10</button>
                   <input type="number" min="0" value={counterValues[entry.id] ?? ""} onChange={(e) => setCounterValues((prev) => ({ ...prev, [entry.id]: e.target.value }))} data-testid={`discord-counter-total-${entry.id}`} placeholder="Wert" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs" />
-                  <button type="button" onClick={() => setCounter(entry)} disabled={!!savingCounter} data-testid={`discord-counter-save-${entry.id}`} className="px-3 py-2 bg-[#5865F2] text-white text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Setzen</button>
+                  <button type="button" onClick={() => setCounter(entry)} disabled={!!savingCounter} data-testid={`discord-counter-save-${entry.id}`} className="px-3 py-2 bg-[#5865F2] text-white tls-type-label rounded-sm disabled:opacity-50">Setzen</button>
                 </div>
               </div>
             );
           })}
           {!counters.length && (
-            <div className="px-4 py-10 text-center text-sm text-white/40">
+            <div className="px-4 py-10 text-center tls-type-small text-white/40">
               Keine Discord-Zähler gefunden. Suche nach einem Benutzer, um den ersten Wert zu setzen.
             </div>
           )}

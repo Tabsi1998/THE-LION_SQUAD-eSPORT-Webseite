@@ -19,10 +19,10 @@ import { Check, ClipboardList, Map as MapIcon, Plus, Trash2, X } from "lucide-re
 // eingefügt von der Match-Seite (Häkchen, „x“ oder „ja“). Darunter die übrigen Spiele des Spieltags, kompakt.
 // Gerechnet und geprüft wird im Server; hier wird nur das Formular gefüllt.
 
-const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
-const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
+const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
+const LABEL = "tls-type-label text-white/45";
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]";
-const QUIET_BUTTON = "tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5";
+const QUIET_BUTTON = "tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5";
 const INVALID = "!border-red-400/80";
 
 function invalidProps(fields, field) {
@@ -33,7 +33,7 @@ function FieldErrors({ fields, testId }) {
   const messages = Object.values(fields || {});
   if (!messages.length) return null;
   return (
-    <ul className="mt-1 space-y-0.5 text-xs text-red-300" data-testid={testId} role="alert">
+    <ul className="mt-1 space-y-0.5 tls-type-small text-red-300" data-testid={testId} role="alert">
       {[...new Set(messages)].map((message) => <li key={message}>{message}</li>)}
     </ul>
   );
@@ -42,7 +42,7 @@ function FieldErrors({ fields, testId }) {
 function PasteErrors({ errors, testId }) {
   if (!errors?.length) return null;
   return (
-    <ul className="text-xs text-red-200 space-y-0.5" data-testid={testId} role="alert">
+    <ul className="tls-type-small text-red-200 space-y-0.5" data-testid={testId} role="alert">
       {errors.map((error, index) => (
         <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-red-200/60"> – „{error.text}“</span> : null}</li>
       ))}
@@ -54,7 +54,7 @@ function PasteErrors({ errors, testId }) {
 function PersonToggle({ person, on, onToggle, testId = "result-lineup-person", size = "md" }) {
   return (
     <button type="button" aria-pressed={on} onClick={onToggle} data-testid={testId}
-      className={`inline-flex items-center gap-1.5 rounded-sm border transition-colors active:scale-[0.97] ${size === "sm" ? "min-h-[30px] px-2 text-[11px]" : "min-h-[34px] px-2.5 text-xs"} ${on ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/10 text-white/60 hover:text-white hover:border-white/25"}`}>
+      className={`tls-type-small inline-flex items-center gap-1.5 rounded-sm border transition-colors active:scale-[0.97] ${size === "sm" ? "min-h-[30px] px-2" : "min-h-[34px] px-2.5"} ${on ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/10 text-white/60 hover:text-white hover:border-white/25"}`}>
       <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-[3px] ${on ? "bg-[#29B6E8] text-[#04121a]" : "ring-1 ring-inset ring-white/25"}`} aria-hidden="true">
         {on && <Check className="h-3 w-3" strokeWidth={3.5} />}
       </span>
@@ -77,10 +77,10 @@ function PasteArea({ label, hint, placeholder, testId, onApply, children }) {
         <textarea value={text} onChange={(event) => setText(event.target.value)} rows={5} placeholder={placeholder} data-testid={`${testId}-text`}
           className={`${INPUT_CLASS} mt-1 font-mono text-xs`} />
       </label>
-      {hint && <p className="text-xs text-white/50">{hint}</p>}
+      {hint && <p className="tls-type-small text-white/50">{hint}</p>}
       {children}
       <button type="button" disabled={!text.trim()} onClick={() => { if (onApply(text)) setText(""); }} data-testid={`${testId}-apply`}
-        className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">
         Übernehmen
       </button>
     </div>
@@ -123,14 +123,14 @@ function MatchdayPaste({ form, setForm, ownTeams, round, onDone }) {
       <PasteArea label="Begegnungsliste einfügen" testId="result-matchday-paste" onApply={apply}
         placeholder={"Termin\tHeim\tAuswärts\tErgebnis\n17.06.2026 20:30 Uhr\tTeam A\tTeam B\t2:1\n17.06.2026 21:00 Uhr\tTeam C\tTeam D\t0:2"}
         hint="Von der Seite des Veranstalters kopieren (etwa „Spieltage → Alle“): Termin, Heim, Auswärts, Ergebnis. Logo- und Link-Spalten stören nicht; mehrere Spieltage trennt ihre Überschrift. Das eigene Spiel wird erkannt und ausgefüllt.">
-        <label className="flex items-center gap-2 text-xs text-white/75">
+        <label className="flex items-center gap-2 tls-type-small text-white/75">
           <input type="checkbox" checked={keepOthers} onChange={(event) => setKeepOthers(event.target.checked)} data-testid="result-matchday-keep-others" className="w-4 h-4" style={{ accentColor: "#29B6E8" }} />
           Übrige Spiele mitspeichern – sie stehen dann beim Spieltag und zählen in die eigene Tabelle
         </label>
       </PasteArea>
       <PasteErrors errors={result?.errors} testId="result-matchday-errors" />
       {result?.choose && (
-        <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="result-matchday-choose">
+        <div className="flex flex-wrap items-center gap-2 tls-type-small" data-testid="result-matchday-choose">
           <span className="text-white/70">Mehrere Spieltage eingefügt – welcher gehört zu diesem Termin?</span>
           {result.choose.map((block, index) => (
             <button key={index} type="button" className={QUIET_BUTTON} onClick={() => choose(result, block)}>
@@ -140,7 +140,7 @@ function MatchdayPaste({ form, setForm, ownTeams, round, onDone }) {
         </div>
       )}
       {result?.outcome && (
-        <p className={`text-sm ${own ? "text-white/75" : "text-amber-200"}`} data-testid="result-matchday-summary" role="status">
+        <p className={`tls-type-small ${own ? "text-white/75" : "text-amber-200"}`} data-testid="result-matchday-summary" role="status">
           {own
             ? <>{owns.length > 1 ? "Eigene Spiele erkannt: " : "Eigenes Spiel erkannt: "}<span className="text-white font-semibold">{shown}</span></>
             : "Kein eigenes Spiel erkannt – stehen die eigenen Teams und ihre Schreibweisen in der Saison?"}
@@ -186,16 +186,16 @@ function MapPoolStrip({ choices, onPick }) {
     <div className="space-y-2 rounded-sm border border-white/10 bg-[#121212] p-2.5" data-testid="result-map-pool">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className={LABEL}>{choices.source === "pool" ? "Map-Pool der Saison" : "Maps des Spiels"}</span>
-        <span className="text-[11px] text-white/45">In der Reihenfolge des Vetos antippen, dann Rolle und Ergebnis.</span>
+        <span className="tls-type-small text-white/45">In der Reihenfolge des Vetos antippen, dann Rolle und Ergebnis.</span>
       </div>
       {groups.map((group) => (
         <div key={group.mode || "alle"} className="space-y-1">
-          {groups.length > 1 || group.mode ? <span className="block text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]/80">{group.label || group.mode}</span> : null}
+          {groups.length > 1 || group.mode ? <span className="block tls-type-label text-[#29B6E8]/80">{group.label || group.mode}</span> : null}
           <ul className="flex flex-wrap gap-1.5">
             {group.maps.map((choice) => (
               <li key={choice.map_id}>
                 <button type="button" onClick={() => onPick({ ...choice, mode: group.mode || "" })} aria-label={`${choice.name} ins Veto`}
-                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] py-1 pl-1 pr-2.5 text-xs text-white/80 transition-colors hover:border-[#29B6E8]/60 hover:text-white active:scale-[0.97] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] py-1 pl-1 pr-2.5 tls-type-small text-white/80 transition-colors hover:border-[#29B6E8]/60 hover:text-white active:scale-[0.97] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
                   <MapThumb item={choice} />
                   {choice.name}
                 </button>
@@ -237,7 +237,7 @@ function MapRow({ match, item, index, errors, choices, onChange, onRemove }) {
         {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
       {banned ? (
-        <span className="w-[6.75rem] text-center text-[10px] font-bold uppercase tracking-widest text-white/40" data-testid="result-map-banned">gesperrt</span>
+        <span className="w-[6.75rem] text-center tls-type-label text-white/40" data-testid="result-map-banned">gesperrt</span>
       ) : (
         <div className="flex items-center gap-1">
           <input aria-label={`Map ${number} Heim`} inputMode="numeric" value={item.home_score} onChange={(event) => set({ home_score: event.target.value })} {...invalidProps(invalid, "home_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${invalid?.home_score ? INVALID : ""}`} data-testid="result-map-home" />
@@ -247,7 +247,7 @@ function MapRow({ match, item, index, errors, choices, onChange, onRemove }) {
       )}
       <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Map ${number} entfernen`}><X className="w-4 h-4" /></button>
       {unknown ? (
-        <p id={`${item.key}-unknown`} className="order-last col-span-full -mt-1 text-[11px] text-amber-200" data-testid="result-map-unknown">
+        <p id={`${item.key}-unknown`} className="order-last col-span-full -mt-1 tls-type-small text-amber-200" data-testid="result-map-unknown">
           Nicht im Map-Pool – bleibt als Freitext. Fehlt die Map, in der Bibliothek anlegen oder als weitere Schreibweise eintragen.
         </p>
       ) : null}
@@ -295,7 +295,7 @@ function LineupPicker({ match, roster, participants, onChange }) {
         <span className={LABEL}>Aufstellung · {match.lineup.length} {roster.length ? `von ${roster.length} im Kader` : "aufgestellt"}</span>
         <div className="flex flex-wrap items-center gap-2">
           {named.length > 0 && (
-            <label className="inline-flex items-center gap-1.5 text-xs text-white/70">
+            <label className="inline-flex items-center gap-1.5 tls-type-small text-white/70">
               <input type="checkbox" checked={Boolean(match.perMap)} onChange={(event) => onChange({ perMap: event.target.checked })} data-testid="result-lineup-per-map" className="w-4 h-4" style={{ accentColor: "#29B6E8" }} />
               je Map
             </label>
@@ -311,7 +311,7 @@ function LineupPicker({ match, roster, participants, onChange }) {
           hint="Mit Spalte für das Häkchen (✓, x oder ja) wird gleich angekreuzt. Fehlt es – beim Kopieren oft ein Bild –, stehen die Namen zum Ankreuzen da." />
       )}
       {notice && (
-        <p className={`text-xs ${notice.marked ? "text-white/60" : "text-amber-200"}`} role="status" data-testid="result-lineup-notice">
+        <p className={`tls-type-small ${notice.marked ? "text-white/60" : "text-amber-200"}`} role="status" data-testid="result-lineup-notice">
           {notice.marked ? `${notice.count} Namen gelesen, Häkchen übernommen.` : `${notice.count} Namen gelesen, aber kein Häkchen erkannt – bitte unten ankreuzen.`}
         </p>
       )}
@@ -325,11 +325,11 @@ function LineupPicker({ match, roster, participants, onChange }) {
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-white/50" data-testid="result-lineup-empty">Noch kein Kader für dieses Team – Namen unten eintragen oder den Kader in der Saison einfügen.</p>
+        <p className="tls-type-small text-white/50" data-testid="result-lineup-empty">Noch kein Kader für dieses Team – Namen unten eintragen oder den Kader in der Saison einfügen.</p>
       )}
       {match.perMap && named.map((item, index) => (
         <div key={item.key} className="pl-3 border-l border-white/10 space-y-1" data-testid="result-map-lineup">
-          <span className="text-[11px] text-white/55">{item.name || `Map ${index + 1}`}</span>
+          <span className="tls-type-small text-white/55">{item.name || `Map ${index + 1}`}</span>
           <ul className="flex flex-wrap gap-1" aria-label={`Aufstellung ${item.name}`}>
             {people.map((entry) => (
               <li key={entry.id || entry.name}>
@@ -402,7 +402,7 @@ function OtherMatches({ matches, errors, onChange, onRemove, onAdd }) {
   return (
     <div className="space-y-1.5" data-testid="result-others">
       <span className={LABEL}>Übrige Spiele des Spieltags{matches.length ? ` · ${matches.length}` : ""}</span>
-      {matches.length === 0 && <p className="text-xs text-white/45">Keine – „Spieltag einfügen“ übernimmt sie mit, sonst „Spiel“.</p>}
+      {matches.length === 0 && <p className="tls-type-small text-white/45">Keine – „Spieltag einfügen“ übernimmt sie mit, sonst „Spiel“.</p>}
       {matches.map((match, index) => {
         const invalid = errors?.[match.key];
         return (
@@ -449,9 +449,9 @@ export function TeamLeagueEntry({ form, setForm, ownTeams, round, participants, 
         {[...new Set([...choiceList(mapChoices).map((item) => item.name), ...mapNames, ...form.matches.flatMap((match) => match.maps.map((item) => String(item.name || "").trim()))].filter(Boolean))].map((name) => <option key={name} value={name} />)}
       </datalist>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spieltag</h3>
+        <h3 className="tls-type-label text-[#29B6E8]">Spieltag</h3>
         <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-matchday-toggle"
-          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
           <ClipboardList className="w-3.5 h-3.5" /> Spieltag einfügen
         </button>
       </div>
@@ -462,7 +462,7 @@ export function TeamLeagueEntry({ form, setForm, ownTeams, round, participants, 
       ))}
       {(editable.length === 0 || (ownTeams || []).length > 1) && (
         <button type="button" onClick={() => setForm((current) => ({ ...current, matches: [emptyMatch({ home: nextOwn }), ...current.matches] }))} data-testid="result-match-add"
-          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
           <Plus className="w-3.5 h-3.5" /> Eigenes Spiel
         </button>
       )}

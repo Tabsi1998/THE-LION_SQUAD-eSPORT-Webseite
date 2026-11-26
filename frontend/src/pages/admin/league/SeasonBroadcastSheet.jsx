@@ -162,25 +162,25 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
       submitLabel={count ? `An ${peopleText(count)} schicken` : "Schicken"} savingLabel="Wird verschickt …" submitTestId="broadcast-send"
       submitDisabled={preview.status !== "ready" || !count || locked} testId="broadcast-sheet">
       <fieldset disabled={locked}>
-        <legend className="mb-2 text-[11px] font-bold uppercase tracking-widest text-white/50">Empfänger</legend>
+        <legend className="mb-2 tls-type-label text-white/50">Empfänger</legend>
         <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
           {AUDIENCES.map((row) => {
             const selected = audience === row.key;
             return (
               <label key={row.key} data-testid={`broadcast-audience-${row.key}`}
                 className={`tls-press tls-press--flat flex min-h-11 cursor-pointer flex-col gap-0.5 rounded-sm border p-3 transition-colors ${selected ? "border-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 hover:border-white/25"}`}>
-                <span className="flex items-center gap-2 text-sm font-bold text-white">
+                <span className="flex items-center gap-2 tls-type-small font-bold text-white">
                   <input type="radio" name="broadcast-audience" value={row.key} checked={selected} onChange={() => setAudience(row.key)} className="accent-[#29B6E8]" />
                   {row.label}
                 </span>
-                <span className="text-xs text-white/55">{row.hint}</span>
+                <span className="tls-type-small text-white/55">{row.hint}</span>
               </label>
             );
           })}
         </div>
       </fieldset>
       <SelectField label="Kreis" value={scope} onChange={setScope} options={options.map((row) => [row.value, row.label])} testId="broadcast-scope" disabled={locked} />
-      <p className="rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-sm" aria-live="polite" data-testid="broadcast-preview">
+      <p className="rounded-sm border border-white/10 bg-[#121212] px-3 py-2 tls-type-small" aria-live="polite" data-testid="broadcast-preview">
         {preview.status === "loading" ? <span className="text-white/50">Empfänger werden gezählt …</span> : null}
         {preview.status === "error" ? <span className="text-warn">{preview.error || "Die Empfänger ließen sich nicht zählen."}</span> : null}
         {preview.status === "ready" ? (
@@ -192,12 +192,12 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
         hint={`${title.trim().length} / ${BROADCAST_LIMITS.titleMax} Zeichen · steht in der Glocke nach dem Namen der Season („Liga Season: Betreff“)`} />
       <TextAreaField label="Nachricht" value={text} onChange={(value) => setText(value.slice(0, BROADCAST_LIMITS.textMax))} rows={6} testId="broadcast-text" disabled={locked}
         hint={`${text.trim().length} / ${BROADCAST_LIMITS.textMax} Zeichen`} />
-      <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-white/80" data-testid="broadcast-mail">
+      <label className="flex min-h-11 cursor-pointer items-start gap-3 tls-type-small text-white/80" data-testid="broadcast-mail">
         <input type="checkbox" checked={mail} onChange={(event) => setMail(event.target.checked)} disabled={locked} className="mt-1 accent-[#29B6E8]" />
-        <span>Auch per Mail<span className="block text-xs text-white/50">Glocke, Push und Mail folgen bei jeder Person der Einstellung „Turnier-Updates“. Wer sie per Mail abgeschaltet hat, bekommt keine Mail.</span></span>
+        <span>Auch per Mail<span className="block tls-type-small text-white/50">Glocke, Push und Mail folgen bei jeder Person der Einstellung „Turnier-Updates“. Wer sie per Mail abgeschaltet hat, bekommt keine Mail.</span></span>
       </label>
       {progress ? (
-        <div className={`rounded-sm border p-3 text-sm ${stale ? "border-warn/40 bg-warn/5" : "border-[#29B6E8]/30 bg-[#29B6E8]/5"}`} role="status" aria-live="polite"
+        <div className={`rounded-sm border p-3 tls-type-small ${stale ? "border-warn/40 bg-warn/5" : "border-[#29B6E8]/30 bg-[#29B6E8]/5"}`} role="status" aria-live="polite"
           data-testid="broadcast-progress" data-stale={stale ? "true" : "false"}>
           <div className="flex items-baseline justify-between gap-2">
             <span className="font-bold text-white">{stale ? "Versand hängt" : "Wird verschickt …"}</span>
@@ -209,18 +209,18 @@ export function SeasonBroadcastSheet({ seasonId, divisions = [], onClose, onSent
           </div>
           {stale ? (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-white/70">Der Versand ist stehen geblieben. Fortsetzen schickt sie nur an alle, die sie noch nicht haben.</p>
+              <p className="tls-type-small text-white/70">Der Versand ist stehen geblieben. Fortsetzen schickt sie nur an alle, die sie noch nicht haben.</p>
               <button type="button" onClick={resume} disabled={resuming} data-testid="broadcast-resume"
-                className="tls-btn tls-btn--primary inline-flex min-h-11 items-center rounded-sm px-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+                className="tls-btn tls-btn--primary inline-flex min-h-11 items-center rounded-sm px-4 tls-type-label disabled:opacity-50">
                 Fortsetzen
               </button>
             </div>
           ) : progress.slow ? (
-            <p className="mt-2 text-xs text-white/60" data-testid="broadcast-progress-slow">Das dauert länger. Der Versand läuft im Hintergrund weiter – du kannst den Dialog schließen, den Endstand zeigt das Protokoll. Öffnest du die Rundnachricht wieder, siehst du den Stand.</p>
+            <p className="mt-2 tls-type-small text-white/60" data-testid="broadcast-progress-slow">Das dauert länger. Der Versand läuft im Hintergrund weiter – du kannst den Dialog schließen, den Endstand zeigt das Protokoll. Öffnest du die Rundnachricht wieder, siehst du den Stand.</p>
           ) : null}
         </div>
       ) : null}
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="broadcast-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="broadcast-error">{error}</p> : null}
     </AdminSheet>
   );
 }

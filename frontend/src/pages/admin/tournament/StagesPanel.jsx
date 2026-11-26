@@ -27,7 +27,7 @@ function inheritedDuration(ctx, { stage = null, match = null } = {}) {
 
 function DurationSource({ own, inherited, testId }) {
   const text = durationSourceText(inherited);
-  return <span className="block mt-1 text-[11px] text-white/45" data-testid={testId}>{own === "" ? text : `Leer lassen: ${text}`}</span>;
+  return <span className="block mt-1 tls-type-small text-white/45" data-testid={testId}>{own === "" ? text : `Leer lassen: ${text}`}</span>;
 }
 
 // Je Spiel (nach Codex-Prüfung): ein Einsatz für einzelne Spiele, Phasen, Gruppen oder Stationen zeigt seine Knöpfe nur dort.
@@ -48,12 +48,12 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
     <DurationContext.Provider value={durationContext}>
     <div className="space-y-5">
       {/* Der Matchplan ersetzt die alte Matchplanung je Karte (Praxis nach #1589): hier Phasen, Spiele und Ergebnisse. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70 border border-white/10 bg-[#0A0A0A] rounded-sm px-4 py-3" data-testid="stages-matchplan-hint">
+      <div className="flex flex-wrap items-center justify-between gap-3 tls-type-small text-white/70 border border-white/10 bg-[#0A0A0A] rounded-sm px-4 py-3" data-testid="stages-matchplan-hint">
         <span>{onsite
           ? "Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“."
           : "Termine und Fristen siehst du im Matchplan – je Spiel „ändern“."}</span>
         {onOpenMatchplan && (
-          <button type="button" onClick={onOpenMatchplan} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zum Matchplan</button>
+          <button type="button" onClick={onOpenMatchplan} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label">Zum Matchplan</button>
         )}
       </div>
 
@@ -137,15 +137,15 @@ function StageRules({ stage, form, set, durationContext, onSave }) {
         className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
         data-testid={`stage-rules-toggle-${stage.id}`}
       >
-        <span className="font-bold uppercase tracking-wider text-xs text-white/80">Regeln dieser Phase</span>
-        <span className="text-white/50 text-lg leading-none" aria-hidden="true">{open ? "−" : "+"}</span>
+        <span className="tls-type-label text-white/80">Regeln dieser Phase</span>
+        <span className="text-white/50 tls-type-card leading-none" aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
       {open && (
         <div id={panelId} className="px-5 pb-5 space-y-3">
           <div className="grid md:grid-cols-3 gap-3">
             <div className="block md:col-span-3">
               <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} testId={`stage-rules-event-mode-${stage.id}`} />
-              <div className="text-[11px] text-white/40 mt-1.5" data-testid={`stage-rules-event-mode-hint-${stage.id}`}>{EVENT_MODE_HINTS[form.event_mode] || EVENT_MODE_HINTS[""]}</div>
+              <div className="tls-type-small text-white/40 mt-1.5" data-testid={`stage-rules-event-mode-hint-${stage.id}`}>{EVENT_MODE_HINTS[form.event_mode] || EVENT_MODE_HINTS[""]}</div>
             </div>
             <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
             <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
@@ -156,8 +156,8 @@ function StageRules({ stage, form, set, durationContext, onSave }) {
             {form.stage_type === "double_elimination" && <GrandFinalField value={form.grand_final} onChange={(v)=>set("grand_final", v)} testId={`stage-rules-grand-final-${stage.id}`} />}
             <AdvancementField value={form.advancement} minutes={form.draw_show_minutes} onChange={(v)=>set("advancement", v)} onMinutes={(v)=>set("draw_show_minutes", v)} testId={`stage-rules-advancement-${stage.id}`} />
           </div>
-          <div className="text-xs text-white/45">Leer heißt: wie beim Turnier. Gilt für neue und noch offene Spiele dieser Phase.</div>
-          <button type="button" onClick={onSave} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid={`stage-rules-save-${stage.id}`}>Regeln speichern</button>
+          <div className="tls-type-small text-white/45">Leer heißt: wie beim Turnier. Gilt für neue und noch offene Spiele dieser Phase.</div>
+          <button type="button" onClick={onSave} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label" data-testid={`stage-rules-save-${stage.id}`}>Regeln speichern</button>
         </div>
       )}
     </div>
@@ -170,11 +170,11 @@ function AdvancementField({ value, minutes = "", onChange, onMinutes, testId }) 
   return (
     <div className="block md:col-span-3">
       <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={value} onChange={onChange} options={STAGE_ADVANCEMENT_OPTIONS} testId={testId} />
-      {value ? <div className="text-[11px] text-white/40 mt-1.5" data-testid={`${testId}-hint`}>{advancementModeHint(value)}</div> : null}
+      {value ? <div className="tls-type-small text-white/40 mt-1.5" data-testid={`${testId}-hint`}>{advancementModeHint(value)}</div> : null}
       {value === "draw_show" ? (
         <div className="mt-2 max-w-xs">
           <Fld label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={minutes} onChange={onMinutes} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} testId={`${testId}-minutes`} />
-          <div className="text-[11px] text-white/40 mt-1">{DRAW_SHOW_MINUTES_HINT}</div>
+          <div className="tls-type-small text-white/40 mt-1">{DRAW_SHOW_MINUTES_HINT}</div>
         </div>
       ) : null}
     </div>
@@ -186,7 +186,7 @@ function GrandFinalField({ value, onChange, testId }) {
   return (
     <div className="block md:col-span-3">
       <SelectField label="Grand Final" value={value} onChange={onChange} options={[["", "Vom Turnier erben"], ...GRAND_FINAL_OPTIONS]} testId={testId} />
-      <div className="text-[11px] text-white/40 mt-1.5">{GRAND_FINAL_HINT}</div>
+      <div className="tls-type-small text-white/40 mt-1.5">{GRAND_FINAL_HINT}</div>
     </div>
   );
 }
@@ -304,9 +304,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
     <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
       <div className="p-5 border-b border-white/10 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Phase #{stage.number || "—"}</div>
-          <h2 className="font-heading text-xl font-bold uppercase mt-1">{stage.name}</h2>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/50">
+          <div className="tls-type-label text-[#29B6E8]">Phase #{stage.number || "—"}</div>
+          <h2 className="tls-type-section mt-1">{stage.name}</h2>
+          <div className="mt-2 flex flex-wrap gap-2 tls-type-small text-white/50">
             <span>{formatMatchType(stage.match_type)}</span>
             <span>·</span>
             <span>{formatStageType(stage.stage_type)}</span>
@@ -322,8 +322,8 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
         </div>
         {canManageStructure && (
           <div className="flex flex-wrap gap-2">
-            {showPreviewButton && <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} data-testid={`stage-preview-${stage.id}`} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>}
-            {showGenerateButton && <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} data-testid={`stage-generate-${stage.id}`} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>}
+            {showPreviewButton && <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} data-testid={`stage-preview-${stage.id}`} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-40">Vorschau</button>}
+            {showGenerateButton && <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} data-testid={`stage-generate-${stage.id}`} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label disabled:opacity-40">Mit Teilnehmern generieren</button>}
           </div>
         )}
       </div>
@@ -338,7 +338,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
             <button
               type="button"
               onClick={() => setActiveSection("all")}
-              className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === "all" ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+              className={`px-3 py-2 rounded-sm border tls-type-label ${activeSection === "all" ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
             >
               Alle <span className="ml-1 text-white/40">{sortedMatches.length}</span>
             </button>
@@ -347,7 +347,7 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveSection(tab.key)}
-                className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === tab.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+                className={`px-3 py-2 rounded-sm border tls-type-label ${activeSection === tab.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
               >
                 {tab.label} <span className="ml-1 text-white/40">{tab.count}</span>
               </button>
@@ -390,25 +390,25 @@ function MatchV2Card({ match, regById, stations = [], canRecordResults = false, 
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-white/40">{sectionRoundLabel(match)}</div>
-          <div className="font-heading font-bold uppercase">{match.match_key}</div>
-          <div className="mt-1 text-[10px] uppercase tracking-wider text-white/45">
+          <div className="tls-type-label text-white/40">{sectionRoundLabel(match)}</div>
+          <div className="font-bold uppercase">{match.match_key}</div>
+          <div className="mt-1 tls-type-label text-white/45">
             {match.scheduled_at ? formatDateTime(match.scheduled_at) : "Termin offen"}
             {stationDisplay(match, stations) ? <span className="text-[#29B6E8]"> - Station {stationDisplay(match, stations)}</span> : null}
           </div>
-          <a href={`/matches/${match.id}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Öffentliche Matchseite</a>
+          <a href={`/matches/${match.id}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex tls-type-label text-[#29B6E8] hover:underline">Öffentliche Matchseite</a>
         </div>
         <StatusBadge status={match.status || "pending"} />
       </div>
       <div className="mt-3 grid sm:grid-cols-2 gap-2">
         {(match.slots || []).map((slot) => (
-          <div key={slot.slot} className={`px-3 py-2 rounded-sm border text-sm ${slot.status === "filled" ? "border-[#29B6E8]/30 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
+          <div key={slot.slot} className={`px-3 py-2 rounded-sm border tls-type-small ${slot.status === "filled" ? "border-[#29B6E8]/30 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`}>
             <span className="text-white/40 mr-2">#{slot.slot}</span>{slot.registration_id ? labelFor(slot.registration_id) : (slot.source?.draw ? sourceLabel(slot.source) : slot.source?.raw) || "Offen"}
           </div>
         ))}
       </div>
       {match.results?.length > 0 && (
-        <div className="mt-3 grid sm:grid-cols-2 gap-2 text-xs">
+        <div className="mt-3 grid sm:grid-cols-2 gap-2 tls-type-small">
           {match.results.map((result) => (
             <div key={result.registration_id} className="flex items-center justify-between bg-[#121212] border border-white/10 px-3 py-2 rounded-sm">
               <span>{result.rank}. {labelFor(result.registration_id)}</span>
@@ -419,7 +419,7 @@ function MatchV2Card({ match, regById, stations = [], canRecordResults = false, 
       )}
       {canRecordResults && filledSlots.length > 1 && (
         <div className="mt-4 border-t border-white/10 pt-3 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => setResultOpen(true)} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase" data-testid={`matchplan-result-${match.id}`}>
+          <button type="button" onClick={() => setResultOpen(true)} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label" data-testid={`matchplan-result-${match.id}`}>
             {(match.results || []).length ? "Ergebnis korrigieren" : "Ergebnis eintragen"}
           </button>
         </div>

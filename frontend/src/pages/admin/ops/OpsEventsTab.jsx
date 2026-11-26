@@ -48,7 +48,7 @@ export function eventStateLine(row) {
   return "";
 }
 
-const ROW_BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm border px-3 py-2 text-[10px] font-bold uppercase tracking-widest disabled:opacity-40";
+const ROW_BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm border px-3 py-2 tls-type-label disabled:opacity-40";
 
 export function EventRow({ row, onResend, resending = false, onAck, acking = false }) {
   const Icon = sourceIcon(row.source);
@@ -61,22 +61,22 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
         <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#29B6E8]" />
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className={`rounded-sm border px-2 py-1 text-[10px] font-black uppercase tracking-widest ${severityClass(row.severity)}`}>
+            <span className={`rounded-sm border px-2 py-1 tls-type-label ${severityClass(row.severity)}`}>
               {SEVERITY_LABELS[row.severity] || row.severity || "Log"}
             </span>
-            <span className="rounded-sm border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/45">{row.source_label}</span>
-            {row.status && <span className="text-[10px] uppercase tracking-widest text-white/35">{row.status}</span>}
-            <span className="ml-auto text-xs text-white/35">{formatEventTime(row.time)}</span>
+            <span className="rounded-sm border border-white/10 px-2 py-1 tls-type-label text-white/45">{row.source_label}</span>
+            {row.status && <span className="tls-type-label text-white/35">{row.status}</span>}
+            <span className="ml-auto tls-type-small text-white/35">{formatEventTime(row.time)}</span>
           </div>
-          <div className="break-words text-sm font-bold text-white">{row.title}</div>
-          {row.subtitle && <div className="mt-1 break-words text-xs text-white/45">{row.subtitle}</div>}
+          <div className="break-words tls-type-small font-bold text-white">{row.title}</div>
+          {row.subtitle && <div className="mt-1 break-words tls-type-small text-white/45">{row.subtitle}</div>}
           {stateLine && (
-            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-ok/80" data-testid={`ops-event-state-${row.id}`}>
+            <div className="mt-2 inline-flex items-center gap-1.5 tls-type-small text-ok/80" data-testid={`ops-event-state-${row.id}`}>
               <CheckCheck className="h-3.5 w-3.5" /> {stateLine}
             </div>
           )}
           {row.detail && (
-            <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-sm border border-white/10 bg-black/20 p-3 text-xs text-white/60">{row.detail}</pre>
+            <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-sm border border-white/10 bg-black/20 p-3 tls-type-small text-white/60">{row.detail}</pre>
           )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -110,9 +110,9 @@ export function LoadError({ onRetry, testId }) {
   return (
     <div role="alert" className="rounded-sm border border-warn/30 bg-warn/5 p-6 text-center" data-testid={testId}>
       <AlertTriangle className="mx-auto h-6 w-6 text-warn" />
-      <div className="mt-2 text-sm font-bold text-white">Die Einträge ließen sich nicht laden.</div>
-      <p className="mt-1 text-xs text-white/50">Ob etwas offen ist, steht erst nach dem Laden fest.</p>
-      <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-white/15 px-4 text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">
+      <div className="mt-2 tls-type-small font-bold text-white">Die Einträge ließen sich nicht laden.</div>
+      <p className="mt-1 tls-type-small text-white/50">Ob etwas offen ist, steht erst nach dem Laden fest.</p>
+      <button type="button" onClick={onRetry} className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-white/15 px-4 tls-type-label hover:border-[#29B6E8]/50">
         <RefreshCw className="h-4 w-4" /> Erneut laden
       </button>
     </div>
@@ -283,7 +283,7 @@ export function OpsEventsTab() {
   const selectedLabel = source === "all" ? "Alle Quellen" : selected[0]?.label || source;
   // „Alle quittieren“ (Review #2447, M2): genau die gezeigten offenen Einträge - Suche, Schwere, Server, Zeitraum gelten.
   const shownOpen = rows.filter((row) => row.ackable && row.ack_id);
-  const toggleClass = (active) => `inline-flex min-h-[44px] items-center gap-2 rounded-sm border px-3 text-xs font-bold uppercase tracking-wider ${active ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`;
+  const toggleClass = (active) => `inline-flex min-h-[44px] items-center gap-2 rounded-sm border px-3 tls-type-label ${active ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`;
 
   return (
     <div className="space-y-4" data-testid="ops-events">
@@ -295,7 +295,7 @@ export function OpsEventsTab() {
               type="button"
               onClick={() => setSource(item.key)}
               data-testid={`ops-events-source-${item.key}`}
-              className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${source === item.key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+              className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label ${source === item.key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
             >
               {item.label}
               {Number(item.problems || 0) > 0 && <span className={`rounded-sm px-1 ${source === item.key ? "bg-black/20" : "bg-[#FFD700]/15 text-[#FFD700]"}`}>{item.problems}</span>}
@@ -328,7 +328,7 @@ export function OpsEventsTab() {
             className="min-h-[44px] w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm text-white" />
         </label>
         <button type="button" onClick={exportCsv} disabled={exporting || !rows.length} data-testid="ops-events-export"
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50 disabled:opacity-40">
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 tls-type-label hover:border-[#29B6E8]/50 disabled:opacity-40">
           <Download className="h-4 w-4" /> Als CSV
         </button>
       </div>
@@ -344,7 +344,7 @@ export function OpsEventsTab() {
         {shownOpen.length > 0 && (
           <button type="button" disabled={!!acking} data-testid="ops-events-ack-all"
             onClick={() => ackAll({ count: shownOpen.length, items: shownOpen.map((row) => ({ source: row.source, id: row.ack_id })), until: data?.as_of, label: selectedLabel })}
-            className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-ok/40 bg-ok/10 px-3 text-xs font-bold uppercase tracking-wider text-ok hover:bg-ok/15 disabled:opacity-40">
+            className="ml-auto inline-flex min-h-[44px] items-center gap-2 rounded-sm border border-ok/40 bg-ok/10 px-3 tls-type-label text-ok hover:bg-ok/15 disabled:opacity-40">
             <CheckCheck className="h-4 w-4" /> {acking === "all" ? "Quittiere …" : `Alle gezeigten quittieren (${shownOpen.length})`}
           </button>
         )}
@@ -354,7 +354,7 @@ export function OpsEventsTab() {
         <div className="flex flex-wrap gap-2" data-testid="ops-events-audit-quick">
           {AUDIT_QUICK.map(([value, label]) => (
             <button key={label} type="button" onClick={() => setQ(value)}
-              className={`min-h-[44px] rounded-sm border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${q === value ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}>
+              className={`min-h-[44px] rounded-sm border px-3 py-1.5 tls-type-label ${q === value ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}>
               {label}
             </button>
           ))}
@@ -378,7 +378,7 @@ export function OpsEventsTab() {
         )}
       </div>
       {data?.summary?.problem_count > 0 && (
-        <div className="inline-flex items-center gap-2 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 text-xs text-[#FFD700]" data-testid="ops-events-problems">
+        <div className="inline-flex items-center gap-2 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 tls-type-small text-[#FFD700]" data-testid="ops-events-problems">
           <AlertTriangle className="h-4 w-4" /> {data.summary.problem_count} auffällige Einträge über alle Quellen.
         </div>
       )}

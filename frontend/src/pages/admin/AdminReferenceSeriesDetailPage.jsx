@@ -51,8 +51,8 @@ function RulesSummary({ series }) {
   const days = dayRoundsLabel(rules);
   const bonuses = bonusRulesLabel(rules);
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] p-4 text-sm text-white/70 space-y-1" data-testid="series-detail-rules">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Regeln · Version {series.rules_version || 1}</div>
+    <div className="border border-white/10 rounded-sm bg-[#121212] p-4 tls-type-small text-white/70 space-y-1" data-testid="series-detail-rules">
+      <div className="tls-type-label text-[#29B6E8]">Regeln · Version {series.rules_version || 1}</div>
       <div>{points}</div>
       {days && <div data-testid="series-detail-days">{days}</div>}
       {doubleUpLabel(rules) && <div data-testid="series-detail-double-up">Double Up: {doubleUpLabel(rules)}</div>}
@@ -122,7 +122,7 @@ export default function AdminReferenceSeriesDetailPage() {
   const current = preview?.current;
   return (
     <AdminLayout>
-      <Link to={board ? "/admin/reference-series" : "/admin/dienst"} data-testid="series-detail-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+      <Link to={board ? "/admin/reference-series" : "/admin/dienst"} data-testid="series-detail-back" className="inline-flex items-center gap-1.5 tls-type-label text-white/50 hover:text-[#29B6E8]">
         <ArrowLeft className="w-3.5 h-3.5" /> {board ? "Serien" : "Mein Dienst"}
       </Link>
       {missing && <div className="mt-6 text-white/60" data-testid="series-detail-missing">{missing}</div>}
@@ -130,35 +130,35 @@ export default function AdminReferenceSeriesDetailPage() {
         <>
           <div className="mt-3 mb-6 flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] flex-wrap" data-testid="series-detail-lineage">
+              <div className="flex items-center gap-2 tls-type-label text-[#29B6E8] flex-wrap" data-testid="series-detail-lineage">
                 <span>{lineage.title}</span>
                 <span className="text-white/45 tracking-widest">{KIND_LABELS[lineage.kind] || lineage.kind}</span>
               </div>
-              <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{seasonLabel(series)}</h1>
-              <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-white/45">{STATUS_LABELS[series.status] || series.status}</div>
-              {cancelledText(series) && <p className="mt-1 text-sm text-amber-200/90" data-testid="series-detail-cancelled">{cancelledText(series)}</p>}
+              <h1 className="tls-type-title mt-1">{seasonLabel(series)}</h1>
+              <div className="mt-1 tls-type-label text-white/45">{STATUS_LABELS[series.status] || series.status}</div>
+              {cancelledText(series) && <p className="mt-1 tls-type-small text-amber-200/90" data-testid="series-detail-cancelled">{cancelledText(series)}</p>}
               {board && current && (
-                <p className="mt-2 text-sm text-white/70" data-testid="series-detail-reference">
+                <p className="mt-2 tls-type-small text-white/70" data-testid="series-detail-reference">
                   Referenz: <span className="text-white font-semibold tabular-nums">{referenceLine(current)}</span> · <Link to={`/references/${current.id}`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">ansehen</Link>
                 </p>
               )}
             </div>
             {board && <div className="flex items-center gap-2 shrink-0 flex-wrap max-w-full">
               {!archived && (
-                <button type="button" onClick={openClose} data-testid="series-detail-close" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+                <button type="button" onClick={openClose} data-testid="series-detail-close" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
                   <Flag className="w-3.5 h-3.5" /> Saison abschließen
                 </button>
               )}
-              <button type="button" onClick={() => setEditing(true)} data-testid="series-detail-edit" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+              <button type="button" onClick={() => setEditing(true)} data-testid="series-detail-edit" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
                 <Pencil className="w-3.5 h-3.5" /> Bearbeiten
               </button>
-              <button type="button" onClick={toggleArchive} data-testid="series-detail-archive" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+              <button type="button" onClick={toggleArchive} data-testid="series-detail-archive" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
                 {archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />} {archived ? "Zurückholen" : "Archivieren"}
               </button>
             </div>}
           </div>
           {!board && (
-            <p className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/75" data-testid="series-detail-captain">
+            <p className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 tls-type-small text-white/75" data-testid="series-detail-captain">
               Du bist Captain dieser Saison{dayLabel(access.valid_until) ? ` bis ${dayLabel(access.valid_until)}` : ""} · {publishText(access.can_publish)}.
             </p>
           )}

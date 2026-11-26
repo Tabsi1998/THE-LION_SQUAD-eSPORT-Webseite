@@ -92,29 +92,29 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
     <div className="grid lg:grid-cols-3 gap-5">
       <form onSubmit={add} className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Helfer</div>
-          <h2 className="font-heading text-lg font-bold mt-1">Helfer eintragen</h2>
-          <p className="mt-1 text-xs text-white/50">Wer eingetragen wird, bekommt eine Nachricht mit seiner Rolle und dem Weg zu „Mein Dienst“.</p>
+          <div className="tls-type-label text-[#29B6E8]">Helfer</div>
+          <h2 className="tls-type-section mt-1">Helfer eintragen</h2>
+          <p className="mt-1 tls-type-small text-white/50">Wer eingetragen wird, bekommt eine Nachricht mit seiner Rolle und dem Weg zu „Mein Dienst“.</p>
         </div>
         <PersonPicker purpose="tournament" contextId={tournamentId} value={person} onChange={setPerson} label="Person" testId="tournament-staff-person" />
         <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Rolle</div>
+          <div className="tls-type-label text-white/60 mb-1.5">Rolle</div>
           <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="tournament-staff-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {STAFF_ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           {/* Je Rolle ein Satz (#1384) - aus derselben Liste, die der Server prüft. */}
-          <p className="mt-1.5 text-xs text-white/55" data-testid="tournament-staff-role-sentence">{staffRoleSentence(form.role)}</p>
+          <p className="mt-1.5 tls-type-small text-white/55" data-testid="tournament-staff-role-sentence">{staffRoleSentence(form.role)}</p>
         </label>
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bereich</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Bereich</div>
             <select value={form.scope} onChange={(e) => setForm((x) => ({ ...x, scope: e.target.value, scope_id: "" }))} data-testid="tournament-staff-scope" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {STAFF_SCOPE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
           {form.scope !== "tournament" && (
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Welche</div>
+              <div className="tls-type-label text-white/60 mb-1.5">Welche</div>
               <select value={form.scope_id} onChange={(e) => set("scope_id", e.target.value)} data-testid="tournament-staff-scope-id" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                 <option value="">{ALL_LABELS[form.scope]}</option>
                 {(choices[form.scope] || []).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -123,15 +123,15 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
           )}
         </div>
         <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Notiz</div>
+          <div className="tls-type-label text-white/60 mb-1.5">Notiz</div>
           <input value={form.notes} onChange={(e) => set("notes", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. Samstag Vormittag" />
         </label>
-        <button disabled={saving} className="w-full min-h-[44px] px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">
+        <button disabled={saving} className="w-full min-h-[44px] px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm tls-type-small disabled:opacity-50">
           Eintragen
         </button>
       </form>
       <div className="lg:col-span-2 border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-        {staffError ? <div className="px-4 py-10 text-center text-sm text-white/55" data-testid="tournament-staff-error">{staffError}</div> : (
+        {staffError ? <div className="px-4 py-10 text-center tls-type-small text-white/55" data-testid="tournament-staff-error">{staffError}</div> : (
         <>
         {/* Am Handy (#1384): je Helfer eine Karte mit Rolle und Satz statt einer Tabelle zum Wischen. */}
         {narrow ? (
@@ -141,20 +141,20 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
               <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0">
                   <div className="font-semibold [overflow-wrap:anywhere]">{a.user?.display_name || a.user?.username || "—"}</div>
-                  {a.user?.username && <div className="text-xs text-white/40 truncate">@{a.user.username}</div>}
+                  {a.user?.username && <div className="tls-type-small text-white/40 truncate">@{a.user.username}</div>}
                 </div>
                 <StatusBadge status={a.is_active === false ? "paused" : "approved"} />
               </div>
-              <div className="text-sm">
+              <div className="tls-type-small">
                 <span className="font-bold text-[#29B6E8]">{roleLabel(a.role)}</span>
                 <span className="text-white/45"> · {scopeLabel(a.scope || "tournament")}{a.scope_id ? `: ${scopeName(a.scope, a.scope_id)}` : ""}</span>
               </div>
-              <p className="text-xs text-white/55">{staffRoleSentence(a.role)}</p>
+              <p className="tls-type-small text-white/55">{staffRoleSentence(a.role)}</p>
               <div className="flex flex-wrap gap-2 pt-1">
-                <button type="button" onClick={() => toggleActive(a)} className="min-h-[44px] px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] font-bold uppercase">
+                <button type="button" onClick={() => toggleActive(a)} className="min-h-[44px] px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">
                   {a.is_active === false ? "Aktivieren" : "Pausieren"}
                 </button>
-                <button type="button" onClick={() => remove(a)} className="min-h-[44px] px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">
+                <button type="button" onClick={() => remove(a)} className="min-h-[44px] px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label">
                   Entfernen
                 </button>
               </div>
@@ -164,8 +164,8 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
         </ul>
         ) : (
         <div className="tls-swipe pb-0">
-          <table className="w-full text-sm min-w-[760px]">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+          <table className="w-full tls-type-small min-w-[760px]">
+            <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">Person</th>
                 <th className="text-left px-4 py-3">Rolle</th>
@@ -179,26 +179,26 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                 <tr key={a.id}>
                   <td className="px-4 py-3">
                     <div className="font-semibold">{a.user?.display_name || a.user?.username || "—"}</div>
-                    {a.user?.username && <div className="text-xs text-white/40">@{a.user.username}</div>}
+                    {a.user?.username && <div className="tls-type-small text-white/40">@{a.user.username}</div>}
                   </td>
                   <td className="px-4 py-3">
                     <div>{roleLabel(a.role)}</div>
-                    <div className="text-xs text-white/45 max-w-[16rem]" data-testid={`tournament-staff-sentence-${a.id}`}>{staffRoleSentence(a.role)}</div>
+                    <div className="tls-type-small text-white/45 max-w-[16rem]" data-testid={`tournament-staff-sentence-${a.id}`}>{staffRoleSentence(a.role)}</div>
                   </td>
                   <td className="px-4 py-3">
                     <div>{scopeLabel(a.scope || "tournament")}</div>
-                    {a.scope_id ? <div className="text-xs text-white/40">{scopeName(a.scope, a.scope_id)}</div>
-                      : a.scope && a.scope !== "tournament" ? <div className="text-xs text-white/40">{ALL_LABELS[a.scope]}</div> : null}
+                    {a.scope_id ? <div className="tls-type-small text-white/40">{scopeName(a.scope, a.scope_id)}</div>
+                      : a.scope && a.scope !== "tournament" ? <div className="tls-type-small text-white/40">{ALL_LABELS[a.scope]}</div> : null}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={a.is_active === false ? "paused" : "approved"} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => toggleActive(a)} className="px-2 py-1 border border-white/15 text-white/70 rounded-sm text-[10px] font-bold uppercase">
+                      <button type="button" onClick={() => toggleActive(a)} className="px-2 py-1 border border-white/15 text-white/70 rounded-sm tls-type-label">
                         {a.is_active === false ? "Aktivieren" : "Pausieren"}
                       </button>
-                      <button type="button" onClick={() => remove(a)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">
+                      <button type="button" onClick={() => remove(a)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label">
                         Entfernen
                       </button>
                     </div>

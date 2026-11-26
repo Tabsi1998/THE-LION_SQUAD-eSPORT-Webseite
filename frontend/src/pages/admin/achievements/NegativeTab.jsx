@@ -63,14 +63,14 @@ export function NegativeTab() {
           <PersonPicker value={person} onChange={setPerson} testId="negative-person" />
           <div className="space-y-2">
             <label className="block">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Vorfall</span>
+              <span className="tls-type-label text-white/50">Vorfall</span>
               <select value={type} onChange={(e) => setType(e.target.value)} data-testid="negative-type" className={`${INPUT_CLASS} mt-1`}>
                 <option value="">— wählen —</option>
                 {types.map((t) => <option key={t.key} value={t.key}>{tierByCode[t.tier_code]?.name || t.key}</option>)}
               </select>
             </label>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz (z. B. Match) – die Person liest sie unter „Meine Strafen“" aria-label="Notiz" data-testid="negative-note" className={INPUT_CLASS} />
-            <button type="button" onClick={trigger} disabled={busy || !person || !type} data-testid="negative-submit" className="px-4 py-2 bg-[#FF3B30] text-white text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">Eintragen</button>
+            <button type="button" onClick={trigger} disabled={busy || !person || !type} data-testid="negative-submit" className="px-4 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm disabled:opacity-40">Eintragen</button>
           </div>
         </div>
       </Panel>
@@ -82,21 +82,21 @@ export function NegativeTab() {
               <div className="flex items-center gap-3">
                 <Badge material={a.material || "hidden"} art={a.art || undefined} icon={a.icon} size="sm" animate={false} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm"><span className="text-[#FF3B30] font-semibold">{a.tier_name}</span> · {a.display_name || a.username}</div>
-                  <div className="text-[11px] text-white/45">{formatWhen(a.earned_at)}{a.context?.note ? ` · „${a.context.note}“` : ""}</div>
+                  <div className="tls-type-small"><span className="text-[#FF3B30] font-semibold">{a.tier_name}</span> · {a.display_name || a.username}</div>
+                  <div className="tls-type-small text-white/45">{formatWhen(a.earned_at)}{a.context?.note ? ` · „${a.context.note}“` : ""}</div>
                 </div>
-                {removing !== a.user_id + a.tier_code && <button type="button" onClick={() => { setRemoving(a.user_id + a.tier_code); setReason(""); }} className="text-[#FF3B30] hover:underline text-xs">Entfernen</button>}
+                {removing !== a.user_id + a.tier_code && <button type="button" onClick={() => { setRemoving(a.user_id + a.tier_code); setReason(""); }} className="text-[#FF3B30] hover:underline tls-type-small">Entfernen</button>}
               </div>
               {removing === a.user_id + a.tier_code && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund" aria-label="Grund für das Entfernen" data-testid={`negative-reason-${a.tier_code}`} className={`${INPUT_CLASS} flex-1 min-w-[12rem]`} />
-                  <button type="button" onClick={() => remove(a)} data-testid={`negative-remove-${a.tier_code}`} className="px-3 py-2 bg-[#FF3B30] text-white text-[10px] font-bold uppercase tracking-widest rounded-sm">Entfernen</button>
-                  <button type="button" onClick={() => setRemoving(null)} className="text-[10px] uppercase tracking-widest text-white/50">Abbrechen</button>
+                  <button type="button" onClick={() => remove(a)} data-testid={`negative-remove-${a.tier_code}`} className="px-3 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm">Entfernen</button>
+                  <button type="button" onClick={() => setRemoving(null)} className="tls-type-label text-white/50">Abbrechen</button>
                 </div>
               )}
             </li>
           ))}
-          {!list.length && <li className="py-10 text-center text-sm text-white/40">Keine Fun-Erfolge vergeben.</li>}
+          {!list.length && <li className="py-10 text-center tls-type-small text-white/40">Keine Fun-Erfolge vergeben.</li>}
         </ul>
       </Panel>
     </div>

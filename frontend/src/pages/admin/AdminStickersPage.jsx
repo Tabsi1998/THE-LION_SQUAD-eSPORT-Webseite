@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 function errorText(err, fallback) {
   return formatApiError(err?.response?.data?.detail) || fallback;
@@ -91,16 +92,16 @@ export default function AdminStickersPage() {
   return (
     <AdminLayout>
       <div className="mb-6">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Content</span>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sticker</h1>
-        <p className="mt-2 text-white/60 text-sm max-w-2xl">
+        <span className="tls-type-label text-[#29B6E8]">Content</span>
+        <h1 className="tls-type-title mt-1"><ShortCaps>Sticker</ShortCaps></h1>
+        <p className="mt-2 text-white/60 tls-type-body max-w-2xl">
           Sticker für Team-, Turnier-, Match- und Direktchats, im Web und in der App. Eigene Pakete stehen in der Auswahl vor dem Startpaket.
         </p>
       </div>
 
       <section className="space-y-4" data-testid="sticker-custom-packs">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="font-heading text-xl font-bold uppercase">Eigene Pakete</h2>
+          <h2 className="tls-type-section">Eigene Pakete</h2>
           <form onSubmit={createPack} className="flex w-full max-w-md gap-2">
             <label className="min-w-0 flex-1">
               <span className="sr-only">Name des neuen Pakets</span>
@@ -112,7 +113,7 @@ export default function AdminStickersPage() {
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
               />
             </label>
-            <button type="submit" disabled={!newPackName.trim()} className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 text-xs disabled:opacity-45">
+            <button type="submit" disabled={!newPackName.trim()} className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-45">
               <Plus className="w-4 h-4" /> Paket anlegen
             </button>
           </form>
@@ -130,7 +131,7 @@ export default function AdminStickersPage() {
           />
         ))}
         {loaded && custom.length === 0 && (
-          <p className="border border-dashed border-white/10 rounded-sm p-6 text-sm text-white/45">
+          <p className="border border-dashed border-white/10 rounded-sm p-6 tls-type-body text-white/45">
             Noch kein eigenes Paket. Lege eins an, etwa für das Maskottchen oder Vereinsmomente.
           </p>
         )}
@@ -138,9 +139,9 @@ export default function AdminStickersPage() {
 
       <section className="mt-10 space-y-4" data-testid="sticker-builtin-packs">
         <div>
-          <h2 className="font-heading text-xl font-bold uppercase">Startpaket</h2>
+          <h2 className="tls-type-section">Startpaket</h2>
           {source && (
-            <p className="mt-1 text-xs text-white/45">
+            <p className="mt-1 tls-type-small text-white/45">
               {source.source}, {source.license}-Lizenz ·{" "}
               <a href={resolveMediaUrl(source.license_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Lizenztext</a>
               {" · "}
@@ -206,21 +207,21 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, 
           </form>
         ) : (
           <div className="min-w-0">
-            <div className="font-heading text-lg font-bold tls-wrap">{pack.name}</div>
-            <div className="text-[10px] uppercase tracking-widest text-white/45">
+            <div className="tls-type-card tls-wrap">{pack.name}</div>
+            <div className="tls-type-label text-white/45">
               {pack.stickers.length} Sticker
               {!pack.active && <span className="ml-2 font-bold text-[#FF6B61]">Nicht im Chat</span>}
             </div>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex items-center gap-2 text-xs text-white/70">
+          <label className="inline-flex items-center gap-2 tls-type-small text-white/70">
             <input type="checkbox" checked={pack.active} onChange={() => onToggle(pack)} className="accent-[#29B6E8]" />
             Im Chat anbieten
           </label>
           {!pack.builtin && (
             <>
-              <button type="button" onClick={onAdd} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 hover:bg-[#29B6E8]/10">
+              <button type="button" onClick={onAdd} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label inline-flex items-center gap-1.5 hover:bg-[#29B6E8]/10">
                 <Plus className="w-3.5 h-3.5" /> Sticker
               </button>
               <button type="button" aria-label={`${pack.name} umbenennen`} onClick={() => setDraftName(pack.name)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
@@ -257,7 +258,7 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, 
           </div>
         ))}
         {!pack.builtin && pack.stickers.length === 0 && (
-          <p className="col-span-full text-sm text-white/40">Noch leer. Ein leeres Paket erscheint nicht im Chat.</p>
+          <p className="col-span-full tls-type-small text-white/40">Noch leer. Ein leeres Paket erscheint nicht im Chat.</p>
         )}
       </div>
     </div>
@@ -316,7 +317,7 @@ function StickerForm({ pack, sticker, onClose, onSaved }) {
       {editing ? (
         <div className="flex items-center gap-3">
           <img src={resolveMediaUrl(sticker.url)} alt="" className="h-20 w-20 rounded-sm bg-black/30 object-contain p-1" />
-          <p className="text-xs text-white/45">Das Bild bleibt. Für ein anderes Bild einen neuen Sticker anlegen.</p>
+          <p className="tls-type-small text-white/45">Das Bild bleibt. Für ein anderes Bild einen neuen Sticker anlegen.</p>
         </div>
       ) : (
         <>
@@ -330,7 +331,7 @@ function StickerForm({ pack, sticker, onClose, onSaved }) {
             mediaScope="admin"
             allowLibrary
           />
-          <p className="text-xs text-white/45">Am besten PNG oder WebP mit durchsichtigem Hintergrund, etwa 512 × 512 Pixel. Leere Ränder schneidet der Upload ab.</p>
+          <p className="tls-type-small text-white/45">Am besten PNG oder WebP mit durchsichtigem Hintergrund, etwa 512 × 512 Pixel. Leere Ränder schneidet der Upload ab.</p>
         </>
       )}
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required maxLength={60} placeholder="z. B. Brüllender Löwe" testId="sticker-name" />

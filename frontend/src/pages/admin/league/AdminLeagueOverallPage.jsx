@@ -30,8 +30,8 @@ const TABS = [
   { key: "abschluss", label: "Abschluss" },
   { key: "belohnungen", label: "Belohnungen" },
 ];
-const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
-const SMALL = "tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-40";
+const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
+const SMALL = "tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-40";
 const ICON = "tls-btn tls-btn--quiet inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-30";
 
 function errorOf(failure, fallback) {
@@ -41,7 +41,7 @@ function errorOf(failure, fallback) {
 function SaveBar({ dirty, problem, saving, onSave, onDiscard, label, testId }) {
   return (
     <div className="sticky bottom-3 z-10 mt-6 flex flex-wrap items-center justify-end gap-3 rounded-sm border border-white/10 bg-[#0A0A0A]/95 p-3" data-testid={`${testId}-bar`}>
-      <span className={`mr-auto text-xs ${problem ? "text-warn" : "text-white/60"}`} role={problem ? "alert" : undefined}>{problem || (dirty ? "Nicht gespeichert." : "Gespeichert.")}</span>
+      <span className={`mr-auto tls-type-small ${problem ? "text-warn" : "text-white/60"}`} role={problem ? "alert" : undefined}>{problem || (dirty ? "Nicht gespeichert." : "Gespeichert.")}</span>
       {dirty ? <button type="button" onClick={onDiscard} className={`${BUTTON} tls-btn--quiet`} data-testid={`${testId}-discard`}>Verwerfen</button> : null}
       <button type="button" onClick={onSave} disabled={!dirty || saving || Boolean(problem)} className={`${BUTTON} tls-btn--primary`} data-testid={`${testId}-save`}>{label}</button>
     </div>
@@ -56,8 +56,8 @@ function Choice({ name, rows, value, onChange, readOnly, testId }) {
           <input type="radio" name={name} value={row.key} checked={value === row.key} disabled={readOnly} onChange={() => onChange(row.key)}
             className="mt-1 h-4 w-4 accent-[var(--tls-cyan)]" data-testid={`${testId}-${row.key}`} />
           <span>
-            <span className="block text-sm font-semibold text-white">{row.label}</span>
-            {row.hint ? <span className="block text-xs text-white/55">{row.hint}</span> : null}
+            <span className="block tls-type-small font-semibold text-white">{row.label}</span>
+            {row.hint ? <span className="block tls-type-small text-white/55">{row.hint}</span> : null}
           </span>
         </label>
       ))}
@@ -94,13 +94,13 @@ function SettingsTab({ data, onSaved }) {
   };
   return (
     <div className="space-y-6" data-testid="overall-settings">
-      {readOnly ? <p className="text-xs text-white/55" data-testid="overall-readonly">Ändern darf, wer „Season konfigurieren“ hat.</p> : null}
+      {readOnly ? <p className="tls-type-small text-white/55" data-testid="overall-readonly">Ändern darf, wer „Season konfigurieren“ hat.</p> : null}
       <FormSection title="Punkte je Season-Platz" testId="overall-points"
         hint="Jede Liga N hat ihre eigene Gesamtwertung. Gerechnet wird aus dem festen Endstand jeder Season, je Staffel – Ausgeschiedene bekommen 0, ein geteilter Platz dieselben Punkte.">
         <Choice name="points-mode" rows={POINTS_MODES} value={form.points_mode} onChange={(value) => set("points_mode", value)} readOnly={readOnly} testId="overall-points-mode" />
         {form.points_mode === "table" ? (
           <fieldset className="mt-4">
-            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Punkte für Platz</legend>
+            <legend className="tls-type-label text-white/60">Punkte für Platz</legend>
             <ol className="mt-2 flex flex-wrap gap-2" data-testid="overall-points-table">
               {form.points_table.map((value, index) => (
                 <li key={index} className="flex items-end gap-1">
@@ -147,7 +147,7 @@ function SettingsTab({ data, onSaved }) {
             const label = TIEBREAKERS.find((row) => row.key === key)?.label;
             return (
               <li key={key} className={`flex items-center gap-2 rounded-sm border p-2 ${active ? "border-white/15" : "border-dashed border-white/10 opacity-70"}`} data-testid={`overall-tiebreak-${key}`}>
-                <label className="flex min-h-11 flex-1 cursor-pointer items-center gap-3 text-sm text-white">
+                <label className="flex min-h-11 flex-1 cursor-pointer items-center gap-3 tls-type-small text-white">
                   <input type="checkbox" checked={active} disabled={readOnly} onChange={() => toggle(key)} className="h-4 w-4 accent-[var(--tls-cyan)]" />
                   {active ? <span className="w-5 text-right font-bold text-[#29B6E8]">{index + 1}.</span> : <span className="w-5" />}
                   {label}
@@ -197,7 +197,7 @@ function PeriodsTab({ data, onSaved }) {
     <div className="space-y-4" data-testid="overall-periods">
       <FormSection title="Wertungszeiträume" testId="overall-periods-section"
         hint="Welche Seasons zusammen eine Gesamtwertung bilden – etwa ein Jahr oder Season 1 bis 4. Eine Season gehört zu höchstens einem Zeitraum. Ohne Zeitraum gibt es keine Gesamtwertung.">
-        {!rows.length ? <p className="text-sm text-white/55" data-testid="overall-periods-empty">Noch kein Zeitraum.</p> : null}
+        {!rows.length ? <p className="tls-type-small text-white/55" data-testid="overall-periods-empty">Noch kein Zeitraum.</p> : null}
         <ul className="space-y-4">
           {rows.map((row, index) => {
             const locked = row.closed_levels.length > 0;
@@ -214,17 +214,17 @@ function PeriodsTab({ data, onSaved }) {
                   )}
                 </div>
                 {locked ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-[#29B6E8]" data-testid={`overall-period-locked-${index}`}>
+                  <p className="mt-2 flex items-center gap-1.5 tls-type-small text-[#29B6E8]" data-testid={`overall-period-locked-${index}`}>
                     <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Abgeschlossen ({row.closed_levels.map((level) => `Liga ${level}`).join(", ")}) – die Seasons bleiben, bis im Reiter „Abschluss“ wieder geöffnet ist.
                   </p>
                 ) : null}
                 <fieldset className="mt-3">
-                  <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Seasons</legend>
+                  <legend className="tls-type-label text-white/60">Seasons</legend>
                   <div className="mt-1 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
                     {(data.seasons || []).map((season) => {
                       const other = takenBy(rows, season.id, row.key);
                       return (
-                        <label key={season.id} className={`flex min-h-11 items-center gap-2 text-sm ${other ? "text-white/40" : "cursor-pointer text-white/85"}`}>
+                        <label key={season.id} className={`flex min-h-11 items-center gap-2 tls-type-small ${other ? "text-white/40" : "cursor-pointer text-white/85"}`}>
                           <input type="checkbox" checked={row.season_ids.includes(season.id)} disabled={readOnly || locked || Boolean(other)}
                             onChange={() => update(row.key, { season_ids: row.season_ids.includes(season.id) ? row.season_ids.filter((id) => id !== season.id) : [...row.season_ids, season.id] })}
                             className="h-4 w-4 accent-[var(--tls-cyan)]" data-testid={`overall-period-${index}-season-${season.number}`} />
@@ -260,8 +260,8 @@ function Preview({ block, seasons, kind, testId }) {
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
     <div role="region" aria-label={`${kind === "teams" ? "Co-Teams" : "Spieler"} ${block.label}`} tabIndex={0} className="tls-swipe rounded-sm border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
-      <table className="w-full text-sm tabular-nums" data-testid={testId}>
-        <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
+      <table className="w-full tls-type-small tabular-nums" data-testid={testId}>
+        <thead className="tls-type-small text-white/50">
           <tr className="border-b border-white/10">
             <th scope="col" className="py-2 pl-3 pr-1 text-left">#</th>
             <th scope="col" className="px-2 py-2 text-left">{kind === "teams" ? "Co-Team" : "Spieler"}</th>
@@ -274,8 +274,8 @@ function Preview({ block, seasons, kind, testId }) {
             <tr key={row.key || index} className="border-t border-white/5">
               <td className="py-2 pl-3 pr-1 font-bold text-white">{row.place}.</td>
               <td className="px-2 py-2 text-white [overflow-wrap:anywhere] hyphens-auto">
-                {row.name}{row.tie ? <span className="ml-2 text-[10px] font-bold uppercase text-warn">gleich</span> : null}
-                {row.lead_decision ? <span className="block text-[11px] text-white/50">{row.lead_decision.method_label}: {row.lead_decision.reason}</span> : null}
+                {row.name}{row.tie ? <span className="ml-2 tls-type-label text-warn">gleich</span> : null}
+                {row.lead_decision ? <span className="block tls-type-small text-white/50">{row.lead_decision.method_label}: {row.lead_decision.reason}</span> : null}
               </td>
               {row.seasons.map((cell, at) => (
                 <td key={cell.season_id} title={cellText(cell, columns[at]?.name)}
@@ -288,7 +288,7 @@ function Preview({ block, seasons, kind, testId }) {
           ))}
         </tbody>
       </table>
-      {!rows.length ? <p className="px-3 py-6 text-center text-sm text-white/45">Noch niemand in der Wertung.</p> : null}
+      {!rows.length ? <p className="px-3 py-6 text-center tls-type-small text-white/45">Noch niemand in der Wertung.</p> : null}
     </div>
   );
 }
@@ -317,7 +317,7 @@ function CloseSheet({ block, data, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title="Gesamtwertung abschließen" eyebrow={`${data.period.name} · ${block.label}`} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Jetzt abschließen" savingLabel="Schließe ab …" submitTestId="overall-close-confirm" testId="overall-close-sheet">
-      <div className="space-y-3 text-sm text-white/75">
+      <div className="space-y-3 tls-type-small text-white/75">
         <p>Der Endstand der Gesamtwertung wird festgehalten: Plätze, Punkte je Season, Entscheide und die Einstellungen von jetzt.</p>
         <ul className="list-disc space-y-1 pl-5 text-white/65">
           <li>Ein neuer Endstand einer Season oder geänderte Punkte ändern ihn danach nicht mehr.</li>
@@ -363,14 +363,14 @@ function ReopenSheet({ block, data, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title="Gesamtwertung wieder öffnen" eyebrow={`${data.period.name} · ${block.label}`} onClose={onClose} onSubmit={submit} saving={saving} noValidate
       submitLabel="Wieder öffnen" savingLabel="Öffne …" submitTestId="overall-reopen-confirm" testId="overall-reopen-sheet">
-      <p className="text-sm text-white/75">Die Wertung rechnet wieder aus den Endständen der Seasons. Fassung {block.final?.version} bleibt im Verlauf, die Belohnungen ruhen, bis neu abgeschlossen ist.</p>
+      <p className="tls-type-body text-white/75">Die Wertung rechnet wieder aus den Endständen der Seasons. Fassung {block.final?.version} bleibt im Verlauf, die Belohnungen ruhen, bis neu abgeschlossen ist.</p>
       <div className="mt-4">
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required placeholder="z. B. Endstand von Season 2 wurde korrigiert"
           hint="Pflicht. Steht im Verlauf und im Protokoll." testId="overall-reopen-reason" />
       </div>
       {needsEmergency ? (
         <div className="mt-4 space-y-2 rounded-sm border border-warn/40 p-3">
-          <p className="text-xs font-semibold text-white/80">Du hast selbst abgeschlossen. Wieder öffnen soll eine zweite Person.</p>
+          <p className="tls-type-small font-semibold text-white/80">Du hast selbst abgeschlossen. Wieder öffnen soll eine zweite Person.</p>
           <TextAreaField label="Grund für die Notausnahme" rows={2} value={emergencyReason} onChange={setEmergencyReason} required testId="overall-reopen-emergency" />
         </div>
       ) : null}
@@ -412,12 +412,12 @@ function DecideSheet({ block, tie, data, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title={`Platz ${tie.place} entscheiden`} eyebrow={`${data.period.name} · ${block.label}`} onClose={onClose} onSubmit={submit} saving={saving} noValidate
       submitLabel="Entscheid speichern" submitTestId="overall-decide-confirm" testId="overall-decide-sheet">
-      <p className="text-sm text-white/75">Diese Co-Teams stehen mit {tie.total} Punkten nach allen Kriterien gleich. Lege die Reihenfolge fest – sie gilt, solange genau diese Teams gleich stehen.</p>
+      <p className="tls-type-body text-white/75">Diese Co-Teams stehen mit {tie.total} Punkten nach allen Kriterien gleich. Lege die Reihenfolge fest – sie gilt, solange genau diese Teams gleich stehen.</p>
       <ol className="mt-3 space-y-2">
         {order.map((row, index) => (
           <li key={row.key} className="flex items-center gap-2 rounded-sm border border-white/10 p-2">
             <span className="w-6 text-right font-bold text-[#29B6E8]">{tie.place + index}.</span>
-            <span className="min-w-0 flex-1 break-words text-sm text-white">{row.name}</span>
+            <span className="min-w-0 flex-1 break-words tls-type-small text-white">{row.name}</span>
             <button type="button" className={ICON} disabled={index === 0} onClick={() => move(index, -1)} aria-label={`${row.name} nach oben`}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
             <button type="button" className={ICON} disabled={index === order.length - 1} onClick={() => move(index, 1)} aria-label={`${row.name} nach unten`}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
           </li>
@@ -441,21 +441,21 @@ function LevelCard({ block, data, onSheet, onUndecide }) {
   return (
     <section className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 sm:p-4" aria-label={block.label} data-testid={testId}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-heading text-lg font-black uppercase text-white">{block.label}</h3>
-        <span className={`rounded-sm border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${state.tone}`} data-testid={`${testId}-state`}>{state.label}</span>
+        <h3 className="tls-type-card text-white">{block.label}</h3>
+        <span className={`rounded-sm border px-2 py-1 tls-type-label ${state.tone}`} data-testid={`${testId}-state`}>{state.label}</span>
       </div>
       {block.closed ? (
-        <p className="mt-3 flex items-start gap-2 text-sm text-white/75"><Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
+        <p className="mt-3 flex items-start gap-2 tls-type-small text-white/75"><Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
           <span>Abgeschlossen am {finalMoment(block.final.closed_at)} von {block.final.closed_by_name} · Fassung {block.final.version}
             {block.rewards ? ` · ${block.rewards} ${block.rewards === 1 ? "Belohnung" : "Belohnungen"} vergeben` : ""}</span></p>
       ) : block.blockers.length ? (
         <ul className="mt-3 space-y-2" aria-label="Was noch fehlt" data-testid={`${testId}-blockers`}>
           {block.blockers.map((blocker) => (
-            <li key={blocker.code} className="rounded-sm border border-warn/30 bg-warn/5 p-3 text-sm" data-testid={`${testId}-blocker-${blocker.code}`}>
+            <li key={blocker.code} className="rounded-sm border border-warn/30 bg-warn/5 p-3 tls-type-small" data-testid={`${testId}-blocker-${blocker.code}`}>
               <p className="font-semibold text-white">{blocker.label}</p>
-              <p className="mt-0.5 text-xs text-white/65">{blocker.text}</p>
+              <p className="mt-0.5 tls-type-small text-white/65">{blocker.text}</p>
               {blocker.items.length ? (
-                <ul className="mt-1 space-y-0.5 text-xs">
+                <ul className="mt-1 space-y-0.5 tls-type-small">
                   {blocker.items.map((item) => (
                     <li key={item.text}>{item.url ? <Link to={item.url} className="text-[#29B6E8] hover:underline">{item.text}</Link> : item.text}</li>
                   ))}
@@ -465,7 +465,7 @@ function LevelCard({ block, data, onSheet, onUndecide }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-3 flex items-start gap-2 text-sm text-ok" data-testid={`${testId}-ready`}>
+        <p className="mt-3 flex items-start gap-2 tls-type-small text-ok" data-testid={`${testId}-ready`}>
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> Alle Seasons dieser Liga N sind abgeschlossen, Platz 1 steht fest.
         </p>
       )}
@@ -473,7 +473,7 @@ function LevelCard({ block, data, onSheet, onUndecide }) {
       {block.ties.length ? (
         <div className="mt-3 space-y-2" data-testid={`${testId}-ties`}>
           {block.ties.map((tie) => (
-            <div key={tie.place} className="flex flex-wrap items-center gap-2 rounded-sm border border-white/10 p-2 text-sm">
+            <div key={tie.place} className="flex flex-wrap items-center gap-2 rounded-sm border border-white/10 p-2 tls-type-small">
               <Scale className="h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
               <span className="min-w-0 flex-1 break-words text-white/80">Platz {tie.place}: {tie.names.join(" – ")}</span>
               {block.can_decide && !(tie.own_team && !data.superadmin) ? (
@@ -484,7 +484,7 @@ function LevelCard({ block, data, onSheet, onUndecide }) {
         </div>
       ) : null}
       {block.decisions.length ? (
-        <ul className="mt-3 space-y-1 text-xs text-white/65" data-testid={`${testId}-decisions`}>
+        <ul className="mt-3 space-y-1 tls-type-small text-white/65" data-testid={`${testId}-decisions`}>
           {block.decisions.map((decision) => (
             <li key={decision.id} className="flex flex-wrap items-center gap-2">
               <span>Entscheid ({decision.method_label}): {decision.names.join(" vor ")} – {decision.reason}</span>
@@ -496,11 +496,11 @@ function LevelCard({ block, data, onSheet, onUndecide }) {
 
       <div className="mt-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">{block.closed ? "Endstand" : "Vorschau"}</h4>
+          <h4 className="tls-type-label text-white/50">{block.closed ? "Endstand" : "Vorschau"}</h4>
           <div className="flex gap-1" role="group" aria-label="Wertung">
             {[["teams", "Co-Teams"], ["players", "Spieler"]].map(([key, text]) => (
               <button key={key} type="button" aria-pressed={kind === key} onClick={() => setKind(key)} data-testid={`${testId}-${key}`}
-                className={`min-h-11 rounded-sm border px-3 text-[11px] font-bold uppercase tracking-wider ${kind === key ? "border-[#29B6E8]/60 text-white" : "border-white/10 text-white/55"}`}>{text}</button>
+                className={`min-h-11 rounded-sm border px-3 tls-type-label ${kind === key ? "border-[#29B6E8]/60 text-white" : "border-white/10 text-white/55"}`}>{text}</button>
             ))}
           </div>
         </div>
@@ -520,18 +520,18 @@ function LevelCard({ block, data, onSheet, onUndecide }) {
           </button>
         ) : null}
         {block.closed && data.can_act && !block.can_reopen ? (
-          <p className="text-xs font-semibold text-white/80">{block.closed_by_me ? "Du hast abgeschlossen. Wieder öffnen muss eine zweite Person." : "Über dein eigenes Team entscheidet eine andere Person."}</p>
+          <p className="tls-type-small font-semibold text-white/80">{block.closed_by_me ? "Du hast abgeschlossen. Wieder öffnen muss eine zweite Person." : "Über dein eigenes Team entscheidet eine andere Person."}</p>
         ) : null}
-        {!data.can_act ? <span className="text-xs text-white/55">Abschließen und wieder öffnen darf, wer „Season konfigurieren“ hat.</span> : null}
+        {!data.can_act ? <span className="tls-type-small text-white/55">Abschließen und wieder öffnen darf, wer „Season konfigurieren“ hat.</span> : null}
       </div>
 
       {block.history.length ? (
         <div className="mt-4 border-t border-white/10 pt-3">
-          <h4 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50"><History className="h-3.5 w-3.5" aria-hidden="true" /> Verlauf</h4>
-          <ul className="space-y-1.5 text-xs text-white/70" data-testid={`${testId}-history`}>
+          <h4 className="mb-2 flex items-center gap-1.5 tls-type-label text-white/50"><History className="h-3.5 w-3.5" aria-hidden="true" /> Verlauf</h4>
+          <ul className="space-y-1.5 tls-type-small text-white/70" data-testid={`${testId}-history`}>
             {block.history.map((entry) => (
               <li key={entry.id} className="flex flex-wrap gap-x-3 gap-y-1">
-                <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${entry.active ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`}>{entry.active ? "Gilt" : "Ersetzt"}</span>
+                <span className={`rounded-sm border px-1.5 py-0.5 tls-type-label ${entry.active ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`}>{entry.active ? "Gilt" : "Ersetzt"}</span>
                 <span className="text-white">Fassung {entry.version} · {finalMoment(entry.closed_at)} · {entry.closed_by_name}</span>
                 {entry.leader ? <span>Platz 1: {entry.leader}</span> : null}
                 {entry.reopened_at ? <span className="min-w-0 break-words">wieder geöffnet von {entry.reopened_by_name}: „{entry.reopen_reason}“</span> : null}
@@ -576,7 +576,7 @@ function CloseTab({ data: settings }) {
       toast.error(errorOf(failure, "Zurücknehmen ging nicht."));
     }
   };
-  if (!periods.length) return <p className="text-sm text-white/60" data-testid="overall-close-empty">Zuerst im Reiter „Zeiträume“ einen Zeitraum mit Seasons anlegen.</p>;
+  if (!periods.length) return <p className="tls-type-small text-white/60" data-testid="overall-close-empty">Zuerst im Reiter „Zeiträume“ einen Zeitraum mit Seasons anlegen.</p>;
   return (
     <FormSection title="Abschluss der Gesamtwertung" testId="overall-close"
       hint="Abgeschlossen wird je Liga N, wenn alle Seasons des Zeitraums abgeschlossen sind. Danach steht die Wertung fest und die Belohnungen werden vergeben.">
@@ -585,16 +585,16 @@ function CloseTab({ data: settings }) {
           <SelectField label="Zeitraum" value={current} onChange={setPeriodId} options={periods.map((row) => [row.id, row.name])} testId="overall-close-period" />
         </div>
       ) : null}
-      {error && !data ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
-      {!data && !error ? <p className="text-sm text-white/45" aria-busy="true">Lade Abschluss …</p> : null}
+      {error && !data ? <p className="tls-type-small text-warn" role="alert">{error}</p> : null}
+      {!data && !error ? <p className="tls-type-small text-white/45" aria-busy="true">Lade Abschluss …</p> : null}
       {data ? (
         <>
-          <p className="text-sm text-white/75" data-testid="overall-close-summary">
+          <p className="tls-type-small text-white/75" data-testid="overall-close-summary">
             {data.period.name}: {data.seasons.map((row) => row.name).join(", ") || "keine Season"}. {rulesLine(data.settings)} {tiebreakLine(data.settings)}
           </p>
           <div className="mt-4 space-y-4">
             {data.levels.length ? data.levels.map((block) => <LevelCard key={block.level} block={block} data={data} onSheet={setSheet} onUndecide={undecide} />)
-              : <p className="text-sm text-white/55">Noch kein Endstand einer Season in diesem Zeitraum.</p>}
+              : <p className="tls-type-small text-white/55">Noch kein Endstand einer Season in diesem Zeitraum.</p>}
           </div>
           {sheet?.kind === "close" ? <CloseSheet block={sheet.block} data={data} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
           {sheet?.kind === "reopen" ? <ReopenSheet block={sheet.block} data={data} superadmin={data.superadmin} onClose={() => setSheet(null)} onDone={done} /> : null}
@@ -631,7 +631,7 @@ function RewardsTab({ data, onSaved }) {
       <FormSection title="Belohnungen der Gesamtwertung" testId="overall-rewards-section"
         hint="Wie die Belohnungen einer Season: Banner, Emblem, Medaille oder Titel je Platz, Platzbereich oder für alle. Vergeben beim Abschluss jeder Liga N – etwa „Gesamtsieger 2027“ für Platz 1.">
         <fieldset>
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Spieler-Belohnungen gehen an</legend>
+          <legend className="tls-type-label text-white/60">Spieler-Belohnungen gehen an</legend>
           <div className="mt-1">
             <Choice name="overall-reward-players" value={form.reward_players} readOnly={readOnly} testId="overall-rewards-basis"
               rows={PLAYER_BASIS.map((row) => ({ ...row, hint: row.key === "fielded" ? "Wer in der Spielerwertung Punkte für das Co-Team geholt hat." : "Alle im Kader des Co-Teams beim Abschluss." }))}
@@ -677,18 +677,18 @@ export default function AdminLeagueOverallPage() {
   } : {};
   return (
     <AdminLayout>
-      <Link to="/admin/leagues" data-testid="overall-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+      <Link to="/admin/leagues" data-testid="overall-back" className="inline-flex items-center gap-1.5 tls-type-label text-white/50 hover:text-[#29B6E8]">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> Liga
       </Link>
-      {error ? <p className="mt-6 text-sm text-warn" role="alert" data-testid="overall-error">{error}</p> : null}
+      {error ? <p className="mt-6 tls-type-small text-warn" role="alert" data-testid="overall-error">{error}</p> : null}
       {!data && !error ? <div className="mt-6 h-40 animate-pulse rounded-sm bg-white/5" aria-busy="true" aria-label="Lade Gesamtwertung" /> : null}
       {data ? (
         <>
           <div className="mb-5 mt-3 flex min-w-0 items-center gap-3" style={accentStyle(data.league.accent_color)}>
             <LeagueEmblem src={data.league.emblem_url} size={48} />
             <div className="min-w-0">
-              <h1 className="break-words font-heading text-3xl font-black uppercase md:text-4xl">{data.league.name} · Gesamtwertung</h1>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-white/60" data-testid="overall-head">
+              <h1 className="break-words tls-type-title">{data.league.name} · Gesamtwertung</h1>
+              <p className="mt-1 flex items-center gap-1.5 tls-type-small text-white/60" data-testid="overall-head">
                 <Gift className="h-3.5 w-3.5" aria-hidden="true" />
                 {data.enabled ? `${data.periods.length} ${data.periods.length === 1 ? "Zeitraum" : "Zeiträume"} · je Liga N eine eigene Wertung` : "Noch kein Zeitraum – die Ligaseite zeigt keine Gesamtwertung."}
               </p>

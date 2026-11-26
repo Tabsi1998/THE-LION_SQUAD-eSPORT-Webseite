@@ -24,7 +24,7 @@ import { viennaDate } from "@/lib/vienna";
 import { toast } from "sonner";
 
 const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
-const CHIP = "inline-flex max-w-full items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[11px] cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8]";
+const CHIP = "inline-flex max-w-full items-center gap-1.5 rounded-sm border px-2 py-0.5 tls-type-small cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8]";
 const ON = "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white";
 const OFF = "border-white/10 bg-[#0A0A0A] text-white/70 hover:border-white/25";
 
@@ -35,7 +35,7 @@ function ModePicker({ modes, value, onChange, label }) {
   const toggle = (key) => onChange(value.includes(key) ? value.filter((item) => item !== key) : [...value, key]);
   return (
     <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={label}>
-      <span className="text-[11px] text-white/55">Gilt in</span>
+      <span className="tls-type-small text-white/55">Gilt in</span>
       <label className={`${CHIP} ${value.length ? OFF : ON}`}>
         <input type="checkbox" checked={!value.length} onChange={() => onChange([])} className="accent-[#29B6E8]" />
         allen Modi
@@ -53,7 +53,7 @@ function ModePicker({ modes, value, onChange, label }) {
 // Notiz des Eintrags aus der Bibliothek (#2302): klein und leise unter dem Namen, nur in der Verwaltung; leer = nichts.
 function ItemNote({ item, className = "" }) {
   if (!item.note) return null;
-  return <p className={`${className} text-[11px] italic text-white/50 break-words`} data-testid={`season-bans-note-${item.id}`}>{item.note}</p>;
+  return <p className={`${className} tls-type-small italic text-white/50 break-words`} data-testid={`season-bans-note-${item.id}`}>{item.note}</p>;
 }
 
 function versionLabel(row) {
@@ -83,7 +83,7 @@ function VersionCompare({ seasonId, versions }) {
   };
   return (
     <details className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="season-bans-compare">
-      <summary className="cursor-pointer select-none rounded-sm text-xs font-bold uppercase tracking-widest text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+      <summary className="cursor-pointer select-none rounded-sm tls-type-label text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
         Versionen vergleichen
       </summary>
       <div className="mt-3 space-y-3">
@@ -91,13 +91,13 @@ function VersionCompare({ seasonId, versions }) {
           <SelectField label="Von Version" value={base} onChange={setBase} options={options} testId="season-bans-compare-base" />
           <SelectField label="Zu Version" value={target} onChange={setTarget} options={options} testId="season-bans-compare-target" />
           <button type="button" onClick={run} disabled={!base || !target} data-testid="season-bans-compare-run"
-            className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50">
             <GitCompare className="h-3.5 w-3.5" aria-hidden="true" /> Vergleichen
           </button>
         </div>
-        {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
-        {diff ? (diff.same ? <p className="text-sm text-white/60" data-testid="season-bans-compare-same">Beide Versionen sperren dasselbe.</p> : (
-          <ul className="space-y-1 text-sm break-words" data-testid="season-bans-compare-result" aria-live="polite">
+        {error ? <p className="tls-type-small text-warn" role="alert">{error}</p> : null}
+        {diff ? (diff.same ? <p className="tls-type-small text-white/60" data-testid="season-bans-compare-same">Beide Versionen sperren dasselbe.</p> : (
+          <ul className="space-y-1 tls-type-small break-words" data-testid="season-bans-compare-result" aria-live="polite">
             {diff.added.map((row) => <li key={`a-${row.kind}-${row.item_id || row.subcategory}`} className="text-[#29B6E8]">Neu gesperrt: {line(row)}</li>)}
             {diff.changed.map((row) => <li key={`c-${row.kind}-${row.item_id || row.subcategory}`} className="text-white/85">Geändert: {line(row)} <span className="text-white/50">(vorher {line(row.before)})</span></li>)}
             {diff.removed.map((row) => <li key={`r-${row.kind}-${row.item_id || row.subcategory}`} className="text-warn">Wieder erlaubt: {line(row)}</li>)}
@@ -111,16 +111,16 @@ function VersionCompare({ seasonId, versions }) {
 function RulesHint({ rules }) {
   if (!rules?.uses_block) {
     return (
-      <p className="text-xs text-white/60" data-testid="season-bans-rules-none">
+      <p className="tls-type-small text-white/60" data-testid="season-bans-rules-none">
         Ins Regelwerk kommt die Liste mit dem Baustein „Sperrliste“ (etwa als Anlage A); jede Fassung hält ihren Stand fest.
       </p>
     );
   }
-  if (!rules.outdated) return <p className="text-xs text-white/60" data-testid="season-bans-rules-ok">Das Regelwerk (Version {rules.version}) zeigt diesen Stand.</p>;
+  if (!rules.outdated) return <p className="tls-type-small text-white/60" data-testid="season-bans-rules-ok">Das Regelwerk (Version {rules.version}) zeigt diesen Stand.</p>;
   return (
-    <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-warn" data-testid="season-bans-rules-outdated">
+    <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-warn" data-testid="season-bans-rules-outdated">
       <span>Das Regelwerk (Version {rules.version}) zeigt noch die alte Liste. Die Unterschiede sind dort markiert.</span>
-      <Link to={rules.admin_url} className="tls-btn tls-btn--secondary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Neue Version vorbereiten</Link>
+      <Link to={rules.admin_url} className="tls-btn tls-btn--secondary rounded-sm px-3 py-1.5 tls-type-label">Neue Version vorbereiten</Link>
     </div>
   );
 }
@@ -141,22 +141,22 @@ function AttachmentLine({ item, weapon, row, everywhere, viaClass, kept, modes, 
           <input type="checkbox" checked={chosen || (fixed && !locked)} disabled={fixed || (blocked && !chosen)} onChange={onToggle} className="accent-[#FF9F0A]"
             aria-label={`${item.name} an ${weapon.name} sperren`} data-testid={`season-bans-attachment-toggle-${weapon.id}-${item.id}`} />
           <EquipmentThumb src={item.image_url} sizes="56px" className="w-14 shrink-0" />
-          <span className="min-w-0 text-sm font-semibold leading-snug break-words">
+          <span className="min-w-0 tls-type-small font-semibold leading-snug break-words">
             {item.name}
-            {statusOf(item) === "inactive" ? <span className="ml-1.5 text-[11px] font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
+            {statusOf(item) === "inactive" ? <span className="ml-1.5 tls-type-small font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
           </span>
         </label>
         {chosen && !fixed && statusOf(item) === "active" ? (
           <button type="button" onClick={() => onEverywhere(value)} data-testid={`season-bans-everywhere-${weapon.id}-${item.id}`}
-            className="tls-btn tls-btn--quiet rounded-sm px-2 py-1 text-[11px] font-semibold">
+            className="tls-btn tls-btn--quiet rounded-sm px-2 py-1 tls-type-small font-semibold">
             An allen Waffen sperren
           </button>
         ) : null}
       </div>
       <ItemNote item={item} className="mt-1" />
-      {viaClass ? <p className="mt-1 text-[11px] text-warn">Mit der ganzen Klasse gesperrt</p> : null}
+      {viaClass ? <p className="mt-1 tls-type-small text-warn">Mit der ganzen Klasse gesperrt</p> : null}
       {everywhere && !viaClass ? (
-        <p className="mt-1 text-[11px] text-warn">{everywhere.modes.length ? `An allen Waffen gesperrt in ${modeNames(everywhere.modes, modes)}` : "An allen Waffen gesperrt"}</p>
+        <p className="mt-1 tls-type-small text-warn">{everywhere.modes.length ? `An allen Waffen gesperrt in ${modeNames(everywhere.modes, modes)}` : "An allen Waffen gesperrt"}</p>
       ) : null}
       {chosen && !fixed && modes.length ? (
         <div className="mt-1.5"><ModePicker modes={modes} value={value} onChange={onModes} label={`Modi für ${item.name} an ${weapon.name}`} /></div>
@@ -191,10 +191,10 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
   return (
     <div className="mt-2 space-y-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-2.5" data-testid={`season-bans-attachments-${weapon.id}`}>
       {lockedText ? (
-        <p className="text-[11px] text-warn" role="status" data-testid={`season-bans-attachments-locked-${weapon.id}`}>{lockedText}</p>
+        <p className="tls-type-small text-warn" role="status" data-testid={`season-bans-attachments-locked-${weapon.id}`}>{lockedText}</p>
       ) : null}
-      <p className="text-[11px] text-white/60">Passende Aufsätze an „{weapon.name}“ – angehakt ist gesperrt, alle anderen bleiben erlaubt.</p>
-      {!slots.length ? <p className="text-xs text-white/60">Zu dieser Waffe passt noch kein Aufsatz.</p> : null}
+      <p className="tls-type-small text-white/60">Passende Aufsätze an „{weapon.name}“ – angehakt ist gesperrt, alle anderen bleiben erlaubt.</p>
+      {!slots.length ? <p className="tls-type-small text-white/60">Zu dieser Waffe passt noch kein Aufsatz.</p> : null}
       {slots.map((slot) => {
         // Ein einziger Slot ist gleich offen - einklappen bringt da nichts.
         const key = `slot:${weapon.id}:${slot.key}`;
@@ -206,10 +206,10 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
             <FoldButton open={open} onToggle={() => fold.toggle(key, single)} controls={bodyId} testId={`season-bans-slot-toggle-${weapon.id}-${slot.key}`}
               className="w-full py-1">
               <SubcategoryIcon src={slot.icon_url} className="h-4 w-4" />
-              <span className="min-w-0 break-words text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]" data-testid="season-bans-slot-label">
+              <span className="min-w-0 break-words tls-type-label text-[#29B6E8]" data-testid="season-bans-slot-label">
                 {slot.label || NO_SUBCATEGORY}
               </span>
-              <span className="text-[11px] tabular-nums text-white/50">
+              <span className="tls-type-small tabular-nums text-white/50">
                 {countText(slot.items.length, "Aufsatz", "Aufsätze")}<BannedNote count={bannedAttachmentCount(rows, weapon.id, slot.items, weapon)} />
               </span>
             </FoldButton>
@@ -230,7 +230,7 @@ function WeaponAttachments({ weapon, attachments, categories, rows, row, keptIds
       })}
       {classLabel && !lockedText ? (
         <button type="button" onClick={onCopyToClass} data-testid={`season-bans-copy-class-${weapon.id}`}
-          className="tls-btn tls-btn--secondary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
+          className="tls-btn tls-btn--secondary rounded-sm px-3 py-1.5 tls-type-label">
           Für alle {classLabel} übernehmen
         </button>
       ) : null}
@@ -247,12 +247,12 @@ function ClassHead({ sub, count, shown, banned, filtering, row, modes, open, onT
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <FoldButton open={open} onToggle={onToggle} controls={controls} testId={`${testId}-fold`} className="flex-1 py-0.5">
           <SubcategoryIcon src={sub.icon_url} />
-          <span className="min-w-0 break-words text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{sub.label}</span>
-          <span className="text-[11px] font-semibold tabular-nums text-white/50" data-testid={`${testId}-count`}>
+          <span className="min-w-0 break-words tls-type-label text-[#29B6E8]">{sub.label}</span>
+          <span className="tls-type-small font-semibold tabular-nums text-white/50" data-testid={`${testId}-count`}>
             {amountText(shown, count, "Eintrag", "Einträge", filtering)}<BannedNote count={banned} />
           </span>
         </FoldButton>
-        <label className={`inline-flex cursor-pointer select-none items-center gap-2 rounded-sm border px-2.5 py-1 text-xs font-semibold focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-warn/60 bg-warn/10 text-warn" : "border-white/15 bg-[#0A0A0A] text-white/75 hover:border-white/30"}`}>
+        <label className={`inline-flex cursor-pointer select-none items-center gap-2 rounded-sm border px-2.5 py-1 tls-type-small font-semibold focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-warn/60 bg-warn/10 text-warn" : "border-white/15 bg-[#0A0A0A] text-white/75 hover:border-white/30"}`}>
           <input type="checkbox" checked={on} onChange={() => onChange(on ? null : { modes: [] })} className="accent-[#FF9F0A]"
             aria-label={`Ganze Klasse ${sub.label} sperren`} data-testid={`${testId}-toggle`} />
           Ganze Klasse sperren
@@ -261,7 +261,7 @@ function ClassHead({ sub, count, shown, banned, filtering, row, modes, open, onT
       {on ? (
         <div className="mt-2 space-y-1.5">
           {modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onChange({ modes: value })} label={`Modi für die Klasse ${sub.label}`} /> : null}
-          <p className="text-[11px] text-white/60">Gilt für alle Einträge der Klasse – auch für später angelegte.</p>
+          <p className="tls-type-small text-white/60">Gilt für alle Einträge der Klasse – auch für später angelegte.</p>
         </div>
       ) : null}
     </div>
@@ -294,24 +294,24 @@ function ItemLine({ item, role, row, classBan, attachmentRow, attachments, kept,
           <label className={`flex items-start gap-2 ${(blocked && !banned) || viaClass ? "cursor-not-allowed text-white/70" : "cursor-pointer text-white"}`}>
             <input type="checkbox" checked={banned} disabled={(blocked && !banned) || viaClass} onChange={() => onItem(row ? null : { modes: [] })}
               className="mt-0.5 accent-[#FF9F0A]" aria-label={`${item.name} sperren`} data-testid={`season-bans-toggle-${item.id}`} />
-            <span className="min-w-0 text-sm font-semibold leading-snug break-words">
+            <span className="min-w-0 tls-type-small font-semibold leading-snug break-words">
               {item.name}
-              {statusOf(item) === "inactive" ? <span className="ml-1.5 text-[11px] font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
+              {statusOf(item) === "inactive" ? <span className="ml-1.5 tls-type-small font-normal text-white/55">inaktiv{blocked ? " – nicht neu sperrbar" : ""}</span> : null}
             </span>
           </label>
           <ItemNote item={item} />
           {viaClass ? (
-            <p className="text-[11px] text-warn" data-testid={`season-bans-via-class-${item.id}`}>
+            <p className="tls-type-small text-warn" data-testid={`season-bans-via-class-${item.id}`}>
               Mit der ganzen Klasse gesperrt{row ? " – die Einzel-Sperre entfällt beim Speichern" : ""}
             </p>
           ) : null}
           {classBan && !viaClass ? (
-            <p className="text-[11px] text-white/60" data-testid={`season-bans-via-class-${item.id}`}>Klasse gesperrt in {modeNames(classBan.modes, modes)} – einzeln zusätzlich möglich</p>
+            <p className="tls-type-small text-white/60" data-testid={`season-bans-via-class-${item.id}`}>Klasse gesperrt in {modeNames(classBan.modes, modes)} – einzeln zusätzlich möglich</p>
           ) : null}
           {row && !viaClass && modes.length ? <ModePicker modes={modes} value={row.modes} onChange={(value) => onItem({ modes: value })} label={`Modi für ${item.name}`} /> : null}
           {role === "weapon" ? (
             <button type="button" onClick={onToggleOpen} aria-expanded={open} aria-controls={boxId} data-testid={`season-bans-open-${item.id}`}
-              className="inline-flex items-center gap-1 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+              className="inline-flex items-center gap-1 rounded-sm tls-type-label text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
               {countText(attachments.length, "Aufsatz", "Aufsätze")}{attachmentCount ? ` · ${attachmentCount} gesperrt` : ""}
             </button>
@@ -379,7 +379,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
     return (weapon) => all.filter((item) => fitsWeapon(item, weapon));
   }, [categories, library]);
 
-  if (error) return <p className="text-sm text-warn" role="alert" data-testid={`${testId}-error`}>{error}</p>;
+  if (error) return <p className="tls-type-small text-warn" role="alert" data-testid={`${testId}-error`}>{error}</p>;
   if (!data) return null;
   const list = data.list;
   const changed = !sameRows(rows, saved, library) || dropped.length > 0;
@@ -483,7 +483,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
   const itemList = (category, items) => (items.length ? (
     <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">{items.map((item) => itemLine(category, item))}</ul>
   ) : (
-    <p className="rounded-sm border border-dashed border-white/15 px-3 py-2 text-xs text-white/55">
+    <p className="rounded-sm border border-dashed border-white/15 px-3 py-2 tls-type-small text-white/55">
       Noch kein Eintrag in dieser Klasse – eine Sperre gilt ab dem ersten.
     </p>
   ));
@@ -492,23 +492,23 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
     <section className="space-y-4 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby={`${testId}-title`} data-testid={testId}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={`${testId}-title`} className="flex items-center gap-2 font-heading text-xl font-bold uppercase">
+          <h2 id={`${testId}-title`} className="flex items-center gap-2 tls-type-section">
             <Ban className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" /> Sperrliste
           </h2>
-          <p className="mt-1 text-sm text-white/65" data-testid={`${testId}-head`}>
+          <p className="mt-1 tls-type-small text-white/65" data-testid={`${testId}-head`}>
             {list ? `Version ${list.version} · ${countText(list.entries.length, "Zeile", "Zeilen")}` : "Noch keine – alles ist erlaubt."}
             {data.staffeln ? ` · ${countText(data.staffeln, "Staffel bekommt", "Staffeln bekommen")} Änderungen beim Übertragen.` : ""}
           </p>
         </div>
         {data.game ? (
-          <Link to={gamePageUrl(data.game.id, "ausruestung")} className="text-[11px] font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]" data-testid={`${testId}-library`}>
+          <Link to={gamePageUrl(data.game.id, "ausruestung")} className="tls-type-label text-white/60 hover:text-[#29B6E8]" data-testid={`${testId}-library`}>
             Bibliothek pflegen
           </Link>
         ) : null}
       </div>
       <RulesHint rules={data.rules} />
       {list?.outdated_item_ids?.length ? (
-        <p className="text-xs text-white/65" data-testid={`${testId}-outdated`}>
+        <p className="tls-type-small text-white/65" data-testid={`${testId}-outdated`}>
           In der Bibliothek geändert seit dieser Version: {countText(list.outdated_item_ids.length, "Eintrag", "Einträge")}. Neu speichern übernimmt Namen und Bilder.
         </p>
       ) : null}
@@ -516,15 +516,15 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
       {!canEdit ? (
         list ? <LoadoutBansView list={list} title="Gesperrt" className="" headingId={`${testId}-view`} testId={`${testId}-view`} /> : null
       ) : !data.game ? (
-        <p className="text-sm text-white/60">Die Liga hat kein Spiel – ohne Spiel gibt es keine Sperrliste.</p>
+        <p className="tls-type-small text-white/60">Die Liga hat kein Spiel – ohne Spiel gibt es keine Sperrliste.</p>
       ) : !library.length ? (
-        <p className="rounded-sm border border-dashed border-white/15 px-3 py-4 text-sm text-white/65" data-testid={`${testId}-empty-library`}>
+        <p className="rounded-sm border border-dashed border-white/15 px-3 py-4 tls-type-body text-white/65" data-testid={`${testId}-empty-library`}>
           Für {data.game.name} gibt es noch keine Ausrüstung. Lege sie in der Bibliothek an – mit Bild, damit Regelwerk und Ligaseite sie zeigen.
         </p>
       ) : (
         <>
           {dropped.length ? (
-            <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" role="status" data-testid={`${testId}-dropped`}>
+            <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-warn" role="status" data-testid={`${testId}-dropped`}>
               Fällt beim Speichern weg, weil archiviert oder gelöscht: {dropped.join(", ")}.
             </p>
           ) : null}
@@ -535,7 +535,7 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                 data-testid={`${testId}-search`}
                 className="w-full rounded-sm border border-white/15 bg-[#0A0A0A] py-2 pl-8 pr-3 text-sm text-white placeholder:text-white/45 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" />
             </label>
-            <label className="inline-flex items-center gap-2 text-xs text-white/70">
+            <label className="inline-flex items-center gap-2 tls-type-small text-white/70">
               <input type="checkbox" checked={onlyBanned} onChange={(event) => setOnlyBanned(event.target.checked)} className="accent-[#29B6E8]" data-testid={`${testId}-only-banned`} />
               Nur gesperrte ({bannedCount})
             </label>
@@ -544,19 +544,19 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
           <div className="tls-swipe flex gap-2 pb-1" role="group" aria-label="Kategorie wählen">
             {[{ key: "", label: "Alle" }, ...categories].map((category) => (
               <button key={category.key || "alle"} type="button" onClick={() => setOnly(category.key)} aria-pressed={only === category.key}
-                className={`shrink-0 rounded-sm border px-2.5 py-1 text-xs focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] ${only === category.key ? ON : OFF}`}>
+                className={`shrink-0 rounded-sm border px-2.5 py-1 tls-type-small focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] ${only === category.key ? ON : OFF}`}>
                 {category.label}
               </button>
             ))}
           </div>
           {newInClasses.length ? (
-            <p className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-xs text-white/70" role="status" data-testid={`${testId}-class-new`}>
+            <p className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 tls-type-small text-white/70" role="status" data-testid={`${testId}-class-new`}>
               Seit dieser Version neu in gesperrten Klassen und schon mitgesperrt: {newInClasses.map((row) => `${row.label}: ${row.names.join(", ")}`).join(" · ")}.
             </p>
           ) : null}
           {(data.unusable_attachments || []).length ? (
             // Nr. 81 (Codex Runde 1): Aufsätze ohne erlaubte Waffe sind nicht spielbar - Regelwerk, Liga- und Matchseite zeigen sie nicht.
-            <section className="space-y-0.5 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs" role="status" data-testid={`${testId}-unusable`}>
+            <section className="space-y-0.5 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small" role="status" data-testid={`${testId}-unusable`}>
               <p className="font-semibold text-warn">Diese Aufsätze erscheinen nicht als erlaubt</p>
               <p className="text-white/70 break-words">
                 {data.unusable_attachments.map((row) => `${row.name} (${row.reason})`).join(", ")}. Nach der gespeicherten Liste passen sie an
@@ -577,11 +577,11 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
               const bodyId = `${testId}-body-${category.key}`;
               return (
                 <div key={category.key} data-testid={`${testId}-group-${category.key}`}>
-                  <h3 className={`${catOpen ? "mb-3" : ""} border-b border-white/10 pb-2 font-heading text-base font-bold uppercase text-white`}>
+                  <h3 className={`${catOpen ? "mb-3" : ""} border-b border-white/10 pb-2 tls-type-card text-white`}>
                     <FoldButton open={catOpen} onToggle={() => fold.toggle(catKey, catBase)} controls={bodyId} testId={`${testId}-fold-${category.key}`}
                       className="w-full">
                       <span className="min-w-0 break-words">{category.label}</span>
-                      <span className="text-[11px] font-semibold normal-case tracking-normal tabular-nums text-white/50" data-testid={`${testId}-count-${category.key}`}>
+                      <span className="tls-type-small font-semibold tabular-nums text-white/50" data-testid={`${testId}-count-${category.key}`}>
                         {amountText(shown, all.length, "Eintrag", "Einträge", filtering)}<BannedNote count={bannedIn(all)} />
                       </span>
                     </FoldButton>
@@ -604,8 +604,8 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                               <div className={`${secOpen ? "mb-2" : ""} rounded-sm border border-white/10 bg-[#0D0D0D] px-2.5 py-2`}>
                                 <FoldButton open={secOpen} onToggle={() => fold.toggle(secKey)} controls={secId} testId={`${testId}-fold-${category.key}-ohne`}
                                   className="w-full py-0.5">
-                                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">{NO_SUBCATEGORY}</span>
-                                  <span className="text-[11px] font-semibold tabular-nums text-white/50">
+                                  <span className="tls-type-label text-white/60">{NO_SUBCATEGORY}</span>
+                                  <span className="tls-type-small font-semibold tabular-nums text-white/50">
                                     {amountText(items.length, members.length, "Eintrag", "Einträge", filtering)}<BannedNote count={bannedIn(members)} />
                                   </span>
                                 </FoldButton>
@@ -619,22 +619,22 @@ export function SeasonLoadoutBansPanel({ seasonId, canEdit, onSaved, testId = "s
                 </div>
               );
             })}
-            {!groups.length ? <p className="text-sm text-white/60">Nichts gefunden.</p> : null}
+            {!groups.length ? <p className="tls-type-small text-white/60">Nichts gefunden.</p> : null}
           </div>
-          <p className="text-xs text-white/60">
+          <p className="tls-type-small text-white/60">
             Eine ganze Klasse gesperrt gilt für alle ihre Einträge, auch später angelegte. Ein Aufsatz in seiner Kategorie gesperrt gilt an
             jeder Waffe; an einer einzelnen Waffe sperrst du ihn, indem du bei der Waffe die Aufsätze aufklappst.
           </p>
           <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#121212]/95 px-4 py-3 md:-mx-5 md:px-5">
             <button type="button" onClick={save} disabled={saving || !changed} data-testid={`${testId}-save`}
-              className="tls-btn tls-btn--primary rounded-sm px-5 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--primary rounded-sm px-5 py-2 tls-type-label disabled:opacity-50">
               {saving ? "Speichere …" : list ? "Neue Version speichern" : "Sperrliste speichern"}
             </button>
             {list ? (
               <button type="button" onClick={clear} data-testid={`${testId}-clear`}
-                className="tls-btn tls-btn--quiet rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">Entfernen</button>
+                className="tls-btn tls-btn--quiet rounded-sm px-3 py-2 tls-type-label">Entfernen</button>
             ) : null}
-            <span className="text-xs text-white/60" aria-live="polite">{changed ? `${countText(bannedCount, "Zeile", "Zeilen")} – noch nicht gespeichert` : "Keine Änderung"}</span>
+            <span className="tls-type-small text-white/60" aria-live="polite">{changed ? `${countText(bannedCount, "Zeile", "Zeilen")} – noch nicht gespeichert` : "Keine Änderung"}</span>
           </div>
         </>
       )}

@@ -27,7 +27,7 @@ function StateBadge({ job, testId }) {
   const style = STATE_STYLE[job.status] || STATE_STYLE.skipped;
   const Icon = style.icon;
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: style.color }} data-testid={testId}>
+    <span className="inline-flex items-center gap-1 tls-type-small font-bold whitespace-nowrap" style={{ color: style.color }} data-testid={testId}>
       <Icon className="w-3.5 h-3.5" /> {STATUS_LABELS[job.status] || "Unbekannt"}
     </span>
   );
@@ -36,9 +36,9 @@ function StateBadge({ job, testId }) {
 function Detail({ job, testId }) {
   return (
     <>
-      <div className="mt-1 text-xs text-white/60" data-testid={testId}>{queueDetail(job, when)}</div>
+      <div className="mt-1 tls-type-small text-white/60" data-testid={testId}>{queueDetail(job, when)}</div>
       {job.last_error && !mailErrorKnown(job.last_error) && (
-        <div className="mt-0.5 text-[11px] text-white/35 break-words">Meldung des Servers: {String(job.last_error).slice(0, 200)}</div>
+        <div className="mt-0.5 tls-type-small text-white/35 break-words">Meldung des Servers: {String(job.last_error).slice(0, 200)}</div>
       )}
     </>
   );
@@ -60,11 +60,11 @@ function Recipient({ job, shown, onReveal, onHide, testId }) {
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="break-all" data-testid={`${testId}-${job.id}`}>{full || job.to_masked || "–"}</span>
       {job.to_masked && (full ? (
-        <button type="button" onClick={() => onHide(job.id)} data-testid={`${testId}-hide-${job.id}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/50 hover:text-white">
+        <button type="button" onClick={() => onHide(job.id)} data-testid={`${testId}-hide-${job.id}`} className="inline-flex items-center gap-1 tls-type-small font-semibold text-white/50 hover:text-white">
           <EyeOff className="w-3 h-3" aria-hidden="true" /> Verbergen
         </button>
       ) : (
-        <button type="button" onClick={() => onReveal(job.id)} data-testid={`${testId}-reveal-${job.id}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#29B6E8] hover:text-white">
+        <button type="button" onClick={() => onReveal(job.id)} data-testid={`${testId}-reveal-${job.id}`} className="inline-flex items-center gap-1 tls-type-small font-semibold text-[#29B6E8] hover:text-white">
           <Eye className="w-3 h-3" aria-hidden="true" /> Adresse zeigen
         </button>
       ))}
@@ -101,18 +101,18 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
       <div className="flex flex-col items-end gap-2">
         <div className="flex flex-wrap justify-end gap-2">
           {allowed.retry && (
-            <button type="button" onClick={() => retryJob(job.id)} data-testid={`${prefix}-retry-${job.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#29B6E8] text-black text-[11px] font-bold uppercase tracking-wider rounded-sm whitespace-nowrap">
+            <button type="button" onClick={() => retryJob(job.id)} data-testid={`${prefix}-retry-${job.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm whitespace-nowrap">
               <RefreshCw className="w-3 h-3" /> Nochmal versuchen
             </button>
           )}
           {allowed.remove && (
-            <button type="button" onClick={() => setMenuFor(open ? null : `${prefix}-${job.id}`)} aria-expanded={open} data-testid={`${prefix}-more-${job.id}`} className="inline-flex items-center gap-1 px-3 py-1.5 border border-white/10 text-white/60 hover:text-white rounded-sm text-[11px] font-bold uppercase tracking-wider">
+            <button type="button" onClick={() => setMenuFor(open ? null : `${prefix}-${job.id}`)} aria-expanded={open} data-testid={`${prefix}-more-${job.id}`} className="inline-flex items-center gap-1 px-3 py-1.5 border border-white/10 text-white/60 hover:text-white rounded-sm tls-type-label">
               Mehr <ChevronDown className={`w-3 h-3 transition ${open ? "rotate-180" : ""}`} />
             </button>
           )}
         </div>
         {open && (
-          <button type="button" onClick={() => { setMenuFor(null); deleteJob(job); }} data-testid={`${prefix}-delete-${job.id}`} className="inline-flex items-center gap-1 text-xs text-[#FF6B6B] hover:underline">
+          <button type="button" onClick={() => { setMenuFor(null); deleteJob(job); }} data-testid={`${prefix}-delete-${job.id}`} className="inline-flex items-center gap-1 tls-type-small text-[#FF6B6B] hover:underline">
             <Trash2 className="w-3 h-3" /> Löschen
           </button>
         )}
@@ -132,13 +132,13 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
             data-testid={`queue-stat-${key}`}
             className={`border rounded-sm p-3 text-left transition ${queueFilter === key ? "border-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 bg-[#121212] hover:border-white/25"}`}
           >
-            <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{STATUS_LABELS[key]}</div>
-            <div className="mt-1 font-heading text-2xl font-black tabular-nums" style={{ color: STATE_STYLE[key].color }}>{queueCounts[key] || 0}</div>
+            <div className="tls-type-label text-white/45">{STATUS_LABELS[key]}</div>
+            <div className="mt-1 tls-type-section tls-type-num" style={{ color: STATE_STYLE[key].color }}>{queueCounts[key] || 0}</div>
           </button>
         ))}
       </div>
       {(stale > 0 || latest) && (
-        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/70" data-testid="queue-hint">
+        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/70" data-testid="queue-hint">
           <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-1">Hinweis</div>
           {stale > 0 && (
             <div>
@@ -173,27 +173,27 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
                 className="bg-[#0A0A0A] border border-white/10 pl-8 pr-3 py-2 rounded-sm text-sm w-56"
               />
             </label>
-            <button type="submit" data-testid="queue-search-submit" className="px-3 py-2 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">Suchen</button>
+            <button type="submit" data-testid="queue-search-submit" className="px-3 py-2 border border-white/15 text-white/70 hover:text-white tls-type-label rounded-sm">Suchen</button>
             {queueSearch && (
-              <button type="button" onClick={() => { setTerm(""); searchQueue(""); }} data-testid="queue-search-clear" className="text-xs text-white/50 hover:text-white">Suche leeren</button>
+              <button type="button" onClick={() => { setTerm(""); searchQueue(""); }} data-testid="queue-search-clear" className="tls-type-small text-white/50 hover:text-white">Suche leeren</button>
             )}
           </form>
         )}
-        <span className="text-xs text-white/50" data-testid="queue-count">
+        <span className="tls-type-small text-white/50" data-testid="queue-count">
           {filteredQueue.length} von {queue.length} Mails · {queueStats?.due_pending || 0} jetzt fällig · der Versand läuft alle 30 Sekunden von selbst
         </span>
       </div>
 
       {filteredQueue.length === 0 ? (
-        <div className="border border-white/10 bg-[#121212] rounded-sm py-10 text-center text-sm text-white/40" data-testid="queue-empty">
+        <div className="border border-white/10 bg-[#121212] rounded-sm py-10 text-center tls-type-small text-white/40" data-testid="queue-empty">
           {queueSearch && queue.length === 0 ? "Keine Mail an diese Adresse." : queue.length === 0 ? "Die Warteschlange ist leer." : "Keine Mails mit diesem Stand."}
         </div>
       ) : (
         <>
           <div className="hidden lg:block border border-white/10 bg-[#121212] rounded-sm overflow-hidden" data-testid="queue-table">
             <div className="tls-swipe pb-0">
-              <table className="w-full text-sm min-w-[680px]">
-                <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+              <table className="w-full tls-type-small min-w-[680px]">
+                <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                   <tr>
                     <th className="text-left px-4 py-3">Erstellt</th>
                     <th className="text-left px-4 py-3">An</th>
@@ -205,9 +205,9 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
                 <tbody className="divide-y divide-white/5">
                   {filteredQueue.map((job) => (
                     <tr key={job.id} data-testid={`queue-row-${job.id}`} className="align-top">
-                      <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{when(job.created_at)}</td>
+                      <td className="px-4 py-3 text-white/50 tls-type-small whitespace-nowrap">{when(job.created_at)}</td>
                       <td className="px-4 py-3 max-w-[240px]"><Recipient job={job} shown={shown} onReveal={reveal} onHide={hide} testId="queue-to" /></td>
-                      <td className="px-4 py-3 text-xs max-w-[260px]"><MailText job={job} /></td>
+                      <td className="px-4 py-3 tls-type-small max-w-[260px]"><MailText job={job} /></td>
                       <td className="px-4 py-3 max-w-[300px]">
                         <StateBadge job={job} testId={`queue-state-${job.id}`} />
                         <Detail job={job} testId={`queue-detail-${job.id}`} />
@@ -224,10 +224,10 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
               <li key={job.id} className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`queue-card-${job.id}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <StateBadge job={job} testId={`queue-card-state-${job.id}`} />
-                  <span className="text-[11px] text-white/45">{when(job.created_at)}</span>
+                  <span className="tls-type-small text-white/45">{when(job.created_at)}</span>
                 </div>
-                <div className="mt-2 text-sm"><Recipient job={job} shown={shown} onReveal={reveal} onHide={hide} testId="queue-card-to" /></div>
-                <div className="mt-1 text-xs min-w-0"><MailText job={job} /></div>
+                <div className="mt-2 tls-type-small"><Recipient job={job} shown={shown} onReveal={reveal} onHide={hide} testId="queue-card-to" /></div>
+                <div className="mt-1 tls-type-small min-w-0"><MailText job={job} /></div>
                 <Detail job={job} testId={`queue-card-detail-${job.id}`} />
                 {queueActions(job).retry || queueActions(job).remove ? <div className="mt-3">{actions(job, "queue-card")}</div> : null}
               </li>

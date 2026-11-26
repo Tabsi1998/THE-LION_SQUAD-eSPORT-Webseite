@@ -15,6 +15,7 @@ import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, 
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet, Star } from "lucide-react";
 import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
 import { seasonAnchorUrl } from "@/lib/seasonTabs";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 function StatusDot({ ok }) {
   const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
@@ -345,14 +346,14 @@ export default function AdminDashboardPage() {
     <AdminLayout>
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Control Room</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1" data-testid="admin-dashboard-heading">Kommando&shy;zentrale</h1>
+          <span className="tls-type-label text-[#29B6E8]">Control Room</span>
+          <h1 className="tls-type-title mt-1" data-testid="admin-dashboard-heading"><ShortCaps>Kommando&shy;zentrale</ShortCaps></h1>
         </div>
         <button
           type="button"
           onClick={load}
           data-testid="dashboard-refresh"
-          className="inline-flex items-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white transition"
+          className="inline-flex items-center gap-2 rounded-sm border border-white/10 px-3 py-2 tls-type-label text-white/55 hover:border-[#29B6E8]/50 hover:text-white transition"
           title="Live-Zahlen aktualisieren"
         >
           <RefreshCw className="w-3.5 h-3.5 text-[#29B6E8]" />
@@ -363,7 +364,7 @@ export default function AdminDashboardPage() {
       {/* Entscheidungen der Leitung (#2194): stehen ganz oben. */}
       {hasDutyAttention(duty) && (
         <section className="mb-6" data-testid="dashboard-attention" aria-labelledby="dashboard-attention-heading">
-          <h2 id="dashboard-attention-heading" className="mb-3 font-heading font-bold uppercase text-lg">Braucht deine Entscheidung</h2>
+          <h2 id="dashboard-attention-heading" className="mb-3 tls-type-section">Braucht deine Entscheidung</h2>
           <DutyAttention duty={duty} testId="dashboard-attention-list" />
         </section>
       )}
@@ -372,8 +373,8 @@ export default function AdminDashboardPage() {
       {dutyRows.length > 0 && (
         <section className="mb-6" data-testid="dashboard-duty" aria-labelledby="dashboard-duty-heading">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 id="dashboard-duty-heading" className="font-heading font-bold uppercase text-lg">Deine Einsätze</h2>
-            <Link to="/admin/dienst" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Mein Dienst</Link>
+            <h2 id="dashboard-duty-heading" className="tls-type-section">Deine Einsätze</h2>
+            <Link to="/admin/dienst" className="tls-type-label text-[#29B6E8] hover:text-white">Mein Dienst</Link>
           </div>
           <DutyList rows={dutyRows} testId="dashboard-duty-list" />
         </section>
@@ -385,12 +386,12 @@ export default function AdminDashboardPage() {
         {liveChips.map((c) => (
           <Link key={c.label} to={c.to} className="border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/40 transition group">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/55">
+              <span className="inline-flex items-center gap-2 tls-type-label text-white/55">
                 <c.icon className="w-3.5 h-3.5 text-white/45 group-hover:text-[#29B6E8] transition" />{c.label}
               </span>
               <StatusDot ok={c.ok} />
             </div>
-            <div className="mt-2 text-xs text-white/70 tls-wrap">{c.detail}</div>
+            <div className="mt-2 tls-type-small text-white/70 tls-wrap">{c.detail}</div>
           </Link>
         ))}
       </div>
@@ -402,18 +403,18 @@ export default function AdminDashboardPage() {
             <div className="flex items-center gap-3">
               <Sparkles className="w-5 h-5 text-[#29B6E8] shrink-0" />
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Plattform-Setup {setupStatus.health_score ?? 0}%</div>
-                <div className="font-heading text-base mt-0.5">
+                <div className="tls-type-label text-[#29B6E8]">Plattform-Setup {setupStatus.health_score ?? 0}%</div>
+                <div className="tls-type-card mt-0.5">
                   {setupStatus.completed ? "Setup prüfen — es fehlen noch sinnvolle Konfigurationspunkte" : "Setup-Wizard ausführen — Branding, SMTP & Admin-Passwort in 4 Schritten"}
                 </div>
                 {(setupStatus.missing || []).length > 0 && (
-                  <div className="text-xs text-white/45 mt-1">
+                  <div className="tls-type-small text-white/45 mt-1">
                     Offen: {(setupStatus.missing || []).slice(0, 3).map((m) => m.label).join(", ")}
                   </div>
                 )}
               </div>
             </div>
-            <div className="text-[#29B6E8] text-2xl group-hover:translate-x-1 transition-transform">→</div>
+            <div className="text-[#29B6E8] tls-type-section group-hover:translate-x-1 transition-transform">→</div>
           </div>
         </Link>
       )}
@@ -421,12 +422,12 @@ export default function AdminDashboardPage() {
       <div className="mb-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-tasks">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Tageszentrale</div>
-            <h2 className="font-heading font-bold uppercase text-lg mt-1">
+            <div className="tls-type-label text-[#29B6E8]">Tageszentrale</div>
+            <h2 className="tls-type-section mt-1">
               Offene Aufgaben{activeTaskItems.length > 0 ? ` · ${activeTaskItems.length}` : ""}
             </h2>
           </div>
-          <span className="text-xs text-white/40">{viennaDate(new Date())}</span>
+          <span className="tls-type-small text-white/40">{viennaDate(new Date())}</span>
         </div>
         {activeTaskItems.length > 0 ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -436,28 +437,28 @@ export default function AdminDashboardPage() {
                   <item.icon className="w-4 h-4" style={{ color: item.tone }} />
                   <span className="text-[#29B6E8] group-hover:translate-x-0.5 transition-transform">→</span>
                 </div>
-                <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{item.label}</div>
-                <div className="mt-1 text-xs text-white/45 leading-relaxed">{item.detail}</div>
+                <div className="mt-3 tls-type-label text-white">{item.label}</div>
+                <div className="mt-1 tls-type-small text-white/45 leading-relaxed">{item.detail}</div>
               </Link>
             ))}
           </div>
         ) : (
           <div data-testid="dashboard-tasks-empty" className="flex items-start gap-3 rounded-sm border border-[#00FF88]/25 bg-[#00FF88]/5 px-4 py-3">
             <ShieldCheck className="w-4 h-4 text-[#00FF88] shrink-0 mt-0.5" />
-            <span className="text-sm text-white/70">Nichts offen. Keine Konflikte, Anträge, Gewinne oder Fehler warten gerade auf dich.</span>
+            <span className="tls-type-small text-white/70">Nichts offen. Keine Konflikte, Anträge, Gewinne oder Fehler warten gerade auf dich.</span>
           </div>
         )}
         {/* Termine heute (#227): Matches, Check-ins und Events des Vereinstags als Liste, nicht nur die Zahl - nur für die
             Turnierleitung, der Server schickt sie sonst nicht (#1353). */}
         {Array.isArray(data?.today) && (
         <div className="mt-5 border-t border-white/10 pt-4" data-testid="dashboard-today">
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 mb-2">Termine heute</div>
+          <div className="tls-type-label text-white/45 mb-2">Termine heute</div>
           {today.length ? (
             <ul className="divide-y divide-white/5">
               {today.map((item, index) => (
-                <li key={`${item.kind}-${item.url}-${index}`} className="py-2 flex items-center gap-3 text-sm">
+                <li key={`${item.kind}-${item.url}-${index}`} className="py-2 flex items-center gap-3 tls-type-small">
                   <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? viennaTime(item.at, { timeStyle: "short" }) : "–"}</span>
-                  <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? "#FFD700" : "#29B6E8" }}>
+                  <span className="shrink-0 tls-type-label" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? "#FFD700" : "#29B6E8" }}>
                     {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
                   </span>
                   {may(item.url) ? (
@@ -465,18 +466,18 @@ export default function AdminDashboardPage() {
                   ) : (
                     <span className="min-w-0 flex-1 tls-wrap text-white">{item.title}</span>
                   )}
-                  {item.detail && <span className="text-xs text-white/40 shrink-0">{item.detail}</span>}
+                  {item.detail && <span className="tls-type-small text-white/40 shrink-0">{item.detail}</span>}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-white/45">Heute steht nichts an – keine Matches, Check-ins oder Events.</p>
+            <p className="tls-type-small text-white/45">Heute steht nichts an – keine Matches, Check-ins oder Events.</p>
           )}
         </div>
         )}
         {secondaryTaskItems.length > 0 && (
           <details className="mt-4 border-t border-white/10 pt-4 group">
-            <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">
+            <summary className="cursor-pointer list-none tls-type-label text-white/45 hover:text-white inline-flex items-center gap-2">
               Weitere Werkzeuge <span className="text-[#29B6E8] group-open:rotate-90 transition-transform">→</span>
             </summary>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -484,7 +485,7 @@ export default function AdminDashboardPage() {
                 <Link
                   key={item.label}
                   to={item.to}
-                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 tls-type-label text-white/55 hover:border-[#29B6E8]/50 hover:text-white"
                 >
                   <item.icon className="w-3.5 h-3.5" style={{ color: item.tone }} />
                   {item.label}
@@ -497,7 +498,7 @@ export default function AdminDashboardPage() {
 
       {quickActions.length > 0 && (
         <div className="mb-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-quick-actions">
-          <h2 className="font-heading font-bold uppercase text-lg mb-3">Schnellzugriff</h2>
+          <h2 className="tls-type-section mb-3">Schnellzugriff</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {quickActions.map((action) => (
               <Link
@@ -505,8 +506,8 @@ export default function AdminDashboardPage() {
                 to={action.to}
                 data-testid={action.testId}
                 className={action.primary
-                  ? "px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] text-sm uppercase tracking-wider font-bold rounded-sm hover:bg-[#29B6E8]/10"
-                  : "px-4 py-3 border border-white/10 text-white text-sm uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/40"}
+                  ? "px-4 py-3 border border-[#29B6E8]/40 text-[#29B6E8] tls-type-label rounded-sm hover:bg-[#29B6E8]/10"
+                  : "px-4 py-3 border border-white/10 text-white tls-type-label rounded-sm hover:border-[#29B6E8]/40"}
               >
                 {action.label}
               </Link>
@@ -517,16 +518,16 @@ export default function AdminDashboardPage() {
 
       {kpis.length > 0 && (
       <div data-testid="dashboard-kpis">
-        <h2 className="font-heading font-bold uppercase text-lg mb-3">Zahlen im Überblick</h2>
+        <h2 className="tls-type-section mb-3">Zahlen im Überblick</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map((k) => {
             const tile = (
               <>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold">{k.label}</span>
+                  <span className="tls-type-label text-white/50">{k.label}</span>
                   <k.icon className="w-4 h-4" style={{ color: k.color }} />
                 </div>
-                <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
+                <div className="mt-3 tls-type-title tls-type-num text-white">{k.value ?? "—"}</div>
               </>
             );
             const look = "border border-white/10 rounded-sm bg-[#121212] p-4 hover:border-[#29B6E8]/40 transition";
@@ -542,28 +543,28 @@ export default function AdminDashboardPage() {
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-growth-widget">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold inline-flex items-center gap-2">
+            <div className="tls-type-label text-[#29B6E8] inline-flex items-center gap-2">
               <TrendingUp className="w-3.5 h-3.5" /> Wachstum · letzte 30 Tage
             </div>
-            <h2 className="font-heading font-bold uppercase text-lg mt-1">Logins, Konten & Vereinsmitglieder</h2>
+            <h2 className="tls-type-section mt-1">Logins, Konten & Vereinsmitglieder</h2>
           </div>
           {/* Am Handy als Kacheln untereinander (2 x 2), ab sm in einer Zeile wie bisher. */}
           <div className="grid grid-cols-2 gap-4 w-full sm:w-auto sm:flex sm:gap-5 sm:text-right">
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Logins</div>
-              <div className="font-display font-bold text-2xl text-[#29B6E8] tabular-nums">{totalLogins30d}</div>
+              <div className="tls-type-label text-white/45">Logins</div>
+              <div className="tls-type-section tls-type-num text-[#29B6E8]">{totalLogins30d}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Neue Konten</div>
-              <div className="font-display font-bold text-2xl text-[#00FF88] tabular-nums" data-testid="growth-new-accounts">{newUsers30d}</div>
+              <div className="tls-type-label text-white/45">Neue Konten</div>
+              <div className="tls-type-section tls-type-num text-[#00FF88]" data-testid="growth-new-accounts">{newUsers30d}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Konten gesamt</div>
-              <div className="font-display font-bold text-2xl text-[#FFD700] tabular-nums" data-testid="growth-total-accounts">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
+              <div className="tls-type-label text-white/45">Konten gesamt</div>
+              <div className="tls-type-section tls-type-num text-[#FFD700]" data-testid="growth-total-accounts">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Neue Vereinsmitglieder</div>
-              <div className="font-display font-bold text-2xl text-white tabular-nums" data-testid="growth-new-club-members">{newClubMembers30d ?? "—"}</div>
+              <div className="tls-type-label text-white/45">Neue Vereinsmitglieder</div>
+              <div className="tls-type-section tls-type-num text-white" data-testid="growth-new-club-members">{newClubMembers30d ?? "—"}</div>
             </div>
           </div>
         </div>
@@ -595,7 +596,7 @@ export default function AdminDashboardPage() {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-3 flex flex-wrap gap-4 text-[10px] uppercase tracking-widest font-bold">
+        <div className="mt-3 flex flex-wrap gap-4 tls-type-label">
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#29B6E8]" /> Logins / Tag</span>
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#00FF88]" /> Neue Konten / Tag</span>
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#FFD700]" /> Konten gesamt</span>
@@ -607,10 +608,10 @@ export default function AdminDashboardPage() {
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-settings-hub">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Einstellungen-Zentrale</div>
-            <h2 className="font-heading font-bold uppercase text-lg mt-1">Alles konfigurieren</h2>
+            <div className="tls-type-label text-[#29B6E8]">Einstellungen-Zentrale</div>
+            <h2 className="tls-type-section mt-1">Alles konfigurieren</h2>
           </div>
-          {may("/admin/integrations") && <Link to="/admin/integrations" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>}
+          {may("/admin/integrations") && <Link to="/admin/integrations" className="tls-type-label text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
           {settingsHub.map((s) => (
@@ -619,8 +620,8 @@ export default function AdminDashboardPage() {
                 <s.icon className="w-4 h-4 text-[#29B6E8]" />
                 {s.ok !== undefined ? <StatusDot ok={s.ok} /> : <span className="text-[#29B6E8] opacity-0 group-hover:opacity-100 transition">→</span>}
               </div>
-              <div className="mt-3 text-xs font-bold uppercase tracking-wider text-white">{s.label}</div>
-              <div className="mt-1 text-xs text-white/45 leading-relaxed tls-wrap">{s.detail}</div>
+              <div className="mt-3 tls-type-label text-white">{s.label}</div>
+              <div className="mt-1 tls-type-small text-white/45 leading-relaxed tls-wrap">{s.detail}</div>
             </Link>
           ))}
         </div>
@@ -631,14 +632,14 @@ export default function AdminDashboardPage() {
       {Array.isArray(data?.recent_audit_logs) && (
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-audit-log">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
-          {may("/admin/ops") && <Link to="/admin/ops?tab=events" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>}
+          <h2 className="tls-type-section flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
+          {may("/admin/ops") && <Link to="/admin/ops?tab=events" className="tls-type-label text-[#29B6E8] hover:text-white">Alle Logs</Link>}
         </div>
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 tls-type-small">
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
             <div key={i} className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
               <span className="text-white/80 tls-wrap">{l.action}</span>
-              <span className="text-white/40 text-xs shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
+              <span className="text-white/40 tls-type-small shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
             </div>
           ))}
           {data.recent_audit_logs.length === 0 && <div className="text-white/40">Keine Einträge.</div>}

@@ -77,8 +77,8 @@ export default function AdminEventEditPage() {
     return (
       <AdminLayout>
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50" data-testid="event-missing">
-          <div className="font-heading font-bold text-white">Event nicht gefunden</div>
-          <p className="mt-2 text-sm">Vielleicht wurde es gelöscht. <Link to="/admin/events" className="text-[#9F7AEA] hover:underline">Zurück zur Liste</Link></p>
+          <div className="font-bold text-white">Event nicht gefunden</div>
+          <p className="mt-2 tls-type-small">Vielleicht wurde es gelöscht. <Link to="/admin/events" className="text-[#9F7AEA] hover:underline">Zurück zur Liste</Link></p>
         </div>
       </AdminLayout>
     );
@@ -333,7 +333,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
             {/* Mit externem Anmeldelink zählen wir keine Plätze (#2127, EV11). */}
             {form.has_registration && form.registration_url
-              ? <p className="text-xs text-white/45" data-testid="event-external-no-seats">Externer Anmeldelink: Plätze und Warteliste führt die andere Seite.</p>
+              ? <p className="tls-type-small text-white/45" data-testid="event-external-no-seats">Externer Anmeldelink: Plätze und Warteliste führt die andere Seite.</p>
               : <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />}
           </FormSection>
           <DistributeBox kind="event" itemId={event?.id} title={event?.name}>
@@ -356,7 +356,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
           <MarkdownEditor value={form.description} onChange={(v) => set("description", v)} rows={5} testId="event-description" />
         </FieldLabel>
         {descriptionEchoesTitle(form.name, form.description) ? (
-          <p className="text-xs text-[#FF9F43]" data-testid="event-description-echo">
+          <p className="tls-type-small text-[#FF9F43]" data-testid="event-description-echo">
             Die Beschreibung beginnt mit dem Titel. Auf der Event-Seite steht der Titel schon groß im Kopf – die erste Zeile kann weg.
           </p>
         ) : null}
@@ -373,7 +373,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
 
       <FormSection title={eventMode === "online" ? "Veranstalter" : "Ort und Veranstalter"} accent={ACCENT}>
         {/* Online braucht es weder Ort noch Adresse noch Karte (#2111, W3). */}
-        {eventMode === "online" && <p className="text-xs text-white/45" data-testid="event-online-no-place">Online-Event – Ort, Adresse und Karte entfallen.</p>}
+        {eventMode === "online" && <p className="tls-type-small text-white/45" data-testid="event-online-no-place">Online-Event – Ort, Adresse und Karte entfallen.</p>}
         {eventMode !== "online" && <EventLocationsSection value={locationsForm} onChange={setLocationsForm} />}
         {/* „Ort“ hieß bisher zweideutig; es ist der Name des Veranstaltungsorts. Die Karte sucht die Adresse (#204). */}
         {eventMode !== "online" && !usesLocationList && (
@@ -445,7 +445,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
         </FieldLabel>
         {/* Event als Klammer (#1371): Turniere und Fast Laps werden hier angelegt oder hinzugefügt - nur hier. */}
         <div className="space-y-2">
-          <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Turniere und Fast Laps</div>
+          <div className="tls-type-label text-white/60">Turniere und Fast Laps</div>
           <EventProgramPanel eventId={event?.id} program={program} failed={programFailed} reload={reloadProgram} onEmbed={insertProgramEmbed} />
         </div>
       </FormSection>
@@ -487,9 +487,9 @@ function EventSponsorsInfo({ isNew, sponsors, clearOwn, onClearOwn }) {
   const names = (sponsors?.items || []).map((item) => item.name).filter(Boolean);
   return (
     <div className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] space-y-2" data-testid="event-sponsors">
-      <div className="text-[11px] uppercase tracking-widest font-bold text-white/60">Event-Sponsoren</div>
+      <div className="tls-type-label text-white/60">Event-Sponsoren</div>
       {!isNew && sponsors && (
-        <p className="text-sm text-white/75" data-testid="event-sponsors-list">
+        <p className="tls-type-small text-white/75" data-testid="event-sponsors-list">
           {names.length ? `Erscheinen beim Event: ${names.join(", ")}.` : "Beim Event erscheinen gerade keine Sponsoren."}
         </p>
       )}
@@ -502,7 +502,7 @@ function EventSponsorsInfo({ isNew, sponsors, clearOwn, onClearOwn }) {
           testId="event-sponsors-clear-own"
         />
       )}
-      <p className="text-[11px] text-white/45">
+      <p className="tls-type-small text-white/45">
         Welche Sponsoren bei welchem Event erscheinen, legt die Redaktion beim Sponsor fest: bei allen Events oder bei ausgewählten.
       </p>
     </div>

@@ -48,11 +48,11 @@ function StaffelBracketPanel({ tournamentId }) {
       .catch(() => alive && setFailed(true));
     return () => { alive = false; };
   }, [tournamentId]);
-  if (failed) return <p className="text-sm text-warn" role="alert">Der Baum ließ sich nicht laden.</p>;
-  if (!data) return <p className="text-sm text-white/45" aria-busy="true">Lade Baum …</p>;
+  if (failed) return <p className="tls-type-small text-warn" role="alert">Der Baum ließ sich nicht laden.</p>;
+  if (!data) return <p className="tls-type-small text-white/45" aria-busy="true">Lade Baum …</p>;
   return (
     <div className="space-y-3" data-testid="staffel-bracket">
-      <p className="text-sm text-white/65">Die Setzliste kommt aus dem Endstand der regulären Staffeln. Neu berechnen und abschließen: Reiter „Abschluss“ der Season.</p>
+      <p className="tls-type-body text-white/65">Die Setzliste kommt aus dem Endstand der regulären Staffeln. Neu berechnen und abschließen: Reiter „Abschluss“ der Season.</p>
       <BracketTree data={data} quietSections />
     </div>
   );
@@ -75,7 +75,7 @@ function Breadcrumbs({ tournament }) {
   const crumb = "inline-flex min-h-[44px] items-center hover:text-[#29B6E8] [overflow-wrap:anywhere]";
   return (
     <nav aria-label="Brotkrumen" data-testid="staffel-breadcrumbs">
-      <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs font-bold uppercase tracking-wider text-white/60">
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1.5 tls-type-small font-bold text-white/60">
         <li><Link to="/admin/leagues" className={crumb} data-testid="staffel-crumb-leagues">Liga</Link></li>
         {links.league_name ? (
           <>
@@ -181,7 +181,7 @@ function StaffelPage({ tournamentId }) {
   if (!t) {
     return (
       <AdminLayout>
-        {error ? <p className="p-6 text-sm text-warn" role="alert" data-testid="staffel-error">{error}</p> : <div className="p-6"><SkeletonDetailHeader label="Lade Staffel" /></div>}
+        {error ? <p className="p-6 tls-type-small text-warn" role="alert" data-testid="staffel-error">{error}</p> : <div className="p-6"><SkeletonDetailHeader label="Lade Staffel" /></div>}
       </AdminLayout>
     );
   }
@@ -189,8 +189,8 @@ function StaffelPage({ tournamentId }) {
     return (
       <AdminLayout>
         <div className="max-w-xl space-y-3 p-2" data-testid="staffel-not-league">
-          <p className="text-sm text-white/70">„{t.title}“ ist ein Turnier, keine Liga-Staffel.</p>
-          <Link to={`/admin/tournaments/${encodeURIComponent(t.id)}`} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center rounded-sm px-4 text-xs font-bold uppercase tracking-wider">Zur Turnierverwaltung</Link>
+          <p className="tls-type-small text-white/70">„{t.title}“ ist ein Turnier, keine Liga-Staffel.</p>
+          <Link to={`/admin/tournaments/${encodeURIComponent(t.id)}`} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center rounded-sm px-4 tls-type-label">Zur Turnierverwaltung</Link>
         </div>
       </AdminLayout>
     );
@@ -198,7 +198,7 @@ function StaffelPage({ tournamentId }) {
   if (!(t.league_capabilities || []).length) {
     return (
       <AdminLayout>
-        <p className="max-w-xl p-2 text-sm text-warn" role="alert" data-testid="staffel-no-right">{NO_LEAGUE_RIGHT}</p>
+        <p className="max-w-xl p-2 tls-type-small text-warn" role="alert" data-testid="staffel-no-right">{NO_LEAGUE_RIGHT}</p>
       </AdminLayout>
     );
   }
@@ -209,12 +209,12 @@ function StaffelPage({ tournamentId }) {
   // Ladefehler bei schon geladener Staffel: ein sichtbarer Hinweis mit „Nochmal versuchen“ statt stiller Leere.
   const loadNotice = error ? (
     <div role="alert" className="mb-5 flex flex-col gap-3 rounded-sm border border-warn/40 bg-warn/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="staffel-load-error">
-      <p className="min-w-0 text-sm text-white/85 [overflow-wrap:anywhere]">
+      <p className="min-w-0 tls-type-small text-white/85 [overflow-wrap:anywhere]">
         {lists ? "Neu laden hat nicht geklappt – was hier steht, kann veraltet sein." : "Co-Teams und Spiele ließen sich nicht laden – darum stehen hier noch keine Teams und Zahlen."}
         <span className="block text-white/60">{error}</span>
       </p>
       <button type="button" onClick={loadSafely} data-testid="staffel-retry"
-        className="tls-btn tls-btn--secondary inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-sm px-4 text-xs font-bold uppercase tracking-wider">
+        className="tls-btn tls-btn--secondary inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-sm px-4 tls-type-label">
         Nochmal versuchen
       </button>
     </div>
@@ -242,16 +242,16 @@ function StaffelPage({ tournamentId }) {
     <AdminLayout>
       <Breadcrumbs tournament={t} />
       <header className="mt-3 mb-5 min-w-0">
-        <h1 className="font-heading text-3xl font-black uppercase break-words [overflow-wrap:anywhere] md:text-4xl" data-testid="staffel-title">{staffelLabel(t)}</h1>
+        <h1 className="tls-type-title break-words [overflow-wrap:anywhere]" data-testid="staffel-title">{staffelLabel(t)}</h1>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <span className="inline-flex" data-testid="staffel-stand"><StaffelStand tournament={t} /></span>
-          {t.locked_at ? <span className="rounded-sm border border-[#FFD700]/40 px-2 py-[3px] text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">Gesperrt</span> : null}
+          {t.locked_at ? <span className="rounded-sm border border-[#FFD700]/40 px-2 py-[3px] tls-type-label text-[#FFD700]">Gesperrt</span> : null}
         </div>
       </header>
 
       {loadNotice}
       <AdminTabBar tabs={tabs} active={tab} onSelect={go} idBase={idBase} label="Bereiche der Staffel" testPrefix="staffel" />
-      {!lists && !error ? <p className="text-sm text-white/60" data-testid="staffel-lists-loading">Lade Co-Teams und Spiele …</p> : null}
+      {!lists && !error ? <p className="tls-type-small text-white/60" data-testid="staffel-lists-loading">Lade Co-Teams und Spiele …</p> : null}
       {lists && TABS.map((row) => (row.key === tab ? (
         <div key={row.key} role="tabpanel" id={`${idBase}-panel-${row.key}`} aria-labelledby={`${idBase}-tab-${row.key}`} data-testid={`staffel-panel-${row.key}`} className="min-w-0">
           {panels[row.key]()}

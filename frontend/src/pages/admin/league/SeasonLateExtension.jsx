@@ -6,7 +6,7 @@ import { api, formatApiError } from "@/lib/api";
 import { TextField } from "@/components/tls/FormFields";
 import { fromViennaInput, viennaDateTime } from "@/lib/vienna";
 
-const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const REASON_MIN = 5;
 
@@ -44,7 +44,7 @@ export function SeasonLateExtension({ seasonId, extension, onSaved }) {
   return (
     <div className="space-y-2 border-l-2 border-[#29B6E8]/40 pl-3" data-testid="season-late-extension" role="presentation" onKeyDown={onKeyDown}>
       {extension?.until ? (
-        <p className="text-xs text-white/70" data-testid="season-late-extension-current">
+        <p className="tls-type-small text-white/70" data-testid="season-late-extension-current">
           Verlängert bis {viennaDateTime(extension.until, WHEN)} Uhr. Grund: {extension.reason}
         </p>
       ) : null}

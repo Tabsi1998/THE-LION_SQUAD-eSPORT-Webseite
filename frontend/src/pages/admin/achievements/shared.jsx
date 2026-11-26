@@ -135,11 +135,11 @@ export function Panel({ title, hint, icon: Icon, accent = "#FFD700", actions, ch
         <header className="px-4 sm:px-5 pt-4 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             {title && (
-              <h2 className="text-[11px] font-bold uppercase tracking-widest text-white/80 inline-flex items-center gap-2">
+              <h2 className="tls-type-label text-white/80 inline-flex items-center gap-2">
                 {Icon && <Icon className="w-3.5 h-3.5" style={{ color: accent }} />} {title}
               </h2>
             )}
-            {hint && <p className="mt-1 text-xs text-white/50 max-w-2xl">{hint}</p>}
+            {hint && <p className="mt-1 tls-type-small text-white/50 max-w-2xl">{hint}</p>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
@@ -154,9 +154,9 @@ export function Stat({ label, value, hint, accent = "#FFD700", testId }) {
   const wordy = typeof value === "string" && value.length > 7;
   return (
     <div className="border border-white/10 bg-[#0F0F10] rounded-sm px-4 py-3 min-w-0" data-testid={testId}>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</div>
-      <div className={`mt-1 font-heading font-black tabular-nums break-words ${wordy ? "text-lg leading-tight" : "text-2xl tls-wrap"}`} style={{ color: accent }}>{value}</div>
-      {hint && <div className="mt-0.5 text-[11px] text-white/50">{hint}</div>}
+      <div className="tls-type-label text-white/45">{label}</div>
+      <div className={`mt-1 break-words ${wordy ? "tls-type-card leading-tight" : "tls-type-section tls-type-num tls-wrap"}`} style={{ color: accent }}>{value}</div>
+      {hint && <div className="mt-0.5 tls-type-small text-white/50">{hint}</div>}
     </div>
   );
 }
@@ -164,7 +164,7 @@ export function Stat({ label, value, hint, accent = "#FFD700", testId }) {
 /** Datei wählen - ein eigener Knopf statt des Browser-Felds (das spricht sonst die Sprache des Browsers). */
 export function FilePick({ label = "Datei wählen", accept, onFile, testId }) {
   return (
-    <label className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 text-white/70 hover:text-white text-[10px] font-bold uppercase tracking-widest rounded-sm cursor-pointer focus-within:ring-1 focus-within:ring-[#29B6E8]">
+    <label className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 text-white/70 hover:text-white tls-type-label rounded-sm cursor-pointer focus-within:ring-1 focus-within:ring-[#29B6E8]">
       {label}
       <input type="file" accept={accept} onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} data-testid={testId} className="sr-only" />
     </label>
@@ -177,7 +177,7 @@ export function Bars({ rows, accent = "#29B6E8", testId, unit = "" }) {
   return (
     <div className="space-y-1.5" data-testid={testId}>
       {rows.map((row) => (
-        <div key={row.key} className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-2 text-xs" data-testid={testId ? `${testId}-${row.key}` : undefined}>
+        <div key={row.key} className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-2 tls-type-small" data-testid={testId ? `${testId}-${row.key}` : undefined}>
           <span className="text-white/60 tls-wrap">{row.label}</span>
           <span className="h-2.5 bg-white/5 rounded-sm overflow-hidden">
             <span className="block h-full rounded-sm" style={{ width: `${Math.round(((row.value || 0) / max) * 100)}%`, backgroundColor: row.color || accent }} />
@@ -191,7 +191,7 @@ export function Bars({ rows, accent = "#29B6E8", testId, unit = "" }) {
 
 export function MaterialChip({ tier, className = "" }) {
   return (
-    <span className={`text-[10px] font-bold uppercase tracking-widest ${className}`} style={{ color: materialColor(tier) }}>{materialLabel(tier)}</span>
+    <span className={`tls-type-label ${className}`} style={{ color: materialColor(tier) }}>{materialLabel(tier)}</span>
   );
 }
 
@@ -212,8 +212,8 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
       <div className="flex items-center gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
         {value.avatar_url ? <img src={resolveMediaUrl(value.avatar_url)} alt="" className="w-8 h-8 rounded-sm object-cover" /> : <div className="w-8 h-8 rounded-sm bg-[#0A0A0A] border border-white/10" />}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold tls-wrap">{personName(value)}</div>
-          <div className="text-[10px] text-white/45 tls-wrap">@{value.username}{value.is_club_member ? " · Vereinsmitglied" : ""}</div>
+          <div className="tls-type-small font-semibold tls-wrap">{personName(value)}</div>
+          <div className="tls-type-small text-white/45 tls-wrap">@{value.username}{value.is_club_member ? " · Vereinsmitglied" : ""}</div>
         </div>
         <button type="button" onClick={() => onChange(null)} aria-label="Andere Person wählen" data-testid={`${testId}-clear`} className="p-1 text-white/50 hover:text-white">
           <X className="w-4 h-4" />
@@ -224,7 +224,7 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
   return (
     <div>
       <label className="block">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{label}</span>
+        <span className="tls-type-label text-white/50">{label}</span>
         <span className="relative mt-1 block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
           <input value={q} onChange={(e) => setQ(e.target.value)} data-testid={`${testId}-search`} placeholder="Name, Benutzername oder E-Mail …" className={`${INPUT_CLASS} pl-9`} />
@@ -235,13 +235,13 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
           <button key={u.id} type="button" onClick={() => onChange(u)} data-testid={`${testId}-option-${u.id}`} className="w-full text-left px-3 py-2 hover:bg-white/5 transition flex items-center gap-3">
             {u.avatar_url ? <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-7 h-7 rounded-sm object-cover" /> : <div className="w-7 h-7 rounded-sm bg-[#0A0A0A] border border-white/10" />}
             <div className="min-w-0">
-              <div className="text-sm font-semibold tls-wrap">{personName(u)}</div>
-              <div className="text-[10px] text-white/40 tls-wrap">@{u.username}</div>
+              <div className="tls-type-small font-semibold tls-wrap">{personName(u)}</div>
+              <div className="tls-type-small text-white/40 tls-wrap">@{u.username}</div>
             </div>
             {u.is_club_member && <Crown className="ml-auto w-3.5 h-3.5 text-[#FFD700]" aria-label="Vereinsmitglied" />}
           </button>
         ))}
-        {!users.length && <div className="px-3 py-5 text-center text-xs text-white/40">Keine Treffer.</div>}
+        {!users.length && <div className="px-3 py-5 text-center tls-type-small text-white/40">Keine Treffer.</div>}
       </div>
     </div>
   );
@@ -262,7 +262,7 @@ export function TierSelect({ tiers, groupsByCode, value, onChange, testId, label
   }, [tiers, groupsByCode, filter]);
   return (
     <label className="block">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{label}</span>
+      <span className="tls-type-label text-white/50">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} className={`${INPUT_CLASS} mt-1`}>
         <option value="">— wählen —</option>
         {sections.map(([key, rows]) => (
@@ -280,7 +280,7 @@ export function TierSelect({ tiers, groupsByCode, value, onChange, testId, label
 export function BoardOnly({ board, children, what = "Das" }) {
   if (board) return children;
   return (
-    <p className="text-xs text-white/50 border border-white/10 bg-[#0F0F10] rounded-sm px-3 py-2" data-testid="board-only">
+    <p className="tls-type-small text-white/50 border border-white/10 bg-[#0F0F10] rounded-sm px-3 py-2" data-testid="board-only">
       {what} dürfen nur der Vorstand oder die Systemverwaltung.
     </p>
   );

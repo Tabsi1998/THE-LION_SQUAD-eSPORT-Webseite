@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { CAPABILITY_LABELS, DOLIBARR_STATUS_LABELS, LINK_STATUS_LABELS, MODE_HINTS, MODE_LABELS, PREVIEW_STATE_LABELS, describeSync, formatDate, needsManualChoice, splitWithoutAccount } from "@/lib/dolibarr";
 import { Empty, Field, Panel, Tile } from "./dolibarr/parts";
 import { FeaturesTab } from "./dolibarr/FeaturesTab";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Dolibarr (#316, #295, #297, #330, #510). Wer was sieht: Verbindung und Schlüssel nur
 // „System“, Zuordnungen und Umstellung die Vereinsverwaltung, die Freigabe
@@ -237,15 +238,15 @@ export default function AdminDolibarrPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mitglieder</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dolibarr</h1>
-          <p className="text-sm text-white/55 mt-2 max-w-2xl">
+          <span className="tls-type-label text-[#29B6E8]">Mitglieder</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Dolibarr</ShortCaps></h1>
+          <p className="tls-type-body text-white/55 mt-2 max-w-2xl">
             Dolibarr mit dem Vereinsmodul führt Mitgliedschaft, Beiträge und Vereinsfunktionen – die Website übernimmt den Stand für
             bestätigt zugeordnete Konten. Der Abgleich löst keine Mails und keine Discord-Meldungen aus.
           </p>
         </div>
         <button type="button" onClick={() => syncNow(false)} disabled={!!busy || status?.mode === "off"} data-testid="dolibarr-sync"
-          className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-40">
+          className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
           <RefreshCw className={`w-3.5 h-3.5 ${busy === "sync" ? "animate-spin" : ""}`} /> Jetzt abgleichen
         </button>
       </div>
@@ -260,7 +261,7 @@ export default function AdminDolibarrPage() {
       <div className="flex flex-wrap gap-2 mb-5" role="tablist">
         {tabs.map((entry) => (
           <button key={entry.key} type="button" role="tab" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)} data-testid={`dolibarr-tab-${entry.key}`}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border ${tab === entry.key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/60 hover:text-white"}`}>
+            className={`px-4 py-2 tls-type-label rounded-sm border ${tab === entry.key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/60 hover:text-white"}`}>
             {entry.label}
           </button>
         ))}
@@ -271,21 +272,21 @@ export default function AdminDolibarrPage() {
           {/* Wunsch des Betreibers: an einer Stelle sehen, welche Dolibarr-Funktion an ist und wo ihr Schalter liegt. */}
           <div className="lg:col-span-2">
             <Panel title="Dolibarr auf der Website – was läuft, was fehlt, wo es steht">
-              <p className="text-xs text-white/45 mb-2">Je Funktion: ob sie an ist und was sie braucht. Ein- und ausgeschaltet wird alles im Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
+              <p className="tls-type-small text-white/45 mb-2">Je Funktion: ob sie an ist und was sie braucht. Ein- und ausgeschaltet wird alles im Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
               {(status?.features || []).length === 0 ? <Empty text="Noch kein Stand geladen." /> : (
                 <ul className="divide-y divide-white/5" data-testid="dolibarr-features">
                   {status.features.map((feature) => (
-                    <li key={feature.key} className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 text-sm" data-testid={`dolibarr-feature-${feature.key}`}>
+                    <li key={feature.key} className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 tls-type-small" data-testid={`dolibarr-feature-${feature.key}`}>
                       <span className="flex items-center gap-2 sm:w-80 shrink-0">
                         {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] shrink-0" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0" />}
                         <span className="font-bold">{feature.label}</span>
                       </span>
-                      <span className="flex-1 min-w-0 text-xs text-white/60">
+                      <span className="flex-1 min-w-0 tls-type-small text-white/60">
                         <span className={feature.enabled ? "text-[#00FF88]" : "text-[#FFD700]"}>{feature.state}</span>
                         {feature.hint ? <span> · {feature.hint}</span> : null}
                       </span>
                       {feature.where && (
-                        <Link to={feature.where} className="text-[11px] uppercase font-bold tracking-wider text-[#29B6E8] hover:text-white whitespace-nowrap shrink-0" data-testid={`dolibarr-feature-${feature.key}-where`}>
+                        <Link to={feature.where} className="tls-type-label text-[#29B6E8] hover:text-white whitespace-nowrap shrink-0" data-testid={`dolibarr-feature-${feature.key}-where`}>
                           {feature.where_label} →
                         </Link>
                       )}
@@ -296,8 +297,8 @@ export default function AdminDolibarrPage() {
             </Panel>
           </div>
           <Panel title="Was das Vereinsmodul kann">
-            <p className="text-xs text-white/45 mb-3">Modul {status?.sync?.module_version || "–"}, API-Version {status?.sync?.api_version ?? "–"}. Was fehlt, setzt die Website nicht voraus.</p>
-            <ul className="space-y-1.5 text-sm">
+            <p className="tls-type-small text-white/45 mb-3">Modul {status?.sync?.module_version || "–"}, API-Version {status?.sync?.api_version ?? "–"}. Was fehlt, setzt die Website nicht voraus.</p>
+            <ul className="space-y-1.5 tls-type-small">
               {Object.entries(CAPABILITY_LABELS).map(([key, label]) => {
                 const has = status?.sync?.capabilities?.[key];
                 return (
@@ -310,7 +311,7 @@ export default function AdminDolibarrPage() {
             </ul>
           </Panel>
           <Panel title="So läuft die Umstellung">
-            <ol className="list-decimal pl-5 space-y-2 text-sm text-white/75">
+            <ol className="list-decimal pl-5 space-y-2 tls-type-small text-white/75">
               <li><strong>Verbindung</strong> eintragen und testen (nur „System“).</li>
               <li>Modus <strong>Vorschau</strong>: Dolibarr wird gelesen, nichts wird übernommen.</li>
               <li>Unter <strong>Umstellung</strong> die Vorschau ansehen, Mitgliedsarten zuordnen, Konten bestätigen.</li>
@@ -323,19 +324,19 @@ export default function AdminDolibarrPage() {
 
       {tab === "links" && canClub && (
         <Panel title="Konto ↔ Mitglied">
-          <p className="text-xs text-white/45 mb-3">Eine Zuordnung gilt erst, wenn sie bestätigt ist. E-Mail und Mitgliedsnummer finden Kandidaten, beweisen aber nichts. Bestätigen geht unter „Umstellung“.</p>
+          <p className="tls-type-small text-white/45 mb-3">Eine Zuordnung gilt erst, wenn sie bestätigt ist. E-Mail und Mitgliedsnummer finden Kandidaten, beweisen aber nichts. Bestätigen geht unter „Umstellung“.</p>
           {links.length === 0 ? <Empty text="Noch keine Zuordnungen." /> : (
             <div className="divide-y divide-white/5">
               {links.map((link) => (
                 <div key={link.id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-2.5" data-testid={`dolibarr-link-${link.username}`}>
                   <div className="sm:w-56 min-w-0">
                     <div className="font-bold tls-wrap">{link.display_name || link.username}</div>
-                    <div className="text-xs text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
+                    <div className="tls-type-small text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
                   </div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${link.status === "verified" ? "text-[#00FF88]" : link.status === "conflict" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
-                  <div className="text-xs text-white/50 flex-1 min-w-0">{link.note || (link.verified_at ? `seit ${formatDate(link.verified_at)}` : "")}</div>
+                  <span className={`tls-type-label ${link.status === "verified" ? "text-[#00FF88]" : link.status === "conflict" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
+                  <div className="tls-type-small text-white/50 flex-1 min-w-0">{link.note || (link.verified_at ? `seit ${formatDate(link.verified_at)}` : "")}</div>
                   {link.status === "verified" && (
-                    <button type="button" onClick={() => removeLink(link)} className="text-[10px] uppercase font-bold text-[#FF6B6B] inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
+                    <button type="button" onClick={() => removeLink(link)} className="tls-type-label text-[#FF6B6B] inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
                   )}
                 </div>
               ))}
@@ -347,13 +348,13 @@ export default function AdminDolibarrPage() {
       {tab === "preview" && canClub && (
         <div className="space-y-4">
           <Panel title="Vorschau der Umstellung">
-            <p className="text-xs text-white/45 mb-3">Trockenlauf: liest alle Mitglieder aus Dolibarr und sucht zu jedem Konto mit bestätigter E-Mail das Mitglied. Schreibt nichts.</p>
+            <p className="tls-type-small text-white/45 mb-3">Trockenlauf: liest alle Mitglieder aus Dolibarr und sucht zu jedem Konto mit bestätigter E-Mail das Mitglied. Schreibt nichts.</p>
             <button type="button" onClick={loadPreview} disabled={!!busy || status?.mode === "off"} data-testid="dolibarr-preview-run"
-              className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-40">
+              className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
               <PlayCircle className="w-4 h-4" /> {busy === "preview" ? "Lese …" : "Vorschau erstellen"}
             </button>
             {preview && (
-              <div className="mt-4 text-sm text-white/70" data-testid="dolibarr-preview-summary">
+              <div className="mt-4 tls-type-small text-white/70" data-testid="dolibarr-preview-summary">
                 {preview.members_in_dolibarr} Mitglieder in Dolibarr · {preview.users_checked} Konten geprüft · {preview.rows.length} Zeilen · {preview.members_without_account.length} Mitglieder ohne Konto
               </div>
             )}
@@ -367,15 +368,15 @@ export default function AdminDolibarrPage() {
                       <div key={row.user_id} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-2.5" data-testid={`dolibarr-preview-${row.username}`}>
                         <div className="sm:w-52 min-w-0">
                           <div className="font-bold tls-wrap">{row.display_name || row.username}</div>
-                          <div className="text-xs text-white/45">hier: {row.local_status}{row.requested_ref ? ` · gibt Nr. ${row.requested_ref} an` : ""}</div>
+                          <div className="tls-type-small text-white/45">hier: {row.local_status}{row.requested_ref ? ` · gibt Nr. ${row.requested_ref} an` : ""}</div>
                         </div>
-                        <div className="text-xs text-white/70 flex-1 min-w-0">
+                        <div className="tls-type-small text-white/70 flex-1 min-w-0">
                           {PREVIEW_STATE_LABELS[row.state] || row.state}
                           {row.member_id ? ` → ${row.member_name} (Nr. ${row.member_ref}, ${DOLIBARR_STATUS_LABELS[row.dolibarr_status] || row.dolibarr_status})` : ""}
                           {row.would_change_status && <span className="text-[#FFD700]"> · Status ändert sich</span>}
                         </div>
                         {(row.state === "match" || row.state === "match_unverified_email") && (
-                          <button type="button" onClick={() => confirmLink(row)} disabled={!!busy} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+                          <button type="button" onClick={() => confirmLink(row)} disabled={!!busy} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
                             <Link2 className="w-3 h-3" /> Bestätigen
                           </button>
                         )}
@@ -389,7 +390,7 @@ export default function AdminDolibarrPage() {
                                 <option key={entry.member_id} value={entry.member_id}>{entry.name} · Nr. {entry.ref}{entry.ended ? " (beendet)" : ""}</option>
                               ))}
                             </select>
-                            <button type="button" onClick={() => confirmManual(row)} disabled={!!busy || !manualChoice[row.user_id]} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Zuordnen</button>
+                            <button type="button" onClick={() => confirmManual(row)} disabled={!!busy || !manualChoice[row.user_id]} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label rounded-sm disabled:opacity-40">Zuordnen</button>
                           </div>
                         )}
                       </div>
@@ -398,10 +399,10 @@ export default function AdminDolibarrPage() {
                 )}
               </Panel>
               <Panel title="Mitgliedsarten zuordnen">
-                <p className="text-xs text-white/45 mb-3">Eine Art ohne Zuordnung bleibt Mitglied, aber ohne Mitgliedsart – nie still „ordentlich“.{!canSystem && " Ändern kann das, wer „System“ hat."}</p>
+                <p className="tls-type-small text-white/45 mb-3">Eine Art ohne Zuordnung bleibt Mitglied, aber ohne Mitgliedsart – nie still „ordentlich“.{!canSystem && " Ändern kann das, wer „System“ hat."}</p>
                 <div className="space-y-2">
                   {preview.types.map((type) => (
-                    <label key={type.id} className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
+                    <label key={type.id} className="flex flex-col sm:flex-row sm:items-center gap-2 tls-type-small">
                       <span className="sm:w-72">{type.label} <span className="text-white/40">({type.members})</span></span>
                       <select value={status?.type_map?.[String(type.id)] || ""} disabled={!canSystem || !!busy}
                         onChange={(e) => saveSettings({ type_map: { ...(status?.type_map || {}), [String(type.id)]: e.target.value } }, "Mitgliedsart zugeordnet.")}
@@ -415,16 +416,16 @@ export default function AdminDolibarrPage() {
               </Panel>
               {withoutAccount.active.length > 0 && (
                 <Panel title={`Aktive Mitglieder ohne Website-Konto (${withoutAccount.active.length})`}>
-                  <p className="text-xs text-white/45 mb-3">Sie haben kein Konto – oder eines mit anderer E-Mail-Adresse. Dann oben beim Konto von Hand zuordnen.</p>
-                  <div className="text-sm text-white/70 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-without-account">
+                  <p className="tls-type-small text-white/45 mb-3">Sie haben kein Konto – oder eines mit anderer E-Mail-Adresse. Dann oben beim Konto von Hand zuordnen.</p>
+                  <div className="tls-type-small text-white/70 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-without-account">
                     {withoutAccount.active.map((entry) => <div key={entry.member_id}>{entry.name} <span className="text-white/35">Nr. {entry.ref}</span></div>)}
                   </div>
                 </Panel>
               )}
               {withoutAccount.ended.length > 0 && (
                 <Panel title={`Beendete Mitgliedschaften ohne Konto (${withoutAccount.ended.length})`}>
-                  <p className="text-xs text-white/45 mb-3">Ehemalige – keine Mitglieder mehr. Sie stehen hier nur, damit nichts fehlt.</p>
-                  <div className="text-sm text-white/40 line-through decoration-white/20 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-ended">
+                  <p className="tls-type-small text-white/45 mb-3">Ehemalige – keine Mitglieder mehr. Sie stehen hier nur, damit nichts fehlt.</p>
+                  <div className="tls-type-small text-white/40 line-through decoration-white/20 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-ended">
                     {withoutAccount.ended.map((entry) => <div key={entry.member_id}>{entry.name} <span className="text-white/25">Nr. {entry.ref}</span></div>)}
                   </div>
                 </Panel>
@@ -440,7 +441,7 @@ export default function AdminDolibarrPage() {
 
       {tab === "policy" && (
         <Panel title="Vorstand → Bereiche">
-          <p className="text-xs text-white/45 mb-3">
+          <p className="tls-type-small text-white/45 mb-3">
             Einmal festlegen, danach läuft es von selbst: Beginnt eine Funktion in Dolibarr, öffnet sich der Bereich; endet sie, ist er weg.
             Ableitbar ist nur die Vereinsverwaltung – nie System, Moderation, Rollenvergabe oder Geldfreigaben. Zwei-Faktor bleibt Pflicht.
             {status?.policy?.active ? ` Gültig: Fassung ${status.policy.version} vom ${formatDate(status.policy.approved_at)}.` : " Noch keine gültige Freigabe – bis dahin zählt der lokale Vorstandsposten."}
@@ -451,12 +452,12 @@ export default function AdminDolibarrPage() {
                 const info = functionCodes.find((fn) => fn.code === code);
                 const checked = (policyMap[code] || []).includes("club");
                 return (
-                  <label key={code} className="flex items-center gap-3 text-sm" data-testid={`dolibarr-policy-${code}`}>
+                  <label key={code} className="flex items-center gap-3 tls-type-small" data-testid={`dolibarr-policy-${code}`}>
                     <input type="checkbox" checked={checked} disabled={!isSuperAdmin} className="accent-[#29B6E8]"
                       onChange={(e) => { policyDirtyRef.current = true; setPolicyPreview(null); setPolicyMap((current) => ({ ...current, [code]: e.target.checked ? ["club"] : [] })); }} />
-                    <span className="font-mono text-xs text-white/50 w-44 tls-wrap">{code}</span>
+                    <span className="font-mono tls-type-small text-white/50 w-44 tls-wrap">{code}</span>
                     <span>{info?.label || code}{info ? <span className="text-white/40"> ({info.holders})</span> : null}</span>
-                    <span className="text-xs text-white/45">{checked ? "öffnet die Vereinsverwaltung" : "öffnet nichts"}</span>
+                    <span className="tls-type-small text-white/45">{checked ? "öffnet die Vereinsverwaltung" : "öffnet nichts"}</span>
                   </label>
                 );
               })}
@@ -464,14 +465,14 @@ export default function AdminDolibarrPage() {
           )}
           {isSuperAdmin ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" onClick={previewPolicy} disabled={!!busy} data-testid="dolibarr-policy-preview" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Wer bekäme was?</button>
-              <button type="button" onClick={approvePolicy} disabled={!!busy || !policyPreview} data-testid="dolibarr-policy-approve" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-40">
+              <button type="button" onClick={previewPolicy} disabled={!!busy} data-testid="dolibarr-policy-preview" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40">Wer bekäme was?</button>
+              <button type="button" onClick={approvePolicy} disabled={!!busy || !policyPreview} data-testid="dolibarr-policy-approve" className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
                 <ShieldCheck className="w-4 h-4" /> Freigeben
               </button>
             </div>
-          ) : <p className="mt-4 text-xs text-white/45">Ändern und freigeben kann nur der Superadmin, weil die Freigabe Rechte vergibt.</p>}
+          ) : <p className="mt-4 tls-type-small text-white/45">Ändern und freigeben kann nur der Superadmin, weil die Freigabe Rechte vergibt.</p>}
           {policyPreview && (
-            <div className="mt-4 border border-white/10 rounded-sm p-3 text-sm" data-testid="dolibarr-policy-affected">
+            <div className="mt-4 border border-white/10 rounded-sm p-3 tls-type-small" data-testid="dolibarr-policy-affected">
               {policyPreview.affected.length === 0 ? "Mit dieser Fassung bekäme im Moment niemand einen Bereich." : (
                 <ul className="space-y-1">
                   {policyPreview.affected.map((row) => (
@@ -491,21 +492,21 @@ export default function AdminDolibarrPage() {
               <Field label="Adresse von Dolibarr (https)" value={form.base_url} onChange={(v) => setForm({ ...form, base_url: v })} placeholder="https://erp.example.org" testId="dolibarr-base-url" />
               <Field label={`API-Schlüssel des Website-Benutzers${status?.api_key_configured ? " (gespeichert – leer lassen, um ihn zu behalten)" : ""}`} value={form.api_key} onChange={(v) => setForm({ ...form, api_key: v })} type="password" testId="dolibarr-api-key" />
               {addressChanged && (
-                <p className="text-xs text-warn" data-testid="dolibarr-key-needed">
+                <p className="tls-type-small text-warn" data-testid="dolibarr-key-needed">
                   Neue Adresse: Gespeicherte Schlüssel gelten nur für die bisherige. Bitte den API-Schlüssel neu eintragen; ein eigener Schreib-Schlüssel wird entfernt.
                 </p>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Kennung der Installation" value={form.instance} onChange={(v) => setForm({ ...form, instance: v })} placeholder="verein" testId="dolibarr-instance" />
                 <label className="block">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Umgebung</div>
+                  <div className="tls-type-label text-white/60 mb-1.5">Umgebung</div>
                   <select value={form.environment} onChange={(e) => setForm({ ...form, environment: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                     <option value="production">Produktion (nur https)</option>
                     <option value="test">Test</option>
                   </select>
                 </label>
               </div>
-              <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3" data-testid="dolibarr-howto">
+              <details className="tls-type-small text-white/55 border border-white/10 rounded-sm p-3" data-testid="dolibarr-howto">
                 <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">So richtest du es in Dolibarr ein</summary>
                 <ol className="list-decimal pl-5 mt-2 space-y-1.5">
                   <li><strong>Start → Einstellungen → Module/Applikationen</strong>: „API REST“ und „Vereine“ müssen aktiv sein.</li>
@@ -516,17 +517,17 @@ export default function AdminDolibarrPage() {
                   <li>Speichern → „Verbindung testen“. Steht dort „Verbunden“, rechts den Modus auf „Vorschau“ stellen.</li>
                 </ol>
               </details>
-              <p className="text-xs text-white/40">Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+              <p className="tls-type-small text-white/40">Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={!!busy} data-testid="dolibarr-save" onClick={saveConnection}
-                  className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
-                <button type="button" disabled={!!busy || !status?.api_key_configured} onClick={testConnection} data-testid="dolibarr-test" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Verbindung testen</button>
+                  className="px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
+                <button type="button" disabled={!!busy || !status?.api_key_configured} onClick={testConnection} data-testid="dolibarr-test" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40">Verbindung testen</button>
                 {status?.api_key_configured && (
-                  <button type="button" disabled={!!busy} onClick={() => removeKey("read")} data-testid="dolibarr-key-remove" className="px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Schlüssel entfernen</button>
+                  <button type="button" disabled={!!busy} onClick={() => removeKey("read")} data-testid="dolibarr-key-remove" className="px-4 py-2 border border-live/40 text-live tls-type-label rounded-sm hover:bg-live/10 disabled:opacity-40">Schlüssel entfernen</button>
                 )}
               </div>
               {testResult && (
-                <div className={`text-sm ${testResult.ok ? "text-[#00FF88]" : "text-[#FF6B6B]"}`} data-testid="dolibarr-test-result">
+                <div className={`tls-type-small ${testResult.ok ? "text-[#00FF88]" : "text-[#FF6B6B]"}`} data-testid="dolibarr-test-result">
                   {testResult.ok ? `Verbunden: Modul ${testResult.module_version}, API-Version ${testResult.api_version}.` : `Keine Verbindung: ${testResult.text}`}
                 </div>
               )}
@@ -534,17 +535,17 @@ export default function AdminDolibarrPage() {
           </Panel>
           <div className="space-y-4">
             <Panel title="Schreibzugriff für Rechnungen">
-              <div className="space-y-3 text-sm" data-testid="dolibarr-write">
-                <p className="text-xs text-white/55">Rechnungen und Geschäftspartner legt die Website mit dem Website-Benutzer an, sobald der Haken gesetzt ist und der Modus auf „Live“ steht. Ohne Haken schreibt sie nichts – Rechnungsaufträge bleiben in der Finanzübersicht stehen, nichts geht verloren. Ein eigener Schlüssel für einen zweiten Benutzer ist möglich, aber nicht nötig.</p>
-                <p className="text-xs text-white/60">Ein- und ausgeschaltet wird der Schreibzugriff unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline" data-testid="dolibarr-write-to-features">Funktionen</button>; hier stehen die Rechte des Website-Benutzers und der optionale zweite Schlüssel.</p>
+              <div className="space-y-3 tls-type-small" data-testid="dolibarr-write">
+                <p className="tls-type-small text-white/55">Rechnungen und Geschäftspartner legt die Website mit dem Website-Benutzer an, sobald der Haken gesetzt ist und der Modus auf „Live“ steht. Ohne Haken schreibt sie nichts – Rechnungsaufträge bleiben in der Finanzübersicht stehen, nichts geht verloren. Ein eigener Schlüssel für einen zweiten Benutzer ist möglich, aber nicht nötig.</p>
+                <p className="tls-type-small text-white/60">Ein- und ausgeschaltet wird der Schreibzugriff unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline" data-testid="dolibarr-write-to-features">Funktionen</button>; hier stehen die Rechte des Website-Benutzers und der optionale zweite Schlüssel.</p>
                 {/* Rechnungsangaben (#1358): Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, Steuersätze und „gleich freigeben“
                     pflegt der Kassier selbst - an einer Stelle, in der Finanzübersicht. */}
-                <div className="border border-white/10 rounded-sm p-3 text-xs text-white/65" data-testid="dolibarr-invoice-details-pointer">
+                <div className="border border-white/10 rounded-sm p-3 tls-type-small text-white/65" data-testid="dolibarr-invoice-details-pointer">
                   Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“ und „Rechnungen gleich freigeben“ pflegt der Kassier unter{" "}
                   <Link to="/admin/finance?tab=rechnungsangaben" className="text-[#29B6E8] hover:underline">Finanzübersicht → Rechnungsangaben</Link>
                   {status?.invoice_terms ? <> – Stand: <span className={status.invoice_terms.complete ? "text-[#00FF88]" : "text-[#FF9500]"}>{status.invoice_terms.complete ? "vollständig" : "unvollständig, Belege bleiben Entwurf"}</span></> : null}.
                 </div>
-                <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
+                <details className="tls-type-small text-white/55 border border-white/10 rounded-sm p-3">
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>
                   <ul className="list-disc pl-5 mt-2 space-y-1">
                     <li>Geschäftspartner: einsehen, erstellen/bearbeiten, „Zugriff auf alle Geschäftspartner erweitern“.</li>
@@ -552,14 +553,14 @@ export default function AdminDolibarrPage() {
                     <li>Produkte und Leistungen: einsehen. Mitglieder: einsehen. Vereine: „Mitglieder und Geschäftspartner verknüpfen“.</li>
                   </ul>
                 </details>
-                <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
+                <details className="tls-type-small text-white/55 border border-white/10 rounded-sm p-3">
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Optional: eigener Schlüssel eines zweiten Benutzers</summary>
                   <div className="mt-2 space-y-2">
                     <Field label={`API-Schlüssel des Schreib-Benutzers${status?.write_api_key_configured ? " (gespeichert – leer lassen, um ihn zu behalten)" : ""}`} value={writeKey} onChange={setWriteKey} type="password" testId="dolibarr-write-key" />
                     <button type="button" disabled={!!busy || !writeKey} data-testid="dolibarr-write-save" onClick={() => saveSettings({ write_api_key: writeKey }, "Schreib-Schlüssel gespeichert.").then(() => setWriteKey(""))}
-                      className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Schlüssel speichern</button>
+                      className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Schlüssel speichern</button>
                     {status?.write_api_key_configured && (
-                      <button type="button" disabled={!!busy} onClick={() => removeKey("write")} data-testid="dolibarr-write-key-remove" className="ml-2 px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Schlüssel entfernen</button>
+                      <button type="button" disabled={!!busy} onClick={() => removeKey("write")} data-testid="dolibarr-write-key-remove" className="ml-2 px-4 py-2 border border-live/40 text-live tls-type-label rounded-sm hover:bg-live/10 disabled:opacity-40">Schlüssel entfernen</button>
                     )}
                   </div>
                 </details>
@@ -568,46 +569,46 @@ export default function AdminDolibarrPage() {
             <Panel title="Modus">
               <div className="space-y-2">
                 {Object.keys(MODE_LABELS).map((mode) => (
-                  <div key={mode} className="flex items-start gap-3 text-sm">
+                  <div key={mode} className="flex items-start gap-3 tls-type-small">
                     <input type="radio" id={`dolibarr-mode-${mode}`} name="dolibarr-mode" checked={status?.mode === mode} disabled={!!busy} onChange={() => saveSettings({ mode }, `Modus: ${MODE_LABELS[mode]}.`)} className="mt-1 accent-[#29B6E8]" data-testid={`dolibarr-mode-${mode}`} />
                     <div>
                       <label htmlFor={`dolibarr-mode-${mode}`} className="font-bold">{MODE_LABELS[mode]}</label>
-                      <div className="text-xs text-white/45">{MODE_HINTS[mode]}</div>
+                      <div className="tls-type-small text-white/45">{MODE_HINTS[mode]}</div>
                     </div>
                   </div>
                 ))}
               </div>
-              <p className="mt-4 text-xs text-white/45">Zuordnung per E-Mail, Mitgliederverzeichnis, Feldzuordnung und Beitrittsanträge: Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
+              <p className="mt-4 tls-type-small text-white/45">Zuordnung per E-Mail, Mitgliederverzeichnis, Feldzuordnung und Beitrittsanträge: Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
             </Panel>
             <Panel title="Signierter Webhook">
               <div className="space-y-3" data-testid="dolibarr-signed-webhook">
-                <p className="text-xs text-white/55">Empfohlen. Dolibarr meldet Änderungen sofort, die Website prüft die Signatur und liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf.</p>
-                <p className={`text-xs ${status?.signed_webhook?.configured ? "text-ok" : "text-warn"}`} data-testid="dolibarr-signed-state">
+                <p className="tls-type-small text-white/55">Empfohlen. Dolibarr meldet Änderungen sofort, die Website prüft die Signatur und liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf.</p>
+                <p className={`tls-type-small ${status?.signed_webhook?.configured ? "text-ok" : "text-warn"}`} data-testid="dolibarr-signed-state">
                   {status?.signed_webhook?.source === "env" ? "Eingerichtet in der Server-Umgebung." : status?.signed_webhook?.configured ? "Eingerichtet." : "Noch nicht eingerichtet."}
                 </p>
-                <div className="text-xs text-white/65">
+                <div className="tls-type-small text-white/65">
                   Im Vereinsmodul unter <strong>Einrichtung → Vereine → Webhooks</strong> diese Adresse eintragen und Kennung und Geheimnis von dort hier übernehmen:
                   <div className="mt-1 font-mono break-all border border-white/10 rounded-sm p-2" data-testid="dolibarr-signed-path">{window.location.origin}{status?.signed_webhook?.path}</div>
                 </div>
                 <Field label="Schlüssel-Kennung" value={signedKeyId} onChange={setSignedKeyId} testId="dolibarr-signed-key-id" />
                 <Field label={`Geheimnis${status?.signed_webhook?.secret_stored ? " (gespeichert – leer lassen, um es zu behalten)" : " (mindestens 32 Zeichen)"}`} value={signedSecret} onChange={setSignedSecret} type="password" testId="dolibarr-signed-secret" />
                 {status?.signed_webhook?.source === "env" && (
-                  <p className="text-xs text-white/45" data-testid="dolibarr-signed-env">In der Server-Umgebung steht schon ein Schlüssel (DOLIBARR_WEBHOOK_SECRETS). Er gilt weiter und hat bei gleicher Kennung Vorrang.</p>
+                  <p className="tls-type-small text-white/45" data-testid="dolibarr-signed-env">In der Server-Umgebung steht schon ein Schlüssel (DOLIBARR_WEBHOOK_SECRETS). Er gilt weiter und hat bei gleicher Kennung Vorrang.</p>
                 )}
-                <p className="text-xs text-white/40">Das Geheimnis wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+                <p className="tls-type-small text-white/40">Das Geheimnis wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" disabled={!!busy || !signedKeyId.trim() || (!signedSecret && !status?.signed_webhook?.secret_stored) || (!signedSecret && signedKeyId.trim() === (status?.signed_webhook?.key_id || ""))} onClick={saveSignedWebhook} data-testid="dolibarr-signed-save"
-                    className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
+                    className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
                   {(status?.signed_webhook?.secret_stored || status?.signed_webhook?.key_id) && (
-                    <button type="button" disabled={!!busy} onClick={removeSignedWebhook} data-testid="dolibarr-signed-remove" className="px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Entfernen</button>
+                    <button type="button" disabled={!!busy} onClick={removeSignedWebhook} data-testid="dolibarr-signed-remove" className="px-4 py-2 border border-live/40 text-live tls-type-label rounded-sm hover:bg-live/10 disabled:opacity-40">Entfernen</button>
                   )}
                 </div>
               </div>
             </Panel>
             <Panel title="Alter Webhook-Weg (Token in der Adresse)">
-              <p className="text-xs text-white/45 mb-3">Bleibt nur bis zur Umstellung auf den signierten Webhook; abschalten unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
-              <button type="button" onClick={newWebhook} disabled={!!busy} data-testid="dolibarr-webhook-new" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Neue Adresse erzeugen</button>
-              {webhookPath && <div className="mt-3 text-xs font-mono break-all border border-[#FFD700]/30 rounded-sm p-2" data-testid="dolibarr-webhook-path">{window.location.origin}{webhookPath}</div>}
+              <p className="tls-type-small text-white/45 mb-3">Bleibt nur bis zur Umstellung auf den signierten Webhook; abschalten unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
+              <button type="button" onClick={newWebhook} disabled={!!busy} data-testid="dolibarr-webhook-new" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40">Neue Adresse erzeugen</button>
+              {webhookPath && <div className="mt-3 tls-type-small font-mono break-all border border-[#FFD700]/30 rounded-sm p-2" data-testid="dolibarr-webhook-path">{window.location.origin}{webhookPath}</div>}
             </Panel>
           </div>
         </div>

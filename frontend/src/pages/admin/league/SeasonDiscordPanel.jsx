@@ -65,7 +65,7 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
   }, [seasonId]);
   useLiveRefresh(refresh, ["leagues"], { fallbackMs: REFRESH_MS });
 
-  if (!form) return error ? <p className="text-sm text-warn" role="alert" data-testid="season-discord-error">{error}</p> : null;
+  if (!form) return error ? <p className="tls-type-small text-warn" role="alert" data-testid="season-discord-error">{error}</p> : null;
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const release = async () => {
     if (!releasing?.confirmed) return;
@@ -107,7 +107,7 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
       <p><span className="font-semibold">{row.label}:</span> {row.text}</p>
       {canEdit && row.key && releasing?.key !== row.key ? (
         <button type="button" onClick={() => setReleasing({ key: row.key, confirmed: false })} data-testid={`season-discord-release-${row.key}`}
-          className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+          className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 tls-type-label">
           Noch einmal senden
         </button>
       ) : null}
@@ -118,11 +118,11 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
             hint="Erst nachsehen: Steht sie doch im Kanal, nicht freigeben – sonst steht sie zweimal da." />
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={release} disabled={!releasing.confirmed || releasing.busy} data-testid="season-discord-release-go"
-              className="tls-btn tls-btn--primary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+              className="tls-btn tls-btn--primary min-h-11 rounded-sm px-3 py-2 tls-type-label disabled:opacity-40">
               {releasing.busy ? "Gebe frei …" : "Freigeben"}
             </button>
             <button type="button" onClick={() => setReleasing(null)} data-testid="season-discord-release-cancel"
-              className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+              className="tls-btn tls-btn--secondary min-h-11 rounded-sm px-3 py-2 tls-type-label">
               Abbrechen
             </button>
           </div>
@@ -136,12 +136,12 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
     <FormSection title="Discord" testId="season-discord"
       hint="Meldungen im Discord des Vereins: nach jedem Spieltag eine Zusammenfassung je Staffel, am Ende der Season Meister, Auf- und Absteiger mit Link zur Season-Seite. Ohne Einstellung ist alles aus.">
       {state && !state.public ? (
-        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="note" data-testid="season-discord-hidden">
+        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-body text-white" role="note" data-testid="season-discord-hidden">
           Diese Season ist nicht öffentlich – solange geht nichts hinaus, auch wenn es eingeschaltet ist.
         </p>
       ) : null}
       {!canEdit ? (
-        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/75" data-testid="season-discord-readonly">
+        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-small text-white/75" data-testid="season-discord-readonly">
           Nur lesen: Ändern darf, wer für diese Liga „Season konfigurieren“ hat.
         </p>
       ) : null}
@@ -174,34 +174,34 @@ export function SeasonDiscordPanel({ seasonId, canEdit = true }) {
           hint={`Ein Kanal für beide Meldungen – kein Rückfall auf einen anderen. Zur Wahl stehen die freigegebenen Kanäle (${PLACE}).${state?.channels_text ? ` ${state.channels_text}` : ""}`} />
       </FormGrid>
       {!listed ? (
-        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/80" role="note" data-testid="season-discord-no-channels">
+        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-body text-white/80" role="note" data-testid="season-discord-no-channels">
           Noch kein Kanal freigegeben. Freigeben unter <a className="underline underline-offset-2" href="/admin/integrations/discord">{PLACE}</a> (Community, News oder Events und Turniere).
         </p>
       ) : null}
       {notApproved ? (
-        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="note" data-testid="season-discord-not-approved">
+        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-body text-white" role="note" data-testid="season-discord-not-approved">
           Der gespeicherte Kanal ist nicht freigegeben – solange geht nichts hinaus. Bitte einen freigegebenen Kanal wählen.
         </p>
       ) : null}
       {loud.length ? (
-        <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="note" data-testid="season-discord-problems">
+        <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-small text-white" role="note" data-testid="season-discord-problems">
           <p className="font-bold">Meldungen, die du prüfen solltest</p>
           <ul className="mt-1 space-y-1">{loud.map(item)}</ul>
         </div>
       ) : null}
       {quiet.length ? (
         // Nr. 243: verworfene Spieltage - nichts ist schiefgegangen, darum leiser als „unklar“.
-        <div className="rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 text-sm text-white/70" role="note" data-tone="quiet"
+        <div className="rounded-sm border border-white/10 bg-white/[0.02] px-3 py-2 tls-type-small text-white/70" role="note" data-tone="quiet"
           data-testid="season-discord-skipped">
           <p className="font-semibold text-white/80">Verworfene Spieltage</p>
           <ul className="mt-1 space-y-1">{quiet.map(item)}</ul>
         </div>
       ) : null}
-      {anyOn && !String(form.channel_id || "").trim() ? <p className="text-sm text-warn" data-testid="season-discord-channel-missing">Bitte einen Kanal wählen – ohne Kanal geht nichts hinaus.</p> : null}
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="season-discord-error">{error}</p> : null}
+      {anyOn && !String(form.channel_id || "").trim() ? <p className="tls-type-small text-warn" data-testid="season-discord-channel-missing">Bitte einen Kanal wählen – ohne Kanal geht nichts hinaus.</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="season-discord-error">{error}</p> : null}
       {canEdit ? (
         <button type="button" onClick={save} disabled={saving} data-testid="season-discord-save"
-          className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
           {saving ? "Speichere …" : "Discord speichern"}
         </button>
       ) : null}

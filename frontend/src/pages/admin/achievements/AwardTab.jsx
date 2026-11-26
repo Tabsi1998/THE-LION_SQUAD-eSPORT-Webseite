@@ -40,7 +40,7 @@ function AwardOptions({ value, onChange, testPrefix }) {
     <div className="space-y-2">
       <TextAreaField label="Grund (steht im Protokoll)" rows={2} value={value.note} onChange={(v) => set("note", v)} testId={`${testPrefix}-note`} placeholder="z. B. LAN-Party Herbst 2026" />
       <label className="block">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Datum (leer = jetzt, sonst rückwirkend)</span>
+        <span className="tls-type-small font-bold text-white/50">Datum (leer = jetzt, sonst rückwirkend)</span>
         <input type="datetime-local" max={nowLocal()} value={value.when} onChange={(e) => set("when", e.target.value)} data-testid={`${testPrefix}-date`} className={`${INPUT_CLASS} mt-1`} />
       </label>
       <CheckField label="Ohne Zeremonie – zählt, wird aber nicht gefeiert" checked={value.silent} onChange={(v) => set("silent", v)} testId={`${testPrefix}-silent`} accent="#FFD700" />
@@ -101,10 +101,10 @@ function SingleAward({ catalog, person, setPerson, onDone }) {
         <PersonPicker value={person} onChange={setPerson} testId="award-person" />
         <TierSelect tiers={catalog.tiers} groupsByCode={catalog.groupsByCode} value={tierCode} onChange={setTierCode} testId="award-tier-select" filter={(t, g) => !g.is_negative} />
         {tier?.member_only && (
-          <p className="border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-2 text-xs text-white/70">Nur für aktive oder Ehren-Mitglieder.</p>
+          <p className="border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-2 tls-type-small text-white/70">Nur für aktive oder Ehren-Mitglieder.</p>
         )}
         <AwardOptions value={options} onChange={setOptions} testPrefix="award" />
-        <button type="button" onClick={award} disabled={busy || !person || !tierCode} data-testid="award-submit" className="w-full px-4 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
+        <button type="button" onClick={award} disabled={busy || !person || !tierCode} data-testid="award-submit" className="w-full px-4 py-3 bg-[#FFD700] text-black tls-type-label rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Award className="w-4 h-4" /> {busy ? "Vergebe …" : "Vergeben"}
         </button>
       </div>
@@ -142,23 +142,23 @@ function PersonAwards({ person, tick, onDone }) {
           <li key={row.tier_code} className="py-2" data-testid={`person-award-${row.tier_code}`}>
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold tls-wrap">{row.tier_name} <MaterialChip tier={row} className="ml-1" /></div>
-                <div className="text-[11px] text-white/45">{row.group_name} · {formatWhen(row.earned_at)}{row.silent ? " · still" : ""}{row.is_negative ? " · negativ" : ""}{row.note ? ` · „${row.note}“` : ""}</div>
+                <div className="tls-type-small font-semibold tls-wrap">{row.tier_name} <MaterialChip tier={row} className="ml-1" /></div>
+                <div className="tls-type-small text-white/45">{row.group_name} · {formatWhen(row.earned_at)}{row.silent ? " · still" : ""}{row.is_negative ? " · negativ" : ""}{row.note ? ` · „${row.note}“` : ""}</div>
               </div>
               {revoking !== row.tier_code && (
-                <button type="button" onClick={() => { setRevoking(row.tier_code); setReason(""); }} data-testid={`revoke-${row.tier_code}`} className="text-[#FF3B30] hover:underline text-xs shrink-0">Zurücknehmen</button>
+                <button type="button" onClick={() => { setRevoking(row.tier_code); setReason(""); }} data-testid={`revoke-${row.tier_code}`} className="text-[#FF3B30] hover:underline tls-type-small shrink-0">Zurücknehmen</button>
               )}
             </div>
             {revoking === row.tier_code && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund der Rücknahme" aria-label="Grund der Rücknahme" data-testid={`revoke-reason-${row.tier_code}`} className={`${INPUT_CLASS} flex-1 min-w-[12rem]`} />
-                <button type="button" onClick={() => revoke(row)} data-testid={`revoke-confirm-${row.tier_code}`} className="px-3 py-2 bg-[#FF3B30] text-white text-[10px] font-bold uppercase tracking-widest rounded-sm">Zurücknehmen</button>
-                <button type="button" onClick={() => setRevoking(null)} className="text-[10px] uppercase tracking-widest text-white/50">Abbrechen</button>
+                <button type="button" onClick={() => revoke(row)} data-testid={`revoke-confirm-${row.tier_code}`} className="px-3 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm">Zurücknehmen</button>
+                <button type="button" onClick={() => setRevoking(null)} className="tls-type-label text-white/50">Abbrechen</button>
               </div>
             )}
           </li>
         ))}
-        {person && !rows.length && <li className="py-6 text-center text-xs text-white/40">Noch keine Erfolge.</li>}
+        {person && !rows.length && <li className="py-6 text-center tls-type-small text-white/40">Noch keine Erfolge.</li>}
       </ul>
     </Panel>
   );
@@ -232,10 +232,10 @@ function BulkAward({ catalog, board, onDone }) {
           <div className="space-y-3">
             <TierSelect tiers={catalog.tiers} groupsByCode={catalog.groupsByCode} value={tierCode} onChange={update(setTierCode)} testId="bulk-tier-select" filter={(t, g) => !g.is_negative} />
             <label className="block">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Liste: Benutzername, E-Mail oder Konto je Zeile</span>
+              <span className="tls-type-small font-bold text-white/50">Liste: Benutzername, E-Mail oder Konto je Zeile</span>
               <textarea rows={4} value={namesText} onChange={(e) => update(setNamesText)(e.target.value)} data-testid="bulk-names" placeholder={"paula\nmax@example.com"} className={`${INPUT_CLASS} mt-1 font-mono text-xs`} />
             </label>
-            <div className="flex items-center justify-between gap-2 text-[11px] text-white/45">
+            <div className="flex items-center justify-between gap-2 tls-type-small text-white/45">
               <FilePick label="CSV-Datei wählen" accept=".csv,.txt,text/csv,text/plain" onFile={onFile} testId="bulk-file" />
               <span data-testid="bulk-name-count">{names.length} Namen</span>
             </div>
@@ -247,11 +247,11 @@ function BulkAward({ catalog, board, onDone }) {
           </div>
           <div className="space-y-3">
             <AwardOptions value={options} onChange={setOptions} testPrefix="bulk" />
-            <button type="button" onClick={runPreview} disabled={busy || !tierCode || !hasSource} data-testid="bulk-preview" className="w-full px-4 py-2.5 border border-[#29B6E8]/60 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
+            <button type="button" onClick={runPreview} disabled={busy || !tierCode || !hasSource} data-testid="bulk-preview" className="w-full px-4 py-2.5 border border-[#29B6E8]/60 text-[#29B6E8] tls-type-label rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
               <ListChecks className="w-4 h-4" /> Vorschau
             </button>
             {preview && (
-              <div className="border border-white/10 rounded-sm p-3 text-xs space-y-2" data-testid="bulk-result">
+              <div className="border border-white/10 rounded-sm p-3 tls-type-small space-y-2" data-testid="bulk-result">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <span className="text-[#00FF88]" data-testid="bulk-would">{preview.would_award} bekommen es</span>
                   <span className="text-white/55">{preview.already} haben es schon</span>
@@ -267,7 +267,7 @@ function BulkAward({ catalog, board, onDone }) {
                     </li>
                   ))}
                 </ul>
-                <button type="button" onClick={run} disabled={busy || !preview.would_award} data-testid="bulk-submit" className="w-full px-4 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">
+                <button type="button" onClick={run} disabled={busy || !preview.would_award} data-testid="bulk-submit" className="w-full px-4 py-2.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">
                   {busy ? "Vergebe …" : `An ${preview.would_award} Person${preview.would_award === 1 ? "" : "en"} vergeben`}
                 </button>
               </div>
@@ -322,7 +322,7 @@ function Protocol({ person, tick }) {
             {Object.entries(EVENT_KINDS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
           {person && (
-            <label className="text-[11px] text-white/60 inline-flex items-center gap-1.5">
+            <label className="tls-type-small text-white/60 inline-flex items-center gap-1.5">
               <input type="checkbox" checked={onlyPerson} onChange={(e) => setOnlyPerson(e.target.checked)} data-testid="protocol-only-person" /> nur {personName(person)}
             </label>
           )}
@@ -331,8 +331,8 @@ function Protocol({ person, tick }) {
       testId="award-protocol"
     >
       <div className="tls-swipe pb-0">
-        <table className="w-full text-xs min-w-[760px]">
-          <thead className="text-[10px] uppercase tracking-widest text-white/45">
+        <table className="w-full tls-type-small min-w-[760px]">
+          <thead className="tls-type-label text-white/45">
             <tr>
               <th className="text-left py-2 pr-3">Wann</th>
               <th className="text-left py-2 pr-3">Was</th>

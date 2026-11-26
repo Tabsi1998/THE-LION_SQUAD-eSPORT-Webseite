@@ -32,7 +32,7 @@ export function SeasonPhaseBar({ season, calendar, divisions, now }) {
   const steps = seasonPhases({ season, calendar, divisions, now });
   return (
     <section className="rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby="season-phases-title" data-testid="season-phases">
-      <h2 id="season-phases-title" className="mb-4 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ablauf der Season</h2>
+      <h2 id="season-phases-title" className="mb-4 tls-type-label text-[#29B6E8]">Ablauf der Season</h2>
       <ol className="grid gap-3 md:grid-cols-5 md:gap-0">
         {steps.map((step, index) => {
           const last = index === steps.length - 1;
@@ -45,12 +45,12 @@ export function SeasonPhaseBar({ season, calendar, divisions, now }) {
               ) : null}
               <PhaseDot state={step.state} />
               <div className="min-w-0 pb-1 md:mt-2.5">
-                <div className={`flex flex-wrap items-center gap-x-2 text-xs font-bold uppercase tracking-wider ${current ? "text-white" : step.state === "upcoming" ? "text-white/55" : "text-white/70"}`}>
+                <div className={`flex flex-wrap items-center gap-x-2 tls-type-label ${current ? "text-white" : step.state === "upcoming" ? "text-white/55" : "text-white/70"}`}>
                   {step.label}
-                  {current ? <span className="rounded-sm bg-[#29B6E8]/15 px-1.5 py-0.5 text-[10px] text-[#29B6E8]">Jetzt</span> : <span className="sr-only">({STATE_TEXT[step.state]})</span>}
+                  {current ? <span className="rounded-sm bg-[#29B6E8]/15 px-1.5 py-0.5 tls-type-small text-[#29B6E8]">Jetzt</span> : <span className="sr-only">({STATE_TEXT[step.state]})</span>}
                 </div>
-                {step.when ? <div className="mt-0.5 text-xs tabular-nums text-white/60">{step.when}</div> : null}
-                <div className={`mt-0.5 text-xs ${current ? "text-white/75" : "text-white/40"}`}>{step.note}</div>
+                {step.when ? <div className="mt-0.5 tls-type-small tabular-nums text-white/60">{step.when}</div> : null}
+                <div className={`mt-0.5 tls-type-small ${current ? "text-white/75" : "text-white/40"}`}>{step.note}</div>
               </div>
             </li>
           );
@@ -66,16 +66,16 @@ function RulesNotice({ notice, rulesLink, onJump }) {
   return (
     <div role="status" className="flex flex-wrap items-start gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3" data-testid="season-rules-notice" data-kind={notice.kind}>
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
-      <div className="min-w-[min(100%,14rem)] flex-1 text-sm">
+      <div className="min-w-[min(100%,14rem)] flex-1 tls-type-small">
         <p className="font-semibold text-white">Regelwerk muss freigegeben werden</p>
         <p className="mt-0.5 text-white/70">{notice.text}</p>
       </div>
       {rulesLink ? (
-        <Link to={rulesLink} className="tls-btn tls-btn--secondary inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" data-testid="season-rules-notice-link">
+        <Link to={rulesLink} className="tls-btn tls-btn--secondary inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-3 py-1.5 tls-type-label" data-testid="season-rules-notice-link">
           Regelwerk öffnen <ArrowRight className="h-3 w-3" aria-hidden="true" />
         </Link>
       ) : (
-        <button type="button" onClick={() => onJump("regelwerk")} className="tls-btn tls-btn--quiet inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
+        <button type="button" onClick={() => onJump("regelwerk")} className="tls-btn tls-btn--quiet inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-3 py-1.5 tls-type-label">
           Zu Regelwerk <ArrowRight className="h-3 w-3" aria-hidden="true" />
         </button>
       )}
@@ -84,7 +84,7 @@ function RulesNotice({ notice, rulesLink, onJump }) {
 }
 
 function Effect({ children, testId }) {
-  return <p className="-mt-2 text-xs leading-relaxed text-white/60" data-testid={testId}>{children}</p>;
+  return <p className="-mt-2 tls-type-small leading-relaxed text-white/60" data-testid={testId}>{children}</p>;
 }
 
 export function SeasonOverviewTab({ data, form, set, setForm, saved, canSeason, readiness, overrideReason, onOverrideReason, onJump, rulesNotice, rulesLink,
@@ -110,17 +110,17 @@ export function SeasonOverviewTab({ data, form, set, setForm, saved, canSeason, 
               <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(value) => set("visibility", value)} options={VISIBILITY_OPTIONS} testId="season-form-visibility" />
               <Effect testId="season-visibility-effect">{VISIBILITY_EFFECT[form.visibility]} Gilt beim Speichern sofort, auch für alle Staffeln.</Effect>
               {blocked ? (
-                <p className="text-xs text-warn" data-testid="season-visibility-blocked">Die Prüfung links meldet noch Probleme – so lässt sich die Season noch nicht veröffentlichen.</p>
+                <p className="tls-type-small text-warn" data-testid="season-visibility-blocked">Die Prüfung links meldet noch Probleme – so lässt sich die Season noch nicht veröffentlichen.</p>
               ) : null}
               <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
               <Effect testId="season-status-effect">{STATUS_EFFECT[form.status]}</Effect>
               {/* Startseite (#2324): Vorgabe an. Wer die Season sieht, sagt weiter die Sichtbarkeit. */}
-              <label className="flex min-h-[44px] items-start gap-2 text-sm text-white/80">
+              <label className="flex min-h-[44px] items-start gap-2 tls-type-small text-white/80">
                 <input type="checkbox" checked={Boolean(form.promote_on_home)} onChange={(event) => set("promote_on_home", event.target.checked)}
                   className="mt-1 accent-[#29B6E8]" data-testid="season-form-promote-home" />
                 <span className="min-w-0">
                   Auf der Startseite bewerben
-                  <span className="block text-xs text-white/50">In „Nächste Termine“ und, solange die Anmeldung offen ist, als Hinweis mit „Mit Co-Team anmelden“ oben auf der Startseite. Nur für alle, die die Season sehen dürfen.</span>
+                  <span className="block tls-type-small text-white/50">In „Nächste Termine“ und, solange die Anmeldung offen ist, als Hinweis mit „Mit Co-Team anmelden“ oben auf der Startseite. Nur für alle, die die Season sehen dürfen.</span>
                 </span>
               </label>
             </FormSection>
@@ -144,9 +144,9 @@ export function SeasonOverviewTab({ data, form, set, setForm, saved, canSeason, 
         <div className="grid items-start gap-6 lg:grid-cols-2">
           <div id="pruefung" className="min-w-0 scroll-mt-24">{check}</div>
           <FormSection title="Season" testId="season-state">
-            <p className="text-sm text-white/80"><strong className="text-white">Sichtbarkeit:</strong> {VISIBILITY_SHORT[season.visibility]}</p>
+            <p className="tls-type-small text-white/80"><strong className="text-white">Sichtbarkeit:</strong> {VISIBILITY_SHORT[season.visibility]}</p>
             <Effect>{VISIBILITY_EFFECT[season.visibility]}</Effect>
-            <p className="text-sm text-white/80"><strong className="text-white">Stand:</strong> {STATUS_TEXT[season.status] || season.status}</p>
+            <p className="tls-type-small text-white/80"><strong className="text-white">Stand:</strong> {STATUS_TEXT[season.status] || season.status}</p>
             <Effect>{STATUS_EFFECT[season.status]}</Effect>
           </FormSection>
         </div>

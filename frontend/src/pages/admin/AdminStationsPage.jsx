@@ -25,6 +25,7 @@ import { moveMatch } from "@/lib/schedulePlan";
 import { StationTimeline } from "./tournament/matchplan/StationTimeline";
 import { StationAgenda } from "./tournament/matchplan/MatchPlanParts";
 import "./tournament/matchplan/matchplan.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const DEVICES = [
   ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"], ["ps5", "PS5"], ["xbox", "Xbox"],
@@ -267,16 +268,16 @@ export default function AdminStationsPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Event-Einrichtung</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Stationen</h1>
+      <span className="tls-type-label text-[#29B6E8]">Event-Einrichtung</span>
+      <h1 className="tls-type-title mt-1 mb-6"><ShortCaps>Stationen</ShortCaps></h1>
       {pageError && (
-        <div className="mb-4 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FFB3B3] px-4 py-3 rounded-sm text-sm">
+        <div className="mb-4 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FFB3B3] px-4 py-3 rounded-sm tls-type-small">
           {pageError}
         </div>
       )}
       <div className="mb-6 border border-white/10 rounded-sm bg-[#121212] p-4 flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
         <label className="block flex-1">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aktives Turnier</div>
+          <div className="tls-type-label text-white/60 mb-1.5">Aktives Turnier</div>
           <select value={activeTid} onChange={(e) => setActiveTid(e.target.value)} data-testid="station-tournament-select" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {!tournaments.length && <option value="">Keine Turniere verfügbar</option>}
             {groups.onsite.length > 0 && groups.others.length > 0 ? (
@@ -302,7 +303,7 @@ export default function AdminStationsPage() {
             target="_blank"
             rel="noreferrer"
             aria-disabled={disabled}
-            className={`px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${disabled ? "pointer-events-none opacity-40" : "hover:border-[#29B6E8]/50 hover:text-[#29B6E8]"}`}
+            className={`px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm inline-flex items-center justify-center gap-2 ${disabled ? "pointer-events-none opacity-40" : "hover:border-[#29B6E8]/50 hover:text-[#29B6E8]"}`}
           >
             PDF Hochformat
           </a>
@@ -311,7 +312,7 @@ export default function AdminStationsPage() {
             target="_blank"
             rel="noreferrer"
             aria-disabled={disabled}
-            className={`px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 text-xs ${disabled ? "pointer-events-none opacity-40" : "hover:bg-[#29B6E8]/10"}`}
+            className={`px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] tls-type-label rounded-sm inline-flex items-center justify-center gap-2 ${disabled ? "pointer-events-none opacity-40" : "hover:bg-[#29B6E8]/10"}`}
           >
             PDF Querformat
           </a>
@@ -325,8 +326,8 @@ export default function AdminStationsPage() {
 
       {leadUrl ? (
         <div className="mb-6 flex flex-col gap-3 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="stations-lead-link">
-          <p className="text-sm text-white/70">Aufrufen, Starten, Freigeben, Defekt und Umlegen stehen am Turniertag in der <span className="font-bold text-white">Turnierleitung</span> – am Handy und am PC.</p>
-          <Link to={leadUrl} className="tls-btn tls-btn--primary inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+          <p className="tls-type-body text-white/70">Aufrufen, Starten, Freigeben, Defekt und Umlegen stehen am Turniertag in der <span className="font-bold text-white">Turnierleitung</span> – am Handy und am PC.</p>
+          <Link to={leadUrl} className="tls-btn tls-btn--primary inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label">
             <ExternalLink className="h-4 w-4" aria-hidden="true" /> Stationen live bedienen
           </Link>
         </div>
@@ -351,7 +352,7 @@ export default function AdminStationsPage() {
         {/* LEFT: Create form + unassigned matches queue */}
         <div className="space-y-6">
           {isTournamentLead && <form onSubmit={create} className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Einzelne Station</div>
+            <div className="tls-type-label text-white/60">Einzelne Station</div>
             <input placeholder="Name (z.B. Switch 1)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required data-testid="station-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <select value={form.device_type} onChange={(e) => setForm({ ...form, device_type: e.target.value })} data-testid="station-device" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {DEVICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -361,7 +362,7 @@ export default function AdminStationsPage() {
           </form>}
 
           {isTournamentLead && <div className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Schnell-Setup</div>
+            <div className="tls-type-label text-white/60">Schnell-Setup</div>
             <div className="grid grid-cols-2 gap-2">
               <input placeholder="Namensanfang" aria-label="Namensanfang" value={bulk.prefix} onChange={(e) => setBulk({ ...bulk, prefix: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input type="number" min="1" max="64" value={bulk.count} onChange={(e) => setBulk({ ...bulk, count: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -377,31 +378,31 @@ export default function AdminStationsPage() {
 
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Offene Spiele</div>
+              <div className="tls-type-label text-white/60">Offene Spiele</div>
             </div>
             <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
               {unassignedMatches.map((m) => (
-                <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A] hover:border-[#29B6E8]/40">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
+                <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm tls-type-small bg-[#0A0A0A] hover:border-[#29B6E8]/40">
+                  <div className="text-white/40 tls-type-label">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                   <div className="mt-1 text-white/40">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Keine feste Zeit"}{m.planned_minutes ? ` · ${m.planned_minutes} Min.` : ""}</div>
                 </div>
               ))}
-              {loadingMatches && <div className="text-white/40 text-xs text-center py-6">Spiele werden geladen …</div>}
-              {!loadingMatches && unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
+              {loadingMatches && <div className="text-white/40 tls-type-small text-center py-6">Spiele werden geladen …</div>}
+              {!loadingMatches && unassignedMatches.length === 0 && <div className="text-white/40 tls-type-small text-center py-6">Keine offenen Spiele</div>}
             </div>
           </div>
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Geplante Warteschlange</div>
+            <div className="tls-type-label text-white/60 mb-3">Geplante Warteschlange</div>
             <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
               {plannedQueue.map((m) => (
-                <div key={m.id} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A]">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
+                <div key={m.id} className="p-2 border border-white/10 rounded-sm tls-type-small bg-[#0A0A0A]">
+                  <div className="text-white/40 tls-type-label">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                   <div className="mt-1 text-white/40">Station {stationName(m.station_id, list)}{m.scheduled_at ? ` · ${formatDateTime(m.scheduled_at)}` : ""}</div>
                 </div>
               ))}
-              {plannedQueue.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine geplanten Spiele</div>}
+              {plannedQueue.length === 0 && <div className="text-white/40 tls-type-small text-center py-6">Keine geplanten Spiele</div>}
             </div>
           </div>
         </div>
@@ -415,8 +416,8 @@ export default function AdminStationsPage() {
               <div key={s.id} className={`border rounded-sm bg-[#121212] p-4 ${s.status === "busy" ? "border-[#FF3B30]/30" : "border-white/10"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{formatDeviceType(s.device_type)}</div>
-                    <div className="font-heading text-lg font-bold">{s.name}</div>
+                    <div className="tls-type-label text-[#29B6E8]">{formatDeviceType(s.device_type)}</div>
+                    <div className="tls-type-card">{s.name}</div>
                   </div>
                   {isTournamentLead && (
                     <div className="flex shrink-0 gap-1">
@@ -428,7 +429,7 @@ export default function AdminStationsPage() {
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
                   {isTournamentLead && !s.current_match_id ? (
-                    <button type="button" onClick={() => toggleBroken(s)} data-testid={`station-broken-${s.id}`} className={`ml-auto min-h-[36px] rounded-sm border px-3 text-[11px] font-bold uppercase tracking-wider ${s.status === "broken" ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"}`}>
+                    <button type="button" onClick={() => toggleBroken(s)} data-testid={`station-broken-${s.id}`} className={`ml-auto min-h-[36px] rounded-sm border px-3 tls-type-label ${s.status === "broken" ? "border-ok/40 text-ok hover:bg-ok/10" : "border-warn/40 text-warn hover:bg-warn/10"}`}>
                       {s.status === "broken" ? "Bereit" : "Defekt"}
                     </button>
                   ) : null}
@@ -436,22 +437,22 @@ export default function AdminStationsPage() {
                 {/* Hält die Station ein Spiel (#1162), gehört „Defekt“ in die Turnierleitung - dort bleibt der Aufruf und das
                     Spiel lässt sich umlegen. */}
                 {isTournamentLead && s.current_match_id ? (
-                  <p className="mt-2 text-xs text-white/55" data-testid={`station-broken-hint-${s.id}`}>
+                  <p className="mt-2 tls-type-small text-white/55" data-testid={`station-broken-hint-${s.id}`}>
                     Station hält ein Spiel – {leadUrl ? <Link to={leadUrl} className="text-[#29B6E8] underline-offset-2 hover:underline">in der Turnierleitung als defekt melden</Link> : "in der Turnierleitung als defekt melden"}.
                   </p>
                 ) : null}
                 {/* Current match */}
                 {s.current_match_id ? (
                   <div className="mt-3 p-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm">
-                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{s.status === "reserved" ? "Reserviert" : "Aktuell"}</div>
-                    <div className="text-sm text-white truncate">{currentMatch ? nameOfMatch(currentMatch) : "Spiel wird geladen oder ist nicht mehr vorhanden"}</div>
-                    {currentMatch?.scheduled_at && <div className="mt-1 text-[11px] text-white/45">{formatDateTime(currentMatch.scheduled_at)}</div>}
+                    <div className="tls-type-label text-[#29B6E8]">{s.status === "reserved" ? "Reserviert" : "Aktuell"}</div>
+                    <div className="tls-type-small text-white truncate">{currentMatch ? nameOfMatch(currentMatch) : "Spiel wird geladen oder ist nicht mehr vorhanden"}</div>
+                    {currentMatch?.scheduled_at && <div className="mt-1 tls-type-small text-white/45">{formatDateTime(currentMatch.scheduled_at)}</div>}
                     {currentMatch ? (
-                      <button type="button" onClick={() => setResultFor(currentMatch.id)} className="mt-3 w-full px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-[10px] font-bold uppercase tracking-widest" data-testid={`station-result-${s.id}`}>Ergebnis eintragen</button>
+                      <button type="button" onClick={() => setResultFor(currentMatch.id)} className="mt-3 w-full px-3 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label" data-testid={`station-result-${s.id}`}>Ergebnis eintragen</button>
                     ) : null}
                   </div>
                 ) : null}
-                {s.notes && <div className="mt-2 text-white/50 text-xs">{s.notes}</div>}
+                {s.notes && <div className="mt-2 text-white/50 tls-type-small">{s.notes}</div>}
               </div>
               );
             })}

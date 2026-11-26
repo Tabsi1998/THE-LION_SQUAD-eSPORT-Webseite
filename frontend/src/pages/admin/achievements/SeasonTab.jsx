@@ -82,20 +82,20 @@ export function SeasonTab() {
     <div className="space-y-6" data-testid="ach-season">
       <div className="flex flex-wrap items-end gap-3">
         <label className="block min-w-[16rem]">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">Saison</span>
+          <span className="tls-type-label text-white/50">Saison</span>
           <select value={seasonId} onChange={(e) => setSeasonId(e.target.value)} data-testid="season-select" className="mt-1 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {!seasons.length && <option value="">Keine Saison angelegt</option>}
             {seasons.map((s) => <option key={s.id} value={s.id}>{s.name} · {STATUS_LABELS[s.status] || s.status}</option>)}
           </select>
         </label>
         {preview && (
-          <p className="text-xs text-white/50 pb-2" data-testid="season-summary">
+          <p className="tls-type-small text-white/50 pb-2" data-testid="season-summary">
             {preview.ranked} Plätze · {preview.awards_total} Erfolg{preview.awards_total === 1 ? "" : "e"} beim Abschluss{preview.already_written ? " · Rangliste schon festgeschrieben" : ""}
           </p>
         )}
       </div>
 
-      {loading && <p className="text-sm text-white/40">Lädt …</p>}
+      {loading && <p className="tls-type-small text-white/40">Lädt …</p>}
       {preview && !loading && (
         <>
           <Panel
@@ -106,15 +106,15 @@ export function SeasonTab() {
               ? "Die Saison ist abgeschlossen. Ein erneuter Abschluss schreibt die Rangliste neu und vergibt, was noch fehlt – doppelt wird nichts."
               : "Die Saison läuft noch. Abgeschlossen wird sie in der Jahreswertung mit dem Knopf „Abschließen“ – dabei werden genau diese Erfolge vergeben."}
             actions={preview.finished ? (
-              <button type="button" onClick={awardSeason} disabled={busy} data-testid="season-award" className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">Abschluss vergeben</button>
+              <button type="button" onClick={awardSeason} disabled={busy} data-testid="season-award" className="px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Abschluss vergeben</button>
             ) : (
-              <Link to="/admin/seasons" className="px-3 py-1.5 border border-white/20 text-white/70 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:text-white" data-testid="season-to-ranking">Zur Jahreswertung</Link>
+              <Link to="/admin/seasons" className="px-3 py-1.5 border border-white/20 text-white/70 tls-type-label rounded-sm hover:text-white" data-testid="season-to-ranking">Zur Jahreswertung</Link>
             )}
             testId="season-preview"
           >
             <div className="tls-swipe pb-0">
-              <table className="w-full text-sm min-w-[640px]">
-                <thead className="text-[10px] uppercase tracking-widest text-white/45">
+              <table className="w-full tls-type-small min-w-[640px]">
+                <thead className="tls-type-label text-white/45">
                   <tr>
                     <th className="text-left py-2 pr-3 w-12">Platz</th>
                     <th className="text-left py-2 pr-3">Person</th>
@@ -126,17 +126,17 @@ export function SeasonTab() {
                 <tbody className="divide-y divide-white/5">
                   {preview.standings.map((row) => (
                     <tr key={row.user_id || row.rank} data-testid={`season-row-${row.rank}`}>
-                      <td className="py-2 pr-3 font-heading font-black tabular-nums" style={{ color: row.rank === 1 ? "#FFD700" : undefined }}>{row.rank}</td>
-                      <td className="py-2 pr-3">{personName(row)} {row.username && <span className="text-[11px] text-white/35">@{row.username}</span>}</td>
+                      <td className="py-2 pr-3 tls-type-num" style={{ color: row.rank === 1 ? "#FFD700" : undefined }}>{row.rank}</td>
+                      <td className="py-2 pr-3">{personName(row)} {row.username && <span className="tls-type-small text-white/35">@{row.username}</span>}</td>
                       <td className="py-2 pr-3 text-right tabular-nums">{Number(row.points || 0).toLocaleString("de-DE")}</td>
                       <td className="py-2 pr-3">
                         <div className="flex flex-wrap gap-1.5">
                           {row.awards.map((a) => (
-                            <span key={a.code} className="inline-flex items-center gap-1 border border-white/10 rounded-sm px-1.5 py-0.5 text-[11px]" data-testid={`season-award-${a.code}`}>
+                            <span key={a.code} className="inline-flex items-center gap-1 border border-white/10 rounded-sm px-1.5 py-0.5 tls-type-small" data-testid={`season-award-${a.code}`}>
                               {a.name} <MaterialChip tier={a} />
                             </span>
                           ))}
-                          {!row.awards.length && <span className="text-[11px] text-white/30">–</span>}
+                          {!row.awards.length && <span className="tls-type-small text-white/30">–</span>}
                         </div>
                       </td>
                       {preview.mvp && (
@@ -148,7 +148,7 @@ export function SeasonTab() {
                       )}
                     </tr>
                   ))}
-                  {!preview.standings.length && <tr><td colSpan="5" className="py-6 text-center text-xs text-white/40">Noch keine Punkte in dieser Saison.</td></tr>}
+                  {!preview.standings.length && <tr><td colSpan="5" className="py-6 text-center tls-type-small text-white/40">Noch keine Punkte in dieser Saison.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -157,8 +157,8 @@ export function SeasonTab() {
           {preview.mvp && (
             <Panel title="Saison-MVP" icon={Star} accent="#FF3B30" hint="Die Spielerin oder der Spieler der Saison – von der Vereinsleitung gewählt. In der Tabelle auswählen, dann auszeichnen." testId="season-mvp">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm text-white/70">{mvp ? `Ausgewählt: ${personName(preview.standings.find((r) => r.user_id === mvp))}` : "Noch niemand ausgewählt."}</span>
-                <button type="button" onClick={awardMvp} disabled={busy || !mvp} data-testid="season-mvp-award" className="px-3 py-1.5 bg-[#FF3B30] text-white text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">
+                <span className="tls-type-small text-white/70">{mvp ? `Ausgewählt: ${personName(preview.standings.find((r) => r.user_id === mvp))}` : "Noch niemand ausgewählt."}</span>
+                <button type="button" onClick={awardMvp} disabled={busy || !mvp} data-testid="season-mvp-award" className="px-3 py-1.5 bg-[#FF3B30] text-white tls-type-label rounded-sm disabled:opacity-40">
                   Als Saison-MVP auszeichnen
                 </button>
               </div>

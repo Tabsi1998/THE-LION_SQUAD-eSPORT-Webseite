@@ -114,13 +114,13 @@ export function ClubMemberProfilesAdminContent() {
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
           {/* Reiter unter Mitglieder (#1365): die Seite trägt schon die Überschrift „Mitglieder“ - hier eine Stufe darunter. */}
-          <h2 className="font-heading text-xl md:text-2xl font-black uppercase">Öffentliche Profile</h2>
-          <p className="text-sm text-white/60 mt-1 max-w-3xl">
+          <h2 className="tls-type-section">Öffentliche Profile</h2>
+          <p className="tls-type-body text-white/60 mt-1 max-w-3xl">
             Redaktionelle Mitgliederübersicht mit festen Profilen, großen Bildern, Bio, Games und Plattformen. Funktionen wie Obmann/Kassier kommen automatisch aus dem Vorstand.
             Ein Profil ist kein Konto und keine Mitgliedschaft: „Profil erstellen“ legt nur das Vereinsprofil an – das Website-Konto verknüpfst du im Profil unter „Konto“ (optional).
           </p>
         </div>
-        <button onClick={() => setEditing({ profile: null, form: toForm(null) })} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-black uppercase tracking-wider hover:bg-[#e8c200]">
+        <button onClick={() => setEditing({ profile: null, form: toForm(null) })} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label hover:bg-[#e8c200]">
           <Plus className="w-4 h-4" /> Profil erstellen
         </button>
       </div>
@@ -150,37 +150,37 @@ export function ClubMemberProfilesAdminContent() {
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="font-heading font-black uppercase truncate">{profile.gamertag || profile.display_name}</h2>
-                    {profile.real_name && <p className="text-[10px] text-white/40 truncate">{profile.real_name}</p>}
-                    <p className="text-xs text-[#FFD700] uppercase tracking-wider font-bold">{profile.board_title || profile.role_title || "Mitglied"}</p>
+                    <h2 className="tls-type-section truncate">{profile.gamertag || profile.display_name}</h2>
+                    {profile.real_name && <p className="tls-type-small text-white/40 truncate">{profile.real_name}</p>}
+                    <p className="tls-type-label text-[#FFD700]">{profile.board_title || profile.role_title || "Mitglied"}</p>
                     {profile.board_title && profile.role_title && profile.board_title !== profile.role_title && (
-                      <p className="text-[10px] text-white/35 uppercase tracking-widest">Profil: {profile.role_title}</p>
+                      <p className="tls-type-label text-white/35">Profil: {profile.role_title}</p>
                     )}
                     {profile.linked_account && (
-                      <p className="text-[10px] text-white/35 truncate">@{profile.linked_account.username}</p>
+                      <p className="tls-type-small text-white/35 truncate">@{profile.linked_account.username}</p>
                     )}
                     {/* Verzeichnis per Opt-in (#410): vom Mitglied selbst angelegt, ggf. gesperrt */}
-                    {profile.source === "member" && <p className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid={`club-member-self-${profile.id}`}>vom Mitglied eingetragen</p>}
+                    {profile.source === "member" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-self-${profile.id}`}>vom Mitglied eingetragen</p>}
                     {/* Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): vom Abgleich angelegt, Widerruf nimmt offline */}
-                    {profile.source === "dolibarr" && <p className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${viennaDate(profile.consent.moment)})` : ""}</p>}
+                    {profile.source === "dolibarr" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${viennaDate(profile.consent.moment)})` : ""}</p>}
                     {/* Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich die Karte wieder - ohne Konto heißt: Konto noch nicht verknüpft */}
-                    {profile.dolibarr_member_id && <p className="text-[10px] text-white/40" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
-                    {profile.deactivated_reason === "consent_withdrawn" && <p className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
-                    {profile.directory_blocked && <p className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
+                    {profile.dolibarr_member_id && <p className="tls-type-small text-white/40" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
+                    {profile.deactivated_reason === "consent_withdrawn" && <p className="tls-type-small font-bold text-[#FFD700]" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
+                    {profile.directory_blocked && <p className="tls-type-label text-[#FF3B30]" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
                   </div>
-                  <span className="text-[10px] text-white/40 font-mono">#{profile.order_index || 0}</span>
+                  <span className="tls-type-small text-white/40 font-mono">#{profile.order_index || 0}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {(profile.games || []).slice(0, 4).map((game) => <span key={game} className="px-2 py-1 bg-white/5 border border-white/10 rounded-sm text-[10px] text-white/60">{game}</span>)}
+                  {(profile.games || []).slice(0, 4).map((game) => <span key={game} className="px-2 py-1 bg-white/5 border border-white/10 rounded-sm tls-type-small text-white/60">{game}</span>)}
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <Link to={`/members/${profile.slug}`} target="_blank" className="px-3 py-2 border border-white/10 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 hover:text-white">
+                  <Link to={`/members/${profile.slug}`} target="_blank" className="px-3 py-2 border border-white/10 text-white/65 rounded-sm tls-type-label inline-flex items-center gap-2 hover:text-white">
                     <Eye className="w-3.5 h-3.5" /> Öffnen
                   </Link>
-                  <button onClick={() => setEditing({ profile, form: toForm(profile) })} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 hover:bg-[#29B6E8]/10">
+                  <button onClick={() => setEditing({ profile, form: toForm(profile) })} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label inline-flex items-center gap-2 hover:bg-[#29B6E8]/10">
                     <Edit3 className="w-3.5 h-3.5" /> Bearbeiten
                   </button>
-                  <button onClick={() => remove(profile)} className="ml-auto px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10">
+                  <button onClick={() => remove(profile)} className="ml-auto px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -269,12 +269,12 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
         <AccountBox form={form} set={set} profile={entry.profile} profiles={profiles} />
         {/* Streamer oder Creator des Vereins (#2338): mit per Anmeldung verknüpftem Twitch gibt es „Verifizierter Streamer“. */}
         <CheckField label="Streamer oder Creator des Vereins" checked={form.creator} onChange={(v) => set("creator", v)} accent="var(--tls-honor)" testId="club-member-creator" hint="Zusammen mit einem per Anmeldung verknüpften Twitch-Konto bekommt die Person den Erfolg „Verifizierter Streamer“. Wird im Protokoll vermerkt." />
-        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
+        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 tls-type-small text-white/60 rounded-sm">
           Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
         </div>
         {/* Profil aus Dolibarr (#496): was dort gepflegt ist, setzt der Abgleich hier wieder - der Vorstand soll das sehen, bevor er tippt. */}
         {entry.profile?.dolibarr_profile_at && (
-          <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-3 py-2 text-xs text-white/60 rounded-sm" data-testid="club-member-dolibarr-hint">
+          <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-3 py-2 tls-type-small text-white/60 rounded-sm" data-testid="club-member-dolibarr-hint">
             Die zugeordneten Felder des Website-Profils (Dolibarr → Verbindung → Feldzuordnung) und das Foto kommen aus Dolibarr (Mitgliedskarte → Verein → Website-Profil; Stand {viennaDateTime(entry.profile.dolibarr_profile_at)}).
             Was dort gepflegt ist, setzt der nächste Abgleich hier wieder; leere Felder in Dolibarr lassen deine Eingaben stehen. Vor- und Nachname sowie Realname bleiben deine Sache.
           </div>
@@ -290,7 +290,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Detail-Cover optional" testId="club-member-cover" variant="wide" allowLibrary />
         </FormGrid>
         {/* Vorstands-Porträts aus einem Guss (#1332): freigestellte Fotos bekommen den Vereins-Hintergrund dahinter. */}
-        <p className="text-xs text-white/50" data-testid="club-member-photo-hint">Profilbild am schönsten freigestellt (ohne Hintergrund, als PNG) – der Verein legt seinen dahinter. Fotos mit Hintergrund zeigt die Vorstandsseite einheitlich in Vereinsfarben.</p>
+        <p className="tls-type-small text-white/50" data-testid="club-member-photo-hint">Profilbild am schönsten freigestellt (ohne Hintergrund, als PNG) – der Verein legt seinen dahinter. Fotos mit Hintergrund zeigt die Vorstandsseite einheitlich in Vereinsfarben.</p>
         <FormGrid>
           <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
           <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" className="self-end pb-2" />

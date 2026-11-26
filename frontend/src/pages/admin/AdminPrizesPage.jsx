@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle, Search, Users, User, CalendarDays, Plus } from "lucide-react";
 import { asInstant, viennaDate } from "@/lib/vienna";
 import { PrizeFormSheet } from "./prizes/PrizeFormSheet";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABEL = {
   pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
@@ -169,9 +170,9 @@ export default function AdminPrizesPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-2">Gewinne</h1>
-      <p className="text-white/60 text-sm mb-6 max-w-2xl">
+      <span className="tls-type-label text-[#29B6E8]">eSports</span>
+      <h1 className="tls-type-title mt-1 mb-2"><ShortCaps>Gewinne</ShortCaps></h1>
+      <p className="text-white/60 tls-type-body mb-6 max-w-2xl">
         Bei jedem auf <em>Ergebnisse veröffentlicht</em> gesetzten Turnier oder Fast Lap werden Gewinne automatisch
         anhand der hinterlegten Preisstruktur erstellt. Markiere Preise als <strong>bereit</strong>,
         sobald sie zur Abholung verfügbar sind — der Gewinner bekommt Bescheid (Glocke, Push und E-Mail, bei Teams die
@@ -179,7 +180,7 @@ export default function AdminPrizesPage() {
       </p>
 
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <p className="text-xs text-white/45 max-w-2xl">
+        <p className="tls-type-small text-white/45 max-w-2xl">
           Öffentliche Preise sind die Ausschreibung. Diese Seite zeigt konkrete Abhol-Einträge, die nach veröffentlichten Ergebnissen entstehen.
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -187,7 +188,7 @@ export default function AdminPrizesPage() {
             type="button"
             onClick={() => setSheet("new")}
             data-testid="prizes-add"
-            className="inline-flex items-center justify-center gap-2 rounded-sm bg-[#29B6E8] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-black hover:bg-[#1E95C2]"
+            className="inline-flex items-center justify-center gap-2 rounded-sm bg-[#29B6E8] px-4 py-2.5 tls-type-label text-black hover:bg-[#1E95C2]"
           >
             <Plus className="h-4 w-4" />
             Gewinn hinzufügen
@@ -197,7 +198,7 @@ export default function AdminPrizesPage() {
             onClick={createMissing}
             disabled={creatingMissing}
             data-testid="prizes-create-missing"
-            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 tls-type-label text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
             Gewinne neu erzeugen
@@ -211,7 +212,7 @@ export default function AdminPrizesPage() {
             key={value || "all"}
             type="button"
             onClick={() => updateFilterParams({ source: sourceFilter === value ? "" : value })}
-            className={`rounded-sm border px-3 py-2 text-xs font-bold uppercase tracking-wider ${sourceFilter === value ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/20"}`}
+            className={`rounded-sm border px-3 py-2 tls-type-label ${sourceFilter === value ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/20"}`}
           >
             {label} <span className="text-white/40">({count})</span>
           </button>
@@ -225,8 +226,8 @@ export default function AdminPrizesPage() {
             <button key={k} onClick={() => updateFilterParams({ status: filter === k ? "" : k })} data-testid={`prize-stat-${k}`}
               className={`border rounded-sm p-3 text-left transition-all ${filter === k ? STATUS_LABEL[k].color : "border-white/10 bg-[#121212] text-white/70 hover:border-white/20"}`}>
               <Icn className="w-4 h-4 mb-1" />
-              <div className="text-2xl font-black">{counts[k] || 0}</div>
-              <div className="text-[10px] uppercase tracking-widest">{label}</div>
+              <div className="tls-type-section">{counts[k] || 0}</div>
+              <div className="tls-type-label">{label}</div>
             </button>
           );
         })}
@@ -244,8 +245,8 @@ export default function AdminPrizesPage() {
           />
         </label>
         <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm px-4 py-2.5 flex items-center justify-between gap-3">
-          <span className="text-xs uppercase tracking-widest text-white/50">Bald fällig</span>
-          <span className="font-heading font-black text-[#FFD700]">{dueSoon}</span>
+          <span className="tls-type-label text-white/50">Bald fällig</span>
+          <span className="font-black text-[#FFD700]">{dueSoon}</span>
         </div>
       </div>
 
@@ -257,7 +258,7 @@ export default function AdminPrizesPage() {
             <div className="text-center py-12 px-4">
               <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
               <p className="text-white/50">{allItems.length ? "Keine Gewinne für diesen Filter." : "Noch keine Abhol-Einträge erfasst."}</p>
-              <p className="text-xs text-white/30 mt-1">Preise werden nach veröffentlichten Ergebnissen oder über "Gewinne neu erzeugen" zu Abhol-Einträgen.</p>
+              <p className="tls-type-small text-white/30 mt-1">Preise werden nach veröffentlichten Ergebnissen oder über "Gewinne neu erzeugen" zu Abhol-Einträgen.</p>
             </div>
           ) : items.map((p) => (
             <PrizeMobileCard key={p.id} p={p} updateStatus={updateStatus} markPickedUp={markPickedUp} remove={remove} edit={setSheet} />
@@ -265,8 +266,8 @@ export default function AdminPrizesPage() {
         </div>
 
         <div className="hidden md:block tls-swipe pb-0">
-          <table className="w-full text-sm min-w-[900px]">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+          <table className="w-full tls-type-small min-w-[900px]">
+            <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">Quelle</th>
                 <th className="text-left px-4 py-3">Empfänger</th>
@@ -284,7 +285,7 @@ export default function AdminPrizesPage() {
                 <tr><td colSpan="7" className="text-center py-12">
                   <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
                   <p className="text-white/50">{allItems.length ? "Keine Gewinne für diesen Filter." : "Noch keine Gewinne erfasst."}</p>
-                  <p className="text-xs text-white/30 mt-1">Gewinne werden automatisch erstellt, sobald Ergebnisse veröffentlicht werden.</p>
+                  <p className="tls-type-small text-white/30 mt-1">Gewinne werden automatisch erstellt, sobald Ergebnisse veröffentlicht werden.</p>
                 </td></tr>
               ) : items.map((p) => {
                 const s = STATUS_LABEL[p.status] || STATUS_LABEL.pending;
@@ -296,48 +297,48 @@ export default function AdminPrizesPage() {
                   <tr key={p.id} data-testid={`prize-row-${p.id}`}>
                     <td className="px-4 py-3">
                       <div className="font-semibold">{p.fastlap_challenge_title || p.tournament_title || "—"}</div>
-                      {p.fastlap_source_label && <div className="text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
-                      {p.source_type === "fastlap" && <div className="text-[10px] uppercase tracking-widest text-white/35">Fast Lap</div>}
+                      {p.fastlap_source_label && <div className="tls-type-small text-[#29B6E8]">{p.fastlap_source_label}</div>}
+                      {p.source_type === "fastlap" && <div className="tls-type-label text-white/35">Fast Lap</div>}
                       <ReviewMark p={p} />
-                      {p.source_type === "season" && <div className="text-xs text-[#e9c46a]">Verlosung{p.season_source_label ? ` · ${p.season_source_label}` : ""}</div>}
+                      {p.source_type === "season" && <div className="tls-type-small text-[#e9c46a]">Verlosung{p.season_source_label ? ` · ${p.season_source_label}` : ""}</div>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <RecipientIcon className={`w-4 h-4 ${p.recipient_type === "team" ? "text-[#10B981]" : "text-[#29B6E8]"}`} />
                         <div>
                           <div className="font-semibold">{p.recipient_label || p.display_name || "—"}</div>
-                          <div className="text-xs text-white/40">{p.recipient_subtitle || p.email || "—"}</div>
+                          <div className="tls-type-small text-white/40">{p.recipient_subtitle || p.email || "—"}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-bold text-[#29B6E8]">#{p.place}</td>
-                    <td className="px-4 py-3"><div className="font-semibold">{p.prize_label}</div>{p.prize_value && <div className="text-xs text-white/50">{p.prize_value}</div>}</td>
+                    <td className="px-4 py-3"><div className="font-semibold">{p.prize_label}</div>{p.prize_value && <div className="tls-type-small text-white/50">{p.prize_value}</div>}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm border ${s.color}`}>
+                      <span className={`inline-flex items-center gap-1.5 tls-type-label px-2 py-1 rounded-sm border ${s.color}`}>
                         <Icn className="w-3 h-3" /> {s.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 tls-type-small whitespace-nowrap">
                       <div className={`inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
                         <CalendarDays className="w-3 h-3" /> {deadlineText(p)}
                       </div>
-                      {isUrgent && <div className="text-[10px] uppercase tracking-widest text-[#FFD700] mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
+                      {isUrgent && <div className="tls-type-label text-[#FFD700] mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {p.status === "pending" && (
-                        <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mark-ready-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 text-xs font-semibold">Bereit ▸</button>
+                        <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mark-ready-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small font-semibold">Bereit ▸</button>
                       )}
                       {p.status === "ready" && (
-                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 text-xs font-semibold">Abgeholt ✓</button>
+                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 tls-type-small font-semibold">Abgeholt ✓</button>
                       )}
                       {p.status === "picked_up" && (
-                        <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 text-xs"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>
+                        <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 tls-type-small"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>
                       )}
                       {p.status === "expired" && (
-                        <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-reopen-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 text-xs font-semibold"><RefreshCw className="w-3 h-3 inline mr-1" />Wieder öffnen</button>
+                        <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-reopen-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small font-semibold"><RefreshCw className="w-3 h-3 inline mr-1" />Wieder öffnen</button>
                       )}
-                      <button onClick={() => setSheet(p)} data-testid={`prize-edit-${p.id}`} className="text-white/70 hover:text-white hover:underline mr-3 text-xs">Bearbeiten</button>
-                      <button onClick={() => remove(p.id)} className="text-[#FF3B30] hover:underline text-xs">Löschen</button>
+                      <button onClick={() => setSheet(p)} data-testid={`prize-edit-${p.id}`} className="text-white/70 hover:text-white hover:underline mr-3 tls-type-small">Bearbeiten</button>
+                      <button onClick={() => remove(p.id)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>
                     </td>
                   </tr>
                 );
@@ -349,7 +350,7 @@ export default function AdminPrizesPage() {
 
       <div className="mt-6 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" />
-        <div className="text-sm text-white/80">
+        <div className="tls-type-small text-white/80">
           <strong>Hinweis:</strong> Die Abholfrist beträgt standardmäßig 90 Tage ab „Bereit“ – offene Gewinne verfallen nie. Ist die Frist vorbei,
           steht der Gewinn auf „Verfallen“ und der Gewinner bekommt Bescheid; mit <strong>Wieder öffnen</strong> läuft eine neue Frist.
           „Zurück“ bei einem abgeholten Gewinn schickt keine neue Nachricht. Jeder Schritt steht im Protokoll.
@@ -370,7 +371,7 @@ export default function AdminPrizesPage() {
 function ReviewMark({ p }) {
   if (!p.needs_review) return null;
   return (
-    <div data-testid={`prize-review-${p.id}`} title={p.review_note || ""} className="mt-1 inline-flex text-[10px] font-bold uppercase tracking-widest text-honor border border-honor/40 bg-honor/10 px-1.5 py-0.5 rounded-sm">
+    <div data-testid={`prize-review-${p.id}`} title={p.review_note || ""} className="mt-1 inline-flex tls-type-label text-honor border border-honor/40 bg-honor/10 px-1.5 py-0.5 rounded-sm">
       Nach Korrektur prüfen
     </div>
   );
@@ -387,58 +388,58 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
     <article data-testid={`prize-mobile-${p.id}`} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">{p.source_type === "fastlap" ? "Fast Lap" : p.source_type === "season" ? "Verlosung" : "Turnier"}</div>
-          <h2 className="mt-1 font-heading text-lg font-black uppercase leading-tight break-words">{p.fastlap_challenge_title || p.tournament_title || "Quelle offen"}</h2>
-          {p.fastlap_source_label && <div className="mt-1 text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
-          {p.source_type === "season" && p.season_source_label && <div className="mt-1 text-xs text-[#e9c46a]">{p.season_source_label}</div>}
+          <div className="tls-type-label text-white/35">{p.source_type === "fastlap" ? "Fast Lap" : p.source_type === "season" ? "Verlosung" : "Turnier"}</div>
+          <h2 className="mt-1 tls-type-section leading-tight break-words">{p.fastlap_challenge_title || p.tournament_title || "Quelle offen"}</h2>
+          {p.fastlap_source_label && <div className="mt-1 tls-type-small text-[#29B6E8]">{p.fastlap_source_label}</div>}
+          {p.source_type === "season" && p.season_source_label && <div className="mt-1 tls-type-small text-[#e9c46a]">{p.season_source_label}</div>}
           <ReviewMark p={p} />
         </div>
-        <span className={`shrink-0 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border ${s.color}`}>
+        <span className={`shrink-0 inline-flex items-center gap-1.5 tls-type-label px-2 py-1 rounded-sm border ${s.color}`}>
           <Icn className="w-3 h-3" /> {s.label}
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+      <div className="mt-4 grid grid-cols-2 gap-3 tls-type-small">
         <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">Empfänger</div>
+          <div className="tls-type-label text-white/35">Empfänger</div>
           <div className="mt-1 flex items-center gap-2 min-w-0">
             <RecipientIcon className={`w-4 h-4 shrink-0 ${p.recipient_type === "team" ? "text-[#10B981]" : "text-[#29B6E8]"}`} />
             <span className="font-semibold truncate">{p.recipient_label || p.display_name || "-"}</span>
           </div>
-          <div className="mt-1 text-xs text-white/35 truncate">{p.recipient_subtitle || p.email || "-"}</div>
+          <div className="mt-1 tls-type-small text-white/35 truncate">{p.recipient_subtitle || p.email || "-"}</div>
         </div>
         <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">Platz</div>
-          <div className="mt-1 font-heading text-2xl font-black text-[#29B6E8]">#{p.place}</div>
+          <div className="tls-type-label text-white/35">Platz</div>
+          <div className="mt-1 tls-type-section tls-type-num text-[#29B6E8]">#{p.place}</div>
         </div>
       </div>
 
       <div className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3">
-        <div className="text-[10px] uppercase tracking-widest text-white/35">Gewinn</div>
+        <div className="tls-type-label text-white/35">Gewinn</div>
         <div className="mt-1 font-semibold">{p.prize_label || "-"}</div>
-        {p.prize_value && <div className="mt-1 text-xs text-white/45">{p.prize_value}</div>}
+        {p.prize_value && <div className="mt-1 tls-type-small text-white/45">{p.prize_value}</div>}
       </div>
 
-      <div className={`mt-3 text-xs inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
+      <div className={`mt-3 tls-type-small inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
         <CalendarDays className="w-3 h-3" /> Frist: {deadlineText(p)}
         {isUrgent && <span className="font-bold uppercase tracking-widest">{due < 0 ? "überfällig" : `${due} Tage`}</span>}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {p.status === "pending" && (
-          <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-ready-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">Bereit</button>
+          <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-ready-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label">Bereit</button>
         )}
         {p.status === "ready" && (
-          <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-xs font-bold uppercase tracking-wider">Abgeholt</button>
+          <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm tls-type-label">Abgeholt</button>
         )}
         {p.status === "picked_up" && (
-          <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Zurück</button>
+          <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Zurück</button>
         )}
         {p.status === "expired" && (
-          <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-mobile-reopen-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">Wieder öffnen</button>
+          <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-mobile-reopen-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label">Wieder öffnen</button>
         )}
-        <button onClick={() => edit(p)} data-testid={`prize-mobile-edit-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Bearbeiten</button>
-        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider">Löschen</button>
+        <button onClick={() => edit(p)} data-testid={`prize-mobile-edit-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Bearbeiten</button>
+        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label">Löschen</button>
       </div>
     </article>
   );

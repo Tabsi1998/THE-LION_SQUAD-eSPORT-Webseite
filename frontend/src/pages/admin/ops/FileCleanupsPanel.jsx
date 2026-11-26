@@ -53,7 +53,7 @@ export function FileCleanupsPanel({ onChanged }) {
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b border-white/5">
         <div>
           <div className="font-bold">Datei-Nacharbeit</div>
-          <div className="text-[11px] text-white/45">
+          <div className="tls-type-small text-white/45">
             {data.counts.pending} offen · {data.counts.failed} aufgegeben (nach {data.retry_limit} Versuchen) · erst die Rechte am Upload-Volume prüfen
           </div>
         </div>
@@ -62,22 +62,22 @@ export function FileCleanupsPanel({ onChanged }) {
           onClick={retry}
           disabled={busy}
           data-testid="ops-file-cleanups-retry"
-          className="inline-flex items-center gap-2 border border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+          className="inline-flex items-center gap-2 border border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50"
         >
           <RotateCcw className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} /> Erneut versuchen
         </button>
       </div>
       <div className="divide-y divide-white/5">
         {items.map((item) => (
-          <div key={item.filename} className="p-3 text-sm" data-testid={`ops-file-cleanup-${item.filename}`}>
+          <div key={item.filename} className="p-3 tls-type-small" data-testid={`ops-file-cleanup-${item.filename}`}>
             <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="font-mono text-xs break-all">{item.filename}</span>
+              <span className="font-mono tls-type-small break-all">{item.filename}</span>
               <span className={item.status === "failed" ? "text-[#FF6B61] font-bold" : "text-[#FFD95A]"}>
                 {item.status === "failed" ? "aufgegeben" : "offen"}
               </span>
-              <span className="text-white/45 text-xs">{SOURCE_LABELS[item.source] || item.source}</span>
+              <span className="text-white/45 tls-type-small">{SOURCE_LABELS[item.source] || item.source}</span>
             </div>
-            <div className="text-[11px] text-white/45">
+            <div className="tls-type-small text-white/45">
               {item.attempts} Versuche · {item.last_error || "–"} · {item.status === "failed" ? `aufgegeben ${formatTime(item.failed_at)}` : `nächster Versuch ${formatTime(item.next_attempt_at)}`}
             </div>
           </div>

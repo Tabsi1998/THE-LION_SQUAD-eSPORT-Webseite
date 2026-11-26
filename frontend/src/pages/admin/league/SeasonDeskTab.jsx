@@ -26,7 +26,7 @@ const BROADCAST_STATE = { sent: "verschickt", sending: "wird verschickt", interr
 const WHEN = { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" };
 // Gruppen, deren Aufgaben nie zu einer Staffel gehören - mit Staffel-Filter blendet der Leitstand sie ganz aus.
 const SEASON_GROUPS = new Set(["applications", "rules"]);
-const ACTION = "tls-btn tls-btn--secondary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider sm:w-auto";
+const ACTION = "tls-btn tls-btn--secondary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label sm:w-auto";
 
 /** Der Satz einer Aufgabe. Vorfälle und Regelwerk sagen es wie „Mein Dienst“ - mit derselben Funktion. */
 export function deskText(item) {
@@ -42,9 +42,9 @@ function DeskItem({ item, group, now }) {
       data-mine={item.mine ? "true" : "false"}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">{item.title}</div>
-          <p className="mt-1 text-sm text-white/70 [overflow-wrap:anywhere]">{deskText(item)}</p>
-          <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/55">
+          <div className="font-bold text-white [overflow-wrap:anywhere]">{item.title}</div>
+          <p className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">{deskText(item)}</p>
+          <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 tls-type-small text-white/55">
             {when ? (
               <div className={when.over ? "text-[#FF6B60]" : when.kind === "due" ? "text-white/75" : ""}>
                 <dt className="sr-only">{when.kind === "due" ? "Frist" : "Offen"}</dt>
@@ -59,7 +59,7 @@ function DeskItem({ item, group, now }) {
             </div>
           </dl>
           {item.conflict ? (
-            <p className="mt-2 flex items-start gap-1.5 text-xs text-warn" data-testid={`desk-item-conflict-${item.id}`}>
+            <p className="mt-2 flex items-start gap-1.5 tls-type-small text-warn" data-testid={`desk-item-conflict-${item.id}`}>
               <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {item.conflict_text}
             </p>
           ) : null}
@@ -77,13 +77,13 @@ function DeskGroup({ group, now }) {
   return (
     <section aria-labelledby={`desk-group-${group.key}`} data-testid={`desk-group-${group.key}`}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id={`desk-group-${group.key}`} className="flex items-center gap-2 font-heading text-base font-bold uppercase">
+        <h3 id={`desk-group-${group.key}`} className="flex items-center gap-2 tls-type-card tls-type-num">
           {group.label}
-          <Glow trigger={count} className="inline-flex min-w-[1.75rem] justify-center rounded-full bg-[#29B6E8]/15 px-2 py-0.5 text-xs font-bold text-[#29B6E8]">
+          <Glow trigger={count} className="inline-flex min-w-[1.75rem] justify-center rounded-full bg-[#29B6E8]/15 px-2 py-0.5 tls-type-small font-bold text-[#29B6E8]">
             <CountUp value={count} data-testid={`desk-group-count-${group.key}`} />
           </Glow>
         </h3>
-        <span className="text-xs text-white/45">{group.responsible}</span>
+        <span className="tls-type-small text-white/45">{group.responsible}</span>
       </div>
       <StaggerIn as="ul" className="space-y-2">
         {group.items.map((item) => <DeskItem key={item.id} item={item} group={group} now={now} />)}
@@ -92,7 +92,7 @@ function DeskGroup({ group, now }) {
   );
 }
 
-const PAGE_BUTTON = "tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1 rounded-sm px-3 text-xs font-bold uppercase tracking-wider disabled:opacity-40";
+const PAGE_BUTTON = "tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1 rounded-sm px-3 tls-type-label disabled:opacity-40";
 
 /**
  * Protokoll der Season, seitenweise (`GET …/desk/log`), ohne Begründungen und Namen aus den Fällen. ``staffelId`` (#2262): nur diese
@@ -115,26 +115,26 @@ export function SeasonLog({ seasonId, staffelId = "", version = 0, title = "Prot
   return (
     <section id={sectionId} className="scroll-mt-24" aria-labelledby="desk-log-heading" aria-busy={state.busy ? "true" : undefined} data-testid="desk-log">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="desk-log-heading" className="font-heading text-base font-bold uppercase">{title}</h3>
+        <h3 id="desk-log-heading" className="tls-type-card">{title}</h3>
         {state.status === "ready" ? (
-          <span className="text-xs text-white/60" data-testid="desk-log-total">{state.total === 1 ? "1 Eintrag" : `${state.total} Einträge`}, ohne Begründungen und Namen aus den Fällen</span>
+          <span className="tls-type-small text-white/60" data-testid="desk-log-total">{state.total === 1 ? "1 Eintrag" : `${state.total} Einträge`}, ohne Begründungen und Namen aus den Fällen</span>
         ) : null}
       </div>
-      {state.status === "loading" ? <p className="text-sm text-white/60" data-testid="desk-log-loading">Protokoll wird geladen …</p> : null}
+      {state.status === "loading" ? <p className="tls-type-small text-white/60" data-testid="desk-log-loading">Protokoll wird geladen …</p> : null}
       {state.status === "error" ? (
         <div role="alert" className="flex flex-col gap-3 rounded-sm border border-warn/40 bg-warn/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="desk-log-error">
-          <p className="min-w-0 text-sm text-white/85 [overflow-wrap:anywhere]">{state.error || "Das Protokoll ließ sich nicht laden."}</p>
+          <p className="min-w-0 tls-type-small text-white/85 [overflow-wrap:anywhere]">{state.error || "Das Protokoll ließ sich nicht laden."}</p>
           <button type="button" onClick={() => setRetry((value) => value + 1)} className={`${PAGE_BUTTON} justify-center`} data-testid="desk-log-retry">Nochmal versuchen</button>
         </div>
       ) : null}
       {state.status === "ready" && !state.items.length ? (
-        <p className="text-sm text-white/60" data-testid="desk-log-empty">{staffelId ? "Zu dieser Staffel steht noch nichts im Protokoll." : "Noch nichts im Protokoll."}</p>
+        <p className="tls-type-small text-white/60" data-testid="desk-log-empty">{staffelId ? "Zu dieser Staffel steht noch nichts im Protokoll." : "Noch nichts im Protokoll."}</p>
       ) : null}
       {state.items.length ? (
         <ol className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]" data-testid="desk-log-list">
           {state.items.map((row) => (
-            <li key={row.id} className="flex flex-col gap-0.5 px-4 py-2.5 text-sm sm:flex-row sm:items-baseline sm:gap-4" data-testid={`desk-log-${row.id}`}>
-              <span className="shrink-0 text-xs tabular-nums text-white/60 sm:w-32">{row.at ? viennaDateTime(row.at, WHEN) : ""}</span>
+            <li key={row.id} className="flex flex-col gap-0.5 px-4 py-2.5 tls-type-small sm:flex-row sm:items-baseline sm:gap-4" data-testid={`desk-log-${row.id}`}>
+              <span className="shrink-0 tls-type-small tabular-nums text-white/60 sm:w-32">{row.at ? viennaDateTime(row.at, WHEN) : ""}</span>
               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                 <span className="font-semibold text-white">{row.label}</span>
                 {row.broadcast ? (
@@ -151,7 +151,7 @@ export function SeasonLog({ seasonId, staffelId = "", version = 0, title = "Prot
                 {/* Tippfläche 44 px, ohne die Zeile höher zu machen (negativer Rand gleicht die Höhe aus). */}
                 {row.match_id ? <> · <Link to={`/matches/${row.match_id}`} className="-my-3 inline-flex min-h-[44px] items-center px-1 text-[#29B6E8] hover:underline" data-testid={`desk-log-match-${row.id}`}>Spiel</Link></> : null}
               </span>
-              <span className="shrink-0 text-xs text-white/60 [overflow-wrap:anywhere]">{row.actor}</span>
+              <span className="shrink-0 tls-type-small text-white/60 [overflow-wrap:anywhere]">{row.actor}</span>
             </li>
           ))}
         </ol>
@@ -161,7 +161,7 @@ export function SeasonLog({ seasonId, staffelId = "", version = 0, title = "Prot
           <button type="button" onClick={() => setPage(Math.max(1, shownPage - 1))} disabled={shownPage <= 1 || state.busy} data-testid="desk-log-newer" className={PAGE_BUTTON}>
             <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" /> Neuer
           </button>
-          <span className="text-xs tabular-nums text-white/60" data-testid="desk-log-page" aria-live="polite">Seite {shownPage} von {state.pages}</span>
+          <span className="tls-type-small tabular-nums text-white/60" data-testid="desk-log-page" aria-live="polite">Seite {shownPage} von {state.pages}</span>
           <button type="button" onClick={() => setPage(Math.min(state.pages, shownPage + 1))} disabled={shownPage >= state.pages || state.busy} data-testid="desk-log-older" className={PAGE_BUTTON}>
             Älter <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -175,15 +175,15 @@ export function SeasonLog({ seasonId, staffelId = "", version = 0, title = "Prot
 function StaffelFilter({ label, hidden, onClear }) {
   return (
     <div className="flex flex-col gap-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-3 sm:flex-row sm:items-center sm:justify-between" data-testid="desk-staffel-filter">
-      <p className="flex min-w-0 items-start gap-2 text-sm text-white/85">
+      <p className="flex min-w-0 items-start gap-2 tls-type-small text-white/85">
         <Filter className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
         <span className="min-w-0 [overflow-wrap:anywhere]">
           Nur <strong className="font-semibold text-white" data-testid="desk-staffel-filter-label">{label}</strong>
-          {hidden ? <span className="block text-xs text-white/60" data-testid="desk-staffel-filter-hidden">{hidden === 1 ? "1 Aufgabe der ganzen Season ist ausgeblendet." : `${hidden} Aufgaben der ganzen Season sind ausgeblendet.`}</span> : null}
+          {hidden ? <span className="block tls-type-small text-white/60" data-testid="desk-staffel-filter-hidden">{hidden === 1 ? "1 Aufgabe der ganzen Season ist ausgeblendet." : `${hidden} Aufgaben der ganzen Season sind ausgeblendet.`}</span> : null}
         </span>
       </p>
       <button type="button" onClick={onClear} data-testid="desk-staffel-filter-clear"
-        className="tls-btn tls-btn--secondary inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-sm px-3 text-xs font-bold uppercase tracking-wider">
+        className="tls-btn tls-btn--secondary inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-sm px-3 tls-type-label">
         <X className="h-3.5 w-3.5" aria-hidden="true" /> Alle Staffeln
       </button>
     </div>
@@ -234,12 +234,12 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
     <div className="space-y-8" data-testid="season-desk">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Leitstand</span>
-          <h2 className="mt-1 font-heading text-2xl font-black uppercase">
+          <span className="tls-type-label text-[#29B6E8]">Leitstand</span>
+          <h2 className="mt-1 tls-type-section tls-type-num">
             {data ? <CountUp value={shown} data-testid="desk-total" /> : "…"} {shown === 1 ? "offene Aufgabe" : "offene Aufgaben"}
           </h2>
           {data ? (
-            <p className="mt-1 text-sm text-white/55" data-testid="desk-summary">
+            <p className="mt-1 tls-type-small text-white/55" data-testid="desk-summary">
               {mine === total ? (total ? "Alle davon kannst du selbst erledigen." : staffelId ? "In dieser Staffel wartet gerade nichts." : "In dieser Season wartet gerade nichts.")
                 : `${mine} von ${total} kannst du selbst erledigen – der Rest wartet auf eine zweite Person oder die Gegenseite.`}
             </p>
@@ -252,7 +252,7 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
               const count = row.key === "mine" ? mine : total;
               return (
                 <button key={row.key} type="button" role="radio" aria-checked={selected} onClick={() => setFilter(row.key)} data-testid={`desk-filter-${row.key}`}
-                  className={`tls-press inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 text-xs font-bold uppercase tracking-wider transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] ${selected ? "bg-[#29B6E8] text-black" : "text-white/60 hover:text-white"}`}>
+                  className={`tls-press inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 tls-type-label transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] ${selected ? "bg-[#29B6E8] text-black" : "text-white/60 hover:text-white"}`}>
                   {row.label}{count != null ? <span className="tabular-nums opacity-80">{count}</span> : null}
                 </button>
               );
@@ -260,7 +260,7 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
           </div>
           {data?.can_broadcast ? (
             <button type="button" id="rundnachricht" onClick={() => setSheet(true)} data-testid="desk-broadcast-open"
-              className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 rounded-sm px-4 text-xs font-bold uppercase tracking-wider">
+              className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 rounded-sm px-4 tls-type-label">
               <Megaphone className="h-4 w-4" aria-hidden="true" /> Rundnachricht
             </button>
           ) : null}
@@ -269,16 +269,16 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
 
       {staffelId ? <StaffelFilter label={staffelLabel} hidden={hiddenBySeason} onClear={clearStaffel} /> : null}
 
-      {state.status === "loading" ? <p className="text-sm text-white/50" data-testid="desk-loading">Leitstand wird geladen …</p> : null}
-      {state.status === "error" ? <p className="text-sm text-warn" role="alert" data-testid="desk-error">{state.error || "Der Leitstand ließ sich nicht laden."}</p> : null}
+      {state.status === "loading" ? <p className="tls-type-small text-white/50" data-testid="desk-loading">Leitstand wird geladen …</p> : null}
+      {state.status === "error" ? <p className="tls-type-small text-warn" role="alert" data-testid="desk-error">{state.error || "Der Leitstand ließ sich nicht laden."}</p> : null}
 
       {data && !open.length ? (
         <StaggerIn>
         <div className="flex items-start gap-3 rounded-sm border border-ok/30 bg-ok/5 p-5" data-testid="desk-empty">
           <CheckCircle2 className="h-6 w-6 shrink-0 text-ok" aria-hidden="true" />
           <div>
-            <div className="font-heading text-lg font-bold uppercase text-white">Alles erledigt</div>
-            <p className="mt-1 text-sm text-white/65">
+            <div className="tls-type-card text-white">Alles erledigt</div>
+            <p className="mt-1 tls-type-small text-white/65">
               {filter === "mine" && total ? "Für dich liegt hier gerade nichts. Was noch offen ist, entscheidet eine zweite Person oder die Gegenseite – unter „Alle“ siehst du es."
                 : staffelId ? "In dieser Staffel wartet gerade keine Aufgabe. Neue Fälle erscheinen hier von selbst."
                 : data.limited ? "Für deine Zuständigkeiten wartet gerade nichts. Neue Fälle erscheinen hier von selbst."
@@ -292,12 +292,12 @@ export function SeasonDeskTab({ seasonId, divisions = [] }) {
       {open.length ? <div className="space-y-6">{open.map((group) => <DeskGroup key={group.key} group={group} now={now} />)}</div> : null}
 
       {data && quiet.length ? (
-        <p className="text-xs text-white/45" data-testid="desk-quiet">
+        <p className="tls-type-small text-white/45" data-testid="desk-quiet">
           Ohne offene Aufgabe: {quiet.map((group) => group.label).join(", ")}.
         </p>
       ) : null}
       {failed.length ? (
-        <p className="text-xs text-warn" role="status" data-testid="desk-failed">
+        <p className="tls-type-small text-warn" role="status" data-testid="desk-failed">
           Nicht geladen: {failed.map((group) => group.label).join(", ")}. Die Stelle selbst zeigt den Stand – bitte gleich noch einmal laden.
         </p>
       ) : null}

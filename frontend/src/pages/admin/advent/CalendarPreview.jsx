@@ -63,11 +63,11 @@ export function CalendarPreview({ year, doors, onClose }) {
     <div ref={previewRef} className="fixed inset-0 z-40 flex flex-col bg-[#060606]/95 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Vorschau Adventkalender ${year}`} data-testid="advent-preview">
       <div className="flex flex-wrap items-end gap-3 border-b border-white/10 bg-[#0A0A0A] px-4 py-3 md:px-6">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]">Vorschau</div>
-          <h2 className="font-heading text-xl font-black uppercase">Adventkalender {year}</h2>
+          <div className="tls-type-label text-[#e9c46a]">Vorschau</div>
+          <h2 className="tls-type-section">Adventkalender {year}</h2>
         </div>
         <label className="ml-auto block min-w-[15rem] max-w-full flex-1 sm:flex-none">
-          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/60">So sieht er aus am …</span>
+          <span className="mb-1.5 block tls-type-small font-bold text-white/60">So sieht er aus am …</span>
           <select value={moment} onChange={(event) => { setShownDay(null); setNote(""); setMoment(event.target.value); }} className={INPUT_CLASS} data-testid="advent-preview-moment">
             {moments.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}
           </select>
@@ -78,13 +78,13 @@ export function CalendarPreview({ year, doors, onClose }) {
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6">
         <div className="tls-adv mx-auto w-full max-w-[1180px]">
-          <p className="mb-4 text-sm text-white/55">Hier wird nichts gezählt. Geöffnet ist, was Gäste an diesem Tag schon öffnen dürfen – ein Klick zeigt den Inhalt.</p>
-          {problem && <div className="rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#ffb4ae]" role="alert" data-testid="advent-preview-problem">{problem}</div>}
+          <p className="mb-4 tls-type-body text-white/55">Hier wird nichts gezählt. Geöffnet ist, was Gäste an diesem Tag schon öffnen dürfen – ein Klick zeigt den Inhalt.</p>
+          {problem && <div className="rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert" data-testid="advent-preview-problem">{problem}</div>}
           {calendar?.active === false && <div className="rounded-sm border border-white/10 bg-[#121212] p-8 text-center text-white/60" data-testid="advent-preview-empty">Für {year} ist noch kein Türchen angelegt – der Kalender erscheint erst mit dem ersten.</div>}
           {calendar?.active && (
             <>
               <AdventBoard calendar={calendar} onShow={(door) => { setNote(""); setShownDay(door.day); }} onOpen={() => {}} onLocked={(door) => setNote(`Türchen ${door.day} ist an diesem Tag noch verschlossen.`)} />
-              <p className="mt-4 min-h-[1.5rem] text-center text-sm text-[#ffd98a]" role="status" aria-live="polite" data-testid="advent-preview-note">{note}</p>
+              <p className="mt-4 min-h-[1.5rem] text-center tls-type-body text-[#ffd98a]" role="status" aria-live="polite" data-testid="advent-preview-note">{note}</p>
             </>
           )}
         </div>

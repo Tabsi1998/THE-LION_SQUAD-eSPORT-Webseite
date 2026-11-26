@@ -118,12 +118,12 @@ export function RoundSheet({ series, lineage, round, rounds = [], suggestion, ve
       </FormGrid>
       {racing && counts === "manual" && !noScore && (
         <button type="button" onClick={() => setCounts("auto")} data-testid="round-counts-auto"
-          className="tls-btn tls-btn--quiet self-start px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">
+          className="tls-btn tls-btn--quiet self-start px-3 py-1.5 rounded-sm tls-type-label">
           Wertung wie der Ablauf
         </button>
       )}
       <TextAreaField label="Notiz" value={form.note} onChange={(v) => set("note", v)} rows={2} hint="Nur in der Verwaltung sichtbar." testId="round-note" />
-      {!isNew && series.default_time && <p className="text-xs text-white/45">Standard der Saison: {series.default_time} Uhr.</p>}
+      {!isNew && series.default_time && <p className="tls-type-small text-white/45">Standard der Saison: {series.default_time} Uhr.</p>}
     </AdminSheet>
   );
 }
@@ -152,7 +152,7 @@ export function PostponeSheet({ series, round, version, onClose, onSaved, onStal
 
   return (
     <AdminSheet title={`${roundLabel(round)} verschieben`} onClose={onClose} onSubmit={save} saving={saving} submitLabel="Verschieben" submitTestId="postpone-save" testId="postpone-sheet">
-      {original && <p className="text-sm text-white/60" data-testid="postpone-original">Ursprünglich: {dayLabel(original)} – bleibt beim Termin stehen.</p>}
+      {original && <p className="tls-type-small text-white/60" data-testid="postpone-original">Ursprünglich: {dayLabel(original)} – bleibt beim Termin stehen.</p>}
       <FormGrid>
         <TextField label="Neuer Tag" type="date" required value={day} onChange={setDay} testId="postpone-day" />
         <TextField label="Uhrzeit" type="time" value={time} onChange={setTime} hint="Wiener Zeit; leer: ohne Uhrzeit." testId="postpone-time" />
@@ -221,7 +221,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={placeholder}
         hint={`${what} ${undated} Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${weekendHint ? ` ${weekendHint}.` : ""}${teamHint}`} />
       {preview && preview.errors.length > 0 && (
-        <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
+        <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 tls-type-small text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>
           <ul className="space-y-0.5">
             {preview.errors.map((error, index) => (
@@ -233,9 +233,9 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
       {preview && !preview.errors.length && (
         preview.rows.length ? (
           <div className="tls-swipe pb-0" data-testid="paste-preview">
-            <table className="w-full text-sm">
+            <table className="w-full tls-type-small">
               <thead>
-                <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">
+                <tr className="text-left tls-type-small text-white/45">
                   <th className="py-1.5 pr-3 font-bold">Kürzel</th>
                   <th className="py-1.5 pr-3 font-bold">Tag</th>
                   <th className="py-1.5 pr-3 font-bold">{withSessions ? "Läufe" : "Uhrzeit"}</th>
@@ -248,9 +248,9 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                     <td className="py-1.5 pr-3 font-bold">{row.code || "–"}</td>
                     <td className="py-1.5 pr-3 whitespace-nowrap">
                       {row.open ? <span className="text-white/60" data-testid="paste-open">Termin offen</span> : dayLabel(row.day)}
-                      {row.day_end && <span className="block text-[11px] text-white/60" data-testid="paste-day-end">bis {dayLabel(row.day_end)}</span>}
-                      {row.derived_day && <span className="block text-[11px] text-white/45">aus dem Wochentag</span>}
-                      {row.warning && <span className="block text-[11px] text-amber-300">{row.warning}</span>}
+                      {row.day_end && <span className="block tls-type-small text-white/60" data-testid="paste-day-end">bis {dayLabel(row.day_end)}</span>}
+                      {row.derived_day && <span className="block tls-type-small text-white/45">aus dem Wochentag</span>}
+                      {row.warning && <span className="block tls-type-small text-amber-300">{row.warning}</span>}
                     </td>
                     <td className="py-1.5 pr-3" data-testid="paste-sessions">
                       {withSessions ? (
@@ -259,7 +259,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                             <li key={index} className="whitespace-nowrap">
                               <span className="font-semibold">{item.session || "Rennen"}</span>
                               <span className="text-white/55 tabular-nums">{` ${item.day && item.day !== row.day ? `${dayLabel(item.day)} ` : ""}${item.time || ""}`}</span>
-                              {item.counts === false && <span className="text-[11px] text-white/45"> · zählt nicht</span>}
+                              {item.counts === false && <span className="tls-type-small text-white/45"> · zählt nicht</span>}
                             </li>
                           ))}
                         </ul>
@@ -276,7 +276,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
               </tbody>
             </table>
           </div>
-        ) : <p className="text-sm text-white/55">Keine Termine in der Liste.</p>
+        ) : <p className="tls-type-small text-white/55">Keine Termine in der Liste.</p>
       )}
     </AdminSheet>
   );

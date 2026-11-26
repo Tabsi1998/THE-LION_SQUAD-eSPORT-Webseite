@@ -15,6 +15,7 @@ import { STATUS_MAIL, exitLine, listLimitHint, mailOutcome, statusChangeSentence
 import { viennaDate, viennaDay } from "@/lib/vienna";
 import { toast } from "sonner";
 import { Crown, Download, Search } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABELS = {
   none: "Kein Mitglied",
@@ -138,9 +139,9 @@ export default function AdminMembersPage() {
     <AdminLayout>
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREIN</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Mitglieder</h1>
-          <p className="text-sm text-white/60 mt-1">Mitgliedschaften, Mitgliedsnummern und die öffentlichen Profile an einem Ort pflegen.</p>
+          <span className="tls-type-label text-[#FFD700]">VEREIN</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Mitglieder</ShortCaps></h1>
+          <p className="tls-type-body text-white/60 mt-1">Mitgliedschaften, Mitgliedsnummern und die öffentlichen Profile an einem Ort pflegen.</p>
         </div>
       </div>
 
@@ -158,7 +159,7 @@ export default function AdminMembersPage() {
             aria-selected={tab === item.k}
             onClick={() => setTab(item.k)}
             data-testid={`members-main-tab-${item.k}`}
-            className={`shrink-0 whitespace-nowrap px-4 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition ${
+            className={`shrink-0 whitespace-nowrap px-4 py-3 tls-type-label border-b-2 transition ${
               tab === item.k
                 ? "border-[#FFD700] text-[#FFD700]"
                 : "border-transparent text-white/45 hover:text-white"
@@ -193,7 +194,7 @@ export default function AdminMembersPage() {
               key={t.k}
               onClick={() => setFilter(t.k)}
               data-testid={`members-filter-${t.k}`}
-              className={`px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeFilter === t.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+              className={`px-3 py-2 tls-type-label rounded-sm transition ${activeFilter === t.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
             >
               {t.l}
             </button>
@@ -201,7 +202,7 @@ export default function AdminMembersPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-5 tls-type-small">
         {openApplications !== null && (
           <Link to="/admin/membership-applications" data-testid="members-open-applications" className="font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Offene Bewerbungen ({openApplications})</Link>
         )}
@@ -214,12 +215,12 @@ export default function AdminMembersPage() {
           </>
         )}
       </div>
-      {limitHint && <p className="mb-5 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-sm text-white/80" data-testid="members-limit-hint">{limitHint}</p>}
+      {limitHint && <p className="mb-5 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-body text-white/80" data-testid="members-limit-hint">{limitHint}</p>}
 
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="tls-swipe pb-0">
-          <table className="w-full text-sm min-w-[800px]">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+          <table className="w-full tls-type-small min-w-[800px]">
+            <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">User</th>
                 <th className="text-left px-4 py-3">E-Mail</th>
@@ -241,19 +242,19 @@ export default function AdminMembersPage() {
                         {u.display_name || u.username}
                         {u.is_club_member && <Crown className="w-3 h-3 text-[#FFD700]" />}
                       </div>
-                      <div className="text-[11px] text-white/50">@{u.username}</div>
+                      <div className="tls-type-small text-white/50">@{u.username}</div>
                     </td>
-                    <td className="px-4 py-3 text-white/60 text-xs">{u.email}</td>
+                    <td className="px-4 py-3 text-white/60 tls-type-small">{u.email}</td>
                     <td className="px-4 py-3">
                       <StatusPill status={m?.member_status || "none"} />
-                      {m?.exit_request && <div className="mt-1 text-[10px] uppercase tracking-wider font-bold text-[#FF9500]" data-testid={`member-exit-${u.username}`}>Austritt erklärt</div>}
+                      {m?.exit_request && <div className="mt-1 tls-type-label text-[#FF9500]" data-testid={`member-exit-${u.username}`}>Austritt erklärt</div>}
                     </td>
-                    <td className="px-4 py-3 text-xs font-mono text-[#FFD700]">{m?.member_number || "—"}</td>
-                    <td className="px-4 py-3 text-xs text-white/70">{m?.membership_type ? TYPE_LABELS[m.membership_type] || m.membership_type : "—"}</td>
-                    <td className="px-4 py-3 text-xs text-white/70">{formatMemberSince(m?.member_since, m?.member_since_precision)}</td>
-                    <td className="px-4 py-3 text-xs text-white/70">{m?.internal_role || "—"}</td>
+                    <td className="px-4 py-3 tls-type-small font-mono text-[#FFD700]">{m?.member_number || "—"}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/70">{m?.membership_type ? TYPE_LABELS[m.membership_type] || m.membership_type : "—"}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/70">{formatMemberSince(m?.member_since, m?.member_since_precision)}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/70">{m?.internal_role || "—"}</td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => setEditing({ user: u, membership: m })} data-testid={`member-edit-${u.username}`} className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition">
+                      <button onClick={() => setEditing({ user: u, membership: m })} data-testid={`member-edit-${u.username}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition">
                         Bearbeiten
                       </button>
                     </td>
@@ -285,7 +286,7 @@ function StatusPill({ status }) {
     none: "bg-white/5 text-white/40 border-white/10",
   };
   return (
-    <span className={`text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-sm border ${colors[status] || colors.none}`}>
+    <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${colors[status] || colors.none}`}>
       {STATUS_LABELS[status] || status}
     </span>
   );
@@ -346,12 +347,12 @@ function EditModal({ entry, meta, onClose, onSave }) {
   return (
     <AdminSheet title="Mitgliedschaft bearbeiten" eyebrow={`${u.display_name || u.username} · @${u.username}`} accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="edit-save" testId="member-sheet">
       {led && (
-        <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 text-xs text-white/75" data-testid="edit-led-by-dolibarr">
+        <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 tls-type-small text-white/75" data-testid="edit-led-by-dolibarr">
           Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Aufgabe und Notiz bleiben hier.
         </div>
       )}
       {exitText && (
-        <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-xs text-white/80" data-testid="edit-exit-request">
+        <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="edit-exit-request">
           {exitText} Setze den Status auf „Ehemalig“, wenn es so weit ist – die Person bleibt bis dahin Mitglied. Hält sie einen Vorstandsposten, besetze ihn zuerst neu.
         </p>
       )}
@@ -369,7 +370,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
       </FormGrid>
       <TextField label="Aufgabe im Verein" value={form.internal_role} onChange={(v) => set("internal_role", v)} placeholder="z.B. Vorstand, Captain, Helfer" hint="Sieht nur das Mitglied selbst und die Verwaltung, nie die Öffentlichkeit." testId="edit-role" />
       <TextAreaField label="Interne Notizen (sieht das Mitglied nicht)" value={form.notes} onChange={(v) => set("notes", v)} rows={3} testId="edit-notes" />
-      <p className="text-xs text-white/55" data-testid="edit-show-number">Mitgliedsnummer öffentlich: <strong className="text-white/80">{m.show_member_number_publicly ? "ja" : "nein"}</strong> – das entscheidet das Mitglied unter „Meine Mitgliedschaft“.</p>
+      <p className="tls-type-small text-white/55" data-testid="edit-show-number">Mitgliedsnummer öffentlich: <strong className="text-white/80">{m.show_member_number_publicly ? "ja" : "nein"}</strong> – das entscheidet das Mitglied unter „Meine Mitgliedschaft“.</p>
     </AdminSheet>
   );
 }

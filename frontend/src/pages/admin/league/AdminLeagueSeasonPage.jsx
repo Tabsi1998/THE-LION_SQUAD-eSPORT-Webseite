@@ -410,18 +410,18 @@ export default function AdminLeagueSeasonPage() {
 
   return (
     <AdminLayout>
-      <Link to="/admin/leagues" data-testid="season-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+      <Link to="/admin/leagues" data-testid="season-back" className="inline-flex items-center gap-1.5 tls-type-label text-white/50 hover:text-[#29B6E8]">
         <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> Liga
       </Link>
-      {error ? <p className="mt-6 text-sm text-warn" role="alert" data-testid="season-error">{error}</p> : null}
+      {error ? <p className="mt-6 tls-type-small text-warn" role="alert" data-testid="season-error">{error}</p> : null}
       {data && form ? (
         <>
           <div className="mt-3 mb-5 flex flex-wrap items-end justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3" style={accentStyle(data.league.accent_color)}>
               <LeagueEmblem src={data.look?.emblem_url} size={48} testId="season-head-emblem" />
               <div className="min-w-0">
-                <h1 className="font-heading text-3xl md:text-4xl font-black uppercase break-words">{data.league.name} · {season.name}</h1>
-                <p className="mt-1 text-sm text-white/60" data-testid="season-head">
+                <h1 className="tls-type-title break-words">{data.league.name} · {season.name}</h1>
+                <p className="mt-1 tls-type-small text-white/60" data-testid="season-head">
                   {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
                 </p>
               </div>
@@ -433,16 +433,16 @@ export default function AdminLeagueSeasonPage() {
                 {/* Aus dem Vorgänger übernommen (F.2, Nr. 162): Wurde dessen Endstand korrigiert, rechnet der Knopf die Übernahme neu - nur vor dem Start. */}
                 {season.predecessor_id ? (
                   <button type="button" onClick={() => setRecomputeOpen(true)} data-testid="season-recompute"
-                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                     <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Übernahme neu berechnen
                   </button>
                 ) : null}
                 <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor"
-                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                   <CopyPlus className="w-3.5 h-3.5" aria-hidden="true" /> Neue Season aus {season.name}
                 </button>
                 <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
-                  className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                  className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Season löschen
                 </button>
               </div>
@@ -450,16 +450,16 @@ export default function AdminLeagueSeasonPage() {
           </div>
 
           {pendingSync > 0 ? (
-            <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-warn" data-testid="season-sync-hint">
+            <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-warn" data-testid="season-sync-hint">
               <span>Gespeichert. Die {pendingSync === 1 ? "bestehende Staffel trägt" : `${pendingSync} bestehenden Staffeln tragen`} noch die alten Werte.</span>
               <button type="button" onClick={() => sync("oben")} disabled={syncing} data-testid="season-sync-now"
-                className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Jetzt übertragen</button>
+                className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">Jetzt übertragen</button>
             </div>
           ) : null}
           {syncRows?.from === "oben" ? (
             <div className="mb-5 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="season-sync-top">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Übertragen</span>
+                <span className="tls-type-label text-[#29B6E8]">Übertragen</span>
                 <button type="button" onClick={() => setSyncRows(null)} aria-label="Ergebnis schließen" data-testid="season-sync-top-close"
                   className="rounded-sm p-1.5 text-white/50 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
                   <X className="h-4 w-4" aria-hidden="true" />

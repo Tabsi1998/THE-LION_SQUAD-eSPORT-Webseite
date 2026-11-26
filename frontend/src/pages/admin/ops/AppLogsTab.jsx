@@ -82,7 +82,7 @@ export function AppLogsTab() {
       <div className="flex justify-end">
         <button
           onClick={load}
-          className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
+          className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm tls-type-label hover:border-[#29B6E8]/50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
         </button>
@@ -90,20 +90,20 @@ export function AppLogsTab() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/40">Offen</div>
-          <div className="font-display text-2xl font-bold">{summary.open}</div>
+          <div className="tls-type-label text-white/40">Offen</div>
+          <div className="tls-type-section tls-type-num">{summary.open}</div>
         </div>
         <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/10 rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-[#FF6B61]">Kritisch</div>
-          <div className="font-display text-2xl font-bold">{summary.critical}</div>
+          <div className="tls-type-label text-[#FF6B61]">Kritisch</div>
+          <div className="tls-type-section tls-type-num">{summary.critical}</div>
         </div>
         <div className="border border-[#FFD95A]/30 bg-[#FFD95A]/10 rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-[#FFD95A]">Hoch</div>
-          <div className="font-display text-2xl font-bold">{summary.high}</div>
+          <div className="tls-type-label text-[#FFD95A]">Hoch</div>
+          <div className="tls-type-section tls-type-num">{summary.high}</div>
         </div>
         <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/40">Gruppiert</div>
-          <div className="font-display text-2xl font-bold">{summary.repeated}</div>
+          <div className="tls-type-label text-white/40">Gruppiert</div>
+          <div className="tls-type-section tls-type-num">{summary.repeated}</div>
         </div>
       </div>
 
@@ -141,31 +141,31 @@ export function AppLogsTab() {
                 <Bug className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className={`text-[10px] font-black uppercase tracking-wider border px-2 py-1 rounded-sm ${badgeClass(log.level)}`}>{log.level || "info"}</span>
-                    <span className="text-[10px] font-black uppercase tracking-wider border border-white/10 px-2 py-1 rounded-sm text-white/50">{log.status || "open"}</span>
-                    <span className="text-[10px] font-black uppercase tracking-wider border border-white/10 px-2 py-1 rounded-sm text-white/50">{log.priority || "low"}</span>
+                    <span className={`tls-type-label border px-2 py-1 rounded-sm ${badgeClass(log.level)}`}>{log.level || "info"}</span>
+                    <span className="tls-type-label border border-white/10 px-2 py-1 rounded-sm text-white/50">{log.status || "open"}</span>
+                    <span className="tls-type-label border border-white/10 px-2 py-1 rounded-sm text-white/50">{log.priority || "low"}</span>
                     {Number(log.repeat_count || 0) > 1 && (
-                      <span className="text-[10px] font-black uppercase tracking-wider border border-[#29B6E8]/30 px-2 py-1 rounded-sm text-[#29B6E8]">x{log.repeat_count}</span>
+                      <span className="tls-type-label border border-[#29B6E8]/30 px-2 py-1 rounded-sm text-[#29B6E8]">x{log.repeat_count}</span>
                     )}
-                    <span className="text-xs text-white/35">{formatTime(log.received_at || log.created_at)}</span>
-                    <span className="text-xs text-[#29B6E8]">{log.display_name || log.username || log.user_id?.slice(0, 8) || "Unbekannt"}</span>
+                    <span className="tls-type-small text-white/35">{formatTime(log.received_at || log.created_at)}</span>
+                    <span className="tls-type-small text-[#29B6E8]">{log.display_name || log.username || log.user_id?.slice(0, 8) || "Unbekannt"}</span>
                   </div>
-                  <p className="text-sm font-semibold text-white break-words">{log.message}</p>
-                  <p className="text-xs text-white/45 mt-1">
+                  <p className="tls-type-body font-semibold text-white break-words">{log.message}</p>
+                  <p className="tls-type-small text-white/45 mt-1">
                     {[log.source, log.screen, log.platform, log.device_name, log.app_version && `v${log.app_version}`, log.build_version && `Build ${log.build_version}`].filter(Boolean).join(" | ")}
                   </p>
                 </div>
               </button>
               {isExpanded && (
                 <div className="border-t border-white/10 p-4 space-y-3">
-                  <p className="text-xs text-white/45">
+                  <p className="tls-type-small text-white/45">
                     Kennung <span className="font-mono text-white/70 select-all" data-testid={`app-log-id-${log.id}`}>{log.id}</span>
                   </p>
                   {log.stack && (
-                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-sm bg-[#0A0A0A] border border-white/10 p-3 text-xs text-white/70">{log.stack}</pre>
+                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-sm bg-[#0A0A0A] border border-white/10 p-3 tls-type-small text-white/70">{log.stack}</pre>
                   )}
                   {log.context && (
-                    <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-sm bg-[#0A0A0A] border border-white/10 p-3 text-xs text-white/55">{JSON.stringify(log.context, null, 2)}</pre>
+                    <pre className="max-h-52 overflow-auto whitespace-pre-wrap rounded-sm bg-[#0A0A0A] border border-white/10 p-3 tls-type-small text-white/55">{JSON.stringify(log.context, null, 2)}</pre>
                   )}
                   <textarea
                     defaultValue={log.admin_note || ""}
@@ -176,13 +176,13 @@ export function AppLogsTab() {
                     className="w-full min-h-20 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
                   />
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => patchLog(log, { status: "resolved" })} className="inline-flex items-center gap-2 bg-[#29B6E8] text-black px-3 py-2 rounded-sm text-xs font-black uppercase tracking-wider">
+                    <button onClick={() => patchLog(log, { status: "resolved" })} className="inline-flex items-center gap-2 bg-[#29B6E8] text-black px-3 py-2 rounded-sm tls-type-label">
                       <CheckCircle2 className="w-4 h-4" /> Erledigt
                     </button>
-                    <button onClick={() => patchLog(log, { status: "open" })} className="border border-white/10 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70">
+                    <button onClick={() => patchLog(log, { status: "open" })} className="border border-white/10 px-3 py-2 rounded-sm tls-type-label text-white/70">
                       Offen
                     </button>
-                    <button onClick={() => patchLog(log, { status: "ignored" })} className="border border-white/10 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider text-white/45">
+                    <button onClick={() => patchLog(log, { status: "ignored" })} className="border border-white/10 px-3 py-2 rounded-sm tls-type-label text-white/45">
                       Ignorieren
                     </button>
                   </div>

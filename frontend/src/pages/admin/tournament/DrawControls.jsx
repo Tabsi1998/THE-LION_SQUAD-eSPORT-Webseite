@@ -40,7 +40,7 @@ export function drawStatusText(row, matches) {
   return `ausgelost${at ? ` am ${at}` : ""}.`;
 }
 
-const BUTTON = "tls-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "tls-btn shrink-0 whitespace-nowrap px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50";
 
 /** ``touch``: Tippflächen ab 44 px (Staffel-Seite der Liga-Verwaltung, #2262) - die Turnierverwaltung bleibt, wie sie ist. */
 export function DrawControls({ tournamentId, stage, matches = [], onChanged, touch = false }) {
@@ -70,11 +70,11 @@ export function DrawControls({ tournamentId, stage, matches = [], onChanged, tou
 
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-2" data-testid="draw-controls">
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/50">
+      <div className="flex items-center gap-2 tls-type-label text-white/50">
         <Shuffle size={12} aria-hidden="true" /> Auslosung
       </div>
       {groups.map((row) => (
-        <div key={row.group} className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/70" data-testid={`draw-group-${row.group}`} data-mode={row.mode}>
+        <div key={row.group} className="flex flex-wrap items-center justify-between gap-2 tls-type-small text-white/70" data-testid={`draw-group-${row.group}`} data-mode={row.mode}>
           <span className="min-w-0 break-words">
             <span className="font-bold text-white">{row.label}</span>
             {" – "}{drawStatusText(row, matches)}
@@ -111,7 +111,7 @@ export function DrawControls({ tournamentId, stage, matches = [], onChanged, tou
         </div>
       ))}
       {league && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/70">
+        <div className="flex flex-wrap items-center justify-between gap-2 tls-type-small text-white/70">
           <span className="min-w-0 break-words">
             <span className="font-bold text-white">Spieltage</span> – Reihenfolge und Heimrecht sind ausgelost. Neu auslosen geht bis Spieltag 1 beginnt.
           </span>

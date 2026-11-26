@@ -34,34 +34,34 @@ function UnknownNameRow({ item, profiles, busy, onAssign }) {
     <li className="py-3 space-y-2" data-testid={testId}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <span className="font-bold text-white break-words">{participant.name}</span>
-        <span className="text-[10px] uppercase tracking-widest text-white/45 font-bold">
+        <span className="tls-type-small text-white/45 font-bold">
           {[participant.start_number && `Nr. ${participant.start_number}`, participant.default_team].filter(Boolean).join(" · ")}
         </span>
       </div>
       {suggestions.length > 0 ? (
         <ul className="space-y-1" data-testid={`${testId}-suggestions`}>
           {suggestions.map((entry) => (
-            <li key={`${entry.target}-${entry.profile_id || entry.guest_name}`} className="text-xs text-white/60">
+            <li key={`${entry.target}-${entry.profile_id || entry.guest_name}`} className="tls-type-small text-white/60">
               <span className={entry.strong ? "text-[#29B6E8] font-bold" : "text-white/75"}>{entry.target === "guest" ? `Gast: ${entry.label}` : entry.label}</span>
               <span className="text-white/45"> · {entry.reason}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <div className="text-xs text-white/40" data-testid={`${testId}-none`}>Kein Vorschlag.</div>
+        <div className="tls-type-small text-white/40" data-testid={`${testId}-none`}>Kein Vorschlag.</div>
       )}
       <div className="flex items-end gap-2 flex-wrap">
         <SelectField label="Mitglied" value={profileId} onChange={setProfileId} options={profileOptions(suggestions, profiles)} testId={`${testId}-profile`} className="flex-1 min-w-[12rem]" />
         <button type="button" disabled={busy || !profileId} onClick={() => onAssign(participant, { link: "member", profile_id: profileId })} data-testid={`${testId}-confirm`}
-          className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+          className="tls-btn tls-btn--primary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
           <Check className="w-3.5 h-3.5" /> Bestätigen
         </button>
         <button type="button" disabled={busy} onClick={() => onAssign(participant, { link: "guest", guest_name: guest?.guest_name || participant.name })} data-testid={`${testId}-guest`}
-          className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+          className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
           <UserRound className="w-3.5 h-3.5" /> Gast
         </button>
         <button type="button" disabled={busy} onClick={() => onAssign(participant, { link: "external" })} data-testid={`${testId}-external`}
-          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
           <UserX className="w-3.5 h-3.5" /> Extern
         </button>
       </div>
@@ -105,13 +105,13 @@ export function UnknownNamesSheet({ series, onClose, onChanged }) {
   const items = data?.items || [];
   return (
     <AdminSheet title="Unbekannte Namen" eyebrow={series.lineage?.title} size="lg" onClose={onClose} cancelLabel="Schließen" testId="unknown-names">
-      <p className="text-sm text-white/60">
+      <p className="tls-type-body text-white/60">
         Einmal bestätigen genügt: Mitglied und Gast merkt sich die Website als Alias und erkennt den Namen danach in jeder Serie selbst.
         Gäste zählen fürs Team, aber nicht in der Vereinsstatistik. Für Externe wird nichts gespeichert.
       </p>
-      {notice && <p className="text-xs text-white/55 border-l-2 border-[#29B6E8]/50 pl-3" role="status" data-testid="unknown-names-notice">{notice}</p>}
-      {!data && <div className="text-sm text-white/40">Lädt …</div>}
-      {data && items.length === 0 && <div className="text-sm text-white/50" data-testid="unknown-names-empty">Alle Namen sind zugeordnet.</div>}
+      {notice && <p className="tls-type-small text-white/55 border-l-2 border-[#29B6E8]/50 pl-3" role="status" data-testid="unknown-names-notice">{notice}</p>}
+      {!data && <div className="tls-type-small text-white/40">Lädt …</div>}
+      {data && items.length === 0 && <div className="tls-type-small text-white/50" data-testid="unknown-names-empty">Alle Namen sind zugeordnet.</div>}
       {items.length > 0 && (
         <ul className="divide-y divide-white/5" data-testid="unknown-names-list">
           {items.map((item) => <UnknownNameRow key={item.participant.id} item={item} profiles={data.profiles || []} busy={busy} onAssign={assign} />)}

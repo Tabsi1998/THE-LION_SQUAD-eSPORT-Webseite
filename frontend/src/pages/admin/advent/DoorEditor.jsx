@@ -31,7 +31,7 @@ function KindPicker({ kinds, value, onChange }) {
             title={KIND_HINTS[kind.key]}
             onClick={() => onChange(kind.key)}
             data-testid={`advent-editor-kind-${kind.key}`}
-            className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-sm border px-2 py-2 text-center text-[11px] font-bold leading-tight transition ${active ? "border-[#e9c46a] bg-[#e9c46a]/10 text-[#e9c46a]" : "border-white/10 bg-[#0A0A0A] text-white/60 hover:border-white/25 hover:text-white"}`}
+            className={`flex min-h-[4.25rem] flex-col items-center justify-center gap-1.5 rounded-sm border px-2 py-2 text-center tls-type-small font-bold leading-tight transition ${active ? "border-[#e9c46a] bg-[#e9c46a]/10 text-[#e9c46a]" : "border-white/10 bg-[#0A0A0A] text-white/60 hover:border-white/25 hover:text-white"}`}
           >
             {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
             <span className="break-words">{kind.label}</span>
@@ -43,12 +43,12 @@ function KindPicker({ kinds, value, onChange }) {
 }
 
 function StickerPicker({ packs, value, onChange }) {
-  if (!packs.length) return <p className="text-sm text-white/50">Es gibt gerade keine Sticker zur Auswahl (Verwaltung → Sticker).</p>;
+  if (!packs.length) return <p className="tls-type-small text-white/50">Es gibt gerade keine Sticker zur Auswahl (Verwaltung → Sticker).</p>;
   return (
     <div className="space-y-3" data-testid="advent-editor-stickers">
       {packs.map((pack) => (
         <div key={pack.id}>
-          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-white/40">{pack.name}</div>
+          <div className="mb-1.5 tls-type-small font-bold text-white/40">{pack.name}</div>
           <div className="flex flex-wrap gap-1.5">
             {pack.stickers.map((sticker) => (
               <button
@@ -135,7 +135,7 @@ export function DoorEditor({ year, day, door, kinds, options, locked = false, sa
             <div className="space-y-2" role="radiogroup" aria-label="Richtige Antwort">
               {[0, 1, 2].map((index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <label className="flex shrink-0 items-center gap-1.5 text-xs font-bold text-white/60" title="Diese Antwort ist richtig">
+                  <label className="flex shrink-0 items-center gap-1.5 tls-type-small font-bold text-white/60" title="Diese Antwort ist richtig">
                     <input type="radio" name="advent-quiz-correct" checked={form.quiz.correct === index} onChange={() => setQuiz({ correct: index })} style={{ accentColor: GOLD }} data-testid={`advent-editor-quiz-correct-${index}`} />
                     {LETTERS[index]}
                   </label>
@@ -173,7 +173,7 @@ export function DoorEditor({ year, day, door, kinds, options, locked = false, sa
         </FormGrid>
       </FormSection>
 
-      {problem && <div className="rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#ffb4ae]" role="alert" data-testid="advent-editor-problem">{problem}</div>}
+      {problem && <div className="rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert" data-testid="advent-editor-problem">{problem}</div>}
 
       <FormSection title="So sieht es aus" accent={GOLD} hint="Das Fenster, das sich nach dem Öffnen zeigt. Die Verlosung und das Quiz sind hier nur zum Ansehen." testId="advent-editor-preview">
         <div className="tls-adv-dialog !static !max-h-none !w-full !translate-x-0 !translate-y-0" style={{ position: "static" }}>

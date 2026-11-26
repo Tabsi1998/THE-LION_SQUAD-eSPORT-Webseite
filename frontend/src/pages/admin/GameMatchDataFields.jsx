@@ -53,7 +53,7 @@ function ModeIconField({ mode, index, setMode, testPrefix }) {
       <ImageUpload value={mode.icon_url} onChange={(value) => setMode(index, { icon_url: value || "" })} label="Symbol (quadratisch)"
         variant="square" crop="square" allowLibrary logo={media} logoPreview={false} endpoint={media ? "/uploads/logo" : "/uploads/image"}
         testId={`${testPrefix}-mode-icon-${index}`} {...mediaPropsFor(user)} />
-      <p className="mt-1 text-xs text-white/45">Erscheint vor dem Namen auf Match- und Ligaseite, im Map-Pool und im Regelwerk. Ohne Bild steht ein neutrales Symbol.</p>
+      <p className="mt-1 tls-type-small text-white/45">Erscheint vor dem Namen auf Match- und Ligaseite, im Map-Pool und im Regelwerk. Ohne Bild steht ein neutrales Symbol.</p>
     </div>
   );
 }
@@ -109,7 +109,7 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
           placeholder="z. B. Standard-Regeln" hint="Freitext, etwa die Regel-Variante." testId={`${testPrefix}-mode-format-${index}`} />
       </FormGrid>
       <fieldset className="space-y-2">
-        <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Ergebnisregel</legend>
+        <legend className="tls-type-label text-white/60">Ergebnisregel</legend>
         <SelectField label="Art" value={kind} onChange={(value) => setMode(index, { rule_kind: value })} options={RESULT_RULE_KINDS}
           hint={RULE_HINTS[kind]} testId={`${testPrefix}-mode-rule-kind-${index}`} />
         {kind && (
@@ -140,7 +140,7 @@ function ModeDetails({ mode, index, setMode, testPrefix }) {
           </>
         )}
         {/* Seit C.3 (#1617): Die Season übernimmt die Regel als Kopie und prüft damit - der Hinweis sagt das (docs/handbuch/turniere.md 3.12). */}
-        <p className="text-xs text-white/45" data-testid={`${testPrefix}-mode-rule-note-${index}`}>
+        <p className="tls-type-small text-white/45" data-testid={`${testPrefix}-mode-rule-note-${index}`}>
           Eine neue Liga-Season übernimmt die Regel als eigene Kopie und prüft damit jeden gemeldeten Endstand. Spätere Änderungen hier
           erreichen laufende Seasons erst, wenn die Leitung sie dort übernimmt. Andere Turniere prüfen damit nichts.
         </p>
@@ -179,17 +179,17 @@ function ModeRow({ mode, index, open, onToggle, setMode, usage, onRemove, isFirs
             </span>
           </span>
           <span className="col-start-2 md:col-start-auto">
-            <span className={`inline-block rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${chipClass}`} data-testid={`${testPrefix}-mode-chip-${index}`}>{chip}</span>
+            <span className={`inline-block rounded-sm border px-1.5 py-0.5 tls-type-label ${chipClass}`} data-testid={`${testPrefix}-mode-chip-${index}`}>{chip}</span>
           </span>
-          <span className="hidden md:block text-xs text-white/70 tabular-nums">{playersOf(mode) || <span className="text-white/35">–</span>}</span>
-          <span className="hidden md:block min-w-0 truncate text-xs text-white/70" title={rule}>{rule || <span className="text-white/35">keine Regel</span>}</span>
-          <span className="hidden md:block text-xs text-white/70 tabular-nums">{durationOf(mode) || <span className="text-white/35">–</span>}</span>
-          <span className="col-start-2 md:hidden min-w-0 text-xs text-white/55 [overflow-wrap:anywhere]" data-testid={`${testPrefix}-mode-summary-${index}`}>{modeSummary(mode)}</span>
+          <span className="hidden md:block tls-type-small text-white/70 tabular-nums">{playersOf(mode) || <span className="text-white/35">–</span>}</span>
+          <span className="hidden md:block min-w-0 truncate tls-type-small text-white/70" title={rule}>{rule || <span className="text-white/35">keine Regel</span>}</span>
+          <span className="hidden md:block tls-type-small text-white/70 tabular-nums">{durationOf(mode) || <span className="text-white/35">–</span>}</span>
+          <span className="col-start-2 md:hidden min-w-0 tls-type-small text-white/55 [overflow-wrap:anywhere]" data-testid={`${testPrefix}-mode-summary-${index}`}>{modeSummary(mode)}</span>
         </button>
         <RemoveOrLock mode={mode} index={index} usage={usage} onRemove={onRemove} testPrefix={testPrefix} />
       </div>
       {mode.mode && modeInUse(usage, mode.mode) && (
-        <p className="px-3 pb-2 -mt-1 text-[11px] text-white/50" data-testid={`${testPrefix}-mode-used-${index}`}>
+        <p className="px-3 pb-2 -mt-1 tls-type-small text-white/50" data-testid={`${testPrefix}-mode-used-${index}`}>
           Wird verwendet (Pool, Reihenfolge, Turnier oder Spiel) – entfernen geht nicht, nur deaktivieren oder archivieren.
         </p>
       )}
@@ -203,18 +203,18 @@ function ModeRow({ mode, index, open, onToggle, setMode, usage, onRemove, isFirs
               testId={`${testPrefix}-mode-status-${index}`} />
           </FormGrid>
           {STATUS_HINTS[status] && (
-            <p className="text-xs text-warn/90" data-testid={`${testPrefix}-mode-status-hint-${index}`}>{STATUS_HINTS[status]}</p>
+            <p className="tls-type-small text-warn/90" data-testid={`${testPrefix}-mode-status-hint-${index}`}>{STATUS_HINTS[status]}</p>
           )}
           <ModeIconField mode={mode} index={index} setMode={setMode} testPrefix={testPrefix} />
           <fieldset className="space-y-2">
-            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Dauer für die Turnierplanung</legend>
+            <legend className="tls-type-label text-white/60">Dauer für die Turnierplanung</legend>
             <div className="grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)] md:items-center">
               <TextField label="Minuten" type="number" min="1" max="600" value={mode.minutes} onChange={(value) => setMode(index, { minutes: value })}
                 placeholder="z. B. 12" testId={`${testPrefix}-mode-minutes-${index}`} />
               <CheckField label="Minuten je Einzelspiel – Best-of zählt mit" checked={mode.per_game} onChange={(value) => setMode(index, { per_game: value })}
                 testId={`${testPrefix}-mode-per-game-${index}`} className="md:mt-5" />
             </div>
-            <p className="text-xs text-white/45">
+            <p className="tls-type-small text-white/45">
               Freiwillig. Ein Modus ohne Dauer dient nur den Maps und der Reihenfolge einer Liga.
               {isFirst ? " Der erste Modus ist die Vorgabe für die Dauer, wenn ein Turnier keinen Modus wählt." : ""}
             </p>
@@ -252,12 +252,12 @@ export function GameModesEditor({ modes = [], onChange, usage, testPrefix = "gam
       testId={`${testPrefix}-modes`}
     >
       {modes.length === 0 ? (
-        <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 text-sm text-white/55" data-testid={`${testPrefix}-modes-empty`}>
+        <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 tls-type-body text-white/55" data-testid={`${testPrefix}-modes-empty`}>
           Noch kein Modus. Ohne Modus gilt die Matchdauer des Turniers, sonst 30 Minuten, und jede Map gilt für jeden Pool.
         </p>
       ) : (
         <div className="space-y-2">
-          <div className={`${ROW_GRID} hidden md:grid px-3 pr-12 text-[10px] font-bold uppercase tracking-widest text-white/40`} aria-hidden="true">
+          <div className={`${ROW_GRID} hidden md:grid px-3 pr-12 tls-type-label text-white/40`} aria-hidden="true">
             <span />
             <span>Modus</span>
             <span>Zustand</span>
@@ -278,20 +278,20 @@ export function GameModesEditor({ modes = [], onChange, usage, testPrefix = "gam
           type="button"
           onClick={add}
           disabled={modes.length >= MODES_MAX}
-          className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+          className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-40 disabled:cursor-not-allowed"
           data-testid={`${testPrefix}-mode-add`}
         >
           <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Modus hinzufügen
         </button>
         {modes.length >= MODES_MAX && (
-          <span className="text-xs text-white/45" data-testid={`${testPrefix}-modes-full`}>Höchstens {MODES_MAX} Modi je Spiel.</span>
+          <span className="tls-type-small text-white/45" data-testid={`${testPrefix}-modes-full`}>Höchstens {MODES_MAX} Modi je Spiel.</span>
         )}
       </div>
       {modes.some((mode) => mode.per_game) && (
-        <p className="text-xs text-white/45">Je Einzelspiel: ein Best of 3 plant 2,5 Spiele, ein Best of 5 vier.</p>
+        <p className="tls-type-small text-white/45">Je Einzelspiel: ein Best of 3 plant 2,5 Spiele, ein Best of 5 vier.</p>
       )}
       {modes.length > 0 && (
-        <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-maps`}>
+        <p className="tls-type-small text-white/45" data-testid={`${testPrefix}-modes-maps`}>
           Entfernen geht nur bei unbenutzten Modi und nimmt sie beim Speichern auch aus den Maps. Einen verwendeten Modus stellst du
           auf „Inaktiv“ oder „Archiviert“.
         </p>
@@ -335,14 +335,14 @@ export function GameTournamentPresets({ value, onChange, testPrefix = "game-edit
       </FormGrid>
 
       <fieldset className="space-y-2">
-        <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Geräte für Stationen</legend>
+        <legend className="tls-type-label text-white/60">Geräte für Stationen</legend>
         <div className="flex flex-wrap gap-2">
           {deviceOptions.map(([key, label]) => {
             const on = devices.includes(key);
             return (
               <label
                 key={key}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border tls-type-small cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}
               >
                 <input type="checkbox" checked={on} onChange={() => toggleDevice(key)} className="accent-[#29B6E8]" data-testid={`${testPrefix}-device-${key}`} />
                 {label}
@@ -350,15 +350,15 @@ export function GameTournamentPresets({ value, onChange, testPrefix = "game-edit
             );
           })}
         </div>
-        <p className="text-xs text-white/45">Der Planer nimmt nur Stationen mit einem dieser Geräte. Nichts gewählt: jede Station.</p>
+        <p className="tls-type-small text-white/45">Der Planer nimmt nur Stationen mit einem dieser Geräte. Nichts gewählt: jede Station.</p>
       </fieldset>
 
       <div className="space-y-1">
         <TextField label="Punktetabelle" value={data.points_table} onChange={(v) => set("points_table", v)} placeholder="z. B. 15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1" testId={`${testPrefix}-points`} />
         {points.error ? (
-          <div role="alert" className="text-xs text-warn" data-testid={`${testPrefix}-points-error`}>{points.error}</div>
+          <div role="alert" className="tls-type-small text-warn" data-testid={`${testPrefix}-points-error`}>{points.error}</div>
         ) : (
-          <div className="text-xs text-white/45 tabular-nums break-words" data-testid={`${testPrefix}-points-preview`}>
+          <div className="tls-type-small text-white/45 tabular-nums break-words" data-testid={`${testPrefix}-points-preview`}>
             {pointsPreview(points.points) || "Punkte je Platz, getrennt durch Komma oder Bindestrich (4-3-2-1)."}
           </div>
         )}

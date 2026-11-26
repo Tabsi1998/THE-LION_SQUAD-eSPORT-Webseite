@@ -34,7 +34,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
   return (
     <div className="space-y-6">
       {jumps.length > 1 ? (
-        <nav aria-label="Abschnitte" className="flex flex-wrap gap-x-4 gap-y-1 text-xs" data-testid="season-entry-jumps">
+        <nav aria-label="Abschnitte" className="flex flex-wrap gap-x-4 gap-y-1 tls-type-small" data-testid="season-entry-jumps">
           {jumps.map(([key, label]) => (
             <button key={key} type="button" onClick={() => onJump(key)} className="min-h-[32px] font-bold text-[#29B6E8] underline-offset-2 hover:text-white hover:underline">{label}</button>
           ))}
@@ -54,7 +54,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
       {canApplications ? <SeasonLateEntriesPanel seasonId={seasonId} version={season.updated_at} /> : null}
       {canRoster ? <div id="kader" className="scroll-mt-24"><SeasonRosterPanel seasonId={seasonId} /></div> : null}
       {!canSeason && !canApplications && !canRoster ? (
-        <FormSection title="Anmeldung und Kader"><p className="text-sm text-white/60">Dafür fehlt dir die Zuständigkeit in dieser Liga.</p></FormSection>
+        <FormSection title="Anmeldung und Kader"><p className="tls-type-small text-white/60">Dafür fehlt dir die Zuständigkeit in dieser Liga.</p></FormSection>
       ) : null}
     </div>
   );

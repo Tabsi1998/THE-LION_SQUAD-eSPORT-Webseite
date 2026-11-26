@@ -13,6 +13,7 @@ import { ChevronDown, Crown, Plus } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { CLUB_ACCESS, boardSentence, clearSentence, deleteSentence, postTitle, statusSentence } from "@/lib/boardRights";
 import { isDeputyPosition } from "@/lib/boardSeats";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Vorstand (#1355): Posten als Liste mit „Besetzen“ bzw. „Ändern“. Besetzt wird über die Personensuche, nur mit
 // Vereinsmitgliedern; vorher sagt ein Satz, welche Rechte der Posten bringt, und eine Rückfrage bestätigt es. Führt
@@ -117,15 +118,15 @@ export default function AdminBoardPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Verein</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Vorstand</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-2xl" data-testid="board-rights-intro">
+          <span className="tls-type-label text-[#FFD700]">Verein</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Vorstand</ShortCaps></h1>
+          <p className="mt-2 text-white/60 tls-type-small max-w-2xl" data-testid="board-rights-intro">
             {rightsFromDolibarr
               ? "Die Rechte kommen aus den Funktionen in Dolibarr – ein Posten hier ist nur für die Anzeige auf der Website."
               : `Wer einen aktiven Posten hält oder vertritt, bekommt die Vereinsverwaltung: ${CLUB_ACCESS}. Besetzt wird deshalb nur mit Vereinsmitgliedern und erst nach einer Rückfrage.`}
             {" "}Obmann oder Obfrau: der Titel richtet sich nach dem Geschlecht im Profil.
           </p>
-          <p className="mt-2 text-white/50 text-xs max-w-xl" data-testid="board-photo-hint">
+          <p className="mt-2 text-white/50 tls-type-small max-w-xl" data-testid="board-photo-hint">
             Die Fotos kommen aus den <Link to="/admin/members?tab=profiles" className="text-[#29B6E8] hover:text-white">öffentlichen Profilen</Link>. Am schönsten freigestellt (ohne Hintergrund) – der Verein legt seinen dahinter; Fotos mit Hintergrund stehen einheitlich in Vereinsfarben. Offene Funktionen zeigt die Vorstandsseite als „Wir suchen …“ mit dem Satz, den du hier je Funktion einträgst.
           </p>
         </div>
@@ -136,20 +137,20 @@ export default function AdminBoardPage() {
 
       {source?.dolibarr && (
         <div className="mb-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="board-dolibarr">
-          <div className="font-heading font-bold uppercase text-[#29B6E8]">Der Vorstand kommt aus Dolibarr</div>
-          <p className="text-sm text-white/70">
+          <div className="font-bold text-[#29B6E8]">Der Vorstand kommt aus Dolibarr</div>
+          <p className="tls-type-body text-white/70">
             Der Schalter „Vereinsdaten aus Dolibarr übernehmen“ ist an (<Link to="/admin/club" className="text-[#29B6E8] hover:text-white">Verein → Vereinsdaten</Link>).
             Die Vorstandsseite, „Über uns“ und die Ansprechpartner auf der Startseite zeigen die Funktionen und Inhaber aus dem Vereinsmodul
             (Stand {source.fetched_at ? viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" }) : "–"}, stündlich nachgelesen).
             Funktionen und Inhaber pflegst du in Dolibarr; ein Name erscheint nur, wenn die Person der Nennung zugestimmt hat. Die Liste unten ist nur zum Lesen.
           </p>
           {dolibarrBoard.length > 0 && (
-            <ul className="text-sm divide-y divide-white/5" data-testid="board-dolibarr-rows">
+            <ul className="tls-type-small divide-y divide-white/5" data-testid="board-dolibarr-rows">
               {dolibarrBoard.map((p) => (
                 <li key={p.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-testid={`board-dolibarr-${p.slug}`}>
                   <span className="font-bold">{p.display_title}</span>
                   <span className="text-white/70">{p.user ? p.user.display_name : p.name_withheld ? "Name nicht freigegeben" : "unbesetzt"}</span>
-                  {p.represents && <span className="text-[10px] uppercase tracking-widest text-[#FFD700]">vertritt nach außen</span>}
+                  {p.represents && <span className="tls-type-label text-[#FFD700]">vertritt nach außen</span>}
                   {p.vacant && !isDeputyPosition(p) ? <VacancyTextField slug={p.slug} value={p.vacancy_text || ""} onSaved={load} /> : null}
                 </li>
               ))}
@@ -158,7 +159,7 @@ export default function AdminBoardPage() {
         </div>
       )}
       {source && source.switch_on && !source.has_board && (
-        <div className="mb-6 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/70" data-testid="board-dolibarr-missing">
+        <div className="mb-6 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/70" data-testid="board-dolibarr-missing">
           „Vereinsdaten aus Dolibarr“ ist an, aber Dolibarr hat noch keinen Vorstand geliefert – bis dahin gilt die Liste unten. Nachlesen geht unter <Link to="/admin/club" className="text-[#29B6E8] hover:text-white">Verein → Vereinsdaten</Link>.
         </div>
       )}
@@ -171,31 +172,31 @@ export default function AdminBoardPage() {
                 <Crown className="w-4 h-4 text-[#FFD700] shrink-0 mt-1" />
                 <div className="min-w-0">
                   <div className="font-semibold">{postTitle(p)}</div>
-                  <div className="text-xs text-white/40">{p.is_active ? "aktiv" : "inaktiv"}{p.is_default ? " · Standard" : " · eigener Posten"}</div>
+                  <div className="tls-type-small text-white/40">{p.is_active ? "aktiv" : "inaktiv"}{p.is_default ? " · Standard" : " · eigener Posten"}</div>
                 </div>
               </div>
-              <div className="min-w-[12rem] flex-1 text-sm">
-                <div data-testid={`board-holder-${p.slug}`}>{p.user ? <><span className="font-semibold">{holderName(p.user)}</span>{p.user_since ? <span className="text-white/40 text-xs"> · seit {viennaDate(p.user_since)}</span> : null}</> : <span className="text-white/45">offen</span>}</div>
-                {p.allow_deputy && <div className="text-xs text-white/50 mt-0.5" data-testid={`board-deputy-${p.slug}`}>Vertretung: {p.deputy_user ? holderName(p.deputy_user) : "keine"}</div>}
+              <div className="min-w-[12rem] flex-1 tls-type-small">
+                <div data-testid={`board-holder-${p.slug}`}>{p.user ? <><span className="font-semibold">{holderName(p.user)}</span>{p.user_since ? <span className="text-white/40 tls-type-small"> · seit {viennaDate(p.user_since)}</span> : null}</> : <span className="text-white/45">offen</span>}</div>
+                {p.allow_deputy && <div className="tls-type-small text-white/50 mt-0.5" data-testid={`board-deputy-${p.slug}`}>Vertretung: {p.deputy_user ? holderName(p.deputy_user) : "keine"}</div>}
               </div>
               {!readOnly && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => setAssigning({ position: p, deputy: false })} data-testid={`board-assign-${p.slug}`} className={`px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider ${p.user ? "border border-white/15 text-white/80 hover:text-white" : "bg-[#FFD700] text-black"}`}>
+                  <button type="button" onClick={() => setAssigning({ position: p, deputy: false })} data-testid={`board-assign-${p.slug}`} className={`px-3 py-1.5 rounded-sm tls-type-label ${p.user ? "border border-white/15 text-white/80 hover:text-white" : "bg-[#FFD700] text-black"}`}>
                     {p.user ? "Ändern" : "Besetzen"}
                   </button>
                   {p.allow_deputy && (
-                    <button type="button" onClick={() => setAssigning({ position: p, deputy: true })} data-testid={`board-assign-deputy-${p.slug}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-white rounded-sm text-[11px] font-bold uppercase tracking-wider">
+                    <button type="button" onClick={() => setAssigning({ position: p, deputy: true })} data-testid={`board-assign-deputy-${p.slug}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-white rounded-sm tls-type-label">
                       Vertretung
                     </button>
                   )}
-                  <button type="button" onClick={() => setMenuFor(menuFor === p.id ? null : p.id)} aria-expanded={menuFor === p.id} data-testid={`board-more-${p.slug}`} className="inline-flex items-center gap-1 px-3 py-1.5 border border-white/10 text-white/60 hover:text-white rounded-sm text-[11px] font-bold uppercase tracking-wider">
+                  <button type="button" onClick={() => setMenuFor(menuFor === p.id ? null : p.id)} aria-expanded={menuFor === p.id} data-testid={`board-more-${p.slug}`} className="inline-flex items-center gap-1 px-3 py-1.5 border border-white/10 text-white/60 hover:text-white rounded-sm tls-type-label">
                     Mehr <ChevronDown className={`w-3 h-3 transition ${menuFor === p.id ? "rotate-180" : ""}`} />
                   </button>
                 </div>
               )}
             </div>
             {!readOnly && menuFor === p.id && (
-              <div className="mt-3 border-t border-white/10 pt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs" data-testid={`board-menu-${p.slug}`}>
+              <div className="mt-3 border-t border-white/10 pt-3 flex flex-wrap gap-x-4 gap-y-2 tls-type-small" data-testid={`board-menu-${p.slug}`}>
                 <button type="button" onClick={() => { setEditing(p); setMenuFor(null); }} className="text-[#29B6E8] hover:underline">Bezeichnung bearbeiten</button>
                 <button type="button" onClick={() => toggle(p)} data-testid={`board-toggle-${p.slug}`} className="text-white/70 hover:text-white">{p.is_active ? "Deaktivieren" : "Aktivieren"}</button>
                 {p.user && <button type="button" onClick={() => clearHolder(p, false)} data-testid={`board-clear-${p.slug}`} className="text-white/70 hover:text-white">Posten leeren</button>}
@@ -205,7 +206,7 @@ export default function AdminBoardPage() {
             )}
           </li>
         ))}
-        {!positions.length && <li className="py-10 text-center text-white/40 text-sm">Noch keine Posten.</li>}
+        {!positions.length && <li className="py-10 text-center text-white/40 tls-type-small">Noch keine Posten.</li>}
       </ul>
 
       {assigning && (
@@ -247,7 +248,7 @@ function VacancyTextField({ slug, value, onSaved }) {
     <span className="basis-full flex flex-col sm:flex-row gap-2" data-testid={`board-vacancy-text-${slug}`}>
       <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="Wir suchen …: ein Satz zum Aufwand, z. B. „Zwei Stunden im Monat, Einschulung inklusive.“" aria-label={`Satz für die offene Funktion ${slug}`}
         className="flex-1 bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" />
-      <button type="button" onClick={save} disabled={busy || text === value} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Speichern</button>
+      <button type="button" onClick={save} disabled={busy || text === value} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-40">Speichern</button>
     </span>
   );
 }
@@ -281,10 +282,10 @@ function AssignSheet({ position, deputy, rightsFromDolibarr, onClose, onAssigned
 
   return (
     <AdminSheet title={`${title} besetzen`} eyebrow="Vorstand" accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Besetzen" savingLabel="Besetze …" submitTestId="board-assign-save" testId="board-assign-sheet">
-      <p className="text-sm text-white/60">Jetzt: {current ? <span className="text-white font-semibold">{holderName(current)}</span> : "offen"}. Gesucht werden nur Vereinsmitglieder.</p>
+      <p className="tls-type-small text-white/60">Jetzt: {current ? <span className="text-white font-semibold">{holderName(current)}</span> : "offen"}. Gesucht werden nur Vereinsmitglieder.</p>
       <PersonPicker purpose="board" value={person} onChange={setPerson} label="Vereinsmitglied" placeholder="Name tippen …" testId="board-person" emptyText="Kein Vereinsmitglied mit diesem Namen." />
       {sentence && (
-        <div className={`border rounded-sm p-3 text-sm ${rightsFromDolibarr || person?.has_account === false ? "border-white/15 bg-white/5 text-white/70" : "border-[#FFD700]/40 bg-[#FFD700]/5 text-white/80"}`} data-testid="board-assign-sentence">
+        <div className={`border rounded-sm p-3 tls-type-small ${rightsFromDolibarr || person?.has_account === false ? "border-white/15 bg-white/5 text-white/70" : "border-[#FFD700]/40 bg-[#FFD700]/5 text-white/80"}`} data-testid="board-assign-sentence">
           {sentence}
         </div>
       )}

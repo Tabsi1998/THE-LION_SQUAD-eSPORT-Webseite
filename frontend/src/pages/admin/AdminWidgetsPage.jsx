@@ -8,6 +8,7 @@ import { useBrandingAssets } from "@/components/tls/Logo";
 import { downloadQrPng, downloadQrSvg } from "@/lib/qrExport";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { CalendarDays, Copy, Download, Eye, Flag, Globe, Image as ImageIcon, Monitor, Printer, QrCode, Radio, Trophy } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 function safeWidgetUrl({ type, id, track, base }) {
   if (!id || !/^[A-Za-z0-9_-]+$/.test(String(id))) return "";
@@ -148,11 +149,11 @@ export default function AdminWidgetsPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Content</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Downloads & QR</h1>
+      <span className="tls-type-label text-[#29B6E8]">Content</span>
+      <h1 className="tls-type-title mt-1 mb-6"><ShortCaps>Downloads & QR</ShortCaps></h1>
       <div className="mb-5 flex flex-wrap gap-2">
-        <button type="button" onClick={() => setMode("embed")} className={`px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold ${mode === "embed" ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Display-Links</button>
-        <button type="button" onClick={() => setMode("qr")} className={`inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold ${mode === "qr" ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}><QrCode className="w-3.5 h-3.5" /> Vor-Ort QR</button>
+        <button type="button" onClick={() => setMode("embed")} className={`px-4 py-2 rounded-sm tls-type-label ${mode === "embed" ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Display-Links</button>
+        <button type="button" onClick={() => setMode("qr")} className={`inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label ${mode === "qr" ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}><QrCode className="w-3.5 h-3.5" /> Vor-Ort QR</button>
       </div>
 
       {mode === "embed" ? (
@@ -165,7 +166,7 @@ export default function AdminWidgetsPage() {
           )}
           <Field label="Höhe (px)" type="number" value={height} onChange={(v)=>setHeight(Number(v)||600)} testId="widget-height"/>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Einbettungscode</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Einbettungscode</div>
             <textarea readOnly value={iframe} rows={5} data-testid="widget-iframe" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono"/>
           </div>
           <div className="flex gap-2">
@@ -205,14 +206,14 @@ export default function AdminWidgetsPage() {
         <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
             <Select label="Event" value={qrEventId} onChange={setQrEventId} options={[["","Event auswählen"], ...events.map((event) => [event.id, event.name])]} testId="qr-event"/>
-            <button type="button" onClick={copyQrLinks} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white disabled:opacity-40">
+            <button type="button" onClick={copyQrLinks} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white disabled:opacity-40">
               <Copy className="w-3.5 h-3.5" /> Links kopieren
             </button>
-            <button type="button" onClick={() => window.print()} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40">
+            <button type="button" onClick={() => window.print()} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40">
               <Printer className="w-3.5 h-3.5" /> Drucken
             </button>
           </div>
-          <p className="mt-3 text-xs text-white/45">Erzeugt QR-Codes für Eventdetails, Live-Seite, Display, Turniere/Check-in, Matchseiten, Stationen, Galerie und Feedback.</p>
+          <p className="mt-3 tls-type-small text-white/45">Erzeugt QR-Codes für Eventdetails, Live-Seite, Display, Turniere/Check-in, Matchseiten, Stationen, Galerie und Feedback.</p>
         </div>
         {qrLoading ? (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">Lade QR-Daten...</div>
@@ -338,21 +339,21 @@ function QrCard({ item }) {
           <BrandedQRCode value={item.url} size={116} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] print:text-black">
+          <div className="inline-flex items-center gap-2 tls-type-label text-[#29B6E8] print:text-black">
             <Icon className="w-3.5 h-3.5" /> {item.label}
           </div>
-          <div className="mt-2 font-heading text-lg font-black uppercase leading-tight break-words">{item.description}</div>
-          <div className="mt-2 text-[11px] text-white/45 break-all print:text-black/70">{item.url}</div>
-          <button type="button" onClick={copyUrl} className="mt-3 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white print:hidden">
+          <div className="mt-2 tls-type-card leading-tight break-words">{item.description}</div>
+          <div className="mt-2 tls-type-small text-white/45 break-all print:text-black/70">{item.url}</div>
+          <button type="button" onClick={copyUrl} className="mt-3 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white print:hidden">
             <Copy className="w-3 h-3" /> Kopieren
           </button>
-          <a href={pdfUrl} target="_blank" rel="noreferrer" className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-[10px] uppercase tracking-wider font-bold hover:bg-[#FFD700]/10 print:hidden">
+          <a href={pdfUrl} target="_blank" rel="noreferrer" className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm tls-type-label hover:bg-[#FFD700]/10 print:hidden">
             <Printer className="w-3 h-3" /> PDF
           </a>
-          <button type="button" onClick={exportPng} data-testid={`qr-png-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white print:hidden">
+          <button type="button" onClick={exportPng} data-testid={`qr-png-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white print:hidden">
             <Download className="w-3 h-3" /> PNG
           </button>
-          <button type="button" onClick={exportSvg} data-testid={`qr-svg-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white print:hidden">
+          <button type="button" onClick={exportSvg} data-testid={`qr-svg-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white print:hidden">
             <Download className="w-3 h-3" /> SVG
           </button>
         </div>
@@ -361,8 +362,8 @@ function QrCard({ item }) {
   );
 }
 function Field({ label, value, onChange, type="text", testId }) {
-  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><input type={type} value={value||""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
+  return (<label className="block"><div className="tls-type-label text-white/60 mb-1.5">{label}</div><input type={type} value={value||""} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"/></label>);
 }
 function Select({ label, value, onChange, options, testId }) {
-  return (<label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div><select value={value} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">{options.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>);
+  return (<label className="block"><div className="tls-type-label text-white/60 mb-1.5">{label}</div><select value={value} onChange={(e)=>onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">{options.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>);
 }

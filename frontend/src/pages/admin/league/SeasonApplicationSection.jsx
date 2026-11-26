@@ -8,11 +8,11 @@ import { SeasonLateExtension } from "./SeasonLateExtension";
 
 function Toggle({ label, hint, checked, onChange, testId }) {
   return (
-    <label className="flex min-h-[44px] items-start gap-2 text-sm text-white/80">
+    <label className="flex min-h-[44px] items-start gap-2 tls-type-small text-white/80">
       <input type="checkbox" checked={Boolean(checked)} onChange={(event) => onChange(event.target.checked)} className="mt-1 accent-[#29B6E8]" data-testid={testId} />
       <span className="min-w-0">
         <span className="block">{label}</span>
-        {hint ? <span className="block text-xs text-white/50">{hint}</span> : null}
+        {hint ? <span className="block tls-type-small text-white/50">{hint}</span> : null}
       </span>
     </label>
   );
@@ -40,9 +40,9 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
         onChange={(value) => set("late_registration_days", value)} placeholder={String(LATE_DAYS_DEFAULT)} className="max-w-xs"
         hint={`Leer: ${LATE_DAYS_DEFAULT} Tage. Danach schließt die Anmeldung, auch wenn das Fenster länger läuft. 0: nur bis zum Start.`} testId="season-form-late-days" />
       {afterStart ? (
-        <p className="text-xs text-white/70" data-testid="season-form-application-after-start">{afterStart} Nachgemeldete Co-Teams teilst du im Eingang einer Staffel zu, ihre Spiele trägst du unter „Nachmeldungen“ nach.</p>
+        <p className="tls-type-small text-white/70" data-testid="season-form-application-after-start">{afterStart} Nachgemeldete Co-Teams teilst du im Eingang einer Staffel zu, ihre Spiele trägst du unter „Nachmeldungen“ nach.</p>
       ) : null}
-      {capLine ? <p className="text-xs text-warn" data-testid="season-form-late-cap">{capLine}</p> : null}
+      {capLine ? <p className="tls-type-small text-warn" data-testid="season-form-late-cap">{capLine}</p> : null}
       {seasonId && late && closes && start && new Date(closes) > new Date(start) ? (
         <SeasonLateExtension seasonId={seasonId} extension={late.extension} onSaved={onReload} />
       ) : null}
@@ -54,13 +54,13 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
           hint="Bei „Nur Vereinsmitglieder“ gilt das für den ganzen Kader." testId="season-form-entry-policy" />
       </FormGrid>
       {form.entry_policy === "all" && form.visibility === "members" ? (
-        <p className="text-xs text-warn" data-testid="season-form-application-visibility-hint">Die Sichtbarkeit steht auf „Nur Mitglieder“: Externe Konten sehen die Season nicht und können sich nicht anmelden.</p>
+        <p className="tls-type-small text-warn" data-testid="season-form-application-visibility-hint">Die Sichtbarkeit steht auf „Nur Mitglieder“: Externe Konten sehen die Season nicht und können sich nicht anmelden.</p>
       ) : null}
       <Toggle label="Anmeldungen automatisch annehmen"
         hint="Eine gültige Anmeldung ist sofort angenommen und belegt einen Startplatz. Wer zuerst kommt, wird zuerst bedient: Anmeldungen, die noch auf deine Prüfung warten, halten ihren Platz. Sind alle vergeben oder wartet schon jemand, kommt sie auf die Warteliste. Gibt es nur eine Staffel, ist das Co-Team gleich zugeteilt. Du kannst nachträglich mit Grund ablehnen. Aus: Du prüfst jede Anmeldung."
         checked={form.application_auto_accept} onChange={(value) => set("application_auto_accept", value)} testId="season-form-application-auto-accept" />
       {waitingText ? (
-        <p className="text-xs text-warn" data-testid="season-form-application-auto-waiting">{waitingText}. Entscheide sie im Eingang.</p>
+        <p className="tls-type-small text-warn" data-testid="season-form-application-auto-waiting">{waitingText}. Entscheide sie im Eingang.</p>
       ) : null}
       <Toggle label="Warteliste" hint="Sind alle Startplätze vergeben, kommen Anmeldungen auf die Warteliste: Du setzt sie dorthin, mit „automatisch annehmen“ die Season. Ohne Warteliste endet die Anmeldung, sobald alle Plätze weg sind. Niemand rückt von selbst nach, über einen freien Platz entscheidest du."
         checked={form.application_waitlist} onChange={(value) => set("application_waitlist", value)} testId="season-form-application-waitlist" />

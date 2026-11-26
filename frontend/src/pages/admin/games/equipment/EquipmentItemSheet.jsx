@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { useReportDirty } from "./useReportDirty";
 
-const CHIP = "inline-flex max-w-full cursor-pointer select-none items-center gap-2 rounded-sm border px-3 py-1.5 text-xs focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8]";
+const CHIP = "inline-flex max-w-full cursor-pointer select-none items-center gap-2 rounded-sm border px-3 py-1.5 tls-type-small focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8]";
 const ON = "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white";
 const OFF = "border-white/10 bg-[#0A0A0A] text-white/70 hover:border-white/25";
 
@@ -32,13 +32,13 @@ function WeaponPicker({ classes, weapons, value, classValue, onChange, onClassCh
   const summary = fitsSummary(classValue.length, value.length);
   return (
     <fieldset className="space-y-3" data-testid="equipment-weapons">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Passt zu</legend>
-      <p className={`text-xs ${summary ? "text-white/60" : "font-semibold text-warn"}`} data-testid="equipment-weapons-count">
+      <legend className="tls-type-label text-white/60">Passt zu</legend>
+      <p className={`tls-type-small ${summary ? "text-white/60" : "font-semibold text-warn"}`} data-testid="equipment-weapons-count">
         {summary || "Keine Waffe gewählt – der Aufsatz passt dann zu keiner Waffe."}
       </p>
       {classes.length ? (
         <div className="space-y-1.5" data-testid="equipment-weapon-classes">
-          <p className="text-xs text-white/60">Ganze Waffenklassen – neue Waffen der Klasse passen sofort.</p>
+          <p className="tls-type-small text-white/60">Ganze Waffenklassen – neue Waffen der Klasse passen sofort.</p>
           <div className="flex flex-wrap gap-2">
             {classes.map((klass) => {
               const on = classValue.includes(klass.key);
@@ -54,7 +54,7 @@ function WeaponPicker({ classes, weapons, value, classValue, onChange, onClassCh
         </div>
       ) : null}
       <div className="space-y-1.5">
-        {classes.length ? <p className="text-xs text-white/60">Einzelne Waffen</p> : null}
+        {classes.length ? <p className="tls-type-small text-white/60">Einzelne Waffen</p> : null}
         {weapons.length > 8 ? (
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Waffe suchen"
             aria-label="Waffe suchen" className="w-full rounded-sm border border-white/15 bg-[#0A0A0A] px-3 py-2 text-sm text-white placeholder:text-white/45 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" />
@@ -75,7 +75,7 @@ function WeaponPicker({ classes, weapons, value, classValue, onChange, onClassCh
               );
             })}
           </div>
-        ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
+        ) : <p className="tls-type-small text-white/60">Noch keine Waffe angelegt.</p>}
       </div>
     </fieldset>
   );

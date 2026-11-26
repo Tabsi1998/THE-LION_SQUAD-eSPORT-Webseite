@@ -82,10 +82,10 @@ function ClubPhotoField({ value, onChange }) {
   return (
     <div className="space-y-3" data-testid="about-club-photo">
       <ImageUpload value={value.url} onChange={(url) => onChange({ ...value, url })} label="Vereinsfoto" testId="about-club-photo-upload" variant="wide" allowLibrary />
-      <p className="text-xs text-[#FFD700]/80">Nur ein Foto, mit dem alle Abgebildeten einverstanden sind.</p>
+      <p className="tls-type-small text-[#FFD700]/80">Nur ein Foto, mit dem alle Abgebildeten einverstanden sind.</p>
       {value.url ? (
         <div>
-          <div className="text-xs text-white/55 mb-1">Fokuspunkt: ins Bild klicken – dieser Punkt bleibt beim Zuschneiden immer sichtbar ({value.focus_x} % / {value.focus_y} %).</div>
+          <div className="tls-type-small text-white/55 mb-1">Fokuspunkt: ins Bild klicken – dieser Punkt bleibt beim Zuschneiden immer sichtbar ({value.focus_x} % / {value.focus_y} %).</div>
           <button type="button" onClick={pick} className="relative block w-full max-w-md overflow-hidden rounded-sm border border-white/10 cursor-crosshair" data-testid="about-club-photo-focus" aria-label="Fokuspunkt setzen">
             <img src={resolveMediaUrl(value.url)} alt="" className="block w-full h-auto" />
             <span className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white bg-[#29B6E8]/70 pointer-events-none" style={{ left: `${value.focus_x}%`, top: `${value.focus_y}%` }} />
@@ -118,10 +118,10 @@ function NumbersPicker({ shown, numbers, onChange }) {
         const active = shown.includes(key);
         const position = shown.indexOf(key);
         return (
-          <li key={key} className="flex items-center gap-2 text-sm" data-testid={`about-number-${key}`}>
+          <li key={key} className="flex items-center gap-2 tls-type-small" data-testid={`about-number-${key}`}>
             <input type="checkbox" checked={active} onChange={() => onChange(toggleShown(shown, key))} className="accent-[#29B6E8]" data-testid={`about-number-${key}-toggle`} aria-label={NUMBER_LABELS[key][0]} />
             <span className={active ? "text-white" : "text-white/50"}>{NUMBER_LABELS[key][0]}</span>
-            <span className="text-xs text-white/45">{numberValueText(key, numbers)}</span>
+            <span className="tls-type-small text-white/45">{numberValueText(key, numbers)}</span>
             {active && (
               <span className="ml-auto inline-flex gap-1">
                 <button type="button" onClick={() => onChange(moveShown(shown, key, -1))} disabled={position === 0} aria-label={`${NUMBER_LABELS[key][0]} nach oben`} data-testid={`about-number-${key}-up`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
@@ -180,12 +180,12 @@ export default function AdminAboutPage() {
         backLabel="Dashboard"
         onSubmit={submit}
         testId="about-form"
-        headerExtra={<Link to="/about" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition" data-testid="about-preview-link">Seite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>}
+        headerExtra={<Link to="/about" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 tls-type-label text-white/60 hover:text-[#29B6E8] transition" data-testid="about-preview-link">Seite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>}
         aside={(
           <>
             <FormSection title="Vereinsdaten" accent={ACCENT} hint={fromDolibarr ? "Gründung, Zweck und gemeinnützig kommen aus Dolibarr (Schalter „Vereinsdaten aus Dolibarr“ unter Verein → Vereinsdaten). Die Felder hier sind nur der Rückfall." : "Solange die Vereinsdaten nicht aus Dolibarr kommen, gelten diese Felder."} testId="about-organization">
               {fromDolibarr && (
-                <p className="text-xs text-[#29B6E8]" data-testid="about-organization-dolibarr">
+                <p className="tls-type-small text-[#29B6E8]" data-testid="about-organization-dolibarr">
                   Aus Dolibarr: {data.organization.founded_on ? `gegründet am ${foundedLabel(data.organization.founded_on)}` : data.organization.founded_year ? `gegründet ${data.organization.founded_year}` : "kein Gründungsdatum"}{data.organization.nonprofit ? ", gemeinnützig" : ""}{data.organization.purpose ? ` – „${data.organization.purpose}“` : ""}
                 </p>
               )}
@@ -196,14 +196,14 @@ export default function AdminAboutPage() {
               </FormGrid>
               {/* Aus Dolibarr gesperrt wie Gründung und Gemeinnützig (#2122 NW8) - eine Änderung hier würde nicht wirken. */}
               <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />
-              <p className="text-xs text-white/45" data-testid="about-legal-hint">ZVR und Sitz kommen aus <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
+              <p className="tls-type-small text-white/45" data-testid="about-legal-hint">ZVR und Sitz kommen aus <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
             </FormSection>
             <FormSection title="Der Verein in Zahlen" accent={ACCENT} testId="about-numbers">
-              <p className="text-xs text-white/50">Gezählt, nicht getippt. Häkchen zeigen die Kachel auf „Über uns“ und der Startseite, die Pfeile bestimmen die Reihenfolge. Zähler mit null bleiben von selbst weg.</p>
+              <p className="tls-type-small text-white/50">Gezählt, nicht getippt. Häkchen zeigen die Kachel auf „Über uns“ und der Startseite, die Pfeile bestimmen die Reihenfolge. Zähler mit null bleiben von selbst weg.</p>
               <NumbersPicker shown={form.numbers_shown || []} numbers={numbers} onChange={(next) => set("numbers_shown", next)} />
             </FormSection>
             <FormSection title="Was die Seite sonst zeigt" accent={ACCENT} plain testId="about-live-data">
-              <ul className="text-xs text-white/60 space-y-1.5">
+              <ul className="tls-type-small text-white/60 space-y-1.5">
                 <li><span className="text-white">{data.games ?? 0}</span> Spiele aus <Link to="/admin/games" className="underline">Admin → Spiele</Link> mit der Zahl der Turniere je Spiel.</li>
                 <li>Ansprechpartner aus dem <Link to="/admin/board" className="underline">Vorstand</Link> – nur freigegebene Namen.</li>
                 <li><span className="text-white">{data.offline_events ?? 0}</span> vergangene Vereinsevents mit Bild als kleine Galerie (Typ Vereinsabend, LAN, Grillabend, Messe …).</li>
@@ -220,7 +220,7 @@ export default function AdminAboutPage() {
             <TextField label="Überschrift, zweite Zeile" value={form.home_highlight} onChange={(v) => set("home_highlight", v)} maxLength={60} placeholder={data.defaults?.home_highlight || ""} testId="about-home-highlight" />
           </FormGrid>
           <TextAreaField label="Satz darunter" value={form.home_text} onChange={(v) => set("home_text", v)} rows={3} testId="about-home-text" hint="Ein, zwei Sätze, wer wir sind – ohne Formatierung." />
-          <Link to="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8]" data-testid="about-home-preview">Startseite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>
+          <Link to="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 tls-type-label text-white/60 hover:text-[#29B6E8]" data-testid="about-home-preview">Startseite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>
         </FormSection>
         <FormSection title="Kopf von „Über uns“" accent={ACCENT} testId="about-section-hero" hint="Ein eigener Satz für „Über uns“ – nicht derselbe wie auf der Startseite.">
           <FormGrid>
@@ -248,7 +248,7 @@ export default function AdminAboutPage() {
               </li>
             ))}
           </ol>
-          <button type="button" onClick={() => set("timeline", [...form.timeline, { year: "", title: "", text: "", image_url: "" }])} data-testid="about-timeline-add" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Plus className="w-3.5 h-3.5" /> Eintrag</button>
+          <button type="button" onClick={() => set("timeline", [...form.timeline, { year: "", title: "", text: "", image_url: "" }])} data-testid="about-timeline-add" className="inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8] hover:text-white"><Plus className="w-3.5 h-3.5" /> Eintrag</button>
         </FormSection>
         <FormSection title="Werte & Ziele" accent={ACCENT} testId="about-section-values" hint="Der Abschnitt „Werte & Ziele“ auf „Über uns“ – die alte Seite /values leitet dorthin.">
           <TextField label="Überschrift" value={form.values_title} onChange={(v) => set("values_title", v)} maxLength={120} testId="about-values-title" />
@@ -265,7 +265,7 @@ export default function AdminAboutPage() {
               </li>
             ))}
           </ol>
-          <button type="button" onClick={() => set("values", [...form.values, { title: "", text: "", example: "" }])} data-testid="about-value-add" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Plus className="w-3.5 h-3.5" /> Wert</button>
+          <button type="button" onClick={() => set("values", [...form.values, { title: "", text: "", example: "" }])} data-testid="about-value-add" className="inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8] hover:text-white"><Plus className="w-3.5 h-3.5" /> Wert</button>
           <TextAreaField label="Unsere Ziele (eines je Zeile)" value={form.goals} onChange={(v) => set("goals", v)} rows={5} testId="about-goals" hint="**fett** hebt den Anfang hervor." />
         </FormSection>
         <FormSection title="Was wir spielen" accent={ACCENT} testId="about-section-games" hint="Die Spiele selbst kommen aus der Spiele-Verwaltung; hier steht nur der Text darüber.">

@@ -65,12 +65,12 @@ function ProceduresInbox({ seasonId }) {
   return (
     <FormSection title="Eingang der Verfahren" testId="season-procedures"
       hint="Beanstandungen, Proteste und Einsprüche dieser Season. Übernommen und entschieden wird auf der Matchseite - dort stehen Nachweise, Stellungnahme und MOSS.">
-      {state.status === "loading" ? <p className="text-sm text-white/50">Verfahren werden geladen …</p> : null}
-      {state.status === "error" ? <p className="text-sm text-warn" role="alert" data-testid="season-procedures-error">{state.error}</p> : null}
-      {state.status === "ready" && !state.items.length ? <p className="text-sm text-white/60" data-testid="season-procedures-empty">Kein Verfahren in dieser Season.</p> : null}
+      {state.status === "loading" ? <p className="tls-type-small text-white/50">Verfahren werden geladen …</p> : null}
+      {state.status === "error" ? <p className="tls-type-small text-warn" role="alert" data-testid="season-procedures-error">{state.error}</p> : null}
+      {state.status === "ready" && !state.items.length ? <p className="tls-type-small text-white/60" data-testid="season-procedures-empty">Kein Verfahren in dieser Season.</p> : null}
       {state.items.length ? (
         <>
-          <p className="text-sm text-white/75" data-testid="season-procedures-count"><strong className="text-white">{state.open}</strong> {state.open === 1 ? "Verfahren wartet" : "Verfahren warten"} auf eine Entscheidung.</p>
+          <p className="tls-type-small text-white/75" data-testid="season-procedures-count"><strong className="text-white">{state.open}</strong> {state.open === 1 ? "Verfahren wartet" : "Verfahren warten"} auf eine Entscheidung.</p>
           <ul className="tls-stagger space-y-2" data-testid="season-procedures-list">
             {state.items.map((item) => {
               const deadline = item.target_at || item.statement?.due_at || null;
@@ -78,16 +78,16 @@ function ProceduresInbox({ seasonId }) {
                 <li key={item.id} className={`rounded-sm border bg-[#0A0A0A] p-3 ${item.state === "open" ? "border-honor/30" : "border-white/10"}`} data-testid={`season-procedure-${item.id}`}>
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">{item.staffel}</div>
+                      <div className="tls-type-label text-white/50">{item.staffel}</div>
                       <div className="font-bold text-white">{item.kind_label}{item.reason_label ? ` · ${item.reason_label}` : ""}</div>
-                      <div className="text-sm text-white/70">{(item.sides || []).join(" gegen ")}{item.side_name ? ` · eingereicht von ${item.side_name}` : ""}</div>
+                      <div className="tls-type-small text-white/70">{(item.sides || []).join(" gegen ")}{item.side_name ? ` · eingereicht von ${item.side_name}` : ""}</div>
                     </div>
-                    <span className="shrink-0 rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white/70">{PROCEDURE_STATE_LABELS[item.state] || item.state}</span>
+                    <span className="shrink-0 rounded-full border border-white/15 px-2.5 py-1 tls-type-label text-white/70">{PROCEDURE_STATE_LABELS[item.state] || item.state}</span>
                   </div>
                   {item.conflict ? (
-                    <p className="mt-2 text-xs text-warn" data-testid={`season-procedure-conflict-${item.id}`}>Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.</p>
+                    <p className="mt-2 tls-type-small text-warn" data-testid={`season-procedure-conflict-${item.id}`}>Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.</p>
                   ) : (
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 tls-type-small">
                       <span className="text-white/60">
                         {item.state === "open" ? (item.assignee ? `Übernommen von ${item.assignee.name}` : "Noch nicht übernommen") : `Entschieden ${item.resolved_at ? viennaDateTime(item.resolved_at, WHEN) : ""}`}
                         {item.state === "open" && deadline ? <span className={`ml-2 tabular-nums ${TONE[deadlineTone(deadline, now)]}`}>· {item.target_at ? "Zielfrist" : "Stellungnahme"} {remainingText(deadline, now)}</span> : null}
@@ -122,7 +122,7 @@ function ProtestSettings({ seasonId, canEdit }) {
     return () => { alive = false; };
   }, [seasonId]);
 
-  if (!form) return error ? <p className="text-sm text-warn" role="alert" data-testid="protest-settings-error">{error}</p> : null;
+  if (!form) return error ? <p className="tls-type-small text-warn" role="alert" data-testid="protest-settings-error">{error}</p> : null;
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const setReason = (index, patch) => set("protest_reasons", form.protest_reasons.map((row, at) => (at === index ? { ...row, ...patch } : row)));
   const addReason = () => set("protest_reasons", [...form.protest_reasons, { key: reasonKeyFor(`grund ${form.protest_reasons.length + 1}`, form.protest_reasons.map((row) => row.key)), label: "", ask_notified: false, fresh: true }]);
@@ -150,7 +150,7 @@ function ProtestSettings({ seasonId, canEdit }) {
     <FormSection title="Fristen, Gründe und Tabelle" testId="season-protest-settings"
       hint="Gilt sofort für alle Staffeln dieser Season (gesperrte nehmen es beim Übertragen mit). Laufende Verfahren behalten ihre Fristen. Alle Fristen ruhen in Sperrzeiten.">
       {!state?.active ? (
-        <p className="rounded-sm border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/75" data-testid="protest-settings-defaults">
+        <p className="rounded-sm border border-white/10 bg-white/5 px-3 py-2 tls-type-body text-white/75" data-testid="protest-settings-defaults">
           Diese Season hat noch keine eigenen Werte gespeichert – es gelten die Vorgaben des Regelwerks.
         </p>
       ) : null}
@@ -164,16 +164,16 @@ function ProtestSettings({ seasonId, canEdit }) {
             options={MODE_OPTIONS} hint="Gilt für Proteste nach der Bestätigung. Eine Beanstandung davor hält das Spiel immer an." testId="protest-settings-mode" />
         </FormGrid>
         <div className="space-y-2" data-testid="protest-settings-reasons">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Gründe zum Antippen</div>
-          <p className="text-xs text-white/50">„Sofort hingewiesen?“ stellt die Pflichtfrage, ob die Gegenseite sofort darauf angesprochen wurde (Regelwerk § 8.8). Die vier Grundgründe bleiben, damit auch die App melden kann.</p>
+          <div className="tls-type-label text-white/60">Gründe zum Antippen</div>
+          <p className="tls-type-small text-white/50">„Sofort hingewiesen?“ stellt die Pflichtfrage, ob die Gegenseite sofort darauf angesprochen wurde (Regelwerk § 8.8). Die vier Grundgründe bleiben, damit auch die App melden kann.</p>
           {form.protest_reasons.map((row, index) => (
             <div key={row.key} className="grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[1fr_auto_auto]">
               <TextField label={`Grund ${index + 1}`} maxLength={60} value={row.label} onChange={(value) => setReason(index, { label: value })} testId={`protest-reason-label-${index}`} />
-              <label className="col-span-2 flex min-h-11 items-center gap-2 text-sm text-white/75 sm:col-span-1 sm:mt-5">
+              <label className="col-span-2 flex min-h-11 items-center gap-2 tls-type-small text-white/75 sm:col-span-1 sm:mt-5">
                 <input type="checkbox" checked={Boolean(row.ask_notified)} onChange={(event) => setReason(index, { ask_notified: event.target.checked })} data-testid={`protest-reason-ask-${index}`} />
                 Sofort hingewiesen?
               </label>
-              {row.fixed ? <span className="row-start-1 col-start-2 text-[11px] uppercase tracking-wider text-white/40 sm:col-start-3 sm:mt-5">fest</span> : (
+              {row.fixed ? <span className="row-start-1 col-start-2 tls-type-label text-white/40 sm:col-start-3 sm:mt-5">fest</span> : (
                 <button type="button" onClick={() => set("protest_reasons", form.protest_reasons.filter((_, at) => at !== index))} aria-label={`Grund ${index + 1} entfernen`}
                   className="row-start-1 col-start-2 flex min-h-11 min-w-11 items-center justify-center rounded-sm text-white/50 hover:text-live focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] sm:col-start-3 sm:mt-5" data-testid={`protest-reason-remove-${index}`}>
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -182,16 +182,16 @@ function ProtestSettings({ seasonId, canEdit }) {
             </div>
           ))}
           {form.protest_reasons.length < (state.reasons_max || 20) ? (
-            <button type="button" onClick={addReason} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" data-testid="protest-reason-add">
+            <button type="button" onClick={addReason} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label" data-testid="protest-reason-add">
               <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Grund hinzufügen
             </button>
           ) : null}
         </div>
       </fieldset>
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="protest-settings-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="protest-settings-error">{error}</p> : null}
       {canEdit ? (
         <button type="button" onClick={save} disabled={saving} data-testid="protest-settings-save"
-          className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
           {saving ? "Speichere …" : "Proteste speichern"}
         </button>
       ) : null}

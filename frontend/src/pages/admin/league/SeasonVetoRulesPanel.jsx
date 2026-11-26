@@ -24,11 +24,11 @@ function toForm(rules, defaults) {
 
 function Toggle({ label, hint, checked, onChange, testId }) {
   return (
-    <label className="flex min-h-[44px] items-start gap-2 text-sm text-white/80">
+    <label className="flex min-h-[44px] items-start gap-2 tls-type-small text-white/80">
       <input type="checkbox" checked={Boolean(checked)} onChange={(event) => onChange(event.target.checked)} className="mt-1 accent-[#29B6E8]" data-testid={testId} />
       <span className="min-w-0">
         <span className="block">{label}</span>
-        {hint ? <span className="block text-xs text-white/50">{hint}</span> : null}
+        {hint ? <span className="block tls-type-small text-white/50">{hint}</span> : null}
       </span>
     </label>
   );
@@ -37,7 +37,7 @@ function Toggle({ label, hint, checked, onChange, testId }) {
 // Eine Zeile je Schritt (Fabian: übersichtlich): Nr. · Art · Modus · Wer · Position · Pfeile/Löschen; bei 390 px bricht sie in zwei
 // saubere Zeilen (Nr., Art, Modus / Wer, Position, Knöpfe). Die Felder tragen ihre Beschriftung für Vorleser, der Satz steht nur dort.
 // Ohne w-full: die Breite je Feld steht unten (sonst gewinnt w-full, und jedes Feld nimmt eine eigene Zeile).
-const FIELD = "min-h-9 rounded-sm border border-white/10 bg-[#121212] px-2 py-1 text-sm text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
+const FIELD = "min-h-9 rounded-sm border border-white/10 bg-[#121212] px-2 py-1 tls-type-small text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
 
 function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemove }) {
   const set = (patch) => onChange({ ...step, ...patch });
@@ -45,7 +45,7 @@ function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemov
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] px-2 py-1.5" data-testid={`veto-step-${index}`}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="w-5 shrink-0 text-xs font-bold tabular-nums text-[#29B6E8] sm:w-7">{number}.</span>
+        <span className="w-5 shrink-0 tls-type-small tls-type-num text-[#29B6E8] sm:w-7">{number}.</span>
         <select aria-label={`Schritt ${number}: Art`} className={`${FIELD} w-[6.5rem] shrink-0 sm:w-[7.5rem]`} value={step.kind} data-testid={`veto-step-${index}-kind`}
           onChange={(event) => set({ kind: event.target.value, team: isSystemKind(event.target.value) ? null : step.team || "A", position: event.target.value === "ban" ? "" : step.position })}>
           {KIND_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -58,11 +58,11 @@ function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemov
           <select aria-label={`Schritt ${number}: Wer`} className={`${FIELD} w-[6.5rem] shrink-0`} value={step.team || ""} onChange={(event) => set({ team: event.target.value })} data-testid={`veto-step-${index}-team`}>
             {TEAM_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-        ) : <span className="inline-flex min-h-9 w-[6.5rem] shrink-0 items-center px-2 text-xs text-white/50">{step.kind === "preset" ? "Liga-Leitung" : "System"}</span>}
+        ) : <span className="inline-flex min-h-9 w-[6.5rem] shrink-0 items-center px-2 tls-type-small text-white/50">{step.kind === "preset" ? "Liga-Leitung" : "System"}</span>}
         {step.kind !== "ban" ? (
           <input aria-label={`Schritt ${number}: Position (Map Nr.)`} type="number" min={1} max={9} inputMode="numeric" className={`${FIELD} w-[5rem] shrink-0 tabular-nums`}
             value={step.position} onChange={(event) => set({ position: event.target.value })} placeholder="Map" data-testid={`veto-step-${index}-position`} />
-        ) : <span className="inline-flex min-h-9 w-[5rem] shrink-0 items-center px-2 text-xs text-white/40">keine Map</span>}
+        ) : <span className="inline-flex min-h-9 w-[5rem] shrink-0 items-center px-2 tls-type-small text-white/40">keine Map</span>}
         <span className="ml-auto flex shrink-0 items-center gap-0.5">
           <button type="button" className={ICON} onClick={() => onMove(-1)} disabled={index === 0} aria-label={`Schritt ${number} nach oben`} data-testid={`veto-step-${index}-up`}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" className={ICON} onClick={() => onMove(1)} disabled={index === count - 1} aria-label={`Schritt ${number} nach unten`} data-testid={`veto-step-${index}-down`}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
@@ -105,7 +105,7 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
     : []), [form, modes, state]);
 
   if (!form) {
-    return error ? <p className="text-sm text-warn" role="alert" data-testid="veto-rules-error">{error}</p> : null;
+    return error ? <p className="tls-type-small text-warn" role="alert" data-testid="veto-rules-error">{error}</p> : null;
   }
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const setSteps = (steps) => set("steps", steps);
@@ -154,17 +154,17 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
     <FormSection title="Veto" testId="season-veto-rules"
       hint={`Regelwerk § 6: Vor Map 1 sperren und wählen die Teams die Maps nach dieser Vorlage (Best of ${bestOf}). Gilt sofort für alle Staffeln dieser Season; ein laufendes Veto behält seinen Stand.`}>
       {state && !state.veto_rules ? (
-        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/75" data-testid="veto-rules-inactive">
+        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-body text-white/75" data-testid="veto-rules-inactive">
           Diese Season ist älter als das Veto: Dort werden die Maps beim Ergebnis eingetragen, bis ihr einmal speichert.
         </p>
       ) : null}
       {state && state.has_checkin === false ? (
-        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/75" data-testid="veto-rules-no-checkin">
+        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-body text-white/75" data-testid="veto-rules-no-checkin">
           Das Veto braucht den Check-in (Reiter Termine) – es beginnt, sobald beide Seiten eingecheckt sind.
         </p>
       ) : null}
       {state?.auto ? (
-        <p className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/70" data-testid="veto-rules-auto">
+        <p className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 tls-type-body text-white/70" data-testid="veto-rules-auto">
           Diese Vorlage folgt automatisch dem Map-Pool, „Modus je Map“ und dem Best of der Season (Vorschlag), bis ihr hier das erste Mal speichert – danach bleibt sie, wie ihr sie gespeichert habt.
         </p>
       ) : null}
@@ -178,21 +178,21 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
       </FormGrid>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Schrittfolge</div>
+          <div className="tls-type-label text-white/60">Schrittfolge</div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={propose} disabled={proposing || !modes.length} data-testid="veto-rules-propose"
-              className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50">
               <Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> {proposing ? "Erzeuge …" : "Vorschlag aus Modusfolge und Pools"}
             </button>
             <button type="button" onClick={() => setSteps([...form.steps, emptyStep(modes[0]?.mode || "")])} disabled={form.steps.length >= STEPS_MAX} data-testid="veto-rules-add"
-              className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50">
               <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Schritt hinzufügen
             </button>
           </div>
         </div>
-        <p className="text-xs text-white/50">Sperren und Wählen gehören einem Team und einem Modus; eine Wahl, der Decider (die übrige Map, vom System gesetzt) und die Vorgabe (die Map legt ihr je Spielwoche fest – niemand sperrt oder wählt sie) bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
+        <p className="tls-type-small text-white/50">Sperren und Wählen gehören einem Team und einem Modus; eine Wahl, der Decider (die übrige Map, vom System gesetzt) und die Vorgabe (die Map legt ihr je Spielwoche fest – niemand sperrt oder wählt sie) bekommen ihre Position in der Serie (Map 1 bis {bestOf}). Die Reihenfolge hier ist die des Vetos, nicht die Spielreihenfolge.</p>
         {form.steps.length ? (
-          <div className="hidden text-[10px] font-bold uppercase tracking-widest text-white/45 sm:flex sm:items-center sm:gap-1.5 sm:px-2" aria-hidden="true">
+          <div className="hidden tls-type-label text-white/45 sm:flex sm:items-center sm:gap-1.5 sm:px-2" aria-hidden="true">
             <span className="w-7">Nr.</span><span className="w-[7.5rem]">Art</span><span className="min-w-[8rem] flex-1">Modus</span>
             <span className="w-[6.5rem]">Wer</span><span className="w-[5rem]">Position</span><span className="ml-auto w-[7rem]" />
           </div>
@@ -206,26 +206,26 @@ export function SeasonVetoRulesPanel({ seasonId, version = "" }) {
                 onRemove={() => setSteps(form.steps.filter((_, at) => at !== index))} />
             ))}
           </ol>
-        ) : <p className="text-sm text-white/55" data-testid="veto-rules-empty">Noch keine Schritte – „Vorschlag aus Modusfolge und Pools“ baut eine passende Folge.</p>}
+        ) : <p className="tls-type-body text-white/55" data-testid="veto-rules-empty">Noch keine Schritte – „Vorschlag aus Modusfolge und Pools“ baut eine passende Folge.</p>}
       </div>
       {form.enabled && formProblems.length ? (
-        <ul className="space-y-1 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="veto-rules-problems" aria-live="polite">
+        <ul className="space-y-1 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-small text-white/85" data-testid="veto-rules-problems" aria-live="polite">
           {formProblems.map((text) => <li key={text}>{text}</li>)}
         </ul>
       ) : form.enabled && form.steps.length ? (
-        <p className="text-xs text-ok" data-testid="veto-rules-ok">Die Vorlage geht mit dem Pool auf.</p>
+        <p className="tls-type-small text-ok" data-testid="veto-rules-ok">Die Vorlage geht mit dem Pool auf.</p>
       ) : null}
       {savedProblems.length ? (
-        <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/60" data-testid="veto-rules-saved-problems">
+        <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 tls-type-small text-white/60" data-testid="veto-rules-saved-problems">
           <p className="font-bold text-white/70">Gespeicherter Stand – gilt, bis ihr „Veto speichern“ drückt:</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
             {savedProblems.map((text) => <li key={text}>{text}</li>)}
           </ul>
         </div>
       ) : null}
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="veto-rules-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="veto-rules-error">{error}</p> : null}
       <button type="button" onClick={save} disabled={saving || (form.enabled && problems.length > 0)} data-testid="veto-rules-save"
-        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
         {saving ? "Speichere …" : "Veto speichern"}
       </button>
       {/* Vorgabe der Woche (#2326): gehört zur Vorlage und steht darum im selben Kasten - mit eigenem Speichern, weil sie sich Woche für

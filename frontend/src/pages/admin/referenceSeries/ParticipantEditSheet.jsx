@@ -113,7 +113,7 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
 
   const footer = row.in_results ? null : (
     <button type="button" onClick={remove} data-testid="participant-edit-remove"
-      className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm text-white/55 hover:text-[#FF3B30] transition-colors">
+      className="inline-flex items-center gap-1.5 px-3 py-2.5 tls-type-label rounded-sm text-white/55 hover:text-[#FF3B30] transition-colors">
       <Trash2 className="w-3.5 h-3.5" /> Entfernen
     </button>
   );
@@ -138,14 +138,14 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
         {form.link === "member" && (
           <SelectField label="Mitglied" value={form.profile_id} onChange={set("profile_id")} options={profileOptions} testId="participant-edit-profile" />
         )}
-        <p className="text-xs text-white/55 leading-relaxed">{LINK_HINT} {ALIAS_HINT}</p>
+        <p className="tls-type-small text-white/55 leading-relaxed">{LINK_HINT} {ALIAS_HINT}</p>
       </div>
       <LearnedSpellings items={form.read_aliases.map((name) => ({ key: name, label: name }))}
         removed={learnedNames(row).length - form.read_aliases.length} testId="participant-edit-read-aliases"
         onRemove={(name) => set("read_aliases")(form.read_aliases.filter((item) => item !== name))}
         hint="So stand der Name in Ergebnis-Bildern, bevor ihr ihn im Blatt korrigiert habt – die Bild-Erkennung erkennt ihn daran wieder." />
       {row.in_results && (
-        <p className="text-xs text-white/55 leading-relaxed" data-testid="participant-edit-in-results">
+        <p className="tls-type-small text-white/55 leading-relaxed" data-testid="participant-edit-in-results">
           Steht in Ergebnissen dieser Saison und lässt sich deshalb nicht entfernen. Doppelt angelegt? Wählt beide in der Liste aus und führt sie zusammen.
         </p>
       )}

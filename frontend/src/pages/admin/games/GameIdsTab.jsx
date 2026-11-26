@@ -45,7 +45,7 @@ function IdFieldCard({ field, index, onChange, onLabel, onRemove, onPlatform, in
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 md:p-4 space-y-3" data-testid={`game-id-field-${index}`}>
       <div className="flex items-center justify-between gap-3">
-        <span className="tls-wrap text-sm font-semibold text-white">{String(field.label || "").trim() || String(field.key || "").trim() || `ID-Feld ${index + 1}`}</span>
+        <span className="tls-wrap tls-type-small font-semibold text-white">{String(field.label || "").trim() || String(field.key || "").trim() || `ID-Feld ${index + 1}`}</span>
         <button type="button" onClick={onRemove} aria-label={`ID-Feld ${index + 1} entfernen`} data-testid={`game-id-field-remove-${index}`}
           className="p-2 text-white/45 hover:text-live focus-visible:outline focus-visible:outline-1 focus-visible:outline-live rounded-sm">
           <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -80,7 +80,7 @@ function IdFieldCard({ field, index, onChange, onLabel, onRemove, onPlatform, in
           checked={platform} disabled={!platform && (!hasOptions(field) || Boolean(inherited))} onChange={onPlatform} testId={`game-id-field-platform-${index}`} />
       </div>
       {platform && field.required === false ? (
-        <p className="rounded-sm border border-warn/40 bg-warn/5 px-3 py-2 text-xs text-warn" role="note" data-testid={`game-id-field-platform-optional-${index}`}>
+        <p className="rounded-sm border border-warn/40 bg-warn/5 px-3 py-2 tls-type-small text-warn" role="note" data-testid={`game-id-field-platform-optional-${index}`}>
           {PLATFORM_NOT_REQUIRED}
         </p>
       ) : null}
@@ -149,7 +149,7 @@ export function GameIdsTab({ gameId, kind, form, onChange, games, usage, parentG
         hint="Welche ID bei der Anmeldung gefragt wird, etwa die Activision ID. Pflichtfelder prüft die Turnieranmeldung; Format und Auswahl gelten für neue Werte im Profil und für die Liga."
         testId="game-ids-fields">
         {inherited ? (
-          <p className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid="game-ids-platform-inherited">
+          <p className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 tls-type-small text-white/70" data-testid="game-ids-platform-inherited">
             Plattform: Feld „{inherited.label}“ von {inherited.game} – gilt auch für diese Version.
           </p>
         ) : null}
@@ -162,18 +162,18 @@ export function GameIdsTab({ gameId, kind, form, onChange, games, usage, parentG
             ))}
           </ul>
         ) : (
-          <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 text-sm text-white/55" data-testid="game-ids-empty">
+          <p className="rounded-sm border border-dashed border-white/15 px-4 py-5 tls-type-small text-white/55" data-testid="game-ids-empty">
             Noch keine Spieler-ID. Ohne ID-Feld fragt die Anmeldung nichts ab{isEdition ? " – außer die Version erbt sie oben" : ""}.
           </p>
         )}
         {(form.removed_fields || []).some((row) => !fields.some((field) => idFieldKey(field) === row.key)) ? (
-          <p className="text-xs text-warn" data-testid="game-ids-removed">
+          <p className="tls-type-small text-warn" data-testid="game-ids-removed">
             Beim Speichern entfernt: {(form.removed_fields || []).filter((row) => !fields.some((field) => idFieldKey(field) === row.key))
               .map((row) => `„${row.label}“${row.players ? ` (IDs von ${people(row.players)})` : ""}`).join(", ")}.
           </p>
         ) : null}
         <button type="button" onClick={() => setFields([...fields, { key: "", label: "", help_text: "", required: true, _new: true }])}
-          className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40"
+          className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-40"
           data-testid="game-id-field-add">
           <Plus className="w-3.5 h-3.5" aria-hidden="true" /> ID-Feld hinzufügen
         </button>

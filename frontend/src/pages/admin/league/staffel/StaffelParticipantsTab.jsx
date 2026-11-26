@@ -17,14 +17,14 @@ import { SquadKaderSheet } from "../SquadKaderSheet";
 import { ACTIVE_STAFFEL_REGISTRATION, kaderLine, registrationLateText } from "./staffelPage";
 
 const nameOf = (registration) => registration.display_name || registration.squad_name || registration.user?.display_name || registration.ingame_name || "Co-Team";
-const SMALL_BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 text-[11px] font-bold uppercase tracking-wider";
+const SMALL_BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 tls-type-label";
 
 /** Kader-Hinweis aus der Kaderübersicht der Season („6 im Kader · alle IDs gültig“) - nur, wenn sie geladen ist („Kader prüfen“). */
 function KaderHint({ registration, squad }) {
   const line = kaderLine(squad);
   if (!line) return null;
   return (
-    <div className={`mt-1 text-xs ${line.warn ? "text-warn" : "text-white/60"}`} data-testid={`staffel-reg-kaderline-${registration.id}`}>{line.text}</div>
+    <div className={`mt-1 tls-type-small ${line.warn ? "text-warn" : "text-white/60"}`} data-testid={`staffel-reg-kaderline-${registration.id}`}>{line.text}</div>
   );
 }
 
@@ -40,13 +40,13 @@ function Marks({ registration, sanctions = [], seasonId }) {
     <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5">
       {left ? <span className="inline-flex min-h-[24px] items-center" data-testid={`staffel-reg-status-${registration.id}`}><StatusBadge status={registration.status} /></span> : null}
       {late ? (
-        <span className="inline-flex items-center rounded-sm border border-brand/40 bg-brand/10 px-1.5 py-0.5 text-[11px] font-semibold text-brand" data-testid={`staffel-reg-late-${registration.id}`}>{late}</span>
+        <span className="inline-flex items-center rounded-sm border border-brand/40 bg-brand/10 px-1.5 py-0.5 tls-type-small font-semibold text-brand" data-testid={`staffel-reg-late-${registration.id}`}>{late}</span>
       ) : null}
       {sanctions.map((row) => (
         // Das Etikett bleibt klein, die Tippfläche hat 44 px Höhe.
         <Link key={row.id} to={seasonAnchorUrl(seasonId, "strafen")} data-testid={`staffel-reg-sanction-${row.id}`}
           className="group inline-flex min-h-[44px] max-w-full items-center">
-          <span className="inline-flex max-w-full items-center gap-1 rounded-sm border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-[11px] font-semibold text-warn group-hover:text-white">
+          <span className="inline-flex max-w-full items-center gap-1 rounded-sm border border-warn/40 bg-warn/10 px-1.5 py-0.5 tls-type-small font-semibold text-warn group-hover:text-white">
             <span className="[overflow-wrap:anywhere]">
               {row.kind_label}{row.target_type === "player" && row.target_name ? ` · ${row.target_name}` : ""}{row.status === "provisional" ? " (vorläufig)" : ""}
             </span>
@@ -100,24 +100,24 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
     <div className="space-y-4">
       <div id="zuteilen" className="scroll-mt-24 flex flex-col gap-3 rounded-sm border border-white/10 bg-[#121212] p-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <h2 className="font-heading text-xl font-black uppercase" data-testid="staffel-teams-count">
+          <h2 className="tls-type-section" data-testid="staffel-teams-count">
             Co-Teams <span className="tabular-nums text-white/60">{active}{max ? ` von ${max}` : ""}</span>
           </h2>
-          <p className="mt-1 text-sm text-white/60">Teilnehmer dieser Liga sind Co-Teams. Captain und Vertreter vergibt die Teamleitung im Profil.</p>
+          <p className="mt-1 tls-type-body text-white/60">Teilnehmer dieser Liga sind Co-Teams. Captain und Vertreter vergibt die Teamleitung im Profil.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:shrink-0">
           {canAssign ? (
             <SquadAssignDialog tournament={tournament} onAssigned={onReload}
-              triggerClassName="tls-btn tls-btn--primary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 text-xs font-bold uppercase tracking-wider sm:w-auto" />
+              triggerClassName="tls-btn tls-btn--primary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 tls-type-label sm:w-auto" />
           ) : null}
           <a href={`${API}/exports/tournaments/${tournament.id}/participants.pdf`} target="_blank" rel="noreferrer" data-testid="staffel-pdf-participants"
-            className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 tls-type-label">
             <FileDown className="h-4 w-4" aria-hidden="true" /> PDF Teilnehmer
           </a>
         </div>
       </div>
 
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/60" data-testid="staffel-entry-hint">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/60" data-testid="staffel-entry-hint">
         Anmeldungen und Warteliste stehen im Eingang der Season.
         <Link to={seasonAnchorUrl(seasonId, "anmeldungen")} className="inline-flex min-h-[44px] items-center gap-1 font-bold text-[#29B6E8] hover:text-white" data-testid="staffel-entry-link">
           Zum Eingang <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -140,8 +140,8 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
             <li key={registration.id} className="space-y-3 p-4" data-testid={`staffel-reg-card-${registration.id}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-widest text-white/60">#{index + 1}</div>
-                  <div className="mt-0.5 font-heading font-bold uppercase [overflow-wrap:anywhere]">{nameOf(registration)}</div>
+                  <div className="tls-type-label text-white/60">#{index + 1}</div>
+                  <div className="mt-0.5 font-bold uppercase [overflow-wrap:anywhere]">{nameOf(registration)}</div>
                   <KaderHint registration={registration} squad={squads[registration.id]} />
                   <LineupMark info={lineups[registration.id]} />
                   <Marks registration={registration} sanctions={sanctions[registration.id]} seasonId={seasonId} />
@@ -150,10 +150,10 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
               <Actions {...rowProps(registration)} />
             </li>
           ))}
-          {shown.length === 0 ? <li className="px-4 py-10 text-center text-sm text-white/60" data-testid="staffel-reg-empty">{empty}</li> : null}
+          {shown.length === 0 ? <li className="px-4 py-10 text-center tls-type-small text-white/60" data-testid="staffel-reg-empty">{empty}</li> : null}
         </ul>
-        <table className="hidden w-full table-fixed text-sm md:table">
-          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/60">
+        <table className="hidden w-full table-fixed tls-type-small md:table">
+          <thead className="bg-[#0A0A0A] tls-type-label text-white/60">
             <tr>
               <th scope="col" className="w-12 px-4 py-3 text-left">#</th>
               <th scope="col" className="px-4 py-3 text-left">Co-Team</th>

@@ -60,7 +60,7 @@ export function OpsAlertsPanel() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  if (!data || !form) return <div className="text-sm text-white/45" data-testid="ops-alerts-loading">Lade Alarme …</div>;
+  if (!data || !form) return <div className="tls-type-small text-white/45" data-testid="ops-alerts-loading">Lade Alarme …</div>;
 
   const setRule = (kind, channel, value) => setForm((current) => ({ ...current, rules: { ...current.rules, [kind]: { ...current.rules[kind], [channel]: value } } }));
   const save = async () => {
@@ -104,18 +104,18 @@ export function OpsAlertsPanel() {
       <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><BellRing className="w-4 h-4 text-[#FFD700]" /> Wer erfährt was</div>
-            <p className="text-xs text-white/50 mt-1 max-w-2xl">
+            <div className="tls-type-label inline-flex items-center gap-2"><BellRing className="w-4 h-4 text-[#FFD700]" /> Wer erfährt was</div>
+            <p className="tls-type-small text-white/50 mt-1 max-w-2xl">
               Discord geht über den Bot in den Betriebskanal (Verbindungen → Discord, ein privater Kanal nur für den Vorstand; Bot aus = kein Alarm). E-Mail geht über die Mail-Queue an die Empfänger unten.
               Je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job) meldet die Website höchstens einmal je Sperrfrist.
             </p>
           </div>
-          <button type="button" onClick={sendTest} disabled={!!busy} data-testid="ops-alert-test" className="inline-flex items-center gap-2 border border-[#29B6E8] text-[#29B6E8] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          <button type="button" onClick={sendTest} disabled={!!busy} data-testid="ops-alert-test" className="inline-flex items-center gap-2 border border-[#29B6E8] text-[#29B6E8] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">
             <Send className="w-3.5 h-3.5" /> {busy === "test" ? "Sende …" : "Testalarm"}
           </button>
         </div>
-        <table className="w-full mt-4 text-sm">
-          <thead className="text-[10px] uppercase tracking-widest text-white/45">
+        <table className="w-full mt-4 tls-type-small">
+          <thead className="tls-type-label text-white/45">
             <tr><th className="text-left py-2">Ereignis</th><th className="py-2">Discord</th><th className="py-2">E-Mail</th></tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -123,7 +123,7 @@ export function OpsAlertsPanel() {
               <tr key={kind.key} data-testid={`ops-alert-row-${kind.key}`}>
                 <td className="py-2 pr-3">
                   <div className="font-bold">{kind.label}</div>
-                  <div className="text-xs text-white/45">{kind.hint}</div>
+                  <div className="tls-type-small text-white/45">{kind.hint}</div>
                 </td>
                 <td className="text-center"><input type="checkbox" checked={!!form.rules[kind.key]?.discord} onChange={(e) => setRule(kind.key, "discord", e.target.checked)} data-testid={`ops-alert-${kind.key}-discord`} className="accent-[#5865F2]" /></td>
                 <td className="text-center">
@@ -140,61 +140,61 @@ export function OpsAlertsPanel() {
             <input type="checkbox" checked={form.client_errors_enabled} onChange={(e) => setForm((c) => ({ ...c, client_errors_enabled: e.target.checked }))}
               data-testid="ops-alert-client-errors" className="mt-0.5 h-5 w-5 accent-brand" />
             <span>
-              <span className="block text-sm font-bold">Fehler aus Website und App sammeln</span>
-              <span className="block text-xs text-white/50">Aus: Meldungen aus Browser und App werden verworfen. Fehler des Servers stehen immer unter Fehler.</span>
+              <span className="block tls-type-small font-bold">Fehler aus Website und App sammeln</span>
+              <span className="block tls-type-small text-white/50">Aus: Meldungen aus Browser und App werden verworfen. Fehler des Servers stehen immer unter Fehler.</span>
             </span>
           </label>
         ) : null}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
           <label className="block sm:col-span-2">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">E-Mail-Empfänger (mit Komma)</div>
+            <div className="tls-type-label text-white/60 mb-1.5">E-Mail-Empfänger (mit Komma)</div>
             <input value={form.emails} onChange={(e) => setForm((c) => ({ ...c, emails: e.target.value }))} placeholder="vorstand@verein.at, kassier@verein.at" data-testid="ops-alert-emails" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Sperrfrist je Schlüssel (Minuten)</div>
+            <div className="tls-type-small font-bold text-white/60 mb-1.5">Sperrfrist je Schlüssel (Minuten)</div>
             <input type="number" min={5} max={1440} value={form.cooldown_minutes} onChange={(e) => setForm((c) => ({ ...c, cooldown_minutes: e.target.value }))} data-testid="ops-alert-cooldown" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
           {/* Dauer-Rot (#2080): ein roter Check meldet sich beim Wechsel und erinnert danach in diesem Abstand. */}
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Erinnerung bei Dauer-Rot (Stunden, 0 = aus)</div>
+            <div className="tls-type-small font-bold text-white/60 mb-1.5">Erinnerung bei Dauer-Rot (Stunden, 0 = aus)</div>
             <input type="number" min={0} max={720} value={form.red_reminder_hours ?? 24} onChange={(e) => setForm((c) => ({ ...c, red_reminder_hours: e.target.value }))} data-testid="ops-alert-red-reminder" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
           {NUMBER_FIELDS.filter((field) => form[field.key] !== undefined).map((field) => (
             <label key={field.key} className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}</div>
+              <div className="tls-type-label text-white/60 mb-1.5">{field.label}</div>
               <input type="number" min={field.min} max={field.max} value={form[field.key]} onChange={(e) => setForm((c) => ({ ...c, [field.key]: e.target.value }))} data-testid={field.testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
           ))}
           {Object.entries(RETENTION_LABELS).map(([key, label]) => (
             <label key={key} className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aufbewahrung: {label}</div>
+              <div className="tls-type-label text-white/60 mb-1.5">Aufbewahrung: {label}</div>
               <input type="number" min={7} max={3650} value={form.retention_days[key] ?? ""} onChange={(e) => setForm((c) => ({ ...c, retention_days: { ...c.retention_days, [key]: e.target.value } }))} data-testid={`ops-retention-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
           ))}
           {/* Datei-Uploads (#2447): dauern so lange wie die Leitung, sind kein Tempo-Problem - zählen nicht als langsam. */}
           {form.upload_routes !== undefined ? (
             <label className="block sm:col-span-2">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Upload-Routen, die nicht als langsam zählen (eine je Zeile, * am Ende = beginnt mit)</div>
+              <div className="tls-type-small font-bold text-white/60 mb-1.5">Upload-Routen, die nicht als langsam zählen (eine je Zeile, * am Ende = beginnt mit)</div>
               <textarea value={form.upload_routes} onChange={(e) => setForm((c) => ({ ...c, upload_routes: e.target.value }))} rows={5} spellCheck={false} data-testid="ops-alert-upload-routes"
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-              <div className="text-xs text-white/40 mt-1">Anfragen mit Datei (multipart) erkennt die Website selbst; die Liste gilt für ältere Einträge und Sonderfälle.</div>
+              <div className="tls-type-small text-white/40 mt-1">Anfragen mit Datei (multipart) erkennt die Website selbst; die Liste gilt für ältere Einträge und Sonderfälle.</div>
             </label>
           ) : null}
         </div>
-        <p className="text-xs text-white/40 mt-2">App-Logs, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
-        <button type="button" onClick={save} disabled={!!busy} data-testid="ops-alert-save" className="mt-3 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy === "save" ? "Speichere …" : "Alarme speichern"}</button>
+        <p className="tls-type-small text-white/40 mt-2">App-Logs, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
+        <button type="button" onClick={save} disabled={!!busy} data-testid="ops-alert-save" className="mt-3 px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Speichere …" : "Alarme speichern"}</button>
       </div>
 
       <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="ops-alert-recent">
-        <div className="font-heading font-bold uppercase text-sm mb-2">Letzte Alarme</div>
-        {!data.recent?.length ? <div className="text-sm text-white/45">Noch kein Alarm.</div> : (
-          <ul className="divide-y divide-white/5 text-sm">
+        <div className="tls-type-label mb-2">Letzte Alarme</div>
+        {!data.recent?.length ? <div className="tls-type-small text-white/45">Noch kein Alarm.</div> : (
+          <ul className="divide-y divide-white/5 tls-type-small">
             {data.recent.map((row) => (
               <li key={row.id} className="py-2 flex flex-wrap gap-x-3 gap-y-1">
-                <span className="text-white/40 text-xs w-36 shrink-0">{formatTime(row.at)}</span>
+                <span className="text-white/40 tls-type-small w-36 shrink-0">{formatTime(row.at)}</span>
                 <span className="font-bold">{row.title}</span>
-                <span className="text-xs text-white/45">{row.channels?.length ? row.channels.map((c) => (c === "discord" ? "Discord" : "E-Mail")).join(", ") : "kein Weg (Regel aus oder nichts eingerichtet)"}</span>
-                {row.description ? <span className="basis-full text-xs text-white/50 break-words">{row.description}</span> : null}
+                <span className="tls-type-small text-white/45">{row.channels?.length ? row.channels.map((c) => (c === "discord" ? "Discord" : "E-Mail")).join(", ") : "kein Weg (Regel aus oder nichts eingerichtet)"}</span>
+                {row.description ? <span className="basis-full tls-type-small text-white/50 break-words">{row.description}</span> : null}
               </li>
             ))}
           </ul>

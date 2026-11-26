@@ -12,8 +12,8 @@ import { Check, ImagePlus, Trash2, X } from "lucide-react";
 // Captains ordnen nur eigene Entwürfe ein; freigeben und löschen darf der Vorstand.
 
 const ACCEPT = "image/png,image/jpeg,image/webp";
-const SMALL = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1.5 rounded-sm text-sm text-white focus:outline-none disabled:opacity-50";
-const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
+const SMALL = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1.5 rounded-sm tls-type-small text-white focus:outline-none disabled:opacity-50";
+const LABEL = "tls-type-label text-white/45";
 
 /** Ein Bild als Original anhängen - Body ist das Bild selbst (wie beim Lesen). */
 export async function attachOriginal(base, file, { kind, origin = "upload", map } = {}) {
@@ -67,7 +67,7 @@ function SourceField({ value, disabled, onSave, idPrefix }) {
       <input id={`${idPrefix}-source`} type="url" inputMode="url" value={text} disabled={disabled} placeholder="https://…" maxLength={500}
         onChange={(event) => setText(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }}
         aria-invalid={problem ? true : undefined} className={`${SMALL} ${problem ? "!border-red-400/80" : ""}`} data-testid="original-source" />
-      {problem && <span className="mt-1 block text-xs text-red-300" role="alert">{problem}</span>}
+      {problem && <span className="mt-1 block tls-type-small text-red-300" role="alert">{problem}</span>}
     </label>
   );
 }
@@ -77,7 +77,7 @@ function VisibilitySwitch({ value, disabled, onChange }) {
     <div role="radiogroup" aria-label="Sichtbarkeit" className="inline-flex rounded-sm border border-white/10 p-0.5" data-testid="original-visibility">
       {[[true, "Öffentlich"], [false, "Nur Verwaltung"]].map(([option, label]) => (
         <button key={label} type="button" role="radio" aria-checked={value === option} disabled={disabled} onClick={() => value !== option && onChange(option)}
-          className={`rounded-[2px] px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-50 ${value === option ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}>
+          className={`rounded-[2px] px-2.5 py-1 tls-type-small font-bold transition-colors disabled:opacity-50 ${value === option ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}>
           {label}
         </button>
       ))}
@@ -99,26 +99,26 @@ function OriginalRow({ item, board, onChange, onRelease, onDelete, onOpen, busy,
           <VisibilitySwitch value={item.public !== false} disabled={!editable || busy} onChange={(value) => onChange({ public: value })} />
         </div>
         <SourceField value={item.source_url} disabled={!editable || busy} idPrefix={id} onSave={(value) => onChange({ source_url: value })} />
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 tls-type-small">
           <span className={item.shown ? "text-emerald-300" : "text-white/55"} data-testid="original-status">
             {item.shown ? "Öffentlich zu sehen" : reason}
           </span>
           {item.origin === "reading" && <span className="text-white/40">aus der Bild-Erkennung</span>}
           {board && item.state === "draft" && (
-            <button type="button" disabled={busy} onClick={onRelease} className="tls-btn tls-btn--secondary inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid="original-release">
+            <button type="button" disabled={busy} onClick={onRelease} className="tls-btn tls-btn--secondary inline-flex items-center gap-1 rounded-sm px-2 py-1 tls-type-label disabled:opacity-50" data-testid="original-release">
               <Check className="h-3 w-3" aria-hidden="true" /> Freigeben
             </button>
           )}
           {board && !confirming && (
-            <button type="button" disabled={busy} onClick={() => setConfirming(true)} className="tls-btn tls-btn--quiet ml-auto inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid="original-delete">
+            <button type="button" disabled={busy} onClick={() => setConfirming(true)} className="tls-btn tls-btn--quiet ml-auto inline-flex items-center gap-1 rounded-sm px-2 py-1 tls-type-label disabled:opacity-50" data-testid="original-delete">
               <Trash2 className="h-3 w-3" aria-hidden="true" /> Löschen
             </button>
           )}
           {board && confirming && (
             <span className="ml-auto inline-flex items-center gap-2" role="group" aria-label="Bild löschen?">
               <span className="text-white/70">Endgültig löschen?</span>
-              <button type="button" disabled={busy} onClick={() => { setConfirming(false); onDelete(); }} className="tls-btn tls-btn--danger rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid="original-delete-confirm">Löschen</button>
-              <button type="button" onClick={() => setConfirming(false)} className="tls-btn tls-btn--quiet rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider" data-testid="original-delete-cancel">Abbrechen</button>
+              <button type="button" disabled={busy} onClick={() => { setConfirming(false); onDelete(); }} className="tls-btn tls-btn--danger rounded-sm px-2 py-1 tls-type-label disabled:opacity-50" data-testid="original-delete-confirm">Löschen</button>
+              <button type="button" onClick={() => setConfirming(false)} className="tls-btn tls-btn--quiet rounded-sm px-2 py-1 tls-type-label" data-testid="original-delete-cancel">Abbrechen</button>
             </span>
           )}
         </div>
@@ -133,9 +133,9 @@ function PendingRow({ pending, onChange, onDrop, kinds = null }) {
       <Thumb src={pending.picture} label="Gelesenes Bild" />
       <div className="min-w-0 flex-1 space-y-2">
         <KindFields kind={pending.kind} map={pending.map} idPrefix="original-pending" onChange={onChange} kinds={kinds} />
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 tls-type-small">
           <span className="text-[#29B6E8]">Aus dem Bild gelesen – wird beim Übernehmen des Ergebnisses als Original angehängt.</span>
-          <button type="button" onClick={onDrop} className="tls-btn tls-btn--quiet ml-auto inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider" data-testid="original-pending-drop">
+          <button type="button" onClick={onDrop} className="tls-btn tls-btn--quiet ml-auto inline-flex items-center gap-1 rounded-sm px-2 py-1 tls-type-label" data-testid="original-pending-drop">
             <X className="h-3 w-3" aria-hidden="true" /> Nicht anhängen
           </button>
         </div>
@@ -252,21 +252,21 @@ export function OriginalsSection({ base, defaultKind, board, canPublish, pending
       onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
       onDrop={onDrop} onPaste={onPaste} aria-labelledby="result-originals-title" data-testid="result-originals" data-dragging={dragging ? "true" : undefined}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="result-originals-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+        <h3 id="result-originals-title" className="tls-type-label text-[#29B6E8]">
           Original-Bilder{count ? ` · ${count}` : ""}
         </h3>
-        <button type="button" onClick={() => input.current?.click()} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" data-testid="original-add">
+        <button type="button" onClick={() => input.current?.click()} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label" data-testid="original-add">
           <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" /> Bild hinzufügen
         </button>
         <input ref={input} type="file" accept={ACCEPT} multiple className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="original-file"
           onChange={(event) => { const files = Array.from(event.target.files || []); event.target.value = ""; if (files.length) upload(files); }} />
       </div>
-      <p className="text-xs text-white/55">
+      <p className="tls-type-small text-white/55">
         Screenshots oder Fotos des Veranstalters als Beleg – hierher ziehen, mit Strg+V einfügen oder hinzufügen (am Handy auch mit der Kamera). PNG, JPG oder WebP bis {maxMb} MB; gespeichert wird ohne Ortsangaben.
         {!board && !canPublish ? " Deine Bilder sind Entwürfe – sie gehen mit dem Ergebnis hinaus, sobald der Vorstand freigibt." : ""}
       </p>
       {count === 0 && uploading.length === 0 ? (
-        <div className="rounded-sm border border-dashed border-white/15 px-3 py-5 text-center text-sm text-white/45" data-testid="original-empty">
+        <div className="rounded-sm border border-dashed border-white/15 px-3 py-5 text-center tls-type-small text-white/45" data-testid="original-empty">
           Noch keine Original-Bilder zu diesem Termin.
         </div>
       ) : (
@@ -278,7 +278,7 @@ export function OriginalsSection({ base, defaultKind, board, canPublish, pending
               onDelete={() => remove(item)} onOpen={() => setViewing(index)} />
           ))}
           {uploading.map((key) => (
-            <li key={key} className="py-3 text-sm text-white/55" role="status" data-testid="original-uploading">Bild wird hochgeladen …</li>
+            <li key={key} className="py-3 tls-type-small text-white/55" role="status" data-testid="original-uploading">Bild wird hochgeladen …</li>
           ))}
         </ul>
       )}

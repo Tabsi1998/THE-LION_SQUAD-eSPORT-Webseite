@@ -43,10 +43,10 @@ export function JoinPageBox() {
   return (
     <details className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="join-page-box">
       <summary className="cursor-pointer select-none">
-        <span className="font-heading font-bold uppercase">Seite „Mitglied werden“</span>
-        <span className="block text-xs text-white/50 mt-1">Vier Vorteile mit Symbol und je einem Satz, dazu wofür der Beitrag verwendet wird. Die Beträge kommen aus Dolibarr. <Link to="/membership/join" target="_blank" className="text-[#29B6E8] hover:text-white">Ansehen</Link></span>
+        <span className="font-bold uppercase">Seite „Mitglied werden“</span>
+        <span className="block tls-type-small text-white/50 mt-1">Vier Vorteile mit Symbol und je einem Satz, dazu wofür der Beitrag verwendet wird. Die Beträge kommen aus Dolibarr. <Link to="/membership/join" target="_blank" className="text-[#29B6E8] hover:text-white">Ansehen</Link></span>
       </summary>
-      <div className="mt-4 space-y-4 text-sm">
+      <div className="mt-4 space-y-4 tls-type-small">
         <div className="grid gap-3 md:grid-cols-2">
           {form.benefits.map((row, index) => (
             <div key={index} className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={`join-page-benefit-${index}`}>
@@ -63,11 +63,11 @@ export function JoinPageBox() {
           ))}
         </div>
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-white/65">Wofür der Beitrag verwendet wird (ein Satz)</span>
+          <span className="tls-type-small font-bold text-white/65">Wofür der Beitrag verwendet wird (ein Satz)</span>
           <input value={form.fee_purpose} onChange={(e) => setForm((current) => ({ ...current, fee_purpose: e.target.value }))} maxLength={300} data-testid="join-page-purpose"
             placeholder="Der Beitrag zahlt Hallenmiete, Turnierpreise und Technik." className="mt-1 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
         </label>
-        <button type="button" onClick={save} disabled={busy} data-testid="join-page-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Speichern</button>
+        <button type="button" onClick={save} disabled={busy} data-testid="join-page-save" className="px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">Speichern</button>
       </div>
     </details>
   );

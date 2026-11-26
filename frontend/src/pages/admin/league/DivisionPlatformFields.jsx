@@ -27,8 +27,8 @@ export function DivisionPlatformFields({ form, set, seasonId }) {
   const deviceNow = INPUT_DEVICE_OPTIONS.find(([key]) => key === (settings.input_device || ""))?.[1] || "keine Angabe";
   return (
     <fieldset className="min-w-0 space-y-2" data-testid="division-platform">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Plattform</legend>
-      <p className="text-xs text-white/55" data-testid="division-platform-season">
+      <legend className="tls-type-label text-white/60">Plattform</legend>
+      <p className="tls-type-small text-white/55" data-testid="division-platform-season">
         Season: {platformShort({ allowed: field ? settings.allowed_platforms : [], crossplay: settings.crossplay, input_device: settings.input_device })}
       </p>
       {field ? (
@@ -40,7 +40,7 @@ export function DivisionPlatformFields({ form, set, seasonId }) {
           ) : null}
         </>
       ) : (
-        <p className="text-xs text-white/50">Plattformen eingrenzen geht erst, wenn die Season das Feld gewählt hat: Reiter „Anmeldung und Kader“ → „Plattform und Eingabegerät“.</p>
+        <p className="tls-type-small text-white/50">Plattformen eingrenzen geht erst, wenn die Season das Feld gewählt hat: Reiter „Anmeldung und Kader“ → „Plattform und Eingabegerät“.</p>
       )}
       <FormGrid cols={2}>
         <SelectField label="Crossplay" value={form.crossplay} onChange={(value) => set("crossplay", value)} options={asSeason(CROSSPLAY_OPTIONS, crossplayNow)}

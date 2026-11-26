@@ -217,12 +217,12 @@ export default function AdminTournamentNewPage() {
         headerExtra={(preset || event) && (
           <>
             {event && (
-              <div className="mt-3 border border-[#9F7AEA]/40 bg-[#9F7AEA]/5 rounded-sm px-4 py-3 text-sm max-w-2xl" data-testid="new-tr-event-hint">
+              <div className="mt-3 border border-[#9F7AEA]/40 bg-[#9F7AEA]/5 rounded-sm px-4 py-3 tls-type-small max-w-2xl" data-testid="new-tr-event-hint">
                 Neues Turnier in <strong className="text-white">{event.name}</strong>{event.window ? ` (${event.window})` : ""}. Ort, Tag, Partner und Discord-Einstellungen sind vom Event übernommen – der Tag muss im Event liegen.
               </div>
             )}
             {preset && (
-              <div className="mt-3 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm max-w-2xl" data-testid="new-tr-preset-hint">
+              <div className="mt-3 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm px-4 py-3 tls-type-small max-w-2xl" data-testid="new-tr-preset-hint">
                 Voreinstellung <strong className="text-white">„{preset.label}“</strong> aus dem <Link to="/admin/tournament-guide#turnierformen" className="text-[#29B6E8] hover:underline">Leitfaden</Link> übernommen: Format, Teilnahme, Best of und die Spielregel-Vorgabe sind gesetzt – alles bleibt änderbar.
               </div>
             )}
@@ -248,11 +248,11 @@ export default function AdminTournamentNewPage() {
               </FormSection>
             </FormSection>
             {planningWarnings.length > 0 && (
-              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 text-sm text-[#FFD700]" data-testid="new-tr-planning-warnings">
+              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 tls-type-small text-[#FFD700]" data-testid="new-tr-planning-warnings">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                   <div className="space-y-1">
-                    <div className="text-[11px] font-bold uppercase tracking-widest">Planung prüfen</div>
+                    <div className="tls-type-label">Planung prüfen</div>
                     {planningWarnings.map((warning) => <div key={warning}>{warning}</div>)}
                   </div>
                 </div>
@@ -350,13 +350,13 @@ export default function AdminTournamentNewPage() {
         {/* Structured Prize Places */}
         <FormSection title="Preise" collapsible accent="#FFD700">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-white/50">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
+            <div className="tls-type-small text-white/50">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
             <div className="flex flex-wrap justify-end gap-3">
               {/* Siegerrunde und Verliererrunde nur beim Doppel-K.-o. (#2111, T5). */}
-              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("winner")} data-testid="new-tr-prize-winner-top3" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Siegerrunde Top 3</button>}
-              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("loser")} data-testid="new-tr-prize-loser-top3" className="text-xs font-bold uppercase tracking-wider text-[#CD7F32] hover:text-white">+ Verliererrunde Top 3</button>}
-              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
-              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">+ Letzter Platz</button>
+              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("winner")} data-testid="new-tr-prize-winner-top3" className="tls-type-label text-[#29B6E8] hover:text-white">+ Siegerrunde Top 3</button>}
+              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("loser")} data-testid="new-tr-prize-loser-top3" className="tls-type-label text-[#CD7F32] hover:text-white">+ Verliererrunde Top 3</button>}
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="tls-type-label text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="tls-type-label text-[#FFD700] hover:text-white">+ Letzter Platz</button>
             </div>
           </div>
           {form.prize_places.map((p, i) => (
@@ -384,7 +384,7 @@ export default function AdminTournamentNewPage() {
             <TextField label="Kanal oder Adresse" value={form.stream_address} onChange={(v) => set("stream_address", v)} testId="new-tr-stream-url" placeholder={STREAM_ADDRESS_HINT[form.stream_platform] || STREAM_ADDRESS_HINT[""]} />
             {/* Ort (#1371): im Event kommt er vom Event; ein eigener Ort nur ohne Event. */}
             {event ? (
-              <div className="text-sm text-white/70" data-testid="new-tr-location-event">Ort: {form.location || "wie beim Event"} <span className="text-white/45">(vom Event)</span></div>
+              <div className="tls-type-small text-white/70" data-testid="new-tr-location-event">Ort: {form.location || "wie beim Event"} <span className="text-white/45">(vom Event)</span></div>
             ) : (
               <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
             )}
@@ -419,14 +419,14 @@ function RulePresetPicker({ form, onApply }) {
             key={preset.key}
             type="button"
             onClick={() => onApply(preset)}
-            className={`px-3 py-2 border rounded-sm text-xs uppercase tracking-wider font-bold ${activeKey === preset.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white"}`}
+            className={`px-3 py-2 border rounded-sm tls-type-label ${activeKey === preset.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white"}`}
           >
             {preset.label}
           </button>
         ))}
       </div>
-      <div className="mt-2 text-xs text-white/55">{ruleModeSummary(form)}</div>
-      {warnings.length > 0 && <div className="mt-2 text-xs text-[#FFD700]">{warnings.join(" ")}</div>}
+      <div className="mt-2 tls-type-small text-white/55">{ruleModeSummary(form)}</div>
+      {warnings.length > 0 && <div className="mt-2 tls-type-small text-[#FFD700]">{warnings.join(" ")}</div>}
     </div>
   );
 }

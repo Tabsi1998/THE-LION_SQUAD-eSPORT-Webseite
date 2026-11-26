@@ -94,14 +94,14 @@ function ManagedSeasonCard({ season }) {
   const place = MANAGED_ELSEWHERE[season.key];
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`season-${season.key}`}>
-      <div className="font-heading font-bold uppercase inline-flex items-center gap-2">
+      <div className="font-bold uppercase inline-flex items-center gap-2">
         {season.label}
-        {season.active_now && <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88] tracking-wider">läuft</span>}
+        {season.active_now && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88]">läuft</span>}
       </div>
-      <p className="mt-1 text-sm text-white/75" data-testid={`season-${season.key}-managed`}>
+      <p className="mt-1 tls-type-small text-white/75" data-testid={`season-${season.key}-managed`}>
         {season.enabled ? "An" : "Aus"} – gepflegt unter <Link to={place.to} className="text-[#29B6E8] hover:underline">{place.page}</Link>.
       </p>
-      <p className="mt-1 text-xs text-white/50" data-testid={`season-${season.key}-state`}>{stateText(season)}</p>
+      <p className="mt-1 tls-type-small text-white/50" data-testid={`season-${season.key}-state`}>{stateText(season)}</p>
     </div>
   );
 }
@@ -117,37 +117,37 @@ function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false })
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3" data-testid={`season-${season.key}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-heading font-bold uppercase inline-flex items-center gap-2">
+          <div className="font-bold uppercase inline-flex items-center gap-2">
             {season.label}
-            {season.active_now && <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88] tracking-wider" data-testid={`season-${season.key}-live`}>läuft</span>}
+            {season.active_now && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88]" data-testid={`season-${season.key}-live`}>läuft</span>}
           </div>
-          <p className="mt-1 text-xs text-white/50 max-w-2xl">{season.description}</p>
-          <p className="mt-1 text-xs text-white/70" data-testid={`season-${season.key}-state`}>{stateText(season)}</p>
+          <p className="mt-1 tls-type-small text-white/50 max-w-2xl">{season.description}</p>
+          <p className="mt-1 tls-type-small text-white/70" data-testid={`season-${season.key}-state`}>{stateText(season)}</p>
         </div>
-        <label className="flex items-center gap-2 text-sm shrink-0">
+        <label className="flex items-center gap-2 tls-type-small shrink-0">
           <input type="checkbox" checked={!!season.enabled} disabled={busy} onChange={(e) => onSave({ enabled: e.target.checked }, e.target.checked ? `${season.label} an.` : `${season.label} aus.`)} className="accent-[#29B6E8]" data-testid={`season-${season.key}-enabled`} />
           <span>An</span>
         </label>
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 tls-type-small">
         <label className="space-y-1">
-          <span className="block text-white/45 uppercase tracking-wider text-[10px]">Modus</span>
+          <span className="block text-white/45 tls-type-label">Modus</span>
           <select value={season.mode} disabled={busy || !season.enabled} onChange={(e) => onSave({ mode: e.target.value }, `${season.label}: ${MODE_LABELS[e.target.value]}.`)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid={`season-${season.key}-mode`}>
             {Object.entries(MODE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-white/45 uppercase tracking-wider text-[10px]">Bis (bei jetzt an / aus)</span>
+          <span className="block text-white/45 tls-type-small">Bis (bei jetzt an / aus)</span>
           <input type="datetime-local" value={toLocalInput(season.until)} disabled={busy || season.mode === "auto"} onChange={(e) => onSave({ until: e.target.value || "" }, e.target.value ? `Gilt bis ${dateText(e.target.value)}.` : "Ohne Ende, bis du umstellst.")} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid={`season-${season.key}-until`} />
         </label>
         <label className="space-y-1">
-          <span className="block text-white/45 uppercase tracking-wider text-[10px]">Stärke</span>
+          <span className="block text-white/45 tls-type-label">Stärke</span>
           <select value={season.intensity} disabled={busy} onChange={(e) => onSave({ intensity: e.target.value }, `${season.label}: ${INTENSITY_LABELS[e.target.value]}.`)} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid={`season-${season.key}-intensity`}>
             {Object.entries(INTENSITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <div className="space-y-1">
-          <span className="block text-white/45 uppercase tracking-wider text-[10px]">Wo</span>
+          <span className="block text-white/45 tls-type-label">Wo</span>
           <div className="flex gap-3 py-1.5">
             {Object.entries(CHANNEL_LABELS).filter(([value]) => !season.supported_channels || season.supported_channels.includes(value)).map(([value, label]) => (
               <label key={value} className="flex items-center gap-1.5">
@@ -165,44 +165,44 @@ function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false })
         <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-end">
           <div className="space-y-2">
             {textNames.map((name) => (
-              <label key={name} className="block text-xs space-y-1">
-                <span className="block text-white/45 uppercase tracking-wider text-[10px]">{TEXT_LABELS[name] || name}</span>
+              <label key={name} className="block tls-type-small space-y-1">
+                <span className="block text-white/45 tls-type-small">{TEXT_LABELS[name] || name}</span>
                 <input value={draft[name] || ""} maxLength={200} placeholder={season.defaults[name]} onChange={(e) => setTexts({ ...draft, [name]: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid={`season-${season.key}-text-${name}`} />
               </label>
             ))}
-            <p className="text-[11px] text-white/40">Leer = Vorgabe. {season.key === "club_birthday" ? "{years} wird durch die Jahre ersetzt." : ""}</p>
+            <p className="tls-type-small text-white/40">Leer = Vorgabe. {season.key === "club_birthday" ? "{years} wird durch die Jahre ersetzt." : ""}</p>
           </div>
-          <button type="button" onClick={() => onSave({ texts: draft }, "Texte gespeichert.", () => setTexts(null))} disabled={busy || !dirty} data-testid={`season-${season.key}-text-save`} className="px-3 py-2 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Texte speichern</button>
+          <button type="button" onClick={() => onSave({ texts: draft }, "Texte gespeichert.", () => setTexts(null))} disabled={busy || !dirty} data-testid={`season-${season.key}-text-save`} className="px-3 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Texte speichern</button>
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/5">
-        <button type="button" onClick={() => onPreview(previewAt)} disabled={busy} data-testid={`season-${season.key}-preview`} className="px-3 py-1.5 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+        <button type="button" onClick={() => onPreview(previewAt)} disabled={busy} data-testid={`season-${season.key}-preview`} className="px-3 py-1.5 border border-white/20 text-white tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
           <Eye className="w-3 h-3" /> Vorschau 60 Sekunden
         </button>
         {season.key !== "weather" && (
-          <label className="flex items-center gap-2 text-[11px] text-white/50">
+          <label className="flex items-center gap-2 tls-type-small text-white/50">
             <span>zu dieser Zeit</span>
             <input type="datetime-local" value={previewAt} onChange={(e) => setPreviewAt(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" data-testid={`season-${season.key}-preview-at`} />
           </label>
         )}
-        <span className="text-[11px] text-white/40">Nur du siehst sie – sofort, in diesem Tab.</span>
+        <span className="tls-type-small text-white/40">Nur du siehst sie – sofort, in diesem Tab.</span>
         {previewRunning && (
           // Im selben Tab (#1838): das Token liegt nur in dieser Sitzung - ein neuer Tab kennt es nicht. Auf der Website
           // steht auch, was die Verwaltung nicht hat (Logo, Kopfzeile, Fußzeile).
-          <Link to="/" data-testid={`season-${season.key}-preview-site`} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#29B6E8] hover:underline">
+          <Link to="/" data-testid={`season-${season.key}-preview-site`} className="inline-flex items-center gap-1 tls-type-small font-bold text-[#29B6E8] hover:underline">
             Auf der Website ansehen <ArrowUpRight className="w-3 h-3" />
           </Link>
         )}
         {season.key === "advent_calendar" && (
-          <Link to="/admin/advent" data-testid="season-advent_calendar-doors" className="ml-auto px-3 py-1.5 border border-[#e9c46a]/50 text-[#e9c46a] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#e9c46a]/10">Türchen pflegen</Link>
+          <Link to="/admin/advent" data-testid="season-advent_calendar-doors" className="ml-auto px-3 py-1.5 border border-[#e9c46a]/50 text-[#e9c46a] tls-type-label rounded-sm hover:bg-[#e9c46a]/10">Türchen pflegen</Link>
         )}
         {season.key === "easter_hunt" && (
           // Wie „Türchen pflegen“ (#858): die Eier versteckt man an genau einer Stelle, dorthin führt der Knopf.
-          <Link to="/admin/ostern" data-testid="season-easter_hunt-eggs" className="ml-auto px-3 py-1.5 border border-[#9be15d]/50 text-[#9be15d] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#9be15d]/10">Ostereier verstecken</Link>
+          <Link to="/admin/ostern" data-testid="season-easter_hunt-eggs" className="ml-auto px-3 py-1.5 border border-[#9be15d]/50 text-[#9be15d] tls-type-label rounded-sm hover:bg-[#9be15d]/10">Ostereier verstecken</Link>
         )}
       </div>
       {limits.length > 0 && (
-        <ul className="text-[11px] text-[#FFC857]/85 space-y-0.5" data-testid={`season-${season.key}-preview-limits`}>
+        <ul className="tls-type-small text-[#FFC857]/85 space-y-0.5" data-testid={`season-${season.key}-preview-limits`}>
           {limits.map((line) => <li key={line}>{line}</li>)}
         </ul>
       )}
@@ -290,7 +290,7 @@ export function SeasonsSettings() {
   };
 
   if (!data) {
-    return loadError ? <div className="text-xs text-[#FF6B6B]" data-testid="seasons-error">Der Stand der Jahreszeiten konnte nicht geladen werden.</div> : null;
+    return loadError ? <div className="tls-type-small text-[#FF6B6B]" data-testid="seasons-error">Der Stand der Jahreszeiten konnte nicht geladen werden.</div> : null;
   }
   const year = calendarYear ?? new Date(data.now).getFullYear();
   const rows = calendar ?? data.calendar ?? [];
@@ -298,13 +298,13 @@ export function SeasonsSettings() {
     <div className="space-y-4" data-testid="seasons-settings">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#29B6E8]" /> Saisonale Deko</div>
-          <p className="mt-1 text-xs text-white/50 max-w-2xl">
+          <div className="font-bold uppercase inline-flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#29B6E8]" /> Saisonale Deko</div>
+          <p className="mt-1 tls-type-small text-white/50 max-w-2xl">
             Halloween, Advent und Weihnachten, Silvester, Fasching, Vereinsgeburtstag und Ostern schalten sich nach Datum von selbst ein und aus (Zeitzone Wien; Ostern und die Adventsonntage werden berechnet).
             Hier stellst du je Saison ein, ob, wie stark und wo. Jede Person kann die Deko für sich auf dezent oder aus stellen; bei „Bewegung reduzieren“ bleibt alles ruhig.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm shrink-0">
+        <label className="flex items-center gap-2 tls-type-small shrink-0">
           <input type="checkbox" checked={!!data.enabled} disabled={busy} onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? "Saisonale Deko an." : "Saisonale Deko aus – nirgends mehr zu sehen, Einstellungen bleiben.")} className="accent-[#29B6E8]" data-testid="seasons-enabled" />
           <span>Saisonale Deko</span>
         </label>
@@ -321,7 +321,7 @@ export function SeasonsSettings() {
         onPreview={() => preview("weather")}
       />
       {ownLimits.length > 0 && (
-        <ul className="border border-[#FFC857]/25 bg-[#FFC857]/5 rounded-sm px-4 py-2 text-xs text-[#FFC857]/85 space-y-0.5" data-testid="seasons-preview-own-limits">
+        <ul className="border border-[#FFC857]/25 bg-[#FFC857]/5 rounded-sm px-4 py-2 tls-type-small text-[#FFC857]/85 space-y-0.5" data-testid="seasons-preview-own-limits">
           {ownLimits.map((line) => <li key={line}>{line}</li>)}
         </ul>
       )}
@@ -334,13 +334,13 @@ export function SeasonsSettings() {
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3" data-testid="seasons-calendar">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#29B6E8]" /> Kalender {year}</div>
+          <div className="font-bold uppercase inline-flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#29B6E8]" /> Kalender {year}</div>
           <div className="flex gap-2">
-            <button type="button" onClick={() => loadCalendar(year - 1)} className="px-2 py-1 border border-white/20 text-[10px] uppercase tracking-wider rounded-sm" data-testid="seasons-calendar-prev">{year - 1}</button>
-            <button type="button" onClick={() => loadCalendar(year + 1)} className="px-2 py-1 border border-white/20 text-[10px] uppercase tracking-wider rounded-sm" data-testid="seasons-calendar-next">{year + 1}</button>
+            <button type="button" onClick={() => loadCalendar(year - 1)} className="px-2 py-1 border border-white/20 tls-type-label rounded-sm" data-testid="seasons-calendar-prev">{year - 1}</button>
+            <button type="button" onClick={() => loadCalendar(year + 1)} className="px-2 py-1 border border-white/20 tls-type-label rounded-sm" data-testid="seasons-calendar-next">{year + 1}</button>
           </div>
         </div>
-        <div className="border border-white/5 rounded-sm divide-y divide-white/5 text-xs">
+        <div className="border border-white/5 rounded-sm divide-y divide-white/5 tls-type-small">
           {rows.map((row) => (
             <div key={`${row.key}-${row.phase}-${row.start}`} className="flex flex-wrap justify-between gap-2 px-3 py-2">
               <span>{row.label} <span className="text-white/40">({row.phase})</span></span>
@@ -349,7 +349,7 @@ export function SeasonsSettings() {
           ))}
           {rows.length === 0 && <div className="px-3 py-2 text-white/40">Keine Termine in diesem Jahr.</div>}
         </div>
-        {!data.founded_on && <p className="text-[11px] text-white/40">Der Vereinsgeburtstag erscheint, sobald unter Verein → Über uns ein Gründungsdatum steht.</p>}
+        {!data.founded_on && <p className="tls-type-small text-white/40">Der Vereinsgeburtstag erscheint, sobald unter Verein → Über uns ein Gründungsdatum steht.</p>}
       </div>
     </div>
   );

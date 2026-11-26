@@ -62,18 +62,18 @@ export function SeriesTeamColorsSection({ series }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" aria-labelledby="series-colors-heading" data-testid="series-team-colors">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="series-colors-heading" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Teamfarben</h2>
-          <p className="mt-1 text-sm text-white/60">Startnummer und Team in der Ergebnistabelle je Runde – wie in den Grafiken des Veranstalters. Leer heißt neutral.</p>
+          <h2 id="series-colors-heading" className="tls-type-label text-[#29B6E8]">Teamfarben</h2>
+          <p className="mt-1 tls-type-body text-white/60">Startnummer und Team in der Ergebnistabelle je Runde – wie in den Grafiken des Veranstalters. Leer heißt neutral.</p>
         </div>
         {open.length > 0 && (
           <button type="button" onClick={() => setDraft((current) => ({ ...current, ...Object.fromEntries(open.map((item) => [item.team, item.suggestion])) }))}
-            className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2" data-testid="series-colors-take-all">
+            className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2" data-testid="series-colors-take-all">
             <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> Vorschläge aus dem Bild ({open.length})
           </button>
         )}
       </div>
-      {failed && <p className="mt-3 text-sm text-white/60" data-testid="series-colors-error">{failed}</p>}
-      {teams && teams.length === 0 && <p className="mt-3 text-sm text-white/50" data-testid="series-colors-empty">Noch keine Teams – sie kommen mit den Teilnehmern und Ergebnissen.</p>}
+      {failed && <p className="mt-3 tls-type-small text-white/60" data-testid="series-colors-error">{failed}</p>}
+      {teams && teams.length === 0 && <p className="mt-3 tls-type-small text-white/50" data-testid="series-colors-empty">Noch keine Teams – sie kommen mit den Teilnehmern und Ergebnissen.</p>}
       {teams && teams.length > 0 && (
         <ul className="mt-4 grid gap-2 sm:grid-cols-2" data-testid="series-colors-list">
           {teams.map((item) => {
@@ -85,7 +85,7 @@ export function SeriesTeamColorsSection({ series }) {
                 <input type="color" value={color || NEUTRAL} onChange={(event) => set(item.team, event.target.value)}
                   aria-label={`Farbe für ${item.team}`} className="h-8 w-9 shrink-0 cursor-pointer rounded-sm border border-white/15 bg-transparent p-0.5" data-testid="series-colors-picker" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold italic" style={{ color: color || NEUTRAL }}>{item.team}</span>
+                  <span className="block truncate tls-type-small font-semibold italic" style={{ color: color || NEUTRAL }}>{item.team}</span>
                   {item.own && <span className="tls-standing-me mt-0.5">Verein</span>}
                 </span>
                 <input value={value} onChange={(event) => set(item.team, event.target.value)} placeholder="neutral" maxLength={7} spellCheck={false}
@@ -109,10 +109,10 @@ export function SeriesTeamColorsSection({ series }) {
       {teams && teams.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button type="button" onClick={save} disabled={!changed || invalid || saving} data-testid="series-colors-save"
-            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
             Teamfarben speichern
           </button>
-          {invalid && <span className="text-xs text-warn">Farbe als #rrggbb, etwa #29b6e8.</span>}
+          {invalid && <span className="tls-type-small text-warn">Farbe als #rrggbb, etwa #29b6e8.</span>}
         </div>
       )}
     </section>

@@ -73,8 +73,8 @@ export function XpTab({ board = false }) {
             </div>
             <Panel title={`Tagesdeckel heute (${caps.day})`} icon={Gauge} accent="#29B6E8" hint="Wie oft eine Quelle heute schon XP gebracht hat – volle Deckel bringen bis Mitternacht nichts mehr." testId="xp-caps">
               <div className="tls-swipe pb-0">
-                <table className="w-full text-xs min-w-[480px]">
-                  <thead className="text-[10px] uppercase tracking-widest text-white/45">
+                <table className="w-full tls-type-small min-w-[480px]">
+                  <thead className="tls-type-label text-white/45">
                     <tr><th className="text-left py-2 pr-3">Quelle</th><th className="text-right py-2 pr-3">XP je Mal</th><th className="text-left py-2 pr-3">Heute</th><th className="text-right py-2">Stand</th></tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -100,7 +100,7 @@ export function XpTab({ board = false }) {
                   <div className="space-y-2">
                     <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="z. B. 50 oder -20" aria-label="XP" data-testid="xp-amount" className={INPUT_CLASS} />
                     <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund" aria-label="Grund" data-testid="xp-reason" className={INPUT_CLASS} />
-                    <button type="button" onClick={correct} disabled={busy} data-testid="xp-submit" className="px-4 py-2 bg-[#FFD700] text-black text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">Korrigieren</button>
+                    <button type="button" onClick={correct} disabled={busy} data-testid="xp-submit" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-40">Korrigieren</button>
                   </div>
                 </BoardOnly>
               </Panel>
@@ -109,15 +109,15 @@ export function XpTab({ board = false }) {
                   {view.prestige ? (
                     <div className="space-y-2">
                       <input value={resetReason} onChange={(e) => setResetReason(e.target.value)} placeholder="Grund" aria-label="Grund für das Zurücksetzen" data-testid="xp-reset-reason" className={INPUT_CLASS} />
-                      <button type="button" onClick={resetPrestige} disabled={busy} data-testid="xp-reset-submit" className="px-4 py-2 bg-[#FF3B30] text-white text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">Zurücksetzen</button>
+                      <button type="button" onClick={resetPrestige} disabled={busy} data-testid="xp-reset-submit" className="px-4 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm disabled:opacity-40">Zurücksetzen</button>
                     </div>
-                  ) : <p className="text-xs text-white/45">{personName(person)} hat keine Prestige-Sterne.</p>}
+                  ) : <p className="tls-type-small text-white/45">{personName(person)} hat keine Prestige-Sterne.</p>}
                 </BoardOnly>
               </Panel>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-white/40 self-center" data-testid="xp-empty">Eine Person wählen, um Stand und Deckel zu sehen.</p>
+          <p className="tls-type-small text-white/40 self-center" data-testid="xp-empty">Eine Person wählen, um Stand und Deckel zu sehen.</p>
         )}
       </div>
     </div>

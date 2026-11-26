@@ -48,7 +48,7 @@ export function OverviewTab() {
     }
   };
 
-  if (!data) return <div className="text-sm text-white/40" data-testid="ach-overview-loading">Lädt …</div>;
+  if (!data) return <div className="tls-type-small text-white/40" data-testid="ach-overview-loading">Lädt …</div>;
   const rarest = data.rarest;
   const active = data.most_active_category;
   const queue = data.queue || {};
@@ -70,7 +70,7 @@ export function OverviewTab() {
           <Bars testId="ov-level-bars" rows={LEVEL_BUCKETS.map((key) => ({ key, label: key === "60" ? "Level 60" : `Level ${key}`, value: data.levels?.[key] || 0 }))} />
         </Panel>
         <Panel title="Freischaltungen je Kategorie (30 Tage)" icon={Users} accent="#00FF88" testId="ov-categories">
-          {perCategory.length ? <Bars rows={perCategory} accent="#00FF88" testId="ov-category-bars" /> : <p className="text-xs text-white/45">In den letzten 30 Tagen wurde nichts freigeschaltet.</p>}
+          {perCategory.length ? <Bars rows={perCategory} accent="#00FF88" testId="ov-category-bars" /> : <p className="tls-type-small text-white/45">In den letzten 30 Tagen wurde nichts freigeschaltet.</p>}
         </Panel>
       </div>
 
@@ -80,13 +80,13 @@ export function OverviewTab() {
           icon={Activity}
           hint="Erfolge werden vergeben, sobald etwas passiert (Ergebnis, Turnierabschluss, Bestzeit …) – eine Warteschlange arbeitet die Betroffenen alle 30 Sekunden ab."
           actions={(
-            <button type="button" onClick={evaluateAll} disabled={busy} data-testid="ach-evaluate-all" className="px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+            <button type="button" onClick={evaluateAll} disabled={busy} data-testid="ach-evaluate-all" className="px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
               <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} /> Alle jetzt auswerten
             </button>
           )}
           testId="ach-evaluation"
         >
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 tls-type-small">
             <dt className="text-white/45">Warten gerade</dt><dd className="tabular-nums" data-testid="ov-queue-waiting">{queue.waiting ?? "–"}</dd>
             <dt className="text-white/45">Noch zu melden</dt><dd className="tabular-nums">{queue.unannounced ?? "–"}</dd>
             <dt className="text-white/45">Letzter Lauf</dt><dd>{formatWhen(queue.last_queue_run_at)}</dd>
@@ -95,13 +95,13 @@ export function OverviewTab() {
         </Panel>
         <Panel title="Nächtlicher Abgleich" icon={Moon} accent="#A855F7" hint="Nachts werden alle zuletzt Aktiven komplett neu gerechnet; Abweichungen heißen, dass ein Ereignis unterwegs verloren ging." testId="ov-reconcile">
           {reconcile ? (
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 tls-type-small">
               <dt className="text-white/45">Zuletzt</dt><dd>{formatWhen(reconcile.at)}</dd>
               <dt className="text-white/45">Geprüft</dt><dd className="tabular-nums">{reconcile.checked ?? 0} Personen</dd>
               <dt className="text-white/45">Abweichungen</dt><dd className={`tabular-nums ${reconcile.drift ? "text-[#FFD700]" : ""}`} data-testid="ov-reconcile-drift">{reconcile.drift ?? 0}</dd>
               <dt className="text-white/45">Dabei vergeben</dt><dd className="tabular-nums">{reconcile.awarded ?? 0}</dd>
             </dl>
-          ) : <p className="text-xs text-white/45">Der Abgleich ist noch nicht gelaufen.</p>}
+          ) : <p className="tls-type-small text-white/45">Der Abgleich ist noch nicht gelaufen.</p>}
         </Panel>
       </div>
       {canSystem && (
@@ -110,18 +110,18 @@ export function OverviewTab() {
           icon={Trophy}
           hint="Pokale und Banner für alle Turniere mit veröffentlichten Ergebnissen neu ableiten – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht dabei nichts."
           actions={(
-            <button type="button" onClick={rebuildAwards} disabled={rebuilding} data-testid="ach-awards-rebuild" className="px-3 py-1.5 border border-honor/50 text-honor text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+            <button type="button" onClick={rebuildAwards} disabled={rebuilding} data-testid="ach-awards-rebuild" className="px-3 py-1.5 border border-honor/50 text-honor tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
               <RefreshCw className={`w-3.5 h-3.5 ${rebuilding ? "animate-spin" : ""}`} /> Pokale nachtragen
             </button>
           )}
           testId="ach-awards"
         >
-          <p className="text-xs text-white/45">Nur für System: der Lauf geht über alle Turniere und steht im Protokoll.</p>
+          <p className="tls-type-small text-white/45">Nur für System: der Lauf geht über alle Turniere und steht im Protokoll.</p>
         </Panel>
       )}
       {/* Neuberechnung (#2340): Probelauf und Abschluss nur für den Superadmin. */}
       {isSuperAdmin && <RecountPanel />}
-      <p className="text-[11px] text-white/35">Katalog: {data.catalog?.groups ?? 0} Gruppen · {data.catalog?.tiers ?? 0} Stufen</p>
+      <p className="tls-type-small text-white/35">Katalog: {data.catalog?.groups ?? 0} Gruppen · {data.catalog?.tiers ?? 0} Stufen</p>
     </div>
   );
 }

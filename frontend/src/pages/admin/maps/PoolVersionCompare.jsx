@@ -48,7 +48,7 @@ export function PoolVersionCompare({ baseUrl, version, testId = "pool-compare" }
   const rows = compareRows(diff);
   return (
     <details className="group rounded-sm border border-white/10 bg-[#121212] p-4" data-testid={testId}>
-      <summary className="cursor-pointer select-none text-xs font-bold uppercase tracking-widest text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm">
+      <summary className="cursor-pointer select-none tls-type-label text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm">
         Versionen vergleichen
       </summary>
       <div className="mt-3 space-y-3">
@@ -56,22 +56,22 @@ export function PoolVersionCompare({ baseUrl, version, testId = "pool-compare" }
           <SelectField label="Von Version" value={base} onChange={setBase} options={options} testId={`${testId}-base`} />
           <SelectField label="Zu Version" value={target} onChange={setTarget} options={options} testId={`${testId}-target`} />
           <button type="button" onClick={run} disabled={!base || !target} data-testid={`${testId}-run`}
-            className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+            className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
             <GitCompare className="w-3.5 h-3.5" aria-hidden="true" /> Vergleichen
           </button>
         </div>
-        {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
+        {error ? <p className="tls-type-small text-warn" role="alert">{error}</p> : null}
         {diff ? (
-          diff.same ? <p className="text-sm text-white/60" data-testid={`${testId}-same`}>Beide Versionen haben dieselben Maps.</p> : (
+          diff.same ? <p className="tls-type-small text-white/60" data-testid={`${testId}-same`}>Beide Versionen haben dieselben Maps.</p> : (
             <ul className="space-y-2" data-testid={`${testId}-result`} aria-live="polite">
               {rows.map((row) => (
-                <li key={row.key} className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm" data-testid={`${testId}-mode-${row.key}`}>
+                <li key={row.key} className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 tls-type-small" data-testid={`${testId}-mode-${row.key}`}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="font-semibold text-white">{row.label}</span>
-                    <span className="text-xs text-white/55">{row.statusText}{row.kept ? ` · ${row.kept} geblieben` : ""}</span>
+                    <span className="tls-type-small text-white/55">{row.statusText}{row.kept ? ` · ${row.kept} geblieben` : ""}</span>
                   </div>
-                  {row.added.length ? <div className="text-xs text-[#29B6E8]">Hinzu: {row.added.join(", ")}</div> : null}
-                  {row.removed.length ? <div className="text-xs text-warn">Weg: {row.removed.join(", ")}</div> : null}
+                  {row.added.length ? <div className="tls-type-small text-[#29B6E8]">Hinzu: {row.added.join(", ")}</div> : null}
+                  {row.removed.length ? <div className="tls-type-small text-warn">Weg: {row.removed.join(", ")}</div> : null}
                 </li>
               ))}
             </ul>

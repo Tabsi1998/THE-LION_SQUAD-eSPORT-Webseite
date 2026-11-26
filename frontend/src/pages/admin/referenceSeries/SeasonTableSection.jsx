@@ -27,17 +27,17 @@ import { kindShows, kindWord } from "@/lib/seriesKinds";
 // hängt erst beim Übernehmen als Original „Tabelle“ am Termin (#1933): bei der Team-Tabelle an der gewählten Runde, bei
 // der Fahrer-Tabelle an der letzten Runde der Tabelle - „Nicht anhängen“ lässt es weg.
 
-const SELECT_CLASS = `${INPUT_CLASS} text-sm py-1.5`;
+const SELECT_CLASS = `${INPUT_CLASS} tls-type-small py-1.5`;
 // Wie die übrigen Felder, nur ohne volle Breite - im Raster bestimmt die Spalte die Breite.
-const ROUND_SELECT_CLASS = `${INPUT_CLASS.replace("w-full ", "")} min-w-0 text-sm py-1.5`;
+const ROUND_SELECT_CLASS = `${INPUT_CLASS.replace("w-full ", "")} min-w-0 tls-type-small py-1.5`;
 // Tabellen-Text: feste Zeichenbreite und kein Umbruch, damit Spalten erkennbar bleiben.
-const PASTE_CLASS = `${INPUT_CLASS} font-mono text-xs leading-relaxed [tab-size:12]`;
+const PASTE_CLASS = `${INPUT_CLASS} font-mono tls-type-small leading-relaxed [tab-size:12]`;
 const DAY_PLACEHOLDER = "Pos\tSpieler\tT1\tT2\tT3\tGesamt\n1\tAda Ausgedacht\t35\t30\t--\t65\n2\tBruno Beispiel\t30\t35\t26\t91";
 const PLACEHOLDER = "Pos\tFahrer\tTeam\tR1\tR2\tR3\tGesamt\n1\tAda Ausgedacht\tProbe Rot\t25\t18\tOUT\t43\n2\tBruno Beispiel\tProbe Blau\t--\t25\t18\t43";
 
 function Badge({ state }) {
   const shown = SEASON_STATES[state] || SEASON_STATES.error;
-  return <span className={`inline-flex px-1.5 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${shown.tone}`}>{shown.label}</span>;
+  return <span className={`inline-flex px-1.5 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${shown.tone}`}>{shown.label}</span>;
 }
 
 function ColumnKinds({ parsed, kinds, onKind }) {
@@ -45,7 +45,7 @@ function ColumnKinds({ parsed, kinds, onKind }) {
   const rounds = roundColumns(kinds).length;
   const named = kinds.map((kind, index) => [kind, parsed.columns[index].label]).filter(([kind]) => kind !== "round" && kind !== "ignore");
   return (
-    <details className="text-sm text-white/70" data-testid="season-table-kinds">
+    <details className="tls-type-small text-white/70" data-testid="season-table-kinds">
       <summary className="cursor-pointer text-white/60 hover:text-white">
         Erkannt: {named.map(([kind, text]) => `${label(kind)} „${text}“`).join(" · ")}{named.length ? " · " : ""}{rounds} {rounds === 1 ? "Runde" : "Runden"} – Spalten ändern
       </summary>
@@ -84,7 +84,7 @@ function ColumnItem({ column, rounds, roundId, picked, onPick, onRound, people =
       </span>
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[4.5rem_minmax(0,26rem)_auto]">
-          <span className="text-sm font-bold text-white break-words [overflow-wrap:anywhere]" title="Kopf der Spalte in der Tabelle">{column.label}</span>
+          <span className="tls-type-small font-bold text-white break-words [overflow-wrap:anywhere]" title="Kopf der Spalte in der Tabelle">{column.label}</span>
           <select value={roundId ?? column.round?.id ?? ""} onChange={(event) => onRound(event.target.value)} aria-label={`Termin für Spalte ${column.label}`}
             data-testid="season-table-round" className={`${ROUND_SELECT_CLASS} col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto`}>
             {!column.round && column.state !== "skip" && <option value="">Termin wählen …</option>}
@@ -93,22 +93,22 @@ function ColumnItem({ column, rounds, roundId, picked, onPick, onRound, people =
           </select>
           <span className="flex items-center justify-end gap-2 sm:justify-start">
             <Badge state={column.state} />
-            {column.unclear > 0 && <span className="text-xs font-semibold text-amber-200 tabular-nums">{column.unclear} gelb</span>}
+            {column.unclear > 0 && <span className="tls-type-small font-semibold text-amber-200 tabular-nums">{column.unclear} gelb</span>}
           </span>
         </div>
-        <div className="text-xs text-white/60">{[targetText(column), how, counts].filter(Boolean).join(" · ")}</div>
+        <div className="tls-type-small text-white/60">{[targetText(column), how, counts].filter(Boolean).join(" · ")}</div>
         {problems.length > 0 && (
-          <ul className="text-xs text-red-200 space-y-0.5" data-testid="season-table-problems">
+          <ul className="tls-type-small text-red-200 space-y-0.5" data-testid="season-table-problems">
             {problems.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
         {warnings.length > 0 && (
-          <ul className="text-xs text-amber-200/90 space-y-0.5" data-testid="season-table-warnings">
+          <ul className="tls-type-small text-amber-200/90 space-y-0.5" data-testid="season-table-warnings">
             {warnings.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
         {total > 0 && (
-          <details className="text-xs text-white/70" data-testid="season-table-changes">
+          <details className="tls-type-small text-white/70" data-testid="season-table-changes">
             <summary className="cursor-pointer text-white/60 hover:text-white">Abweichungen ansehen ({total})</summary>
             <ul className="mt-1.5 space-y-1 border-l border-white/10 pl-3">
               {lines.map((line) => <li key={line.key}><span className="font-semibold text-white">{line.name}</span>: {line.text}</li>)}
@@ -131,19 +131,19 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
     <section className={`border rounded-sm p-3 space-y-3 ${open ? "border-amber-400/40 bg-amber-400/[0.06]" : "border-white/10"}`} data-testid="season-table-unclear" aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-white">{open ? `${open} ${open === 1 ? "Zelle" : "Zellen"} zum Klären` : "Alle gelben Zellen sind geklärt"}</h3>
-          <p className="text-xs text-white/60">Hier ist der Platz aus den Punkten nicht eindeutig. Bis zur Klärung zählt der Wert der Tabelle – übernommen wird die Runde erst danach.</p>
+          <h3 className="tls-type-small font-bold text-white">{open ? `${open} ${open === 1 ? "Zelle" : "Zellen"} zum Klären` : "Alle gelben Zellen sind geklärt"}</h3>
+          <p className="tls-type-small text-white/60">Hier ist der Platz aus den Punkten nicht eindeutig. Bis zur Klärung zählt der Wert der Tabelle – übernommen wird die Runde erst danach.</p>
         </div>
         {open > 0 && (
           <div className="flex flex-wrap gap-2">
             {single > 0 && (
               <button type="button" onClick={onProposals} disabled={busy} data-testid="season-table-proposals"
-                className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+                className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">
                 Eindeutige Vorschläge übernehmen ({single})
               </button>
             )}
             <button type="button" onClick={onOrganizer} disabled={busy} data-testid="season-table-organizer"
-              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">
               Offene: Punkte laut Veranstalter
             </button>
           </div>
@@ -152,13 +152,13 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
       <ul className="divide-y divide-amber-200/10">
         {cells.map((cell) => (
           <li key={cell.id} className="py-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] sm:items-center" data-testid="season-table-cell" data-decided={cell.decided || undefined}>
-            <div className="min-w-0 text-sm">
+            <div className="min-w-0 tls-type-small">
               <span className="font-semibold text-white">{cell.round}</span>
               <span className="text-white/45"> · </span>
               <span className="text-white/85 break-words [overflow-wrap:anywhere]">{cell.name}</span>
               <span className="text-white/45"> · </span>
               <span className="tabular-nums text-white">{cell.value} Punkte</span>
-              <span className={`block text-xs ${cell.decided ? "text-emerald-200/80" : "text-amber-200"}`}>{cell.decided ? "geklärt" : UNCLEAR_TEXT[cell.code] || "unklar"}</span>
+              <span className={`block tls-type-small ${cell.decided ? "text-emerald-200/80" : "text-amber-200"}`}>{cell.decided ? "geklärt" : UNCLEAR_TEXT[cell.code] || "unklar"}</span>
             </div>
             <select value={decisionValue(byKey.get(cell.id), cell.candidates)} disabled={busy} aria-label={`Klären: ${cell.round}, ${cell.name}`}
               onChange={(event) => onDecide(cell, event.target.value)} data-testid="season-table-decide"
@@ -186,24 +186,24 @@ function ImageMarks({ marks, onConfirm, onConfirmAll, namesUndo, onConfirmNames,
     <section className="border border-amber-400/40 bg-amber-400/[0.06] rounded-sm p-3 space-y-2" data-testid="season-table-image-marks" aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-white">Aus dem Bild unsicher: {cells} {cells === 1 ? "Zelle" : "Zellen"} in {marks.length} {marks.length === 1 ? "Zeile" : "Zeilen"}</h3>
-          <p className="text-xs text-amber-100/80">Mit dem Bild vergleichen. Falsches im Feld oben korrigieren und „Neu einlesen“ – sonst „Passt so“. Übernommen wird erst danach.</p>
+          <h3 className="tls-type-small font-bold text-white">Aus dem Bild unsicher: {cells} {cells === 1 ? "Zelle" : "Zellen"} in {marks.length} {marks.length === 1 ? "Zeile" : "Zeilen"}</h3>
+          <p className="tls-type-small text-amber-100/80">Mit dem Bild vergleichen. Falsches im Feld oben korrigieren und „Neu einlesen“ – sonst „Passt so“. Übernommen wird erst danach.</p>
         </div>
         <button type="button" onClick={onConfirmAll} data-testid="season-table-image-confirm-all"
-          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
           <Check className="w-3.5 h-3.5" /> Alle geprüft
         </button>
       </div>
       {bar}
       <ul className="divide-y divide-amber-200/10">
         {marks.map((mark) => (
-          <li key={mark.row} className="py-1.5 flex flex-wrap items-start justify-between gap-2 text-xs" data-testid="season-table-image-mark">
+          <li key={mark.row} className="py-1.5 flex flex-wrap items-start justify-between gap-2 tls-type-small" data-testid="season-table-image-mark">
             <span className="min-w-0 text-amber-100">
               <span className="font-semibold text-white">{mark.name}</span> · {markText(mark)}
               {mark.notes.length > 0 && <span className="block text-amber-200/70">{mark.notes.join(" · ")}</span>}
             </span>
             <button type="button" onClick={() => onConfirm(mark.row)} data-testid="season-table-image-confirm"
-              className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+              className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-label inline-flex items-center gap-1">
               <Check className="w-3 h-3" /> Passt so
             </button>
           </li>
@@ -223,11 +223,11 @@ function originalsUrl(series, round) {
 /** Das gelesene Bild hängt beim Übernehmen als Original „Tabelle“ am Termin (#1933) - oder eben nicht. */
 function PendingOriginal({ target, onDrop, testId }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/60" data-testid={testId}>
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/60" data-testid={testId}>
       <ImagePlus className="w-3.5 h-3.5 text-[#29B6E8]" aria-hidden="true" />
       <span className="min-w-0">Das Bild hängt beim Übernehmen als Original „Tabelle“ an {target ? roundOption(target) : "der Runde"}.</span>
       <button type="button" onClick={onDrop} data-testid={`${testId}-drop`}
-        className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+        className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-label inline-flex items-center gap-1">
         <X className="w-3 h-3" aria-hidden="true" /> Nicht anhängen
       </button>
     </p>
@@ -290,43 +290,43 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
     <section className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 space-y-3" data-testid="season-table-team-totals">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-white">Team-Tabelle erkannt – Teamwertung laut Veranstalter</h3>
-          <p className="text-xs text-white/60">Sie gilt nach der gewählten Runde für Platz und Punkte der Teamwertung; die eigene Rechnung bleibt als Prüfhinweis.</p>
+          <h3 className="tls-type-small font-bold text-white">Team-Tabelle erkannt – Teamwertung laut Veranstalter</h3>
+          <p className="tls-type-small text-white/60">Sie gilt nach der gewählten Runde für Platz und Punkte der Teamwertung; die eigene Rechnung bleibt als Prüfhinweis.</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Team-Tabelle verwerfen" data-testid="season-table-team-close" className="-m-1 p-1 rounded-sm text-white/45 hover:text-white"><X className="w-4 h-4" /></button>
       </div>
       {preview && (
         <label className="block max-w-md">
-          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Nach Runde</span>
+          <span className="block tls-type-label text-white/60 mb-1.5">Nach Runde</span>
           <select value={preview.round.id} onChange={(event) => setRoundId(event.target.value)} data-testid="season-table-team-round" className={SELECT_CLASS}>
             {preview.rounds.map((round) => <option key={round.id} value={round.id}>{roundOption(round)}{round.sheet_status === "published" ? "" : " · Entwurf"}</option>)}
           </select>
         </label>
       )}
-      {error && <p className="text-sm text-amber-200" role="alert" data-testid="season-table-team-error">{error}</p>}
-      {preview && !preview.team_scoring && <p className="text-xs text-amber-200">Die Saison führt keine Teamwertung – die Werte stehen dann nur im Ergebnis.</p>}
+      {error && <p className="tls-type-small text-amber-200" role="alert" data-testid="season-table-team-error">{error}</p>}
+      {preview && !preview.team_scoring && <p className="tls-type-small text-amber-200">Die Saison führt keine Teamwertung – die Werte stehen dann nur im Ergebnis.</p>}
       {preview && Object.keys(preview.previous || {}).length > 0 && (
         <fieldset className="space-y-1" data-testid="season-table-team-mode">
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Vorhandene Teamwertung dieser Runde</legend>
+          <legend className="tls-type-small font-bold text-white/60 mb-1">Vorhandene Teamwertung dieser Runde</legend>
           {[["merge", "Ergänzen bzw. aktualisieren", "Teams, die im Bild fehlen, bleiben stehen."],
             ["replace", "Ersetzen", "Teams, die im Bild fehlen, werden entfernt."]].map(([value, label, hint]) => (
-            <label key={value} className="flex items-start gap-2 text-sm text-white/80">
+            <label key={value} className="flex items-start gap-2 tls-type-small text-white/80">
               <input type="radio" name={`team-mode-${series.id}`} value={value} checked={mode === value} onChange={() => setMode(value)}
                 data-testid={`season-table-team-mode-${value}`} style={{ accentColor: "#29B6E8" }} className="mt-1 shrink-0" />
-              <span>{label}<span className="block text-xs text-white/45">{hint}</span></span>
+              <span>{label}<span className="block tls-type-small text-white/45">{hint}</span></span>
             </label>
           ))}
         </fieldset>
       )}
       <OfficialTeamTotals totals={totals} initialRows={initialRows} onChange={setTotals} onOpenChange={setOpen} teams={(preview?.rows || []).map((row) => row.team)} />
       {(preview?.unknown_teams || []).length > 0 && (
-        <p className="text-xs text-amber-200" data-testid="season-table-team-unknown">Neu in der Saison: {preview.unknown_teams.join(", ")} – Schreibweise prüfen.</p>
+        <p className="tls-type-small text-amber-200" data-testid="season-table-team-unknown">Neu in der Saison: {preview.unknown_teams.join(", ")} – Schreibweise prüfen.</p>
       )}
       {rows.length > 0 && (
         <div className="tls-swipe">
-          <table className="w-full text-sm" data-testid="season-table-team-compare">
+          <table className="w-full tls-type-small" data-testid="season-table-team-compare">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-widest text-white/50">
+              <tr className="text-left tls-type-label text-white/50">
                 <th scope="col" className="py-1.5 pr-3 font-bold">Team</th>
                 {/* Am Handy kurze Köpfe - die Zahlen bleiben lesbar, die Namen brechen nicht mitten im Wort. */}
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap">Bisher</th>
@@ -340,7 +340,7 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
                 <tr key={row.team} data-testid="season-table-team-change" data-state={row.state}>
                   <td className="py-1.5 pr-3 text-white break-words">
                     {row.team}
-                    {TEAM_STATES[row.state] && <span className={`block text-[11px] ${row.state === "removed" ? "text-amber-200" : "text-white/45"}`}>{TEAM_STATES[row.state]}</span>}
+                    {TEAM_STATES[row.state] && <span className={`block tls-type-small ${row.state === "removed" ? "text-amber-200" : "text-white/45"}`}>{TEAM_STATES[row.state]}</span>}
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/60">{row.previous ?? "–"}</td>
                   <td className={`py-1.5 pr-3 text-right tabular-nums ${row.state === "removed" ? "text-white/35 line-through" : "text-white"}`}>{row.final ?? row.previous ?? "–"}</td>
@@ -353,17 +353,17 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
         </div>
       )}
       {(removed > 0 || kept > 0) && (
-        <p className={`text-xs ${removed ? "text-amber-200" : "text-white/55"}`} data-testid="season-table-team-mode-note">
+        <p className={`tls-type-small ${removed ? "text-amber-200" : "text-white/55"}`} data-testid="season-table-team-mode-note">
           {removed ? `${removed} ${removed === 1 ? "Team wird" : "Teams werden"} entfernt – sie fehlen im Bild.` : `${kept} ${kept === 1 ? "Team bleibt" : "Teams bleiben"} stehen – nicht im Bild.`}
         </p>
       )}
       {attach && file && preview && <PendingOriginal target={preview.round} onDrop={() => setAttach(false)} testId="season-table-team-original" />}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={save} disabled={!preview || open > 0 || saving || !Object.keys(totals).length} data-testid="season-table-team-save"
-          className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
           {saving ? "Übernimmt …" : "Teamwertung übernehmen"}
         </button>
-        {open > 0 && <span className="text-xs text-amber-200">Erst die gelben Zeilen prüfen.</span>}
+        {open > 0 && <span className="tls-type-small text-amber-200">Erst die gelben Zeilen prüfen.</span>}
       </div>
     </section>
   );
@@ -379,7 +379,7 @@ const TOTAL_TONES = { ok: "text-white/60", explained: "text-[#29B6E8]", differs:
 
 function TotalsTable({ totals, error, people = "Fahrer" }) {
   const [onlyIssues, setOnlyIssues] = useState(true);
-  if (error) return <p className="text-sm text-amber-200" role="alert" data-testid="season-table-totals-error">{error}</p>;
+  if (error) return <p className="tls-type-small text-amber-200" role="alert" data-testid="season-table-totals-error">{error}</p>;
   if (!totals) return null;
   const summary = totalsSummary(totals);
   const issues = totals.filter((item) => item.state !== "ok" || item.rank_differs);
@@ -392,18 +392,18 @@ function TotalsTable({ totals, error, people = "Fahrer" }) {
   return (
     <section className="space-y-2" data-testid="season-table-totals">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-bold text-white">Abgleich mit „Gesamt“</h3>
-        <span className={`text-xs tabular-nums ${summary.differs ? "text-amber-200" : "text-white/60"}`} data-testid="season-table-totals-summary">{parts.join(" · ")}</span>
+        <h3 className="tls-type-small font-bold text-white">Abgleich mit „Gesamt“</h3>
+        <span className={`tls-type-small tabular-nums ${summary.differs ? "text-amber-200" : "text-white/60"}`} data-testid="season-table-totals-summary">{parts.join(" · ")}</span>
       </div>
-      <p className="text-xs text-white/55">Die eigene Rechnung nach allen Runden, als wären die Entwürfe veröffentlicht – mit Streichresultaten, Anpassungen und Boni der Saison.</p>
+      <p className="tls-type-small text-white/55">Die eigene Rechnung nach allen Runden, als wären die Entwürfe veröffentlicht – mit Streichresultaten, Anpassungen und Boni der Saison.</p>
       <CheckField label="Nur Auffällige zeigen" checked={onlyIssues} onChange={setOnlyIssues} testId="season-table-only-issues" />
       {shown.length === 0 ? (
-        <p className="text-sm text-emerald-200/90" data-testid="season-table-totals-fine">Alle Summen und Plätze stimmen mit der Tabelle.</p>
+        <p className="tls-type-small text-emerald-200/90" data-testid="season-table-totals-fine">Alle Summen und Plätze stimmen mit der Tabelle.</p>
       ) : (
         <div className="tls-swipe">
-          <table className="w-full text-sm">
+          <table className="w-full tls-type-small">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-widest text-white/50">
+              <tr className="text-left tls-type-label text-white/50">
                 <th scope="col" className="py-1.5 pr-3 font-bold">{people}</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Tabelle</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Gerechnet</th>
@@ -415,14 +415,14 @@ function TotalsTable({ totals, error, people = "Fahrer" }) {
               {shown.map((item) => (
                 <tr key={item.row} data-testid="season-table-total" data-state={item.state} className="align-top">
                   <td className="py-1.5 pr-3 text-white break-words [overflow-wrap:anywhere]">
-                    {item.name}{item.is_new && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">neu</span>}
+                    {item.name}{item.is_new && <span className="ml-1.5 tls-type-label text-[#29B6E8]">neu</span>}
                     {/* Am Handy steht der Hinweis unter dem Namen statt in einer eigenen Spalte. */}
-                    <span className={`block sm:hidden text-xs ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</span>
+                    <span className={`block sm:hidden tls-type-small ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</span>
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/80">{item.table_total ?? "–"}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white">{item.computed}</td>
                   <td className={`py-1.5 pr-3 text-right tabular-nums ${item.rank_differs ? "text-amber-200" : "text-white/70"}`}>{rankText(item)}</td>
-                  <td className={`hidden sm:table-cell py-1.5 text-xs ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</td>
+                  <td className={`hidden sm:table-cell py-1.5 tls-type-small ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</td>
                 </tr>
               ))}
             </tbody>
@@ -572,45 +572,45 @@ export function SeasonTableSection({ series, onChanged }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" aria-labelledby="season-table-heading" data-testid="season-table">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="season-table-heading" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Saisontabelle einlesen</h2>
-          <p className="mt-1 text-sm text-white/60">Vergangene Runden in einem Schritt nachtragen: die Gesamttabelle des Veranstalters einfügen – je Runde entsteht ein Entwurf, veröffentlicht wird nichts.</p>
+          <h2 id="season-table-heading" className="tls-type-label text-[#29B6E8]">Saisontabelle einlesen</h2>
+          <p className="mt-1 tls-type-body text-white/60">Vergangene Runden in einem Schritt nachtragen: die Gesamttabelle des Veranstalters einfügen – je Runde entsteht ein Entwurf, veröffentlicht wird nichts.</p>
         </div>
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} data-testid="season-table-toggle"
-          className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
           <TableProperties className="w-3.5 h-3.5" aria-hidden="true" /> {open ? "Schließen" : "Tabelle einfügen"}
         </button>
       </div>
       {open && (
         <div className="mt-4 space-y-4">
           <label className="block min-w-0">
-            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tabelle des Veranstalters</span>
+            <span className="block tls-type-label text-white/60 mb-1.5">Tabelle des Veranstalters</span>
             <textarea ref={pasteRef} rows={8} wrap="off" spellCheck={false} value={text} onChange={(event) => setText(event.target.value)}
               placeholder={placeholder} data-testid="season-table-text" className={PASTE_CLASS} />
-            <span className="mt-1 block text-xs text-white/45">Aus der Tabellenkalkulation oder einer Webseite kopieren: {people} (auch Name#TAG), optional Team, je Runde Punkte, optional Gesamt. OUT oder DNF = Ausfall, -- oder leer = nicht angetreten, DSQ, DNS.</span>
+            <span className="mt-1 block tls-type-small text-white/45">Aus der Tabellenkalkulation oder einer Webseite kopieren: {people} (auch Name#TAG), optional Team, je Runde Punkte, optional Gesamt. OUT oder DNF = Ausfall, -- oder leer = nicht angetreten, DSQ, DNS.</span>
           </label>
           <fieldset className="space-y-1.5" disabled={byOrganizer}>
-            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Punkte</legend>
+            <legend className="tls-type-label text-white/60 mb-1.5">Punkte</legend>
             {POINT_MODES.map(([value, label]) => (
-              <label key={value} className="flex items-start gap-2 text-sm text-white/80">
+              <label key={value} className="flex items-start gap-2 tls-type-small text-white/80">
                 <input type="radio" name={`season-points-${series.id}`} value={value} checked={(byOrganizer ? "organizer" : points) === value}
                   onChange={() => setPoints(value)} data-testid={`season-table-points-${value}`} style={{ accentColor: "#29B6E8" }} className="mt-1 shrink-0" />
                 <span>{label}
-                  <span className="block text-xs text-white/45">
+                  <span className="block tls-type-small text-white/45">
                     {value === "scheme" ? "Über das Punkteschema der Runde; nicht Eindeutiges wird gelb." : "Ohne Rückrechnung, etwa wenn Boni schon im Wert stecken (21 = 18 + 3 Bingo) – mit Hinweis, wenn ein Wert nicht im Schema liegt."}
                   </span>
                 </span>
               </label>
             ))}
-            {byOrganizer && <p className="text-xs text-white/45">Die Saison zählt Punkte laut Veranstalter – zurückgerechnet wird nicht.</p>}
+            {byOrganizer && <p className="tls-type-small text-white/45">Die Saison zählt Punkte laut Veranstalter – zurückgerechnet wird nicht.</p>}
           </fieldset>
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={read} disabled={!text.trim() || busy === "apply"} data-testid="season-table-read"
-              className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
               {parsed ? "Neu einlesen" : "Einlesen"}
             </button>
             <ResultImageButton image={image} pasteHint={false} testId="season-table-image" fileTestId="season-table-image-file" />
-            {image.busy && <span className="text-xs text-white/60" role="status" data-testid="season-table-image-reading">Bild wird gelesen – das dauert ein paar Sekunden.</span>}
-            {busy === "preview" && <span className="text-xs text-white/50" role="status">Rechnet die Vorschau …</span>}
+            {image.busy && <span className="tls-type-small text-white/60" role="status" data-testid="season-table-image-reading">Bild wird gelesen – das dauert ein paar Sekunden.</span>}
+            {busy === "preview" && <span className="tls-type-small text-white/50" role="status">Rechnet die Vorschau …</span>}
           </div>
           {teamImage && <TeamTotalsPanel series={series} result={teamImage.result} file={teamImage.file} onClose={() => setTeamImage(null)} onChanged={onChanged} />}
           <ImageMarks marks={imageMarks} onConfirm={(row) => setImageMarks((current) => current.filter((mark) => mark.row !== row))}
@@ -622,15 +622,15 @@ export function SeasonTableSection({ series, onChanged }) {
             }}
             onUndoNames={() => { setImageMarks((current) => undoTableNames(current, namesUndo)); setNamesUndo(null); }} />
           {parseErrors.length > 0 && (
-            <ul className="text-sm text-amber-200 space-y-0.5" data-testid="season-table-parse-errors">
+            <ul className="tls-type-small text-amber-200 space-y-0.5" data-testid="season-table-parse-errors">
               {parseErrors.map((item, index) => <li key={index}>{item.line ? `Zeile ${item.line}: ` : ""}{item.message}</li>)}
             </ul>
           )}
-          {error && <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100" role="alert" data-testid="season-table-error">{error}</p>}
+          {error && <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100" role="alert" data-testid="season-table-error">{error}</p>}
           {parsed && parsed.columns.length > 0 && <ColumnKinds parsed={parsed} kinds={kinds} onKind={changeKind} />}
           {preview && (
             <div className="space-y-5" data-testid="season-table-preview">
-              <p className="text-sm text-white/75 tabular-nums" data-testid="season-table-summary">
+              <p className="tls-type-body text-white/75 tabular-nums" data-testid="season-table-summary">
                 {preview.summary.rows} {people} · {preview.summary.mapped} von {preview.summary.columns} Runden zugeordnet
                 {preview.summary.unclear ? ` · ${preview.summary.unclear} gelb` : ""}{preview.summary.errors ? ` · ${preview.summary.errors} mit Fehler` : ""}
               </p>
@@ -647,17 +647,17 @@ export function SeasonTableSection({ series, onChanged }) {
               )}
               <TotalsTable totals={preview.totals} error={preview.totals_error} people={people} />
               {unknown.length > 0 && (
-                <p className="text-sm text-white/70" data-testid="season-table-unknown">
+                <p className="tls-type-body text-white/70" data-testid="season-table-unknown">
                   {unknown.length} {unknown.length === 1 ? "Name ist" : "Namen sind"} neu in der Saison – beim Übernehmen werden sie offene Teilnehmer, danach ordnest du sie zu.
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-3">
                 <button type="button" onClick={apply} disabled={!picked.length || Boolean(busy) || imageMarks.length > 0} data-testid="season-table-apply"
-                  className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+                  className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
                   {busy === "apply" ? "Übernimmt …" : `Übernehmen (${picked.length})`}
                 </button>
                 {tableFile && <PendingOriginal target={lastTableRound(columns)} onDrop={() => setTableFile(null)} testId="season-table-original" />}
-                <span className="text-xs text-white/50">Ergebnisse kommen als Entwurf. Vorhandenes wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes Ergebnis bekommt einen Entwurf daneben. Runden mit gelben Zellen kommen nach dem Klären dazu.</span>
+                <span className="tls-type-small text-white/50">Ergebnisse kommen als Entwurf. Vorhandenes wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes Ergebnis bekommt einen Entwurf daneben. Runden mit gelben Zellen kommen nach dem Klären dazu.</span>
               </div>
             </div>
           )}

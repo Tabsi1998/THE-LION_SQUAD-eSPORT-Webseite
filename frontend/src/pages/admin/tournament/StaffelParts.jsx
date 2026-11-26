@@ -30,7 +30,7 @@ export function StaffelStandBadge({ tournament, season, now, testId }) {
   const tone = stand.live ? "bg-live/20 text-live border-live/50" : stand.hidden ? "bg-warn/15 text-warn border-warn/50" : STAND_TONE[stand.key];
   return (
     <span data-testid={testId} title={stand.note}
-      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-[3px] text-[10px] font-bold uppercase tracking-wider ${tone}`}>
+      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-[3px] tls-type-label ${tone}`}>
       {stand.live ? <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" aria-hidden="true" /> : null}
       {stand.label}
     </span>
@@ -46,7 +46,7 @@ export function StaffelNeedsHint({ tournament, season, now, testId, className = 
       {needs.map((need) => (
         <li key={need.code}>
           <Link to={need.to} data-testid={testId ? `${testId}-${need.code}` : undefined}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold leading-snug text-warn hover:text-white">
+            className="inline-flex items-center gap-1 tls-type-small font-semibold leading-snug text-warn hover:text-white">
             {need.text} <ArrowRight className="h-3 w-3 shrink-0" aria-hidden="true" />
           </Link>
         </li>
@@ -75,7 +75,7 @@ function SeasonSourceNote({ tournament, children = "Kommt aus der Season – dor
   const seasonPath = tournament?.league_links?.season_admin_path
     || (tournament?.league_context?.season_id ? `/admin/leagues/seasons/${tournament.league_context.season_id}` : null);
   return (
-    <p className="text-xs text-white/50" data-testid={testId}>
+    <p className="tls-type-small text-white/50" data-testid={testId}>
       {children}{" "}
       {seasonPath && <Link to={seasonPath} className="-my-3 inline-flex min-h-[44px] items-center text-[#29B6E8] font-bold hover:text-white">Season öffnen</Link>}
     </p>
@@ -85,8 +85,8 @@ function SeasonSourceNote({ tournament, children = "Kommt aus der Season – dor
 function ReadOnlyValue({ label, value, testId, wide = false }) {
   return (
     <div className={`min-w-0 ${wide ? "md:col-span-2" : ""}`}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <div className="rounded-sm border border-white/5 bg-[#0A0A0A]/60 px-3 py-2 text-sm text-white/80 break-words" data-testid={testId}>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
+      <div className="rounded-sm border border-white/5 bg-[#0A0A0A]/60 px-3 py-2 tls-type-small text-white/80 break-words" data-testid={testId}>
         {value === null || value === undefined || value === "" ? "—" : value}
       </div>
     </div>
@@ -116,8 +116,8 @@ export function StaffelSeasonValues({ tournament, games = [] }) {
         <ReadOnlyValue label="Sichtbarkeit" value={optionLabel(VISIBILITY_OPTIONS, tournament.visibility || "internal")} testId="tr-edit-season-visibility" wide />
       </FormGrid>
       <div className="min-w-0">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Regeltext</div>
-        <div className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-sm border border-white/5 bg-[#0A0A0A]/60 px-3 py-2 text-xs text-white/70" data-testid="tr-edit-season-rules">
+        <div className="tls-type-label text-white/60 mb-1.5">Regeltext</div>
+        <div className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-sm border border-white/5 bg-[#0A0A0A]/60 px-3 py-2 tls-type-small text-white/70" data-testid="tr-edit-season-rules">
           {tournament.rules || "Noch kein Regeltext."}
         </div>
       </div>

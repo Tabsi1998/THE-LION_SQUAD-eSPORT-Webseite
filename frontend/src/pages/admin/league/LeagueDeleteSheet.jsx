@@ -84,23 +84,23 @@ export function LeagueDeleteSheet({ kind, target, name, onClose, onDeleted, onAr
       submitDisabled={!reasonOk} submitTestId="league-delete-confirm" testId="league-delete-sheet" noValidate
       footer={blocked && onArchive ? (
         <button type="button" onClick={archive} disabled={saving || plan.archived} data-testid="league-delete-archive"
-          className="tls-btn tls-btn--primary ml-auto px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+          className="tls-btn tls-btn--primary ml-auto px-4 py-2.5 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
           <Archive className="w-3.5 h-3.5" aria-hidden="true" /> {plan.archived ? "Schon archiviert" : "Archivieren"}
         </button>
       ) : null}>
-      {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
-      {!plan && !error ? <p className="text-sm text-white/60" role="status">Prüfe, was dranhängt …</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert">{error}</p> : null}
+      {!plan && !error ? <p className="tls-type-small text-white/60" role="status">Prüfe, was dranhängt …</p> : null}
 
       {blocked ? (
         <div className="space-y-3" data-testid="league-delete-blocked">
           <div className="rounded-sm border border-warn/30 bg-warn/5 px-4 py-3">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-warn">Archivieren statt löschen</h3>
-            <p className="mt-1 text-sm text-white/80">Löschen geht nicht, weil schon gespielt oder zugeteilt wurde:</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/80">
+            <h3 className="tls-type-label text-warn">Archivieren statt löschen</h3>
+            <p className="mt-1 tls-type-small text-white/80">Löschen geht nicht, weil schon gespielt oder zugeteilt wurde:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 tls-type-small text-white/80">
               {plan.blockers.map((text) => <li key={text} className="break-words">{text}</li>)}
             </ul>
           </div>
-          <p className="text-sm text-white/60">
+          <p className="tls-type-small text-white/60">
             {plan.archived
               ? "Ist schon archiviert – ausgeblendet, aber mit allen Spielen und Ergebnissen erhalten."
               : "Archivieren blendet es auf der Ligaseite aus; Spiele, Ergebnisse und Protokoll bleiben erhalten. Zurückholen geht über den Stand „Aktiv“."}
@@ -110,21 +110,21 @@ export function LeagueDeleteSheet({ kind, target, name, onClose, onDeleted, onAr
 
       {plan?.deletable ? (
         <div className="space-y-4" data-testid="league-delete-list">
-          <p className="text-sm text-white/80">Das wird endgültig gelöscht – zurückholen geht nicht:</p>
-          <ul className="space-y-1 rounded-sm border border-white/10 bg-[#0A0A0A] px-4 py-3 text-sm">
+          <p className="tls-type-small text-white/80">Das wird endgültig gelöscht – zurückholen geht nicht:</p>
+          <ul className="space-y-1 rounded-sm border border-white/10 bg-[#0A0A0A] px-4 py-3 tls-type-small">
             <li className="font-semibold text-white break-words">{name || plan.name}</li>
             {kind !== "staffel" && deletionGroups(plan).map((group) => (
               <li key={group.label} className="pt-2">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">{group.label}</div>
+                <div className="tls-type-label text-white/50">{group.label}</div>
                 <ul className="mt-1 space-y-0.5 text-white/75">
                   {group.items.map((item) => <li key={item} className="break-words">{item}</li>)}
                 </ul>
               </li>
             ))}
           </ul>
-          {plan.note ? <p className="text-sm text-white/65">{plan.note}</p> : null}
+          {plan.note ? <p className="tls-type-body text-white/65">{plan.note}</p> : null}
           {kind !== "staffel" && plan.staffeln?.length ? (
-            <p className="text-xs text-white/50">Die Staffeln sind Entwürfe ohne Co-Teams und Spiele – sie gehen mit.</p>
+            <p className="tls-type-small text-white/50">Die Staffeln sind Entwürfe ohne Co-Teams und Spiele – sie gehen mit.</p>
           ) : null}
           <TextAreaField label="Grund" required rows={2} value={reason} onChange={(value) => setReason(value.slice(0, 500))}
             placeholder="z. B. falsch angelegt, doppelt" hint={`Steht im Protokoll, mindestens ${MIN_REASON} Zeichen.`} testId="league-delete-reason" />

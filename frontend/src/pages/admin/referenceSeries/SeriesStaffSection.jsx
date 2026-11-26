@@ -31,23 +31,23 @@ function StaffRow({ row, seriesId, onSaved, onRemove }) {
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <PersonAvatar person={row} />
         <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{row.name}</div>
-          <div className="text-xs text-white/55" data-testid={`series-staff-validity-${row.id}`}>
+          <div className="tls-type-small font-semibold truncate">{row.name}</div>
+          <div className="tls-type-small text-white/55" data-testid={`series-staff-validity-${row.id}`}>
             {validityText(row)} · {publishText(row.publishes_directly)}
           </div>
           {!row.mfa_enabled && (
-            <div className="text-xs text-warn" data-testid={`series-staff-mfa-${row.id}`}>Zwei-Faktor fehlt noch – bis dahin kommt dieser Captain nicht in die Saison.</div>
+            <div className="tls-type-small text-warn" data-testid={`series-staff-mfa-${row.id}`}>Zwei-Faktor fehlt noch – bis dahin kommt dieser Captain nicht in die Saison.</div>
           )}
-          {!row.account_active && <div className="text-xs text-warn">Konto ist gesperrt oder inaktiv.</div>}
+          {!row.account_active && <div className="tls-type-small text-warn">Konto ist gesperrt oder inaktiv.</div>}
           {row.is_member === false && (
-            <div className="text-xs text-warn" data-testid={`series-staff-member-${row.id}`}>Kein aktives Vereinsmitglied mehr – das Recht ruht, bis die Mitgliedschaft wieder aktiv ist.</div>
+            <div className="tls-type-small text-warn" data-testid={`series-staff-member-${row.id}`}>Kein aktives Vereinsmitglied mehr – das Recht ruht, bis die Mitgliedschaft wieder aktiv ist.</div>
           )}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-3 md:mt-0 md:shrink-0">
         <TextField label="Gilt bis" type="date" value={until} min={todayDay()} onChange={setUntil} testId={`series-staff-until-${row.id}`} className="w-40" />
         {until && until !== row.valid_until && (
-          <button type="button" onClick={() => patch({ valid_until: until })} data-testid={`series-staff-until-save-${row.id}`} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+          <button type="button" onClick={() => patch({ valid_until: until })} data-testid={`series-staff-until-save-${row.id}`} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label">
             Ablauf speichern
           </button>
         )}
@@ -113,10 +113,10 @@ export function SeriesStaffSection({ series }) {
 
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" aria-labelledby="series-staff-heading" data-testid="series-staff">
-      <h2 id="series-staff-heading" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Captains</h2>
-      <p className="mt-1 text-sm text-white/60" data-testid="series-staff-mode">{publishModeSentence(series.publish_mode)}</p>
-      {failed && <p className="mt-3 text-sm text-white/60" data-testid="series-staff-error">{failed}</p>}
-      {rows && rows.length === 0 && <p className="mt-3 text-sm text-white/50" data-testid="series-staff-empty">Noch kein Captain. Ergebnisse trägt bis dahin der Vorstand ein.</p>}
+      <h2 id="series-staff-heading" className="tls-type-label text-[#29B6E8]">Captains</h2>
+      <p className="mt-1 tls-type-small text-white/60" data-testid="series-staff-mode">{publishModeSentence(series.publish_mode)}</p>
+      {failed && <p className="mt-3 tls-type-small text-white/60" data-testid="series-staff-error">{failed}</p>}
+      {rows && rows.length === 0 && <p className="mt-3 tls-type-small text-white/50" data-testid="series-staff-empty">Noch kein Captain. Ergebnisse trägt bis dahin der Vorstand ein.</p>}
       {rows && rows.length > 0 && (
         <ul className="mt-3 space-y-2" data-testid="series-staff-list">
           {rows.map((row) => <StaffRow key={row.id} row={row} seriesId={seriesId} onSaved={load} onRemove={remove} />)}
@@ -128,7 +128,7 @@ export function SeriesStaffSection({ series }) {
           <TextField label="Gilt bis" type="date" required value={until} min={todayDay()} onChange={setUntil} hint="Meist das Saisonende." testId="series-staff-new-until" className="w-48" />
           <CheckField label="Darf veröffentlichen" checked={canPublish} onChange={setCanPublish} hint="Sonst sind die Einträge Entwürfe, die der Vorstand freigibt." testId="series-staff-new-publish" className="pb-2" />
         </div>
-        <button type="submit" disabled={!person || !until || saving} data-testid="series-staff-submit" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+        <button type="submit" disabled={!person || !until || saving} data-testid="series-staff-submit" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
           <Plus className="w-3.5 h-3.5" /> Captain hinzufügen
         </button>
       </form>

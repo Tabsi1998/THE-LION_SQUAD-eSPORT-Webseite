@@ -23,9 +23,9 @@ import { ACTIVE_STAFFEL_REGISTRATION, STAFFEL_RUNNING_STATUSES, STAFFEL_STATUS_W
 
 const DONE = new Set(["completed", "forfeit"]);
 const CARD = "min-w-0 rounded-sm border border-white/10 bg-[#121212] p-4";
-const EYEBROW = "text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]";
-const LABEL = "text-[11px] font-bold uppercase tracking-wider text-white/60";
-const SUBTLE = "text-base text-white/60";
+const EYEBROW = "tls-type-label text-[#29B6E8]";
+const LABEL = "tls-type-label text-white/60";
+const SUBTLE = "tls-type-body text-white/60";
 
 /** Teams x von y und Spiele gespielt/gesamt - vor dem Start zählt nur die Vorschau. */
 export function staffelNumbers(tournament, registrations = [], matches = []) {
@@ -45,20 +45,20 @@ function Numbers({ tournament, registrations, matches }) {
       <dl className="mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
           <dt className={LABEL}>Teams</dt>
-          <dd className="mt-0.5 font-heading text-2xl font-black tabular-nums" data-testid="staffel-numbers-teams">
+          <dd className="mt-0.5 tls-type-section tls-type-num" data-testid="staffel-numbers-teams">
             {numbers.teams}{numbers.max ? <span className={SUBTLE}> von {numbers.max}</span> : null}
           </dd>
         </div>
         <div className="min-w-0">
           <dt className={LABEL}>Spiele</dt>
-          <dd className="mt-0.5 font-heading text-2xl font-black tabular-nums" data-testid="staffel-numbers-matches">
-            {before ? <span className="text-base font-bold text-white/60">noch keine</span> : (
+          <dd className="mt-0.5 tls-type-section tabular-nums" data-testid="staffel-numbers-matches">
+            {before ? <span className="tls-type-body font-bold text-white/60">noch keine</span> : (
               <>{numbers.played}<span className={SUBTLE}> von {numbers.total}</span></>
             )}
           </dd>
         </div>
       </dl>
-      <p className="mt-2 text-xs text-white/60" data-testid="staffel-numbers-note">
+      <p className="mt-2 tls-type-small text-white/60" data-testid="staffel-numbers-note">
         {before
           ? numbers.preview ? `Vorschau mit ${numbers.preview} Spielen – fest wird der Spielplan mit „Liga starten“.` : "Der Spielplan entsteht mit den zugeteilten Teams."
           : numbers.open ? `${numbers.open} ${numbers.open === 1 ? "Spiel" : "Spiele"} noch offen.` : numbers.total ? "Alle Spiele gespielt." : "Noch kein festes Spiel."}
@@ -67,7 +67,7 @@ function Numbers({ tournament, registrations, matches }) {
   );
 }
 
-const ACTION = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 text-sm font-bold uppercase tracking-wider";
+const ACTION = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 tls-type-label";
 
 function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
   const manage = Boolean(tournament.can_edit_staffel);
@@ -86,9 +86,9 @@ function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
           ) : null}
           {before ? (
             <>
-              <p className="text-xs text-white/60" data-testid="staffel-start-note">Macht den Spielplan fest und schaltet die Staffel live. Danach kommen Teams nur noch als Nachmeldung dazu.</p>
+              <p className="tls-type-small text-white/60" data-testid="staffel-start-note">Macht den Spielplan fest und schaltet die Staffel live. Danach kommen Teams nur noch als Nachmeldung dazu.</p>
               {/* Vor dem Start kein Auswahlfeld: starten oder absagen. */}
-              <button type="button" onClick={() => onStatus("cancelled")} data-testid="staffel-cancel" className={`tls-btn tls-btn--quiet ${ACTION} text-xs`}>
+              <button type="button" onClick={() => onStatus("cancelled")} data-testid="staffel-cancel" className={`tls-type-small tls-btn tls-btn--quiet ${ACTION} `}>
                 Staffel absagen
               </button>
             </>
@@ -106,7 +106,7 @@ function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
         </div>
       ) : (
         // Der Stand steht schon im Abzeichen oben - hier nur, wer ihn ändert.
-        <p className="mt-3 text-sm text-white/70" data-testid="staffel-status-readonly">Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.</p>
+        <p className="mt-3 tls-type-small text-white/70" data-testid="staffel-status-readonly">Den Status ändert, wer in dieser Liga „Liga verwalten“ hat.</p>
       )}
     </section>
   );
@@ -127,9 +127,9 @@ function Needs({ tournament: base, teams }) {
           {needs.map((need) => (
             <li key={need.code}>
               {need.to === here ? (
-                <span className="inline-flex min-h-[44px] items-center text-sm font-semibold text-warn" data-testid={`staffel-needs-${need.code}`}>{need.text}</span>
+                <span className="inline-flex min-h-[44px] items-center tls-type-small font-semibold text-warn" data-testid={`staffel-needs-${need.code}`}>{need.text}</span>
               ) : (
-                <Link to={need.to} data-testid={`staffel-needs-${need.code}`} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-warn hover:text-white">
+                <Link to={need.to} data-testid={`staffel-needs-${need.code}`} className="inline-flex min-h-[44px] items-center gap-1 tls-type-small font-semibold text-warn hover:text-white">
                   {need.text} <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 </Link>
               )}
@@ -137,7 +137,7 @@ function Needs({ tournament: base, teams }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-3 flex items-center gap-2 text-sm text-white/70" data-testid="staffel-needs-none">
+        <p className="mt-3 flex items-center gap-2 tls-type-small text-white/70" data-testid="staffel-needs-none">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-ok" aria-hidden="true" /> Gerade fehlt nichts.
         </p>
       )}
@@ -180,8 +180,8 @@ function Ways({ tournament }) {
   const seasonId = tournament.league_context?.season_id;
   const seasonPath = links.season_admin_path || seasonAnchorUrl(seasonId);
   const count = useDeskCount(tournament);
-  const row = "flex min-h-[44px] min-w-0 items-center justify-between gap-3 px-3 py-1.5 text-sm font-semibold text-white/85 hover:bg-white/5 hover:text-white";
-  const sub = "block text-xs font-normal text-white/60";
+  const row = "flex min-h-[44px] min-w-0 items-center justify-between gap-3 px-3 py-1.5 tls-type-small font-semibold text-white/85 hover:bg-white/5 hover:text-white";
+  const sub = "block tls-type-small font-normal text-white/60";
   return (
     <nav className={`${CARD} p-0`} aria-label="Wege von dieser Staffel" data-testid="staffel-ways">
       <ul className="divide-y divide-white/5">
@@ -193,7 +193,7 @@ function Ways({ tournament }) {
             </span>
             <span className="flex shrink-0 items-center gap-2">
               {count && !count.failed ? (
-                <span className={`inline-flex min-w-[1.75rem] justify-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${count.total ? "bg-warn/15 text-warn" : "bg-white/5 text-white/60"}`}
+                <span className={`inline-flex min-w-[1.75rem] justify-center rounded-full px-2 py-0.5 tls-type-small tls-type-num ${count.total ? "bg-warn/15 text-warn" : "bg-white/5 text-white/60"}`}
                   data-testid="staffel-desk-total">{count.total}</span>
               ) : null}
               <ArrowRight className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" />

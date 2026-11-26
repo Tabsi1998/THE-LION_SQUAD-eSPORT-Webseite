@@ -12,6 +12,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { viennaDay } from "@/lib/vienna";
 import { toast } from "sonner";
 import { Plus, Trash2, Gift } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const TYPE_LABELS = {
   ordinary: "Ordentlich",
@@ -58,10 +59,10 @@ export default function AdminBenefitsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREIN</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Mitglieder&shy;vorteile</h1>
+          <span className="tls-type-label text-[#FFD700]">VEREIN</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Mitglieder&shy;vorteile</ShortCaps></h1>
         </div>
-        <button onClick={() => setEditing({})} data-testid="benefits-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#e8c200] transition">
+        <button onClick={() => setEditing({})} data-testid="benefits-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm hover:bg-[#e8c200] transition">
           <Plus className="w-3.5 h-3.5" /> Neuer Vorteil
         </button>
       </div>
@@ -69,8 +70,8 @@ export default function AdminBenefitsPage() {
       {list.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
           <Gift className="w-10 h-10 mx-auto opacity-40 mb-4" />
-          <div className="font-heading font-bold text-lg">Noch keine Mitgliedervorteile</div>
-          <div className="text-sm mt-2">Lege den ersten Vorteil an.</div>
+          <div className="tls-type-card">Noch keine Mitgliedervorteile</div>
+          <div className="tls-type-small mt-2">Lege den ersten Vorteil an.</div>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -78,16 +79,16 @@ export default function AdminBenefitsPage() {
             <div key={b.id} className={`border rounded-sm bg-[#121212] p-5 ${b.is_active ? "border-white/10" : "border-white/5 opacity-60"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  {b.category && <div className="text-[10px] uppercase tracking-widest text-[#FFD700]/70">{b.category}</div>}
-                  <h3 className="font-heading font-black uppercase">{b.title}</h3>
+                  {b.category && <div className="tls-type-label text-[#FFD700]/70">{b.category}</div>}
+                  <h3 className="tls-type-card">{b.title}</h3>
                 </div>
-                {!b.is_active && <span className="text-[10px] text-white/40 uppercase">inaktiv</span>}
-                {b.is_active && benefitTimeLabel(b) && <span className="text-[10px] text-[#FF9500] uppercase" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
+                {!b.is_active && <span className="tls-type-label text-white/40">inaktiv</span>}
+                {b.is_active && benefitTimeLabel(b) && <span className="tls-type-label text-[#FF9500]" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
               </div>
-              {b.description && <p className="mt-2 text-sm text-white/65 line-clamp-3">{b.description}</p>}
+              {b.description && <p className="mt-2 tls-type-body text-white/65 line-clamp-3">{b.description}</p>}
               <div className="mt-4 flex gap-2">
-                <button onClick={() => setEditing(b)} data-testid={`benefit-edit-${b.id}`} className="text-xs uppercase tracking-wider font-bold px-3 py-1 border border-[#FFD700]/40 text-[#FFD700] rounded-sm hover:bg-[#FFD700]/10">Bearbeiten</button>
-                <button onClick={() => remove(b.id)} data-testid={`benefit-delete-${b.id}`} className="text-xs uppercase tracking-wider font-bold px-3 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                <button onClick={() => setEditing(b)} data-testid={`benefit-edit-${b.id}`} className="tls-type-label px-3 py-1 border border-[#FFD700]/40 text-[#FFD700] rounded-sm hover:bg-[#FFD700]/10">Bearbeiten</button>
+                <button onClick={() => remove(b.id)} data-testid={`benefit-delete-${b.id}`} className="tls-type-label px-3 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
                   <Trash2 className="w-3 h-3" /> Löschen
                 </button>
               </div>
@@ -160,7 +161,7 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
       <FieldLabel label="Sichtbar für Mitgliedsarten (leer = alle)">
         <div className="flex flex-wrap gap-2">
           {meta.types.map((t) => (
-            <button key={t} type="button" onClick={() => toggleType(t)} className={`text-xs px-3 py-1.5 rounded-sm border ${form.visible_for_membership_types.includes(t) ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]" : "border-white/15 text-white/50"}`}>
+            <button key={t} type="button" onClick={() => toggleType(t)} className={`tls-type-small px-3 py-1.5 rounded-sm border ${form.visible_for_membership_types.includes(t) ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]" : "border-white/15 text-white/50"}`}>
               {TYPE_LABELS[t] || t}
             </button>
           ))}

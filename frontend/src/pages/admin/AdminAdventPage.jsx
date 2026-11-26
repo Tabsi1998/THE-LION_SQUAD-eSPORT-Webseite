@@ -14,6 +14,7 @@ import { CalendarPreview } from "./advent/CalendarPreview";
 import { DoorEditor } from "./advent/DoorEditor";
 import { RafflePanel, drawQuestion } from "./advent/RafflePanel";
 import { dayText, defaultYear, yearOptions } from "./advent/form";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Adventkalender pflegen (#641): 24 Türchen je Jahr anlegen, ansehen, kopieren - mit den Zahlen je Türchen und
 // der Ziehung bei Gewinnen. Alles zum Kalender steht auf dieser einen Seite - seit #1360 auch der Schalter (an/aus, wo er
@@ -26,8 +27,8 @@ function errorText(failure, fallback) {
 function Tile({ label, value, tone = "text-white", testId }) {
   return (
     <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid={testId}>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</div>
-      <div className={`mt-1.5 font-heading text-2xl font-black tabular-nums ${tone}`}>{value}</div>
+      <div className="tls-type-label text-white/45">{label}</div>
+      <div className={`mt-1.5 tls-type-section tls-type-num ${tone}`}>{value}</div>
     </div>
   );
 }
@@ -49,33 +50,33 @@ function DayRow({ year, item, kinds, busy, onEdit, onDelete, onDraw, onRedraw })
   return (
     <li className={`rounded-sm border bg-[#121212] p-4 ${door ? "border-white/10" : "border-dashed border-white/15"}`} data-testid={`advent-admin-day-${day}`} data-filled={door ? "1" : "0"}>
       <div className="flex flex-wrap items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#e9c46a]/50 bg-[#0A0A0A] font-serif text-lg font-semibold text-[#e9c46a]" style={{ fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' }} aria-hidden="true">{day}</div>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#e9c46a]/50 bg-[#0A0A0A] font-serif tls-type-card text-[#e9c46a]" style={{ fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' }} aria-hidden="true">{day}</div>
         <div className="min-w-[11rem] flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-white/45">{dayText(year, day)}</span>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${item.is_open ? "text-[#5fd38d]" : "text-white/35"}`}>{item.is_open ? "offen" : `öffnet ${opensLabel(item.opens_at)}`}</span>
+            <span className="tls-type-label text-white/45">{dayText(year, day)}</span>
+            <span className={`tls-type-label ${item.is_open ? "text-[#5fd38d]" : "text-white/35"}`}>{item.is_open ? "offen" : `öffnet ${opensLabel(item.opens_at)}`}</span>
           </div>
           {door ? (
             <>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {Icon && <Icon className="h-4 w-4 shrink-0 text-[#e9c46a]" aria-hidden="true" />}
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#e9c46a]">{kindLabel}</span>
+                <span className="tls-type-label text-[#e9c46a]">{kindLabel}</span>
                 <span className="min-w-0 break-words font-bold text-white" data-testid={`advent-admin-title-${day}`}>{door.title}</span>
               </div>
-              {door.copied_from && <div className="mt-0.5 text-xs text-white/40">Übernommen aus {door.copied_from}</div>}
+              {door.copied_from && <div className="mt-0.5 tls-type-small text-white/40">Übernommen aus {door.copied_from}</div>}
             </>
           ) : (
-            <div className="mt-1 text-sm text-white/50">Noch nichts eingetragen</div>
+            <div className="mt-1 tls-type-small text-white/50">Noch nichts eingetragen</div>
           )}
           {problem && (
-            <div className="mt-2 flex items-start gap-2 text-xs text-[#ffd98a]" data-testid={`advent-admin-problem-${day}`}>
+            <div className="mt-2 flex items-start gap-2 tls-type-small text-[#ffd98a]" data-testid={`advent-admin-problem-${day}`}>
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> <span>{problem}</span>
             </div>
           )}
-          <div className="mt-2 text-xs text-white/45" data-testid={`advent-admin-stats-${day}`}>{statsText(stats, door?.kind)}</div>
+          <div className="mt-2 tls-type-small text-white/45" data-testid={`advent-admin-stats-${day}`}>{statsText(stats, door?.kind)}</div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 max-sm:w-full max-sm:pl-[3.75rem]">
-          <button type="button" onClick={() => onEdit(day)} disabled={busy} data-testid={`advent-admin-edit-${day}`} className="inline-flex items-center gap-1.5 rounded-sm border border-white/15 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white/80 transition hover:border-[#e9c46a]/60 hover:text-[#e9c46a] disabled:opacity-40">
+          <button type="button" onClick={() => onEdit(day)} disabled={busy} data-testid={`advent-admin-edit-${day}`} className="inline-flex items-center gap-1.5 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/80 transition hover:border-[#e9c46a]/60 hover:text-[#e9c46a] disabled:opacity-40">
             {door ? <Pencil className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />} {door ? "Bearbeiten" : "Anlegen"}
           </button>
           {door && (
@@ -199,14 +200,14 @@ export default function AdminAdventPage() {
       <div className="mx-auto w-full max-w-6xl" data-testid="advent-admin">
         <div className="mb-6 flex flex-wrap items-end gap-4">
           <div className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]"><CalendarHeart className="h-4 w-4" /> Content</span>
-            <h1 className="mt-1 font-heading text-3xl font-black uppercase md:text-4xl">Adventkalender</h1>
-            <p className="mt-2 max-w-3xl text-sm text-white/60">
+            <span className="inline-flex items-center gap-2 tls-type-label text-[#e9c46a]"><CalendarHeart className="h-4 w-4" /> Content</span>
+            <h1 className="mt-1 tls-type-title"><ShortCaps>Adventkalender</ShortCaps></h1>
+            <p className="mt-2 max-w-3xl tls-type-body text-white/60">
               24 Türchen je Jahr. Jedes geht an seinem Tag um {data?.door_hour || 6} Uhr auf und lässt sich bis 6. Jänner nachholen. Ein Tag ohne Eintrag zeigt den Gruß des Löwen; ohne ein einziges Türchen gibt es in dem Jahr keinen Kalender.
             </p>
           </div>
           <label className="block w-32">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/60">Jahr</span>
+            <span className="mb-1.5 block tls-type-label text-white/60">Jahr</span>
             <select value={year} onChange={(event) => { setEditing(null); setYear(Number(event.target.value)); }} className={INPUT_CLASS} data-testid="advent-admin-year">
               {years.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
             </select>
@@ -214,8 +215,8 @@ export default function AdminAdventPage() {
           <SeasonSwitch seasonKey="advent_calendar" label="Adventkalender" className="w-full xl:w-96" />
         </div>
 
-        {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#ffb4ae]" role="alert" data-testid="advent-admin-error">{failed}</div>}
-        {!data && !failed && <div className="py-16 text-center text-sm text-white/45" role="status">Lade Adventkalender …</div>}
+        {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert" data-testid="advent-admin-error">{failed}</div>}
+        {!data && !failed && <div className="py-16 text-center tls-type-small text-white/45" role="status">Lade Adventkalender …</div>}
 
         {data && (
           <>
@@ -227,20 +228,20 @@ export default function AdminAdventPage() {
             </div>
 
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => setPreview(true)} disabled={!data.filled} data-testid="advent-admin-preview" className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-black transition hover:opacity-90 disabled:opacity-40">
+              <button type="button" onClick={() => setPreview(true)} disabled={!data.filled} data-testid="advent-admin-preview" className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-4 py-2.5 tls-type-label text-black transition hover:opacity-90 disabled:opacity-40">
                 <Eye className="h-3.5 w-3.5" /> Vorschau
               </button>
               {hasLastYear && (
-                <button type="button" onClick={copy} disabled={busy} data-testid="advent-admin-copy" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white/80 transition hover:border-white/30 disabled:opacity-40">
+                <button type="button" onClick={copy} disabled={busy} data-testid="advent-admin-copy" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2.5 tls-type-label text-white/80 transition hover:border-white/30 disabled:opacity-40">
                   <Copy className="h-3.5 w-3.5" /> Aus {year - 1} übernehmen
                 </button>
               )}
               {data.running && (
-                <Link to="/advent" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white/80 transition hover:border-white/30" data-testid="advent-admin-open">
+                <Link to="/advent" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2.5 tls-type-label text-white/80 transition hover:border-white/30" data-testid="advent-admin-open">
                   <ExternalLink className="h-3.5 w-3.5" /> Kalender öffnen
                 </Link>
               )}
-              {!data.filled && <span className="text-xs text-white/45">Die Vorschau gibt es ab dem ersten Türchen.</span>}
+              {!data.filled && <span className="tls-type-small text-white/45">Die Vorschau gibt es ab dem ersten Türchen.</span>}
             </div>
 
             <ol className="space-y-3" data-testid="advent-admin-days">

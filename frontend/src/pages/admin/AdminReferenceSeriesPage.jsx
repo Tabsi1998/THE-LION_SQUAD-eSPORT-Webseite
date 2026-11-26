@@ -13,6 +13,7 @@ import { ReferenceBundleSheet } from "./referenceSeries/ReferenceBundleSheet";
 import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, Layers, ListOrdered, Pencil, Plus } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Serien (#1741): externe Wettbewerbe mit Kalender und Tabelle - eine Spur (etwa eine Rennliga) als Klammer, darunter je
 // Saison und Stufe eine Serie. Gelöscht wird nichts: Spur und Saison werden archiviert und lassen sich zurückholen.
@@ -80,16 +81,16 @@ export default function AdminReferenceSeriesPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Serien</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">Externe Wettbewerbe über eine ganze Saison: Turnierserien, Rennligen und Team-Ligen. Eine Spur ist die Klammer, darunter je Saison und Stufe eine Serie mit eigenen Regeln.</p>
+          <span className="tls-type-label text-[#29B6E8]">Verein</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Serien</ShortCaps></h1>
+          <p className="mt-2 text-white/60 tls-type-body max-w-xl">Externe Wettbewerbe über eine ganze Saison: Turnierserien, Rennligen und Team-Ligen. Eine Spur ist die Klammer, darunter je Saison und Stufe eine Serie mit eigenen Regeln.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* #1751: bestehende Referenzen ohne Saison zu Spur und Saisons bündeln */}
-          <button type="button" onClick={() => setBundling(true)} data-testid="bundle-open" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          <button type="button" onClick={() => setBundling(true)} data-testid="bundle-open" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm tls-type-label inline-flex items-center gap-2">
             <Layers className="w-4 h-4" aria-hidden="true" /> Referenzen bündeln
           </button>
-          <button type="button" onClick={() => setEditingLineage({})} data-testid="lineage-new" className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          <button type="button" onClick={() => setEditingLineage({})} data-testid="lineage-new" className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm tls-type-label inline-flex items-center gap-2">
             <Plus className="w-4 h-4" /> Neue Spur
           </button>
         </div>
@@ -102,7 +103,7 @@ export default function AdminReferenceSeriesPage() {
           <section key={lineage.id} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`lineage-${lineage.id}`}>
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
+                <div className="flex items-center gap-2 tls-type-small text-white/45 font-bold flex-wrap">
                   <span className="text-[#29B6E8]">{KIND_LABELS[lineage.kind] || lineage.kind}</span>
                   {lineage.label && <span>{lineage.label}</span>}
                   {lineage.organizer && <span>{lineage.organizer}</span>}
@@ -112,11 +113,11 @@ export default function AdminReferenceSeriesPage() {
                 <div className="mt-1 flex items-center gap-3 min-w-0">
                   {/* #2014: Logo der Spur, wie es öffentlich steht. */}
                   <SeriesLogo src={lineage.logo_url} size="sm" testId={`lineage-logo-${lineage.id}`} />
-                  <h2 className="font-heading text-xl font-black uppercase leading-tight">{lineage.title}</h2>
+                  <h2 className="tls-type-section leading-tight">{lineage.title}</h2>
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button type="button" onClick={() => setEditingSeries({ lineage, series: null })} data-testid={`series-new-${lineage.id}`} className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                <button type="button" onClick={() => setEditingSeries({ lineage, series: null })} data-testid={`series-new-${lineage.id}`} className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5" /> Saison
                 </button>
                 <button type="button" onClick={() => setEditingLineage(lineage)} aria-label="Spur bearbeiten" title="Spur bearbeiten" data-testid={`lineage-edit-${lineage.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
@@ -132,8 +133,8 @@ export default function AdminReferenceSeriesPage() {
                 <li key={series.id} className="py-2 flex items-center justify-between gap-3" data-testid={`series-row-${series.id}`}>
                   <div className="min-w-0">
                     <Link to={`/admin/reference-series/${series.id}`} className="font-bold text-white hover:text-[#29B6E8]">{seasonLabel(series)}</Link>
-                    {series.title && <span className="ml-2 text-sm text-white/55">{series.title}</span>}
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
+                    {series.title && <span className="ml-2 tls-type-small text-white/55">{series.title}</span>}
+                    <div className="mt-0.5 flex items-center gap-2 tls-type-label text-white/45 flex-wrap">
                       <span className={STATUS_TONE[series.status] || ""}>{STATUS_LABELS[series.status] || series.status}</span>
                       <span>{PUBLISH_LABELS[series.publish_mode] || series.publish_mode}</span>
                       <span>Regeln v{series.rules_version || 1}</span>
@@ -150,7 +151,7 @@ export default function AdminReferenceSeriesPage() {
                   </div>
                 </li>
               ))}
-              {lineage.series.length === 0 && <li className="py-2 text-sm text-white/40">Noch keine Saison.</li>}
+              {lineage.series.length === 0 && <li className="py-2 tls-type-small text-white/40">Noch keine Saison.</li>}
             </ul>
           </section>
         ))}

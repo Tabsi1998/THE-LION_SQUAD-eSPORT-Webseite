@@ -42,7 +42,7 @@ function DiscordServerField({ form, games, servers, onChange, testId }) {
         options={[["", `Erben (${inherited})`], ...options.map((server) => [server.guild_id, serverOptionLabel(server)])]}
         hint="Wohin Turnier- und Liga-Meldungen dieses Spiels gehen." />
       {current && (!current.enabled || current.left) ? (
-        <div className="text-[11px] text-[#FFD700]" data-testid={`${testId}-off`}>Dieser Server ist {current.left ? "nicht mehr erreichbar" : "ausgeschaltet"} – bis dahin gilt: {inherited}.</div>
+        <div className="tls-type-small text-[#FFD700]" data-testid={`${testId}-off`}>Dieser Server ist {current.left ? "nicht mehr erreichbar" : "ausgeschaltet"} – bis dahin gilt: {inherited}.</div>
       ) : null}
     </div>
   );
@@ -52,7 +52,7 @@ export function EditionPreview({ form, games }) {
   const parent = games.find((game) => game.id === form.parent_game_id);
   if (!parent || form.kind !== "edition" || !form.name) return null;
   return (
-    <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 text-xs text-white/60" data-testid="game-edition-preview">
+    <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 tls-type-small text-white/60" data-testid="game-edition-preview">
       Anzeige in Turnieren und Profilen: <span className="font-bold text-white">{gameLabel({ ...form, parent_game: parent })}</span>
     </div>
   );

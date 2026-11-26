@@ -292,22 +292,22 @@ export function AlbumPhotos({ album, onBack }) {
 
   return (
     <AdminLayout>
-      <button onClick={onBack} className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8] mb-4">
+      <button onClick={onBack} className="inline-flex items-center gap-2 tls-type-label text-white/50 hover:text-[#29B6E8] mb-4">
         <ArrowLeft className="w-3.5 h-3.5" /> Alben
       </button>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
-          <h1 className="font-heading text-3xl font-black uppercase">{album.title}</h1>
-          <div className="text-xs text-white/50">{photos.length} Medien · {sections.length} Abschnitte · /{album.slug}</div>
+          <h1 className="tls-type-title">{album.title}</h1>
+          <div className="tls-type-small text-white/50">{photos.length} Medien · {sections.length} Abschnitte · /{album.slug}</div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button type="button" onClick={openMedia} data-testid="photo-media-picker" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/75 font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-white/5">
+          <button type="button" onClick={openMedia} data-testid="photo-media-picker" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/75 tls-type-label rounded-sm hover:bg-white/5">
             <ImageIcon className="w-3.5 h-3.5" /> Aus Medien
           </button>
-          <button type="button" onClick={() => setLinkOpen(true)} data-testid="gallery-video-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#9F7AEA]/40 text-[#C4B5FD] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#9F7AEA]/10">
+          <button type="button" onClick={() => setLinkOpen(true)} data-testid="gallery-video-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#9F7AEA]/40 text-[#C4B5FD] tls-type-label rounded-sm hover:bg-[#9F7AEA]/10">
             <LinkIcon className="w-3.5 h-3.5" /> Video-Link
           </button>
-          <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="media-bulk-upload">
+          <label className={`inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm cursor-pointer ${uploading ? "opacity-50" : ""}`} data-testid="media-bulk-upload">
             <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
             <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { onPickMedia(e.target.files); e.target.value = ""; }} />
           </label>
@@ -318,16 +318,16 @@ export function AlbumPhotos({ album, onBack }) {
       <div className="mb-6 border border-white/10 bg-[#101010] rounded-sm p-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">
+            <div className="inline-flex items-center gap-2 tls-type-label text-[#29B6E8]">
               <Layers className="w-3.5 h-3.5" /> Album-Abschnitte
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {sections.length === 0 ? (
-                <span className="text-sm text-white/45">Noch keine Abschnitte.</span>
+                <span className="tls-type-small text-white/45">Noch keine Abschnitte.</span>
               ) : sections.map((section) => (
                 <div key={section.id} className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-black/20 px-2.5 py-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-white">{section.title}</span>
-                  <span className="text-[10px] text-white/35">#{section.order_index || 0}</span>
+                  <span className="tls-type-label text-white">{section.title}</span>
+                  <span className="tls-type-small text-white/35">#{section.order_index || 0}</span>
                   <button type="button" onClick={() => setEditingSection(section)} className="text-white/45 hover:text-[#29B6E8]" aria-label={`${section.title} bearbeiten`}>
                     <Pencil className="w-3 h-3" />
                   </button>
@@ -338,13 +338,13 @@ export function AlbumPhotos({ album, onBack }) {
               ))}
             </div>
           </div>
-          <button type="button" onClick={() => setEditingSection({})} data-testid="gallery-section-new" className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/15 text-white font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-white/10">
+          <button type="button" onClick={() => setEditingSection({})} data-testid="gallery-section-new" className="inline-flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/15 text-white tls-type-label rounded-sm hover:bg-white/10">
             <Plus className="w-3.5 h-3.5" /> Abschnitt
           </button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,16rem)_1fr] items-end">
           <SelectField label="Upload-Ziel" value={targetSectionId || ""} onChange={(v) => setTargetSectionId(v)} options={[["", "Ohne Abschnitt"], ...sections.map((section) => [section.id, section.title])]} testId="gallery-upload-target" />
-          <div className="text-xs text-white/45 pb-2">
+          <div className="tls-type-small text-white/45 pb-2">
             Aktuell: <span className="text-white/75">{sectionTitle(sections, targetSectionId || null)}</span>
           </div>
         </div>
@@ -352,8 +352,8 @@ export function AlbumPhotos({ album, onBack }) {
 
       {photos.length > 0 && (
         <div className="lg:sticky lg:top-0 z-10 mb-4 flex flex-wrap items-center gap-2 border border-white/10 bg-[#101010] rounded-sm p-3" data-testid="gallery-bulk-bar">
-          <span className="text-xs font-bold tabular-nums text-white/70" data-testid="gallery-bulk-count">{checked.length} von {photos.length} ausgewählt</span>
-          <button type="button" onClick={() => setChecked(checked.length === photos.length ? [] : photos.map((p) => p.id))} data-testid="gallery-bulk-all" className="min-h-10 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+          <span className="tls-type-small font-bold tabular-nums text-white/70" data-testid="gallery-bulk-count">{checked.length} von {photos.length} ausgewählt</span>
+          <button type="button" onClick={() => setChecked(checked.length === photos.length ? [] : photos.map((p) => p.id))} data-testid="gallery-bulk-all" className="min-h-10 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white">
             {checked.length === photos.length ? "Auswahl aufheben" : "Alle auswählen"}
           </button>
           {checked.length > 0 && (
@@ -363,7 +363,7 @@ export function AlbumPhotos({ album, onBack }) {
                 <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
                 {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
               </select>
-              <button type="button" disabled={bulkBusy} onClick={bulkRemove} data-testid="gallery-bulk-remove" className="tls-btn tls-btn--danger min-h-10 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              <button type="button" disabled={bulkBusy} onClick={bulkRemove} data-testid="gallery-bulk-remove" className="tls-btn tls-btn--danger min-h-10 rounded-sm tls-type-label disabled:opacity-50">
                 Aus dem Album nehmen
               </button>
             </>
@@ -378,13 +378,13 @@ export function AlbumPhotos({ album, onBack }) {
             <div key={group.id}>
               <div className="mb-3 flex items-end justify-between gap-3 border-b border-white/10 pb-2">
                 <div>
-                  <h2 className="font-heading text-lg font-black uppercase">{group.title}</h2>
-                  {group.description && <p className="mt-1 text-sm text-white/50">{group.description}</p>}
+                  <h2 className="tls-type-section">{group.title}</h2>
+                  {group.description && <p className="mt-1 tls-type-body text-white/50">{group.description}</p>}
                 </div>
-                <span className="text-[10px] uppercase tracking-widest text-white/40">{group.items.length} Medien</span>
+                <span className="tls-type-label text-white/40">{group.items.length} Medien</span>
               </div>
               {group.items.length === 0 ? (
-                <div className="border border-dashed border-white/10 rounded-sm p-6 text-center text-sm text-white/35">Leer</div>
+                <div className="border border-dashed border-white/10 rounded-sm p-6 text-center tls-type-small text-white/35">Leer</div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                   {group.items.map((p) => (
@@ -397,7 +397,7 @@ export function AlbumPhotos({ album, onBack }) {
                       <select
                         value={sectionValue(p.section_id)}
                         onChange={(e) => moveMediaToSection(p, sectionIdFromValue(e.target.value))}
-                        className="absolute left-1 top-9 max-w-[calc(100%-0.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
+                        className="absolute left-1 top-9 max-w-[calc(100%-0.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 tls-type-small text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
                         aria-label="Abschnitt ändern"
                       >
                         <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
@@ -428,8 +428,8 @@ export function AlbumPhotos({ album, onBack }) {
           <div ref={mediaDialogRef} role="dialog" aria-modal="true" aria-labelledby={mediaTitleId} className="max-w-5xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <h3 id={mediaTitleId} className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
-                <div className="text-xs text-white/45">{selectedMedia.length} ausgewählt</div>
+                <h3 id={mediaTitleId} className="tls-type-card">Medienbibliothek</h3>
+                <div className="tls-type-small text-white/45">{selectedMedia.length} ausgewählt</div>
               </div>
               <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white" aria-label="Schließen">×</button>
             </div>
@@ -453,7 +453,7 @@ export function AlbumPhotos({ album, onBack }) {
                     >
                       <GalleryAdminThumb item={item} />
                       <MediaBadge item={item} />
-                      {active && <span className="absolute top-1 right-1 bg-[#29B6E8] text-black text-[10px] font-black px-1.5 py-0.5 rounded-sm">OK</span>}
+                      {active && <span className="absolute top-1 right-1 bg-[#29B6E8] text-black tls-type-small font-black px-1.5 py-0.5 rounded-sm">OK</span>}
                     </button>
                   );
                 })}
@@ -461,8 +461,8 @@ export function AlbumPhotos({ album, onBack }) {
             )}
             <MediaLibraryMore library={media} testId="gallery-media" />
             <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
-              <button type="button" onClick={() => setMediaOpen(false)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-              <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Auswahl hinzufügen</button>
+              <button type="button" onClick={() => setMediaOpen(false)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm tls-type-label">Abbrechen</button>
+              <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label disabled:opacity-50">Auswahl hinzufügen</button>
             </div>
           </div>
         </div>
@@ -503,7 +503,7 @@ function GalleryAdminThumb({ item }) {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/35">
       <Film className="w-8 h-8" />
-      <span className="text-[10px] uppercase tracking-widest font-bold text-center px-2">{type === "embed" ? "Video-Link" : "Video"}</span>
+      <span className="tls-type-label text-center px-2">{type === "embed" ? "Video-Link" : "Video"}</span>
     </div>
   );
 }
@@ -512,7 +512,7 @@ function MediaBadge({ item }) {
   if (!isVideoLike(item)) return null;
   const label = item.embed_provider ? providerLabel(item.embed_provider) : "Video";
   return (
-    <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 rounded-sm bg-black/75 px-1.5 py-1 text-[9px] font-black uppercase tracking-widest text-white">
+    <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 rounded-sm bg-black/75 px-1.5 py-1 tls-type-label text-white">
       <Play className="w-3 h-3 fill-current" /> {label}
     </span>
   );

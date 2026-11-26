@@ -36,7 +36,7 @@ export function SeasonCheckinRulesPanel({ seasonId }) {
   }, [seasonId]);
 
   if (!form) {
-    return error ? <p className="text-sm text-warn" role="alert" data-testid="checkin-rules-error">{error}</p> : null;
+    return error ? <p className="tls-type-small text-warn" role="alert" data-testid="checkin-rules-error">{error}</p> : null;
   }
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const save = async () => {
@@ -58,7 +58,7 @@ export function SeasonCheckinRulesPanel({ seasonId }) {
     <FormSection title="Check-in vor dem Spiel" testId="season-checkin-rules"
       hint="Gilt sofort für alle Staffeln dieser Season (gesperrte nehmen es beim Übertragen mit). Regelwerk § 8: Nach dem Fenster entscheidet die Leitung, gewertet wird nie automatisch.">
       {!state?.active ? (
-        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/75" data-testid="checkin-rules-inactive">
+        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-body text-white/75" data-testid="checkin-rules-inactive">
           Diese Season ist älter als der Check-in: Dort gibt es keinen Check-in und keinen Vorschlag „nicht erschienen“, bis ihr einmal speichert.
         </p>
       ) : null}
@@ -75,9 +75,9 @@ export function SeasonCheckinRulesPanel({ seasonId }) {
         <TextField label="Erinnerung an fehlende Angaben (Stunden vor dem ersten Spiel)" type="number" min={0} max={168} value={form.open_points_remind_hours ?? ""}
           onChange={(value) => set("open_points_remind_hours", value)} hint="Geburtsdatum, Spiel-ID, Plattform – an Spieler und Captain; 0 = keine, Vorgabe 48" testId="checkin-rules-open-points" />
       </FormGrid>
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="checkin-rules-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="checkin-rules-error">{error}</p> : null}
       <button type="button" onClick={save} disabled={saving} data-testid="checkin-rules-save"
-        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
         {saving ? "Speichere …" : "Check-in speichern"}
       </button>
     </FormSection>
