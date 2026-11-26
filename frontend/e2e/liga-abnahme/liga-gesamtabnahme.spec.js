@@ -420,13 +420,17 @@ test.describe("Liga-Gesamtabnahme: die 18 Szenarien gegen echte API und MongoDB"
 
   test("Szenario 15: Default-Win wird mit maximalen Maps gewertet und als kampflos markiert", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", LARGE);
-    const play = world.round1[4];
+    // Unabhängig vom Los (#2570): Der Spielplan wird jede Nacht neu gelost. Ein festes `round1[4]` traf etwa jede achte Nacht das
+    // Co-Team mit dem Punktabzug aus Szenario 14 - der bleibt bis in den Endstand, der Verlierer stand dann bei -2 statt 0. Darum
+    // ein offenes Spiel des ersten Spieltags ohne dieses Co-Team (round1[0] bis [2] sind gespielt, [3] trägt die Spielsperre).
+    const play = world.round1.slice(4).find((row) => ![row.winner, row.loser].includes(world.deduction.registration_id));
+    expect(play, "ein offenes Spiel am ersten Spieltag ohne Punktabzug").toBeTruthy();
     const shortNote = await api(lead, "POST", `/api/matches/${play.id}/forfeit`, { forfeit_registration_id: play.loser, note: "weg" });
     expect(shortNote.status).toBe(422);
     await ok(lead, "POST", `/api/matches/${play.id}/forfeit`, { forfeit_registration_id: play.loser, note: "Gegner nicht erschienen, Leitung hat geprüft" });
     const table = await standings(lead, world.tid);
-    expect(table[play.winner]).toMatchObject({ points: 3, played: 1, forfeit_won: 1, score_for: 3, score_against: 0 });
-    expect(table[play.loser]).toMatchObject({ points: 0, played: 1, forfeit_lost: 1, score_for: 0, score_against: 3 });
+    expect(table[play.winner]).toMatchObject({ points: 3, played: 1, forfeit_won: 1, score_for: 3, score_against: 0, deducted_points: 0 });
+    expect(table[play.loser]).toMatchObject({ points: 0, played: 1, forfeit_lost: 1, score_for: 0, score_against: 3, deducted_points: 0 });
     await done(lead);
     const guest = await as(browser, testInfo, "anon", SMALL);
     await openPage(guest, `${leagueUrl()}/spieltage?staffel=${world.tid}&woche=1`);
