@@ -31,6 +31,8 @@ export const NAV_STRUCTURE = [
       { to: "/membership/join", label: "Mitglied werden" },
       { to: "/galerie", label: "Galerie" },
       { to: "/references", label: "Referenzen" },
+      // Vereinsinhalte wohnen seit #2059 in „Mein Bereich“ - hier steht für Mitglieder nur der Weg dorthin.
+      { to: "/mein-bereich/verein", label: "Mein Bereich", memberOnly: true },
     ],
   },
   {
@@ -118,7 +120,7 @@ function cachedNavItems() {
 
 /** Was jemand sieht: Mitglieder-Einträge nur für Mitglieder, Einträge mit Konto (Chats) nur angemeldet. */
 export function visibleNavChildren(item, { isClubMember = false, signedIn = false } = {}) {
-  return (item.children || []).filter((c) => (!c.memberOnly || isClubMember) && (!(c.authOnly || c.auth_only) || signedIn));
+  return (item.children || []).filter((c) => (!(c.memberOnly || c.member_only) || isClubMember) && (!(c.authOnly || c.auth_only) || signedIn));
 }
 
 // --- Desktop Dropdown ---
