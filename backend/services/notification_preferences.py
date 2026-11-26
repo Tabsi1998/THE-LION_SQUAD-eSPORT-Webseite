@@ -286,11 +286,12 @@ TOPIC_LABELS: dict[str, str] = {
     ACCOUNT_TOPIC: "Konto & System",
 }
 
-# Wichtigkeit je Art (#1662): ``urgent`` kommt auch in der Ruhezeit sofort und nie in die Sammel-Mail (genau die
-# Ausnahmen der Ruhezeit, quiet_hours_rules.EXEMPT_KINDS); ``important`` verlangt meist etwas von dir; ``normal`` ist
-# zur Kenntnis. Eine einzelne Meldung kann ihre Stufe in ``meta.importance`` nennen.
+# Wichtigkeit je Art (#1662): ``urgent`` kommt auch in der Ruhezeit sofort und nie in die Sammel-Mail (die Ausnahmen der
+# Ruhezeit, quiet_hours_rules.EXEMPT_KINDS, und Absagen); ``important`` verlangt meist etwas von dir; ``normal`` ist zur
+# Kenntnis. Eine einzelne Meldung kann ihre Stufe in ``meta.importance`` nennen.
 IMPORTANCE_LEVELS: tuple[str, ...] = ("urgent", "important", "normal")
-_URGENT = {"match_call", "match_station", "admin_push_test"}
+# Absagen sind dringend (Fabian 26.11., A) - Terminänderungen eines Events tragen ``meta.importance`` (event_changes).
+_URGENT = {"match_call", "match_station", "admin_push_test", "tournament_cancelled"}
 _IMPORTANT = {
     "match_reminder", "match_report", "match_attention", "schedule_escalation", "match_schedule", "match_dispute",
     "team_presence_nudge", "tournament_checkin", "tournament_registration", "tournament_cancelled", "tournament_notice",

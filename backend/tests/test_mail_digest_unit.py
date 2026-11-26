@@ -86,3 +86,9 @@ def test_the_preview_line_uses_the_first_text_value_and_is_short():
     long = mail_digest.preview_line({"message": "a" * 400})
     assert len(long) <= 200 and long.endswith("…")
     assert mail_digest.preview_line({"url": "https://x"}) == ""
+
+
+def test_cancellations_are_urgent_and_never_collected():
+    """Fabian 26.11. (A): Absagen gelten als dringend."""
+    for key in ("tournament_cancelled", "event_cancelled"):
+        assert not mail_digest.collectable(key), key

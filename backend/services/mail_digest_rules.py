@@ -20,9 +20,11 @@ RHYTHMS: tuple[str, ...] = ("instant", "daily", "weekly")
 RHYTHM_LABELS = {"instant": "Sofort", "daily": "Täglich", "weekly": "Wöchentlich"}
 WEEKDAYS = ("Montags", "Dienstags", "Mittwochs", "Donnerstags", "Freitags", "Samstags", "Sonntags")
 DEFAULTS: dict[str, Any] = {"default_rhythm": "instant", "daily_time": "07:00", "weekly_weekday": 0, "weekly_time": "07:00"}
-# Kann nicht warten: Spiel in 10 Minuten, Erinnerung vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute offen.
+# Kann nicht warten: Spiel in 10 Minuten, Erinnerung vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute offen -
+# und Absagen von Turnier und Event (Fabian 26.11., A). Die Terminänderung eines Events ruft mit ``importance="urgent"``.
 URGENT_TEMPLATES = frozenset({
     "match_lead_10m", "match_reminder", "checkin_closes_soon", "checkin_closes_soon_on_site", "score_reported", "dispute_opened",
+    "tournament_cancelled", "event_cancelled",
 })
 # Schon selbst ein Gruß bzw. eine Zusammenfassung - und die Newsletter mit eigenem Abmeldeweg.
 OWN_FORMAT_TEMPLATES = frozenset({"birthday_greeting", "achievement_recap", "newsletter_news", "newsletter_event", DIGEST_TEMPLATE})
@@ -130,7 +132,10 @@ async def hold(user: dict, template_key: str, category: str | None, values: dict
     if rhythm_of(user, cfg) == "instant":
         return None
     template_values = {key: value for key, value in values.items() if key not in ("dedupe_key", "mail_meta", "mail_headers")}
-    rendered = await render_named(template_key, **template_values)
+    try:
+        rendered = await render_named(template_key, **template_values)
+    except TypeError:
+        return None  # falsche Werte: wie bisher meldet send_template das (ok False)
     if rendered is None:
         return None
     dedupe_key = values.get("dedupe_key") or None

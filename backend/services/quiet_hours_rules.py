@@ -22,6 +22,7 @@ EXEMPTION_TEXTS = (
     "Aufruf zu deinem Spiel und „Match startet jetzt“",
     "Liga: Check-in offen und Veto – ihr seid am Zug, für dein eigenes Spiel",
     "Für die Turnierleitung: „Braucht Aufmerksamkeit“, solange dein Turnier läuft",
+    "Absage oder neuer Termin deines Turniers bzw. Events",
 )
 
 

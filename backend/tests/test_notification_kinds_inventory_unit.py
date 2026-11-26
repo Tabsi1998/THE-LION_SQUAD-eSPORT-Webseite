@@ -57,9 +57,15 @@ def test_every_topic_and_importance_is_known():
     assert set(TOPIC_LABELS) == set(LEVEL_TOPICS) | {ACCOUNT_TOPIC}
 
 
-def test_urgent_kinds_are_exactly_the_quiet_hour_exceptions():
+def test_every_quiet_hour_exception_is_urgent_and_every_urgent_kind_comes_through():
+    """Dringend heißt: kommt auch in der Ruhezeit. Seit Fabians Entscheidung (26.11., A) gehören Absagen dazu."""
+    import asyncio
+
+    from services.quiet_hours import is_exempt
+
     urgent = {kind for kind, level in NOTIFICATION_KIND_IMPORTANCE.items() if level == "urgent"}
-    assert urgent == set(EXEMPT_KINDS)
+    assert set(EXEMPT_KINDS) <= urgent
+    assert all(asyncio.run(is_exempt(None, kind, {})) for kind in urgent)
 
 
 def test_required_kinds_sit_under_account():
@@ -80,3 +86,9 @@ def test_topic_and_importance_of_a_single_notification():
     assert notification_importance("tournament_notice", {"importance": "urgent"}) == "urgent"
     assert notification_importance("tournament_notice", {"importance": "egal"}) == "important"
     assert notification_importance("unbekannt") == "normal"
+
+
+def test_cancellations_are_urgent():
+    """Fabian 26.11. (A): Absagen und Terminänderungen sind dringend - auch in der Ruhezeit."""
+    assert notification_importance("tournament_cancelled") == "urgent"
+    assert notification_importance("event_message", {"importance": "urgent"}) == "urgent"
