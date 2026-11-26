@@ -5,7 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import { lazyPage } from "@/lib/chunkReload";
 import { viennaDate } from "@/lib/vienna";
 import { SkeletonList } from "@/components/tls/Skeleton";
-import { BEREICH, RECHNUNGEN_REITER, VEREIN_SEITEN, gruppe, vereinPfad } from "@/lib/meinBereich";
+import { BEREICH, VEREIN_SEITEN, gruppe, vereinPfad } from "@/lib/meinBereich";
+import { RECHNUNGEN_REITER } from "@/lib/meinBereichSeiten";
 import { DatenHerunterladen, KontoLoeschen } from "../PrivacyAccountPage";
 import { BereichReiter, BereichSeite } from "./BereichSeite";
 

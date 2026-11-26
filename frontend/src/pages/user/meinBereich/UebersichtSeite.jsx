@@ -1,7 +1,7 @@
 import { Link, useOutletContext } from "react-router-dom";
 import { ArrowRight, CheckCircle2, KeyRound, Hash, MapPin, Receipt, Trash2 } from "lucide-react";
 import { StaggerIn, Glow } from "@/components/tls/motion";
-import { schnellwege } from "@/lib/meinBereich";
+import { schnellwege } from "@/lib/meinBereichSeiten";
 import { BereichListe } from "./BereichNav";
 import { BereichSeite } from "./BereichSeite";
 import { Identitaet } from "./MeinBereichLayout";

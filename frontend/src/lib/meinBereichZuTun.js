@@ -1,5 +1,6 @@
 import { feeBadge, formatMoney } from "@/lib/dolibarr";
-import { BEREICH, vereinPfad, zweiFaktorPfad } from "@/lib/meinBereich";
+import { BEREICH, vereinPfad } from "@/lib/meinBereich";
+import { zweiFaktorPfad } from "@/lib/meinBereichSeiten";
 
 // „Zu tun“ in „Mein Bereich“ (#2059): eigene Datei, damit die Adressen in lib/meinBereich.js ohne Dolibarr-Helfer im
 // Start-JS bleiben (Menü, untere Leiste, Weiterleitungen).

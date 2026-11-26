@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { StaggerIn } from "@/components/tls/motion";
+import { GRUPPEN_TEXT } from "@/lib/meinBereichSeiten";
 
 // Die Gruppen von „Mein Bereich“ (#2059): am PC als Seitenleiste mit gleitendem Marker, am Handy (und auf der Übersicht)
 // als Liste mit einer Zeile Text je Gruppe. Dieselben Einträge, dieselbe Reihenfolge - nur anders angeordnet.
@@ -89,7 +90,7 @@ export function BereichListe({ gruppen, offen = {}, testId = "mein-bereich-liste
               </span>
               <span className="min-w-0 flex-1">
                 <span className="tls-card__title tls-wrap block font-bold text-white">{item.label}</span>
-                <span className="tls-wrap block text-xs text-white/55">{item.text}</span>
+                <span className="tls-wrap block text-xs text-white/55">{GRUPPEN_TEXT[item.key]}</span>
               </span>
               {count ? <span className="tls-mb-dot shrink-0 rounded-full bg-[#FFD700] px-2 py-0.5 text-[11px] font-black text-black" aria-hidden="true">{offenText(count)}</span> : null}
               <ChevronRight className="tls-card__arrow w-4 h-4 shrink-0 text-white/35" aria-hidden="true" />

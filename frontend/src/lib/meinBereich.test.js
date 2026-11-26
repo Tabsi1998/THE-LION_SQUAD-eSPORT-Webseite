@@ -1,4 +1,5 @@
-import { GRUPPEN, gruppeZuPfad, gruppenFuer, reiterPfad, schnellwege, zweiFaktorPfad } from "./meinBereich";
+import { GRUPPEN, gruppeZuPfad, gruppenFuer } from "./meinBereich";
+import { GRUPPEN_TEXT, reiterPfad, schnellwege, zweiFaktorPfad } from "./meinBereichSeiten";
 import { legacyTarget } from "./meinBereichAlt";
 
 // „Mein Bereich“ (#2059): acht Gruppen wie im Issue, alte Adressen leiten mit Suche und Anker weiter, „Zu tun“ aus
@@ -11,6 +12,8 @@ test("die acht Gruppen stehen in der Reihenfolge des Issues, Verein nur für Mit
   expect(gruppenFuer({ mitglied: false }).map((item) => item.key)).not.toContain("verein");
   expect(gruppenFuer({ mitglied: true }).map((item) => item.key)).toContain("verein");
   for (const item of GRUPPEN) expect(item.path.startsWith("/mein-bereich")).toBe(true);
+  // Jede Gruppe außer der Übersicht hat ihre Zeile Text für Liste und Dashboard.
+  for (const item of GRUPPEN) expect(GRUPPEN_TEXT[item.key], item.key).toBeTruthy();
 });
 
 test("die Gruppe zu einer Adresse - auch für Unterseiten, nie außerhalb", () => {
