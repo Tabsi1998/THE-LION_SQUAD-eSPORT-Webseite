@@ -3,7 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CreditCard, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
-import { gemeinsamLaden } from "@/lib/gemeinsamLaden";
+import { gemeinsamLaden, istVerworfen } from "@/lib/gemeinsamLaden";
+import { useOptionalAuth } from "@/context/AuthContext";
 import { DocumentViewer } from "@/components/tls/DocumentViewer";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -36,12 +37,14 @@ export function InvoicesPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const wanted = searchParams.get("invoice") || "";
   const opened = useRef("");
+  const konto = useOptionalAuth()?.user?.id || "";
 
   const load = useCallback((event) => {
-    // Dieselbe Anfrage wie „Zu tun“ im Rahmen von Mein Bereich (#2059) - nach einer Änderung frisch.
-    gemeinsamLaden("/account/invoices", { frisch: Boolean(event) }).then(({ data: result }) => { setData(result); setError(""); })
-      .catch((err) => setError(formatRequestError(err, "Rechnungen konnten nicht geladen werden.")));
-  }, []);
+    // Dieselbe Anfrage wie „Zu tun“ im Rahmen von Mein Bereich (#2059) - nach einer Änderung frisch. Geteilt nur
+    // innerhalb des Kontos; die verworfene Antwort eines vorigen Kontos zeigt nichts an.
+    gemeinsamLaden("/account/invoices", { frisch: Boolean(event), konto }).then(({ data: result }) => { setData(result); setError(""); })
+      .catch((err) => { if (!istVerworfen(err)) setError(formatRequestError(err, "Rechnungen konnten nicht geladen werden.")); });
+  }, [konto]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "account/invoices"]);
 

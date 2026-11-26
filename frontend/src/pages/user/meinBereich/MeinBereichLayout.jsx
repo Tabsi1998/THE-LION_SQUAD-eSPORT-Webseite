@@ -28,11 +28,14 @@ export function siehtVerein(user) {
 function useZuTunDaten(user, mitglied, secondFactor) {
   const [state, setState] = useState({ items: [], loaded: false });
   const userId = user?.id || "";
+  const lauf = useRef(0);
   const load = useCallback((event) => {
     if (!userId || !zuTunNachladen(event)) return;
     // Rechnungen, Mitgliedschaft und Vereins-Übersicht holt die geöffnete Seite auch - eine Anfrage für beide.
     const frisch = Boolean(event);
-    const geteilt = (path) => gemeinsamLaden(path, { frisch });
+    const geteilt = (path) => gemeinsamLaden(path, { frisch, konto: userId });
+    // Nur der letzte Lauf zählt - nach einem Kontowechsel kommt der vorige nicht mehr an.
+    const nr = ++lauf.current;
     const member = (path, get = api.get) => (mitglied ? get(path) : Promise.resolve({ data: null }));
     Promise.allSettled([
       geteilt("/account/invoices"),
@@ -42,6 +45,7 @@ function useZuTunDaten(user, mitglied, secondFactor) {
       member("/membership/me/jersey-number"),
       member("/membership/area-summary", geteilt),
     ]).then(([invoices, prizes, membership, consents, jersey, area]) => {
+      if (nr !== lauf.current) return;
       const value = (result) => (result.status === "fulfilled" && result.value?.data && typeof result.value.data === "object" ? result.value.data : null);
       setState({
         loaded: true,

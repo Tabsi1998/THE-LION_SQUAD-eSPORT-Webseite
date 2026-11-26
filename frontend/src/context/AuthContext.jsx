@@ -2,6 +2,7 @@ import { adminWithoutSecondFactor, areasOf, canUseArea, hasArea, isAnyAdmin } fr
 import { clearRecentSearches } from "@/lib/recentSearches";
 import { clearOfflineCard, offlineCardOwner } from "@/lib/memberCardOffline";
 import { forgetWebPush } from "@/lib/webPush";
+import { gemeinsamKonto } from "@/lib/gemeinsamLaden";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
@@ -39,6 +40,13 @@ export function AuthProvider({ children }) {
     const owner = offlineCardOwner();
     if (user?.id && owner && owner !== user.id) clearOfflineCard();
   }, [user?.id]);
+
+  // Die geteilte Ablage von Mein Bereich (#2059) gilt nur für ein Konto: ein anderes oder keines leert sie, eine noch
+  // laufende Antwort für das vorige wird verworfen. Solange die Sitzung noch geprüft wird (undefined), bleibt sie.
+  const accountId = user === undefined ? undefined : user?.id || null;
+  useEffect(() => {
+    if (accountId !== undefined) gemeinsamKonto(accountId);
+  }, [accountId]);
 
   const googleAuthenticate = useCallback(async (credential, options = {}) => {
     setGoogleProcessing(true);
@@ -151,6 +159,7 @@ export function AuthProvider({ children }) {
       await api.post("/auth/logout");
       setMfaTicket("");
       setUser(null);
+      gemeinsamKonto(null);
       // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
       clearRecentSearches();
       clearOfflineCard();

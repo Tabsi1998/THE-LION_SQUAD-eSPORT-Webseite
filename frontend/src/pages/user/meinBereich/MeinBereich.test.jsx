@@ -16,7 +16,10 @@ vi.mock("@/lib/api", () => ({
   formatMemberSince: (value) => String(value || ""),
   resolveMediaUrl: (value) => value || "",
 }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ ...authState, refresh: vi.fn(), logout: vi.fn() }) }));
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({ ...authState, refresh: vi.fn(), logout: vi.fn() }),
+  useOptionalAuth: () => ({ ...authState }),
+}));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div data-testid="public-layout">{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => ({ settings: {}, loading: false }) }));

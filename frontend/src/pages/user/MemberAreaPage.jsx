@@ -101,17 +101,19 @@ export default function MemberAreaPage() {
   const [answering, setAnswering] = useState("");
   const [loaded, setLoaded] = useState(false);
 
+  const konto = user?.id || "";
   const load = useCallback((event) => {
-    // Mitgliedschaft und Übersicht teilt sich die Seite mit „Zu tun“ im Rahmen (#2059) - nach einer Änderung frisch.
+    // Mitgliedschaft und Übersicht teilt sich die Seite mit „Zu tun“ im Rahmen (#2059) - nach einer Änderung frisch,
+    // geteilt nur innerhalb des Kontos.
     const frisch = Boolean(event);
     Promise.allSettled([
       api.get("/membership/benefits"),
-      gemeinsamLaden("/membership/me", { frisch }),
+      gemeinsamLaden("/membership/me", { frisch, konto }),
       api.get("/documents", { params: { scope: "club" } }),
       api.get("/news"),
       api.get("/board?active_only=true"),
       api.get("/settings/public"),
-      gemeinsamLaden("/membership/area-summary", { frisch }),
+      gemeinsamLaden("/membership/area-summary", { frisch, konto }),
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
       api.get("/membership/discord-servers"),
@@ -130,7 +132,7 @@ export default function MemberAreaPage() {
       if (dv.status === "fulfilled" && dv.value.data?.available) setDiscordVoice(dv.value.data);
       setLoaded(true);
     });
-  }, []);
+  }, [konto]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "documents", "news", "users", "events", "board", "settings"]);
 

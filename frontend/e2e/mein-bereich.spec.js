@@ -54,6 +54,34 @@ async function dismissCookies(page) {
   if (await allow.isVisible().catch(() => false)) await allow.click();
 }
 
+// Wechsel innerhalb der Seite, ohne sie neu zu laden - so bleibt im Speicher, was die Seite schon geholt hat.
+async function spaGehe(page, path) {
+  await page.evaluate((to) => {
+    window.history.pushState({}, "", to);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, path);
+}
+
+// Die Sitzung wie am Server: wer angemeldet ist, bestimmt die Antworten; Abmelden und Anmelden schalten um.
+async function mockSitzung(page, start) {
+  const sitzung = { wer: start };
+  const ich = (route) => route.fulfill(json(sitzung.wer));
+  await page.route("**/api/auth/me", ich);
+  await page.route("**/api/users/me", ich);
+  await page.route("**/api/auth/logout", (route) => { sitzung.wer = null; return route.fulfill(json({ ok: true })); });
+  return sitzung;
+}
+
+async function abmelden(page, form) {
+  if (form === "handy") {
+    await page.getByTestId("nav-mobile-toggle").click();
+    await page.getByTestId("nav-logout-mobile").click();
+  } else {
+    await page.getByTestId("nav-user").click();
+    await page.getByTestId("nav-logout").click();
+  }
+}
+
 for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", { width: 1440, height: 900 }]]) {
   test.describe(`Mein Bereich (${form})`, () => {
     test.use({ viewport });
@@ -230,6 +258,65 @@ for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", {
       await expect(darstellung).toHaveAttribute("aria-current", "page");
       await expect(page.getByTestId("settings-appearance")).toBeVisible();
       await expect.poll(() => new URL(page.url()).search).toBe("?tab=appearance");
+    });
+
+    // Prüfung #2059: A wartet auf seine Rechnungen, meldet sich ab, B meldet sich an - ohne Neuladen der Seite. Die
+    // Antwort für A kommt erst, wenn B schon auf „Rechnungen & Unterlagen“ steht; B sieht nur die eigenen Belege.
+    test("Abmelden und ein anderes Konto: die Rechnungen von A kommen bei B nie an", async ({ page }) => {
+      test.setTimeout(120_000);
+      await mockServer(page);
+      const b = { id: "user-2", username: "morgentau", display_name: "Morgentau", role: "player", is_club_member: false, email: "tau@example.test", created_at: "2025-03-01T10:00:00Z" };
+      const sitzung = await mockSitzung(page, member);
+      await page.route("**/api/auth/login", (route) => { sitzung.wer = b; return route.fulfill(json(b)); });
+      const belege = (key, ref) => ({ connected: true, currency: "EUR", summary: { count: 1, open_count: 1, open_total: 36, overdue_count: 0 }, invoices: [{ key, ref, status: "open", type: "invoice", type_label: "Rechnung", total: 36, date: "2026-10-01" }] });
+      let gibA;
+      const aFrei = new Promise((resolve) => { gibA = resolve; });
+      let aGeliefert = false;
+      await page.route("**/api/account/invoices", async (route) => {
+        if (sitzung.wer?.id !== member.id) return route.fulfill(json(belege("d-b2", "RE-B-0002")));
+        // Langsamer Server: die Antwort für A dauert (höchstens 20 s, sonst gibt sie der Test frei).
+        await Promise.race([aFrei, new Promise((resolve) => { setTimeout(resolve, 20_000); })]);
+        await route.fulfill(json(belege("d-a1", "RE-A-0001")));
+        aGeliefert = true;
+        return undefined;
+      });
+      const anfrageA = page.waitForRequest("**/api/account/invoices");
+      await page.goto("/mein-bereich/rechnungen");
+      await dismissCookies(page);
+      await anfrageA;
+      await abmelden(page, form);
+      await expect.poll(() => sitzung.wer).toBeNull();
+      await spaGehe(page, "/login?next=%2Fmein-bereich%2Frechnungen");
+      await page.getByTestId("login-email").fill("tau@example.test");
+      await page.getByTestId("login-password").fill("nur-ein-test");
+      await page.getByTestId("login-submit").click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe("/mein-bereich/rechnungen");
+      await expect(page.getByTestId("my-invoices")).toBeVisible();
+      // Jetzt erst kommt die Antwort für A.
+      gibA();
+      await expect.poll(() => aGeliefert).toBe(true);
+      await expect(page.getByTestId("invoice-d-b2")).toBeVisible();
+      await page.waitForTimeout(500);
+      await expect(page.getByText("RE-A-0001")).toHaveCount(0);
+      await expect(page.getByTestId("invoice-d-b2")).toBeVisible();
+    });
+
+    // Prüfung #2059: nach „Konto löschen“ die Startseite mit kurzer Bestätigung, nicht die Anmeldung. Mit Leerzeichen
+    // am Rand: Dialog und Seite vergleichen gleich.
+    test("Konto löschen: danach die Startseite mit Bestätigung - auch mit Leerzeichen um das Wort", async ({ page }) => {
+      test.setTimeout(90_000);
+      await mockServer(page);
+      await mockSitzung(page, member);
+      let geloescht = false;
+      await page.route("**/api/dsgvo/anonymize-me", (route) => { geloescht = true; return route.fulfill(json({ ok: true })); });
+      await page.goto("/mein-bereich/datenschutz?tab=loeschung");
+      await dismissCookies(page);
+      await page.getByTestId("dsgvo-anonymize-btn").click();
+      await page.getByTestId("confirm-dialog-input").fill(" LÖSCHEN ");
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => geloescht).toBe(true);
+      await expect.poll(() => { const url = new URL(page.url()); return `${url.pathname}${url.search}`; }).toBe("/");
+      await expect(page.getByText("Dein Konto ist gelöscht.")).toBeVisible();
     });
   });
 }
