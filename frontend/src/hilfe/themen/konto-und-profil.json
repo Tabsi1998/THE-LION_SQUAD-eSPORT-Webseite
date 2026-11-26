@@ -116,7 +116,7 @@
           "id": "ruhezeit",
           "titel": "Ruhezeit einschalten",
           "text": "Tippe auf den Reiter Ruhezeit und schalte sie ein. Vorgeschlagen ist 22:00 bis 7:00 Uhr. In dieser Zeit kommt kein Push, alles wartet in der Glocke. Danach kommt eine Sammelmeldung.",
-          "hinweis": "Der Aufruf zu deinem Spiel, „Match startet jetzt“, Absagen und neue Termine kommen trotzdem sofort. E-Mails kommen wie bisher.",
+          "hinweis": "Der Aufruf zu deinem Spiel und „Match startet jetzt“ kommen trotzdem sofort. Absagen, neue Termine und Nachrücken nur, wenn der Termin vor 9 Uhr ist. E-Mails kommen wie bisher.",
           "bild": true,
           "clip": true
         },
@@ -124,7 +124,7 @@
           "id": "weitere-wege",
           "titel": "E-Mail und Sammel-Mail",
           "text": "Tippe auf den Reiter E-Mail. Wähle Sofort, Täglich oder Wöchentlich: Dann kommen deine Mails einzeln oder gesammelt in einer Mail. Darunter stellst du je Thema ein, was per Mail kommt.",
-          "hinweis": "Dringendes wie „Dein Spiel startet in 10 Minuten“ oder eine Absage kommt immer sofort. In jeder Sammel-Mail führt „Zurück auf Einzelmails“ mit einem Klick zurück, in den Einstellungen „Vorgabe des Vereins nutzen“ zur Vorgabe.",
+          "hinweis": "Dringendes wie „Dein Spiel startet in 10 Minuten“, Absagen und Nachrücken kommen immer sofort. In jeder Sammel-Mail führt „Zurück auf Einzelmails“ mit einem Klick zurück, in den Einstellungen „Vorgabe des Vereins nutzen“ zur Vorgabe.",
           "bild": true,
           "clip": true
         }

@@ -1267,8 +1267,13 @@ einmal, unter dem Thema **Turnier-Updates** (die Person kann es abschalten):
 - Wer nicht erschienen ist, ist nie „weiter“ über den Sieger-Weg.
 - Wird ein Ergebnis noch einmal gleich gemeldet, kommt nichts doppelt. Ändert eine Korrektur den Ausgang, bekommen beide die
   passende neue Meldung; die alte ist als gelesen und überholt markiert.
+- **Nachgerückt** und **Turnier abgesagt** sind zeitkritisch: Die Mail kommt immer sofort, der Push in der Ruhezeit nur, wenn das
+  Turnier vor 9 Uhr am Morgen beginnt.
 - „Weiter“ heißt: im nächsten, tatsächlich gespielten Spiel. Gewinnt im Double Elimination der Erste das Grand Final und der Reset
-  entfällt, kommt keine Meldung – dafür kommt **Turnier beendet**.
+  entfällt, kommt keine Meldung – dafür kommt **Turnier beendet**. Gewinnt die Seite aus dem Loser Bracket, lesen beide
+  **Entscheidungsspiel** („gewonnen – jetzt kommt das Entscheidungsspiel“ bzw. „verloren – es gibt ein Entscheidungsspiel, du bist
+  noch dabei“).
+- Eine Korrektur meldet nur, wenn sich der Ausgang ändert; ein korrigierter Spielstand mit gleichem Sieger meldet nichts.
 - „Der Turnierbaum ist da“ kommt bei jedem Start: von der Turnierleitung, nach Zeitplan und mit dem ersten Spiel an einer Station.
 - Die Pausen-Meldung entfällt nur, wenn die Leitung in den fünf Minuten davor selbst einen Pausen-Hinweis an genau dieses Turnier
   geschickt hat; andere Hinweise und solche ans ganze Event zählen nicht.

@@ -224,8 +224,9 @@ Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sa
   - Trotzdem sofort kommen: der **Aufruf zum eigenen Spiel**, **Match startet jetzt**, in der Liga **Check-in offen** und **Veto – ihr seid am
     Zug** fürs eigene Spiel, und für die Turnierleitung **Braucht Aufmerksamkeit**, solange ihr Turnier läuft. Leitungs-Meldungen einer
     Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung. Der **Push-Test** der Verwaltung kommt ebenfalls sofort.
-  - **Absagen** von Turnier und Event und ein **neuer Termin oder Ort** eines Events kommen ebenfalls sofort (Fabians Entscheidung
-    26.11.), genauso alles, was die Website ausdrücklich als **dringend** schickt.
+  - **Zeitkritisches** – Absage von Turnier oder Event, neuer Termin oder Ort eines Events, Nachrücken von der Warteliste – kommt
+    nur dann sofort, wenn der Termin vor 9 Uhr am Morgen liegt, an dem die Ruhezeit endet. Sonst wartet der Push bis zum Ende der
+    Ruhezeit (Fabians Entscheidung 26.11.). Die Mail dazu geht immer sofort.
   - E-Mails sind davon nicht betroffen.
 - **Dieser Browser** (unter den Themen, nur wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat): ob der Browser, in dem die Seite
   gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw. **Browser abmelden**. Blockiert der Browser die Benachrichtigungen,
@@ -236,7 +237,8 @@ Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sa
     heißt: eine Mail mit allem, was seit der letzten kam, nach Themen sortiert, mit Link zu jeder Sache. Darunter steht, wann sie kommt
     („Täglich um 07:00 Uhr“), und solange die Person nichts gewählt hat, die **Vorgabe des Vereins**. Wer selbst gewählt hat, kommt
     mit **Vorgabe des Vereins nutzen** wieder zurück. Dringendes (Spiel in 10 Minuten, Check-in schließt, Ergebnis bestätigen,
-    Dispute, Absagen, neuer Termin) und Konto-Mails kommen immer sofort. Ist E-Mail ganz aus, sagt die Karte das.
+    Dispute), Zeitkritisches (Absage, neuer Termin, Nachrücken) und Konto-Mails kommen immer sofort. Ist E-Mail ganz aus, sagt die
+    Karte das.
   - In jeder Sammel-Mail steht **Zurück auf Einzelmails**: ein Klick, ohne Anmeldung, dann ein Knopf auf der Seite – danach kommt
     jede Mail wieder einzeln. Der Link gehört zu genau diesem Konto und ändert nur den Rhythmus.
   - der Kanal **E-Mail** ganz an oder aus und je Thema **E-Mail**. Ein Strich heißt: Dieses Thema gibt es per Mail nicht;
@@ -267,8 +269,8 @@ So arbeitet sie:
 - **Was gesammelt wird:** optionale Mails einer Person mit Rhythmus Täglich oder Wöchentlich – Anmeldungen, Turnier- und Liga-Hinweise,
   Gewinne, Rechnungen, Nachrichten, Vereinsinternes. Nur Themen, die sie per Mail an hat.
 - **Was nie gesammelt wird:** Konto- und Sicherheitsmails, Entscheidungen zur Mitgliedschaft, Dringendes (Spiel in 10 Minuten, Erinnerung
-  vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute, Absage von Turnier oder Event, neuer Termin oder Ort eines Events),
-  Newsletter, Geburtstagsgruß und Wochenrückblick.
+  vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute), Zeitkritisches (Absage von Turnier oder Event, neuer Termin oder
+  Ort eines Events, Nachrücken von der Warteliste), Newsletter, Geburtstagsgruß und Wochenrückblick.
 - **Wann:** Der Job `mail_digest` sieht alle 10 Minuten nach. Je Person geht **genau eine** Mail je Zeitraum hinaus, mit allem, was vor dem
   Termin kam; was danach kommt, wartet auf den nächsten. Zwei Läufe gleichzeitig schicken trotzdem nur eine.
 - **Sichtbarkeit:** Beim Versand wird jede Zeile neu geprüft: Konto aktiv und nicht gesperrt, Thema per Mail noch an, Vereinsinternes
@@ -286,7 +288,8 @@ Jede Art von Meldung hat ein **Thema** (die Themen der Einstellungen) und eine *
 
 | Wichtigkeit | Bedeutung | Beispiele |
 | --- | --- | --- |
-| **Dringend** | kommt auch in der Ruhezeit sofort, nie in eine Sammlung, in der Glocke rot und als einzige angesagt | Du bist dran, Match startet jetzt, Turnier abgesagt, Event abgesagt oder verschoben, Push-Test |
+| **Dringend** | kommt auch in der Ruhezeit sofort, nie in eine Sammlung, in der Glocke rot und als einzige angesagt | Du bist dran, Match startet jetzt, Push-Test |
+| **Zeitkritisch** (Merkmal zu „wichtig“) | nie in eine Sammlung; in der Ruhezeit sofort nur, wenn der Termin vor 9 Uhr am Morgen liegt | Turnier oder Event abgesagt, Event verschoben, Nachgerückt |
 | **Wichtig** | verlangt meist etwas von dir | Termin, Check-in, Anmeldung, Weiter/Ausgeschieden, Pause, Rechnung, Nachricht an dich |
 | **Normal** | zur Kenntnis | Ergebnisse, Erfolge, News, Galerie, Team-Änderungen |
 
