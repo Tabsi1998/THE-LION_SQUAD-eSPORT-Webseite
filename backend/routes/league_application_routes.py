@@ -16,6 +16,7 @@ from models import LeagueApplicationDecision, LeagueApplicationSubmit
 from routes.tournament_registration_routes import _refresh_tournament_previews_after_registration
 from services import league_applications as applications
 from services import league_service as leagues
+from services import league_start_rights
 from services.league_permissions import require_league
 from services.league_service import LeagueProblem
 
@@ -61,19 +62,23 @@ async def submit_application(league_slug: str, season_slug: str, body: LeagueApp
 @router.post("/{league_slug}/{season_slug}/applications/{application_id}/withdraw")
 async def withdraw_application(league_slug: str, season_slug: str, application_id: str, me: dict = Depends(get_current_user)):
     league, season = await _visible(league_slug, season_slug, me)
-    done = await _call(applications.withdraw(get_db(), league, season, application_id, me, refresh_previews=_refresh_tournament_previews_after_registration))
+    done = await _call(applications.withdraw(get_db(), league, season, application_id, me, refresh_previews=_refresh_tournament_previews_after_registration,
+                                             on_released=league_start_rights.released))
     return await applications.team_answer(get_db(), done)
 
 
 @me_router.get("/league-applications")
 async def my_league_applications(me: dict = Depends(get_current_user)):
-    return {"items": await applications.my_applications(get_db(), me)}
+    # ``start_rights`` (#1627, F.2a): Prognose bzw. bestätigtes Startrecht der eigenen Co-Teams, solange es die Folge-Season noch nicht
+    # gibt - leer ohne die Einstellung an der Season.
+    return {"items": await applications.my_applications(get_db(), me), "start_rights": await league_start_rights.outlook(get_db(), me)}
 
 
 @me_router.post("/league-applications/{application_id}/withdraw")
 async def withdraw_own_application(application_id: str, me: dict = Depends(get_current_user)):
     """Abmelden von der Team-Seite (F.2, #1627): auch, solange die neue Season noch nicht veröffentlicht ist."""
-    done = await _call(applications.withdraw_own(get_db(), application_id, me, refresh_previews=_refresh_tournament_previews_after_registration))
+    done = await _call(applications.withdraw_own(get_db(), application_id, me, refresh_previews=_refresh_tournament_previews_after_registration,
+                                                 on_released=league_start_rights.released))
     return await applications.team_answer(get_db(), done)
 
 

@@ -3,6 +3,7 @@
 // Plattform je Season (#2270, #plattform): ein weiterer Abschnitt im Formular, gespeichert mit dem Reiter.
 // Staffeln auslosen (#1623, #auslosung): gleich unter dem Eingang - Los auf mehrere Staffeln einer Liga N und die Platzprüfung.
 // Nachmeldungen (#2422, #nachmeldungen): unter dem Eingang - Spiele für Teams, die nach dem Start in eine Staffel kamen.
+// Startrechte (#1627, F.2a, #startrechte): zwischen Eingang und Los - wer aus der Vorgänger-Season zugesagt hat, kommt ins Los.
 import { FormSection } from "@/components/tls/AdminForm";
 import { TextField } from "@/components/tls/FormFields";
 import { SeasonApplicationSection } from "./SeasonApplicationSection";
@@ -12,10 +13,11 @@ import { SeasonEligibilitySection } from "./SeasonEligibilitySection";
 import { SeasonLateEntriesPanel } from "./SeasonLateEntriesPanel";
 import { SeasonPlatformSection } from "./SeasonPlatformSection";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
+import { SeasonStartRightsPanel } from "./SeasonStartRightsPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
 const JUMPS = [["selbstanmeldung", "Selbstanmeldung"], ["spielberechtigung", "Kader und Spielberechtigung"], ["plattform", "Plattform"], ["anmeldungen", "Eingang"],
-  ["auslosung", "Staffeln auslosen"], ["nachmeldungen", "Nachmeldungen"], ["kader", "Kaderübersicht"]];
+  ["startrechte", "Startrechte"], ["auslosung", "Staffeln auslosen"], ["nachmeldungen", "Nachmeldungen"], ["kader", "Kaderübersicht"]];
 
 export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canApplications, canRoster, formProps, onJump, applicationsWaiting = 0,
   lateRegistration = null, onReload = null }) {
@@ -27,7 +29,8 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
       hint={hasWindow ? "Mit Anmeldefenster gilt „Anmeldung bis“ – das Feld kann leer bleiben." : "Steht auf der Ligaseite, solange es keine Selbstanmeldung gibt."}
       testId="season-form-deadline" className="max-w-xs" />
   ) : null;
-  const jumps = JUMPS.filter(([key]) => (key === "anmeldungen" || key === "auslosung" || key === "nachmeldungen" ? canApplications : key === "kader" ? canRoster : canSeason));
+  const jumps = JUMPS.filter(([key]) => (key === "anmeldungen" || key === "auslosung" || key === "nachmeldungen" ? canApplications
+    : key === "kader" ? canRoster : key === "startrechte" ? canSeason || canApplications : canSeason));
   return (
     <div className="space-y-6">
       {jumps.length > 1 ? (
@@ -46,6 +49,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
         </SeasonTabForm>
       ) : null}
       {canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
+      {canSeason || canApplications ? <SeasonStartRightsPanel seasonId={seasonId} canSeason={canSeason} canApplications={canApplications} version={season.updated_at} /> : null}
       {canApplications ? <SeasonDrawPanel seasonId={seasonId} version={season.updated_at} /> : null}
       {canApplications ? <SeasonLateEntriesPanel seasonId={seasonId} version={season.updated_at} /> : null}
       {canRoster ? <div id="kader" className="scroll-mt-24"><SeasonRosterPanel seasonId={seasonId} /></div> : null}

@@ -160,3 +160,19 @@ test("ein übernommenes Los lässt sich nachlesen, aber nicht mehr ändern", asy
   expect(screen.queryByTestId("draw-redraw-open")).toBeNull();
   expect(screen.queryByTestId("draw-swap-open-s1")).toBeNull();
 });
+
+// Startrechte (#1627, docs/LIGA.md „F.2a“): Ins Los kommt nur, wer zugesagt hat - wer noch offen ist, steht daneben.
+test("Co-Teams ohne Zusage zum Startrecht stehen als Hinweis da und nicht im Los", async () => {
+  apiMock.get.mockResolvedValue({ data: body({ ...DIVISION, waiting_start_right: [{ application_id: "a7", display_name: "Probe Grau · Eins" },
+    { application_id: "a8", display_name: "Probe Weiß · Eins" }] }) });
+  render(<SeasonDrawPanel seasonId="s1" />);
+  expect(await screen.findByTestId("draw-open-rights-1"))
+    .toHaveTextContent("2 Co-Teams haben ihr Startrecht noch nicht angenommen und kommen erst nach der Zusage ins Los: Probe Grau · Eins, Probe Weiß · Eins.");
+});
+
+test("ohne offene Startrechte steht kein Hinweis da", async () => {
+  apiMock.get.mockResolvedValue({ data: body(DIVISION) });
+  render(<SeasonDrawPanel seasonId="s1" />);
+  await screen.findByTestId("draw-division-1");
+  expect(screen.queryByTestId("draw-open-rights-1")).toBeNull();
+});
