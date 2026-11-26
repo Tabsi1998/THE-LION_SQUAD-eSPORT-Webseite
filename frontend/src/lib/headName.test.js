@@ -37,8 +37,10 @@ test("feste lange Wörter in den Überschriften tragen eine weiche Trennstelle",
 
 test("Handy und Tablet trennen große Überschriften, am Handy wird die große Schrift kleiner", () => {
   const css = read("src/index.css");
-  expect(css).toContain("@media (max-width: 1023px) {\n  h1, h2, .font-heading {\n    -webkit-hyphens: auto;\n    hyphens: auto;");
-  expect(css).toContain(":is(h1, h2).font-heading:is(.text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {\n    font-size: clamp(1.5rem, 7.8vw, 2.25rem);");
+  expect(css).toContain("@media (max-width: 1023px) {\n  h1, h2, .font-heading, .tls-type-hero, .tls-type-title {\n    -webkit-hyphens: auto;\n    hyphens: auto;");
+  // Seit der Schrift-Treppe (#1302) gilt das für den Seitentitel: ein GROSSES Wort mit 14 Buchstaben passt bei 360 px.
+  expect(css).toContain(".tls-type-title {\n    font-size: clamp(1.5rem, 7.8vw, var(--tls-type-title-size));");
+  expect(css).toContain(".tls-type-title.tls-head-name--long {\n    font-size: clamp(1.375rem, 6.4vw, 1.875rem);");
   const name = css.slice(css.indexOf(".tls-head-name {"), css.indexOf("}", css.indexOf(".tls-head-name {")));
   expect(name).toContain("overflow-wrap: anywhere;");
   expect(name).toContain("-webkit-line-clamp: 2;");

@@ -81,16 +81,19 @@ img, video, canvas, svg {
   max-width: 100%;
 }
 
-.font-heading { font-family: 'Unbounded', 'Arial Black', 'Segoe UI Black', sans-serif; }
-.font-display { font-family: 'Rajdhani', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif; }
-.font-body { font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }
+/* Die Schriften selbst (#1228) - welche wo steht, sagt die Schrift-Treppe (styles/system.css, #1302): Unbounded nur auf
+   der Bühne und in Seitentiteln, Rajdhani für Zahlen. `.font-display` bleibt als Name für Rajdhani, damit alte Stellen
+   nicht brechen; neue Stellen nehmen tls-type-num. `.font-heading` steht nur noch an den Ausnahmen (TV-Seiten). */
+.font-heading { font-family: var(--tls-font-stage); }
+.font-display { font-family: var(--tls-font-num); }
+.font-body { font-family: var(--tls-font-text); }
 
 /* Lange Überschriften (#1218): Handy und Tablet trennen große Überschriften mit Bindestrich (die Seite ist
    lang="de"), statt sie mitten im Wort ohne Zeichen zu brechen oder aus dem Bild laufen zu lassen. Getrennt werden
    nur Wörter ab zehn Buchstaben. Feste Wörter in Großbuchstaben tragen zusätzlich eine weiche Trennstelle (&shy;),
    weil nicht jeder Browser großgeschriebene Wörter selbst trennt. Am PC bleibt alles, wie es ist. */
 @media (max-width: 1023px) {
-  h1, h2, .font-heading {
+  h1, h2, .font-heading, .tls-type-hero, .tls-type-title {
     -webkit-hyphens: auto;
     hyphens: auto;
     hyphenate-limit-chars: 10 4 4;
@@ -101,16 +104,13 @@ img, video, canvas, svg {
     overflow-wrap: anywhere;
   }
 }
-/* Am Handy wird die große Schrift so klein, dass ein Wort mit 14 Buchstaben bei 360 px in die Zeile passt -
-   ab etwa 460 px Breite bleibt sie so groß wie vorher. */
+/* Am Handy wird der Seitentitel (tls-type-title, 30 px) so klein, dass ein GROSSES Wort mit 14 Buchstaben bei 360 px in
+   die Zeile passt - ab 390 px steht er auf seinen 30 px. Ein sehr langer Name im Profilkopf kommt eine Stufe kleiner. */
 @media (max-width: 639px) {
-  :is(h1, h2).font-heading.text-3xl {
-    font-size: clamp(1.5rem, 7.8vw, 1.875rem);
+  .tls-type-title {
+    font-size: clamp(1.5rem, 7.8vw, var(--tls-type-title-size));
   }
-  :is(h1, h2).font-heading:is(.text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {
-    font-size: clamp(1.5rem, 7.8vw, 2.25rem);
-  }
-  h1.font-heading.tls-head-name--long {
+  .tls-type-title.tls-head-name--long {
     font-size: clamp(1.375rem, 6.4vw, 1.875rem);
   }
 }
@@ -1474,30 +1474,27 @@ textarea.input {
   resize: vertical;
 }
 
+/* Lesetext (#1302): Stufe „Text“ (17 / 16 px, Zeilenabstand 1,6). Überschriften im Text sind Abschnitt und Kartentitel -
+   Outfit, normal geschrieben (#1303); Unbounded bleibt dem Seitentitel über dem Artikel. */
 .prose-cms {
   color: rgba(255,255,255,0.78);
-  line-height: 1.7;
-  font-size: 15px;
+  line-height: 1.6;
+  font-size: var(--tls-type-body-size);
 }
-.prose-cms h1 {
-  font-family: var(--font-heading, "Unbounded"), sans-serif;
-  font-size: 2rem;
-  text-transform: uppercase;
-  letter-spacing: 0;
-  margin: 1.5em 0 0.5em;
-  color: #fff;
-}
-.prose-cms h2 {
-  font-family: var(--font-heading, "Unbounded"), sans-serif;
-  font-size: 1.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0;
+.prose-cms :is(h1, h2) {
+  font-family: var(--tls-font-text);
+  font-size: var(--tls-type-section-size);
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: none;
+  letter-spacing: normal;
   margin: 1.25em 0 0.5em;
   color: #fff;
 }
 .prose-cms h3 {
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: var(--tls-type-card-size);
+  line-height: 1.3;
   margin: 1em 0 0.4em;
   color: #fff;
 }
