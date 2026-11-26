@@ -5212,7 +5212,7 @@ hintereinander ändert nichts.
 
 **Meister mit Belohnungen** (A): ein Ablauf. Zuerst der goldene Meister-Moment, mit **Weiter** die Belohnungen derselben Season als zweite
 Karte in derselben Karte (`RewardCardContent`), ohne neues Aufpoppen. Ohne eingestellte Belohnung bleibt es beim Meister-Moment.
-- Die Belohnungen des Meisters warten so lange auf ihn: `GET /api/me/rewards/unseen` hält sie zurück (`league_moments.held_reward_ids`),
+- Die Belohnungen des Meisters warten so lange auf ihn: `GET /api/me/rewards/unseen` hält sie zurück (`league_moment_rules.held_reward_ids`, Blatt-Modul ohne Import-Kreis),
   solange der Endstand der Season nicht feststeht oder die Person den Moment noch sehen wird; `GET …/league-moments/unseen` bringt sie am
   Meister-Moment mit (`rewards`). Gesehen sind sie, wenn die zweite Karte kam; schließt die Person vorher, kommen sie danach wie bisher.
   Hatte ein anderes Gerät den Moment schon, zeigt dieses Gerät die Belohnungen allein.
