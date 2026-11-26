@@ -223,6 +223,8 @@ async def plan(db, season: dict) -> dict:
             outcome = relegated.get(registration.get("squad_id") or "")
             move = RELEGATION_MOVES[outcome] if outcome in RELEGATION_MOVES else league_zones.MOVES.get(zone, 0)
             there = target_level(levels, level, move)
+            moving = {"target_level": there, **({"via": "relegation", "relegation": outcome} if outcome in RELEGATION_MOVES else {}),
+                      "movement": "up" if isinstance(level, int) and there < level else "down" if isinstance(level, int) and there > level else "stay"}
             if exit_kind or zone == league_zones.OUT:
                 dropped.append({**entry, "reason": REASONS.get(exit_kind or "", "Ausgeschieden")})
             elif not registration.get("squad_id"):
@@ -230,16 +232,14 @@ async def plan(db, season: dict) -> dict:
             elif not squad or squad.get("status") == "archived" or squad.get("team_id") not in teams:
                 # Der Platz im Endstand bleibt (#1627, F.2a, ``placed_levels``): Ob es einen Startplatz gibt, hängt an der
                 # Platzierung - nicht daran, ob es das Co-Team noch gibt.
-                dropped.append({**entry, "reason": "Das Co-Team gibt es nicht mehr", "target_level": there})
+                dropped.append({**entry, "reason": "Das Co-Team gibt es nicht mehr", **moving})
             elif squad["id"] in seen:
                 continue
             else:
                 seen.add(squad["id"])
                 team = teams[squad["team_id"]]
                 carried.append({**entry, "squad_id": squad["id"], "team_id": team["id"], "team_name": team.get("name"),
-                                "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad),
-                                "target_level": there, **({"via": "relegation", "relegation": outcome} if outcome in RELEGATION_MOVES else {}),
-                                "movement": "up" if isinstance(level, int) and there < level else "down" if isinstance(level, int) and there > level else "stay"})
+                                "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad), **moving})
     # Umzug innerhalb der Season (in Staffel A ausgetreten, in Staffel B aktiv): Das Co-Team steht nur einmal da, bei den Übernommenen.
     dropped = [row for row in dropped if not row.get("squad_id") or row["squad_id"] not in seen]
     out_divisions = []
@@ -575,6 +575,8 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
 # ---------------------------------------------------------------- Übernahme neu berechnen (Entscheidung Nr. 162)
 
 CARRY_KEYS = ("from_label", "from_level", "from_staffel", "rank", "zone", "movement", "division_level", "via")
+# Aufgegebene Anträge (#1627, F.2a): abgemeldet bzw. abgelehnt - auch verfallen; zurückgenommene tragen ``carry_over.revoked_at``.
+GAVE_UP = ("withdrawn", "rejected")
 
 
 def started(season: dict, now: datetime | None = None) -> bool:
@@ -614,6 +616,15 @@ async def _recompute_plan(db, season: dict) -> dict:
     carried = {row["squad_id"]: row for row in rows if row.get("carry_over")}
     by_id = {row["id"]: row for row in rows}
     placed = placed_levels(checked)
+    # Startrechte (#1627, F.2a) - nur mit der Einstellung der Season; ohne sie bleibt alles wie in Nr. 162. Ein aufgegebener Antrag
+    # folgt dann seiner Platzierung, auch wenn es das Co-Team nicht mehr gibt (``dropped`` mit ``target_level``).
+    rights_on = league_start_right_rules.stored(season) is not None
+    labels = {division["level"]: division["label"] for division in checked["divisions"]}
+    gone = {}
+    for entry in checked["dropped"] if rights_on else []:
+        if entry.get("squad_id") and isinstance(entry.get("target_level"), int):
+            own = divisions.get(entry["target_level"])
+            gone[entry["squad_id"]] = (entry, own, division_label(own) if own else labels.get(entry["target_level"], ""))
     others = {row["squad_id"]: row for row in rows if not row.get("carry_over") and row.get("active_key")}
     changes, manual = [], []
     unchanged = 0
@@ -644,12 +655,20 @@ async def _recompute_plan(db, season: dict) -> dict:
                             "from_label": carry.get("division_label"), "to_label": wanted[2], "carry_over": new, "place_gone": True})
             continue
         if not free:
-            if row["status"] == "withdrawn" and new and new["movement"] == "up" and new["division_level"] != carry.get("division_level"):
-                # Die Korrektur macht einen Abgemeldeten zum Aufsteiger (aus Nr. 266): Den Aufstiegsplatz gibt es laut Endstand,
-                # und er hat ihn abgegeben. Der Antrag folgt dem Endstand und bleibt abgemeldet - damit ist der Platz in der
-                # höheren Liga N frei, und es gilt die Nachrückerregel (``released_places``). Kein Fall für „von Hand“.
-                changes.append({"kind": "place", "application_id": row["id"], "squad_id": squad_id, "display_name": name,
-                                "from_label": carry.get("division_label"), "to_label": wanted[2], "carry_over": new})
+            # Aufgegeben (Entscheidung 26.11.): abgemeldet, verfallen oder von der Leitung abgelehnt - nicht zurückgenommen (oben) und
+            # kein Nachrücker (dessen Antrag steht in der Liga des Platzes, auf den er nachgerückt war). Der Antrag folgt seiner
+            # neuen Platzierung, in jeder Richtung; damit ist sein Platz dort frei, und es gilt die Nachrückerregel
+            # (``released_places``). Er bleibt, was er ist: kein neues Angebot, keine Nachricht, kein Fall für „von Hand“.
+            seen_at = (wanted or gone.get(squad_id)) if rights_on and row["status"] in GAVE_UP and not isinstance(carry.get("fills"), dict) else None
+            if seen_at:
+                place = _carry_of(predecessor, seen_at[0], seen_at[1], seen_at[2])
+                if place["division_level"] != carry.get("division_level"):
+                    changes.append({"kind": "place", "application_id": row["id"], "squad_id": squad_id, "display_name": name,
+                                    "from_label": carry.get("division_label"), "to_label": seen_at[2], "carry_over": place,
+                                    "status": row["status"]})
+                else:
+                    # Die Liga stimmt: Der Platz steht schon als frei oder vergeben da - auch wenn es das Co-Team nicht mehr gibt.
+                    unchanged += 1
             elif not wanted or new["division_level"] != carry.get("division_level"):
                 why = "zugeteilt" if row.get("assignment") else {"withdrawn": "abgemeldet"}.get(row["status"], "nicht mehr angenommen")
                 manual.append({"application_id": row["id"], "display_name": name, "status": row["status"], "why": why,
@@ -756,12 +775,12 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
             continue
         query = {"id": change["application_id"]}
         if kind == "place":
-            # Abgemeldet und laut korrigiertem Endstand Aufsteiger: Der Antrag zeigt auf den Aufstiegsplatz, den er abgegeben hat.
-            # Wer auf seinem früheren Platz nachgerückt war, hält den neuen nicht (``filled_by`` fällt weg).
-            query.update({"status": "withdrawn"})
+            # Aufgegeben, und der korrigierte Endstand sieht das Co-Team in einer anderen Liga N: Der Antrag zeigt auf den Platz,
+            # den es dort hätte. Wer auf seinem früheren Platz nachgerückt war, hält den neuen nicht (``filled_by`` fällt weg).
+            query.update({"status": change["status"], "carry_over.revoked_at": {"$exists": False}})
             update = {"$set": {**{f"carry_over.{key}": value for key, value in change["carry_over"].items()}, "updated_at": now},
                       "$unset": {"carry_over.filled_by": ""},
-                      "$push": {"history": {"status": "withdrawn", "by": who, "at": now, "carry_over": True, "recomputed": True}}}
+                      "$push": {"history": {"status": change["status"], "by": who, "at": now, "carry_over": True, "recomputed": True}}}
         elif kind == "revoked":
             query.update({"status": ACCEPTED, "assignment": {"$exists": False}})
             update = {"$set": {"status": REJECTED, "decision_reason": REVOKED_REASON, "decided_by": who, "decided_at": now, "updated_at": now,
