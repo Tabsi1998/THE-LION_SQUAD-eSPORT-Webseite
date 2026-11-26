@@ -32,11 +32,12 @@ Season stehen - der Job (``sweep``) holt nach. Die Nachrichten gehen danach auß
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services.league_moment_rules import champions, fresh, moment_key
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_moments")
@@ -46,11 +47,7 @@ REASON = "league_moment"
 OUTCOMES = ("champion", "up", "down")
 LABELS = {"champion": "Meister", "up": "Aufstieg", "down": "Abstieg"}
 LIMIT = 500
-# So lange nach dem bestätigten Endstand erscheint der Moment beim nächsten Besuch - danach bleibt nur der Hinweis. Je Season
-# einstellbar (Reiter „Belohnungen“, ``league_seasons.moment_days``), Vorgabe 45 Tage.
-DAYS_FIELD = "moment_days"
-DEFAULT_DAYS = 45
-DAYS_MIN, DAYS_MAX = 1, 365
+# Dauer je Season (D), Regeln für die Belohnungen des Meisters (A): ``services/league_moment_rules.py`` (Blatt-Modul, ohne Import-Kreis).
 # Merkmarke an der Season: ein Abgleich steht aus (Sperre belegt, Abbruch). Endet auf ``_at`` - geht nicht in die Folge-Season (F.2).
 PENDING_FIELD = "moments_pending_at"
 # Sichtbar für Mitglieder (Fabian 26.11., C): „Aus“ und „Nur Liga-Leitung“ zeigen nichts.
@@ -69,29 +66,9 @@ def _now() -> str:
     return now_utc().isoformat()
 
 
-def _key(season_id: str, entrant: str) -> str:
-    return f"{season_id}:{entrant}"
-
-
 def fact_of(outcome: str, level) -> str:
     """Der Ausgang als Wert, den ein Wiederöffnen vergleicht: ``up:1``, ``down:3``, ``champion:1``."""
     return f"{outcome}:{level}"
-
-
-def clean_days(value) -> int:
-    """Tage zwischen 1 und 365 - sonst ``ValueError`` mit deutschem Text."""
-    try:
-        days = int(value)
-    except (TypeError, ValueError):
-        raise ValueError("Bitte eine ganze Zahl an Tagen angeben.") from None
-    if not DAYS_MIN <= days <= DAYS_MAX:
-        raise ValueError(f"Der Saisonende-Moment erscheint {DAYS_MIN} bis {DAYS_MAX} Tage nach dem Endstand.")
-    return days
-
-
-def moment_days(season: dict | None) -> int:
-    value = (season or {}).get(DAYS_FIELD)
-    return value if isinstance(value, int) and DAYS_MIN <= value <= DAYS_MAX else DEFAULT_DAYS
 
 
 def member_visible(season: dict | None) -> bool:
@@ -212,25 +189,6 @@ async def confirmed(db, season: dict) -> dict[str, dict] | None:
                 "from": _step(level, divisions), "to": _step(level, divisions), "via": None, "staffel": champion["staffel"],
                 "playoffs": champion["playoffs"]}
     return found
-
-
-async def champions(db, season_id: str) -> list[dict]:
-    """Die geltenden Meister-Einträge der Season mit ihrer Anmeldung - aus der Tabelle oder aus den Playoffs, nie ruhende."""
-    awards = await db.tournament_awards.find(
-        {"league.season_id": season_id, "league.title": "Meister", "reward_key": None, "suspended": {"$ne": True}},
-        {"_id": 0, "registration_id": 1, "league": 1}).to_list(LIMIT)
-    registration_ids = sorted({award["registration_id"] for award in awards if award.get("registration_id")})
-    registrations = {row["id"]: row for row in await db.tournament_registrations.find(
-        {"id": {"$in": registration_ids}}, {"_id": 0, "id": 1, "squad_id": 1, "user_id": 1, "team_id": 1, "display_name": 1,
-                                             "tournament_id": 1}).to_list(LIMIT)} if registration_ids else {}
-    out = []
-    for award in awards:
-        registration = registrations.get(award.get("registration_id") or "")
-        if registration:
-            league = award.get("league") or {}
-            out.append({"registration": registration, "playoffs": not league.get("staffel"), "staffel": league.get("staffel"),
-                        "display_name": league.get("display_name")})
-    return out
 
 
 def _entry(outcome: str, team: dict, divisions: dict[int, dict]) -> dict:
@@ -354,7 +312,7 @@ async def _sync(db, season_id: str) -> dict:
     people = await audiences(db, season, found)
     existing = {row["key"]: row async for row in db.league_moments.find({"season_id": season_id}, {"_id": 0})}
     for entrant, item in found.items():
-        key = _key(season_id, entrant)
+        key = moment_key(season_id, entrant)
         await _store(db, season, key, item, people[entrant], existing.get(key), now)
     for key, doc in existing.items():
         if key[len(season_id) + 1:] in found or not doc.get("active", True):
@@ -481,52 +439,6 @@ async def notify(db, season_id: str) -> int:
 
 # ---------------------------------------------------------------- Belohnungen des Meisters (Fabian 26.11., A)
 
-async def _champion_squads(db, season_ids: list[str]) -> dict[str, set[str]]:
-    """Je Season die Co-Teams (bzw. ``user:<person>``) der geltenden Meister."""
-    out: dict[str, set[str]] = {}
-    for season_id in season_ids:
-        out[season_id] = set()
-        for champion in await champions(db, season_id):
-            registration = champion["registration"]
-            if registration.get("squad_id"):
-                out[season_id].add(registration["squad_id"])
-            elif registration.get("user_id"):
-                out[season_id].add(f"user:{registration['user_id']}")
-    return out
-
-
-async def held_reward_ids(db, user_id: str, awards: list[dict]) -> set[str]:
-    """Belohnungen des Meisters warten auf seinen Moment und kommen als zweite Karte mit: solange der Endstand der Season nicht feststeht,
-    und solange die Person den Moment noch sehen wird. Danach (oder ohne Moment für sie) kommen sie wie bisher."""
-    awards = [award for award in awards if (award.get("league") or {}).get("season_id") and award.get("registration_id")]
-    if not awards:
-        return set()
-    season_ids = sorted({award["league"]["season_id"] for award in awards})
-    winners = await _champion_squads(db, season_ids)
-    registration_ids = sorted({award["registration_id"] for award in awards})
-    registrations = {row["id"]: row for row in await db.tournament_registrations.find(
-        {"id": {"$in": registration_ids}}, {"_id": 0, "id": 1, "squad_id": 1, "user_id": 1}).to_list(len(registration_ids) + 1)}
-    held: set[str] = set()
-    moments: dict[str, dict | None] = {}
-    seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}).to_list(len(season_ids) + 1)}
-    for award in awards:
-        season_id = award["league"]["season_id"]
-        registration = registrations.get(award["registration_id"]) or {}
-        entrant = registration.get("squad_id") or (f"user:{registration['user_id']}" if registration.get("user_id") else None)
-        if not entrant or entrant not in winners.get(season_id, set()):
-            continue
-        key = _key(season_id, entrant)
-        if key not in moments:
-            moments[key] = await db.league_moments.find_one({"key": key}, {"_id": 0})
-        doc = moments[key]
-        if doc is None or doc.get("suspended"):
-            held.add(award["id"])  # der Endstand der Season steht noch nicht fest - sie kommen mit dem Moment
-        elif (doc.get("active", True) and user_id in (doc.get("audience_ids") or []) and user_id not in (doc.get("seen_by") or [])
-              and fresh(doc, seasons.get(season_id))):
-            held.add(award["id"])  # der Moment kommt noch - mit ihnen als zweiter Karte
-    return held
-
-
 async def _rewards_for(db, doc: dict, user_id: str) -> list[dict]:
     """Die Belohnungen, die der Meister-Moment dieser Person als zweite Karte mitbringt - geltend, noch nicht gesehen."""
     from services.awards import award_view
@@ -587,16 +499,6 @@ async def _next_step(db, doc: dict, user_id: str) -> dict | None:
     if (application or {}).get("status") == "accepted" and right.get("status") == "offered":
         return {"label": "Startrecht zusagen", "url": "/teams"}
     return None
-
-
-def fresh(doc: dict, season: dict | None = None, now: datetime | None = None) -> bool:
-    """Noch frisch genug, um beim nächsten Besuch zu erscheinen - so viele Tage, wie die Season einstellt (Vorgabe 45)."""
-    stamp = doc.get("confirmed_at") or doc.get("created_at")
-    try:
-        when = datetime.fromisoformat(str(stamp))
-    except (TypeError, ValueError):
-        return False
-    return when >= (now or now_utc()) - timedelta(days=moment_days(season))
 
 
 async def _readable(db, season: dict | None, closed: dict[str, bool]) -> bool:

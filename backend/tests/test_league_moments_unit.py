@@ -7,6 +7,7 @@ from datetime import timedelta
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from models import now_utc  # noqa: E402
+from services import league_moment_rules as rules  # noqa: E402
 from services import league_moments as moments  # noqa: E402
 
 TITLE = "Probe-Liga · Season 1"
@@ -78,7 +79,7 @@ def test_push_texts_first_and_corrected():
 def test_fresh_only_for_a_while_after_the_confirmed_final():
     now = now_utc()
     assert moments.fresh({"confirmed_at": (now - timedelta(days=1)).isoformat()}, None, now)
-    assert not moments.fresh({"confirmed_at": (now - timedelta(days=moments.DEFAULT_DAYS + 1)).isoformat()}, None, now)
+    assert not moments.fresh({"confirmed_at": (now - timedelta(days=rules.DEFAULT_DAYS + 1)).isoformat()}, None, now)
     assert not moments.fresh({"confirmed_at": "kaputt"}, None, now)
     assert not moments.fresh({}, None, now)
     # Je Season einstellbar (Fabian 26.11., D).
@@ -88,15 +89,15 @@ def test_fresh_only_for_a_while_after_the_confirmed_final():
 
 
 def test_days_are_checked_and_default_to_45():
-    assert moments.clean_days("30") == 30
+    assert rules.clean_days("30") == 30
     for wrong in (0, 366, "viel", None):
         try:
-            moments.clean_days(wrong)
+            rules.clean_days(wrong)
         except ValueError as problem:
             assert "Tage" in str(problem) or "Zahl" in str(problem)
         else:
             raise AssertionError(wrong)
-    assert moments.moment_days({}) == 45 and moments.moment_days({"moment_days": 400}) == 45 and moments.moment_days({"moment_days": 9}) == 9
+    assert rules.moment_days({}) == 45 and rules.moment_days({"moment_days": 400}) == 45 and rules.moment_days({"moment_days": 9}) == 9
 
 
 def test_only_seasons_members_see_count():

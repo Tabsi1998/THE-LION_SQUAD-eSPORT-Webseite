@@ -167,13 +167,13 @@ async def admin_view(db, season: dict, *, can_edit: bool) -> dict:
             # Nr. 167: Teams ohne gemeldete Aufstellung - deren Spieler-Belohnung ging an den Kader zum Abschluss.
             "roster_fallback": sorted(count["fallback"])})
     basis = basis_of(season)
-    from services import league_moments
+    from services import league_moment_rules
 
     return {
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status")},
         "can_edit": can_edit, "reward_players": basis, "player_basis": PLAYER_BASIS, "kinds": KINDS,
         # Saisonende-Moment (#1639): so viele Tage nach dem Endstand erscheint er beim nächsten Besuch (Fabian 26.11., D).
-        "moment_days": league_moments.moment_days(season), "moment_days_default": league_moments.DEFAULT_DAYS,
+        "moment_days": league_moment_rules.moment_days(season), "moment_days_default": league_moment_rules.DEFAULT_DAYS,
         "items": [public_item(item, basis) for item in season.get("rewards") or []],
         "divisions": [{
             "id": division["id"], "level": division.get("level"), "label": division_label(division),
@@ -195,10 +195,10 @@ async def save(db, season: dict, body: dict, actor: dict) -> dict:
     if "reward_players" in body:
         season_update["reward_players"] = clean_basis(body.get("reward_players"))
     if body.get("moment_days") is not None:
-        from services import league_moments
+        from services import league_moment_rules
 
         try:
-            season_update[league_moments.DAYS_FIELD] = league_moments.clean_days(body["moment_days"])
+            season_update[league_moment_rules.DAYS_FIELD] = league_moment_rules.clean_days(body["moment_days"])
         except ValueError as problem:
             raise RewardProblem(str(problem), 422) from None
     if "items" in body:
@@ -625,12 +625,12 @@ async def unseen_for(db, user_id: str) -> list[dict]:
     """Was die Person noch nicht gefeiert hat (Zeremonie, Nr. 165) - nur geltende Einträge."""
     from services.awards import award_view
 
-    from services import league_moments
+    from services import league_moment_rules
 
     docs = await db.tournament_awards.find({"audience_ids": user_id, "reward_key": {"$type": "string"}, "suspended": {"$ne": True},
                                             "seen_by": {"$ne": user_id}}, {"_id": 0}).sort("updated_at", -1).to_list(20)
     # Saisonende-Moment (#1639, Fabian 26.11., A): Die Belohnungen des Meisters kommen als zweite Karte mit seinem Moment.
-    held = await league_moments.held_reward_ids(db, user_id, docs)
+    held = await league_moment_rules.held_reward_ids(db, user_id, docs)
     return [award_view(doc) for doc in docs if doc["id"] not in held]
 
 
