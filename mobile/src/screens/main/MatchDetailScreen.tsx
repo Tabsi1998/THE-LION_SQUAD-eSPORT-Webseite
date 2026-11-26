@@ -54,6 +54,7 @@ import { IncidentPanel, MapStateNotes, type IncidentLeague } from "../../compone
 import { AppealForm, ProcedureCard, ProcedureGuidedForm } from "../../components/league/ProcedurePanel";
 import type { Procedure, ProcedureGuide, ProcedurePayload } from "../../lib/leagueProcedures";
 import { sidesInSlotOrder } from "../../lib/leagueGames";
+import { teamLeadsWord } from "../../lib/leagueTeam";
 import { flowBadge, type CheckinBlock, type FlowTone } from "../../lib/leagueCheckin";
 import { keepNewerVeto, mergeLiveVeto, vetoClockOffset, type VetoBlock } from "../../lib/leagueVeto";
 import { useVetoPolling } from "../../lib/useVetoPolling";
@@ -699,7 +700,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           ) : page?.schedule_mode === "fixed_by_staff" ? (
             <Muted>Termin und Station werden durch die Turnierleitung festgelegt.</Muted>
           ) : (
-            <Muted>Termine können Teilnehmer, Team-Captains oder Turnierleitung vorschlagen.</Muted>
+            <Muted>Termine können Teilnehmer, {teamLeadsWord(Boolean(league))} oder Turnierleitung vorschlagen.</Muted>
           )}
           {pendingProposals.length ? (
             <View style={styles.stack}>
@@ -758,7 +759,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <StickerPicker visible={stickersOpen} onClose={() => setStickersOpen(false)} onPick={(sticker) => { void sendSticker(sticker); }} />
             </View>
           ) : (
-            <Muted>Schreiben können Teilnehmer, Team-Captains oder Turnierleitung.</Muted>
+            <Muted>Schreiben können Teilnehmer, {teamLeadsWord(Boolean(league))} oder Turnierleitung.</Muted>
           )}
         </Card>
       </ScrollView>
@@ -842,7 +843,7 @@ function FlowNotice({ page, canUseChat }: { page: MatchPage; canUseChat: boolean
   const scheduleText = scheduleMode === "fixed_by_staff"
     ? "Termin und Station werden durch die Turnierleitung festgelegt."
     : scheduleMode === "player_proposal"
-      ? "Terminvorschläge sind für Teilnehmer oder Team-Captains vorgesehen."
+      ? `Terminvorschläge sind für Teilnehmer oder ${teamLeadsWord(Boolean(page.league))} vorgesehen.`
       : scheduleMode === "hybrid"
         ? "Termine können vorgeschlagen oder durch Staff festgelegt werden."
         : "";

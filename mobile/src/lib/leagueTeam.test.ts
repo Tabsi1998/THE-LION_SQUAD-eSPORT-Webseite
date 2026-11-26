@@ -1,7 +1,7 @@
 import {
   applicationTone, applicationsForSquads, carryLine, finalNote, historyMovement, historyPlace, historyWhere, knownZone, lateEntryText, staffelApiPath, teamStateLabel, afterStartLine, seasonApiPath, windowLine,
   winnerLabel, zoneLegend,
-  ZONE_LABELS,
+  ZONE_LABELS, teamLeadsWord,
 } from "./leagueTeam";
 
 // Liga an Team, Profil und Tabelle (#2173): dieselben Fälle wie im Web (lib/leagueApplications.test.js, lib/leagueZones.test.js,
@@ -97,4 +97,10 @@ test("Anmeldefenster der Season mit wirksamem Ende (#2422): offen, bald, vorbei,
   expect(afterStartLine({ ...open, state: "closed" })).toBe("");
   expect(afterStartLine({ state: "open", closes_at: open.closes_at })).toBe("");
   expect(windowLine(null)).toBe("");
+});
+
+// Glossar (#2542): Wer für ein Team spricht, heißt in der Liga „Captain“, sonst „Teamleitung“ - nie „Team-Captain“.
+test("teamLeadsWord: Captains in der Liga, sonst Teamleitungen", () => {
+  expect(teamLeadsWord(true)).toBe("Captains");
+  expect(teamLeadsWord(false)).toBe("Teamleitungen");
 });
