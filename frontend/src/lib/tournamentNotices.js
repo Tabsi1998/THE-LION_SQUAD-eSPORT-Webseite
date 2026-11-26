@@ -2,6 +2,7 @@
 // auf Turnier- und Event-Seite und den TV. Die Regeln (Empfänger, Rechte, Doppelversand) stehen im Server
 // (backend/services/tournament_notices.py); hier nur, was die Oberfläche rechnet.
 import { fromViennaInput, viennaInputValue, viennaTime } from "@/lib/vienna";
+import { formatDuration } from "@/lib/datetime";
 
 export const NOTICE_MAX = 140;
 export const NOTICE_DURATION_DEFAULT = 120;
@@ -72,12 +73,10 @@ export function nextExpiry(items, now = Date.now()) {
 
 /** „noch 1 Std. 45 Min.“, „noch 12 Min.“, „läuft gleich ab“. */
 export function remainingText(expiresAt, now = Date.now()) {
-  const minutes = Math.ceil((Date.parse(expiresAt || "") - now) / MINUTE);
-  if (!Number.isFinite(minutes) || minutes <= 1) return "läuft gleich ab";
-  if (minutes < 60) return `noch ${minutes} Min.`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `noch ${hours} Std. ${rest} Min.` : `noch ${hours} Std.`;
+  const left = Date.parse(expiresAt || "") - now;
+  if (!Number.isFinite(left) || Math.ceil(left / MINUTE) <= 1) return "läuft gleich ab";
+  // Eine Schreibweise für Dauern (#1304, lib/datetime formatDuration) - angefangene Minuten zählen mit.
+  return `noch ${formatDuration(left, { round: "up" })}`;
 }
 
 /** Wie viel der Zeit noch übrig ist (1 = gerade geschrieben, 0 = abgelaufen) - für die Leiste unter dem Banner. */

@@ -1,6 +1,7 @@
 // Verfahren der Liga (E.2, #1619): Beanstandung, Protest, Einspruch. Der Server sagt, wer was sieht und darf
 // (services/league_procedures, Block `league.procedures` der Matchseite) - hier stehen nur Wörter, die Restzeit einer Frist
 // und die Anfrage aus dem geführten Formular. Jede Angabe steht an einer Stelle (#2023).
+import { formatDuration } from "@/lib/datetime";
 
 export const PROCEDURE_STATE_LABELS = { open: "Läuft", withdrawn: "Zurückgezogen", decided: "Entschieden" };
 
@@ -24,12 +25,8 @@ export function remainingText(until, now = Date.now()) {
   const left = new Date(until).getTime() - now;
   if (Number.isNaN(left)) return null;
   if (left <= 0) return "abgelaufen";
-  const minutes = Math.floor(left / 60000);
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  if (days > 0) return `noch ${days} ${days === 1 ? "Tag" : "Tage"}${hours ? ` ${hours} Std.` : ""}`;
-  if (hours > 0) return `noch ${hours} Std.${minutes % 60 ? ` ${minutes % 60} Min.` : ""}`;
-  return `noch ${Math.max(1, minutes)} Min.`;
+  // Eine Schreibweise für Dauern (#1304, lib/datetime formatDuration); unter einer Minute „noch 1 Min.“.
+  return left < 60000 ? "noch 1 Min." : `noch ${formatDuration(left)}`;
 }
 
 /** Wie dringend eine Frist ist - für die Farbe des Countdowns. */
