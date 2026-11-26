@@ -45,6 +45,8 @@ logger = logging.getLogger("tls.mail_digest")
 CLAIM_SECONDS = 600
 # Verschickte und herausgefallene Zeilen und abgeschlossene Läufe bleiben so lange (Nachfragen), dann räumt ``send_due`` auf.
 KEEP_DAYS = 90
+# So viele Zeilen stehen einzeln in der Mail; der Rest als „… und N weitere“ (Prüfung 26.11.: nie Zeilen liegen lassen).
+SHOWN_MAX = 200
 # Was der Versand vom Konto braucht - nie die privaten Felder (services/private_fields.py).
 USER_FIELDS = {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "is_active": 1, "is_banned": 1, "mail_digest": 1,
                "newsletter_consent": 1, "notification_preferences": 1}
@@ -112,14 +114,14 @@ def _account_ok(user: dict | None) -> bool:
     return bool(user and user.get("email") and user.get("is_active", True) and not user.get("is_banned"))
 
 
-async def render_digest(items: list[dict], display_name: str, base: str) -> tuple[str, str]:
+async def render_digest(items: list[dict], display_name: str, base: str, instant_url: str = "") -> tuple[str, str]:
     from email_service import render_named
 
     from services.email_delivery import SafeHtml, html_value
     from services.notification_preferences import TOPIC_LABELS
 
     groups: dict[str, list[dict]] = {}
-    for item in items:
+    for item in items[:SHOWN_MAX]:
         groups.setdefault(TOPIC_LABELS.get(item.get("category") or "") or "Weitere Neuigkeiten", []).append(item)
     parts: list[str] = []
     for label in sorted(groups, key=lambda name: (-len(groups[name]), name)):
@@ -133,9 +135,12 @@ async def render_digest(items: list[dict], display_name: str, base: str) -> tupl
         parts.append(f'<p style="margin:18px 0 6px;font-size:13px;font-weight:700;color:#111827;text-transform:uppercase;'
                      f'letter-spacing:.06em">{html_value(label)}</p><ul style="margin:0;padding-left:18px">{"".join(rows)}</ul>')
     count = len(items)
+    if count > SHOWN_MAX:
+        parts.append(f'<p style="margin:14px 0 0;color:#5b6573">… und {count - SHOWN_MAX} weitere – alles Weitere siehst du auf der '
+                     f'Website in der Glocke und auf deinen Turnierseiten.</p>')
     rendered = await render_named(
         DIGEST_TEMPLATE, display_name=display_name, count=str(count), items=SafeHtml("".join(parts)),
-        preferences_url=f"{base}{SETTINGS_PATH}",
+        preferences_url=f"{base}{SETTINGS_PATH}", instant_url=instant_url,
     )
     return rendered or ("", "")
 
@@ -149,7 +154,8 @@ async def _finish(db, run: dict, user: dict, now: datetime, cutoff: str) -> tupl
         {"user_id": user["id"], "digest_id": {"$exists": False}, "created_at": {"$lt": cutoff}},
         {"$set": {"digest_id": run["id"]}},
     )
-    items = await db.mail_digest_items.find({"digest_id": run["id"]}, {"_id": 0}).sort([("created_at", 1), ("id", 1)]).to_list(500)
+    # Alle gebundenen Zeilen - sonst blieben über einer Grenze gebundene, nie gelesene Zeilen für immer liegen.
+    items = await db.mail_digest_items.find({"digest_id": run["id"]}, {"_id": 0}).sort([("created_at", 1), ("id", 1)]).to_list(None)
     shown: list[dict] = []
     dropped: list[str] = []
     member: bool | None = None
@@ -157,16 +163,30 @@ async def _finish(db, run: dict, user: dict, now: datetime, cutoff: str) -> tupl
         ok, member = await _visible(db, user, item, member) if _account_ok(user) else (False, member)
         (shown.append(item) if ok else dropped.append(item["id"]))
     stamp = now.isoformat()
+    if not await _still_mine(db, run):
+        return 0, 0  # ein späterer Lauf hat übernommen und schließt ab - nichts doppelt einreihen oder zählen
     if shown:
-        subject, html = await render_digest(shown, user.get("display_name") or user.get("username") or "Löwe", await _site_base_url())
+        from services.mail_digest_link import links_for
+
+        base = await _site_base_url()
+        subject, html = await render_digest(shown, user.get("display_name") or user.get("username") or "Löwe", base,
+                                            links_for(base, user["id"])["page"])
         await enqueue_mail(to=user["email"], subject=subject, html=html, template_key=DIGEST_TEMPLATE,
                            dedupe_key=f"mail_digest:{run['id']}",
                            meta={"kind": "notification_digest", "user_id": user["id"], "period": run["period"], "count": len(shown)})
         await db.mail_digest_items.update_many({"id": {"$in": [item["id"] for item in shown]}}, {"$set": {"sent_at": stamp}})
     if dropped:
         await db.mail_digest_items.update_many({"id": {"$in": dropped}}, {"$set": {"dropped": stamp}})
-    await db.mail_digest_runs.update_one({"id": run["id"]}, {"$set": {"status": "sent", "sent_at": stamp, "count": len(shown)}})
+    done = await db.mail_digest_runs.update_one({"id": run["id"], "status": "claimed", "claimed_at": run.get("claimed_at")},
+                                                {"$set": {"status": "sent", "sent_at": stamp, "count": len(shown)}})
+    if not int(getattr(done, "modified_count", 0) or 0):
+        return 0, 0
     return len(shown), len(dropped)
+
+
+async def _still_mine(db, run: dict) -> bool:
+    """Gilt der Anspruch dieses Laufs noch? Ein langsamer Lauf, den ein anderer übernommen hat, hört auf."""
+    return bool(await db.mail_digest_runs.find_one({"id": run["id"], "status": "claimed", "claimed_at": run.get("claimed_at")}, {"_id": 1}))
 
 
 async def send_due(db, now: datetime | None = None) -> dict[str, int]:
@@ -233,5 +253,7 @@ async def preview(db, display_name: str) -> dict:
         {"category": "community_messages", "subject": "Neue Nachricht von Max", "preview": "Bist du am Samstag dabei?",
          "url": f"{base}/messages"},
     ]
-    subject, html = await render_digest(samples, display_name or "Paula", base)
+    # Der Link führt ins Leere - ein echter würde die ansehende Person umstellen.
+    from services.mail_digest_link import PAGE_PATH
+    subject, html = await render_digest(samples, display_name or "Paula", base, f"{base}{PAGE_PATH}?token=vorschau")
     return {"subject": subject, "html": html, "settings": await load_settings(db)}

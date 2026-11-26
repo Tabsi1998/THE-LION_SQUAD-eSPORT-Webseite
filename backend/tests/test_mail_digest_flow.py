@@ -317,3 +317,102 @@ async def test_a_second_claim_never_wins_whatever_the_ids(flow, monkeypatch):
     second = await mail_digest.claim_run(flow.db, "u1", "daily:2026-11-26", moment)
     assert first["id"] == "zzz-first" and second is None
     assert [row["id"] for row in await flow.db.mail_digest_runs.find({}, {"_id": 0}).to_list(5)] == ["zzz-first"]
+
+
+# ---------------------------------------------------------------- Nachbesserung (Prüfung 26.11., Fabians Entscheidungen)
+
+@pytest.mark.asyncio
+async def test_more_than_500_rows_all_go_out_and_none_hang(flow, monkeypatch):
+    _clock(monkeypatch, "2026-11-25T15:00:00")
+    paula = await _person(flow, "daily")
+    await flow.db.mail_digest_items.insert_many([
+        {"id": f"i{number:04d}", "user_id": paula["id"], "template_key": "registration_approved", "category": "tournament_updates",
+         "subject": f"Meldung {number}", "preview": "", "url": URL, "created_at": f"2026-11-25T15:{number % 60:02d}:00+00:00"}
+        for number in range(520)])
+    done = await mail_digest.send_due(flow.db, _utc("2026-11-26T06:00:00"))
+    assert (done["digests"], done["items"]) == (1, 520)
+    assert await flow.db.mail_digest_items.count_documents({"sent_at": {"$exists": False}}) == 0
+    job = (await _jobs(flow))[0]
+    assert job["subject"] == "Deine Sammel-Mail: 520 Neuigkeiten"
+    assert f"und {520 - mail_digest.SHOWN_MAX} weitere" in job["html"]
+
+
+@pytest.mark.asyncio
+async def test_cancellations_and_new_dates_never_wait(flow, monkeypatch):
+    """Fabian 26.11. (A): Absagen und Terminänderungen sind dringend - sofort, nie gesammelt."""
+    _clock(monkeypatch, "2026-11-26T10:00:00")
+    paula = await _person(flow, "weekly")
+    await send_user_template(paula, "tournament_cancelled", display_name="Paula", tournament_title="Winter Cup", url=URL,
+                             dedupe_key=f"cancel:{paula['id']}")
+    await send_user_template(paula, "event_cancelled", display_name="Paula", event_name="Herbst-LAN", url=URL,
+                             dedupe_key=f"ev-cancel:{paula['id']}")
+    from services import event_changes
+    event = {"id": "ev-1", "name": "Herbst-LAN", "slug": "herbst-lan"}
+    await event_changes._inform(flow.db, event, [paula], title="Termin oder Ort geändert", message="Neuer Termin: Samstag",
+                                dedupe="ev-change:ev-1:1")
+    assert sorted(job["template_key"] for job in await _jobs(flow)) == ["event_cancelled", "event_message", "tournament_cancelled"]
+    assert await flow.db.mail_digest_items.count_documents({}) == 0
+    note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "event_message"}, {"_id": 0})
+    assert note["importance"] == "urgent"
+
+
+@pytest.mark.asyncio
+async def test_a_broken_template_call_still_reports_not_ok(flow, monkeypatch):
+    _clock(monkeypatch, "2026-11-26T10:00:00")
+    paula = await _person(flow, "daily")
+    result = await send_user_template(paula, "registration_approved", tournament_title="Cup", url=URL, gibt_es_nicht="x")
+    assert result["ok"] is False and "template args" in result["reason"]
+    assert await flow.db.mail_digest_items.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_slow_run_that_was_taken_over_counts_nothing_and_sends_nothing(flow, monkeypatch):
+    _clock(monkeypatch, "2026-11-25T15:00:00")
+    paula = await _person(flow, "daily")
+    await _approved(paula, 1)
+    moment = _utc("2026-11-26T06:00:00")
+    slow = await mail_digest.claim_run(flow.db, paula["id"], "daily:2026-11-26", moment, moment.isoformat())
+    later = moment + timedelta(seconds=mail_digest.CLAIM_SECONDS + 60)
+    assert (await mail_digest.send_due(flow.db, later))["digests"] == 1
+    user = await flow.db.users.find_one({"id": paula["id"]}, mail_digest.USER_FIELDS)
+    assert await mail_digest._finish(flow.db, slow, user, moment, moment.isoformat()) == (0, 0)
+    assert len(await _jobs(flow)) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_mail_carries_a_signed_one_click_link_back_to_single_mails(flow, monkeypatch):
+    """Fabian 26.11. (D): „Zurück auf Einzelmails“ mit einem Klick, ohne Login, signiert - wirkt nur auf mail_digest=instant."""
+    from services import mail_digest_link
+
+    _clock(monkeypatch, "2026-11-25T15:00:00")
+    paula = await _person(flow, "weekly", newsletter_consent=True)
+    await _approved(paula, 1)
+    await mail_digest.send_due(flow.db, _utc("2026-11-30T06:00:00"))
+    token = mail_digest_link.token_for(paula["id"])
+    html = (await _jobs(flow))[0]["html"]
+    assert f"{mail_digest_link.PAGE_PATH}?token={token}" in html
+    # Fremdes Konto, kaputter Schlüssel: nichts.
+    other = await _person(flow, "weekly")
+    forged = f"{other['id']}.{token.rsplit('.', 1)[1]}"
+    assert (await flow.client.post(f"{mail_digest_link.API_PATH}?token={forged}")).status_code == 400
+    assert (await flow.client.post(f"{mail_digest_link.API_PATH}?token=kaputt")).status_code == 400
+    assert mail_digest_link.token_for(paula["id"]) != mail_digest_link.token_for(other["id"])
+    # Ein Klick: nur der Rhythmus, sonst nichts; der zweite Klick sagt „schon“.
+    done = await flow.client.post(f"{mail_digest_link.API_PATH}?token={token}")
+    assert done.status_code == 200 and done.json() == {"ok": True, "rhythm": "instant"}
+    stored = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0, "mail_digest": 1, "newsletter_consent": 1})
+    assert stored == {"mail_digest": "instant", "newsletter_consent": True}
+    again = await flow.client.post(f"{mail_digest_link.API_PATH}?token={token}")
+    assert again.json() == {"ok": True, "rhythm": "instant", "already": True}
+    assert (await flow.db.users.find_one({"id": other["id"]}, {"_id": 0, "mail_digest": 1}))["mail_digest"] == "weekly"
+
+
+@pytest.mark.asyncio
+async def test_back_to_the_club_default(flow):
+    """„Vorgabe des Vereins“ wählbar: mail_digest null nimmt die eigene Wahl zurück (Fabian 26.11., D)."""
+    paula = await _person(flow, "weekly")
+    flow.act_as(paula)
+    res = await flow.patch("/api/users/me", json={"mail_digest": None})
+    assert res.status_code == 200, res.text
+    payload = (await flow.get("/api/users/me/notification-preferences")).json()["mail_digest"]
+    assert payload["own"] is None and payload["rhythm"] == "instant"

@@ -99,6 +99,7 @@ SAMPLES: dict[str, str] = {
     "week": "29.09. – 05.10.2026", "xp_week": "240", "level": "12", "level_title": "Rudel", "unlocked": "Champion III (Gold)\nFrühaufsteher I (Bronze)",
     # Sammel-Mail (#1662)
     "count": "3",
+    "instant_url": "{origin}/sammel-mail/einzeln?token=beispiel",
     "items": "Anmeldung bestätigt: Mario Kart Winter Cup – Check-in ab 17:30 Uhr.",
     "next_up": "Turnierspieler II – noch 2", "bonus_hint": "Vereinsmitglieder bekommen 10 % mehr XP auf alles.",
 }

@@ -1368,6 +1368,21 @@ async def preview_notification_digest(me: dict = Depends(require_club_admin())):
     return await mail_digest.preview(get_db(), me.get("display_name") or me.get("username") or "")
 
 
+@settings_router.post("/notification-digest/instant")
+async def notification_digest_instant(request: Request, token: str = Query("", max_length=200)):
+    """Zurück auf Einzelmails mit einem Klick aus der Sammel-Mail (#1662) - ohne Login, nur mit dem signierten Schlüssel;
+    ändert nur den Rhythmus. Gezählt werden wie bei der Newsletter-Abmeldung nur ungültige Versuche je Adresse."""
+    from services.mail_digest_link import switch_to_instant
+    from services.rate_limit import enforce_rate_limit
+
+    result = await switch_to_instant(get_db(), token)
+    if result is None:
+        await enforce_rate_limit(request, "mail_digest:instant:ip", limit=30, window_seconds=3600,
+                                 message="Zu viele ungültige Links. Bitte warte noch {wait}.")
+        raise HTTPException(400, "Der Link ist ungültig. Den Rhythmus stellst du auch im Profil unter Benachrichtigungen → E-Mail um.")
+    return result
+
+
 @settings_router.post("/email/test")
 async def send_test(body: TestEmailBody, me: dict = Depends(require_club_admin())):
     res = await send_template("test", body.to, branding="THE LION SQUAD", queue=False)
