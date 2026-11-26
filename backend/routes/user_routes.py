@@ -1079,6 +1079,9 @@ async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     if not user:
         raise HTTPException(404, "Nutzer nicht gefunden.")
     payload = public_preferences_payload(user)
+    # Sammel-Mail (#1662): der eigene Rhythmus, die Vorgabe der Verwaltung und wann sie kommt.
+    from services import mail_digest
+    payload["mail_digest"] = mail_digest.settings_payload(user, await mail_digest.load_settings(db))
     # Discord als Kanal (#567): nur mit verknüpftem Konto; nach einer abgelehnten Direktnachricht steht der Klickweg.
     from services.discord_dm import dm_state
     payload["discord"] = await dm_state(db, user)

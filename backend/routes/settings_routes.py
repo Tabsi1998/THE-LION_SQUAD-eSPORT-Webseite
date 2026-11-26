@@ -1319,6 +1319,55 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
     return {"ok": True, "changed": True}
 
 
+class NotificationDigestSettings(BaseModel):
+    """Vorgaben der Sammel-Mail (#1662): Rhythmus für alle ohne eigene Wahl, Uhrzeit täglich, Wochentag und Uhrzeit
+    wöchentlich - Wiener Zeit. Ein Teil-PUT ändert nur, was er schickt."""
+    model_config = ConfigDict(extra="forbid")
+
+    default_rhythm: Optional[Literal["instant", "daily", "weekly"]] = None
+    daily_time: Optional[str] = Field(default=None, max_length=5)
+    weekly_weekday: Optional[int] = Field(default=None, ge=0, le=6)
+    weekly_time: Optional[str] = Field(default=None, max_length=5)
+
+
+@settings_router.get("/notification-digest")
+async def get_notification_digest_settings(me: dict = Depends(require_club_admin())):
+    from services import mail_digest
+
+    db = get_db()
+    cfg = await mail_digest.load_settings(db)
+    return {"settings": cfg, "defaults": dict(mail_digest.DEFAULTS),
+            "schedules": {rhythm: mail_digest.schedule_text(rhythm, cfg) for rhythm in mail_digest.RHYTHMS}}
+
+
+@settings_router.put("/notification-digest")
+async def update_notification_digest_settings(body: NotificationDigestSettings, me: dict = Depends(require_club_admin())):
+    from services import mail_digest
+    from services.quiet_hours_rules import parse_time
+
+    db = get_db()
+    updates = body.model_dump(exclude_unset=True, exclude_none=True)
+    for field in ("daily_time", "weekly_time"):
+        if field in updates and parse_time(updates[field]) is None:
+            raise HTTPException(status_code=422, detail="Bitte eine Uhrzeit wie 07:00 angeben.")
+    current = await db.settings.find_one({"id": mail_digest.SETTINGS_ID}, {"_id": 0}) or {}
+    changed = _changed_setting_fields(current, updates, {})
+    if changed:
+        await db.settings.update_one({"id": mail_digest.SETTINGS_ID},
+                                     {"$set": {**updates, "updated_at": now_utc().isoformat()}, "$setOnInsert": {"id": mail_digest.SETTINGS_ID}},
+                                     upsert=True)
+        await _audit_settings_change(db, "settings.notification_digest.update", mail_digest.SETTINGS_ID, me["id"], changed)
+    return await get_notification_digest_settings(me)
+
+
+@settings_router.get("/notification-digest/preview")
+async def preview_notification_digest(me: dict = Depends(require_club_admin())):
+    """Die Sammel-Mail mit Beispielzeilen und dem Namen der ansehenden Person - es wird nichts verschickt."""
+    from services import mail_digest
+
+    return await mail_digest.preview(get_db(), me.get("display_name") or me.get("username") or "")
+
+
 @settings_router.post("/email/test")
 async def send_test(body: TestEmailBody, me: dict = Depends(require_club_admin())):
     res = await send_template("test", body.to, branding="THE LION SQUAD", queue=False)

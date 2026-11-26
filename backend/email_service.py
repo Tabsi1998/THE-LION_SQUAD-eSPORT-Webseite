@@ -630,6 +630,22 @@ def tpl_team_chat_mention(display_name: str, team_name: str, sender_name: str, p
     )
 
 
+@mail_template
+def tpl_notification_digest(display_name: str, count: str, items: str, preferences_url: str = "") -> tuple[str, str]:
+    """Sammel-Mail (#1662): die gesammelten Mails einer Person, nach Themen - ``items`` baut services/mail_digest.py."""
+    what = "1 Neuigkeit" if str(count) == "1" else f"{count} Neuigkeiten"
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>seit deiner letzten Sammel-Mail ist das passiert:</p>"
+        f"{items}"
+        '<p style="margin-top:22px;font-size:12px;color:#6b7280">'
+        "Du bekommst diese Mails gesammelt, weil du es so eingestellt hast. Dringendes (etwa „Dein Spiel startet in 10 Minuten“) "
+        "kommt weiter sofort. "
+        f'<a href="{preferences_url}">Rhythmus ändern oder wieder Einzelmails bekommen</a>.</p>'
+    )
+    return f"Deine Sammel-Mail: {what}", _wrap("Deine Sammel-Mail", body, "Einstellungen öffnen", preferences_url or None)
+
+
 def _wrap(title: str, body_html: str, cta_label: Optional[str] = None, cta_url: Optional[str] = None) -> str:
     """Neutral transactional email layout tuned for inbox placement."""
     cta = ""
@@ -737,6 +753,7 @@ async def render_named(template_key: str, **kwargs) -> Optional[tuple[str, str]]
         "invoice_ready": tpl_invoice_ready,
         "direct_message": tpl_direct_message,
         "team_chat_mention": tpl_team_chat_mention,
+        "notification_digest": tpl_notification_digest,
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
         "event_message": tpl_event_message,

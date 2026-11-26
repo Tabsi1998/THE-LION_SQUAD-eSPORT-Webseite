@@ -856,6 +856,18 @@ async def _safe_quiet_digest():
         _log_task_failure("quiet_digest", exc)
 
 
+async def _safe_mail_digest():
+    """Sammel-Mail (#1662): fällige Sammel-Mails einreihen - je Person und Zeitraum genau eine."""
+    try:
+        from database import get_db
+        from services.mail_digest import send_due
+        done = await send_due(get_db())
+        if done.get("digests"):
+            logger.info(f"[scheduler] mail_digest digests={done['digests']} items={done['items']}")
+    except Exception as exc:
+        _log_task_failure("mail_digest", exc)
+
+
 async def _safe_media_scan():
     try:
         from services.media_scan import process_pending
@@ -1354,6 +1366,9 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     # Ruhezeit (#1206): Sammelmeldung nach dem Ende - alle 5 Minuten nachsehen.
     sched.add_job(_single_replica("quiet_digest", _safe_quiet_digest, lease_seconds=240.0), IntervalTrigger(minutes=5), id="quiet_digest",
+                  max_instances=1, coalesce=True)
+    # Sammel-Mail (#1662): alle 10 Minuten nachsehen, wessen Termin begonnen hat.
+    sched.add_job(_single_replica("mail_digest", _safe_mail_digest, lease_seconds=540.0), IntervalTrigger(minutes=10), id="mail_digest",
                   max_instances=1, coalesce=True)
     # Ergebnisse mit „Rückgängig“ (#1156): nach 10 Sekunden veröffentlichen, auch nach einem Neustart.
     sched.add_job(_single_replica("result_holds", _safe_result_holds, lease_seconds=60.0), IntervalTrigger(seconds=5), id="result_holds",

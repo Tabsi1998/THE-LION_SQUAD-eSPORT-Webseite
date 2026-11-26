@@ -520,13 +520,24 @@ def notification_level(user: dict | None, prefs: dict[str, bool] | None = None) 
     return CUSTOM_LEVEL
 
 
-async def send_user_template(user: dict | None, template_key: str, category: str | None = None, **kwargs) -> dict:
-    """Send a named template to a user if their preferences allow it."""
+async def send_user_template(user: dict | None, template_key: str, category: str | None = None, *,
+                             importance: str | None = None, **kwargs) -> dict:
+    """Send a named template to a user if their preferences allow it.
+
+    Sammel-Mail (#1662): Wer „täglich“ oder „wöchentlich“ eingestellt hat, bekommt optionale Mails gesammelt
+    (services/mail_digest.py) - Pflicht und Dringendes (``importance="urgent"`` oder eine dringende Vorlage) nie. Ein
+    gesammelte Mail meldet ``{"ok": True, "digest": True}``."""
     if not user or not user.get("email"):
         return {"ok": False, "skipped": True, "reason": "missing_email"}
     category = category or TEMPLATE_CATEGORY.get(template_key)
     if not email_allowed(user, template_key, category):
         return {"ok": True, "skipped": True, "reason": "preference_disabled", "category": category}
+    from services import mail_digest
+
+    if user.get("id") and mail_digest.collectable(template_key, importance):
+        held = await mail_digest.hold(user, template_key, category, kwargs)
+        if held:
+            return held
     from email_service import send_template
     return await send_template(template_key, user["email"], **kwargs)
 
