@@ -128,6 +128,7 @@ export const ADMIN_GROUPS = [
     label: "E-Mail",
     items: [
       { to: "/admin/settings/newsletter", label: "Newsletter", icon: Mail, areas: ["system"] },
+      { to: "/admin/settings/sammel-mail", label: "Sammel-Mail", icon: Mail, areas: ["system"] },
       { to: "/admin/settings/mail-queue", label: "Mail-Queue", icon: Inbox, areas: ["system"] },
       { to: "/admin/email-templates", label: "E-Mail-Vorlagen", icon: FileText, areas: ["system"] },
     ],
@@ -211,6 +212,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/settings/resend": ["resend", "absender", "api key", "mail", "e-mail", "versand"],
   "/admin/settings/smtp": ["smtp", "mailserver", "postausgang", "port", "tls"],
   "/admin/settings/newsletter": ["newsletter", "rundmail", "empfänger", "abo"],
+  "/admin/settings/sammel-mail": ["sammel-mail", "sammelmail", "digest", "täglich", "wöchentlich", "zusammenfassung", "einzelmails"],
   "/admin/settings/mail-queue": ["mail-queue", "warteschlange", "versand", "haengt", "hängt", "failed"],
   "/admin/settings/branding": ["branding", "logo", "favicon", "farbe", "akzentfarbe", "maskottchen", "banner", "share bild", "marke", "play store", "play-store-link"],
   "/admin/settings/socials": ["socials", "instagram", "tiktok", "youtube", "facebook", "whatsapp", "discord link", "social links", "x", "twitter", "threads", "bluesky", "mastodon", "telegram", "kick", "linkedin", "steam", "kanäle", "kanaele"],
