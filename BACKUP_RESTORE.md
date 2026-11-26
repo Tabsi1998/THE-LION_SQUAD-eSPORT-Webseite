@@ -313,7 +313,7 @@ Docker-Stand am eigenen Rechner, **nie auf dem Server, nie gegen Produktion**, n
 
 1. Stand mit eigenem Projektnamen (`lsw-backup-probe`), eigenen Ports und Volumes aus `docker-compose.yml`,
    `docker-compose.abnahme.yml` und einer erzeugten Probe-Datei (Testbetrieb, Versand gesperrt, MongoDB nur auf `127.0.0.1`).
-   Geteilte Stände (`lsw-abnahme`, Port 23000) lehnt das Skript ab.
+   Als Projektname gilt nur `lsw-backup-probe` oder `lsw-backup-probe-<name>` (Erlaubnisliste), Port 23000 nie.
 2. Liga-Daten über die Seeds: `scripts/seed_abnahme_liga.py` (Liga, Teams, Map-Bilder als Uploads) und die erweiterte
    Gesamtabnahme (`liga-saisonende`, `liga-betrieb`: Endstand, Playoffs, Relegation, Startrechte, Saisonende-Momente,
    Vorfälle, Rundnachricht, Erinnerungen).
@@ -330,8 +330,18 @@ Docker-Stand am eigenen Rechner, **nie auf dem Server, nie gegen Produktion**, n
 PYTHON=<Python mit backend/requirements.txt> PROBE_RUNS=2 bash scripts/liga_backup_probe.sh
 ```
 
-Gelöscht wird nur das eigene Compose-Projekt samt Volumes und Ordner unter `<Repo>/.local-testing/` - das Skript prüft
-jeden Pfad vor dem Löschen. Protokolle und Vergleich liegen danach unter `.local-testing/backup-probe/`.
+**Schutzregeln** (je mit Gegenprobe geprüft, entschärftes `docker` und `rm`):
+
+- *Nur auf einem Entwicklungsrechner:* Läuft ein Container mit einem festen Namen aus `docker-compose.yml` (`tls-mongodb`,
+  `tls-backend`, `tls-frontend`), steht in der `.env` des Repos `APP_ENV=production` oder in der Shell `APP_ENV=production`,
+  bricht das Skript ab, bevor es etwas baut, startet oder löscht.
+- *Nur das eigene Projekt:* Vor jedem `docker compose down -v`, Backup und Restore prüft es, dass das Projekt leer ist oder nur
+  die Container `<projekt>-mongodb`, `-backend`, `-frontend` (dazu Einmal-Container `<projekt>-backend-run-…`) und die Volumes
+  `<projekt>_mongo_data`, `_uploads_data`, `_upload_spool` enthält - sonst Abbruch ohne Löschen.
+- *Nur unter `<Repo>/.local-testing/`:* Ordner löscht es nur nach Prüfung des Pfads (absolut, ohne `..`, nie `.local-testing`
+  selbst). `ABNAHME_SOURCE` aus der Shell wird verworfen, gebunden wird fest an `127.0.0.1`.
+
+Protokolle und Vergleich liegen danach unter `.local-testing/backup-probe/`.
 
 **Ergebnis 26.11.2026** (zwei vollständige Läufe, `PROBE_RUNS=2`, je rund fünf Minuten; Stand aus `main` 96fde3cce mit dieser
 Abnahme):

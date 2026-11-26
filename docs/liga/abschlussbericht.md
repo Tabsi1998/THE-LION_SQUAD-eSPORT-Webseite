@@ -180,7 +180,7 @@ Noch offen:
   Textkorrektur (wie in G.3) ändert darum auch die Anzeige älterer Fassungen; der Inhalt bleibt.
 - **Veto per kurzem Abruf:** Kein WebSocket. Viele gleichzeitige Vetos erzeugen viele kurze Anfragen; nicht unter Last geprüft.
 - **Echte Dienste:** Mail, Push und Discord laufen in der Abnahme gesperrt; der erste echte Versand passiert in Season 1 - vorher
-  eine Probe mit Testkonto (Abschnitt 9, Schritt 3).
+  eine Probe mit Testkonto (Abschnitt 9, Schritt 4).
 - **Nächtliche Abnahme:** läuft seit dem Merge von #2423 jede Nacht auf `main`. Eine rote Nacht legt ein Issue an – es muss jemand lesen.
   Rot kann auch die Abnahme selbst sein: Am 26.11. hing Szenario 15 vom gelosten Spielplan ab (#2570), am selben Tag die
   Profil-Prüfung vom alten Belohnungs-Ablauf vor #1639. Neue Szenarien greifen darum nie auf feste Plätze im Spielplan zu.
@@ -205,16 +205,26 @@ Noch offen:
 ## 9. Was ist vor Season 1 noch zu tun? Checkliste für den Server
 
 Der Reihe nach abhaken. Gebaut ist alles; hier geht es um Einspielen, Einrichten und die erste echte Probe. Den echten
-Versand an Teilnehmer macht der Betreiber in Season 1 - davor nur die Probe mit einem Testkonto (Schritt 3).
+Versand an Teilnehmer macht der Betreiber in Season 1 - davor nur die Probe mit einem Testkonto (Schritt 4).
 
-1. [ ] **Release einspielen.** Mindestens Website 1.100.0 (Saisonende-Moment #1639, Versionsanzeige #2585; Playoffs #2404 und
-   Startrechte #1627 stecken schon in 1.96.0 und 1.98.0) auf dem Server einspielen, Migrationen laufen beim Start von selbst.
+1. [ ] **Release einspielen.** **Vorher eine Sicherung ziehen** (`bash scripts/backup.sh` wie in
+   [BACKUP_RESTORE.md](../../BACKUP_RESTORE.md), vor jedem Eingriff wie in [BETRIEB.md](../BETRIEB.md#eindeutige-indizes-und-altdubletten-930-1043)
+   Schritt 1). Dann mindestens Website 1.100.0 (Saisonende-Moment #1639, Versionsanzeige #2585; Playoffs #2404 und Startrechte
+   #1627 stecken schon in 1.96.0 und 1.98.0) auf dem Server einspielen, Migrationen laufen beim Start von selbst
+   ([BETRIEB.md, Migrationen beim Start](../BETRIEB.md#migrationen-beim-start-1006)).
    Prüfen: `/api/health/ready` grün, die Fußzeile zeigt die Version (#2585), die nächste nächtliche Gesamtabnahme auf `main`
    grün - die erweiterte Abnahme dieses Pakets ist ein Test-PR und ändert am Release nichts.
-2. [ ] **Bereich „Ligen“ vergeben.** Allen Liga-Leitungen den Bereich **Ligen** geben, Zwei-Faktor bei jedem Konto prüfen,
+2. [ ] **Zeitplaner läuft.** Auf dem Server ohne `DISABLE_SCHEDULER` und ohne einschränkende `SCHEDULER_JOBS` (beides nur für
+   Abnahme-Stände). Verwaltung → Einstellungen → System (`/admin/settings/status`, auch die Karte „Scheduler“ auf der Startseite
+   der Verwaltung) zeigt je Job den nächsten Lauf - für die Liga mindestens `league_moments` (Saisonende-Moment nachholen, alle
+   5 Minuten), `league_start_rights` (Fristen, Nachrücken und Erinnerungen der Startrechte, alle 15 Minuten), `match_deadlines`
+   (Fristen und Erinnerungen der Spiele, jede Minute), dazu `league_veto` und `result_holds`. Unter Betrieb & Logs → Checks steht
+   „Scheduler“ auf Grün; bricht ein Job ab, kommt der Alarm „Hintergrundjob abgebrochen: …“
+   ([BETRIEB.md, Alarme](../BETRIEB.md#alarme-517)).
+3. [ ] **Bereich „Ligen“ vergeben.** Allen Liga-Leitungen den Bereich **Ligen** geben, Zwei-Faktor bei jedem Konto prüfen,
    Zuständige je Liga eintragen (B.1). Eine zweite Person mit Bereich Ligen ist Pflicht: Wiederöffnen, Einsprüche und
    Befangenheit brauchen sie.
-3. [ ] **Erster echter Versand als Probe - mit Testkonto, nicht mit Teilnehmern.**
+4. [ ] **Erster echter Versand als Probe - mit Testkonto, nicht mit Teilnehmern.**
    - Vorher: `OUTBOUND_DISABLED` ist auf dem Server **nicht** gesetzt, Mail-Zugang (`RESEND_API_KEY`), Push (App mit Testkonto,
      Mitteilungen erlaubt) und der Discord-Bot sind eingerichtet; das Testkonto hat Discord verknüpft und Discord-Nachrichten erlaubt.
    - Eine Probe-Liga mit einer Season auf **Nur Liga-Leitung**, ein Test-Co-Team mit dem Testkonto als Captain, einer Staffel
@@ -225,24 +235,24 @@ Versand an Teilnehmer macht der Betreiber in Season 1 - davor nur die Probe mit 
      kommt „Liga-Spiel in 24 Stunden“ einmal als Push und als Direktnachricht vom Bot?
    - Danach die Probe-Liga archivieren. Fällt etwas aus, Mail- bzw. Push-Protokoll in der Betriebssicht ansehen, nicht mit echten
      Teilnehmern weiterprobieren.
-4. [ ] **Backup-Timer prüfen.** `systemctl list-timers 'tls-*'` (Backup täglich 03:15, Restore-Drill monatlich),
+5. [ ] **Backup-Timer prüfen.** `systemctl list-timers 'tls-*'` (Backup täglich 03:15, Restore-Drill monatlich),
    `journalctl -u tls-backup.service --since yesterday` ohne Fehler, das letzte Manifest mit `consistent: true`,
    `bash scripts/restore-drill-status.sh` gibt 0. `BACKUP_REMOTE` zeigt auf ein Ziel außerhalb des Servers. Passwortdatei und
    `SETTINGS_ENCRYPTION_KEY` liegen im Passwortspeicher. Die Dienstdatei mit `TimeoutStartSec=2h` ist kopiert
    (`BACKUP_RESTORE.md`, „Was am Server zu tun ist“). Den Ablauf hat der Backup-Probelauf lokal belegt (Abschnitt 5).
-5. [ ] **Datenschutztext** für externe Teilnehmer freigeben, rechtlich prüfen lassen, in der Season eintragen (Nr. 1, 72, 141).
-6. [ ] **Spiel und Bibliothek:** MW4 als Version unter Call of Duty (Nr. 36), Modi mit Ergebnisregel und Symbol, Maps mit Bild,
+6. [ ] **Datenschutztext** für externe Teilnehmer freigeben, rechtlich prüfen lassen, in der Season eintragen (Nr. 1, 72, 141).
+7. [ ] **Spiel und Bibliothek:** MW4 als Version unter Call of Duty (Nr. 36), Modi mit Ergebnisregel und Symbol, Maps mit Bild,
    Ausrüstung.
-7. [ ] **Liga und Season anlegen:** „Tiroler Liga MW4 Allmode“ unter `tiroler-liga-mw4-allmode` (Nr. 68), Season mit den Werten aus
+8. [ ] **Liga und Season anlegen:** „Tiroler Liga MW4 Allmode“ unter `tiroler-liga-mw4-allmode` (Nr. 68), Season mit den Werten aus
    dem Regelwerk – Checkliste im [Handbuch, Abschnitt 6](../handbuch/liga.md#6-checkliste-vor-dem-season-start). **Vor dem ersten
    Abschluss festlegen**, weil es danach feststeht (Nr. 228): Playoffs (Plätze je Staffel, „Meister aus“), Relegation, Zonen,
    Startrechte (Zusage, Frist, Nachrückerregel), Dauer des Saisonende-Moments, Erinnerungen samt Discord-Schalter, Vorfälle.
-8. [ ] **Regelwerk v0.15** mit Bausteinen und Variablen übertragen, Veto-Folge nach CDL-Prüfung (Nr. 100), veröffentlichen mit
+9. [ ] **Regelwerk v0.15** mit Bausteinen und Variablen übertragen, Veto-Folge nach CDL-Prüfung (Nr. 100), veröffentlichen mit
    Zustimmungspflicht. Dabei (#2424, #2426): Anlage B nur mit `[[baustein:veto]]`, `[[baustein:lead_rulings]]` in Anlage C bzw. § 9a,
    „Ende des ersten Spieltags“ im Fließtext auf „Spielwoche“ ändern. Playoffs und Relegation als Anlage F von Hand (der Baustein
    ist Folgepaket, Nr. 216).
-9. [ ] **„Was fehlt noch?“** ohne Probleme, Ligaseite mit *Nur Liga-Leitung* ansehen, dann Sichtbarkeit und Anmeldefenster öffnen.
-10. [ ] **Anmeldungen** entscheiden, Co-Teams zuteilen, **Liga starten** je Staffel.
-11. [ ] **Ankündigung** auf Discord von Hand mit Link zur Ligaseite und zum Spickzettel.
-12. [ ] **Nach dem ersten Spielabend:** Leitstand und Protokoll der Season ansehen, die erste echte Erinnerung und Rundnachricht
+10. [ ] **„Was fehlt noch?“** ohne Probleme, Ligaseite mit *Nur Liga-Leitung* ansehen, dann Sichtbarkeit und Anmeldefenster öffnen.
+11. [ ] **Anmeldungen** entscheiden, Co-Teams zuteilen, **Liga starten** je Staffel.
+12. [ ] **Ankündigung** auf Discord von Hand mit Link zur Ligaseite und zum Spickzettel.
+13. [ ] **Nach dem ersten Spielabend:** Leitstand und Protokoll der Season ansehen, die erste echte Erinnerung und Rundnachricht
     kontrollieren; ein rotes Issue „Liga-Gesamtabnahme rot“ sofort lesen.
