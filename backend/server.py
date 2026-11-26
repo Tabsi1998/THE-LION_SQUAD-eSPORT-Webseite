@@ -55,6 +55,7 @@ from routes.league_successor_routes import admin_router as league_successor_admi
 from routes.league_start_right_routes import admin_router as league_start_right_admin_router, me_router as league_start_right_me_router
 from routes.league_postseason_routes import admin_router as league_postseason_admin_router
 from routes.league_reward_routes import admin_router as league_reward_admin_router, router as league_reward_router
+from routes.league_moment_routes import router as league_moment_router
 from routes.league_overall_routes import admin_router as league_overall_admin_router, router as league_overall_router
 from routes.league_desk_routes import admin_router as league_desk_admin_router
 from routes.league_result_rule_routes import admin_router as league_result_rule_admin_router
@@ -449,6 +450,7 @@ app.include_router(league_start_right_me_router)  # Startrechte: Captain sagt zu
 app.include_router(league_postseason_admin_router)  # Playoffs und Relegation aus dem Endstand (F.6, #2404)
 app.include_router(league_reward_admin_router)  # Belohnungen je Season und Liga N (F.4, #2214)
 app.include_router(league_reward_router)  # Zeremonie und Teilen-Bild der Belohnungen (F.4, #2214)
+app.include_router(league_moment_router)  # Saisonende-Moment für Aufstieg, Abstieg und Meister (#1639)
 app.include_router(league_overall_admin_router)  # Gesamtwertung über Seasons: Einstellungen, Abschluss, Belohnungen (F.5, #2215)
 app.include_router(league_overall_router)  # Gesamtwertung auf der Ligaseite und als PDF (F.5, #2215)
 app.include_router(league_desk_admin_router)  # Leitstand der Season: offene Aufgaben, Protokoll, Rundnachricht (E.4)

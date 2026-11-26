@@ -16,7 +16,7 @@ const { SeasonRewardsTab, rewardsPayload, rewardsToForm } = await import("./Seas
 const GOLD = { id: "gold", kind: "medal", name: "Goldmedaille", description: "", places: { mode: "rank", rank: 1 }, place_label: "1. Platz", recipients: ["team", "players"],
   image_url: null, prize: null };
 const body = (extra = {}) => ({
-  season: { id: "s1", name: "Season 1" }, can_edit: true, reward_players: "fielded", items: [GOLD],
+  season: { id: "s1", name: "Season 1" }, can_edit: true, reward_players: "fielded", items: [GOLD], moment_days: 45, moment_days_default: 45,
   divisions: [
     { id: "d1", level: 1, label: "Liga 1", own: false, items: [GOLD], staffeln: [
       { tournament_id: "t1", staffel: "A", closed: true, version: 2, awards: 5, teams: 1, players: 8, suspended: false, roster_fallback: ["Nordlicht"] },
@@ -89,6 +89,15 @@ test("ohne „Season konfigurieren“ nur lesen", async () => {
 });
 
 test("Form und Anfrage passen zusammen", () => {
-  expect(rewardsPayload(rewardsToForm(body()))).toEqual({ reward_players: "fielded", items: [{ id: "gold", kind: "medal", name: "Goldmedaille", description: "",
+  expect(rewardsPayload(rewardsToForm(body()))).toEqual({ reward_players: "fielded", moment_days: 45, items: [{ id: "gold", kind: "medal", name: "Goldmedaille", description: "",
     places: { mode: "rank", rank: 1 }, recipients: ["team", "players"], image_url: null, prize: null }], divisions: { d1: null, d2: [] } });
+});
+
+test("Saisonende-Moment (#1639): wie lange er nach dem Endstand erscheint - je Season, Vorgabe 45 Tage", async () => {
+  renderTab(body({ moment_days: 30 }));
+  const field = await screen.findByTestId("season-rewards-moment-days");
+  const input = field.querySelector("input") || field;
+  expect(input).toHaveValue(30);
+  expect(screen.getByText(/Vorgabe 45/)).toBeInTheDocument();
+  expect(rewardsToForm(body({ moment_days: undefined })).moment_days).toBe(45);
 });

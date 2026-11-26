@@ -13,11 +13,12 @@ import "./leagueBadge.css";
 
 // Die Metalle (Cyan, Gold für den Meister) stehen als --tls-lbadge-light/-base/-dark in leagueBadge.css - Gold über die Rolle
 // --tls-honor, wie REWARD_METALS (RewardArt) bzw. METALS.gold (TrophyShelf).
-const paint = (part) => `var(--tls-lbadge-${part})`;
+// Formen und Farben stehen auch dem Saisonende-Moment zur Verfügung (#1639, SeasonMoment): dasselbe Wappen, nur mit Zahlenwechsel.
+export const paint = (part) => `var(--tls-lbadge-${part})`;
 // Festes Leerzeichen vor dem Punkt, normales danach: Bricht der Text um, dann hinter dem Punkt - er steht nie am Zeilenanfang.
 const SEP = " · ";
-const SHIELD = "M10 20h44v24c0 17-10 27-22 33C20 71 10 61 10 44z";
-const FIELD = "M15.5 25.5h33v18.5c0 12.6-7.4 20.4-16.5 25.4-9.1-5-16.5-12.8-16.5-25.4z";
+export const SHIELD = "M10 20h44v24c0 17-10 27-22 33C20 71 10 61 10 44z";
+export const FIELD = "M15.5 25.5h33v18.5c0 12.6-7.4 20.4-16.5 25.4-9.1-5-16.5-12.8-16.5-25.4z";
 const RIM = "M13 23h38v21c0 15-9 24-19 29.6C22 68 13 59 13 44z";
 const CROWN = "M21 18.5L18.6 8l6.6 4.6L32 5l6.8 7.6L45.4 8 43 18.5z";
 // Wie StaggerIn: einmal beim ersten Sichtbarwerden, danach Ruhe.
@@ -50,7 +51,20 @@ export function useFirstSight(play) {
   return [ref, state];
 }
 
-function Shield({ tier, id }) {
+/** Die Krone der Liga 1 - auf dem Wappen und im Saisonende-Moment. */
+export function Crown({ id, className = "tls-lbadge__crown", testId }) {
+  return (
+    <g className={className} data-testid={testId}>
+      <path d={CROWN} fill={`url(#${id}-metal)`} style={{ stroke: paint("dark") }} strokeWidth="0.6" strokeLinejoin="round" />
+      <rect x="20.6" y="17" width="22.8" height="3" rx="1" style={{ fill: paint("base") }} />
+      <circle cx="18.6" cy="8" r="1.5" style={{ fill: paint("light") }} />
+      <circle cx="32" cy="5" r="1.7" style={{ fill: paint("light") }} />
+      <circle cx="45.4" cy="8" r="1.5" style={{ fill: paint("light") }} />
+    </g>
+  );
+}
+
+export function Shield({ tier, id }) {
   const fill = `url(#${id}-metal)`;
   if (tier === "base") {
     // Ab Liga 3 schlicht: nur die Kontur im Metall, keine Fläche, kein zweiter Rand.
@@ -106,15 +120,7 @@ export function LeagueBadge({ badge, size = "card", label = true, decorative = f
           ) : null}
           <text x="32" y="47" textAnchor="middle" dominantBaseline="central" className="tls-lbadge__number"
             style={{ fill: paint(tier === "base" ? "base" : "light") }} fontSize={number.length > 1 ? 17 : 23}>{number}</text>
-          {tier === "top" ? (
-            <g className="tls-lbadge__crown" data-testid={testId ? `${testId}-crown` : undefined}>
-              <path d={CROWN} fill={`url(#${id}-metal)`} style={{ stroke: paint("dark") }} strokeWidth="0.6" strokeLinejoin="round" />
-              <rect x="20.6" y="17" width="22.8" height="3" rx="1" style={{ fill: paint("base") }} />
-              <circle cx="18.6" cy="8" r="1.5" style={{ fill: paint("light") }} />
-              <circle cx="32" cy="5" r="1.7" style={{ fill: paint("light") }} />
-              <circle cx="45.4" cy="8" r="1.5" style={{ fill: paint("light") }} />
-            </g>
-          ) : null}
+          {tier === "top" ? <Crown id={id} testId={testId ? `${testId}-crown` : undefined} /> : null}
         </svg>
       </span>
       {label ? (

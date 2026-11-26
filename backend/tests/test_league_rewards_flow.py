@@ -189,7 +189,7 @@ async def test_a_season_without_rewards_behaves_as_before(flow):
     await play_all(flow, staffel)
     await must_close(flow, staffel)
     assert await rewards_of(flow, staffel) == []
-    assert await flow.db.notifications.count_documents({"kind": "league_reward"}) == 0
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward"}) == 0
     assert await flow.db.prize_pickups.count_documents({}) == 0
     view = (await flow.get(f"{PAGE}/staffeln/{staffel['slug']}")).json()
     assert view["staffel"]["rewards"] is None
@@ -201,7 +201,8 @@ async def test_a_season_without_rewards_behaves_as_before(flow):
     assert saved.status_code == 200, saved.text
     await must_close(flow, staffel)
     assert held(await rewards_of(flow, staffel)) == {("reg-1", "Goldmedaille")}
-    assert await flow.db.notifications.count_documents({"kind": "league_reward"}) > 0
+    # Der Meister bekam seinen Saisonende-Moment schon beim ersten Abschluss (#1639) - die nachgetragene Belohnung meldet sich selbst.
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward"}) > 0
 
 
 # ---------------------------------------------------------------- Spieler mit Einsatz gegenüber Kader (Nr. 163)
@@ -284,10 +285,13 @@ async def test_reopen_lets_rewards_rest_and_a_new_close_reassigns_them_without_a
     await play_all(flow, staffel)
     await must_close(flow, staffel)
     first = {doc["reward_key"]: doc["id"] for doc in await rewards_of(flow, staffel)}
-    gains = await flow.db.notifications.find({"kind": "league_reward"}, {"_id": 0}).to_list(100)
-    assert {note["user_id"] for note in gains if note["title"] == "Neue Belohnung"} >= {"p-1-1", "p-2-1"}
-    # Team-Belohnung: eigene Nachricht an den Captain, nicht als persönlicher Gewinn.
-    assert {(note["user_id"], note["title"]) for note in gains if note["user_id"].startswith("captain")} == {("captain-1", "Belohnung für euer Team")}
+    gains = await flow.db.notifications.find({"kind": "league_reward", "meta.reason": "league_reward"}, {"_id": 0}).to_list(100)
+    assert {note["user_id"] for note in gains if note["title"] == "Neue Belohnung"} >= {"p-2-1"}
+    # Der Meister (Team 1) erfährt seine Belohnungen mit dem Saisonende-Moment - eine Nachricht, nicht zwei (#1639, Fabian 26.11., A).
+    assert "p-1-1" not in {note["user_id"] for note in gains} and "captain-1" not in {note["user_id"] for note in gains}
+    moment = await flow.db.notifications.find({"meta.reason": "league_moment"}, {"_id": 0}).to_list(100)
+    assert {"p-1-1", "captain-1"} <= {note["user_id"] for note in moment}
+    assert all("Goldmedaille" in note["body"] for note in moment if note["user_id"] in {"p-1-1", "captain-1"})
     assert "captain-2" not in {note["user_id"] for note in gains}  # Team 2 hat nur Spieler-Belohnungen
 
     second = await lead(flow, league, "Zweite Leitung", "season")
@@ -315,11 +319,12 @@ async def test_reopen_lets_rewards_rest_and_a_new_close_reassigns_them_without_a
         if doc["reward_key"] in first:
             assert doc["id"] == first[doc["reward_key"]]
     final = await flow.db.league_final_tables.find_one({"tournament_id": staffel["id"], "active": True}, {"_id": 0})
-    changed = await flow.db.notifications.find({"kind": "league_reward", "meta.dedupe_key": {"$regex": f"^league-reward:{final['id']}:"}},
+    changed = await flow.db.notifications.find({"kind": "league_reward", "meta.reason": "league_reward", "meta.dedupe_key": {"$regex": f"^league-reward:{final['id']}:"}},
                                                {"_id": 0}).to_list(100)
     by_person = {(note["user_id"], note["title"]) for note in changed}
     assert ("p-1-1", "Belohnung entfällt") in by_person and ("captain-1", "Team-Belohnung entfällt") in by_person
-    assert ("p-2-1", "Neue Belohnung") in by_person and ("captain-2", "Belohnung für euer Team") in by_person
+    # Der neue Meister (Team 2) erfährt die Goldmedaille mit seinem Saisonende-Moment, nicht hier.
+    assert ("p-2-1", "Neue Belohnung") not in by_person and ("captain-2", "Belohnung für euer Team") not in by_person
     assert ("captain-1", "Belohnung entfällt") not in by_person  # der Captain hielt die Team-Belohnung nie persönlich
     # Gegenprobe: wer nur „alle“ hat und behält, bekommt keine Nachricht.
     assert not any(person == "p-3-1" for person, _title in by_person)
@@ -332,17 +337,20 @@ async def test_the_message_is_sent_once_per_version_direction_and_person(flow):
     _admin, _league, _season, _division, staffel = await setup(flow, rewards=[GOLD])
     await play_all(flow, staffel)
     await must_close(flow, staffel)
-    count = await flow.db.notifications.count_documents({"kind": "league_reward"})
-    assert count == 3  # zwei Spieler und der Captain von Team 1
+    # Die Goldmedaille gehört dem Meister: Sie kommt mit seinem Saisonende-Moment (#1639, Fabian 26.11., A) - hier keine eigene Nachricht.
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward"}) == 0
     final = await flow.db.league_final_tables.find_one({"tournament_id": staffel["id"], "active": True}, {"_id": 0})
     tournament = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     frame = await league_final._frame(flow.db, tournament)
     again = {"gains": {"p-1-1": ["Goldmedaille"]}, "losses": {}}
     await league_rewards.notify(flow.db, tournament, final, frame, again)
-    assert await flow.db.notifications.count_documents({"kind": "league_reward"}) == count
+    count = await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward"})
+    assert count == 1
+    await league_rewards.notify(flow.db, tournament, final, frame, again)
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward"}) == count
     # Gegenprobe: eine andere Fassung ist eine neue Nachricht.
     await league_rewards.notify(flow.db, tournament, {**final, "id": "andere-fassung"}, frame, again)
-    assert await flow.db.notifications.count_documents({"kind": "league_reward"}) == count + 1
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward"}) == count + 1
 
 
 # ---------------------------------------------------------------- Echter Gewinn
@@ -456,7 +464,7 @@ async def test_two_closes_at_once_grant_every_reward_exactly_once(flow):
     docs = await rewards_of(flow, staffel)
     keys = [doc["reward_key"] for doc in docs]
     assert len(keys) == len(set(keys)) == 5
-    persons = [note["user_id"] for note in await flow.db.notifications.find({"kind": "league_reward"}, {"_id": 0}).to_list(100)]
+    persons = [note["user_id"] for note in await flow.db.notifications.find({"kind": "league_reward", "meta.reason": "league_reward"}, {"_id": 0}).to_list(100)]
     assert len(persons) == len(set(persons))
 
 
@@ -483,6 +491,9 @@ async def test_the_ceremony_shows_each_new_reward_once_and_only_to_its_people(fl
     await play_all(flow, staffel)
     await must_close(flow, staffel)
     flow.act_as({"id": "p-1-1", "role": "user"})
+    # Die Goldmedaille des Meisters wartet auf seinen Saisonende-Moment (#1639) - danach kommt sie wie bisher.
+    assert (await flow.get("/api/me/rewards/unseen")).json()["rewards"] == []
+    await flow.db.league_moments.update_many({"audience_ids": "p-1-1"}, {"$addToSet": {"seen_by": "p-1-1"}})
     unseen = (await flow.get("/api/me/rewards/unseen")).json()["rewards"]
     assert [row["reward"]["name"] for row in unseen] == ["Goldmedaille"]
     # Eine fremde Person kann nichts für andere als gesehen markieren.
@@ -581,7 +592,7 @@ async def test_a_single_player_league_gives_player_rewards_only_with_an_appearan
     assert banner["user_id"] == "solo-1" and banner["audience_ids"] == ["solo-1"]
     flow.act_as({"id": "solo-4", "role": "user"})
     assert [row["reward"]["name"] for row in (await flow.get("/api/me/awards")).json()["awards"] if row["reward"]] == ["Teilnehmer-Emblem"]
-    notes = await flow.db.notifications.find({"kind": "league_reward", "user_id": "solo-4"}, {"_id": 0}).to_list(10)
+    notes = await flow.db.notifications.find({"kind": "league_reward", "meta.reason": "league_reward", "user_id": "solo-4"}, {"_id": 0}).to_list(10)
     assert [note["body"] for note in notes] and all("Spieler-Banner" not in note["body"] for note in notes)
 
     # Kader-Variante: Die angemeldete Person selbst bekommt es - auch ohne Spiel.
@@ -632,7 +643,7 @@ async def test_a_new_captain_after_a_reopen_brings_no_gain_or_loss_message(flow)
     flow.act_as(admin)
     await must_close(flow, staffel)
     final = await flow.db.league_final_tables.find_one({"tournament_id": staffel["id"], "active": True}, {"_id": 0})
-    second = await flow.db.notifications.count_documents({"kind": "league_reward", "meta.dedupe_key": {"$regex": f"^league-reward:{final['id']}:"}})
+    second = await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward", "meta.dedupe_key": {"$regex": f"^league-reward:{final['id']}:"}})
     assert second == 0
     # Gegenprobe: Der neue Captain hört von einer neuen Team-Belohnung schon.
     from services import league_final, league_rewards
@@ -641,7 +652,7 @@ async def test_a_new_captain_after_a_reopen_brings_no_gain_or_loss_message(flow)
     frame = await league_final._frame(flow.db, tournament)
     await league_rewards.notify(flow.db, tournament, final, frame, {"team_gains": {"team-1": ["Neu"]}, "team_leads": {"team-1": ["p-1-3"]},
                                                                    "team_names": {"team-1": "Probe 1"}})
-    assert await flow.db.notifications.count_documents({"kind": "league_reward", "user_id": "p-1-3", "title": "Belohnung für euer Team"}) == 1
+    assert await flow.db.notifications.count_documents({"kind": "league_reward", "meta.reason": "league_reward", "user_id": "p-1-3", "title": "Belohnung für euer Team"}) == 1
 
 
 @pytest.mark.asyncio

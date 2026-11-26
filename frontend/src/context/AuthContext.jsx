@@ -2,6 +2,7 @@ import { adminWithoutSecondFactor, areasOf, canUseArea, hasArea, isAnyAdmin } fr
 import { clearRecentSearches } from "@/lib/recentSearches";
 import { clearOfflineCard, offlineCardOwner } from "@/lib/memberCardOffline";
 import { forgetWebPush } from "@/lib/webPush";
+import { clearMomentMarks } from "@/lib/momentMarks";
 import { gemeinsamKonto } from "@/lib/gemeinsamLaden";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
@@ -162,6 +163,8 @@ export function AuthProvider({ children }) {
     // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
     clearRecentSearches();
     clearOfflineCard();
+    // Saisonende-Moment (#1639): Geräte-Schlüssel und Fertig-Marken gehören der Person - weg mit dem Konto.
+    clearMomentMarks();
     // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
     void forgetWebPush();
   };

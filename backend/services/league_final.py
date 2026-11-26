@@ -31,6 +31,8 @@ from services import league_rewards
 from services import league_protest_settings as protest_settings
 from services import league_cross_zones, league_zones
 from services.league_final_read import CLOSED_LOCK, active_final, frozen_rows, is_closed  # noqa: F401 - CLOSED_LOCK für Routen
+# ``all_closed`` und die Stände, die nicht zählen, stehen im Blatt-Modul (auch für den Saisonende-Moment, #1639).
+from services.league_final_read import IGNORED_STAFFEL_STATUSES, all_closed  # noqa: F401 - Leser greifen über league_final zu
 from services.league_finale import FIELD as TV_FINALE
 # Gleichstände um Meister und Zonengrenze (#2262): im Blatt-Modul, damit Tabelle und Abschluss dieselbe Rechnung nutzen.
 from services.league_ties import (  # noqa: F401 - weiter über league_final erreichbar
@@ -52,7 +54,6 @@ CLOSABLE_STATUSES = frozenset({"live", "paused", "completed", "results_published
 # Kein Spiel mehr offen: gespielt, kampflos, abgesagt, Freilos, archiviert.
 SETTLED_MATCH_STATUSES = frozenset({"completed", "forfeit", "cancelled", "archived", "bye"})
 # Staffeln, die für den Abschluss der Season nicht zählen.
-IGNORED_STAFFEL_STATUSES = frozenset({"cancelled", "archived", "draft"})
 ITEM_LIMIT = 50
 HISTORY_LIMIT = 50
 KIND = "tournament_registration"
@@ -533,11 +534,6 @@ async def season_staffeln(db, season_id: str) -> list[dict]:
                                      {"_id": 0, "id": 1, "status": 1, "final_table": 1, "league_context.kind": 1}).to_list(500)
 
 
-def all_closed(staffeln: list[dict]) -> bool:
-    counted = [row for row in staffeln if is_closed(row) or row.get("status") not in IGNORED_STAFFEL_STATUSES]
-    return bool(counted) and all(is_closed(row) for row in counted)
-
-
 async def _season_done(db, season_id: str) -> bool:
     """Alle Staffeln aller Arten abgeschlossen - und nichts Eingeschaltetes fehlt noch."""
     if not all_closed(await season_staffeln(db, season_id)):
@@ -611,8 +607,9 @@ async def _season_follows(db, season_id: str | None, actor_id: str | None, tourn
 
 # ---------------------------------------------------------------- Nachrichten an die Captains
 
-async def notify_captains(db, tournament: dict, final: dict, frame: dict, event: str) -> int:
-    """Captains und Vertreter jeder Seite der Staffel: „abgeschlossen“ bzw. „wieder geöffnet“ - je Fassung und Person einmal."""
+async def notify_captains(db, tournament: dict, final: dict, frame: dict, event: str, *, only: set[str] | None = None) -> int:
+    """Captains und Vertreter jeder Seite der Staffel: „abgeschlossen“ bzw. „wieder geöffnet“ - je Fassung und Person einmal.
+    ``only``: nur diese Personen (der Saisonende-Moment holt Zurückgestelltes nach, #1639)."""
     from services.match_audience import responsible_ids, teams_by_id
     from services.user_notifications import create_user_notification
 
@@ -621,8 +618,22 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
             {"tournament_id": tournament["id"], "status": {"$in": ["approved", "checked_in"]}}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
         teams = await teams_by_id(db, registrations)
         people: set[str] = set()
+        # Der Meister (#1639, Fabian 26.11., A): Er erfährt es mit dem Saisonende-Moment - eine Nachricht, nicht zwei. Zurückgestellt am
+        # Meister-Eintrag (M3): Erreicht ihn der Moment nicht, schickt der Abgleich diese Nachricht wie bisher.
+        champion = (final.get("champion") or {}).get("registration_id") if event == "closed" and only is None else None
+        owed: set[str] = set()
         for registration in registrations:
-            people |= responsible_ids(registration, teams.get(registration.get("team_id") or ""))
+            persons = responsible_ids(registration, teams.get(registration.get("team_id") or ""))
+            if registration["id"] == champion:
+                owed |= persons
+            else:
+                people |= persons
+        if only is not None:
+            people = people & only
+        if owed:
+            from services.league_rewards import owe_to_moment
+
+            await owe_to_moment(db, tournament["id"], champion, final["id"], {"close": sorted(owed)})
         league, season = frame["league"], frame["season"]
         url = (f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug")
                else f"/tournaments/{tournament.get('slug') or tournament['id']}")
@@ -637,7 +648,9 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
         sent = 0
         for user_id in sorted(people):
             if await create_user_notification(user_id, title, text, url=url, kind=KIND,
-                                              meta={"reason": "league_final", "dedupe_key": f"league-final:{final['id']}:{event}:{user_id}"}):
+                                              meta={"reason": "league_final", "dedupe_key": f"league-final:{final['id']}:{event}:{user_id}",
+                                                    # Eindeutig je Person und Schlüssel (#1639, Prüfung 3) - auch beim Nachholen.
+                                                    "unique_dedupe": True}):
                 sent += 1
         return sent
     except Exception:  # noqa: BLE001 - der Abschluss steht, die Nachricht hält ihn nicht auf
