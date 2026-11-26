@@ -2,10 +2,15 @@ import React from "react";
 import { NavigationContext } from "@react-navigation/native";
 import { AppState } from "react-native";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
-import { GUEST_SETTINGS_GROUPS, SETTINGS_GROUPS, SettingsScreen } from "./SettingsScreen";
+import { GUEST_SETTINGS_SECTIONS, GruppenEinstellungen, SETTINGS_SECTIONS, type SettingsGruppe } from "./SettingsScreen";
 
-// Einstellungen an einem Ort (#1146): eine Seite mit Gruppen in fester Reihenfolge - Darstellung, Benachrichtigungen,
-// Sicherheit, Privatsphäre, Konto, Über die App. Gäste sehen nur Darstellung und Über die App. Schalter speichern von selbst.
+// Die Einstellungen in Mein Bereich (#2059, #1677, früher eine Seite hinter dem Zahnrad #1146): Benachrichtigungen, Konto &
+// Sicherheit und Datenschutz - je Gruppe ihre Abschnitte in fester Reihenfolge wie im Web. Gäste sehen nur Darstellung und
+// Über die App. Schalter speichern von selbst. Die Tests legen die drei Gruppen untereinander - jede mit ihrer Warteschlange.
+const ALLE: SettingsGruppe[] = ["benachrichtigungen", "datenschutz", "konto"];
+function SettingsScreen({ gruppen = ALLE }: { gruppen?: SettingsGruppe[] }) {
+  return <>{gruppen.map((gruppe) => <GruppenEinstellungen key={gruppe} gruppe={gruppe} />)}</>;
+}
 
 const mockUser: { value: Record<string, unknown> | null } = { value: null };
 const mockLogout = jest.fn(async () => undefined);
@@ -47,8 +52,10 @@ const TEST_IDS: Record<string, string> = {
   Darstellung: "settings-group-appearance",
   Benachrichtigungen: "settings-group-notifications",
   Sicherheit: "settings-group-security",
-  Privatsphäre: "settings-group-privacy",
-  Konto: "settings-group-account",
+  Sichtbarkeit: "settings-group-privacy",
+  Einwilligungen: "settings-group-consents",
+  Kalender: "settings-group-calendar",
+  Abmelden: "settings-group-account",
   "Über die App": "settings-group-about",
 };
 
@@ -59,14 +66,28 @@ beforeEach(() => {
   mockGet.mockImplementation((path: string) => Promise.resolve({ data: path === "/auth/sessions" ? [] : { preferences: {}, discord: { linked: false } } }));
 });
 
-test("angemeldet: alle Gruppen in der festen Reihenfolge - wie im Web", async () => {
-  expect(SETTINGS_GROUPS).toEqual(["Darstellung", "Benachrichtigungen", "Sicherheit", "Privatsphäre", "Konto", "Über die App"]);
+test("angemeldet: je Gruppe ihre Abschnitte in fester Reihenfolge - wie im Web", async () => {
+  expect(SETTINGS_SECTIONS).toEqual({
+    benachrichtigungen: ["Benachrichtigungen"],
+    konto: ["Sicherheit", "Darstellung", "Kalender", "Über die App", "Abmelden"],
+    datenschutz: ["Sichtbarkeit", "Einwilligungen", "Daten herunterladen", "Konto löschen"],
+  });
+  for (const gruppe of ALLE) {
+    const view = await render(
+      <NavigationContext.Provider value={navigation}>
+        <SettingsScreen gruppen={[gruppe]} />
+      </NavigationContext.Provider>,
+    );
+    const shown = screen.getAllByRole("header").map((node) => String(node.props.children));
+    expect([gruppe, shown]).toEqual([gruppe, SETTINGS_SECTIONS[gruppe]]);
+    await view.unmount();
+  }
   await renderSettings();
-  const shown = screen.getAllByRole("header").map((node) => String(node.props.children));
-  expect(shown).toEqual([...SETTINGS_GROUPS]);
-  for (const group of SETTINGS_GROUPS) expect(screen.getByTestId(TEST_IDS[group])).toBeTruthy();
-  // Die Deko steht nur hier (nicht mehr unter „Mehr“).
+  for (const id of Object.values(TEST_IDS)) expect(screen.getByTestId(id)).toBeTruthy();
+  // Die Deko steht nur hier (Konto & Sicherheit → Darstellung).
   expect(screen.getByTestId("season-deco-setting")).toBeTruthy();
+  // Was andere Gruppen tragen, steht nicht mehr hier: Profil bearbeiten (Profil), Mitgliedschaft, Rechnungen.
+  expect(screen.queryByTestId("settings-edit-profile")).toBeNull();
 });
 
 // Geräteprobe vor 1.4.0: die Überschriften stehen über den Karten - der oberste Schalter einer Karte bekam trotzdem
@@ -82,7 +103,7 @@ test("der oberste Schalter einer Karte hat keine Trennlinie über sich, die folg
 test("Gast: nur Darstellung und Über die App", async () => {
   mockUser.value = null;
   await renderSettings();
-  expect(screen.getAllByRole("header").map((node) => String(node.props.children))).toEqual([...GUEST_SETTINGS_GROUPS]);
+  expect(screen.getAllByRole("header").map((node) => String(node.props.children))).toEqual([...GUEST_SETTINGS_SECTIONS]);
   expect(mockGet).not.toHaveBeenCalled();
   await fireEvent.press(screen.getByTestId("more-whats-new"));
   expect(mockWhatsNew).toHaveBeenCalledTimes(1);
@@ -212,11 +233,20 @@ test("Fehler: Hinweis mit Erneut versuchen, die Schalterstellung bleibt", async 
   expect(screen.queryByTestId("settings-retry")).toBeNull();
 });
 
-test("Konto: Profil bearbeiten öffnet die eigene Seite, Abmelden meldet ab", async () => {
+test("Konto & Sicherheit: Kalender-Abo öffnet die eigene Seite, Passwort die Website, Abmelden meldet ab", async () => {
+  const { Linking } = jest.requireActual<typeof import("react-native")>("react-native");
+  const opened = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
   await renderSettings();
-  await fireEvent.press(screen.getByTestId("settings-edit-profile"));
-  expect(navigate).toHaveBeenCalledWith("ProfileEdit");
-  // Mein Kalender-Abo (#1788): der feste Eintrag unter Konto.
+  // Passwort, Zwei-Faktor und Google ändert die Website - an der Stelle von Mein Bereich → Konto & Sicherheit.
+  await fireEvent.press(screen.getByTestId("settings-password-web"));
+  await waitFor(() => expect(opened).toHaveBeenCalled());
+  expect(String(opened.mock.calls[0][0])).toMatch(/\/mein-bereich\/konto#passwort$/);
+  // Daten herunterladen (#2059, früher „Meine Daten“): die Seite der Website.
+  await fireEvent.press(screen.getByTestId("settings-data"));
+  await waitFor(() => expect(opened).toHaveBeenCalledTimes(2));
+  expect(String(opened.mock.calls[1][0])).toMatch(/\/privacy-account$/);
+  opened.mockRestore();
+  // Mein Kalender-Abo (#1788): der feste Eintrag unter Konto & Sicherheit.
   await fireEvent.press(screen.getByTestId("settings-calendar-subscription"));
   expect(navigate).toHaveBeenCalledWith("CalendarSubscription");
   await fireEvent.press(screen.getByTestId("settings-logout"));

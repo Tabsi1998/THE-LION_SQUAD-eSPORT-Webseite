@@ -2,7 +2,7 @@ import { currentTab, navigateToNotification, navigateToUrl, openSignIn, openTab,
 import { ARTICLE, FOREIGN_ARTICLE_LINKS, OWN_ARTICLE_LINKS } from "../lib/linkOrigins.fixture";
 
 // Wohin Adressen und Benachrichtigungen führen (#1143, #1144): Detail-Screens legen sich über den Tab, in dem man gerade
-// ist; nur die Übersichten (Home, Events, Community, Verein, Profil) wechseln den Tab. Alte Adressen - aus Mails, alten
+// ist; nur die Übersichten (Home, Events, Community, Verein, Mein Bereich) wechseln den Tab. Alte Adressen - aus Mails, alten
 // Benachrichtigungen und Links von außen - landen am neuen Ort.
 
 const mockRef = { ready: false, navigate: jest.fn(), root: undefined as unknown };
@@ -64,10 +64,13 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/members/area", tab("VereinTab", "VereinHub")],
   ["/mitgliederbereich", tab("VereinTab", "VereinHub")],
   ["/members/news", tab("VereinTab", "VereinHub")],
-  ["/profile", tab("ProfileTab", "Profile")],
-  ["/u/me", tab("ProfileTab", "Profile")],
-  ["/profile?tab=achievements", tab("ProfileTab", "Profile", { tab: "achievements" })],
-  ["/profile?tab=honours", tab("ProfileTab", "Profile", { tab: "honours" })],
+  // Mein Bereich (#2059): /profile ist im Web Mein Bereich → Profil; das eigene Profil liegt über dem Tab.
+  ["/profile", detail("MeinBereichGruppe", { gruppe: "profil" })],
+  ["/u/me", detail("OwnProfile")],
+  ["/u/me?tab=achievements", detail("OwnProfile", { tab: "achievements" })],
+  ["/u/me?tab=trophaeen", detail("OwnProfile", { tab: "awards" })],
+  ["/profile?tab=achievements", detail("OwnProfile", { tab: "achievements" })],
+  ["/profile?tab=honours", detail("OwnProfile", { tab: "honours" })],
   ["/matches/m-1", detail("MatchDetail", { id: "m-1" })],
   ["/tournaments/herbst-cup", detail("TournamentDetail", { id: "herbst-cup" })],
   ["/tournaments/herbst-cup/chat", detail("TournamentChat", { id: "herbst-cup" })],
@@ -93,9 +96,18 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/profile?tab=invoices&invoice=d-501", detail("MyInvoices", { invoice: "d-501" })],
   ["/me/prizes", detail("MyPrizes")],
   ["/my/prizes", detail("MyPrizes")],
-  ["/profile?tab=notifications", detail("Settings")],
-  ["/profile?tab=privacy", detail("Settings")],
-  ["/profile?tab=security", detail("Settings")],
+  // Die alten Reiter der Einstellungen (#1146) an ihrer Stelle in Mein Bereich (#2059).
+  ["/profile?tab=notifications", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen" })],
+  ["/profile?tab=privacy", detail("MeinBereichGruppe", { gruppe: "datenschutz" })],
+  ["/profile?tab=security", detail("MeinBereichGruppe", { gruppe: "konto" })],
+  ["/profile?tab=sessions", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "geraete" })],
+  ["/profile?tab=appearance", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "darstellung" })],
+  ["/profile?tab=about", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "version" })],
+  ["/profile?tab=calendar", detail("CalendarSubscription")],
+  ["/profile?tab=prizes", detail("MyPrizes")],
+  ["/profile?tab=gaming", detail("ProfileEdit")],
+  ["/privacy-account", detail("MeinBereichGruppe", { gruppe: "datenschutz", ziel: "daten" })],
+  ["/my/penalties", detail("MeinBereichGruppe", { gruppe: "rechnungen", ziel: "strafen" })],
   ["/profile?tab=basic", detail("ProfileEdit")],
   ["/members/membership", detail("MyMembership")],
   ["/members/documents", detail("MemberDocuments")],
@@ -130,8 +142,101 @@ const ADDRESSES: Array<[string, unknown]> = [
   // Trophäen (#2425): ?tab=trophaeen öffnet den Reiter an Team und eigenem Profil.
   ["/teams/t-9?tab=trophaeen", detail("TeamDetail", { id: "t-9", tab: "trophies" })],
   ["/teams/t-9?tab=chat", detail("TeamDetail", { id: "t-9" })],
-  ["/profile?tab=trophaeen", tab("ProfileTab", "Profile", { tab: "awards" })],
+  ["/profile?tab=trophaeen", detail("OwnProfile", { tab: "awards" })],
 ];
+
+// Mein Bereich (#2059): jede Adresse des Webs (frontend/src/lib/meinBereich*.js) und ihre Stelle in der App - Gruppen,
+// Reiter (?tab=), Anker (#…) und die Seiten unter Verein. Mails, Push und die FAQ nennen sie, sobald die App sie kennt.
+const MEIN_BEREICH: Array<[string, unknown]> = [
+  ["/mein-bereich", tab("ProfileTab", "MeinBereich")],
+  ["/mein-bereich/", tab("ProfileTab", "MeinBereich")],
+  ["https://lionsquad.at/mein-bereich", tab("ProfileTab", "MeinBereich")],
+  ["/mein-bereich/gibt-es-nicht", tab("ProfileTab", "MeinBereich")],
+  // Profil
+  ["/mein-bereich/profil", detail("MeinBereichGruppe", { gruppe: "profil" })],
+  ["/mein-bereich/profil?tab=basic", detail("ProfileEdit")],
+  ["/mein-bereich/profil?tab=gaming", detail("ProfileEdit")],
+  ["/mein-bereich/profil?tab=socials", detail("ProfileEdit")],
+  // Mitgliedschaft: die Gruppe, mit Anker direkt die Stelle in „Meine Mitgliedschaft“.
+  ["/mein-bereich/mitgliedschaft", detail("MeinBereichGruppe", { gruppe: "mitgliedschaft" })],
+  ["/mein-bereich/mitgliedschaft#nummer", detail("MyMembership", { ziel: "nummer" })],
+  ["https://lionsquad.at/mein-bereich/mitgliedschaft#meine-daten", detail("MyMembership", { ziel: "meine-daten" })],
+  ["/mein-bereich/mitgliedschaft#beitrag", detail("MyMembership", { ziel: "beitrag" })],
+  ["/mein-bereich/mitgliedschaft#austritt", detail("MyMembership", { ziel: "austritt" })],
+  ["/mein-bereich/mitgliedschaft#status", detail("MyMembership", { ziel: "status" })],
+  ["/mein-bereich/mitgliedschaft#website-profil", detail("MyMembership", { ziel: "website-profil" })],
+  ["/mein-bereich/mitgliedschaft#mitgliedskarte", detail("MemberCard")],
+  ["/mein-bereich/mitgliedschaft#beitreten", detail("MeinBereichGruppe", { gruppe: "mitgliedschaft", ziel: "beitreten" })],
+  // Rechnungen & Unterlagen: die Belege direkt, die übrigen Reiter ihre Screens, Strafen die Stelle in der Gruppe.
+  ["/mein-bereich/rechnungen", detail("MyInvoices", undefined)],
+  ["/mein-bereich/rechnungen?invoice=d-501", detail("MyInvoices", { invoice: "d-501" })],
+  ["/mein-bereich/rechnungen?invoice=../x", detail("MyInvoices", undefined)],
+  ["/mein-bereich/rechnungen?tab=unterlagen", detail("MyDocuments")],
+  ["/mein-bereich/rechnungen?tab=gewinne", detail("MyPrizes")],
+  ["/mein-bereich/rechnungen?tab=strafen", detail("MeinBereichGruppe", { gruppe: "rechnungen", ziel: "strafen" })],
+  // Verein: die Übersicht ist der Tab Verein, die Seiten darunter ihre Screens.
+  ["/mein-bereich/verein", tab("VereinTab", "VereinHub")],
+  ["/mein-bereich/verein/versammlungen", detail("MemberMeetings")],
+  ["/mein-bereich/verein/versammlungen?meeting=m-1", detail("MemberMeetings")],
+  ["/mein-bereich/verein/helfen", detail("MemberHelperShifts")],
+  ["/mein-bereich/verein/helfen?event=5", detail("MemberHelperShifts", { event: 5 })],
+  ["/mein-bereich/verein/dokumente", detail("MemberDocuments")],
+  ["/mein-bereich/verein/news", tab("VereinTab", "VereinHub")],
+  ["/mein-bereich/verein/vorteile", detail("InfoCenter", { section: "benefits" })],
+  // Benachrichtigungen: ?bereich= aus dem Web (Themen, E-Mail, Ruhezeit, Mehr) oder ein Anker.
+  ["/mein-bereich/benachrichtigungen", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen" })],
+  ["/mein-bereich/benachrichtigungen?bereich=mail", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "sammel-mail" })],
+  ["/mein-bereich/benachrichtigungen?bereich=ruhezeit", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "ruhezeit" })],
+  ["/mein-bereich/benachrichtigungen?bereich=themen", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "themen" })],
+  ["/mein-bereich/benachrichtigungen?bereich=mehr", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "weitere-wege" })],
+  ["/mein-bereich/benachrichtigungen#newsletter", detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "newsletter" })],
+  // Konto & Sicherheit
+  ["/mein-bereich/konto", detail("MeinBereichGruppe", { gruppe: "konto" })],
+  ["/mein-bereich/konto#passwort", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "passwort" })],
+  ["/mein-bereich/konto?mfa=required&next=%2Fadmin", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "passwort" })],
+  ["/mein-bereich/konto?tab=sessions#dieser-browser", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "geraete" })],
+  ["/mein-bereich/konto?tab=appearance", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "darstellung" })],
+  ["/mein-bereich/konto?tab=about", detail("MeinBereichGruppe", { gruppe: "konto", ziel: "version" })],
+  ["/mein-bereich/konto?tab=calendar", detail("CalendarSubscription")],
+  // Datenschutz
+  ["/mein-bereich/datenschutz", detail("MeinBereichGruppe", { gruppe: "datenschutz" })],
+  ["/mein-bereich/datenschutz?tab=einwilligungen", detail("MeinBereichGruppe", { gruppe: "datenschutz", ziel: "einwilligungen" })],
+  ["/mein-bereich/datenschutz?tab=daten", detail("MeinBereichGruppe", { gruppe: "datenschutz", ziel: "daten" })],
+  ["/mein-bereich/datenschutz?tab=loeschung", detail("MeinBereichGruppe", { gruppe: "datenschutz", ziel: "loeschung" })],
+  ["/mein-bereich/datenschutz#erfolge-oeffentlich", detail("MeinBereichGruppe", { gruppe: "datenschutz", ziel: "erfolge-oeffentlich" })],
+  // Ein kaputter oder fremder Anker zählt als keiner.
+  ["/mein-bereich/datenschutz#%E0%A4", detail("MeinBereichGruppe", { gruppe: "datenschutz" })],
+  ["/mein-bereich/konto#<script>", detail("MeinBereichGruppe", { gruppe: "konto" })],
+  // Eine fremde Website mit demselben Pfad öffnet nie einen Screen (#921).
+  ["https://evil.example/mein-bereich/konto", null],
+  ["//evil.example/mein-bereich", null],
+];
+
+test("#2059: jede Adresse von Mein Bereich hat ihre Stelle in der App - Gruppen, Reiter, Anker und Verein", () => {
+  for (const [url, expected] of MEIN_BEREICH) {
+    expect([url, targetFromUrl(url)]).toEqual([url, expected]);
+  }
+});
+
+test("#2059: die alten Adressen (/profile, /members, /account, /my) führen weiter dorthin, wo Mein Bereich es zeigt", () => {
+  const old: Array<[string, string]> = [
+    ["/members/membership", "MyMembership"],
+    ["/members/meetings", "MemberMeetings"],
+    ["/members/documents", "MemberDocuments"],
+    ["/members/helfen", "MemberHelperShifts"],
+    ["/account/invoices", "MyInvoices"],
+    ["/account/documents", "MyDocuments"],
+    ["/my/prizes", "MyPrizes"],
+    ["/me/prizes", "MyPrizes"],
+    ["/my/penalties", "MeinBereichGruppe"],
+    ["/profile?tab=basic", "ProfileEdit"],
+    ["/profile?tab=notifications", "MeinBereichGruppe"],
+    ["/privacy-account", "MeinBereichGruppe"],
+  ];
+  for (const [url, screen] of old) expect([url, (targetFromUrl(url) as { screen?: string } | null)?.screen]).toEqual([url, screen]);
+  // Die Mitgliederübersicht bleibt der Tab Verein.
+  expect(targetFromUrl("/members/area")).toEqual(tab("VereinTab", "VereinHub"));
+});
 
 test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles andere legt sich darüber", () => {
   for (const [url, expected] of ADDRESSES) {
@@ -154,7 +259,7 @@ test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles
   expect(targetFromUrl("/faq#%E0%A4")).toEqual(detail("Faq"));
   expect(targetFromUrl("/hilfe?q=ruhezeit")).toEqual(detail("Faq", { q: "ruhezeit" }));
   expect(targetFromUrl("/faq/turniere#einchecken")).toBeNull();
-  for (const url of ["/servers", "/membership/join", "/privacy", "/imprint", "/privacy-account", "", null, undefined]) {
+  for (const url of ["/servers", "/membership/join", "/privacy", "/imprint", "", null, undefined]) {
     expect([url, targetFromUrl(url)]).toEqual([url, null]);
   }
 });
@@ -208,7 +313,10 @@ test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst di
   expect(targetFromNotification(note("tournament_notice", { tournament_id: "t-1", event_id: "e-1" }, "/events/herbst-lan") as never)).toEqual(detail("EventDetail", { id: "herbst-lan" }));
   expect(targetFromNotification(note("friend_request", { requester_username: "kiwikomet" }) as never)).toEqual(detail("PublicProfile", { username: "kiwikomet" }));
   expect(targetFromNotification(note("friend_accepted") as never)).toEqual(tab("CommunityTab", "CommunityHub", { section: "players" }));
-  expect(targetFromNotification(note("achievement", {}, "/profile?tab=achievements") as never)).toEqual(tab("ProfileTab", "Profile", { tab: "achievements" }));
+  expect(targetFromNotification(note("achievement", {}, "/profile?tab=achievements") as never)).toEqual(detail("OwnProfile", { tab: "achievements" }));
+  // Mein Bereich (#2059): „Deine Rechnung ist da“ mit der neuen Adresse öffnet den Beleg, die Sammel-Mail die E-Mail.
+  expect(targetFromNotification(note("billing_invoice", {}, "/mein-bereich/rechnungen?invoice=d-7") as never)).toEqual(detail("MyInvoices", { invoice: "d-7" }));
+  expect(targetFromNotification(note("system", {}, "/mein-bereich/benachrichtigungen?bereich=mail") as never)).toEqual(detail("MeinBereichGruppe", { gruppe: "benachrichtigungen", ziel: "sammel-mail" }));
 
   // Ohne Ziel: die Liste der Glocke - über dem aktuellen Tab.
   mockRef.ready = true;

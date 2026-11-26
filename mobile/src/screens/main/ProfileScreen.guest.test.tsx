@@ -2,8 +2,9 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { ProfileScreen } from "./ProfileScreen";
 
-// Gast zuerst (#918): ohne Konto zeigt der Profil-Tab den Weg zum Konto - kein leeres Profil „Live-Daten“ mehr. Darunter
-// die Einstellungen für Gäste (#1146): nur Darstellung und „Über die App“.
+// Gast zuerst (#918): kommt ein Gast über einen Link (/u/me) auf das eigene Profil, zeigt es den Weg zum Konto - kein leeres
+// Profil „Live-Daten“. Darstellung und „Über die App“ stehen seit Mein Bereich (#2059) in dessen Übersicht
+// (MeinBereichScreen.test.tsx), nicht mehr hier.
 
 const mockOpenSignIn = jest.fn();
 jest.mock("../../navigation/rootNavigation", () => ({
@@ -30,7 +31,6 @@ jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null }));
 test("als Gast: Anmelden oder Konto erstellen statt eines leeren Profils - ohne eine einzige Anfrage", async () => {
   await render(<ProfileScreen />);
   expect(screen.getByText("Dein Profil")).toBeTruthy();
-  expect(screen.getByTestId("profile-header-title")).toHaveTextContent("Profil");
   expect(screen.queryByText("Live-Gastmodus")).toBeNull();
   expect(screen.queryByText("Live-Daten")).toBeNull();
   expect(mockGet).not.toHaveBeenCalled();
@@ -41,14 +41,9 @@ test("als Gast: Anmelden oder Konto erstellen statt eines leeren Profils - ohne 
   expect(mockOpenSignIn).toHaveBeenLastCalledWith("Register");
 });
 
-test("als Gast: unter dem Anmelde-Hinweis nur Darstellung und „Über die App“ - kein Zahnrad, keine Glocke", async () => {
+test("als Gast: kein Zahnrad, kein zweiter Kopf - die Einstellungen wohnen in Mein Bereich", async () => {
   await render(<ProfileScreen />);
-  expect(screen.getByTestId("settings-group-appearance")).toBeTruthy();
-  expect(screen.getByTestId("season-deco-setting")).toBeTruthy();
-  expect(screen.getByTestId("settings-group-about")).toBeTruthy();
-  expect(screen.getByText(/LionsAPP v0\.5\.0-beta · Build 63/)).toBeTruthy();
-  for (const group of ["notifications", "security", "privacy", "account"]) expect(screen.queryByTestId(`settings-group-${group}`)).toBeNull();
   expect(screen.queryByTestId("profile-settings")).toBeNull();
-  expect(screen.queryByTestId("profile-header-bell")).toBeNull();
-  expect(screen.getByTestId("profile-header-search")).toBeTruthy();
+  expect(screen.queryByTestId("profile-header")).toBeNull();
+  expect(screen.queryByTestId("settings-group-appearance")).toBeNull();
 });

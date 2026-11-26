@@ -2,7 +2,12 @@ import React from "react";
 import { NavigationContext } from "@react-navigation/native";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { LEVEL_TOPIC_KEYS, levelPatch, type NotificationLevel } from "../../lib/notificationLevels";
-import { SettingsScreen } from "./SettingsScreen";
+import { GruppenEinstellungen } from "./SettingsScreen";
+
+// Seit Mein Bereich (#2059) die Gruppe Benachrichtigungen.
+function SettingsScreen() {
+  return <GruppenEinstellungen gruppe="benachrichtigungen" />;
+}
 
 // Benachrichtigungen in Stufen, Themen und Ruhezeit (#2444, wie das Web #1204/#1206): drei Stufen mit „Eigene Auswahl“, je
 // Thema Push / Nur App / Aus, Ruhezeit von–bis mit Ausnahmen und 15 Minuten Lücke, „Weitere Wege“ eingeklappt. Ein älterer

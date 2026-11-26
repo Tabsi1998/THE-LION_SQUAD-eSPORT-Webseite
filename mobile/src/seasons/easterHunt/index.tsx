@@ -20,8 +20,9 @@ import { clearHunt, huntState, setHuntSpots } from "./store";
 
 /** Die App-Screens mit Verstecken - so heißen sie beim Server (wie im Admin wählbar). */
 export const HUNT_SCREENS: Record<string, string> = {
-  // Die fünf Tabs (#1143): Home, Events, Community, Verein, Profil - dazu News, Galerie und Jahreswertung.
-  Dashboard: "app:Dashboard", TournamentList: "app:Tournaments", CommunityHub: "app:Community", VereinHub: "app:Verein", Profile: "app:Profile",
+  // Die fünf Tabs (#1143): Home, Events, Community, Verein, Mein Bereich (früher Profil, beim Server weiter „app:Profile“) -
+  // dazu News, Galerie und Jahreswertung.
+  Dashboard: "app:Dashboard", TournamentList: "app:Tournaments", CommunityHub: "app:Community", VereinHub: "app:Verein", MeinBereich: "app:Profile",
   NewsList: "app:News", Gallery: "app:Gallery", SeasonPass: "app:SeasonPass",
 };
 const RELAYOUT_MS = 250;

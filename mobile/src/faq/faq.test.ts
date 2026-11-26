@@ -89,7 +89,8 @@ describe("Bereich LionsAPP", () => {
 
   test("Links der App-Fragen öffnen einen Screen der App", () => {
     for (const frage of APP_FRAGEN.filter((row) => row.link)) {
-      expect([frage.id, targetFromUrl(frage.link?.to)]).toEqual([frage.id, expect.objectContaining({ screen: "Settings" })]);
+      // Seit Mein Bereich (#2059): die Gruppe Benachrichtigungen bzw. Konto & Sicherheit.
+      expect([frage.id, targetFromUrl(frage.link?.to)]).toEqual([frage.id, expect.objectContaining({ screen: "MeinBereichGruppe" })]);
     }
   });
 });

@@ -39,5 +39,7 @@ test("Thema → Ort steht für jedes Thema da, und jedes Ziel ist ein echter Scr
   const screens = new Set([...read("navigation/screenRegistry.ts").matchAll(/^\s{2}(\w+): \w+Screen,\r?$/gm)].map((match) => match[1]));
   expect(screens.size).toBeGreaterThan(30);
   for (const gone of ["MoreHub", "MemberArea", "DirectMessages", "FastLapList", "TeamList"]) expect(screens.has(gone)).toBe(false);
-  for (const kept of ["MyInvoices", "MyDocuments", "MyMembership", "Gallery", "Settings", "Notifications", "AchievementShowcase"]) expect(screens.has(kept)).toBe(true);
+  // Mein Bereich (#2059): das Zahnrad „Settings“ ist weg - die Gruppen und das eigene Profil sind eigene Screens.
+  for (const gone of ["Settings"]) expect(screens.has(gone)).toBe(false);
+  for (const kept of ["MyInvoices", "MyDocuments", "MyMembership", "Gallery", "MeinBereichGruppe", "OwnProfile", "Notifications", "AchievementShowcase"]) expect(screens.has(kept)).toBe(true);
 });
