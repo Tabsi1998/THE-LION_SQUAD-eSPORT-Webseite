@@ -132,3 +132,17 @@ async def test_a_pause_with_a_time_is_announced_once_per_time(flow):
     # Dieselbe Uhrzeit noch einmal: nichts Neues.
     await flow.put(f"/api/tournaments/{tournament['id']}/pause", json={"paused_until": until})
     assert await flow.db.notifications.count_documents({"kind": "tournament_pause"}) == 2 * len(player)
+
+
+@pytest.mark.asyncio
+async def test_no_second_pause_message_right_after_a_notice_of_the_lead(flow):
+    """Der Hinweis „Pause bis 14:30“ der Turnierleitung pausiert auf Wunsch gleich mit (NoticeComposer) - dann sagt die
+    automatische Meldung dasselbe kein zweites Mal."""
+    staff, tournament, player = await _bracket(flow)
+    await flow.start(tournament)
+    await flow.db.tournament_notices.insert_one({"_id": "n-1", "id": "n-1", "target": "tournament", "tournament_id": tournament["id"],
+                                                 "text": "Pause bis 14:30", "created_at": now_utc().isoformat()})
+    flow.act_as(staff)
+    res = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "paused"})
+    assert res.status_code == 200, res.text
+    assert await flow.db.notifications.count_documents({"kind": "tournament_pause"}) == 0

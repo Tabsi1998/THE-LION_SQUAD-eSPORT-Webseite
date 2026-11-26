@@ -15,9 +15,10 @@ Ereignis höchstens einmal (``meta.dedupe_key``):
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from models import now_utc
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.tournament_progress")
@@ -29,6 +30,8 @@ KIND_PAUSE = "tournament_pause"
 DONE_STATUSES = frozenset({"completed", "forfeit"})
 ACTIVE_REGISTRATIONS = ("approved", "checked_in")
 OPEN_MATCH_STATUSES = ("pending", "scheduled", "ready", "live", "called", "in_progress")
+# So lange nach einem Hinweis der Turnierleitung an das Turnier gilt eine Pause als schon angesagt.
+NOTICE_COVERS_MINUTES = 5
 
 
 def _rank(match: dict, edge: dict, qualifiers: int) -> int:
@@ -194,6 +197,13 @@ async def notify_pause(db, tournament: dict) -> int:
     """Pause mit oder ohne Uhrzeit (#1123) an alle Angemeldeten - einmal je Pause und Uhrzeit."""
     fresh = await db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}) or tournament
     if fresh.get("status") != "paused":
+        return 0
+    # Hat die Turnierleitung eben selbst einen Hinweis geschickt („Pause bis 14:30“ mit „Turnier gleich pausieren“, #1166),
+    # sagt die automatische Meldung dasselbe nicht noch einmal.
+    from services.tournament_notices import _query_for
+
+    recent = (now_utc() - timedelta(minutes=NOTICE_COVERS_MINUTES)).isoformat()
+    if await db.tournament_notices.find_one({**_query_for([fresh["id"]], fresh.get("event_id")), "created_at": {"$gte": recent}}, {"_id": 1}):
         return 0
     until = fresh.get("paused_until")
     title, body = pause_message(fresh.get("title") or "", until)
