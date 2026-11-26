@@ -88,9 +88,9 @@ export function KontoLoeschen() {
       // Erst zur Startseite, dann abmelden (#2059): ohne Konto leitet die geschützte Seite sonst sofort zur Anmeldung
       // weiter, bevor der Weg zur Startseite ankommt. `replace`: Zurück führt nicht auf die Seite des gelöschten Kontos.
       nav("/", { replace: true });
-      // Leise: scheitert das Abmelden am Netz, bleibt „Dein Konto ist gelöscht.“ die einzige Meldung - das Gerät wird
-      // trotzdem geleert (AuthContext).
-      await logout({ quiet: true });
+      // Der Server hat alle Sitzungen schon beendet: das Gerät wird auch bei Netzfehler geleert, und „Dein Konto ist
+      // gelöscht.“ bleibt die einzige Meldung (AuthContext).
+      await logout({ afterDelete: true });
       return;
     } catch (err) {
       toast.error(formatRequestError(err, "Das Konto konnte nicht gelöscht werden."));

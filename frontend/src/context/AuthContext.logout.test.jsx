@@ -1,8 +1,9 @@
 import { act, render, waitFor } from "@testing-library/react";
 
-// Abmelden leert den Zustand auf diesem Gerät immer (#2059, geteilte Geräte): Konto, geteilte Ablage von Mein Bereich,
-// gespeicherte Mitgliedskarte, letzte Suchen und die Browser-Benachrichtigungen - auch wenn /auth/logout scheitert
-// (Netzfehler). `quiet` (nach „Konto löschen“): keine zweite Meldung neben „Dein Konto ist gelöscht.“. Erfundene Daten.
+// Abmelden leert, was das Konto auf diesem Gerät hinterlässt: Konto, geteilte Ablage von Mein Bereich, gespeicherte
+// Mitgliedskarte, letzte Suchen und die Browser-Benachrichtigungen (#2059). Scheitert /auth/logout, bleibt die Sitzung
+// sichtbar - das Cookie gilt am Server weiter (public.spec: „logout keeps the visible session …“). Nach „Konto löschen“
+// (`afterDelete`) hat der Server alle Sitzungen schon beendet: dann wird immer geleert, ohne zweite Meldung. Erfundene Daten.
 
 const apiMock = { get: vi.fn(), post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "" }));
@@ -58,20 +59,23 @@ beforeEach(() => {
   toastMock.error.mockReset();
 });
 
-test("Abmelden ohne Netz: das Gerät ist trotzdem leer, eine Meldung sagt, dass der Server es nicht bestätigt hat", async () => {
-  const laufend = await angemeldetMitDaten();
+test("Abmelden ohne Netz: die Sitzung bleibt sichtbar, mit Meldung - nichts wird vorgetäuscht", async () => {
+  await angemeldetMitDaten();
   apiMock.post.mockRejectedValue(new Error("Network Error"));
   let ergebnis;
   await act(async () => { ergebnis = await auth.logout(); });
   expect(ergebnis).toBe(false);
-  await erwarteGeleert(laufend);
+  expect(auth.user?.id).toBe("u-a");
+  expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   expect(toastMock.error).toHaveBeenCalledTimes(1);
 });
 
-test("nach „Konto löschen“ (quiet) ohne Netz: Gerät leer, keine zweite Meldung", async () => {
+test("nach „Konto löschen“ (afterDelete) ohne Netz: Gerät leer, keine zweite Meldung", async () => {
   const laufend = await angemeldetMitDaten();
   apiMock.post.mockRejectedValue(new Error("Network Error"));
-  await act(async () => { await auth.logout({ quiet: true }); });
+  let ergebnis;
+  await act(async () => { ergebnis = await auth.logout({ afterDelete: true }); });
+  expect(ergebnis).toBe(true);
   await erwarteGeleert(laufend);
   expect(toastMock.error).not.toHaveBeenCalled();
 });

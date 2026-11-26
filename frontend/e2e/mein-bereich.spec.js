@@ -352,7 +352,9 @@ for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", {
       await expect(page.locator('[data-sonner-toast][data-type="error"]')).toHaveCount(0);
     });
 
-    test("Abmelden scheitert am Netz: das Gerät ist trotzdem leer, eine Meldung sagt es", async ({ page }) => {
+    // Normales Abmelden ohne Netz: die Sitzung bleibt sichtbar, mit Meldung - das Cookie gilt am Server weiter, ein
+    // leeres Gerät täuschte ein Abmelden nur vor (wie public.spec „logout keeps the visible session …“).
+    test("Abmelden scheitert am Netz: die Sitzung bleibt sichtbar, eine Meldung sagt es", async ({ page }) => {
       test.setTimeout(90_000);
       await mockServer(page);
       await mockSitzung(page, member);
@@ -362,8 +364,8 @@ for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", {
       await geraetBefuellen(page);
       await abmelden(page, form);
       await expect(page.locator('[data-sonner-toast][data-type="error"]')).toHaveCount(1);
-      await expect.poll(() => geraetReste(page)).toEqual([]);
-      await expect(page.getByTestId("nav-user")).toHaveCount(0);
+      await expect(page.getByTestId("mein-bereich")).toBeVisible();
+      expect(await geraetReste(page)).toEqual(GERAET);
     });
   });
 }

@@ -154,28 +154,35 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // `quiet` (nach „Konto löschen“): scheitert der Server, keine zweite Meldung neben „Dein Konto ist gelöscht.“.
-  const logout = async ({ quiet = false } = {}) => {
+  // Was das Konto auf diesem Gerät hinterlässt.
+  const clearDevice = () => {
+    setMfaTicket("");
+    setUser(null);
+    gemeinsamKonto(null);
+    // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
+    clearRecentSearches();
+    clearOfflineCard();
+    // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
+    void forgetWebPush();
+  };
+
+  // Scheitert das Abmelden am Server, bleibt die Sitzung sichtbar (mit Meldung): das Sitzungs-Cookie gilt dort weiter,
+  // ein leeres Gerät täuschte ein Abmelden nur vor. Anders nach „Konto löschen“ (`afterDelete`, #2059): da hat der
+  // Server alle Sitzungen schon beendet - das Gerät wird immer geleert, ohne zweite Meldung neben „Dein Konto ist gelöscht.“.
+  const logout = async ({ afterDelete = false } = {}) => {
     try {
       await api.post("/auth/logout");
+      clearDevice();
       return true;
     } catch (e) {
-      if (!quiet) {
-        const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";
-        setError(msg);
-        toast.error(msg);
+      if (afterDelete) {
+        clearDevice();
+        return true;
       }
+      const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";
+      setError(msg);
+      toast.error(msg);
       return false;
-    } finally {
-      // Dieses Gerät ist danach immer leer - auch wenn der Server nicht antwortet (geteilte Geräte, #2059).
-      setMfaTicket("");
-      setUser(null);
-      gemeinsamKonto(null);
-      // Die letzten Suchen (#1145) und die gespeicherte Mitgliedskarte (#1256) gehen mit dem Konto.
-      clearRecentSearches();
-      clearOfflineCard();
-      // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
-      void forgetWebPush();
     }
   };
 
