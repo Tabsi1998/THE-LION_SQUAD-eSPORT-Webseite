@@ -20,7 +20,7 @@ function renderAt(path, element) {
         <Route path={path} element={element} />
         <Route path="/403" element={<div>verboten</div>} />
         <Route path="/login" element={<div>anmelden</div>} />
-        <Route path="/profile" element={<MfaSetup />} />
+        <Route path="/mein-bereich/konto" element={<MfaSetup />} />
       </Routes>
     </MemoryRouter>
   );
@@ -97,7 +97,7 @@ test("die Turnierleitung ohne Zwei-Faktor geht zur Einrichtung - aus Rolle wie a
     const view = renderAt("/admin/f1", <ProtectedRoute requireTournamentStaff><div>fast lap</div></ProtectedRoute>);
     expect(screen.queryByText("fast lap")).toBeNull();
     const params = new URLSearchParams(screen.getByTestId("mfa-setup").dataset.search);
-    expect(Object.fromEntries(params)).toEqual({ tab: "security", mfa: "required", next: "/admin/f1" });
+    expect(Object.fromEntries(params)).toEqual({ mfa: "required", next: "/admin/f1" });
     view.unmount();
   }
 });
@@ -132,7 +132,7 @@ function renderEntrance(user) {
         <Route path="/admin/dienst" element={<ProtectedRoute requireDuty><div>mein dienst</div></ProtectedRoute>} />
         <Route path="/admin/moderation" element={<ProtectedRoute requireArea="moderation"><div>meldungen</div></ProtectedRoute>} />
         <Route path="/403" element={<NoDuty />} />
-        <Route path="/profile" element={<MfaSetup />} />
+        <Route path="/mein-bereich/konto" element={<MfaSetup />} />
       </Routes>
     </MemoryRouter>
   );
@@ -271,4 +271,24 @@ test.each([
   renderAt("/admin/tournaments", <ProtectedRoute requireTournamentStaff allowLeagueStaff><div>turniere</div></ProtectedRoute>);
   if (expected === "mfa-setup") expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
   else expect(screen.getByText(expected)).toBeInTheDocument();
+});
+
+// Nicht angemeldet (#2059, Prüfung): das Ziel samt Reiter und Anker geht mit zum Login - sonst landet /my/prizes nach
+// der Anmeldung auf den Rechnungen statt auf den Gewinnen.
+function LoginProbe() {
+  const { search } = useLocation();
+  return <div data-testid="login-probe" data-next={new URLSearchParams(search).get("next") || ""} />;
+}
+
+test("ohne Anmeldung: next nimmt Pfad, Suche und Anker mit", async () => {
+  authState.user = null;
+  render(
+    <MemoryRouter initialEntries={["/mein-bereich/datenschutz?tab=loeschung#oben"]}>
+      <Routes>
+        <Route path="/mein-bereich/datenschutz" element={<ProtectedRoute><div>datenschutz</div></ProtectedRoute>} />
+        <Route path="/login" element={<LoginProbe />} />
+      </Routes>
+    </MemoryRouter>
+  );
+  expect(await screen.findByTestId("login-probe")).toHaveAttribute("data-next", "/mein-bereich/datenschutz?tab=loeschung#oben");
 });

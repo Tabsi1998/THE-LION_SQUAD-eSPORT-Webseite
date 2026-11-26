@@ -4,13 +4,10 @@
  */
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { PublicLayout } from "@/components/tls/PublicLayout";
-import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { LoadState } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
-import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, MessageCircleQuestion, ShieldAlert, ArrowRight } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
@@ -25,18 +22,14 @@ const KIND_META = {
 };
 
 export default function MyPenaltiesPage() {
-  useDocumentTitle("Meine Strafen", "Übersicht aller Strafen mit Begründung.");
   // „Saubere Weste“ nur nach einer erfolgreichen, leeren Antwort (#984) - ein Ladefehler ist keine Entwarnung.
   const penalties = useLoad("penalties/me", ({ signal }) => api.get("/penalties/me", { signal }).then(({ data }) => ({ count: 0, ...data, items: data?.items || [] })));
   useApiInvalidation(penalties.reload, ["penalties", "matches", "f1"]);
 
   return (
-    <PublicLayout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs items={[{ label: "Dashboard", to: "/dashboard" }, { label: "Meine Strafen" }]} className="mb-6" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">Transparenz</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Meine Strafen</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">
+    <>
+      <div className="min-w-0">
+        <p className="text-white/60 max-w-2xl">
           Hier siehst du jede Strafe, ungültige Runde oder kampflose Niederlage – inklusive der vollständigen Begründung. Hältst du etwas für falsch? Stell über „Rückfrage“ an der Strafe eine Frage, wir schauen es uns an.
           Gegen eine Strafe der Liga-Leitung kannst du innerhalb der Frist einmal Einspruch einlegen, direkt an der Strafe.
         </p>
@@ -68,7 +61,7 @@ export default function MyPenaltiesPage() {
           </LoadState>
         </div>
       </div>
-    </PublicLayout>
+    </>
   );
 }
 

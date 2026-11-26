@@ -13,18 +13,18 @@ import { viennaDate } from "@/lib/vienna";
 import { referenceHref } from "@/lib/seasonClose";
 
 // /verein (#1147): das Ziel des Eintrags „Verein“ in der Handy-Leiste - derselbe Aufbau wie der Tab in der App.
-// Mitglieder sehen oben kurz ihren Mitgliederbereich (mit dem Weg zu /members/area), alle anderen „Mitglied werden“ mit
+// Mitglieder sehen oben kurz ihren Bereich „Verein“ (mit dem Weg nach /mein-bereich/verein, #2059), alle anderen „Mitglied werden“ mit
 // drei Gründen. Darunter für alle: neueste News, Galerie, Über uns, Referenzen, Sponsoren und Partner. Am PC bleibt das
-// Menü „Verein“ mit denselben Seiten. Rechnungen stehen im Profil, interne Termine unter Events (#1150). Die Zahlen an den
+// Menü „Verein“ mit denselben Seiten. Rechnungen stehen unter „Rechnungen & Unterlagen“, interne Termine unter Events (#1150). Die Zahlen an den
 // Kacheln („1 offen“, „6 frei“, „2 neu“) sind dieselben wie in der Sprungleiste des Mitgliederbereichs (#1257).
 
 export const MEMBER_TILES = [
-  { key: "card", to: "/members/membership#mitgliedskarte", label: "Karte", icon: QrCode },
-  { key: "membership", to: "/members/membership", label: "Mitgliedschaft", icon: Crown },
-  { key: "meetings", to: "/members/meetings", label: "Versammlungen", icon: Vote },
-  { key: "helping", to: "/members/helfen", label: "Helfen", icon: HandHelping },
-  { key: "documents", to: "/members/documents", label: "Dokumente", icon: FileText },
-  { key: "benefits", to: "/members/benefits", label: "Vorteile", icon: Gift },
+  { key: "card", to: "/mein-bereich/mitgliedschaft#mitgliedskarte", label: "Karte", icon: QrCode },
+  { key: "membership", to: "/mein-bereich/mitgliedschaft", label: "Mitgliedschaft", icon: Crown },
+  { key: "meetings", to: "/mein-bereich/verein/versammlungen", label: "Versammlungen", icon: Vote },
+  { key: "helping", to: "/mein-bereich/verein/helfen", label: "Helfen", icon: HandHelping },
+  { key: "documents", to: "/mein-bereich/verein/dokumente", label: "Dokumente", icon: FileText },
+  { key: "benefits", to: "/mein-bereich/verein/vorteile", label: "Vorteile", icon: Gift },
 ];
 
 export const JOIN_REASONS = [
@@ -122,7 +122,7 @@ export default function VereinPage() {
                 ))}
               </div>
             ) : null}
-            <Link to="/members/area" data-testid="verein-member-area-link" className="mt-4 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:underline">Zum Mitgliederbereich <ArrowRight className="w-3.5 h-3.5" /></Link>
+            <Link to="/mein-bereich/verein" data-testid="verein-member-area-link" className="tls-btn tls-btn--secondary mt-4 inline-flex min-h-11 items-center gap-1 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Mein Bereich · Verein <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></Link>
           </div>
         ) : (
           <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/[0.05] rounded-sm p-5 md:p-6 max-w-3xl" data-testid="verein-join">

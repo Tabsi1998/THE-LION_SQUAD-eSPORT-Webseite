@@ -11,15 +11,22 @@ export function pageContentElement() {
   return document.getElementById("main-content") || document.querySelector("main") || document.body;
 }
 
+// Innerhalb von „Mein Bereich“ (#2059) blendet der Rahmen selbst ein - die Seitenleiste steht still, nur der Inhalt wechselt.
+const OWN_TRANSITION = /^\/mein-bereich(?:\/|$)/;
+
 export function PageTransition({ children }) {
   const { pathname } = useLocation();
   const first = useRef(true);
+  const previous = useRef(pathname);
 
   useEffect(() => {
+    const before = previous.current;
+    previous.current = pathname;
     if (first.current) {
       first.current = false;
       return;
     }
+    if (OWN_TRANSITION.test(before) && OWN_TRANSITION.test(pathname)) return;
     if (prefersReducedMotion()) return;
     const element = pageContentElement();
     if (!element || typeof element.animate !== "function") return;

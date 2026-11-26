@@ -113,7 +113,7 @@ export function ModerationStandingCard({ compact = false }) {
         </details>
       )}
       {compact && (
-        <Link to="/my/penalties" data-testid="standing-more" className="mt-3 inline-block text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Details und Einspruch →</Link>
+        <Link to="/mein-bereich/rechnungen?tab=strafen" data-testid="standing-more" className="tls-btn tls-btn--secondary mt-3 inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider">Details und Einspruch</Link>
       )}
     </section>
   );

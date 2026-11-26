@@ -1,0 +1,75 @@
+/* „Mein Bereich“ (#2059): Seitenleiste, Reiter und Seitenwechsel. Bewegt werden nur transform und opacity, Dauer und
+   Kurve aus den Tokens (index.css); mit „Bewegung reduzieren“ steht --tls-motion-on auf 0 und die Wege fallen weg. */
+
+/* Seitenleiste: ein Marker gleitet zur aktiven Gruppe, statt dass er an der alten verschwindet und an der neuen auftaucht.
+   Lage und Höhe misst BereichNav; bewegt wird nur translateY. Beim ersten Zeichnen steht er sofort (data-ready="0"). */
+.tls-mb-nav { position: relative; }
+.tls-mb-nav__mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  border-radius: 2px;
+  background: rgb(41 182 232 / 0.1);
+  box-shadow: inset 2px 0 0 var(--tls-cyan);
+  pointer-events: none;
+  transform: translateY(var(--tls-mb-y, 0px));
+  transition: transform var(--tls-motion-mid) var(--tls-ease-move), opacity var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-mb-nav__mark[data-ready="0"] { transition: none; }
+.tls-mb-nav__mark[data-shown="0"] { opacity: 0; }
+.tls-mb-nav__item {
+  position: relative;
+  z-index: 1;
+  transition: color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-mb-nav__icon {
+  transition: transform var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-mid) var(--tls-ease);
+  opacity: 0.6;
+}
+/* Aufleuchten: das Zeichen der aktiven Gruppe wird hell und wächst einen Hauch. */
+.tls-mb-nav__item[aria-current="page"] .tls-mb-nav__icon {
+  opacity: 1;
+  transform: scale(calc(1 + 0.1 * var(--tls-motion-on)));
+}
+@media (hover: hover) and (pointer: fine) {
+  .tls-mb-nav__item:hover .tls-mb-nav__icon { opacity: 1; }
+}
+
+/* Punkt an einer Gruppe mit etwas „Zu tun“ - er blendet ein, wenn die Daten da sind. */
+.tls-mb-dot {
+  animation: tls-mb-dot-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+@keyframes tls-mb-dot-in {
+  from { opacity: 0; transform: scale(calc(1 - 0.4 * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Inhalt beim Wechsel der Gruppe oder des Reiters: kurz einblenden und 8 px aufsteigen - die Seitenleiste steht still. */
+.tls-mb-panel { animation: tls-mb-in var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tls-mb-in {
+  from { opacity: 0; transform: translateY(calc(8px * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Reiter: der Strich unter dem aktiven Reiter zeichnet den Weg zum neuen nach. Breite 1 px, gestreckt über scaleX - so
+   bleibt es bei transform, auch wenn die Reiter verschieden breit sind. */
+.tls-mb-tabs { position: relative; }
+.tls-mb-tabs__line {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 2px;
+  background: var(--tls-cyan);
+  transform-origin: left center;
+  transform: translateX(var(--tls-mb-x, 0px)) scaleX(var(--tls-mb-w, 0));
+  transition: transform var(--tls-motion-mid) var(--tls-ease-move);
+  pointer-events: none;
+}
+.tls-mb-tabs__line[data-ready="0"] { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-mb-panel, .tls-mb-dot { animation: none; }
+  .tls-mb-nav__mark, .tls-mb-tabs__line, .tls-mb-nav__icon { transition: none; }
+}

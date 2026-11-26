@@ -63,7 +63,7 @@ test("das Dashboard zeigt einen kommenden Termin, keinen vergangenen, Aktionen u
   await expect(page.getByTestId("dashboard-teams-link")).toHaveCount(0);
   await expect(page.getByTestId("dashboard-achievements-link")).toHaveCount(0);
   await expect(page.getByTestId("dashboard-penalties-link")).toBeVisible();
-  await expect(page.getByTestId("dashboard-privacy-link")).toBeVisible();
+  await expect(page.getByTestId("dashboard-bereich-liste-datenschutz")).toBeVisible();
 });
 
 test("ohne Termine steht der Hinweis mit dem Weg zu den Events", async ({ page }) => {

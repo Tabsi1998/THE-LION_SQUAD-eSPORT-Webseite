@@ -106,7 +106,7 @@ test("ohne Weg zur Akte steht der Grund, mit Bindung ohne Fähigkeit der Grund j
   apiMock.get.mockResolvedValue({ data: { available: false, reason: "not_bound", text: "Dafür muss dein Konto verbunden sein.", meetings: [], ballots: [] } });
   const { unmount } = render(<MemoryRouter><MemberMeetingsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("meetings-unavailable")).toHaveTextContent("verbunden sein"));
-  expect(screen.getByText("Zu Meine Mitgliedschaft")).toBeInTheDocument();
+  expect(screen.getByText("Zur Mitgliedschaft")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
   unmount();
 
   apiMock.get.mockResolvedValue({ data: { ...VIEW, meetings: [], ballots: [], meetings_reason: null, ballots_reason: "no_capability_votes", ballots_text: "Deine Verbindung erlaubt Abstimmungen noch nicht." } });

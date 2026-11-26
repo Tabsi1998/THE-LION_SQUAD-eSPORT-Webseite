@@ -61,7 +61,7 @@ export default function MembersDirectoryPage() {
             </p>
           </div>
           {isClubMember ? (
-            <Link to="/members/membership" data-testid="members-own-entry" className="tls-btn tls-btn--secondary inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
+            <Link to="/mein-bereich/mitgliedschaft" data-testid="members-own-entry" className="tls-btn tls-btn--secondary inline-flex items-center self-start shrink-0 gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
               <Crown className="w-4 h-4" /> Mein Eintrag
             </Link>
           ) : (

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { api, formatApiError, formatMemberSince } from "@/lib/api";
 import { toastLoadFailed } from "@/lib/loadProblem";
 import { useAuth } from "@/context/AuthContext";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeCard, formatDate } from "@/lib/dolibarr";
 import { exitLine } from "@/lib/membershipMail";
@@ -14,10 +13,11 @@ import { MemberFileAccountsCard } from "@/pages/user/MemberFileAccountsCard";
 import JerseyNumberCard from "@/pages/user/JerseyNumberCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
-import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
+import { Crown, Calendar, Hash, FileText, Eye, EyeOff, History, Wallet, Users, ShieldCheck } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
+import { BEREICH, vereinPfad } from "@/lib/meinBereich";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -29,6 +29,9 @@ const TYPE_LABELS = {
   honorary: "Ehrenmitglied", youth: "Jugend", guest: "Gast", former: "Ehemalig",
 };
 
+// Meine Mitgliedschaft (#295 ff., seit #2059 die Gruppe „Mitgliedschaft“ in „Mein Bereich“): oben Status und Ausweis,
+// dann Beitrag, Wunschnummer und „Meine Daten“ (Anschrift und Telefon ändern, Austritt) - das, was man hier sucht. Die
+// Einwilligungen stehen unter Datenschutz → Einwilligungen (ConsentsCard), Rechnungen unter Rechnungen & Unterlagen.
 export default function MyMembershipPage() {
   const { user } = useAuth();
   // Ein Fehler beendet das Laden (#983, #1152; über useLoad): ohne Stand der Fehler mit „Nochmal versuchen“, mit Stand
@@ -39,15 +42,9 @@ export default function MyMembershipPage() {
   useApiInvalidation(load, ["membership", "users"]);
 
   if (membership.status === "error") {
-    return (
-      <PublicLayout>
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <LoadState load={membership} errorTitle="Mitgliedschaft konnte nicht geladen werden" />
-        </div>
-      </PublicLayout>
-    );
+    return <LoadState load={membership} errorTitle="Mitgliedschaft konnte nicht geladen werden" />;
   }
-  if (!data) return <PublicLayout><div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8"><SkeletonDetailHeader label="Lade Mitgliedschaft" /><SkeletonCards count={4} columns={4} image={false} label="Lade Mitgliedschaft" /></div></PublicLayout>;
+  if (!data) return <div className="space-y-8"><SkeletonDetailHeader label="Lade Mitgliedschaft" /><SkeletonCards count={4} columns={4} image={false} label="Lade Mitgliedschaft" /></div>;
 
   const m = data.membership;
   const erp = data.dolibarr;
@@ -57,19 +54,14 @@ export default function MyMembershipPage() {
   const yearsAsMember = memberSince ? Math.floor((Date.now() - memberSince.getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : null;
 
   return (
-    <PublicLayout>
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to="/members/area" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#FFD700]">
-          <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
-        </Link>
-        <LoadStaleNotice load={membership} className="mt-6" />
+    <div data-testid="my-membership">
+        <LoadStaleNotice load={membership} className="mb-6" />
 
-        {/* Hero card */}
-        <div className="mt-8 border border-[#FFD700]/40 bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent rounded-sm p-6 md:p-8 relative overflow-hidden">
-          <div className="absolute -right-8 -top-8 opacity-10"><Crown className="w-48 h-48 text-[#FFD700]" /></div>
+        {/* Status: Name, Nummer, Stand - die Überschrift der Gruppe steht darüber (Mein Bereich). */}
+        <div className="border border-[#FFD700]/40 bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent rounded-sm p-6 md:p-8 relative overflow-hidden" data-testid="membership-status">
+          <div className="absolute -right-8 -top-8 opacity-10" aria-hidden="true"><Crown className="w-48 h-48 text-[#FFD700]" /></div>
           <div className="relative">
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">MEINE MITGLIEDSCHAFT</span>
-            <h1 className="font-heading text-3xl md:text-5xl font-black uppercase mt-2">{user?.display_name || user?.username}</h1>
+            <h2 className="tls-wrap font-heading text-2xl md:text-4xl font-black uppercase">{user?.display_name || user?.username}</h2>
             {m?.member_number && (
               <div className="mt-3 inline-flex items-center gap-2 text-[#FFD700] font-mono text-lg font-bold">
                 <Hash className="w-4 h-4" /> {m.member_number}
@@ -91,21 +83,12 @@ export default function MyMembershipPage() {
           <Stat icon={FileText} label="Mitgliedsart" value={m?.membership_type ? TYPE_LABELS[m.membership_type] : "—"} />
         </div>
 
-        {/* Mitgliedsnummer öffentlich (#2125): entscheidet das Mitglied selbst; Standard ist nein */}
-        {m?.member_number && <NumberVisibilityCard membership={m} onChanged={load} />}
-
         {/* Digitale Mitgliedskarte (#346): nur für aktive Mitglieder, der Server entscheidet */}
         {(m?.member_status === "active" || m?.member_status === "honorary") && <MemberCardPanel />}
 
-        {/* Mitgliederverzeichnis per Opt-in (#410): der Server sagt, ob die Person eintragen darf */}
-        {(m?.member_status === "active" || m?.member_status === "honorary") && <DirectoryCard />}
-
-        {/* Meine Nummer (#2034): einmal wählen, danach nur über den Vorstand; der Server sagt, ob es sie gibt */}
-        <JerseyNumberCard />
-
         {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
         {fee && (
-          <div className={`mt-6 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
+          <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
               <span className={`text-[10px] font-black uppercase tracking-widest ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-[#00FF88]"}`}>{fee.label}</span>
@@ -122,12 +105,11 @@ export default function MyMembershipPage() {
             </div>
           </div>
         )}
-        {/* Meine Einwilligungen (#329, Teil 1): der Stand aus der Mitgliederverwaltung, nur mit bestätigter Zuordnung */}
-        {erp?.led_by_dolibarr && <ConsentsCard />}
-        {/* Vereinsakte verbinden (#324 Teil 1): Einladungscode vom Vorstand, danach eigene Unterlagen aus der Akte */}
-        {erp?.connected && <IdentityCard />}
+        {/* Meine Nummer (#2034): einmal wählen, danach nur über den Vorstand; der Server sagt, ob es sie gibt */}
+        <div id="nummer" className="scroll-mt-32"><JerseyNumberCard /></div>
+
         {/* Eigene Daten und Austritt (#329 Teil 2): nur mit Bindung und Fähigkeit „eigene Daten“ */}
-        {erp?.connected && <SelfServiceCard />}
+        {erp?.connected && <div id="meine-daten" className="scroll-mt-32"><SelfServiceCard /></div>}
         {/* Konten in der Mitgliederakte (#846): geprüfte Konten nur auf Wunsch in die Akte */}
         {erp?.connected && <MemberFileAccountsCard />}
         {/* Eigenes Website-Profil (#260): Gamertag, Kurztext, Spiele, Plattformen in der Vereinsakte, Anzeige nur mit Einwilligung */}
@@ -149,6 +131,15 @@ export default function MyMembershipPage() {
         {/* Austritt ohne Dolibarr (#2125): eine Erklärung an den Vorstand; mit Dolibarr geht er über „Meine Daten“ */}
         {(m?.member_status === "active" || m?.member_status === "honorary") && !erp?.led_by_dolibarr && <SimpleExitCard exitRequest={m.exit_request} onChanged={load} />}
 
+        {/* Mitgliedsnummer öffentlich (#2125): entscheidet das Mitglied selbst; Standard ist nein */}
+        {m?.member_number && <NumberVisibilityCard membership={m} onChanged={load} />}
+
+        {/* Vereinsakte verbinden (#324 Teil 1): Einladungscode vom Vorstand, danach eigene Unterlagen aus der Akte */}
+        {erp?.connected && <IdentityCard />}
+        {/* Mitgliederverzeichnis per Opt-in (#410): der Server sagt, ob die Person eintragen darf */}
+        {(m?.member_status === "active" || m?.member_status === "honorary") && <DirectoryCard />}
+
+        {/* Meine Einwilligungen (#329, Teil 1) stehen seit #2059 unter Datenschutz → Einwilligungen. */}
         {/* History */}
         {!!m?.history?.length && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5">
@@ -173,14 +164,13 @@ export default function MyMembershipPage() {
           </div>
         )}
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link to="/profile" className="px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs">Profil bearbeiten</Link>
-          <Link to="/members/benefits" className="px-4 py-2 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs">Vorteile ansehen</Link>
-          {erp?.led_by_dolibarr && <Link to="/profile?tab=invoices" data-testid="membership-invoices-link" className="px-4 py-2 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs">Meine Rechnungen</Link>}
-          <Link to="/privacy-account" className="px-4 py-2 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">DSGVO / Datenexport</Link>
+        {/* Weiter in „Mein Bereich“: was zur Mitgliedschaft gehört, aber eine eigene Gruppe hat. */}
+        <div className="mt-8 flex flex-wrap gap-3" data-testid="membership-more">
+          <Link to={vereinPfad("vorteile")} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Vorteile ansehen</Link>
+          {erp?.led_by_dolibarr && <Link to={`${BEREICH}/rechnungen`} data-testid="membership-invoices-link" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Rechnungen</Link>}
+          {erp?.led_by_dolibarr && <Link to={`${BEREICH}/datenschutz?tab=einwilligungen`} data-testid="membership-consents-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Einwilligungen</Link>}
         </div>
-      </section>
-    </PublicLayout>
+    </div>
   );
 }
 
@@ -301,7 +291,7 @@ function IdentityCard() {
           {viaMember
             ? <>Dein Konto ist über deine Mitgliedsnummer{state.member_ref ? ` ${state.member_ref}` : ""} mit der Vereinsakte verbunden – Unterlagen, eigene Daten und dein Website-Profil kommen von selbst aus der Mitgliederverwaltung.</>
             : <>Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden{state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.</>}{" "}
-          <Link to="/members/documents" className="text-[#FFD700] hover:underline" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
+          <Link to={vereinPfad("dokumente")} className="tls-btn tls-btn--quiet mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
           {viaMember && state.right_missing ? (
             <p className="mt-2 text-[#FFD700]/80" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
           ) : null}
@@ -592,7 +582,7 @@ function ConsentTexts({ row }) {
   );
 }
 
-function ConsentsCard() {
+export function ConsentsCard() {
   const [state, setState] = useState(null);
   const [problem, setProblem] = useState(null);
   const [open, setOpen] = useState(null);
@@ -730,7 +720,7 @@ function DirectoryCard() {
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-directory-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Mitgliederverzeichnis</h2>
-        {entry.listed && entry.slug && <Link to={`/members/${entry.slug}`} data-testid="membership-directory-link" className="text-xs uppercase tracking-wider font-bold text-[#FFD700]">Meinen Eintrag ansehen</Link>}
+        {entry.listed && entry.slug && <Link to={`/members/${entry.slug}`} data-testid="membership-directory-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Meinen Eintrag ansehen</Link>}
       </div>
       {entry.blocked ? (
         <p className="mt-3 text-sm text-[#FFD700]" data-testid="membership-directory-blocked">Dein Eintrag ist von der Vereinsverwaltung gesperrt. Wenn du meinst, das stimmt nicht, melde dich beim Vorstand.</p>

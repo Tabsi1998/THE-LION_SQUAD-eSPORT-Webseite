@@ -32,7 +32,7 @@ export default function NotificationsPage() {
             <p className="mt-1 text-sm text-white/50">{unread} ungelesen · {read} gelesen. Ein Klick öffnet das Ziel und markiert als gelesen.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/profile?tab=notifications" data-testid="notifications-settings-link" className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm text-[11px] font-bold uppercase tracking-wider hover:text-white hover:border-white/30">
+            <Link to="/mein-bereich/benachrichtigungen" data-testid="notifications-settings-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider">
               <Settings className="w-3.5 h-3.5" /> Einstellen
             </Link>
             {unread > 0 ? (

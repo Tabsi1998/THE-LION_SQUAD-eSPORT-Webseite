@@ -74,6 +74,9 @@ export default defineConfig({
           groups: [
             { name: "react-core", test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 40 },
             { name: sharedWithHeavy, debugName: "vendor-shared", priority: 35 },
+            // Die Zeichen, die schon der Start braucht (Kopf, Menü, untere Leiste), in einer Datei (#2059): einzeln
+            // zerfielen sie in viele kleine Teile. `$initial` nimmt nur, was der Start lädt - Seiten laden ihre selbst.
+            { name: "start-icons", test: /[\\/]node_modules[\\/]lucide-react[\\/]/, tags: ["$initial"], priority: 32 },
             { name: "ui-radix", test: /[\\/]node_modules[\\/]@radix-ui[\\/]/, priority: 30 },
             { name: "editor", test: EDITOR_MODULES, priority: 20 },
             { name: "charts", test: CHART_MODULES, priority: 10 },

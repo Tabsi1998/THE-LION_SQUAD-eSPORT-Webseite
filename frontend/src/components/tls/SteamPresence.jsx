@@ -39,7 +39,7 @@ export function SteamPresence({ data }) {
       )}
       {canJoin && (
         <div className="text-xs text-white/45" data-testid="steam-presence-join">
-          Auch dabei sein: <Link to="/profile?tab=socials" className="text-[#29B6E8] hover:underline">Profil → Socials → „Meinen Steam-Status im Mitgliederbereich zeigen“</Link>.
+          Auch dabei sein: <Link to="/mein-bereich/profil?tab=socials" className="text-[#29B6E8] hover:underline">Mein Bereich → Profil → Socials → „Meinen Steam-Status im Mitgliederbereich zeigen“</Link>.
         </div>
       )}
     </div>

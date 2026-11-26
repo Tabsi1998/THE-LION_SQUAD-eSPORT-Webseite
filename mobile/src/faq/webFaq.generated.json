@@ -124,7 +124,7 @@
     {
       "id": "datenschutz",
       "titel": "Datenschutz & Konto",
-      "kurz": "Deine Daten herunterladen oder das Konto anonymisieren.",
+      "kurz": "Deine Daten herunterladen oder das Konto löschen.",
       "icon": "shield",
       "rollen": [
         "spieler",
@@ -171,7 +171,7 @@
     {
       "id": "activision-id",
       "frage": "Wo trage ich meine Activision-ID ein?",
-      "antwort": "In den Einstellungen unter Gaming bei den Spiel-IDs. Trag sie genau so ein, wie sie im Spiel steht, mit # und Zahlen.",
+      "antwort": "In Mein Bereich unter Profil, Reiter Gaming & Spiel-IDs. Trag sie genau so ein, wie sie im Spiel steht, mit # und Zahlen.",
       "bereich": "konto-profil",
       "rollen": [
         "spieler",
@@ -187,7 +187,7 @@
     {
       "id": "weniger-push",
       "frage": "Wie bekomme ich weniger Benachrichtigungen?",
-      "antwort": "Öffne in den Einstellungen Benachrichtigungen und wähl die Stufe Wichtiges oder Wenig. Mit der Ruhezeit kommt nachts kein Push.",
+      "antwort": "Öffne in Mein Bereich die Benachrichtigungen und wähl die Stufe Wichtiges oder Wenig. Mit der Ruhezeit kommt nachts kein Push.",
       "bereich": "benachrichtigungen",
       "rollen": [
         "spieler",
@@ -314,7 +314,7 @@
     {
       "id": "daten-und-konto",
       "frage": "Wie lade ich meine Daten herunter oder lösche mein Konto?",
-      "antwort": "Unter Meine Daten lädst du alles als JSON herunter. Dort kannst du dein Konto auch anonymisieren. Das lässt sich nicht rückgängig machen.",
+      "antwort": "In Mein Bereich unter Datenschutz: Daten herunterladen lädt alles als Datei herunter, Konto löschen löscht dein Konto. Das lässt sich nicht rückgängig machen.",
       "bereich": "datenschutz",
       "rollen": [
         "spieler",
@@ -414,7 +414,7 @@
       "sichtbar_fuer": "alle",
       "link": {
         "to": "/account/invoices",
-        "label": "Zu Meine Rechnungen"
+        "label": "Zu deinen Rechnungen"
       }
     },
     {
@@ -564,13 +564,13 @@
       "sichtbar_fuer": "alle",
       "link": {
         "to": "/profile?tab=privacy",
-        "label": "Privatsphäre öffnen"
+        "label": "Sichtbarkeit öffnen"
       }
     },
     {
       "id": "anonymisieren-was-passiert",
-      "frage": "Was passiert, wenn ich mein Konto anonymisiere?",
-      "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben. Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen.",
+      "frage": "Was passiert, wenn ich mein Konto lösche?",
+      "antwort": "Name, E-Mail, verknüpfte Konten und Nachrichten werden gelöscht oder überschrieben, Turnier-Ergebnisse bleiben ohne Namen stehen. Das lässt sich nicht rückgängig machen. Früher hieß das „Konto anonymisieren“.",
       "bereich": "datenschutz",
       "rollen": [
         "spieler",
@@ -586,7 +586,7 @@
     {
       "id": "konto-loeschen-gesperrt",
       "frage": "Warum kann ich mein Konto nicht löschen?",
-      "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Meine Daten steht je Rolle, wo das geht.",
+      "antwort": "Bist du noch Teamleitung, Co-Leitung, Captain oder Vertreter, gib die Rolle zuerst ab. Unter Datenschutz → Konto löschen steht je Rolle, wo das geht.",
       "bereich": "datenschutz",
       "rollen": [
         "spieler",
@@ -602,7 +602,7 @@
     {
       "id": "was-bekomme-ich-zugeschickt",
       "frage": "Wo stelle ich ein, was ich zugeschickt bekomme?",
-      "antwort": "In den Einstellungen unter Benachrichtigungen. Wie das geht, steht in der Anleitung zu Konto und Profil.",
+      "antwort": "In Mein Bereich unter Benachrichtigungen. Wie das geht, steht in der Anleitung zu Konto und Profil.",
       "bereich": "datenschutz",
       "rollen": [
         "spieler",
@@ -677,8 +677,8 @@
           "schritte": [
             {
               "id": "einstellungen",
-              "titel": "Einstellungen öffnen",
-              "text": "Tippe oben rechts auf deinen Namen und dann auf Einstellungen. Am Handy findest du sie im Menü.",
+              "titel": "Mein Bereich öffnen",
+              "text": "Tippe oben rechts auf deinen Namen und dann auf Profil. Am Handy findest du es im Menü. Alles über dich steht dort in Mein Bereich.",
               "hinweis": "Es gibt keinen Speichern-Knopf. Alles, was du einträgst, speichert sich von selbst."
             },
             {
@@ -694,18 +694,18 @@
             {
               "id": "plattform",
               "titel": "Plattform wählen",
-              "text": "Öffne Gaming. Tippe unter Plattformen alles an, worauf du spielst. Mehrere sind möglich."
+              "text": "Öffne den Reiter Gaming & Spiel-IDs. Tippe unter Plattformen alles an, worauf du spielst. Mehrere sind möglich."
             },
             {
               "id": "spiel-ids",
               "titel": "Spiel-IDs eintragen",
-              "text": "Unter Gaming stehen die Spiel-IDs. Trag deine ID genau so ein, wie sie im Spiel steht. Für Call of Duty ist das die Activision-ID mit # und Zahlen.",
+              "text": "Unter Gaming & Spiel-IDs stehen die Spiel-IDs. Trag deine ID genau so ein, wie sie im Spiel steht. Für Call of Duty ist das die Activision-ID mit # und Zahlen.",
               "hinweis": "Fragt eine Liga nach deiner Plattform, steht das Feld direkt bei der Spiel-ID. Felder mit * sind Pflicht."
             },
             {
               "id": "liga-hinweis",
               "titel": "Fehlt noch etwas für die Liga?",
-              "text": "Spielst du in einer Liga, zeigt ein Hinweis unter Gaming, ob noch etwas fehlt. Trag es nach. Sonst kannst du nicht einchecken und nicht aufgestellt werden.",
+              "text": "Spielst du in einer Liga, zeigt ein Hinweis unter Gaming & Spiel-IDs, ob noch etwas fehlt. Trag es nach. Sonst kannst du nicht einchecken und nicht aufgestellt werden.",
               "hinweis": "Für die Liga gilt die ID, die bei der Anmeldung festgehalten wurde. Änderst du sie später, gibt die Liga-Leitung die neue frei."
             }
           ]
@@ -1519,7 +1519,7 @@
     {
       "slug": "datenschutz-und-konto",
       "titel": "Datenschutz und Konto",
-      "kurz": "Deine Daten herunterladen und das Konto anonymisieren.",
+      "kurz": "Deine Daten herunterladen und das Konto löschen.",
       "zielgruppe": "Für alle mit Konto",
       "bereich": "datenschutz",
       "rollen": [
@@ -1548,7 +1548,7 @@
             {
               "id": "daten-herunterladen",
               "titel": "Daten herunterladen",
-              "text": "Öffne in den Einstellungen Meine Daten und tippe auf Als JSON herunterladen. Die Datei enthält alles, was wir über dich gespeichert haben."
+              "text": "Öffne in Mein Bereich die Gruppe Datenschutz und dort den Reiter Daten herunterladen. Tippe auf Daten herunterladen. Die Datei enthält alles, was wir über dich gespeichert haben."
             }
           ]
         },
@@ -1558,8 +1558,8 @@
           "schritte": [
             {
               "id": "konto-anonymisieren",
-              "titel": "Konto anonymisieren",
-              "text": "Unter Meine Daten tippst du auf Konto anonymisieren. Zur Sicherheit tippst du danach LÖSCHEN ein.",
+              "titel": "Konto löschen",
+              "text": "Unter Datenschutz öffnest du den Reiter Konto löschen und tippst auf Konto löschen. Zur Sicherheit tippst du danach LÖSCHEN ein. Früher hieß das „Konto anonymisieren“.",
               "hinweis": "Das gilt sofort und lässt sich nicht rückgängig machen. Deine Turnier-Ergebnisse bleiben ohne Namen stehen."
             },
             {

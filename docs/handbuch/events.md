@@ -322,7 +322,7 @@ Vor-Ort-QR-Code oder einen Zugangslink). Abgesagtes und „Nur intern“ stehen 
 - Je Termin steht der eigene **Stand** als Plakette: angemeldet, Warteliste, eingecheckt, „Du bist dabei · mit Team“, gefahren,
   zugesagt oder der Stand der Schicht. Ein Tipp öffnet den Termin (Turnierseite, Event, Mitgliederbereich).
 - Leer heißt: noch nirgends angemeldet – mit Wegen zu **Turniere** und **Events**.
-- Erreichbar über den Reiter im Kalender und über **Einstellungen → Konto → Mein Kalender-Abo**.
+- Erreichbar über den Reiter im Kalender und über **Mein Bereich → Konto & Sicherheit → Kalender-Abo**.
 
 <img src="../assets/kalender/mein-kalender-liste.png" alt="Mein Kalender, Als Nächstes mit dem angemeldeten Turnier und seinem Stand" width="560">
 
@@ -439,7 +439,7 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | „Nochmal senden“ fehlt | Nur Redaktion und System dürfen ein zweites Mal senden | Redaktion fragen |
 | Abschnitt Kosten fehlt | Es gibt einen externen Anmeldelink, oder die Anmeldung ist aus | Link entfernen bzw. Anmeldung einschalten |
 | Kosten lassen sich nicht ändern | Dafür ist der Bereich **Finanzen** nötig | Rechte klären ([Rollen](../ROLLEN.md)) |
-| Persönliches Abo zeigt nichts | Die Adresse wurde neu erzeugt oder das Abo abgeschaltet | Unter **Mein Kalender** bzw. **Einstellungen → Mein Kalender-Abo** **Neu erzeugen** und im Kalender die neue Adresse eintragen |
+| Persönliches Abo zeigt nichts | Die Adresse wurde neu erzeugt oder das Abo abgeschaltet | Unter **Mein Kalender** bzw. **Mein Bereich → Konto & Sicherheit → Kalender-Abo** **Neu erzeugen** und im Kalender die neue Adresse eintragen |
 | Termin fehlt in „Mein Kalender“ | Abgemeldet, abgesagt oder „Nur intern“ | Gewollt; Abgesagtes und Internes stehen nie darin |
 | Der Abo-Hinweis kommt nicht mehr | Er erscheint je Konto nur einmal und nie mit aktivem Abo | Abo über **Mein Kalender** einrichten |
 | Freunde-Abschnitt fehlt | Keine bestätigten Freunde angemeldet, oder sie teilen ihre Anmeldungen nicht | Gewollt; jede Person steuert es selbst |

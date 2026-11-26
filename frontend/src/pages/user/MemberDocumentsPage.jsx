@@ -3,9 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { loadOk, problemKind, toastLoadFailed } from "@/lib/loadProblem";
 import { PublicErrorState } from "@/components/tls/PublicEmptyState";
-import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { FileText, ArrowLeft, Search } from "lucide-react";
+import { FileText, Search } from "lucide-react";
 import { DocumentViewer } from "@/components/tls/DocumentViewer";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { CATEGORY_LABELS, DocumentGroup } from "./DocumentRows";
@@ -53,24 +52,19 @@ export default function MemberDocumentsPage() {
   const rest = filtered.filter((d) => !d.pinned);
 
   return (
-    <PublicLayout>
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link to="/members/area" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#FFD700]">
-          <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
-        </Link>
-        <span className="mt-6 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700] block">EXKLUSIV</span>
-        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Vereins&shy;dokumente</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">
+    <>
+      <section className="min-w-0">
+        <p className="text-white/60 max-w-2xl">
           Statuten, Protokolle, Formulare und Vereinsleitlinien - zentral abgelegt, direkt einsehbar und immer aktuell.
         </p>
         <p className="mt-2 text-sm text-white/55" data-testid="docs-own-hint">
-          Deine eigenen Unterlagen aus der Vereinsakte (Bestätigungen, Schreiben) stehen in deinem Profil unter{" "}
-          <Link to="/account/documents" className="text-[#29B6E8] hover:underline">„Nur für dich“ → Deine Unterlagen</Link>.
+          Deine eigenen Unterlagen aus der Vereinsakte (Bestätigungen, Schreiben) stehen unter{" "}
+          <Link to="/mein-bereich/rechnungen?tab=unterlagen" className="text-[#29B6E8] hover:underline">Rechnungen & Unterlagen → Unterlagen</Link>.
         </p>
         {identity && identity.status !== "bound" && (
           <div className="mt-6 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75" data-testid="docs-identity-hint">
             Dort erscheinen sie von selbst, sobald dein Konto deinem Mitgliedseintrag zugeordnet ist (über die bestätigte E-Mail-Adresse oder durch den Vorstand) – oder du löst einen{" "}
-            <Link to="/members/membership" className="text-[#FFD700] hover:underline">Einladungscode unter Meine Mitgliedschaft</Link> ein.
+            <Link to="/mein-bereich/mitgliedschaft" className="text-[#FFD700] hover:underline">Einladungscode unter Mitgliedschaft</Link> ein.
           </div>
         )}
 
@@ -125,6 +119,6 @@ export default function MemberDocumentsPage() {
           onClose={() => setViewing(null)}
         />
       )}
-    </PublicLayout>
+    </>
   );
 }

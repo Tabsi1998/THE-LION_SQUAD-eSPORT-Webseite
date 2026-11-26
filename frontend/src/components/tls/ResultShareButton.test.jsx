@@ -68,8 +68,8 @@ describe("ResultShareButton", () => {
     apiMock.get.mockResolvedValue({ data: { shareable: false, reason: "private_profile", text: "Dein Profil ist privat." } });
     const { unmount } = renderButton({ nav: {} });
     const hint = await screen.findByTestId("result-share-hint");
-    expect(hint).toHaveTextContent("Dein Profil ist privat. Zur Privatsphäre");
-    expect(screen.getByRole("link", { name: "Zur Privatsphäre" })).toHaveAttribute("href", "/profile?tab=privacy");
+    expect(hint).toHaveTextContent("Dein Profil ist privat. Zur Sichtbarkeit");
+    expect(screen.getByRole("link", { name: "Zur Sichtbarkeit" })).toHaveAttribute("href", "/mein-bereich/datenschutz");
     unmount();
 
     apiMock.get.mockResolvedValue({ data: { shareable: false, reason: "not_participant", text: "Du hast nicht mitgespielt." } });

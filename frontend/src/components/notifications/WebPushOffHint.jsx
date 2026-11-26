@@ -10,7 +10,7 @@ import { loadWebPushConfig, webPushBlocked } from "@/lib/webPush";
 export const WEB_PUSH_OFF_TEXT = "Aufrufe sind aus";
 export const WEB_PUSH_OFF_ACTION = "einschalten";
 /** Der Link führt direkt zur Karte „Dieser Browser“ (BrowserPushCard), die erklärt, wie man es im Browser erlaubt. */
-export const WEB_PUSH_OFF_LINK = "/profile?tab=notifications#dieser-browser";
+export const WEB_PUSH_OFF_LINK = "/mein-bereich/benachrichtigungen#dieser-browser";
 
 // Die Einstellung des Servers ändert sich selten: einmal je Sitzung laden, nicht bei jedem Fokuswechsel.
 let sessionConfig = null;

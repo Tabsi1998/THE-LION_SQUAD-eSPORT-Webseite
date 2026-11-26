@@ -28,8 +28,8 @@ import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/b
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { StoreButton } from "@/components/tls/StoreButton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, ShieldCheck, Crown, Megaphone, ArrowUp, Smartphone, ClipboardList, UserRound } from "lucide-react";
-import { mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
+import { Menu, X, LogOut, Shield, ShieldCheck, Megaphone, ArrowUp, Smartphone, ClipboardList, UserRound, Eye } from "lucide-react";
+import { isAnyAdmin, mfaSetupPath, showsDutyEntry } from "@/lib/permissions";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -144,8 +144,8 @@ export function PublicLayout({ children }) {
                     <NotificationBell />
                   </Suspense>
                 </OptionalBoundary>
-                {/* Benutzermenü statt sechs Knöpfen (#282): Dashboard, Profil, Einstellungen, Mitgliederbereich, Admin,
-                    Abmelden. Die Chats stehen seit #1148 unter Community - kein zweiter Knopf dafür im Kopf. */}
+                {/* Benutzermenü statt sechs Knöpfen (#282, #2059): Dashboard, die Gruppen von „Mein Bereich“, Admin, Abmelden.
+                    Die Chats stehen seit #1148 unter Community - kein zweiter Knopf dafür im Kopf. */}
                 <UserMenu />
               </>
             ) : (
@@ -195,11 +195,6 @@ export function PublicLayout({ children }) {
               <SeasonMenuSlot onClose={closeMobile} />
               <MobileNav isClubMember={isClubMember} signedIn={Boolean(user)} onClose={closeMobile} />
               <div className="border-t border-white/10 mt-3 pt-3 space-y-0.5">
-                {user && isClubMember && (
-                  <Link to="/members/area" onClick={closeMobile} data-testid="nav-member-area-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FFD700]">
-                    <Crown className="w-3.5 h-3.5 inline mr-1.5" /> Mitgliederbereich
-                  </Link>
-                )}
                 {user && isAdmin && adminNeedsSecondFactor && (
                   <Link to={mfaSetupPath("/admin")} onClick={closeMobile} data-testid="nav-mfa-setup-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
                     <ShieldCheck className="w-3.5 h-3.5 inline mr-1.5" /> 2FA einrichten
@@ -217,11 +212,15 @@ export function PublicLayout({ children }) {
                 )}
                 {user ? (
                   <>
-                    {userMenuEntries({ username: user.username }).map((entry) => (
+                    {/* Wie im Benutzermenü am PC (#2059): Dashboard und die Gruppen von „Mein Bereich“, dazu das öffentliche Profil. */}
+                    {userMenuEntries({ mitglied: Boolean(user.is_club_member) || isAnyAdmin(user) }).map((entry) => (
                       <Link key={entry.key} to={entry.to} onClick={closeMobile} data-testid={userMenuTestId(entry.key, "-mobile")} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
                         <entry.icon className="w-3.5 h-3.5 inline mr-1.5" /> {entry.label}
                       </Link>
                     ))}
+                    <Link to={`/u/${encodeURIComponent(user.username)}`} onClick={closeMobile} data-testid={userMenuTestId("profile", "-mobile")} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                      <Eye className="w-3.5 h-3.5 inline mr-1.5" /> So sehen andere mich
+                    </Link>
                     <button
                       type="button"
                       data-testid="nav-logout-mobile"

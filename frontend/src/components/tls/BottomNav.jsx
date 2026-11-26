@@ -2,7 +2,7 @@
  * Die untere Leiste am Handy (#1143) - dieselben fünf Einträge wie die App: Start · Events · Community · Verein · Profil
  * (in der App heißt der erste noch „Home“, #2122). Für alle gleich, damit Hilfe am Telefon funktioniert („tipp unten auf
  * Verein“). Angemeldet führt Start zum Dashboard
- * und Profil zum eigenen Profil; Gäste kommen über Profil zur Anmeldung. Die Zahl an Community zählt ungelesene Chats.
+ * und Profil nach „Mein Bereich“ (#2059); Gäste kommen über Profil zur Anmeldung. Die Zahl an Community zählt ungelesene Chats.
  * Ein Tipp auf den aktiven Eintrag (#1144) bringt zur Übersicht - steht man schon dort, ganz nach oben.
  */
 import { Link, useLocation } from "react-router-dom";
@@ -16,8 +16,8 @@ export const BOTTOM_SECTIONS = {
   home: ["/", "/dashboard"],
   events: ["/events", "/tournaments", "/fastlap", "/f1", "/esports", "/matches", "/hub/matches", "/calendar", "/advent", "/ostern"],
   community: ["/community", "/messages", "/teams", "/players", "/achievements", "/seasons", "/servers"],
-  verein: ["/verein", "/about", "/board", "/values", "/partners", "/sponsors", "/members", "/membership", "/galerie", "/references", "/news", "/contact", "/mitgliederbereich"],
-  profile: ["/u/me", "/profile", "/account", "/my/", "/notifications", "/privacy-account"],
+  verein: ["/verein", "/about", "/board", "/values", "/partners", "/sponsors", "/members", "/membership", "/galerie", "/references", "/news", "/contact"],
+  profile: ["/mein-bereich", "/u/me", "/profile", "/account", "/my/", "/notifications", "/privacy-account", "/mitgliederbereich"],
 };
 
 export function bottomNavItems(user) {
@@ -26,7 +26,7 @@ export function bottomNavItems(user) {
     { key: "events", to: "/events", label: "Events", icon: Calendar },
     { key: "community", to: "/community", label: "Community", icon: MessageSquare },
     { key: "verein", to: "/verein", label: "Verein", icon: Shield },
-    { key: "profile", to: user ? "/u/me" : "/login", label: "Profil", icon: User },
+    { key: "profile", to: user ? "/mein-bereich" : "/login", label: "Profil", icon: User },
   ];
 }
 
@@ -66,7 +66,7 @@ export function BottomNav() {
   const onPress = (event, item) => {
     if (current !== item.key) return;
     // Schon auf der Übersicht: nicht neu laden, sondern ganz nach oben (#1144).
-    const onOverview = location.pathname === item.to || (item.key === "profile" && user && location.pathname === `/u/${encodeURIComponent(user.username)}`);
+    const onOverview = location.pathname === item.to;
     if (onOverview) {
       event.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });

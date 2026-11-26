@@ -87,7 +87,7 @@ test("gar keine Saison: ein Satz für Gäste, die Anleitung nur mit dem Bereich 
   authState.user = { id: "u9", role: "tournament_admin", areas: ["tournaments", "moderation"], mfa_enabled: false };
   renderPage();
   const hint = await screen.findByTestId("season-admin-guide");
-  expect(hint.querySelector("a")).toHaveAttribute("href", "/profile?tab=security&mfa=required&next=%2Fadmin%2Fseasons");
+  expect(hint.querySelector("a")).toHaveAttribute("href", "/mein-bereich/konto?mfa=required&next=%2Fadmin%2Fseasons");
   expect(hint.querySelector("a")).toHaveTextContent("2FA einrichten");
 });
 

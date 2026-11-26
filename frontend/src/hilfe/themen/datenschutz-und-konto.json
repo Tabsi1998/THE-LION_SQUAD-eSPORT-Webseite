@@ -1,7 +1,7 @@
 {
   "slug": "datenschutz-und-konto",
   "titel": "Datenschutz und Konto",
-  "kurz": "Deine Daten herunterladen und das Konto anonymisieren.",
+  "kurz": "Deine Daten herunterladen und das Konto löschen.",
   "zielgruppe": "Für alle mit Konto",
   "bereich": "datenschutz",
   "rollen": ["spieler", "captain", "mitglied"],
@@ -15,9 +15,9 @@
         {
           "id": "daten-herunterladen",
           "titel": "Daten herunterladen",
-          "text": "Öffne in den Einstellungen Meine Daten und tippe auf Als JSON herunterladen. Die Datei enthält alles, was wir über dich gespeichert haben.",
+          "text": "Öffne in Mein Bereich die Gruppe Datenschutz und dort den Reiter Daten herunterladen. Tippe auf Daten herunterladen. Die Datei enthält alles, was wir über dich gespeichert haben.",
           "bild": true,
-          "link": { "to": "/privacy-account", "label": "Zu Meine Daten" }
+          "link": { "to": "/mein-bereich/datenschutz?tab=daten", "label": "Zu Daten herunterladen" }
         }
       ]
     },
@@ -27,8 +27,8 @@
       "schritte": [
         {
           "id": "konto-anonymisieren",
-          "titel": "Konto anonymisieren",
-          "text": "Unter Meine Daten tippst du auf Konto anonymisieren. Zur Sicherheit tippst du danach LÖSCHEN ein.",
+          "titel": "Konto löschen",
+          "text": "Unter Datenschutz öffnest du den Reiter Konto löschen und tippst auf Konto löschen. Zur Sicherheit tippst du danach LÖSCHEN ein. Früher hieß das „Konto anonymisieren“.",
           "hinweis": "Das gilt sofort und lässt sich nicht rückgängig machen. Deine Turnier-Ergebnisse bleiben ohne Namen stehen.",
           "bild": true
         },

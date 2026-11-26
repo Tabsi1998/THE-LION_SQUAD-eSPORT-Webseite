@@ -10,11 +10,11 @@ const MEMBER_LEVELS = new Set(["members", "internal"]);
 // des Servers (/membership/area-summary). Rechnungen und eigene Unterlagen stehen hier nicht: sie gehören zum Konto
 // (Profil → „Nur für dich“), der Mitgliederbereich bleibt Verein (#320, #1255).
 export const AREA_JUMPS = [
-  { key: "karte", label: "Karte", to: "/members/membership#mitgliedskarte" },
-  { key: "versammlung", label: "Versammlung", field: "meetings_open", unit: "offen", to: "/members/meetings" },
-  { key: "helfen", label: "Helfen", field: "helping_free", unit: "frei", to: "/members/helfen" },
-  { key: "news", label: "News", field: "news_new", unit: "neu", to: "/members/news" },
-  { key: "dokumente", label: "Dokumente", field: "documents_new", unit: "neu", to: "/members/documents" },
+  { key: "karte", label: "Karte", to: "/mein-bereich/mitgliedschaft#mitgliedskarte" },
+  { key: "versammlung", label: "Versammlung", field: "meetings_open", unit: "offen", to: "/mein-bereich/verein/versammlungen" },
+  { key: "helfen", label: "Helfen", field: "helping_free", unit: "frei", to: "/mein-bereich/verein/helfen" },
+  { key: "news", label: "News", field: "news_new", unit: "neu", to: "/mein-bereich/verein/news" },
+  { key: "dokumente", label: "Dokumente", field: "documents_new", unit: "neu", to: "/mein-bereich/verein/dokumente" },
 ];
 
 function summaryCount(summary, field) {

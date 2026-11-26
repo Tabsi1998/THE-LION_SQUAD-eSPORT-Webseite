@@ -2,6 +2,7 @@ import { MessageSquare, ShieldCheck } from "lucide-react";
 import { DIRECT_MESSAGE_PRIVACY } from "./constants";
 import { Section } from "./fields";
 import { AutosaveStatus, SwitchRow } from "./SwitchRow";
+import { BlockierteBenutzer } from "../PrivacyAccountPage";
 import { QUICK_VISIBILITY, VISIBILITY_LEVELS, fieldLevel, groupLevel, visibilityGroupsFor } from "./visibility";
 
 // Privatsphäre in drei Karten (#257): öffentliches Profil, Direktnachrichten
@@ -162,6 +163,9 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
           })}
         </div>
       </div>
+
+      {/* Blockierte Konten (#2059): bei der Sichtbarkeit - wer mir schreiben darf, steht gleich darüber. */}
+      <BlockierteBenutzer />
     </Section>
   );
 }

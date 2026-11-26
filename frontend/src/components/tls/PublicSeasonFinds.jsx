@@ -57,7 +57,7 @@ export function PublicSeasonFinds({ userId, own = false }) {
       {own && (
         <p className="mt-3 text-[11px] text-white/40" data-testid="public-season-finds-note">
           {data.public ? "Andere sehen hier nur die Summen." : "Nur du siehst diese Karte. "}
-          {!data.public && <Link to="/profile?tab=privacy" className="text-[#29B6E8] hover:underline">Unter Privatsphäre kannst du sie zeigen.</Link>}
+          {!data.public && <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Unter Datenschutz → Sichtbarkeit kannst du sie zeigen.</Link>}
         </p>
       )}
     </section>

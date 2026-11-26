@@ -69,7 +69,8 @@ test.describe("Handy (390 px)", () => {
     // Die Zahl der ungelesenen Chats kommt kurz nach dem Aufbau.
     await expect.poll(() => nav.getByRole("link").evaluateAll((links) => links.map((link) => link.getAttribute("aria-label"))))
       .toEqual(["Start", "Events", "Community, 3 ungelesene Chats", "Verein", "Profil"]);
-    const cases = [["events", /\/events$/], ["community", /\/community$/], ["verein", /\/verein$/], ["profile", /\/u\/neonfalke$/], ["home", /\/dashboard$/]];
+    // „Profil“ führt seit #2059 nach Mein Bereich.
+    const cases = [["events", /\/events$/], ["community", /\/community$/], ["verein", /\/verein$/], ["profile", /\/mein-bereich$/], ["home", /\/dashboard$/]];
     for (const [key, url] of cases) {
       await page.getByTestId(`bottom-nav-${key}`).click();
       await expect(page).toHaveURL(url);
@@ -97,7 +98,7 @@ for (const width of [390, 1440]) {
       await mockServer(page);
       await page.goto("/verein");
       await expect(page.getByTestId("verein-member-area")).toBeVisible();
-      await expect(page.getByTestId("verein-member-area-link")).toHaveAttribute("href", "/members/area");
+      await expect(page.getByTestId("verein-member-area-link")).toHaveAttribute("href", "/mein-bereich/verein");
       await expect(page.getByTestId("verein-join")).toHaveCount(0);
       await expect(page.getByTestId("verein-news")).toContainText("Herbst-LAN");
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -124,7 +125,7 @@ test("Chats: alle vier Arten in einer Liste, Direktnachricht rechts", async ({ p
   await expect(page.getByTestId("chat-item-tournament:fc26")).toHaveAttribute("href", "/tournaments/fc-26-cup#chat");
 });
 
-test("Einstellungen: als Angemeldeter die Deko unter Darstellung umstellen - im Footer kein Schalter", async ({ page }) => {
+test("Mein Bereich → Konto & Sicherheit: als Angemeldeter die Deko unter Darstellung umstellen - im Footer kein Schalter", async ({ page }) => {
   const patches = [];
   await mockServer(page, { patches });
   await page.goto("/profile?tab=appearance");
@@ -133,7 +134,9 @@ test("Einstellungen: als Angemeldeter die Deko unter Darstellung umstellen - im 
   await expect(page.getByTestId("settings-deco-off")).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => patches.some((call) => call.path === "/users/me" && call.body?.seasonal_decorations === "off")).toBe(true);
   await expect(page.getByTestId("season-deco-switch")).toHaveCount(0);
-  await expect(page.getByTestId("settings-group-title")).toHaveText(["Darstellung", "Benachrichtigungen", "Sicherheit", "Privatsphäre", "Konto", "Über die App"]);
+  await expect(page).toHaveURL(/\/mein-bereich\/konto\?tab=appearance$/);
+  await expect(page.getByTestId("profile-tab-appearance")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("mein-bereich-reiter").getByRole("button")).toHaveText(["Sicherheit", "Darstellung", "Kalender-Abo", "App & Rechtliches"]);
 });
 
 test("eigenes Profil: „Nur für dich“ und der Schalter „So sehen dich andere“", async ({ page }) => {
@@ -145,18 +148,18 @@ test("eigenes Profil: „Nur für dich“ und der Schalter „So sehen dich ande
   await page.getByTestId("profile-as-others-switch").click();
   await expect(page.getByTestId("profile-as-others-switch")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("profile-private-box")).toHaveCount(0);
-  await expect(page.getByTestId("profile-settings")).toHaveAttribute("href", "/profile");
+  await expect(page.getByTestId("profile-settings")).toHaveAttribute("href", "/mein-bereich/profil");
 });
 
 test("alte Adressen leiten an den neuen Ort weiter", async ({ page }) => {
   await mockServer(page);
   const cases = [
-    ["/profile?tab=invoices&invoice=d-501", /\/account\/invoices\?invoice=d-501$/],
+    ["/profile?tab=invoices&invoice=d-501", /\/mein-bereich\/rechnungen\?invoice=d-501$/],
     ["/profile?tab=teams", /\/teams$/],
     ["/profile?tab=friends", /\/players$/],
     ["/profile?tab=achievements", /\/u\/neonfalke\?tab=achievements$/],
     ["/profile?tab=inbox&to=u-schatten", /\/messages\/u-schatten$/],
-    ["/mitgliederbereich", /\/members\/area$/],
+    ["/mitgliederbereich", /\/mein-bereich\/verein$/],
   ];
   for (const [from, to] of cases) {
     await page.goto(from);

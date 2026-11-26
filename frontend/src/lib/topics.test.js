@@ -44,10 +44,16 @@ test("Chats stehen nur mit Konto im Menü", () => {
   expect(menuPlaces(true).filter((place) => place.to === "/messages")).toHaveLength(1);
 });
 
+// Seit #2059 führt das Benutzermenü direkt in die Gruppen von „Mein Bereich“ - dort wohnen Rechnungen, Mitgliedschaft und
+// Konto. Ein zweiter Weg zu Chats, Glocke, Teams oder „Mitglied werden“ kommt nicht dazu.
 test("das Benutzermenü führt keinen zweiten Weg zu einem der Themen", () => {
-  const entries = userMenuEntries({ username: "neonfalke" }).map((entry) => entry.to);
-  expect(entries).toEqual(["/dashboard", "/u/neonfalke", "/profile"]);
-  for (const path of ["/messages", "/notifications", "/account/invoices", "/members/membership", "/teams", "/my/prizes", "/membership/join", "/contact"]) {
+  const entries = userMenuEntries({ mitglied: true }).map((entry) => entry.to);
+  expect(entries).toEqual([
+    "/dashboard", "/mein-bereich", "/mein-bereich/profil", "/mein-bereich/mitgliedschaft", "/mein-bereich/rechnungen",
+    "/mein-bereich/verein", "/mein-bereich/benachrichtigungen", "/mein-bereich/konto", "/mein-bereich/datenschutz",
+  ]);
+  expect(userMenuEntries({ mitglied: false }).map((entry) => entry.to)).not.toContain("/mein-bereich/verein");
+  for (const path of ["/messages", "/notifications", "/teams", "/membership/join", "/contact", "/profile", "/members/area"]) {
     expect(entries).not.toContain(path);
   }
 });
@@ -59,10 +65,11 @@ test("die Handy-Leiste hat die fünf Einträge der App und kennt jedes Thema", (
   expect(activeSection("/galerie/sommer")).toBe("verein");
   expect(activeSection("/fastlap/monza")).toBe("events");
   expect(activeSection("/account/invoices")).toBe("profile");
+  expect(activeSection("/mein-bereich/verein/helfen")).toBe("profile");
 });
 
-test("Saison-Deko: Angemeldete unter Einstellungen → Darstellung, Gäste je Gerät an einem Platz (#1239)", () => {
+test("Saison-Deko: Angemeldete unter Konto & Sicherheit → Darstellung, Gäste je Gerät an einem Platz (#1239, #2059)", () => {
   const deco = WEB_TOPICS.find((entry) => entry.topic === "Saison-Deko und Einstellungen");
-  expect(deco.place).toBe("Einstellungen → Darstellung (Gäste: am Handy im Menü, am PC in der Fußzeile)");
+  expect(deco.place).toBe("Mein Bereich → Konto & Sicherheit → Darstellung (Gäste: am Handy im Menü, am PC in der Fußzeile)");
   expect(deco.menu).toBeNull();
 });

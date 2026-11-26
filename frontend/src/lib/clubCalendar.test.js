@@ -11,7 +11,7 @@ test("eine Versammlung um 18 Uhr Wiener Zeit, zwei Stunden lang, Datei nur über
   expect(item.end).toBe("2026-10-24T18:00:00.000Z");
   expect(item.allDay).toBe(false);
   expect(serverIcsPath(item)).toBe("/api/calendar/meetings/7.ics");
-  expect(item.url).toMatch(/\/members\/meetings\?meeting=7$/);
+  expect(item.url).toMatch(/\/mein-bereich\/verein\/versammlungen\?meeting=7$/);
   expect(meetingTitle({ kind_label: "Vorstandssitzung", title: "Oktober" })).toBe("Vorstandssitzung: Oktober");
 });
 

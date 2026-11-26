@@ -55,7 +55,7 @@ test("ohne Bindung: der Weg über den Einladungscode", async () => {
   const empty = await screen.findByTestId("account-documents-empty");
   expect(empty).toHaveTextContent("Noch keine Unterlagen");
   expect(empty).toHaveTextContent("Einladungscode");
-  expect(screen.getByTestId("account-documents-bind")).toHaveAttribute("href", "/members/membership");
+  expect(screen.getByTestId("account-documents-bind")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
 });
 
 test("verbunden, aber noch nichts abgelegt", async () => {

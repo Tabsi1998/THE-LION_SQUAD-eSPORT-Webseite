@@ -38,9 +38,13 @@ test("jede Adresse der Sprungleiste hat eine Route", async () => {
   const app = fs.readFileSync(path.resolve(process.cwd(), "src/App.jsx"), "utf-8");
   const routes = [...app.matchAll(/<Route path="([^"]+)"/g)].map((match) => match[1]);
   expect(AREA_JUMPS.map((jump) => jump.label)).toEqual(["Karte", "Versammlung", "Helfen", "News", "Dokumente"]);
+  // Seit #2059 unter „Mein Bereich“: Gruppen als Kinder-Routen, die Seiten des Vereins als verein/<seite>.
+  const { VEREIN_SEITEN } = await import("@/lib/meinBereich");
+  expect(app).toContain("{VEREIN_SEITEN.map((seite) => (");
+  const children = new Set([...routes, ...VEREIN_SEITEN.map((seite) => `verein/${seite.k}`)].map((route) => `/mein-bereich/${route}`));
   for (const jump of AREA_JUMPS) {
     const target = jump.to.split("#")[0];
-    expect(routes, `${jump.label} → ${jump.to}`).toContain(target);
+    expect(children.has(target) || routes.includes(target), `${jump.label} → ${jump.to}`).toBe(true);
   }
   // Alte Adressen leiten weiter, statt 404 zu zeigen.
   expect(routes).toContain("/mitgliederbereich");

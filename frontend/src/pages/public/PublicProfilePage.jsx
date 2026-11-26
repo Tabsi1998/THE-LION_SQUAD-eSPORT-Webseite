@@ -398,7 +398,7 @@ export default function PublicProfilePage() {
           <div className="border border-dashed border-white/15 rounded-sm px-6 py-10 text-center text-white/55">
             <Lock className="w-7 h-7 mx-auto mb-3 opacity-60" />
             <p className="font-bold text-white/80">Dein Profil ist privat</p>
-            <p className="mt-1 text-sm">Andere sehen dein Profil nicht. Öffentlich stellst du es unter <Link to="/profile?tab=privacy" className="text-[#29B6E8] hover:underline">Einstellungen → Privatsphäre</Link>.</p>
+            <p className="mt-1 text-sm">Andere sehen dein Profil nicht. Öffentlich stellst du es unter <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Mein Bereich → Datenschutz</Link>.</p>
           </div>
         </div>
       </PublicLayout>
@@ -664,7 +664,7 @@ export default function PublicProfilePage() {
                 </>
               )}
               {isOwnProfile && (
-                <Link to="/profile" data-testid="profile-settings" aria-label="Einstellungen" title="Einstellungen" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                <Link to="/mein-bereich/profil" data-testid="profile-settings" aria-label="Profil bearbeiten" title="Profil bearbeiten" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                   <Settings className="w-3.5 h-3.5" /> Einstellungen
                 </Link>
               )}

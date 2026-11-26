@@ -41,15 +41,15 @@ Wer das sieht: der Bereich **Vereinsverwaltung** (auch, wer einen aktiven Vorsta
 | **Mitglied werden** | Seite mit vier Vorteilen, Beiträgen aus Dolibarr und dem Knopf „Antrag stellen“ | Admin → Mitglieder → Bewerbungen, Kasten „Seite „Mitglied werden““ |
 | **Antrag** | Online-Antrag mit Mitgliedsart, Nachricht und Einwilligungen | Bewerbungen |
 | **Einladung zum Antrag** | Der Vorstand lädt ein Konto gezielt ein | Bewerbungen, „+ Zum Antrag einladen“ |
-| **Mitgliederbereich** | Karte, Versammlungen, Helferdienste, News, Dokumente, Vorteile | `/members/area` (für Mitglieder) |
-| **Mitgliedskarte** | Karte mit Prüfcode, auch als Bild und ohne Netz | Meine Mitgliedschaft |
+| **Mein Bereich → Verein** | Versammlungen, Helferdienste, News, Dokumente, Vorteile (früher „Mitgliederbereich“) | `/mein-bereich/verein` (für Mitglieder), siehe [Mein Bereich](mein-bereich.md) |
+| **Mitgliedskarte** | Karte mit Prüfcode, auch als Bild und ohne Netz | Mein Bereich → Mitgliedschaft |
 | **Vorstand** | Posten, Stellvertretung, „Wir suchen …“ | Admin → Verein → Vorstand |
 | **Statuten** | Geltende Fassung als PDF für alle oder nur für Mitglieder | Dolibarr → Funktionen bzw. Dokumente |
 | **Versammlungen** | Einladung, Tagesordnung, Anträge, Abstimmung; Einlass per Karte | Dolibarr (Vereinsakte), Einlass |
-| **Helferdienste** | Schichten bei Veranstaltungen, Anfrage und Bestätigung | Dolibarr (Vereinsakte), Mitgliederbereich → Helfen |
-| **Persönliche Unterlagen** | Bestätigungen und Schreiben nur für dich | Profil → „Nur für dich“ → Deine Unterlagen |
+| **Helferdienste** | Schichten bei Veranstaltungen, Anfrage und Bestätigung | Dolibarr (Vereinsakte), Mein Bereich → Verein → Helfen |
+| **Persönliche Unterlagen** | Bestätigungen und Schreiben nur für dich | Mein Bereich → Rechnungen & Unterlagen → Unterlagen |
 | **Mitgliederverzeichnis** | Öffentliche Profile mit Foto, Spielen, Plattformen | Mitgliederprofile, oder aus Dolibarr per Einwilligung |
-| **Wunschnummer** | Jedes Mitglied sucht sich einmal eine eigene Nummer aus, etwa fürs Trikot | Meine Mitgliedschaft; Admin → Mitglieder → Reiter Nummern |
+| **Wunschnummer** | Jedes Mitglied sucht sich einmal eine eigene Nummer aus, etwa fürs Trikot | Mein Bereich → Mitgliedschaft; Admin → Mitglieder → Reiter Nummern |
 
 ---
 
@@ -110,9 +110,10 @@ Ohne Mitgliedschaft schickt eine Seite des Mitgliederbereichs auf **Mitglied wer
 - Einladen darf nur die Vereinsverwaltung.
 - Eine neue Bewerbung meldet die Website per Mail an alle mit der Vereinsverwaltung: Vorstand, Freigaben, Club-Admin, Superadmin.
 
-### 3.3 Der Mitgliederbereich
+### 3.3 Mein Bereich → Verein (früher Mitgliederbereich)
 
-Für aktive Mitglieder und Ehrenmitglieder: Benutzermenü → **Mitgliederbereich** (`/members/area`). Oben die Karte mit
+Für aktive Mitglieder und Ehrenmitglieder: Benutzermenü → **Verein** in Mein Bereich (`/mein-bereich/verein`, die alte
+Adresse `/members/area` leitet weiter). Oben die Karte mit
 Name, Nummer, „Mitglied seit“ und Beitragsstand, darunter die **Sprungleiste**: **Karte**, **Versammlung**, **Helfen**,
 **News**, **Dokumente**, mit der Zahl dessen, was offen oder neu ist („Versammlung · 1 offen“). „Neu“ heißt: in den letzten
 zwei Wochen erschienen. Weiter unten stehen nur Abschnitte, in denen etwas ist: Versammlung, offene Abstimmung, freie
@@ -120,13 +121,14 @@ Helferdienste, Vereinsdokumente, Mitgliedervorteile, Ansprechpartner, „Gerade 
 und Einwilligung), „Discord jetzt“ (nur Zahlen, nie Namen) und die Discord-Server des Vereins.
 
 Dieselben Zahlen stehen an den Kacheln auf **/verein** und im Tab „Verein“ der App. Interne Events stehen nicht hier, sondern
-unter Events (gold markiert) und im Kalender. Eigene Rechnungen und eigene Unterlagen gehören zum Konto (Profil → „Nur für dich“).
+unter Events (gold markiert) und im Kalender. Eigene Rechnungen und eigene Unterlagen gehören zum Konto (Mein Bereich →
+Rechnungen & Unterlagen).
 
 **Wer ist Mitglied?** Aktive Mitglieder und Ehrenmitglieder sowie, wer Vereinsverwaltung oder System hat. Ein Konto muss dafür
 einem Mitgliedseintrag zugeordnet sein (Dolibarr → Zuordnungen, oder das Mitglied nutzt auf „Meine Mitgliedschaft“ **Zuordnung
 anfragen** bzw. den Einladungscode vom Vorstand). Eine Mitgliedsnummer allein reicht nicht.
 
-**Meine Mitgliedschaft** (`/members/membership`): Karte, Mitgliedsart, „Mitglied seit“, Funktion im Verein, mit Dolibarr **Austritt
+**Mein Bereich → Mitgliedschaft** (`/mein-bereich/mitgliedschaft`, früher „Meine Mitgliedschaft“): Karte, Mitgliedsart, „Mitglied seit“, Funktion im Verein, mit Dolibarr **Austritt
 erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung gerechnet), ohne Dolibarr eine einfache **Austrittserklärung** (mit Wunschtermin; sie geht an den Vorstand, die Person bleibt Mitglied, bis er den Status auf „Ehemalig“ setzt, und kann sie bis dahin zurücknehmen; der Vorstand bekommt beides per Mail), **Meine Einwilligungen**
 (auch in der App; **Ich stimme zu** erst nach dem Lesen der Fassung, **Widerrufen** jederzeit, der Text der zugestimmten Fassung bleibt lesbar), der eigene Eintrag im Mitgliederverzeichnis
 (**Im Mitgliederverzeichnis zeigen**, Gamertag, Spiele, Plattformen, Kurztext, **Eintrag speichern**) und der Schalter **Mitgliedsnummer öffentlich zeigen**: Das entscheidet nur das Mitglied, Standard ist aus.
@@ -174,7 +176,7 @@ erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung ge
 - **Mitgliedervorteile:** Admin → Mitglieder → Mitgliedervorteile: Titel, Text, Link, Gültigkeit, **Sichtbar für Mitgliedsarten**
   (leer = alle), **Aktiv**. Mitglieder sehen sie im Mitgliederbereich und in der App, nur innerhalb von **Gültig von/bis** (beide Tage zählen mit); in der Verwaltung steht dann „abgelaufen“ oder „noch nicht gültig“.
 - **Persönliche Unterlagen** (Bestätigungen, Schreiben) legt der Vorstand in der Vereinsakte in Dolibarr ab; das Mitglied
-  findet sie im eigenen Profil unter **Nur für dich → Deine Unterlagen** (`/account/documents`). Voraussetzung ist die bestätigte
+  findet sie unter **Mein Bereich → Rechnungen & Unterlagen → Unterlagen** (`/mein-bereich/rechnungen?tab=unterlagen`). Voraussetzung ist die bestätigte
   Zuordnung des Kontos zum Mitgliedseintrag. Ohne sie steht dort, wie die Verbindung klappt.
 
 ### 3.7 Versammlungen, Abstimmungen und Einlass
@@ -192,14 +194,14 @@ Alles kommt aus der Vereinsakte in Dolibarr; die Website zeigt und reicht durch,
 
 ### 3.8 Helferdienste
 
-Mitgliederbereich → **Helfen** (`/members/helfen`): Veranstaltungen mit Schichten aus der Vereinsakte. **Ich helfe** fragt an,
+Mein Bereich → Verein → **Helfen** (`/mein-bereich/verein/helfen`): Veranstaltungen mit Schichten aus der Vereinsakte. **Ich helfe** fragt an,
 **Anfrage zurückziehen** nimmt sie zurück. „Angefragt“ heißt: Der Vorstand bestätigt; gezählt wird, was als geleistet
 bestätigt ist. Absagen nach der Bestätigung gehen an den Vorstand. Die eigene Schicht lässt sich in den Kalender eintragen.
 Schichten und Plätze legt der Verein in Dolibarr an. Ein Helfer-Aufruf führt direkt zur Veranstaltung.
 
 ### 3.9 Mitgliedskarte
 
-Unter **Meine Mitgliedschaft** (Web) und in der App unter Mehr → Mitgliederbereich → Mitgliedskarte. Ein Partner scannt den
+Unter **Mein Bereich → Mitgliedschaft** (Web) und in der App unter Mehr → Mitgliederbereich → Mitgliedskarte. Ein Partner scannt den
 QR-Code; die Prüfseite zeigt ohne Anmeldung nur: gültig oder nicht, Vorname mit Anfangsbuchstabe, Mitgliedsart, gültig bis.
 Der Code gilt fünf Minuten und erneuert sich, ein Foto davon nützt nichts. **Als Bild speichern** legt die Karte ohne Prüfcode
 ins Album; ohne Netz zeigt die Seite die zuletzt geladene Karte mit „Stand“. Die Karte gilt, solange die Mitgliedschaft aktiv ist.
@@ -249,7 +251,7 @@ Dazu die Benachrichtigung „Kontaktanfragen“ in der Kommandozentrale. Das The
 
 ### 3.12 Wunschnummer (#2034)
 
-**Für Mitglieder – Meine Mitgliedschaft → Meine Nummer:** Freie Nummer im Raster antippen oder eintippen; die Seite sagt sofort,
+**Für Mitglieder – Mein Bereich → Mitgliedschaft → Meine Nummer:** Freie Nummer im Raster antippen oder eintippen; die Seite sagt sofort,
 ob sie frei ist (wer eine Nummer hat, steht nirgends). Mit
 **Nummer festlegen** und der Bestätigung gehört sie dir. Jede Nummer gibt es im Verein nur einmal. Danach änderst du sie nicht
 mehr selbst, sondern stellst mit **Andere Nummer beantragen** einen Antrag – mit kurzer Begründung und, wenn du magst, einer
@@ -288,9 +290,9 @@ Nummer: beim bisherigen Mitglied wird sie in Dolibarr gelöscht, beim neuen eing
 | „Gerade nicht möglich – die Mitgliederverwaltung ist im Moment nicht erreichbar“ beim Antrag | Dolibarr antwortet nicht | Später noch einmal; der Antrag geht nicht verloren |
 | Antrag steht auf „In Übermittlung“ | Gespeichert, aber noch nicht bei Dolibarr | Warten, die Website versucht es weiter; Stand unter Bewerbungen → In Übermittlung |
 | Bei einem Antrag fehlt **Annehmen** | Der Antrag läuft über Dolibarr | **In Dolibarr öffnen** und dort entscheiden |
-| Eine Person findet ihre Unterlagen nicht | Konto ist keinem Mitgliedseintrag zugeordnet | Dolibarr → Zuordnungen bestätigen, oder Einladungscode unter Meine Mitgliedschaft |
+| Eine Person findet ihre Unterlagen nicht | Konto ist keinem Mitgliedseintrag zugeordnet | Dolibarr → Zuordnungen bestätigen, oder Einladungscode unter Mein Bereich → Mitgliedschaft |
 | „Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln“ | Recht beim API-Benutzer fehlt | In Dolibarr einrichten ([Dolibarr](../DOLIBARR.md)) |
-| Mitgliederbereich leitet auf „Mitglied werden“ | Das Konto ist kein aktives Mitglied | Mitgliedschaft und Zuordnung prüfen |
+| Mein Bereich → Verein leitet auf „Mitglied werden“ | Das Konto ist kein aktives Mitglied | Mitgliedschaft und Zuordnung prüfen |
 | In „Zum Antrag einladen“ findet die Suche niemanden | Gesucht werden nur Konten ohne Mitgliedschaft | Anderen Namen versuchen |
 | Einladung ist weg | Sie ist nach 30 Tagen abgelaufen | Neu einladen |
 | Eine Person lässt sich nicht als Vorstand eintragen | Es geht nur mit Vereinsmitgliedern | Erst Mitgliedschaft klären |
