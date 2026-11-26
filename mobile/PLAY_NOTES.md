@@ -12,6 +12,17 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.15
+
+Neu in 1.7.15:
+• Saisonende-Moment für Aufstieg, Abstieg und Meister
+• Startrecht annehmen und mit Co-Team zur Liga anmelden
+• Liga-Spieltag: Ergebnis mit Maps, Vorfälle und Protest in der App
+• Mein Bereich mit acht Gruppen und Suche statt Profil-Einstellungen
+• Discord, Twitch und Steam lassen sich wieder verknüpfen
+• Ecken zeigen, wo du und dein Team stehen
+• Ruhige Saison-Deko am Turniertag
+
 ## 1.7.14
 
 Neu in 1.7.14:
