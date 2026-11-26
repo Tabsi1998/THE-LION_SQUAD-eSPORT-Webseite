@@ -157,7 +157,7 @@ export function SeriesFinal({ final }) {
             const metal = PODIUM[row.place];
             return (
               <li key={row.key} className="py-2.5 flex items-center gap-3" data-testid="series-final-row" data-club={row.club_member ? "true" : undefined}>
-                <span className={`w-10 shrink-0 tls-type-card tabular-nums ${metal ? metal.text : "text-white/70"}`}>
+                <span className={`w-10 shrink-0 tls-type-card tls-type-num ${metal ? metal.text : "text-white/70"}`}>
                   {row.place ? `${row.place}.` : "–"}
                   {metal && <span className="sr-only"> ({metal.label})</span>}
                 </span>

@@ -17,6 +17,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { useAuth } from "@/context/AuthContext";
 import { viennaDate } from "@/lib/vienna";
+import { NumText } from "@/components/tls/NumText";
 
 // Der Schaukasten (#619): Erfolg der Woche, Laufband der neuesten Freischaltungen, Kategorien mit Fortschritt und
 // Ranglisten nach Punkten oder Level (je Kategorie und Zeitraum).
@@ -467,7 +468,7 @@ function CategoryRow({ category, own, progress = null, index = 0, negativeCount 
               data-testid={`category-progress-${category.key}`}
             >
               {complete && <CategoryCheck accent={accent} delay={delay} reduced={reduced} testId={`category-complete-${category.key}`} />}
-              {summary}
+              <NumText text={summary} />
             </span>
           </div>
           <div className="relative mt-1.5 h-1 bg-white/5 rounded-sm overflow-hidden" aria-hidden="true">
@@ -708,7 +709,7 @@ function PodiumCard({ entry, index, byLevel = false }) {
         {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
       </Link>
       <div className="mt-1 sm:mt-2 tls-type-section tabular-nums" style={{ color: style.color }}>
-        {byLevel ? `Level ${entry.level}` : entry.points}
+        <NumText text={byLevel ? `Level ${entry.level}` : entry.points} />
       </div>
       <div className="tls-type-label sm:tracking-widest text-white/55 truncate">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : erfolge(entry.count)}</div>
     </motion.div>

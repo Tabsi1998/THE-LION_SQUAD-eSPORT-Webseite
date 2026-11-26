@@ -247,7 +247,7 @@ export default function F1DetailPage() {
               <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden relative">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
                   <h3 className="tls-type-card min-w-0 truncate">{board?.track?.name || "—"}</h3>
-                  <span className="shrink-0 tls-type-label text-white/50">{board?.entries?.length || 0} Fahrer</span>
+                  <span className="shrink-0 tls-type-label text-white/50"><span className="tls-type-num">{board?.entries?.length || 0}</span> Fahrer</span>
                 </div>
                 {marks.best && (
                   <div key={marks.bestKey} className="tls-best-flash" role="status" data-testid="f1-best-flash">

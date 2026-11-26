@@ -84,7 +84,7 @@ function AnswerCountdown({ incident, offset, onDone }) {
     <div className="mt-3" data-testid={`incident-countdown-${incident.id}`} role="timer" aria-live="off">
       <div className="flex items-baseline justify-between gap-3 tls-type-small text-white/60">
         <span>Antwortzeit bis {clock(incident.answer_deadline)}</span>
-        <span className="tls-type-card tabular-nums text-white" data-testid={`incident-countdown-text-${incident.id}`}>{left > 0 ? remainingText(left) : "vorbei"}</span>
+        <span className="tls-type-card tls-type-num text-white" data-testid={`incident-countdown-text-${incident.id}`}>{left > 0 ? remainingText(left) : "vorbei"}</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
         <div ref={bar} className="tls-incident-bar h-full rounded-full bg-honor" data-moving={moving ? "true" : "false"}

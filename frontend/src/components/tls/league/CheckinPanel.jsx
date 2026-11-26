@@ -49,7 +49,7 @@ function CountdownRing({ block }) {
       </svg>
       <div className="text-right">
         <div className="tls-type-label text-white/55">{done ? "" : countdownLabel(block)}</div>
-        <div className="tls-type-section tabular-nums text-white" data-testid="checkin-countdown-text">
+        <div className="tls-type-title tls-type-num text-white" data-testid="checkin-countdown-text">
           {done ? "jetzt" : remainingText(target, now)}
         </div>
       </div>
