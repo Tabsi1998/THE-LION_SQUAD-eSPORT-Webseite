@@ -224,7 +224,8 @@ Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sa
   - Trotzdem sofort kommen: der **Aufruf zum eigenen Spiel**, **Match startet jetzt**, in der Liga **Check-in offen** und **Veto – ihr seid am
     Zug** fürs eigene Spiel, und für die Turnierleitung **Braucht Aufmerksamkeit**, solange ihr Turnier läuft. Leitungs-Meldungen einer
     Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung. Der **Push-Test** der Verwaltung kommt ebenfalls sofort.
-  - Was die Turnierleitung oder die Website ausdrücklich als **dringend** schickt, kommt ebenfalls sofort.
+  - **Absagen** von Turnier und Event und ein **neuer Termin oder Ort** eines Events kommen ebenfalls sofort (Fabians Entscheidung
+    26.11.), genauso alles, was die Website ausdrücklich als **dringend** schickt.
   - E-Mails sind davon nicht betroffen.
 - **Dieser Browser** (unter den Themen, nur wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat): ob der Browser, in dem die Seite
   gerade offen ist, Meldungen bekommt, mit **Browser anmelden** bzw. **Browser abmelden**. Blockiert der Browser die Benachrichtigungen,
@@ -233,8 +234,11 @@ Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sa
 - **Reiter E-Mail** (#1662):
   - **Sammel-Mail:** **Sofort**, **Täglich** oder **Wöchentlich**. Sofort heißt: jede Mail einzeln wie bisher. Täglich bzw. wöchentlich
     heißt: eine Mail mit allem, was seit der letzten kam, nach Themen sortiert, mit Link zu jeder Sache. Darunter steht, wann sie kommt
-    („Täglich um 07:00 Uhr“), und solange die Person nichts gewählt hat, die **Vorgabe des Vereins**. Dringendes (Spiel in 10 Minuten,
-    Check-in schließt, Ergebnis bestätigen, Dispute) und Konto-Mails kommen immer sofort. Ist E-Mail ganz aus, sagt die Karte das.
+    („Täglich um 07:00 Uhr“), und solange die Person nichts gewählt hat, die **Vorgabe des Vereins**. Wer selbst gewählt hat, kommt
+    mit **Vorgabe des Vereins nutzen** wieder zurück. Dringendes (Spiel in 10 Minuten, Check-in schließt, Ergebnis bestätigen,
+    Dispute, Absagen, neuer Termin) und Konto-Mails kommen immer sofort. Ist E-Mail ganz aus, sagt die Karte das.
+  - In jeder Sammel-Mail steht **Zurück auf Einzelmails**: ein Klick, ohne Anmeldung, dann ein Knopf auf der Seite – danach kommt
+    jede Mail wieder einzeln. Der Link gehört zu genau diesem Konto und ändert nur den Rhythmus.
   - der Kanal **E-Mail** ganz an oder aus und je Thema **E-Mail**. Ein Strich heißt: Dieses Thema gibt es per Mail nicht;
   - der **Newsletter**. **News & Events** per E-Mail geht nur mit dieser Einwilligung: „Ich willige separat ein, Newsletter, Event-Hinweise
     und Vereinsnews per E-Mail zu erhalten. Jederzeit widerrufbar.“ Newsletter kommen nie in die Sammel-Mail.
@@ -256,19 +260,22 @@ Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sa
 2. **Täglich um** und **Wöchentlich am … um**: Wiener Zeit. Vorgabe 07:00 Uhr und Montag 07:00 Uhr.
 3. **Speichern.** Rechts steht die **Vorschau** mit Beispielzeilen und deinem Namen; verschickt wird dabei nichts.
 
-<img src="bilder/sammel-mail-vorschau.png" alt="Sammel-Mail: Hallo Paula, nach Themen Turnier-Updates, Gewinne und Nachrichten je mit Link und einer Zeile, unten Rhythmus ändern" width="420">
+<img src="bilder/sammel-mail-vorschau.png" alt="Sammel-Mail: Hallo Paula, nach Themen Turnier-Updates, Gewinne und Nachrichten je mit Link und einer Zeile, unten Rhythmus ändern und Zurück auf Einzelmails" width="420">
 
 So arbeitet sie:
 
 - **Was gesammelt wird:** optionale Mails einer Person mit Rhythmus Täglich oder Wöchentlich – Anmeldungen, Turnier- und Liga-Hinweise,
   Gewinne, Rechnungen, Nachrichten, Vereinsinternes. Nur Themen, die sie per Mail an hat.
 - **Was nie gesammelt wird:** Konto- und Sicherheitsmails, Entscheidungen zur Mitgliedschaft, Dringendes (Spiel in 10 Minuten, Erinnerung
-  vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute), Newsletter, Geburtstagsgruß und Wochenrückblick.
+  vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute, Absage von Turnier oder Event, neuer Termin oder Ort eines Events),
+  Newsletter, Geburtstagsgruß und Wochenrückblick.
 - **Wann:** Der Job `mail_digest` sieht alle 10 Minuten nach. Je Person geht **genau eine** Mail je Zeitraum hinaus, mit allem, was vor dem
   Termin kam; was danach kommt, wartet auf den nächsten. Zwei Läufe gleichzeitig schicken trotzdem nur eine.
 - **Sichtbarkeit:** Beim Versand wird jede Zeile neu geprüft: Konto aktiv und nicht gesperrt, Thema per Mail noch an, Vereinsinternes
   nur, solange die Person Mitglied ist. Was nicht mehr passt, fällt still heraus.
-- **Zurück auf Sofort:** Was noch wartet, kommt beim nächsten Lauf als eine Mail.
+- **Zurück auf Sofort** (in den Einstellungen oder mit dem Link **Zurück auf Einzelmails** aus der Mail): Was noch wartet, kommt beim
+  nächsten Lauf als eine Mail.
+- **Viel auf einmal:** Es geht immer alles hinaus. Bis 200 Neuigkeiten stehen einzeln in der Mail, darüber steht „… und N weitere“.
 - In der **Mail-Queue** steht jede Sammel-Mail als `notification_digest`; die Vorlage lässt sich unter **E-Mail-Vorlagen** anpassen
   (Platzhalter `{{items}}` ist die fertige Liste).
 - Gesammelte Zeilen stehen in der Datenauskunft der Person und werden mit dem Konto gelöscht; Verschicktes räumt der Job nach 90 Tagen weg.
@@ -279,7 +286,7 @@ Jede Art von Meldung hat ein **Thema** (die Themen der Einstellungen) und eine *
 
 | Wichtigkeit | Bedeutung | Beispiele |
 | --- | --- | --- |
-| **Dringend** | kommt auch in der Ruhezeit sofort, nie in eine Sammlung, in der Glocke rot | Du bist dran, Match startet jetzt, Push-Test |
+| **Dringend** | kommt auch in der Ruhezeit sofort, nie in eine Sammlung, in der Glocke rot und als einzige angesagt | Du bist dran, Match startet jetzt, Turnier abgesagt, Event abgesagt oder verschoben, Push-Test |
 | **Wichtig** | verlangt meist etwas von dir | Termin, Check-in, Anmeldung, Weiter/Ausgeschieden, Pause, Rechnung, Nachricht an dich |
 | **Normal** | zur Kenntnis | Ergebnisse, Erfolge, News, Galerie, Team-Änderungen |
 

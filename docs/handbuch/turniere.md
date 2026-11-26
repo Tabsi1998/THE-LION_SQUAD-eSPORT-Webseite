@@ -1265,10 +1265,13 @@ einmal, unter dem Thema **Turnier-Updates** (die Person kann es abschalten):
 
 - Das Finale, Gruppen- und Liga-Spieltage melden nichts zusätzlich – dafür gibt es **Turnier beendet** und die Tabelle.
 - Wer nicht erschienen ist, ist nie „weiter“ über den Sieger-Weg.
-- Hat die Turnierleitung in den fünf Minuten davor selbst einen **Hinweis** an das Turnier geschickt (3.17, etwa „Pause bis
-  14:30“ mit „Turnier gleich pausieren“), kommt keine zweite Pausen-Meldung.
-- Wird ein Ergebnis noch einmal gleich gemeldet, kommt nichts doppelt; ändert eine Korrektur den Sieger, bekommt der neue Sieger
-  seine Meldung.
+- Wird ein Ergebnis noch einmal gleich gemeldet, kommt nichts doppelt. Ändert eine Korrektur den Ausgang, bekommen beide die
+  passende neue Meldung; die alte ist als gelesen und überholt markiert.
+- „Weiter“ heißt: im nächsten, tatsächlich gespielten Spiel. Gewinnt im Double Elimination der Erste das Grand Final und der Reset
+  entfällt, kommt keine Meldung – dafür kommt **Turnier beendet**.
+- „Der Turnierbaum ist da“ kommt bei jedem Start: von der Turnierleitung, nach Zeitplan und mit dem ersten Spiel an einer Station.
+- Die Pausen-Meldung entfällt nur, wenn die Leitung in den fünf Minuten davor selbst einen Pausen-Hinweis an genau dieses Turnier
+  geschickt hat; andere Hinweise und solche ans ganze Event zählen nicht.
 
 ## 4. Wenn etwas nicht klappt
 

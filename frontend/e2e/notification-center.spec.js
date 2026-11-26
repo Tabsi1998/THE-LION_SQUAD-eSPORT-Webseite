@@ -190,3 +190,31 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     });
   });
 }
+
+// Prüfung 26.11.: „Wöchentlich“ war bei 360 und 320 px abgeschnitten. Nichts abschneiden - bei 320, 360 und 390 px.
+for (const width of [320, 360, 390]) {
+  test.describe(`Segment bei ${width} px`, () => {
+    test.skip(({ isMobile }) => Boolean(isMobile), "die Breiten stehen hier ausdrücklich");
+    test.use({ viewport: { width, height: 800 } });
+
+    test("Sofort, Täglich, Wöchentlich und die Themen ohne Abschneiden; Vorgabe des Vereins wählbar", async ({ page }) => {
+      const seen = await mockServer(page);
+      await page.goto("/profile?tab=notifications&bereich=mail");
+      await page.getByTestId("notification-digest-weekly").click();
+      await expect(page.getByTestId("notification-digest-weekly")).toHaveAttribute("aria-checked", "true");
+      const clipped = await page.locator(".tls-seg__option").evaluateAll((nodes) => nodes
+        .filter((node) => node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1)
+        .map((node) => node.textContent));
+      expect(clipped).toEqual([]);
+      expect(await noSidewaysScroll(page)).toBe(true);
+      await shot(page, page.getByTestId("notification-digest"), "segment", width);
+      await page.getByTestId("notification-digest-use-default").click();
+      await expect.poll(() => seen.patches.some((patch) => "mail_digest" in patch && patch.mail_digest === null)).toBe(true);
+      await expect(page.getByTestId("notification-digest-default")).toContainText("Vorgabe des Vereins: Sofort");
+      await page.getByTestId("notification-section-themen").click();
+      const topicClipped = await page.locator(".tls-seg__option").evaluateAll((nodes) => nodes
+        .filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent));
+      expect(topicClipped).toEqual([]);
+    });
+  });
+}
