@@ -103,16 +103,17 @@ jobs:
 
   backend:
     # Jede Testdatei läuft in genau einem Teil; verteilt wird nach gemessener Dauer (backend/tests/shard_plan.py).
-    name: Backend-Tests (${{ matrix.shard }}/3)
+    name: Backend-Tests (${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
-    # Ein Teil braucht gut 4 Minuten samt Einrichtung; 15 lässt Platz für einen langsamen Runner.
+    # Vier statt drei Teile (26.11.2026): main brauchte je Teil schon 8 bis 12,5 Minuten, ein langsamer Runner riss die
+    # 15 Minuten. Die Grenze bleibt, damit ein hängender Test nicht länger kostet.
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     env:
       APP_ENV: test
       MONGO_URL: mongodb://127.0.0.1:27017
@@ -124,7 +125,7 @@ jobs:
       # Zweiter Leser (#2018): das Modell wie im Image (backend/Dockerfile), die Tests mit ihm laufen immer.
       RESULT_IMAGE_SECOND_READER_MODEL: /tmp/ocr-models/PP-OCRv6_rec_small.onnx
       REQUIRE_SECOND_READER: "1"
-      TEST_SHARD: ${{ matrix.shard }}/3
+      TEST_SHARD: ${{ matrix.shard }}/4
       TEST_SHARD_REPORT: test-results/backend-shard-${{ matrix.shard }}.json
       # Ohne Punkt am Anfang: upload-artifact lässt versteckte Dateien weg.
       COVERAGE_FILE: test-results/backend-coverage-${{ matrix.shard }}
@@ -162,7 +163,7 @@ jobs:
           curl --fail --silent --show-error --location --retry 5 --retry-delay 20 --retry-all-errors \
             --output "$RESULT_IMAGE_SECOND_READER_MODEL" "$url"
           echo "$sha  $RESULT_IMAGE_SECOND_READER_MODEL" | sha256sum --check
-      - name: Run backend unit tests (part ${{ matrix.shard }} of 3)
+      - name: Run backend unit tests (part ${{ matrix.shard }} of 4)
         # Die Schwelle (--cov-fail-under=35) prüft der Job "Backend-Coverage" über alle Teile zusammen.
         run: |
           mkdir -p test-results
@@ -219,12 +220,19 @@ jobs:
   # Dieselben Abläufe wie in „Backend-Tests“, aber auf echtem MongoDB (#2200): Indizes, Sperren und Aggregationen, die
   # mongomock nicht prüft. Jeder Prozess hat seine Datenbank, jeder Test beginnt leer: backend/tests/flow_mongo.py.
   backend-mongo:
-    name: Backend-Abläufe auf MongoDB
+    # In zwei Teilen wie die Backend-Tests (shard_plan.py, TEST_SHARD): ein Job brauchte schon gut 10 Minuten.
+    name: Backend-Abläufe auf MongoDB (${{ matrix.shard }}/2)
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
+      TEST_SHARD: ${{ matrix.shard }}/2
+      TEST_SHARD_REPORT: test-results/mongo-shard-${{ matrix.shard }}.json
       APP_ENV: test
       # Wie in „Backend-Tests“: auf 27017 antwortet niemand. Die Abläufe schreiben nur in ihre eigene Testdatenbank.
       MONGO_URL: mongodb://127.0.0.1:27017
@@ -259,8 +267,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
-      - name: Run the league, squad, match and map flows on MongoDB
+      - name: Run the league, squad, match and map flows on MongoDB (part ${{ matrix.shard }} of 2)
         run: python scripts/flow_mongo_tests.py --numprocesses=auto
+      - name: Upload the part report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-mongo-shard-${{ matrix.shard }}
+          path: test-results/mongo-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  backend-mongo-check:
+    # Wie bei den Backend-Tests: Jede Ablauf-Datei lief in genau einem Teil.
+    name: Backend-Abläufe auf MongoDB (Teile vollständig)
+    needs: backend-mongo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: backend-mongo-shard-*
+          path: test-results
+          merge-multiple: true
+      - name: Every flow file ran in exactly one part
+        run: python scripts/test-shards.py check test-results/mongo-shard-*.json
 
   frontend:
     name: Frontend
@@ -820,7 +855,7 @@ jobs:
   ci-result:
     name: CI-Ergebnis
     # Das Prüftor (#1660) zählt mit: rot heißt nicht mergen. Der Kommentar-Job nicht - er meldet nur.
-    needs: [changes, backend-checks, backend, backend-coverage, backend-mongo, frontend, frontend-unit, frontend-coverage, frontend-e2e,
+    needs: [changes, backend-checks, backend, backend-coverage, backend-mongo, backend-mongo-check, frontend, frontend-unit, frontend-coverage, frontend-e2e,
       prueftor, mobile, container-smoke]
     if: always()
     runs-on: ubuntu-24.04
@@ -831,6 +866,8 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
           BACKEND: ${{ needs.backend.result }}
           BACKEND_COVERAGE: ${{ needs.backend-coverage.result }}
+          BACKEND_MONGO: ${{ needs.backend-mongo.result }}
+          BACKEND_MONGO_CHECK: ${{ needs.backend-mongo-check.result }}
           FRONTEND_UNIT: ${{ needs.frontend-unit.result }}
           FRONTEND_COVERAGE: ${{ needs.frontend-coverage.result }}
         run: |
@@ -844,6 +881,10 @@ jobs:
           # Liefen die Backend-Tests, muss auch die Coverage-Schwelle geprüft sein - übersprungen zählt dann nicht.
           if [ "$BACKEND" = "success" ] && [ "$BACKEND_COVERAGE" != "success" ]; then
             echo "Die Backend-Tests liefen, die Coverage-Schwelle wurde aber nicht geprüft ($BACKEND_COVERAGE)."
+            exit 1
+          fi
+          if [ "$BACKEND_MONGO" = "success" ] && [ "$BACKEND_MONGO_CHECK" != "success" ]; then
+            echo "Die Abläufe auf MongoDB liefen, ihre Vollständigkeit wurde aber nicht geprüft ($BACKEND_MONGO_CHECK)."
             exit 1
           fi
           if [ "$FRONTEND_UNIT" = "success" ] && [ "$FRONTEND_COVERAGE" != "success" ]; then
