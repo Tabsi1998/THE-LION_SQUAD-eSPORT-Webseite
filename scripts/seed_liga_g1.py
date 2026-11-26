@@ -18,6 +18,7 @@ nicht im Repo). Die Zeit-Helfer der Spec (kein Warten in Echtzeit, es gibt keine
     python scripts/seed_liga_g1.py --job veto --tournament <id> --minutes 2          # Veto-Zeitüberschreitung
     python scripts/seed_liga_g1.py --job age --tournament <id> --days 3              # Ergebnisse „vor 3 Tagen“ bestätigt
     python scripts/seed_liga_g1.py --job legacy --season <id>                        # Season ohne neue Felder (Altdaten)
+    python scripts/seed_liga_g1.py --job start_rights --season <id> --days 11        # Startrechte-Job „jetzt + 11 Tage“
 
 Die Antwort eines Jobs steht als JSON in der letzten Zeile.
 """
@@ -191,6 +192,18 @@ async def job(name: str, tournament_id: str | None, season_id: str | None, minut
     db = get_db()
     if name == "legacy":
         return await legacy_season(db, season_id)
+    if name == "start_rights":
+        # Der echte Job der Startrechte (F.2a, #1627) mit späterem „jetzt“: Fristen, Nachrücken, Erinnerungen - nur für diese
+        # Season (wie die anderen Helfer nur für eine Staffel), unter ihrer Sperre. Sonst träfe ein zweiter Lauf auf derselben
+        # Datenbank die Folge-Seasons früherer Läufe mit.
+        from services import league_start_rights
+
+        if not await db.league_seasons.find_one({"id": season_id, "start_rights": {"$type": "object"}}, {"_id": 1}):
+            raise SystemExit("Season mit Startrechten gibt es hier nicht.")
+        out = dict(league_start_rights.ZERO)
+        async with league_start_rights._Lock(db, season_id, wait_seconds=10.0):
+            await league_start_rights._sweep_season(db, season_id, now_utc() + timedelta(days=days, minutes=minutes), out)
+        return out
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
     if not tournament:
         raise SystemExit("Staffel gibt es hier nicht.")
@@ -261,7 +274,7 @@ async def legacy_season(db, season_id: str | None) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--job", choices=("deadlines", "veto", "age", "legacy"))
+    parser.add_argument("--job", choices=("deadlines", "veto", "age", "legacy", "start_rights"))
     parser.add_argument("--tournament")
     parser.add_argument("--season")
     parser.add_argument("--minutes", type=float, default=0.0)

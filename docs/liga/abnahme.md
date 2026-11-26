@@ -13,9 +13,12 @@ Fehleingaben, gleichzeitige Aktionen, Sperren, Rechte und historische Daten.
 |---|---|---|
 | Ablauf | [`scripts/run_liga_g1.sh`](../../scripts/run_liga_g1.sh) | `up` startet das Backend (uvicorn), `seed` legt die Testwelt an, `run` startet die Specs, `down` stoppt das Backend |
 | Testwelt | [`scripts/seed_liga_g1.py`](../../scripts/seed_liga_g1.py) | Leitung (Superadmin, zwei Liga-Leitungen, eine befangene Leitung, Turnierleitung ohne Bereich Ligen), 16 erfundene Teams mit Co-Team, ein Spieler ohne Team, das Spiel. Je Lauf ein eigenes Kürzel |
-| Zeit-Helfer | `seed_liga_g1.py --job …` | `deadlines` (Fristen-Job mit späterem „jetzt“), `veto` (Zeitüberschreitung im Veto), `age` (Ergebnisse einer Staffel um Tage zurückdatieren), `legacy` (Season ohne neue Felder) |
+| Zeit-Helfer | `seed_liga_g1.py --job …` | `deadlines` (Fristen-Job mit späterem „jetzt“, darin auch die Erinnerungen E.5), `veto` (Zeitüberschreitung im Veto), `age` (Ergebnisse einer Staffel um Tage zurückdatieren), `legacy` (Season ohne neue Felder), `start_rights` (Job der Startrechte mit späterem „jetzt“, nur für eine Season) |
 | Hauptweg | [`liga-gesamtabnahme.spec.js`](../../frontend/e2e/liga-abnahme/liga-gesamtabnahme.spec.js) | Szenarien 1 bis 15, 17 und 18, dazu Belohnungen, Gesamtwertung und Profil |
 | Grenzfälle | [`liga-grenzfaelle.spec.js`](../../frontend/e2e/liga-abnahme/liga-grenzfaelle.spec.js) | Szenario 16, Rechte, Gleichzeitigkeit, Fehleingaben, Fristen-Job, Abbrüche, Sperren, Altdaten |
+| Saisonende (#1632) | [`liga-saisonende.spec.js`](../../frontend/e2e/liga-abnahme/liga-saisonende.spec.js) | Playoffs und Relegation (#2404), Saisonende-Moment (#1639), Startrechte der Folge-Season (#1627) |
+| Betrieb (#1632) | [`liga-betrieb.spec.js`](../../frontend/e2e/liga-abnahme/liga-betrieb.spec.js) | Vorfälle (D.5), Leitstand mit Protokoll und Rundnachricht (E.4), Erinnerungen (E.5) |
+| Backup-Probelauf (#1632) | [`scripts/liga_backup_probe.sh`](../../scripts/liga_backup_probe.sh), [`scripts/liga_backup_probe.py`](../../scripts/liga_backup_probe.py) | eigener Docker-Stand, Liga-Daten über die Seeds, Backup mit Schreibpause, frischer Stand, Restore, Vergleich (BACKUP_RESTORE.md, „Probelauf“) |
 | Hilfen | [`g1.js`](../../frontend/e2e/liga-abnahme/g1.js) | Anmelden (Sitzungen aus `e2e/abnahme/abnahmeSession.js`), API-Aufrufe mit CSRF, Liga anlegen, Serien und Veto |
 
 Die Specs nutzen keine nachgestellte API. Alles, was sie tun, läuft über die Routen, die auch das Web aufruft. Konten und Teams
@@ -30,6 +33,11 @@ schreibt nur der Seed direkt in die Datenbank, wie bei den anderen Abnahme-Seeds
 
 **Rangfolge:** Bei jedem Spiel gewinnt das Co-Team mit dem kleineren Index der Testwelt. So ist der Endstand vorhersagbar:
 Meister ist Index 0 mit 45 Punkten.
+
+**Unabhängig vom Los (#2570):** Spielplan, Heimrecht und Spieltage werden gelost. Eine Spec greift darum nie auf einen festen Platz
+im Spielplan zu (`round1[4]`), wenn die Erwartung vom Co-Team abhängt, sondern auf das Spiel zweier Indizes (`matchOf`) oder auf
+ein Spiel ohne das Co-Team, das eine frühere Prüfung verändert hat (Punktabzug aus Szenario 14). Setzliste, Relegation und
+Folge-Season folgen der Rangfolge; Ausnahmen (Finale, Relegation, Korrektur) wählt die Spec ausdrücklich.
 
 **Nicht in der normalen CI:** `playwright.config.js` blendet `e2e/liga-abnahme/` aus. Nur mit `LIGA_ABNAHME=1` sind die
 Specs gelistet, das setzt `run_liga_g1.sh`. Die Browser-Teile der CI werden dadurch nicht langsamer.
@@ -104,6 +112,36 @@ Weitere Prüfungen:
 | Sperren | Gesperrtes Konto im Check-in blockiert (D-4), abgeschlossene Staffel nimmt nichts mehr an, Wiederöffnen nur durch eine zweite Person | Grenzfälle „Abbrüche und Sperren …“ |
 | Altdaten | Season ohne die Felder des Masterplans: melden ohne Check-in und Veto mit Aufstellung je Map, Tabelle, Protest-Vorgaben inaktiv, Seiten fehlerfrei | Grenzfälle „Altdaten …“ |
 
+## Erweiterung zur Betriebsfreigabe (#1632, Fabian 26.11.)
+
+Was seit G.1 (#2423) dazukam, steht in zwei weiteren Specs. Beide laufen nachts mit (alle Specs unter `frontend/e2e/liga-abnahme/`),
+jede baut ihre eigene Liga aus der Testwelt und hängt nicht von den anderen ab. Laufzeit lokal (26.11., vier volle Läufe):
+Saisonende rund 40 Sekunden, Betrieb rund 45 Sekunden, die ganze Abnahme mit 29 Tests 5,3 bis 5,8 Minuten - weit unter der Grenze
+des Nacht-Jobs (30 Minuten für die Specs, 45 für den Job). Eine Aufteilung in mehr Dateien ist darum nicht nötig.
+
+**Saisonende** (`liga-saisonende.spec.js`): zwei Liga N mit je sechs Co-Teams (Index 0 bis 5 und 6 bis 11), Liga 1 mit Playoffs der
+besten vier und „Meister aus den Playoffs“, Relegation Platz 5 oben gegen Platz 2 unten, Startrechte mit Zusage (zehn Tage,
+Nachrücken nach Regel).
+
+| Nr. | Szenario | Schritte | Erwartet |
+|---|---|---|---|
+| S1 | Reguläre Season nach der Rangfolge | Zonen, Vorlage der Playoffs und Relegation, Startrechte, 2 × 15 Spiele von der Leitung, Abschluss | Kennzeichen „Playoff-Platz“ für 1 bis 4; vor dem Abschluss keine Setzliste (`regular_open`); danach Setzliste 1-4, 2-3, Relegation 4 gegen 7; Staffelsieger ist noch kein Meister, kein Moment |
+| S2 | Playoffs aus dem Endstand | Anlegen per Doppelklick, Halbfinale nach der Rangfolge, Finale 3:2 für Platz 2, Abschluss | Eine Playoff-Staffel (zweiter Aufruf `replay`), Heimrecht des besser Gesetzten, Meister ist der Finalsieger (Plätze 1, 2, 3, 3). **Meister sofort** (Fabian 26.11.): Moment und genau eine Nachricht „Meister: …“, obwohl die Relegation noch offen ist; Auf- und Abstieg haben noch keinen Moment |
+| S3 | Relegation mit „beide nicht erschienen“ | Notiz zu kurz 422; beim ersten Mal neu ansetzen; dann gewinnt der Untere | `no_show_step: retry`, `no_show_retry.counted` (Nr. 245); Season abgeschlossen; Folge-Season: Liga 1 = 0-3, 6, 7, Liga 2 = 4, 5, 8-11, die Relegation mit `via: relegation`. Momente je Person (Auf, Ab, Meister), keiner für Bleibende; im Browser (390 px) einmal, ein zweites Gerät zeigt ihn nicht; Captains lesen „Aufstieg bestätigt“ der Startrechte, Spieler die Nachricht zum Moment - je eine |
+| S4 | Folge-Season mit Startrechten, Pause und Korrektur | Anlegen; Captain und Vertreter sagen gleichzeitig zu; die zweite Leitung öffnet die Relegation wieder; Korrektur mit Grund (der Obere gewinnt), Abschluss, „Übernahme neu berechnen“ | Zwölf Startrechte `offered`; die doppelte Zusage zählt einmal (`replay`); in der Pause ruht die Frist (`paused`, `accept_until: null`), Zusagen bleibt möglich; nach dem Abschluss keine Pause mehr; der Moment des alten Aufsteigers fällt weg, er liest einmal „Endstand korrigiert“; Index 4 neu in Liga 1, Index 7 in Liga 2, je mit neuer Zusage |
+| S5 | Absage, Nachrücker, Frist, Startdatum | Index 4 meldet sich ab; Index 5 sagt als Nachrücker zu; Job „in elf Tagen“; Startdatum auf gestern | Der beste Absteiger rückt nach (`fills`); drei Startrechte verfallen, der freie Platz in Liga 1 geht an den besten Nicht-Aufsteiger (Index 9), in der untersten Liga rückt niemand nach; ein zweiter Lauf ändert nichts. Ab dem Startdatum verfällt nichts, das Team sagt nicht mehr selbst zu (409), die Leitung trägt die Zusage mit Grund ein (`accepted_via: lead`); Verwaltung (1440 px) und Ligaseite (390 px) fehlerfrei |
+
+**Betrieb** (`liga-betrieb.spec.js`): eine Staffel mit Index 12 bis 15, Best of 5 mit Check-in und Veto.
+
+| Nr. | Szenario | Schritte | Erwartet |
+|---|---|---|---|
+| B1 | Vorfälle im Spiel (D.5) | Spiel 12 gegen 13: Check-in, Veto; Vorfall Map 1 „fortsetzen“ (Zustimmung), Vorfall Map 3 „Rehost“ (Ablehnung); Entscheid der Leitung, dann melden beide 3:1 | Map 3 „in Klärung“; der Leitstand zeigt den Fall unter „Vorfälle“ mit Weg zur Matchseite; Grund zu kurz 422; Entscheid `no_action` mit „Serie feststellen“, danach ist der Fall nicht mehr offen; das Ergebnis gilt, die Tabelle zählt es einmal; Matchseite (390 px) fehlerfrei |
+| B2 | Leitstand, Protokoll, Rundnachricht (E.4) | Protokoll lesen; Vorschau an Captains und an Spieler der Staffel; Betreff/Text zu kurz; senden, dieselbe Kennung noch einmal | Protokoll ohne Gründe oder Texte; acht Empfänger (Captain und Vertreter je Team), Spieler mehr; 422; Stand `sent`, der zweite Aufruf `replay`; Captain und Vertreter je genau eine Nachricht, ein Spieler ohne Rolle keine; Reiter Leitstand (1440 px) fehlerfrei |
+| B3 | Erinnerungen (E.5) | Vorgaben lesen und speichern; Spiel 14 gegen 15 in gut 24 Stunden; Fristen-Job „in einer Stunde“, noch einmal, dann neuer Termin | „Liga-Spiel in 24 Stunden“ an beide Captains genau einmal, mit `unique_dedupe` und ohne Discord (`no_discord`); ein zweiter Lauf schickt nichts; ein neuer Termin ist ein neuer Anlass (genau eine weitere) |
+
+Abgedeckt sind damit die Punkte aus `docs/liga/abschlussbericht.md`, Abschnitt 6, die vorher „getestet, aber nicht in G.1“ waren:
+Vorfälle, Leitstand und Rundnachricht, Erinnerungen - und Playoffs, Relegation, Startrechte und der Saisonende-Moment.
+
 ## Außerhalb des Umfangs
 
 Diese Punkte aus der Testmatrix von #1632 betreffen Funktionen, die es noch nicht gibt. Die Abnahme baut sie nicht nach.
@@ -111,14 +149,14 @@ Diese Punkte aus der Testmatrix von #1632 betreffen Funktionen, die es noch nich
 | Punkt aus #1632 | Grund | Issue |
 |---|---|---|
 | Solo-Ligen (Solo-Parität, EA-FC-Solo), Partien ohne Maps | Ligen gibt es heute nur für Co-Teams | #2401, #1627 |
-| Relegation, Playoffs aus dem Endstand (Gruppen → Playoffs) | Noch nicht gebaut, nur in `docs/liga/erweiterbarkeit.md` vorbereitet | #2404 |
-| Sportlicher Auf- und Abstieg über mehrere Ligen N | Folge-Season übernimmt die Stufe, eine Regel je Spiel fehlt | #1627 |
+| Sportlicher Auf- und Abstieg als Regel je Spiel | Folge-Season übernimmt Zonen und Relegation (abgenommen in „Saisonende“), eine Regel je Spiel fehlt | #1627 |
 | Zusammenlegen und Entflechten von Divisionen | Noch nicht gebaut | #1628 |
 | Titelwechsel je Season, freier Name je Liga N | Noch nicht gebaut | #2400, #2405 |
 | Veto-Seitenwahl, Aufstellungsgröße je Modus | Noch nicht gebaut | #2402 |
 | Vorfallarten und MOSS je Season schaltbar | Noch nicht gebaut | #2403 |
 | App (Check-in, Veto, Anmeldestatus) | Paket G.2 | #2173 |
-| Benachrichtigungen über echte Dienste, Backup und Restore | Versandsperre im Testbetrieb, Betriebsprüfung auf dem Server | #1632 (Freigabe-Gates) |
+| Benachrichtigungen über echte Dienste | Versandsperre im Testbetrieb; die erste echte Probe macht Fabian mit einem Testkonto auf dem Server (Abschlussbericht, Checkliste) | #1632 (Freigabe-Gates) |
+| Backup und Restore auf dem Server | Lokal geprüft mit dem Backup-Probelauf (oben); auf dem Server bleibt der Timer und ein Restore-Drill zu prüfen | #1632 (Freigabe-Gates) |
 
 ## Offene Punkte aus der Abnahme
 

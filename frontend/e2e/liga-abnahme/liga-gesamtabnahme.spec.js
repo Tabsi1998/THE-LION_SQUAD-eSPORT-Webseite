@@ -595,6 +595,18 @@ test.describe("Liga-Gesamtabnahme: die 18 Szenarien gegen echte API und MongoDB"
     const captain = await as(browser, testInfo, "captain-0", SMALL);
     const me = await get(captain, "/api/auth/me");
     await openPage(captain, `/u/${me.username}`);
+    // Saisonende-Moment (#1639, Fabian 26.11.): Der Meister sieht beim nächsten Besuch zuerst seinen Moment, die Goldmedaille kommt
+    // als zweite Karte im selben Ablauf - nicht mehr als eigene Zeremonie daneben.
+    const moment = captain.page.getByTestId("season-moment");
+    await expect(moment).toBeVisible({ timeout: 20_000 });
+    await expect(moment.getByTestId("season-moment-title")).toHaveText("Meister");
+    await moment.getByTestId("season-moment-done").click();
+    await expect(moment.getByTestId("season-moment-rewards")).toContainText("Goldmedaille");
+    await shot(captain.page, "g1-spielerprofil-moment-390.png");
+    await moment.getByTestId("season-moment-done").click();
+    await expect(moment).toBeHidden();
+    // Im Profil unter Trophäen - die Übersicht zeigt nur zwei, bei gleichem Datum in beliebiger Reihenfolge (unabhängig vom Los, #2570).
+    await captain.page.getByTestId("profile-tab-awards").click();
     await expect(captain.page.getByText("Goldmedaille").first()).toBeVisible();
     await shot(captain.page, "g1-spielerprofil-390.png");
     await done(captain);

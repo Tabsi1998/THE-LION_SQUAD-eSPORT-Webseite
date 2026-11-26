@@ -283,7 +283,10 @@ Schalter für Ausnahmen - jeder nur bewusst und mit Grund:
 
 **Frisches Ziel statt Überschreiben:** Wer nicht ins laufende System restaurieren will, startet einen zweiten
 Stack mit eigenem Projektnamen und leeren Volumes (wie unter „Zielauswahl“ beschrieben), restauriert dorthin
-(`RESTORE_ALLOW_FOREIGN_PROJECT=<quelle>`), prüft und schaltet erst danach um.
+(`RESTORE_ALLOW_FOREIGN_PROJECT=<quelle>`), prüft und schaltet erst danach um. **Der Projektname allein reicht
+nicht:** `docker-compose.yml` setzt feste Containernamen (`tls-mongodb`, `tls-backend`, `tls-frontend`) und Ports. Läuft
+der erste Stack auf demselben Server, bricht der zweite mit einem Namens- bzw. Portkonflikt ab. Er braucht eine eigene
+Override-Datei mit `container_name` und Ports - wie `docker-compose.staging.yml` (gefunden im Probelauf, unten).
 
 ### Was am Server zu tun ist (#1009/#1010)
 
@@ -294,8 +297,76 @@ Stack mit eigenem Projektnamen und leeren Volumes (wie unter „Zielauswahl“ b
 - **Reihenfolge beim Einspielen:** erst das Release mit dem neuen Backend deployen (es kennt
   `services.maintenance` und `services.backup_inventory`), dann läuft das nächste nächtliche Backup schon mit Pause
   und Manifest. Mit einem alten Backend-Image bricht `backup.sh` ab, bevor es ein Archiv schreibt.
-- Am Host werden wie bisher `docker compose`, `openssl`, `gzip`, `tar` und `python3` gebraucht.
+- Am Host werden wie bisher `docker compose`, `openssl`, `gzip`, `tar` und `python3` gebraucht. Dazu das Hilfsbild
+  `alpine`: Upload-Archiv, Leeren und Einspielen des Upload-Volumes laufen in einem Einmal-Container (`docker run … alpine`,
+  ohne feste Version). Es muss auf dem Server ladbar sein oder vorab gezogen werden (`docker pull alpine`) - sonst scheitert
+  das Backup erst beim Upload-Teil, der Restore nach dem Einspielen der Datenbank.
 - Uptime-Prüfungen per GET (`/api/health/*`) merken von der Pause nichts. Webhooks, die in der Pause ankommen,
   bekommen 503 und werden von den Absendern üblicherweise wiederholt.
 - Alte Backups mit `.manifest.txt` laufen mit der Aufbewahrung (`RETENTION_DAYS`) aus; bis dahin nur mit
   `RESTORE_ALLOW_LEGACY_MANIFEST=true` wiederherstellbar.
+
+## Probelauf vor dem Betrieb (#1632)
+
+`scripts/liga_backup_probe.sh` spielt Backup und Restore mit echten Liga-Daten einmal ganz durch - auf einem eigenen
+Docker-Stand am eigenen Rechner, **nie auf dem Server, nie gegen Produktion**, nur mit Testwerten:
+
+1. Stand mit eigenem Projektnamen (`lsw-backup-probe`), eigenen Ports und Volumes aus `docker-compose.yml`,
+   `docker-compose.abnahme.yml` und einer erzeugten Probe-Datei (Testbetrieb, Versand gesperrt, MongoDB nur auf `127.0.0.1`).
+   Als Projektname gilt nur `lsw-backup-probe` oder `lsw-backup-probe-<name>` (Erlaubnisliste), Port 23000 nie.
+2. Liga-Daten über die Seeds: `scripts/seed_abnahme_liga.py` (Liga, Teams, Map-Bilder als Uploads) und die erweiterte
+   Gesamtabnahme (`liga-saisonende`, `liga-betrieb`: Endstand, Playoffs, Relegation, Startrechte, Saisonende-Momente,
+   Vorfälle, Rundnachricht, Erinnerungen).
+3. Bestand vorher: `scripts/liga_backup_probe.py snapshot` im Backend-Container (nur lesen).
+4. `scripts/backup.sh` wie oben, mit Schreibpause. In der Pause muss ein Schreibversuch `503` bekommen, das Manifest
+   `consistent: true` tragen.
+5. Stand frisch aufsetzen (`docker compose down -v`, nur das eigene Projekt), 6. `scripts/restore.sh <Manifest>` mit
+   `RESTORE_CONFIRM`.
+7. Bestand nachher und Vergleich: jede Sammlung mit Anzahl, Endstände, Tabellen jeder Liga-Staffel (wie die Website sie
+   liest), Startrechte, Momente, Vorfälle, Indizes jeder Sammlung und die Uploads mit Inhalt (SHA-256 je Datei - der
+   Restore selbst vergleicht nur Pfad und Größe).
+
+```bash
+PYTHON=<Python mit backend/requirements.txt> PROBE_RUNS=2 bash scripts/liga_backup_probe.sh
+```
+
+**Schutzregeln** (je mit Gegenprobe geprüft, entschärftes `docker` und `rm`):
+
+- *Nur auf einem Entwicklungsrechner:* Läuft ein Container mit einem festen Namen aus `docker-compose.yml` (`tls-mongodb`,
+  `tls-backend`, `tls-frontend`), steht in der `.env` des Repos `APP_ENV=production` oder in der Shell `APP_ENV=production`,
+  bricht das Skript ab, bevor es etwas baut, startet oder löscht.
+- *Nur das eigene Projekt:* Vor jedem `docker compose down -v`, Backup und Restore prüft es, dass das Projekt leer ist oder nur
+  die Container `<projekt>-mongodb`, `-backend`, `-frontend` (dazu Einmal-Container `<projekt>-backend-run-…`) und die Volumes
+  `<projekt>_mongo_data`, `_uploads_data`, `_upload_spool` enthält - sonst Abbruch ohne Löschen.
+- *Nur unter `<Repo>/.local-testing/`:* Ordner löscht es nur nach Prüfung des Pfads (absolut, ohne `..`, nie `.local-testing`
+  selbst). `ABNAHME_SOURCE` aus der Shell wird verworfen, gebunden wird fest an `127.0.0.1`.
+
+Protokolle und Vergleich liegen danach unter `.local-testing/backup-probe/`.
+
+**Ergebnis 26.11.2026** (zwei vollständige Läufe, `PROBE_RUNS=2`, je rund fünf Minuten; Stand aus `main` 96fde3cce mit dieser
+Abnahme):
+
+| Prüfung | vorher | nachher | Lauf 1 | Lauf 2 |
+| --- | --- | --- | --- | --- |
+| Schreibpause | - | Schreibversuch in der Pause `503`, Manifest `consistent: true` | 14 s | 17 s |
+| Sammlungen mit gleicher Anzahl | 200 | 200 von 200 (Lauf 2: 199 - `rate_limits` 10 → 6, abgelaufen per TTL) | gleich | gleich |
+| Konten | 144 | 144 | gleich | gleich |
+| Liga-Staffeln / davon mit öffentlicher Tabelle | 8 / 5 | 8 / 5, Inhalt der Tabellen gleich | gleich | gleich |
+| Endstände (gültig) | 4 | 4, alle Fassungen (5) inhaltsgleich | gleich | gleich |
+| Startrechte | 8 zugesagt, 1 abgemeldet, 3 verfallen | dasselbe, alle 12 Anträge inhaltsgleich | gleich | gleich |
+| Saisonende-Momente (gültig) | 1 Meister, 1 Auf, 1 Ab | dasselbe, alle 5 inhaltsgleich | gleich | gleich |
+| Meister-Einträge, Vorfälle, Liga-Spiele, Anmeldungen | 1, 2, 98, 35 | inhaltsgleich | gleich | gleich |
+| Indizes | 766 | 766 gleich (dazu `_id_` von `ops_maintenance`, Betriebsdaten der Pause) | gleich | gleich |
+| Uploads | 26 Dateien, 131 602 Bytes | dieselben Dateien, SHA-256 je Datei gleich | gleich | gleich |
+
+`restore.sh` selbst meldete jeweils „Restored data matches the manifest“ (201 Sammlungen samt `ops_maintenance`). Kein Lauf
+brauchte `RESTORE_EXTRA_COLLECTIONS`: Ein frisch gestarteter Stand legt keine Sammlung an, die im Backup fehlt.
+
+**Lücken in dieser Anleitung, die der Probelauf fand** (oben ergänzt):
+
+- *Frisches Ziel:* Ein zweiter Stack braucht neben dem Projektnamen eigene Containernamen und Ports (Abschnitt
+  „Destruktiver Restore“, „Frisches Ziel statt Überschreiben“).
+- *Hilfsbild `alpine`:* stand nicht bei den Voraussetzungen am Host („Was am Server zu tun ist“).
+- *Nur lokal, nicht am Server:* Unter Windows (Git Bash) brauchen die Skripte ein echtes `python3` ohne CRLF in der Ausgabe
+  und Windows-Pfade für Python - das erledigt der Probelauf selbst (`cygpath`, Hilfsdatei `python3`). Am Linux-Server
+  stellt sich das nicht.
