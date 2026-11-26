@@ -4056,6 +4056,7 @@ bis es zusagt, absagt oder die Frist verfällt.
 | `offered` Zusage offen | Folge-Season angelegt, `carry_over.start_right.status: "offered"`, Frist läuft | Verwaltung, eigenes Team | – |
 | `accepted` zugesagt | Zusage des Teams (oder von der Leitung eingetragen) | Verwaltung, eigenes Team | – |
 | `declined` abgemeldet, `expired` verfallen, `revoked` zurückgenommen (Nr. 162) | Abmelden, Frist ohne Zusage, „Übernahme neu berechnen“ | Verwaltung, eigenes Team | – |
+| `rejected` abgelehnt, `waitlist` Warteliste | die Leitung hat den übernommenen Antrag im Eingang abgelehnt bzw. zurückgestuft (B.4) | Verwaltung, eigenes Team | – |
 | `participating` Teilnahme | einer Staffel zugeteilt (`assignment`, die Anmeldung der Staffel) | wie jede Teilnahme (Teilnehmerliste) | – |
 
 Im Modus `auto` gibt es `offered` und `accepted` nicht: Der übernommene Antrag steht ohne `start_right` da und liest sich als
@@ -4149,6 +4150,8 @@ abgeschlossen“ (F.1) und die Discord-Saisonende-Meldung (F.7) bleiben, wie sie
   state: forecast | confirmed, movement, division_label, zone_label, rank}`; eine Prognose nennt keine Liga N (`division_label: null`).
 - Der Eingang (`…/applications`) trägt an übernommenen Zeilen dasselbe `carry_over.start_right`; `GET …/draws` nennt je Liga N unter
   `waiting_start_right`, wer noch nicht zugesagt hat. Die Vorschau `GET …/successor` trägt `start_rights: {settings, defaults}`.
+- Der Leitstand (E.4, `league_desk._applications`) fragt bei offener Zusage nicht nach „Zuteilen“: Die Aufgabe heißt „Startrechte
+  ansehen“, führt zu `#startrechte` und ist zur Frist der Zusage fällig.
 - Konto löschen (`league_applications.scrub_person`): `start_right.accepted_by` und `fills.by` fallen wie die übrigen Kennungen heraus.
 
 **Rechte**

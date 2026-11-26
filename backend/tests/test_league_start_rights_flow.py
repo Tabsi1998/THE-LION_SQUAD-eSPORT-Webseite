@@ -713,3 +713,21 @@ async def test_deleting_an_account_takes_the_person_out_of_the_start_rights(flow
     assert after[stays["squad_id"]]["carry_over"]["start_right"]["accepted_by"] is None
     assert after[second["squad_id"]]["carry_over"]["fills"]["by"] is None
     assert lead_id not in str(after)
+
+
+# ---------------------------------------------------------------- Leitstand
+
+@pytest.mark.asyncio
+async def test_the_desk_does_not_ask_to_assign_a_team_that_has_not_accepted(flow):
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    promoted, waits = rows[squad_id(world, 2, 0)], rows[squad_id(world, 1, 0)]
+    ok(await answer(flow, promoted["squad_id"], promoted["id"]))
+    flow.act_as(world["lead"])
+    data = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/desk"))
+    items = {row["id"]: row for part in data["groups"] if part["key"] == "applications" for row in part["items"]}
+    # Zugesagt: zuteilen wie immer. Offen: erst die Zusage - der Weg führt zu den Startrechten, die Frist ist das Fälligkeitsdatum.
+    assert items[f"applications:{promoted['id']}"]["action"] == "Zuteilen"
+    open_right = items[f"applications:{waits['id']}"]
+    assert open_right["action"] == "Startrechte ansehen" and "Zusage" in open_right["text"] and open_right["url"].endswith("#startrechte")
+    assert open_right["due_at"] == league_start_rights.accept_until(waits, season).isoformat()

@@ -78,6 +78,10 @@ def test_the_states_stay_apart():
     auto = {**SEASON, "start_rights": {"mode": "auto"}}
     assert rights.state(application(), auto, NOW) == "confirmed"
     assert rights.state({**application(), "status": "withdrawn"}, auto, NOW) == "declined"
+    # Von der Leitung abgelehnt oder auf die Warteliste gesetzt ist weder „verfallen“ noch „abgemeldet“.
+    assert rights.state({**offered, "status": "rejected"}, SEASON, NOW) == "rejected"
+    assert rights.state({**application(), "status": "rejected"}, auto, NOW) == "rejected"
+    assert rights.state({**accepted, "status": "waitlist"}, SEASON, NOW) == "waitlist"
     # Kein übernommener Antrag: kein Startrecht.
     assert rights.state({"id": "x", "status": "accepted"}, SEASON, NOW) is None
 

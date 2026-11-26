@@ -9,12 +9,13 @@ const LONG = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit
 // Getrennte Zustände: Prognose, bestätigt, Zusage, Teilnahme. „Zugesagt“ ist nicht „Spielt mit“ - das ist erst die Zuteilung.
 const STATE_LABEL = {
   forecast: "Prognose", confirmed: "Automatisch dabei", offered: "Zusage offen", accepted: "Zugesagt", declined: "Abgemeldet",
-  expired: "Verfallen", revoked: "Zurückgenommen", participating: "Spielt mit",
+  expired: "Verfallen", revoked: "Zurückgenommen", participating: "Spielt mit", rejected: "Abgelehnt", waitlist: "Warteliste",
 };
 // Farbe des Abzeichens: offen fällt auf, erledigt ist ruhig, verloren gedämpft.
-const STATE_TONE = { offered: "warn", accepted: "ok", participating: "ok", confirmed: "info", declined: "muted", expired: "muted", revoked: "muted" };
+const STATE_TONE = { offered: "warn", accepted: "ok", participating: "ok", confirmed: "info", declined: "muted", expired: "muted", revoked: "muted",
+  rejected: "muted", waitlist: "warn" };
 const COUNT_ORDER = [["offered", "Zusage offen"], ["accepted", "zugesagt"], ["confirmed", "automatisch dabei"], ["participating", "spielen mit"],
-  ["declined", "abgemeldet"], ["expired", "verfallen"], ["revoked", "zurückgenommen"]];
+  ["declined", "abgemeldet"], ["expired", "verfallen"], ["rejected", "abgelehnt"], ["waitlist", "auf der Warteliste"], ["revoked", "zurückgenommen"]];
 const WHY_TEXT = { declined: "abgemeldet", expired: "Frist verfallen", rejected: "von der Leitung abgelehnt" };
 const GROUP_TEXT = { non_promoted: "der beste Nicht-Aufsteiger", relegated: "der beste Absteiger bleibt" };
 

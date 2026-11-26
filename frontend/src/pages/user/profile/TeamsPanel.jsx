@@ -68,12 +68,13 @@ export function TeamsPanel() {
 
   // Stand der Liga-Anmeldungen (#2205): nur die eigenen Co-Teams, kein Fehler, wenn er nicht kommt.
   const loadApplications = useCallback(() => {
-    // Bewusst still: der Stand der Liga-Anmeldungen ist eine Zugabe; ohne ihn steht die Teamliste wie bisher.
-    Promise.resolve(api.get("/me/league-applications")).then((answer) => {
+    const keep = (answer) => {
       setApplications(answer?.data?.items || []);
       // Startrechte (#1627, F.2a): Prognose bzw. bestätigtes Startrecht, solange es die Folge-Season noch nicht gibt.
       setStartRights(answer?.data?.start_rights || []);
-    }).catch(() => {});
+    };
+    // Bewusst still: der Stand der Liga-Anmeldungen ist eine Zugabe; ohne ihn steht die Teamliste wie bisher.
+    Promise.resolve(api.get("/me/league-applications")).then(keep).catch(() => {});
   }, []);
 
   const loadMeta = useCallback(() => {

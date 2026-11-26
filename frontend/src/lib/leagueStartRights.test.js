@@ -15,12 +15,15 @@ describe("Zustände bleiben getrennt", () => {
     expect(stateLabel("expired")).toBe("Verfallen");
     expect(stateLabel("declined")).toBe("Abgemeldet");
     expect(stateLabel("revoked")).toBe("Zurückgenommen");
+    expect(stateLabel("rejected")).toBe("Abgelehnt");
+    expect(stateLabel("waitlist")).toBe("Warteliste");
     expect(stateLabel("etwas anderes")).toBe("");
   });
 
   it("zählt für die Übersicht nur, was es gibt, in fester Reihenfolge", () => {
     expect(countsLine({ accepted: 3, offered: 4, expired: 1 })).toBe("4 Zusage offen · 3 zugesagt · 1 verfallen");
     expect(countsLine({ participating: 2, confirmed: 1 })).toBe("1 automatisch dabei · 2 spielen mit");
+    expect(countsLine({ rejected: 1, waitlist: 2 })).toBe("1 abgelehnt · 2 auf der Warteliste");
     expect(countsLine({})).toBe("");
   });
 });

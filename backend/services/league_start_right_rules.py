@@ -34,6 +34,7 @@ NUMBERS: dict[str, tuple[int, int, str]] = {
 }
 OFFERED, ACCEPTED, DECLINED, EXPIRED = "offered", "accepted", "declined", "expired"
 FORECAST, CONFIRMED, REVOKED, PARTICIPATING = "forecast", "confirmed", "revoked", "participating"
+REJECTED, WAITLIST = "rejected", "waitlist"
 NON_PROMOTED, RELEGATED = "non_promoted", "relegated"
 REASON_MIN = 5
 
@@ -153,7 +154,8 @@ def state(application: dict | None, season: dict | None, now: datetime | None = 
     if status == "withdrawn" or right.get("status") == DECLINED:
         return DECLINED
     if status != "accepted":
-        return EXPIRED if right else DECLINED
+        # Von der Leitung abgelehnt bzw. auf die Warteliste gesetzt (B.4): weder verfallen noch abgemeldet.
+        return WAITLIST if status == "waitlist" else REJECTED
     if application.get("assignment"):
         return PARTICIPATING
     if right.get("status") == OFFERED:
