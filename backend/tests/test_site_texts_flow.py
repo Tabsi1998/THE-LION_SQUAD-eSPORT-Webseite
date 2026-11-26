@@ -59,7 +59,7 @@ async def test_without_services_the_privacy_page_says_so_and_the_imprint_shows_t
     assert "Fundstücke der Jahreszeiten" in counted and "nicht öffentlich" in counted and "Datenexport" in counted and "gelöscht" in counted
     assert "Zählerstände hinter den Erfolgen" in blocks(privacy, "account-deletion")[1]["text"]
     # Der Weg nennt den Knopf so, wie er auf der Seite heißt (#1238).
-    assert "„Konto anonymisieren“" in blocks(privacy, "account-deletion")[0]["text"]
+    assert "„Konto löschen“" in blocks(privacy, "account-deletion")[0]["text"]
     assert any("eigener Infrastruktur des Vereins" in item for item in block(privacy, "privacy-recipients")["items"])
     # Steam braucht keine App - es ist die einzige Plattform, die ohne Einrichtung verknüpfbar ist.
     # Steam, Lichess, Mastodon und Bluesky brauchen keine App - die vier sind ohne Einrichtung verknüpfbar.
@@ -110,7 +110,7 @@ async def test_configured_services_appear_with_googles_limited_use_notice_and_th
     # Die Crawler-Vorschau: derselbe Text als HTML, Vereinstext escaped, Anker für Google Play bleibt.
     html = (await flow.get("/api/seo/preview", params={"path": "/privacy"})).text
     assert "<h2>Google-Nutzerdaten</h2>" in html and "Limited-Use-Anforderungen" in html
-    assert '<section id="account-deletion">' in html and '<a href="/privacy-account">' in html
+    assert '<section id="account-deletion">' in html and '<a href="/mein-bereich/datenschutz?tab=loeschung">' in html
     assert "<script>alert(1)</script>" not in html and "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert "<strong>Passkey</strong>" in html
     assert html.count("<h2>") >= 20

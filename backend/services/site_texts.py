@@ -371,7 +371,7 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         # Konto löschen (#390): öffentlich lesbar, weil Google Play einen Link dorthin verlangt - die Anker-ID bleibt.
         section("account-deletion", "Konto löschen",
                 p("Du kannst dein Konto jederzeit selbst löschen – in der LionsAPP unter Profil → Einstellungen (Zahnrad) → „Konto löschen“, "
-                  f"oder auf der Website nach der Anmeldung unter {link('Datenschutz → Meine Daten → „Konto anonymisieren“', '/privacy-account')}. "
+                  f"oder auf der Website nach der Anmeldung unter {link('Mein Bereich → Datenschutz → „Konto löschen“', '/mein-bereich/datenschutz?tab=loeschung')}. "
                   "Ein Login ist dafür nötig, damit niemand ein fremdes Konto löscht; wer sich nicht mehr anmelden kann, schreibt an "
                   f"{_contact_or_form(legal)}."),
                 p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, deine Bilder (Avatar, Banner und was du sonst für dein "
