@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.100.0 (26.11.2026)
+
+### Neu
+
+* Fußzeile zeigt die Version der Website
+* Liga – geänderter Endstand: der Moment kommt einmal neu mit „Endstand korrigiert“ (#1639)
+* Liga – Meister-Moment samt Belohnungen in einem Ablauf mit einer Nachricht, sobald Liga 1 samt Playoffs fertig ist (#1639)
+* Liga – Saisonende-Moment für Aufstieg, Abstieg und Meister aus dem bestätigten Endstand, einmal je Person (#1639)
+* Liga-Verwaltung – Dauer des Saisonende-Moments je Season im Reiter „Belohnungen“ (#1639)
+* Profil und Teamseite – Hinweis „Saisonende“ mit dem bestätigten Ausgang, Moment noch einmal ansehen (#1639)
+* Web – Saisonende-Moment beim nächsten Besuch: Aufstieg mit Wappen, Zahlenwechsel und Krone, goldener Meister-Moment mit Pokal, ruhiger Abstieg mit Blick auf die nächste Season (#1639)
+
+### Fehlerbehebungen
+
+* Zeremonien – Karten rollen im Querformat am Handy statt abgeschnitten zu werden (#1639)
+
+### Dokumentation
+
+* Liga – Vertrag Saisonende-Moment (F.8), Handbuch Liga und Captains, Hilfe „Aufstieg, Abstieg, Meister“ (#1639)
+
 ## 1.99.0 (26.11.2026)
 
 ### Neu

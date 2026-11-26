@@ -3,14 +3,13 @@ import { asInstant } from "@/lib/vienna";
 // Was nur Mitglieder oder der Vorstand sehen (#283, #284).
 const MEMBER_LEVELS = new Set(["members", "internal"]);
 
-// Die Sprungleiste des Mitgliederbereichs (#1257, #1336) statt der Zeile aus neun kleinen Verweisen (#364): fünf
+// Die Sprungleiste des Mitgliederbereichs (#1257, #1336) statt der Zeile aus neun kleinen Verweisen (#364): vier
 // Einträge, eine Zahl nur, wenn etwas offen oder neu ist („Versammlung · 1 offen“). Ein Tipp springt zum Abschnitt; steht
 // der Abschnitt gerade nicht auf der Seite (nichts angesetzt), öffnet der Eintrag die eigene Seite - jede Adresse hat eine
 // Route in App.jsx (Test). Dieselben Zahlen stehen an den Kacheln auf /verein und im Tab „Verein“ der App: eine Antwort
 // des Servers (/membership/area-summary). Rechnungen und eigene Unterlagen stehen hier nicht: sie gehören zum Konto
 // (Profil → „Nur für dich“), der Mitgliederbereich bleibt Verein (#320, #1255).
 export const AREA_JUMPS = [
-  { key: "karte", label: "Karte", to: "/mein-bereich/mitgliedschaft#mitgliedskarte" },
   { key: "versammlung", label: "Versammlung", field: "meetings_open", unit: "offen", to: "/mein-bereich/verein/versammlungen" },
   { key: "helfen", label: "Helfen", field: "helping_free", unit: "frei", to: "/mein-bereich/verein/helfen" },
   { key: "news", label: "News", field: "news_new", unit: "neu", to: "/mein-bereich/verein/news" },
