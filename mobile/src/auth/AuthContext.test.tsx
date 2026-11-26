@@ -246,10 +246,13 @@ describe("Abmelden", () => {
     await SecureStore.setItemAsync("tls.member-card", JSON.stringify({ user_id: "u-1", saved_at: "2026-10-07T16:05:00Z", card: { name: "Fan" } }));
     // Die Installations-Kennung für Push (#2470) gehört zur Installation, nicht zum Konto - sie bleibt.
     await SecureStore.setItemAsync(INSTALLATION_ID_KEY, "4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
+    // Saisonende-Moment (#2584): Geräte-Schlüssel und „fertig“-Marken gehören dem Konto - sie gehen.
+    await SecureStore.setItemAsync("tls.mobile.leagueMoments", JSON.stringify({ accounts: { "u-1": { token: "geraet-u1-abc", done: ["m1"] } } }));
 
     await act(async () => {
       await result.current.logout();
     });
+    expect(await SecureStore.getItemAsync("tls.mobile.leagueMoments")).toBeNull();
     expect(await SecureStore.getItemAsync(INSTALLATION_ID_KEY)).toBe("4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
 
     expect(mockApi.post).toHaveBeenCalledWith("/auth/mobile/logout", { refresh_token: "refresh-neu" });
@@ -365,6 +368,7 @@ describe("Kontowechsel", () => {
     });
 
     await SecureStore.setItemAsync(INSTALLATION_ID_KEY, "4b1d7c2e-9f3a-4c55-8e21-0a6b9d3f7e10");
+    await SecureStore.setItemAsync("tls.mobile.leagueMoments", JSON.stringify({ accounts: { "u-1": { token: "geraet-u1-abc", done: ["m1"] } } }));
     mockApi.post.mockResolvedValue({ data: { user: { ...USER, id: "u-2" }, access_token: "a2", refresh_token: "r2" } });
     await act(async () => {
       await result.current.login("zweiter@lionsquad.at", "geheim", true);
@@ -379,6 +383,7 @@ describe("Kontowechsel", () => {
     expect(mockDismissAllNotifications).toHaveBeenCalled();
     expect(await SecureStore.getItemAsync("tls.recent-searches")).toBeNull();
     expect(await SecureStore.getItemAsync("tls.member-card")).toBeNull();
+    expect(await SecureStore.getItemAsync("tls.mobile.leagueMoments")).toBeNull();
     expect(result.current.user?.id).toBe("u-2");
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBe("a2");
   });

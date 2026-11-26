@@ -4,22 +4,33 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "
 import { ceremonyQueue, type CeremonyQueue } from "../../achievements/ceremony/queue";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
-import { artLines, metalColor, momentSubtitle, momentTitle, rewardPackages, type RewardAward } from "../../lib/leagueRewards";
+import { momentSubtitle, momentTitle, type RewardAward } from "../../lib/leagueRewards";
+import {
+  forgetMomentDone, markMomentDone, momentToken, momentsDoneHere, planCeremonies, subscribeMomentRequests, type CeremonyItem, type LeagueMoment,
+} from "../../lib/leagueMoments";
+import { openLink } from "../../lib/openLink";
 import { playMoment } from "../../lib/tournamentHaptics";
+import { navigateToUrl, openDetail } from "../../navigation/rootNavigation";
 import { colors, motion, radius, roles, surfaces } from "../../theme";
 import { Button } from "../Button";
-import { Glow, StaggerIn, useReduceMotion } from "../motion";
-import { Body, Muted } from "../Text";
-import { RewardArt } from "./RewardArt";
+import { useReduceMotion } from "../motion";
+import { Muted } from "../Text";
+import { RewardMomentList } from "./RewardMomentList";
+import { SeasonMomentCard } from "./SeasonMoment";
 import { useModalGate } from "../../lib/modalGate";
 
-// Zeremonie bei neuer Belohnung (#2173, Web: components/tls/rewards/RewardWatcher.jsx und RewardMoment.jsx, docs/LIGA.md F.4, Nr. 165):
-// Nach dem Anmelden fragt die App einmal, welche Belohnungen noch nicht gefeiert wurden, und zeigt je Staffel ein Paket - nie zugleich
-// mit einer Erfolgs-Zeremonie (die wartet nicht, die Belohnung wartet auf sie). Erst wenn sie geschlossen ist, gilt sie als gesehen.
-// Detail-Runde: die Karte hebt sich an und blendet ein, die Belohnungen bauen sich gestaffelt auf, jede Vorlage leuchtet einmal in
-// ihrem Metall auf, dazu einmal die Sieg-Vibration. Mit „Bewegung reduzieren“ steht alles sofort da, die Vibration bleibt.
+// Zeremonien der Liga (#2173, #2584; Web: components/tls/rewards/RewardWatcher.jsx, RewardMoment.jsx, league/moment/SeasonMoment.jsx,
+// docs/LIGA.md F.4 und F.8): Nach dem Anmelden fragt die App, welche Saisonende-Momente und Belohnungen noch nicht gefeiert wurden, und
+// zeigt sie nacheinander - zuerst der Ausgang der Season (Meister, Aufstieg, Abstieg), dann je Staffel ein Paket Belohnungen. Nie zugleich
+// mit einer Erfolgs-Zeremonie (die wartet nicht, die Liga wartet auf sie), nie zwei Fenster übereinander.
+// Ein Moment wird direkt vor dem Zeigen für dieses Gerät geholt (lib/leagueMoments: Geräte-Schlüssel je Gerät und Konto) und erst nach
+// dem Schließen als fertig gemeldet; der Meister bringt seine Belohnungen als zweite Karte mit. Belohnungen gelten nach dem Schließen als
+// gesehen. Detail-Runde der Belohnungen: die Karte hebt sich an, die Belohnungen bauen sich gestaffelt auf, jede Vorlage leuchtet einmal
+// in ihrem Metall auf, dazu einmal die Sieg-Vibration. Mit „Bewegung reduzieren“ steht alles sofort da, die Vibration bleibt.
 
 const ease = Easing.bezier(motion.ease[0], motion.ease[1], motion.ease[2], motion.ease[3]);
+
+type HostItem = CeremonyItem & { claimed?: boolean };
 
 function MomentCard({ rewards, onClose }: { rewards: RewardAward[]; onClose: () => void }) {
   const reduce = useReduceMotion();
@@ -37,20 +48,7 @@ function MomentCard({ rewards, onClose }: { rewards: RewardAward[]; onClose: () 
       <Text style={styles.title} accessibilityRole="header" testID="reward-moment-title">{momentTitle(rewards)}</Text>
       {/* Viele Belohnungen oder große Schrift: die Liste scrollt, Überschrift und „Weiter“ bleiben sichtbar. */}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} testID="reward-moment-scroll">
-      <StaggerIn style={styles.list}>
-        {rewards.map((award, index) => (
-          <View key={award.id} style={[styles.row, { borderColor: metalColor(award.reward?.art?.metal) }]} testID={`reward-moment-${award.id}`}>
-            <RewardArt reward={award.reward} size={56} />
-            <View style={styles.text}>
-              <Text style={[styles.kind, { color: metalColor(award.reward?.art?.metal) }]}>{award.reward?.kind_label}</Text>
-              <Body style={styles.name} numberOfLines={2}>{award.reward?.name}</Body>
-              <Muted style={styles.meta} numberOfLines={2}>{artLines(award.reward?.art).join(" · ")}</Muted>
-              {award.team?.name ? <Muted style={styles.meta} numberOfLines={1}>{award.team.name}</Muted> : null}
-            </View>
-            <Glow active color={metalColor(award.reward?.art?.metal)} peak={0.25} delay={300 + index * 120} />
-          </View>
-        ))}
-      </StaggerIn>
+        <RewardMomentList rewards={rewards} />
       </ScrollView>
       <Muted style={styles.meta}>Du findest sie in deinem Profil unter „Auszeichnungen“.</Muted>
       <Button label="Weiter" onPress={onClose} testID="reward-moment-close" />
@@ -58,62 +56,132 @@ function MomentCard({ rewards, onClose }: { rewards: RewardAward[]; onClose: () 
   );
 }
 
-/** Beim Zurückkommen in den Vordergrund höchstens so oft nach neuen Belohnungen fragen. */
+/** Beim Zurückkommen in den Vordergrund höchstens so oft nach neuen Momenten und Belohnungen fragen. */
 export const UNSEEN_THROTTLE_MS = 5 * 60 * 1000;
+
+/** Fertig melden: erst die Marke auf dem Gerät, dann der Server - kommt er an, geht die Marke wieder. Bewusst still. */
+function reportDone(userId: string, id: string) {
+  void markMomentDone(userId, id)
+    .then(() => api.post("/me/league-moments/done", { ids: [id] }))
+    .then(() => forgetMomentDone(userId, id))
+    .catch(() => {});
+}
 
 export function RewardMomentHost({ queue = ceremonyQueue }: { queue?: CeremonyQueue }) {
   const { user } = useAuth();
   const userId = user?.id;
-  const [packages, setPackages] = useState<RewardAward[][]>([]);
+  const [items, setItems] = useState<HostItem[]>([]);
   const queued = useRef(new Set<string>());
-  // Läuft eine Erfolgs-Zeremonie, wartet die Belohnung - nie zwei Momente übereinander.
+  // Läuft eine Erfolgs-Zeremonie, wartet die Liga - nie zwei Momente übereinander.
   const busy = useSyncExternalStore(queue.subscribe, () => Boolean(queue.getCurrent()), () => false);
 
   // Nachfragen beim Anmelden und beim Zurückkommen in den Vordergrund - dort höchstens alle UNSEEN_THROTTLE_MS, damit ein
-  // kurzes Wechseln der App keinen Abruf auslöst. Schon eingereihte Belohnungen kommen nie ein zweites Mal.
+  // kurzes Wechseln der App keinen Abruf auslöst. Schon Eingereihtes kommt nie ein zweites Mal. Bewusst still: Feiern sind eine Zugabe.
   const lastFetch = useRef(0);
   const fetchUnseen = useCallback((isCurrent: () => boolean) => {
+    if (!userId) return;
     lastFetch.current = Date.now();
-    api.get<{ rewards?: RewardAward[] }>("/me/rewards/unseen").then(({ data }) => {
+    const moments = api.get<{ moments?: LeagueMoment[] }>("/me/league-moments/unseen")
+      .then(({ data }) => (Array.isArray(data?.moments) ? data.moments : []), () => [] as LeagueMoment[]);
+    const rewards = api.get<{ rewards?: RewardAward[] }>("/me/rewards/unseen")
+      .then(({ data }) => (Array.isArray(data?.rewards) ? data.rewards : []), () => [] as RewardAward[]);
+    const done = momentsDoneHere(userId).catch(() => [] as string[]);
+    void Promise.all([moments, rewards, done]).then(([momentRows, rewardRows, doneHere]) => {
       if (!isCurrent()) return;
-      const fresh = (data?.rewards || []).filter((award) => award?.reward && !queued.current.has(award.id));
-      if (!fresh.length) return;
-      fresh.forEach((award) => queued.current.add(award.id));
-      setPackages((rest) => [...rest, ...rewardPackages(fresh)]);
-    }).catch(() => {});
-  }, []);
+      const plan = planCeremonies(momentRows, rewardRows, { queued: queued.current, doneHere: new Set(doneHere) });
+      plan.reportDone.forEach((id) => reportDone(userId, id));
+      if (plan.items.length) setItems((rest) => [...rest, ...plan.items]);
+    });
+  }, [userId]);
 
+  const alive = useRef(false);
   useEffect(() => {
-    setPackages([]);
+    setItems([]);
     queued.current = new Set();
     if (!userId) return undefined;
-    let alive = true;
-    const isCurrent = () => alive;
+    alive.current = true;
+    const isCurrent = () => alive.current;
     fetchUnseen(isCurrent);
     const subscription = AppState.addEventListener?.("change", (state) => {
       if (state === "active" && Date.now() - lastFetch.current >= UNSEEN_THROTTLE_MS) fetchUnseen(isCurrent);
     });
+    // „Moment ansehen“ am Hinweis (ohne Zählung, nur einmal in der Schlange) und das Antippen der Nachricht (gleich nachsehen).
+    const unsubscribe = subscribeMomentRequests((request) => {
+      if (request.kind === "fetch") {
+        fetchUnseen(isCurrent);
+        return;
+      }
+      const key = `replay:${request.moment.id}`;
+      setItems((rest) => (rest.some((item) => item.key === key) ? rest : [...rest, { kind: "moment", key, moment: request.moment, rewards: [], replay: true }]));
+    });
     return () => {
-      alive = false;
+      alive.current = false;
       subscription?.remove?.();
+      unsubscribe();
     };
   }, [fetchUnseen, userId]);
 
-  const current = packages[0] || null;
-  const close = useCallback(() => {
-    if (!current) return;
-    api.post("/me/rewards/seen", { ids: current.map((award) => award.id) }).catch(() => {});
-    setPackages((rest) => rest.slice(1));
-  }, [current]);
+  const head = items[0] || null;
 
+  // Direkt vor dem Zeigen: den Moment für dieses Gerät holen. Nur was der Server zuspricht, wird gezeigt. Hatte ein anderes Gerät ihn
+  // schon (oder scheitert das Holen), bleibt er für den nächsten Start - die Belohnungen des Meisters zeigt dieses Gerät dann allein.
+  useEffect(() => {
+    if (!userId || !head || head.kind !== "moment" || head.replay || head.claimed !== undefined || busy) return undefined;
+    let current = true;
+    const id = head.moment.id;
+    momentToken(userId)
+      .then((token) => api.post<{ claimed?: string[] }>("/me/league-moments/seen", { ids: [id], token }))
+      .then(({ data }) => Array.isArray(data?.claimed) && data.claimed.includes(id), () => false)
+      .then((claimed) => {
+        if (!current) return;
+        setItems((rest) => {
+          const first = rest[0];
+          if (!first || first.key !== head.key || first.kind !== "moment") return rest;
+          if (claimed) return [{ ...first, claimed: true }, ...rest.slice(1)];
+          const alone: HostItem[] = first.rewards.length ? [{ kind: "rewards", key: `rewards:${first.rewards.map((award) => award.id).join("-")}`, rewards: first.rewards }] : [];
+          return [...alone, ...rest.slice(1)];
+        });
+      });
+    return () => { current = false; };
+  }, [busy, head, userId]);
+
+  const close = useCallback((rewardsShown = true) => {
+    if (!head) return;
+    if (head.kind === "moment") {
+      if (!head.replay && head.claimed && userId) reportDone(userId, head.moment.id);
+      // Die Belohnungen des Meisters sind gesehen, wenn die zweite Karte kam - schließt die Person vorher, kommen sie später wie bisher.
+      if (!head.replay && rewardsShown && head.rewards.length) api.post("/me/rewards/seen", { ids: head.rewards.map((award) => award.id) }).catch(() => {});
+    } else {
+      api.post("/me/rewards/seen", { ids: head.rewards.map((award) => award.id) }).catch(() => {});
+    }
+    setItems((rest) => rest.slice(1));
+  }, [head, userId]);
+
+  const visible = Boolean(head && !busy && (head.kind === "rewards" || head.replay || head.claimed));
   // Nie zwei Fenster übereinander (#1208): die Frage nach Benachrichtigungen wartet.
-  useModalGate("reward-moment", Boolean(current && !busy));
+  useModalGate("reward-moment", visible);
 
-  if (!current || busy) return null;
+  if (!head || !visible) return null;
   return (
-    <Modal transparent animationType="none" visible onRequestClose={close} statusBarTranslucent>
+    <Modal transparent animationType="none" visible onRequestClose={() => close(false)} statusBarTranslucent>
       <View style={styles.backdrop}>
-        <MomentCard key={current[0]?.id} rewards={current} onClose={close} />
+        {head.kind === "moment" ? (
+          <SeasonMomentCard
+            key={head.key}
+            item={head}
+            onClose={close}
+            onNextStep={(moment) => {
+              close(false);
+              // „Startrecht zusagen“: zur Teamseite mit dem Antrag - sonst dorthin, wohin der Server zeigt.
+              if (moment.team_id) openDetail("TeamDetail", { id: moment.team_id });
+              else navigateToUrl(moment.next_step?.url);
+            }}
+            onFinal={(moment) => {
+              close(false);
+              openLink(moment.url);
+            }}
+          />
+        ) : <MomentCard key={head.key} rewards={head.rewards} onClose={() => close()} />}
       </View>
     </Modal>
   );
@@ -126,10 +194,5 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 2 },
   eyebrow: { color: roles.honor, fontSize: 11, fontWeight: "900", letterSpacing: 1.6, textTransform: "uppercase" },
   title: { color: colors.white, fontSize: 24, fontWeight: "900", textTransform: "uppercase" },
-  list: { gap: 8 },
-  row: { alignItems: "center", backgroundColor: surfaces.s1, borderRadius: radius.lg, borderWidth: 1, flexDirection: "row", gap: 12, overflow: "hidden", padding: 10 },
-  text: { flex: 1, minWidth: 0 },
-  kind: { fontSize: 10, fontWeight: "900", letterSpacing: 1.4, textTransform: "uppercase" },
-  name: { fontWeight: "900" },
   meta: { fontSize: 12 },
 });
