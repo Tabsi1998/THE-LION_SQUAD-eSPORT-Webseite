@@ -64,7 +64,11 @@ test("ohne Rolle: kein Hinweis, Löschen über die Rückfrage wie bisher", async
   expect(screen.getByTestId("dsgvo-anonymize-btn")).not.toBeDisabled();
   expect(screen.getByTestId("dsgvo-anonymize-btn")).toHaveTextContent(/^Konto löschen$/);
   fireEvent.click(screen.getByTestId("dsgvo-anonymize-btn"));
-  await waitFor(() => expect(promptMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Konto löschen?", confirmLabel: "Konto löschen" })));
+  await waitFor(() => expect(promptMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Konto löschen?", confirmLabel: "Konto löschen", label: "Tippe LÖSCHEN zur Bestätigung" })));
+  const { validate, placeholder } = promptMock.mock.calls[0][0];
+  expect(placeholder).toBeUndefined();
+  expect(validate("loeschen")).toMatch(/genau LÖSCHEN/);
+  expect(validate("LÖSCHEN")).toBe("");
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/dsgvo/anonymize-me"));
 });
 

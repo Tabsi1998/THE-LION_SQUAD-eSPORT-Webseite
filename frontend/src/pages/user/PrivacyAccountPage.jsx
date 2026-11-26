@@ -67,8 +67,10 @@ export function KontoLoeschen() {
     if (roleBlockers.length) return;
     const answer = await prompt({
       title: "Konto löschen?",
-      description: 'Das lässt sich nicht rückgängig machen. Tippe "LÖSCHEN", um dein Konto zu löschen.',
-      placeholder: "LÖSCHEN",
+      description: "Das lässt sich nicht rückgängig machen. Deine persönlichen Daten werden überschrieben.",
+      // Sichtbare Beschriftung statt Platzhalter (#2059): ein leeres Feld sieht nicht wie schon ausgefüllt aus.
+      label: "Tippe LÖSCHEN zur Bestätigung",
+      validate: (value) => (value.trim() === "LÖSCHEN" ? "" : "Bitte genau LÖSCHEN eintippen – in Großbuchstaben."),
       confirmLabel: "Konto löschen",
       tone: "danger",
       multiline: false,
