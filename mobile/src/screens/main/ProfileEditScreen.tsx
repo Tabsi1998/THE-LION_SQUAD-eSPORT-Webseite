@@ -32,8 +32,9 @@ export function profileEditForm(user: Record<string, any> | null | undefined): R
   PROFILE_FIELDS.forEach((key) => { form[key] = u[key] || ""; });
   form.nintendo_fc = u.nintendo_fc || u.switch_code || "";
   form.favorite_games = Array.isArray(u.favorite_games) ? u.favorite_games.join(", ") : "";
-  // Eingabegeräte (#2542, #2126): Mehrfachauswahl wie im Web - der alte Einzelwert `input_device` zählt als Vorauswahl.
-  form.input_devices = Array.isArray(u.input_devices) ? u.input_devices.map(String) : u.input_device ? [String(u.input_device)] : [];
+  // Eingabegeräte (#2542, #2126): Mehrfachauswahl wie im Web. Der alte Einzelwert `input_device` wird sauber abgebildet
+  // (legacyInputDevices) - Freitext wählt nichts unsichtbar vor, er steht nur als Hinweis da.
+  form.input_devices = Array.isArray(u.input_devices) ? u.input_devices.map(String) : legacyInputDevices(u.input_device);
   // Spiel-Rollen im Discord (#629): Vorgabe an - wie im Web.
   form.discord_game_roles = u.discord_game_roles !== false;
   return form;
@@ -57,8 +58,31 @@ export const INPUT_DEVICES: Array<{ value: string; label: string }> = [
   { value: "arcade", label: "Arcade Stick" },
 ];
 
+// Die alten Kennungen des Einzelfelds (Liga-Plattform: controller, mouse_keyboard, both) in den neuen der Liste.
+const LEGACY_INPUT_DEVICES: Record<string, string[]> = {
+  controller: ["controller"],
+  mouse_keyboard: ["keyboard_mouse"],
+  keyboard_mouse: ["keyboard_mouse"],
+  both: ["keyboard_mouse", "controller"],
+};
+
+/** Der alte Einzelwert als Vorauswahl - nur, was sich eindeutig abbilden lässt (eine Kennung der Liste oder eine alte), sonst nichts. */
+export function legacyInputDevices(value: unknown): string[] {
+  const key = String(value || "").trim();
+  if (!key) return [];
+  if (LEGACY_INPUT_DEVICES[key]) return LEGACY_INPUT_DEVICES[key];
+  return INPUT_DEVICES.some((option) => option.value === key) ? [key] : [];
+}
+
+/** Der alte Freitext, der sich nicht abbilden lässt - er steht als Hinweis unter der Auswahl. Sonst leer. */
+export function legacyInputDeviceText(user: Record<string, any> | null | undefined): string {
+  if (!user || Array.isArray(user.input_devices)) return "";
+  const text = String(user.input_device || "").trim();
+  return text && !legacyInputDevices(text).length ? text : "";
+}
+
 /** Mehrfachauswahl als Chips: antippen wählt, noch einmal antippen nimmt es weg. Die Reihenfolge bleibt die der Liste. */
-function InputDeviceChoice({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
+function InputDeviceChoice({ value, legacy, onChange }: { value: string[]; legacy?: string; onChange: (next: string[]) => void }) {
   const chosen = new Set(value);
   const toggle = (key: string) => {
     selectFeedback();
@@ -78,6 +102,7 @@ function InputDeviceChoice({ value, onChange }: { value: string[]; onChange: (ne
           );
         })}
       </View>
+      {legacy ? <Muted testID="profile-input-device-legacy">Bisher eingetragen: „{legacy}“ – bitte oben auswählen.</Muted> : null}
     </View>
   );
 }
@@ -221,7 +246,7 @@ export function ProfileEditScreen() {
           <Field label="Lieblingsspiele, getrennt mit Komma" value={form.favorite_games} onChangeText={(v) => setField(setForm, "favorite_games", v)} />
           <Field label="Hauptplattform" value={form.main_platform} onChangeText={(v) => setField(setForm, "main_platform", v)} />
           <Field label="Bevorzugte Rolle" value={form.preferred_role} onChangeText={(v) => setField(setForm, "preferred_role", v)} />
-          <InputDeviceChoice value={form.input_devices || []} onChange={(next) => setField(setForm, "input_devices", next)} />
+          <InputDeviceChoice value={form.input_devices || []} legacy={legacyInputDeviceText(user as Record<string, any> | null)} onChange={(next) => setField(setForm, "input_devices", next)} />
         </Card>
         <Card style={profileStyles.card}>
           <Heading>Konten</Heading>

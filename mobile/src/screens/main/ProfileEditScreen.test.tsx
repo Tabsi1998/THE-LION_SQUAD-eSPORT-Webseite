@@ -88,6 +88,7 @@ test("Bild hochgeladen, Speichern scheitert: Erneut versuchen speichert die neue
 // Eingabegeräte (#2542, #2126): Mehrfachauswahl `input_devices` wie im Web statt des alten Einzelfelds `input_device`.
 test("Eingabegeräte als Mehrfachauswahl: der alte Einzelwert ist vorgewählt, gespeichert wird nur die Liste", async () => {
   mockUser.value = { ...mockUser.value, input_device: "controller" };
+  // (Nachbesserung: die alte Kennung „mouse_keyboard“ heißt neu „keyboard_mouse“ - eigener Test unten.)
   await render(<ProfileEditScreen />);
   expect(screen.queryByLabelText("Eingabegerät")).toBeNull();
   expect(screen.getByTestId("profile-input-device-controller").props.accessibilityState).toMatchObject({ checked: true });
@@ -107,4 +108,26 @@ test("Eingabegeräte abwählen: die leere Liste geht raus", async () => {
   await fireEvent.press(screen.getByTestId("profile-edit-save"));
   await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
   expect(mockPatch.mock.calls[0][1]).toEqual({ input_devices: [] });
+});
+
+// Nachbesserung (#2542): Der alte Einzelwert wird sauber abgebildet - nie unsichtbar vorgewählt. Freitext steht als Hinweis da.
+test("alte Kennung mouse_keyboard heißt neu keyboard_mouse; „both“ wählt beide; Freitext wird nicht vorgewählt, nur genannt", async () => {
+  mockUser.value = { ...mockUser.value, input_device: "mouse_keyboard" };
+  await render(<ProfileEditScreen />);
+  expect(screen.getByTestId("profile-input-device-keyboard_mouse").props.accessibilityState).toMatchObject({ checked: true });
+  expect(screen.queryByTestId("profile-input-device-legacy")).toBeNull();
+
+  mockUser.value = { ...mockUser.value, input_device: "both" };
+  await render(<ProfileEditScreen />);
+  expect(screen.getByTestId("profile-input-device-keyboard_mouse").props.accessibilityState).toMatchObject({ checked: true });
+  expect(screen.getByTestId("profile-input-device-controller").props.accessibilityState).toMatchObject({ checked: true });
+
+  mockUser.value = { ...mockUser.value, input_device: "PS5-Pad mit Paddles" };
+  await render(<ProfileEditScreen />);
+  for (const key of ["keyboard_mouse", "controller", "wheel", "fightstick", "mobile_touch", "arcade"]) {
+    expect(screen.getByTestId(`profile-input-device-${key}`).props.accessibilityState).toMatchObject({ checked: false });
+  }
+  expect(screen.getByTestId("profile-input-device-legacy")).toHaveTextContent("Bisher eingetragen: „PS5-Pad mit Paddles“ – bitte oben auswählen.");
+  await fireEvent.press(screen.getByTestId("profile-edit-save"));
+  expect(mockPatch).not.toHaveBeenCalled();
 });
