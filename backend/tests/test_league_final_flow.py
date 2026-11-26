@@ -567,7 +567,8 @@ async def test_captains_hear_once_about_close_and_reopen_and_the_season_stays_pu
     second = await lead(flow, league, "Zweite Leitung", "season")
     await must_close(flow, staffel)
     notes = await flow.db.notifications.find({"meta.reason": "league_final"}, {"_id": 0}).to_list(50)
-    assert sorted(note["user_id"] for note in notes) == [f"captain-{index}" for index in range(1, 5)]
+    # Der Meister (Team 1) erfährt es mit seinem Saisonende-Moment - eine Nachricht, nicht zwei (#1639, Fabian 26.11., A).
+    assert sorted(note["user_id"] for note in notes) == [f"captain-{index}" for index in range(2, 5)]
     assert {note["title"] for note in notes} == {"Staffel abgeschlossen"} and all("Meister: Probe 1" in note["body"] for note in notes)
     assert {note["url"] for note in notes} == {"/liga/probe-shooter/season-1"}
 
@@ -582,7 +583,7 @@ async def test_captains_hear_once_about_close_and_reopen_and_the_season_stays_pu
     flow.act_as(second)
     await must_reopen(flow, staffel)
     notes = await flow.db.notifications.find({"meta.reason": "league_final"}, {"_id": 0}).to_list(50)
-    assert sorted(note["title"] for note in notes) == ["Staffel abgeschlossen"] * 4 + ["Staffel wieder geöffnet"] * 4
+    assert sorted(note["title"] for note in notes) == ["Staffel abgeschlossen"] * 3 + ["Staffel wieder geöffnet"] * 4
     assert all("Ergebnis war falsch" not in note["body"] for note in notes)  # der Grund bleibt bei der Leitung
     flow.act_as(None)
     assert (await flow.get(f"{PAGE}/staffeln/{staffel['slug']}")).json()["staffel"]["final"] is None

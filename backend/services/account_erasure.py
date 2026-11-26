@@ -615,6 +615,10 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     from services import league_sanctions
 
     await league_sanctions.scrub_person(db, user_id)
+    # Saisonende-Moment (#1639): Der Moment bleibt Vereinsinhalt, die Kennung fällt aus Empfängern, „gesehen“ und Gerätevermerken.
+    from services import league_moments
+
+    await league_moments.scrub_person(db, user_id)
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.

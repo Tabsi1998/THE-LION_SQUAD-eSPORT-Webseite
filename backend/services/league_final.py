@@ -621,8 +621,11 @@ async def notify_captains(db, tournament: dict, final: dict, frame: dict, event:
             {"tournament_id": tournament["id"], "status": {"$in": ["approved", "checked_in"]}}, {"_id": 0}).to_list(REGISTRATION_LIMIT)
         teams = await teams_by_id(db, registrations)
         people: set[str] = set()
+        # Der Meister (#1639, Fabian 26.11., A): Er erfährt es mit dem Saisonende-Moment - eine Nachricht, nicht zwei.
+        champion = (final.get("champion") or {}).get("registration_id") if event == "closed" else None
         for registration in registrations:
-            people |= responsible_ids(registration, teams.get(registration.get("team_id") or ""))
+            if registration["id"] != champion:
+                people |= responsible_ids(registration, teams.get(registration.get("team_id") or ""))
         league, season = frame["league"], frame["season"]
         url = (f"/liga/{league.get('slug')}/{season.get('slug')}" if league.get("slug") and season.get("slug")
                else f"/tournaments/{tournament.get('slug') or tournament['id']}")

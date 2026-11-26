@@ -18,7 +18,7 @@ export const paint = (part) => `var(--tls-lbadge-${part})`;
 // Festes Leerzeichen vor dem Punkt, normales danach: Bricht der Text um, dann hinter dem Punkt - er steht nie am Zeilenanfang.
 const SEP = " · ";
 export const SHIELD = "M10 20h44v24c0 17-10 27-22 33C20 71 10 61 10 44z";
-export const FIELD ="M15.5 25.5h33v18.5c0 12.6-7.4 20.4-16.5 25.4-9.1-5-16.5-12.8-16.5-25.4z";
+export const FIELD = "M15.5 25.5h33v18.5c0 12.6-7.4 20.4-16.5 25.4-9.1-5-16.5-12.8-16.5-25.4z";
 const RIM = "M13 23h38v21c0 15-9 24-19 29.6C22 68 13 59 13 44z";
 const CROWN = "M21 18.5L18.6 8l6.6 4.6L32 5l6.8 7.6L45.4 8 43 18.5z";
 // Wie StaggerIn: einmal beim ersten Sichtbarwerden, danach Ruhe.

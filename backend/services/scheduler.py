@@ -815,6 +815,18 @@ async def _safe_league_discord():
         _log_task_failure("league_discord", exc)
 
 
+async def _safe_league_moments():
+    """Saisonende-Moment (#1639): ein ausgelassener Abgleich (Sperre belegt, Abbruch) holt hier nach - Marke an der Season."""
+    try:
+        from database import get_db
+        from services.league_moments import sweep
+        result = await sweep(get_db())
+        if result.get("synced"):
+            logger.info(f"[scheduler] league_moments synced={result['synced']}")
+    except Exception as exc:
+        _log_task_failure("league_moments", exc)
+
+
 async def _safe_proof_photo_retention():
     """Nachweise zu Spielen (#1157, #2360): nie verwendete nach 24 Stunden; Turniere 30 Tage nach dem Hochladen, Liga-Staffeln
     nach Season-Ende plus Frist, MOSS nach Verfahrensende plus Einspruchsfrist (``match_proof_retention.purge``)."""
@@ -1385,6 +1397,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Liga im Discord (#1642): fertige Spieltage und das Saisonende melden - alle 15 Minuten, nie doppelt (league_discord_posts).
     sched.add_job(_single_replica("league_discord", _safe_league_discord, lease_seconds=300.0), IntervalTrigger(minutes=15),
                   id="league_discord", max_instances=1, coalesce=True)
+    # Saisonende-Moment (#1639): ausgelassene Abgleiche nachholen - alle 5 Minuten, nie doppelt (Sperre und Marke je Season).
+    sched.add_job(_single_replica("league_moments", _safe_league_moments, lease_seconds=300.0), IntervalTrigger(minutes=5),
+                  id="league_moments", max_instances=1, coalesce=True)
     # Veto der Liga (#1618, D.3): 60 Sekunden je Schritt - alle 10 Sekunden nachsehen, ob eine Frist abgelaufen ist.
     sched.add_job(_single_replica("league_veto", _safe_league_veto, lease_seconds=60.0), IntervalTrigger(seconds=10),
                   id="league_veto", max_instances=1, coalesce=True)

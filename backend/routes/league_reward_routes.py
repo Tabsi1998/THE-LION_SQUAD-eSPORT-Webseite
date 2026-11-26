@@ -58,6 +58,8 @@ class RewardsBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reward_players: str | None = Field(default=None, max_length=20)
+    # Saisonende-Moment (#1639): so viele Tage nach dem Endstand erscheint er beim nächsten Besuch (1-365, Vorgabe 45).
+    moment_days: int | None = Field(default=None, ge=1, le=365)
     items: list[RewardBody] | None = Field(default=None, max_length=league_rewards.ITEM_LIMIT + 1)
     # Je Liga N: ``null`` übernimmt die Belohnungen der Season, eine Liste ist die eigene Zusammenstellung.
     divisions: dict[str, list[RewardBody] | None] | None = None
@@ -91,6 +93,8 @@ async def admin_save_season_rewards(season_id: str, body: RewardsBody,
     payload: dict = {}
     if body.reward_players is not None:
         payload["reward_players"] = body.reward_players
+    if body.moment_days is not None:
+        payload["moment_days"] = body.moment_days
     if body.items is not None:
         payload["items"] = [row.plain() for row in body.items]
     if body.divisions is not None:

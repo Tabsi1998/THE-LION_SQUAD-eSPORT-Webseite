@@ -77,10 +77,42 @@ def test_push_texts_first_and_corrected():
 
 def test_fresh_only_for_a_while_after_the_confirmed_final():
     now = now_utc()
-    assert moments.fresh({"confirmed_at": (now - timedelta(days=1)).isoformat()}, now)
-    assert not moments.fresh({"confirmed_at": (now - timedelta(days=moments.FRESH_DAYS + 1)).isoformat()}, now)
-    assert not moments.fresh({"confirmed_at": "kaputt"}, now)
-    assert not moments.fresh({}, now)
+    assert moments.fresh({"confirmed_at": (now - timedelta(days=1)).isoformat()}, None, now)
+    assert not moments.fresh({"confirmed_at": (now - timedelta(days=moments.DEFAULT_DAYS + 1)).isoformat()}, None, now)
+    assert not moments.fresh({"confirmed_at": "kaputt"}, None, now)
+    assert not moments.fresh({}, None, now)
+    # Je Season einstellbar (Fabian 26.11., D).
+    ten_days = {"confirmed_at": (now - timedelta(days=10)).isoformat()}
+    assert not moments.fresh(ten_days, {"moment_days": 7}, now)
+    assert moments.fresh(ten_days, {"moment_days": 14}, now)
+
+
+def test_days_are_checked_and_default_to_45():
+    assert moments.clean_days("30") == 30
+    for wrong in (0, 366, "viel", None):
+        try:
+            moments.clean_days(wrong)
+        except ValueError as problem:
+            assert "Tage" in str(problem) or "Zahl" in str(problem)
+        else:
+            raise AssertionError(wrong)
+    assert moments.moment_days({}) == 45 and moments.moment_days({"moment_days": 400}) == 45 and moments.moment_days({"moment_days": 9}) == 9
+
+
+def test_only_seasons_members_see_count():
+    assert moments.member_visible({"visibility": "public"}) and moments.member_visible({"visibility": "members"})
+    for season in ({"visibility": "admins"}, {"visibility": "off"}, {}, None, {"visibility": "public", "status": "archived"}):
+        assert not moments.member_visible(season)
+
+
+def test_a_corrected_moment_says_so_and_the_champion_names_his_rewards():
+    corrected = moments.texts(doc(corrected_at="2026-11-26T10:00:00+00:00"), TITLE)
+    assert corrected["notice"] == "Endstand korrigiert" and corrected["aria"].startswith("Endstand korrigiert. Aufstieg:")
+    assert moments.texts(doc(), TITLE)["notice"] is None
+    headline, text = moments.push_texts(doc("champion"), TITLE, rewards=["Goldmedaille", "Season-Banner"])
+    assert headline == "Meister: Probe Alpha" and text.endswith("Probe Alpha ist Meister. Dazu: Goldmedaille, Season-Banner.")
+    headline, text = moments.push_texts(doc(), TITLE, corrected=True)
+    assert headline == "Endstand korrigiert"
 
 
 def test_latest_per_entrant_keeps_one_row_per_co_team():
