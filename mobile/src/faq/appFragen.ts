@@ -78,7 +78,7 @@ export const APP_FRAGEN: FaqFrage[] = [
   {
     id: "app-aktualisieren",
     frage: "Wie aktualisiere ich die App?",
-    antwort: "Updates kommen über Google Play. Ist die App von dort installiert, öffnet sich bei einer neuen Version das Update-Fenster von Google Play von selbst. Sonst zeigt die App einen Hinweis mit dem Knopf Play Store öffnen. Was neu ist, steht in den Einstellungen unter Über die App bei Was ist neu.",
+    antwort: "Updates kommen über Google Play. Ist die App von dort installiert, öffnet sich bei einer neuen Version das Update-Fenster von Google Play von selbst. Sonst zeigt die App einen Hinweis mit dem Knopf Play Store öffnen. Was neu ist, steht unter Mein Bereich → Konto & Sicherheit bei Über die App unter Was ist neu.",
     bereich: "lionsapp", rollen: ALLE, sichtbar_fuer: "alle", haeufig: true,
   },
 ];

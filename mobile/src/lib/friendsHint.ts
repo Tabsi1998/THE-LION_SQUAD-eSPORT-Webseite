@@ -13,9 +13,9 @@ export const FRIENDS_HINT_TEXT = "Deine Freunde sehen, zu welchen Events du ange
 async function answer(turnOff: boolean): Promise<void> {
   try {
     await api.post("/users/me/friends-hint", { turn_off: turnOff });
-    if (turnOff) Alert.alert("Ausgeschaltet", "Einschalten kannst du es unter Einstellungen → Privatsphäre.");
+    if (turnOff) Alert.alert("Ausgeschaltet", "Einschalten kannst du es unter Mein Bereich → Datenschutz.");
   } catch {
-    Alert.alert("Das hat nicht geklappt", "Du findest die Einstellung unter Einstellungen → Privatsphäre.");
+    Alert.alert("Das hat nicht geklappt", "Du findest die Einstellung unter Mein Bereich → Datenschutz.");
   }
 }
 
@@ -44,7 +44,7 @@ export async function offerFriendsHint(): Promise<boolean> {
     if (open === closed) open = null;
     close();
   };
-  Alert.alert(FRIENDS_HINT_TITLE, `${FRIENDS_HINT_TEXT} Das kannst du jederzeit unter Einstellungen → Privatsphäre ändern.`, [
+  Alert.alert(FRIENDS_HINT_TITLE, `${FRIENDS_HINT_TEXT} Das kannst du jederzeit unter Mein Bereich → Datenschutz ändern.`, [
     { text: "Ausschalten", style: "destructive", onPress: () => { done(); void answer(true); } },
     { text: "Verstanden", onPress: () => { done(); void answer(false); } },
   ], { onDismiss: done });

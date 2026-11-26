@@ -77,7 +77,7 @@ export function FriendsAtEventCard({ eventKey, path, scope = "event", signedIn, 
     try {
       await api.post("/users/me/friends-hint", { turn_off: turnOff });
       setData((current) => (current ? { ...current, hint: false, sharing: turnOff ? false : current.sharing } : current));
-      if (turnOff) setMessage("Ausgeschaltet. Einschalten kannst du es unter Einstellungen → Privatsphäre.");
+      if (turnOff) setMessage("Ausgeschaltet. Einschalten kannst du es unter Mein Bereich → Datenschutz.");
     } catch (err) {
       setMessage(errorMessage(err, "Das hat nicht geklappt."));
     } finally {
