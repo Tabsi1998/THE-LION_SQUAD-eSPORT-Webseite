@@ -277,7 +277,8 @@ async def test_promotion_by_zone_is_announced_once_when_confirmed_and_offered_wi
 async def test_the_best_runner_up_is_only_confirmed_after_the_last_staffel_of_the_division(flow):
     world = await build(flow, levels=2, staffeln={2: [4, 3]}, zones={2: {"promote": 1, "promote_best": 1}})
     ok(await configure(flow, world))
-    top, first, second = world["tids"][1][0], *world["tids"][2]
+    top = world["tids"][1][0]
+    first, second = world["tids"][2]
     await close(flow, world, top, first)
     # Der Erste der Staffel A steigt sicher auf - gemeldet wird trotzdem erst der bestätigte Endstand der Season.
     assert await notes(flow, ANNOUNCED) == []
@@ -909,7 +910,8 @@ async def test_a_decision_changed_after_the_last_close_corrects_the_announcement
     bekommt die Bestätigung - vorher blieb A2 bei „Aufstieg bestätigt“ und B2 bekam nichts."""
     world = await build(flow, levels=2, staffeln={2: [4, 4]}, zones={2: {"promote": 1, "promote_best": 1}})
     ok(await configure(flow, world))
-    top, first, second = world["tids"][1][0], *world["tids"][2]
+    top = world["tids"][1][0]
+    first, second = world["tids"][2]
     a2, b2 = world["regs"][first][1], world["regs"][second][1]
     url = f"{ADMIN}/divisions/{world['divisions'][2]['id']}/zone-decision"
     body = {"kind": "promote_best", "method": "playoff", "reason": "Entscheidungsspiel 3:1"}
