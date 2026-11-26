@@ -492,9 +492,12 @@ def withdraw_until(season: dict) -> str | None:
     return season.get("start_date")
 
 
-async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, kind: str = "new", stamp: str = "") -> int:
+async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, kind: str = "new", stamp: str = "",
+                         gone: dict[str, str] | None = None) -> int:
     """„Ihr seid in Liga N der neuen Season, abmelden bis …“ an Captain und Vertreter - je Season, Co-Team und Person einmal, nach
-    „Übernahme neu berechnen“ einmal je Fassung des Endstands (``stamp``). Danach steht ``carry_over.notified_at`` am Antrag."""
+    „Übernahme neu berechnen“ einmal je Fassung des Endstands (``stamp``). Danach steht ``carry_over.notified_at`` am Antrag.
+    ``kind: "back"`` (#1627, F.2a): ein Nachrücker, dessen Platz nach dem korrigierten Endstand entfällt - ``gone`` nennt je Antrag
+    die Liga N dieses Platzes."""
     from services.league_applications import _responsible
     from services.league_mail import send_league_mail
     from services.user_notifications import create_user_notification
@@ -517,6 +520,20 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
                 headline = "Neue Season: Übernahme zurückgenommen"
                 text = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
                         f"{row['display_name']} ist danach nicht mehr in {title}. Fragen beantwortet die Liga-Leitung.")
+            elif kind == "back":
+                # Wie jeder Rückfall eines Nachrückers (Nr. 260, Nr. 265): Die frühere Zusage gilt wieder, sonst die Restfrist.
+                headline = "Neue Season: Nachrücken entfällt"
+                right = carry.get("start_right") if isinstance(carry.get("start_right"), dict) else None
+                if offered:
+                    follow = (f"Eure Zusage dort ist noch offen: bitte bis {offered.astimezone(LOCAL_TZ).strftime('%d.%m.%Y, %H:%M Uhr')} "
+                              f"zusagen: {where}. Ohne Zusage verfällt das Startrecht.")
+                elif right:
+                    follow = "Eure Zusage dort gilt weiter."
+                else:
+                    follow = f"Ihr seid automatisch dabei. Wer nicht mitspielen will, meldet sich bis zum Start ({day}) ab: {where}."
+                text = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
+                        f"Der Platz in {(gone or {}).get(row['id']) or 'der höheren Liga'} entfällt nach dem korrigierten Endstand. "
+                        f"{row['display_name']} bleibt in {carry['division_label']} der neuen Season {title}. {follow}")
             elif offered:
                 # Startrecht mit Zusage (#1627, F.2a): keine automatische Anmeldung - das Team sagt innerhalb der Frist zu.
                 headline = "Neue Season: neue Liga" if kind == "moved" else "Neue Season: euer Startrecht"
@@ -611,6 +628,10 @@ async def _recompute_plan(db, season: dict) -> dict:
             if place and place[0]["target_level"] == carry.get("division_level"):
                 unchanged += 1
                 continue
+            # Rückfall wie bei jedem Nachrücker (Nr. 260, Nr. 265): frühere Zusage bzw. Restfrist statt einer neuen vollen Frist.
+            changes.append({"kind": "moved", "application_id": row["id"], "squad_id": squad_id, "display_name": name,
+                            "from_label": carry.get("division_label"), "to_label": wanted[2], "carry_over": new, "place_gone": True})
+            continue
         if not free:
             if not wanted or new["division_level"] != carry.get("division_level"):
                 why = "zugeteilt" if row.get("assignment") else {"withdrawn": "abgemeldet"}.get(row["status"], "nicht mehr angenommen")
@@ -672,9 +693,14 @@ async def recompute(db, season: dict, body: dict, actor: dict) -> dict:
     league = await leagues.get_league(db, fresh["league_id"])
     notified = 0
     for kind in ("moved", "added", "reactivated", "revoked"):
-        rows = [row for change, row in done if change["kind"] == kind]
+        rows = [row for change, row in done if change["kind"] == kind and not change.get("place_gone")]
         notified += await _tell_captains(db, league, fresh, rows, kind="moved" if kind in ("moved", "reactivated") else kind,
                                          stamp=found["stamp"]) if rows else 0
+    # Nachrücker, deren Platz nach dem korrigierten Endstand entfällt (#1627, F.2a): eigene Nachricht mit dem Grund.
+    back = [(change, row) for change, row in done if change.get("place_gone")]
+    if back:
+        notified += await _tell_captains(db, league, fresh, [row for _change, row in back], kind="back", stamp=found["stamp"],
+                                         gone={row["id"]: change.get("from_label") for change, row in back})
     counts = {kind: len([1 for change, _row in done if change["kind"] == kind]) for kind in ("moved", "updated", "added", "reactivated", "revoked")}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "league.season.successor.recompute", "actor_id": actor.get("id"), "target_id": fresh["id"],
@@ -731,7 +757,16 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
             # geblieben): Er steht ab jetzt aus eigenem Recht dort, wo der Endstand ihn sieht - „Ablehnen“ führte sonst in die
             # falsche Liga. ``fills`` fällt weg, bei ``updated`` wie bei ``moved``.
             update["$unset"] = {"carry_over.fills": ""}
-            if kind == "moved":
+            if change.get("place_gone"):
+                # Der Platz, auf den er nachgerückt war, entfällt: zurück auf das frühere Startrecht - Zusage bzw. Restfrist,
+                # mindestens ``rest_days`` (``restored_right``, wie beim verstrichenen Nachrück-Angebot).
+                before = await db.league_applications.find_one({"id": change["application_id"]}, {"_id": 0, "carry_over.fills": 1}) or {}
+                own = league_start_right_rules.restored_right((before.get("carry_over") or {}).get("fills"), season, now_utc(), who, declined=False)
+                if own is not None:
+                    update["$set"]["carry_over.start_right"] = own
+                else:
+                    update["$unset"]["carry_over.start_right"] = ""
+            elif kind == "moved":
                 # Andere Liga N: Im Zusage-Modus gilt die alte Zusage nicht für die neue Liga.
                 update["$set"].update({f"carry_over.{key}": value for key, value in fresh_right.items()})
         try:

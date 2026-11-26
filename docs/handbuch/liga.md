@@ -2150,8 +2150,9 @@ der Platz, auf den er nachgerückt war, wieder frei – dann gilt wieder diese R
 
 **Einen Platz gibt es nur, solange der Endstand ihn kennt.** Korrigiert ihr den Endstand so, dass das abgemeldete Team gar nicht mehr
 aufgestiegen wäre (ein anderes steigt jetzt aus eigenem Recht auf), **entfällt sein Platz ganz**: Niemand rückt dafür nach, und ein
-Nachrücker, der schon darauf stand, geht mit „Übernahme neu berechnen“ zurück in seine Liga. So steigen nie zwei Teams für einen
-Platz auf.
+Nachrücker, der schon darauf stand, geht mit „Übernahme neu berechnen“ zurück in seine Liga. Seine frühere Zusage gilt dann wieder;
+war sie noch offen, hat er dafür die restliche Frist, mindestens 3 Tage (einstellbar). Die Nachricht an ihn nennt den Grund. So
+steigen nie zwei Teams für einen Platz auf.
 
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht

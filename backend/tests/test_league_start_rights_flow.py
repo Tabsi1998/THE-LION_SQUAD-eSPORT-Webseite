@@ -1424,16 +1424,23 @@ async def test_the_job_closes_an_open_pause_even_after_the_start_date(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_successor_goes_back_when_the_corrected_final_no_longer_knows_the_place(flow):
+@pytest.mark.parametrize("had_accepted", [True, False])
+async def test_a_successor_goes_back_when_the_corrected_final_no_longer_knows_the_place(flow, had_accepted):
     """P1, dieselbe Ursache auf dem anderen Weg: Der Nachrücker bleibt nach der Korrektur, wo der Endstand ihn vorher sah (Liga 2) -
     aber der Platz, auf den er nachgerückt war, besteht nicht mehr, weil jetzt ein anderer aus eigenem Recht aufsteigt. Dann geht
-    er zurück in seine Liga; sonst stiegen wieder zwei auf."""
+    er zurück in seine Liga; sonst stiegen wieder zwei auf. Wie bei jedem Rückfall (Nr. 260, Nr. 265): Seine frühere Zusage gilt
+    wieder - war sie noch offen, hat er die Restfrist, mindestens ``rest_days``, nie eine neue volle Frist."""
     world = await build(flow, levels=2)
     season, rows = await ready(flow, world)
     x, n, third = (rows[squad_id(world, 2, index)] for index in range(3))
+    if had_accepted:
+        ok(await answer(flow, n["squad_id"], n["id"]))
     flow.act_as(await person(flow, x["squad_id"]))
     ok(await flow.post(f"/api/me/league-applications/{x['id']}/withdraw"))
     assert (await carried(flow, season["id"]))[n["squad_id"]]["carry_over"]["division_level"] == 1
+    # Rückdatiert: Das eigene Startrecht kam vor neun Tagen (Frist zehn Tage) - beim Nachrücken blieb davon ein Tag.
+    first_offer = (now_utc() - timedelta(days=9)).isoformat()
+    await flow.db.league_applications.update_one({"id": n["id"]}, {"$set": {"carry_over.fills.back.start_right.offered_at": first_offer}})
     tid = world["tids"][2][0]
     regs = world["regs"][tid]
     flow.act_as(await second_lead(flow, world))
@@ -1453,6 +1460,24 @@ async def test_a_successor_goes_back_when_the_corrected_final_no_longer_knows_th
     assert back["status"] == "accepted" and back["carry_over"]["division_level"] == 2 and "fills" not in back["carry_over"]
     assert "filled_by" not in after[x["squad_id"]]["carry_over"]
     assert (await overview(flow, world, season["id"]))["open_places"] == []
+    # Das frühere Startrecht gilt wieder - keine neue volle Frist.
+    right = back["carry_over"]["start_right"]
+    assert right["offered_at"] == first_offer
+    told = [row for row in await notes(flow, "league_successor", (await person(flow, n["squad_id"]))["id"])
+            if "entfällt nach dem korrigierten Endstand" in row["body"]]
+    assert len(told) == 1 and "Der Platz in Liga 1 entfällt" in told[0]["body"] and "bleibt in Liga 2" in told[0]["body"]
+    if had_accepted:
+        assert right["status"] == "accepted" and right["accepted_via"] == "team"
+        assert "Eure Zusage dort gilt weiter" in told[0]["body"]
+    else:
+        # Restfrist: ein Tag wäre übrig, mindestens aber drei Tage (``rest_days``) - nicht zehn.
+        fresh = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
+        until = league_start_rights.accept_until(back, fresh)
+        assert right["status"] == "offered" and right["min_until"]
+        assert timedelta(days=2, hours=23) < until - now_utc() < timedelta(days=3, hours=1)
+        assert "bitte bis " in told[0]["body"] and "zusagen" in told[0]["body"]
+        item = await own_item(flow, n["squad_id"], n["id"])
+        assert item["carry_over"]["start_right"]["state"] == "offered" and item["carry_over"]["start_right"]["fills"] is None
     # Ein zweites Neuberechnen ändert nichts mehr.
     flow.act_as(world["lead"])
     again = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
