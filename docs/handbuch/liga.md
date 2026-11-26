@@ -2154,6 +2154,10 @@ Nachrücker, der schon darauf stand, geht mit „Übernahme neu berechnen“ zur
 war sie noch offen, hat er dafür die restliche Frist, mindestens 3 Tage (einstellbar). Die Nachricht an ihn nennt den Grund. So
 steigen nie zwei Teams für einen Platz auf.
 
+Umgekehrt bleibt ein Platz, solange er im Endstand steht: **Löscht ein abgemeldetes Team sein Co-Team**, ist sein Platz trotzdem frei
+für den Nachrücker. Und macht eure Korrektur ein **abgemeldetes Team zum Aufsteiger**, zeigt „Übernahme neu berechnen“ es als
+**Platz frei**: Das Team bleibt abgemeldet, sein Aufstiegsplatz geht nach eurer Regel an den Nächsten.
+
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht
 für Teams, die bleiben. Öffnet ihr eine Staffel wieder und schließt sie mit demselben Ergebnis ab, kommt nichts noch einmal; ändert
