@@ -1701,3 +1701,68 @@ async def test_without_the_setting_recompute_keeps_a_withdrawn_team_under_manual
     after = await carried(flow, season["id"])
     assert after[y["squad_id"]]["status"] == "withdrawn" and after[y["squad_id"]]["carry_over"] == y["carry_over"]
     assert after[x["squad_id"]]["carry_over"]["division_level"] == 2 and "fills" not in after[x["squad_id"]]["carry_over"]
+
+
+# ---------------------------------------------------------------- Nach der Freigabe: Bestätigung ohne Angebot, Klartext unter „von Hand“
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("how", ["withdrawn", "expired", "rejected", "still_in"])
+async def test_the_confirmation_makes_no_offer_to_a_team_that_gave_up(flow, how):
+    """Nr. 271: Ein aufgegebener Antrag bekommt kein neues Angebot. Macht die Korrektur so ein Co-Team zum Aufsteiger, nennt die
+    Bestätigung nur den Endstand - vorher stand da „Startrecht für Liga 1 … sagt dort zu“. Wer weiter dabei ist, liest es wie bisher."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    x, y = rows[squad_id(world, 2, 0)], rows[squad_id(world, 2, 1)]
+    if how != "still_in":
+        await give_up(flow, world, season, y, how)
+    captain = await person(flow, y["squad_id"])
+    assert await notes(flow, ANNOUNCED, captain["id"]) == []  # Y blieb in Liga 2: bisher keine Nachricht
+    tid = world["tids"][2][0]
+    regs = world["regs"][tid]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    await flip(flow, tid, regs[1], regs[0])
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+    told = await notes(flow, ANNOUNCED, captain["id"])
+    assert [row["title"] for row in told] == ["Aufstieg bestätigt"]
+    body = told[0]["body"]
+    if how == "still_in":
+        assert "steigt auf: Startrecht für Liga 1" in body and "sagt dort zu" in body
+    else:
+        assert "steigt auf." in body and "Startrecht" not in body and "sagt dort zu" not in body and "zusagen" not in body
+    # X ist weiter dabei und liest die Korrektur wie bisher.
+    other = await notes(flow, ANNOUNCED, (await person(flow, x["squad_id"]))["id"])
+    assert sorted(row["title"] for row in other) == ["Aufstieg bestätigt", "Endstand korrigiert"]
+    # Derselbe Stand noch einmal: nichts doppelt.
+    assert (await league_start_rights.announce(flow.db, world["season"]["id"]))["sent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_an_assigned_successor_whose_place_is_gone_says_so_under_manual(flow):
+    """Ein Nachrücker, der schon einer Staffel zugeteilt ist, bleibt beim Neuberechnen stehen („Bitte von Hand prüfen“). Ist der
+    Platz entfallen, auf den er nachgerückt war, sagt die Zeile das - vorher stand dort nur „zugeteilt“."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    x, n = rows[squad_id(world, 2, 0)], rows[squad_id(world, 2, 1)]
+    flow.act_as(await person(flow, x["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{x['id']}/withdraw"))
+    ok(await answer(flow, n["squad_id"], n["id"]))
+    division = await flow.db.league_divisions.find_one({"season_id": season["id"], "level": 1}, {"_id": 0})
+    flow.act_as(world["lead"])
+    staffel = ok(await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={}))
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/applications/{n['id']}/assign", json={"tournament_id": staffel["tournament_id"]}))
+    # Solange es den Platz gibt, steht dort nur „zugeteilt“.
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    assert [row["why"] for row in preview["manual"] if row["application_id"] == n["id"]] == ["zugeteilt"]
+    tid = world["tids"][2][0]
+    regs = world["regs"][tid]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnisse vertauscht eingetragen"}))
+    await flip(flow, tid, regs[2], regs[0])
+    await flip(flow, tid, regs[2], regs[1])
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    line = next(row for row in preview["manual"] if row["application_id"] == n["id"])
+    assert line["why"] == "zugeteilt, der Nachrückplatz ist entfallen" and line["to_label"].startswith("Liga 2")

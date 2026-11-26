@@ -671,6 +671,11 @@ async def _recompute_plan(db, season: dict) -> dict:
                     unchanged += 1
             elif not wanted or new["division_level"] != carry.get("division_level"):
                 why = "zugeteilt" if row.get("assignment") else {"withdrawn": "abgemeldet"}.get(row["status"], "nicht mehr angenommen")
+                fills = carry.get("fills") if isinstance(carry.get("fills"), dict) else None
+                if row.get("assignment") and fills and placed.get((by_id.get(fills.get("for_application_id")) or {}).get("squad_id")) != carry.get("division_level"):
+                    # Zugeteilter Nachrücker (#1627, F.2a), dessen Platz nach dem korrigierten Endstand entfallen ist: Die Leitung
+                    # liest, warum er hier steht - er spielt in einer Liga N, für die es seinen Platz nicht mehr gibt.
+                    why = "zugeteilt, der Nachrückplatz ist entfallen"
                 manual.append({"application_id": row["id"], "display_name": name, "status": row["status"], "why": why,
                                "from_label": carry.get("division_label"), "to_label": wanted[2] if wanted else None})
             else:
