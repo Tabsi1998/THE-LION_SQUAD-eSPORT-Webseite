@@ -5,7 +5,9 @@ Endstand und nur einmal, Startrecht mit Frist, Zusage, Verfall, Nachrücken mit 
 Vorgängers - und Seasons ohne die Einstellung bleiben, wie sie sind. Nur erfundene Namen.
 """
 import asyncio
+import copy
 import pathlib
+import re
 import sys
 from datetime import timedelta
 
@@ -16,7 +18,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
-from league_postseason_world import STAFFELN, build, close, create, matches_of, play_round, settle, sides, win  # noqa: E402
+import league_postseason_world  # noqa: E402
+from league_postseason_world import STAFFELN, close, create, matches_of, play_round, settle, sides, win  # noqa: E402
 from league_start_world import ADMIN, ok  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import league_calendar, league_start_rights  # noqa: E402
@@ -34,6 +37,45 @@ async def flow():
         yield instance
     finally:
         await shutdown()
+
+
+# ---------------------------------------------------------------- Aufbau: je Form der Liga nur einmal über die Routen
+
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+_build = league_postseason_world.build
+_BUILT: dict[str, tuple[dict, dict[str, list[dict]]]] = {}
+
+
+def _renamed(value, names: dict[str, str]):
+    """Dieselbe Struktur mit neuen Kennungen: Jede UUID bekommt - überall dieselbe - eine frische."""
+    if isinstance(value, str):
+        return UUID.sub(lambda found: names.setdefault(found.group(0), new_id()), value)
+    if isinstance(value, dict):
+        return {_renamed(key, names): _renamed(item, names) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_renamed(item, names) for item in value)
+    return value
+
+
+async def build(flow, **shape) -> dict:
+    """Die gespielte Liga aus ``league_postseason_world.build``. Jede Form (``levels``, ``staffeln``, ``zones``) wird je Prozess nur
+    einmal über die Routen aufgebaut; jeder weitere Test bekommt den Stand danach als Kopie in seine eigene Datenbank - mit
+    frischen Kennungen, damit nichts im Prozess (Zwischenspeicher nach Kennung) zwei Tests verbindet. Der Aufbau ist der teure
+    Teil jedes Ablaufs hier (auf echtem MongoDB gut eine Sekunde je Test); die Fälle selbst laufen unverändert über die Routen."""
+    key = repr(sorted(shape.items()))
+    if key not in _BUILT:
+        world = await _build(flow, **shape)
+        _BUILT[key] = (copy.deepcopy(world), {name: await flow.db[name].find({}).to_list(None)
+                                              for name in await flow.db.list_collection_names()})
+        return world
+    names: dict[str, str] = {}
+    world, stored = _BUILT[key]
+    for name, rows in stored.items():
+        if rows:
+            await flow.db[name].insert_many(_renamed(rows, names))
+    world = _renamed(world, names)
+    flow.act_as(world["lead"])
+    return world
 
 
 # ---------------------------------------------------------------- Helfer
@@ -1766,3 +1808,46 @@ async def test_an_assigned_successor_whose_place_is_gone_says_so_under_manual(fl
     preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
     line = next(row for row in preview["manual"] if row["application_id"] == n["id"])
     assert line["why"] == "zugeteilt, der Nachrückplatz ist entfallen" and line["to_label"].startswith("Liga 2")
+
+
+# ---------------------------------------------------------------- Die gespielte Liga wird je Form nur einmal aufgebaut
+
+@pytest.mark.asyncio
+async def test_the_cached_league_is_a_fresh_copy_with_its_own_ids(monkeypatch):
+    """``build`` baut eine Form der Liga je Prozess nur einmal über die Routen auf; danach bekommt jeder Test eine Kopie mit eigenen
+    Kennungen in seiner eigenen Datenbank - gleichwertig zu einem frischen Aufbau, nur schneller."""
+    this = sys.modules[__name__]
+    calls = []
+
+    async def counted(flow, **shape):
+        calls.append(shape)
+        return await league_postseason_world.build(flow, **shape)
+
+    monkeypatch.setattr(this, "_build", counted)
+    monkeypatch.setattr(this, "_BUILT", {})
+    seen = []
+    for _round in range(2):
+        instance, shutdown = make_flow()
+        try:
+            world = await build(instance, levels=2)
+            names = sorted([name for name in await instance.db.list_collection_names() if await instance.db[name].count_documents({})])
+            counts = {name: await instance.db[name].count_documents({}) for name in names}
+            # Die Kopie trägt die Liga wie das Original: abschließen, Folge-Season anlegen, acht Teams übernommen.
+            await close(instance, world)
+            season = await successor(instance, world)
+            rows = await carried(instance, season["id"])
+            seen.append({"world": world, "counts": counts, "db": instance.db, "names": sorted(row["display_name"] for row in rows.values()),
+                         "levels": sorted(row["carry_over"]["division_level"] for row in rows.values()),
+                         "known": {row["id"] async for row in instance.db.league_seasons.find({}, {"_id": 0, "id": 1})}})
+            assert instance.user == world["lead"]
+        finally:
+            await shutdown()
+    first, second = seen
+    assert len(calls) == 1
+    assert first["counts"] == second["counts"] and first["names"] == second["names"] and first["levels"] == second["levels"]
+    assert len(second["names"]) == 8
+    # Eigene Kennungen: Nichts aus dem ersten Aufbau kommt in der Kopie vor - weder in der Antwort noch in der Datenbank.
+    ids = [set(UUID.findall(repr(row["world"]))) for row in seen]
+    assert len(ids[0]) == len(ids[1]) > 20 and not ids[0] & ids[1]
+    assert not first["known"] & second["known"] and second["world"]["season"]["id"] in second["known"]
+    assert list(second["world"]["tids"]) == [1, 2] and second["world"]["tids"][2][0] in second["world"]["regs"]
