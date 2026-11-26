@@ -1268,7 +1268,7 @@ einmal, unter dem Thema **Turnier-Updates** (die Person kann es abschalten):
 - Wird ein Ergebnis noch einmal gleich gemeldet, kommt nichts doppelt. Ändert eine Korrektur den Ausgang, bekommen beide die
   passende neue Meldung; die alte ist als gelesen und überholt markiert.
 - **Nachgerückt** und **Turnier abgesagt** sind zeitkritisch: Die Mail kommt immer sofort, der Push in der Ruhezeit nur, wenn das
-  Turnier vor 9 Uhr am Morgen beginnt.
+  Turnier bis 2 Stunden nach dem Ende der Ruhezeit beginnt.
 - „Weiter“ heißt: im nächsten, tatsächlich gespielten Spiel. Gewinnt im Double Elimination der Erste das Grand Final und der Reset
   entfällt, kommt keine Meldung – dafür kommt **Turnier beendet**. Gewinnt die Seite aus dem Loser Bracket, lesen beide
   **Entscheidungsspiel** („gewonnen – jetzt kommt das Entscheidungsspiel“ bzw. „verloren – es gibt ein Entscheidungsspiel, du bist

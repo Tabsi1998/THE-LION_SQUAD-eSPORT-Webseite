@@ -225,7 +225,9 @@ Die Seite hat vier Reiter (#1662): **Themen** (Stufe und Themen), **E-Mail** (Sa
     Zug** fürs eigene Spiel, und für die Turnierleitung **Braucht Aufmerksamkeit**, solange ihr Turnier läuft. Leitungs-Meldungen einer
     Liga-Staffel (Verfahren, Fristen) warten bis zur Sammelmeldung. Der **Push-Test** der Verwaltung kommt ebenfalls sofort.
   - **Zeitkritisches** – Absage von Turnier oder Event, neuer Termin oder Ort eines Events, Nachrücken von der Warteliste – kommt
-    nur dann sofort, wenn der Termin vor 9 Uhr am Morgen liegt, an dem die Ruhezeit endet. Sonst wartet der Push bis zum Ende der
+    nur dann sofort, wenn der Termin noch bevorsteht und bis 2 Stunden nach dem Ende der Ruhezeit beginnt (bei 22 bis 7 Uhr also vor
+    9 Uhr; bei einer Mittagsruhe 13 bis 15 Uhr ein Termin um 14 Uhr sofort). Bei einem neuen Termin zählt der frühere von altem und
+    neuem, solange er noch bevorsteht. Ein vergangener Termin weckt niemanden. Sonst wartet der Push bis zum Ende der
     Ruhezeit (Fabians Entscheidung 26.11.). Die Mail dazu geht immer sofort.
   - E-Mails sind davon nicht betroffen.
 - **Dieser Browser** (unter den Themen, nur wenn der Betreiber Browser-Benachrichtigungen eingerichtet hat): ob der Browser, in dem die Seite
@@ -289,7 +291,7 @@ Jede Art von Meldung hat ein **Thema** (die Themen der Einstellungen) und eine *
 | Wichtigkeit | Bedeutung | Beispiele |
 | --- | --- | --- |
 | **Dringend** | kommt auch in der Ruhezeit sofort, nie in eine Sammlung, in der Glocke rot und als einzige angesagt | Du bist dran, Match startet jetzt, Push-Test |
-| **Zeitkritisch** (Merkmal zu „wichtig“) | nie in eine Sammlung; in der Ruhezeit sofort nur, wenn der Termin vor 9 Uhr am Morgen liegt | Turnier oder Event abgesagt, Event verschoben, Nachgerückt |
+| **Zeitkritisch** (Merkmal zu „wichtig“) | nie in eine Sammlung; in der Ruhezeit sofort nur, wenn der Termin bis 2 Stunden nach dem Ende der Ruhezeit beginnt | Turnier oder Event abgesagt, Event verschoben, Nachgerückt |
 | **Wichtig** | verlangt meist etwas von dir | Termin, Check-in, Anmeldung, Weiter/Ausgeschieden, Pause, Rechnung, Nachricht an dich |
 | **Normal** | zur Kenntnis | Ergebnisse, Erfolge, News, Galerie, Team-Änderungen |
 

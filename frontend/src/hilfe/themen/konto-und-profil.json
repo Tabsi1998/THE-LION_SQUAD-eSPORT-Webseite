@@ -116,7 +116,7 @@
           "id": "ruhezeit",
           "titel": "Ruhezeit einschalten",
           "text": "Tippe auf den Reiter Ruhezeit und schalte sie ein. Vorgeschlagen ist 22:00 bis 7:00 Uhr. In dieser Zeit kommt kein Push, alles wartet in der Glocke. Danach kommt eine Sammelmeldung.",
-          "hinweis": "Der Aufruf zu deinem Spiel und „Match startet jetzt“ kommen trotzdem sofort. Absagen, neue Termine und Nachrücken nur, wenn der Termin vor 9 Uhr ist. E-Mails kommen wie bisher.",
+          "hinweis": "Der Aufruf zu deinem Spiel und „Match startet jetzt“ kommen trotzdem sofort. Absagen, neue Termine und Nachrücken nur, wenn der Termin bis 2 Stunden nach dem Ende deiner Ruhezeit beginnt. E-Mails kommen wie bisher.",
           "bild": true,
           "clip": true
         },
