@@ -272,3 +272,23 @@ test.each([
   if (expected === "mfa-setup") expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
   else expect(screen.getByText(expected)).toBeInTheDocument();
 });
+
+// Nicht angemeldet (#2059, Prüfung): das Ziel samt Reiter und Anker geht mit zum Login - sonst landet /my/prizes nach
+// der Anmeldung auf den Rechnungen statt auf den Gewinnen.
+function LoginProbe() {
+  const { search } = useLocation();
+  return <div data-testid="login-probe" data-next={new URLSearchParams(search).get("next") || ""} />;
+}
+
+test("ohne Anmeldung: next nimmt Pfad, Suche und Anker mit", async () => {
+  authState.user = null;
+  render(
+    <MemoryRouter initialEntries={["/mein-bereich/datenschutz?tab=loeschung#oben"]}>
+      <Routes>
+        <Route path="/mein-bereich/datenschutz" element={<ProtectedRoute><div>datenschutz</div></ProtectedRoute>} />
+        <Route path="/login" element={<LoginProbe />} />
+      </Routes>
+    </MemoryRouter>
+  );
+  expect(await screen.findByTestId("login-probe")).toHaveAttribute("data-next", "/mein-bereich/datenschutz?tab=loeschung#oben");
+});
