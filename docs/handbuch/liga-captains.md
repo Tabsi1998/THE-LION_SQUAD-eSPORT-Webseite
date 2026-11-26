@@ -217,12 +217,16 @@ Liga 2). Abmelden bis zum Start …“.
   Prüft die Liga-Leitung den Endstand der alten Season noch einmal, **ruht die Frist** und läuft danach entsprechend länger –
   zusagen könnt ihr trotzdem. Hat die neue Season ihr Startdatum erreicht, entscheidet die Liga-Leitung über offene Zusagen.
 - **Nachgerückt?** Wird in einer höheren Liga ein Platz frei, kann euer Co-Team nachrücken. Ihr bekommt eine Nachricht und könnt
-  **annehmen** oder **Nachrücken ablehnen** – dann bleibt ihr in eurer Liga. Meldet ihr euch nicht, bleibt ihr ebenfalls dort.
+  **annehmen** oder **Nachrücken ablehnen**. Solange das Angebot offen ist, ruht eure Frist für die eigene Liga. Ablehnen heißt: Ihr
+  bleibt in eurer Liga, und das gilt zugleich als eure Zusage dort. Meldet ihr euch nicht, bleibt ihr ebenfalls dort – war eure
+  Zusage noch offen, habt ihr dafür die restliche Frist, mindestens 3 Tage (der Tag steht in der Nachricht).
 - **Vorher schon wissen, wohin es geht:** Während der Season steht beim Co-Team die **Prognose** nach der laufenden Tabelle – fest
   ist sie nicht. Nach dem Abschluss der ganzen Season steht dort **Startrecht bestätigt**, und ihr bekommt die Nachricht „Aufstieg
   bestätigt“ bzw. „Abstieg bestätigt“.
 
 <img src="../assets/liga/startrechte-teams-390.png" alt="Teams am Handy: beim Co-Team die neue Season mit dem orangen Stand Startrecht – Zusage offen, dem Satz Startrecht für Liga 1 bitte bis zum genannten Tag zusagen und den Knöpfen Startrecht annehmen und Abmelden" width="300">
+
+<img src="../assets/liga/startrechte-nachruecker-390.png" alt="Teams am Handy: ein nachgerücktes Co-Team mit dem Satz, dass in Liga 1 ein Platz frei geworden ist, die eigene Frist für Liga 2 ruht, Ablehnen als Zusage für Liga 2 gilt und ohne Antwort die restliche Frist bleibt, darunter die Knöpfe Startrecht annehmen, Nachrücken ablehnen und Abmelden" width="300">
 - **Regelwerk:** Gibt es eine neue Fassung, stimmt Captain oder Vertreter ihr vor dem ersten Spiel zu (Startseite oder
   Regelwerk). Ohne Zustimmung geht kein Check-in.
 - **Kader:** Die Kaderregeln der Season gelten weiter – prüft vor dem Start, ob alle Angaben stimmen.

@@ -4072,6 +4072,7 @@ Endstand (Zonen, TV, Discord-Saisonende); wer zugesagt hat, sehen nur die Leitun
 | `successor` | `next` \| `lead` | `next` | Nachrückerregel. `next`: Wird ein Platz frei, rückt automatisch nach, wen die Regel unten nennt. `lead`: Die Verwaltung zeigt den Vorschlag, die Leitung löst aus |
 | `remind_hours` | 0–336 | 48 | Erinnerung so viele Stunden vor Fristende, einmal je Startrecht. 0: keine. Auf die Frist gekappt: nie in ihrer ersten Hälfte (`remind_at`) - bei einem Tag Frist und 48 Stunden also zwölf Stunden vor Fristende statt sofort nach der Vergabe |
 | `announce` | bool | `true` | Nachricht „Aufstieg/Abstieg bestätigt“, sobald der Endstand **dieser** Season die Startrechte für die nächste bestätigt |
+| `rest_days` | 0–30 | 3 | Restfrist (Entscheidung 26.11.): Wer ein Nachrück-Angebot verstreichen lässt, hat danach in der eigenen Liga mindestens so viele Tage für die Zusage - nie über das Startdatum hinaus |
 
 Das Feld steht nicht in `NOT_COPIED`: Die neue Season übernimmt es vom Vorgänger (Nr. 161), `POST …/successor` nimmt es optional als
 `start_rights` entgegen (das Blatt „Neue Season aus …“ fragt es ab). `PUT` mit `{"active": false}` nimmt das Feld weg. Wechselt `mode`
@@ -4085,12 +4086,13 @@ Von `auto` auf `accept` verlangt nachträglich niemandem eine Zusage ab. Protoko
 
 | Feld | Inhalt |
 | --- | --- |
-| `start_right` | nur im Modus `accept`: `{status: offered \| accepted \| declined \| expired, offered_at, accepted_at?, accepted_by?, accepted_via? (team \| lead \| mode \| assignment), accept_reason?, closed_at?, reminded_at?}` |
+| `start_right` | nur im Modus `accept`: `{status: offered \| accepted \| declined \| expired, offered_at, accepted_at?, accepted_by?, accepted_via? (team \| lead \| mode \| assignment), accept_reason?, closed_at?, reminded_at?, rests?, min_until?}` - `rests` (`[{from, to}]`): wann die Frist ruhte, weil ein Nachrück-Angebot offen war; `min_until`: vor diesem Zeitpunkt endet die Frist nicht (Restfrist) |
 | `fills` | am Nachrücker: `{for_application_id, for_name, why (declined \| expired \| rejected), by (null = Regel), reason?, at, group (non_promoted \| relegated), back: {division_id, division_level, division_label, movement, start_right?}}` - `back` ist das Startrecht, auf das er zurückfällt |
 | `filled_by` | am frei gewordenen Antrag: `{application_id, display_name, at}` - ein Platz wird nie zweimal vergeben |
 | `passed` | Kennungen frei gewordener Anträge, deren Platz das Co-Team abgelehnt hat oder verfallen ließ - es wird dafür nicht noch einmal gefragt |
 
-Die Frist steht nicht am Antrag: `accept_until = min(offered_at + accept_days + Pausen, Startdatum der Season)`. Dazu an der Season
+Die Frist steht nicht am Antrag: `accept_until = min(max(offered_at + accept_days + Ruhezeiten, min_until), Startdatum der Season)` -
+Ruhezeiten sind die Pausen der Season und die `rests` des Startrechts, überlappende Zeiten zählen einmal. Dazu an der Season
 `start_right_notices` (`{<squad_id>: {fact, seq, at, sent_at}}`, der letzte gemeldete Stand je Co-Team), `start_right_notices_open`
 und `start_right_pauses` (`[{from, to}]`, höchstens 50: wann die Fristen ruhten; `to: null` = die Pause läuft). Nichts davon geht in
 die Folge-Season (`NOT_COPIED`). Keine neue Sammlung, kein neuer Index.
@@ -4105,10 +4107,10 @@ die Folge-Season (`NOT_COPIED`). Keine neue Sammlung, kein neuer Index.
 | Absage | Abmelden wie in F.2 (`…/withdraw`, bis zum Start der Season): `start_right.status: "declined"`, der Platz ist frei |
 | Verfall | Der Job `league_start_rights.sweep` (alle 15 Minuten, einmal je Lauf und Replik): Frist vorbei ohne Zusage → Antrag `rejected` ohne `active_key`, `start_right.status: "expired"`, Grund „Startrecht verfallen: bis … keine Zusage.“, Nachricht an Captain und Vertreter. Schon vor dem Job gilt die Frist: Zusagen danach antworten 409. **Reihenfolge je Lauf** (Entscheidung 26.11.): erst alle Verfälle (schweigende Nachrücker fallen zurück, überfällige Startrechte verfallen), dann das Nachrücken auf die frei gewordenen Plätze in fester Reihenfolge (Liga N, Herkunft, Platz), zuletzt die Erinnerungen - das Ergebnis hängt nicht davon ab, welchen Antrag der Lauf zuerst anfasst. Schweigen alle, verfallen alle, und niemand rückt nach |
 | Startdatum erreicht | Ab dem Startdatum der Folge-Season - **auch wenn sie noch Entwurf ist** (`start_reached`, Entscheidung 26.11.) - verfällt nichts mehr automatisch, rückt niemand mehr automatisch nach und wird nicht erinnert: Die Leitung entscheidet. Ein offenes Startrecht mit abgelaufener Frist bleibt `offered` (`waits_for_lead: true`), das Team kann nicht mehr selbst zusagen (409), die Leitung trägt die Zusage ein oder lehnt im Eingang ab. `…/fill` antwortet 409 („Die Season hat schon begonnen …“) |
-| Warteliste | Stuft die Leitung ein übernommenes Co-Team auf die Warteliste zurück (B.4), verfällt dort nichts (der Job fasst nur `accepted` an). Annehmen von der Warteliste **mit** Staffel antwortet bei offener Zusage 422 („… Bitte erst ohne Staffel annehmen …“) - kein Weg an der Zusage vorbei. Annehmen **ohne** Staffel vergibt das Startrecht neu: Die Frist beginnt neu (`reoffer_fields`) |
+| Warteliste | Stuft die Leitung ein übernommenes Co-Team auf die Warteliste zurück (B.4), verfällt dort nichts (der Job fasst nur `accepted` an). Annehmen von der Warteliste **mit** Staffel antwortet bei offener Zusage 422 („… Bitte erst ohne Staffel annehmen …“) - kein Weg an der Zusage vorbei. Annehmen **ohne** Staffel vergibt das Startrecht neu: Die Frist beginnt neu (`reoffer_fields`). Braucht die Season keine Zusage (mehr) - Modus `auto` oder ausgeschaltet -, entsteht dabei kein neues `offered`: Das Startrecht gilt als zugesagt (`accepted_via: "mode"`), auch gleich mit Staffel |
 | Erneut anmelden | Nach Verfall oder Absage geht nur der normale Weg: neue Anmeldung im Anmeldefenster (B.4) - als neue Anmeldung, über die die Leitung entscheidet (neue Co-Teams in der untersten Liga N, höher nur mit Grund, Nr. 226) |
 | Zuteilen | `…/assign` und das Los (`league_draw`) nehmen nur zugesagte Startrechte: bei `offered` 422 „… hat das Startrecht noch nicht angenommen …“ bzw. das Co-Team steht im Los unter `waiting_start_right`. Der Sonderweg „Co-Team zuteilen“ gilt als Zusage durch die Leitung (`accepted_via: "assignment"`) |
-| Pause | Solange der Vorgänger wieder geöffnet ist (`plan` hat `problems` - auch nach einem zurückgenommenen Entscheid über Staffeln hinweg), **steht die Frist still** und ist danach **um die Dauer der Pause länger** (Entscheidung 26.11.): `start_right_pauses` an der Folge-Season hält Beginn und Ende fest (`after_final_change` nach Wiederöffnen, Abschluss und Entscheid; der Job gleicht bei jedem Lauf ab, falls ein Schritt fehlte). Während der Pause verfällt nichts, rückt niemand nach und wird nicht erinnert; `accept_until` ist `null`, `paused: true`. **Zusagen bleibt möglich.** Eine Pause zählt nur, soweit sie in die laufende Frist fällt: War die Frist schon vor der Pause vorbei, bleibt sie vorbei. Nach dem neuen Abschluss rechnet „Übernahme neu berechnen“ (Nr. 162): `moved` setzt das Startrecht zurück auf `offered` mit neuer Frist (andere Liga N, neue Zusage), `updated` lässt die Zusage stehen, `revoked` nimmt es zurück. Ein Nachrücker, dessen Endstand sich nicht geändert hat, bleibt, wo er ist; sagt der Endstand für ihn jetzt etwas anderes als vor dem Nachrücken - etwa selbst den Aufstieg -, steht er ab da aus eigenem Recht dort (`fills` fällt weg, „Ablehnen“ gibt es nicht mehr) |
+| Pause | Solange der Vorgänger wieder geöffnet ist (`plan` hat `problems` - auch nach einem zurückgenommenen Entscheid über Staffeln hinweg), **steht die Frist still** und ist danach **um die Dauer der Pause länger** (Entscheidung 26.11.): `start_right_pauses` an der Folge-Season hält Beginn und Ende fest (`after_final_change` nach Wiederöffnen, Abschluss und Entscheid - erst der Pausenabgleich, dann die Nachricht; der Job gleicht bei jedem Lauf vor dem Startdatum ab, falls ein Schritt fehlte, und setzt den Beginn dann auf das jüngste Wiederöffnen einer noch offenen Staffel des Vorgängers, `reopened_at`, statt auf die Zeit des Laufs). Während der Pause verfällt nichts, rückt niemand nach und wird nicht erinnert; `accept_until` ist `null`, `paused: true`. **Zusagen bleibt möglich.** Eine Pause zählt nur, soweit sie in die laufende Frist fällt: War die Frist schon vor der Pause vorbei, bleibt sie vorbei. Nach dem neuen Abschluss rechnet „Übernahme neu berechnen“ (Nr. 162): `moved` setzt das Startrecht zurück auf `offered` mit neuer Frist (andere Liga N, neue Zusage), `updated` lässt die Zusage stehen, `revoked` nimmt es zurück. Ein Nachrücker, dessen Endstand sich nicht geändert hat, bleibt, wo er ist; sagt der Endstand für ihn jetzt etwas anderes als vor dem Nachrücken - etwa selbst den Aufstieg -, steht er ab da aus eigenem Recht dort (`fills` fällt weg, „Ablehnen“ gibt es nicht mehr). **Nimmt das Neuberechnen einen Nachrücker zurück** (`revoked`), ist der Platz, auf den er nachgerückt war, wieder frei: `filled_by` fällt weg, die Antwort nennt ihn unter `released_places`, und es gilt die Nachrückerregel der Season - mit `next` rückt sofort der Nächste nach (`fill_places`), mit `lead` steht der Platz wieder unter `open_places` |
 
 **Nachrücken.** Frei wird ein Platz durch Absage, Verfall oder Ablehnung durch die Leitung. Nachgerückt wird nur, solange das
 Startdatum der Season nicht erreicht ist - auch im Entwurf (danach von Hand im Eingang, wie Nr. 162; sonst bekäme der Nachrücker
@@ -4130,10 +4132,19 @@ Datenbank), für einen freien Platz in Liga N mit Stufe L:
    Anmeldungen (B.4). Gibt es keinen Kandidaten, bleibt auch der freie Platz so.
 
 Der Nachrücker behält seinen Antrag; `carry_over` zeigt in die neue Liga N (`division_*`, `movement` neu gerechnet), `fills` hält fest,
-für wen und warum, und `back`, worauf er zurückfällt. Im Modus `accept` beginnt für ihn eine neue Frist (`offered`). Er kann den Platz
-**ablehnen** (`{action: "decline"}`) oder die Frist verstreichen lassen: Dann gilt wieder `back` - mit seiner früheren Zusage, wenn es
-eine gab -, der Platz geht an den nächsten Kandidaten. Wer gar nicht spielen will, meldet sich ab. Im Modus `auto` rückt er sofort nach
-und kann bis zum Start ablehnen. Von Hand: `POST …/start-rights/{application_id}/fill` `{candidate_id, reason (≥ 5 Zeichen),
+für wen und warum, und `back`, worauf er zurückfällt. Im Modus `accept` beginnt für ihn eine neue Frist (`offered`). **Solange dieses
+Angebot offen ist, ruht seine eigene Frist** - genau wie in der Pause (Entscheidung 26.11., `restored_right`):
+
+| Der Nachrücker … | Dann |
+| --- | --- |
+| sagt zu | Er steht in der höheren Liga N - das ist zugleich seine Zusage |
+| lehnt ausdrücklich ab (`{action: "decline"}`) | zurück in die eigene Liga N; das **gilt als Zusage** für sie (`accepted_via: "team"`), der Platz geht an den nächsten Kandidaten |
+| schweigt, bis das Angebot verfällt | zurück in die eigene Liga N. Hatte er dort schon zugesagt, gilt die Zusage weiter. War sie noch offen, läuft ihre Frist mit dem Rest weiter, der beim Nachrücken übrig war (`rests`) - **mindestens `rest_days`** (`min_until`), nie über das Startdatum hinaus; die Erinnerung beginnt neu, die Nachricht nennt das neue Fristende |
+| meldet sich ab | nicht mehr dabei, beide Plätze sind frei |
+
+Fällt das Startdatum in diese Zeit, gilt „Startdatum erreicht“ oben: Nichts fällt mehr von selbst zurück oder verfällt, die Leitung
+entscheidet. Im Modus `auto` rückt er sofort nach und kann bis zum Start ablehnen. Die Nachricht beim Nachrücken und die Zeile unter
+Teams sagen genau das (`fills.own_open`, `fills.rest_days` in der Antwort an das eigene Team). Von Hand: `POST …/start-rights/{application_id}/fill` `{candidate_id, reason (≥ 5 Zeichen),
 conflict_reason?}` am frei gewordenen Antrag - bei `successor: "lead"`, bei Gleichstand oder nach einer Ablehnung durch die Leitung;
 `candidate_id` muss einer der vorgeschlagenen Kandidaten sein. Befangenheit: nie für das eigene Team.
 

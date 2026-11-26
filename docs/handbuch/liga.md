@@ -2094,6 +2094,7 @@ Tagen** und was geschieht, **wenn ein Platz frei wird**. Oder vorher und nachher
 | **Frist für die Zusage (Tage)** | 14 | zählt ab dem Anlegen der Season, für Nachrücker ab dem Nachrücken – und endet spätestens mit dem Startdatum der Season. Eine geänderte Zahl gilt sofort für alle offenen Startrechte |
 | **Wird ein Platz frei** | automatisch nach der Regel | oder: „Die Leitung löst es aus“ – dann seht ihr den Vorschlag und drückt selbst |
 | **Erinnerung vor Fristende (Stunden)** | 48 | einmal an Captain und Vertreter; 0 = keine. Nie in der ersten Hälfte der Frist: Bei einem Tag Frist kommt sie zwölf Stunden vorher, nicht sofort |
+| **Restfrist nach einem Nachrück-Angebot (Tage)** | 3 | siehe „Nachrücken“: so viele Tage hat ein Team mindestens für seine eigene Zusage, wenn es ein Nachrück-Angebot verstreichen lässt |
 | **Nachricht „Aufstieg bestätigt“** | an | siehe unten |
 
 <img src="../assets/liga/startrechte-verwaltung-1440.png" alt="Abschnitt Startrechte am PC: oben die Einstellung mit Frist in Tagen, Nachrückerregel und Erinnerung, darunter die Übersicht Startrechte aus Season 1 mit der Zeile 3 Zusage offen, 2 zugesagt, 1 spielen mit, 1 verfallen, einem frei gewordenen Platz mit Vorschlag und Knopf Nachrücken lassen und je Liga die Co-Teams mit Stand, Frist und Knopf Zusage eintragen" width="720">
@@ -2134,9 +2135,17 @@ an, beginnt die Frist neu; gleich mit Staffel annehmen geht erst nach der Zusage
 - **Keine Kette:** Der Platz, den der Nachrücker verlässt, wird nicht automatisch weitergegeben – er ist frei für Warteliste und
   neue Anmeldungen.
 
-Der Nachrücker bekommt eine Nachricht und – im Modus „mit Zusage“ – eine **eigene Frist**. Er kann **zusagen** oder **ablehnen**.
-Lehnt er ab oder meldet er sich nicht, **bleibt er in seiner Liga** (mit seiner früheren Zusage), und der Nächste ist dran. Mit „Die
-Leitung löst es aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben.
+Der Nachrücker bekommt eine Nachricht und – im Modus „mit Zusage“ – eine **eigene Frist** für das Angebot. Solange das Angebot offen
+ist, **ruht seine Frist für die eigene Liga**. Er hat drei Möglichkeiten:
+
+- **Zusagen:** Er spielt in der höheren Liga – das ist zugleich seine Zusage.
+- **Nachrücken ablehnen:** Er bleibt in seiner Liga, und das **gilt als Zusage** für sie. Der Nächste ist dran.
+- **Nicht antworten:** Er bleibt in seiner Liga. Hatte er dort schon zugesagt, gilt das weiter. War seine Zusage noch offen, hat er
+  dafür die restliche Frist, **mindestens 3 Tage** (einstellbar), aber nie über das Startdatum hinaus – die Nachricht nennt den Tag.
+
+Niemand verliert also sein eigenes Startrecht, nur weil er ein Angebot für die höhere Liga bekommen hat. Mit „Die Leitung löst es
+aus“ steht der freie Platz orange über der Übersicht: **Nachrücken lassen** → Team wählen, Grund angeben. Nimmt „Übernahme neu
+berechnen“ einen Nachrücker zurück (etwa nach einer Disqualifikation), ist sein Platz wieder frei – dann gilt wieder diese Regel.
 
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht
