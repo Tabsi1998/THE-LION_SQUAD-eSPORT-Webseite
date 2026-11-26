@@ -183,3 +183,30 @@ test("Nachmeldung (Nr. 180): läuft das Fenster über den Season-Start, sagt die
   renderPanel({ ...BLOCK, season_starts_at: "2026-11-17T00:00:00", state: "closed" });
   expect(screen.queryByTestId("league-application-after-start")).toBeNull();
 });
+
+// Startrechte (#1627, docs/LIGA.md „F.2a“): Die Zusage geht über denselben Antrag - auf der Ligaseite wie unter Teams.
+test("ein offenes Startrecht zeigt Frist und „Startrecht annehmen“ statt „automatisch dabei“", async () => {
+  const carried = { ...SQUAD, state: "accepted", can_submit: false, application: { id: "a9", status: "accepted", can_withdraw: true,
+    carry_over: { from_season_name: "Season 1", from_label: "Liga 2", division_label: "Liga 1", movement: "up", withdraw_until: "2027-01-04T23:00:00+00:00",
+      start_right: { state: "offered", accept_until: "2026-12-15T17:00:00+00:00", can_accept: true, can_decline: false, fills: null } } } };
+  apiMock.get.mockResolvedValue({ data: view([carried]) });
+  apiMock.post.mockResolvedValue({ data: { status: "accepted" } });
+  renderPanel();
+  const row = await screen.findByTestId("league-application-row-s1");
+  expect(screen.getByTestId("league-application-state-s1")).toHaveTextContent("Startrecht – Zusage offen");
+  expect(row).toHaveTextContent("Startrecht für Liga 1: bitte bis 15.12.2026, 18:00 Uhr zusagen.");
+  expect(row).not.toHaveTextContent("automatisch dabei");
+  fireEvent.click(screen.getByTestId("league-start-right-accept-a9"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a9/start-right", { action: "accept" }));
+});
+
+test("ohne Startrecht bleibt ein übernommenes Co-Team „automatisch dabei“", async () => {
+  const carried = { ...SQUAD, state: "accepted", can_submit: false, application: { id: "a8", status: "accepted", can_withdraw: true,
+    carry_over: { from_season_name: "Season 1", from_label: "Liga 2", division_label: "Liga 1", movement: "up", withdraw_until: "2027-01-04T23:00:00+00:00" } } };
+  apiMock.get.mockResolvedValue({ data: view([carried]) });
+  renderPanel();
+  const row = await screen.findByTestId("league-application-row-s1");
+  expect(row).toHaveTextContent("Ihr seid automatisch dabei.");
+  expect(screen.getByTestId("league-application-state-s1")).toHaveTextContent("Angemeldet – Zuteilung folgt");
+  expect(screen.queryByTestId("league-start-right-accept-a8")).toBeNull();
+});
