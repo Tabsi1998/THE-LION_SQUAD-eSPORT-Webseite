@@ -146,6 +146,8 @@ for (const width of [390, 768, 1440, 2560]) {
     test.use({ viewport: { width, height: width === 390 ? 844 : 1000 } });
 
     test(`Karte oben, Sprungleiste, kein Verweis über einer Überschrift (${width})`, async ({ page }) => {
+      // Ohne Bewegung: gemessen wird der Endstand, nicht das Einblenden von „Mein Bereich“ (#2059).
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await mockServer(page, FULL);
       await page.goto("/members/area");
       await acceptCookies(page);
@@ -161,8 +163,6 @@ for (const width of [390, 768, 1440, 2560]) {
       await expect(bar.getByTestId("member-area-jump-karte")).toHaveText("Karte");
       await expect(page.getByTestId("member-area-board")).toContainText("Mira Muster");
 
-      // Gemessen wird, wenn das Einblenden von „Mein Bereich“ (#2059) vorbei ist - sonst wandert die Leiste noch.
-      await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running"));
       const items = await bar.locator(".tls-area-jump__item").all();
       const rects = [];
       for (const item of items) rects.push(await box(item));
