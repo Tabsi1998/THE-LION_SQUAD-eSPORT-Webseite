@@ -72,6 +72,17 @@ async function mockSitzung(page, start) {
   return sitzung;
 }
 
+// Was ein Konto auf dem Gerät hinterlässt: gespeicherte Mitgliedskarte, letzte Suchen, Browser-Benachrichtigungen.
+const GERAET = ["tls-member-card-v1", "tls-recent-searches", "tls-web-push-owner"];
+async function geraetBefuellen(page) {
+  await page.evaluate((keys) => {
+    window.localStorage.setItem(keys[0], JSON.stringify({ owner: "user-1", card: { name: "Nachtfalke", member_number: "TLS-077" } }));
+    window.localStorage.setItem(keys[1], JSON.stringify(["turnier"]));
+    window.localStorage.setItem(keys[2], "user-1");
+  }, GERAET);
+}
+const geraetReste = (page) => page.evaluate((keys) => keys.filter((key) => window.localStorage.getItem(key)), GERAET);
+
 async function abmelden(page, form) {
   if (form === "handy") {
     await page.getByTestId("nav-mobile-toggle").click();
@@ -317,6 +328,42 @@ for (const [form, viewport] of [["handy", { width: 390, height: 844 }], ["pc", {
       await expect.poll(() => geloescht).toBe(true);
       await expect.poll(() => { const url = new URL(page.url()); return `${url.pathname}${url.search}`; }).toBe("/");
       await expect(page.getByText("Dein Konto ist gelöscht.")).toBeVisible();
+    });
+
+    // Geteilte Geräte (#2059): scheitert das Abmelden nach dem Löschen am Netz, ist das Gerät trotzdem leer - und es
+    // bleibt bei einer Meldung.
+    test("Konto löschen, Abmelden scheitert am Netz: Gerät leer, nur „Dein Konto ist gelöscht.“", async ({ page }) => {
+      test.setTimeout(90_000);
+      await mockServer(page);
+      await mockSitzung(page, member);
+      await page.route("**/api/auth/logout", (route) => route.abort("failed"));
+      await page.route("**/api/dsgvo/anonymize-me", (route) => route.fulfill(json({ ok: true })));
+      await page.goto("/mein-bereich/datenschutz?tab=loeschung");
+      await dismissCookies(page);
+      await geraetBefuellen(page);
+      await page.getByTestId("dsgvo-anonymize-btn").click();
+      await page.getByTestId("confirm-dialog-input").fill("LÖSCHEN");
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe("/");
+      await expect(page.getByText("Dein Konto ist gelöscht.")).toBeVisible();
+      await expect.poll(() => geraetReste(page)).toEqual([]);
+      await expect(page.getByTestId("nav-user")).toHaveCount(0);
+      await page.waitForTimeout(500);
+      await expect(page.locator('[data-sonner-toast][data-type="error"]')).toHaveCount(0);
+    });
+
+    test("Abmelden scheitert am Netz: das Gerät ist trotzdem leer, eine Meldung sagt es", async ({ page }) => {
+      test.setTimeout(90_000);
+      await mockServer(page);
+      await mockSitzung(page, member);
+      await page.route("**/api/auth/logout", (route) => route.abort("failed"));
+      await page.goto("/mein-bereich");
+      await dismissCookies(page);
+      await geraetBefuellen(page);
+      await abmelden(page, form);
+      await expect(page.locator('[data-sonner-toast][data-type="error"]')).toHaveCount(1);
+      await expect.poll(() => geraetReste(page)).toEqual([]);
+      await expect(page.getByTestId("nav-user")).toHaveCount(0);
     });
   });
 }

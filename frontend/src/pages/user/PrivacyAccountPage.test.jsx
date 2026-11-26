@@ -114,6 +114,8 @@ test("nach dem Löschen: erst die Startseite, dann abmelden - mit Bestätigung",
   fireEvent.click(screen.getByTestId("dsgvo-anonymize-btn"));
   expect(await screen.findByTestId("startseite")).toBeInTheDocument();
   expect(logoutMock).toHaveBeenCalledTimes(1);
+  // Leise abmelden: scheitert es (Netz), bleibt „Dein Konto ist gelöscht.“ die einzige Meldung - geleert wird trotzdem.
+  expect(logoutMock).toHaveBeenCalledWith({ quiet: true });
   expect(pfadBeimAbmelden).toBe("/");
   expect(toastMock.success).toHaveBeenCalledWith("Dein Konto ist gelöscht.");
   window.history.replaceState({}, "", "/");

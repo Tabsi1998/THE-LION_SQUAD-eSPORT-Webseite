@@ -154,9 +154,20 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = async () => {
+  // `quiet` (nach „Konto löschen“): scheitert der Server, keine zweite Meldung neben „Dein Konto ist gelöscht.“.
+  const logout = async ({ quiet = false } = {}) => {
     try {
       await api.post("/auth/logout");
+      return true;
+    } catch (e) {
+      if (!quiet) {
+        const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";
+        setError(msg);
+        toast.error(msg);
+      }
+      return false;
+    } finally {
+      // Dieses Gerät ist danach immer leer - auch wenn der Server nicht antwortet (geteilte Geräte, #2059).
       setMfaTicket("");
       setUser(null);
       gemeinsamKonto(null);
@@ -165,12 +176,6 @@ export function AuthProvider({ children }) {
       clearOfflineCard();
       // Browser-Benachrichtigungen (#1163): dieser Browser bekommt nach dem Abmelden nichts mehr - der Server löscht seine Seite mit.
       void forgetWebPush();
-      return true;
-    } catch (e) {
-      const msg = formatApiError(e.response?.data?.detail) || "Logout fehlgeschlagen.";
-      setError(msg);
-      toast.error(msg);
-      return false;
     }
   };
 
