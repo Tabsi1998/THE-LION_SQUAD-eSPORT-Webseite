@@ -3991,7 +3991,7 @@ Vorgänger wieder abgeschlossen ist.
 | übernommen, angenommen, ohne Staffel | folgt dem Endstand: `moved` (andere Liga N), `updated` (gleiche Liga, Platz oder Zone neu) |
 | fehlt in der neuen Season | `added`: neuer übernommener Antrag |
 | nicht mehr dabei (z. B. ausgeschieden) | `revoked`: Stand `rejected`, `carry_over.revoked_at`, Grund „Übernahme zurückgenommen“ - nichts wird gelöscht; kommt es später wieder dazu: `reactivated` |
-| zugeteilt, abgemeldet oder selbst angemeldet | bleibt unverändert, steht unter `manual` („Bitte von Hand prüfen“), wenn der Endstand etwas anderes sagt |
+| zugeteilt, abgemeldet oder selbst angemeldet | bleibt unverändert, steht unter `manual` („Bitte von Hand prüfen“), wenn der Endstand etwas anderes sagt. Ein zugeteilter Nachrücker (#1627, F.2a), dessen Platz nach dem korrigierten Endstand entfallen ist, steht dort mit `why: "zugeteilt, der Nachrückplatz ist entfallen"` - sonst nur „zugeteilt“ |
 | aufgegeben und laut korrigiertem Endstand in einer anderen Liga N (#1627, F.2a - **nur mit der Einstellung `start_rights`**, ohne sie bleibt die Zeile unter `manual`) | `place`: abgemeldete, verfallene und von der Leitung abgelehnte Anträge (nicht zurückgenommen, kein Nachrücker) folgen ihrer neuen Platzierung - hoch, bleibt oder runter. Stand und Startrecht bleiben, wie sie sind; der Platz in der neuen Liga N ist frei (`released_places`), keine Nachricht, nicht unter `manual`. Stimmt die Liga schon, steht nichts da - auch wenn es das Co-Team nicht mehr gibt |
 
 Vorschau zuerst (`changes`, `manual`, `stamp` = Fingerabdruck der Fassungen des Endstands); `POST {confirm, stamp}` mit veraltetem
@@ -4173,7 +4173,9 @@ Staffel - wird nie gemeldet. Je Co-Team merkt sich die Season den zuletzt gemeld
 gleichem Ergebnis meldet nichts noch einmal, ein geändertes Ergebnis meldet einmal „Endstand korrigiert“. Gemeldet wird nach jedem
 Schritt, der den Endstand ändert (`after_final_change` aus `routes/league_final_routes.py`): Abschluss, Wiederöffnen und der Entscheid
 über Staffeln hinweg (`PUT`/`DELETE …/zone-decision`) - wird ein Entscheid nach dem letzten Abschluss umgesetzt, bekommt das bisher
-gewählte Co-Team „Endstand korrigiert“ und das neue die Bestätigung. `dedupe_key`
+gewählte Co-Team „Endstand korrigiert“ und das neue die Bestätigung. **Kein Angebot an ein aufgegebenes Team** (Nr. 271): Gibt es
+die Folge-Season schon und hat das Co-Team seinen Platz dort aufgegeben (abgemeldet, verfallen, von der Leitung abgelehnt - nicht
+zurückgenommen), nennt die Nachricht nur den Endstand („… steigt auf.“) - ohne „Startrecht für …“ und ohne den Satz zur Zusage. `dedupe_key`
 `league-start-right:<season>:<co-team>:<seq>:<person>` mit `unique_dedupe`. Die Nachricht ersetzt keine bestehende: „Staffel
 abgeschlossen“ (F.1) und die Discord-Saisonende-Meldung (F.7) bleiben, wie sie sind, und nennen den Auf- und Abstieg nicht je Person.
 

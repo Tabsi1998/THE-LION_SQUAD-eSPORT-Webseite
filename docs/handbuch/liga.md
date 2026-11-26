@@ -2161,7 +2161,11 @@ für den Nachrücker.
 oder von euch abgelehntes Team in einer anderen Liga (es wäre aufgestiegen, geblieben oder abgestiegen), zeigt „Übernahme neu
 berechnen“ es als **Platz frei**: Das Team bleibt, was es ist – es bekommt kein neues Angebot und keine Nachricht –, und sein Platz
 in der neuen Liga geht nach eurer Regel an den Nächsten. Drückt ihr vor dem Neuberechnen **Nachrücken lassen**, sagt die Seite,
-dass erst neu berechnet werden muss.
+dass erst neu berechnet werden muss. Auch „Aufstieg bestätigt“ nennt so einem Team nur den Endstand, ohne Aufforderung zuzusagen.
+
+Ist ein Nachrücker schon **einer Staffel zugeteilt** und sein Platz entfällt, ändert „Übernahme neu berechnen“ nichts an ihm: Er
+steht unter **Bitte von Hand prüfen** mit „zugeteilt, der Nachrückplatz ist entfallen“ – dann entscheidet ihr, ob er zurück in
+seine Liga geht.
 
 **6. Nachricht „Aufstieg bestätigt“.** Sobald der Endstand der **ganzen** Season feststeht, bekommen Captain und Vertreter jedes
 auf- oder absteigenden Co-Teams genau eine Nachricht (Glocke, App, Mail). Nie vorher, nie aus einer laufenden Tabelle, und nicht
