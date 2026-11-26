@@ -27,7 +27,6 @@ const SERVERS = [
 
 const MEMBER = { membership: { member_status: "active", member_number: "TLS-031", member_since: "2026-02-01", membership_type: "ordinary" } };
 const PAID = { ...MEMBER, dolibarr: { led_by_dolibarr: true, type_label: "Ordentliches Mitglied", paid_until: "2026-12-31", fee: { status: "paid" } } };
-const DUE = { ...MEMBER, dolibarr: { led_by_dolibarr: true, fee: { status: "due" } } };
 const MEETING = { id: 7, kind_label: "Generalversammlung", title: "Generalversammlung 2026", day: "2026-10-24", time: "18:00", place: "Vereinsheim", format_label: "vor Ort", response: "", response_label: "noch keine Antwort", can_respond: true };
 
 function mockApi({ discord = { linked: true, servers: [] }, me = { membership: {} }, summary = {}, documents = [], news = [] } = {}) {
@@ -58,41 +57,20 @@ beforeEach(() => {
   apiMock.put.mockReset();
 });
 
-test("Kopf: die eigene Karte, Gruß, „Mitglied seit“ und „Beitrag bezahlt“", async () => {
+// Seit „Mein Bereich“ (#2059) stehen Karte, Gruß und Beitrag nur unter Mitgliedschaft - Verein beginnt mit der Sprungleiste
+// (Fabian 26.11.: nicht doppelt). Die Seite fragt dafür weder /membership/me noch die öffentlichen Einstellungen.
+test("kein Kopf: keine Karte, kein Gruß, kein Beitrags-Schild - das steht unter Mitgliedschaft", async () => {
   mockApi({ me: PAID });
   renderPage();
-  expect(await screen.findByTestId("member-area-card")).toBeInTheDocument();
-  expect(screen.getByTestId("member-area-card-name")).toHaveTextContent("LunaByte");
-  expect(screen.getByTestId("member-area-card")).toHaveTextContent("Nr. TLS-031 · seit 2026");
-  expect(screen.getByTestId("member-area-card")).toHaveTextContent("Ordentliches Mitglied · gültig bis 31.12.2026");
-  expect(screen.getByTestId("member-area-card-link")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft#mitgliedskarte");
-  expect(screen.getByTestId("member-area-greeting")).toHaveTextContent("Hallo, LunaByte");
-  expect(screen.getByTestId("member-area-since")).toHaveTextContent("Mitglied seit Februar 2026");
-  expect(screen.getByTestId("member-area-fee")).toHaveTextContent("Beitrag bezahlt");
-  expect(screen.getByTestId("member-area-fee")).toHaveAttribute("data-tone", "ok");
-  expect(screen.getByTestId("member-area-my-membership")).toHaveAttribute("href", "/mein-bereich/mitgliedschaft");
-});
-
-test("Kopf: offener Beitrag; ohne Dolibarr kein Schild; ohne gültige Mitgliedschaft keine Karte", async () => {
-  mockApi({ me: DUE });
-  const { unmount } = renderPage();
-  expect(await screen.findByTestId("member-area-fee")).toHaveTextContent("Beitrag offen");
-  expect(screen.getByTestId("member-area-fee")).toHaveAttribute("data-tone", "warn");
-  unmount();
-
-  gemeinsamVergessen();
-  mockApi({ me: MEMBER });
-  const second = renderPage();
-  expect(await screen.findByTestId("member-area-card")).toBeInTheDocument();
-  expect(screen.queryByTestId("member-area-fee")).toBeNull();
-  second.unmount();
-
-  gemeinsamVergessen();
-  mockApi({ me: { membership: { member_status: "pending" } } });
-  renderPage();
-  expect(await screen.findByTestId("member-area-greeting")).toHaveTextContent("Hallo, LunaByte");
+  expect(await screen.findByTestId("member-area-links")).toBeInTheDocument();
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/membership/area-summary"));
+  expect(screen.queryByTestId("member-area-head")).toBeNull();
   expect(screen.queryByTestId("member-area-card")).toBeNull();
+  expect(screen.queryByTestId("member-area-greeting")).toBeNull();
+  expect(screen.queryByTestId("member-area-fee")).toBeNull();
+  expect(screen.queryByTestId("member-area-jump-karte")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/membership/me");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/settings/public");
 });
 
 test("Sprungleiste: Zahl nur, wo etwas offen ist; vorhandene Abschnitte als Sprung, fehlende als Seite", async () => {
@@ -107,13 +85,11 @@ test("Sprungleiste: Zahl nur, wo etwas offen ist; vorhandene Abschnitte als Spru
   expect(within(bar).getByTestId("member-area-jump-versammlung")).toHaveAttribute("aria-label", "Versammlung, 1 offen");
   expect(within(bar).getByTestId("member-area-jump-helfen")).toHaveTextContent("Helfen · 6 frei");
   expect(within(bar).getByTestId("member-area-jump-news")).toHaveTextContent("News · 1 neu");
-  expect(within(bar).getByTestId("member-area-jump-karte")).toHaveTextContent(/^Karte$/);
   expect(within(bar).getByTestId("member-area-jump-dokumente")).toHaveTextContent(/^Dokumente$/);
 
   // Versammlung und Dokumente stehen auf der Seite: Sprung; Helfen und News nicht (nichts geladen): ihre Seiten.
   await waitFor(() => expect(within(bar).getByTestId("member-area-jump-dokumente")).toHaveAttribute("href", "#dokumente"));
   expect(within(bar).getByTestId("member-area-jump-versammlung")).toHaveAttribute("href", "#versammlung");
-  expect(within(bar).getByTestId("member-area-jump-karte")).toHaveAttribute("href", "#karte");
   expect(within(bar).getByTestId("member-area-jump-helfen")).toHaveAttribute("href", "/mein-bereich/verein/helfen");
   expect(within(bar).getByTestId("member-area-jump-news")).toHaveAttribute("href", "/mein-bereich/verein/news");
 
@@ -171,11 +147,13 @@ test("ohne Verknüpfung: Einladungen und der Weg zum Verknüpfen", async () => {
 test("keine Server oder Fehler: kein Block", async () => {
   mockApi({ discord: { linked: true, servers: [] } });
   const { unmount } = renderPage();
-  expect(await screen.findByTestId("member-area-discord")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/membership/discord-servers"));
+  expect(await screen.findByTestId("member-area-links")).toBeInTheDocument();
   expect(screen.queryByTestId("member-area-discord-servers")).toBeNull();
   unmount();
   mockApi({ discord: new Error("offline") });
   renderPage();
-  expect(await screen.findByTestId("member-area-discord")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/membership/discord-servers"));
+  expect(await screen.findByTestId("member-area-links")).toBeInTheDocument();
   expect(screen.queryByTestId("member-area-discord-servers")).toBeNull();
 });

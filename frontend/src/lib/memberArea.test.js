@@ -37,7 +37,7 @@ test("jede Adresse der Sprungleiste hat eine Route", async () => {
   const path = await import("node:path");
   const app = fs.readFileSync(path.resolve(process.cwd(), "src/App.jsx"), "utf-8");
   const routes = [...app.matchAll(/<Route path="([^"]+)"/g)].map((match) => match[1]);
-  expect(AREA_JUMPS.map((jump) => jump.label)).toEqual(["Karte", "Versammlung", "Helfen", "News", "Dokumente"]);
+  expect(AREA_JUMPS.map((jump) => jump.label)).toEqual(["Versammlung", "Helfen", "News", "Dokumente"]);
   // Seit #2059 unter „Mein Bereich“: Gruppen als Kinder-Routen, die Seiten des Vereins als verein/<seite>.
   const { VEREIN_SEITEN } = await import("@/lib/meinBereich");
   expect(app).toContain("{VEREIN_SEITEN.map((seite) => (");
@@ -54,7 +54,7 @@ test("jede Adresse der Sprungleiste hat eine Route", async () => {
 test("Sprungleiste und Kacheln auf /verein: dieselben Zahlen, ohne Offenes ohne Zahl", () => {
   const summary = { meetings_open: 1, helping_free: 6, news_new: 1, documents: 9, documents_new: 0 };
   expect(jumpEntries(summary).map((entry) => [entry.key, entry.note])).toEqual([
-    ["karte", ""], ["versammlung", "1 offen"], ["helfen", "6 frei"], ["news", "1 neu"], ["dokumente", ""],
+    ["versammlung", "1 offen"], ["helfen", "6 frei"], ["news", "1 neu"], ["dokumente", ""],
   ]);
   expect(jumpEntries({ ...summary, documents_new: 2 }).at(-1).note).toBe("2 neu");
   expect(jumpEntries(null).every((entry) => entry.count === 0 && entry.note === "")).toBe(true);
