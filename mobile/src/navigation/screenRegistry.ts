@@ -34,6 +34,7 @@ import { ProfileScreen } from "../screens/main/ProfileScreen";
 import { PublicProfileScreen } from "../screens/main/PublicProfileScreen";
 import { ReferenceRoundScreen } from "../screens/main/ReferenceRoundScreen";
 import { LeagueOverallScreen } from "../screens/main/LeagueOverallScreen";
+import { LeagueApplyScreen } from "../screens/main/LeagueApplyScreen";
 import { ReferenceSeasonScreen } from "../screens/main/ReferenceSeasonScreen";
 import { SearchScreen } from "../screens/main/SearchScreen";
 import { SeasonPassScreen } from "../screens/main/SeasonPassScreen";
@@ -96,6 +97,7 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   ReferenceSeason: ReferenceSeasonScreen,
   ReferenceRound: ReferenceRoundScreen,
   LeagueOverall: LeagueOverallScreen,
+  LeagueApply: LeagueApplyScreen,
   ClubAbout: ClubAboutScreen,
   YearReview: YearReviewScreen,
   OwnProfile: ProfileScreen,

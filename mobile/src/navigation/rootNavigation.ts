@@ -3,6 +3,7 @@ import type { AppStackParamList, DetailScreenName, LooseNavigation, MainTabName,
 import type { UserNotification } from "../types";
 import { isLocalPath, ownPath } from "../lib/siteUrls";
 import { overallParams } from "../lib/leagueOverall";
+import { applyParams } from "../lib/leagueApply";
 import { isQuietDigest } from "../lib/notificationKinds";
 
 // Die Navigation von außen (#1144): Benachrichtigungen, Links von außen und Adressen aus Inhalten öffnen ihren Screen
@@ -221,10 +222,13 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
     const trophies = TROPHY_TABS.has(query.get("tab") || "") ? { tab: "trophies" as const } : {};
     return detail("TeamDetail", query.get("einladung") ? { id: second, invite: query.get("einladung"), ...trophies } : { id: second, ...trophies });
   }
-  // Gesamtwertung über Seasons (F.5, #2173): /liga/<liga>/<season>/gesamtwertung - die übrigen Seiten der Liga bleiben im Web.
+  // Gesamtwertung über Seasons (F.5, #2173): /liga/<liga>/<season>/gesamtwertung; mit Co-Team anmelden (B.4, #2542):
+  // /liga/<liga>/<season>/anmelden - die übrigen Seiten der Liga bleiben im Web.
   if (first === "liga") {
     const overall = overallParams(parsed.path);
     if (overall) return detail("LeagueOverall", overall);
+    const apply = applyParams(parsed.path);
+    if (apply) return detail("LeagueApply", apply);
   }
   if (first === "news" && second) return detail("NewsDetail", { id: second });
   // Saison einer Serie (#1945): /references/series/<spur>/<saison> öffnet die Saison in der App.

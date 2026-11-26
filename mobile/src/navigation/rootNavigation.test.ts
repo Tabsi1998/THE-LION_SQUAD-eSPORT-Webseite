@@ -338,6 +338,10 @@ test("Saisonende-Moment (#2584): die Nachricht zum Moment öffnet Mein Profil mi
   expect(targetFromNotification(note("league_reward", { reason: "league_moment", moment_id: "../x?y" }, "/liga/cod/season-2") as never)).toEqual(detail("OwnProfile"));
   // Gegenprobe: dieselbe Art ohne den Grund (neue Belohnung) folgt weiter ihrer Adresse - die Ligaseite gibt es nur im Web.
   expect(targetFromNotification(note("league_reward", {}, "/liga/cod/season-2") as never)).toBeNull();
+  // Mit Co-Team anmelden (#2542): die Adresse aus Mail und Web öffnet die Schritte in der App; die Ligaseite selbst bleibt im Web.
+  expect(targetFromUrl("/liga/cod/season-3/anmelden")).toEqual(detail("LeagueApply", { league: "cod", season: "season-3" }));
+  expect(targetFromUrl("https://lionsquad.at/liga/cod/season-3/anmelden")).toEqual(detail("LeagueApply", { league: "cod", season: "season-3" }));
+  expect(targetFromUrl("/liga/cod/season-3")).toBeNull();
   // Als Adresse: /u/me?moment=<id> - dieselbe Stelle.
   expect(targetFromUrl("/u/me?moment=m-1")).toEqual(detail("OwnProfile", { moment: "m-1" }));
   expect(targetFromUrl("/u/me?moment=")).toEqual(detail("OwnProfile"));

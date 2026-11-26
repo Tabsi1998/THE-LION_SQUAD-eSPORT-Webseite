@@ -167,7 +167,6 @@ export function LeagueApplicationsCard({ squadIds, enabled = true }: { squadIds:
           </View>
         ))}
       </StaggerIn>
-      <Muted style={styles.small}>Mit einem Co-Team anmelden geht auf der Ligaseite im Web – dort stehen auch Regelwerk und Plätze.</Muted>
     </Card>
   );
 }
