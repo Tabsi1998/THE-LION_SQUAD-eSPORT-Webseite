@@ -134,6 +134,8 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     meta = {
         "match_id": match.get("id"),
         "tournament_id": match.get("tournament_id"),
+        # Glocke (#1205): „3 neue Ergebnisse in Liga 1“ braucht den Namen.
+        "tournament_title": tournament_title,
         "collection": collection_name,
         "force": bool(force),
         **({"dispute_resolved": True} if dispute_resolved else {}),

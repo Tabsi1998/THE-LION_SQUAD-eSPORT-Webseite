@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Check, Inbox, Settings, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { NotificationRow } from "@/components/tls/NotificationRow";
+import { NotificationGroupedList } from "@/components/tls/NotificationGroupedList";
 import { useNotificationFeed } from "@/hooks/useNotificationFeed";
 import { LoadNotice, LoadState } from "@/components/tls/LoadState";
 import { SkeletonList } from "@/components/tls/Skeleton";
@@ -20,13 +20,7 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState("all");
   const feed = useNotificationFeed({ enabled: Boolean(user) });
-  const { bundles, unread, read } = feed;
-
-  const visible = useMemo(() => {
-    if (tab === "unread") return bundles.filter((bundle) => !bundle.read);
-    if (tab === "read") return bundles.filter((bundle) => bundle.read);
-    return bundles;
-  }, [bundles, tab]);
+  const { items, unread, read } = feed;
 
   return (
     <PublicLayout>
@@ -81,13 +75,17 @@ export default function NotificationsPage() {
           >
             {() => (
               <div className="border border-white/10 rounded-sm bg-[#0F0F10] overflow-hidden">
-                {visible.length === 0 ? (
-                  <NoNotifications tab={tab} />
-                ) : (
-                  visible.map((bundle) => (
-                    <NotificationRow key={bundle.id} bundle={bundle} onOpen={feed.markRead} onDelete={feed.deleteBundle} pending={bundle.ids.some((id) => feed.pendingIds.has(id))} testIdPrefix="notifications-row" />
-                  ))
-                )}
+                {/* Nach Tagen und Themen, Gleichartiges gebündelt (#1205). */}
+                <NotificationGroupedList
+                  rows={items}
+                  tab={tab}
+                  onOpen={feed.markRead}
+                  onDelete={feed.deleteBundle}
+                  pendingIds={feed.pendingIds}
+                  testIdPrefix="notifications-row"
+                  emptyText={tab === "unread" ? "Keine ungelesenen Benachrichtigungen." : "Keine Benachrichtigungen."}
+                  testId="notifications-groups"
+                />
               </div>
             )}
           </LoadState>
