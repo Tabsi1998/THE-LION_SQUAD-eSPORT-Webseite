@@ -20,6 +20,8 @@
 # PROBE_SPECS ("liga-saisonende liga-betrieb"), PYTHON (Python mit backend/requirements.txt für Seed und Zeit-Helfer).
 # Backup-Ziel und Passwort liegen nur im Probe-Ordner (Testwerte). Versand bleibt gesperrt (OUTBOUND_DISABLED).
 set -euo pipefail
+# Git Bash: Docker-Argumente wie name=^/tls-backend$ nicht als Pfad umschreiben (gilt für alles darunter).
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) export MSYS_NO_PATHCONV=1 ;; esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 POSIX_ROOT="$ROOT"
@@ -46,12 +48,27 @@ good() { printf "\033[1;32m[probe] %s\033[0m\n" "$*"; }
 die()  { printf "\033[1;31m[probe] %s\033[0m\n" "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- Schutz: nur ein eigener, lokaler Stand
-case "$PROJECT" in
-  lsw-abnahme|lsw-abnahme-*|tls|tls-arena|tls-staging|"") die "Projektname ${PROJECT} ist ein geteilter oder produktiver Stand - bitte PROBE_PROJECT setzen." ;;
-esac
+# Erlaubnisliste statt Sperrliste: nur lsw-backup-probe oder lsw-backup-probe-<name>. Alles andere (codstats, domis-dev,
+# lsw-abnahme, der Ordnername des Checkouts …) bricht ab, bevor irgendetwas gestartet oder gelöscht wird.
+if ! [[ "$PROJECT" =~ ^lsw-backup-probe(-[a-z0-9]+)*$ ]]; then
+  die "Projektname ${PROJECT} ist nicht erlaubt - nur lsw-backup-probe oder lsw-backup-probe-<name>."
+fi
 for port in "$FRONTEND_PORT_VALUE" "$BACKEND_PORT_VALUE" "$MONGO_PORT" "$VITE_PORT"; do
+  [[ "$port" =~ ^[0-9]+$ ]] || die "Port ${port} ist keine Zahl."
   [ "$port" != "23000" ] || die "Port 23000 gehört dem geteilten Abnahme-Stand."
 done
+# Server-Schutz: Läuft hier ein produktiver Stand (feste Containernamen aus docker-compose.yml) oder steht im Repo eine .env mit
+# APP_ENV=production, ist das kein Entwicklungsrechner - Abbruch, bevor etwas gebaut, gestartet oder gelöscht wird.
+PRODUCTION_CONTAINERS="$(sed -n 's/^[[:space:]]*container_name:[[:space:]]*\([A-Za-z0-9_.-]*\)[[:space:]]*$/\1/p' docker-compose.yml)"
+for name in ${PRODUCTION_CONTAINERS:-tls-mongodb tls-backend tls-frontend}; do
+  if [ -n "$(docker ps -q --filter "name=^/${name}$" 2>/dev/null)" ]; then
+    die "Nur auf einem Entwicklungsrechner: Hier läuft der Container ${name} aus docker-compose.yml (Produktion oder Staging)."
+  fi
+done
+if [ -f .env ] && grep -Eq '^[[:space:]]*(export[[:space:]]+)?APP_ENV[[:space:]]*=[[:space:]]*["'"'"']?production["'"'"']?[[:space:]]*$' .env; then
+  die "Nur auf einem Entwicklungsrechner: Die .env im Repo sagt APP_ENV=production."
+fi
+case "${APP_ENV:-}" in production|prod) die "Nur auf einem Entwicklungsrechner: APP_ENV=${APP_ENV} in der Shell." ;; esac
 # Alles, was der Probelauf anlegt oder löscht, liegt unter <Repo>/.local-testing/ - nie anderswo (Pfad ohne „..“).
 SCRATCH="$ROOT/.local-testing/"
 case "$DIR_REL" in *..*|/*|[A-Za-z]:*) die "PROBE_DIR_REL muss ein Pfad unter .local-testing/ sein, ohne „..“: ${DIR_REL}" ;; esac
@@ -78,6 +95,8 @@ case "$(uname -s)" in
     ;;
 esac
 if ! python3 -c 'import sys' >/dev/null 2>&1; then
+  # Die Hilfsdatei ruft PYTHON auf - zeigte das wieder auf „python3“, riefe sie sich ohne Ende selbst auf.
+  "$PYTHON" -c 'import sys' >/dev/null 2>&1 || die "PYTHON (${PYTHON}) ist kein lauffähiges Python - bitte setzen, unter Windows etwa PYTHON=C:/…/python.exe."
   mkdir -p "$DIR/bin"
   # Windows-Python schreibt Zeilenenden als CRLF; backup.sh liest Namen aus seiner Ausgabe (DB_NAME, Volume) - ohne „\r“ entfernen
   # endete der Dateiname auf „\r“ (openssl: „Invalid argument“).
@@ -111,6 +130,9 @@ export COMPOSE_FILE="docker-compose.yml:docker-compose.abnahme.yml:${DIR_REL}/co
 export COMPOSE_ENV_FILES=".env.abnahme.example"
 export COMPOSE_DISABLE_ENV_FILE=true
 export ABNAHME_PROJECT="$PROJECT"
+# Nichts aus der Shell übernehmen, was Quelle oder Erreichbarkeit des Stands ändert: gebaut wird aus diesem Checkout, nur auf 127.0.0.1.
+unset ABNAHME_SOURCE
+export BACKEND_BIND=127.0.0.1 FRONTEND_BIND=127.0.0.1
 export FRONTEND_PORT="$FRONTEND_PORT_VALUE" BACKEND_PORT="$BACKEND_PORT_VALUE"
 export FRONTEND_URL="http://127.0.0.1:${VITE_PORT}" PUBLIC_BACKEND_URL="http://127.0.0.1:${FRONTEND_PORT_VALUE}"
 export CORS_ORIGINS="http://127.0.0.1:${VITE_PORT},http://127.0.0.1:${FRONTEND_PORT_VALUE}" TRUSTED_HOSTS="127.0.0.1,localhost"
@@ -136,8 +158,32 @@ stack_up() {
   docker compose up -d ${1:-} --wait --wait-timeout 900 >"$DIR/compose-up.log" 2>&1 || { tail -n 40 "$DIR/compose-up.log"; die "Stand startet nicht."; }
 }
 
+# Vor jedem Eingriff in das Projekt (down -v, Backup, Restore): Es enthält nichts oder nur, was die Probe-Dateien anlegen -
+# die drei Container ${PROJECT}-mongodb/-backend/-frontend (dazu Einmal-Container ${PROJECT}-backend-run-…), die Volumes
+# ${PROJECT}_mongo_data/_uploads_data/_upload_spool. Sonst Abbruch ohne Löschen.
+guard_project() {
+  local name containers volumes
+  containers="$(docker ps -a --filter "label=com.docker.compose.project=${PROJECT}" --format '{{.Names}}')" \
+    || die "Docker antwortet nicht - nichts gelöscht."
+  volumes="$(docker volume ls --filter "label=com.docker.compose.project=${PROJECT}" --format '{{.Name}}')" \
+    || die "Docker antwortet nicht - nichts gelöscht."
+  for name in $containers; do
+    case "$name" in
+      "${PROJECT}-mongodb"|"${PROJECT}-backend"|"${PROJECT}-frontend"|"${PROJECT}-backend-run-"*) ;;
+      *) die "Projekt ${PROJECT} enthält den fremden Container ${name} - nichts gelöscht." ;;
+    esac
+  done
+  for name in $volumes; do
+    case "$name" in
+      "${PROJECT}_mongo_data"|"${PROJECT}_uploads_data"|"${PROJECT}_upload_spool") ;;
+      *) die "Projekt ${PROJECT} enthält das fremde Volume ${name} - nichts gelöscht." ;;
+    esac
+  done
+}
+
 stack_down() {
-  docker compose down -v --remove-orphans >/dev/null 2>&1 || true
+  guard_project
+  docker compose -p "$PROJECT" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 
 snapshot() {
@@ -172,6 +218,7 @@ backup() {
   safe_remove_dir "$BACKUP_DIR"; mkdir -p "$BACKUP_DIR"
   [ -s "$BACKUP_ENCRYPTION_PASSWORD_FILE" ] || (umask 077; openssl rand -base64 48 >"$BACKUP_ENCRYPTION_PASSWORD_FILE")
   docker stats --no-stream --format "{{.Name}} {{.MemUsage}} {{.CPUPerc}}" $(docker compose ps -q) >"$DIR/stats-before-backup.txt" 2>&1 || true
+  guard_project
   BACKUP_WRITE_PAUSE_SETTLE_SECONDS=5 bash scripts/backup.sh >"$DIR/backup.log" 2>&1 &
   local pid=$! status code=""
   # In der Pause: Lesen geht, Schreiben bekommt 503 (auch ohne Anmeldung, vor jeder Rechteprüfung).
@@ -201,6 +248,7 @@ restore() {
   say "Stand frisch aufsetzen (Volumes weg) und nach BACKUP_RESTORE.md wiederherstellen"
   stack_down
   stack_up
+  guard_project
   RESTORE_CONFIRM="$PROBE_DB" bash scripts/restore.sh "$MANIFEST" >"$DIR/restore.log" 2>&1 || { tail -n 40 "$DIR/restore.log"; die "restore.sh scheiterte."; }
   good "Restore fertig ($(grep -c . "$DIR/restore.log") Zeilen Protokoll)"
 }
