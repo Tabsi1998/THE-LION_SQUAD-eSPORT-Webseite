@@ -91,6 +91,7 @@ export function momentPackage(moment, client = api) {
       if (claimed) reportDone(moment.id, client);
       // Ohne Moment kamen die Belohnungen als eigener Ablauf - dann sind sie gesehen; mit Moment nur, wenn die zweite Karte kam.
       if (rewards.length && (rewardsShown || !claimed)) {
+        // Bewusst still: nur die Gesehen-Marke - schlimmstenfalls kommen die Belohnungen noch einmal.
         client.post("/me/rewards/seen", { ids: rewards.map((award) => award.id) }).catch(() => {});
       }
     },
