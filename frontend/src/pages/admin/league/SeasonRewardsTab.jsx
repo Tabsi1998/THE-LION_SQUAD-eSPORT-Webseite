@@ -27,6 +27,8 @@ const SELECT = "min-h-11 w-full rounded-sm border border-white/15 bg-[#0A0A0A] p
 export function rewardsToForm(body) {
   return {
     reward_players: body?.reward_players || "fielded",
+    // Saisonende-Moment (#1639): so viele Tage nach dem Endstand erscheint er beim nächsten Besuch (Fabian 26.11., D).
+    moment_days: body?.moment_days ?? body?.moment_days_default ?? 45,
     items: (body?.items || []).map(rewardToForm),
     divisions: Object.fromEntries((body?.divisions || []).map((row) => [row.id, row.own ? row.items.map(rewardToForm) : null])),
   };
@@ -36,6 +38,7 @@ export function rewardsToForm(body) {
 export function rewardsPayload(form) {
   return {
     reward_players: form.reward_players,
+    moment_days: Number(form.moment_days) || 45,
     items: form.items.map(rewardPayload),
     divisions: Object.fromEntries(Object.entries(form.divisions).map(([key, rows]) => [key, rows === null ? null : rows.map(rewardPayload)])),
   };
@@ -234,6 +237,11 @@ export function SeasonRewardsTab({ seasonId }) {
             ))}
           </div>
         </fieldset>
+        {/* Gehört zur Zeremonie wie die Belohnungen: Der Saisonende-Moment folgt derselben Regel „Spieler-Belohnungen gehen an“. */}
+        <TextField label="Saisonende-Moment beim nächsten Besuch (Tage)" type="number" min={1} max={365} value={form.moment_days}
+          disabled={readOnly} className="max-w-xs" testId="season-rewards-moment-days"
+          hint={`Vorgabe ${data?.moment_days_default ?? 45} Tage. So lange nach dem Endstand der ganzen Season erscheint der Moment für Aufstieg, Abstieg und Meister einmal - danach bleibt nur der Hinweis im Profil. Wer ihn bekommt, folgt „Spieler-Belohnungen gehen an“.`}
+          onChange={(value) => setForm((current) => ({ ...current, moment_days: value }))} />
         <RewardList items={form.items} readOnly={readOnly} testId="season-rewards-items" onChange={(items) => setForm((current) => ({ ...current, items }))}
           emptyText="Noch keine Belohnungen – die Season vergibt dann nur den Meister-Eintrag wie bisher." />
       </FormSection>

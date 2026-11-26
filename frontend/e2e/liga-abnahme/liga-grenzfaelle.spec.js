@@ -19,7 +19,7 @@ const unique = () => `${g1.RUN}-${Date.now().toString(36)}`;
 /** Das Spiel zwischen zwei Indizes der Testwelt, mit Heim, Gast und Sieger (kleinerer Index). */
 function matchOf(world, a, b) {
   const match = world.matches.find((row) => {
-    const sides = row.slots.map((slot) => world.index[slot.registration_id]).sort();
+    const sides = row.slots.map((slot) => world.index[slot.registration_id]).sort((x, y) => x - y);
     return sides[0] === Math.min(a, b) && sides[1] === Math.max(a, b);
   });
   const [home, away] = match.slots.map((slot) => slot.registration_id);

@@ -166,6 +166,22 @@ Staffel ab**. Ihr bekommt eine Nachricht. Ab dann steht über der Tabelle „End
   Endstand, ohne weitere Bestätigung. Ein ausgetretenes oder disqualifiziertes Team steigt nie auf und ist in der nächsten
   Season nicht dabei.
 
+### Aufstieg, Abstieg, Meister: der Moment
+
+Steht euer Ausgang fest, zeigt die Website – Aufstieg und Abstieg mit dem **Endstand der ganzen Season** (alle Staffeln, auch Playoffs
+und Relegation), den Meister schon, sobald **Liga 1 samt Playoffs** fertig ist –
+euren Ausgang beim nächsten Besuch einmal als kurzen Moment: **Aufstieg** (euer Liga-Wappen hebt sich, die Zahl zählt um, in Liga 1
+setzt sich die Krone), **Meister** (goldener Pokal, danach eure Belohnungen als zweite Karte) oder **Abstieg** (ruhig, mit Blick auf
+die nächste Season). Wer bleibt, bekommt keinen Moment. Zu sehen ist er erst, wenn die Season für Mitglieder sichtbar ist.
+
+- Den Moment bekommt, wer in der Season mindestens ein gespieltes Spiel in der Aufstellung stand (wie bei den Belohnungen, kampflose
+  Spiele zählen nicht), dazu Captain und Vertreter. Ihr bekommt dazu eine Nachricht – als Meister genau eine, mit euren Belohnungen.
+- Er kommt **einmal je Person** – auch nach dem Neuladen oder auf einem anderen Gerät nicht noch einmal.
+- Danach steht der Ausgang unter **Saisonende** in eurem Profil und an der Teamseite. **Moment ansehen** spielt ihn noch einmal ab.
+- Habt ihr ein offenes Startrecht für die nächste Season, führt **Startrecht zusagen** direkt zu den Teams.
+- Korrigiert die Liga-Leitung den Endstand, ruht der Hinweis bis zum neuen Abschluss. Bleibt euer Ausgang gleich, passiert nichts.
+  Ändert er sich, kommt der neue Moment einmal mit „Endstand korrigiert“.
+
 ### Belohnungen
 
 Hat die Liga Belohnungen festgelegt (Medaille, Banner, Emblem oder Titel), stehen sie vor dem Abschluss auf der Ligaseite unter

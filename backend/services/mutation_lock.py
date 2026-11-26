@@ -81,6 +81,12 @@ def league_season_veto_resource(season_id: str) -> str:
     return f"league_season:{season_id}:veto"
 
 
+def league_season_moment_resource(season_id: str) -> str:
+    """Der Saisonende-Moment einer Season (#1639): der Abgleich mit dem bestätigten Endstand nacheinander. Ein Blatt - wer sie hält,
+    nimmt keine weitere Sperre; genommen erst, wenn die Sperren des Abschlusses frei sind."""
+    return f"league_season:{season_id}:moments"
+
+
 def game_equipment_resource(game_id: str) -> str:
     """Die Ausrüstungs-Bibliothek eines Spiels (#2287): Kategorien und Unterkategorien speichern, Einträge anlegen, ändern, verschieben,
     übernehmen und eine Sperrliste mit ganzer Klasse speichern nacheinander - nie verweist so etwas auf eine eben entfernte Unterkategorie.

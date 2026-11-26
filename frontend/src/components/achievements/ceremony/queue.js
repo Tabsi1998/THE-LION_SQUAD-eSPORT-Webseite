@@ -35,16 +35,17 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
   }
 
   function enqueue(pkg) {
-    if (pkg?.placement || pkg?.rewards?.length) return enqueuePlacement(pkg);
+    if (pkg?.placement || pkg?.rewards?.length || pkg?.moments?.length) return enqueuePlacement(pkg);
     if (!pkg || (!(pkg.tiers || []).length && !pkg.levelUp)) return null;
     const stamp = now();
     const last = state.pending[state.pending.length - 1];
     let entry;
     // Die Sammel-Zeremonie der Neuberechnung (#2340) bleibt für sich - sie zählt nur die nachgerechneten Stufen.
-    const alone = (item) => Boolean(item?.placement || item?.rewards || item?.context?.recount);
+    const alone = (item) => Boolean(item?.placement || item?.rewards || item?.moments || item?.context?.recount);
     if (last && !alone(last) && !alone(pkg) && stamp - state.lastEnqueueAt <= bundleMs) {
       entry = mergeInto(last, pkg);
-    } else if (!last && state.current && !state.current.placement && !state.current.rewards && pkg.levelUp && !(pkg.tiers || []).length) {
+    } else if (!last && state.current && !state.current.placement && !state.current.rewards && !state.current.moments && pkg.levelUp
+      && !(pkg.tiers || []).length) {
       // Ein Level-up während einer laufenden Zeremonie wird Teil davon (am Ende gezeigt). Sieger-Moment und Liga-Belohnung
       // zeigen kein Level - dort käme es nie auf die Bühne und gälte trotzdem als gesehen (#2450); es wartet als eigenes Paket.
       state.current = { ...state.current, levelUp: pkg.levelUp, onDone: chain(state.current.onDone, pkg.onDone) };
@@ -64,11 +65,20 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
   // Sieger-Moment (#1180): ein Turnier-Platz ist ein eigenes Paket - nie mit Erfolgen verschmolzen, und er steht vor
   // Erfolgen, die noch warten (der Platz zuerst, dann der dabei freigeschaltete Erfolg). Ein laufender bleibt stehen.
   // Belohnungen der Liga (F.4, #2214) gehen denselben Weg: eigenes Paket (``rewards``), vor wartenden Erfolgen.
+  // Der Saisonende-Moment (#1639, ``moments``) ebenso - mit der Prüfung vor dem Anzeigen (``check``): Er gilt erst als gezeigt, wenn der
+  // Server ihn diesem Gerät zugesprochen hat.
   function enqueuePlacement(pkg) {
-    const entry = pkg.rewards?.length
-      ? { id: pkg.id || `rewards-${pkg.rewards.map((row) => row.id).join("-")}`, tiers: [], context: {}, levelUp: null, rewards: pkg.rewards, onDone: pkg.onDone || null }
-      : { id: pkg.id || `placement-${pkg.placement.key || now()}`, tiers: [], context: {}, levelUp: null, placement: pkg.placement, onDone: pkg.onDone || null };
-    const firstOther = state.pending.findIndex((item) => !item.placement && !item.rewards);
+    let entry;
+    if (pkg.moments?.length) {
+      entry = { id: pkg.id || `moments-${pkg.moments.map((row) => row.id).join("-")}`, tiers: [], context: {}, levelUp: null, moments: pkg.moments,
+        rewards: pkg.rewards?.length ? pkg.rewards : null, onRewardsShown: pkg.onRewardsShown || null,
+        onDone: pkg.onDone || null, check: pkg.check || null, checked: false };
+    } else if (pkg.rewards?.length) {
+      entry = { id: pkg.id || `rewards-${pkg.rewards.map((row) => row.id).join("-")}`, tiers: [], context: {}, levelUp: null, rewards: pkg.rewards, onDone: pkg.onDone || null };
+    } else {
+      entry = { id: pkg.id || `placement-${pkg.placement.key || now()}`, tiers: [], context: {}, levelUp: null, placement: pkg.placement, onDone: pkg.onDone || null };
+    }
+    const firstOther = state.pending.findIndex((item) => !item.placement && !item.rewards && !item.moments);
     if (firstOther < 0) state.pending.push(entry);
     else state.pending.splice(firstOther, 0, entry);
     if (!state.current) advance();
@@ -97,6 +107,8 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     const next = { ...state.current, checked: true };
     if (Array.isArray(patch?.tiers)) next.tiers = patch.tiers;
     if (patch && "levelUp" in patch) next.levelUp = patch.levelUp || null;
+    // Saisonende-Moment (#1639): nur, was der Server diesem Gerät zugesprochen hat (``claimed``).
+    if (Array.isArray(patch?.moments)) next.moments = patch.moments;
     state.current = next;
     if (!planCeremony(state.current)) return advance();
     emit();
@@ -115,6 +127,8 @@ export function createCeremonyQueue({ now = () => Date.now(), bundleMs = BUNDLE_
     refine,
     clear,
     getCurrent: () => state.current,
+    // Steht ein Paket mit dieser Kennung schon an (läuft oder wartet)? „Moment ansehen“ legt ihn nur einmal hinein (#1639).
+    has: (id) => Boolean(id) && (state.current?.id === id || state.pending.some((item) => item.id === id)),
     getPendingCount: () => state.pending.length,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   };

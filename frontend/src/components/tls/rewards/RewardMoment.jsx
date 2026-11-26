@@ -15,21 +15,61 @@ import { RewardShareButton, canShareReward } from "./RewardShareButton";
  *
  * Läuft über den Zeremonie-Host (components/achievements/ceremony) - nie zugleich mit einem Erfolg.
  */
+/** Überschrift und Titel einer Zeremonie der Belohnungen - auch für den Dialog-Namen. */
+export function rewardHeading(awards) {
+  const many = awards.length > 1;
+  return {
+    heading: many ? `${awards.length} neue Belohnungen` : "Neue Belohnung",
+    title: many ? awards.map((award) => award.reward.name).join(" · ") : awards[0]?.reward?.name,
+  };
+}
+
+/**
+ * Der Inhalt der Karte: Grafiken, Zeilen, Teilen und Sammlung. Eigener Baustein, damit der Meister-Moment (#1639, Fabian 26.11., A) die
+ * Belohnungen als zweite Karte im selben Ablauf zeigt - ohne neues Aufpoppen.
+ */
+export function RewardCardContent({ awards, onClose, reduced = false, profileHref = "/u/me?tab=awards", titleId }) {
+  const first = awards[0];
+  if (!first) return null;
+  const many = awards.length > 1;
+  const { heading, title } = rewardHeading(awards);
+  const lines = [
+    <p key="label" className="tls-placement__label">{heading}</p>,
+    <h2 key="title" id={titleId} className="tls-placement__title font-heading">{title}</h2>,
+    <p key="where" className="tls-placement__name">{artLines(first.reward.art).join(" · ")}</p>,
+    first.team?.name ? <p key="team" className="tls-placement__tournament">{first.team.name}</p> : null,
+  ].filter(Boolean);
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap items-end justify-center gap-3" data-testid="reward-moment-arts">
+        {awards.slice(0, 4).map((award, index) => (
+          <RewardArt key={award.id} reward={award.reward} size={many ? "md" : "lg"} play={reduced ? undefined : "run"} index={index}
+            testId={`reward-moment-art-${award.id}`} />
+        ))}
+      </div>
+      <div className="tls-placement__text">
+        {lines.map((line, index) => (
+          <div key={line.key} className="tls-placement__line" style={{ "--tls-i": index }}>{line}</div>
+        ))}
+      </div>
+      <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
+        {canShareReward(first) ? <RewardShareButton award={first} testId="reward-moment-share" /> : null}
+        <Link to={profileHref} onClick={onClose} data-testid="reward-moment-collection"
+          className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
+          Zur Sammlung
+        </Link>
+      </div>
+    </>
+  );
+}
+
 export function RewardMoment({ plan, onClose, reduced = false, profileHref = "/u/me?tab=awards" }) {
   const awards = plan.rewards || [];
   const first = awards[0];
   const cardRef = useModalBehavior(true, onClose);
   if (!first) return null;
   const metal = ["gold", "silver", "bronze"].includes(first.reward?.art?.metal) ? first.reward.art.metal : "lion";
-  const many = awards.length > 1;
-  const heading = many ? `${awards.length} neue Belohnungen` : "Neue Belohnung";
-  const title = many ? awards.map((award) => award.reward.name).join(" · ") : first.reward.name;
-  const lines = [
-    <p key="label" className="tls-placement__label">{heading}</p>,
-    <h2 key="title" className="tls-placement__title tls-type-section">{title}</h2>,
-    <p key="where" className="tls-placement__name">{artLines(first.reward.art).join(" · ")}</p>,
-    first.team?.name ? <p key="team" className="tls-placement__tournament">{first.team.name}</p> : null,
-  ].filter(Boolean);
+  const { heading, title } = rewardHeading(awards);
   return (
     <motion.div
       className="tls-placement tls-reward-moment"
@@ -58,24 +98,7 @@ export function RewardMoment({ plan, onClose, reduced = false, profileHref = "/u
         <button type="button" onClick={onClose} className="tls-placement__close" aria-label="Schließen" data-testid="reward-moment-close">
           <X className="h-5 w-5" />
         </button>
-        <div className="mb-3 flex flex-wrap items-end justify-center gap-3" data-testid="reward-moment-arts">
-          {awards.slice(0, 4).map((award, index) => (
-            <RewardArt key={award.id} reward={award.reward} size={many ? "md" : "lg"} play={reduced ? undefined : "run"} index={index}
-              testId={`reward-moment-art-${award.id}`} />
-          ))}
-        </div>
-        <div className="tls-placement__text">
-          {lines.map((line, index) => (
-            <div key={line.key} className="tls-placement__line" style={{ "--tls-i": index }}>{line}</div>
-          ))}
-        </div>
-        <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
-          {canShareReward(first) ? <RewardShareButton award={first} testId="reward-moment-share" /> : null}
-          <Link to={profileHref} onClick={onClose} data-testid="reward-moment-collection"
-            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
-            Zur Sammlung
-          </Link>
-        </div>
+        <RewardCardContent awards={awards} onClose={onClose} reduced={reduced} profileHref={profileHref} />
       </motion.div>
     </motion.div>
   );

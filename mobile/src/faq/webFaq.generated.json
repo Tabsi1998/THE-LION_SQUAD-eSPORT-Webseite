@@ -1093,6 +1093,12 @@
               "hinweis": "Spieler-Belohnungen bekommt, wer mindestens ein Spiel gespielt hat. Kampflose Spiele zählen nicht."
             },
             {
+              "id": "aufstieg-abstieg",
+              "titel": "Aufstieg, Abstieg, Meister",
+              "text": "Steht euer Ausgang fest, zeigt die Website ihn einmal als kurzen Moment. Auf- und Abstieg kommen mit dem Endstand der ganzen Season. Den Meister zeigt sie schon, sobald Liga 1 fertig ist. Danach steht er unter Saisonende im Profil und an der Teamseite.",
+              "hinweis": "Den Moment bekommt, wer in der Season gespielt hat, dazu Captain und Vertreter. Mit Moment ansehen spielt ihr ihn noch einmal ab."
+            },
+            {
               "id": "neue-season",
               "titel": "Neue Season",
               "text": "Legt die Liga-Leitung die nächste Season an, ist euer Co-Team automatisch dabei. Wollt ihr nicht, tippt auf Abmelden.",

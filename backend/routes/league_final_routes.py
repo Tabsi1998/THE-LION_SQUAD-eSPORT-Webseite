@@ -109,6 +109,9 @@ async def admin_close_staffel(tournament_id: str, body: CloseBody, me: dict = De
     # Startrechte (#1627, F.2a): Bestätigt dieser Abschluss den Endstand der ganzen Season, erfahren Auf- und Absteiger es einmal -
     # nur mit der Einstellung ``start_rights`` an der Season. Der Abschluss steht; eine Nachricht hält ihn nicht auf.
     await _start_rights_follow(db, final.get("season_id"), tournament_id)
+    # Saisonende-Moment (#1639): Bestätigt dieser Abschluss den Endstand der ganzen Season, entstehen die Momente für Aufstieg, Abstieg
+    # und Meister. Der Abschluss steht; ein Fehler hier hält ihn nicht auf.
+    await _moments_follow(db, final.get("season_id"), tournament_id)
     return {"ok": True, "version": final["version"], "closed_at": final["closed_at"],
             "champion": (final.get("champion") or {}).get("display_name"), "season_status": result["season_status"]}
 
@@ -127,6 +130,8 @@ async def admin_reopen_staffel(tournament_id: str, body: ReopenBody, me: dict = 
     await _published(tournament_id)
     # Startrechte (#1627, F.2a): Gibt es schon die Folge-Season, ruhen ihre Fristen ab jetzt, bis der Endstand wieder steht.
     await _start_rights_follow(db, result["final"].get("season_id"), tournament_id)
+    # Saisonende-Moment (#1639): Der Endstand steht nicht mehr fest - die Momente der Season ruhen.
+    await _moments_follow(db, result["final"].get("season_id"), tournament_id)
     return {"ok": True, "version": result["final"]["version"], "season_status": result["season_status"]}
 
 
@@ -155,6 +160,17 @@ async def _start_rights_follow(db, season_id: str | None, ref: str) -> None:
         logger.warning("[league_final] Startrechte nach Änderung des Endstands nicht nachgezogen: %s", log_safe(ref), exc_info=True)
 
 
+async def _moments_follow(db, season_id: str | None, ref: str) -> None:
+    """Nach einem Schritt, der den Endstand ändert (Abschluss, Wiederöffnen, Entscheid über Staffeln hinweg): der Saisonende-Moment
+    (``league_moments.sync``). Der Schritt steht; ein Fehler hier hält ihn nicht auf."""
+    from services import league_moments
+
+    try:
+        await league_moments.sync(db, season_id)
+    except Exception:  # noqa: BLE001 - siehe oben
+        logger.warning("[league_final] Saisonende-Moment nach Änderung des Endstands nicht nachgezogen: %s", log_safe(ref), exc_info=True)
+
+
 async def _division_season(db, division_id: str) -> str | None:
     division = await db.league_divisions.find_one({"id": division_id}, {"_id": 0, "season_id": 1})
     return (division or {}).get("season_id")
@@ -170,6 +186,8 @@ async def admin_set_zone_decision(division_id: str, body: ZoneDecisionBody, me: 
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
     # Ein Entscheid nach dem letzten Abschluss ändert, wer aufsteigt (#1627, F.2a): „Endstand korrigiert“ und die neue Bestätigung.
     await _start_rights_follow(get_db(), await _division_season(get_db(), division_id), division_id)
+    # Ein Entscheid nach dem letzten Abschluss ändert, wer auf- oder absteigt (#1639): der Moment zieht ruhig nach.
+    await _moments_follow(get_db(), await _division_season(get_db(), division_id), division_id)
     return {"ok": True, "decision": {key: decision[key] for key in ("id", "registration_ids", "method", "reason", "at")}}
 
 
@@ -181,4 +199,5 @@ async def admin_clear_zone_decision(division_id: str, kind: str, body: ZoneDecis
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
     # Ohne Entscheid ist der Gleichstand wieder offen: Der Endstand steht nicht mehr - die Fristen einer Folge-Season ruhen.
     await _start_rights_follow(get_db(), await _division_season(get_db(), division_id), division_id)
+    await _moments_follow(get_db(), await _division_season(get_db(), division_id), division_id)
     return {"ok": True}

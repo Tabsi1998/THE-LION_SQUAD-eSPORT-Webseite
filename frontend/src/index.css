@@ -613,9 +613,13 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 /* Sieger-Moment (#1180): eine ruhige Karte statt Feuerwerk. Metall nur an Kante, Symbol und Ziffer; die Zeilen folgen
    im Abstand von 60 ms, die Ziffer schwingt kaum merklich über, über den Pokal läuft einmal ein Glanz. */
 .tls-placement { --tls-metal-rgb: var(--tls-honor-rgb); position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 16px; }
+/* Querformat am Handy (#1639): Ist die Karte höher als das Fenster, rollt die Fläche - die Karte bleibt erreichbar statt oben und unten
+   abgeschnitten; passt sie, steht sie mittig (margin: auto). Der Hintergrund bleibt dabei stehen. */
+.tls-placement { overflow-y: auto; overscroll-behavior: contain; }
+.tls-placement__card { margin: auto; }
 .tls-placement[data-metal="silver"] { --tls-metal-rgb: var(--tls-silver-rgb); }
 .tls-placement[data-metal="bronze"] { --tls-metal-rgb: var(--tls-bronze-rgb); }
-.tls-placement__backdrop { position: absolute; inset: 0; background: rgb(5 5 6 / 0.84); }
+.tls-placement__backdrop { position: fixed; inset: 0; background: rgb(5 5 6 / 0.84); }
 .tls-placement__card {
   position: relative; width: 100%; max-width: 26rem; padding: 28px 24px 22px; border-radius: 10px; text-align: center; outline: none;
   background: linear-gradient(180deg, var(--tls-surface-2) 0%, var(--tls-surface-0) 100%);

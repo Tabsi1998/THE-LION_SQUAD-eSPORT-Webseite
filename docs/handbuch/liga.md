@@ -2225,6 +2225,45 @@ solange der Gewinn nicht abgeholt ist.
 
 **Sichtbarkeit:** Öffentlich steht eine Belohnung nur, wenn Gäste die Season und die Staffel sehen dürfen.
 
+### 3.12a Saisonende-Moment: Aufstieg, Abstieg, Meister
+
+Der Moment kommt von selbst. **Aufstieg und Abstieg** erst, wenn der **Endstand der ganzen Season** feststeht: alle Staffeln
+abgeschlossen, auch Playoffs und Relegation, kein offener Gleichstand an einer Grenze. Der **Meister** schon, sobald **seine Liga**
+fertig ist – alle Staffeln von Liga 1 samt Playoffs; die Relegation ändert am Meister nichts. Die laufende Tabelle löst nie etwas aus.
+
+**Wer ihn sieht:** die Spieler mit Einsatz in der Season (wie bei den Belohnungen, 3.12 – kampflose Spiele zählen nicht; ohne
+gemeldete Aufstellung der Kader; steht die Season auf „Ganzer Kader zum Abschluss“, der ganze Kader), dazu Captain und Vertreter.
+Beim nächsten Besuch der Website erscheint der Moment einmal:
+
+| Ausgang | So sieht es aus |
+| --- | --- |
+| **Aufstieg** | Das Liga-Wappen hebt sich, die Zahl zählt um, in Liga 1 setzt sich die Krone. |
+| **Meister** | Goldener Moment mit Pokal und goldenem Abzeichen. Hat die Season Belohnungen, folgen sie mit **Weiter** als zweite Karte im selben Ablauf. |
+| **Abstieg** | Ruhig, Wappen in Grau-Blau, mit Blick auf die nächste Season – kein Alarm. |
+
+Wer „Bewegung reduzieren“ eingestellt hat (System oder **Zeremonien dezent** im Profil), sieht gleich das fertige Bild. Danach
+bleibt der Ausgang als Hinweis **Saisonende** im Profil und an der Teamseite; dort spielt **Moment ansehen** ihn noch einmal ab.
+
+**Nachricht:** eine je Person in der Glocke und als Push. Erreicht der Moment den Meister, bekommt er nur diese eine – mit seinen
+Belohnungen darin; „Neue Belohnung“ und „Staffel abgeschlossen“ entfallen für ihn. Ist Liga 1 noch nicht ganz fertig (eine zweite
+Staffel läuft), sehen Mitglieder die Season nicht oder hat eine Team-Anmeldung kein Co-Team, kommen Belohnung und Abschluss-Nachricht wie
+gewohnt – und der Moment später nennt nichts doppelt. Captain und Vertreter von Auf- und Absteigern bekommen keine zweite, wenn
+die Season schon „Aufstieg bestätigt“ zu den Startrechten schickt (3.11a).
+
+**Wie lange:** **Season → Reiter Belohnungen → „Saisonende-Moment beim nächsten Besuch (Tage)“**, Vorgabe 45. So lange nach dem
+Endstand erscheint der Moment von selbst; danach bleibt nur der Hinweis.
+
+**Einmal je Person:** Gesehen merkt sich der Server – nach dem Neuladen, in einem zweiten Tab oder auf einem anderen Gerät kommt
+der Moment nicht noch einmal. Bricht die Verbindung genau beim Öffnen ab, kommt er beim nächsten Besuch auf demselben Gerät wieder.
+
+**Korrigieren:** Öffnest du eine Staffel wieder, ruhen alle Momente der Season (unsichtbar). Bleibt der Ausgang nach dem neuen
+Abschluss gleich, passiert nichts – niemand bekommt ihn zweimal. Ändert er sich, kommt der neue Moment einmal mit dem Hinweis
+„Endstand korrigiert“ – auch für alle, die den alten schon gesehen hatten. Fällt er weg (das Team bleibt), verschwindet der Hinweis,
+und wer davon erfahren hatte, bekommt still „Endstand korrigiert“ in der Glocke.
+
+**Sichtbarkeit:** Erst wenn die Season auf **Mitglieder** oder **Öffentlich** steht. Bei **Aus** und **Nur Liga-Leitung** sieht
+niemand etwas, auch die Leitung nicht, und es geht keine Nachricht hinaus. Schaltest du sie sichtbar, kommen die Nachrichten dann.
+
 ### 3.13 Gesamtwertung über Seasons
 
 **Wo:** **Admin → Ligen → Gesamtwertung** (Knopf an der Liga). Lesen darf jede Zuständigkeit, ändern, abschließen und wieder

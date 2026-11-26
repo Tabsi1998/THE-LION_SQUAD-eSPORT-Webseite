@@ -20,7 +20,7 @@ export function PlacementMoment({ plan, onClose, reduced = false }) {
   const bracketPath = placement.tournamentPath ? `${placement.tournamentPath}/bracket` : "/tournaments";
   const lines = [
     <p key="label" className="tls-placement__label">{placement.label}</p>,
-    <h2 key="title" className="tls-placement__title tls-type-section">{placement.title}</h2>,
+    <h2 key="title" className="tls-placement__title font-heading">{placement.title}</h2>,
     <p key="name" className="tls-placement__name">{placement.name}{placement.team ? " · mit deinem Team" : ""}</p>,
     placement.tournamentTitle ? <p key="tournament" className="tls-placement__tournament">{placement.tournamentTitle}</p> : null,
   ].filter(Boolean);

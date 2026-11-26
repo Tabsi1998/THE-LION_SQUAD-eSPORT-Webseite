@@ -167,9 +167,13 @@ async def admin_view(db, season: dict, *, can_edit: bool) -> dict:
             # Nr. 167: Teams ohne gemeldete Aufstellung - deren Spieler-Belohnung ging an den Kader zum Abschluss.
             "roster_fallback": sorted(count["fallback"])})
     basis = basis_of(season)
+    from services import league_moment_rules
+
     return {
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status")},
         "can_edit": can_edit, "reward_players": basis, "player_basis": PLAYER_BASIS, "kinds": KINDS,
+        # Saisonende-Moment (#1639): so viele Tage nach dem Endstand erscheint er beim nächsten Besuch (Fabian 26.11., D).
+        "moment_days": league_moment_rules.moment_days(season), "moment_days_default": league_moment_rules.DEFAULT_DAYS,
         "items": [public_item(item, basis) for item in season.get("rewards") or []],
         "divisions": [{
             "id": division["id"], "level": division.get("level"), "label": division_label(division),
@@ -190,6 +194,13 @@ async def save(db, season: dict, body: dict, actor: dict) -> dict:
     season_update: dict = {}
     if "reward_players" in body:
         season_update["reward_players"] = clean_basis(body.get("reward_players"))
+    if body.get("moment_days") is not None:
+        from services import league_moment_rules
+
+        try:
+            season_update[league_moment_rules.DAYS_FIELD] = league_moment_rules.clean_days(body["moment_days"])
+        except ValueError as problem:
+            raise RewardProblem(str(problem), 422) from None
     if "items" in body:
         season_update["rewards"] = clean_items(body.get("items"), known)
     division_updates: dict[str, list[dict] | None] = {}
@@ -211,7 +222,7 @@ async def save(db, season: dict, body: dict, actor: dict) -> dict:
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "league.rewards.save", "actor_id": actor.get("id"), "target_id": season["id"],
         "data": {"items": len(season_update.get("rewards") or []) if "rewards" in season_update else None,
-                 "reward_players": season_update.get("reward_players"),
+                 "reward_players": season_update.get("reward_players"), "moment_days": season_update.get("moment_days"),
                  "divisions": {key: (None if value is None else len(value)) for key, value in division_updates.items()}},
         "created_at": now})
     return await db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
@@ -383,8 +394,28 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
     for registration in registrations.values():
         if registration.get("team_id") in {*result["team_gains"], *result["team_losses"]}:
             leads.setdefault(registration["team_id"], set()).update(responsible_ids(registration, teams.get(registration["team_id"]) or None))
+    # Der Meister (Fabian 26.11., A): Seine Belohnungen kommen mit dem Saisonende-Moment - eine Nachricht, nicht zwei. Zurückgestellt,
+    # nicht verschluckt (M3): ``notify`` merkt sie am Meister-Eintrag (``moment_owed``); erreicht der Moment eine Person nicht,
+    # schickt der Abgleich (``league_moments.settle``) ihr die Nachricht wie bisher. Verluste nach einer Korrektur meldet die Belohnung
+    # weiter selbst.
+    champion = (final.get("champion") or {}).get("registration_id")
+    held = {person for doc in after if champion and doc["registration_id"] == champion for person in [*doc["player_ids"], doc.get("user_id")]
+            if person}
+    held_team = (registrations.get(champion) or {}).get("team_id") if champion else None
+    if held or held_team:
+        # Kam die Meister-Nachricht schon (Belohnung erst nach einem Wiederöffnen nachgetragen), meldet sich die Belohnung selbst.
+        from services.league_moment_rules import entrant_of
+
+        entrant = entrant_of(registrations.get(champion)) if champion else None  # Co-Team bzw. Person der Einzel-Liga
+        moment = await db.league_moments.find_one({"key": f"{season.get('id')}:{entrant}", "active": True},
+                                                  {"_id": 0, "notified_ids": 1, "responsible_ids": 1}) if entrant else None
+        told = set((moment or {}).get("notified_ids") or [])
+        held -= told
+        if set((moment or {}).get("responsible_ids") or []) & told:
+            held_team = None
     return {**result, "team_leads": {key: sorted(value) for key, value in leads.items()},
-            "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads}}
+            "team_names": {key: (teams.get(key) or {}).get("name") or "Euer Team" for key in leads},
+            "held_people": sorted(held), "held_team": held_team, "held_registration": champion if (held or held_team) else None}
 
 
 async def store(db, scope: dict, before: list[dict], after: list[dict], wanted_prizes: list[dict]) -> dict:
@@ -426,8 +457,13 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *
                   else f"/tournaments/{tournament.get('slug') or tournament['id']}")
     name = tournament.get("title") or "Die Staffel"
     sent = 0
+    held = set(result.get("held_people") or [])
+    owed: dict = {"gains": {}, "team_gains": {}, "team_leads": {}, "team_names": {}}
     for event, people in (("gain", result.get("gains") or {}), ("loss", result.get("losses") or {})):
         for user_id in sorted(people):
+            if event == "gain" and user_id in held:
+                owed["gains"][user_id] = list(people[user_id])  # zurückgestellt für den Saisonende-Moment des Meisters
+                continue
             rewards = ", ".join(people[user_id])
             if event == "gain":
                 title, text = "Neue Belohnung", f"{name}: {rewards}. Sie steht ab jetzt in deiner Sammlung."
@@ -439,6 +475,11 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *
     # Team-Belohnungen (Nr. 166): eigene Nachricht an Captain und Vertreter, je Fassung, Team, Richtung und Person einmal.
     for event, teams in (("team-gain", result.get("team_gains") or {}), ("team-loss", result.get("team_losses") or {})):
         for team_id in sorted(teams):
+            if event == "team-gain" and team_id == result.get("held_team"):
+                owed["team_gains"][team_id] = list(teams[team_id])  # zurückgestellt für den Saisonende-Moment des Meisters
+                owed["team_leads"][team_id] = list((result.get("team_leads") or {}).get(team_id) or [])
+                owed["team_names"][team_id] = (result.get("team_names") or {}).get(team_id) or "Euer Team"
+                continue
             rewards = ", ".join(teams[team_id])
             team_name = (result.get("team_names") or {}).get(team_id) or "Euer Team"
             if event == "team-gain":
@@ -448,13 +489,26 @@ async def notify(db, tournament: dict, final: dict, frame: dict, result: dict, *
             for user_id in (result.get("team_leads") or {}).get(team_id) or []:
                 sent += await _send(create_user_notification, user_id, title, text, url, tournament,
                                     f"league-reward:{final['id']}:{event}:{team_id}:{user_id}")
+    if result.get("held_registration") and (owed["gains"] or owed["team_gains"]):
+        await owe_to_moment(db, tournament["id"], result["held_registration"], final["id"], {"rewards": owed})
     return sent
+
+
+async def owe_to_moment(db, tournament_id: str, registration_id: str, final_id: str, parts: dict) -> None:
+    """Am Meister-Eintrag merken, was für den Saisonende-Moment zurückgestellt ist (#1639, M3) - der Abgleich schickt es, wenn der Moment
+    die Person nicht erreicht."""
+    now = now_utc().isoformat()
+    await db.tournament_awards.update_one({"tournament_id": tournament_id, "reward_key": None, "registration_id": registration_id},
+                                          {"$set": {**{f"moment_owed.{key}": value for key, value in parts.items()},
+                                                    "moment_owed.final_id": final_id, "moment_owed.at": now}})
 
 
 async def _send(create, user_id: str, title: str, text: str, url: str, tournament: dict, dedupe_key: str) -> int:
     try:
         done = await create(user_id, title, text, url=url, kind=NOTIFICATION_KIND,
-                            meta={"reason": "league_reward", "tournament_id": tournament["id"], "dedupe_key": dedupe_key})
+                            # Eindeutig je Person und Schlüssel (#1639, Prüfung 3): Holt der Saisonende-Moment Zurückgestelltes nach, während
+                            # ein zweiter Lauf dasselbe tut, entsteht trotzdem nur eine Nachricht.
+                            meta={"reason": "league_reward", "tournament_id": tournament["id"], "dedupe_key": dedupe_key, "unique_dedupe": True})
         return 1 if done else 0
     except Exception:  # noqa: BLE001 - die Vergabe steht, die Nachricht hält sie nicht auf
         logger.warning("[league_rewards] Nachricht für Staffel %s nicht verschickt", log_safe(tournament.get("id")), exc_info=True)
@@ -588,13 +642,20 @@ async def pdf_rows(db, tournament: dict) -> list[list[str]]:
     return rows
 
 
-async def unseen_for(db, user_id: str) -> list[dict]:
+async def unseen_for(db, user: dict) -> list[dict]:
     """Was die Person noch nicht gefeiert hat (Zeremonie, Nr. 165) - nur geltende Einträge."""
     from services.awards import award_view
 
+    from services import league_moment_rules
+    from services.league_service import can_see_season
+
+    user_id = user["id"]
     docs = await db.tournament_awards.find({"audience_ids": user_id, "reward_key": {"$type": "string"}, "suspended": {"$ne": True},
                                             "seen_by": {"$ne": user_id}}, {"_id": 0}).sort("updated_at", -1).to_list(20)
-    return [award_view(doc) for doc in docs]
+    # Saisonende-Moment (#1639, Fabian 26.11., A): Die Belohnungen des Meisters kommen als zweite Karte mit seinem Moment - nur, wenn er
+    # die Person erreicht (M3).
+    held = await league_moment_rules.held_reward_ids(db, user, docs, can_see_season)
+    return [award_view(doc) for doc in docs if doc["id"] not in held]
 
 
 async def mark_seen(db, user_id: str, ids: list[str]) -> int:

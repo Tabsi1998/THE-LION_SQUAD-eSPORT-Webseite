@@ -144,6 +144,10 @@ test("CSS: keine Schrift unter 12 px - außer kleinen Punkten und Grafiken mit G
 const HEADING_FONT = /(?<![\w-])font-heading(?![\w-])/g;
 const HEADING_FONT_EXCEPTIONS = {
   "components/tls/BracketTree.jsx": 2, // derselbe Baum auf dem TV (tv-t-head): Beamer-Schrift wie die übrigen TV-Seiten
+  // Der Moment (Platz, Belohnung, Saisonende) ist die Bühne des Augenblicks - Titel in der Vereinsschrift (.tls-placement__title).
+  "components/tls/podium/PlacementMoment.jsx": 1,
+  "components/tls/rewards/RewardMoment.jsx": 1,
+  "components/tls/league/moment/SeasonMoment.jsx": 1,
 };
 
 test("Unbounded (font-heading) nur auf Bühne und Seitentitel - sonst tls-type-*", () => {

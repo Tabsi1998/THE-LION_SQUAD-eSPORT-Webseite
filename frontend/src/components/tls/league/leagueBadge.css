@@ -160,3 +160,16 @@ a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E
 @media (prefers-reduced-motion: reduce) {
   .tls-season-line[data-play] .tls-season-line__path, .tls-season-line[data-play] .tls-season-line__point { animation: none; opacity: 1; }
 }
+
+/* Saisonende-Moment (#1639, LeagueMomentHint.jsx): der bleibende Hinweis an Profil und Teamseite - je Co-Team der letzte Ausgang.
+   Strich links in der Farbe des Ausgangs: Blau hinauf, Gold für den Meister, ruhiges Grau hinunter. */
+.tls-moment-hint {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 14px; padding: 12px 14px;
+  border: 1px solid rgb(255 255 255 / 0.1); border-radius: 2px; background: #121212; box-shadow: inset 3px 0 0 rgb(41 182 232 / 0.75);
+}
+.tls-moment-hint[data-outcome="champion"] { box-shadow: inset 3px 0 0 rgb(var(--tls-honor-rgb) / 0.85); }
+.tls-moment-hint[data-outcome="down"] { box-shadow: inset 3px 0 0 rgb(148 163 184 / 0.6); }
+@media (max-width: 479px) {
+  .tls-moment-hint { grid-template-columns: auto minmax(0, 1fr); }
+  .tls-moment-hint__replay { grid-column: 1 / -1; justify-self: start; }
+}

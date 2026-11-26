@@ -49,6 +49,7 @@ import { ShareButton } from "@/components/tls/ShareButton";
 import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory";
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 import { LeagueSeasonLine } from "@/components/tls/league/LeagueSeasonLine";
+import { LeagueMomentHint } from "@/components/tls/league/LeagueMomentHint";
 
 const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview" };
 
@@ -490,6 +491,8 @@ function TeamDetail({ id }) {
             <LoadNotice testId="team-overview-error" message="Termine und letzte Spiele konnten gerade nicht geladen werden." onRetry={overviewLoad.reload} />
           )}
           <TeamLeague overview={overview} />
+          {/* Saisonende-Moment (#1639): je Co-Team der letzte bestätigte Ausgang; Mitglieder spielen ihn noch einmal ab. */}
+          <LeagueMomentHint rows={team.league_moments} canReplay={isMember} testId="team-league-moments" />
           {/* Co-Teams mit Captain und Vertreter (#2110) - nur für Mitglieder und Teamleitung. */}
           <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEditTeam} enabled={isMember || canEditTeam} />
           <TeamSchedule overview={overview} />

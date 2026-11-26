@@ -732,6 +732,9 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
      {"partialFilterExpression": {"reward_key": {"$type": "string"}}}),
     ("prize_pickups", [("tournament_id", 1), ("reward_key", 1)], "league_reward",
      {"partialFilterExpression": {"source_type": "league_reward"}}),
+    # Saisonende-Moment (#1639): je Season und Co-Team (bzw. Person einer Einzel-Liga) genau ein Eintrag - auch wenn zwei Abgleiche
+    # zugleich anlegen (services/league_moments.py).
+    ("league_moments", "key", "season_entrant", {}),
     ("season_points", [("season_id", 1), ("source_type", 1), ("source_id", 1), ("user_id", 1)], "fastlap_source_user",
      {"partialFilterExpression": {"source_type": "fastlap"}}),
     # Shop (#1703, docs/SHOP.md): je Idempotenzschlüssel eine Bestellung, je Bestellung ein Printful-Auftrag, jedes
@@ -809,6 +812,11 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("tournament_awards", "registration_id"),
     # Zeremonie der Belohnungen (F.4): „was habe ich noch nicht gesehen“ je Person.
     ("tournament_awards", "audience_ids"),
+    # Saisonende-Moment (#1639): „was habe ich noch nicht gesehen“ je Person, Abgleich je Season, Hinweis an Profil und Teamseite.
+    ("league_moments", "audience_ids"),
+    ("league_moments", "season_id"),
+    ("league_moments", "player_ids"),
+    ("league_moments", "team_id"),
     ("team_squads", "team_id"),
     ("chat_attachments", "owner_id"),
     ("chat_attachments", [("status", 1), ("created_at", 1)]),
