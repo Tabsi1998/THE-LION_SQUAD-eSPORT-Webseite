@@ -168,7 +168,8 @@ Staffel ab**. Ihr bekommt eine Nachricht. Ab dann steht über der Tabelle „End
 
 ### Aufstieg, Abstieg, Meister: der Moment
 
-Steht der **Endstand der ganzen Season** fest – alle Staffeln abgeschlossen, auch Playoffs und Relegation –, zeigt die Website
+Steht euer Ausgang fest, zeigt die Website – Aufstieg und Abstieg mit dem **Endstand der ganzen Season** (alle Staffeln, auch Playoffs
+und Relegation), den Meister schon, sobald **Liga 1 samt Playoffs** fertig ist –
 euren Ausgang beim nächsten Besuch einmal als kurzen Moment: **Aufstieg** (euer Liga-Wappen hebt sich, die Zahl zählt um, in Liga 1
 setzt sich die Krone), **Meister** (goldener Pokal, danach eure Belohnungen als zweite Karte) oder **Abstieg** (ruhig, mit Blick auf
 die nächste Season). Wer bleibt, bekommt keinen Moment. Zu sehen ist er erst, wenn die Season für Mitglieder sichtbar ist.

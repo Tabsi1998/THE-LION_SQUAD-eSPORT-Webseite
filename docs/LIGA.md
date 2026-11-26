@@ -5151,12 +5151,14 @@ Am Ende einer Season erleben Spieler und Co-Teams den Ausgang einmal als ruhigen
 `routes/league_moment_routes.py`, Oberfläche `components/tls/league/moment/SeasonMoment.jsx` (über den Zeremonie-Host) und
 `components/tls/league/LeagueMomentHint.jsx`. Entscheidungen Fabians vom 26.11. (A bis D) unten an ihrer Stelle.
 
-**Kein zweites System.** Quelle ist allein der bestätigte Endstand der ganzen Season: `league_successor.plan` ohne `problems` -
-alle Staffeln aller Arten abgeschlossen, samt Playoffs und Relegation (Überlagerung `via: "relegation"`), kein offener Gleichstand an
-einer Grenze, nichts Eingeschaltetes fehlt (`league_postseason.missing`). Dieselbe Stelle liest die Folge-Season (F.2) und die
-Nachricht „Aufstieg bestätigt“ (F.2a). Der Meister kommt aus dem geltenden Meister-Eintrag (`tournament_awards`, `league.title:
-"Meister"`, nicht ruhend - aus der Tabelle oder aus den Playoffs, F.6). Nie aus einer laufenden Tabelle und nie aus einer einzelnen
-abgeschlossenen Staffel. Gezeigt wird über die Warteschlange der Zeremonien (wie F.4), die Nachricht läuft über die bestehende Art
+**Kein zweites System.** Quelle für **Auf- und Abstieg** ist allein der bestätigte Endstand der ganzen Season
+(`league_moments.confirmed_moves`): `league_successor.plan` ohne `problems` - alle Staffeln aller Arten abgeschlossen, samt Playoffs und
+Relegation (Überlagerung `via: "relegation"`), kein offener Gleichstand an einer Grenze, nichts Eingeschaltetes fehlt
+(`league_postseason.missing`). Dieselbe Stelle liest die Folge-Season (F.2) und die Nachricht „Aufstieg bestätigt“ (F.2a). Der
+**Meister** kommt sofort, sobald **seine** Liga N fertig ist (Fabian 26.11., `league_moments.confirmed_champions`): alle ihre Staffeln
+abgeschlossen samt Playoffs (die Relegation zählt nicht - sie entscheidet nie über den Meister), keine Playoffs fehlen, und der
+geltende Meister-Eintrag ist gesetzt (`tournament_awards`, `league.title: "Meister"`, nicht ruhend - aus der Tabelle oder aus den
+Playoffs, F.6). Nie aus einer laufenden Tabelle. Gezeigt wird über die Warteschlange der Zeremonien (wie F.4), die Nachricht läuft über die bestehende Art
 `league_reward` (Thema „Turniere“, Wichtigkeit normal, Push-Kanal der Erfolge) mit `meta.reason: "league_moment"`. TV (Saisonfinale F.7)
 und Discord (Saisonende-Meldung) bleiben, wie sie sind - sie zeigen Auf- und Absteiger schon.
 
@@ -5199,12 +5201,15 @@ hinweg (gesetzt oder zurückgenommen; `routes/league_final_routes._moments_follo
 Abschlusses). Erst setzt er die Marke an der Season, dann gleicht er unter der Blatt-Sperre `league_season_moment_resource` ab (nimmt
 keine weitere Sperre), dann nimmt er nur seine eigene Marke wieder weg. Bekommt er die Sperre nicht (ein anderer Abgleich läuft) oder
 bricht er ab, bleibt die Marke stehen - der Job `league_moments` (alle 5 Minuten, `league_moments.sweep`) holt nach. Die Nachrichten
-gehen danach **außerhalb der Sperre** und gebündelt an Expo (`push_batch`, #2553). Ein Fehler hält den Schritt nicht auf. Zweimal
-hintereinander ändert nichts.
+gehen danach **außerhalb der Sperre** und gebündelt an Expo (`push_batch`, #2553): erst die zum Moment (`notify`, je Person bedingt in
+`notified_ids` beansprucht), dann das Zurückgestellte des Meisters (`settle`, unten). Ein Fehler hält den Schritt nicht auf. Zweimal
+hintereinander - oder viermal gleichzeitig - ändert nichts. Jede Lesestelle (Zeigen, Holen, Hinweis, Nachricht, Zurückhalten der
+Belohnungen) fragt frisch, ob der Endstand des Moments steht (`league_moment_rules.ready`: beim Meister seine Liga N und sein
+Meister-Eintrag, sonst alle Staffeln der Season).
 
 | Fall | Wirkung |
 | --- | --- |
-| Endstand steht nicht fest (Staffel offen, wieder geöffnet, Gleichstand an der Grenze, Relegation oder Playoffs offen) | jeder Moment der Season ruht (`suspended`) - nichts gezeigt, kein Hinweis, nichts gelöscht |
+| Endstand steht nicht fest (Staffel offen, wieder geöffnet, Gleichstand an der Grenze, Relegation oder Playoffs offen) | Auf- und Abstieg ruhen (`suspended`); der Meister ruht nur, wenn seine Liga N wieder offen ist - nichts gezeigt, kein Hinweis, nichts gelöscht |
 | bestätigt, neu | Eintrag mit `seen_by: []`; Nachricht je Person |
 | bestätigt, gleicher Ausgang wie vorher (Wiederöffnen ohne Änderung) | derselbe Eintrag samt `seen_by` - nichts passiert, kein zweiter Moment, keine zweite Nachricht |
 | bestätigt, anderer Ausgang (B) | derselbe Eintrag, `corrected_at`, `previous`, `seq` + 1, `seen_by` und `claims` leer: Der neue Moment kommt **einmal** mit dem Hinweis „Endstand korrigiert“ - auch für alle, die den alten sahen; Nachricht „Endstand korrigiert“ (mit Push) |
@@ -5223,10 +5228,12 @@ die Season, die Person sieht sie selbst, und - frisch gefragt - alle Staffeln si
 - **Nachricht:** Der Abschluss stellt „Neue Belohnung“ und „Belohnung für euer Team“ für die Anmeldung des Meisters (`league_rewards.grant`
   → `notify`) und „Staffel abgeschlossen“ für Captain und Vertreter des Meisters (`league_final.notify_captains`) zurück und merkt sie
   am Meister-Eintrag (`tournament_awards.moment_owed`: `{final_id, at, rewards: {gains, team_gains, team_leads, team_names}, close}`,
-  nie in einer Antwort). Gleich danach entscheidet der Abgleich (`league_moments.settle`, bei belegter Sperre der Job): Wen der Moment
-  erreicht, dem sagt es **eine** Nachricht „Meister: <Co-Team>“ mit „Dazu: <Belohnungen>“. Alle anderen - die Season ist noch nicht ganz
-  bestätigt, steht auf „Nur Liga-Leitung“, die Person sieht sie nicht, die Anmeldung hat kein Co-Team - bekommen die zurückgestellten
-  Nachrichten wie vor #1639, mit denselben Schlüsseln, also nie doppelt.
+  nie in einer Antwort). Gleich danach entscheidet der Abgleich (`league_moments.settle`, bei belegter Sperre der Job): Er beansprucht
+  das Gemerkte zuerst (bedingtes `$unset` auf `moment_owed.at`) und schickt nur dann - gleichzeitige Läufe schicken einmal; die
+  Nachrichten tragen dazu `unique_dedupe`. Wem die Nachricht zum Moment ging (`notified_ids`), dem sagt es **eine** Nachricht „Meister:
+  <Co-Team>“ mit „Dazu: <Belohnungen>“. Alle anderen - die Liga des Meisters ist noch nicht fertig (eine zweite Staffel läuft), die
+  Season steht auf „Nur Liga-Leitung“, die Person sieht sie nicht, die Anmeldung hat kein Co-Team, die Season wurde zwischendurch wieder
+  unsichtbar - bekommen die zurückgestellten Nachrichten wie vor #1639, mit denselben Schlüsseln, also nie doppelt.
 - **Später sichtbar oder bestätigt:** Die Nachricht zum Moment sieht nach, was die Person zum Meister schon hörte (`_heard`, nach den
   Schlüsseln): Kam „Staffel abgeschlossen … Meister“, schweigt sie; kam die Belohnung schon, nennt sie sie nicht noch einmal.
 - Bekam der Meister seine Nachricht schon (Belohnung erst nach einem Wiederöffnen nachgetragen), meldet sich die Belohnung wieder selbst.

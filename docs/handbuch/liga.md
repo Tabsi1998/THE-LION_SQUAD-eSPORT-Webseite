@@ -2227,8 +2227,9 @@ solange der Gewinn nicht abgeholt ist.
 
 ### 3.12a Saisonende-Moment: Aufstieg, Abstieg, Meister
 
-Der Moment kommt von selbst, sobald der **Endstand der ganzen Season** feststeht: alle Staffeln abgeschlossen, auch Playoffs und
-Relegation, kein offener Gleichstand an einer Grenze. Ein einzelner Abschluss oder die laufende Tabelle lösen nie etwas aus.
+Der Moment kommt von selbst. **Aufstieg und Abstieg** erst, wenn der **Endstand der ganzen Season** feststeht: alle Staffeln
+abgeschlossen, auch Playoffs und Relegation, kein offener Gleichstand an einer Grenze. Der **Meister** schon, sobald **seine Liga**
+fertig ist – alle Staffeln von Liga 1 samt Playoffs; die Relegation ändert am Meister nichts. Die laufende Tabelle löst nie etwas aus.
 
 **Wer ihn sieht:** die Spieler mit Einsatz in der Season (wie bei den Belohnungen, 3.12 – kampflose Spiele zählen nicht; ohne
 gemeldete Aufstellung der Kader; steht die Season auf „Ganzer Kader zum Abschluss“, der ganze Kader), dazu Captain und Vertreter.
@@ -2244,9 +2245,9 @@ Wer „Bewegung reduzieren“ eingestellt hat (System oder **Zeremonien dezent**
 bleibt der Ausgang als Hinweis **Saisonende** im Profil und an der Teamseite; dort spielt **Moment ansehen** ihn noch einmal ab.
 
 **Nachricht:** eine je Person in der Glocke und als Push. Erreicht der Moment den Meister, bekommt er nur diese eine – mit seinen
-Belohnungen darin; „Neue Belohnung“ und „Staffel abgeschlossen“ entfallen für ihn. Steht die Season noch nicht ganz fest, sehen
-Mitglieder sie nicht oder hat die Anmeldung kein Co-Team, kommen Belohnung und Abschluss-Nachricht wie gewohnt – und der Moment
-später nennt nichts doppelt. Captain und Vertreter von Auf- und Absteigern bekommen keine zweite, wenn
+Belohnungen darin; „Neue Belohnung“ und „Staffel abgeschlossen“ entfallen für ihn. Ist Liga 1 noch nicht ganz fertig (eine zweite
+Staffel läuft), sehen Mitglieder die Season nicht oder hat die Anmeldung kein Co-Team, kommen Belohnung und Abschluss-Nachricht wie
+gewohnt – und der Moment später nennt nichts doppelt. Captain und Vertreter von Auf- und Absteigern bekommen keine zweite, wenn
 die Season schon „Aufstieg bestätigt“ zu den Startrechten schickt (3.11a).
 
 **Wie lange:** **Season → Reiter Belohnungen → „Saisonende-Moment beim nächsten Besuch (Tage)“**, Vorgabe 45. So lange nach dem
